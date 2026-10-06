@@ -125,6 +125,18 @@ describe("MobileTaskDetailPage back link", () => {
     );
   });
 
+  it("does not open the first line while a refreshed task is loading", async () => {
+    const user = userEvent.setup();
+    renderTask(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42`);
+
+    const back = screen.getByTestId("mobile-task-back");
+    expect(back).toBeDisabled();
+    await user.click(back);
+
+    expect(screen.queryByTestId("mobile-task-location")).toBeNull();
+    expect(screen.getByText("Loading task…")).toBeTruthy();
+  });
+
   it("returns to the task dispatch line after a refresh", async () => {
     useWorkOrder.mockReturnValue({
       data: {
