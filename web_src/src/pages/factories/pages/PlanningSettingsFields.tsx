@@ -16,26 +16,34 @@ export function PlanningSettingsFields({
   draft,
   lines,
   onUpdate,
+  planningReviewEnabled = false,
 }: {
   draft: PlanningDraftSettings;
   lines: PlanningAutoStartLine[];
   onUpdate: PlanningUpdate;
+  planningReviewEnabled?: boolean;
 }) {
   return (
     <>
       <PlanningToggleRow
         title={PLANNING_SETTINGS_COPY.planningLabel}
-        description={PLANNING_SETTINGS_COPY.planningHelper}
+        description={
+          planningReviewEnabled ? PLANNING_SETTINGS_COPY.planningReviewHelper : PLANNING_SETTINGS_COPY.planningHelper
+        }
         checked={draft.enabled}
         onCheckedChange={(enabled) => onUpdate("enabled", enabled)}
         testId="planning-settings-enabled"
       />
-      <PlanningChecksSection draft={draft} onUpdate={onUpdate} />
-      <AutoStartSection draft={draft} lines={lines} onUpdate={onUpdate} />
+      {planningReviewEnabled ? null : <PlanningChecksSection draft={draft} onUpdate={onUpdate} />}
+      <AutoStartSection draft={draft} lines={lines} onUpdate={onUpdate} planningReviewEnabled={planningReviewEnabled} />
     </>
   );
 }
 
+/**
+ * The legacy per-check toggles. On the task planning review flow scoring is
+ * not optional, so the parent skips this section.
+ */
 function PlanningChecksSection({ draft, onUpdate }: { draft: PlanningDraftSettings; onUpdate: PlanningUpdate }) {
   const disabled = !draft.enabled;
   return (
@@ -93,12 +101,16 @@ function AutoStartSection({
   draft,
   lines,
   onUpdate,
+  planningReviewEnabled,
 }: {
   draft: PlanningDraftSettings;
   lines: PlanningAutoStartLine[];
   onUpdate: PlanningUpdate;
+  planningReviewEnabled: boolean;
 }) {
-  const unavailable = !draft.enabled || !draft.confidence || lines.length === 0;
+  // Review scoring is always on, so only the legacy flow gates Auto-start
+  // on the Confidence estimate toggle.
+  const unavailable = !draft.enabled || (!planningReviewEnabled && !draft.confidence) || lines.length === 0;
   const selected = lines.find((line) => line.id === draft.autoStartLineId);
   const checked = Boolean(selected);
   const showLineSelect = lines.length > 1 && checked;
@@ -107,7 +119,7 @@ function AutoStartSection({
     <div data-testid="planning-settings-auto-start">
       <PlanningToggleRow
         title={PLANNING_SETTINGS_COPY.autoStartLabel}
-        description={autoStartDescription(draft, lines)}
+        description={autoStartDescription(draft, lines, planningReviewEnabled)}
         checked={checked}
         disabled={unavailable}
         onCheckedChange={(next) => {
@@ -151,17 +163,21 @@ function AutoStartSection({
   );
 }
 
-function autoStartDescription(draft: PlanningDraftSettings, lines: PlanningAutoStartLine[]): string {
+function autoStartDescription(
+  draft: PlanningDraftSettings,
+  lines: PlanningAutoStartLine[],
+  planningReviewEnabled: boolean,
+): string {
   if (!draft.enabled) {
     return PLANNING_SETTINGS_COPY.autoStartPlanningOffHelper;
   }
-  if (!draft.confidence) {
+  if (!planningReviewEnabled && !draft.confidence) {
     return PLANNING_SETTINGS_COPY.autoStartConfidenceOffHelper;
   }
   if (lines.length === 0) {
     return PLANNING_SETTINGS_COPY.autoStartNoBoardHelper;
   }
-  return PLANNING_SETTINGS_COPY.autoStartHelper;
+  return planningReviewEnabled ? PLANNING_SETTINGS_COPY.autoStartReviewHelper : PLANNING_SETTINGS_COPY.autoStartHelper;
 }
 
 function PlanningToggleRow({

@@ -508,7 +508,7 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	return defaultIntakeSettings()
 }
 
-func intakeRefinementConfiguration(agent *intakeAgent, vcsName string) map[string]any {
+func intakeRefinementConfiguration(agent *intakeAgent, vcsName string, planningReview bool) map[string]any {
 	configuration := intakeRunnerConfiguration(agent, vcsName)
 	configuration["steps"] = []any{
 		map[string]any{
@@ -520,7 +520,7 @@ func intakeRefinementConfiguration(agent *intakeAgent, vcsName string) map[strin
 			"name":             "Refine Task",
 			"type":             "prompt",
 			"workingDirectory": "repo",
-			"prompt":           intakeRefinementPrompt(),
+			"prompt":           intakeRefinementPrompt(planningReview),
 		},
 	}
 	return configuration
@@ -567,8 +567,15 @@ func intakeRunnerConfiguration(agent *intakeAgent, vcsName string) map[string]an
 	return configuration
 }
 
-func intakeRefinementPrompt() string {
-	return runner.PlanningSessionUserPromptMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
+// intakeRefinementPrompt returns the Refine Task node prompt. Organizations
+// on the task planning review flow get the 1 through 3 prompt pack; the
+// hardcoded analysis protocol stays the safety net either way.
+func intakeRefinementPrompt(planningReview bool) string {
+	pack := runner.PlanningSessionUserPromptMarkdown()
+	if planningReview {
+		pack = runner.PlanningSessionUserPromptReviewMarkdown()
+	}
+	return pack + "\n\nTask:\n{{ root().data.workOrder }}"
 }
 
 func intakeAnalysisCloneCommand() string {

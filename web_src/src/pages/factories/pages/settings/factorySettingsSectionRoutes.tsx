@@ -40,16 +40,16 @@ import {
 } from "@/pages/factories/pages/settings/FactoryOrganizationSettingsPages";
 import {
   AccountLinkedAccountsRedirect,
-  LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
   OrganizationUsageRedirect,
   WorkspaceAutomationsSettingsRedirect,
   WorkspaceSpendingRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
 import { LegacyAgentResourcesRedirect } from "@/pages/factories/pages/settings/LegacyAgentResourcesRedirect";
+import { FactorySettingsIndexRoute } from "@/pages/factories/pages/settings/MobileSettingsIndexPage";
 
 export const factorySettingsSectionRoutes = [
-  <Route key="factory-settings-index" index element={<LegacyFactorySettingsIndexRedirect />} />,
+  <Route key="factory-settings-index" index element={<FactorySettingsIndexRoute />} />,
   <Route
     key="factory-settings-account-general"
     path="account/general"

@@ -101,6 +101,40 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	assert.Equal(t, 4.0, scores[models.PlanningConfidenceCheckKey])
 }
 
+func TestRunnerPlanningSessionUpdateWritesScoresSpecAndSurvey(t *testing.T) {
+	r := support.Setup(t)
+	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/updates", bytes.NewReader([]byte(`{
+		"scores": {
+			"clarity": {"score": 3, "summary": "Outcome, scope, and done are defined."},
+			"complexity": {"score": 2, "summary": "One agent can finish this in one run."},
+			"verifiability": {"score": 3, "summary": "Existing tests cover the change."}
+		},
+		"spec": "# Retry refunds\n\nStop double charges.\n",
+		"survey": {"questions": [{"prompt": "Which service?", "options": ["Payments", "Billing"]}]}
+	}`)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 3)
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Which service?", reloaded.CurrentSurvey().Questions[0].Prompt)
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	require.NotEmpty(t, artifacts)
+	assert.Contains(t, string(artifacts[0].Data), "Stop double charges.")
+}
+
 func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
@@ -731,6 +765,7 @@ func TestRunnerPlanningSessionRejectsTaskCreationKind(t *testing.T) {
 	}{
 		{name: "wait", method: http.MethodGet, path: "/api/v1/runner/planning-sessions/wait?hold_seconds=1"},
 		{name: "spec", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/specs", body: `{"body":"# Plan"}`},
+		{name: "update", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/updates", body: `{"spec":"# Plan"}`},
 		{name: "clarity", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/clarity", body: `{"score":4,"summary":"Clear"}`},
 		{name: "confidence", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/confidence", body: `{"score":4,"summary":"Clear"}`},
 		{name: "survey", method: http.MethodPost, path: "/api/v1/runner/planning-sessions/surveys", body: `{"questions":[{"prompt":"Priority?","options":["High","Low"]}]}`},

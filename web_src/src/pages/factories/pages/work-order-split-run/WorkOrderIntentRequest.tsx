@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
 import type { UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
 import { useSpokenPhraseDictation, type SpokenPhraseField } from "@/hooks/useSpokenPhraseDictation";
-import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { cn } from "@/lib/utils";
 import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { CreateWorkOrderRequestAttachButton } from "../../CreateWorkOrderRequestAttachButton";
@@ -18,18 +17,16 @@ import { PendingWorkOrderFileChips } from "../../PendingWorkOrderFileChips";
 import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestImages";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
-import type { CreateWithAgentView } from "../createWithAgentTypes";
 import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME } from "./chatBubbleStyle";
 import { AnalysisPlanControls } from "./AnalysisPlanControls";
 import { PlanningImplementationControls } from "./PlanningImplementationControls";
-import type { ComposerScore } from "./PlanningReview";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
+import type { IntentAnalysisChat } from "./intentAnalysisChat";
 import { JumpToLatestPill } from "./JumpToLatestPill";
-import { composerChipsWorking, type PlanChipStatus } from "./planChipStatus";
+import { composerChipsWorking } from "./planChipStatus";
 import { mergeAnalysisTranscriptFiles, useAnalysisComposerImages } from "./useAnalysisComposerImages";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
-import type { ComposerCreditVerdict } from "./splitRunFooter";
 import {
   SPLIT_RUN_CHAT_COLUMN_CLASSNAME,
   SPLIT_RUN_CHAT_SCROLLBAR_GUTTER_CLASSNAME,
@@ -41,37 +38,7 @@ import { WorkOrderIntentSurvey } from "./WorkOrderIntentSurvey";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
 import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
 
-export type IntentAnalysisChat = {
-  planningReviewEnabled?: boolean;
-  organizationId: string;
-  factoryId?: string;
-  view: CreateWithAgentView;
-  composer: string;
-  composerError?: string;
-  canSend: boolean;
-  isUploading?: boolean;
-  onComposerChange: (value: string) => void;
-  onSend: (text?: string) => void | Promise<boolean>;
-  onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
-  onSubmitSurvey: (text: string) => void;
-  planTitle?: string;
-  planPaneOpen?: boolean;
-  onTogglePlan?: () => void;
-  canTogglePlan?: boolean;
-  clarity?: ComposerScore;
-  confidence?: ComposerScore;
-  showClarity?: boolean;
-  showConfidence?: boolean;
-  planStatus?: PlanChipStatus;
-  isAnalyzing?: boolean;
-  /** Set when backlog analysis stopped because hosted credit is gone. */
-  creditVerdict?: ComposerCreditVerdict;
-  prioritizeImplementation?: boolean;
-  startDiscouraged?: boolean;
-  closedDecision?: ReactNode;
-  /** Model selection applies to implementation, separately from the plan. */
-  modelSelect?: ReactNode;
-};
+export type { IntentAnalysisChat };
 
 type WorkOrderIntentRequestProps = {
   title: string;

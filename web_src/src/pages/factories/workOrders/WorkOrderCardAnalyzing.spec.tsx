@@ -106,7 +106,7 @@ describe("Confidence score on a backlog card", () => {
     const mark = screen.getByTestId("work-order-card-score-wo-1");
     expect(mark).toHaveAttribute("data-tone", "ready");
     expect(screen.getByTestId("work-order-card-score-wo-1-clarity")).toHaveTextContent("Clarity–");
-    expect(screen.getByTestId("work-order-card-score-wo-1-confidence")).toHaveTextContent("Confidence4/5");
+    expect(screen.getByTestId("work-order-card-score-wo-1-confidence")).toHaveTextContent("Confidence4");
     expect(mark).toHaveAttribute(
       "aria-label",
       "This task is ready to start. Clarity score no score yet. Confidence score 4 of 5",
@@ -131,8 +131,8 @@ describe("Confidence score on a backlog card", () => {
     const confidence = screen.getByTestId("work-order-card-score-wo-1-confidence");
     expect(clarity).toHaveTextContent("Clarity5/5");
     expect(clarity).toHaveClass("text-emerald-700");
-    expect(confidence).toHaveTextContent("Confidence3/5");
-    expect(confidence).toHaveClass("text-orange-700");
+    expect(confidence).toHaveTextContent("Confidence3");
+    expect(screen.getByTestId("work-order-card-score-wo-1-confidence-meter")).toBeInTheDocument();
     expect(mark).toHaveAttribute(
       "aria-label",
       "Review the plan before you start. Clarity score 5 of 5. Confidence score 3 of 5",
