@@ -33,6 +33,7 @@ import {
 import { useSplitRunFooterActions } from "../pages/work-order-split-run/useSplitRunFooterActions";
 import { useSplitRunFooterCloser } from "../pages/work-order-split-run/useSplitRunFooterCloser";
 import { draftStartAction, footerMutationHandlers } from "../pages/work-order-split-run/workOrderPopupActions";
+import { useColumnAppCheckRuns } from "../pages/work-order-split-run/useColumnAppCheckRuns";
 import { useWorkOrderPRFeedbackLog } from "../pages/useWorkOrderPRFeedbackRunHref";
 import { MOBILE_TASK_COPY } from "./mobileCopy";
 
@@ -102,6 +103,7 @@ type MobileTaskModel = {
   onStop: ReturnType<typeof footerMutationHandlers>["onStop"];
   startBusy: boolean;
   actionBusy: boolean;
+  columnAppRunQueries: ReturnType<typeof useColumnAppCheckRuns>["queries"];
 };
 
 /** Loads everything the task screen shows and wires the footer actions. */
@@ -126,6 +128,8 @@ function useMobileTaskModel(
   const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
+  const columnApps = columnAppsFromFactoryApps(apps);
+  const columnAppCheckRuns = useColumnAppCheckRuns(order.checks, columnApps);
 
   const fixture = splitRunFixtureForWorkOrder(order, {
     checks: order.checks,
@@ -135,11 +139,12 @@ function useMobileTaskModel(
     demoArtifacts: false,
     prFeedbackRuns,
     analysisRuns: backlogAnalysis.runsByWorkOrder.get(orderId) ?? [],
-    columnApps: columnAppsFromFactoryApps(apps),
+    columnApps,
     isAnalyzing: backlogAnalysis.analyzingOrderIds.has(orderId),
     stoppedBy: closer.actor,
     closer,
     resolveUser,
+    columnAppRuns: columnAppCheckRuns.lookup,
   });
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, onDone);
   const onStart = draftStartAction(
@@ -162,6 +167,7 @@ function useMobileTaskModel(
     onStop: mutations.onStop,
     startBusy: cardActions.dispatchingOrderIds.has(orderId),
     actionBusy: footerActions.busy,
+    columnAppRunQueries: columnAppCheckRuns.queries,
   };
 }
 
@@ -185,6 +191,7 @@ function LoadedMobileTask({
 
   return (
     <MobileTaskFrame onBack={onBack}>
+      {model.columnAppRunQueries}
       <article className="flex flex-col gap-5 px-4 pt-3 pb-8" data-testid="mobile-task-detail">
         <MobileTaskHeader order={order} fixture={fixture} />
 

@@ -30,8 +30,22 @@ import {
 } from "../../__fixtures__/workOrderCheckFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { splitRunDecisionTone } from "./splitRunFooter";
-import { splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
+import { columnAppCheckRunsToDescribe, splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
+
+function mergeConfidenceCheck(runId = "run-merge") {
+  return {
+    id: "check-merge",
+    key: "merge-confidence",
+    name: "Merge confidence",
+    score: 4,
+    maxScore: 5,
+    level: "LEVEL_POSITIVE" as const,
+    automation: { appId: "app-merge", appName: "Merge confidence" },
+    runId,
+    updatedAt: "2026-08-26T11:10:00Z",
+  };
+}
 
 function dispatch(state: FactoriesWorkOrderLineDispatch["state"], stepExecutions: FactoriesWorkOrderExecution[]) {
   return {
@@ -2266,6 +2280,154 @@ describe("line board work-order examples", () => {
     });
 
     expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")?.duration).toBe("");
+  });
+
+  it("uses a described canvas run when the pull request has no linked run", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [mergeConfidenceCheck()],
+      columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      columnAppRuns: {
+        runsById: new Map([
+          [
+            "run-merge",
+            {
+              id: "run-merge",
+              canvasId: "app-merge",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T11:00:00Z",
+              finishedAt: "2026-08-26T11:18:08Z",
+              totalTokens: "46200",
+              costCents: "45",
+              models: ["anthropic/claude-sonnet-4-6"],
+            },
+          ],
+        ]),
+        loadingIds: new Set(),
+      },
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")).toMatchObject({
+      duration: "18m 8s",
+      costCents: "45",
+      totalTokens: "46200",
+      model: "anthropic/claude-sonnet-4-6",
+    });
+  });
+
+  it("leaves column-app duration blank while the canvas run lookup is loading", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [mergeConfidenceCheck()],
+      columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      columnAppRuns: {
+        runsById: new Map(),
+        loadingIds: new Set(["run-merge"]),
+      },
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")?.duration).toBe("");
+  });
+
+  it("omits a zero dollar amount on a column-app check card", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [mergeConfidenceCheck()],
+      columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      columnAppRuns: {
+        runsById: new Map([
+          [
+            "run-merge",
+            {
+              id: "run-merge",
+              canvasId: "app-merge",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T11:00:00Z",
+              finishedAt: "2026-08-26T11:04:00Z",
+              totalTokens: "1200",
+              costCents: "0",
+              models: ["anthropic/claude-sonnet-4-6"],
+            },
+          ],
+        ]),
+        loadingIds: new Set(),
+      },
+    });
+    const phase = fixture.phases.find((entry) => entry.id === "column-app-run-merge");
+
+    expect(phase?.costCents).toBeUndefined();
+    expect(phase?.totalTokens).toBe("1200");
+    expect(phase?.model).toBe("anthropic/claude-sonnet-4-6");
+  });
+
+  it("shows the described model when the linked pull request has tokens and cost but no models", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...OPEN_WORK_ORDER,
+        pullRequests: [
+          {
+            number: "12",
+            runs: [
+              {
+                totalTokens: "46200",
+                costCents: "45",
+                run: {
+                  id: "run-merge",
+                  canvasId: "app-merge",
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                  createdAt: "2026-08-26T11:00:00Z",
+                  finishedAt: "2026-08-26T11:18:08Z",
+                },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        demoArtifacts: false,
+        checks: [mergeConfidenceCheck()],
+        columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+        columnAppRuns: {
+          runsById: new Map([
+            [
+              "run-merge",
+              {
+                id: "run-merge",
+                canvasId: "app-merge",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                createdAt: "2026-08-26T11:00:00Z",
+                finishedAt: "2026-08-26T11:18:08Z",
+                totalTokens: "46200",
+                costCents: "45",
+                models: ["anthropic/claude-sonnet-4-6"],
+              },
+            ],
+          ]),
+          loadingIds: new Set(),
+        },
+      },
+    );
+
+    expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")).toMatchObject({
+      duration: "18m 8s",
+      costCents: "45",
+      totalTokens: "46200",
+      model: "anthropic/claude-sonnet-4-6",
+    });
+  });
+
+  it("describes linked column-app check runs so the card can show the model", () => {
+    const checks = [mergeConfidenceCheck(), { ...mergeConfidenceCheck(), id: "check-linked", runId: "run-linked" }];
+    const columnApps = [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }];
+
+    expect(columnAppCheckRunsToDescribe(columnApps, checks)).toEqual([
+      { appId: "app-merge", runId: "run-merge" },
+      { appId: "app-merge", runId: "run-linked" },
+    ]);
   });
 
   it("keeps a column-app check card live while the canvas run continues", () => {
