@@ -1,3 +1,4 @@
+import type { SuperplaneComponentsNode } from "@/api-client";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,7 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MergeConfidenceCanvasProvider } from "@/lib/mergeConfidenceCanvas";
 import { cn } from "@/lib/utils";
 import { Ellipsis } from "lucide-react";
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
@@ -113,58 +114,31 @@ export function MergeConfidenceConfigModal({
         >
           <SettingsAutomationHeaderRow tabs={<ConfigTabs tab={tab} onTabChange={setTab} />} />
         </PopupHeader>
-        <div
-          ref={split.containerRef}
-          className="flex min-h-0 min-w-0 flex-1"
-          data-testid="merge-confidence-config-body"
-          data-split={selectedNode ? "true" : "false"}
-        >
-          {selectedNode ? (
-            <NodeConfigPanel
-              node={selectedNode}
-              organizationId={graph?.organizationId}
-              factoryId={panelFactoryId(factoryId, graph)}
-              factoryKey={factoryKey}
-              widthPercent={split.percent}
-              onClose={() => setSelectedNodeId(null)}
-              onSave={onSaveNode}
-            />
-          ) : null}
-          {selectedNode ? <ConfigResizeHandle isResizing={split.isResizing} onPointerDown={split.startResize} /> : null}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            {tab === "runs" ? (
-              <MergeConfidenceCanvas
-                graph={graph}
-                loading={loading}
-                error={error}
-                onRetry={onRetry}
-                canvasId={canvasId}
-                runHrefFor={runHrefFor}
-                showRuns
-                selectLatestRun
-                selectedRunId={selectedRunId}
-                onSelectedRunIdChange={setSelectedRunId}
-                onNodeSelect={() => undefined}
-              />
-            ) : (
-              <MergeConfidenceCanvas
-                graph={graph}
-                loading={loading}
-                error={error}
-                onRetry={onRetry}
-                canvasId={canvasId}
-                runHrefFor={runHrefFor}
-                showRuns={false}
-                onNodeSelect={setSelectedNodeId}
-                focusNodeId={selectedNodeId}
-                focusNonce={focusNonce}
-                focusFit={false}
-                lockNativeZoom
-                layoutFitNonce={layoutFitNonce}
-              />
-            )}
-          </div>
-        </div>
+        <MergeConfidenceConfigBody
+          containerRef={split.containerRef}
+          selectedNode={selectedNode}
+          organizationId={graph?.organizationId}
+          factoryId={panelFactoryId(factoryId, graph)}
+          factoryKey={factoryKey}
+          widthPercent={split.percent}
+          isResizing={split.isResizing}
+          onResizeStart={split.startResize}
+          onClosePanel={() => setSelectedNodeId(null)}
+          onSaveNode={onSaveNode}
+          tab={tab}
+          graph={graph}
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
+          canvasId={canvasId}
+          runHrefFor={runHrefFor}
+          selectedRunId={selectedRunId}
+          onSelectedRunIdChange={setSelectedRunId}
+          onNodeSelect={setSelectedNodeId}
+          selectedNodeId={selectedNodeId}
+          focusNonce={focusNonce}
+          layoutFitNonce={layoutFitNonce}
+        />
         {onDelete ? (
           <MergeConfidenceDeleteDialog
             open={confirmDelete}
@@ -176,6 +150,111 @@ export function MergeConfidenceConfigModal({
         ) : null}
       </PopupShell>
     </MergeConfidenceCanvasProvider>
+  );
+}
+
+function MergeConfidenceConfigBody({
+  containerRef,
+  selectedNode,
+  organizationId,
+  factoryId,
+  factoryKey,
+  widthPercent,
+  isResizing,
+  onResizeStart,
+  onClosePanel,
+  onSaveNode,
+  tab,
+  graph,
+  loading,
+  error,
+  onRetry,
+  canvasId,
+  runHrefFor,
+  selectedRunId,
+  onSelectedRunIdChange,
+  onNodeSelect,
+  selectedNodeId,
+  focusNonce,
+  layoutFitNonce,
+}: {
+  containerRef: RefObject<HTMLDivElement | null>;
+  selectedNode?: SuperplaneComponentsNode;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  widthPercent: number;
+  isResizing: boolean;
+  onResizeStart: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onClosePanel: () => void;
+  onSaveNode: (update: NodeConfigurationUpdate) => Promise<void> | void;
+  tab: MergeConfidenceConfigTab;
+  graph?: IntakeAutomationGraph;
+  loading: boolean;
+  error: boolean;
+  onRetry?: () => void;
+  canvasId?: string;
+  runHrefFor?: RunsSidebarHrefForRun;
+  selectedRunId: string | null;
+  onSelectedRunIdChange: (runId: string | null) => void;
+  onNodeSelect: (nodeId: string) => void;
+  selectedNodeId: string | null;
+  focusNonce: number;
+  layoutFitNonce: number | null;
+}) {
+  return (
+    <div
+      ref={containerRef}
+      className="flex min-h-0 min-w-0 flex-1"
+      data-testid="merge-confidence-config-body"
+      data-split={selectedNode ? "true" : "false"}
+    >
+      {selectedNode ? (
+        <NodeConfigPanel
+          node={selectedNode}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          widthPercent={widthPercent}
+          onClose={onClosePanel}
+          onSave={onSaveNode}
+        />
+      ) : null}
+      {selectedNode ? <ConfigResizeHandle isResizing={isResizing} onPointerDown={onResizeStart} /> : null}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {tab === "runs" ? (
+          <MergeConfidenceCanvas
+            graph={graph}
+            loading={loading}
+            error={error}
+            onRetry={onRetry}
+            canvasId={canvasId}
+            runHrefFor={runHrefFor}
+            showRuns
+            selectLatestRun
+            selectedRunId={selectedRunId}
+            onSelectedRunIdChange={onSelectedRunIdChange}
+            onNodeSelect={() => undefined}
+          />
+        ) : (
+          <MergeConfidenceCanvas
+            graph={graph}
+            loading={loading}
+            error={error}
+            onRetry={onRetry}
+            canvasId={canvasId}
+            runHrefFor={runHrefFor}
+            showRuns={false}
+            onNodeSelect={onNodeSelect}
+            focusNodeId={selectedNodeId}
+            focusNonce={focusNonce}
+            focusFit={false}
+            lockNativeZoom
+            layoutFitNonce={layoutFitNonce}
+          />
+        )}
+      </div>
+    </div>
   );
 }
 
