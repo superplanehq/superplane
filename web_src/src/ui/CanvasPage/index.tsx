@@ -151,6 +151,8 @@ interface FocusRequest {
   requestId: number;
   targetMode: "live" | "runs";
   tab?: "latest" | "settings";
+  /** When false, select the node and leave the viewport zoom unchanged. */
+  fit?: boolean;
 }
 
 export interface NodeEditData {
@@ -2669,7 +2671,7 @@ function CanvasContent({
     // Auto-focus toggle: when disabled, still record the focus request as handled
     // (so re-enabling later does not replay a stale request) and let the sidebar/
     // selection update above stand, but keep the viewport where the user left it.
-    if (!isAutoFocusEnabled) {
+    if (!isAutoFocusEnabled || focusRequest.fit === false) {
       return;
     }
     void fitView({ nodes: [targetNode], duration: 500, ...CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS }).then(
@@ -2887,14 +2889,14 @@ function CanvasContent({
       return;
     }
     const timeoutId = window.setTimeout(() => {
-      void fitView({ ...LIVE_CANVAS_FIT_VIEW_OPTIONS, duration: 0 }).then(() => {
+      void fitView({ ...resolveInitialCanvasFitViewOptions(lockNativeZoom), duration: 0 }).then(() => {
         const nextViewport = getViewport();
         viewportRef.current = nextViewport;
         reportZoom(nextViewport.zoom);
       });
     }, 50);
     return () => window.clearTimeout(timeoutId);
-  }, [factoryDisplayLayout, fitView, getViewport, hasReactFlowInitialized, reportZoom, viewportRef]);
+  }, [factoryDisplayLayout, fitView, getViewport, hasReactFlowInitialized, lockNativeZoom, reportZoom, viewportRef]);
 
   const { ready: factoryConfigureEnterReady } = useFactoryConfigureFitView({
     factoryConfigure,

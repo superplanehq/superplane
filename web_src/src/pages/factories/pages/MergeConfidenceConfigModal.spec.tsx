@@ -260,14 +260,15 @@ function renderModal(
   onSaveNode = vi.fn(),
   graph: IntakeAutomationGraph = confidenceGraph(),
 ) {
-  return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const element = (nextGraph: IntakeAutomationGraph = graph) => (
+    <QueryClientProvider client={client}>
       <MemoryRouter>
         <ThemeProvider>
           <TooltipProvider>
             <MergeConfidenceConfigModal
               title="Merge confidence"
-              graph={graph}
+              graph={nextGraph}
               canvasId="merge-confidence"
               onClose={vi.fn()}
               onSaveNode={onSaveNode}
@@ -276,8 +277,10 @@ function renderModal(
           </TooltipProvider>
         </ThemeProvider>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(element());
+  return { ...view, rerenderGraph: (nextGraph: IntakeAutomationGraph) => view.rerender(element(nextGraph)) };
 }
 
 beforeEach(() => {
@@ -289,16 +292,17 @@ afterEach(() => {
 });
 
 describe("MergeConfidenceConfigModal", () => {
-  it("shows the automation and no step form", () => {
+  it("opens the first component beside the automation", () => {
     renderModal();
 
     expect(screen.getByRole("heading", { name: "Merge confidence" })).toBeInTheDocument();
-    expect(screen.getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "false");
+    expect(screen.getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
     expect(screen.getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
     expect(screen.getByTestId("merge-confidence-config-tab-automation")).toHaveAttribute("data-state", "active");
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Automation", "Runs"]);
     expect(screen.queryByTestId("factory-automation-runs-sidebar")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
+    const form = screen.getByTestId("merge-confidence-config-form");
+    expect(within(form).getByRole("heading", { name: "On Pull Request" })).toBeInTheDocument();
     expect(screen.queryByTestId("merge-confidence-settings")).not.toBeInTheDocument();
     expect(screen.queryByTestId("merge-confidence-config-footer")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
@@ -307,6 +311,23 @@ describe("MergeConfidenceConfigModal", () => {
     expect(screen.queryByRole("button", { name: "Errors" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Warnings" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+  });
+
+  it("selects the trigger when the automation loads with the agent listed first", () => {
+    const loaded = confidenceGraph();
+    const agentFirst: IntakeAutomationGraph = {
+      ...loaded,
+      specNodes: [...(loaded.specNodes ?? [])].reverse(),
+    };
+    const view = renderModal(vi.fn(), vi.fn(), { nodes: [], edges: [], specNodes: [] });
+
+    expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
+
+    view.rerenderGraph(agentFirst);
+
+    expect(
+      within(screen.getByTestId("merge-confidence-config-form")).getByRole("heading", { name: "On Pull Request" }),
+    ).toBeInTheDocument();
   });
 
   it("opens the component settings beside the automation when a step is selected", async () => {
@@ -420,7 +441,7 @@ describe("MergeConfidenceConfigModal", () => {
 
   it("opens the trigger settings from the component fields and can close them", async () => {
     const user = userEvent.setup();
-    renderModal();
+    const view = renderModal();
 
     await user.click(screen.getByTestId("factory-node-on-pull-request"));
 
@@ -457,6 +478,10 @@ describe("MergeConfidenceConfigModal", () => {
 
     expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
     expect(screen.getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
+
+    view.rerenderGraph(confidenceGraph());
+
+    expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
   });
 
   it("selects the latest run when the Runs tab opens", async () => {
