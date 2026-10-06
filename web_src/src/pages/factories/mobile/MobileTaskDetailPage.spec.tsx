@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
@@ -95,6 +95,19 @@ function LocationProbe() {
   return <div data-testid="mobile-task-location">{`${location.pathname}${location.search}`}</div>;
 }
 
+function TestLineSwitch() {
+  const [, setSearchParams] = useSearchParams();
+  return (
+    <button
+      type="button"
+      data-testid="mobile-task-test-line"
+      onClick={() => setSearchParams({ lineId: REFUND_LINE_HOTFIX_ID })}
+    >
+      Switch test line
+    </button>
+  );
+}
+
 function renderTask(
   entry: string | { pathname: string; search?: string; state?: unknown },
   factory: FactoriesFactory = REFUND_FACTORY,
@@ -115,6 +128,7 @@ function renderTask(
                 openCreateWorkOrder: vi.fn(),
               }}
             >
+              <TestLineSwitch />
               <Routes>
                 <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<MobileTaskDetailPage />} />
                 <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LocationProbe />} />
@@ -302,6 +316,26 @@ describe("MobileTaskDetailPage model select", () => {
     expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
       lineName: PLAN_LINE_NAME,
       model: "claude-opus-4-6",
+      thinkingLevel: "high",
+    });
+  });
+
+  it("does not start with a model from the previous line", async () => {
+    const user = userEvent.setup();
+    renderDraft();
+
+    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(screen.getByRole("menuitem", { name: "High" }));
+    await user.click(screen.getByRole("button", { name: "Model: Auto High" }));
+    await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
+    await user.click(screen.getByTestId("mobile-task-test-line"));
+
+    expect(screen.getByRole("button", { name: "Model: Auto High" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
+      lineName: "hotfix",
+      model: undefined,
       thinkingLevel: "high",
     });
   });

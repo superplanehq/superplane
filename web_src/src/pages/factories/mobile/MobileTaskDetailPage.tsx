@@ -212,8 +212,14 @@ function LoadedMobileTask({
   backDisabled?: boolean;
 }) {
   const { organizationId, factoryId, routeSegment } = useFactoriesLayout();
+  const startLineKey = lineId || lineName || "";
+  const [draftLineKey, setDraftLineKey] = useState(startLineKey);
   const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
   const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
+  if (draftLineKey !== startLineKey) {
+    setDraftLineKey(startLineKey);
+    setDraftModel(DRAFT_START_MODEL_AUTO);
+  }
   const model = useMobileTaskModel(order, orderId, lineId, lineName, onBack);
   const { fixture, artifacts, pullRequests } = model;
   const activity = fixture.phases.filter((phase) => !phase.historyRun);
