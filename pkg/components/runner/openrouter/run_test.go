@@ -159,7 +159,7 @@ func TestBuildOpenCodeConfigWritesAnalysisInstructions(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	})
 	instructions, _ := config["instructions"].([]any)
-	require.Equal(t, []any{"/task/analysis_protocol.md"}, instructions)
+	require.Equal(t, []any{"/task/analysis_protocol.md", "/task/agent_instructions.md"}, instructions)
 }
 
 func TestBuildOpenCodeConfigKeepsProtocolAtInstructionPriority(t *testing.T) {
@@ -169,7 +169,7 @@ func TestBuildOpenCodeConfigKeepsProtocolAtInstructionPriority(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	}, string(protocol)+"\n\nTask:\nFix retries.")
-	require.Equal(t, []any{"/task/analysis_protocol.md"}, config["instructions"])
+	require.Equal(t, []any{"/task/analysis_protocol.md", "/task/agent_instructions.md"}, config["instructions"])
 }
 
 func TestRunPromptRecordsPlanningAgentReply(t *testing.T) {
@@ -192,6 +192,41 @@ func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
 	assert.Equal(t, "allow", permission["*"])
 	assert.Nil(t, permission["edit"])
 	assert.Nil(t, config["mcp"])
+}
+
+func TestBuildOpenCodeConfigWritesConfirmPromptRuleOutsidePlanning(t *testing.T) {
+	dir := t.TempDir()
+	config := jsBuildConfig(t, dir, map[string]string{})
+	instructions, _ := config["instructions"].([]any)
+	rulePath := filepath.Join(dir, "agent_instructions.md")
+	require.Equal(t, []any{rulePath}, instructions)
+	body, err := os.ReadFile(rulePath)
+	require.NoError(t, err)
+	assert.Contains(t, string(body), "Do not run a command that waits for a person.")
+	assert.Contains(t, string(body), "decide from the task whether to keep it or replace it")
+	assert.Contains(t, string(body), "pass the overwrite flag")
+	assert.Contains(t, string(body), "Do not end the run.")
+	assert.Contains(t, string(body), "Do not wait for a person to answer.")
+	assert.NotContains(t, string(body), "propose_spec")
+}
+
+func TestBuildOpenCodeConfigWritesConfirmPromptRuleForPlanning(t *testing.T) {
+	dir := t.TempDir()
+	config := jsBuildConfig(t, dir, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	})
+	instructions, _ := config["instructions"].([]any)
+	require.Equal(t, []any{
+		filepath.Join(dir, "analysis_protocol.md"),
+		filepath.Join(dir, "agent_instructions.md"),
+	}, instructions)
+	body, err := os.ReadFile(filepath.Join(dir, "agent_instructions.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(body), "Do not end the run.")
+	protocol, err := os.ReadFile(filepath.Join(dir, "analysis_protocol.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(protocol), "propose_spec")
 }
 
 func TestBuildOpenCodeConfigMergesWorkspaceMCP(t *testing.T) {

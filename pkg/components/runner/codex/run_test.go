@@ -237,6 +237,20 @@ func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
 	assert.Contains(t, joined, "propose_confidence")
 	assert.NotContains(t, joined, "propose_plan")
 	assert.Contains(t, joined, "Use only the analysis tools")
+	assert.Contains(t, joined, "Do not run a command that waits for a person.")
+	assert.Contains(t, joined, "Do not end the run.")
+}
+
+func TestCodexExecArgsIncludesConfirmPromptRuleOutsidePlanning(t *testing.T) {
+	args := codexExecArgsFromScript(t, map[string]string{}, "gpt-5", "/task/task_artifact_mcp.js")
+	joined := strings.Join(args, " ")
+	assert.Contains(t, joined, "developer_instructions=")
+	assert.Contains(t, joined, "Do not run a command that waits for a person.")
+	assert.Contains(t, joined, "decide from the task whether to keep it or replace it")
+	assert.Contains(t, joined, "pass the overwrite flag")
+	assert.Contains(t, joined, "Do not end the run.")
+	assert.Contains(t, joined, "Do not wait for a person to answer.")
+	assert.NotContains(t, joined, "propose_spec")
 }
 
 func TestCodexExecArgsKeepsProtocolAtDeveloperPriority(t *testing.T) {
