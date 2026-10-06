@@ -46,3 +46,11 @@ and the [TUF root role](https://theupdateframework.github.io/specification/lates
 the application ships the key that verifies later key material. Creating,
 publishing, and rotating that key are issuer operations. They are documented
 in the licensing repository.
+
+A failed download, or a list signed by a root this binary does not contain,
+leaves the trusted list in place. Licenses signed by keys in that list keep
+verifying. This installation learns a new signing key only from a later list
+that one of its embedded roots signed. Replacing the root therefore requires
+a release that embeds the new public key. Restoring the issuer key and
+choosing that release are issuer operations. They are documented in the
+licensing repository.
