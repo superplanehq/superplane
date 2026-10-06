@@ -194,7 +194,7 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 }
 
 func TestMaterializeRiskScoreOmitsDisabledChecks(t *testing.T) {
-	result, err := materializeFactoryTemplate("risk-score", factoryTemplateInput{
+	result, err := materializeFactoryTemplate("risk-score", "", factoryTemplateInput{
 		appID:   "app-risk",
 		appName: "Merge confidence",
 		installParams: map[string]string{
