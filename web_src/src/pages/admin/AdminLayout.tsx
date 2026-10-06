@@ -71,7 +71,7 @@ const AdminLayout: React.FC = () => {
               </NavLink>
               <NavLink to="/admin/runner-tasks" className={navLinkClass}>
                 <Terminal size={14} />
-                Runner Tasks
+                Fleets
               </NavLink>
               <NavLink to="/admin/polar-webhooks" className={navLinkClass}>
                 <Webhook size={14} />
