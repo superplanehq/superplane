@@ -53,6 +53,10 @@ type FactoryContext interface {
 	FindPullRequest(params FindPullRequestParams) (*PullRequestMatch, error)
 	AddPullRequestActivity(params AddPullRequestActivityParams) (*PullRequestActivityResult, error)
 	UpdatePullRequestActivity(params UpdatePullRequestActivityParams) (*PullRequestActivityResult, error)
+	// VCSProvider returns the workspace Git host from factory onboarding.
+	// An empty value means GitHub. A caller that has no factory gets an
+	// empty value and keeps GitHub branch links.
+	VCSProvider() (string, error)
 }
 
 type WorkOrderParams struct {

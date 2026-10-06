@@ -188,17 +188,15 @@ func workOrderRefinementEnabled(tx *gorm.DB, order *models.FactoryWorkOrder) boo
 func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (string, string, string) {
 	repository := strings.TrimSpace(stringValue(order.Repository))
 	defaultBranch := strings.TrimSpace(stringValue(order.DefaultBranch))
-	if repository == "" || defaultBranch == "" {
-		factoryModel, err := models.FindFactory(tx, order.OrganizationID, order.FactoryID)
-		if err == nil {
-			config := factoryModel.OnboardingConfigValue()
-			if repository == "" {
-				repository = strings.TrimSpace(config.AppRepository)
-			}
-			if defaultBranch == "" {
-				defaultBranch = strings.TrimSpace(config.DefaultBranch)
-			}
-		}
+	config := models.FactoryOnboardingConfig{}
+	if factoryModel, err := models.FindFactory(tx, order.OrganizationID, order.FactoryID); err == nil {
+		config = factoryModel.OnboardingConfigValue()
+	}
+	if repository == "" {
+		repository = strings.TrimSpace(config.AppRepository)
+	}
+	if defaultBranch == "" {
+		defaultBranch = strings.TrimSpace(config.DefaultBranch)
 	}
 	if repository == "" {
 		return "", "", ""
@@ -206,7 +204,7 @@ func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (st
 	if defaultBranch == "" {
 		defaultBranch = "main"
 	}
-	return repository, githubRepositoryURL(repository), defaultBranch
+	return repository, models.VCSRepositoryCloneURL(config.EffectiveVCSProvider(), repository), defaultBranch
 }
 
 func onWorkOrderNodeID(spec models.LiveCanvasSpec) string {

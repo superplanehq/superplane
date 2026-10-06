@@ -1,12 +1,19 @@
 import type { FactoriesFactory, FactoriesUpdateFactoryOnboardingBody } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/homeIntegrationStatus";
 
-import { WIZARD_STEPS, type IssuesChoiceId, type WizardStepId } from "./onboardingFixtures";
+import { WIZARD_STEPS, type IssuesChoiceId, type VcsHostId, type WizardStepId } from "./onboardingFixtures";
+
+/** The saved Git host of the workspace. An empty provider means GitHub. */
+export function onboardingVcsHost(onboarding: FactoriesFactory["onboarding"]): VcsHostId | null {
+  if (!onboarding?.vcsIntegrationId) return null;
+  return onboarding.vcsProvider === "bitbucket" ? "bitbucket" : "github";
+}
 
 export function initialOnboardingSelections(onboarding: FactoriesFactory["onboarding"]): IntegrationSelections {
   const selections: IntegrationSelections = {};
-  if (onboarding?.vcsIntegrationId) {
-    selections.github = {
+  const vcsHost = onboardingVcsHost(onboarding);
+  if (vcsHost && onboarding?.vcsIntegrationId) {
+    selections[vcsHost] = {
       id: onboarding.vcsIntegrationId,
       name: onboarding.vcsIntegrationId,
       ready: false,
