@@ -55,8 +55,6 @@ type FactoryVelocityMember struct {
 	// "git_hub_login", so the query alias would not bind and every member would
 	// look like they have no GitHub identity.
 	GitHubLogin string `gorm:"column:github_login"`
-	// BitbucketLogin is the linked Bitbucket username, when the member has one.
-	BitbucketLogin string `gorm:"column:bitbucket_login"`
 }
 
 // ListFactoryVelocityPullRequests returns every factory pull request that
@@ -160,7 +158,7 @@ WHERE p.factory_id = ?
 `
 
 // ListFactoryVelocityMembers returns the human members of an organization with
-// their GitHub identity, when they linked one, and the linked Bitbucket username.
+// their GitHub identity, when they linked one.
 //
 // A member can arrive at a GitHub login two ways: they linked a GitHub account
 // on purpose, or they sign in with GitHub. The link wins, because a member who
@@ -168,7 +166,7 @@ WHERE p.factory_id = ?
 // fallback so members who joined that way keep their attribution.
 func ListFactoryVelocityMembers(tx *gorm.DB, orgID uuid.UUID) ([]FactoryVelocityMember, error) {
 	var members []FactoryVelocityMember
-	err := tx.Raw(listFactoryVelocityMembersSQL, ProviderGitHub, ProviderGitHub, ProviderBitbucket, orgID, UserTypeHuman).Scan(&members).Error
+	err := tx.Raw(listFactoryVelocityMembersSQL, ProviderGitHub, ProviderGitHub, orgID, UserTypeHuman).Scan(&members).Error
 	if err != nil {
 		return nil, err
 	}
@@ -181,19 +179,11 @@ SELECT DISTINCT ON (u.id)
 	u.name,
 	COALESCE(NULLIF(l.avatar_url, ''), p.avatar_url, '') AS avatar_url,
 	COALESCE(u.email, '') AS email,
-	COALESCE(NULLIF(l.username, ''), p.username, '') AS github_login,
-	COALESCE(bb.username, '') AS bitbucket_login
+	COALESCE(NULLIF(l.username, ''), p.username, '') AS github_login
 FROM users u
 LEFT JOIN accounts a ON a.id = u.account_id
 LEFT JOIN account_linked_accounts l ON l.account_id = a.id AND l.provider = ?
 LEFT JOIN account_providers p ON p.account_id = a.id AND p.provider = ?
-LEFT JOIN LATERAL (
-	SELECT username
-	FROM account_linked_accounts
-	WHERE account_id = a.id AND provider = ?
-	ORDER BY linked_at DESC NULLS LAST
-	LIMIT 1
-) bb ON true
 WHERE u.organization_id = ?
 	AND u.type = ?
 	AND u.deleted_at IS NULL

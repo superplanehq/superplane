@@ -137,7 +137,7 @@ function BitbucketAssociatedAccounts({
           <li key={account.providerId}>
             <SettingsActionRow
               title={<BitbucketTitle />}
-              description={`Linked as ${account.username}. Velocity uses this Bitbucket account to credit your pull requests.`}
+              description={`Linked as ${account.username}. SuperPlane uses this Bitbucket account to find repositories you can open.`}
               testId={
                 index === 0
                   ? "account-redesign-associated-bitbucket"
@@ -155,7 +155,7 @@ function BitbucketAssociatedAccounts({
           <li>
             <SettingsActionRow
               title={<BitbucketTitle />}
-              description="Velocity uses this Bitbucket account to credit your pull requests."
+              description="SuperPlane uses this Bitbucket account to find repositories you can open."
               testId="account-redesign-associated-bitbucket"
               action={
                 <Button type="button" size="sm" variant="outline" onClick={onLink}>
@@ -201,8 +201,8 @@ function RemoveAssociatedBitbucketDialog({
         <DialogHeader>
           <DialogTitle>Remove {username}?</DialogTitle>
           <DialogDescription>
-            Velocity reports will no longer credit pull requests from this Bitbucket account. Your sign-in methods do
-            not change.
+            SuperPlane will no longer use this Bitbucket account to find repositories you can open. Your sign-in methods
+            do not change.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
