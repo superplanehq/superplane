@@ -72,6 +72,8 @@ interface SettingsTabProps {
   onOpenCreateIntegrationDialog?: () => void;
   onOpenConfigureIntegrationDialog?: (integrationId: string) => void;
   readOnly?: boolean;
+  /** `fill` scrolls inside a parent panel. `sidebar` keeps the canvas sidebar height. */
+  layout?: "sidebar" | "fill";
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -151,6 +153,7 @@ export function SettingsTab({
   onOpenCreateIntegrationDialog,
   onOpenConfigureIntegrationDialog,
   readOnly = false,
+  layout = "sidebar",
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
@@ -542,9 +545,13 @@ export function SettingsTab({
     [allowIntegrations, configurationFields, integrationName, integrationRef, integrations, nodeConfiguration],
   );
 
+  const fillsParent = layout === "fill";
+  const scrollClassName = cn("overflow-x-hidden overflow-y-auto p-4", fillsParent ? "min-h-0 flex-1" : "pb-24");
+  const scrollStyle = fillsParent ? undefined : { maxHeight: "80vh" };
+
   if (isReadOnly) {
     return (
-      <div className="overflow-y-auto p-4 pb-24" style={{ maxHeight: "80vh" }}>
+      <div className={scrollClassName} style={scrollStyle}>
         <div className="space-y-6">
           <ConfigurationView model={configurationDisplayModel} />
           {customField && shouldShowConfiguration && (
@@ -559,8 +566,8 @@ export function SettingsTab({
 
   return (
     <div
-      className="p-4 pb-24 overflow-y-auto overflow-x-hidden"
-      style={{ maxHeight: "80vh" }}
+      className={scrollClassName}
+      style={scrollStyle}
       onBlurCapture={(event) => {
         const target = event.target as HTMLElement | null;
         if (!target) {
