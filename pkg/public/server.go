@@ -107,6 +107,14 @@ func (s *Server) SetLicenseService(service *licensing.Service) {
 	s.licenseService = service
 }
 
+func (s *Server) entitlements() licensing.Entitlements {
+	if s.licenseService == nil {
+		return licensing.Community
+	}
+
+	return s.licenseService
+}
+
 // WebsocketHub returns the websocket hub for this server
 func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
@@ -278,7 +286,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 	ctx := context.Background()
 
-	authorizer := authorization.NewGatewayAuthorizer(s.authService)
+	authorizer := authorization.NewGatewayAuthorizer(s.authService).WithEntitlements(s.entitlements())
 
 	var grpcGatewayMux *runtime.ServeMux
 	grpcGatewayMux = runtime.NewServeMux(
@@ -801,6 +809,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminGetOrganizationBillingPlan).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/spending-report", s.adminGetOrganizationSpendingReport).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/velocity", s.adminGetOrganizationVelocity).Methods("GET")
 	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks", s.adminListPolarWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks/endpoints", s.adminListPolarWebhookEndpoints).Methods("GET")

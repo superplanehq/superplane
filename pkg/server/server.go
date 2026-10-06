@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/ee/rbac"
 	"github.com/superplanehq/superplane/pkg/agents"
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
@@ -29,6 +30,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
@@ -76,6 +78,32 @@ func getAgentProviderOverride() agents.Provider {
 	agentProviderOverride.Lock()
 	defer agentProviderOverride.Unlock()
 	return agentProviderOverride.provider
+}
+
+var licenseServiceOverride = struct {
+	sync.Mutex
+	service *licensing.Service
+}{}
+
+// SetLicenseServiceForTests replaces the license service that Start creates.
+// End-to-end tests use it with licenses signed by ephemeral test keys.
+func SetLicenseServiceForTests(service *licensing.Service) func() {
+	licenseServiceOverride.Lock()
+	previous := licenseServiceOverride.service
+	licenseServiceOverride.service = service
+	licenseServiceOverride.Unlock()
+
+	return func() {
+		licenseServiceOverride.Lock()
+		licenseServiceOverride.service = previous
+		licenseServiceOverride.Unlock()
+	}
+}
+
+func getLicenseServiceOverride() *licensing.Service {
+	licenseServiceOverride.Lock()
+	defer licenseServiceOverride.Unlock()
+	return licenseServiceOverride.service
 }
 
 func buildAgentService(authService authorization.Authorization) (agents.Provider, agentsActions.AgentsService) {
@@ -426,7 +454,11 @@ func buildGRPCServices(
 	oidcProvider oidc.Provider,
 	agentService agentsActions.AgentsService,
 	jwtSigner *jwt.Signer,
+	licenseService *licensing.Service,
 ) (*grpc.Services, error) {
+	features := enterprise.NewRegistry()
+	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
+
 	return grpc.NewServices(grpc.ServicesConfig{
 		BaseURL:          baseURL,
 		WebhooksBaseURL:  webhooksBaseURL,
@@ -437,6 +469,8 @@ func buildGRPCServices(
 		OIDCProvider:     oidcProvider,
 		AgentService:     agentService,
 		JWTSigner:        jwtSigner,
+		Entitlements:     licenseService,
+		Enterprise:       features,
 	})
 }
 
@@ -812,6 +846,7 @@ func Start() {
 			oidcProvider,
 			agentService,
 			jwtSigner,
+			licenseService,
 		)
 		if err != nil {
 			log.Fatalf("failed to build gRPC services: %v", err)
@@ -849,6 +884,10 @@ func Start() {
 }
 
 func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {
+	if override := getLicenseServiceOverride(); override != nil {
+		return override
+	}
+
 	extraKeys, source := developmentLicense(licensing.SourceFromEnvironment(encryptor))
 	keys, err := licensing.TrustedKeyStore(extraKeys)
 	if err != nil {

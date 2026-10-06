@@ -39,7 +39,7 @@ function renderPage() {
         ),
       ),
     );
-  return render(<OrganizationDetail />, { wrapper });
+  return { queryClient, ...render(<OrganizationDetail />, { wrapper }) };
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -132,6 +132,9 @@ describe("OrganizationDetail", () => {
             catalogs: { workspaces: [], users: [], models: [], machines: [] },
           });
         }
+        if (url.startsWith(`/admin/api/organizations/${ORG_ID}/velocity`)) {
+          return jsonResponse(adminVelocityReport());
+        }
         if (url.includes("/llm-credit")) {
           return jsonResponse({
             remaining_credit_cents: 5000,
@@ -173,6 +176,7 @@ describe("OrganizationDetail", () => {
       "Connections",
       "Features",
       "Spending",
+      "Velocity",
       "Credits",
     ]);
     expect(await screen.findByText("Acme")).toBeInTheDocument();
@@ -271,6 +275,118 @@ describe("OrganizationDetail", () => {
     expect(urls.some((url) => url.includes("/api/v1/organizations/"))).toBe(false);
   });
 
+  it("opens velocity from the admin API and hides people, sync, and cycle time", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
+    const urlsBefore = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    expect(urlsBefore.some((url) => url.includes("/velocity"))).toBe(false);
+
+    await user.click(screen.getByRole("tab", { name: "Velocity" }));
+
+    expect(await screen.findByTestId("velocity-summary")).toBeInTheDocument();
+    expect(screen.getByText("Tasks closed")).toBeInTheDocument();
+    expect(screen.getByText("Task waste")).toBeInTheDocument();
+    expect(screen.getByText("Cost per task")).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-delivery")).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-cost")).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-task-cost")).toBeInTheDocument();
+    const automations = screen.getByTestId("velocity-automations");
+    expect(within(automations).getByText("Nightly close")).toBeInTheDocument();
+    expect(within(automations).queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByText("Refunds")).toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-people")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "People" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-overflow-menu")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-refresh-data")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-sync-progress")).not.toBeInTheDocument();
+    expect(screen.queryByText("Median cycle time")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-task-time")).not.toBeInTheDocument();
+    expect(screen.queryByText("Manual work")).not.toBeInTheDocument();
+
+    const urls = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    const velocityCalls = urls.filter((url) => url.includes("/velocity"));
+    expect(velocityCalls).toEqual([`/admin/api/organizations/${ORG_ID}/velocity?period_days=30`]);
+    expect(urls.some((url) => url.includes("/api/v1/"))).toBe(false);
+  });
+
+  it("says when the organization has no workspaces", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}`) {
+        return jsonResponse(organizationOverview());
+      }
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/velocity`)) {
+        return jsonResponse({ factories: [] });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole("tab", { name: "Velocity" }));
+
+    expect(await screen.findByText("This organization has no workspaces.")).toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-summary")).not.toBeInTheDocument();
+  });
+
+  it("says when the selected workspace has no velocity in the period", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}`) {
+        return jsonResponse(organizationOverview());
+      }
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/velocity`)) {
+        return jsonResponse({
+          factories: [{ id: "factory-1", name: "Quiet" }],
+          factoryId: "factory-1",
+          periodDays: 30,
+          hasPeopleCohort: false,
+          hasPreviousWindow: false,
+          totals: {},
+          previousTotals: {},
+          points: [],
+          intakeSources: [],
+          automations: [],
+        });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole("tab", { name: "Velocity" }));
+
+    expect(await screen.findByText("There is no velocity in this period.")).toBeInTheDocument();
+    expect(screen.getByText("Quiet")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "30d" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("velocity-summary")).not.toBeInTheDocument();
+  });
+
+  it("shows a failed refresh next to the saved velocity report", async () => {
+    const user = userEvent.setup();
+    const { queryClient } = renderPage();
+
+    await user.click(await screen.findByRole("tab", { name: "Velocity" }));
+    expect(await screen.findByTestId("velocity-summary")).toBeInTheDocument();
+
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/velocity`)) {
+        return new Response("error", { status: 500 });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    await queryClient.invalidateQueries({ queryKey: ["admin", "organizations", ORG_ID, "velocity"] });
+
+    expect(await screen.findByTestId("admin-velocity-refresh-error")).toBeInTheDocument();
+    expect(screen.getByText("Could not refresh velocity.")).toBeInTheDocument();
+    expect(screen.getByText(/^Last loaded /)).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-summary")).toBeInTheDocument();
+    expect(screen.getByText("Refunds")).toBeInTheDocument();
+  });
+
   it("does not load credits until the credits tab opens", async () => {
     renderPage();
 
@@ -352,3 +468,75 @@ describe("OrganizationDetail", () => {
     expect(await screen.findByText("Acme")).toBeInTheDocument();
   });
 });
+
+function organizationOverview() {
+  return {
+    id: ORG_ID,
+    name: "Acme",
+    slug: "acme",
+    description: "Builds widgets",
+    canvas_count: 2,
+    task_count: 4,
+    done_task_count: 6,
+    member_count: 3,
+    created_at: "2024-01-15T12:00:00Z",
+    updated_at: "2024-02-20T12:00:00Z",
+  };
+}
+
+function adminVelocityReport() {
+  return {
+    factories: [{ id: "factory-1", name: "Refunds" }],
+    factoryId: "factory-1",
+    periodDays: 30,
+    hasPeopleCohort: false,
+    hasPreviousWindow: true,
+    totals: {
+      superplaneMerged: 2,
+      peopleMerged: 0,
+      waste: 1,
+      costCents: 500,
+      modelCostCents: 400,
+      computeCostCents: 100,
+      tokens: 1000,
+      wasteCostCents: 50,
+      tasksClosed: 3,
+      tasksWaste: 1,
+    },
+    previousTotals: {
+      superplaneMerged: 1,
+      peopleMerged: 0,
+      waste: 0,
+      costCents: 100,
+      tasksClosed: 1,
+      tasksWaste: 0,
+    },
+    points: [
+      {
+        day: "Mon 1",
+        superplaneMerged: 2,
+        peopleMerged: 0,
+        waste: 1,
+        costCents: 500,
+        modelCostCents: 400,
+        computeCostCents: 100,
+        tokens: 1000,
+        wasteCostCents: 50,
+        medianTaskModelCostCents: 200,
+        medianTaskComputeCostCents: 50,
+        intake: [{ key: "manual", merged: 2 }],
+      },
+    ],
+    intakeSources: [{ key: "manual", label: "Manually created", merged: 2 }],
+    automations: [
+      {
+        id: "canvas-9",
+        name: "Nightly close",
+        runs: 4,
+        failed: 1,
+        costCents: 300,
+        averageDurationHours: 0.5,
+      },
+    ],
+  };
+}

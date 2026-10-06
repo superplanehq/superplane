@@ -467,10 +467,13 @@ func seedSentryIssues(
 		return intakeSeedResult{}, err
 	}
 
-	project, _ := binding.Configuration["project"].(string)
-	issues, err := client.ListNewestUnresolvedIssues(project, intakeSentrySeedSize)
+	projects := sentryProjectIDsFromConfiguration(binding.Configuration)
+	if len(projects) == 0 {
+		return intakeSeedResult{}, fmt.Errorf("sentry intake has no projects")
+	}
+	issues, err := newestSentrySeedIssues(client, projects)
 	if err != nil {
-		return intakeSeedResult{}, fmt.Errorf("failed to list the issues of project %s: %w", project, err)
+		return intakeSeedResult{}, err
 	}
 
 	return seedKnownSentryIssues(tx, canvasID, client, issues)

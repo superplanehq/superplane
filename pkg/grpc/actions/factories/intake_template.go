@@ -463,6 +463,15 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 		configuration["labels"] = linearLabelPredicates(request.Settings.LinearLabels)
 		configuration["actions"] = []any{"create", "update"}
 	}
+	if request.Source == models.FactoryIntakeSourceSentryExceptions {
+		projects := request.Settings.SentryProjectIDs
+		if len(projects) == 0 {
+			projects = sentryProjectIDsFromConfiguration(configuration)
+		}
+		if len(projects) > 0 {
+			applySentryProjectConfiguration(configuration, projects)
+		}
+	}
 
 	return configuration
 }

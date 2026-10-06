@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useNavigate } from "react-router";
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
@@ -130,13 +130,18 @@ vi.mock("@/hooks/useCanvasData", () => {
   };
 });
 
-function OpenTaskRouteButton({ href }: { href: string }) {
+function OpenTaskRouteButton({ href, state }: { href: string; state?: unknown }) {
   const navigate = useNavigate();
   return (
-    <button type="button" data-testid="open-task-route" onClick={() => navigate(href)}>
+    <button type="button" data-testid="open-task-route" onClick={() => navigate(href, { state })}>
       Open task
     </button>
   );
+}
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="done-column-location">{`${location.pathname}${location.search}`}</div>;
 }
 
 function renderBoard(factory: FactoriesFactory = REFUND_FACTORY) {
@@ -341,7 +346,7 @@ describe("LinesPage Done column", () => {
 
   it("keeps the Done line and the board when a card opens for the first time", async () => {
     const user = userEvent.setup();
-    const taskHref = workOrderDetailPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, "101", REFUND_LINE_PLAN_ID);
+    const taskHref = workOrderDetailPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, "101");
     useFactoryBoardWorkOrders.mockImplementation((...args: unknown[]) => {
       const options = args[2] as { done?: { lineId?: string } } | undefined;
       return boardPageResult(!options?.done?.lineId, useFactoryWorkOrders().data ?? []);
@@ -369,7 +374,8 @@ describe("LinesPage Done column", () => {
                   <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LinesPage />} />
                   <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<LinesPage />} />
                 </Routes>
-                <OpenTaskRouteButton href={taskHref} />
+                <OpenTaskRouteButton href={taskHref} state={{ lineId: REFUND_LINE_PLAN_ID }} />
+                <LocationProbe />
               </FactoriesLayoutContext.Provider>
             </MemoryRouter>
           </TooltipProvider>
@@ -393,6 +399,9 @@ describe("LinesPage Done column", () => {
     );
     expect(screen.queryByTestId(WORKSPACE_LOADING_TEST_ID)).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-done-column")).toBeInTheDocument();
+    const location = screen.getByTestId("done-column-location");
+    expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/101`);
+    expect(location).not.toHaveTextContent("lineId=");
   });
 
   it("scopes Done to the displayed line when the task URL line was deleted", () => {

@@ -76,11 +76,12 @@ spec:
               revision="$(git rev-parse HEAD)"
               base_ref="$(printf '%s' "${BASE}" | sed 's#/#%2F#g')"
               gh api -H "Accept: application/vnd.github.v3.diff" "/repos/${REPO}/compare/${base_ref}...${revision}" > /tmp/pr.diff
-          - name: Review Pull Request
+          - name: Blast radius
             type: prompt
             workingDirectory: repo
             prompt: |-
-              Review this pull request. The repository is checked out at the pull request head.
+              Merge check: risk.
+              The repository is checked out at the pull request head.
               The pull request diff is in /tmp/pr.diff. Review that file.
               It is the difference between the base branch and the head.
               Do not change files. Do not commit. Do not push.
@@ -96,17 +97,13 @@ spec:
               Task title: {{ root().data.workOrder.title }}
               Task description: {{ root().data.workOrder.description }}
 
-              Report each enabled check with the report_merge_check tool.
-              Call the tool once for every check named in Enabled checks.
-              Do not call the tool for a check that is not named.
-              When Enabled checks is none, do not call the tool.
-              Pass check, score, and summary.
-              check is risk, performance, security, drift, or reversibility.
+              Report this check with the report_merge_check tool.
+              Call the tool once.
+              check is risk.
+              score is an integer from 1 to 5.
+              summary is one sentence.
               Do not write a file.
 
-              Enabled checks: {{ install_params.enabledChecks }}.
-
-              Risk. Use this section only when risk is enabled.
               score is an integer from 1 to 5. A higher score means more risk.
               Apply these category rules. If a change matches a category, the score is at least that category score.
               If several categories match, use the highest score.
@@ -131,8 +128,34 @@ spec:
               Good lower: Lower risk because the pull request is introducing user interface changes only.
               Good higher: Higher risk because the pull request is introducing infrastructure changes by raising the ingress body limit from 64 MB to 80 MB.
               Good none: Moderate risk because the pull request matches no configured category and rewrites the retry loop.
+          - name: Performance
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              Merge check: performance.
+              The repository is checked out at the pull request head.
+              The pull request diff is in /tmp/pr.diff. Review that file.
+              It is the difference between the base branch and the head.
+              Do not change files. Do not commit. Do not push.
 
-              Performance. Use this section only when performance is enabled.
+              Repository: {{ root().data.repository.full_name }}
+              Pull request: #{{ root().data.pull_request.number }}
+              Title: {{ root().data.pull_request.title }}
+              Author: {{ root().data.pull_request.user.login }}
+              Base branch: {{ root().data.pull_request.base.ref }}
+              Head SHA: {{ root().data.pull_request.head.sha }}
+
+              The original task is the intent for this change.
+              Task title: {{ root().data.workOrder.title }}
+              Task description: {{ root().data.workOrder.description }}
+
+              Report this check with the report_merge_check tool.
+              Call the tool once.
+              check is performance.
+              score is an integer from 1 to 5.
+              summary is one sentence.
+              Do not write a file.
+
               score is an integer from 1 to 5. A higher score means the change follows the performance practices in this repository.
               Read the repository for the performance practices it already states.
               Use docs, comments, and the patterns in the existing code.
@@ -147,16 +170,68 @@ spec:
               Name the practice and say whether the change follows it or breaks it.
               If no practice applies, say that no performance practice in this repository applies.
               Do not skip the check. Do not repeat the score. Do not write a second sentence.
+          - name: Security
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              Merge check: security.
+              The repository is checked out at the pull request head.
+              The pull request diff is in /tmp/pr.diff. Review that file.
+              It is the difference between the base branch and the head.
+              Do not change files. Do not commit. Do not push.
 
-              Security. Use this section only when security is enabled.
+              Repository: {{ root().data.repository.full_name }}
+              Pull request: #{{ root().data.pull_request.number }}
+              Title: {{ root().data.pull_request.title }}
+              Author: {{ root().data.pull_request.user.login }}
+              Base branch: {{ root().data.pull_request.base.ref }}
+              Head SHA: {{ root().data.pull_request.head.sha }}
+
+              The original task is the intent for this change.
+              Task title: {{ root().data.workOrder.title }}
+              Task description: {{ root().data.workOrder.description }}
+
+              Report this check with the report_merge_check tool.
+              Call the tool once.
+              check is security.
+              score is an integer from 1 to 5.
+              summary is one sentence.
+              Do not write a file.
+
               Use the same rules as Performance, for the security practices in this repository.
               Read the repository for the security practices it already states.
               Do not use a generic checklist from outside this repository.
               If no security practice applies, report the check with 5.
               Say that no security practice in this repository applies.
               Do not skip the check.
+          - name: Drift from Specification
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              Merge check: drift.
+              The repository is checked out at the pull request head.
+              The pull request diff is in /tmp/pr.diff. Review that file.
+              It is the difference between the base branch and the head.
+              Do not change files. Do not commit. Do not push.
 
-              Drift. Use this section only when drift is enabled.
+              Repository: {{ root().data.repository.full_name }}
+              Pull request: #{{ root().data.pull_request.number }}
+              Title: {{ root().data.pull_request.title }}
+              Author: {{ root().data.pull_request.user.login }}
+              Base branch: {{ root().data.pull_request.base.ref }}
+              Head SHA: {{ root().data.pull_request.head.sha }}
+
+              The original task is the intent for this change.
+              Task title: {{ root().data.workOrder.title }}
+              Task description: {{ root().data.workOrder.description }}
+
+              Report this check with the report_merge_check tool.
+              Call the tool once.
+              check is drift.
+              score is an integer from 1 to 5.
+              summary is one sentence.
+              Do not write a file.
+
               score is an integer from 1 to 5. A higher score means the change moved farther from the original task.
               Compare the diff with the task title and the task description.
               1 means the change does what the task asks.
@@ -168,8 +243,34 @@ spec:
               summary is one sentence.
               Say what the task asked for and what the change did.
               Do not repeat the score. Do not write a second sentence.
+          - name: Reversibility
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              Merge check: reversibility.
+              The repository is checked out at the pull request head.
+              The pull request diff is in /tmp/pr.diff. Review that file.
+              It is the difference between the base branch and the head.
+              Do not change files. Do not commit. Do not push.
 
-              Reversibility. Use this section only when reversibility is enabled.
+              Repository: {{ root().data.repository.full_name }}
+              Pull request: #{{ root().data.pull_request.number }}
+              Title: {{ root().data.pull_request.title }}
+              Author: {{ root().data.pull_request.user.login }}
+              Base branch: {{ root().data.pull_request.base.ref }}
+              Head SHA: {{ root().data.pull_request.head.sha }}
+
+              The original task is the intent for this change.
+              Task title: {{ root().data.workOrder.title }}
+              Task description: {{ root().data.workOrder.description }}
+
+              Report this check with the report_merge_check tool.
+              Call the tool once.
+              check is reversibility.
+              score is an integer from 1 to 5.
+              summary is one sentence.
+              Do not write a file.
+
               score is an integer from 1 to 5. A higher score means the change is easier to undo.
               5 means a revert undoes the change and no data is lost.
               4 means a revert undoes the change after one small manual step.
