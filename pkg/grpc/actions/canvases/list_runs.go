@@ -54,7 +54,7 @@ func ListRuns(ctx context.Context, db *gorm.DB, canvas *models.Canvas, limit uin
 	if err != nil {
 		return nil, err
 	}
-	attachCanvasRunUsage(db, serialized)
+	AttachCanvasRunUsage(db, serialized)
 
 	return &pb.ListRunsResponse{
 		Runs:          serialized,
@@ -410,7 +410,7 @@ func getLastRunTimestamp(runs []models.CanvasRun) *timestamppb.Timestamp {
 	return nil
 }
 
-func attachCanvasRunUsage(db *gorm.DB, runs []*pb.CanvasRun) {
+func AttachCanvasRunUsage(db *gorm.DB, runs []*pb.CanvasRun) {
 	ids := make([]uuid.UUID, 0, len(runs))
 	for _, run := range runs {
 		id, err := uuid.Parse(run.GetId())
@@ -423,7 +423,7 @@ func attachCanvasRunUsage(db *gorm.DB, runs []*pb.CanvasRun) {
 	usageByRun, modelsByRun, err := models.SumUsageAndModelsForRunTrees(db, ids)
 	if err != nil {
 		log.WithError(err).Warnf(
-			"canvas run listing: usage rollup unavailable for %d run(s), returning zero usage",
+			"canvas run usage rollup unavailable for %d run(s), returning zero usage",
 			len(ids),
 		)
 		usageByRun = map[uuid.UUID]models.UsageTotals{}

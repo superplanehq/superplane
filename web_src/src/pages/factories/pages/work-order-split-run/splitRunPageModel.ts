@@ -8,6 +8,7 @@ import { canvasKeyForPhase, parseSplitRunCanvasKey, type SplitRunCanvasKey } fro
 import {
   SPLIT_RUN_RUNNING,
   splitRunFixtureForWorkOrder,
+  type ColumnAppCanvasRunLookup,
   type SplitRunColumnApp,
   type SplitRunFixture,
   type SplitRunPhase,
@@ -51,6 +52,8 @@ export type FixtureForSplitRunPageOptions = {
   isAnalyzing?: boolean;
   /** Looks up an org member's display (name, initials, avatar) by id. */
   resolveUser?: OrgUserDisplayLookup;
+  /** Canvas runs for column-app checks that are not on the pull request. */
+  columnAppRuns?: ColumnAppCanvasRunLookup;
 };
 
 export function fixtureForSplitRunPage(
@@ -72,6 +75,7 @@ export function fixtureForSplitRunPage(
     artifacts: options?.artifacts,
     isAnalyzing: options?.isAnalyzing,
     resolveUser: options?.resolveUser,
+    columnAppRuns: options?.columnAppRuns,
   });
 }
 

@@ -180,6 +180,8 @@ func broadcastRunState(workflowID string, runID string, wsHub *ws.Hub) (uuid.UUI
 		return uuid.Nil, "", fmt.Errorf("failed to serialize run: %w", err)
 	}
 
+	canvases.AttachCanvasRunUsage(db, []*pb.CanvasRun{serializedRun})
+
 	serializedRunJSON, err := marshalCanvasRunJSON(serializedRun)
 	if err != nil {
 		return uuid.Nil, "", fmt.Errorf("failed to marshal run: %w", err)
