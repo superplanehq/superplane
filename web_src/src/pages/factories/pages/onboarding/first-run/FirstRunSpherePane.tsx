@@ -1,11 +1,15 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
 
+import { FirstRunArtPane } from "./FirstRunArtPane";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
+import type { FirstRunArtScene } from "./firstRunArtScene";
 
 const CANVAS_SIZE = 300;
 
 export type FirstRunSphereChip = { label: string; value: string; tone?: "ghost" | "amber" };
+
+export type { FirstRunArtScene } from "./firstRunArtScene";
 
 export type FirstRunSphereProps = {
   testId?: string;
@@ -19,6 +23,8 @@ export type FirstRunSphereProps = {
   phasesLit?: boolean;
   /** Redraw with flicker (analysis screen only). */
   animate?: boolean;
+  /** Preview globe. When set, the pane mounts the owned art script instead of the dotted sphere. */
+  art?: FirstRunArtScene;
 };
 
 // The bright amber reads well on the dark pane but washes out on light
@@ -88,7 +94,12 @@ function SphereChip({ chip, side }: { chip: FirstRunSphereChip; side: "left" | "
   );
 }
 
-export function FirstRunSpherePane({
+export function FirstRunSpherePane(props: FirstRunSphereProps) {
+  if (props.art) return <FirstRunArtPane art={props.art} testId={props.testId} />;
+  return <DottedSpherePane {...props} />;
+}
+
+function DottedSpherePane({
   testId,
   level,
   caption,
