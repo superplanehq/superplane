@@ -236,8 +236,12 @@ function confirmPromptInstructionPath(taskDir) {
 function writeInstructionFile(filePath, text) {
   try {
     fs.writeFileSync(filePath, `${text}\n`);
-  } catch (_err) {
-    // Tests pass a fake task dir. The runner writes this file when the dir exists.
+  } catch (err) {
+    if (err && err.code === "ENOENT" && !fs.existsSync(path.dirname(filePath))) {
+      return;
+    }
+    const message = err && err.message ? err.message : String(err);
+    throw new Error(`failed to write instruction file ${filePath}: ${message}`);
   }
 }
 

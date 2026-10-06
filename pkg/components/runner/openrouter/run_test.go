@@ -194,6 +194,23 @@ func TestBuildOpenCodeConfigAllowsEditsOutsidePlanning(t *testing.T) {
 	assert.Nil(t, config["mcp"])
 }
 
+func TestBuildOpenCodeConfigReportsInstructionWriteError(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "agent_instructions.md"), 0o755))
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(map[string]any{
+		"taskDir": dir,
+		"env":     map[string]string{},
+	})
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { buildOpenCodeConfig } = require(process.argv[1]); buildOpenCodeConfig(JSON.parse(process.argv[2]));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.Error(t, err)
+	assert.Contains(t, string(out), "failed to write instruction file")
+	assert.Contains(t, string(out), "agent_instructions.md")
+}
+
 func TestBuildOpenCodeConfigWritesConfirmPromptRuleOutsidePlanning(t *testing.T) {
 	dir := t.TempDir()
 	config := jsBuildConfig(t, dir, map[string]string{})

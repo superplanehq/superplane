@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 "use strict";
 
+const fs = require("fs");
 const { spawn } = require("child_process");
 
 const CONFIRM_PROMPT_RULE =
   "Do not run a command that waits for a person. When the target file already exists, decide from the task whether to keep it or replace it. If you replace it, pass the overwrite flag. If you keep it, do not run the installer in a way that asks. If a command prints a confirm prompt, stop that command and continue the task. Do not end the run. Do not wait for a person to answer.";
 
 const CONFIRM_PROMPT_BLOCK_MS = 800;
+const CPU_SLACK_TICKS = 5;
 
 const CONFIRM_PROMPT_PATTERNS = [
   /\(y\/n\)/i,
@@ -18,50 +20,176 @@ const CONFIRM_PROMPT_PATTERNS = [
   /already exists\b.*\?/i,
   /Press (?:any key|Enter)/i,
   /Continue\?/i,
+  /\bok to proceed\?/i,
+  /\?\s*\(y\)\s*$/i,
 ];
+
+const TIMER_WAIT = /^(?:hrtimer_nanosleep|do_nanosleep)$/;
+const TTY_WAIT = /^(?:n_tty_read|tty_read)$/;
 
 function stripAnsi(text) {
   return String(text || "").replace(/\u001b\[[0-9;]*[A-Za-z]/g, "");
 }
 
-function lastOutputLine(text) {
-  const lines = stripAnsi(text).replace(/\r/g, "\n").trimEnd().split("\n");
-  return (lines[lines.length - 1] || "").trim();
+function createLineTracker() {
+  let pending = "";
+  let lastLine = "";
+  const publish = () => {
+    const current = pending.trim();
+    return (current || lastLine).slice(-400);
+  };
+  return {
+    push(chunk) {
+      pending += chunk.toString("utf8");
+      if (pending.length > 2048) {
+        pending = pending.slice(-2048);
+      }
+      const parts = stripAnsi(pending).replace(/\r/g, "\n").split("\n");
+      pending = parts.pop() || "";
+      if (pending.length > 500) {
+        pending = pending.slice(-500);
+      }
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (trimmed) {
+          lastLine = trimmed.slice(-400);
+        }
+      }
+      return publish();
+    },
+    current: publish,
+  };
 }
 
 function isBlockedConfirmLine(text) {
-  const line = lastOutputLine(text);
+  const line = String(text || "").trim();
   if (!line || line.length > 400) {
     return false;
   }
   return CONFIRM_PROMPT_PATTERNS.some((pattern) => pattern.test(line));
 }
 
-function stopChild(child, stopped) {
+function readProc(pid, name) {
+  try {
+    return fs.readFileSync(`/proc/${pid}/${name}`, "utf8");
+  } catch (_err) {
+    return "";
+  }
+}
+
+function processSnapshot(pid) {
+  const stat = readProc(pid, "stat");
+  const close = stat.lastIndexOf(")");
+  if (close < 0) {
+    return null;
+  }
+  const fields = stat.slice(close + 2).trim().split(/\s+/);
+  const ioText = readProc(pid, "io");
+  let io = 0;
+  for (const row of ioText.split("\n")) {
+    if (row.startsWith("read_bytes:") || row.startsWith("write_bytes:")) {
+      io += Number(row.split(/\s+/)[1] || 0);
+    }
+  }
+  const syscall = readProc(pid, "syscall").trim().split(/\s+/);
+  return {
+    state: fields[0] || "",
+    cpu: Number(fields[11] || 0) + Number(fields[12] || 0),
+    io,
+    wchan: readProc(pid, "wchan").trim(),
+    stdinRead: syscall[0] === "0" && syscall[1] === "0x0",
+  };
+}
+
+function descendantPids(root) {
+  const pids = [];
+  const seen = new Set();
+  const walk = (pid) => {
+    const id = String(pid || "");
+    if (!id || seen.has(id)) {
+      return;
+    }
+    seen.add(id);
+    pids.push(id);
+    for (const child of readProc(id, `task/${id}/children`).trim().split(/\s+/)) {
+      if (child) {
+        walk(child);
+      }
+    }
+  };
+  walk(root);
+  return pids;
+}
+
+function treeActivity(pid) {
+  const activity = {
+    seen: false,
+    cpu: 0,
+    io: 0,
+    running: false,
+    timerWait: false,
+    inputWait: false,
+  };
+  for (const id of descendantPids(pid)) {
+    const snap = processSnapshot(id);
+    if (!snap) {
+      continue;
+    }
+    activity.seen = true;
+    activity.cpu += snap.cpu;
+    activity.io += snap.io;
+    if (snap.state === "R" || snap.state === "D") {
+      activity.running = true;
+    }
+    if (TIMER_WAIT.test(snap.wchan)) {
+      activity.timerWait = true;
+    }
+    if (snap.stdinRead || TTY_WAIT.test(snap.wchan)) {
+      activity.inputWait = true;
+    }
+  }
+  return activity;
+}
+
+function commandBlocked(pid, line) {
+  const activity = treeActivity(pid);
+  if (!activity.seen || activity.running) {
+    return null;
+  }
+  const prompt = isBlockedConfirmLine(line);
+  if (activity.timerWait && !activity.inputWait) {
+    return null;
+  }
+  if (!prompt && !activity.inputWait) {
+    return null;
+  }
+  return activity;
+}
+
+function signalTree(pid, signal) {
+  for (const id of descendantPids(pid).reverse()) {
+    try {
+      process.kill(Number(id), signal);
+    } catch (_err) {
+      continue;
+    }
+  }
+}
+
+function stopChild(child, stopped, signal = "SIGTERM") {
   if (!child || !child.pid || stopped.current) {
     return;
   }
   stopped.current = true;
-  try {
-    process.kill(-child.pid, "SIGTERM");
-  } catch (_err) {
-    try {
-      child.kill("SIGTERM");
-    } catch (_killErr) {
-      return;
-    }
+  const pid = child.pid;
+  signalTree(pid, signal);
+  if (signal === "SIGKILL") {
+    return;
   }
-  setTimeout(() => {
-    try {
-      process.kill(-child.pid, "SIGKILL");
-    } catch (_err) {
-      try {
-        child.kill("SIGKILL");
-      } catch (_killErr) {
-        return;
-      }
-    }
-  }, 200).unref();
+  const timer = setTimeout(() => signalTree(pid, "SIGKILL"), 200);
+  if (timer.unref) {
+    timer.unref();
+  }
 }
 
 function runConfirmPromptGuard(script, io = process) {
@@ -72,28 +200,58 @@ function runConfirmPromptGuard(script, io = process) {
       return;
     }
     const child = spawn("bash", ["-c", command], {
-      detached: true,
       stdio: ["inherit", "pipe", "pipe"],
     });
-    let output = "";
-    let blockedSince = 0;
+    const tracker = createLineTracker();
     const stopped = { current: false };
-    const note = (chunk, stream) => {
-      stream.write(chunk);
-      output += chunk.toString("utf8");
-      blockedSince = isBlockedConfirmLine(output) ? Date.now() : 0;
+    let watch = null;
+    const halt = (signal) => stopChild(child, stopped, signal);
+    const onSignal = () => {
+      halt("SIGKILL");
+      process.exit(1);
     };
-    child.stdout.on("data", (chunk) => note(chunk, io.stdout));
-    child.stderr.on("data", (chunk) => note(chunk, io.stderr));
+    const onExit = () => halt("SIGKILL");
+    process.on("SIGTERM", onSignal);
+    process.on("SIGINT", onSignal);
+    process.on("SIGHUP", onSignal);
+    process.on("exit", onExit);
+    child.stdout.on("data", (chunk) => {
+      io.stdout.write(chunk);
+      tracker.push(chunk);
+    });
+    child.stderr.on("data", (chunk) => {
+      io.stderr.write(chunk);
+      tracker.push(chunk);
+    });
     const timer = setInterval(() => {
-      if (!blockedSince || Date.now() - blockedSince < CONFIRM_PROMPT_BLOCK_MS) {
+      if (!child.pid || stopped.current) {
+        return;
+      }
+      const activity = commandBlocked(child.pid, tracker.current());
+      if (!activity) {
+        watch = null;
+        return;
+      }
+      if (
+        !watch ||
+        activity.cpu > watch.cpu + CPU_SLACK_TICKS ||
+        activity.io > watch.io
+      ) {
+        watch = { since: Date.now(), cpu: activity.cpu, io: activity.io };
+        return;
+      }
+      if (Date.now() - watch.since < CONFIRM_PROMPT_BLOCK_MS) {
         return;
       }
       clearInterval(timer);
-      stopChild(child, stopped);
+      halt("SIGTERM");
     }, 100);
     const finish = (code) => {
       clearInterval(timer);
+      process.removeListener("SIGTERM", onSignal);
+      process.removeListener("SIGINT", onSignal);
+      process.removeListener("SIGHUP", onSignal);
+      process.removeListener("exit", onExit);
       resolve(code);
     };
     child.on("error", () => finish(1));

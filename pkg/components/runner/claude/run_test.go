@@ -891,10 +891,48 @@ func TestClaudeRunEnvFailsBlockedConfirmWithoutAnswering(t *testing.T) {
 func TestConfirmPromptGuardReturnsBlockedOverwritePrompt(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, err := runConfirmPromptGuard(ctx, `printf '%s\n' '? The file card.tsx already exists. Would you like to overwrite? › (y/N)'; sleep 30`)
+	out, err := runConfirmPromptGuardStdin(ctx, `printf '%s\n' '? The file card.tsx already exists. Would you like to overwrite? › (y/N)'; read -r ans`, true)
 	require.Error(t, err)
 	assert.Contains(t, out, "card.tsx")
 	assert.NotContains(t, out, "ANSWER:")
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, 1, exitErr.ExitCode())
+}
+
+func TestConfirmPromptGuardStopsYesPrompt(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := runConfirmPromptGuardStdin(ctx, `printf '%s\n' 'Ok to proceed? (y)'; read -r ans`, true)
+	require.Error(t, err)
+	assert.Contains(t, out, "Ok to proceed?")
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, 1, exitErr.ExitCode())
+}
+
+func TestConfirmPromptGuardLeavesWorkingPromptTextAlone(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := runConfirmPromptGuard(ctx, `printf '%s\n' 'Continue?'; sleep 1.2; printf '%s\n' done`)
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "done")
+}
+
+func TestConfirmPromptGuardLeavesBusyPromptTextAlone(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := runConfirmPromptGuard(ctx, `printf '%s\n' '(y/n)'; node -e 'const e=Date.now()+1200; while(Date.now()<e){}'; printf '%s\n' done`)
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "done")
+}
+
+func TestConfirmPromptGuardSeesPromptAfterLargeOutput(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := runConfirmPromptGuardStdin(ctx, `node -e 'process.stdout.write("x\n".repeat(4000))'; printf '%s\n' 'Ok to proceed? (y)'; read -r ans`, true)
+	require.Error(t, err)
+	assert.Contains(t, out, "Ok to proceed?")
 	var exitErr *exec.ExitError
 	require.ErrorAs(t, err, &exitErr)
 	assert.Equal(t, 1, exitErr.ExitCode())
@@ -941,13 +979,29 @@ func claudeRunEnvFromScript(t *testing.T, taskDir string) map[string]string {
 }
 
 func runConfirmPromptGuard(ctx context.Context, command string) (string, error) {
+	return runConfirmPromptGuardStdin(ctx, command, false)
+}
+
+func runConfirmPromptGuardStdin(ctx context.Context, command string, holdStdin bool) (string, error) {
 	script, err := filepath.Abs(filepath.Join("..", "confirm_prompt.js"))
 	if err != nil {
 		return "", err
 	}
 	cmd := exec.CommandContext(ctx, "node", "-e", `const { runConfirmPromptGuard } = require(process.argv[1]); runConfirmPromptGuard(process.argv[2]).then((code) => process.exit(code));`, script, command)
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	cmd.Stderr = &buf
+	if holdStdin {
+		reader, writer, pipeErr := os.Pipe()
+		if pipeErr != nil {
+			return "", pipeErr
+		}
+		defer writer.Close()
+		defer reader.Close()
+		cmd.Stdin = reader
+	}
+	err = cmd.Run()
+	return buf.String(), err
 }
 
 func assertConfirmPromptRule(t *testing.T, text string) {
