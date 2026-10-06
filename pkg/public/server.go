@@ -107,6 +107,14 @@ func (s *Server) SetLicenseService(service *licensing.Service) {
 	s.licenseService = service
 }
 
+func (s *Server) entitlements() licensing.Entitlements {
+	if s.licenseService == nil {
+		return licensing.Community
+	}
+
+	return s.licenseService
+}
+
 // WebsocketHub returns the websocket hub for this server
 func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
@@ -278,7 +286,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 	ctx := context.Background()
 
-	authorizer := authorization.NewGatewayAuthorizer(s.authService)
+	authorizer := authorization.NewGatewayAuthorizer(s.authService).WithEntitlements(s.entitlements())
 
 	var grpcGatewayMux *runtime.ServeMux
 	grpcGatewayMux = runtime.NewServeMux(
