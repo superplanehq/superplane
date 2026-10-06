@@ -297,9 +297,16 @@ async function persistCanvasChange(args: {
     await invalidate();
     showSuccessToast(successNotice);
   } catch (error) {
+    if (isNoStagedChangesError(error)) {
+      return;
+    }
     showErrorToast(getApiErrorMessage(error, failureFallback));
     throw error;
   }
+}
+
+function isNoStagedChangesError(error: unknown): boolean {
+  return getApiErrorMessage(error, "").includes("no staged changes to commit");
 }
 
 function editFromCanvas(canvas: CanvasesCanvas, change: CanvasChange): AgentCanvasEdit {

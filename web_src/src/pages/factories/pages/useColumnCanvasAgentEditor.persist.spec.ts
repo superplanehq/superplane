@@ -459,6 +459,31 @@ describe("persistColumnAgent", () => {
 });
 
 describe("persistNodeConfiguration", () => {
+  it("stays quiet when the step is already saved", async () => {
+    const { showErrorToast, showSuccessToast } = await import("@/lib/toast");
+    vi.mocked(showErrorToast).mockClear();
+    vi.mocked(showSuccessToast).mockClear();
+    const commit = vi.fn().mockRejectedValue(new Error("no staged changes to commit"));
+
+    await persistNodeConfiguration({
+      appId: "app-refund-implementer",
+      canvas: agentCanvas,
+      update: {
+        nodeId: "onrun-implement",
+        name: "On run",
+        configuration: {},
+      },
+      stageYaml: vi.fn().mockResolvedValue({}),
+      commit,
+      invalidate: vi.fn(),
+      ...stagingSaveDeps(),
+    });
+
+    expect(commit).toHaveBeenCalled();
+    expect(showErrorToast).not.toHaveBeenCalled();
+    expect(showSuccessToast).not.toHaveBeenCalled();
+  });
+
   it("stages one step and leaves the other steps unchanged", async () => {
     const stageYaml = vi.fn().mockResolvedValue({});
     const commit = vi.fn().mockResolvedValue({});
