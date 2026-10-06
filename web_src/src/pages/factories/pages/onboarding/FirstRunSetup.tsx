@@ -209,8 +209,9 @@ function TicketsScreenHost({
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
-      jiraAvailable={flow.jiraAvailable}
-      jiraFeatureLoading={flow.jiraFeatureLoading}
+      intakeState={flow.intakeState}
+      intakesLoading={flow.intakesLoading}
+      ticketIntakes={flow.ticketIntakes}
       jiraChoiceBlock={flow.jiraChoiceBlock}
       linearAvailable={flow.linearAvailable}
       linearFeatureLoading={flow.linearFeatureLoading}

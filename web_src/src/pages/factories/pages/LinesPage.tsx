@@ -21,6 +21,7 @@ import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useCreateFactoryIntake, useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useIntakeCatalogAvailability } from "@/hooks/useIntakeCatalogAvailability";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
@@ -189,10 +190,9 @@ import { replaceLineStepParallelism } from "../lib/factoryLineFormShared";
 import { ColumnLaneMenu } from "./ColumnLaneMenu";
 import { ParallelismSettingsDialog } from "./ParallelismSettingsDialog";
 import {
-  addIntakeTemplatesForOrg,
+  addIntakeTemplatesFromCatalog,
   apiIntakeSource,
   intakeSourcesFromFactoryIntakes,
-  isAddIntakeSoon,
   isLineIntakeSourceId,
   type AddIntakeTemplate,
 } from "./lineIntakeModel";
@@ -373,7 +373,11 @@ export function LinesPage() {
     (): string[] => configuredIntakes.map((intake) => intake.source.id),
     [configuredIntakes],
   );
-  const addIntakeTemplates = useMemo(() => addIntakeTemplatesForOrg(hasExperimentalFeature), [hasExperimentalFeature]);
+  const intakeCatalog = useIntakeCatalogAvailability(organizationId);
+  const addIntakeTemplates = useMemo(
+    () => addIntakeTemplatesFromCatalog(intakeCatalog.catalog),
+    [intakeCatalog.catalog],
+  );
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
@@ -543,7 +547,7 @@ export function LinesPage() {
 
   const createIntakeFromTemplate = (template: AddIntakeTemplate) => {
     setAddIntakeOpen(false);
-    if (isAddIntakeSoon(template, hasExperimentalFeature) || takenIntakeSourceIds.includes(template.id)) {
+    if (template.soon || takenIntakeSourceIds.includes(template.id)) {
       return;
     }
     if (template.id === "github-issues") {
@@ -666,6 +670,8 @@ export function LinesPage() {
         onClose={() => setAddIntakeOpen(false)}
         onSelect={createIntakeFromTemplate}
         templates={addIntakeTemplates}
+        loading={intakeCatalog.loading}
+        loadFailed={intakeCatalog.error}
         takenSourceIds={takenIntakeSourceIds}
       />
       <AddPRFeedbackPicker
