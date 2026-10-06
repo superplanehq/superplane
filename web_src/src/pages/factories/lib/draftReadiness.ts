@@ -19,10 +19,20 @@ export type DraftReadinessInput = {
   clarity?: number;
   confidence?: number;
   isAnalyzing?: boolean;
+  /** Top of the scale the scores use: 5 for legacy scores, 3 for review scores. */
+  scoreMax?: number;
 };
 
 const LOW_SCORE_MAX = 2;
 const MID_SCORE = 3;
+
+/** Legacy 1–5 scores: low is 1–2, the midpoint is 3. Review 1–3 scores: low is 1, the midpoint is 2. */
+function scoreThresholds(scoreMax?: number): { low: number; mid: number } {
+  if (scoreMax != null && scoreMax <= 3) {
+    return { low: 1, mid: 2 };
+  }
+  return { low: LOW_SCORE_MAX, mid: MID_SCORE };
+}
 
 export const DRAFT_READINESS_NOTES = {
   analyzing: {
@@ -87,13 +97,14 @@ export function draftReadiness(input: DraftReadinessInput): DraftReadiness {
       ? withTone("analyzing", DRAFT_READINESS_NOTES.analyzing)
       : withTone("pending", DRAFT_READINESS_NOTES.pending);
   }
-  if (clarity != null && clarity <= LOW_SCORE_MAX) {
+  const { low, mid } = scoreThresholds(input.scoreMax);
+  if (clarity != null && clarity <= low) {
     return withTone("blocked", DRAFT_READINESS_NOTES.unclear);
   }
-  if (confidence != null && confidence <= LOW_SCORE_MAX) {
+  if (confidence != null && confidence <= low) {
     return withTone("caution", DRAFT_READINESS_NOTES.agentFit);
   }
-  if (clarity === MID_SCORE || confidence === MID_SCORE) {
+  if (clarity === mid || confidence === mid) {
     return withTone("caution", DRAFT_READINESS_NOTES.uncertain);
   }
   return withTone("ready", DRAFT_READINESS_NOTES.ready);

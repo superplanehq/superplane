@@ -187,6 +187,7 @@ function planningStartTone(analysis: IntentAnalysisChat): DraftReadinessTone {
   return liveDraftReadiness({
     clarity: analysis.showClarity !== false ? analysis.clarity?.score : undefined,
     confidence: analysis.showConfidence !== false ? analysis.confidence?.score : undefined,
+    scoreMax: analysis.confidence?.maxScore,
     isAnalyzing:
       analysis.isAnalyzing || analysis.view.machineStatus === "starting" || analysis.view.machineStatus === "running",
   }).tone;

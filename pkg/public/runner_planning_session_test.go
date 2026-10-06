@@ -111,9 +111,9 @@ func TestRunnerPlanningSessionUpdateWritesScoresSpecAndSurvey(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/updates", bytes.NewReader([]byte(`{
 		"scores": {
-			"clarity": {"score": 4, "summary": "Outcome, scope, and done are defined."},
-			"complexity": {"score": 3, "summary": "One agent can finish this in one run."},
-			"verifiability": {"score": 5, "summary": "Existing tests cover the change."}
+			"clarity": {"score": 3, "summary": "Outcome, scope, and done are defined."},
+			"complexity": {"score": 2, "summary": "One agent can finish this in one run."},
+			"verifiability": {"score": 3, "summary": "Existing tests cover the change."}
 		},
 		"spec": "# Retry refunds\n\nStop double charges.\n",
 		"survey": {"questions": [{"prompt": "Which service?", "options": ["Payments", "Billing"]}]}

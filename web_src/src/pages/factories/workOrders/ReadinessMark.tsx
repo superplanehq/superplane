@@ -12,7 +12,7 @@ import {
   type ConfidenceBand,
 } from "../lib/confidenceScore";
 import { DRAFT_READINESS_SHORT_LABEL, draftReadiness, type DraftReadinessTone } from "../lib/draftReadiness";
-import { planningReviewLevel } from "../lib/planningReviewScore";
+import { PLANNING_REVIEW_SCORE_MAX, planningReviewAtMax, planningReviewLevel } from "../lib/planningReviewScore";
 import { workOrderCheckStatus, type WorkOrderCheckLevel } from "../lib/workOrderChecks";
 import { ConfidenceMeter } from "./ConfidenceMeter";
 
@@ -98,19 +98,25 @@ export function CardScoreBadges({
   testId?: string;
 }) {
   const hasReview = Boolean(reviewMetrics && reviewMetrics.length > 0);
+  const scoreMax = hasReview ? PLANNING_REVIEW_SCORE_MAX : CONFIDENCE_SCORE_MAX;
   const readiness = draftReadiness({
     clarity: hasReview || !showClarity ? undefined : clarity,
     confidence: showConfidence ? confidence : undefined,
+    scoreMax,
   });
   const rows = scoreRows(clarity, confidence, {
     showClarity: hasReview ? false : showClarity,
     showConfidence,
   });
-  const metricSpeech = (reviewMetrics ?? []).map((metric) => {
+  const breakdownMetrics = reviewBreakdown(reviewMetrics);
+  const metricSpeech = (breakdownMetrics ?? []).map((metric) => {
     const status = reviewMetricStatus(metric);
     return `${metric.name} ${status.label}`;
   });
-  const speech = [readiness.headline, ...(metricSpeech.length > 0 ? metricSpeech : rows.map(scoreSpeech))].join(". ");
+  const speech = [
+    readiness.headline,
+    ...(metricSpeech.length > 0 ? metricSpeech : rows.map((row) => scoreSpeech(row, scoreMax))),
+  ].join(". ");
 
   return (
     <Tooltip>
@@ -124,7 +130,12 @@ export function CardScoreBadges({
         >
           {rows.map((row) =>
             row.key === "confidence" ? (
-              <ConfidenceChip key={row.key} score={row.score} testId={testId ? `${testId}-${row.key}` : undefined} />
+              <ConfidenceChip
+                key={row.key}
+                score={row.score}
+                max={scoreMax}
+                testId={testId ? `${testId}-${row.key}` : undefined}
+              />
             ) : (
               <span
                 key={row.key}
@@ -145,9 +156,9 @@ export function CardScoreBadges({
         <span className="block font-medium" data-testid={testId ? `${testId}-verdict` : undefined}>
           {readiness.headline}
         </span>
-        {reviewMetrics && reviewMetrics.length > 0 ? (
+        {breakdownMetrics ? (
           <span className="mt-1 grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5">
-            {reviewMetrics.map((metric) => {
+            {breakdownMetrics.map((metric) => {
               const status = reviewMetricStatus(metric);
               return (
                 <Fragment key={metric.key}>
@@ -163,8 +174,8 @@ export function CardScoreBadges({
   );
 }
 
-function ConfidenceChip({ score, testId }: { score?: number; testId?: string }) {
-  const value = score == null ? undefined : clampConfidenceScore(score);
+function ConfidenceChip({ score, max, testId }: { score?: number; max: number; testId?: string }) {
+  const value = score == null ? undefined : clampConfidenceScore(score, max);
   return (
     <span
       data-testid={testId}
@@ -177,15 +188,27 @@ function ConfidenceChip({ score, testId }: { score?: number; testId?: string }) 
         <>
           <ConfidenceMeter
             score={value}
+            max={max}
             showTooltip={false}
             decorative
             testId={testId ? `${testId}-meter` : undefined}
           />
-          <span className={cn("tabular-nums", NUMBER_TONE[confidenceBandForScore(value)])}>{value}</span>
+          <span className={cn("tabular-nums", NUMBER_TONE[confidenceBandForScore(value, max)])}>{value}</span>
         </>
       )}
     </span>
   );
+}
+
+/**
+ * At the top score the verdict already says it all, so the tooltip
+ * skips the per-check breakdown.
+ */
+function reviewBreakdown<Metric extends { score: number }>(reviewMetrics?: Metric[]): Metric[] | undefined {
+  if (!reviewMetrics || reviewMetrics.length === 0 || planningReviewAtMax(reviewMetrics)) {
+    return undefined;
+  }
+  return reviewMetrics;
 }
 
 function reviewMetricStatus(metric: { key: string; name: string; score: number; level?: WorkOrderCheckLevel }) {
@@ -201,15 +224,15 @@ function tooltipResultTone(metric: { score: number; level?: WorkOrderCheckLevel 
   return TOOLTIP_RESULT_TONE[metric.level ?? planningReviewLevel(metric.score)];
 }
 
-function scoreText(score?: number) {
-  return score == null ? "–" : `${clampConfidenceScore(score)}/${CONFIDENCE_SCORE_MAX}`;
+function scoreText(score?: number, max: number = CONFIDENCE_SCORE_MAX) {
+  return score == null ? "–" : `${clampConfidenceScore(score, max)}/${max}`;
 }
 
-function scoreSpeech(row: ScoreRow) {
+function scoreSpeech(row: ScoreRow, max: number = CONFIDENCE_SCORE_MAX) {
   if (row.score == null) {
     return `${row.label} no score yet`;
   }
-  return `${row.label} ${clampConfidenceScore(row.score)} of ${CONFIDENCE_SCORE_MAX}`;
+  return `${row.label} ${clampConfidenceScore(row.score, max)} of ${max}`;
 }
 
 /**
@@ -229,7 +252,7 @@ export function CardReadinessMark({
 }) {
   const readiness = draftReadiness({ clarity, confidence });
   const rows = scoreRows(clarity, confidence);
-  const speech = [readiness.headline, ...rows.map(scoreSpeech)].join(". ");
+  const speech = [readiness.headline, ...rows.map((row) => scoreSpeech(row))].join(". ");
 
   return (
     <Tooltip>

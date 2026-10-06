@@ -102,19 +102,19 @@ describe("CardScoreBadges", () => {
     const user = userEvent.setup();
     render(
       <CardScoreBadges
-        clarity={5}
-        confidence={3}
+        clarity={3}
+        confidence={2}
         reviewMetrics={[
-          { key: "clarity", name: "Clarity", score: 5 },
-          { key: "complexity", name: "Complexity", score: 3 },
-          { key: "verifiability", name: "Verifiability", score: 5 },
+          { key: "clarity", name: "Clarity", score: 3 },
+          { key: "complexity", name: "Complexity", score: 2 },
+          { key: "verifiability", name: "Verifiability", score: 3 },
         ]}
         testId="badges"
       />,
     );
 
     expect(screen.queryByTestId("badges-clarity")).not.toBeInTheDocument();
-    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence3");
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence2");
     expect(screen.getByTestId("badges-confidence-meter")).toBeInTheDocument();
     expect(screen.getByTestId("badges")).toHaveAttribute("data-tone", "caution");
 
@@ -131,15 +131,15 @@ describe("CardScoreBadges", () => {
     expect(screen.getByText("Provable")).toHaveClass("text-emerald-300");
   });
 
-  it("uses Unclear Hard and Unproven for a score of 2", async () => {
+  it("uses Unclear Hard and Unproven for a score of 1", async () => {
     const user = userEvent.setup();
     render(
       <CardScoreBadges
-        confidence={2}
+        confidence={1}
         reviewMetrics={[
-          { key: "clarity", name: "Clarity", score: 2 },
-          { key: "complexity", name: "Complexity", score: 2 },
-          { key: "verifiability", name: "Verifiability", score: 2 },
+          { key: "clarity", name: "Clarity", score: 1 },
+          { key: "complexity", name: "Complexity", score: 1 },
+          { key: "verifiability", name: "Verifiability", score: 1 },
         ]}
         testId="badges"
       />,
@@ -151,6 +151,30 @@ describe("CardScoreBadges", () => {
     expect(tip).toHaveTextContent("Hard");
     expect(tip).toHaveTextContent("Unproven");
     expect(tip).not.toHaveTextContent("Partial");
+  });
+
+  it("skips the per-check breakdown when every review score is 3", async () => {
+    const user = userEvent.setup();
+    render(
+      <CardScoreBadges
+        confidence={3}
+        reviewMetrics={[
+          { key: "clarity", name: "Clarity", score: 3 },
+          { key: "complexity", name: "Complexity", score: 3 },
+          { key: "verifiability", name: "Verifiability", score: 3 },
+        ]}
+        testId="badges"
+      />,
+    );
+
+    expect(screen.getByTestId("badges")).toHaveAttribute("data-tone", "ready");
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence3");
+
+    await user.hover(screen.getByTestId("badges"));
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("This task is ready to start");
+    expect(tip).not.toHaveTextContent("Clear");
+    expect(tip).not.toHaveTextContent("Provable");
   });
 
   it("keeps the verdict headline in the tooltip", async () => {

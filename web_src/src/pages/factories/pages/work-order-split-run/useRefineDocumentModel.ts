@@ -24,6 +24,7 @@ function refineClarity(analysis: IntentAnalysisChat | undefined, clarity?: WorkO
   return {
     score: liveScore ?? clarity?.score,
     summary: clarity?.summary?.trim(),
+    maxScore: clarity?.maxScore,
   };
 }
 
@@ -31,6 +32,7 @@ function refineConfidence(confidence?: WorkOrderCheckPresentation): ComposerScor
   return {
     score: confidence?.score,
     summary: confidence?.summary?.trim(),
+    maxScore: confidence?.maxScore,
   };
 }
 
@@ -136,6 +138,9 @@ function bindRefineChat({
   if (!analysis) {
     return undefined;
   }
+  // Review scoring is not optional: when review scores exist, the stored
+  // Confidence setting never hides the derived headline.
+  const hasReview = Boolean(reviewMetrics && reviewMetrics.length > 0);
   return {
     ...analysis,
     planPaneOpen,
@@ -148,7 +153,8 @@ function bindRefineChat({
     clarity,
     confidence,
     reviewMetrics,
-    showClarity: reviewMetrics && reviewMetrics.length > 0 ? false : analysis.showClarity,
+    showClarity: hasReview ? false : analysis.showClarity,
+    showConfidence: hasReview ? true : analysis.showConfidence,
     planStatus,
     isAnalyzing,
   };

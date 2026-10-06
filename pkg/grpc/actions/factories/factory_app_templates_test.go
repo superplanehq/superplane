@@ -580,6 +580,25 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 	assert.Contains(t, text, "Task:\n{{ root().data.workOrder }}")
 }
 
+func TestBuildBacklogCanvasPlanningReviewPrompt(t *testing.T) {
+	legacy := backlogRefinementPromptText(t, buildBacklogCanvas(backlogCanvasRequest{}))
+	assert.Contains(t, legacy, runner.PlanningSessionUserPromptMarkdown())
+	assert.NotContains(t, legacy, "Clarity, Complexity, and Verifiability")
+
+	review := backlogRefinementPromptText(t, buildBacklogCanvas(backlogCanvasRequest{PlanningReview: true}))
+	assert.Contains(t, review, runner.PlanningSessionUserPromptReviewMarkdown())
+	assert.Contains(t, review, "Task:\n{{ root().data.workOrder }}")
+	assert.NotContains(t, review, "1 through 5")
+}
+
+func backlogRefinementPromptText(t *testing.T, canvas *yaml.Canvas) string {
+	t.Helper()
+	refinement := findYAMLNode(t, canvas, backlogRefinementNodeID)
+	text, ok := implementationStep(t, refinement, "Refine Task")["prompt"].(string)
+	require.True(t, ok)
+	return text
+}
+
 func agentPrompt(t *testing.T, agent *yaml.Node) string {
 	t.Helper()
 	prompt, ok := implementationStep(t, agent, "Review Pull Request")["prompt"].(string)

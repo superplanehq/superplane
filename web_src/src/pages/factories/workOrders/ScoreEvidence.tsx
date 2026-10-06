@@ -19,7 +19,10 @@ const ITEM_CLASS = "inline-flex h-7 items-center gap-1.5 px-1.5 text-[12px] lead
 const CHIP_BUTTON_CLASS =
   "rounded-md transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none";
 
-export type ScoreEvidenceValue = ScoreSummaryValue;
+export type ScoreEvidenceValue = ScoreSummaryValue & {
+  /** Top of the scale: 5 for legacy scores, 3 for review scores. */
+  maxScore?: number;
+};
 
 /**
  * External control for the confidence drawer. The chip reports hover and
@@ -137,18 +140,20 @@ export function ScoreEvidence({
     return <ScoreEvidencePlaceholder label={label.short} ariaLabel={`${label.short}. No score yet`} testId={testId} />;
   }
 
-  const chipLabel = `${label.short} ${score}/${CONFIDENCE_SCORE_MAX}`;
+  const max = value?.maxScore || CONFIDENCE_SCORE_MAX;
+  const chipLabel = `${label.short} ${score}/${max}`;
   const content = (
     <>
       <ScoreEvidenceLabel>{label.short}</ScoreEvidenceLabel>
       <ConfidenceMeter
         score={score}
+        max={max}
         label={label.name}
         showTooltip={false}
         decorative
         testId={testId ? `${testId}-meter` : undefined}
       />
-      <span className={cn("tabular-nums font-semibold", NUMBER_TONE[confidenceBandForScore(score)])}>{score}</span>
+      <span className={cn("tabular-nums font-semibold", NUMBER_TONE[confidenceBandForScore(score, max)])}>{score}</span>
     </>
   );
 

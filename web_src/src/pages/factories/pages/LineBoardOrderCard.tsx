@@ -157,16 +157,18 @@ function cardScores(
       key: check.key,
       name: check.name ?? "",
       score: check.score ?? 0,
-      maxScore: check.maxScore ?? 5,
+      maxScore: check.maxScore ?? 0,
       level: planningReviewLevel(check.score ?? 0),
     })),
   );
   if (review) {
+    // Review scoring is not optional, so the stored Confidence setting
+    // never hides review scores.
     return {
       clarityScore: undefined,
       confidenceScore: review.headline.score,
       showClarity: false,
-      showConfidenceScore: visibility.showConfidence,
+      showConfidenceScore: true,
       reviewMetrics: review.metrics,
       isAnalyzing: draftCardAgentIsWorking(session, backlogAnalyzing, review.headline.score),
     };

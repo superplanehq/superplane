@@ -76,6 +76,13 @@ describe("confidenceScore", () => {
     expect(confidenceCheckLevel(2)).toBe("caution");
   });
 
+  it("bands and clamps a 1 to 3 review score on its own scale", () => {
+    expect(confidenceBandForScore(3, 3)).toBe("High");
+    expect(confidenceBandForScore(2, 3)).toBe("Medium");
+    expect(confidenceBandForScore(1, 3)).toBe("Low");
+    expect(clampConfidenceScore(5, 3)).toBe(3);
+  });
+
   it("labels a confidence check High Medium or Low, not Healthy", () => {
     expect(workOrderCheckStatus({ name: "Confidence score", score: 5, level: "positive" }).label).toBe("High");
     expect(workOrderCheckStatus({ name: "Confidence score", score: 3, level: "neutral" }).label).toBe("Medium");

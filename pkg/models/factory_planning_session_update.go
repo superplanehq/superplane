@@ -15,15 +15,19 @@ const (
 	PlanningComplexityCheckName    = "Complexity"
 	PlanningVerifiabilityCheckKey  = "verifiability"
 	PlanningVerifiabilityCheckName = "Verifiability"
+
+	// Review sub-parameters use a 1 through 3 scale: 3 is good, 2 is
+	// partial, 1 is bad. The legacy scores keep PlanningScoreMax.
+	PlanningReviewScoreMax = 3
 )
 
 var planningReviewScoreKinds = []planningScoreKind{
-	{key: PlanningClarityCheckKey, name: PlanningClarityCheckName},
-	{key: PlanningComplexityCheckKey, name: PlanningComplexityCheckName},
-	{key: PlanningVerifiabilityCheckKey, name: PlanningVerifiabilityCheckName},
+	{key: PlanningClarityCheckKey, name: PlanningClarityCheckName, max: PlanningReviewScoreMax},
+	{key: PlanningComplexityCheckKey, name: PlanningComplexityCheckName, max: PlanningReviewScoreMax},
+	{key: PlanningVerifiabilityCheckKey, name: PlanningVerifiabilityCheckName, max: PlanningReviewScoreMax},
 }
 
-// PlanningScoreValue is one 1 through 5 sub-parameter with a one-sentence summary.
+// PlanningScoreValue is one 1 through 3 sub-parameter with a one-sentence summary.
 type PlanningScoreValue struct {
 	Score   float64
 	Summary string
@@ -75,15 +79,11 @@ func (s *FactoryPlanningSession) ProposeUpdate(tx *gorm.DB, update PlanningSessi
 		if err != nil {
 			return err
 		}
-		factoryModel, err := FindFactory(inner, s.OrganizationID, s.FactoryID)
-		if err != nil {
-			return err
-		}
 		checks, err := order.ListChecks(inner)
 		if err != nil {
 			return err
 		}
-		if err := validatePlanningSessionUpdate(update, factoryModel, checks); err != nil {
+		if err := validatePlanningSessionUpdate(update, checks); err != nil {
 			return err
 		}
 		if update.Scores != nil {
@@ -106,23 +106,14 @@ func (s *FactoryPlanningSession) ProposeUpdate(tx *gorm.DB, update PlanningSessi
 	})
 }
 
-func validatePlanningSessionUpdate(
-	update PlanningSessionUpdate,
-	factoryModel *Factory,
-	checks []FactoryWorkOrderCheck,
-) error {
+// validatePlanningSessionUpdate checks one propose_update call. Review
+// scoring is not optional: the first plan turn must publish all three
+// sub-parameters, and any scores sent later must be complete and valid.
+func validatePlanningSessionUpdate(update PlanningSessionUpdate, checks []FactoryWorkOrderCheck) error {
 	if update.Scores != nil {
-		if factoryModel != nil && !factoryModel.PlanningConfidence {
-			return fmt.Errorf("%w: scoring is disabled", ErrFactoryPlanningSessionInvalid)
-		}
-		if err := validatePlanningReviewScores(*update.Scores); err != nil {
-			return err
-		}
+		return validatePlanningReviewScores(*update.Scores)
 	}
-	if hasPlanningReviewScores(checks) || update.Scores != nil {
-		return nil
-	}
-	if factoryModel != nil && !factoryModel.PlanningConfidence {
+	if hasPlanningReviewScores(checks) {
 		return nil
 	}
 	return fmt.Errorf("%w: the first plan turn must include scores", ErrFactoryPlanningSessionInvalid)
@@ -139,8 +130,8 @@ func validatePlanningReviewScores(scores PlanningReviewScores) error {
 }
 
 func validatePlanningReviewScore(kind planningScoreKind, value PlanningScoreValue) error {
-	if !isFiniteCheckNumber(value.Score) || math.Trunc(value.Score) != value.Score || value.Score < 1 || value.Score > PlanningScoreMax {
-		return fmt.Errorf("%w: %s score must be an integer from 1 through 5", ErrFactoryPlanningSessionInvalid, kind.key)
+	if !isFiniteCheckNumber(value.Score) || math.Trunc(value.Score) != value.Score || value.Score < 1 || value.Score > PlanningReviewScoreMax {
+		return fmt.Errorf("%w: %s score must be an integer from 1 through 3", ErrFactoryPlanningSessionInvalid, kind.key)
 	}
 	if strings.TrimSpace(value.Summary) == "" {
 		return fmt.Errorf("%w: %s summary is required", ErrFactoryPlanningSessionInvalid, kind.key)

@@ -234,16 +234,18 @@ func markdownFileRef(file File) string {
 	return fmt.Sprintf("[%s](%s)", label, ref)
 }
 
-// planningScoreKind names one of the two 1 through 5 scores a refine session
-// publishes as a work-order check.
+// planningScoreKind names one score a refine session publishes as a
+// work-order check. The legacy scores run 1 through 5; the review
+// sub-parameters run 1 through 3.
 type planningScoreKind struct {
 	key  string
 	name string
+	max  float64
 }
 
 var (
-	planningClarityScore    = planningScoreKind{key: PlanningClarityCheckKey, name: PlanningClarityCheckName}
-	planningConfidenceScore = planningScoreKind{key: PlanningConfidenceCheckKey, name: PlanningConfidenceCheckName}
+	planningClarityScore    = planningScoreKind{key: PlanningClarityCheckKey, name: PlanningClarityCheckName, max: PlanningScoreMax}
+	planningConfidenceScore = planningScoreKind{key: PlanningConfidenceCheckKey, name: PlanningConfidenceCheckName, max: PlanningScoreMax}
 )
 
 // ProposeClarity publishes how well the task is defined.
@@ -309,9 +311,9 @@ func reportPlanningScore(tx *gorm.DB, session *FactoryPlanningSession, order *Fa
 		Key:      kind.key,
 		Name:     kind.name,
 		Score:    score,
-		MaxScore: PlanningScoreMax,
+		MaxScore: kind.max,
 		Format:   FactoryWorkOrderCheckFormatFraction,
-		Level:    planningScoreLevel(score),
+		Level:    planningScoreLevel(score, kind.max),
 		Summary:  strings.TrimSpace(summary),
 		Run:      run,
 	})
@@ -363,7 +365,17 @@ func upsertPlanningSpecArtifact(tx *gorm.DB, order *FactoryWorkOrder, body strin
 	return err
 }
 
-func planningScoreLevel(score float64) string {
+// Review scores band at 3/2/1. The legacy 1 through 5 scores band at 4-5/3/1-2.
+func planningScoreLevel(score, maxScore float64) string {
+	if maxScore <= PlanningReviewScoreMax {
+		if score >= 3 {
+			return FactoryWorkOrderCheckLevelPositive
+		}
+		if score >= 2 {
+			return FactoryWorkOrderCheckLevelCaution
+		}
+		return FactoryWorkOrderCheckLevelCritical
+	}
 	if score >= 4 {
 		return FactoryWorkOrderCheckLevelPositive
 	}
@@ -376,9 +388,10 @@ func planningScoreLevel(score float64) string {
 func planningScoreCallSentence(tx *gorm.DB, session *FactoryPlanningSession) string {
 	const updateCue = "End an answer, and the first plan, with how to update the plan or the scores. "
 	const startCue = "When every required score is 5, publish each required score on that plan turn. "
+	const reviewStartCue = "When every required score is 3, publish each required score on that plan turn. "
 	const missingCue = "If no score is published yet, this turn is a plan turn. Publish the required scores before you ask or stop. "
 	if organizationHasPlanningReview(tx, session.OrganizationID) {
-		return missingCue + "Call propose_update with scores, spec, and survey in one call. Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
+		return missingCue + "Call propose_update with scores, spec, and survey in one call. Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + reviewStartCue + updateCue
 	}
 	factoryModel, err := FindFactory(tx, session.OrganizationID, session.FactoryID)
 	if err != nil {
@@ -609,7 +622,12 @@ func WorkOrderReadyForAutoStart(
 	if order.State != FactoryWorkOrderStateDraft {
 		return false, nil
 	}
-	if !factoryModel.PlanningEnabled || !factoryModel.PlanningConfidence {
+	if !factoryModel.PlanningEnabled {
+		return false, nil
+	}
+	// Review scoring is not optional, so the Confidence setting only gates
+	// auto-start on the legacy flow.
+	if !factoryModel.PlanningConfidence && !organizationHasPlanningReview(tx, factoryModel.OrganizationID) {
 		return false, nil
 	}
 	if len(session.CurrentSurvey().Questions) > 0 {
@@ -672,7 +690,7 @@ func currentPlanningTurn(tx *gorm.DB, session *FactoryPlanningSession) (planning
 
 func (turn planningTurn) reportedReviewScores(checks []FactoryWorkOrderCheck) bool {
 	for _, kind := range planningReviewScoreKinds {
-		if !turn.reportedScore(checks, kind.key, PlanningScoreMax) {
+		if !turn.reportedScore(checks, kind.key, kind.max) {
 			return false
 		}
 	}
@@ -724,13 +742,18 @@ func planningScoreTextFromChecks(checks []FactoryWorkOrderCheck, key string) pla
 		if checks[i].Key != key {
 			continue
 		}
-		score := strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.1f", checks[i].Score), "0"), ".")
-		if score == "" {
-			score = "0"
-		}
-		return planningScoreText{score: score + "/5", summary: strings.TrimSpace(checks[i].Summary)}
+		fraction := planningScoreNumberText(checks[i].Score) + "/" + planningScoreNumberText(checks[i].MaxScore)
+		return planningScoreText{score: fraction, summary: strings.TrimSpace(checks[i].Summary)}
 	}
 	return planningScoreText{}
+}
+
+func planningScoreNumberText(value float64) string {
+	text := strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.1f", value), "0"), ".")
+	if text == "" {
+		return "0"
+	}
+	return text
 }
 
 func FindPlanningSessionByDraftWorkOrder(

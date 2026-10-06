@@ -84,6 +84,8 @@ test("analysis protocol uses the review wiring when the flag is on", () => {
   assert.match(review, /Do not call propose_spec, propose_clarity, propose_confidence, or survey/);
   assert.match(review, /weakest sub-parameter/);
   assert.match(review, /name only the weakest/);
+  assert.match(review, /integer from 1 through 3/);
+  assert.match(review, /Do not use that scale or its thresholds/);
 });
 
 test("planningTools omits disabled score tools", () => {
@@ -238,6 +240,45 @@ test("analysis user prompt covers tone, score rules, and plan shape", () => {
   assert.doesNotMatch(pack, /## Files and seams/);
   assert.doesNotMatch(pack, /at least five/);
   assert.doesNotMatch(pack, /Key architecture decisions/);
+});
+
+test("review user prompt scores three sub-parameters on the 1 through 3 scale", () => {
+  const pack = fs.readFileSync(path.join(__dirname, "analysis_user_prompt_review.md"), "utf8");
+  assert.match(pack, /Talk like a colleague/);
+  assert.match(pack, /## 1\. Research/);
+  assert.match(pack, /## 2\. Decide or ask/);
+  assert.match(pack, /## 3\. Score Clarity/);
+  assert.match(pack, /## 4\. Score Complexity/);
+  assert.match(pack, /## 5\. Score Verifiability/);
+  assert.match(pack, /## 6\. Write the plan/);
+  assert.match(pack, /integer from 1 through 3/);
+  assert.doesNotMatch(pack, /1 through 5/);
+  assert.doesNotMatch(pack, /## Score Confidence/);
+  assert.doesNotMatch(pack, /Confidence summary/);
+  assert.match(pack, /derives one Confidence number from the weakest sub-parameter/);
+  assert.match(pack, /You never invent the headline number/);
+  assert.match(pack, /how well the task is defined/);
+  assert.match(pack, /finishes this task in one run/);
+  assert.match(pack, /whether the run can prove the change works/);
+  assert.match(pack, /### Calibration/);
+  assert.match(pack, /Start at 3 for a bounded change that has a pattern in the repository/);
+  assert.match(pack, /Finish the research first\. Publish the scores, the plan, and any question together, once, at the end of the turn\./);
+  assert.match(pack, /Never publish placeholder or filler text/);
+  assert.match(pack, /If Clarity is 1, do not write a specification/);
+  assert.match(pack, /Publish the scores alone/);
+  assert.match(pack, /If Clarity is 2, write the plan\. Say it is a first pass\./);
+  assert.match(pack, /Keep refining until every score is 3/);
+  assert.match(pack, /A simple task can reach 3 on every score with no survey/);
+  assert.match(pack, /one sentence of 14 words or fewer/);
+  assert.match(pack, /about the task, not to the user/);
+  assert.match(pack, /name only the weakest sub-parameter/);
+  assert.match(pack, /Skip Risks only when every score is 3/);
+  assert.match(pack, /Keep this task as one task/);
+  assert.match(pack, /ask to update the plan or the scores, or confirm a decision/);
+  assert.match(pack, /Do not use a survey to answer a question/);
+  assert.match(pack, /Keep each option under 12 words/);
+  assert.doesNotMatch(pack, /propose_update/);
+  assert.doesNotMatch(pack, /propose_spec/);
 });
 
 test("embedded analysis protocol is removed from the task prompt", () => {

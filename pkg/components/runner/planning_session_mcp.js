@@ -360,7 +360,7 @@ async function recordAgentMessage(text) {
 const UPDATE_TOOL = {
   name: "propose_update",
   description:
-    "Publish scores, the specification, and an optional survey in one call. Pass scores as clarity, complexity, and verifiability. Each score is an integer from 1 through 5 with a one-sentence summary. Pass spec as the full markdown body. Pass survey only when you ask a question. The first plan turn must include scores.",
+    "Publish scores, the specification, and an optional survey in one call. Pass scores as clarity, complexity, and verifiability. Each score is an integer from 1 through 3 with a one-sentence summary. Pass spec as the full markdown body. Pass survey only when you ask a question. The first plan turn must include scores.",
   inputSchema: {
     type: "object",
     properties: {
@@ -370,7 +370,7 @@ const UPDATE_TOOL = {
           clarity: {
             type: "object",
             properties: {
-              score: { type: "number", description: "Integer from 1 through 5." },
+              score: { type: "number", description: "Integer from 1 through 3." },
               summary: { type: "string", description: "One sentence." },
             },
             required: ["score", "summary"],
@@ -378,7 +378,7 @@ const UPDATE_TOOL = {
           complexity: {
             type: "object",
             properties: {
-              score: { type: "number", description: "Integer from 1 through 5." },
+              score: { type: "number", description: "Integer from 1 through 3." },
               summary: { type: "string", description: "One sentence." },
             },
             required: ["score", "summary"],
@@ -386,7 +386,7 @@ const UPDATE_TOOL = {
           verifiability: {
             type: "object",
             properties: {
-              score: { type: "number", description: "Integer from 1 through 5." },
+              score: { type: "number", description: "Integer from 1 through 3." },
               summary: { type: "string", description: "One sentence." },
             },
             required: ["score", "summary"],

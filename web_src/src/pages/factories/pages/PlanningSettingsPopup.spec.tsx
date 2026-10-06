@@ -192,14 +192,26 @@ describe("PlanningSettingsPopup", () => {
     expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartPlanningOffHelper)).toBeInTheDocument();
   });
 
-  it("shows one flat Confidence toggle without the checks group when Planning Review is on", () => {
+  it("hides the score toggles when Planning Review is on", () => {
     renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { planningReviewEnabled: true });
 
     expect(screen.queryByTestId("planning-settings-clarity")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("planning-settings-confidence")).not.toBeInTheDocument();
     expect(screen.queryByTestId("planning-settings-checks")).not.toBeInTheDocument();
     expect(screen.queryByText(PLANNING_SETTINGS_COPY.checksLabel)).not.toBeInTheDocument();
-    expect(screen.getByTestId("planning-settings-confidence")).toBeInTheDocument();
-    expect(screen.getByText(PLANNING_SETTINGS_COPY.confidenceReviewHelper)).toBeInTheDocument();
+    expect(screen.getByText(PLANNING_SETTINGS_COPY.planningReviewHelper)).toBeInTheDocument();
+  });
+
+  it("keeps Auto-start available when Planning Review is on and Confidence was stored off", () => {
+    renderPopup(
+      vi.fn(),
+      { enabled: true, clarity: false, confidence: false, autoStartLineId: "" },
+      { planningReviewEnabled: true, lines: [{ id: "line-implement", name: "implement" }] },
+    );
+
+    const toggle = within(screen.getByTestId("planning-settings-auto-start")).getByRole("switch");
+    expect(toggle).not.toBeDisabled();
+    expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartReviewHelper)).toBeInTheDocument();
   });
 
   it("shows General, Agent, and Automation tabs when an agent exists", () => {

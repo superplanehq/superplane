@@ -31,6 +31,9 @@ var analysisProtocolReviewMarkdown string
 //go:embed analysis_user_prompt.md
 var analysisUserPromptMarkdown string
 
+//go:embed analysis_user_prompt_review.md
+var analysisUserPromptReviewMarkdown string
+
 //go:embed mcp.json
 var planningSessionMCPConfig string
 
@@ -77,6 +80,13 @@ func PlanningSessionProtocolMarkdown() string {
 // Clarity rules, and plan shape. Factories can edit that node prompt.
 func PlanningSessionUserPromptMarkdown() string {
 	return strings.TrimSpace(analysisUserPromptMarkdown)
+}
+
+// PlanningSessionUserPromptReviewMarkdown is the Refine Task prompt for
+// organizations on the task planning review flow: three sub-parameters on a
+// 1 through 3 scale. Factories can edit that node prompt.
+func PlanningSessionUserPromptReviewMarkdown() string {
+	return strings.TrimSpace(analysisUserPromptReviewMarkdown)
 }
 
 // PlanningSessionProtocolMarkdownFile ships the canonical protocol to runners.

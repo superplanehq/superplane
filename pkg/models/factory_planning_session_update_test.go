@@ -19,7 +19,7 @@ func TestFactoryPlanningSession_ProposeUpdateWritesScoresSpecAndSurvey(t *testin
 	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
 
 	err := session.ProposeUpdate(db, PlanningSessionUpdate{
-		Scores: reviewScores(4, 3, 5),
+		Scores: reviewScores(3, 2, 3),
 		Spec:   "# Retry refunds\n\nStop double charges.\n",
 		Survey: &PlanningSessionSurvey{
 			Questions: []PlanningSessionSurveyQuestion{{Prompt: "Which service?", Options: []string{"Payments", "Billing"}}},
@@ -34,12 +34,14 @@ func TestFactoryPlanningSession_ProposeUpdateWritesScoresSpecAndSurvey(t *testin
 	for _, check := range checks {
 		byKey[check.Key] = check
 	}
-	assert.Equal(t, 4.0, byKey[PlanningClarityCheckKey].Score)
+	assert.Equal(t, 3.0, byKey[PlanningClarityCheckKey].Score)
 	assert.Equal(t, PlanningClarityCheckName, byKey[PlanningClarityCheckKey].Name)
-	assert.Equal(t, 3.0, byKey[PlanningComplexityCheckKey].Score)
+	assert.Equal(t, 2.0, byKey[PlanningComplexityCheckKey].Score)
 	assert.Equal(t, PlanningComplexityCheckName, byKey[PlanningComplexityCheckKey].Name)
-	assert.Equal(t, 5.0, byKey[PlanningVerifiabilityCheckKey].Score)
+	assert.Equal(t, 3.0, byKey[PlanningVerifiabilityCheckKey].Score)
 	assert.Equal(t, PlanningVerifiabilityCheckName, byKey[PlanningVerifiabilityCheckKey].Name)
+	assert.Equal(t, float64(PlanningReviewScoreMax), byKey[PlanningClarityCheckKey].MaxScore)
+	assert.Equal(t, FactoryWorkOrderCheckLevelPositive, byKey[PlanningClarityCheckKey].Level)
 	assert.Equal(t, FactoryWorkOrderCheckLevelCaution, byKey[PlanningComplexityCheckKey].Level)
 
 	spec, err := planningSpecBody(db, order)
@@ -59,7 +61,7 @@ func TestFactoryPlanningSession_ProposeUpdateStoresJSONEncodedSpecAsMarkdown(t *
 	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
 
 	err := session.ProposeUpdate(db, PlanningSessionUpdate{
-		Scores: reviewScores(5, 5, 5),
+		Scores: reviewScores(3, 3, 3),
 		Spec:   `"# Retry refunds\n\nStop double charges.\n"`,
 	})
 	require.NoError(t, err)
@@ -102,8 +104,8 @@ func TestFactoryPlanningSession_ProposeUpdateRejectsPartialScores(t *testing.T) 
 
 	err := session.ProposeUpdate(db, PlanningSessionUpdate{
 		Scores: &PlanningReviewScores{
-			Clarity:    PlanningScoreValue{Score: 4, Summary: "Outcome is clear."},
-			Complexity: PlanningScoreValue{Score: 4, Summary: "One run can finish."},
+			Clarity:    PlanningScoreValue{Score: 3, Summary: "Outcome is clear."},
+			Complexity: PlanningScoreValue{Score: 3, Summary: "One run can finish."},
 		},
 	})
 	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
@@ -135,7 +137,7 @@ func TestFactoryPlanningSession_ProposeUpdateRejectsNonIntegerScore(t *testing.T
 	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
 	_, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
 
-	err := session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(4.5, 3, 5)})
+	err := session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(2.5, 2, 3)})
 	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
 	assert.Contains(t, err.Error(), "clarity")
 }
@@ -147,7 +149,7 @@ func TestFactoryPlanningSession_ProposeUpdateAllowsLaterSurveyOnly(t *testing.T)
 	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Confidence: true}))
 	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
 	_, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
-	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(2, 4, 5)}))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(1, 2, 3)}))
 
 	err := session.ProposeUpdate(db, PlanningSessionUpdate{
 		Survey: &PlanningSessionSurvey{
@@ -168,34 +170,52 @@ func TestAnalysisContinuationTextUsesProposeUpdateWhenReviewIsOn(t *testing.T) {
 	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
 	_, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
 	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{
-		Scores: reviewScores(4, 3, 5),
+		Scores: reviewScores(3, 2, 3),
 		Spec:   "# Retry refunds\n\nStop double charges.\n",
 	}))
 
 	text, err := AnalysisContinuationText(db, session)
 	require.NoError(t, err)
 	assert.Contains(t, text, "Call propose_update with scores, spec, and survey in one call")
+	assert.Contains(t, text, "When every required score is 3")
 	assert.Contains(t, text, "include spec on propose_update")
 	assert.Contains(t, text, "Include survey on propose_update")
-	assert.Contains(t, text, "Current Clarity: 4/5")
-	assert.Contains(t, text, "Current Complexity: 3/5")
-	assert.Contains(t, text, "Current Verifiability: 5/5")
+	assert.Contains(t, text, "Current Clarity: 3/3")
+	assert.Contains(t, text, "Current Complexity: 2/3")
+	assert.Contains(t, text, "Current Verifiability: 3/3")
 	assert.NotContains(t, text, "propose_spec")
 	assert.NotContains(t, text, "Call survey only")
 }
 
-func TestWorkOrderReadyForAutoStartReviewRequiresAllThreeFives(t *testing.T) {
+func TestFactoryPlanningSession_ProposeUpdateIgnoresConfidenceSetting(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-update-confidence-off")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Confidence: false}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
+
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 2, 3)}))
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	assert.Len(t, checks, 3)
+}
+
+// Review scoring is not optional, so a stored Confidence=false from the
+// legacy settings must not block review auto-start.
+func TestWorkOrderReadyForAutoStartReviewRequiresAllThreeThrees(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-review")
 	db := database.DB(t.Context())
 	require.NoError(t, EnableExperimentalFeatureInTransaction(db, org.ID, features.FeatureTaskPlanningReview))
-	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: true}))
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: false}))
 	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
 	line, err := factoryModel.CreateLine(db, "ship", nil)
 	require.NoError(t, err)
 	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
 	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{
-		Scores: reviewScores(5, 5, 4),
+		Scores: reviewScores(3, 3, 2),
 		Spec:   "# Retry refunds\n\nStop double charges.\n",
 	}))
 
@@ -203,7 +223,7 @@ func TestWorkOrderReadyForAutoStartReviewRequiresAllThreeFives(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, ready)
 
-	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(5, 5, 5)}))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.True(t, ready)
