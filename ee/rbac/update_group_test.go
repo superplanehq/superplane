@@ -1,4 +1,4 @@
-package auth
+package rbac
 
 import (
 	"context"
@@ -25,7 +25,7 @@ func TestUpdateGroup(t *testing.T) {
 			Role: models.RoleOrgAdmin,
 		}
 
-		resp, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "test-group", groupSpec, r.AuthService)
+		resp, err := updateGroup(ctx, models.DomainTypeOrganization, orgID, "test-group", groupSpec, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Spec.Role)
@@ -44,7 +44,7 @@ func TestUpdateGroup(t *testing.T) {
 			Description: "Updated Description",
 		}
 
-		resp, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "metadata-group", groupSpec, r.AuthService)
+		resp, err := updateGroup(ctx, models.DomainTypeOrganization, orgID, "metadata-group", groupSpec, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, "Updated Display Name", resp.Group.Spec.DisplayName)
@@ -61,7 +61,7 @@ func TestUpdateGroup(t *testing.T) {
 			Description: "Full Update Description",
 		}
 
-		resp, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "full-update-group", groupSpec, r.AuthService)
+		resp, err := updateGroup(ctx, models.DomainTypeOrganization, orgID, "full-update-group", groupSpec, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Spec.Role)
@@ -84,7 +84,7 @@ func TestUpdateGroup(t *testing.T) {
 			Role: models.RoleOrgAdmin,
 		}
 
-		resp, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "membership-group", groupSpec, r.AuthService)
+		resp, err := updateGroup(ctx, models.DomainTypeOrganization, orgID, "membership-group", groupSpec, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -99,7 +99,7 @@ func TestUpdateGroup(t *testing.T) {
 		err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "nil-spec-group", models.RoleOrgOperator, "Nil Spec Group", "Nil Spec Description")
 		require.NoError(t, err)
 
-		resp, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "nil-spec-group", nil, r.AuthService)
+		resp, err := updateGroup(ctx, models.DomainTypeOrganization, orgID, "nil-spec-group", nil, r.AuthService)
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Equal(t, models.RoleOrgOperator, resp.Group.Spec.Role)
@@ -112,7 +112,7 @@ func TestUpdateGroup(t *testing.T) {
 			Role: models.RoleOrgAdmin,
 		}
 
-		_, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "non-existent-group", groupSpec, r.AuthService)
+		_, err := updateGroup(ctx, models.DomainTypeOrganization, orgID, "non-existent-group", groupSpec, r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
@@ -122,7 +122,7 @@ func TestUpdateGroup(t *testing.T) {
 			Role: models.RoleOrgAdmin,
 		}
 
-		_, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "", groupSpec, r.AuthService)
+		_, err := updateGroup(ctx, models.DomainTypeOrganization, orgID, "", groupSpec, r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})

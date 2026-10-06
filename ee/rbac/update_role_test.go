@@ -1,4 +1,4 @@
-package auth
+package rbac
 
 import (
 	"context"
@@ -56,7 +56,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		resp, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "test-custom-role", req, r.AuthService)
+		resp, err := updateRole(ctx, models.DomainTypeOrganization, orgID, "test-custom-role", req, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -82,7 +82,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		resp, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "test-custom-role", req, r.AuthService)
+		resp, err := updateRole(ctx, models.DomainTypeOrganization, orgID, "test-custom-role", req, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -105,7 +105,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "", req, r.AuthService)
+		_, err := updateRole(ctx, models.DomainTypeOrganization, orgID, "", req, r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role name must be specified")
 	})
@@ -121,7 +121,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, req, r.AuthService)
+		_, err := updateRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, req, r.AuthService)
 		assert.Error(t, err)
 		assert.Equal(t, "failed to update role", err.Error())
 	})
@@ -137,7 +137,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "nonexistent-role", req, r.AuthService)
+		_, err := updateRole(ctx, models.DomainTypeOrganization, orgID, "nonexistent-role", req, r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role not found")
 	})
@@ -158,7 +158,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "test-custom-role", req, r.AuthService)
+		_, err := updateRole(ctx, models.DomainTypeOrganization, orgID, "test-custom-role", req, r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "inherited role not found")
 	})

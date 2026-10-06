@@ -1,4 +1,4 @@
-package auth
+package rbac
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
@@ -41,11 +42,11 @@ func Test_CreateRole(t *testing.T) {
 			},
 		}
 
-		resp, err := CreateRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
+		resp, err := createRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		response, err := DescribeRole(ctx, models.DomainTypeOrganization, orgID, "custom-role", r.AuthService)
+		response, err := auth.DescribeRole(ctx, models.DomainTypeOrganization, orgID, "custom-role", r.AuthService)
 		require.NoError(t, err)
 		createdRole := response.GetRole()
 		assert.Equal(t, "custom-role", createdRole.GetMetadata().GetName())
@@ -78,12 +79,12 @@ func Test_CreateRole(t *testing.T) {
 			},
 		}
 
-		resp, err := CreateRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
+		resp, err := createRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
 		// Check if role was created with inheritance
-		roleResponse, err := DescribeRole(ctx, models.DomainTypeOrganization, orgID, "custom-role-with-inheritance", r.AuthService)
+		roleResponse, err := auth.DescribeRole(ctx, models.DomainTypeOrganization, orgID, "custom-role-with-inheritance", r.AuthService)
 		require.NoError(t, err)
 		createdRole := roleResponse.GetRole()
 		assert.Equal(t, "custom-role-with-inheritance", createdRole.GetMetadata().GetName())
@@ -111,7 +112,7 @@ func Test_CreateRole(t *testing.T) {
 			},
 		}
 
-		_, err := CreateRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
+		_, err := createRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role name must be specified")
 	})
@@ -134,7 +135,7 @@ func Test_CreateRole(t *testing.T) {
 			},
 		}
 
-		_, err := CreateRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
+		_, err := createRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
 		assert.Error(t, err)
 		assert.Equal(t, "failed to create role", err.Error())
 	})
@@ -162,7 +163,7 @@ func Test_CreateRole(t *testing.T) {
 			},
 		}
 
-		_, err := CreateRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
+		_, err := createRole(ctx, models.DomainTypeOrganization, orgID, role, r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "inherited role not found")
 	})
