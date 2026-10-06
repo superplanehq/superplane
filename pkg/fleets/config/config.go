@@ -17,12 +17,14 @@ const (
 	defaultReconcileIntervalSeconds = 15
 	defaultRequestTimeoutSeconds    = 90
 	defaultInstanceType             = "t3.micro"
+	defaultAzureVMSize              = "Standard_D4ds_v5"
 	defaultVolumeSizeGB             = 30
 
 	fleetManagerConfigEnvironment = "FLEET_MANAGER_CONFIG"
 	installationTokenEnvironment  = "INSTALLATION_ADMIN_TOKEN"
 
 	ProviderAWS    = "aws"
+	ProviderAzure  = "azure"
 	ProviderDocker = "docker"
 )
 
@@ -42,6 +44,7 @@ type Fleet struct {
 	MaxCapacity  int    `json:"maxCapacity"`
 	Provider     string `json:"provider"`
 	AWS          AWS    `json:"aws"`
+	Azure        Azure  `json:"azure"`
 	Docker       Docker `json:"docker"`
 }
 
@@ -63,6 +66,22 @@ type AWS struct {
 
 type CloudWatch struct {
 	LogGroupName string `json:"logGroupName"`
+}
+
+type Azure struct {
+	SubscriptionID         string            `json:"subscriptionId"`
+	ResourceGroup          string            `json:"resourceGroup"`
+	Location               string            `json:"location"`
+	ImageID                string            `json:"imageId"`
+	VMSize                 string            `json:"vmSize"`
+	Architecture           string            `json:"architecture"`
+	SubnetID               string            `json:"subnetId"`
+	NetworkSecurityGroupID string            `json:"networkSecurityGroupId"`
+	IdentityID             string            `json:"identityId"`
+	Zones                  []string          `json:"zones"`
+	DiskSizeGB             int32             `json:"diskSizeGb"`
+	EphemeralOSDisk        bool              `json:"ephemeralOSDisk"`
+	ResourceTags           map[string]string `json:"resourceTags"`
 }
 
 type Docker struct {
@@ -165,6 +184,12 @@ func (c *Config) applyDefaults() {
 		if fleet.AWS.VolumeSizeGB == 0 {
 			fleet.AWS.VolumeSizeGB = defaultVolumeSizeGB
 		}
+		if strings.TrimSpace(fleet.Azure.VMSize) == "" {
+			fleet.Azure.VMSize = defaultAzureVMSize
+		}
+		if fleet.Azure.DiskSizeGB == 0 {
+			fleet.Azure.DiskSizeGB = defaultVolumeSizeGB
+		}
 		fleet.ID = strings.TrimSpace(fleet.ID)
 		fleet.AWS.Region = strings.TrimSpace(fleet.AWS.Region)
 		fleet.AWS.Architecture = strings.ToLower(strings.TrimSpace(fleet.AWS.Architecture))
@@ -173,6 +198,18 @@ func (c *Config) applyDefaults() {
 		fleet.AWS.CloudWatch.LogGroupName = strings.TrimSpace(
 			fleet.AWS.CloudWatch.LogGroupName,
 		)
+		fleet.Azure.SubscriptionID = strings.TrimSpace(fleet.Azure.SubscriptionID)
+		fleet.Azure.ResourceGroup = strings.TrimSpace(fleet.Azure.ResourceGroup)
+		fleet.Azure.Location = strings.TrimSpace(fleet.Azure.Location)
+		fleet.Azure.ImageID = strings.TrimSpace(fleet.Azure.ImageID)
+		fleet.Azure.VMSize = strings.TrimSpace(fleet.Azure.VMSize)
+		fleet.Azure.Architecture = strings.ToLower(strings.TrimSpace(fleet.Azure.Architecture))
+		fleet.Azure.SubnetID = strings.TrimSpace(fleet.Azure.SubnetID)
+		fleet.Azure.NetworkSecurityGroupID = strings.TrimSpace(
+			fleet.Azure.NetworkSecurityGroupID,
+		)
+		fleet.Azure.IdentityID = strings.TrimSpace(fleet.Azure.IdentityID)
+		fleet.Azure.Zones = nonEmpty(fleet.Azure.Zones)
 		fleet.Docker.Image = strings.TrimSpace(fleet.Docker.Image)
 		fleet.Docker.Architecture = strings.ToLower(
 			strings.TrimSpace(fleet.Docker.Architecture),
@@ -202,7 +239,7 @@ func (c *Config) validate() error {
 	case len(c.Fleets) == 0:
 		return fmt.Errorf("fleets must contain at least one fleet")
 	}
-	if c.hasProvider(ProviderAWS) {
+	if c.hasProvider(ProviderAWS) || c.hasProvider(ProviderAzure) {
 		switch {
 		case c.RunnerReleaseBaseURL == "":
 			return fmt.Errorf("runnerReleaseBaseUrl is required")
@@ -230,6 +267,7 @@ func (c *Config) validate() error {
 				prefix,
 			)
 		case fleet.Provider != ProviderAWS &&
+			fleet.Provider != ProviderAzure &&
 			fleet.Provider != ProviderDocker:
 			return fmt.Errorf("%s.provider is invalid", prefix)
 		case fleet.Provider == ProviderDocker &&
@@ -243,6 +281,45 @@ func (c *Config) validate() error {
 				prefix,
 			)
 		case fleet.Provider == ProviderDocker:
+			break
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.SubscriptionID == "":
+			return fmt.Errorf("%s.azure.subscriptionId is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.ResourceGroup == "":
+			return fmt.Errorf("%s.azure.resourceGroup is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.Location == "":
+			return fmt.Errorf("%s.azure.location is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.ImageID == "":
+			return fmt.Errorf("%s.azure.imageId is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.Architecture != "amd64" &&
+			fleet.Azure.Architecture != "arm64":
+			return fmt.Errorf(
+				"%s.azure.architecture must be amd64 or arm64",
+				prefix,
+			)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.SubnetID == "":
+			return fmt.Errorf("%s.azure.subnetId is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.NetworkSecurityGroupID == "":
+			return fmt.Errorf(
+				"%s.azure.networkSecurityGroupId is required",
+				prefix,
+			)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.IdentityID == "":
+			return fmt.Errorf("%s.azure.identityId is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			len(fleet.Azure.Zones) == 0:
+			return fmt.Errorf("%s.azure.zones must not be empty", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.DiskSizeGB < 1:
+			return fmt.Errorf("%s.azure.diskSizeGb must be positive", prefix)
+		case fleet.Provider == ProviderAzure:
 			break
 		case fleet.AWS.Region == "":
 			return fmt.Errorf("%s.aws.region is required", prefix)

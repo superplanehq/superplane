@@ -1,0 +1,8 @@
+subscription_id         = "00000000-0000-0000-0000-000000000000"
+location                = "eastus"
+gallery_resource_group  = "superplane-runners"
+gallery_name            = "superplanerunners"
+image_name              = "superplane-runner-amd64"
+image_version           = "1.0.0"
+architecture            = "amd64"
+vm_size                 = "Standard_D2ds_v5"

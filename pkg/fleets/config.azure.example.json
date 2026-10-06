@@ -1,0 +1,34 @@
+{
+  "id": "aks",
+  "superplaneUrl": "https://superplane.example",
+  "installationAdminToken": "replace-with-personal-api-token",
+  "runnerReleaseBaseUrl": "https://downloads.example/runner",
+  "reconcileIntervalSeconds": 15,
+  "requestTimeoutSeconds": 90,
+  "fleets": [
+    {
+      "id": "linux-amd64",
+      "provider": "azure",
+      "warmCapacity": 1,
+      "maxCapacity": 10,
+      "azure": {
+        "subscriptionId": "00000000-0000-0000-0000-000000000000",
+        "resourceGroup": "superplane-runners",
+        "location": "eastus",
+        "imageId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane-runners/providers/Microsoft.Compute/galleries/superplanerunners/images/superplane-runner-amd64/versions/1.0.0",
+        "vmSize": "Standard_D4ds_v5",
+        "architecture": "amd64",
+        "subnetId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane/providers/Microsoft.Network/virtualNetworks/superplane-vnet/subnets/superplane-runners",
+        "networkSecurityGroupId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane/providers/Microsoft.Network/networkSecurityGroups/superplane-runners",
+        "identityId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane-runners/providers/Microsoft.ManagedIdentity/userAssignedIdentities/superplane-runner",
+        "zones": ["1", "2"],
+        "diskSizeGb": 30,
+        "ephemeralOSDisk": true,
+        "resourceTags": {
+          "Environment": "production",
+          "ManagedBy": "fleet-manager"
+        }
+      }
+    }
+  ]
+}
