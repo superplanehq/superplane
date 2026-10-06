@@ -169,6 +169,7 @@ export type CreateFactoryIntake = (input: {
   integrationId?: string;
   resourceId?: string;
   settings?: FactoriesFactoryIntakeSettings;
+  skipInitialImport?: boolean;
 }) => Promise<FactoriesFactoryIntake>;
 
 export type DeleteFactoryIntake = (intakeId: string) => Promise<unknown>;
@@ -208,6 +209,7 @@ async function removeProvisionedIntake(
 export async function provisionGithubIntake(args: {
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
+  skipInitialImport?: boolean;
 }): Promise<FactoriesFactoryIntake> {
   const intakes = await args.listIntakes();
   const existing = intakes.find((intake) => intake.source === GITHUB_INTAKE_SOURCE);
@@ -215,7 +217,10 @@ export async function provisionGithubIntake(args: {
     return existing;
   }
 
-  return args.createIntake({ source: GITHUB_INTAKE_SOURCE });
+  return args.createIntake({
+    source: GITHUB_INTAKE_SOURCE,
+    ...(args.skipInitialImport ? { skipInitialImport: true } : {}),
+  });
 }
 
 export async function provisionJiraIntake(args: {
@@ -298,6 +303,7 @@ export async function provisionOnboardingIntake(args: {
     integrationId: string;
     projectIds: string[];
   };
+  skipInitialImport?: boolean;
 }): Promise<FactoriesFactoryIntake | undefined> {
   const intakes = await args.listIntakes();
   const desiredSource = backlogSourceForChoice(args.issuesChoice);
@@ -334,6 +340,7 @@ export async function provisionOnboardingIntake(args: {
   return provisionGithubIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
+    skipInitialImport: args.skipInitialImport,
   });
 }
 

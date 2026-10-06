@@ -1,5 +1,6 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 
+import { IntakeSkipInitialImportField } from "../../IntakeSkipInitialImportField";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunTicketChoices } from "./firstRunTicketChoices";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
@@ -51,6 +52,9 @@ type FirstRunTicketsScreenProps = {
   onConnectLinear?: () => void;
   onToggleLinearProject?: (id: string) => void;
   onRetryLinearProjects?: () => void;
+  /** True when GitHub Issues should import the newest open issues. Off by default. */
+  importExistingIssues?: boolean;
+  onImportExistingIssuesChange?: (importExistingIssues: boolean) => void;
 };
 
 const TICKET_SCREEN_DEFAULTS = {
@@ -153,6 +157,8 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
     onConnectLinear,
     onToggleLinearProject,
     onRetryLinearProjects,
+    importExistingIssues = false,
+    onImportExistingIssuesChange,
   } = { ...TICKET_SCREEN_DEFAULTS, ...props };
   const copy = FIRST_RUN_COPY.tickets;
   const canAnalyze = ticketScanAllowed({
@@ -215,6 +221,12 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
           testId="first-run-linear-choice-notice"
         />
         <div className="space-y-3">
+          <GitHubExistingIssueImport
+            ticketSource={ticketSource}
+            importExistingIssues={importExistingIssues}
+            saving={saving}
+            onImportExistingIssuesChange={onImportExistingIssuesChange}
+          />
           <LoadingButton
             type="button"
             className="w-full"
@@ -229,6 +241,31 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
         </div>
       </div>
     </FirstRunShell>
+  );
+}
+
+function GitHubExistingIssueImport({
+  ticketSource,
+  importExistingIssues,
+  saving,
+  onImportExistingIssuesChange,
+}: {
+  ticketSource: FirstRunTicketSource | null;
+  importExistingIssues: boolean;
+  saving: boolean;
+  onImportExistingIssuesChange?: (importExistingIssues: boolean) => void;
+}) {
+  if (ticketSource !== "github-issues") return null;
+  const copy = FIRST_RUN_COPY.tickets;
+  return (
+    <IntakeSkipInitialImportField
+      checked={importExistingIssues}
+      disabled={saving}
+      helper={importExistingIssues ? copy.importExistingHelperOn : copy.importExistingHelperOff}
+      label={copy.importExisting}
+      onCheckedChange={(importExisting) => onImportExistingIssuesChange?.(importExisting)}
+      testId="first-run-import-existing-issues"
+    />
   );
 }
 
