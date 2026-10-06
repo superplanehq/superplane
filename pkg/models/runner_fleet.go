@@ -267,6 +267,13 @@ type TaskListPage struct {
 	HasNextPage bool
 }
 
+type FleetStateCount struct {
+	FleetID   uuid.UUID
+	FleetSlug string
+	State     string
+	Count     int64
+}
+
 func (f *RunnerFleet) FindRunner(tx *gorm.DB, id uuid.UUID) (*Runner, error) {
 	var runner Runner
 	err := tx.Where("id = ? AND fleet_id = ?", id, f.ID).First(&runner).Error
@@ -380,6 +387,22 @@ func (f *RunnerFleet) CountRunnersByState(tx *gorm.DB) (map[string]int64, error)
 	return counts, nil
 }
 
+func ListRunnerCountsByFleetState(tx *gorm.DB) ([]FleetStateCount, error) {
+	return listCountsByFleetState(tx, &Runner{}, []string{
+		RunnerStatePending,
+		RunnerStateIdle,
+		RunnerStateBusy,
+	})
+}
+
+func ListRunnerTaskCountsByFleetState(tx *gorm.DB) ([]FleetStateCount, error) {
+	return listCountsByFleetState(tx, &RunnerTask{}, []string{
+		RunnerTaskStateQueued,
+		RunnerTaskStateReserved,
+		RunnerTaskStateRunning,
+	})
+}
+
 func (f *RunnerFleet) PinRunnerVersion(tx *gorm.DB, version string) error {
 	version = strings.TrimSpace(version)
 	if version == "" {
@@ -456,4 +479,66 @@ func trimListPage[T any](rows []T, limit int) ([]T, bool) {
 		return rows[:limit], true
 	}
 	return rows, false
+}
+
+func listCountsByFleetState(tx *gorm.DB, model any, states []string) ([]FleetStateCount, error) {
+	type fleetRow struct {
+		ID   uuid.UUID
+		Slug string
+	}
+
+	var fleets []fleetRow
+	if err := tx.Model(&RunnerFleet{}).
+		Select("id", "slug").
+		Order("slug ASC, id ASC").
+		Scan(&fleets).
+		Error; err != nil {
+		return nil, err
+	}
+	if len(fleets) == 0 {
+		return []FleetStateCount{}, nil
+	}
+
+	fleetIDs := make([]uuid.UUID, 0, len(fleets))
+	for _, fleet := range fleets {
+		fleetIDs = append(fleetIDs, fleet.ID)
+	}
+
+	type countRow struct {
+		FleetID uuid.UUID
+		State   string
+		Count   int64
+	}
+
+	var rows []countRow
+	if err := tx.Model(model).
+		Select("fleet_id, state, COUNT(*) AS count").
+		Where("fleet_id IN ? AND state IN ?", fleetIDs, states).
+		Group("fleet_id, state").
+		Scan(&rows).
+		Error; err != nil {
+		return nil, err
+	}
+
+	type key struct {
+		FleetID uuid.UUID
+		State   string
+	}
+	counts := make(map[key]int64, len(rows))
+	for _, row := range rows {
+		counts[key{FleetID: row.FleetID, State: row.State}] = row.Count
+	}
+
+	result := make([]FleetStateCount, 0, len(fleets)*len(states))
+	for _, fleet := range fleets {
+		for _, state := range states {
+			result = append(result, FleetStateCount{
+				FleetID:   fleet.ID,
+				FleetSlug: fleet.Slug,
+				State:     state,
+				Count:     counts[key{FleetID: fleet.ID, State: state}],
+			})
+		}
+	}
+	return result, nil
 }
