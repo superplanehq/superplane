@@ -6,7 +6,6 @@ import type {
   FactoriesWorkOrderSummary,
 } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
-import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -24,7 +23,17 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Loader2 } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 
 import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
@@ -464,7 +473,8 @@ function MobileColumn({
   paging: ColumnPaging;
   renderCard: (order: FactoriesWorkOrder) => ReactNode;
 }) {
-  const loadMoreIfNeeded = useAutoLoadMoreOnScroll(paging);
+  const listRef = useRef<HTMLUListElement>(null);
+  const loadIfVisible = useVisibleColumnLoadMore(listRef, hidden, column.cards.length, paging);
   const showEmpty = !cardsPending && column.cards.length === 0 && !paging.hasMore;
 
   return (
@@ -481,29 +491,68 @@ function MobileColumn({
         </p>
       ) : (
         <LineBoardColumnCardList
+          ref={listRef}
           pending={cardsPending}
           className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 [scrollbar-width:none]"
           testId={`mobile-board-column-scroll-${column.key}`}
-          onScroll={loadMoreIfNeeded}
+          onScroll={loadIfVisible}
         >
           {column.cards.map((card) => (
             <li key={card.key}>{renderCard(card.order)}</li>
           ))}
         </LineBoardColumnCardList>
       )}
-      {paging.hasMore ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-2 w-full shrink-0"
-          disabled={paging.isLoading}
-          onClick={() => paging.onLoadMore()}
-          data-testid={`mobile-board-load-more-${column.key}`}
-        >
-          {MOBILE_BOARD_COPY.loadMore}
-        </Button>
-      ) : null}
+      {paging.isLoading ? <MobileColumnLoadingMore /> : null}
     </section>
   );
+}
+
+function MobileColumnLoadingMore() {
+  return (
+    <div
+      role="status"
+      aria-label={MOBILE_BOARD_COPY.loadingMore}
+      className="mt-2 flex h-8 shrink-0 items-center justify-center"
+    >
+      <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
+    </div>
+  );
+}
+
+function useVisibleColumnLoadMore(
+  listRef: RefObject<HTMLUListElement | null>,
+  hidden: boolean,
+  cardCount: number,
+  paging: ColumnPaging,
+) {
+  const loadMoreIfNeeded = useAutoLoadMoreOnScroll(paging);
+  const hiddenRef = useRef(hidden);
+  hiddenRef.current = hidden;
+  const loadIfVisible = useCallback(
+    (element: HTMLElement | null) => {
+      if (hiddenRef.current) {
+        return;
+      }
+      loadMoreIfNeeded(element);
+    },
+    [loadMoreIfNeeded],
+  );
+
+  useLayoutEffect(() => {
+    loadIfVisible(listRef.current);
+  }, [cardCount, hidden, listRef, loadIfVisible]);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || hidden) {
+      return;
+    }
+    const observer = new ResizeObserver(() => {
+      loadIfVisible(list);
+    });
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, [cardCount, hidden, listRef, loadIfVisible]);
+
+  return loadIfVisible;
 }

@@ -15,7 +15,7 @@ export const MOBILE_BOARD_COPY = {
   closeSearch: "Close search",
   switchLine: "Switch line",
   lines: "Lines",
-  loadMore: "Load more",
+  loadingMore: "Loading more",
 } as const;
 
 export const MOBILE_SETTINGS_COPY = {
