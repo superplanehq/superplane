@@ -21,6 +21,15 @@ const experimental = vi.hoisted(() => ({
   loading: false,
 }));
 
+const bitbucketOnboarding = vi.hoisted(() => ({
+  providerConfigured: false,
+  identity: undefined as { login?: string; providerUserId?: string } | undefined,
+  repositories: [] as Array<{ fullName?: string }>,
+  installUrl: "",
+  isPending: false,
+  error: null as unknown,
+}));
+
 vi.mock("@/hooks/useIntegrations", () => ({
   useIntegrationResources: (
     _organizationId: string,
@@ -36,6 +45,20 @@ vi.mock("@/hooks/useIntegrations", () => ({
       isError: false,
     };
   },
+}));
+
+vi.mock("./useBitbucketOnboarding", () => ({
+  useBitbucketOnboarding: () => ({
+    data: {
+      providerConfigured: bitbucketOnboarding.providerConfigured,
+      identity: bitbucketOnboarding.identity,
+      repositories: bitbucketOnboarding.repositories,
+      installUrl: bitbucketOnboarding.installUrl,
+    },
+    isPending: bitbucketOnboarding.isPending,
+    error: bitbucketOnboarding.error,
+    startInstallation: { mutateAsync: vi.fn() },
+  }),
 }));
 
 vi.mock("./useGitHubOnboarding", () => ({
@@ -97,6 +120,7 @@ function pageModel(setup: OnboardingSetupApi, overrides: Partial<OnboardingPageM
     requestConnect: vi.fn(),
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
     bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
@@ -152,6 +176,12 @@ async function chooseBitbucket(user: ReturnType<typeof userEvent.setup>) {
 describe("FirstRunSetup Bitbucket", () => {
   beforeEach(() => {
     resources.calls = [];
+    bitbucketOnboarding.providerConfigured = false;
+    bitbucketOnboarding.identity = undefined;
+    bitbucketOnboarding.repositories = [];
+    bitbucketOnboarding.installUrl = "";
+    bitbucketOnboarding.isPending = false;
+    bitbucketOnboarding.error = null;
     experimental.enabled = new Set([FEATURE_FACTORY_BITBUCKET]);
     experimental.loading = false;
     localStorage.clear();
@@ -191,6 +221,22 @@ describe("FirstRunSetup Bitbucket", () => {
 
     expect(requestConnect).toHaveBeenCalledWith("bitbucket");
     expect(screen.queryByTestId("first-run-connect")).not.toBeInTheDocument();
+  });
+
+  it("connects a Bitbucket account with OAuth when Forge is configured", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    const user = userEvent.setup();
+    const requestConnect = vi.fn();
+    renderSetup(new Set(), { requestConnect });
+
+    await chooseBitbucket(user);
+    const link = screen.getByTestId("first-run-bitbucket-oauth");
+
+    expect(link).toHaveAttribute("href", expect.stringContaining("/auth/bitbucket?intent=connect"));
+    expect(requestConnect).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Connect your Bitbucket account. SuperPlane uses it to find repositories you can open."),
+    ).toBeInTheDocument();
   });
 
   it("saves the chosen Bitbucket repository and opens the ticket screen", async () => {

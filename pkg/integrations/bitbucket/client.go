@@ -12,7 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const baseURL = "https://api.bitbucket.org/2.0"
+const baseURL = APIBaseURL
 
 type Client struct {
 	AuthType string
@@ -27,12 +27,12 @@ type RepositoryResponse struct {
 }
 
 type Repository struct {
-	UUID     string         `json:"uuid" mapstructure:"uuid"`
-	Name     string         `json:"name" mapstructure:"name"`
-	FullName string         `json:"full_name" mapstructure:"full_name"`
-	Slug     string         `json:"slug" mapstructure:"slug"`
-	Mainbranch *Branch    `json:"mainbranch,omitempty" mapstructure:"mainbranch,omitempty"`
-	Links    RepositoryLink `json:"links" mapstructure:"links"`
+	UUID       string         `json:"uuid" mapstructure:"uuid"`
+	Name       string         `json:"name" mapstructure:"name"`
+	FullName   string         `json:"full_name" mapstructure:"full_name"`
+	Slug       string         `json:"slug" mapstructure:"slug"`
+	Mainbranch *Branch        `json:"mainbranch,omitempty" mapstructure:"mainbranch,omitempty"`
+	Links      RepositoryLink `json:"links" mapstructure:"links"`
 }
 
 type Branch struct {
