@@ -17,6 +17,7 @@ const KIND_LABEL: Record<PlanningReviewStepKind, string> = { bash: "Bash", promp
  * settings below the list. The list reads top to bottom in run order.
  */
 export function PlanningReviewStepList({
+  appearance = "card",
   steps,
   onChange,
   onRestoreDefaultPrompt,
@@ -25,6 +26,7 @@ export function PlanningReviewStepList({
   onRetryRestore,
   restoreRetryDisabled = false,
 }: {
+  appearance?: "card" | "fields";
   steps: PlanningReviewStep[];
   onChange: (steps: PlanningReviewStep[]) => void;
   onRestoreDefaultPrompt?: () => void;
@@ -57,32 +59,20 @@ export function PlanningReviewStepList({
     setOpenStep("");
   };
 
+  const fields = appearance === "fields";
+
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-card shadow-sm" aria-label="Steps">
-      <header className="flex items-center gap-2.5 border-b border-border px-5 py-3.5">
-        <h3 className="text-sm font-semibold text-foreground">Steps</h3>
-        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
-          {steps.length}
-        </span>
-        <span className="flex-1" />
-        {onRestoreDefaultPrompt ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0"
-            onClick={onRestoreDefaultPrompt}
-            disabled={restoreDefaultPromptDisabled}
-            data-testid="planning-review-restore-default-prompt"
-          >
-            Restore default prompt
-          </Button>
-        ) : null}
-        <Button type="button" variant="outline" size="sm" onClick={addStep} data-testid="planning-review-add-step">
-          <Plus aria-hidden />
-          Add step
-        </Button>
-      </header>
+    <section
+      className={fields ? "flex flex-col gap-2" : "overflow-hidden rounded-xl border border-border bg-card shadow-sm"}
+      aria-label="Steps"
+    >
+      <StepListHeader
+        fields={fields}
+        count={steps.length}
+        onAdd={addStep}
+        onRestoreDefaultPrompt={onRestoreDefaultPrompt}
+        restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
+      />
       {restoreError ? (
         <div className="flex items-center gap-3 border-b border-border px-5 py-2.5">
           <p className="text-sm text-destructive" data-testid="planning-review-restore-default-prompt-error">
@@ -104,13 +94,16 @@ export function PlanningReviewStepList({
         </div>
       ) : null}
       {steps.length === 0 ? (
-        <p className="px-5 py-10 text-center text-sm text-muted-foreground" data-testid="planning-review-steps-empty">
+        <p
+          className={fields ? "text-sm text-muted-foreground" : "px-5 py-10 text-center text-sm text-muted-foreground"}
+          data-testid="planning-review-steps-empty"
+        >
           This agent has no steps yet. Add a step to tell the runner what to do.
         </p>
       ) : (
-        <ol className="divide-y divide-border">
+        <ol className={fields ? "flex flex-col gap-2" : "divide-y divide-border"}>
           {(renderedItems as PlanningReviewStep[]).map((step, index) => (
-            <li key={index}>
+            <li key={index} className={fields ? "overflow-hidden rounded-lg border border-border bg-card" : undefined}>
               <StepRow
                 step={step}
                 position={index}
@@ -129,6 +122,55 @@ export function PlanningReviewStepList({
         </ol>
       )}
     </section>
+  );
+}
+
+function StepListHeader({
+  fields,
+  count,
+  onAdd,
+  onRestoreDefaultPrompt,
+  restoreDefaultPromptDisabled,
+}: {
+  fields: boolean;
+  count: number;
+  onAdd: () => void;
+  onRestoreDefaultPrompt?: () => void;
+  restoreDefaultPromptDisabled: boolean;
+}) {
+  return (
+    <header
+      className={fields ? "flex items-center gap-2" : "flex items-center gap-2.5 border-b border-border px-5 py-3.5"}
+    >
+      <h3 className={fields ? "workspace-section-title" : "text-sm font-semibold text-foreground"}>Steps</h3>
+      <span
+        className={
+          fields
+            ? "text-sm tabular-nums text-muted-foreground"
+            : "rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground"
+        }
+      >
+        {count}
+      </span>
+      <span className="flex-1" />
+      {onRestoreDefaultPrompt ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          onClick={onRestoreDefaultPrompt}
+          disabled={restoreDefaultPromptDisabled}
+          data-testid="planning-review-restore-default-prompt"
+        >
+          Restore default prompt
+        </Button>
+      ) : null}
+      <Button type="button" variant="outline" size="sm" onClick={onAdd} data-testid="planning-review-add-step">
+        <Plus aria-hidden />
+        Add step
+      </Button>
+    </header>
   );
 }
 

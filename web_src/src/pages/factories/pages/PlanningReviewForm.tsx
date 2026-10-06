@@ -28,6 +28,8 @@ export function PlanningReviewForm({
   factoryId,
   factoryKey,
   showVisualEvidenceSetting = false,
+  showResources = true,
+  appearance = "card",
   onRestoreDefaultPrompt,
   restoreDefaultPromptDisabled = false,
   restoreError,
@@ -40,6 +42,9 @@ export function PlanningReviewForm({
   factoryId?: string;
   factoryKey?: string;
   showVisualEvidenceSetting?: boolean;
+  showResources?: boolean;
+  /** `fields` matches the pull request step. `card` is the GitHub agent settings. */
+  appearance?: "card" | "fields";
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled?: boolean;
   restoreError?: string;
@@ -54,15 +59,17 @@ export function PlanningReviewForm({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className={appearance === "fields" ? "flex flex-col gap-8" : "flex flex-col gap-4"}>
       {draft.components.map((component) => (
         <AgentPanel
           key={component.id}
+          appearance={appearance}
           component={component}
           organizationId={organizationId}
           factoryId={factoryId}
           factoryKey={factoryKey}
           showVisualEvidenceSetting={showVisualEvidenceSetting}
+          showResources={showResources}
           onRestoreDefaultPrompt={onRestoreDefaultPrompt}
           restoreDefaultPromptDisabled={restoreDefaultPromptDisabled}
           restoreError={restoreError}
@@ -76,11 +83,13 @@ export function PlanningReviewForm({
 }
 
 function AgentPanel({
+  appearance,
   component,
   organizationId,
   factoryId,
   factoryKey,
   showVisualEvidenceSetting,
+  showResources,
   onRestoreDefaultPrompt,
   restoreDefaultPromptDisabled,
   restoreError,
@@ -88,11 +97,13 @@ function AgentPanel({
   restoreRetryDisabled,
   onChange,
 }: {
+  appearance: "card" | "fields";
   component: PlanningReviewComponent;
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
   showVisualEvidenceSetting: boolean;
+  showResources: boolean;
   onRestoreDefaultPrompt?: () => void;
   restoreDefaultPromptDisabled: boolean;
   restoreError?: string;
@@ -139,12 +150,19 @@ function AgentPanel({
   }, [byokModelDefault]);
 
   return (
-    <div className="flex flex-col gap-4" data-testid={`planning-review-component-${component.id}`}>
+    <div
+      className={appearance === "fields" ? "flex flex-col gap-8" : "flex flex-col gap-4"}
+      data-testid={`planning-review-component-${component.id}`}
+    >
       <section
-        className={cn(
-          "grid gap-x-6 gap-y-4 rounded-xl border border-border bg-card px-5 py-4 shadow-sm",
-          showVisualEvidenceSetting ? "grid-cols-3" : "grid-cols-2",
-        )}
+        className={
+          appearance === "fields"
+            ? "flex flex-col gap-6"
+            : cn(
+                "grid gap-x-6 gap-y-4 rounded-xl border border-border bg-card px-5 py-4 shadow-sm",
+                showVisualEvidenceSetting ? "grid-cols-3" : "grid-cols-2",
+              )
+        }
         data-testid="planning-review-settings"
       >
         <div className="flex flex-col gap-2">
@@ -198,6 +216,7 @@ function AgentPanel({
         ) : null}
       </section>
       <PlanningReviewStepList
+        appearance={appearance}
         steps={(component.configuration.steps as PlanningReviewStep[]) ?? []}
         onChange={(steps) => setConfigurationField("steps", steps)}
         onRestoreDefaultPrompt={onRestoreDefaultPrompt}
@@ -206,17 +225,20 @@ function AgentPanel({
         onRetryRestore={onRetryRestore}
         restoreRetryDisabled={restoreRetryDisabled}
       />
-      <PlanningReviewResourcesCard
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={factoryKey}
-        disabledIds={disabledAgentResourceIds(component.configuration)}
-        disabledTools={disabledAgentResourceTools(component.configuration)}
-        enabledTools={enabledAgentResourceTools(component.configuration)}
-        onDisabledIdsChange={(ids) => setConfigurationField("disabledAgentResourceIds", ids)}
-        onDisabledToolsChange={(tools) => setConfigurationField("disabledAgentResourceTools", tools)}
-        onEnabledToolsChange={(tools) => setConfigurationField("enabledAgentResourceTools", tools)}
-      />
+      {showResources ? (
+        <PlanningReviewResourcesCard
+          appearance={appearance}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          disabledIds={disabledAgentResourceIds(component.configuration)}
+          disabledTools={disabledAgentResourceTools(component.configuration)}
+          enabledTools={enabledAgentResourceTools(component.configuration)}
+          onDisabledIdsChange={(ids) => setConfigurationField("disabledAgentResourceIds", ids)}
+          onDisabledToolsChange={(tools) => setConfigurationField("disabledAgentResourceTools", tools)}
+          onEnabledToolsChange={(tools) => setConfigurationField("enabledAgentResourceTools", tools)}
+        />
+      ) : null}
     </div>
   );
 }

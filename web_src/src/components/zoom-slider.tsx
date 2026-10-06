@@ -216,6 +216,7 @@ export const ZoomSlider = memo(function ZoomSlider({
   isAutoFocusEnabled,
   onAutoFocusToggle,
   usePanel = true,
+  showFitView = true,
   ...props
 }: Omit<PanelProps, "children"> & {
   orientation?: "horizontal" | "vertical";
@@ -231,6 +232,7 @@ export const ZoomSlider = memo(function ZoomSlider({
   isAutoFocusEnabled?: boolean;
   onAutoFocusToggle?: () => void;
   usePanel?: boolean;
+  showFitView?: boolean;
 }) {
   const { zoom } = useViewport();
   const { zoomTo, zoomIn, zoomOut, fitView, getNodes } = useReactFlow();
@@ -358,19 +360,22 @@ export const ZoomSlider = memo(function ZoomSlider({
         </TooltipTrigger>
         <TooltipContent>Reset zoom to 100% (Ctrl/Cmd + 0)</TooltipContent>
       </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="h-7 w-7"
-            onClick={() => fitView({ duration: 300, ...LIVE_CANVAS_FIT_VIEW_OPTIONS })}
-          >
-            <Eye className="h-3 w-3" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Fit all components in view (Ctrl/Cmd + 1)</TooltipContent>
-      </Tooltip>
+      {showFitView ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="h-7 w-7"
+              aria-label="Fit all components in view"
+              onClick={() => fitView({ duration: 300, ...LIVE_CANVAS_FIT_VIEW_OPTIONS })}
+            >
+              <Eye className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Fit all components in view (Ctrl/Cmd + 1)</TooltipContent>
+        </Tooltip>
+      ) : null}
       {leadingContent}
       <ScreenshotToolbarButton screenshotName={screenshotName} onScreenshot={handleScreenshot} />
       <SnapToGridToggleButton enabled={isSnapToGridEnabled} onToggle={onSnapToGridToggle} />
