@@ -946,35 +946,6 @@ CREATE TABLE public.hosted_llm_providers (
 
 
 --
--- Name: installation_license_keys; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.installation_license_keys (
-    id integer NOT NULL,
-    document text NOT NULL,
-    version bigint NOT NULL,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT installation_license_keys_singleton CHECK ((id = 1)),
-    CONSTRAINT installation_license_keys_version_positive CHECK ((version > 0))
-);
-
-
---
--- Name: installation_licenses; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.installation_licenses (
-    id integer NOT NULL,
-    encrypted_license bytea NOT NULL,
-    installed_by uuid,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT installation_licenses_singleton CHECK ((id = 1))
-);
-
-
---
 -- Name: installation_llm_settings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1007,6 +978,22 @@ CREATE TABLE public.installation_metadata (
     allow_private_network_access boolean DEFAULT false NOT NULL,
     signups_enabled boolean DEFAULT true NOT NULL,
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
+);
+
+
+--
+-- Name: intake_catalog_entries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.intake_catalog_entries (
+    key character varying(64) NOT NULL,
+    name character varying(255) NOT NULL,
+    category character varying(64) NOT NULL,
+    status character varying(32) DEFAULT 'planned'::character varying NOT NULL,
+    status_note text DEFAULT ''::text NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_by uuid
 );
 
 
@@ -2457,22 +2444,6 @@ ALTER TABLE ONLY public.factory_pull_request_runs
 
 
 --
--- Name: installation_license_keys installation_license_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.installation_license_keys
-    ADD CONSTRAINT installation_license_keys_pkey PRIMARY KEY (id);
-
-
---
--- Name: installation_licenses installation_licenses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.installation_licenses
-    ADD CONSTRAINT installation_licenses_pkey PRIMARY KEY (id);
-
-
---
 -- Name: installation_llm_settings installation_llm_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2486,6 +2457,14 @@ ALTER TABLE ONLY public.installation_llm_settings
 
 ALTER TABLE ONLY public.installation_metadata
     ADD CONSTRAINT installation_metadata_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: intake_catalog_entries intake_catalog_entries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.intake_catalog_entries
+    ADD CONSTRAINT intake_catalog_entries_pkey PRIMARY KEY (key);
 
 
 --
@@ -5000,14 +4979,6 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
--- Name: installation_licenses installation_licenses_installed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.installation_licenses
-    ADD CONSTRAINT installation_licenses_installed_by_fkey FOREIGN KEY (installed_by) REFERENCES public.accounts(id) ON DELETE SET NULL;
-
-
---
 -- Name: organization_hosted_model_allowlists organization_hosted_model_allowlists_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5559,7 +5530,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261005202819	f
+20261004143358	f
 \.
 
 
@@ -5595,7 +5566,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260925150940	f
+20261005100236	f
 \.
 
 

@@ -15,7 +15,6 @@ export type IntegrationOption = {
 
 export const VCS_OPTIONS: IntegrationOption[] = [
   { id: "github", label: "GitHub", detail: "Connect GitHub to list repositories and open pull requests." },
-  { id: "gitlab", label: "GitLab", detail: "Connect GitLab to list repositories and open merge requests.", soon: true },
 ];
 
 export const AGENT_OPTIONS: IntegrationOption[] = [
