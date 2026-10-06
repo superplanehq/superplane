@@ -134,7 +134,7 @@ func UpdateFactoryRepository(
 		if err != nil {
 			return err
 		}
-		if err := factory.SnapshotWorkOrderRepository(tx, previous.AppRepository, previousBranch); err != nil {
+		if err := factory.SnapshotWorkOrderRepository(tx, previous.AppRepository, previousBranch, previous.EffectiveVCSProvider()); err != nil {
 			return err
 		}
 
