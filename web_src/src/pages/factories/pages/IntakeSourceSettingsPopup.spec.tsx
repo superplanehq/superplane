@@ -25,6 +25,7 @@ import {
 } from "./intakeSourceSettingsModel";
 import { JIRA_COMPLETION_COLUMN_COPY } from "./jiraCompletionColumnCopy";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
+import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
@@ -486,6 +487,22 @@ describe("IntakeSourceSettingsPopup", () => {
     });
 
     expect(screen.getByText(LINEAR_INTAKE_SETUP_COPY.projectsRequired)).toBeInTheDocument();
+    const save = screen.getByTestId("intake-source-settings-save");
+    expect(save).toBeDisabled();
+    await user.click(save);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("does not save a Sentry intake with no project", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "sentry-exceptions",
+      settings: { ...DEFAULT_SENTRY_INTAKE_SETTINGS, sentryProjectIds: [] },
+      onSave,
+    });
+
+    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.projectsRequired)).toBeInTheDocument();
     const save = screen.getByTestId("intake-source-settings-save");
     expect(save).toBeDisabled();
     await user.click(save);

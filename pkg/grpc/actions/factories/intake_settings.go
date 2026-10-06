@@ -77,6 +77,8 @@ type intakeSettings struct {
 	SentryAssignedIssues bool
 	// Issue levels that still create a task. Empty means every level.
 	SentryLevels []string
+	// Projects that still create a task. Sentry exception intakes only.
+	SentryProjectIDs []string
 	// Skip Productive.io key tasks (milestones). Productive task intakes only.
 	ExcludeKeyTasks bool
 	// Severities that still create a task. Empty means every severity.
@@ -136,6 +138,7 @@ func defaultSentryIntakeSettings() intakeSettings {
 	settings.SentryRegressedIssues = false
 	settings.SentryAssignedIssues = false
 	settings.SentryLevels = []string{}
+	settings.SentryProjectIDs = []string{}
 	return settings
 }
 
@@ -189,6 +192,7 @@ func (s intakeSettings) normalized() intakeSettings {
 	s.Labels = labels
 	s.JiraCompletionColumn = strings.TrimSpace(s.JiraCompletionColumn)
 	s.SentryLevels = normalizeSentryLevels(s.SentryLevels)
+	s.SentryProjectIDs = normalizeSentryProjectIDs(s.SentryProjectIDs)
 	s.DependabotSeverities = normalizeDependabotSeverities(s.DependabotSeverities)
 	s.TaskListIDs = normalizeTaskListIDs(s.TaskListIDs)
 	s.DatadogEnvironments = normalizeDatadogEnvironments(s.DatadogEnvironments)
@@ -482,7 +486,8 @@ func intakeSettingsChangeTrigger(source string, current, updated intakeSettings)
 	if source == models.FactoryIntakeSourceSentryExceptions {
 		return current.SentryNewIssues != updated.SentryNewIssues ||
 			current.SentryRegressedIssues != updated.SentryRegressedIssues ||
-			current.SentryAssignedIssues != updated.SentryAssignedIssues
+			current.SentryAssignedIssues != updated.SentryAssignedIssues ||
+			!slices.Equal(current.SentryProjectIDs, updated.SentryProjectIDs)
 	}
 	if source == models.FactoryIntakeSourceDatadog {
 		return current.DatadogTriggeredAlerts != updated.DatadogTriggeredAlerts ||
@@ -598,6 +603,7 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 			settings.SentryNewIssues = slices.Contains(actions, intakeSentryActionCreated)
 			settings.SentryRegressedIssues = slices.Contains(actions, intakeSentryActionUnresolved)
 			settings.SentryAssignedIssues = slices.Contains(actions, intakeSentryActionAssigned)
+			settings.SentryProjectIDs = sentryProjectIDsFromConfiguration(trigger.Configuration)
 		case models.FactoryIntakeSourceDatadog:
 			settings = datadogAlertSettingsFromTransitions(
 				configurationStrings(trigger.Configuration["alertTransitions"]),
@@ -739,6 +745,7 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		serialized.SentryRegressedIssues = proto.Bool(settings.SentryRegressedIssues)
 		serialized.SentryAssignedIssues = proto.Bool(settings.SentryAssignedIssues)
 		serialized.SentryLevels = settings.SentryLevels
+		serialized.SentryProjectIds = settings.SentryProjectIDs
 	}
 	if source == models.FactoryIntakeSourceProductiveTasks {
 		serialized.ExcludeKeyTasks = proto.Bool(settings.ExcludeKeyTasks)
@@ -800,6 +807,7 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.SentryAssignedIssues = requested.GetSentryAssignedIssues()
 	}
 	updated.SentryLevels = requested.GetSentryLevels()
+	updated.SentryProjectIDs = requested.GetSentryProjectIds()
 	updated.DependabotSeverities = requested.GetDependabotSeverities()
 	if requested.ExcludeKeyTasks != nil {
 		updated.ExcludeKeyTasks = requested.GetExcludeKeyTasks()

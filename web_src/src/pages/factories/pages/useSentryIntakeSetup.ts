@@ -17,7 +17,7 @@ export type SentrySetupStep = "connection" | "project";
 export function useSentryIntakeSetup(organizationId: string, factoryId: string) {
   const [step, setStep] = useState<SentrySetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
-  const [projectId, setProjectId] = useState("");
+  const [projectIds, setProjectIds] = useState<string[]>([]);
   const [skipInitialImport, setSkipInitialImport] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [stayOnConnection, setStayOnConnection] = useState(false);
@@ -75,13 +75,16 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
   };
 
   const createBoundIntake = async () => {
-    if (!integrationId || !projectId) return;
+    if (!integrationId || projectIds.length === 0) return;
     setError(undefined);
     try {
       await createIntake.mutateAsync({
         source: "SOURCE_SENTRY_EXCEPTIONS",
         integrationId,
-        resourceId: projectId,
+        resourceId: projectIds.join(","),
+        settings: {
+          sentryProjectIds: projectIds,
+        },
         ...(skipInitialImport ? { skipInitialImport: true } : {}),
       });
       return true;
@@ -96,8 +99,10 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
     setStep,
     integrationId,
     setIntegrationId,
-    projectId,
-    setProjectId,
+    projectIds,
+    toggleProject: (id: string) => {
+      setProjectIds((current) => (current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id]));
+    },
     skipInitialImport,
     setSkipInitialImport,
     connectOpen,

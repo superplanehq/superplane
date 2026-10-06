@@ -119,10 +119,16 @@ func CreateFactoryIntake(
 	if source == models.FactoryIntakeSourceLinearIssues && len(settings.LinearProjectIDs) == 0 {
 		settings.LinearProjectIDs = linearProjectIDsFromResource(req.GetResourceId())
 	}
+	if source == models.FactoryIntakeSourceSentryExceptions && len(settings.SentryProjectIDs) == 0 {
+		settings.SentryProjectIDs = sentryProjectIDsFromResource(req.GetResourceId())
+	}
 
 	resourceID := req.GetResourceId()
 	if source == models.FactoryIntakeSourceLinearIssues && len(settings.LinearProjectIDs) > 0 {
 		resourceID = strings.Join(settings.LinearProjectIDs, ",")
+	}
+	if source == models.FactoryIntakeSourceSentryExceptions && len(settings.SentryProjectIDs) > 0 {
+		resourceID = strings.Join(settings.SentryProjectIDs, ",")
 	}
 
 	binding, err := resolveIntakeBinding(db, factory, source, req.GetIntegrationId(), resourceID)
