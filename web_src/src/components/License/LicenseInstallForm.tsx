@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { installInstallationLicense, type InstallationLicense } from "@/lib/license";
@@ -17,6 +18,7 @@ type SelectedLicenseFile = {
 type LicenseInstallFormProps = {
   submitLabel: string;
   onInstalled: (license: InstallationLicense) => void;
+  onInstallingChange?: (installing: boolean) => void;
   secondaryAction?: React.ReactNode;
 };
 
@@ -69,7 +71,7 @@ const LicenseFileField: React.FC<LicenseFileFieldProps> = ({
       </span>
       <span className="mt-1 text-xs text-gray-500 dark:text-gray-400">.license or text file, up to 64 KB</span>
     </label>
-    <input
+    <Input
       ref={fileInputRef}
       id="license-file"
       data-testid="license-file-input"
@@ -122,9 +124,11 @@ const readLicenseFile = async (file: File): Promise<SelectedLicenseFile> => {
 export const LicenseInstallForm: React.FC<LicenseInstallFormProps> = ({
   submitLabel,
   onInstalled,
+  onInstallingChange,
   secondaryAction,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const choiceRef = useRef(0);
   const [pasted, setPasted] = useState("");
   const [selectedFile, setSelectedFile] = useState<SelectedLicenseFile | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -132,16 +136,25 @@ export const LicenseInstallForm: React.FC<LicenseInstallFormProps> = ({
   const [installing, setInstalling] = useState(false);
   const licenseText = (selectedFile?.text ?? pasted).trim();
 
+  const replaceChoice = () => {
+    choiceRef.current += 1;
+  };
+
   const acceptFile = async (file: File | undefined) => {
     if (!file) {
       return;
     }
 
+    const choice = choiceRef.current + 1;
+    choiceRef.current = choice;
     setError(null);
     try {
-      setSelectedFile(await readLicenseFile(file));
+      const nextFile = await readLicenseFile(file);
+      if (choice !== choiceRef.current) return;
+      setSelectedFile(nextFile);
       setPasted("");
     } catch (readError) {
+      if (choice !== choiceRef.current) return;
       setSelectedFile(null);
       setError(readError instanceof Error ? readError.message : "Could not read the license file.");
     }
@@ -158,6 +171,7 @@ export const LicenseInstallForm: React.FC<LicenseInstallFormProps> = ({
     event.preventDefault();
     setError(null);
     setInstalling(true);
+    onInstallingChange?.(true);
 
     try {
       const license = await installInstallationLicense(licenseText);
@@ -168,6 +182,7 @@ export const LicenseInstallForm: React.FC<LicenseInstallFormProps> = ({
       setError(installError instanceof Error ? installError.message : "Failed to install the license");
     } finally {
       setInstalling(false);
+      onInstallingChange?.(false);
     }
   };
 
@@ -199,6 +214,7 @@ export const LicenseInstallForm: React.FC<LicenseInstallFormProps> = ({
           data-testid="license-key-input"
           value={pasted}
           onChange={(event) => {
+            replaceChoice();
             setPasted(event.target.value);
             clearFile();
           }}

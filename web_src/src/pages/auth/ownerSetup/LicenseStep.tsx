@@ -74,6 +74,8 @@ const EditionOption = ({
 export const LicenseStep: React.FC<LicenseStepProps> = ({ onContinue }) => {
   const [license, setLicense] = useState<InstallationLicense | null>(null);
   const [edition, setEdition] = useState<EditionChoice>("community");
+  const [installing, setInstalling] = useState(false);
+  const continued = React.useRef(false);
 
   useEffect(() => {
     fetchInstallationLicenseWhenKeysReady()
@@ -98,6 +100,12 @@ export const LicenseStep: React.FC<LicenseStepProps> = ({ onContinue }) => {
   if (license.edition === "enterprise") {
     return <ActivatedSummary license={license} onContinue={onContinue} />;
   }
+
+  const continueWithCommunity = () => {
+    if (installing) return;
+    continued.current = true;
+    onContinue();
+  };
 
   return (
     <div data-testid="owner-setup-license">
@@ -127,7 +135,14 @@ export const LicenseStep: React.FC<LicenseStepProps> = ({ onContinue }) => {
             >
               {edition === "enterprise" ? (
                 <div className="mt-4 border-t border-border pt-4">
-                  <LicenseInstallForm submitLabel="Activate Enterprise" onInstalled={setLicense} />
+                  <LicenseInstallForm
+                    submitLabel="Activate Enterprise"
+                    onInstallingChange={setInstalling}
+                    onInstalled={(installed) => {
+                      if (continued.current) return;
+                      setLicense(installed);
+                    }}
+                  />
                 </div>
               ) : null}
             </EditionOption>
@@ -140,7 +155,8 @@ export const LicenseStep: React.FC<LicenseStepProps> = ({ onContinue }) => {
         variant={edition === "community" ? "default" : "ghost"}
         className={cn("mt-8 min-w-40", edition === "enterprise" && "text-muted-foreground hover:text-foreground")}
         data-testid="owner-setup-license-skip"
-        onClick={onContinue}
+        disabled={installing}
+        onClick={continueWithCommunity}
       >
         Continue with Community
       </Button>
