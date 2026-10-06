@@ -8,6 +8,14 @@ vi.mock("@/pages/organization/settings/Members", () => ({
 
 import { FactoryOrganizationMembersPage } from "./FactoryOrganizationSettingsPages";
 
+function settingsColumnClassName(content: HTMLElement) {
+  const column = content.closest("[class*='max-w-3xl'], [class*='max-w-6xl']");
+  if (!(column instanceof HTMLElement)) {
+    throw new Error("settings column not found");
+  }
+  return column.className;
+}
+
 describe("FactoryOrganizationMembersPage", () => {
   it("uses the wide settings column so the member table stays in view", () => {
     render(
@@ -18,9 +26,9 @@ describe("FactoryOrganizationMembersPage", () => {
       </MemoryRouter>,
     );
 
-    // Members is a settings table, so its column matches the wide settings
-    // max-width, not the short form measure.
     expect(screen.getByTestId("workspace-page-header").className).toContain("max-w-6xl");
-    expect(screen.getByTestId("members-body")).toBeInTheDocument();
+    const bodyClassName = settingsColumnClassName(screen.getByTestId("members-body"));
+    expect(bodyClassName).toContain("max-w-6xl");
+    expect(bodyClassName).not.toContain("max-w-3xl");
   });
 });
