@@ -36,6 +36,7 @@ import type { WorkOrderStatusNotePresentation } from "../lib/workOrderStatusNote
 import {
   intakeSettingsFromApi,
   linearProjectIdsFromResource,
+  sentryProjectIdsFromResource,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
 import { intakeCanvasForSource } from "./lineIntakeCanvas";
@@ -338,6 +339,9 @@ export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[
     const settings = intakeSettingsFromApi(name, intake.settings);
     if (source.id === "linear-issues" && settings.linearProjectIds.length === 0) {
       settings.linearProjectIds = linearProjectIdsFromResource(intake.resourceId);
+    }
+    if (source.id === "sentry-exceptions" && settings.sentryProjectIds.length === 0) {
+      settings.sentryProjectIds = sentryProjectIdsFromResource(intake.resourceId);
     }
     return [
       {

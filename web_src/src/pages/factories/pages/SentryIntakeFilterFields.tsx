@@ -1,10 +1,13 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { useId, type Dispatch, type SetStateAction } from "react";
 
 import type { IntakeSourceSettings } from "./intakeSourceSettingsModel";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
+import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
+import { SentryProjectPicker } from "./SentryProjectPicker";
 
 const SENTRY_INTAKE_SETTINGS_COPY = {
   intakeSection: "Create task when:",
@@ -15,12 +18,19 @@ export function SentryIntakeFilterFields({
   sourceId,
   settings,
   onSettingsChange,
+  organizationId,
+  integrationId,
 }: {
   sourceId: LineIntakeSourceId;
   settings: IntakeSourceSettings;
   onSettingsChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
+  organizationId?: string;
+  integrationId?: string;
 }) {
   const idPrefix = useId();
+  const projectsQuery = useIntegrationResources(organizationId ?? "", integrationId ?? "", "project", undefined, {
+    enabled: sourceId === "sentry-exceptions" && Boolean(organizationId && integrationId),
+  });
   if (sourceId !== "sentry-exceptions") {
     return null;
   }
@@ -29,8 +39,30 @@ export function SentryIntakeFilterFields({
     onSettingsChange((current) => ({ ...current, [key]: value }));
   }
 
+  const toggleProject = (id: string) => {
+    onSettingsChange((current) => ({
+      ...current,
+      sentryProjectIds: current.sentryProjectIds.includes(id)
+        ? current.sentryProjectIds.filter((entry) => entry !== id)
+        : [...current.sentryProjectIds, id],
+    }));
+  };
+
   return (
     <div className="flex flex-col gap-6">
+      <fieldset className="min-w-0">
+        <legend className="workspace-section-title">{SENTRY_INTAKE_SETUP_COPY.projectsLabel}</legend>
+        <div className="mt-2">
+          <SentryProjectPicker
+            projects={projectsQuery.data ?? []}
+            selectedIds={settings.sentryProjectIds}
+            loading={projectsQuery.isLoading}
+            error={projectsQuery.isError}
+            onToggle={toggleProject}
+            onRetry={() => void projectsQuery.refetch()}
+          />
+        </div>
+      </fieldset>
       <fieldset className="min-w-0">
         <legend className="workspace-section-title">{SENTRY_INTAKE_SETTINGS_COPY.intakeSection}</legend>
         <div className="mt-2 flex flex-col gap-2">

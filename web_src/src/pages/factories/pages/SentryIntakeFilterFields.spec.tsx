@@ -13,6 +13,19 @@ import {
 } from "./intakeSourceSettingsModel";
 import type { LineIntakeSourceId } from "./lineIntakeModel";
 import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
+import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
+
+vi.mock("@/hooks/useIntegrations", () => ({
+  useIntegrationResources: () => ({
+    data: [
+      { id: "payments", name: "Payments" },
+      { id: "growth", name: "Growth" },
+    ],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
 
 function FilterHarness({
   sourceId,
@@ -28,7 +41,13 @@ function FilterHarness({
   return (
     <div>
       <GitHubIntakeFilterFields sourceId={sourceId} settings={settings} onSettingsChange={setSettings} />
-      <SentryIntakeFilterFields sourceId={sourceId} settings={settings} onSettingsChange={setSettings} />
+      <SentryIntakeFilterFields
+        sourceId={sourceId}
+        settings={settings}
+        onSettingsChange={setSettings}
+        organizationId="org-1"
+        integrationId="integration-1"
+      />
       <button type="button" onClick={() => onSave?.(normalizeIntakeSourceSettings(settings, sourceId))}>
         Save
       </button>
@@ -121,5 +140,26 @@ describe("SentryIntakeFilterFields", () => {
     expect(intakeSettingsToApi(onSave.mock.calls[0][0])).toMatchObject({
       sentryLevels: ["fatal", "error"],
     });
+  });
+
+  it("shows project names and toggles more than one project", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <FilterHarness
+        sourceId="sentry-exceptions"
+        initial={{ ...DEFAULT_SENTRY_INTAKE_SETTINGS, sentryProjectIds: ["payments"] }}
+        onSave={onSave}
+      />,
+    );
+
+    expect(screen.getByRole("group", { name: SENTRY_INTAKE_SETUP_COPY.projectsLabel })).toBeInTheDocument();
+    expect(screen.getByText("Payments")).toBeInTheDocument();
+    expect(screen.getByTestId("sentry-project-payments")).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByTestId("sentry-project-growth"));
+    expect(screen.getByTestId("sentry-project-growth")).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ sentryProjectIds: ["payments", "growth"] }));
   });
 });

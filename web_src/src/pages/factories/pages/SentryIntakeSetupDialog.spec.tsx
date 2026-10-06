@@ -85,7 +85,7 @@ describe("SentryIntakeSetupDialog", () => {
       "listens for new issues",
     );
     expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.importExistingHelper)).toHaveTextContent(
-      "adds the newest unresolved issues",
+      "newest unresolved issues",
     );
     expect(screen.getByTestId("sentry-skip-initial-import")).toBeChecked();
     expect(screen.getByTestId("sentry-intake-setup-stepper")).toBeInTheDocument();
@@ -107,6 +107,7 @@ describe("SentryIntakeSetupDialog", () => {
         source: "SOURCE_SENTRY_EXCEPTIONS",
         integrationId: "integration-1",
         resourceId: "payments",
+        settings: { sentryProjectIds: ["payments"] },
       });
     });
     expect(onCreated).toHaveBeenCalled();
@@ -130,6 +131,7 @@ describe("SentryIntakeSetupDialog", () => {
         source: "SOURCE_SENTRY_EXCEPTIONS",
         integrationId: "integration-1",
         resourceId: "payments",
+        settings: { sentryProjectIds: ["payments"] },
         skipInitialImport: true,
       });
     });
@@ -179,6 +181,7 @@ describe("SentryIntakeSetupDialog", () => {
         source: "SOURCE_SENTRY_EXCEPTIONS",
         integrationId: "integration-2",
         resourceId: "payments",
+        settings: { sentryProjectIds: ["payments"] },
       });
     });
   });
@@ -204,5 +207,28 @@ describe("SentryIntakeSetupDialog", () => {
     await user.click(screen.getByTestId("sentry-setup-finish"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(SENTRY_INTAKE_SETUP_COPY.wizardCreateError);
+  });
+
+  it("keeps create disabled until a project is selected and sends both ids", async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    const finish = await screen.findByTestId("sentry-setup-finish");
+    expect(finish).toBeDisabled();
+    await user.click(screen.getByTestId("sentry-project-payments"));
+    await user.click(screen.getByTestId("sentry-project-growth"));
+    expect(screen.getByTestId("sentry-project-payments")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("sentry-project-growth")).toHaveAttribute("aria-selected", "true");
+    expect(finish).toBeEnabled();
+    await user.click(finish);
+
+    await waitFor(() => {
+      expect(mocks.createIntake).toHaveBeenCalledWith({
+        source: "SOURCE_SENTRY_EXCEPTIONS",
+        integrationId: "integration-1",
+        resourceId: "payments,growth",
+        settings: { sentryProjectIds: ["payments", "growth"] },
+      });
+    });
   });
 });
