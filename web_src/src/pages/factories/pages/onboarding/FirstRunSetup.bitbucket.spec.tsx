@@ -21,6 +21,17 @@ const experimental = vi.hoisted(() => ({
   loading: false,
 }));
 
+const bitbucketOnboarding = vi.hoisted(() => ({
+  loaded: true,
+  refetch: (() => undefined) as () => unknown,
+  providerConfigured: false,
+  identity: undefined as { login?: string; providerUserId?: string } | undefined,
+  repositories: [] as Array<{ fullName?: string }>,
+  installUrl: "",
+  isPending: false,
+  error: null as unknown,
+}));
+
 vi.mock("@/hooks/useIntegrations", () => ({
   useIntegrationResources: (
     _organizationId: string,
@@ -36,6 +47,23 @@ vi.mock("@/hooks/useIntegrations", () => ({
       isError: false,
     };
   },
+}));
+
+vi.mock("./useBitbucketOnboarding", () => ({
+  useBitbucketOnboarding: () => ({
+    data: bitbucketOnboarding.loaded
+      ? {
+          providerConfigured: bitbucketOnboarding.providerConfigured,
+          identity: bitbucketOnboarding.identity,
+          repositories: bitbucketOnboarding.repositories,
+          installUrl: bitbucketOnboarding.installUrl,
+        }
+      : undefined,
+    isPending: bitbucketOnboarding.isPending,
+    error: bitbucketOnboarding.error,
+    refetch: bitbucketOnboarding.refetch,
+    startInstallation: { mutateAsync: vi.fn() },
+  }),
 }));
 
 vi.mock("./useGitHubOnboarding", () => ({
@@ -97,6 +125,7 @@ function pageModel(setup: OnboardingSetupApi, overrides: Partial<OnboardingPageM
     requestConnect: vi.fn(),
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
     bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
@@ -152,6 +181,14 @@ async function chooseBitbucket(user: ReturnType<typeof userEvent.setup>) {
 describe("FirstRunSetup Bitbucket", () => {
   beforeEach(() => {
     resources.calls = [];
+    bitbucketOnboarding.loaded = true;
+    bitbucketOnboarding.refetch = vi.fn();
+    bitbucketOnboarding.providerConfigured = false;
+    bitbucketOnboarding.identity = undefined;
+    bitbucketOnboarding.repositories = [];
+    bitbucketOnboarding.installUrl = "";
+    bitbucketOnboarding.isPending = false;
+    bitbucketOnboarding.error = null;
     experimental.enabled = new Set([FEATURE_FACTORY_BITBUCKET]);
     experimental.loading = false;
     localStorage.clear();
@@ -191,6 +228,38 @@ describe("FirstRunSetup Bitbucket", () => {
 
     expect(requestConnect).toHaveBeenCalledWith("bitbucket");
     expect(screen.queryByTestId("first-run-connect")).not.toBeInTheDocument();
+  });
+
+  it("connects a Bitbucket account with OAuth when Forge is configured", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    const user = userEvent.setup();
+    const requestConnect = vi.fn();
+    renderSetup(new Set(), { requestConnect });
+
+    await chooseBitbucket(user);
+    const link = screen.getByTestId("first-run-bitbucket-oauth");
+
+    expect(link).toHaveAttribute("href", expect.stringContaining("/auth/bitbucket?intent=connect"));
+    expect(requestConnect).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Connect your Bitbucket account. SuperPlane uses it to find repositories you can open."),
+    ).toBeInTheDocument();
+  });
+
+  it("offers a retry instead of the access token setup when the Bitbucket lookup fails", async () => {
+    bitbucketOnboarding.loaded = false;
+    bitbucketOnboarding.error = new Error("network error");
+    const user = userEvent.setup();
+    const requestConnect = vi.fn();
+    renderSetup(new Set(), { requestConnect });
+
+    await chooseBitbucket(user);
+
+    expect(screen.queryByTestId("first-run-connect-bitbucket")).not.toBeInTheDocument();
+    expect(screen.getByText("SuperPlane could not check the Bitbucket setup. Try again.")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-bitbucket-retry"));
+    expect(bitbucketOnboarding.refetch).toHaveBeenCalled();
+    expect(requestConnect).not.toHaveBeenCalled();
   });
 
   it("saves the chosen Bitbucket repository and opens the ticket screen", async () => {
