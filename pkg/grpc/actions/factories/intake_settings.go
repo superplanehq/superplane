@@ -767,7 +767,10 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 }
 
 // parseIntakeSettings merges a request over what the graph already says, so a
-// caller that leaves an enum unspecified does not reset it.
+// caller that leaves an enum unspecified does not reset it. An omitted or
+// empty Sentry project list keeps the saved projects. JSON does not record
+// that a repeated field was present when the array is empty, and older
+// clients omit the field when they update other settings.
 func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Settings) intakeSettings {
 	if requested == nil {
 		return current
@@ -807,7 +810,9 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.SentryAssignedIssues = requested.GetSentryAssignedIssues()
 	}
 	updated.SentryLevels = requested.GetSentryLevels()
-	updated.SentryProjectIDs = requested.GetSentryProjectIds()
+	if requested.SentryProjectIds != nil {
+		updated.SentryProjectIDs = requested.SentryProjectIds
+	}
 	updated.DependabotSeverities = requested.GetDependabotSeverities()
 	if requested.ExcludeKeyTasks != nil {
 		updated.ExcludeKeyTasks = requested.GetExcludeKeyTasks()

@@ -231,4 +231,42 @@ describe("SentryIntakeSetupDialog", () => {
       });
     });
   });
+
+  it("clears selected projects when the user chooses another Sentry connection", async () => {
+    mocks.connected.splice(
+      0,
+      mocks.connected.length,
+      { metadata: { id: "integration-1", name: "Sentry", integrationName: "sentry" }, status: { state: "ready" } },
+      { metadata: { id: "integration-2", name: "Sentry EU", integrationName: "sentry" }, status: { state: "ready" } },
+    );
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByTestId("sentry-project-payments"));
+    expect(screen.getByTestId("sentry-project-payments")).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByTestId("first-run-back"));
+    await user.click(await screen.findByTestId("sentry-connection-integration-2"));
+    await user.click(screen.getByTestId("sentry-setup-continue"));
+
+    expect(await screen.findByTestId("sentry-project-payments")).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByTestId("sentry-setup-finish")).toBeDisabled();
+  });
+
+  it("keeps selected projects when the user returns to the same connection", async () => {
+    mocks.connected.splice(
+      0,
+      mocks.connected.length,
+      { metadata: { id: "integration-1", name: "Sentry", integrationName: "sentry" }, status: { state: "ready" } },
+      { metadata: { id: "integration-2", name: "Sentry EU", integrationName: "sentry" }, status: { state: "ready" } },
+    );
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByTestId("sentry-project-payments"));
+    await user.click(screen.getByTestId("first-run-back"));
+    await user.click(screen.getByTestId("sentry-setup-continue"));
+
+    expect(await screen.findByTestId("sentry-project-payments")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("sentry-setup-finish")).toBeEnabled();
+  });
 });

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it, vi } from "bun:test";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import {
@@ -15,12 +15,16 @@ import type { LineIntakeSourceId } from "./lineIntakeModel";
 import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 
+const integrationResources = vi.hoisted(() => ({
+  data: [
+    { id: "payments", name: "Payments" },
+    { id: "growth", name: "Growth" },
+  ] as Array<{ id: string; name: string }>,
+}));
+
 vi.mock("@/hooks/useIntegrations", () => ({
   useIntegrationResources: () => ({
-    data: [
-      { id: "payments", name: "Payments" },
-      { id: "growth", name: "Growth" },
-    ],
+    data: integrationResources.data,
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
@@ -56,6 +60,12 @@ function FilterHarness({
 }
 
 describe("SentryIntakeFilterFields", () => {
+  beforeEach(() => {
+    integrationResources.data = [
+      { id: "payments", name: "Payments" },
+      { id: "growth", name: "Growth" },
+    ];
+  });
   it("hides Sentry event fields and level checkboxes for a GitHub intake", () => {
     render(<FilterHarness sourceId="github-issues" initial={DEFAULT_GITHUB_INTAKE_SETTINGS} />);
 
@@ -161,5 +171,26 @@ describe("SentryIntakeFilterFields", () => {
     await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ sentryProjectIds: ["payments", "growth"] }));
+  });
+
+  it("shows a saved project that is missing from the connection so it can be removed", async () => {
+    integrationResources.data = [{ id: "payments", name: "Payments" }];
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <FilterHarness
+        sourceId="sentry-exceptions"
+        initial={{ ...DEFAULT_SENTRY_INTAKE_SETTINGS, sentryProjectIds: ["payments", "billing"] }}
+        onSave={onSave}
+      />,
+    );
+
+    expect(screen.getByTestId("sentry-project-billing")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.unavailableProject)).toBeInTheDocument();
+    await user.click(screen.getByTestId("sentry-project-billing"));
+    expect(screen.queryByTestId("sentry-project-billing")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ sentryProjectIds: ["payments"] }));
   });
 });

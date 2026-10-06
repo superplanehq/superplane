@@ -15,6 +15,7 @@ export const SENTRY_INTAKE_SETUP_COPY = {
   wizardProjectsError: "SuperPlane could not load Sentry projects.",
   wizardProjectsEmpty: "This connection has no available projects.",
   wizardNoMatchingProjects: "No matching projects.",
+  unavailableProject: "Not in this connection",
   wizardSearchProjects: "Search projects",
   wizardRetry: "Try again",
   wizardConnectError: "SuperPlane could not open the Sentry install page.",

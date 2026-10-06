@@ -22,13 +22,14 @@ export function SentryProjectPicker({
   onRetry: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const listed = useMemo(() => sentryPickerProjects(projects, selectedIds), [projects, selectedIds]);
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term) {
-      return projects;
+      return listed;
     }
-    return projects.filter((project) => (project.name ?? project.id ?? "").toLowerCase().includes(term));
-  }, [projects, query]);
+    return listed.filter((project) => (project.name ?? project.id ?? "").toLowerCase().includes(term));
+  }, [listed, query]);
 
   if (loading) {
     return (
@@ -48,7 +49,7 @@ export function SentryProjectPicker({
       </div>
     );
   }
-  if (projects.length === 0) {
+  if (listed.length === 0) {
     return <p className="workspace-body-text text-muted-foreground">{SENTRY_INTAKE_SETUP_COPY.wizardProjectsEmpty}</p>;
   }
 
@@ -94,6 +95,11 @@ export function SentryProjectPicker({
                     )}
                   >
                     <span className="min-w-0 flex-1 truncate">{project.name || "Untitled project"}</span>
+                    {project.unavailable ? (
+                      <span className="shrink-0 text-[12px] font-normal text-muted-foreground">
+                        {SENTRY_INTAKE_SETUP_COPY.unavailableProject}
+                      </span>
+                    ) : null}
                     {selected ? (
                       <Check className="size-3.5 shrink-0 text-foreground" strokeWidth={2.5} aria-hidden />
                     ) : null}
@@ -106,4 +112,17 @@ export function SentryProjectPicker({
       </div>
     </div>
   );
+}
+
+type SentryPickerProject = { id?: string; name?: string; unavailable?: boolean };
+
+function sentryPickerProjects(
+  projects: Array<{ id?: string; name?: string }>,
+  selectedIds: string[],
+): SentryPickerProject[] {
+  const known = new Set(projects.map((project) => project.id).filter((id): id is string => Boolean(id)));
+  const missing = selectedIds
+    .filter((id) => id.length > 0 && !known.has(id))
+    .map((id) => ({ id, name: id, unavailable: true }));
+  return [...missing, ...projects];
 }

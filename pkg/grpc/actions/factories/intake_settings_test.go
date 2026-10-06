@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -702,6 +703,73 @@ func Test__applyIntakeSettingsToGraph_Sentry(t *testing.T) {
 			}}},
 		)
 		assert.Equal(t, []string{"payments"}, parsed.SentryProjectIDs)
+	})
+
+	t.Run("keeps saved projects when the request omits the list", func(t *testing.T) {
+		requested := &pb.FactoryIntake_Settings{}
+		require.NoError(t, protojson.Unmarshal([]byte(`{"sentryNewIssues":false}`), requested))
+		require.Nil(t, requested.SentryProjectIds)
+
+		nodes, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceSentryExceptions,
+			intakeGraph{TriggerNodeID: intakeTriggerNodeID},
+			models.LiveCanvasSpec{Nodes: []models.Node{{
+				ID: intakeTriggerNodeID,
+				Configuration: map[string]any{
+					"project":  "payments",
+					"projects": []any{"payments"},
+					"actions":  []any{"created"},
+				},
+			}}},
+			requested,
+			[]models.Node{{
+				ID: intakeTriggerNodeID,
+				Configuration: map[string]any{
+					"project":  "payments",
+					"projects": []any{"payments"},
+					"actions":  []any{"created"},
+				},
+			}},
+			nil,
+		)
+		require.NoError(t, err)
+
+		trigger := findModelNode(t, nodes, intakeTriggerNodeID)
+		assert.Equal(t, "payments", trigger.Configuration["project"])
+		assert.Equal(t, []any{"payments"}, trigger.Configuration["projects"])
+		assert.Empty(t, trigger.Configuration["actions"])
+	})
+
+	t.Run("keeps saved projects when JSON sends an empty project list", func(t *testing.T) {
+		requested := &pb.FactoryIntake_Settings{}
+		require.NoError(t, protojson.Unmarshal([]byte(`{"sentryProjectIds":[]}`), requested))
+
+		nodes, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceSentryExceptions,
+			intakeGraph{TriggerNodeID: intakeTriggerNodeID},
+			models.LiveCanvasSpec{Nodes: []models.Node{{
+				ID: intakeTriggerNodeID,
+				Configuration: map[string]any{
+					"project":  "payments",
+					"projects": []any{"payments"},
+					"actions":  []any{"created"},
+				},
+			}}},
+			requested,
+			[]models.Node{{
+				ID: intakeTriggerNodeID,
+				Configuration: map[string]any{
+					"project":  "payments",
+					"projects": []any{"payments"},
+				},
+			}},
+			nil,
+		)
+		require.NoError(t, err)
+
+		trigger := findModelNode(t, nodes, intakeTriggerNodeID)
+		assert.Equal(t, "payments", trigger.Configuration["project"])
+		assert.Equal(t, []any{"payments"}, trigger.Configuration["projects"])
 	})
 }
 

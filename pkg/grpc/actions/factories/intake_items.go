@@ -776,12 +776,22 @@ func (s *sentryIntakeItemSource) Search(_ context.Context, query string, limit i
 	}
 
 	matched := make([]sentry.Issue, 0, limit)
+	var firstErr error
+	loaded := 0
 	for _, project := range projects {
 		issues, err := s.sentry.SearchUnresolvedIssues(project, query, limit)
 		if err != nil {
-			return nil, err
+			if firstErr == nil {
+				firstErr = err
+			}
+			log.WithError(err).Warnf("sentry intake search skipped project %s", project)
+			continue
 		}
+		loaded++
 		matched = append(matched, issues...)
+	}
+	if loaded == 0 {
+		return nil, firstErr
 	}
 	matched = mergeNewestSentryIssues(matched, limit)
 

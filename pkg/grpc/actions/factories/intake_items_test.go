@@ -362,6 +362,63 @@ func TestSentryIntakeItemSource_SearchMergesProjectsWithinTheLimit(t *testing.T)
 	assert.Contains(t, httpContext.Requests[1].URL.Path, "/projects/example/growth/issues/")
 }
 
+func TestSentryIntakeItemSource_SearchKeepsResultsWhenOneProjectFails(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(fmt.Sprintf(
+					`[{"id":"1","title":"payments","lastSeen":"%s"}]`,
+					now.Format(time.RFC3339),
+				))),
+			},
+			{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader(`{"detail":"Project not found"}`)),
+			},
+		},
+	}
+	client, err := sentry.NewClient(httpContext, &contexts.IntegrationContext{
+		Configuration: map[string]any{"baseUrl": "https://sentry.io", "userToken": "token"},
+		Metadata:      sentry.Metadata{Organization: &sentry.OrganizationSummary{Slug: "example"}},
+	})
+	require.NoError(t, err)
+
+	source := &sentryIntakeItemSource{sentry: client, projects: []string{"payments", "growth"}}
+	items, err := source.Search(t.Context(), "timeout", 2)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "1", items[0].ID)
+	require.Len(t, httpContext.Requests, 2)
+}
+
+func TestSentryIntakeItemSource_SearchFailsWhenEveryProjectFails(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader(`{"detail":"Project not found"}`)),
+			},
+			{
+				StatusCode: http.StatusNotFound,
+				Body:       io.NopCloser(strings.NewReader(`{"detail":"Project not found"}`)),
+			},
+		},
+	}
+	client, err := sentry.NewClient(httpContext, &contexts.IntegrationContext{
+		Configuration: map[string]any{"baseUrl": "https://sentry.io", "userToken": "token"},
+		Metadata:      sentry.Metadata{Organization: &sentry.OrganizationSummary{Slug: "example"}},
+	})
+	require.NoError(t, err)
+
+	source := &sentryIntakeItemSource{sentry: client, projects: []string{"payments", "growth"}}
+	items, err := source.Search(t.Context(), "timeout", 2)
+	require.Error(t, err)
+	assert.Empty(t, items)
+	require.Len(t, httpContext.Requests, 2)
+}
+
 func TestDatadogIntakeItemSource_StaysInsideItsService(t *testing.T) {
 	source := &datadogIntakeItemSource{service: "checkout"}
 

@@ -9,7 +9,7 @@ import { followBrowserAction } from "@/lib/browserAction";
 import { getApiErrorMessage } from "@/lib/errors";
 import { rememberIntegrationSetupReturn } from "@/lib/integrationSetupReturn";
 import { createWithGeneratedName } from "@/ui/IntegrationCreateDialog/generatedName";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router";
 
 export type SentrySetupStep = "connection" | "project";
@@ -29,6 +29,15 @@ export function useSentryIntakeSetup(organizationId: string, factoryId: string) 
   const projectsQuery = useIntegrationResources(organizationId, integrationId, "project", undefined, {
     enabled: Boolean(integrationId),
   });
+  const previousIntegrationId = useRef(integrationId);
+
+  useEffect(() => {
+    if (previousIntegrationId.current === integrationId) {
+      return;
+    }
+    previousIntegrationId.current = integrationId;
+    setProjectIds([]);
+  }, [integrationId]);
 
   useEffect(() => {
     if (!integrationId && sentryIntegrations.length === 1) {
