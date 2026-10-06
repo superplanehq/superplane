@@ -128,3 +128,7 @@ func DeleteMCPAPITokensForAccount(tx *gorm.DB, accountID uuid.UUID) error {
 	userIDs := tx.Unscoped().Model(&User{}).Select("id").Where("account_id = ?", accountID)
 	return tx.Where("user_id IN (?)", userIDs).Delete(&MCPAPIToken{}).Error
 }
+
+func DeleteMCPAPITokensForFactory(tx *gorm.DB, factoryID uuid.UUID) error {
+	return tx.Where("factory_id = ?", factoryID).Delete(&MCPAPIToken{}).Error
+}

@@ -88,6 +88,34 @@ func TestMCPAPITokenRevokeAndMismatchReturn401(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, revoked.Code)
 }
 
+func TestMCPAPITokenDeletedFactoryReturns401(t *testing.T) {
+	r, server, _ := mcpEnabledServer(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, "OpenCode", "", "OPC")
+	require.NoError(t, err)
+	created, err := factoryactions.CreateFactoryMCPAPIToken(mcpTokenContext(r), r.Organization.ID.String(), &pb.CreateFactoryMCPAPITokenRequest{
+		FactoryId: factory.ID.String(),
+		Name:      "Build server",
+		Resource:  "http://localhost:8000/mcp",
+	})
+	require.NoError(t, err)
+	require.NoError(t, factory.SoftDelete(db))
+	secret := created.GetPlaintext()
+	require.NoError(t, models.CreateMCPAPIToken(db, models.NewMCPAPIToken(
+		r.User,
+		r.Organization.ID,
+		factory.ID,
+		"Leftover",
+		"http://localhost:8000/mcp",
+		crypto.HashToken(secret),
+		models.MCPGrantedScopes,
+	)))
+
+	rec := postMCP(t, server, secret, `{"jsonrpc":"2.0","id":1,"method":"initialize"}`)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
 func TestMCPRejectsPersonalTokenAndOrganizationAPIKey(t *testing.T) {
 	r, server, _ := mcpEnabledServer(t)
 	personal, err := crypto.Base64String(32)

@@ -47,8 +47,14 @@ describe("Factory MCP OpenCode token", () => {
     try {
       await user.click(screen.getByTestId("superplane-mcp-config-copy-opencode"));
       expect(writeText).toHaveBeenCalled();
-      const copied = JSON.stringify(writeText.mock.calls);
-      expect(copied).toContain(`${window.location.origin}/mcp`);
+      const copied = String(writeText.mock.calls[0]?.[0]);
+      const parsed = JSON.parse(copied) as {
+        mcp?: { superplane?: { type?: string; url?: string } };
+        servers?: unknown;
+      };
+      expect(parsed.servers).toBeUndefined();
+      expect(parsed.mcp?.superplane?.type).toBe("remote");
+      expect(parsed.mcp?.superplane?.url).toBe(`${window.location.origin}/mcp`);
       expect(copied).toContain("{file:/path/to/superplane.key}");
       expect(copied).toContain("oauth");
       expect(copied).not.toContain("sp_mcp_");

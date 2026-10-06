@@ -1,6 +1,7 @@
 package mcpserver
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -20,6 +21,12 @@ func ClaimsForAPIToken(tx *gorm.DB, rawToken, resource string) (*AccessClaims, u
 	}
 	if strings.TrimSpace(stored.Resource) != strings.TrimSpace(resource) {
 		return nil, uuid.Nil, models.ErrMCPAPITokenNotFound
+	}
+	if _, err := models.FindFactory(tx, stored.OrganizationID, stored.FactoryID); err != nil {
+		if errors.Is(err, models.ErrFactoryNotFound) {
+			return nil, uuid.Nil, models.ErrMCPAPITokenNotFound
+		}
+		return nil, uuid.Nil, err
 	}
 	user, err := models.FindActiveUserByIDInTransaction(tx, stored.OrganizationID.String(), stored.UserID.String())
 	if err != nil || !user.IsHuman() {

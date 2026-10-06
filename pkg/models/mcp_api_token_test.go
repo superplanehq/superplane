@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
 
 func Test__MCPAPIToken__CreateFindRevoke(t *testing.T) {
@@ -64,4 +65,50 @@ func Test__DeleteMCPAPITokensForAccount(t *testing.T) {
 	found, err := models.FindMCPAPITokenByHash(tx, "hash-other-mcp")
 	require.NoError(t, err)
 	assert.Equal(t, other.ID, found.ID)
+}
+
+func Test__FactorySoftDeleteRemovesMCPAPITokens(t *testing.T) {
+	r := support.Setup(t)
+	tx := database.Conn()
+	factory, err := models.CreateFactory(tx, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	other, err := models.CreateFactory(tx, r.Organization.ID, support.RandomName("other"), "", "")
+	require.NoError(t, err)
+
+	deletedHash := support.RandomName("hash-deleted")
+	keptHash := support.RandomName("hash-kept")
+	own := models.NewMCPAPIToken(r.User, r.Organization.ID, factory.ID, "Own", "http://localhost:8000/mcp", deletedHash, nil)
+	require.NoError(t, models.CreateMCPAPIToken(tx, own))
+	kept := models.NewMCPAPIToken(r.User, r.Organization.ID, other.ID, "Kept", "http://localhost:8000/mcp", keptHash, nil)
+	require.NoError(t, models.CreateMCPAPIToken(tx, kept))
+
+	require.NoError(t, factory.SoftDelete(tx))
+
+	_, err = models.FindMCPAPITokenByHash(tx, deletedHash)
+	assert.ErrorIs(t, err, models.ErrMCPAPITokenNotFound)
+	found, err := models.FindMCPAPITokenByHash(tx, keptHash)
+	require.NoError(t, err)
+	assert.Equal(t, kept.ID, found.ID)
+}
+
+func Test__FactoryResourceCleanerRemovesLeftoverMCPAPITokens(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	require.NoError(t, factory.SoftDelete(db))
+
+	leftoverHash := support.RandomName("hash-leftover")
+	leftover := models.NewMCPAPIToken(r.User, r.Organization.ID, factory.ID, "Leftover", "http://localhost:8000/mcp", leftoverHash, nil)
+	require.NoError(t, models.CreateMCPAPIToken(db, leftover))
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, complete, cleanErr := models.NewFactoryResourceCleaner(tx, factory).WithLimit(500).Run()
+		require.NoError(t, cleanErr)
+		assert.True(t, complete)
+		return nil
+	}))
+
+	_, err = models.FindMCPAPITokenByHash(db, leftoverHash)
+	assert.ErrorIs(t, err, models.ErrMCPAPITokenNotFound)
 }

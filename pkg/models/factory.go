@@ -468,6 +468,10 @@ func ListOrganizationFactoriesByRecentUpdate(tx *gorm.DB, organizationID uuid.UU
 }
 
 func (f *Factory) SoftDelete(tx *gorm.DB) error {
+	if err := DeleteMCPAPITokensForFactory(tx, f.ID); err != nil {
+		return err
+	}
+
 	now := time.Now()
 	newName := fmt.Sprintf("%s (deleted-%d)", f.Name, now.Unix())
 

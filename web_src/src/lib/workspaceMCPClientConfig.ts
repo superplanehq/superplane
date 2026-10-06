@@ -51,7 +51,7 @@ export function workspaceMCPVSCodeConfig(origin: string): string {
 export function workspaceMCPOpenCodeConfig(origin: string): string {
   return JSON.stringify(
     {
-      servers: {
+      mcp: {
         superplane: {
           type: "remote",
           url: workspaceMCPServerURL(origin),
