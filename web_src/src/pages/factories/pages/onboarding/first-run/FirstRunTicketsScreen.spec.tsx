@@ -47,7 +47,7 @@ describe("FirstRunTicketsScreen", () => {
     expect(onAnalyzeTickets).toHaveBeenCalledTimes(1);
   });
 
-  it("lets the user select Jira and keeps Linear as coming soon", async () => {
+  it("lets the user select Jira and Linear", async () => {
     const user = userEvent.setup();
     const onSelectTicketSource = vi.fn();
     const onConnectJira = vi.fn();
@@ -66,12 +66,13 @@ describe("FirstRunTicketsScreen", () => {
     expect(onSelectTicketSource).toHaveBeenCalledWith("jira");
     expect(onConnectJira).toHaveBeenCalledTimes(1);
 
-    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Linear/ })).toBeDisabled();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect Linear" })).toBeEnabled();
   });
 
-  it("shows Jira and Linear as coming soon when Jira is unavailable", async () => {
+  it("shows Jira as coming soon and keeps Linear available when Jira is unavailable", async () => {
     const user = userEvent.setup();
     const onSelectTicketSource = vi.fn();
 
@@ -81,20 +82,25 @@ describe("FirstRunTicketsScreen", () => {
         onSelectTicketSource={onSelectTicketSource}
         onAnalyzeTickets={vi.fn()}
         onConnectJira={vi.fn()}
+        onConnectLinear={vi.fn()}
       />,
     );
 
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).not.toBeInTheDocument();
     expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraHelper)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /GitHub Issues/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Linear/ })).toBeInTheDocument();
-    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Connect Linear" })).toBeEnabled();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(1);
 
     await user.click(screen.getByText(FIRST_RUN_COPY.tickets.jira));
     expect(onSelectTicketSource).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Connect Linear" }));
+    expect(onSelectTicketSource).toHaveBeenCalledWith("linear");
   });
 
   it("does not mark Jira as coming soon while the feature lookup is loading", async () => {
@@ -115,7 +121,8 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraLookupLoading)).toBeInTheDocument();
     expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Coming soon")).toHaveLength(1);
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
 
     await user.click(screen.getByText(FIRST_RUN_COPY.tickets.jira));
@@ -169,7 +176,7 @@ describe("FirstRunTicketsScreen", () => {
     expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
   });
 
-  it("lets the user select Linear when the feature is on and keeps scan stopped until a project is chosen", async () => {
+  it("lets the user select Linear and keeps scan stopped until a project is chosen", async () => {
     const user = userEvent.setup();
     const onSelectTicketSource = vi.fn();
     const onConnectLinear = vi.fn();

@@ -39,15 +39,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Datadog intake from the Backlog column menu", f.Description)
 	})
 
-	t.Run("known id returns factory linear intake feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryLinearIntake)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryLinearIntake, f.ID)
-		assert.Equal(t, "Factory Linear Intake", f.Label)
-		assert.Equal(t, "Add Linear intake from the Backlog column menu", f.Description)
-		assert.Nil(t, f.Released)
-	})
-
 	t.Run("known id returns bitbucket workspaces feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryBitbucket)
 		assert.True(t, ok)
@@ -166,6 +157,12 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, Feature{}, feature)
 	})
 
+	t.Run("retired linear intake flag is absent", func(t *testing.T) {
+		feature, ok := Get("factory_linear_intake")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
+	})
+
 	t.Run("retired task console flag is absent", func(t *testing.T) {
 		feature, ok := Get("factory_task_console")
 		assert.False(t, ok)
@@ -179,7 +176,6 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryJiraIntake))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
-	assert.True(t, Exists(FeatureFactoryLinearIntake))
 	assert.True(t, Exists(FeatureFactoryBitbucket))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
@@ -195,6 +191,7 @@ func Test__Exists(t *testing.T) {
 	assert.False(t, Exists("factory_task_console"))
 	assert.False(t, Exists("factory_sentry_intake"))
 	assert.False(t, Exists("factory_dependabot_intake"))
+	assert.False(t, Exists("factory_linear_intake"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }
@@ -208,6 +205,12 @@ func Test__All_omitsRetiredSentryIntakeFlag(t *testing.T) {
 func Test__All_omitsRetiredDependabotIntakeFlag(t *testing.T) {
 	for _, feature := range All() {
 		assert.NotEqual(t, "factory_dependabot_intake", feature.ID)
+	}
+}
+
+func Test__All_omitsRetiredLinearIntakeFlag(t *testing.T) {
+	for _, feature := range All() {
+		assert.NotEqual(t, "factory_linear_intake", feature.ID)
 	}
 }
 

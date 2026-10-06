@@ -57,7 +57,7 @@ const TICKET_SCREEN_DEFAULTS = {
   jiraAvailable: false,
   jiraFeatureLoading: false,
   jiraChoiceBlock: null as FirstRunFlaggedChoiceBlock | null,
-  linearAvailable: false,
+  linearAvailable: true,
   linearFeatureLoading: false,
   linearChoiceBlock: null as FirstRunFlaggedChoiceBlock | null,
   continueLabel: FIRST_RUN_COPY.tickets.analyze,
