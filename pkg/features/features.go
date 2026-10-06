@@ -24,21 +24,24 @@ const FeatureFactories = "factories"
 // still uses the legacy IntegrationCreateDialog path.
 const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
 
-// FeatureFactoryJiraIntake gates the manual "Add intake" entry for Jira
-// in the Backlog column menu until the flow is generally available.
+// FeatureFactoryJiraIntake gates Jira issue intake until an admin enables it
+// for the organization.
 const FeatureFactoryJiraIntake = "factory_jira_intake"
 
-// FeatureFactoryProductiveIntake gates the manual "Add intake" entry for
-// Productive.io in the Backlog column menu until the flow is generally
-// available.
+// FeatureFactoryProductiveIntake gates Productive task intake until an admin
+// enables it for the organization.
 const FeatureFactoryProductiveIntake = "factory_productive_intake"
 
-// FeatureFactoryDatadogIntake gates Datadog Error Tracking intake from the
-// Backlog column menu until the flow is generally available.
+// FeatureFactoryDatadogIntake gates Datadog Error Tracking intake until an
+// admin enables it for the organization.
 const FeatureFactoryDatadogIntake = "factory_datadog_intake"
 
-// FeatureFactoryLinearIntake gates Linear issue intake from the Backlog
-// column menu until the flow is generally available.
+// FeatureFactoryPagerDutyIntake gates PagerDuty incident intake until an admin
+// enables it for the organization.
+const FeatureFactoryPagerDutyIntake = "factory_pagerduty_intake"
+
+// FeatureFactoryLinearIntake gates Linear issue intake until an admin enables
+// it for the organization.
 const FeatureFactoryLinearIntake = "factory_linear_intake"
 
 // FeatureWorkspaceModels gates the in-progress workspace Models settings
@@ -99,10 +102,11 @@ var registry = []Feature{
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
-	{ID: FeatureFactoryJiraIntake, Label: "Factory Jira Intake", Description: "Add Jira intake from the Backlog column menu"},
-	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
-	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
-	{ID: FeatureFactoryLinearIntake, Label: "Factory Linear Intake", Description: "Add Linear intake from the Backlog column menu"},
+	{ID: FeatureFactoryJiraIntake, Label: "Factory Jira Intake", Description: "Enable Jira issue intake in factories"},
+	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Enable Productive task intake in factories"},
+	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Enable Datadog Error Tracking intake in factories"},
+	{ID: FeatureFactoryPagerDutyIntake, Label: "Factory PagerDuty Intake", Description: "Enable PagerDuty incident intake in factories"},
+	{ID: FeatureFactoryLinearIntake, Label: "Factory Linear Intake", Description: "Enable Linear issue intake in factories"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},

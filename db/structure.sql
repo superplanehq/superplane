@@ -1011,6 +1011,22 @@ CREATE TABLE public.installation_metadata (
 
 
 --
+-- Name: intake_catalog_entries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.intake_catalog_entries (
+    key character varying(64) NOT NULL,
+    name character varying(255) NOT NULL,
+    category character varying(64) NOT NULL,
+    status character varying(32) DEFAULT 'planned'::character varying NOT NULL,
+    status_note text DEFAULT ''::text NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_by uuid
+);
+
+
+--
 -- Name: linear_webhook_receipts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2486,6 +2502,14 @@ ALTER TABLE ONLY public.installation_llm_settings
 
 ALTER TABLE ONLY public.installation_metadata
     ADD CONSTRAINT installation_metadata_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: intake_catalog_entries intake_catalog_entries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.intake_catalog_entries
+    ADD CONSTRAINT intake_catalog_entries_pkey PRIMARY KEY (key);
 
 
 --
@@ -5559,7 +5583,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261005202819	f
+20261006134753	f
 \.
 
 
@@ -5595,7 +5619,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260925150940	f
+20261006134804	f
 \.
 
 

@@ -1,5 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 
+import type { IntakeSurfaceState } from "@/lib/intakeCatalog";
+
 import { FirstRunAnalysisScreen } from "./FirstRunAnalysisScreen";
 import { FirstRunBoardExit } from "./FirstRunBoardExit";
 import { FirstRunChooseScreen } from "./FirstRunChooseScreen";
@@ -17,6 +19,11 @@ const STORY_JIRA_PROJECTS = [
 ];
 
 const STAGE_MS = 900;
+
+/** Stories use GitHub Issues and Jira as available intakes. */
+function storyIntakeState(key: string): IntakeSurfaceState | undefined {
+  return key === "github-issues" || key === "jira-issues" ? "available" : "soon";
+}
 
 /**
  * Clickable Storybook journey for the first-run PRD. Local state only.
@@ -101,7 +108,7 @@ export function FirstRunFlow({
       <FirstRunTicketsScreen
         ticketSource={ticketSource}
         chrome={chromeFor(3, () => setScreen("choose"))}
-        jiraAvailable
+        intakeState={storyIntakeState}
         jiraConnected={jiraConnected}
         jiraProjects={STORY_JIRA_PROJECTS}
         jiraProjectId={jiraProjectId}

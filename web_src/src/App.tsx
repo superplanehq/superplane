@@ -90,6 +90,8 @@ import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
+import { IntakeDetailPage as IntakeDetailAdmin } from "./pages/admin/intakes/IntakeDetailPage";
+import { IntakesListPage as IntakesListAdmin } from "./pages/admin/intakes/IntakesListPage";
 import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
 import { Webhooks as WebhooksAdmin } from "./pages/admin/Webhooks";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
@@ -269,6 +271,8 @@ function AppRouter() {
                 <Route path="settings" element={<InstallationSettingsAdmin />} />
                 <Route path="price-books" element={<PriceBooksAdmin />} />
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
+                <Route path="intakes" element={<IntakesListAdmin />} />
+                <Route path="intakes/:key" element={<IntakeDetailAdmin />} />
                 <Route path="polar-webhooks" element={<PolarWebhooksAdmin />} />
                 <Route path="webhooks" element={<WebhooksAdmin />} />
                 <Route path="sentry-webhooks" element={<Navigate to="/admin/webhooks" replace />} />
