@@ -83,6 +83,8 @@ export const FIRST_RUN_COPY = {
     linearProjectHeading: "Choose Linear projects",
     linearLookupLoading: "Checking whether Linear is available…",
     linearLookupFailed: "SuperPlane could not confirm that Linear is available. Choose GitHub Issues to continue.",
+    intakeSoonHelper: "SuperPlane cannot scan this backlog yet.",
+    beta: "Beta",
     analyze: "Scan my backlog",
     continue: "Continue",
     saving: "Saving ticket source…",

@@ -47,7 +47,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Linear intake from the Backlog column menu", f.Description)
 		assert.Nil(t, f.Released)
 	})
-
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceModels)
 		assert.True(t, ok)

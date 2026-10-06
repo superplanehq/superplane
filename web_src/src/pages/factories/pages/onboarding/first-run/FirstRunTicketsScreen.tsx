@@ -1,4 +1,6 @@
 import { LoadingButton } from "@/components/ui/loading-button";
+import { isIntakeSelectable, type IntakeSurfaceEntry, type IntakeSurfaceState } from "@/lib/intakeCatalog";
+import { findIntakePresentation } from "@/lib/intakePresentation";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunTicketChoices } from "./firstRunTicketChoices";
@@ -15,12 +17,14 @@ type FirstRunTicketsScreenProps = {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
-  /** True when the organization has the Jira intake feature. Shows Jira as coming soon when false and the lookup is done. */
-  jiraAvailable?: boolean;
-  /** True while the feature lookup has not finished. The row does not show Coming soon. */
-  jiraFeatureLoading?: boolean;
+  /** State of each intake for the organization. Undefined until the intake catalog loads. */
+  intakeState?: (key: string) => IntakeSurfaceState | undefined;
+  /** True while the intake catalog loads. Rows do not show Coming soon. */
+  intakesLoading?: boolean;
+  /** Ticket intakes in display order. Null until the intake catalog loads. */
+  ticketIntakes?: IntakeSurfaceEntry[] | null;
   /**
-   * A saved Jira choice cannot continue until the feature lookup confirms Jira.
+   * A saved Jira choice cannot continue until the intake catalog confirms Jira.
    * The notice explains the block.
    */
   jiraChoiceBlock?: FirstRunFlaggedChoiceBlock | null;
@@ -236,6 +240,185 @@ function choiceNoticeCopy(block: FirstRunFlaggedChoiceBlock | null, loading: str
   if (block === "lookup-failed") return failed;
   if (block === "loading") return loading;
   return null;
+}
+
+type FirstRunTicketRowProps = {
+  intakeKey: string;
+  entry?: IntakeSurfaceEntry;
+  state: IntakeSurfaceState | undefined;
+  intakesLoading: boolean;
+  ticketSource: FirstRunTicketSource | null;
+  saving: boolean;
+  jiraConnected: boolean;
+  onSelectTicketSource: (source: FirstRunTicketSource) => void;
+  onConnectJira?: () => void;
+};
+
+/** Exported for the admin preview, which renders the row read-only. */
+export function FirstRunTicketRow(props: FirstRunTicketRowProps) {
+  const copy = FIRST_RUN_COPY.tickets;
+  const { intakeKey, state, saving, ticketSource } = props;
+  const meta = state === "beta" ? copy.beta : undefined;
+
+  if (intakeKey === "github-issues") {
+    return (
+      <ConnectOptionRow
+        icon={<IntegrationChoiceIcon name="github" />}
+        title={copy.githubIssues}
+        detail={copy.githubIssuesHelper}
+        meta={meta}
+        selected={ticketSource === "github-issues"}
+        soon={state === "soon"}
+        disabled={saving}
+        onSelect={() => props.onSelectTicketSource("github-issues")}
+      />
+    );
+  }
+  if (intakeKey === "jira-issues") {
+    return <FirstRunJiraTicketRow {...props} meta={meta} />;
+  }
+  return <FirstRunSoonTicketRow intakeKey={intakeKey} entry={props.entry} saving={saving} />;
+}
+
+function FirstRunSoonTicketRow({
+  intakeKey,
+  entry,
+  saving,
+}: {
+  intakeKey: string;
+  entry?: IntakeSurfaceEntry;
+  saving: boolean;
+}) {
+  const copy = FIRST_RUN_COPY.tickets;
+  if (intakeKey === "linear-issues") {
+    return (
+      <ConnectOptionRow
+        icon={<IntegrationChoiceIcon name="linear" />}
+        title={copy.linear}
+        detail={copy.linearHelper}
+        soon
+        disabled={saving}
+        onSelect={() => undefined}
+      />
+    );
+  }
+  const name = entry?.name ?? findIntakePresentation(intakeKey)?.name ?? intakeKey;
+  const iconSrc = entry?.iconSrc ?? findIntakePresentation(intakeKey)?.iconSrc;
+  return (
+    <ConnectOptionRow
+      icon={<TicketIntakeGlyph name={name} iconSrc={iconSrc} />}
+      title={name}
+      detail={copy.intakeSoonHelper}
+      soon
+      disabled={saving}
+      onSelect={() => undefined}
+    />
+  );
+}
+
+function TicketIntakeGlyph({ name, iconSrc }: { name: string; iconSrc?: string }) {
+  if (iconSrc) {
+    return <img src={iconSrc} alt="" className="size-5" />;
+  }
+  return (
+    <span className="flex size-5 items-center justify-center rounded-md bg-muted text-[11px] font-medium text-muted-foreground">
+      {name.charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
+function FirstRunJiraTicketRow({
+  state,
+  intakesLoading,
+  ticketSource,
+  saving,
+  jiraConnected,
+  meta,
+  onSelectTicketSource,
+  onConnectJira,
+}: FirstRunTicketRowProps & { meta?: string }) {
+  const copy = FIRST_RUN_COPY.tickets;
+  if (state === undefined && intakesLoading) {
+    return (
+      <ConnectOptionRow
+        icon={<IntegrationChoiceIcon name="jira" />}
+        title={copy.jira}
+        detail={copy.jiraLookupLoading}
+        disabled
+        onSelect={() => undefined}
+      />
+    );
+  }
+  if (!isIntakeSelectable(state)) {
+    return (
+      <ConnectOptionRow
+        icon={<IntegrationChoiceIcon name="jira" />}
+        title={copy.jira}
+        detail={copy.jiraSoonHelper}
+        soon
+        disabled={saving}
+        onSelect={() => undefined}
+      />
+    );
+  }
+  return (
+    <ConnectOptionRow
+      icon={<IntegrationChoiceIcon name="jira" />}
+      title={copy.jira}
+      detail={copy.jiraHelper}
+      meta={meta}
+      selected={ticketSource === "jira"}
+      connectLabel={copy.jira}
+      connected={jiraConnected}
+      disabled={saving}
+      onSelect={() => onSelectTicketSource("jira")}
+      onConnect={onConnectJira}
+    />
+  );
+}
+
+function FirstRunJiraProjectFields({
+  jiraAvailable,
+  visible,
+  copy,
+  saving,
+  jiraProjects,
+  jiraProjectsLoading,
+  jiraProjectsError,
+  jiraProjectId,
+  onSelectJiraProject,
+  onRetryJiraProjects,
+}: {
+  jiraAvailable: boolean;
+  visible: boolean;
+  copy: (typeof FIRST_RUN_COPY)["tickets"];
+  saving: boolean;
+  jiraProjects: FirstRunJiraProject[];
+  jiraProjectsLoading: boolean;
+  jiraProjectsError: boolean;
+  jiraProjectId: string;
+  onSelectJiraProject?: (id: string) => void;
+  onRetryJiraProjects?: () => void;
+}) {
+  if (!jiraAvailable || !visible) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 border-t border-border pt-4" data-testid="first-run-jira-projects">
+      <p className="mb-3 text-[13px] font-medium">{copy.jiraProjectHeading}</p>
+      <fieldset disabled={saving} className="contents">
+        <JiraProjectStep
+          projects={jiraProjects}
+          selectedId={jiraProjectId}
+          loading={jiraProjectsLoading}
+          error={jiraProjectsError}
+          onSelect={(id) => onSelectJiraProject?.(id)}
+          onRetry={() => onRetryJiraProjects?.()}
+        />
+      </fieldset>
+    </div>
+  );
 }
 
 function FirstRunChoiceNotice({

@@ -40,7 +40,6 @@ const FeatureFactoryDatadogIntake = "factory_datadog_intake"
 // FeatureFactoryLinearIntake gates Linear issue intake from the Backlog
 // column menu until the flow is generally available.
 const FeatureFactoryLinearIntake = "factory_linear_intake"
-
 // FeatureWorkspaceModels gates the in-progress workspace Models settings
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"

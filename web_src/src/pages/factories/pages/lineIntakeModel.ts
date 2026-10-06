@@ -43,13 +43,7 @@ import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvase
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
 import { splitRunIntakeSource } from "./work-order-split-run/splitRunSource";
 
-export {
-  ADD_INTAKE_COPY,
-  ADD_INTAKE_TEMPLATES,
-  addIntakeTemplatesForOrg,
-  isAddIntakeSoon,
-  type AddIntakeTemplate,
-} from "./addIntakeTemplates";
+export { ADD_INTAKE_COPY, addIntakeTemplatesFromCatalog, type AddIntakeTemplate } from "./addIntakeTemplates";
 
 export type LineIntakeSourceId =
   | "github-issues"

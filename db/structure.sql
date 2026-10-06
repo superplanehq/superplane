@@ -1009,6 +1009,32 @@ CREATE TABLE public.installation_metadata (
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
 );
 
+-- Name: intake_catalog_entries; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.intake_catalog_entries (
+    key character varying(64) NOT NULL,
+    name character varying(255) NOT NULL,
+    category character varying(64) NOT NULL,
+    status character varying(32) DEFAULT 'planned'::character varying NOT NULL,
+    status_note text DEFAULT ''::text NOT NULL,
+    enabled_for_all boolean DEFAULT false NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_by uuid
+);
+
+
+--
+-- Name: intake_catalog_organizations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.intake_catalog_organizations (
+    entry_key character varying(64) NOT NULL,
+    organization_id uuid NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
 
 --
 -- Name: linear_webhook_receipts; Type: TABLE; Schema: public; Owner: -
@@ -2489,6 +2515,21 @@ ALTER TABLE ONLY public.installation_metadata
 
 
 --
+-- Name: intake_catalog_entries intake_catalog_entries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.intake_catalog_entries
+    ADD CONSTRAINT intake_catalog_entries_pkey PRIMARY KEY (key);
+
+
+--
+-- Name: intake_catalog_organizations intake_catalog_organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.intake_catalog_organizations
+    ADD CONSTRAINT intake_catalog_organizations_pkey PRIMARY KEY (entry_key, organization_id);
+
+--
 -- Name: linear_webhook_receipts linear_webhook_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3670,6 +3711,12 @@ CREATE INDEX idx_files_work_order_id ON public.files USING btree (work_order_id)
 
 CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (group_name, domain_type, domain_id);
 
+
+--
+-- Name: idx_intake_catalog_organizations_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_intake_catalog_organizations_organization_id ON public.intake_catalog_organizations USING btree (organization_id);
 
 --
 -- Name: idx_linear_webhook_receipts_received_at; Type: INDEX; Schema: public; Owner: -
@@ -5000,6 +5047,21 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
+-- Name: intake_catalog_organizations intake_catalog_organizations_entry_key_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.intake_catalog_organizations
+    ADD CONSTRAINT intake_catalog_organizations_entry_key_fkey FOREIGN KEY (entry_key) REFERENCES public.intake_catalog_entries(key) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: intake_catalog_organizations intake_catalog_organizations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.intake_catalog_organizations
+    ADD CONSTRAINT intake_catalog_organizations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+--
 -- Name: installation_licenses installation_licenses_installed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5595,7 +5657,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260925150940	f
+20261002155242	f
 \.
 
 

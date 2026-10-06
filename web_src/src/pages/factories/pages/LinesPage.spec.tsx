@@ -13,12 +13,10 @@ import type * as canvasData from "@/hooks/useCanvasData";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
-  FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_LINEAR_INTAKE,
-  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
   FEATURE_FACTORY_RISK_SCORE,
 } from "@/lib/experimentalFeatures";
+import { intakeCatalogAvailability, seededIntakeCatalog } from "@/test/intakeCatalog";
 import { unmockedSrc } from "@/test/unmockedModule";
 
 vi.mock("@monaco-editor/react", () => {
@@ -271,6 +269,12 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   }),
 }));
 
+const grantedIntakes: string[] = [];
+
+vi.mock("@/hooks/useIntakeCatalogAvailability", () => ({
+  useIntakeCatalogAvailability: () => intakeCatalogAvailability(seededIntakeCatalog(grantedIntakes)),
+}));
+
 const useCanvasMock = vi.hoisted(() => vi.fn());
 const updateCanvasVersionMutateAsync = vi.hoisted(() => vi.fn());
 const commitCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
@@ -325,6 +329,7 @@ async function resetLinesBoardMocks() {
   importFactoryIntakeItem.mockReset();
   refreshBacklogMutateAsync.mockReset();
   enabledExperimentalFeatures.clear();
+  grantedIntakes.length = 0;
   useCanvasMock.mockImplementation((_organizationId: string, canvasId: string, options?: { enabled?: boolean }) => {
     if (options?.enabled === false) {
       return { data: undefined, isPending: false, isError: false };
@@ -1226,7 +1231,7 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Datadog setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_DATADOG_INTAKE);
+    grantedIntakes.push("datadog");
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1328,7 +1333,7 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Jira setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
+    grantedIntakes.push("jira-issues");
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1349,7 +1354,7 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Productive.io setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
+    grantedIntakes.push("productive-tasks");
     const user = userEvent.setup();
     renderLinesBoard();
 

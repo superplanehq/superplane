@@ -2,8 +2,14 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 
+import { intakeCatalogAvailability, seededIntakeCatalog } from "@/test/intakeCatalog";
+
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
+
+const jiraLive = intakeCatalogAvailability(
+  seededIntakeCatalog([], { "jira-issues": { status: "ga", available: true } }),
+);
 
 describe("FirstRunTicketsScreen", () => {
   it("keeps analysis stopped until a ticket system is selected", async () => {
@@ -55,7 +61,7 @@ describe("FirstRunTicketsScreen", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="github-issues"
-        jiraAvailable
+        intakeState={jiraLive.stateOf}
         onSelectTicketSource={onSelectTicketSource}
         onAnalyzeTickets={vi.fn()}
         onConnectJira={onConnectJira}
@@ -97,14 +103,14 @@ describe("FirstRunTicketsScreen", () => {
     expect(onSelectTicketSource).not.toHaveBeenCalled();
   });
 
-  it("does not mark Jira as coming soon while the feature lookup is loading", async () => {
+  it("does not mark Jira as coming soon while the intake catalog loads", async () => {
     const user = userEvent.setup();
     const onSelectTicketSource = vi.fn();
 
     render(
       <FirstRunTicketsScreen
         ticketSource={null}
-        jiraFeatureLoading
+        intakesLoading
         onSelectTicketSource={onSelectTicketSource}
         onAnalyzeTickets={vi.fn()}
         onConnectJira={vi.fn()}
@@ -122,7 +128,7 @@ describe("FirstRunTicketsScreen", () => {
     expect(onSelectTicketSource).not.toHaveBeenCalled();
   });
 
-  it("explains a saved Jira choice when the feature lookup fails and keeps scan stopped", async () => {
+  it("explains a saved Jira choice when the intake catalog lookup fails and keeps scan stopped", async () => {
     const user = userEvent.setup();
     const onSelectTicketSource = vi.fn();
 
@@ -149,11 +155,11 @@ describe("FirstRunTicketsScreen", () => {
     expect(onSelectTicketSource).toHaveBeenCalledWith("github-issues");
   });
 
-  it("explains a saved Jira choice while the feature lookup is still loading", () => {
+  it("explains a saved Jira choice while the intake catalog still loads", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="jira"
-        jiraFeatureLoading
+        intakesLoading
         jiraChoiceBlock="loading"
         jiraConnected
         jiraProjectId="PAY"
@@ -273,7 +279,7 @@ describe("FirstRunTicketsScreen", () => {
     const { rerender } = render(
       <FirstRunTicketsScreen
         ticketSource="jira"
-        jiraAvailable
+        intakeState={jiraLive.stateOf}
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={onAnalyzeTickets}
         onConnectJira={vi.fn()}
@@ -287,7 +293,7 @@ describe("FirstRunTicketsScreen", () => {
     rerender(
       <FirstRunTicketsScreen
         ticketSource="jira"
-        jiraAvailable
+        intakeState={jiraLive.stateOf}
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId=""
@@ -306,7 +312,7 @@ describe("FirstRunTicketsScreen", () => {
     rerender(
       <FirstRunTicketsScreen
         ticketSource="jira"
-        jiraAvailable
+        intakeState={jiraLive.stateOf}
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId="PAY"
@@ -345,7 +351,7 @@ describe("FirstRunTicketsScreen", () => {
       <FirstRunTicketsScreen
         ticketSource="jira"
         saving
-        jiraAvailable
+        intakeState={jiraLive.stateOf}
         jiraConnected
         jiraProjects={[
           { id: "PAY", name: "Payments" },
@@ -379,7 +385,7 @@ describe("FirstRunTicketsScreen", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="jira"
-        jiraAvailable
+        intakeState={jiraLive.stateOf}
         jiraConnected
         jiraProjects={[{ id: "PAY", name: "Payments" }]}
         jiraProjectId="PAY"
@@ -390,5 +396,48 @@ describe("FirstRunTicketsScreen", () => {
 
     expect(screen.getByTestId("first-run-jira-projects")).toBeInTheDocument();
     expect(screen.queryByTestId("jira-completion-column")).not.toBeInTheDocument();
+  });
+
+  it("orders ticket intakes from the catalog and marks a Beta intake", () => {
+    const catalog = intakeCatalogAvailability(seededIntakeCatalog(["jira-issues"]));
+
+    render(
+      <FirstRunTicketsScreen
+        ticketSource={null}
+        intakeState={catalog.stateOf}
+        ticketIntakes={catalog.entriesFor("onboardingTickets")}
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    const titles = screen.getAllByRole("button", { pressed: false }).map((button) => button.textContent ?? "");
+    expect(titles[0]).toContain(FIRST_RUN_COPY.tickets.githubIssues);
+    expect(titles[1]).toContain(FIRST_RUN_COPY.tickets.jira);
+    expect(titles[1]).toContain(FIRST_RUN_COPY.tickets.beta);
+    expect(screen.getByRole("button", { name: "Connect Jira" })).toBeEnabled();
+  });
+
+  it("leaves out an Internal intake that the company cannot use and lists an admin-added intake as coming soon", () => {
+    const catalog = intakeCatalogAvailability(
+      seededIntakeCatalog([], {
+        "jira-issues": { status: "alpha", available: false },
+        "azure-boards": { name: "Azure Boards", category: "issue_tracking", status: "planned" },
+      }),
+    );
+
+    render(
+      <FirstRunTicketsScreen
+        ticketSource={null}
+        intakeState={catalog.stateOf}
+        ticketIntakes={catalog.entriesFor("onboardingTickets")}
+        onSelectTicketSource={vi.fn()}
+        onAnalyzeTickets={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.getByText("Azure Boards").closest('[data-soon="true"]')).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linear).closest('[data-soon="true"]')).toBeInTheDocument();
   });
 });
