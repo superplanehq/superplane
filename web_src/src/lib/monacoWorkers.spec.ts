@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it } from "bun:test";
 
-import { setupMonacoEditor, workerUrlForLabel, type MonacoWorkers } from "./monacoWorkers";
+import { setupMonacoEditor, workerScriptUrl, workerUrlForLabel, type MonacoWorkers } from "./monacoWorkers";
 
-const PAGE_URL = "http://localhost/";
 const ASSET_HOST = "https://assets.superplane.com";
+const PRODUCTION_PAGE_URL = "https://app.superplane.com/superplane/workspaces/super-s1pniwje/task/741";
+const LOCAL_PAGE_URL = "http://localhost/";
 
 const workers: MonacoWorkers = {
   editor: `${ASSET_HOST}/releases/sha/assets/editor.worker.js`,
-  json: `${ASSET_HOST}/releases/sha/assets/json.worker.js`,
+  json: `${ASSET_HOST}/releases/sha/assets/json.worker-abc.js`,
   css: `${ASSET_HOST}/releases/sha/assets/css.worker.js`,
   html: `${ASSET_HOST}/releases/sha/assets/html.worker.js`,
   typescript: `${ASSET_HOST}/releases/sha/assets/ts.worker.js`,
@@ -16,11 +17,6 @@ const workers: MonacoWorkers = {
 type StartedWorker = {
   scriptUrl: string | URL;
   options?: WorkerOptions;
-};
-
-type RecordedBlob = {
-  parts: BlobPart[];
-  type?: string;
 };
 
 function monacoEnvironment(): { getWorker: (workerId: string, label: string) => Worker } {
@@ -33,71 +29,24 @@ function monacoEnvironment(): { getWorker: (workerId: string, label: string) => 
   return { getWorker: environment.getWorker };
 }
 
-function setDevelopmentMode(enabled: boolean): void {
-  (import.meta.env as { DEV: boolean }).DEV = enabled;
-}
-
-function installWorkerDoubles() {
+function installWorkerDouble() {
   const started: StartedWorker[] = [];
-  const blobs: RecordedBlob[] = [];
-  const objectUrls: string[] = [];
   const previousWorker = globalThis.Worker;
-  const previousBlob = globalThis.Blob;
-  const previousCreateObjectURL = URL.createObjectURL;
-  const previousRevokeObjectURL = URL.revokeObjectURL;
-  const revoked: string[] = [];
-  let sequence = 0;
 
   class WorkerDouble {
-    constructor(
-      public scriptUrl: string | URL,
-      public options?: WorkerOptions,
-    ) {
+    constructor(scriptUrl: string | URL, options?: WorkerOptions) {
       started.push({ scriptUrl, options });
     }
   }
 
-  class BlobDouble {
-    constructor(
-      public parts: BlobPart[] = [],
-      options?: BlobPropertyBag,
-    ) {
-      blobs.push({ parts, type: options?.type });
-    }
-  }
-
   globalThis.Worker = WorkerDouble as unknown as typeof Worker;
-  globalThis.Blob = BlobDouble as unknown as typeof Blob;
-  URL.createObjectURL = () => {
-    const objectUrl = `blob:monaco-worker-${sequence}`;
-    sequence += 1;
-    objectUrls.push(objectUrl);
-    return objectUrl;
-  };
-  URL.revokeObjectURL = (objectUrl: string) => {
-    revoked.push(objectUrl);
-  };
 
   return {
     started,
-    blobs,
-    objectUrls,
-    revoked,
     restore() {
       globalThis.Worker = previousWorker;
-      globalThis.Blob = previousBlob;
-      URL.createObjectURL = previousCreateObjectURL;
-      URL.revokeObjectURL = previousRevokeObjectURL;
     },
   };
-}
-
-function blobSource(blob: RecordedBlob): string {
-  return blob.parts.map(String).join("");
-}
-
-function importScriptsSource(scriptUrl: string): string {
-  return `importScripts(${JSON.stringify(scriptUrl)})`;
 }
 
 describe("workerUrlForLabel", () => {
@@ -114,17 +63,33 @@ describe("workerUrlForLabel", () => {
   });
 });
 
+describe("workerScriptUrl", () => {
+  it("rewrites a cross-origin release URL to the page origin plus /assets/<file>", () => {
+    expect(workerScriptUrl(workers.json, PRODUCTION_PAGE_URL)).toBe(
+      "https://app.superplane.com/assets/json.worker-abc.js",
+    );
+  });
+
+  it("keeps a same-origin URL unchanged", () => {
+    const sameOriginUrl = "https://app.superplane.com/assets/json.worker-abc.js";
+    expect(workerScriptUrl(sameOriginUrl, PRODUCTION_PAGE_URL)).toBe(sameOriginUrl);
+  });
+
+  it("keeps a cross-origin URL without /assets/ unchanged", () => {
+    const crossOriginUrl = "https://cdn.superplane.com/editor.worker.js";
+    expect(workerScriptUrl(crossOriginUrl, PRODUCTION_PAGE_URL)).toBe(crossOriginUrl);
+  });
+});
+
 describe("setupMonacoEditor", () => {
   const editor = { name: "local-monaco" };
-  const previousDev = (import.meta.env as { DEV: boolean }).DEV;
-  let restoreDoubles: (() => void) | undefined;
+  let restoreDouble: (() => void) | undefined;
 
   afterEach(() => {
     delete (globalThis as { MonacoEnvironment?: unknown }).MonacoEnvironment;
-    setDevelopmentMode(previousDev);
-    restoreDoubles?.();
-    restoreDoubles = undefined;
-    window.history.replaceState(null, "", PAGE_URL);
+    restoreDouble?.();
+    restoreDouble = undefined;
+    window.history.replaceState(null, "", LOCAL_PAGE_URL);
   });
 
   it("gives the loader the local editor", () => {
@@ -141,67 +106,33 @@ describe("setupMonacoEditor", () => {
     expect(configured).toEqual([editor, editor]);
   });
 
-  it("starts a cross-origin worker from a same-origin bootstrap script", () => {
-    setDevelopmentMode(false);
-    window.history.replaceState(null, "", PAGE_URL);
-    const doubles = installWorkerDoubles();
-    restoreDoubles = doubles.restore;
-    const loader = { config() {} };
+  it("starts a cross-origin worker as a module from the page origin", () => {
+    window.history.replaceState(null, "", LOCAL_PAGE_URL);
+    const doubles = installWorkerDouble();
+    restoreDouble = doubles.restore;
 
-    setupMonacoEditor(editor, loader, workers);
+    setupMonacoEditor(editor, loaderConfig(), workers);
     const { getWorker } = monacoEnvironment();
     const labels = ["editor", "json", "css", "html", "typescript", "javascript", "yaml"] as const;
     for (const label of labels) {
       getWorker("workerMain.js", label);
     }
 
-    const scriptUrls = labels.map((label) => workerUrlForLabel(workers, label));
-    const uniqueScriptUrls = [...new Set(scriptUrls)];
-    expect(doubles.objectUrls).toHaveLength(uniqueScriptUrls.length);
-    expect(doubles.started.map((worker) => String(worker.scriptUrl))).toEqual(
-      scriptUrls.map((scriptUrl) => doubles.objectUrls[uniqueScriptUrls.indexOf(scriptUrl)]),
+    expect(doubles.started).toEqual(
+      labels.map((label) => ({
+        scriptUrl: workerScriptUrl(workerUrlForLabel(workers, label), LOCAL_PAGE_URL),
+        options: { type: "module" },
+      })),
     );
-    expect(doubles.started.every((worker) => worker.options === undefined)).toBe(true);
-    for (const scriptUrl of uniqueScriptUrls) {
-      expect(doubles.started.map((worker) => String(worker.scriptUrl))).not.toContain(scriptUrl);
-    }
-    expect(doubles.blobs.map(blobSource)).toEqual(uniqueScriptUrls.map(importScriptsSource));
-    expect(doubles.revoked).toEqual([]);
   });
 
-  it("reuses one bootstrap URL when the same worker restarts", () => {
-    setDevelopmentMode(false);
-    window.history.replaceState(null, "", PAGE_URL);
-    const doubles = installWorkerDoubles();
-    restoreDoubles = doubles.restore;
-
-    setupMonacoEditor(editor, loaderConfig(), workers);
-    const { getWorker } = monacoEnvironment();
-    getWorker("workerMain.js", "json");
-    getWorker("workerMain.js", "json");
-    getWorker("workerMain.js", "javascript");
-
-    expect(doubles.objectUrls).toEqual(["blob:monaco-worker-0", "blob:monaco-worker-1"]);
-    expect(doubles.started.map((worker) => String(worker.scriptUrl))).toEqual([
-      "blob:monaco-worker-0",
-      "blob:monaco-worker-0",
-      "blob:monaco-worker-1",
-    ]);
-    expect(doubles.blobs.map(blobSource)).toEqual([
-      importScriptsSource(workers.json),
-      importScriptsSource(workers.typescript),
-    ]);
-    expect(doubles.revoked).toEqual([]);
-  });
-
-  it("starts a same-origin production worker directly", () => {
-    setDevelopmentMode(false);
-    window.history.replaceState(null, "", PAGE_URL);
-    const doubles = installWorkerDoubles();
-    restoreDoubles = doubles.restore;
+  it("starts a same-origin worker as a module with its URL unchanged", () => {
+    window.history.replaceState(null, "", LOCAL_PAGE_URL);
+    const doubles = installWorkerDouble();
+    restoreDouble = doubles.restore;
     const sameOriginWorkers: MonacoWorkers = {
-      editor: "/assets/editor.worker.js",
-      json: "http://localhost/assets/json.worker.js",
+      editor: "http://localhost/assets/editor.worker.js",
+      json: "/assets/json.worker.js",
       css: "http://localhost/assets/css.worker.js",
       html: "http://localhost/assets/html.worker.js",
       typescript: "http://localhost/assets/ts.worker.js",
@@ -213,29 +144,9 @@ describe("setupMonacoEditor", () => {
     getWorker("workerMain.js", "json");
 
     expect(doubles.started).toEqual([
-      { scriptUrl: sameOriginWorkers.editor, options: undefined },
-      { scriptUrl: sameOriginWorkers.json, options: undefined },
+      { scriptUrl: sameOriginWorkers.editor, options: { type: "module" } },
+      { scriptUrl: sameOriginWorkers.json, options: { type: "module" } },
     ]);
-    expect(doubles.blobs).toEqual([]);
-    expect(doubles.objectUrls).toEqual([]);
-  });
-
-  it("starts a module worker in development", () => {
-    setDevelopmentMode(true);
-    const doubles = installWorkerDoubles();
-    restoreDoubles = doubles.restore;
-
-    setupMonacoEditor(editor, loaderConfig(), workers);
-    const { getWorker } = monacoEnvironment();
-    getWorker("workerMain.js", "typescript");
-    getWorker("workerMain.js", "css");
-
-    expect(doubles.started).toEqual([
-      { scriptUrl: workers.typescript, options: { type: "module" } },
-      { scriptUrl: workers.css, options: { type: "module" } },
-    ]);
-    expect(doubles.blobs).toEqual([]);
-    expect(doubles.objectUrls).toEqual([]);
   });
 });
 
