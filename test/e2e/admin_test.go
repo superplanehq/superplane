@@ -93,6 +93,17 @@ func TestAdminDashboard(t *testing.T) {
 		steps.saveSMTPSettings()
 		steps.assertSMTPSettingsEnabled()
 	})
+
+	t.Run("admin user can view the installation license", func(t *testing.T) {
+		steps := &adminSteps{t: t}
+		steps.start()
+		steps.promoteToAdmin()
+		steps.session.Login()
+		steps.session.Visit("/admin/license")
+		steps.session.AssertText("SuperPlane Enterprise")
+		steps.session.AssertText("Managed license")
+		steps.session.AssertVisible(q.TestID("license-features"))
+	})
 }
 
 func TestAdminOwnerSetupPromotion(t *testing.T) {
