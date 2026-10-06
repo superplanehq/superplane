@@ -3,13 +3,21 @@ import { posthog, isPostHogEnabled } from "@/posthog";
 import { FirstRunShell } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
 import { LicenseStep } from "./ownerSetup/LicenseStep";
+import { OwnerSetupPane } from "./ownerSetup/OwnerSetupPane";
 import { OwnerStep } from "./ownerSetup/OwnerStep";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { newOrganizationLandingPath } from "./newOrganizationLandingPath";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
+const OWNER_SETUP_STEPS = 2;
 
 type OwnerSetupStep = "owner" | "license" | "survey";
+
+function ownerSetupStepNumber(step: OwnerSetupStep) {
+  if (step === "owner") return 1;
+  if (step === "license") return 2;
+  return OWNER_SETUP_STEPS;
+}
 
 function isEmailValid(email: string) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -191,15 +199,18 @@ const OwnerSetup: React.FC = () => {
           ? undefined
           : {
               stepIndex: onEditionStep ? 1 : 0,
-              stepCount: 2,
+              stepCount: OWNER_SETUP_STEPS,
               email: onEditionStep ? email : undefined,
               onLogOut: onEditionStep ? () => (window.location.href = "/logout") : undefined,
             }
       }
-      sphere={{
-        level: onEditionStep ? 0.4 : 0.22,
-        caption: onEditionStep ? "Awaiting edition" : "Awaiting owner",
-      }}
+      aside={
+        <OwnerSetupPane
+          caption={onEditionStep ? "Awaiting edition" : "Awaiting owner"}
+          step={ownerSetupStepNumber(step)}
+          stepCount={OWNER_SETUP_STEPS}
+        />
+      }
     >
       {step === "owner" && (
         <OwnerStep
