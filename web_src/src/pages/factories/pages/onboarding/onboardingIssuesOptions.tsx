@@ -10,6 +10,24 @@ function noIntakeState(): IntakeSurfaceState | undefined {
   return undefined;
 }
 
+function intakeRowState(state: IntakeSurfaceState | undefined): {
+  hidden: boolean;
+  soon: boolean;
+  disabled: boolean;
+  meta?: string;
+} {
+  if (state === undefined) {
+    // Intake catalog has not loaded yet. Keep the row visible but unavailable.
+    return { hidden: false, soon: false, disabled: true };
+  }
+  return {
+    hidden: state === "hidden",
+    soon: state === "soon",
+    disabled: false,
+    meta: state === "beta" ? "Beta" : undefined,
+  };
+}
+
 export function IssuesSourceOptions({
   setup,
   backlogRepo,
@@ -24,49 +42,52 @@ export function IssuesSourceOptions({
   intakeState?: (key: string) => IntakeSurfaceState | undefined;
   onRequestConnect: (id: IntegrationId) => void;
 }) {
-  const hostIssuesState = host === "github" ? intakeState("github-issues") : undefined;
-  const linearIssuesState = intakeState("linear-issues");
-  const jiraIssuesState = intakeState("jira-issues");
+  const hostIssues = intakeRowState(host === "github" ? intakeState("github-issues") : "available");
+  const linearIssues = intakeRowState(intakeState("linear-issues"));
+  const jiraIssues = intakeRowState(intakeState("jira-issues"));
 
   return (
     <>
-      {hostIssuesState !== "hidden" ? (
+      {!hostIssues.hidden ? (
         <ConnectOptionRow
           icon={<IntegrationChoiceIcon name={host} />}
           title={`Use ${vcsLabel(host)} Issues`}
           detail={`Find agent-ready work in open issues on ${backlogRepo}.`}
-          meta={hostIssuesState === "beta" ? "Beta" : undefined}
+          meta={hostIssues.meta}
           selected={setup.issuesChoice === "vcs"}
           connectLabel={vcsLabel(host)}
           connected
-          soon={hostIssuesState === "soon"}
+          soon={hostIssues.soon}
+          disabled={hostIssues.disabled}
           onSelect={() => setup.setIssuesChoice("vcs")}
         />
       ) : null}
-      {linearIssuesState !== "hidden" ? (
+      {!linearIssues.hidden ? (
         <ConnectOptionRow
           icon={<IntegrationChoiceIcon name="linear" />}
           title="Linear"
           detail="Find agent-ready work in your Linear backlog."
-          meta={linearIssuesState === "beta" ? "Beta" : undefined}
+          meta={linearIssues.meta}
           selected={setup.issuesChoice === "linear"}
           connectLabel="Linear"
           connected={setup.connected.has("linear")}
-          soon={linearIssuesState === "soon"}
+          soon={linearIssues.soon}
+          disabled={linearIssues.disabled}
           onSelect={() => setup.setIssuesChoice("linear")}
           onConnect={() => onRequestConnect("linear")}
         />
       ) : null}
-      {jiraIssuesState !== "hidden" ? (
+      {!jiraIssues.hidden ? (
         <ConnectOptionRow
           icon={<IntegrationChoiceIcon name="jira" />}
           title="Jira"
           detail="Find agent-ready work in your Jira backlog."
-          meta={jiraIssuesState === "beta" ? "Beta" : undefined}
+          meta={jiraIssues.meta}
           selected={setup.issuesChoice === "jira"}
           connectLabel="Jira"
           connected={setup.connected.has("jira")}
-          soon={jiraIssuesState === "soon"}
+          soon={jiraIssues.soon}
+          disabled={jiraIssues.disabled}
           onSelect={() => setup.setIssuesChoice("jira")}
           onConnect={() => onRequestConnect("jira")}
         />

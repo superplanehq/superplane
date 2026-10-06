@@ -1,6 +1,7 @@
 package factories
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
@@ -28,6 +29,13 @@ func grantIntakeCatalogAccess(t *testing.T, organizationID uuid.UUID) {
 
 	linear, err := models.FindIntakeCatalogEntry(db, models.FactoryIntakeSourceLinearIssues)
 	require.NoError(t, err)
+	originalStatus := linear.Status
+	t.Cleanup(func() {
+		// The testing context is canceled when the test finishes.
+		restoreDB := database.DB(context.Background())
+		status := originalStatus
+		require.NoError(t, linear.Update(restoreDB, models.IntakeCatalogPatch{Status: &status}, nil))
+	})
 	status := models.IntakeStatusBeta
 	require.NoError(t, linear.Update(db, models.IntakeCatalogPatch{Status: &status}, nil))
 }

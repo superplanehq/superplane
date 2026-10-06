@@ -1,5 +1,5 @@
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -51,6 +51,14 @@ interface StatusNoteEditorProps {
 export function StatusNoteEditor({ entry, saving, savedAt, onSave }: StatusNoteEditorProps) {
   const [note, setNote] = useState(entry.status_note);
   const [dirty, setDirty] = useState(false);
+  const lastEntryKey = useRef(entry.key);
+
+  useEffect(() => {
+    if (lastEntryKey.current === entry.key) return;
+    lastEntryKey.current = entry.key;
+    setNote(entry.status_note);
+    setDirty(false);
+  }, [entry.key, entry.status_note]);
 
   useEffect(() => {
     if (!dirty) {
