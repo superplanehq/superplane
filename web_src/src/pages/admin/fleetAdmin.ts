@@ -164,29 +164,16 @@ type ListBody<T> = {
   hasNextPage?: boolean;
 };
 
-const recordPage = <T>(body: ListBody<T>, cursor: string | null): { page: RecordPage<T>; reset: boolean } => {
-  if (cursor && body.rows.length === 0) {
-    return {
-      page: { rows: [], totalCount: parseCount(body.totalCount), hasNextPage: false },
-      reset: true,
-    };
-  }
-  return {
-    page: {
-      rows: body.rows,
-      totalCount: parseCount(body.totalCount),
-      hasNextPage: body.hasNextPage === true,
-    },
-    reset: false,
-  };
-};
+const recordPage = <T>(body: ListBody<T>): RecordPage<T> => ({
+  rows: body.rows,
+  totalCount: parseCount(body.totalCount),
+  hasNextPage: body.hasNextPage === true,
+});
 
 export type FleetDetails = {
   capacity: FleetCapacity;
   runners: RecordPage<FleetRunner>;
   tasks: RecordPage<FleetTask>;
-  resetRunners: boolean;
-  resetTasks: boolean;
 };
 
 export const fetchFleetDetails = async (
@@ -207,15 +194,6 @@ export const fetchFleetDetails = async (
   const runnerBody: { runners?: FleetRunner[]; totalCount?: unknown; hasNextPage?: boolean } =
     await runnerResponse.json();
   const taskBody: { tasks?: FleetTask[]; totalCount?: unknown; hasNextPage?: boolean } = await taskResponse.json();
-  const runners = recordPage(
-    { rows: runnerBody.runners ?? [], totalCount: runnerBody.totalCount, hasNextPage: runnerBody.hasNextPage },
-    runnerCursor,
-  );
-  const tasks = recordPage(
-    { rows: taskBody.tasks ?? [], totalCount: taskBody.totalCount, hasNextPage: taskBody.hasNextPage },
-    taskCursor,
-  );
-
   return {
     capacity: {
       queuedTasks: parseCount(capacityBody.runnableTasks),
@@ -223,10 +201,16 @@ export const fetchFleetDetails = async (
       idleRunners: parseCount(capacityBody.idleRunners),
       busyRunners: parseCount(capacityBody.busyRunners),
     },
-    runners: runners.page,
-    tasks: tasks.page,
-    resetRunners: runners.reset,
-    resetTasks: tasks.reset,
+    runners: recordPage({
+      rows: runnerBody.runners ?? [],
+      totalCount: runnerBody.totalCount,
+      hasNextPage: runnerBody.hasNextPage,
+    }),
+    tasks: recordPage({
+      rows: taskBody.tasks ?? [],
+      totalCount: taskBody.totalCount,
+      hasNextPage: taskBody.hasNextPage,
+    }),
   };
 };
 

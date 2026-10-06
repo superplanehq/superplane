@@ -1,5 +1,5 @@
 import { showErrorToast } from "@/lib/toast";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import {
   REFRESH_INTERVAL_MS,
@@ -36,13 +36,22 @@ const useFleetCatalog = () => {
     setSelectedFleetId(fleetId);
   }, []);
 
+  const catalogRequest = useRef(0);
+
   const loadFleets = useCallback(async () => {
+    const requestID = ++catalogRequest.current;
     try {
       const nextFleets = await fetchInstallationFleets();
+      if (requestID !== catalogRequest.current) {
+        return;
+      }
       setFleetLoadFailed(false);
       setFleets(nextFleets);
       chooseFleet(selectedFleetIdAfterRefresh(selectedFleetIdRef.current, nextFleets));
     } catch (error) {
+      if (requestID !== catalogRequest.current) {
+        return;
+      }
       showErrorToast(error instanceof Error ? error.message : "Failed to load fleets");
       setFleetLoadFailed(true);
       setFleets((current) => current ?? []);
@@ -66,6 +75,12 @@ const useFleetRecords = (selectedFleetId: string | null) => {
   const [tasks, setTasks] = useState<RecordPage<FleetTask> | null>(null);
   const [cursorFleetId, setCursorFleetId] = useState<string | null>(null);
   const detailsRequest = useRef(0);
+  const selectedFleetIdRef = useRef(selectedFleetId);
+  selectedFleetIdRef.current = selectedFleetId;
+
+  useLayoutEffect(() => {
+    detailsRequest.current += 1;
+  }, [selectedFleetId]);
 
   useEffect(() => {
     setCursorFleetId(selectedFleetId);
@@ -80,20 +95,14 @@ const useFleetRecords = (selectedFleetId: string | null) => {
     const requestID = ++detailsRequest.current;
     try {
       const details = await fetchFleetDetails(fleetId, runnerCursor, taskCursor);
-      if (requestID !== detailsRequest.current) {
+      if (requestID !== detailsRequest.current || fleetId !== selectedFleetIdRef.current) {
         return;
       }
       setCapacity(details.capacity);
       setRunners(details.runners);
       setTasks(details.tasks);
-      if (details.resetRunners) {
-        setRunnerCursors([]);
-      }
-      if (details.resetTasks) {
-        setTaskCursors([]);
-      }
     } catch (error) {
-      if (requestID !== detailsRequest.current) {
+      if (requestID !== detailsRequest.current || fleetId !== selectedFleetIdRef.current) {
         return;
       }
       showErrorToast(error instanceof Error ? error.message : "Failed to load fleet");

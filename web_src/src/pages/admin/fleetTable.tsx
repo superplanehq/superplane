@@ -1,5 +1,6 @@
 import { Text } from "@/components/Text/text";
 import { Timestamp } from "@/components/Timestamp";
+import { Button } from "@/components/ui/button";
 
 import { statusBadgeClass, visibleRange } from "./fleetAdmin";
 
@@ -17,9 +18,6 @@ export const StateBadge = ({ state }: { state: string }) => (
     {state}
   </span>
 );
-
-const buttonClass =
-  "rounded border border-slate-200 bg-white px-3 py-1 text-xs hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800";
 
 export const PageControls = ({
   pageIndex,
@@ -47,18 +45,26 @@ export const PageControls = ({
     <div className="mt-4 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
       <Text className="text-sm text-gray-500 dark:text-gray-400">{label}</Text>
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="xs"
           onClick={onPrevious}
           disabled={pageIndex === 0}
           data-testid={previousTestId}
-          className={buttonClass}
         >
           Previous
-        </button>
-        <button type="button" onClick={onNext} disabled={!hasNextPage} data-testid={nextTestId} className={buttonClass}>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          onClick={onNext}
+          disabled={!hasNextPage}
+          data-testid={nextTestId}
+        >
           Next
-        </button>
+        </Button>
       </div>
     </div>
   );
