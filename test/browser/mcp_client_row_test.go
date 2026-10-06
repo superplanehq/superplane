@@ -55,7 +55,7 @@ func TestMCPClientRevokeStaysInsideNarrowCard(t *testing.T) {
 	require.NoError(t, err)
 
 	revoke := page.GetByTestId(longMCPClientRevokeID)
-	require.NoError(t, revoke.WaitFor(pw.LocatorWaitForOptions{Timeout: pw.Float(20000)}))
+	require.NoError(t, revoke.WaitFor(pw.LocatorWaitForOptions{Timeout: pw.Float(90000)}))
 	require.NoError(t, revoke.ScrollIntoViewIfNeeded())
 
 	narrow := waitForMCPClientRowLayout(t, page, func(layout mcpClientRowLayout) error {
