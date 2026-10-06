@@ -1,15 +1,39 @@
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "bun:test";
 import mermaid from "mermaid";
 
 const require = createRequire(import.meta.url);
-const installedKatexVersion = require("katex/package.json").version as string;
+
+function installedKatexVersion(): string {
+  const mermaidRoot = dirname(require.resolve("mermaid/package.json"));
+  const candidates = [
+    join(mermaidRoot, "node_modules", "katex", "package.json"),
+    join(mermaidRoot, "..", "katex", "package.json"),
+  ];
+
+  for (const candidate of candidates) {
+    if (!existsSync(candidate)) {
+      continue;
+    }
+
+    const parsed = JSON.parse(readFileSync(candidate, "utf8")) as { version?: string };
+    if (parsed.version) {
+      return parsed.version;
+    }
+  }
+
+  throw new Error("installed KaTeX package was not found");
+}
+
+const installedKatexVersionValue = installedKatexVersion();
 
 const MATH_DIAGRAM = 'flowchart LR\n  A["$$a^2+b^2=c^2$$"]';
 
 describe("mermaid math rendering", () => {
   it("renders diagram math with installed KaTeX 0.18.2", async () => {
-    expect(installedKatexVersion).toBe("0.18.2");
+    expect(installedKatexVersionValue).toBe("0.18.2");
 
     if (document.compatMode !== "CSS1Compat") {
       Object.defineProperty(document, "compatMode", {
