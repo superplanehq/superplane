@@ -1,13 +1,12 @@
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { agentRunnerStepTitles } from "@/lib/agentRunnerSteps";
-import { useMergeConfidenceCanvas } from "@/lib/mergeConfidenceCanvas";
 import { getColorClass } from "@/lib/colors";
 import { machineTypeLabel } from "@/lib/machineType";
 import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
-import { FactoryNodeStepList } from "@/ui/factoryNodeChrome";
 import React from "react";
+import { AgentHarnessSteps } from "./AgentHarnessSteps";
 import { getTriggerRenderer } from "./mapperLookup";
 
 import type {
@@ -238,14 +237,6 @@ export const agentHarnessMapper: ComponentBaseMapper = {
     };
   },
 };
-
-function AgentHarnessSteps({ configuration }: { configuration: unknown }) {
-  const steps = agentRunnerStepTitles(configuration, { expandMergeChecks: useMergeConfidenceCanvas() });
-  if (steps.length === 0) {
-    return null;
-  }
-  return <FactoryNodeStepList steps={steps} />;
-}
 
 function runnerEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) return undefined;
