@@ -48,7 +48,7 @@ func serializeFactoryPullRequests(
 		workOrderNumbers = numbers
 	}
 
-	runsByPullRequest, revisions, usageByRun, err := loadPullRequestSerialization(ctx, tx, pullRequests)
+	runsByPullRequest, revisions, ledgerByRun, err := loadPullRequestSerialization(ctx, tx, pullRequests)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func serializeFactoryPullRequests(
 			workOrderNumbers[pullRequests[i].WorkOrderID],
 			runsByPullRequest[pullRequests[i].ID],
 			revisions[pullRequests[i].ID],
-			usageByRun,
+			ledgerByRun,
 		))
 	}
 	return serialized, nil
@@ -97,6 +97,11 @@ func loadSerializedPullRequestsByWorkOrderIDs(
 	return result, nil
 }
 
+type pullRequestRunLedger struct {
+	usage  models.UsageTotals
+	models []string
+}
+
 func loadPullRequestSerialization(
 	ctx context.Context,
 	tx *gorm.DB,
@@ -104,7 +109,7 @@ func loadPullRequestSerialization(
 ) (
 	map[uuid.UUID][]models.FactoryPullRequestLinkedRun,
 	map[uuid.UUID]*models.FactoryPullRequestRevision,
-	map[uuid.UUID]models.UsageTotals,
+	map[uuid.UUID]pullRequestRunLedger,
 	error,
 ) {
 	pullRequestIDs := make([]uuid.UUID, len(pullRequests))
@@ -135,15 +140,23 @@ func loadPullRequestSerialization(
 			runIDs = append(runIDs, linked.Run.ID)
 		}
 	}
-	usageByRun, err := models.SumUsageForRunTrees(tx, runIDs)
+	usageByRun, modelsByRun, err := models.SumUsageAndModelsForRunTrees(tx, runIDs)
 	if err != nil {
 		log.WithError(err).Warnf(
 			"factory PR listing: usage rollup unavailable for %d run(s), returning zero usage",
 			len(runIDs),
 		)
 		usageByRun = map[uuid.UUID]models.UsageTotals{}
+		modelsByRun = map[uuid.UUID][]string{}
 	}
-	return runsByPullRequest, revisions, usageByRun, nil
+	ledgers := make(map[uuid.UUID]pullRequestRunLedger, len(runIDs))
+	for _, runID := range runIDs {
+		ledgers[runID] = pullRequestRunLedger{
+			usage:  usageByRun[runID],
+			models: modelsByRun[runID],
+		}
+	}
+	return runsByPullRequest, revisions, ledgers, nil
 }
 
 func serializeFactoryPullRequest(
@@ -151,7 +164,7 @@ func serializeFactoryPullRequest(
 	workOrderNumber int64,
 	runs []models.FactoryPullRequestLinkedRun,
 	currentRevision *models.FactoryPullRequestRevision,
-	usageByRun map[uuid.UUID]models.UsageTotals,
+	ledgerByRun map[uuid.UUID]pullRequestRunLedger,
 ) *pb.FactoryPullRequest {
 	serialized := &pb.FactoryPullRequest{
 		Id:              pullRequest.ID.String(),
@@ -166,8 +179,8 @@ func serializeFactoryPullRequest(
 		State:           pullRequestStateToProto(pullRequest.State),
 		CreatedAt:       timestamppb.New(pullRequest.CreatedAt),
 		UpdatedAt:       timestamppb.New(pullRequest.UpdatedAt),
-		Runs:            serializePullRequestRuns(runs, usageByRun),
-		Activities:      serializePullRequestActivities(runs, usageByRun),
+		Runs:            serializePullRequestRuns(runs, ledgerByRun),
+		Activities:      serializePullRequestActivities(runs, ledgerByRun),
 		CurrentRevision: serializePullRequestRevision(currentRevision),
 		Mergeable:       factoryPullRequestMergeableOnBoard(pullRequest),
 	}
@@ -185,17 +198,18 @@ func serializeFactoryPullRequest(
 
 func serializePullRequestRuns(
 	runs []models.FactoryPullRequestLinkedRun,
-	usageByRun map[uuid.UUID]models.UsageTotals,
+	ledgerByRun map[uuid.UUID]pullRequestRunLedger,
 ) []*pb.FactoryPullRequestRun {
 	result := make([]*pb.FactoryPullRequestRun, 0, len(runs))
 	for _, linked := range runs {
-		usage := usageByRun[linked.Run.ID]
+		ledger := ledgerByRun[linked.Run.ID]
 		result = append(result, &pb.FactoryPullRequestRun{
 			Title:       linked.Title,
 			Description: linked.Description,
-			TotalTokens: usage.TotalTokens,
-			CostCents:   usage.CostCents(),
+			TotalTokens: ledger.usage.TotalTokens,
+			CostCents:   ledger.usage.CostCents(),
 			Run:         canvases.SerializeCanvasRunRef(linked.Run),
+			Models:      ledger.models,
 		})
 	}
 	return result
@@ -203,11 +217,11 @@ func serializePullRequestRuns(
 
 func serializePullRequestActivities(
 	runs []models.FactoryPullRequestLinkedRun,
-	usageByRun map[uuid.UUID]models.UsageTotals,
+	ledgerByRun map[uuid.UUID]pullRequestRunLedger,
 ) []*pb.FactoryPullRequestActivity {
 	result := make([]*pb.FactoryPullRequestActivity, 0, len(runs))
 	for _, linked := range runs {
-		usage := usageByRun[linked.Run.ID]
+		ledger := ledgerByRun[linked.Run.ID]
 		activity := &pb.FactoryPullRequestActivity{
 			Run:         canvases.SerializeCanvasRunRef(linked.Run),
 			Title:       linked.Title,
@@ -215,8 +229,9 @@ func serializePullRequestActivities(
 			Access:      linked.Access,
 			State:       linked.State,
 			Revision:    serializePullRequestRevision(linked.Revision),
-			TotalTokens: usage.TotalTokens,
-			CostCents:   usage.CostCents(),
+			TotalTokens: ledger.usage.TotalTokens,
+			CostCents:   ledger.usage.CostCents(),
+			Models:      ledger.models,
 		}
 		if linked.Attempt != nil {
 			attempt := int32(*linked.Attempt)
