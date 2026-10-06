@@ -2120,6 +2120,14 @@ func (l *lazyWebhookFactory) UpdatePullRequestActivity(params core.UpdatePullReq
 	return inner.UpdatePullRequestActivity(params)
 }
 
+func (l *lazyWebhookFactory) VCSProvider() (string, error) {
+	inner, err := l.load()
+	if err != nil {
+		return "", err
+	}
+	return inner.VCSProvider()
+}
+
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, string, error) {
 	tx := database.Conn()
 	skip, err := contexts.SkipPausedIntakeFeed(tx, node.WorkflowID)

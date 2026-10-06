@@ -34,6 +34,9 @@ func MaterializeFactoryAppTemplate(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
 	}
+	if featureErr := requireBitbucketWorkspace(db, orgID, factory.OnboardingConfigValue().EffectiveVCSProvider()); featureErr != nil {
+		return nil, factoryErrorToStatus(featureErr, "failed to materialize factory app template")
+	}
 	factoryID := factory.ID
 	canvas, _, err := findFactoryAppForDefaults(db, orgID, factoryID, appID)
 	if err != nil {
@@ -49,11 +52,12 @@ func MaterializeFactoryAppTemplate(
 	if input.agent == nil {
 		input.agent = factoryTemplateAgentFromIntake(resolveIntakeAgent(db, factory))
 	}
-	result, err := materializeFactoryTemplate(req.GetTemplateId(), input)
+	provider := factory.OnboardingConfigValue().EffectiveVCSProvider()
+	result, err := materializeFactoryTemplate(req.GetTemplateId(), provider, input)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
 	}
-	if err := attachFactoryTemplateColumn(db, canvas, req.GetTemplateId()); err != nil {
+	if err := attachFactoryTemplateColumn(db, canvas, req.GetTemplateId(), provider); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
 	}
 
@@ -96,6 +100,9 @@ func MaterializeFactoryAutomationDefaults(
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to materialize factory automation defaults")
+	}
+	if featureErr := requireBitbucketWorkspace(db, orgID, factory.OnboardingConfigValue().EffectiveVCSProvider()); featureErr != nil {
+		return nil, factoryErrorToStatus(featureErr, "failed to materialize factory automation defaults")
 	}
 	factoryID := factory.ID
 	canvas, version, err := findFactoryAppForDefaults(db, orgID, factoryID, automationID)
