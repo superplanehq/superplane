@@ -120,8 +120,6 @@ function ticketContinueButton(args: {
   };
 }
 
-import { FirstRunTicketBody } from "./firstRunTicketRows";
-
 function noIntakeState(): IntakeSurfaceState | undefined {
   return undefined;
 }
