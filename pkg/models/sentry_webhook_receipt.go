@@ -107,15 +107,31 @@ func AppendSentryWebhookTask(tx *gorm.DB, receiptID, taskID uuid.UUID) error {
 	return tx.Model(&SentryWebhookReceipt{}).Where("id = ?", receiptID).Update("task_ids", strings.Join(ids, ",")).Error
 }
 
-func ListSentryWebhookReceipts(tx *gorm.DB, limit, offset int) ([]SentryWebhookReceipt, int64, error) {
+// ListSentryWebhookReceipts returns one page of receipts, newest first.
+// An empty project returns every receipt. A project value matches project_slug
+// as a case-insensitive substring. Percent, underscore, and backslash stay literal.
+func ListSentryWebhookReceipts(tx *gorm.DB, limit, offset int, project string) ([]SentryWebhookReceipt, int64, error) {
 	var total int64
-	if err := tx.Model(&SentryWebhookReceipt{}).Count(&total).Error; err != nil {
+	if err := sentryWebhookReceiptQuery(tx, project).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	var receipts []SentryWebhookReceipt
-	err := tx.Order("received_at DESC").Limit(limit).Offset(offset).Find(&receipts).Error
+	err := sentryWebhookReceiptQuery(tx, project).
+		Order("received_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&receipts).Error
 	return receipts, total, err
+}
+
+func sentryWebhookReceiptQuery(tx *gorm.DB, project string) *gorm.DB {
+	query := tx.Model(&SentryWebhookReceipt{})
+	project = clipWebhookField(project)
+	if project == "" {
+		return query
+	}
+	return query.Where("project_slug ILIKE ? ESCAPE '\\'", containsLikePattern(project))
 }
 
 func clipWebhookField(value string) string {

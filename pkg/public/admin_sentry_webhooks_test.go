@@ -3,6 +3,8 @@ package public
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -81,4 +83,85 @@ func TestAdminSentryWebhooks(t *testing.T) {
 		assert.Equal(t, http.StatusOK, receipt.HTTPStatus)
 		assert.Equal(t, []string{taskID.String()}, receipt.TaskIDs)
 	})
+
+	t.Run("filters receipts by project slug", func(t *testing.T) {
+		slugToken := strings.ReplaceAll(uuid.New().String(), "-", "")
+		productionSlug := "Production-" + slugToken
+		otherSlug := "billing-" + slugToken
+		literalSlug := "100%_" + slugToken
+		wildcardSlug := "100X" + slugToken
+
+		productionID := createAdminSentryReceipt(t, productionSlug)
+		otherID := createAdminSentryReceipt(t, otherSlug)
+		literalID := createAdminSentryReceipt(t, literalSlug)
+		wildcardID := createAdminSentryReceipt(t, wildcardSlug)
+
+		unfiltered := listAdminSentryWebhooks(t, server, token, "")
+		assert.Equal(t, countSentryWebhookReceipts(t), unfiltered.Total)
+		require.NotNil(t, findSentryReceipt(unfiltered.Items, productionID))
+		require.NotNil(t, findSentryReceipt(unfiltered.Items, otherID))
+		require.NotNil(t, findSentryReceipt(unfiltered.Items, literalID))
+		require.NotNil(t, findSentryReceipt(unfiltered.Items, wildcardID))
+
+		production := listAdminSentryWebhooks(t, server, token, "production-"+slugToken)
+		assert.Equal(t, 1, production.Total)
+		require.Len(t, production.Items, 1)
+		assert.Equal(t, productionID, production.Items[0].ID)
+		assert.Equal(t, productionSlug, production.Items[0].ProjectSlug)
+
+		trimmed := listAdminSentryWebhooks(t, server, token, "  production-"+slugToken+"  ")
+		assert.Equal(t, 1, trimmed.Total)
+		require.Len(t, trimmed.Items, 1)
+		assert.Equal(t, productionID, trimmed.Items[0].ID)
+
+		missing := listAdminSentryWebhooks(t, server, token, "missing-"+slugToken)
+		assert.Equal(t, 0, missing.Total)
+		assert.Empty(t, missing.Items)
+
+		literal := listAdminSentryWebhooks(t, server, token, literalSlug)
+		assert.Equal(t, 1, literal.Total)
+		require.Len(t, literal.Items, 1)
+		assert.Equal(t, literalID, literal.Items[0].ID)
+		assert.Nil(t, findSentryReceipt(literal.Items, wildcardID))
+	})
+}
+
+func createAdminSentryReceipt(t *testing.T, projectSlug string) string {
+	t.Helper()
+	receiptID, err := models.CreateSentryWebhookReceipt(database.Conn(), models.SentryWebhookReceipt{
+		ID:           uuid.New(),
+		ReceivedAt:   time.Now().UTC(),
+		HookResource: "issue",
+		Action:       "created",
+		ProjectSlug:  projectSlug,
+		HTTPStatus:   http.StatusOK,
+		Outcome:      models.SentryWebhookOutcomeAccepted,
+	})
+	require.NoError(t, err)
+	return receiptID.String()
+}
+
+func listAdminSentryWebhooks(t *testing.T, server *Server, token, project string) adminSentryWebhooksResponse {
+	t.Helper()
+	path := "/admin/api/sentry/webhooks"
+	if project != "" {
+		path += "?project=" + url.QueryEscape(project)
+	}
+	response := execRequest(server, requestParams{
+		method:     "GET",
+		path:       path,
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, response.Code)
+
+	var body adminSentryWebhooksResponse
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	return body
+}
+
+func countSentryWebhookReceipts(t *testing.T) int {
+	t.Helper()
+	var total int64
+	require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&total).Error)
+	return int(total)
 }

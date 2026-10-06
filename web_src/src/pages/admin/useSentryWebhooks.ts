@@ -6,17 +6,38 @@ import {
   type SentryWebhooksResponse,
 } from "./sentryWebhookReceipts";
 
+function sentryWebhooksURL(offset: number, project: string) {
+  const page = Math.floor(offset / SENTRY_WEBHOOK_PAGE_SIZE) + 1;
+  const params = new URLSearchParams({
+    page: String(page),
+    limit: String(SENTRY_WEBHOOK_PAGE_SIZE),
+  });
+  const trimmedProject = project.trim();
+  if (trimmedProject !== "") {
+    params.set("project", trimmedProject);
+  }
+  return `/admin/api/sentry/webhooks?${params.toString()}`;
+}
+
 export function useSentryWebhooks() {
   const [offset, setOffset] = useState(0);
+  const [project, setProjectValue] = useState("");
   const [data, setData] = useState<SentryWebhooksResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  const load = useCallback(async (nextOffset: number, signal?: AbortSignal) => {
+  const setProject = useCallback((value: string) => {
+    setProjectValue(value);
+    setOffset(0);
+    setData(null);
+    setLoadError("");
+    setLoading(true);
+  }, []);
+
+  const load = useCallback(async (nextOffset: number, nextProject: string, signal?: AbortSignal) => {
     setLoading(true);
     setLoadError("");
-    const page = Math.floor(nextOffset / SENTRY_WEBHOOK_PAGE_SIZE) + 1;
-    const response = await fetch(`/admin/api/sentry/webhooks?page=${page}&limit=${SENTRY_WEBHOOK_PAGE_SIZE}`, {
+    const response = await fetch(sentryWebhooksURL(nextOffset, nextProject), {
       credentials: "include",
       signal,
     });
@@ -28,7 +49,7 @@ export function useSentryWebhooks() {
 
   useEffect(() => {
     const controller = new AbortController();
-    load(offset, controller.signal)
+    load(offset, project, controller.signal)
       .then((next) => {
         if (!controller.signal.aborted) {
           setData(next);
@@ -43,7 +64,7 @@ export function useSentryWebhooks() {
         setLoading(false);
       });
     return () => controller.abort();
-  }, [load, offset]);
+  }, [load, offset, project]);
 
-  return { offset, setOffset, data, loading, loadError };
+  return { offset, setOffset, project, setProject, data, loading, loadError };
 }
