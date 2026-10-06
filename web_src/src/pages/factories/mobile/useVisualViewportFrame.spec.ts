@@ -155,7 +155,7 @@ describe("PinnedPhoneShell", () => {
       globalThis.ResizeObserver = previousObserver;
     });
 
-    render(createElement(PinnedPhoneShell, { testId: "phone-shell" }, "Board"));
+    render(createElement(PinnedPhoneShell, { children: "Board", testId: "phone-shell" }));
     const shell = screen.getByTestId("phone-shell");
     expect(shell).toHaveStyle({ top: "0px", height: "700px" });
 
