@@ -28,6 +28,8 @@ interface AccountProfileRedesignState {
   setEmail: (email: string) => void;
   linkGithub: () => void;
   removeGithub: () => void;
+  linkBitbucket: () => void;
+  removeBitbucket: () => void;
   changePassword: () => void;
   createToken: (name: string) => string;
   revokeToken: (id: string) => void;
@@ -62,6 +64,17 @@ export function AccountProfileRedesignProvider({
       setProfile((current) => ({ ...current, linkedGithubUsername: null }));
       showSuccessToast("GitHub link removed.");
     },
+    linkBitbucket: () => {
+      setProfile((current) => ({
+        ...current,
+        linkedBitbucketUsername: githubIdentity(current.name),
+      }));
+      showSuccessToast("Bitbucket account linked.");
+    },
+    removeBitbucket: () => {
+      setProfile((current) => ({ ...current, linkedBitbucketUsername: null }));
+      showSuccessToast("Bitbucket link removed.");
+    },
     changePassword: () => undefined,
     createToken: (name) => {
       const id = `token-${profile.tokens.length + 1}`;
@@ -95,8 +108,19 @@ function useAccountProfileRedesign() {
 }
 
 export function AccountProfileRedesignRoutePage() {
-  const { profile, setName, setEmail, saveName, linkGithub, removeGithub, changePassword, createToken, revokeToken } =
-    useAccountProfileRedesign();
+  const {
+    profile,
+    setName,
+    setEmail,
+    saveName,
+    linkGithub,
+    removeGithub,
+    linkBitbucket,
+    removeBitbucket,
+    changePassword,
+    createToken,
+    revokeToken,
+  } = useAccountProfileRedesign();
   return (
     <AccountProfileRedesignPage
       name={profile.name}
@@ -118,8 +142,15 @@ export function AccountProfileRedesignRoutePage() {
               ? [{ providerId: "storybook-github-account", username: profile.linkedGithubUsername }]
               : []
           }
+          bitbucketAccounts={
+            profile.linkedBitbucketUsername
+              ? [{ providerId: "storybook-bitbucket-account", username: profile.linkedBitbucketUsername }]
+              : []
+          }
           onLinkGithub={linkGithub}
+          onLinkBitbucket={linkBitbucket}
           onRemoveGithub={() => removeGithub()}
+          onRemoveBitbucket={() => removeBitbucket()}
         />
       }
       security={

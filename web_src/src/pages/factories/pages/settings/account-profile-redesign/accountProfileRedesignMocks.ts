@@ -38,6 +38,7 @@ export interface AccountRedesignProfile {
   email: string;
   passwordSet: boolean;
   linkedGithubUsername: string | null;
+  linkedBitbucketUsername: string | null;
   tokens: AccountRedesignToken[];
   ssoAccounts: AccountRedesignSsoAccount[];
   notifications: AccountRedesignNotifications;
@@ -48,6 +49,7 @@ export const ACCOUNT_REDESIGN_PROFILE: AccountRedesignProfile = {
   email: "ada@example.com",
   passwordSet: true,
   linkedGithubUsername: null,
+  linkedBitbucketUsername: null,
   tokens: [],
   ssoAccounts: [
     { provider: "github", identity: "ada", email: "ada@example.com" },

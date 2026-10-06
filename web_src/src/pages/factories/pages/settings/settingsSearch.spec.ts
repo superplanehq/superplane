@@ -80,6 +80,11 @@ describe("searchFactorySettings", () => {
     expect(titles).toContain("Sign in methods");
   });
 
+  it("sends a bitbucket query to Associated accounts", () => {
+    const results = searchFactorySettings(index, "bitbucket");
+    expect(results.some((result) => result.title === "Associated accounts")).toBe(true);
+  });
+
   it("sends a velocity query to Associated accounts", () => {
     const results = searchFactorySettings(index, "velocity");
     expect(results.some((result) => result.title === "Associated accounts")).toBe(true);

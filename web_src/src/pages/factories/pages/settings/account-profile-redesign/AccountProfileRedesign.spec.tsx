@@ -45,6 +45,10 @@ describe("AccountProfileRedesignPlayground", () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-associated-accounts")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Link Bitbucket" })).toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-associated-bitbucket")).toHaveTextContent(
+      "This link does not change how you sign in.",
+    );
     expect(screen.getByTestId("account-redesign-nav-account-profile")).toHaveTextContent("Account");
     expect(screen.queryByTestId("account-redesign-nav-account-security")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-nav-account-notifications")).toHaveTextContent("Notifications");
@@ -143,6 +147,32 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
   });
 
+  it("links and removes Bitbucket without changing sign-in", async () => {
+    const user = userEvent.setup();
+    renderPlayground();
+
+    expect(screen.getByTestId("account-redesign-associated-bitbucket")).toHaveTextContent(
+      "This link does not change how you sign in.",
+    );
+    expect(screen.getByTestId("account-redesign-associated-bitbucket")).not.toHaveTextContent("Velocity");
+
+    await user.click(screen.getByRole("button", { name: "Link Bitbucket" }));
+    expect(screen.getByTestId("account-redesign-associated-bitbucket")).toHaveTextContent("Linked as ada-lovelace.");
+    expect(screen.getByTestId("account-redesign-associated-bitbucket")).toHaveTextContent(
+      "This link does not change how you sign in.",
+    );
+
+    await user.click(
+      within(screen.getByTestId("account-redesign-associated-bitbucket")).getByRole("button", { name: "Remove" }),
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Your sign-in methods do not change.");
+    expect(dialog).not.toHaveTextContent("Velocity");
+    await user.click(screen.getByRole("button", { name: "Remove account" }));
+
+    expect(screen.getByRole("button", { name: "Link Bitbucket" })).toBeInTheDocument();
+  });
+
   it("shows and removes multiple associated GitHub accounts independently", async () => {
     const user = userEvent.setup();
     const onRemoveGithub = vi.fn();
@@ -152,8 +182,11 @@ describe("AccountProfileRedesignPlayground", () => {
           { providerId: "101", username: "forestileao" },
           { providerId: "202", username: "forestigamer" },
         ]}
+        bitbucketAccounts={[]}
         onLinkGithub={vi.fn()}
+        onLinkBitbucket={vi.fn()}
         onRemoveGithub={onRemoveGithub}
+        onRemoveBitbucket={vi.fn()}
       />,
     );
 
@@ -165,6 +198,35 @@ describe("AccountProfileRedesignPlayground", () => {
     await user.click(within(secondAccount).getByRole("button", { name: "Remove" }));
     await user.click(screen.getByRole("button", { name: "Remove account" }));
     expect(onRemoveGithub).toHaveBeenCalledWith("202");
+  });
+
+  it("shows and removes multiple associated Bitbucket accounts independently", async () => {
+    const user = userEvent.setup();
+    const onRemoveBitbucket = vi.fn();
+    render(
+      <AccountProfileAssociatedAccountsCard
+        githubAccounts={[]}
+        bitbucketAccounts={[
+          { providerId: "bb-1", username: "ada" },
+          { providerId: "bb-2", username: "ada-other" },
+        ]}
+        onLinkGithub={vi.fn()}
+        onLinkBitbucket={vi.fn()}
+        onRemoveGithub={vi.fn()}
+        onRemoveBitbucket={onRemoveBitbucket}
+      />,
+    );
+
+    expect(screen.getByText(/Linked as ada\./)).toBeInTheDocument();
+    expect(screen.getByText(/Linked as ada-other/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Link another Bitbucket account" })).toBeInTheDocument();
+    expect(screen.queryByText(/Velocity uses this Bitbucket/)).not.toBeInTheDocument();
+
+    const secondAccount = screen.getByTestId("account-redesign-associated-bitbucket-bb-2");
+    await user.click(within(secondAccount).getByRole("button", { name: "Remove" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Your sign-in methods do not change.");
+    await user.click(screen.getByRole("button", { name: "Remove account" }));
+    expect(onRemoveBitbucket).toHaveBeenCalledWith("bb-2");
   });
 
   it("turns task emails off and hides events", async () => {

@@ -182,6 +182,30 @@ CI sets dummy GitHub App values so factory E2E can open workspace setup.
 Local `make test.e2e` needs the same dummy values or a real app. Without
 them, `/account/onboarding` returns 503.
 
+## Bitbucket account link
+
+A signed-in person can link a Bitbucket Cloud account from account settings.
+The link is not a sign-in method. SuperPlane does not add Bitbucket to the
+login page.
+
+Create an OAuth consumer in Bitbucket Cloud. Set the callback URL to:
+
+`{BASE_URL}/auth/bitbucket/callback`
+
+Request the `account` scope only. Add these values to `.env`. Do not commit
+real secrets.
+
+```env
+BITBUCKET_CLIENT_ID=oauth-consumer-key
+BITBUCKET_CLIENT_SECRET=oauth-consumer-secret
+```
+
+Restart the server after you save `.env`. SuperPlane stores the Bitbucket
+account UUID and nickname. It does not store the OAuth token.
+
+If either value is empty, SuperPlane does not register the Bitbucket provider.
+Open `/auth/bitbucket?intent=connect` only after both values are set.
+
 ## Factory Sentry App (local issue intake)
 
 Factory Sentry intake installs SuperPlane's public Sentry app. The process

@@ -41,6 +41,7 @@ export const FACTORY_SETTINGS_SEARCH_ENTRIES: FactorySettingsSearchResult[] = [
   entry("account", "profile", "Associated accounts", "account-redesign-associated-accounts", [
     "linked accounts",
     "github",
+    "bitbucket",
     "velocity",
     "pull requests",
     "pr credit",

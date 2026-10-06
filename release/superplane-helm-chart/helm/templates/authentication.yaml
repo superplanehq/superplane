@@ -12,6 +12,12 @@ data:
   GITHUB_CLIENT_ID: {{ $clientId }}
   GITHUB_CLIENT_SECRET: {{ $clientSecret }}
 {{ end }}
+{{ if .Values.authentication.bitbucket.enabled }}
+  {{ $clientId := .Values.authentication.bitbucket.clientId | required ".Values.authentication.bitbucket.clientId is required." -}}
+  {{ $clientSecret := .Values.authentication.bitbucket.clientSecret | required ".Values.authentication.bitbucket.clientSecret is required." -}}
+  BITBUCKET_CLIENT_ID: {{ $clientId }}
+  BITBUCKET_CLIENT_SECRET: {{ $clientSecret }}
+{{ end }}
 {{ if .Values.authentication.google.enabled }}
   {{ $clientId := .Values.authentication.google.clientId | required ".Values.authentication.google.clientId is required." -}}
   {{ $clientSecret := .Values.authentication.google.clientSecret | required ".Values.authentication.google.clientSecret is required." -}}
