@@ -16,20 +16,24 @@ function workspaceLabel(factory: FirstRunWorkspaceOption): string {
 export function FirstRunWorkspaceSwitch({
   switcher,
   disabled,
+  inline = false,
 }: {
   switcher: NonNullable<FirstRunChrome["workspaceSwitch"]> | undefined;
   disabled?: boolean;
+  inline?: boolean;
 }) {
   if (!switcher) return null;
-  return <FirstRunWorkspaceSwitchMenu switcher={switcher} disabled={disabled} />;
+  return <FirstRunWorkspaceSwitchMenu switcher={switcher} disabled={disabled} inline={inline} />;
 }
 
 function FirstRunWorkspaceSwitchMenu({
   switcher,
   disabled,
+  inline,
 }: {
   switcher: NonNullable<FirstRunChrome["workspaceSwitch"]>;
   disabled?: boolean;
+  inline: boolean;
 }) {
   const navigate = useNavigate();
   const copy = FIRST_RUN_COPY.chrome;
@@ -38,7 +42,7 @@ function FirstRunWorkspaceSwitchMenu({
   const currentName = current ? workspaceLabel(current) : "Workspace";
 
   return (
-    <div className="pointer-events-auto absolute bottom-0 left-0 z-10 px-6 pb-6">
+    <div className={inline ? undefined : "pointer-events-auto absolute bottom-0 left-0 z-10 px-6 pb-6"}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
