@@ -16,7 +16,7 @@ interface SettingsAutomationCanvasProps {
   showFindControls?: boolean;
   focusNodeId?: string | null;
   focusNonce?: number;
-  /** When false, selecting a node does not change the viewport zoom. */
+  /** When false, selecting a node does not move the viewport. */
   focusFit?: boolean;
   lockNativeZoom?: boolean;
   layoutFitNonce?: number | null;
