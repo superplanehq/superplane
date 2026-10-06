@@ -59,43 +59,60 @@ type OrganizationWithCounts struct {
 }
 
 func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
+	organizations, total, _, err := ListUnpinnedOrganizations(tx, search, limit, offset, sortBy, sortDirection, nil)
+	return organizations, total, err
+}
+
+func ListUnpinnedOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) (organizations []OrganizationWithCounts, unpinnedTotal int64, matchTotal int64, err error) {
+	matchQuery := organizationsMatchingSearch(tx, search)
+	if err = matchQuery.Count(&matchTotal).Error; err != nil {
+		return nil, 0, 0, err
+	}
+
+	query := excludeOrganizationIDs(organizationsMatchingSearch(tx, search), excludeIDs)
+	if err = query.Count(&unpinnedTotal).Error; err != nil {
+		return nil, 0, 0, err
+	}
+
+	query = withOrganizationCounts(tx, query)
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	if err = query.Order(resolveOrganizationOrderClause(sortBy, sortDirection)).Find(&organizations).Error; err != nil {
+		return nil, 0, 0, err
+	}
+
+	return organizations, unpinnedTotal, matchTotal, nil
+}
+
+func organizationsMatchingSearch(tx *gorm.DB, search string) *gorm.DB {
 	query := tx.
 		Model(&Organization{}).
 		Where("organizations.deleted_at IS NULL")
 
 	search = strings.TrimSpace(search)
-	if search != "" {
-		pattern := "%" + search + "%"
-		query = query.Where(
-			"organizations.name ILIKE ? OR organizations.id::text ILIKE ?",
-			pattern,
-			pattern,
-		)
+	if search == "" {
+		return query
 	}
 
-	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
+	pattern := "%" + search + "%"
+	return query.Where(
+		"organizations.name ILIKE ? OR organizations.id::text ILIKE ?",
+		pattern,
+		pattern,
+	)
+}
+
+func excludeOrganizationIDs(query *gorm.DB, ids []uuid.UUID) *gorm.DB {
+	if len(ids) == 0 {
+		return query
 	}
 
-	query = withOrganizationCounts(tx, query)
-
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-
-	if offset > 0 {
-		query = query.Offset(offset)
-	}
-
-	orderClause := resolveOrganizationOrderClause(sortBy, sortDirection)
-
-	var organizations []OrganizationWithCounts
-	if err := query.Order(orderClause).Find(&organizations).Error; err != nil {
-		return nil, 0, err
-	}
-
-	return organizations, total, nil
+	return query.Where("organizations.id NOT IN ?", ids)
 }
 
 func FindOrganizationWithCounts(tx *gorm.DB, id uuid.UUID) (*OrganizationWithCounts, error) {
