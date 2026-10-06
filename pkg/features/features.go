@@ -80,9 +80,9 @@ const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 // column until the flow is generally available.
 const FeatureFactoryRiskScore = "factory_risk_score"
 
-// FeatureSuperPlaneMCPServer gates the public workspace MCP server.
-// Organizations with this flag can authorize Cursor and other MCP clients
-// against one workspace. Without it, POST /mcp returns 404.
+// FeatureSuperPlaneMCPServer is released. Every organization can authorize
+// Cursor and other MCP clients against one workspace. The factories flag
+// still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 
 // FeatureMobileFactoryBoard gates the mobile-first workspace shell: a
@@ -117,7 +117,7 @@ var registry = []Feature{
 	{ID: FeatureNewRunners, Label: "New Runners", Description: "Run tasks with the integrated SuperPlane runner architecture"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
 	{ID: FeatureFactoryRiskScore, Label: "Factory Merge Confidence", Description: "Add a merge confidence automation to the Verify column"},
-	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization"},
+	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
 	{ID: FeatureMobileFactoryBoard, Label: "Mobile Board", Description: "Show the mobile workspace shell on phone-width screens"},
 }
 
