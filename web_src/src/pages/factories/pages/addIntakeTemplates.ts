@@ -9,7 +9,6 @@ import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import {
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_JIRA_INTAKE,
-  FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
 } from "@/lib/experimentalFeatures";
 
@@ -81,7 +80,6 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     name: "Linear issues",
     description: "Create a task when a Linear issue is added to a selected project.",
     iconSrc: linearIcon,
-    featureId: FEATURE_FACTORY_LINEAR_INTAKE,
   },
   {
     id: "notion",

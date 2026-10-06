@@ -1,11 +1,7 @@
 import type { MeVcsProviderRepository } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
-import {
-  FEATURE_FACTORY_BITBUCKET,
-  FEATURE_FACTORY_JIRA_INTAKE,
-  FEATURE_FACTORY_LINEAR_INTAKE,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_BITBUCKET, FEATURE_FACTORY_JIRA_INTAKE } from "@/lib/experimentalFeatures";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
 
@@ -202,15 +198,10 @@ function waitForBrowserPaint(): Promise<void> {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
-function selectedIssuesChoice(
-  model: OnboardingPageModel,
-  jiraAvailable: boolean,
-  linearAvailable: boolean,
-): IssuesChoiceId | null {
+function selectedIssuesChoice(model: OnboardingPageModel, jiraAvailable: boolean): IssuesChoiceId | null {
   const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice);
   const issuesChoice = issuesChoiceForTicketSource(ticketSource);
   if (issuesChoice === "jira" && !jiraAvailable) return null;
-  if (issuesChoice === "linear" && !linearAvailable) return null;
   if (issuesChoice === "linear" && (model.linearProjectsLoading || model.linearProjectsError)) return null;
   if (
     !issuesChoice ||
@@ -234,21 +225,10 @@ function useFirstRunCommands(args: {
   navigation: ReturnType<typeof useFirstRunNavigation>;
   blocking: FirstRunBlocking;
   jiraAvailable: boolean;
-  linearAvailable: boolean;
   bitbucketAvailable: boolean;
   installScope: GitHubInstallScope;
 }) {
-  const {
-    model,
-    agentGate,
-    connection,
-    navigation,
-    blocking,
-    jiraAvailable,
-    linearAvailable,
-    bitbucketAvailable,
-    installScope,
-  } = args;
+  const { model, agentGate, connection, navigation, blocking, jiraAvailable, bitbucketAvailable, installScope } = args;
   const location = useLocation();
   const saveRepository = async (): Promise<boolean> => {
     const selectedRepo = model.setup.selectedRepo;
@@ -278,7 +258,7 @@ function useFirstRunCommands(args: {
   };
   const continueFromTickets = () =>
     blocking.run("saving-ticket-source", async () => {
-      const issuesChoice = selectedIssuesChoice(model, jiraAvailable, linearAvailable);
+      const issuesChoice = selectedIssuesChoice(model, jiraAvailable);
       if (!issuesChoice) return;
       model.setup.setIssuesChoice(issuesChoice);
       model.setup.commitIssuesStep();
@@ -314,7 +294,7 @@ function useFirstRunCommands(args: {
     });
   const connectIssueTracker = (source: "jira" | "linear") =>
     blocking.runUntilNavigation(source === "jira" ? "connecting-jira" : "connecting-linear", async () => {
-      if (source === "jira" ? !jiraAvailable : !linearAvailable) return false;
+      if (source === "jira" && !jiraAvailable) return false;
       model.setup.setIssuesChoice(source);
       if (!(await model.saveIssues(source))) return false;
       await waitForBrowserPaint();
@@ -328,7 +308,6 @@ function useFirstRunCommands(args: {
   };
   const selectTicketSource = (source: FirstRunTicketSource) => {
     if (source === "jira" && !jiraAvailable) return;
-    if (source === "linear" && !linearAvailable) return;
     const issuesChoice = issuesChoiceForTicketSource(source);
     if (issuesChoice) model.setup.setIssuesChoice(issuesChoice);
   };
@@ -375,21 +354,6 @@ export function shouldClearSavedJiraChoice(args: {
   });
 }
 
-export function shouldClearSavedLinearChoice(args: {
-  issuesChoice: IssuesChoiceId | null;
-  featureLoading: boolean;
-  linearAvailable: boolean;
-  organizationReady: boolean;
-}): boolean {
-  return shouldClearSavedFlaggedChoice({
-    issuesChoice: args.issuesChoice,
-    source: "linear",
-    featureLoading: args.featureLoading,
-    available: args.linearAvailable,
-    organizationReady: args.organizationReady,
-  });
-}
-
 export type SavedFlaggedChoiceBlock = "loading" | "lookup-failed";
 
 function savedFlaggedChoiceBlock(args: {
@@ -421,22 +385,6 @@ export function savedJiraChoiceBlock(args: {
   });
 }
 
-/** A saved Linear choice cannot continue until the feature lookup confirms Linear. */
-export function savedLinearChoiceBlock(args: {
-  issuesChoice: IssuesChoiceId | null;
-  featureLoading: boolean;
-  linearAvailable: boolean;
-  organizationReady: boolean;
-}): SavedFlaggedChoiceBlock | null {
-  return savedFlaggedChoiceBlock({
-    issuesChoice: args.issuesChoice,
-    source: "linear",
-    featureLoading: args.featureLoading,
-    available: args.linearAvailable,
-    organizationReady: args.organizationReady,
-  });
-}
-
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId, factoryId } = useFactoriesLayout();
   const setupFinished = model.provisionedDestination != null;
@@ -450,7 +398,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const intakeFeatures = useExperimentalFeature(organizationId);
   const intakeFeatureLoading = intakeFeatures.isLoading;
   const jiraAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_JIRA_INTAKE);
-  const linearAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_LINEAR_INTAKE);
   const bitbucketAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_BITBUCKET);
   const bitbucket = { available: bitbucketAvailable, loading: intakeFeatureLoading };
   const agentGate = onboardingAgentGate({
@@ -467,7 +414,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     navigation,
     blocking,
     jiraAvailable,
-    linearAvailable,
     bitbucketAvailable,
     installScope,
   });
@@ -484,20 +430,12 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     jiraAvailable,
     organizationReady,
   };
-  const linearChoiceArgs = {
-    issuesChoice,
-    featureLoading: intakeFeatureLoading,
-    linearAvailable,
-    organizationReady,
-  };
   const clearSavedJiraChoice = shouldClearSavedJiraChoice(jiraChoiceArgs);
-  const clearSavedLinearChoice = shouldClearSavedLinearChoice(linearChoiceArgs);
   const jiraChoiceBlock = savedJiraChoiceBlock(jiraChoiceArgs);
-  const linearChoiceBlock = savedLinearChoiceBlock(linearChoiceArgs);
   useEffect(() => {
-    if (!clearSavedJiraChoice && !clearSavedLinearChoice) return;
+    if (!clearSavedJiraChoice) return;
     setIssuesChoice(null);
-  }, [clearSavedJiraChoice, clearSavedLinearChoice, setIssuesChoice]);
+  }, [clearSavedJiraChoice, setIssuesChoice]);
   return {
     ...navigation,
     ...commands,
@@ -515,9 +453,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     jiraAvailable,
     jiraFeatureLoading: intakeFeatureLoading,
     jiraChoiceBlock,
-    linearAvailable,
-    linearFeatureLoading: intakeFeatureLoading,
-    linearChoiceBlock,
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
     repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
     repositoriesLoading: connection.onboarding.isPending,
