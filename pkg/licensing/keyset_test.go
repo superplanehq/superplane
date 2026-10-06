@@ -4,16 +4,17 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/licensing/licensingtest"
 )
 
-func TestProductionKeySetIsValid(t *testing.T) {
-	keySet, err := licensing.ProductionKeySet()
+func TestEmbeddedTrustAnchorsAreValid(t *testing.T) {
+	_, err := licensing.ProductionRootKeySet()
 	require.NoError(t, err)
-	assert.Equal(t, []string{"license-signing-2026-10"}, keySet.KeyIDs())
+
+	_, err = licensing.TrustedKeyStore(nil)
+	require.NoError(t, err, "the bootstrap key list must verify with the embedded root keys")
 }
 
 func TestParseKeySetRejectsUnsafeKeys(t *testing.T) {

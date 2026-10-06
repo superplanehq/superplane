@@ -80,16 +80,30 @@ type snapshot struct {
 type Service struct {
 	verifier  *Verifier
 	source    Source
+	keySync   *KeySync
 	now       func() time.Time
 	current   atomic.Pointer[snapshot]
 	refreshMu sync.Mutex
 }
 
-func NewService(verifier *Verifier, source Source) *Service {
+type ServiceOption func(*Service)
+
+// WithKeySync keeps the trusted signing keys current while the service runs.
+func WithKeySync(keySync *KeySync) ServiceOption {
+	return func(s *Service) {
+		s.keySync = keySync
+	}
+}
+
+func NewService(verifier *Verifier, source Source, options ...ServiceOption) *Service {
 	service := &Service{
 		verifier: verifier,
 		source:   source,
 		now:      time.Now,
+	}
+
+	for _, option := range options {
+		option(service)
 	}
 
 	service.current.Store(&snapshot{source: SourceNone})
@@ -114,6 +128,14 @@ func (s *Service) Start(ctx context.Context) {
 		log.WithError(err).Warn("Licensing: initial license load failed; using Community mode")
 	}
 
+	if s.keySync != nil {
+		s.keySync.Start(ctx, func() {
+			if err := s.Refresh(ctx); err != nil {
+				log.WithError(err).Warn("Licensing: license refresh after a key update failed")
+			}
+		})
+	}
+
 	go func() {
 		ticker := time.NewTicker(RefreshInterval)
 		defer ticker.Stop()
@@ -131,9 +153,53 @@ func (s *Service) Start(ctx context.Context) {
 	}()
 }
 
-// Refresh reloads the license from its source. A temporary database error
-// keeps the last known state instead of removing Enterprise access.
+// Refresh reloads the trusted keys and the license. A temporary database
+// error keeps the last known state instead of removing Enterprise access.
 func (s *Service) Refresh(ctx context.Context) error {
+	s.reloadKeys(ctx)
+
+	if err := s.reloadLicense(ctx); err != nil {
+		return err
+	}
+
+	if s.current.Load().reason != ReasonUnknownKey || !s.syncKeysOnDemand(ctx) {
+		return nil
+	}
+
+	return s.reloadLicense(ctx)
+}
+
+// reloadKeys trusts a newer key list that another replica saved. It reports
+// whether the trusted keys changed.
+func (s *Service) reloadKeys(ctx context.Context) bool {
+	if s.keySync == nil {
+		return false
+	}
+
+	changed, err := s.keySync.Reload(ctx)
+	if err != nil {
+		log.WithError(err).Warn("Licensing: cached license keys were not loaded")
+	}
+
+	return changed
+}
+
+// syncKeysOnDemand downloads the key list when a license names an unknown
+// key. It reports whether the trusted keys changed.
+func (s *Service) syncKeysOnDemand(ctx context.Context) bool {
+	if s.keySync == nil {
+		return false
+	}
+
+	changed, err := s.keySync.SyncOnDemand(ctx)
+	if err != nil {
+		log.WithError(err).Warn("Licensing: license key sync failed; keeping the trusted keys")
+	}
+
+	return changed
+}
+
+func (s *Service) reloadLicense(ctx context.Context) error {
 	s.refreshMu.Lock()
 	defer s.refreshMu.Unlock()
 
@@ -202,6 +268,14 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 	}
 
 	license, err := s.verifier.Verify(raw)
+	if ReasonOf(err) == ReasonUnknownKey && s.reloadKeys(ctx) {
+		license, err = s.verifier.Verify(raw)
+	}
+
+	if ReasonOf(err) == ReasonUnknownKey && s.syncKeysOnDemand(ctx) {
+		license, err = s.verifier.Verify(raw)
+	}
+
 	if err != nil {
 		return s.Status(), err
 	}
