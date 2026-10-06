@@ -30,6 +30,8 @@ interface MergeConfidenceConfigModalProps {
   error?: boolean;
   onRetry?: () => void;
   canvasId?: string;
+  factoryId?: string;
+  factoryKey?: string;
   runHrefFor?: RunsSidebarHrefForRun;
   onClose: () => void;
   onSaveNode: (update: NodeConfigurationUpdate) => Promise<void> | void;
@@ -47,6 +49,8 @@ export function MergeConfidenceConfigModal({
   error = false,
   onRetry,
   canvasId,
+  factoryId,
+  factoryKey,
   runHrefFor,
   onClose,
   onSaveNode,
@@ -54,6 +58,7 @@ export function MergeConfidenceConfigModal({
   deletePending = false,
 }: MergeConfidenceConfigModalProps) {
   const [tab, setTab] = useState<MergeConfidenceConfigTab>("automation");
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [focusNonce, setFocusNonce] = useState(0);
   const [layoutFitNonce, setLayoutFitNonce] = useState<number | null>(null);
@@ -116,6 +121,8 @@ export function MergeConfidenceConfigModal({
               runHrefFor={runHrefFor}
               showRuns
               selectLatestRun
+              selectedRunId={selectedRunId}
+              onSelectedRunIdChange={setSelectedRunId}
               onNodeSelect={() => undefined}
             />
           ) : (
@@ -138,6 +145,8 @@ export function MergeConfidenceConfigModal({
           <NodeConfigPanel
             node={selectedNode}
             organizationId={graph?.organizationId}
+            factoryId={panelFactoryId(factoryId, graph)}
+            factoryKey={factoryKey}
             onClose={() => setSelectedNodeId(null)}
             onSave={onSaveNode}
           />
@@ -155,6 +164,10 @@ export function MergeConfidenceConfigModal({
   );
 }
 
+function panelFactoryId(factoryId: string | undefined, graph: IntakeAutomationGraph | undefined) {
+  return factoryId ?? graph?.factoryId;
+}
+
 function MergeConfidenceCanvas({
   graph,
   loading,
@@ -164,6 +177,8 @@ function MergeConfidenceCanvas({
   runHrefFor,
   showRuns,
   selectLatestRun = false,
+  selectedRunId,
+  onSelectedRunIdChange,
   onNodeSelect,
   focusNodeId = null,
   focusNonce = 0,
@@ -177,6 +192,8 @@ function MergeConfidenceCanvas({
   runHrefFor?: RunsSidebarHrefForRun;
   showRuns: boolean;
   selectLatestRun?: boolean;
+  selectedRunId?: string | null;
+  onSelectedRunIdChange?: (runId: string | null) => void;
   onNodeSelect?: (nodeId: string) => void;
   focusNodeId?: string | null;
   focusNonce?: number;
@@ -208,6 +225,8 @@ function MergeConfidenceCanvas({
       onNodeSelect={onNodeSelect}
       showRuns={showRuns}
       selectLatestRun={selectLatestRun}
+      selectedRunId={selectedRunId}
+      onSelectedRunIdChange={onSelectedRunIdChange}
       showStatusControls={false}
       showFindControls={false}
       focusNodeId={focusNodeId}

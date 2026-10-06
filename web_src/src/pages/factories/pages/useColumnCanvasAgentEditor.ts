@@ -224,6 +224,7 @@ export async function persistNodeConfiguration(args: {
 
   await persistCanvasChange({
     ...args,
+    canvas,
     change: {
       missingMessage: STEP_MISSING_MESSAGE,
       unloadedMessage: CANVAS_NOT_LOADED_MESSAGE,

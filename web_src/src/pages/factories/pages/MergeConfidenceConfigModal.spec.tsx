@@ -46,6 +46,10 @@ vi.mock("@/hooks/useComponentData", () => ({
     ],
     isLoading: false,
   }),
+  useComponent: () => ({
+    data: { configuration: [{ name: "model", label: "Model", type: "string" }] },
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/hooks/useIntegrations", () => {
@@ -238,8 +242,15 @@ describe("MergeConfidenceConfigModal", () => {
     expect(screen.queryByTestId("factory-automation-runs-sidebar")).not.toBeInTheDocument();
     const form = screen.getByTestId("merge-confidence-config-form");
     expect(within(form).getByRole("heading", { name: "Assess Merge Confidence" })).toBeInTheDocument();
-    expect(within(form).getByText("Model")).toBeInTheDocument();
+    expect(within(form).getByText("Concurrency")).toBeInTheDocument();
+    expect(within(form).getByText("Model used")).toBeInTheDocument();
     expect(within(form).getByDisplayValue("sonnet")).toBeInTheDocument();
+    expect(within(form).getByRole("region", { name: "Steps" })).toBeInTheDocument();
+    expect(within(form).queryByText("MCP servers")).not.toBeInTheDocument();
+    expect(within(form).queryByText("Skills")).not.toBeInTheDocument();
+    expect(within(form).getByRole("button", { name: "Save Agent" })).toBeDisabled();
+    expect(within(form).queryByTestId("node-name-input")).not.toBeInTheDocument();
+    expect(within(form).queryByText("Integration")).not.toBeInTheDocument();
     expect(within(form).queryByTestId("merge-confidence-settings")).not.toBeInTheDocument();
     expect(screen.queryByTestId("merge-confidence-config-footer")).not.toBeInTheDocument();
   });
@@ -310,6 +321,12 @@ describe("MergeConfidenceConfigModal", () => {
     expect(screen.getByTestId(`factory-automation-run-${LATEST_RUN_ID}`)).toHaveAttribute("data-selected", "true");
     expect(screen.getByTestId(`factory-automation-run-${OLDER_RUN_ID}`)).not.toHaveAttribute("data-selected");
     expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId(`factory-automation-run-${OLDER_RUN_ID}`));
+    await user.click(screen.getByTestId("merge-confidence-config-tab-automation"));
+    await user.click(screen.getByTestId("merge-confidence-config-tab-runs"));
+
+    expect(screen.getByTestId("merge-confidence-config-canvas")).toHaveAttribute("data-selected-run-id", OLDER_RUN_ID);
   });
 
   it("asks to confirm before it deletes the automation", async () => {

@@ -295,6 +295,8 @@ export function ColumnAutomationViewHost({
           factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })
         }
         onClose={onClose}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
         onSaveNode={agent.saveNode}
         onDelete={onDelete}
         deletePending={deletePending}

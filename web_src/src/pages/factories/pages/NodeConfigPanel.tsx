@@ -1,12 +1,21 @@
-import type { ConfigurationField, IntegrationsIntegrationDefinition, SuperplaneComponentsNode } from "@/api-client";
+import type {
+  ConfigurationField,
+  IntegrationsIntegrationDefinition,
+  OrganizationsIntegration,
+  SuperplaneComponentsNode,
+} from "@/api-client";
 import { useComponents } from "@/hooks/useComponentData";
 import { useTriggers, useWidgets } from "@/hooks/useCanvasData";
-import { useAvailableIntegrations, useConnectedIntegrations } from "@/hooks/useIntegrations";
+import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { isAgentHarnessComponent } from "@/lib/agentRunnerSteps";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 import { SettingsTab } from "@/ui/componentSidebar/SettingsTab";
+import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { ChevronsRight } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useLocation } from "react-router";
 
+import { AgentRunnerSettings } from "./AgentRunnerSettings";
 import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 
 const PULL_REQUEST_TRIGGER = "github.onPullRequest";
@@ -46,14 +55,103 @@ type CatalogEntry = {
 export function NodeConfigPanel({
   node,
   organizationId,
+  factoryId,
+  factoryKey,
   onClose,
   onSave,
 }: {
   node: SuperplaneComponentsNode;
   organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
   onClose: () => void;
   onSave: (update: NodeConfigurationUpdate) => Promise<void> | void;
 }) {
+  const catalog = useNodeCatalog(node, organizationId);
+  const settings = nodeSettingsProps(node, catalog.definition);
+  const [connectOpen, setConnectOpen] = useState(false);
+
+  return (
+    <>
+      <aside
+        className="relative flex w-1/2 min-w-0 shrink-0 flex-col border-l border-border bg-background"
+        aria-label={catalog.nodeName}
+        data-testid="merge-confidence-config-form"
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={NODE_CONFIG_COPY.collapseStep}
+          data-testid="merge-confidence-config-form-collapse"
+          className="absolute top-5 left-0 z-10 flex h-8 w-7 -translate-x-[calc(100%-1px)] items-center justify-center rounded-l-md border border-r-0 border-border bg-background text-muted-foreground hover:bg-accent"
+        >
+          <ChevronsRight className="size-4" aria-hidden />
+        </button>
+        <header className="flex shrink-0 items-center px-10 pt-6">
+          <h2 className="truncate text-[15px] font-semibold text-foreground">{catalog.nodeName}</h2>
+        </header>
+        <div className="flex min-h-0 flex-1 flex-col">
+          {catalog.loading ? (
+            <p className="workspace-body-text px-10 py-6 text-muted-foreground">{NODE_CONFIG_COPY.loading}</p>
+          ) : isAgentHarnessComponent(node.component) ? (
+            <AgentRunnerSettings
+              node={node}
+              organizationId={organizationId}
+              factoryId={factoryId}
+              factoryKey={factoryKey}
+              onSave={onSave}
+            />
+          ) : (
+            <SettingsTab
+              layout="fill"
+              chrome={settings.chrome}
+              booleanControl={settings.booleanControl}
+              fieldGroups={settings.fieldGroups}
+              hiddenFieldNames={settings.hiddenFieldNames}
+              leadingContent={settings.leadingContent}
+              mode="edit"
+              nodeId={node.id}
+              nodeName={catalog.nodeName}
+              nodeLabel={catalog.definition?.label}
+              blockName={catalog.componentName}
+              configuration={settings.configuration}
+              configurationFields={settings.configurationFields}
+              integrationName={catalog.integrationName}
+              integrationRef={node.integration}
+              integrationDefinition={integrationDefinitionFields(catalog.integrationDefinition)}
+              integrations={catalog.integrations}
+              domainId={organizationId}
+              onOpenCreateIntegrationDialog={() => setConnectOpen(true)}
+              showConcurrency={catalog.showConcurrency}
+              concurrency={node.concurrency}
+              concurrencyMaxOnly={catalog.concurrencyMaxOnly}
+              onSave={(configuration, name, integration, concurrency) =>
+                onSave({
+                  nodeId: node.id ?? "",
+                  name,
+                  configuration,
+                  integration,
+                  concurrency,
+                })
+              }
+            />
+          )}
+        </div>
+      </aside>
+      {organizationId && catalog.integrationDefinition ? (
+        <StepIntegrationConnect
+          open={connectOpen}
+          onOpenChange={setConnectOpen}
+          organizationId={organizationId}
+          integration={catalog.integrationDefinition}
+          connectedIntegrations={catalog.integrations}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function useNodeCatalog(node: SuperplaneComponentsNode, organizationId?: string) {
   const componentName = node.component ?? "";
   const componentsQuery = useComponents(organizationId ?? "");
   const triggersQuery = useTriggers();
@@ -70,91 +168,121 @@ export function NodeConfigPanel({
     () => mergeCatalog(triggersQuery.data, availableIntegrations.data, triggersFromCapabilities),
     [availableIntegrations.data, triggersQuery.data],
   );
-  const catalogLoading =
-    isCatalogLoading(node, {
-      components: componentsQuery.isLoading,
-      triggers: triggersQuery.isLoading,
-      widgets: widgetsQuery.isLoading,
-    }) || availableIntegrations.isLoading;
   const definition = findCatalogEntry(node, {
     components,
     triggers,
     widgets: widgetsQuery.data,
   });
   const integrationName = integrationNameForComponent(availableIntegrations.data, componentName);
-  const integrationDefinition = availableIntegrations.data?.find((integration) => integration.name === integrationName);
-  const nodeName = node.name?.trim() || "Step";
-  const simplifiedPullRequest = node.component === PULL_REQUEST_TRIGGER;
-  const repositoryLabel = simplifiedPullRequest ? repositoryDisplay(node.configuration?.repository) : undefined;
+
+  return {
+    componentName,
+    definition,
+    integrationName,
+    integrationDefinition: availableIntegrations.data?.find((integration) => integration.name === integrationName),
+    integrations: connectedIntegrations.data ?? [],
+    nodeName: nodeDisplayName(node),
+    loading: catalogIsLoading(node, {
+      components: componentsQuery.isLoading,
+      triggers: triggersQuery.isLoading,
+      widgets: widgetsQuery.isLoading,
+      integrations: availableIntegrations.isLoading,
+    }),
+    showConcurrency: node.type === "TYPE_ACTION" && componentName !== "merge",
+    concurrencyMaxOnly: componentName === "loop",
+  };
+}
+
+function catalogIsLoading(
+  node: SuperplaneComponentsNode,
+  loading: { components: boolean; triggers: boolean; widgets: boolean; integrations: boolean },
+) {
+  if (loading.integrations) {
+    return true;
+  }
+  return isCatalogLoading(node, loading);
+}
+
+function nodeDisplayName(node: SuperplaneComponentsNode) {
+  const name = node.name?.trim();
+  if (!name) {
+    return "Step";
+  }
+  return name;
+}
+
+function nodeSettingsProps(node: SuperplaneComponentsNode, definition: CatalogEntry | undefined) {
+  const configuration = node.configuration ?? {};
+  if (node.component !== PULL_REQUEST_TRIGGER) {
+    return {
+      chrome: "full" as const,
+      booleanControl: "switch" as const,
+      fieldGroups: undefined,
+      hiddenFieldNames: undefined,
+      leadingContent: undefined,
+      configuration,
+      configurationFields: definition?.configuration ?? [],
+    };
+  }
+  return {
+    chrome: "fields" as const,
+    booleanControl: "checkbox" as const,
+    fieldGroups: PULL_REQUEST_FIELD_GROUPS,
+    hiddenFieldNames: PULL_REQUEST_HIDDEN_FIELDS,
+    leadingContent: repositoryLine(repositoryDisplay(configuration.repository)),
+    configuration,
+    configurationFields: presentPullRequestFields(definition?.configuration ?? [], configuration),
+  };
+}
+
+function repositoryLine(label: string | undefined) {
+  if (!label) {
+    return undefined;
+  }
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-sm font-medium text-foreground">{NODE_CONFIG_COPY.repository}</p>
+      <p className="text-sm text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+function StepIntegrationConnect({
+  open,
+  onOpenChange,
+  organizationId,
+  integration,
+  connectedIntegrations,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  organizationId: string;
+  integration: IntegrationsIntegrationDefinition;
+  connectedIntegrations: OrganizationsIntegration[];
+}) {
+  const createIntegration = useCreateIntegration(organizationId, "node_configuration");
+  const location = useLocation();
+  const existingNames = new Set(
+    connectedIntegrations.map((item) => item.metadata?.name).filter((name): name is string => Boolean(name)),
+  );
 
   return (
-    <aside
-      className="relative flex w-1/2 min-w-0 shrink-0 flex-col border-l border-border bg-background"
-      aria-label={nodeName}
-      data-testid="merge-confidence-config-form"
-    >
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label={NODE_CONFIG_COPY.collapseStep}
-        data-testid="merge-confidence-config-form-collapse"
-        className="absolute top-5 left-0 z-10 flex h-8 w-7 -translate-x-[calc(100%-1px)] items-center justify-center rounded-l-md border border-r-0 border-border bg-background text-muted-foreground hover:bg-accent"
-      >
-        <ChevronsRight className="size-4" aria-hidden />
-      </button>
-      <header className="flex shrink-0 items-center px-10 pt-6">
-        <h2 className="truncate text-[15px] font-semibold text-foreground">{nodeName}</h2>
-      </header>
-      <div className="flex min-h-0 flex-1 flex-col">
-        {catalogLoading ? (
-          <p className="workspace-body-text px-10 py-6 text-muted-foreground">{NODE_CONFIG_COPY.loading}</p>
-        ) : (
-          <SettingsTab
-            layout="fill"
-            chrome={simplifiedPullRequest ? "fields" : "full"}
-            booleanControl={simplifiedPullRequest ? "checkbox" : "switch"}
-            fieldGroups={simplifiedPullRequest ? PULL_REQUEST_FIELD_GROUPS : undefined}
-            hiddenFieldNames={simplifiedPullRequest ? PULL_REQUEST_HIDDEN_FIELDS : undefined}
-            leadingContent={
-              repositoryLabel ? (
-                <div className="flex flex-col gap-1.5">
-                  <p className="text-sm font-medium text-foreground">{NODE_CONFIG_COPY.repository}</p>
-                  <p className="text-sm text-muted-foreground">{repositoryLabel}</p>
-                </div>
-              ) : undefined
-            }
-            mode="edit"
-            nodeId={node.id}
-            nodeName={nodeName}
-            nodeLabel={definition?.label}
-            blockName={componentName}
-            configuration={node.configuration ?? {}}
-            configurationFields={
-              simplifiedPullRequest
-                ? presentPullRequestFields(definition?.configuration ?? [], node.configuration ?? {})
-                : (definition?.configuration ?? [])
-            }
-            integrationName={integrationName}
-            integrationRef={node.integration}
-            integrationDefinition={integrationDefinitionFields(integrationDefinition)}
-            integrations={connectedIntegrations.data ?? []}
-            domainId={organizationId}
-            showConcurrency={node.type === "TYPE_ACTION" && componentName !== "merge"}
-            concurrency={node.concurrency}
-            concurrencyMaxOnly={componentName === "loop"}
-            onSave={(configuration, name, integration, concurrency) =>
-              onSave({
-                nodeId: node.id ?? "",
-                name,
-                configuration,
-                integration,
-                concurrency,
-              })
-            }
-          />
-        )}
-      </div>
-    </aside>
+    <IntegrationCreateDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      integrationDefinition={integration}
+      organizationId={organizationId}
+      onCreateIntegration={async (payload) => {
+        const response = await createIntegration.mutateAsync(payload);
+        return response.data;
+      }}
+      onReset={() => createIntegration.reset()}
+      defaultName={integration.label || integration.name || ""}
+      existingIntegrationNames={existingNames}
+      setupReturnTo={`${location.pathname}${location.search}`}
+      integrationHomeHref={`/${organizationId}/settings/integrations`}
+      onCreated={() => onOpenChange(false)}
+    />
   );
 }
 
