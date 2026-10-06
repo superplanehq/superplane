@@ -5,6 +5,7 @@ import { eventTypesFromToggles, defaultNotificationTypeToggles } from "@/lib/not
 import { FactoriesHarness } from "../../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../../__fixtures__/factoryPageResponses";
 import { FactorySettingsLayout } from "../FactorySettingsLayout";
+import { AccountProfileAssociatedAccountsCard } from "./AccountProfileAssociatedAccountsCard";
 
 /**
  * Account settings pages in the live factory settings chrome.
@@ -24,6 +25,23 @@ const accountPath = (section: string) => `workspaces/${PRIMARY_FACTORY_KEY}/sett
 
 export const Profile: Story = {
   render: () => <FactoriesHarness pathSuffix={accountPath("profile")} factoriesFixture={defaultFactoriesFixture} />,
+};
+
+export const BitbucketLinkUnavailable: Story = {
+  name: "Bitbucket link unavailable",
+  render: () => (
+    <div className="max-w-xl bg-background p-6">
+      <AccountProfileAssociatedAccountsCard
+        githubAccounts={[]}
+        bitbucketAccounts={[]}
+        bitbucketLinkEnabled={false}
+        onLinkGithub={() => undefined}
+        onLinkBitbucket={() => undefined}
+        onRemoveGithub={() => undefined}
+        onRemoveBitbucket={() => undefined}
+      />
+    </div>
+  ),
 };
 
 export const Notifications: Story = {

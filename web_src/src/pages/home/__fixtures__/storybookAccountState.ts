@@ -66,6 +66,18 @@ export function createStorybookAccountState(orgId: string) {
       if (providerMatch) {
         return method === "DELETE" ? applyDisconnect(providerMatch[1]) : null;
       }
+      if (url.pathname === "/auth/config" && method === "GET") {
+        return {
+          json: {
+            providers: ["github", "google"],
+            connectProviders: ["bitbucket"],
+            passwordLoginEnabled: true,
+            signupEnabled: true,
+            signupsBlockedByEnvironment: false,
+            magicCodeEnabled: false,
+          },
+        };
+      }
       if (url.pathname !== "/account" || (method !== "GET" && method !== "PATCH")) {
         return null;
       }

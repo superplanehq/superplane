@@ -13,6 +13,7 @@ import {
   linkedAccountConnectHref,
   updateAccountEmail,
   updateAccountName,
+  type LinkableProvider,
 } from "@/lib/accountSettings";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -24,10 +25,39 @@ import { AccountSecurityRedesignPage } from "./account-profile-redesign/AccountS
 import { DeleteAccountDangerZone } from "./DeleteAccountDangerZone";
 import { useAccountSettingsAuthResults } from "./useAccountSettingsAuthResults";
 
-function linkedGitHubAccounts(linkedAccounts: AccountLinkedAccount[] | undefined) {
+function linkedProviderAccounts(linkedAccounts: AccountLinkedAccount[] | undefined, provider: LinkableProvider) {
   return (linkedAccounts ?? [])
-    .filter((account) => account.provider === "github" && account.provider_id && account.username.trim())
+    .filter((account) => account.provider === provider && account.provider_id && account.username.trim())
     .map((account) => ({ providerId: account.provider_id, username: account.username.trim() }));
+}
+
+function connectProviderEnabled(data: unknown, provider: string) {
+  if (!data || typeof data !== "object") {
+    return false;
+  }
+  const providers = (data as { connectProviders?: unknown }).connectProviders;
+  return Array.isArray(providers) && providers.includes(provider);
+}
+
+function useBitbucketLinkEnabled() {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/auth/config")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: unknown) => {
+        if (!cancelled) {
+          setEnabled(connectProviderEnabled(data, "bitbucket"));
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return enabled;
 }
 
 export function FactorySettingsAccountProfilePage() {
@@ -38,6 +68,7 @@ export function FactorySettingsAccountProfilePage() {
   const [passwordOpen, setPasswordOpen] = useState(false);
   const location = useAccountSettingsAuthResults(refreshAccount);
   const tokensPanel = usePersonalTokensPanel(organizationId);
+  const bitbucketLinkEnabled = useBitbucketLinkEnabled();
 
   useEffect(() => {
     if (account?.name) {
@@ -57,6 +88,17 @@ export function FactorySettingsAccountProfilePage() {
   }));
 
   const redirectPath = `${location.pathname}${location.search}`;
+  const removeLinkedAccount =
+    (provider: LinkableProvider, success: string, failure: string) => (providerId: string) => {
+      void disconnectLinkedAccount(provider, providerId)
+        .then(async () => {
+          await refreshAccount();
+          showSuccessToast(success);
+        })
+        .catch((error) => {
+          showErrorToast(getApiErrorMessage(error, failure));
+        });
+    };
 
   return (
     <>
@@ -95,20 +137,21 @@ export function FactorySettingsAccountProfilePage() {
         }}
         associatedAccounts={
           <AccountProfileAssociatedAccountsCard
-            githubAccounts={linkedGitHubAccounts(account.linked_accounts)}
+            githubAccounts={linkedProviderAccounts(account.linked_accounts, "github")}
+            bitbucketAccounts={linkedProviderAccounts(account.linked_accounts, "bitbucket")}
             onLinkGithub={() => {
               window.location.assign(linkedAccountConnectHref("github", redirectPath));
             }}
-            onRemoveGithub={(providerId) => {
-              void disconnectLinkedAccount("github", providerId)
-                .then(async () => {
-                  await refreshAccount();
-                  showSuccessToast("GitHub link removed.");
-                })
-                .catch((error) => {
-                  showErrorToast(getApiErrorMessage(error, "Failed to remove the GitHub link."));
-                });
+            onLinkBitbucket={() => {
+              window.location.assign(linkedAccountConnectHref("bitbucket", redirectPath));
             }}
+            onRemoveGithub={removeLinkedAccount("github", "GitHub link removed.", "Failed to remove the GitHub link.")}
+            onRemoveBitbucket={removeLinkedAccount(
+              "bitbucket",
+              "Bitbucket link removed.",
+              "Failed to remove the Bitbucket link.",
+            )}
+            bitbucketLinkEnabled={bitbucketLinkEnabled}
           />
         }
         security={
