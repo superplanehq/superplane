@@ -23,6 +23,7 @@ const WORKER_KEY_BY_LABEL: Record<string, keyof MonacoWorkers> = {
 };
 
 const ASSET_PATH_MARKER = "/assets/";
+const RELEASE_ASSET_PATH = /^\/releases\/[0-9a-f]{7,64}\/assets\/[A-Za-z0-9._~-]+$/;
 
 interface MonacoEnvironmentHost {
   MonacoEnvironment?: {
@@ -40,6 +41,10 @@ export function workerScriptUrl(scriptUrl: string, pageUrl: string): string {
   const worker = new URL(scriptUrl, page);
   if (worker.origin === page.origin) {
     return scriptUrl;
+  }
+
+  if (RELEASE_ASSET_PATH.test(worker.pathname)) {
+    return new URL(worker.pathname, page.origin).href;
   }
 
   const markerIndex = worker.pathname.indexOf(ASSET_PATH_MARKER);

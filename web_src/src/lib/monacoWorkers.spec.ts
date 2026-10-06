@@ -3,21 +3,32 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { setupMonacoEditor, workerScriptUrl, workerUrlForLabel, type MonacoWorkers } from "./monacoWorkers";
 
 const ASSET_HOST = "https://assets.superplane.com";
+const RELEASE_SHA = "1ac57e49e2cf11975bc1ece6eab40c3681b6dbf5";
+const OLD_RELEASE_SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const PRODUCTION_PAGE_URL = "https://app.superplane.com/superplane/workspaces/super-s1pniwje/task/741";
 const LOCAL_PAGE_URL = "http://localhost/";
 
 const workers: MonacoWorkers = {
-  editor: `${ASSET_HOST}/releases/sha/assets/editor.worker.js`,
-  json: `${ASSET_HOST}/releases/sha/assets/json.worker-abc.js`,
-  css: `${ASSET_HOST}/releases/sha/assets/css.worker.js`,
-  html: `${ASSET_HOST}/releases/sha/assets/html.worker.js`,
-  typescript: `${ASSET_HOST}/releases/sha/assets/ts.worker.js`,
+  editor: `${ASSET_HOST}/releases/${RELEASE_SHA}/assets/editor.worker.js`,
+  json: `${ASSET_HOST}/releases/${RELEASE_SHA}/assets/json.worker-abc.js`,
+  css: `${ASSET_HOST}/releases/${RELEASE_SHA}/assets/css.worker.js`,
+  html: `${ASSET_HOST}/releases/${RELEASE_SHA}/assets/html.worker.js`,
+  typescript: `${ASSET_HOST}/releases/${RELEASE_SHA}/assets/ts.worker.js`,
 };
 
 type StartedWorker = {
   scriptUrl: string | URL;
   options?: WorkerOptions;
 };
+
+function setPageUrl(url: string): void {
+  const happyDOM = (window as Window & { happyDOM?: { setURL?: (next: string) => void } }).happyDOM;
+  if (happyDOM?.setURL) {
+    happyDOM.setURL(url);
+    return;
+  }
+  window.history.replaceState(null, "", url);
+}
 
 function monacoEnvironment(): { getWorker: (workerId: string, label: string) => Worker } {
   const environment = (
@@ -64,9 +75,16 @@ describe("workerUrlForLabel", () => {
 });
 
 describe("workerScriptUrl", () => {
-  it("rewrites a cross-origin release URL to the page origin plus /assets/<file>", () => {
+  it("keeps the release path on the page origin", () => {
     expect(workerScriptUrl(workers.json, PRODUCTION_PAGE_URL)).toBe(
-      "https://app.superplane.com/assets/json.worker-abc.js",
+      "https://app.superplane.com/releases/1ac57e49e2cf11975bc1ece6eab40c3681b6dbf5/assets/json.worker-abc.js",
+    );
+  });
+
+  it("keeps an older release path on the page origin", () => {
+    const oldWorker = `${ASSET_HOST}/releases/${OLD_RELEASE_SHA}/assets/json.worker-old.js`;
+    expect(workerScriptUrl(oldWorker, PRODUCTION_PAGE_URL)).toBe(
+      "https://app.superplane.com/releases/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/assets/json.worker-old.js",
     );
   });
 
@@ -89,7 +107,7 @@ describe("setupMonacoEditor", () => {
     delete (globalThis as { MonacoEnvironment?: unknown }).MonacoEnvironment;
     restoreDouble?.();
     restoreDouble = undefined;
-    window.history.replaceState(null, "", LOCAL_PAGE_URL);
+    setPageUrl(LOCAL_PAGE_URL);
   });
 
   it("gives the loader the local editor", () => {
@@ -106,28 +124,58 @@ describe("setupMonacoEditor", () => {
     expect(configured).toEqual([editor, editor]);
   });
 
-  it("starts a cross-origin worker as a module from the page origin", () => {
-    window.history.replaceState(null, "", LOCAL_PAGE_URL);
+  it("starts a cross-origin worker as a module from the app host", () => {
+    setPageUrl(PRODUCTION_PAGE_URL);
     const doubles = installWorkerDouble();
     restoreDouble = doubles.restore;
 
     setupMonacoEditor(editor, loaderConfig(), workers);
     const { getWorker } = monacoEnvironment();
-    const labels = ["editor", "json", "css", "html", "typescript", "javascript", "yaml"] as const;
-    for (const label of labels) {
-      getWorker("workerMain.js", label);
-    }
+    getWorker("workerMain.js", "editor");
+    getWorker("workerMain.js", "json");
+    getWorker("workerMain.js", "css");
+    getWorker("workerMain.js", "html");
+    getWorker("workerMain.js", "typescript");
+    getWorker("workerMain.js", "javascript");
+    getWorker("workerMain.js", "yaml");
 
-    expect(doubles.started).toEqual(
-      labels.map((label) => ({
-        scriptUrl: workerScriptUrl(workerUrlForLabel(workers, label), LOCAL_PAGE_URL),
+    expect(doubles.started).toEqual([
+      {
+        scriptUrl:
+          "https://app.superplane.com/releases/1ac57e49e2cf11975bc1ece6eab40c3681b6dbf5/assets/editor.worker.js",
         options: { type: "module" },
-      })),
-    );
+      },
+      {
+        scriptUrl:
+          "https://app.superplane.com/releases/1ac57e49e2cf11975bc1ece6eab40c3681b6dbf5/assets/json.worker-abc.js",
+        options: { type: "module" },
+      },
+      {
+        scriptUrl: "https://app.superplane.com/releases/1ac57e49e2cf11975bc1ece6eab40c3681b6dbf5/assets/css.worker.js",
+        options: { type: "module" },
+      },
+      {
+        scriptUrl: "https://app.superplane.com/releases/1ac57e49e2cf11975bc1ece6eab40c3681b6dbf5/assets/html.worker.js",
+        options: { type: "module" },
+      },
+      {
+        scriptUrl: "https://app.superplane.com/releases/1ac57e49e2cf11975bc1ece6eab40c3681b6dbf5/assets/ts.worker.js",
+        options: { type: "module" },
+      },
+      {
+        scriptUrl: "https://app.superplane.com/releases/1ac57e49e2cf11975bc1ece6eab40c3681b6dbf5/assets/ts.worker.js",
+        options: { type: "module" },
+      },
+      {
+        scriptUrl:
+          "https://app.superplane.com/releases/1ac57e49e2cf11975bc1ece6eab40c3681b6dbf5/assets/editor.worker.js",
+        options: { type: "module" },
+      },
+    ]);
   });
 
   it("starts a same-origin worker as a module with its URL unchanged", () => {
-    window.history.replaceState(null, "", LOCAL_PAGE_URL);
+    setPageUrl(LOCAL_PAGE_URL);
     const doubles = installWorkerDouble();
     restoreDouble = doubles.restore;
     const sameOriginWorkers: MonacoWorkers = {
