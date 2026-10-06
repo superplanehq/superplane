@@ -26,6 +26,7 @@ export function useBitbucketOnboarding(organizationId: string, options: { poll?:
       if (options.poll === false) return false;
       const data = current.state.data;
       if (!data?.providerConfigured || !data.identity) return false;
+      if ((data.repositories ?? []).length > 0) return false;
       return bitbucketOnboardingPollIntervalMs;
     },
   });
