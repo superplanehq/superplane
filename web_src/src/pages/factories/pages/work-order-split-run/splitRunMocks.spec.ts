@@ -30,7 +30,7 @@ import {
 } from "../../__fixtures__/workOrderCheckFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { splitRunDecisionTone } from "./splitRunFooter";
-import { missingColumnAppCheckRuns, splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
+import { columnAppCheckRunsToDescribe, splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 
 function mergeConfidenceCheck(runId = "run-merge") {
@@ -2362,18 +2362,71 @@ describe("line board work-order examples", () => {
     expect(phase?.model).toBe("anthropic/claude-sonnet-4-6");
   });
 
-  it("describes only column-app check runs missing from the pull request", () => {
+  it("shows the described model when the linked pull request has tokens and cost but no models", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...OPEN_WORK_ORDER,
+        pullRequests: [
+          {
+            number: "12",
+            runs: [
+              {
+                totalTokens: "46200",
+                costCents: "45",
+                run: {
+                  id: "run-merge",
+                  canvasId: "app-merge",
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                  createdAt: "2026-08-26T11:00:00Z",
+                  finishedAt: "2026-08-26T11:18:08Z",
+                },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        demoArtifacts: false,
+        checks: [mergeConfidenceCheck()],
+        columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+        columnAppRuns: {
+          runsById: new Map([
+            [
+              "run-merge",
+              {
+                id: "run-merge",
+                canvasId: "app-merge",
+                state: "STATE_FINISHED",
+                result: "RESULT_PASSED",
+                createdAt: "2026-08-26T11:00:00Z",
+                finishedAt: "2026-08-26T11:18:08Z",
+                totalTokens: "46200",
+                costCents: "45",
+                models: ["anthropic/claude-sonnet-4-6"],
+              },
+            ],
+          ]),
+          loadingIds: new Set(),
+        },
+      },
+    );
+
+    expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")).toMatchObject({
+      duration: "18m 8s",
+      costCents: "45",
+      totalTokens: "46200",
+      model: "anthropic/claude-sonnet-4-6",
+    });
+  });
+
+  it("describes linked column-app check runs so the card can show the model", () => {
     const checks = [mergeConfidenceCheck(), { ...mergeConfidenceCheck(), id: "check-linked", runId: "run-linked" }];
     const columnApps = [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }];
-    const pullRequests = [
-      {
-        number: "12",
-        runs: [{ run: { id: "run-linked", canvasId: "app-merge", state: "STATE_FINISHED" as const } }],
-      },
-    ];
 
-    expect(missingColumnAppCheckRuns(columnApps, checks, pullRequests)).toEqual([
+    expect(columnAppCheckRunsToDescribe(columnApps, checks)).toEqual([
       { appId: "app-merge", runId: "run-merge" },
+      { appId: "app-merge", runId: "run-linked" },
     ]);
   });
 

@@ -117,6 +117,9 @@ func broadcastRunState(workflowID string, runID string, wsHub *ws.Hub) (uuid.UUI
 	var executions []models.CanvasNodeExecution
 	var queueItems []models.CanvasNodeQueueItem
 	var rootEvent models.CanvasEvent
+	var usageTotals models.UsageTotals
+	var usageModels []string
+	includeUsage := runBroadcastIncludesUsage(run.State)
 
 	var g errgroup.Group
 	g.Go(func() error {
@@ -153,6 +156,13 @@ func broadcastRunState(workflowID string, runID string, wsHub *ws.Hub) (uuid.UUI
 		return nil
 	})
 
+	if includeUsage {
+		g.Go(func() error {
+			usageTotals, usageModels = canvases.LoadCanvasRunUsage(database.Conn(), runUUID)
+			return nil
+		})
+	}
+
 	if err := g.Wait(); err != nil {
 		return uuid.Nil, "", err
 	}
@@ -180,7 +190,9 @@ func broadcastRunState(workflowID string, runID string, wsHub *ws.Hub) (uuid.UUI
 		return uuid.Nil, "", fmt.Errorf("failed to serialize run: %w", err)
 	}
 
-	canvases.AttachCanvasRunUsage(db, []*pb.CanvasRun{serializedRun})
+	if includeUsage {
+		canvases.ApplyCanvasRunUsage(serializedRun, usageTotals, usageModels)
+	}
 
 	serializedRunJSON, err := marshalCanvasRunJSON(serializedRun)
 	if err != nil {
@@ -199,6 +211,10 @@ func broadcastRunState(workflowID string, runID string, wsHub *ws.Hub) (uuid.UUI
 	log.Debugf("Broadcasted %s event to workflow %s", eventName, workflowID)
 
 	return runUUID, eventName, nil
+}
+
+func runBroadcastIncludesUsage(state string) bool {
+	return state == models.CanvasRunStateStarted || state == models.CanvasRunStateFinished
 }
 
 func groupChildRunsByExecutionID(runs []models.CanvasRun) map[string][]models.CanvasRun {

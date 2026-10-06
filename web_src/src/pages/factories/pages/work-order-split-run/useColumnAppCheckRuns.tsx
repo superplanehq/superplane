@@ -1,9 +1,9 @@
-import type { CanvasesCanvasRun, FactoriesFactoryPullRequest, FactoriesWorkOrderCheck } from "@/api-client";
+import type { CanvasesCanvasRun, FactoriesWorkOrderCheck } from "@/api-client";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { ColumnAppCheckRunQueries } from "./ColumnAppCheckRunQueries";
 import {
-  missingColumnAppCheckRuns,
+  columnAppCheckRunsToDescribe,
   type ColumnAppCanvasRunLookup,
   type ColumnAppCheckRunTarget,
   type SplitRunColumnApp,
@@ -20,19 +20,16 @@ type ColumnAppRunReport = {
 };
 
 /**
- * Describes each column-app check run that is missing from the pull request.
- * Callers render `queries` so each run id gets one `useDescribeRun` request.
- * Duration stays blank while a request is loading.
+ * Describes each column-app check run, including runs already linked on the
+ * pull request. Callers render `queries` so each run id gets one
+ * `useDescribeRun` request. Duration stays blank while an unlinked request
+ * is loading.
  */
 export function useColumnAppCheckRuns(
   checks: FactoriesWorkOrderCheck[] | undefined,
   columnApps: SplitRunColumnApp[],
-  pullRequests: FactoriesFactoryPullRequest[] | undefined,
 ): { lookup: ColumnAppCanvasRunLookup; queries: ReactNode } {
-  const targets = useMemo(
-    () => missingColumnAppCheckRuns(columnApps, checks, pullRequests),
-    [checks, columnApps, pullRequests],
-  );
+  const targets = useMemo(() => columnAppCheckRunsToDescribe(columnApps, checks), [checks, columnApps]);
   const [reports, setReports] = useState<Record<string, ColumnAppRunReport>>({});
   const reportRun = useCallback((runId: string, run: CanvasesCanvasRun | undefined, loading: boolean) => {
     setReports((current) => {

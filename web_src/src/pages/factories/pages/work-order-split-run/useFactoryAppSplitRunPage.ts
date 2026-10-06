@@ -71,7 +71,7 @@ function useSplitRunWorkOrderExtras(
   // popup copy and actions match the board card.
   const isAnalyzing = Boolean(orderId && analyzingOrderIds.has(orderId));
   const columnApps = useMemo(() => columnAppsFromFactoryApps(factoryApps), [factoryApps]);
-  const columnAppCheckRuns = useColumnAppCheckRuns(orderChecks, columnApps, pullRequests);
+  const columnAppCheckRuns = useColumnAppCheckRuns(orderChecks, columnApps);
   return {
     orderChecks,
     artifacts,

@@ -1216,7 +1216,7 @@ function LineBoardSplitRunPopup({
   const { resolveUser } = useOrgUserLookup(organizationId);
   const resolvedLineName = lineName?.trim();
   const columnApps = columnAppsFromFactoryApps(factoryApps);
-  const columnAppCheckRuns = useColumnAppCheckRuns(describedOrder?.checks, columnApps, peekPullRequests);
+  const columnAppCheckRuns = useColumnAppCheckRuns(describedOrder?.checks, columnApps);
   return (
     <>
       {columnAppCheckRuns.queries}

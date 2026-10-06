@@ -129,7 +129,7 @@ function useMobileTaskModel(
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
   const columnApps = columnAppsFromFactoryApps(apps);
-  const columnAppCheckRuns = useColumnAppCheckRuns(order.checks, columnApps, pullRequests);
+  const columnAppCheckRuns = useColumnAppCheckRuns(order.checks, columnApps);
 
   const fixture = splitRunFixtureForWorkOrder(order, {
     checks: order.checks,

@@ -433,8 +433,9 @@ export type SplitRunFixtureOptions = {
   /** Looks up an org member's display (name, initials, avatar) by id. */
   resolveUser?: OrgUserDisplayLookup;
   /**
-   * Canvas runs for column-app checks that are not on the pull request.
-   * Duration stays blank while a run id is still loading.
+   * Described canvas runs for column-app checks. A linked pull request has
+   * tokens and cost but no models, so those runs are described too.
+   * Duration stays blank while an unlinked run id is still loading.
    */
   columnAppRuns?: ColumnAppCanvasRunLookup;
 };
@@ -449,23 +450,22 @@ export type ColumnAppCheckRunTarget = {
   runId: string;
 };
 
-/** Column-app check runs that are not already linked on the pull request. */
-export function missingColumnAppCheckRuns(
+/**
+ * Column-app check runs that need DescribeRun. Linked pull-request entries
+ * have tokens and cost but no models, so they are included.
+ */
+export function columnAppCheckRunsToDescribe(
   columnApps: SplitRunColumnApp[],
   checks: FactoriesWorkOrderCheck[] | undefined,
-  pullRequests: FactoriesFactoryPullRequest[] | undefined,
 ): ColumnAppCheckRunTarget[] {
-  const missing: ColumnAppCheckRunTarget[] = [];
-  for (const [runId, runChecks] of columnAppChecksByRun(columnApps, checks)) {
-    if (canvasRunForCheck(runId, pullRequests)) {
-      continue;
-    }
+  const targets: ColumnAppCheckRunTarget[] = [];
+  for (const [, runChecks] of columnAppChecksByRun(columnApps, checks)) {
     const ref = columnAppCheckRef(runChecks[0]);
     if (ref) {
-      missing.push(ref);
+      targets.push(ref);
     }
   }
-  return missing;
+  return targets;
 }
 
 export function splitRunFixtureForWorkOrder(

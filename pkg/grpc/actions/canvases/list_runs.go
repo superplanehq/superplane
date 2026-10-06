@@ -435,11 +435,29 @@ func AttachCanvasRunUsage(db *gorm.DB, runs []*pb.CanvasRun) {
 		if err != nil {
 			continue
 		}
-		usage := usageByRun[id]
-		run.TotalTokens = usage.TotalTokens
-		run.CostCents = usage.CostCents()
-		run.Models = modelsByRun[id]
+		ApplyCanvasRunUsage(run, usageByRun[id], modelsByRun[id])
 	}
+}
+
+func LoadCanvasRunUsage(db *gorm.DB, runID uuid.UUID) (models.UsageTotals, []string) {
+	usageByRun, modelsByRun, err := models.SumUsageAndModelsForRunTrees(db, []uuid.UUID{runID})
+	if err != nil {
+		log.WithError(err).Warnf(
+			"canvas run usage rollup unavailable for run %s, returning zero usage",
+			runID,
+		)
+		return models.UsageTotals{}, nil
+	}
+	return usageByRun[runID], modelsByRun[runID]
+}
+
+func ApplyCanvasRunUsage(run *pb.CanvasRun, usage models.UsageTotals, modelNames []string) {
+	if run == nil {
+		return
+	}
+	run.TotalTokens = usage.TotalTokens
+	run.CostCents = usage.CostCents()
+	run.Models = modelNames
 }
 
 func serializeCanvasRuns(
