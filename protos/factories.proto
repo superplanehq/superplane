@@ -1544,6 +1544,7 @@ message FactoryPullRequestRun {
   int64 total_tokens = 3;
   int64 cost_cents = 4;
   Superplane.Canvases.CanvasRunRef run = 5;
+  repeated string models = 6;
 }
 
 message FactoryPullRequestRevision {
@@ -1563,6 +1564,7 @@ message FactoryPullRequestActivity {
   optional int32 attempt_limit = 8;
   int64 total_tokens = 9;
   int64 cost_cents = 10;
+  repeated string models = 11;
 }
 
 message FactoryPullRequest {
