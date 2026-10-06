@@ -16,6 +16,8 @@ export const MOBILE_BOARD_COPY = {
   switchLine: "Switch line",
   lines: "Lines",
   loadingMore: "Loading more",
+  loadMoreError: "SuperPlane could not load more tasks.",
+  loadMoreRetry: "Try again",
 } as const;
 
 export const MOBILE_SETTINGS_COPY = {

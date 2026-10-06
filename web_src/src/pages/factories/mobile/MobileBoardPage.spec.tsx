@@ -21,7 +21,12 @@ import {
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { MobileBoardPage } from "./MobileBoardPage";
 
-const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
+const idleBoardPage = () => ({
+  hasNextPage: false,
+  isFetchingNextPage: false,
+  isFetchNextPageError: false,
+  fetchNextPage: vi.fn(),
+});
 const boardWorkOrders = vi.fn((): FactoriesWorkOrder[] => []);
 const backlogPage = vi.fn(idleBoardPage);
 const openPage = vi.fn(idleBoardPage);
@@ -233,8 +238,18 @@ describe("MobileBoardPage", () => {
     const user = userEvent.setup();
     const fetchDone = vi.fn();
     const fetchBacklog = vi.fn();
-    backlogPage.mockReturnValue({ hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fetchBacklog });
-    donePage.mockReturnValue({ hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fetchDone });
+    backlogPage.mockReturnValue({
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      fetchNextPage: fetchBacklog,
+    });
+    donePage.mockReturnValue({
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      fetchNextPage: fetchDone,
+    });
     renderBoard();
 
     const done = screen.getByTestId("mobile-board-column-done");
@@ -263,7 +278,12 @@ describe("MobileBoardPage", () => {
         lineDispatches: [],
       },
     ]);
-    backlogPage.mockReturnValue({ hasNextPage: true, isFetchingNextPage: false, fetchNextPage });
+    backlogPage.mockReturnValue({
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      fetchNextPage,
+    });
     renderBoard();
 
     const backlog = screen.getByTestId("mobile-board-column-backlog");
@@ -285,7 +305,12 @@ describe("MobileBoardPage", () => {
           lineDispatches: [],
         },
       ]);
-      backlogPage.mockReturnValue({ hasNextPage: true, isFetchingNextPage: false, fetchNextPage });
+      backlogPage.mockReturnValue({
+        hasNextPage: true,
+        isFetchingNextPage: false,
+        isFetchNextPageError: false,
+        fetchNextPage,
+      });
       renderBoard();
 
       const list = screen.getByTestId("mobile-board-column-scroll-backlog");
@@ -308,7 +333,12 @@ describe("MobileBoardPage", () => {
 
   it("shows a loading spinner only while the next page loads", () => {
     const fetchNextPage = vi.fn();
-    backlogPage.mockReturnValue({ hasNextPage: true, isFetchingNextPage: true, fetchNextPage });
+    backlogPage.mockReturnValue({
+      hasNextPage: true,
+      isFetchingNextPage: true,
+      isFetchNextPageError: false,
+      fetchNextPage,
+    });
     const view = renderBoard();
 
     const backlog = screen.getByTestId("mobile-board-column-backlog");
@@ -319,11 +349,71 @@ describe("MobileBoardPage", () => {
     expect(within(backlog).queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
     expect(fetchNextPage).not.toHaveBeenCalled();
 
-    backlogPage.mockReturnValue({ hasNextPage: true, isFetchingNextPage: false, fetchNextPage });
+    backlogPage.mockReturnValue({
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      fetchNextPage,
+    });
     view.rerender(boardElement());
 
     expect(screen.queryByRole("status", { name: "Loading more" })).not.toBeInTheDocument();
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops automatic loads after a page error until the user retries", async () => {
+    const user = userEvent.setup();
+    const fetchNextPage = vi.fn();
+    const observers: ResizeObserverCallback[] = [];
+    const originalObserver = globalThis.ResizeObserver;
+    class ImmediateResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        observers.push(callback);
+      }
+      observe() {
+        observers.at(-1)?.([], this as unknown as ResizeObserver);
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    globalThis.ResizeObserver = ImmediateResizeObserver as unknown as typeof ResizeObserver;
+
+    try {
+      boardWorkOrders.mockReturnValue([
+        {
+          id: "wo-draft",
+          number: "42",
+          title: "Fix refund rounding",
+          state: "STATE_DRAFT",
+          lineDispatches: [],
+        },
+      ]);
+      backlogPage.mockReturnValue({
+        hasNextPage: true,
+        isFetchingNextPage: false,
+        isFetchNextPageError: true,
+        fetchNextPage,
+      });
+      const view = renderBoard();
+      const backlog = screen.getByTestId("mobile-board-column-backlog");
+
+      expect(fetchNextPage).not.toHaveBeenCalled();
+      expect(within(backlog).getByRole("alert")).toHaveTextContent("SuperPlane could not load more tasks.");
+      expect(within(backlog).queryByRole("status", { name: "Loading more" })).not.toBeInTheDocument();
+
+      fireEvent.scroll(within(backlog).getByTestId("mobile-board-column-scroll-backlog"));
+      observers.at(-1)?.([], {} as ResizeObserver);
+      expect(fetchNextPage).not.toHaveBeenCalled();
+
+      await user.click(within(backlog).getByRole("button", { name: "Try again" }));
+      expect(fetchNextPage).toHaveBeenCalledTimes(1);
+
+      view.rerender(boardElement());
+      observers.at(-1)?.([], {} as ResizeObserver);
+      expect(fetchNextPage).toHaveBeenCalledTimes(1);
+    } finally {
+      globalThis.ResizeObserver = originalObserver;
+    }
   });
 
   it("opens the closed-task dialog from a status that needs it", async () => {
