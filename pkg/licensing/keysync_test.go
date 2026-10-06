@@ -264,6 +264,7 @@ func TestKeysURLFromEnvironment(t *testing.T) {
 		"":                            licensing.DefaultKeysURL,
 		"none":                        "",
 		"https://mirror.example/keys": "https://mirror.example/keys",
+		"http://127.0.0.1:8100/keys":  "http://127.0.0.1:8100/keys",
 	}
 	for value, want := range cases {
 		t.Setenv(licensing.KeysURLEnv, value)

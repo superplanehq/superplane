@@ -33,9 +33,11 @@ the list version is newer than the list already trusted. The accepted list is
 stored in the database. A failed download leaves that list in place.
 
 The default list URL is `https://licensing.superplane.com/.well-known/license-keys.jws`.
-`SUPERPLANE_LICENSE_KEYS_URL` selects another `https` URL. Set it to `none` to
-turn downloads off. An installation administrator can upload a signed list when
-the installation cannot download one.
+`SUPERPLANE_LICENSE_KEYS_URL` selects another `http` or `https` URL, including
+a local issuer. Set it to `none` to turn downloads off. A plain HTTP URL is
+accepted because the list must still verify with an embedded root. An
+installation administrator can upload a signed list when the installation
+cannot download one.
 
 `pkg/licensing/trustedkeys/license-keys.jws` is the list shipped with a
 release. After a reviewed change to the trust anchor, run
