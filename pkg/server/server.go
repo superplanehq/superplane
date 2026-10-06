@@ -849,13 +849,19 @@ func Start() {
 }
 
 func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {
-	keys, err := licensing.TrustedKeySet()
+	extraKeys, source := developmentLicense(licensing.SourceFromEnvironment(encryptor))
+	keys, err := licensing.TrustedKeyStore(extraKeys)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load trusted license keys: %v", err))
 	}
 
-	keys, source := developmentLicense(keys, licensing.SourceFromEnvironment(encryptor))
-	service := licensing.NewService(licensing.NewVerifier(keys), source)
+	keysURL, err := licensing.KeysURLFromEnvironment()
+	if err != nil {
+		panic(fmt.Sprintf("failed to configure license key sync: %v", err))
+	}
+
+	keySync := licensing.NewKeySync(keys, licensing.DatabaseKeyListCache{}, keysURL)
+	service := licensing.NewService(licensing.NewVerifier(keys), source, licensing.WithKeySync(keySync))
 	service.Start(context.Background())
 	return service
 }
