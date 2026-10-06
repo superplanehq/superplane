@@ -1,7 +1,7 @@
 import { GitBranch, Info, LayoutGrid, Ticket, type LucideIcon } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { INTAKE_CATEGORIES, INTAKE_STATUSES, type IntakeCategory } from "@/lib/intakeCatalog";
+import { INTAKE_CATEGORIES, INTAKE_STATUSES, type IntakeCategory, type IntakeStatus } from "@/lib/intakeCatalog";
 import { intakeSurfaces, type IntakeSurface } from "@/lib/intakePresentation";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
@@ -48,6 +48,52 @@ export function StatusGuide() {
         </table>
       </PopoverContent>
     </Popover>
+  );
+}
+
+interface StatusRailProps {
+  counts: Record<IntakeStatus, number>;
+  total: number;
+  selected: IntakeStatus | null;
+  onSelect: (status: IntakeStatus | null) => void;
+}
+
+export function StatusRail({ counts, total, selected, onSelect }: StatusRailProps) {
+  const items: { value: IntakeStatus | null; label: string; count: number }[] = [
+    { value: null, label: "All statuses", count: total },
+    ...INTAKE_STATUSES.map((status) => ({
+      value: status,
+      label: INTAKE_STATUS_INFO[status].label,
+      count: counts[status],
+    })),
+  ];
+
+  return (
+    <nav aria-label="Statuses" className="flex flex-col gap-0.5">
+      <p className="px-2 pb-2 text-[11px] font-semibold tracking-wide text-slate-400 uppercase dark:text-gray-500">
+        Statuses
+      </p>
+      {items.map((item) => {
+        const active = selected === item.value;
+        return (
+          <button
+            key={item.label}
+            type="button"
+            aria-current={active ? "true" : undefined}
+            onClick={() => onSelect(item.value)}
+            className={cn(
+              "flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
+              active
+                ? "bg-white font-medium text-slate-900 shadow-xs ring-1 ring-slate-200 dark:bg-gray-800 dark:text-gray-100 dark:ring-gray-700"
+                : "text-slate-600 hover:bg-white/70 dark:text-gray-300 dark:hover:bg-gray-800/60",
+            )}
+          >
+            {item.value ? <IntakeStatusPill status={item.value} withTooltip={false} /> : <span>{item.label}</span>}
+            <span className="text-xs text-slate-400 tabular-nums dark:text-gray-500">{item.count}</span>
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
