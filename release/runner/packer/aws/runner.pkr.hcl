@@ -15,6 +15,24 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "vpc_id" {
+  type        = string
+  description = "VPC for the temporary build instance. Empty uses the account default VPC."
+  default     = ""
+}
+
+variable "subnet_id" {
+  type        = string
+  description = "Subnet for the temporary build instance. Set this together with vpc_id."
+  default     = ""
+}
+
+variable "source_revision" {
+  type        = string
+  description = "SuperPlane revision recorded on the AMI."
+  default     = "local"
+}
+
 variable "ami_name_prefix" {
   type        = string
   description = "Prefix for the AMI names."
@@ -70,8 +88,11 @@ locals {
 }
 
 source "amazon-ebs" "ubuntu" {
-  region        = var.aws_region
-  instance_type = var.instance_type
+  region                      = var.aws_region
+  instance_type               = var.instance_type
+  vpc_id                      = var.vpc_id != "" ? var.vpc_id : null
+  subnet_id                   = var.subnet_id != "" ? var.subnet_id : null
+  associate_public_ip_address = var.subnet_id != "" ? true : null
 
   source_ami_filter {
     filters = {
@@ -96,10 +117,11 @@ source "amazon-ebs" "ubuntu" {
   ami_description = "SuperPlane runner AMI for linux/${var.architecture}, built ${local.timestamp}"
 
   tags = {
-    Architecture = var.architecture
-    ManagedBy    = "packer"
-    Name         = "${var.ami_name_prefix}-${var.architecture}"
-    OS           = "ubuntu-24.04"
+    Architecture   = var.architecture
+    ManagedBy      = "packer"
+    Name           = "${var.ami_name_prefix}-${var.architecture}"
+    OS             = "ubuntu-24.04"
+    SourceRevision = var.source_revision
   }
 }
 
