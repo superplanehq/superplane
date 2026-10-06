@@ -182,6 +182,7 @@ function ModelThinkingSelect({
   onCommit: (model: string, thinkingLevel: string) => void;
 }) {
   const selectedLabel = options.find((option) => option.value === model)?.label || model || placeholder;
+  const thinkingLabel = THINKING_LEVELS.find((level) => level.value === thinkingLevel)?.label ?? "Default";
   const modelListTestId = fieldName ? toTestId(`field-${fieldName}-hosted-model-list`) : undefined;
   const thinkingTestId = fieldName ? toTestId(`field-${fieldName}-hosted-thinking`) : undefined;
 
@@ -193,9 +194,10 @@ function ModelThinkingSelect({
           variant="outline"
           disabled={readOnly}
           data-testid={fieldName ? toTestId(`field-${fieldName}-hosted-model`) : undefined}
-          className="h-8 w-full justify-between px-2.5 font-normal shadow-xs"
+          className="h-8 w-full justify-between !rounded-md border-gray-300 bg-white px-2.5 font-normal shadow-xs dark:border-gray-600/70 dark:bg-gray-800"
         >
-          <span className="truncate">{selectedLabel}</span>
+          <span className="min-w-0 truncate">{selectedLabel}</span>
+          <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{thinkingLabel}</span>
           <ChevronDown className="size-4 opacity-50" aria-hidden />
         </Button>
       </DropdownMenuTrigger>

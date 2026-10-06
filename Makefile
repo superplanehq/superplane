@@ -368,6 +368,10 @@ check.lint.ui.baseline.update:
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
 
+# Release step. It reads the live issuer key list, so CI does not run it.
+license.keys.update:
+	$(COMPOSE) exec app go run ./scripts/update_license_keys.go
+
 check.generated.artifacts:
 	@tracked="$$(git ls-files -- $(GENERATED_ARTIFACT_PATHS))"; \
 	if [ -n "$$tracked" ]; then \

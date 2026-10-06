@@ -67,6 +67,18 @@ encryption:
   secretName: ""
   key: ""
 
+#
+# Optional Enterprise license from an existing Kubernetes secret. When set,
+# the mounted file is the only license source and administrators cannot
+# change the license in the UI. Leave empty to install the license in the UI.
+#
+license:
+  secretName: ""
+  secretKey: "license.jws"
+  # URL of the signed license key list. Use "none" without network access.
+  # Leave empty to use the SuperPlane issuer.
+  keysURL: ""
+
 telemetry:
   secretName: ""
   opentelemetry:

@@ -124,6 +124,40 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 			assert.NotEqual(t, "setWorkOrderStatusNote", node.ComponentName())
 		}
 	})
+
+	t.Run("keeps an installed checks graph that still looks up the pull request", func(t *testing.T) {
+		trigger := triggerNode(prFeedbackPullRequestTriggerNodeID, "github.onPullRequest")
+		trigger.Configuration = map[string]any{"repository": "acme/app"}
+		spec := models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				trigger,
+				componentNode(prFeedbackFindNodeID, prFeedbackFindComponent),
+				componentNode(prFeedbackActivityNodeID, prFeedbackActivityComponent),
+				componentNode(prFeedbackWaitChecksNodeID, prFeedbackWaitChecksComponent),
+				componentNode(prFeedbackMarkPassedNodeID, prFeedbackUpdateActivityComponent),
+				componentNode(prFeedbackStartRepairNodeID, prFeedbackUpdateActivityComponent),
+				componentNode(prFeedbackRunnerNodeID, "runnerClaudeCode"),
+				componentNode(prFeedbackPauseFixesNodeID, prFeedbackUpdateActivityComponent),
+				componentNode(prFeedbackStopWaitingNodeID, prFeedbackUpdateActivityComponent),
+				componentNode(prFeedbackRecordTimeoutNodeID, prFeedbackAddRunErrorComponent),
+			},
+			Edges: []models.Edge{
+				{SourceID: prFeedbackPullRequestTriggerNodeID, TargetID: prFeedbackFindNodeID, Channel: "default"},
+				{SourceID: prFeedbackFindNodeID, TargetID: prFeedbackActivityNodeID, Channel: "found"},
+				{SourceID: prFeedbackActivityNodeID, TargetID: prFeedbackWaitChecksNodeID, Channel: "default"},
+				{SourceID: prFeedbackWaitChecksNodeID, TargetID: prFeedbackMarkPassedNodeID, Channel: "passed"},
+				{SourceID: prFeedbackWaitChecksNodeID, TargetID: prFeedbackStartRepairNodeID, Channel: "failed"},
+				{SourceID: prFeedbackWaitChecksNodeID, TargetID: prFeedbackStopWaitingNodeID, Channel: "timedOut"},
+				{SourceID: prFeedbackStartRepairNodeID, TargetID: prFeedbackRunnerNodeID, Channel: "default"},
+				{SourceID: prFeedbackStartRepairNodeID, TargetID: prFeedbackPauseFixesNodeID, Channel: "limitReached"},
+				{SourceID: prFeedbackStopWaitingNodeID, TargetID: prFeedbackRecordTimeoutNodeID, Channel: "default"},
+			},
+		}
+
+		graph := resolvePRFeedbackGraph(spec)
+		assert.Equal(t, prFeedbackFindNodeID, graph.FindNodeID)
+		assert.True(t, graph.Healthy(spec))
+	})
 }
 
 func Test__BuildPRFeedbackCanvas(t *testing.T) {
@@ -360,8 +394,7 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		})
 
 		assert.Equal(t, []string{
-			"default:" + prFeedbackPullRequestTriggerNodeID + "->" + prFeedbackFindNodeID,
-			"found:" + prFeedbackFindNodeID + "->" + prFeedbackActivityNodeID,
+			"default:" + prFeedbackPullRequestTriggerNodeID + "->" + prFeedbackActivityNodeID,
 			"default:" + prFeedbackActivityNodeID + "->" + prFeedbackWaitChecksNodeID,
 			"passed:" + prFeedbackWaitChecksNodeID + "->" + prFeedbackMarkPassedNodeID,
 			"failed:" + prFeedbackWaitChecksNodeID + "->" + prFeedbackStartRepairNodeID,
@@ -372,6 +405,7 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		}, yamlEdgeChannels(canvas))
 
 		activity := findSpecNode(t, canvas, prFeedbackActivityNodeID)
+		assert.Equal(t, `{{ root().data.pullRequest.id }}`, activity.Configuration["pullRequestId"])
 		assert.Equal(t, "concurrent", activity.Configuration["access"])
 		assert.Equal(t, prFeedbackPRHeadSHAExpression(), activity.Configuration["revision"])
 		assert.Equal(t, prFeedbackChecksWaitingTitleExpression(), activity.Configuration["title"])

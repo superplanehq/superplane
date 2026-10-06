@@ -33,6 +33,7 @@ import (
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/llm"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -513,6 +514,7 @@ func startPublicAPI(
 	jwtSigner *jwt.Signer,
 	oidcProvider oidc.Provider,
 	authService authorization.Authorization,
+	licenseService *licensing.Service,
 	grpcServices *grpc.Services,
 	activeLogStoreName string,
 ) {
@@ -539,6 +541,8 @@ func startPublicAPI(
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}
+
+	server.SetLicenseService(licenseService)
 
 	// Start the EventDistributer worker if enabled
 	if os.Getenv("START_EVENT_DISTRIBUTER") == "yes" {
@@ -699,6 +703,8 @@ func Start() {
 		log.WithError(err).Error("development hosted OpenRouter seed skipped")
 	}
 
+	licenseService := startLicenseService(encryptorInstance)
+
 	authService, err := authorization.NewAuthService()
 	if err != nil {
 		log.Fatalf("failed to create auth service: %v", err)
@@ -820,6 +826,7 @@ func Start() {
 			jwtSigner,
 			oidcProvider,
 			authService,
+			licenseService,
 			grpcServices,
 			activeLogStoreName,
 		)
@@ -839,6 +846,24 @@ func Start() {
 	log.Println("SuperPlane is UP.")
 
 	select {}
+}
+
+func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {
+	extraKeys, source := developmentLicense(licensing.SourceFromEnvironment(encryptor))
+	keys, err := licensing.TrustedKeyStore(extraKeys)
+	if err != nil {
+		panic(fmt.Sprintf("failed to load trusted license keys: %v", err))
+	}
+
+	keysURL, err := licensing.KeysURLFromEnvironment()
+	if err != nil {
+		panic(fmt.Sprintf("failed to configure license key sync: %v", err))
+	}
+
+	keySync := licensing.NewKeySync(keys, licensing.DatabaseKeyListCache{}, keysURL)
+	service := licensing.NewService(licensing.NewVerifier(keys), source, licensing.WithKeySync(keySync))
+	service.Start(context.Background())
+	return service
 }
 
 // getWebhookBaseURL returns the webhook base URL, using the same pattern as SyncContext.

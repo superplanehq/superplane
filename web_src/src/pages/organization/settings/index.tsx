@@ -387,7 +387,12 @@ export function OrganizationSettings() {
       </Sidebar>
 
       <div className={cn("flex-1 overflow-auto bg-slate-100 [scrollbar-gutter:stable]", appDarkModeClasses.surface)}>
-        <div className={cn("mx-auto w-full px-8 pb-8", isIntegrationSetupRoute ? "max-w-6xl" : "max-w-3xl")}>
+        <div
+          className={cn(
+            "mx-auto w-full px-8 pb-8",
+            isIntegrationSetupRoute || currentSection === "members" ? "max-w-6xl" : "max-w-3xl",
+          )}
+        >
           <div className="pt-10 pb-8">
             <h1 className={cn("!text-2xl font-medium text-gray-900", appDarkModeClasses.textPrimary)}>
               {activeMeta.title}

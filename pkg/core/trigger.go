@@ -143,6 +143,7 @@ type WebhookRequestContext struct {
 	Webhook       NodeWebhookContext
 	Events        EventContext
 	Integration   IntegrationContext
+	Factory       FactoryContext
 
 	//
 	// Return an execution context for a given execution,

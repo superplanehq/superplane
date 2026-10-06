@@ -7,9 +7,6 @@ spec:
   edges:
     - channel: default
       sourceId: on-pr-risk
-      targetId: find-pull-request
-    - channel: found
-      sourceId: find-pull-request
       targetId: assess-risk
   nodes:
     - id: on-pr-risk
@@ -23,22 +20,10 @@ spec:
           - reopened
           - ready_for_review
         ignoreDrafts: true
+        onlyFactoryPullRequests: true
         repository: '{{ install_params.appRepository }}'
       position:
         x: 80
-        "y": 80
-      isCollapsed: true
-    - id: find-pull-request
-      name: Find Pull Request
-      type: TYPE_ACTION
-      component: findPullRequest
-      configuration:
-        provider: github
-        repository: "{{ root().data.repository.full_name }}"
-        number: "{{ root().data.pull_request.number }}"
-        url: "{{ root().data.pull_request.html_url }}"
-      position:
-        x: 360
         "y": 80
       isCollapsed: true
     - id: assess-risk
@@ -72,7 +57,7 @@ spec:
             value: "{{ root().data.pull_request.base.ref }}"
             valueSource: literal
           - name: SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID
-            value: '{{ $["Find Pull Request"].data.workOrder.id }}'
+            value: '{{ root().data.workOrder.id }}'
             valueSource: literal
         steps:
           - name: Checkout Pull Request
@@ -108,8 +93,8 @@ spec:
               Head SHA: {{ root().data.pull_request.head.sha }}
 
               The original task is the intent for this change.
-              Task title: {{ $["Find Pull Request"].data.workOrder.title }}
-              Task description: {{ $["Find Pull Request"].data.workOrder.description }}
+              Task title: {{ root().data.workOrder.title }}
+              Task description: {{ root().data.workOrder.description }}
 
               Report each enabled check with the report_merge_check tool.
               Call the tool once for every check named in Enabled checks.

@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -87,6 +88,11 @@ func TestCreateTagsAWSResourcesWithRunnerIdentity(t *testing.T) {
 	}
 	if aws.ToString(input.SubnetId) != "subnet-a" {
 		t.Fatalf("subnet = %q", aws.ToString(input.SubnetId))
+	}
+	if input.MetadataOptions == nil ||
+		input.MetadataOptions.HttpTokens != types.HttpTokensStateRequired ||
+		aws.ToInt32(input.MetadataOptions.HttpPutResponseHopLimit) != 2 {
+		t.Fatalf("metadata options = %#v", input.MetadataOptions)
 	}
 	if got, err := base64.StdEncoding.DecodeString(aws.ToString(input.UserData)); err != nil || string(got) != "#!/bin/bash\n" {
 		t.Fatalf("user data = %q, err = %v", got, err)
@@ -192,7 +198,7 @@ func TestCreateRetriesNextSubnetWhenAWSCapacityIsUnavailable(t *testing.T) {
 	}
 }
 
-func TestBuildBootstrapUsesPublicArtifactAndExactVersion(t *testing.T) {
+func TestBuildBootstrapUsesPublicArtifactAndConfiguresCloudWatch(t *testing.T) {
 	awsProvider := newTestProvider(t, &fakeEC2{})
 	script, err := awsProvider.BuildBootstrap(provider.RunnerBootstrap{
 		RunnerID:          "runner-1",
@@ -213,6 +219,14 @@ func TestBuildBootstrapUsesPublicArtifactAndExactVersion(t *testing.T) {
 		"sha256sum --check --strict",
 		"--extract",
 		"--gzip",
+		"StandardOutput=append:/var/log/superplane-runner.log",
+		"StandardError=append:/var/log/superplane-runner.log",
+		"amazon-cloudwatch-agent-ctl",
+		`"region":"us-east-1"`,
+		`"log_group_name":"/superplane/runners"`,
+		`"log_stream_name":"{instance_id}"`,
+		"configure_cloudwatch()",
+		"CloudWatch Agent setup failed; runner installation will continue",
 		"set +x",
 		`RUNNER_API_URL="https://superplane.example" \`,
 		`RUNNER_REGISTRATION_TOKEN="short-lived-registration-token" \`,
@@ -221,6 +235,16 @@ func TestBuildBootstrapUsesPublicArtifactAndExactVersion(t *testing.T) {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("bootstrap does not contain %q:\n%s", expected, body)
 		}
+	}
+	agentStart := strings.Index(body, "amazon-cloudwatch-agent-ctl")
+	runnerStart := strings.Index(body, `"$bundle_dir/install.sh"`)
+	if agentStart == -1 || runnerStart == -1 || agentStart > runnerStart {
+		t.Fatalf("CloudWatch Agent must start before the runner:\n%s", body)
+	}
+	command := exec.Command("bash", "-n")
+	command.Stdin = strings.NewReader(body)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("bootstrap shell syntax: %v\n%s", err, output)
 	}
 }
 
@@ -245,6 +269,8 @@ func newTestProvider(t *testing.T, client EC2API) *Provider {
 		SecurityGroupIDs:   []string{"sg-a"},
 		IAMInstanceProfile: "runner-profile",
 		ResourceTags:       map[string]string{"Environment": "production"},
+		CloudWatchRegion:   "us-east-1",
+		CloudWatchLogGroup: "/superplane/runners",
 	}, nil)
 	if err != nil {
 		t.Fatal(err)

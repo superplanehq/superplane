@@ -8,6 +8,7 @@ import type { AgentStep } from "./automationsViewModel";
 export function activityFromAgentStep(step: AgentStep): AgentActivity | undefined {
   const items: AgentActivityItem[] = [];
   const status = activityStatus(step.status);
+  const commandStatus = step.type === "prompt" ? activityStatus(step.promptStatus ?? step.status) : status;
 
   const command = bashCommandFromStep(step);
   if (command) {
@@ -19,7 +20,7 @@ export function activityFromAgentStep(step: AgentStep): AgentActivity | undefine
       input: command.script,
       output: command.stdout,
       outputStreams: [],
-      status,
+      status: commandStatus,
       durationMs: stepDurationMs(step.duration),
       truncated: false,
     });

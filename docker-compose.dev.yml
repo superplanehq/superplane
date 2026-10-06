@@ -143,6 +143,10 @@ services:
       POLAR_ENVIRONMENT: ${POLAR_ENVIRONMENT:-sandbox}
       POLAR_WEBHOOK_SECRET: ${POLAR_WEBHOOK_SECRET:-}
       POLAR_API_VERSION: ${POLAR_API_VERSION:-}
+      SUPERPLANE_LICENSE_PATH: ${SUPERPLANE_LICENSE_PATH:-}
+      SUPERPLANE_LICENSE_KEYS_URL: ${SUPERPLANE_LICENSE_KEYS_URL:-}
+      SUPERPLANE_LICENSE_DEV_ROOT_JWKS_PATH: ${SUPERPLANE_LICENSE_DEV_ROOT_JWKS_PATH:-}
+      SUPERPLANE_LICENSE_DEV_ENTERPRISE: ${SUPERPLANE_LICENSE_DEV_ENTERPRISE:-true}
 
       #
       # Platform blob storage. Development uses a local directory. Hosted
@@ -249,7 +253,7 @@ services:
     image: superplane-fleet-manager-local:dev
     build:
       context: .
-      dockerfile: cmd/fleetmanager/Dockerfile
+      dockerfile: release/fleet-manager/Dockerfile
       target: local
     environment:
       FLEET_MANAGER_CONFIG: ${FLEET_MANAGER_CONFIG:-}

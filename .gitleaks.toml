@@ -7,8 +7,10 @@ title = "SuperPlane"
 useDefault = true
 
 [allowlist]
-description = "Example payloads, docs, VCR cassettes, and local dummy keys"
+description = "Example payloads, docs, VCR cassettes, local dummy keys, and the public license key list"
 paths = [
+  # Root-signed public key list shipped in the binary. Compact JWS of public JWKs, not a credential.
+  '''pkg/licensing/trustedkeys/license-keys\.jws$''',
   '''(^|/)docs/''',
   '''(^|/)fixtures/''',
   '''(^|/)test/fixtures/''',

@@ -130,6 +130,7 @@ export function PRFeedbackSettingsPopup({
           organizationId={agent.organizationId}
           factoryId={agent.factoryId}
           factoryKey={agent.factoryKey}
+          automationId={agent.automationId}
           isLoading={agent.isLoading}
           showAutomationNote={false}
           showCancel={false}

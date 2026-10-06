@@ -230,6 +230,8 @@ func TruncateTables() error {
 			role_metadata,
 			group_metadata,
 			installation_metadata,
+			installation_licenses,
+			installation_license_keys,
 			workflows,
 			workflow_runs,
 			workflow_nodes,

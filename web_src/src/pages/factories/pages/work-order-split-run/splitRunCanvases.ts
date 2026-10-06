@@ -618,7 +618,7 @@ function artifactForNode(
   if (nodeId === "add-branch-artifact") {
     return OPEN_WORK_ORDER_ARTIFACTS.find((artifact) => artifact.id === "art-branch-1");
   }
-  if (nodeId === "find-work-order" || nodeId === "find-pull-request") {
+  if (nodeId === "find-work-order" || nodeId === "find-pull-request" || nodeId === "on-pr-closed") {
     return MERGE_SCREENSHOT;
   }
   if (nodeId === "complete-work-order") {
