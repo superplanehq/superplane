@@ -62,7 +62,35 @@ vi.mock("@/hooks/useIntegrations", () => {
               type: "TYPE_TRIGGER",
               name: "github.onPullRequest",
               label: "On Pull Request",
-              configuration: [{ name: "repository", label: "Repository", type: "string" }],
+              configuration: [
+                { name: "customName", label: "Run title", type: "string" },
+                { name: "repository", label: "Repository", type: "string", required: true },
+                {
+                  name: "actions",
+                  label: "Actions",
+                  type: "multi-select",
+                  typeOptions: {
+                    multiSelect: {
+                      options: [
+                        { label: "Labeled", value: "labeled" },
+                        { label: "Assigned", value: "assigned" },
+                      ],
+                    },
+                  },
+                },
+                {
+                  name: "ignoreDrafts",
+                  label: "Ignore draft pull requests",
+                  type: "boolean",
+                  description: "Do not start a run when the pull request is a draft.",
+                },
+                {
+                  name: "onlyFactoryPullRequests",
+                  label: "Only pull requests in this factory",
+                  type: "boolean",
+                  description: "Start a run only when the pull request belongs to this factory.",
+                },
+              ],
             },
           ],
         },
@@ -132,7 +160,7 @@ function confidenceGraph(): IntakeAutomationGraph {
         type: "TYPE_TRIGGER",
         component: "github.onPullRequest",
         configuration: {
-          actions: ["opened", "synchronize", "reopened", "ready_for_review"],
+          actions: ["opened", "synchronize", "reopened", "ready_for_review", "labeled"],
           ignoreDrafts: true,
           onlyFactoryPullRequests: true,
           repository: "{{ install_params.appRepository }}",
@@ -225,10 +253,33 @@ describe("MergeConfidenceConfigModal", () => {
     const form = screen.getByTestId("merge-confidence-config-form");
     expect(within(form).getByRole("heading", { name: "On Pull Request" })).toBeInTheDocument();
     expect(within(form).getByText("Repository")).toBeInTheDocument();
-    expect(within(form).getByDisplayValue("{{ install_params.appRepository }}")).toBeInTheDocument();
-    expect(within(form).queryByText("Application repository")).not.toBeInTheDocument();
+    expect(within(form).getByText("Application repository")).toBeInTheDocument();
+    expect(within(form).getByText("Start a run when:")).toBeInTheDocument();
+    expect(within(form).getByText("Filters")).toBeInTheDocument();
+    expect(within(form).queryByText("Actions")).not.toBeInTheDocument();
+    expect(within(form).getByRole("checkbox", { name: "A pull request is opened" })).toBeChecked();
+    expect(within(form).getByRole("checkbox", { name: "New commits are pushed" })).toBeChecked();
+    expect(within(form).getByRole("checkbox", { name: "A pull request is reopened" })).toBeChecked();
+    expect(within(form).getByRole("checkbox", { name: "A pull request is ready for review" })).toBeChecked();
+    expect(within(form).getByRole("checkbox", { name: "Labeled" })).toBeChecked();
+    expect(within(form).queryByRole("checkbox", { name: "Assigned" })).not.toBeInTheDocument();
+    expect(within(form).getByRole("checkbox", { name: "Ignore draft pull requests" })).toBeChecked();
+    expect(
+      within(form).getByRole("checkbox", { name: "Run only when this factory created the pull request" }),
+    ).toBeChecked();
+    expect(within(form).queryByText("Only pull requests in this factory")).not.toBeInTheDocument();
+    expect(within(form).queryByRole("switch")).not.toBeInTheDocument();
+    expect(within(form).queryByText("Do not start a run when the pull request is a draft.")).not.toBeInTheDocument();
+    expect(
+      within(form).queryByText("Start a run only when the pull request belongs to this factory."),
+    ).not.toBeInTheDocument();
+    expect(within(form).queryByDisplayValue("{{ install_params.appRepository }}")).not.toBeInTheDocument();
+    expect(within(form).queryByTestId("node-name-input")).not.toBeInTheDocument();
+    expect(within(form).queryByText("Integration")).not.toBeInTheDocument();
+    expect(within(form).queryByText("Customize run title")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
 
-    await user.click(screen.getByTestId("merge-confidence-config-form-close"));
+    await user.click(screen.getByRole("button", { name: "Collapse step" }));
 
     expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
     expect(screen.getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();

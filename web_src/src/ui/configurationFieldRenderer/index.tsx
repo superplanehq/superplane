@@ -1,5 +1,7 @@
 import React from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { Switch } from "@/ui/switch";
 import type { FieldRendererProps, ValidationError } from "./types";
 import { BooleanFieldRenderer } from "./BooleanFieldRenderer";
@@ -23,6 +25,8 @@ interface ConfigurationFieldRendererProps extends FieldRendererProps {
   // New real-time validation props
   realtimeValidationErrors?: Array<{ field: string; message: string; type: string }>;
   enableRealtimeValidation?: boolean;
+  /** `checkbox` draws a check row. The canvas editor uses `switch`. */
+  booleanControl?: "switch" | "checkbox";
 }
 
 type ConfigurationField = FieldRendererProps["field"];
@@ -118,6 +122,7 @@ export const ConfigurationFieldRenderer = ({
   expressionPreviewContext,
   expressionErrorMessage,
   expressionTemplateValue,
+  booleanControl = "switch",
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
@@ -371,6 +376,59 @@ export const ConfigurationFieldRenderer = ({
           <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{fieldDescription}</p>
         )}
       </div>
+    );
+  }
+
+  if (field.type === "multi-select" && booleanControl === "checkbox") {
+    const options = field.typeOptions?.multiSelect?.options ?? [];
+    const selected = Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    return (
+      <div className="flex flex-col gap-2">
+        {options.map((option) => {
+          if (!option.value) {
+            return null;
+          }
+          const optionValue = option.value;
+          const checked = selected.includes(optionValue);
+          const label = option.label || optionValue;
+          return (
+            <label
+              key={optionValue}
+              className={cn(
+                "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+                checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15",
+              )}
+            >
+              <Checkbox
+                checked={checked}
+                onChange={(event) => {
+                  const next = event.target.checked
+                    ? [...selected, optionValue]
+                    : selected.filter((item) => item !== optionValue);
+                  onChange(next.length > 0 ? next : undefined);
+                }}
+                aria-label={label}
+              />
+              <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">{label}</span>
+            </label>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (field.type === "boolean" && !isTogglable && booleanControl === "checkbox") {
+    const checked = value === true;
+    return (
+      <label
+        className={cn(
+          "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+          checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15",
+        )}
+      >
+        <Checkbox checked={checked} onChange={(event) => onChange(event.target.checked)} aria-label={fieldLabel} />
+        <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">{fieldLabel}</span>
+      </label>
     );
   }
 

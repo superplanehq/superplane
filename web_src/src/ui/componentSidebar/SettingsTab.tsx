@@ -74,6 +74,16 @@ interface SettingsTabProps {
   readOnly?: boolean;
   /** `fill` scrolls inside a parent panel. `sidebar` keeps the canvas sidebar height. */
   layout?: "sidebar" | "fill";
+  /** `fields` hides the node name and integration. The canvas editor uses `full`. */
+  chrome?: "full" | "fields";
+  /** Field names that stay in the saved configuration but are not shown. */
+  hiddenFieldNames?: readonly string[];
+  /** Shown above the fields when the name and integration are hidden. */
+  leadingContent?: ReactNode;
+  /** `checkbox` draws check rows for boolean fields. The canvas editor uses `switch`. */
+  booleanControl?: "switch" | "checkbox";
+  /** Groups visible fields under section labels. Omitted fields stay in the list. */
+  fieldGroups?: readonly { label: string; fieldNames: readonly string[] }[];
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -154,6 +164,11 @@ export function SettingsTab({
   onOpenConfigureIntegrationDialog,
   readOnly = false,
   layout = "sidebar",
+  chrome = "full",
+  hiddenFieldNames = [],
+  leadingContent,
+  booleanControl = "switch",
+  fieldGroups,
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
@@ -546,8 +561,70 @@ export function SettingsTab({
   );
 
   const fillsParent = layout === "fill";
-  const scrollClassName = cn("overflow-x-hidden overflow-y-auto p-4", fillsParent ? "min-h-0 flex-1" : "pb-24");
+  const scrollClassName = cn(
+    "overflow-x-hidden overflow-y-auto",
+    fillsParent ? "px-10 py-6" : "p-4",
+    fillsParent ? "min-h-0 flex-1" : "pb-24",
+  );
   const scrollStyle = fillsParent ? undefined : { maxHeight: "80vh" };
+
+  const renderConfigurationField = (field: ConfigurationField) => {
+    if (!field.name || field.name === "customName" || hiddenFieldNames.includes(field.name)) {
+      return null;
+    }
+    const fieldName = field.name;
+    return (
+      <ConfigurationFieldRenderer
+        allowExpressions={true}
+        key={fieldName}
+        field={field}
+        value={nodeConfiguration[fieldName]}
+        onChange={(value) => {
+          const previousValue = nodeConfiguration[fieldName];
+          setNodeConfiguration((previousConfiguration) => {
+            const newConfig = {
+              ...previousConfiguration,
+              [fieldName]: value,
+            };
+            return filterVisibleFields(newConfig);
+          });
+          const fieldWasCleared = value === undefined || value === null || value === "";
+          const togglableEnabled = field.togglable === true && previousValue == null && !fieldWasCleared;
+          if (fieldWasCleared || togglableEnabled || shouldAutosaveOnChangeByFieldType(field.type)) {
+            requestAutosave();
+          }
+        }}
+        onValuesChange={(patch) => {
+          setNodeConfiguration((previousConfiguration) => {
+            const next = { ...previousConfiguration, ...patch };
+            if (!patch.thinkingLevel) {
+              delete next.thinkingLevel;
+            }
+            return filterVisibleFields(next);
+          });
+          if (shouldAutosaveOnChangeByFieldType(field.type)) {
+            requestAutosave();
+          }
+        }}
+        allValues={nodeConfiguration}
+        organizationId={domainId}
+        integrationId={selectedIntegration?.id}
+        hasError={
+          showValidation &&
+          (validationErrors.has(fieldName) ||
+            Array.from(validationErrors).some(
+              (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
+            ))
+        }
+        validationErrors={showValidation ? validationErrors : undefined}
+        fieldPath={fieldName}
+        realtimeValidationErrors={realtimeValidationErrors}
+        enableRealtimeValidation={true}
+        autocompleteExampleObj={resolvedAutocompleteExampleObj}
+        booleanControl={booleanControl}
+      />
+    );
+  };
 
   if (isReadOnly) {
     return (
@@ -579,32 +656,34 @@ export function SettingsTab({
         }
       }}
     >
-      <div className="space-y-6">
-        {/* Node identification section — always visible */}
-        <div className="flex flex-col gap-2">
-          <Label className="min-w-[100px] text-left">
-            Name
-            <span className="text-gray-800 ml-1">*</span>
-            {hasNodeNameError && <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>}
-          </Label>
-          <Input
-            data-testid="node-name-input"
-            type="text"
-            value={currentNodeName}
-            onChange={(e) => {
-              setCurrentNodeName(e.target.value);
-              requestAutosave();
-            }}
-            placeholder="Enter a name for this node"
-            autoFocus
-            className="shadow-none"
-          />
-        </div>
+      <div className={chrome === "fields" ? "space-y-8" : "space-y-6"}>
+        {leadingContent}
+        {chrome === "full" ? (
+          <div className="flex flex-col gap-2">
+            <Label className="min-w-[100px] text-left">
+              Name
+              <span className="text-gray-800 ml-1">*</span>
+              {hasNodeNameError && <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>}
+            </Label>
+            <Input
+              data-testid="node-name-input"
+              type="text"
+              value={currentNodeName}
+              onChange={(e) => {
+                setCurrentNodeName(e.target.value);
+                requestAutosave();
+              }}
+              placeholder="Enter a name for this node"
+              autoFocus
+              className="shadow-none"
+            />
+          </div>
+        ) : null}
 
         {/* Run title field — rendered right after name, before the separator */}
         {(() => {
           const runTitleField = configurationFields?.find((f) => f.name === "customName");
-          if (!runTitleField || !shouldShowConfiguration) return null;
+          if (!runTitleField || !shouldShowConfiguration || hiddenFieldNames.includes("customName")) return null;
           return (
             <div>
               <ConfigurationFieldRenderer
@@ -631,7 +710,7 @@ export function SettingsTab({
         })()}
 
         {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
-        {integrationName && (
+        {chrome === "full" && integrationName && (
           <div className={SETTINGS_TAB_DIVIDER_CLASS}>
             {!allowIntegrations ? (
               <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-600 dark:text-gray-300">
@@ -800,65 +879,28 @@ export function SettingsTab({
         )}
 
         {/* Configuration section */}
-        {configurationFields && configurationFields.length > 0 && shouldShowConfiguration && (
-          <div className={cn(SETTINGS_TAB_DIVIDER_CLASS, "space-y-4")}>
-            {configurationFields.map((field) => {
-              if (!field.name || field.name === "customName") return null;
-              const fieldName = field.name;
-              return (
-                <ConfigurationFieldRenderer
-                  allowExpressions={true}
-                  key={fieldName}
-                  field={field}
-                  value={nodeConfiguration[fieldName]}
-                  onChange={(value) => {
-                    const previousValue = nodeConfiguration[fieldName];
-                    setNodeConfiguration((previousConfiguration) => {
-                      const newConfig = {
-                        ...previousConfiguration,
-                        [fieldName]: value,
-                      };
-                      return filterVisibleFields(newConfig);
-                    });
-                    const fieldWasCleared = value === undefined || value === null || value === "";
-                    const togglableEnabled = field.togglable === true && previousValue == null && !fieldWasCleared;
-                    if (fieldWasCleared || togglableEnabled || shouldAutosaveOnChangeByFieldType(field.type)) {
-                      requestAutosave();
-                    }
-                  }}
-                  onValuesChange={(patch) => {
-                    setNodeConfiguration((previousConfiguration) => {
-                      const next = { ...previousConfiguration, ...patch };
-                      if (!patch.thinkingLevel) {
-                        delete next.thinkingLevel;
-                      }
-                      return filterVisibleFields(next);
-                    });
-                    if (shouldAutosaveOnChangeByFieldType(field.type)) {
-                      requestAutosave();
-                    }
-                  }}
-                  allValues={nodeConfiguration}
-                  organizationId={domainId}
-                  integrationId={selectedIntegration?.id}
-                  hasError={
-                    showValidation &&
-                    (validationErrors.has(fieldName) ||
-                      // Check for nested errors in this field
-                      Array.from(validationErrors).some(
-                        (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
-                      ))
-                  }
-                  validationErrors={showValidation ? validationErrors : undefined}
-                  fieldPath={fieldName}
-                  realtimeValidationErrors={realtimeValidationErrors}
-                  enableRealtimeValidation={true}
-                  autocompleteExampleObj={resolvedAutocompleteExampleObj}
-                />
-              );
-            })}
-          </div>
-        )}
+        {configurationFields &&
+          configurationFields.some(
+            (field) => field.name && field.name !== "customName" && !hiddenFieldNames.includes(field.name),
+          ) &&
+          shouldShowConfiguration && (
+            <div
+              className={cn(
+                chrome === "full" && SETTINGS_TAB_DIVIDER_CLASS,
+                fieldGroups
+                  ? "flex flex-col gap-6"
+                  : booleanControl === "checkbox"
+                    ? "flex flex-col gap-2"
+                    : chrome === "fields"
+                      ? "space-y-6"
+                      : "space-y-4",
+              )}
+            >
+              {fieldGroups
+                ? renderGroupedConfigurationFields(fieldGroups, configurationFields, renderConfigurationField)
+                : configurationFields.map((field) => renderConfigurationField(field))}
+            </div>
+          )}
 
         {/* Concurrency section */}
         {showConcurrency && (
@@ -940,5 +982,35 @@ export function SettingsTab({
         )}
       </div>
     </div>
+  );
+}
+
+function renderGroupedConfigurationFields(
+  fieldGroups: readonly { label: string; fieldNames: readonly string[] }[],
+  configurationFields: ConfigurationField[] | undefined,
+  renderField: (field: ConfigurationField) => ReactNode,
+) {
+  const fields = configurationFields ?? [];
+  const groupedNames = new Set(fieldGroups.flatMap((group) => group.fieldNames));
+  const ungrouped = fields.filter((field) => field.name && !groupedNames.has(field.name));
+
+  return (
+    <>
+      {fieldGroups.map((group) => {
+        const groupFields = group.fieldNames
+          .map((name) => fields.find((field) => field.name === name))
+          .filter((field): field is ConfigurationField => field !== undefined);
+        if (groupFields.length === 0) {
+          return null;
+        }
+        return (
+          <fieldset key={group.label} className="min-w-0">
+            <legend className="workspace-section-title">{group.label}</legend>
+            <div className="mt-2 flex flex-col gap-2">{groupFields.map((field) => renderField(field))}</div>
+          </fieldset>
+        );
+      })}
+      {ungrouped.map((field) => renderField(field))}
+    </>
   );
 }
