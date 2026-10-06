@@ -130,13 +130,9 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     const summary = screen.getByTestId("redesign-console-summary");
     expect(within(summary).queryByTestId("redesign-console-checks")).not.toBeInTheDocument();
     expect(within(summary).queryByRole("button", { name: "Merge confidence" })).not.toBeInTheDocument();
-
-    const card = screen.getByTestId("redesign-console-column-backlog");
-    fireEvent.click(within(card).getByRole("tab", { name: /Checks/ }));
-    expect(within(card).getByText("Clarity")).toBeInTheDocument();
-    expect(within(card).getByText("Complexity")).toBeInTheDocument();
-    expect(within(card).getByText("Verifiability")).toBeInTheDocument();
-    expect(within(card).queryByText("Confidence score")).not.toBeInTheDocument();
+    expect(within(summary).queryByText("Clarity")).not.toBeInTheDocument();
+    expect(within(summary).queryByText("Complexity")).not.toBeInTheDocument();
+    expect(within(summary).queryByText("Verifiability")).not.toBeInTheDocument();
   });
 
   it("lists each column app that ran for the task as its own card", () => {
