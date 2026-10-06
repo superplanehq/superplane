@@ -12,7 +12,7 @@ export const RESTORE_DEFAULT_PROMPT_COPY = {
 
 type CanvasSpec = CanvasesCanvas["spec"];
 
-export function defaultAgentPromptSteps(
+export function defaultAgentSteps(
   spec: CanvasSpec | null | undefined,
   agentNodeId: string,
 ): PlanningReviewStep[] | null {
@@ -25,14 +25,14 @@ export function defaultAgentPromptSteps(
     return null;
   }
 
-  const prompts: PlanningReviewStep[] = [];
+  const extracted: PlanningReviewStep[] = [];
   for (const value of steps) {
     if (isPromptStep(value)) {
       const step: PlanningReviewStep = { name: value.name, type: "prompt", prompt: value.prompt };
       if (typeof value.workingDirectory === "string") {
         step.workingDirectory = value.workingDirectory;
       }
-      prompts.push(step);
+      extracted.push(step);
       continue;
     }
     if (!isBashStep(value)) {
@@ -45,9 +45,9 @@ export function defaultAgentPromptSteps(
     if (typeof value.workingDirectory === "string") {
       step.workingDirectory = value.workingDirectory;
     }
-    prompts.push(step);
+    extracted.push(step);
   }
-  return prompts;
+  return extracted;
 }
 
 export function applyDefaultAgentPrompts(
@@ -122,9 +122,8 @@ function stepsWithRestoredPrompts(
   defaultSteps: PlanningReviewStep[],
   prompts: PlanningReviewStep[],
 ): PlanningReviewStep[] {
-  const anchorIndexes = matchedFactoryStepIndexes(steps, defaultSteps);
   const insertions = prompts.map((prompt, order) => ({
-    index: promptInsertionIndex(defaultSteps, prompt, anchorIndexes, steps.length),
+    index: promptInsertionIndex(steps, defaultSteps, prompt),
     order,
     step: factoryPromptStep(prompt),
   }));
@@ -139,109 +138,52 @@ function stepsWithRestoredPrompts(
 }
 
 function promptInsertionIndex(
+  steps: PlanningReviewStep[],
   defaultSteps: PlanningReviewStep[],
   prompt: PlanningReviewStep,
-  anchorIndexes: Map<number, number>,
-  fallback: number,
 ): number {
   const promptIndex = defaultSteps.indexOf(prompt);
   if (promptIndex < 0) {
-    return fallback;
+    return steps.length;
   }
 
-  const afterPreceding = indexAfterPrecedingSteps(defaultSteps, promptIndex, anchorIndexes);
-  const beforeFollowing = indexBeforeFollowingSteps(defaultSteps, promptIndex, anchorIndexes, afterPreceding);
-  if (beforeFollowing !== undefined) {
-    return beforeFollowing;
-  }
-  if (afterPreceding > 0) {
-    return afterPreceding;
-  }
-  return fallback;
-}
-
-function indexAfterPrecedingSteps(
-  defaultSteps: PlanningReviewStep[],
-  promptIndex: number,
-  anchorIndexes: Map<number, number>,
-): number {
-  let after = 0;
-  for (let index = 0; index < promptIndex; index += 1) {
+  for (let index = promptIndex - 1; index >= 0; index -= 1) {
     if (defaultSteps[index].type === "prompt") {
       continue;
     }
-    const position = anchorIndexes.get(index);
-    if (position !== undefined) {
-      after = Math.max(after, position + 1);
+    const found = lastMatchingStepIndex(steps, defaultSteps[index]);
+    if (found >= 0) {
+      return found + 1;
     }
   }
-  return after;
-}
 
-function indexBeforeFollowingSteps(
-  defaultSteps: PlanningReviewStep[],
-  promptIndex: number,
-  anchorIndexes: Map<number, number>,
-  notBefore: number,
-): number | undefined {
-  let earliest: number | undefined;
   for (let index = promptIndex + 1; index < defaultSteps.length; index += 1) {
     if (defaultSteps[index].type === "prompt") {
       continue;
     }
-    const position = anchorIndexes.get(index);
-    if (position === undefined || position < notBefore) {
-      continue;
+    const found = firstMatchingStepIndex(steps, defaultSteps[index]);
+    if (found >= 0) {
+      return found;
     }
-    earliest = earliest === undefined ? position : Math.min(earliest, position);
   }
-  return earliest;
+
+  return steps.length;
 }
 
-function matchedFactoryStepIndexes(
-  steps: PlanningReviewStep[],
-  defaultSteps: PlanningReviewStep[],
-): Map<number, number> {
-  const matches = new Map<number, number>();
-  const used = new Set<number>();
-  const unmatched: number[] = [];
-  let cursor = 0;
-  defaultSteps.forEach((step, index) => {
-    if (step.type === "prompt") {
-      return;
-    }
-    const found = steps.findIndex((candidate, position) => position >= cursor && sameStepIdentity(candidate, step));
-    if (found < 0) {
-      unmatched.push(index);
-      return;
-    }
-    matches.set(index, found);
-    used.add(found);
-    cursor = found + 1;
-  });
-  matchReorderedFactorySteps(steps, defaultSteps, unmatched, matches, used);
-  return matches;
+function firstMatchingStepIndex(steps: PlanningReviewStep[], factory: PlanningReviewStep): number {
+  return steps.findIndex((step) => sameStepNameAndType(step, factory));
 }
 
-function matchReorderedFactorySteps(
-  steps: PlanningReviewStep[],
-  defaultSteps: PlanningReviewStep[],
-  unmatched: number[],
-  matches: Map<number, number>,
-  used: Set<number>,
-): void {
-  for (const index of unmatched) {
-    const step = defaultSteps[index];
-    const found = steps.findIndex((candidate, position) => !used.has(position) && sameStepIdentity(candidate, step));
-    if (found < 0) {
-      continue;
+function lastMatchingStepIndex(steps: PlanningReviewStep[], factory: PlanningReviewStep): number {
+  for (let index = steps.length - 1; index >= 0; index -= 1) {
+    if (sameStepNameAndType(steps[index], factory)) {
+      return index;
     }
-    matches.set(index, found);
-    used.add(found);
   }
+  return -1;
 }
 
-function sameStepIdentity(left: PlanningReviewStep, right: PlanningReviewStep): boolean {
+function sameStepNameAndType(left: PlanningReviewStep, right: PlanningReviewStep): boolean {
   return left.type === right.type && left.name === right.name;
 }
 
