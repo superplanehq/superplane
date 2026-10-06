@@ -268,18 +268,33 @@ func (e *IntakeCatalogEntry) Update(tx *gorm.DB, patch IntakeCatalogPatch, accou
 		return err
 	}
 
+	if patch.Name == nil && patch.Category == nil && patch.Status == nil && patch.StatusNote == nil {
+		return nil
+	}
+
 	updated.UpdatedAt = time.Now()
 	updated.UpdatedBy = accountID
+
+	updates := map[string]any{
+		"updated_at": updated.UpdatedAt,
+		"updated_by": updated.UpdatedBy,
+	}
+	if patch.Name != nil {
+		updates["name"] = updated.Name
+	}
+	if patch.Category != nil {
+		updates["category"] = updated.Category
+	}
+	if patch.Status != nil {
+		updates["status"] = updated.Status
+	}
+	if patch.StatusNote != nil {
+		updates["status_note"] = updated.StatusNote
+	}
+
 	err := tx.Model(&IntakeCatalogEntry{}).
 		Where("key = ?", e.Key).
-		Updates(map[string]any{
-			"name":        updated.Name,
-			"category":    updated.Category,
-			"status":      updated.Status,
-			"status_note": updated.StatusNote,
-			"updated_at":  updated.UpdatedAt,
-			"updated_by":  updated.UpdatedBy,
-		}).
+		Updates(updates).
 		Error
 	if err != nil {
 		return err

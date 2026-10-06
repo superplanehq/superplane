@@ -50,10 +50,19 @@ interface StatusNoteEditorProps {
 
 export function StatusNoteEditor({ entry, saving, savedAt, onSave }: StatusNoteEditorProps) {
   const [note, setNote] = useState(entry.status_note);
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
-    setNote(entry.status_note);
-  }, [entry.status_note]);
+    if (!dirty) {
+      setNote(entry.status_note);
+      return;
+    }
+
+    if (note.trim() === entry.status_note) {
+      setDirty(false);
+      setNote(entry.status_note);
+    }
+  }, [dirty, entry.status_note, note]);
 
   const save = () => {
     if (note.trim() !== entry.status_note) {
@@ -68,7 +77,11 @@ export function StatusNoteEditor({ entry, saving, savedAt, onSave }: StatusNoteE
         value={note}
         rows={4}
         placeholder="For example: Works for Jira Cloud. Jira Server is not tested."
-        onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setNote(event.target.value)}
+        onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => {
+          const next = event.target.value;
+          setNote(next);
+          setDirty(next.trim() !== entry.status_note);
+        }}
         onBlur={save}
       />
       <div className="flex items-center justify-between text-xs text-slate-500 dark:text-gray-400">
