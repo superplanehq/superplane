@@ -2076,6 +2076,49 @@ describe("line board work-order examples", () => {
     expect(analysis?.checks?.map((check) => check.name)).toEqual(["Clarity", "Complexity", "Verifiability"]);
   });
 
+  it("keeps leftover Confidence until all three review scores exist", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [
+        {
+          id: "check-confidence",
+          key: "confidence",
+          name: "Confidence score",
+          score: 2,
+          maxScore: 5,
+          format: "FORMAT_FRACTION",
+          level: "LEVEL_CAUTION",
+        },
+        {
+          id: "check-clarity",
+          key: "clarity",
+          name: "Clarity score",
+          score: 3,
+          maxScore: 3,
+          format: "FORMAT_FRACTION",
+          level: "LEVEL_POSITIVE",
+        },
+      ],
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-partial",
+            canvasId: "canvas-backlog",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-28T12:00:00Z",
+            finishedAt: "2026-08-28T12:00:20Z",
+          },
+        },
+      ],
+    });
+
+    const analysis = fixture.phases.find((phase) => phase.id.startsWith("backlog-analysis-"));
+    expect(analysis?.checks?.map((check) => check.name)).toEqual(["Confidence score", "Clarity score"]);
+  });
+
   it("appends matching PR feedback runs after line steps, oldest first", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
       prFeedbackRuns: [

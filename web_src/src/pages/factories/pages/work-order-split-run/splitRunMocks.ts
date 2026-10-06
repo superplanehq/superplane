@@ -39,7 +39,7 @@ import {
   confidenceSuitabilitySummary,
   isScoreCheckName,
 } from "../../lib/confidenceScore";
-import { planningReviewMetrics } from "../../lib/planningReviewScore";
+import { planningReviewFromChecks } from "../../lib/planningReviewScore";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import {
   getWorkOrderDisplayStatus,
@@ -964,9 +964,9 @@ function sumAnalysisMetric(
 
 function confidenceChecks(apiChecks?: FactoriesWorkOrderCheck[]): WorkOrderCheckPresentation[] | undefined {
   const presented = presentWorkOrderChecks(apiChecks ?? []);
-  const review = planningReviewMetrics(presented);
-  if (review.length > 0) {
-    return review;
+  const review = planningReviewFromChecks(presented);
+  if (review) {
+    return review.metrics;
   }
   const reported = presented.filter((check) => isScoreCheckName(check.name));
   if (reported.length === 0) {
