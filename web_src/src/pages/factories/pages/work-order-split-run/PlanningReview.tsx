@@ -1,15 +1,18 @@
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+
 import { EyeOff, FileText } from "lucide-react";
 
 import { Link } from "@/components/Link/link";
 import { Frame, FramePanel } from "@/components/reui/frame";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 import { ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
 import { ReadinessDot } from "../../workOrders/ReadinessMark";
-import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
-import { ScoreEvidenceRow, type ScoreEvidenceValue } from "../../workOrders/ScoreEvidence";
+import { workOrderCheckStatus, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
+import { ScoreEvidenceRow, type ScoreEvidenceDrawer, type ScoreEvidenceValue } from "../../workOrders/ScoreEvidence";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { PlanChipStatus } from "./planChipStatus";
 import type { ComposerCreditVerdict } from "./splitRunFooter";
@@ -50,14 +53,19 @@ export function PlanningReview({
   creditVerdict?: ComposerCreditVerdict;
 }) {
   const analyzing = isAnalyzing && !creditVerdict;
+  const metrics = reviewMetrics && reviewMetrics.length > 0 ? reviewMetrics : undefined;
+  const drawer = useConfidenceDrawer();
   return (
     <Frame
       dense
-      className="my-3 w-full min-w-0"
+      className="relative my-3 w-full min-w-0"
       role="region"
       aria-label={canTogglePlan ? "Plan" : "Planning assessment"}
       data-testid="split-run-intent-status-card"
     >
+      {metrics && drawer.control.open ? (
+        <ReviewMetricsDrawer id={drawer.control.controlsId} metrics={metrics} onHoverChange={drawer.onHoverChange} />
+      ) : null}
       <FramePanel
         fit
         className="flex flex-wrap items-center gap-3 px-3.5 py-3"
@@ -78,6 +86,7 @@ export function PlanningReview({
             showClarity={showClarity}
             showConfidence={showConfidence}
             isAnalyzing={analyzing}
+            confidenceDrawer={metrics ? drawer.control : undefined}
             testIds={SCORE_TEST_IDS}
           />
           {canTogglePlan ? (
@@ -85,20 +94,140 @@ export function PlanningReview({
           ) : null}
         </div>
       </FramePanel>
-      {reviewMetrics && reviewMetrics.length > 0 ? (
-        <ul className="border-t border-border px-3.5 py-2" data-testid="split-run-intent-review-metrics">
-          {reviewMetrics.map((metric) => (
-            <li key={metric.key ?? metric.id} className="flex items-start justify-between gap-3 py-1 text-[12px]">
-              <span className="min-w-0">
-                <span className="font-medium text-foreground">{metric.name}</span>
-                {metric.summary ? <span className="mt-0.5 block text-muted-foreground">{metric.summary}</span> : null}
-              </span>
-              <span className="shrink-0 tabular-nums text-muted-foreground">{metric.score}/5</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </Frame>
+  );
+}
+
+const DRAWER_CLOSE_DELAY_MS = 120;
+
+/**
+ * Hover peeks the drawer, click pins it, Escape closes it. The close
+ * delay lets the pointer cross the gap between the chip and the drawer.
+ */
+function useConfidenceDrawer(): { control: ScoreEvidenceDrawer; onHoverChange: (hovering: boolean) => void } {
+  const controlsId = useId();
+  const [pinned, setPinned] = useState(false);
+  const [hovering, setHovering] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const open = pinned || hovering;
+
+  const onHoverChange = (next: boolean) => {
+    clearTimeout(closeTimer.current);
+    if (next) {
+      setHovering(true);
+      return;
+    }
+    closeTimer.current = setTimeout(() => setHovering(false), DRAWER_CLOSE_DELAY_MS);
+  };
+
+  const onToggle = () => {
+    clearTimeout(closeTimer.current);
+    setPinned((current) => {
+      if (current) {
+        setHovering(false);
+      }
+      return !current;
+    });
+  };
+
+  useEffect(() => () => clearTimeout(closeTimer.current), []);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+      setPinned(false);
+      setHovering(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  return { control: { open, pinned, controlsId, onHoverChange, onToggle }, onHoverChange };
+}
+
+/**
+ * The three review checks in a drawer above the plan card: a list row per
+ * check with its name, a verdict badge, and the agent's one-line reason
+ * below. The drawer floats, so it never moves the card or the composer.
+ */
+function ReviewMetricsDrawer({
+  id,
+  metrics,
+  onHoverChange,
+}: {
+  id: string;
+  metrics: WorkOrderCheckPresentation[];
+  onHoverChange: (hovering: boolean) => void;
+}) {
+  const { ref, side } = useDrawerSide();
+  return (
+    <div
+      ref={ref}
+      id={id}
+      role="group"
+      aria-label="Confidence checks"
+      data-testid="split-run-intent-review-metrics"
+      data-side={side}
+      className={cn(
+        "sp-confidence-drawer absolute inset-x-0 z-[60] grid grid-cols-3 divide-x divide-border overflow-hidden rounded-lg border border-border bg-popover shadow-md",
+        side === "above" ? "bottom-full mb-2" : "top-full mt-2",
+      )}
+      onMouseEnter={() => onHoverChange(true)}
+      onMouseLeave={() => onHoverChange(false)}
+    >
+      {metrics.map((metric) => (
+        <ReviewMetricCell key={metric.key ?? metric.id} metric={metric} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The drawer prefers the space above the plan card. When the card sits near
+ * the top of its scroll area, the drawer would get clipped there, so it
+ * opens below the card instead. Measured once per open, before first paint.
+ */
+function useDrawerSide() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [side, setSide] = useState<"above" | "below">("above");
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node) {
+      return;
+    }
+    if (node.getBoundingClientRect().top < clippingAncestorTop(node)) {
+      setSide("below");
+    }
+  }, []);
+  return { ref, side };
+}
+
+function clippingAncestorTop(node: HTMLElement): number {
+  for (let parent = node.parentElement; parent; parent = parent.parentElement) {
+    if (window.getComputedStyle(parent).overflowY !== "visible") {
+      return parent.getBoundingClientRect().top;
+    }
+  }
+  return 0;
+}
+
+function ReviewMetricCell({ metric }: { metric: WorkOrderCheckPresentation }) {
+  const status = workOrderCheckStatus(metric);
+  return (
+    <div className="sp-review-metric min-w-0 px-4 py-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="truncate text-[13px] leading-5 font-medium text-foreground">{metric.name}</span>
+        <Badge variant="outline" className={cn("shrink-0 border", status.badgeClassName)}>
+          {status.label}
+        </Badge>
+      </div>
+      {metric.summary ? <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{metric.summary}</p> : null}
+    </div>
   );
 }
 

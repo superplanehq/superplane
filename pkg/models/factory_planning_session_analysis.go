@@ -412,7 +412,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	if err != nil {
 		return "", err
 	}
-	if artifacts.spec == "" && artifacts.clarity.score == "" && artifacts.confidence.score == "" && artifacts.complexity.score == "" && artifacts.risk.score == "" && len(messages) == 0 {
+	if artifacts.spec == "" && artifacts.clarity.score == "" && artifacts.confidence.score == "" && artifacts.complexity.score == "" && artifacts.verifiability.score == "" && len(messages) == 0 {
 		return "", nil
 	}
 	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
@@ -432,7 +432,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	}
 	writePlanningScoreBlock(&b, "Clarity", artifacts.clarity)
 	writePlanningScoreBlock(&b, "Complexity", artifacts.complexity)
-	writePlanningScoreBlock(&b, "Risk", artifacts.risk)
+	writePlanningScoreBlock(&b, "Verifiability", artifacts.verifiability)
 	writePlanningScoreBlock(&b, "Confidence", artifacts.confidence)
 	if len(window.Messages) > 0 {
 		b.WriteString("\nRecent messages retained for this rewind:\n")
@@ -548,11 +548,11 @@ type planningScoreText struct {
 }
 
 type analysisContinuationState struct {
-	spec       string
-	clarity    planningScoreText
-	confidence planningScoreText
-	complexity planningScoreText
-	risk       planningScoreText
+	spec          string
+	clarity       planningScoreText
+	confidence    planningScoreText
+	complexity    planningScoreText
+	verifiability planningScoreText
 }
 
 func writePlanningScoreBlock(b *strings.Builder, label string, text planningScoreText) {
@@ -593,7 +593,7 @@ func analysisContinuationArtifacts(tx *gorm.DB, session *FactoryPlanningSession)
 	state.clarity = planningScoreTextFromChecks(checks, PlanningClarityCheckKey)
 	state.confidence = planningScoreTextFromChecks(checks, PlanningConfidenceCheckKey)
 	state.complexity = planningScoreTextFromChecks(checks, PlanningComplexityCheckKey)
-	state.risk = planningScoreTextFromChecks(checks, PlanningRiskCheckKey)
+	state.verifiability = planningScoreTextFromChecks(checks, PlanningVerifiabilityCheckKey)
 	return state, nil
 }
 

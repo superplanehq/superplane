@@ -38,7 +38,8 @@ func TestFactoryPlanningSession_ProposeUpdateWritesScoresSpecAndSurvey(t *testin
 	assert.Equal(t, PlanningClarityCheckName, byKey[PlanningClarityCheckKey].Name)
 	assert.Equal(t, 3.0, byKey[PlanningComplexityCheckKey].Score)
 	assert.Equal(t, PlanningComplexityCheckName, byKey[PlanningComplexityCheckKey].Name)
-	assert.Equal(t, 5.0, byKey[PlanningRiskCheckKey].Score)
+	assert.Equal(t, 5.0, byKey[PlanningVerifiabilityCheckKey].Score)
+	assert.Equal(t, PlanningVerifiabilityCheckName, byKey[PlanningVerifiabilityCheckKey].Name)
 	assert.Equal(t, FactoryWorkOrderCheckLevelCaution, byKey[PlanningComplexityCheckKey].Level)
 
 	spec, err := planningSpecBody(db, order)
@@ -106,7 +107,7 @@ func TestFactoryPlanningSession_ProposeUpdateRejectsPartialScores(t *testing.T) 
 		},
 	})
 	require.ErrorIs(t, err, ErrFactoryPlanningSessionInvalid)
-	assert.Contains(t, err.Error(), "risk")
+	assert.Contains(t, err.Error(), "verifiability")
 }
 
 func TestFactoryPlanningSession_ProposeUpdateRejectsFirstSurveyWithoutScores(t *testing.T) {
@@ -178,7 +179,7 @@ func TestAnalysisContinuationTextUsesProposeUpdateWhenReviewIsOn(t *testing.T) {
 	assert.Contains(t, text, "Include survey on propose_update")
 	assert.Contains(t, text, "Current Clarity: 4/5")
 	assert.Contains(t, text, "Current Complexity: 3/5")
-	assert.Contains(t, text, "Current Risk: 5/5")
+	assert.Contains(t, text, "Current Verifiability: 5/5")
 	assert.NotContains(t, text, "propose_spec")
 	assert.NotContains(t, text, "Call survey only")
 }
@@ -208,10 +209,10 @@ func TestWorkOrderReadyForAutoStartReviewRequiresAllThreeFives(t *testing.T) {
 	assert.True(t, ready)
 }
 
-func reviewScores(clarity, complexity, risk float64) *PlanningReviewScores {
+func reviewScores(clarity, complexity, verifiability float64) *PlanningReviewScores {
 	return &PlanningReviewScores{
-		Clarity:    PlanningScoreValue{Score: clarity, Summary: "Outcome, scope, and done are defined."},
-		Complexity: PlanningScoreValue{Score: complexity, Summary: "One agent can finish this in one run."},
-		Risk:       PlanningScoreValue{Score: risk, Summary: "A mistake here is cheap to undo."},
+		Clarity:       PlanningScoreValue{Score: clarity, Summary: "Outcome, scope, and done are defined."},
+		Complexity:    PlanningScoreValue{Score: complexity, Summary: "One agent can finish this in one run."},
+		Verifiability: PlanningScoreValue{Score: verifiability, Summary: "Existing tests cover the change."},
 	}
 }

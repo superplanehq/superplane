@@ -35,7 +35,13 @@ describe("planningReviewFromChecks", () => {
         level: "caution",
         summary: "The change is large.",
       }),
-      check({ id: "risk", key: "risk", name: "Risk", score: 5, summary: "Easy to undo." }),
+      check({
+        id: "verifiability",
+        key: "verifiability",
+        name: "Verifiability",
+        score: 5,
+        summary: "Existing tests cover the change.",
+      }),
     ]);
 
     expect(review?.headline).toMatchObject({
@@ -44,7 +50,7 @@ describe("planningReviewFromChecks", () => {
       level: "caution",
       summary: "The change is large.",
     });
-    expect(review?.metrics.map((metric) => metric.name)).toEqual(["Clarity", "Complexity", "Risk"]);
+    expect(review?.metrics.map((metric) => metric.name)).toEqual(["Clarity", "Complexity", "Verifiability"]);
   });
 });
 

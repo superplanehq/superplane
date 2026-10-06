@@ -247,9 +247,9 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 }
 
 type planningReviewScoresRequest struct {
-	Clarity    planningScoreRequest `json:"clarity"`
-	Complexity planningScoreRequest `json:"complexity"`
-	Risk       planningScoreRequest `json:"risk"`
+	Clarity       planningScoreRequest `json:"clarity"`
+	Complexity    planningScoreRequest `json:"complexity"`
+	Verifiability planningScoreRequest `json:"verifiability"`
 }
 
 type planningUpdateRequest struct {
@@ -277,9 +277,9 @@ func (s *Server) handleRunnerPlanningUpdate(w http.ResponseWriter, r *http.Reque
 	update := models.PlanningSessionUpdate{Spec: req.Spec}
 	if req.Scores != nil {
 		update.Scores = &models.PlanningReviewScores{
-			Clarity:    models.PlanningScoreValue{Score: req.Scores.Clarity.Score, Summary: req.Scores.Clarity.Summary},
-			Complexity: models.PlanningScoreValue{Score: req.Scores.Complexity.Score, Summary: req.Scores.Complexity.Summary},
-			Risk:       models.PlanningScoreValue{Score: req.Scores.Risk.Score, Summary: req.Scores.Risk.Summary},
+			Clarity:       models.PlanningScoreValue{Score: req.Scores.Clarity.Score, Summary: req.Scores.Clarity.Summary},
+			Complexity:    models.PlanningScoreValue{Score: req.Scores.Complexity.Score, Summary: req.Scores.Complexity.Summary},
+			Verifiability: models.PlanningScoreValue{Score: req.Scores.Verifiability.Score, Summary: req.Scores.Verifiability.Summary},
 		}
 	}
 	if req.Survey != nil {

@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -362,6 +362,85 @@ describe("WorkOrderIntentDocument score evidence", () => {
     await user.hover(screen.getByTestId("split-run-intent-composer-score"));
     expect(await screen.findByTestId("split-run-intent-composer-score-copy")).toHaveTextContent(HIGH_CLARITY.summary);
     expect(window.localStorage.getItem(REFINE_LAYOUT_STORAGE_KEY)).toBeNull();
+  });
+
+  it("reveals review checks on hover and pins them on click", async () => {
+    const user = userEvent.setup();
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        confidence={{ ...HIGH_CONFIDENCE, score: 3, summary: "The change crosses billing and the API." }}
+        reviewMetrics={[
+          {
+            id: "m-clarity",
+            key: "clarity",
+            name: "Clarity",
+            score: 5,
+            maxScore: 5,
+            level: "positive",
+            summary: "The gap is specific and verifiable.",
+          },
+          {
+            id: "m-complexity",
+            key: "complexity",
+            name: "Complexity",
+            score: 3,
+            maxScore: 5,
+            level: "caution",
+            summary: "The work crosses a few layers.",
+          },
+          {
+            id: "m-verifiability",
+            key: "verifiability",
+            name: "Verifiability",
+            score: 5,
+            maxScore: 5,
+            level: "positive",
+            summary: "Existing tests cover the change.",
+          },
+        ]}
+        analysis={analysisChat({ view: WAITING_WITH_PLAN })}
+      />,
+    );
+
+    const confidence = screen.getByTestId("split-run-intent-composer-confidence");
+    expect(confidence).toHaveAccessibleName("Confidence 3/5");
+    expect(screen.queryByTestId("split-run-intent-review-metrics")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-composer-confidence-copy")).not.toBeInTheDocument();
+
+    await user.hover(confidence);
+    const metrics = await screen.findByTestId("split-run-intent-review-metrics");
+    expect(metrics).toBeVisible();
+    expect(metrics).toHaveTextContent("Clarity");
+    expect(metrics).toHaveTextContent("Clear");
+    expect(metrics).toHaveTextContent("Complexity");
+    expect(metrics).toHaveTextContent("Moderate");
+    expect(metrics).toHaveTextContent("Verifiability");
+    expect(metrics).toHaveTextContent("Provable");
+    expect(metrics).toHaveTextContent("The gap is specific and verifiable.");
+    expect(metrics).toHaveTextContent("The work crosses a few layers.");
+    expect(metrics).toHaveTextContent("Existing tests cover the change.");
+    expect(metrics).not.toHaveTextContent("/5");
+    expect(screen.queryByTestId("split-run-intent-composer-confidence-copy")).not.toBeInTheDocument();
+    expect(confidence).toHaveAttribute("aria-expanded", "true");
+    expect(confidence).toHaveAttribute("aria-pressed", "false");
+
+    await user.unhover(confidence);
+    await waitFor(() => {
+      expect(confidence).toHaveAttribute("aria-expanded", "false");
+    });
+    expect(screen.queryByTestId("split-run-intent-review-metrics")).not.toBeInTheDocument();
+
+    await user.click(confidence);
+    expect(confidence).toHaveAttribute("aria-pressed", "true");
+    expect(confidence).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByTestId("split-run-intent-review-metrics")).toBeVisible();
+    await user.unhover(confidence);
+    expect(screen.getByTestId("split-run-intent-review-metrics")).toBeVisible();
+
+    await user.click(confidence);
+    expect(confidence).toHaveAttribute("aria-pressed", "false");
   });
 
   it("shows a dash for a score the analysis has not published", () => {

@@ -12,6 +12,7 @@ import {
   type ConfidenceBand,
 } from "../lib/confidenceScore";
 import { DRAFT_READINESS_SHORT_LABEL, draftReadiness, type DraftReadinessTone } from "../lib/draftReadiness";
+import { workOrderCheckStatus, type WorkOrderCheckLevel } from "../lib/workOrderChecks";
 
 const DOT_TONE: Record<DraftReadinessTone, string> = {
   analyzing: "text-[color:var(--status-draft-dot)]",
@@ -74,7 +75,7 @@ export function CardScoreBadges({
   confidence?: number;
   showClarity?: boolean;
   showConfidence?: boolean;
-  reviewMetrics?: { key: string; name: string; score: number }[];
+  reviewMetrics?: { key: string; name: string; score: number; level?: WorkOrderCheckLevel }[];
   className?: string;
   testId?: string;
 }) {
@@ -87,7 +88,10 @@ export function CardScoreBadges({
     showClarity: hasReview ? false : showClarity,
     showConfidence,
   });
-  const metricSpeech = (reviewMetrics ?? []).map((metric) => `${metric.name} ${scoreText(metric.score)}`);
+  const metricSpeech = (reviewMetrics ?? []).map((metric) => {
+    const status = reviewMetricStatus(metric);
+    return `${metric.name} ${status.label}`;
+  });
   const speech = [readiness.headline, ...(metricSpeech.length > 0 ? metricSpeech : rows.map(scoreSpeech))].join(". ");
 
   return (
@@ -121,17 +125,39 @@ export function CardScoreBadges({
         </span>
         {reviewMetrics && reviewMetrics.length > 0 ? (
           <span className="mt-1 grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5">
-            {reviewMetrics.map((metric) => (
-              <Fragment key={metric.key}>
-                <span>{metric.name}</span>
-                <span className="tabular-nums">{scoreText(metric.score)}</span>
-              </Fragment>
-            ))}
+            {reviewMetrics.map((metric) => {
+              const status = reviewMetricStatus(metric);
+              return (
+                <Fragment key={metric.key}>
+                  <span>{metric.name}</span>
+                  <span className={status.className}>{status.label}</span>
+                </Fragment>
+              );
+            })}
           </span>
         ) : null}
       </TooltipContent>
     </Tooltip>
   );
+}
+
+function reviewMetricStatus(metric: { key: string; name: string; score: number; level?: WorkOrderCheckLevel }) {
+  return workOrderCheckStatus({
+    name: metric.name,
+    key: metric.key,
+    score: metric.score,
+    level: metric.level ?? planningReviewLevel(metric.score),
+  });
+}
+
+function planningReviewLevel(score: number): WorkOrderCheckLevel {
+  if (score >= 4) {
+    return "positive";
+  }
+  if (score >= 3) {
+    return "caution";
+  }
+  return "critical";
 }
 
 function scoreText(score?: number) {

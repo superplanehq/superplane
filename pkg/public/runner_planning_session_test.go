@@ -113,7 +113,7 @@ func TestRunnerPlanningSessionUpdateWritesScoresSpecAndSurvey(t *testing.T) {
 		"scores": {
 			"clarity": {"score": 4, "summary": "Outcome, scope, and done are defined."},
 			"complexity": {"score": 3, "summary": "One agent can finish this in one run."},
-			"risk": {"score": 5, "summary": "A mistake here is cheap to undo."}
+			"verifiability": {"score": 5, "summary": "Existing tests cover the change."}
 		},
 		"spec": "# Retry refunds\n\nStop double charges.\n",
 		"survey": {"questions": [{"prompt": "Which service?", "options": ["Payments", "Billing"]}]}

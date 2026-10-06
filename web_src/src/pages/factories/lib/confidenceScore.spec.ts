@@ -83,6 +83,26 @@ describe("confidenceScore", () => {
     expect(workOrderCheckStatus({ name: "Risk score", score: 65, level: "caution" }).label).toBe("Moderate");
   });
 
+  it("labels planning review metrics with a result word", () => {
+    expect(workOrderCheckStatus({ name: "Clarity", key: "clarity", score: 5, level: "positive" }).label).toBe("Clear");
+    expect(workOrderCheckStatus({ name: "Complexity", key: "complexity", score: 3, level: "caution" }).label).toBe(
+      "Moderate",
+    );
+    expect(
+      workOrderCheckStatus({ name: "Verifiability", key: "verifiability", score: 2, level: "critical" }).label,
+    ).toBe("Unproven");
+  });
+
+  it("keeps the result word for a stored Risk check from an older report", () => {
+    expect(workOrderCheckStatus({ name: "Risk", key: "risk", score: 2, level: "critical" }).label).toBe("High");
+  });
+
+  it("keeps High Medium Low on the stored Clarity score name", () => {
+    expect(workOrderCheckStatus({ name: "Clarity score", key: "clarity", score: 5, level: "positive" }).label).toBe(
+      "High",
+    );
+  });
+
   it("summarizes how suitable the issue is for an agent", () => {
     expect(confidenceSuitabilitySummary("High")).toBe("This issue is a good fit for an agent on this factory line.");
     expect(confidenceSuitabilitySummary("Medium")).toBe("This issue is a mixed fit for an agent on this factory line.");

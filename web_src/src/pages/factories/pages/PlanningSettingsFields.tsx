@@ -48,6 +48,20 @@ function PlanningChecksSection({
   planningReviewEnabled: boolean;
 }) {
   const disabled = !draft.enabled;
+  if (planningReviewEnabled) {
+    return (
+      <PlanningToggleRow
+        title={PLANNING_SETTINGS_COPY.confidenceLabel}
+        description={
+          disabled ? PLANNING_SETTINGS_COPY.confidencePlanningOffHelper : PLANNING_SETTINGS_COPY.confidenceReviewHelper
+        }
+        checked={draft.confidence}
+        disabled={disabled}
+        onCheckedChange={(confidence) => onUpdate("confidence", confidence)}
+        testId="planning-settings-confidence"
+      />
+    );
+  }
   return (
     <section className="space-y-3" data-testid="planning-settings-checks" aria-disabled={disabled}>
       <div>
@@ -64,26 +78,20 @@ function PlanningChecksSection({
       >
         <PlanningToggleRow
           title={PLANNING_SETTINGS_COPY.confidenceLabel}
-          description={
-            planningReviewEnabled
-              ? PLANNING_SETTINGS_COPY.confidenceReviewHelper
-              : PLANNING_SETTINGS_COPY.confidenceHelper
-          }
+          description={PLANNING_SETTINGS_COPY.confidenceHelper}
           checked={draft.confidence}
           disabled={disabled}
           onCheckedChange={(confidence) => onUpdate("confidence", confidence)}
           testId="planning-settings-confidence"
         />
-        {planningReviewEnabled ? null : (
-          <PlanningToggleRow
-            title={PLANNING_SETTINGS_COPY.clarityLabel}
-            description={PLANNING_SETTINGS_COPY.clarityHelper}
-            checked={draft.clarity}
-            disabled={disabled}
-            onCheckedChange={(clarity) => onUpdate("clarity", clarity)}
-            testId="planning-settings-clarity"
-          />
-        )}
+        <PlanningToggleRow
+          title={PLANNING_SETTINGS_COPY.clarityLabel}
+          description={PLANNING_SETTINGS_COPY.clarityHelper}
+          checked={draft.clarity}
+          disabled={disabled}
+          onCheckedChange={(clarity) => onUpdate("clarity", clarity)}
+          testId="planning-settings-clarity"
+        />
       </div>
     </section>
   );

@@ -192,10 +192,12 @@ describe("PlanningSettingsPopup", () => {
     expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartPlanningOffHelper)).toBeInTheDocument();
   });
 
-  it("hides the Clarity toggle when Planning Review is on", () => {
+  it("shows one flat Confidence toggle without the checks group when Planning Review is on", () => {
     renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { planningReviewEnabled: true });
 
     expect(screen.queryByTestId("planning-settings-clarity")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("planning-settings-checks")).not.toBeInTheDocument();
+    expect(screen.queryByText(PLANNING_SETTINGS_COPY.checksLabel)).not.toBeInTheDocument();
     expect(screen.getByTestId("planning-settings-confidence")).toBeInTheDocument();
     expect(screen.getByText(PLANNING_SETTINGS_COPY.confidenceReviewHelper)).toBeInTheDocument();
   });

@@ -137,7 +137,7 @@ async function proposeUpdate(input) {
     body.scores = {
       clarity: scoreField(input.scores, "clarity"),
       complexity: scoreField(input.scores, "complexity"),
-      risk: scoreField(input.scores, "risk"),
+      verifiability: scoreField(input.scores, "verifiability"),
     };
   }
   const spec = unwrapMarkdown(input && input.spec);
@@ -360,7 +360,7 @@ async function recordAgentMessage(text) {
 const UPDATE_TOOL = {
   name: "propose_update",
   description:
-    "Publish scores, the specification, and an optional survey in one call. Pass scores as clarity, complexity, and risk. Each score is an integer from 1 through 5 with a one-sentence summary. Pass spec as the full markdown body. Pass survey only when you ask a question. The first plan turn must include scores.",
+    "Publish scores, the specification, and an optional survey in one call. Pass scores as clarity, complexity, and verifiability. Each score is an integer from 1 through 5 with a one-sentence summary. Pass spec as the full markdown body. Pass survey only when you ask a question. The first plan turn must include scores.",
   inputSchema: {
     type: "object",
     properties: {
@@ -383,7 +383,7 @@ const UPDATE_TOOL = {
             },
             required: ["score", "summary"],
           },
-          risk: {
+          verifiability: {
             type: "object",
             properties: {
               score: { type: "number", description: "Integer from 1 through 5." },
@@ -392,7 +392,7 @@ const UPDATE_TOOL = {
             required: ["score", "summary"],
           },
         },
-        required: ["clarity", "complexity", "risk"],
+        required: ["clarity", "complexity", "verifiability"],
       },
       spec: { type: "string", description: "Full specification markdown." },
       survey: {

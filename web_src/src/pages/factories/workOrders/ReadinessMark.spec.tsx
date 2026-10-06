@@ -107,7 +107,7 @@ describe("CardScoreBadges", () => {
         reviewMetrics={[
           { key: "clarity", name: "Clarity", score: 5 },
           { key: "complexity", name: "Complexity", score: 3 },
-          { key: "risk", name: "Risk", score: 5 },
+          { key: "verifiability", name: "Verifiability", score: 5 },
         ]}
         testId="badges"
       />,
@@ -120,8 +120,11 @@ describe("CardScoreBadges", () => {
     await user.hover(screen.getByTestId("badges"));
     const tip = await screen.findByRole("tooltip");
     expect(tip).toHaveTextContent("Clarity");
+    expect(tip).toHaveTextContent("Clear");
     expect(tip).toHaveTextContent("Complexity");
-    expect(tip).toHaveTextContent("Risk");
+    expect(tip).toHaveTextContent("Moderate");
+    expect(tip).toHaveTextContent("Verifiability");
+    expect(tip).toHaveTextContent("Provable");
   });
 
   it("keeps the verdict headline in the tooltip", async () => {

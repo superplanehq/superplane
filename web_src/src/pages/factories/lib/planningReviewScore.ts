@@ -7,12 +7,12 @@ import {
 import type { WorkOrderCheckLevel, WorkOrderCheckPresentation } from "./workOrderChecks";
 
 export const PLANNING_COMPLEXITY_CHECK_KEY = "complexity";
-export const PLANNING_RISK_CHECK_KEY = "risk";
+export const PLANNING_VERIFIABILITY_CHECK_KEY = "verifiability";
 
 export const PLANNING_REVIEW_METRIC_KEYS = [
   CLARITY_CHECK_KEY,
   PLANNING_COMPLEXITY_CHECK_KEY,
-  PLANNING_RISK_CHECK_KEY,
+  PLANNING_VERIFIABILITY_CHECK_KEY,
 ] as const;
 
 const LEVEL_SEVERITY: Record<WorkOrderCheckLevel, number> = {
@@ -25,7 +25,7 @@ const LEVEL_SEVERITY: Record<WorkOrderCheckLevel, number> = {
 const METRIC_LABEL: Record<(typeof PLANNING_REVIEW_METRIC_KEYS)[number], string> = {
   [CLARITY_CHECK_KEY]: "Clarity",
   [PLANNING_COMPLEXITY_CHECK_KEY]: "Complexity",
-  [PLANNING_RISK_CHECK_KEY]: "Risk",
+  [PLANNING_VERIFIABILITY_CHECK_KEY]: "Verifiability",
 };
 
 export type PlanningReviewMetric = WorkOrderCheckPresentation & { key: string };

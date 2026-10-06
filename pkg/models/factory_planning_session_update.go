@@ -11,16 +11,16 @@ import (
 )
 
 const (
-	PlanningComplexityCheckKey  = "complexity"
-	PlanningComplexityCheckName = "Complexity"
-	PlanningRiskCheckKey        = "risk"
-	PlanningRiskCheckName       = "Risk"
+	PlanningComplexityCheckKey     = "complexity"
+	PlanningComplexityCheckName    = "Complexity"
+	PlanningVerifiabilityCheckKey  = "verifiability"
+	PlanningVerifiabilityCheckName = "Verifiability"
 )
 
 var planningReviewScoreKinds = []planningScoreKind{
 	{key: PlanningClarityCheckKey, name: PlanningClarityCheckName},
 	{key: PlanningComplexityCheckKey, name: PlanningComplexityCheckName},
-	{key: PlanningRiskCheckKey, name: PlanningRiskCheckName},
+	{key: PlanningVerifiabilityCheckKey, name: PlanningVerifiabilityCheckName},
 }
 
 // PlanningScoreValue is one 1 through 5 sub-parameter with a one-sentence summary.
@@ -32,9 +32,9 @@ type PlanningScoreValue struct {
 // PlanningReviewScores is the full set of review sub-parameters. All three
 // must be present when the group is sent.
 type PlanningReviewScores struct {
-	Clarity    PlanningScoreValue
-	Complexity PlanningScoreValue
-	Risk       PlanningScoreValue
+	Clarity       PlanningScoreValue
+	Complexity    PlanningScoreValue
+	Verifiability PlanningScoreValue
 }
 
 // PlanningSessionUpdate is one atomic plan-turn publish: scores, spec, and
@@ -55,8 +55,8 @@ func (s *PlanningReviewScores) value(key string) PlanningScoreValue {
 		return s.Clarity
 	case PlanningComplexityCheckKey:
 		return s.Complexity
-	case PlanningRiskCheckKey:
-		return s.Risk
+	case PlanningVerifiabilityCheckKey:
+		return s.Verifiability
 	default:
 		return PlanningScoreValue{}
 	}

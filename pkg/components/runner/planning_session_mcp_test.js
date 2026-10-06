@@ -312,7 +312,7 @@ test("proposeUpdate publishes scores spec and survey on one route", async () => 
       scores: {
         clarity: { score: 4, summary: "Outcome is clear." },
         complexity: { score: 3, summary: "One run can finish." },
-        risk: { score: 5, summary: "A revert is enough." },
+        verifiability: { score: 5, summary: "Existing tests cover the change." },
       },
       spec: "# Retry refunds\n",
       survey: { questions: [{ prompt: "Which service?", options: ["Payments", "Billing"] }] },
@@ -324,7 +324,7 @@ test("proposeUpdate publishes scores spec and survey on one route", async () => 
       scores: {
         clarity: { score: 4, summary: "Outcome is clear." },
         complexity: { score: 3, summary: "One run can finish." },
-        risk: { score: 5, summary: "A revert is enough." },
+        verifiability: { score: 5, summary: "Existing tests cover the change." },
       },
       spec: "# Retry refunds",
       survey: { questions: [{ prompt: "Which service?", options: ["Payments", "Billing"] }] },
