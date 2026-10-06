@@ -105,7 +105,7 @@ function OrganizationRow({
   return (
     <tr
       className="relative cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors dark:border-gray-800/70 dark:hover:bg-gray-800/50"
-      onClick={(event) => {
+      onClick={(event: React.MouseEvent<HTMLTableRowElement>) => {
         const path = organizationPath(organization.id);
         if (event.metaKey || event.ctrlKey || event.shiftKey) {
           window.open(path, "_blank", "noopener,noreferrer");
@@ -118,7 +118,7 @@ function OrganizationRow({
         <div className="flex items-center gap-2">
           <Link
             to={organizationPath(organization.id)}
-            onClick={(event) => event.stopPropagation()}
+            onClick={(event: React.MouseEvent<HTMLAnchorElement>) => event.stopPropagation()}
             className="flex min-w-0 flex-1 items-center gap-2 text-gray-800 hover:text-blue-600 transition-colors font-medium before:absolute before:inset-0 before:z-10 before:content-[''] dark:text-gray-100 dark:hover:text-blue-400"
           >
             <Building size={14} className="text-gray-400 shrink-0 dark:text-gray-500" />
@@ -135,7 +135,7 @@ function OrganizationRow({
             aria-label={pinActionLabel(pinned)}
             className="relative z-20 shrink-0"
             disabled={pending}
-            onClick={(event) => {
+            onClick={(event: React.MouseEvent<HTMLButtonElement>) => {
               event.stopPropagation();
               onTogglePin(organization, pinned);
             }}
