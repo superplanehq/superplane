@@ -49,6 +49,7 @@ func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand,
 		LLMUsageTaskFile(),
 		TurnTelemetryTaskFile(),
 		ActivityStreamTaskFile(),
+		ConfirmPromptTaskFile(),
 		{Path: input.RunScriptName, Content: input.RunScript, Mode: "0644"},
 		{Path: "prepare.sh", Content: input.PrepareScript, Mode: "0644"},
 	}
