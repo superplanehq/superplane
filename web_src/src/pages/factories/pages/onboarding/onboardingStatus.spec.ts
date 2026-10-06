@@ -86,4 +86,15 @@ describe("initialOnboardingSelections", () => {
       claude: { id: "claude-1", name: "claude-1", ready: false },
     });
   });
+
+  it("fills bitbucket when the saved provider is Bitbucket", () => {
+    expect(
+      initialOnboardingSelections({
+        vcsIntegrationId: "bitbucket-1",
+        vcsProvider: "bitbucket",
+      }),
+    ).toEqual({
+      bitbucket: { id: "bitbucket-1", name: "bitbucket-1", ready: false },
+    });
+  });
 });

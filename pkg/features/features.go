@@ -41,6 +41,10 @@ const FeatureFactoryDatadogIntake = "factory_datadog_intake"
 // column menu until the flow is generally available.
 const FeatureFactoryLinearIntake = "factory_linear_intake"
 
+// FeatureFactoryBitbucket gates Bitbucket as a workspace Git host until the
+// flow is generally available.
+const FeatureFactoryBitbucket = "factory_bitbucket"
+
 // FeatureWorkspaceModels gates the in-progress workspace Models settings
 // page until it is ready for general use.
 const FeatureWorkspaceModels = "workspace_models"
@@ -103,6 +107,7 @@ var registry = []Feature{
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
 	{ID: FeatureFactoryLinearIntake, Label: "Factory Linear Intake", Description: "Add Linear intake from the Backlog column menu"},
+	{ID: FeatureFactoryBitbucket, Label: "Bitbucket Workspaces", Description: "Connect a Bitbucket workspace and open pull requests from Implement"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},

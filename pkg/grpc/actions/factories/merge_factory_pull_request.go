@@ -9,6 +9,7 @@ import (
 	"github.com/google/go-github/v84/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -42,12 +43,13 @@ func MergeFactoryPullRequest(
 		return nil, factoryErrorToStatus(errFactoryPullRequestMergeDisabled, "failed to merge factory pull request")
 	}
 
+	provider := openFactoryVCS(db, deps, factory)
 	result, cached, err := mergeabilityFromCache(db, factory, pullRequest)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}
 	if !cached {
-		result, err = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
+		result, err = readFactoryPullRequestMergeability(ctx, db, provider, pullRequest)
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 		}
@@ -76,18 +78,14 @@ func MergeFactoryPullRequest(
 		return nil, factoryErrorToStatus(errFactoryPullRequestHeadMoved, "failed to merge factory pull request")
 	}
 
-	if result.Client == nil {
-		client, err := newFactoryGitHubAPI(db, deps, factory)
-		if err != nil {
-			if errors.Is(err, errFactoryGitHubNotConnected) {
-				return nil, factoryErrorToStatus(
-					errors.Join(errFactoryPullRequestNotMergeable, errors.New(mergeBlockedMissingIntegration)),
-					"failed to merge factory pull request",
-				)
-			}
-			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+	if err := connectFactoryVCS(provider); err != nil {
+		if errors.Is(err, errFactoryGitHubNotConnected) {
+			return nil, factoryErrorToStatus(
+				errors.Join(errFactoryPullRequestNotMergeable, errors.New(mergeBlockedMissingIntegration)),
+				"failed to merge factory pull request",
+			)
 		}
-		result.Client = client
+		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}
 
 	var closeOutcome *factoryPullRequestCloseResult
@@ -96,11 +94,7 @@ func MergeFactoryPullRequest(
 			return err
 		}
 
-		_, _, err := result.Client.MergePullRequest(ctx, pullRequest.Repository, int(pullRequest.Number), "", &github.PullRequestOptions{
-			MergeMethod: method,
-			SHA:         expectedSHA,
-		})
-		if err != nil {
+		if err := provider.MergePullRequest(ctx, pullRequest.Repository, int(pullRequest.Number), method, expectedSHA); err != nil {
 			return err
 		}
 
@@ -121,6 +115,9 @@ func MergeFactoryPullRequest(
 		return nil
 	})
 	if err != nil {
+		if errors.Is(err, vcs.ErrNotSupported) {
+			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+		}
 		if errors.Is(err, errFactoryPullRequestNotMergeable) {
 			return nil, factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(mergeBlockedActiveRun)), "failed to merge factory pull request")
 		}

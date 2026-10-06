@@ -467,6 +467,10 @@ func (f *recordingFactory) UpdatePullRequestActivity(core.UpdatePullRequestActiv
 	return nil, nil
 }
 
+func (f *recordingFactory) VCSProvider() (string, error) {
+	return "", nil
+}
+
 func Test__OnPullRequest__Setup(t *testing.T) {
 	trigger := OnPullRequest{}
 
