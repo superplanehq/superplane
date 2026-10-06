@@ -449,6 +449,24 @@ func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
 	return factories, nil
 }
 
+// ListOrganizationFactoriesByRecentUpdate returns non-deleted workspaces of an
+// organization, most recently updated first. Equal update times use id
+// descending so the order stays stable.
+func ListOrganizationFactoriesByRecentUpdate(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
+	var factories []Factory
+	err := tx.
+		Where("organization_id = ?", organizationID).
+		Order("updated_at DESC").
+		Order("id DESC").
+		Find(&factories).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return factories, nil
+}
+
 func (f *Factory) SoftDelete(tx *gorm.DB) error {
 	now := time.Now()
 	newName := fmt.Sprintf("%s (deleted-%d)", f.Name, now.Unix())
