@@ -24,13 +24,16 @@ export function readVisualViewportFrame(): VisualViewportFrame {
 
 /**
  * Shift a visual-viewport frame below a banner that is still on screen.
+ * Banner space already above the visible screen is not reserved again.
  * A missing or scrolled-away banner leaves the frame unchanged.
  */
 export function phoneShellFrame(viewport: VisualViewportFrame, bannerInset: number): VisualViewportFrame {
   const inset = Math.max(0, finiteOrZero(bannerInset));
+  const top = finiteOrZero(viewport.top);
+  const visibleInset = Math.max(0, inset - Math.max(0, top));
   return {
-    top: viewport.top + inset,
-    height: Math.max(0, viewport.height - inset),
+    top: top + visibleInset,
+    height: Math.max(0, finiteOrZero(viewport.height) - visibleInset),
   };
 }
 

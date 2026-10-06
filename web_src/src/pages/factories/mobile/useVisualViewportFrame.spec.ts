@@ -1,6 +1,8 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, render, renderHook, screen } from "@testing-library/react";
+import { createElement } from "react";
 import { afterEach, describe, expect, it } from "bun:test";
 
+import { PinnedPhoneShell } from "./PinnedPhoneShell";
 import { phoneShellFrame, readVisualViewportFrame, useVisualViewportFrame } from "./useVisualViewportFrame";
 
 type ViewportStub = {
@@ -93,7 +95,80 @@ describe("useVisualViewportFrame", () => {
 
 describe("phoneShellFrame", () => {
   it("places the shell below a banner that is still visible", () => {
-    expect(phoneShellFrame({ top: 20, height: 700 }, 36)).toEqual({ top: 56, height: 664 });
+    expect(phoneShellFrame({ top: 0, height: 700 }, 36)).toEqual({ top: 36, height: 664 });
     expect(phoneShellFrame({ top: 20, height: 700 }, 0)).toEqual({ top: 20, height: 700 });
+  });
+
+  it("does not reserve banner space that is already above the visible screen", () => {
+    expect(phoneShellFrame({ top: 20, height: 700 }, 36)).toEqual({ top: 36, height: 684 });
+    expect(phoneShellFrame({ top: 40, height: 700 }, 36)).toEqual({ top: 40, height: 700 });
+  });
+});
+
+describe("PinnedPhoneShell", () => {
+  const restores: Array<() => void> = [];
+
+  afterEach(() => {
+    while (restores.length > 0) {
+      restores.pop()?.();
+    }
+  });
+
+  it("moves the shell when a banner appears or disappears after mount", () => {
+    const { viewport } = viewportStub(700, 0);
+    restores.push(stubVisualViewport(viewport));
+
+    let bannerBottom = 0;
+    const region = document.createElement("div");
+    region.setAttribute("data-app-content-region", "");
+    region.getBoundingClientRect = () =>
+      ({
+        top: bannerBottom,
+        left: 0,
+        right: 0,
+        bottom: bannerBottom,
+        width: 0,
+        height: 0,
+        x: 0,
+        y: bannerBottom,
+        toJSON: () => ({}),
+      }) as DOMRect;
+    document.body.appendChild(region);
+    restores.push(() => {
+      region.remove();
+    });
+
+    const previousObserver = globalThis.ResizeObserver;
+    let notifyResize = () => {};
+    globalThis.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) {
+        notifyResize = () => {
+          callback([], this as unknown as ResizeObserver);
+        };
+      }
+
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
+    restores.push(() => {
+      globalThis.ResizeObserver = previousObserver;
+    });
+
+    render(createElement(PinnedPhoneShell, { testId: "phone-shell" }, "Board"));
+    const shell = screen.getByTestId("phone-shell");
+    expect(shell).toHaveStyle({ top: "0px", height: "700px" });
+
+    bannerBottom = 48;
+    act(() => {
+      notifyResize();
+    });
+    expect(shell).toHaveStyle({ top: "48px", height: "652px" });
+
+    bannerBottom = 0;
+    act(() => {
+      notifyResize();
+    });
+    expect(shell).toHaveStyle({ top: "0px", height: "700px" });
   });
 });
