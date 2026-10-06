@@ -158,6 +158,15 @@ export const AnalysisEmpty: Story = {
   render: () => <AnalysisState progress={{ total: 0, scored: 0, ready: 0, stageIndex: 0, empty: true }} />,
 };
 
+export const AnalysisSkipped: Story = {
+  name: "5g Analysis (skipped import)",
+  render: () => <AnalysisState progress={{ total: 0, scored: 0, ready: 0, stageIndex: 0, skipped: true }} />,
+};
+
+export const AnalysisSkippedWithNewIssue: Story = {
+  name: "5h Analysis (skipped import, new issue)",
+  render: () => <AnalysisState progress={{ total: 1, scored: 1, ready: 1, stageIndex: 2, skipped: true }} />,
+};
 export const AnalysisFailed: Story = {
   name: "5f Analysis (failed)",
   render: () => <AnalysisState progress={{ total: 0, scored: 0, ready: 0, stageIndex: 0 }} failed />,

@@ -61,16 +61,39 @@ describe("firstRunAnalysisProgress", () => {
     });
   });
 
-  it("does not report failed or skipped imports as empty", () => {
-    for (const status of ["INITIAL_IMPORT_STATUS_FAILED", "INITIAL_IMPORT_STATUS_SKIPPED"] as const) {
-      expect(firstRunAnalysisProgress([], new Set(), true, { status })).toEqual({
-        total: 0,
-        scored: 0,
-        ready: 0,
-        stageIndex: 0,
-        empty: false,
-      });
-    }
+  it("does not report a failed import as empty", () => {
+    expect(firstRunAnalysisProgress([], new Set(), true, { status: "INITIAL_IMPORT_STATUS_FAILED" })).toEqual({
+      total: 0,
+      scored: 0,
+      ready: 0,
+      stageIndex: 0,
+      empty: false,
+    });
+  });
+
+  it("reports a skipped import as finished, not empty", () => {
+    expect(firstRunAnalysisProgress([], new Set(), true, { status: "INITIAL_IMPORT_STATUS_SKIPPED" })).toEqual({
+      total: 0,
+      scored: 0,
+      ready: 0,
+      stageIndex: 0,
+      empty: false,
+      skipped: true,
+    });
+  });
+
+  it("keeps a skipped import and reports a later issue", () => {
+    const runs = [run("PLACEMENT_BACKLOG", { confidencePct: 80, workOrderId: "wo-1" })];
+
+    expect(
+      firstRunAnalysisProgress(runs, new Set(), true, { status: "INITIAL_IMPORT_STATUS_SKIPPED", itemCount: 0 }),
+    ).toEqual({
+      total: 1,
+      scored: 1,
+      ready: 1,
+      stageIndex: 2,
+      skipped: true,
+    });
   });
 
   // An intake without an analysis node places items on the backlog the
@@ -149,9 +172,9 @@ describe("initialImportFailed", () => {
     expect(initialImportFailed("INITIAL_IMPORT_STATUS_PENDING", true)).toBe(true);
   });
 
-  it("fails terminal import errors without a grace period", () => {
+  it("fails a terminal import error without a grace period", () => {
     expect(initialImportFailed("INITIAL_IMPORT_STATUS_FAILED", false)).toBe(true);
-    expect(initialImportFailed("INITIAL_IMPORT_STATUS_SKIPPED", false)).toBe(true);
+    expect(initialImportFailed("INITIAL_IMPORT_STATUS_SKIPPED", false)).toBe(false);
     expect(initialImportFailed("INITIAL_IMPORT_STATUS_COMPLETED", true)).toBe(false);
   });
 });
