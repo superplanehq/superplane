@@ -249,14 +249,7 @@ func syncFactoryPullRequestMergeability(
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
 ) (*factoryPullRequestMergeability, error) {
-	result, err := evaluateFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
-	if err != nil {
-		return nil, err
-	}
-	if err := persistFactoryPullRequestMergeability(db, pullRequest, result); err != nil {
-		return nil, err
-	}
-	return result, nil
+	return readFactoryPullRequestMergeability(ctx, db, openFactoryVCS(db, deps, factory), pullRequest)
 }
 
 func mergeabilityFromCache(

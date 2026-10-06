@@ -20,7 +20,7 @@ import type { JiraCompletionColumnValue } from "../jiraCompletionColumn";
 import { describeGitHubInstallationName, selectionsWithGitHubInstallation } from "./githubIntegrationSelection";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
-import type { IssuesChoiceId } from "./onboardingFixtures";
+import { vcsLabel, type IssuesChoiceId, type VcsHostId } from "./onboardingFixtures";
 import {
   provisionEventApps,
   provisionOnboardingIntake,
@@ -41,7 +41,8 @@ export function finishOnboardingError(args: {
   appRepository: string | null;
   backlogRepository: string | null;
   workspaceName: string;
-  githubReady: boolean;
+  vcsReady: boolean;
+  vcsHost?: VcsHostId | null;
   remainingCreditCents: number;
   hostedModelsLoading: boolean;
   plan: OnboardingAgentPlan | undefined;
@@ -51,8 +52,8 @@ export function finishOnboardingError(args: {
   linearReady?: boolean;
   linearProjectIds?: string[];
 }): string | null {
-  if (!args.appRepository || !args.backlogRepository || !args.githubReady) {
-    return "Connect GitHub, then select both repositories.";
+  if (!args.appRepository || !args.backlogRepository || !args.vcsReady) {
+    return `Connect ${vcsLabel(args.vcsHost ?? "github")}, then select both repositories.`;
   }
   if (args.issuesChoice === "jira" && (!args.jiraReady || !args.jiraProjectId)) {
     return "Connect Jira, then choose a project.";
@@ -142,7 +143,7 @@ export async function provisionWorkspace(args: {
   backlogRepository: string;
   issuesChoice: IssuesChoiceId | null;
   resolveDefaultBranch: (repository: string) => Promise<string>;
-  github: { id: string };
+  vcs: { id: string; provider: VcsHostId };
   agentPlan: OnboardingAgentPlan;
   agentRewrite: FactoryAgentRewrite;
   agentIntegrationId?: string;
@@ -157,7 +158,7 @@ export async function provisionWorkspace(args: {
     });
   }
   await args.updateOnboarding({
-    vcsIntegrationId: args.github.id,
+    vcsIntegrationId: args.vcs.id,
     ...(args.agentIntegrationId ? { agentIntegrationId: args.agentIntegrationId } : {}),
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
@@ -178,6 +179,7 @@ export async function provisionWorkspace(args: {
     backlogRepository: args.backlogRepository,
     defaultBranch,
     agentRewrite: args.agentRewrite,
+    vcsProvider: args.vcs.provider,
     installFactory: args.installFactory,
     createLine: args.createLine,
     updateOnboarding: args.updateOnboarding,
@@ -189,11 +191,13 @@ export async function provisionWorkspace(args: {
     backlogRepository: args.backlogRepository,
     defaultBranch,
     agentRewrite: args.agentRewrite,
+    vcsProvider: args.vcs.provider,
     installFactory: args.installFactory,
     listApps: args.listApps,
   });
   // The intake needs the line: it opens tasks that the line runs.
   await provisionOnboardingIntake({
+    vcsProvider: args.vcs.provider,
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
     deleteIntake: args.deleteIntake,
@@ -230,6 +234,23 @@ function jiraIntakeBinding(
     projectId,
     settings: jiraCompletionSettingsToApi(completion ?? { jiraMoveOnComplete: true, jiraCompletionColumn: "" }),
   };
+}
+
+function workspaceVcsHost(host: VcsHostId | null): VcsHostId {
+  return host === "bitbucket" ? "bitbucket" : "github";
+}
+
+// A Bitbucket selection already carries the integration name. A GitHub
+// selection names the installation, which templates need.
+async function selectionsWithVcsInstallation(
+  organizationId: string,
+  selections: IntegrationSelections,
+  vcsHost: VcsHostId,
+  integrationId: string,
+): Promise<IntegrationSelections> {
+  if (vcsHost !== "github") return selections;
+  const installationName = await describeGitHubInstallationName(organizationId, integrationId);
+  return selectionsWithGitHubInstallation(selections, installationName);
 }
 
 function agentIntegrationIdForPlan(plan: OnboardingAgentPlan, selections: IntegrationSelections): string | undefined {
@@ -278,14 +299,16 @@ export function useFinishOnboarding(args: {
     const backlogRepository = args.setup.issuesRepo ?? appRepository;
     const workspaceName = args.setup.workspaceName.trim();
     const issuesChoice = issuesChoiceOverride ?? args.setup.issuesChoice;
-    const github = args.selections.github;
+    const vcsHost = workspaceVcsHost(args.setup.vcsHost);
+    const vcs = args.selections[vcsHost];
     const jira = args.selections.jira;
     const linear = args.selections.linear;
     const error = finishOnboardingError({
       appRepository,
       backlogRepository,
       workspaceName,
-      githubReady: Boolean(github?.ready),
+      vcsReady: Boolean(vcs?.ready),
+      vcsHost,
       remainingCreditCents: args.remainingCreditCents,
       hostedModelsLoading: args.hostedModelsLoading,
       plan: args.plan,
@@ -299,14 +322,13 @@ export function useFinishOnboarding(args: {
       showErrorToast(error);
       return;
     }
-    if (!appRepository || !backlogRepository || !github?.ready || !args.plan) {
+    if (!appRepository || !backlogRepository || !vcs?.ready || !args.plan) {
       return;
     }
 
     args.setSaving(true);
     try {
-      const installationName = await describeGitHubInstallationName(args.organizationId, github.id);
-      const selections = selectionsWithGitHubInstallation(args.selections, installationName);
+      const selections = await selectionsWithVcsInstallation(args.organizationId, args.selections, vcsHost, vcs.id);
       const provisioned = await provisionWorkspace({
         ...args,
         selections,
@@ -314,7 +336,7 @@ export function useFinishOnboarding(args: {
         appRepository,
         backlogRepository,
         issuesChoice,
-        github,
+        vcs: { id: vcs.id, provider: vcsHost },
         agentPlan: args.plan,
         agentRewrite: agentRewriteFromPlan(args.plan, selections),
         agentIntegrationId: agentIntegrationIdForPlan(args.plan, selections),

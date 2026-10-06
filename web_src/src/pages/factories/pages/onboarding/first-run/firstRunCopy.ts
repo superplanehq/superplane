@@ -20,6 +20,22 @@ export const FIRST_RUN_COPY = {
       "SuperPlane finds the tickets agents can finish with high confidence and turns them into review-ready pull requests.",
     getStarted: "Get started",
   },
+  host: {
+    headline: "Where is your code?",
+    body: "Choose the Git host of your repository. SuperPlane opens pull requests there.",
+    bitbucketSoon: "Bitbucket is not available yet.",
+    bitbucketLookupLoading: "Checking whether Bitbucket is available…",
+  },
+  bitbucket: {
+    connectHeadline: "Connect SuperPlane to Bitbucket",
+    connectBody:
+      "Connect a Bitbucket workspace with an access token. SuperPlane uses it to read your code and open pull requests.",
+    connectAction: "Connect Bitbucket",
+    repositoryHelper: "SuperPlane opens pull requests in this Bitbucket repository for review.",
+    loading: "Loading Bitbucket repositories…",
+    loadError: "SuperPlane could not load the Bitbucket repositories. Check the connection and try again.",
+    empty: "SuperPlane cannot see repositories in this Bitbucket workspace.",
+  },
   connect: {
     headline: "Connect SuperPlane to GitHub",
     body: "SuperPlane reads your code and tickets, and returns finished work as pull requests.",

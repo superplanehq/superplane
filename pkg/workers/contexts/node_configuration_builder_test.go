@@ -684,6 +684,23 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []any{}, noComments)
 	})
+
+	t.Run("keeps the saved Git host after the workspace switches", func(t *testing.T) {
+		provider := models.ProviderGitHub
+		require.NoError(t, database.Conn().Model(order).Updates(map[string]any{
+			"repository":     repository,
+			"default_branch": defaultBranch,
+			"vcs_provider":   provider,
+		}).Error)
+		bitbucket := models.ProviderBitbucket
+		require.NoError(t, factoryModel.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+			VCSProvider: &bitbucket,
+		}))
+
+		result, err := builder.ResolveExpression(`order().repository_url`)
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/"+repository+".git", result)
+	})
 }
 
 func Test_NodeConfigurationBuilder_OrderSpecReadsStoredArtifact(t *testing.T) {

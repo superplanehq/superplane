@@ -17,6 +17,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -295,11 +296,32 @@ func (w *FactoryVelocitySyncWorker) listTargetMerges(
 	target models.FactoryVelocitySyncTarget,
 	from, to time.Time,
 ) ([]repositoryMerge, error) {
-	client, err := w.githubClient(target.OrganizationID, target.IntegrationID)
+	provider := vcs.Select(target.VCSProvider, &githubVelocity{
+		worker:         w,
+		organizationID: target.OrganizationID,
+		integrationID:  target.IntegrationID,
+	})
+	merged, err := provider.ListMergedPullRequests(ctx, target.Repository, from, to)
 	if err != nil {
 		return nil, err
 	}
-	return listRepositoryMerges(ctx, client, target.Repository, from, to)
+	return repositoryMergesFromProvider(merged), nil
+}
+
+func repositoryMergesFromProvider(merged []vcs.MergedPullRequest) []repositoryMerge {
+	rows := make([]repositoryMerge, len(merged))
+	for i, merge := range merged {
+		rows[i] = repositoryMerge{
+			repository:      merge.Repository,
+			number:          merge.Number,
+			source:          merge.Source,
+			authorLogin:     merge.AuthorLogin,
+			authorName:      merge.AuthorName,
+			authorAvatarURL: merge.AuthorAvatarURL,
+			mergedAt:        merge.MergedAt,
+		}
+	}
+	return rows
 }
 
 func (w *FactoryVelocitySyncWorker) recordSyncError(
