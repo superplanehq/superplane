@@ -946,6 +946,21 @@ CREATE TABLE public.hosted_llm_providers (
 
 
 --
+-- Name: installation_license_keys; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_license_keys (
+    id integer NOT NULL,
+    document text NOT NULL,
+    version bigint NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT installation_license_keys_singleton CHECK ((id = 1)),
+    CONSTRAINT installation_license_keys_version_positive CHECK ((version > 0))
+);
+
+
+--
 -- Name: installation_licenses; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2439,6 +2454,14 @@ ALTER TABLE ONLY public.hosted_llm_providers
 
 ALTER TABLE ONLY public.factory_pull_request_runs
     ADD CONSTRAINT idx_factory_pull_request_runs_run_unique UNIQUE (run_id);
+
+
+--
+-- Name: installation_license_keys installation_license_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_license_keys
+    ADD CONSTRAINT installation_license_keys_pkey PRIMARY KEY (id);
 
 
 --
@@ -5536,7 +5559,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261005155229	f
+20261005202819	f
 \.
 
 

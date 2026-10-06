@@ -14,9 +14,7 @@ import (
 
 var keyIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
 
-// KeySet holds the reviewed public keys that SuperPlane trusts to verify
-// license signatures. It is built from bundled data only and never from the
-// network.
+// KeySet holds public keys that verify signatures.
 type KeySet struct {
 	keys map[string]*ecdsa.PublicKey
 }
@@ -35,9 +33,28 @@ type jwk struct {
 	Y         string `json:"y"`
 }
 
+// PublicKeys finds the public key for a key ID.
+type PublicKeys interface {
+	PublicKey(keyID string) (*ecdsa.PublicKey, bool)
+}
+
 // ParseKeySet parses a JWKS document and rejects any key that is not an
 // ES256 P-256 signing key with a unique, well-formed key ID.
 func ParseKeySet(data []byte) (*KeySet, error) {
+	set, err := ParseOptionalKeySet(data)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(set.keys) == 0 {
+		return nil, errors.New("key set has no keys")
+	}
+
+	return set, nil
+}
+
+// ParseOptionalKeySet is ParseKeySet, but it accepts a key set without keys.
+func ParseOptionalKeySet(data []byte) (*KeySet, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 
@@ -46,12 +63,12 @@ func ParseKeySet(data []byte) (*KeySet, error) {
 		return nil, fmt.Errorf("decode key set: %w", err)
 	}
 
-	if len(set.Keys) == 0 {
-		return nil, errors.New("key set has no keys")
-	}
+	return newKeySet(set.Keys)
+}
 
-	keys := make(map[string]*ecdsa.PublicKey, len(set.Keys))
-	for _, key := range set.Keys {
+func newKeySet(jwks []jwk) (*KeySet, error) {
+	keys := make(map[string]*ecdsa.PublicKey, len(jwks))
+	for _, key := range jwks {
 		publicKey, err := key.publicKey()
 		if err != nil {
 			return nil, fmt.Errorf("key %q: %w", key.KeyID, err)
@@ -95,7 +112,11 @@ func (k *KeySet) KeyIDs() []string {
 	return keyIDs
 }
 
-func (k *KeySet) lookup(keyID string) (*ecdsa.PublicKey, bool) {
+func (k *KeySet) Len() int {
+	return len(k.keys)
+}
+
+func (k *KeySet) PublicKey(keyID string) (*ecdsa.PublicKey, bool) {
 	publicKey, ok := k.keys[keyID]
 	return publicKey, ok
 }

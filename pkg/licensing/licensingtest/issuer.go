@@ -120,6 +120,37 @@ func (i *Issuer) License(features ...licensing.Feature) []byte {
 	return i.Sign(Claims(features...))
 }
 
+// KeyListClaims returns valid key list claims that trust the signers.
+func KeyListClaims(version int64, signers ...*Issuer) map[string]any {
+	var set struct {
+		Keys []map[string]string `json:"keys"`
+	}
+	if err := json.Unmarshal(JWKS(signers...), &set); err != nil {
+		panic(fmt.Sprintf("decode test key set: %v", err))
+	}
+
+	return map[string]any{
+		"iss":     licensing.ExpectedIssuer,
+		"aud":     licensing.KeyListAudience,
+		"version": version,
+		"iat":     time.Now().Unix(),
+		"keys":    set.Keys,
+	}
+}
+
+func KeyListHeader(keyID string) map[string]any {
+	return map[string]any{
+		"alg": licensing.SigningAlgorithm,
+		"kid": keyID,
+		"typ": licensing.KeyListType,
+	}
+}
+
+// KeyList signs, as a root key, a key list that trusts the signers.
+func (i *Issuer) KeyList(version int64, signers ...*Issuer) []byte {
+	return i.SignWithHeader(KeyListHeader(i.KeyID), KeyListClaims(version, signers...))
+}
+
 // StaticSource is a read-only license source for tests.
 type StaticSource struct {
 	Raw []byte
