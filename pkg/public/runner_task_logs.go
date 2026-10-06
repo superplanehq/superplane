@@ -32,6 +32,7 @@ func (s *Server) handleRunnerTaskLogs(w http.ResponseWriter, r *http.Request) {
 		"read",
 	)
 	if err != nil {
+		middleware.SetServerError(r.Context(), err, nil)
 		http.Error(w, "Authorization check failed", http.StatusInternalServerError)
 		return
 	}
@@ -53,7 +54,7 @@ func (s *Server) handleRunnerTaskLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	access, err := runneraction.ResolveLiveLogAccess(user.OrganizationID, canvasID, executionID)
 	if err != nil {
-		writeRunnerLiveLogSessionError(w, err)
+		writeRunnerLiveLogSessionError(w, r, err)
 		return
 	}
 	if access.TaskBackend != core.RunnerTaskBackendIntegrated {
@@ -90,7 +91,7 @@ func (s *Server) serveRunnerTaskLogs(
 		return
 	}
 	if err != nil {
-		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
+		writeCouldNotReadTaskLogs(w, r, err)
 		return
 	}
 
@@ -133,7 +134,7 @@ func (s *Server) serveRunnerTaskLogs(
 		return
 	}
 	if err != nil {
-		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
+		writeCouldNotReadTaskLogs(w, r, err)
 		return
 	}
 	defer result.Content.Close()
@@ -146,7 +147,7 @@ func (s *Server) serveRunnerTaskLogs(
 	writeRunnerLogState(w, state, result.Cursor)
 	content, err := io.ReadAll(result.Content)
 	if err != nil {
-		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
+		writeCouldNotReadTaskLogs(w, r, err)
 		return
 	}
 	if len(content) == 0 {
@@ -155,6 +156,11 @@ func (s *Server) serveRunnerTaskLogs(
 	}
 	w.Header().Set("Content-Type", "application/x-ndjson")
 	_, _ = w.Write(content)
+}
+
+func writeCouldNotReadTaskLogs(w http.ResponseWriter, r *http.Request, err error) {
+	middleware.SetServerError(r.Context(), err, nil)
+	http.Error(w, "Could not read task logs", http.StatusInternalServerError)
 }
 
 func writeRunnerLogState(w http.ResponseWriter, state, cursor string) {
@@ -190,7 +196,7 @@ func (s *Server) serveFinalRunnerTaskLog(
 	if key == "" {
 		installationID, err := models.GetInstallationID(database.DB(r.Context()))
 		if err != nil {
-			http.Error(w, "Could not read task logs", http.StatusInternalServerError)
+			writeCouldNotReadTaskLogs(w, r, err)
 			return
 		}
 		key = runnerlogs.FinalKey(installationID, task.OrganizationID, task.ID)
@@ -201,13 +207,13 @@ func (s *Server) serveFinalRunnerTaskLog(
 		return
 	}
 	if err != nil {
-		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
+		writeCouldNotReadTaskLogs(w, r, err)
 		return
 	}
 
 	reader, err := provider.Get(r.Context(), key)
 	if err != nil {
-		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
+		writeCouldNotReadTaskLogs(w, r, err)
 		return
 	}
 	defer reader.Close()

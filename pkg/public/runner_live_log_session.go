@@ -50,7 +50,7 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 
 	access, err := runneraction.ResolveLiveLogAccess(user.OrganizationID, canvasID, executionID)
 	if err != nil {
-		writeRunnerLiveLogSessionError(w, err)
+		writeRunnerLiveLogSessionError(w, r, err)
 		return
 	}
 	if access.TaskBackend == core.RunnerTaskBackendIntegrated {
@@ -90,7 +90,7 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func writeRunnerLiveLogSessionError(w http.ResponseWriter, err error) {
+func writeRunnerLiveLogSessionError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, runneraction.ErrLiveLogCanvasNotFound):
 		http.Error(w, "Canvas not found", http.StatusNotFound)
@@ -108,6 +108,7 @@ func writeRunnerLiveLogSessionError(w http.ResponseWriter, err error) {
 			http.StatusNotFound,
 		)
 	default:
+		middleware.SetServerError(r.Context(), err, nil)
 		http.Error(w, "Lookup failed", http.StatusInternalServerError)
 	}
 }
