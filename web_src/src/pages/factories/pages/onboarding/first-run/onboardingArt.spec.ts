@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import type { FirstRunArtScene } from "./firstRunArtScene";
-import { onboardingArtMountOptions } from "./onboardingArt";
+import { onboardingArtMountOptions, onboardingArtScriptUrl } from "./onboardingArt";
 
 const globe: FirstRunArtScene = {
   mode: "globe",
@@ -9,6 +9,13 @@ const globe: FirstRunArtScene = {
   arrowColor: "#eeede9",
   count: 100,
 };
+
+describe("onboardingArtScriptUrl", () => {
+  it("requests the scripts from the asset route the production server serves", () => {
+    expect(onboardingArtScriptUrl("three.min.js")).toBe("/assets/onboarding/three.min.js");
+    expect(onboardingArtScriptUrl("superplane-art.js", "/app")).toBe("/app/assets/onboarding/superplane-art.js");
+  });
+});
 
 describe("onboardingArtMountOptions", () => {
   it("mounts the owned script with the preview options", () => {

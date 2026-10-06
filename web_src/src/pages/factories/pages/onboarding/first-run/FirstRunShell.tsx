@@ -220,12 +220,12 @@ function PreviewShell({
         <img src={wordmark} alt="SuperPlane" className="h-[21px] w-auto self-start" data-testid="first-run-logo" />
         <div
           className={cn(
-            "flex min-h-0 flex-1 items-center overflow-y-auto",
+            "flex min-h-0 flex-1 flex-col overflow-y-auto",
             contentSpacing === "compact" ? "py-16" : "py-8",
           )}
           data-testid="first-run-content"
         >
-          <div className={PREVIEW_CONTENT_CLASS}>
+          <div className={cn(PREVIEW_CONTENT_CLASS, "my-auto shrink-0")}>
             {children}
             <FirstRunBack onBack={chrome?.onBack} disabled={controlsDisabled} preview />
           </div>
@@ -233,8 +233,17 @@ function PreviewShell({
         <div className="flex items-center justify-between pt-4" data-testid="first-run-bottom-row">
           <div className="flex items-center gap-3">
             <FirstRunLogOut onLogOut={chrome?.onLogOut} disabled={controlsDisabled} preview />
-            <FirstRunOrganizationSwitch organizationSwitch={chrome?.organizationSwitch} disabled={controlsDisabled} />
-            <FirstRunWorkspaceSwitch switcher={chrome?.workspaceSwitch} disabled={controlsDisabled} inline />
+            <FirstRunOrganizationSwitch
+              organizationSwitch={chrome?.organizationSwitch}
+              disabled={controlsDisabled}
+              menuStyle={PREVIEW_TOKENS}
+            />
+            <FirstRunWorkspaceSwitch
+              switcher={chrome?.workspaceSwitch}
+              disabled={controlsDisabled}
+              inline
+              menuStyle={PREVIEW_TOKENS}
+            />
           </div>
           <FirstRunProgress chrome={chrome} preview />
         </div>
@@ -382,9 +391,11 @@ function FirstRunProgress({ chrome, preview = false }: { chrome?: FirstRunChrome
 function FirstRunOrganizationSwitch({
   organizationSwitch,
   disabled,
+  menuStyle,
 }: {
   organizationSwitch: FirstRunChrome["organizationSwitch"];
   disabled?: boolean;
+  menuStyle?: CSSProperties;
 }) {
   if (!organizationSwitch) return null;
 
@@ -403,7 +414,7 @@ function FirstRunOrganizationSwitch({
           <ArrowRightLeft className="size-4" aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64">
+      <DropdownMenuContent align="start" className="w-64" style={menuStyle} data-testid="first-run-organization-menu">
         <OrganizationSwitchMenu
           currentOrganizationRouteId={organizationSwitch.currentOrganizationRouteId}
           navigateToCurrentOrganization

@@ -45,10 +45,9 @@ export function onboardingArtMountOptions(scene: FirstRunArtScene): OnboardingAr
   return options;
 }
 
-function onboardingAsset(file: string): string {
-  const base = import.meta.env.BASE_URL || "/";
+export function onboardingArtScriptUrl(file: string, base = import.meta.env.BASE_URL || "/"): string {
   const prefix = base.endsWith("/") ? base : `${base}/`;
-  return `${prefix}onboarding/${file}`;
+  return `${prefix}assets/onboarding/${file}`;
 }
 
 function loadScript(src: string): Promise<void> {
@@ -91,8 +90,8 @@ function externalScriptsUnavailable(): boolean {
 export async function loadOnboardingArt(): Promise<void> {
   if (window.THREE && window.SuperplaneArt) return;
   if (externalScriptsUnavailable()) return;
-  await loadScript(onboardingAsset("three.min.js"));
-  await loadScript(onboardingAsset("superplane-art.js"));
+  await loadScript(onboardingArtScriptUrl("three.min.js"));
+  await loadScript(onboardingArtScriptUrl("superplane-art.js"));
 }
 
 export function mountOnboardingArt(target: HTMLElement, scene: FirstRunArtScene): OnboardingArtHandle | null {
