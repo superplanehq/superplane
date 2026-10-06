@@ -30,6 +30,13 @@ export const FIRST_RUN_COPY = {
     connectHeadline: "Connect SuperPlane to Bitbucket",
     connectBody:
       "Connect a Bitbucket workspace with an access token. SuperPlane uses it to read your code and open pull requests.",
+    connectAccountBody: "Connect your Bitbucket account. SuperPlane uses it to find repositories you can open.",
+    grantBody: "A workspace admin must install SuperPlane on the Bitbucket workspace.",
+    grantAction: "Install SuperPlane on Bitbucket",
+    openingBitbucket: "Opening Bitbucket…",
+    grantLinkLabel: "Installation link",
+    copyLink: "Copy link",
+    copied: "Copied",
     connectAction: "Connect Bitbucket",
     repositoryHelper: "SuperPlane opens pull requests in this Bitbucket repository for review.",
     loading: "Loading Bitbucket repositories…",

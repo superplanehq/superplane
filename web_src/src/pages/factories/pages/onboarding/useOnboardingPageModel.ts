@@ -172,6 +172,7 @@ function useOnboardingMutations(organizationId: string, factoryId: string) {
   return {
     updateFactory: useUpdateFactory(organizationId, factoryId),
     selectGitHubRepository: useSelectFactoryVcsProviderRepository(organizationId, factoryId, "github"),
+    selectBitbucketForgeRepository: useSelectFactoryVcsProviderRepository(organizationId, factoryId, "bitbucket"),
     updateOnboarding: useFactoryOnboarding(organizationId, factoryId),
     updateOrganization: useUpdateOrganization(organizationId),
     createLine: useCreateFactoryLine(organizationId, factoryId),
@@ -276,6 +277,21 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
   };
   // The backend reads the provider from the integration, so the workspace
   // becomes a Bitbucket workspace when this save completes.
+  const selectBitbucketForgeRepository = async (fullName: string): Promise<boolean> => {
+    if (!fullName) return false;
+    return runSave(args.setSaving, async () => {
+      const factory = await args.mutations.selectBitbucketForgeRepository.mutateAsync({ repository: fullName });
+      const integrationId = factory.onboarding?.vcsIntegrationId;
+      if (!integrationId) throw new Error("Bitbucket repository selection returned no integration");
+      const installationName = await describeGitHubInstallationName(args.organizationId, integrationId);
+      args.integrations.setSelections((current) => ({
+        ...current,
+        bitbucket: { id: integrationId, name: installationName || "bitbucket", ready: true },
+      }));
+      args.setup.selectVcsHost("bitbucket");
+      args.setup.selectRepo(fullName);
+    });
+  };
   const selectBitbucketRepository = async (fullName: string): Promise<boolean> => {
     if (!bitbucketIntegrationId || !fullName) return false;
     return runSave(args.setSaving, async () => {
@@ -297,6 +313,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     finishSetup,
     selectCatalogRepository,
     selectBitbucketRepository,
+    selectBitbucketForgeRepository,
     jira,
     linear,
     installer,
@@ -406,6 +423,7 @@ export function useOnboardingPageModel(args: {
     requestConnect,
     selectCatalogRepository: wired.selectCatalogRepository,
     selectBitbucketRepository: wired.selectBitbucketRepository,
+    selectBitbucketForgeRepository: wired.selectBitbucketForgeRepository,
     bitbucketIntegrationId: wired.bitbucketIntegrationId,
     integrationDialogs: createElement(OnboardingConnectDialogs, {
       connectDialogs: connect.dialogs,

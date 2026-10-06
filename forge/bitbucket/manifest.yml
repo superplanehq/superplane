@@ -1,0 +1,70 @@
+# SuperPlane Bitbucket Forge app.
+#
+# Replace app.id after `forge register`.
+# Replace remotes.baseUrl with the public tunnel for this environment.
+# Each environment (production, staging, a developer tunnel) needs its own
+# Forge environment and remote URL.
+#
+# The scheduled trigger calls the remote directly so the system token is
+# valid for at least two hours. Do not route that trigger through a function.
+modules:
+  trigger:
+    - key: lifecycle
+      endpoint: lifecycle
+      events:
+        - avi:forge:installed:app
+        - avi:forge:upgraded:app
+  scheduledTrigger:
+    - key: token-refresh
+      endpoint: token-refresh
+      interval: hour
+  webtrigger:
+    - key: bootstrap
+      function: bootstrap
+
+function:
+  - key: bootstrap
+    handler: index.bootstrap
+
+endpoint:
+  - key: lifecycle
+    remote: superplane
+    route:
+      path: /api/v1/bitbucket/forge/lifecycle
+    auth:
+      appSystemToken:
+        enabled: true
+  - key: token-refresh
+    remote: superplane
+    route:
+      path: /api/v1/bitbucket/forge/scheduled
+    auth:
+      appSystemToken:
+        enabled: true
+  - key: bootstrap-remote
+    remote: superplane
+    route:
+      path: /api/v1/bitbucket/forge/bootstrap
+    auth:
+      appSystemToken:
+        enabled: true
+
+remotes:
+  - key: superplane
+    baseUrl: https://example.invalid
+
+permissions:
+  scopes:
+    - read:app-system-token
+    - read:repository:bitbucket
+    - write:repository:bitbucket
+    - read:pullrequest:bitbucket
+    - write:pullrequest:bitbucket
+    - read:workspace:bitbucket
+
+app:
+  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  runtime:
+    name: nodejs22.x
+  licensing:
+    enabled: false
