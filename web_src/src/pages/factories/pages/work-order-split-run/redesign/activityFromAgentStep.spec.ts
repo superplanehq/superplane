@@ -171,4 +171,49 @@ describe("activityFromAgentStep", () => {
       }),
     );
   });
+
+  it("keeps a failed prompt red without failing the step when the run passed", () => {
+    const section: CommandSection = {
+      index: 1,
+      text: "Refine Task",
+      kind: "prompt",
+      preview: "You refine draft tasks so a coding agent can build them in one run.",
+      lines: ["OpenCode started"],
+      events: [{ kind: "note", text: "OpenCode started" }],
+      status: "failed",
+      duration_ms: 20,
+      started_at: 1,
+      collapsed: true,
+    };
+    const step = agentStepsFromNotes(notesFromLiveLogSections("agent", [section], "passed"), "passed")[0];
+    const command = activityFromAgentStep(step!)?.items[0];
+
+    expect(step?.status).toBe("passed");
+    expect(command).toEqual(
+      expect.objectContaining({
+        type: "tool",
+        input: "You refine draft tasks so a coding agent can build them in one run.",
+        status: "failed",
+      }),
+    );
+  });
+
+  it("fails the prompt step that stopped the run", () => {
+    const section: CommandSection = {
+      index: 1,
+      text: "Refine Task",
+      kind: "prompt",
+      preview: "You refine draft tasks so a coding agent can build them in one run.",
+      lines: [],
+      events: [],
+      status: "failed",
+      duration_ms: 20,
+      started_at: 1,
+      collapsed: true,
+    };
+    const step = agentStepsFromNotes(notesFromLiveLogSections("agent", [section], "failed"), "failed")[0];
+
+    expect(step?.status).toBe("failed");
+    expect(activityFromAgentStep(step!)?.items[0]).toEqual(expect.objectContaining({ status: "failed" }));
+  });
 });

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -17,6 +19,7 @@ import (
 
 type fakeEC2 struct {
 	describeOutput *ec2.DescribeInstancesOutput
+	describeInput  *ec2.DescribeInstancesInput
 	runOutputs     []*ec2.RunInstancesOutput
 	runErrors      []error
 	runInputs      []*ec2.RunInstancesInput
@@ -25,10 +28,11 @@ type fakeEC2 struct {
 }
 
 func (f *fakeEC2) DescribeInstances(
-	context.Context,
-	*ec2.DescribeInstancesInput,
-	...func(*ec2.Options),
+	_ context.Context,
+	input *ec2.DescribeInstancesInput,
+	_ ...func(*ec2.Options),
 ) (*ec2.DescribeInstancesOutput, error) {
+	f.describeInput = input
 	return f.describeOutput, nil
 }
 
@@ -85,17 +89,85 @@ func TestCreateTagsAWSResourcesWithRunnerIdentity(t *testing.T) {
 	if aws.ToString(input.SubnetId) != "subnet-a" {
 		t.Fatalf("subnet = %q", aws.ToString(input.SubnetId))
 	}
+	if input.MetadataOptions == nil ||
+		input.MetadataOptions.HttpTokens != types.HttpTokensStateRequired ||
+		aws.ToInt32(input.MetadataOptions.HttpPutResponseHopLimit) != 2 {
+		t.Fatalf("metadata options = %#v", input.MetadataOptions)
+	}
 	if got, err := base64.StdEncoding.DecodeString(aws.ToString(input.UserData)); err != nil || string(got) != "#!/bin/bash\n" {
 		t.Fatalf("user data = %q, err = %v", got, err)
 	}
 	tags := tagMap(input.TagSpecifications[0].Tags)
 	if tags[TagKeyRunnerID] != resource.RunnerID ||
 		tags[TagKeyFleetID] != "linux-amd64" ||
-		tags[TagKeyRunnerVersion] != "1.2.3" {
+		tags[TagKeyRunnerVersion] != "1.2.3" ||
+		tags[TagKeyFleetManagerID] != "fleet-manager-production" ||
+		tags["Environment"] != "production" {
 		t.Fatalf("tags = %#v", tags)
+	}
+	if _, exists := tags["superplane_managed_runner"]; exists {
+		t.Fatalf("legacy managed tag is present: %#v", tags)
 	}
 	if len(input.TagSpecifications) != 2 {
 		t.Fatalf("tag specifications = %d, want instance and volume", len(input.TagSpecifications))
+	}
+	volumeTags := tagMap(input.TagSpecifications[1].Tags)
+	if volumeTags[TagKeyFleetManagerID] != "fleet-manager-production" ||
+		volumeTags["Environment"] != "production" {
+		t.Fatalf("volume tags = %#v", volumeTags)
+	}
+}
+
+func TestListFiltersAWSResourcesByFleetManagerAndFleet(t *testing.T) {
+	client := &fakeEC2{describeOutput: &ec2.DescribeInstancesOutput{}}
+	awsProvider := newTestProvider(t, client)
+
+	if _, err := awsProvider.List(context.Background(), "linux-amd64"); err != nil {
+		t.Fatal(err)
+	}
+	filters := filterMap(client.describeInput.Filters)
+	if filters["tag:"+TagKeyFleetManagerID] != "fleet-manager-production" ||
+		filters["tag:"+TagKeyFleetID] != "linux-amd64" {
+		t.Fatalf("filters = %#v", filters)
+	}
+}
+
+func TestNewRejectsResourceTagsThatOverrideReservedTags(t *testing.T) {
+	for _, key := range []string{TagKeyFleetID, tagKeyLegacyManaged} {
+		t.Run(key, func(t *testing.T) {
+			_, err := New(&fakeEC2{}, Config{
+				FleetManagerID:   "fleet-manager-production",
+				AMI:              "ami-123",
+				InstanceType:     "t3.micro",
+				Architecture:     "amd64",
+				SubnetIDs:        []string{"subnet-a"},
+				SecurityGroupIDs: []string{"sg-a"},
+				ResourceTags:     map[string]string{key: "overridden"},
+			}, nil)
+			if err == nil || !strings.Contains(err.Error(), "reserved AWS resource tag") {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}
+
+func TestNewRejectsTooManyResourceTags(t *testing.T) {
+	resourceTags := make(map[string]string, maxCustomResourceTags+1)
+	for index := range maxCustomResourceTags + 1 {
+		resourceTags[fmt.Sprintf("CustomTag%d", index)] = "value"
+	}
+
+	_, err := New(&fakeEC2{}, Config{
+		FleetManagerID:   "fleet-manager-production",
+		AMI:              "ami-123",
+		InstanceType:     "t3.micro",
+		Architecture:     "amd64",
+		SubnetIDs:        []string{"subnet-a"},
+		SecurityGroupIDs: []string{"sg-a"},
+		ResourceTags:     resourceTags,
+	}, nil)
+	if err == nil || !strings.Contains(err.Error(), "at most 44 entries") {
+		t.Fatalf("error = %v", err)
 	}
 }
 
@@ -126,7 +198,7 @@ func TestCreateRetriesNextSubnetWhenAWSCapacityIsUnavailable(t *testing.T) {
 	}
 }
 
-func TestBuildBootstrapUsesPublicArtifactAndExactVersion(t *testing.T) {
+func TestBuildBootstrapUsesPublicArtifactAndConfiguresCloudWatch(t *testing.T) {
 	awsProvider := newTestProvider(t, &fakeEC2{})
 	script, err := awsProvider.BuildBootstrap(provider.RunnerBootstrap{
 		RunnerID:          "runner-1",
@@ -147,6 +219,14 @@ func TestBuildBootstrapUsesPublicArtifactAndExactVersion(t *testing.T) {
 		"sha256sum --check --strict",
 		"--extract",
 		"--gzip",
+		"StandardOutput=append:/var/log/superplane-runner.log",
+		"StandardError=append:/var/log/superplane-runner.log",
+		"amazon-cloudwatch-agent-ctl",
+		`"region":"us-east-1"`,
+		`"log_group_name":"/superplane/runners"`,
+		`"log_stream_name":"{instance_id}"`,
+		"configure_cloudwatch()",
+		"CloudWatch Agent setup failed; runner installation will continue",
 		"set +x",
 		`RUNNER_API_URL="https://superplane.example" \`,
 		`RUNNER_REGISTRATION_TOKEN="short-lived-registration-token" \`,
@@ -155,6 +235,16 @@ func TestBuildBootstrapUsesPublicArtifactAndExactVersion(t *testing.T) {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("bootstrap does not contain %q:\n%s", expected, body)
 		}
+	}
+	agentStart := strings.Index(body, "amazon-cloudwatch-agent-ctl")
+	runnerStart := strings.Index(body, `"$bundle_dir/install.sh"`)
+	if agentStart == -1 || runnerStart == -1 || agentStart > runnerStart {
+		t.Fatalf("CloudWatch Agent must start before the runner:\n%s", body)
+	}
+	command := exec.Command("bash", "-n")
+	command.Stdin = strings.NewReader(body)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("bootstrap shell syntax: %v\n%s", err, output)
 	}
 }
 
@@ -171,12 +261,16 @@ func TestDeleteTreatsMissingAWSInstanceAsSuccess(t *testing.T) {
 func newTestProvider(t *testing.T, client EC2API) *Provider {
 	t.Helper()
 	awsProvider, err := New(client, Config{
+		FleetManagerID:     "fleet-manager-production",
 		AMI:                "ami-123",
 		InstanceType:       "t3.micro",
 		Architecture:       "amd64",
 		SubnetIDs:          []string{"subnet-a", "subnet-b"},
 		SecurityGroupIDs:   []string{"sg-a"},
 		IAMInstanceProfile: "runner-profile",
+		ResourceTags:       map[string]string{"Environment": "production"},
+		CloudWatchRegion:   "us-east-1",
+		CloudWatchLogGroup: "/superplane/runners",
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -188,6 +282,16 @@ func tagMap(tags []types.Tag) map[string]string {
 	values := make(map[string]string, len(tags))
 	for _, tag := range tags {
 		values[aws.ToString(tag.Key)] = aws.ToString(tag.Value)
+	}
+	return values
+}
+
+func filterMap(filters []types.Filter) map[string]string {
+	values := make(map[string]string, len(filters))
+	for _, filter := range filters {
+		if len(filter.Values) == 1 {
+			values[aws.ToString(filter.Name)] = filter.Values[0]
+		}
 	}
 	return values
 }

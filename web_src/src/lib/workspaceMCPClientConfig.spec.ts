@@ -5,6 +5,7 @@ import {
   workspaceMCPClientSnippet,
   workspaceMCPCodexCommand,
   workspaceMCPCursorConfig,
+  workspaceMCPOpenCodeConfig,
   workspaceMCPServerURL,
   workspaceMCPVSCodeConfig,
 } from "./workspaceMCPClientConfig";
@@ -41,10 +42,31 @@ describe("workspaceMCPClientConfig", () => {
     );
   });
 
+  it("builds an OpenCode config object and strips a trailing slash", () => {
+    const openCodeConfig = (url: string) =>
+      JSON.stringify(
+        {
+          mcp: {
+            superplane: {
+              type: "remote",
+              url,
+              enabled: true,
+            },
+          },
+        },
+        null,
+        2,
+      );
+
+    expect(workspaceMCPOpenCodeConfig(ORIGIN)).toBe(openCodeConfig(URL));
+    expect(workspaceMCPOpenCodeConfig("https://app.example.com/")).toBe(openCodeConfig("https://app.example.com/mcp"));
+  });
+
   it("selects the snippet for each tool", () => {
     expect(workspaceMCPClientSnippet("cursor", ORIGIN)).toBe(workspaceMCPCursorConfig(ORIGIN));
     expect(workspaceMCPClientSnippet("claudeCode", ORIGIN)).toBe(workspaceMCPClaudeCodeCommand(ORIGIN));
     expect(workspaceMCPClientSnippet("vscode", ORIGIN)).toBe(workspaceMCPVSCodeConfig(ORIGIN));
     expect(workspaceMCPClientSnippet("codex", ORIGIN)).toBe(workspaceMCPCodexCommand(ORIGIN));
+    expect(workspaceMCPClientSnippet("opencode", ORIGIN)).toBe(workspaceMCPOpenCodeConfig(ORIGIN));
   });
 });

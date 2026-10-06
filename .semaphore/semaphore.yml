@@ -192,6 +192,10 @@ after_pipeline:
           - test-results gen-pipeline-report
 
 promotions:
+  - name: Publish Fleet Manager Image
+    pipeline_file: release-fleet-manager-image.yml
+    deployment_target: ghcr
+
   - name: Deploy to Production
     pipeline_file: deploy-to-production.yml
     deployment_target: production

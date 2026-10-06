@@ -15,7 +15,7 @@ spec:
           > This app is not a factory line step. It listens for pull request
           > events on the app repository.
           >
-          > When a pull request opens or updates on the default branch:
+          > When a pull request opens or updates, and it is not a draft:
           > - The app reviews the diff.
           > - It scores only the checks you turn on.
           > - Risk, performance, security, and drift are stored on the task.

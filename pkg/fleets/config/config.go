@@ -19,15 +19,18 @@ const (
 	defaultInstanceType             = "t3.micro"
 	defaultVolumeSizeGB             = 30
 
+	fleetManagerConfigEnvironment = "FLEET_MANAGER_CONFIG"
+	installationTokenEnvironment  = "INSTALLATION_ADMIN_TOKEN"
+
 	ProviderAWS    = "aws"
 	ProviderDocker = "docker"
 )
 
 type Config struct {
+	ID                       string  `json:"id"`
 	SuperPlaneURL            string  `json:"superplaneUrl"`
 	InstallationAdminToken   string  `json:"installationAdminToken"`
 	RunnerReleaseBaseURL     string  `json:"runnerReleaseBaseUrl"`
-	AWSRegion                string  `json:"awsRegion"`
 	ReconcileIntervalSeconds int     `json:"reconcileIntervalSeconds"`
 	RequestTimeoutSeconds    int     `json:"requestTimeoutSeconds"`
 	Fleets                   []Fleet `json:"fleets"`
@@ -43,16 +46,23 @@ type Fleet struct {
 }
 
 type AWS struct {
-	AMI                  string   `json:"ami"`
-	InstanceType         string   `json:"instanceType"`
-	Architecture         string   `json:"architecture"`
-	SubnetIDs            []string `json:"subnetIds"`
-	SecurityGroupIDs     []string `json:"securityGroupIds"`
-	IAMInstanceProfile   string   `json:"iamInstanceProfile"`
-	KeyName              string   `json:"keyName"`
-	VolumeSizeGB         int32    `json:"volumeSizeGb"`
-	VolumeIOPS           int32    `json:"volumeIops"`
-	VolumeThroughputMBps int32    `json:"volumeThroughputMbps"`
+	Region               string            `json:"region"`
+	AMI                  string            `json:"ami"`
+	InstanceType         string            `json:"instanceType"`
+	Architecture         string            `json:"architecture"`
+	SubnetIDs            []string          `json:"subnetIds"`
+	SecurityGroupIDs     []string          `json:"securityGroupIds"`
+	IAMInstanceProfile   string            `json:"iamInstanceProfile"`
+	KeyName              string            `json:"keyName"`
+	VolumeSizeGB         int32             `json:"volumeSizeGb"`
+	VolumeIOPS           int32             `json:"volumeIops"`
+	VolumeThroughputMBps int32             `json:"volumeThroughputMbps"`
+	ResourceTags         map[string]string `json:"resourceTags"`
+	CloudWatch           CloudWatch        `json:"cloudWatch"`
+}
+
+type CloudWatch struct {
+	LogGroupName string `json:"logGroupName"`
 }
 
 type Docker struct {
@@ -65,21 +75,27 @@ type Docker struct {
 }
 
 func Load(path string) (*Config, error) {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return nil, fmt.Errorf("config path is required")
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("open config: %w", err)
-	}
-	defer file.Close()
-
 	var config Config
-	if err := decode(file, filepath.Ext(path), &config); err != nil {
-		return nil, fmt.Errorf("decode config: %w", err)
+	if body := strings.TrimSpace(os.Getenv(fleetManagerConfigEnvironment)); body != "" {
+		if err := decode(strings.NewReader(body), ".yaml", &config); err != nil {
+			return nil, fmt.Errorf("decode %s: %w", fleetManagerConfigEnvironment, err)
+		}
+	} else {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return nil, fmt.Errorf("config path is required")
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			return nil, fmt.Errorf("open config: %w", err)
+		}
+		defer file.Close()
+
+		if err := decode(file, filepath.Ext(path), &config); err != nil {
+			return nil, fmt.Errorf("decode config: %w", err)
+		}
 	}
-	if token := strings.TrimSpace(os.Getenv("INSTALLATION_ADMIN_TOKEN")); token != "" {
+	if token := strings.TrimSpace(os.Getenv(installationTokenEnvironment)); token != "" {
 		config.InstallationAdminToken = token
 	}
 	config.applyDefaults()
@@ -126,6 +142,7 @@ func (c *Config) RequestTimeout() time.Duration {
 }
 
 func (c *Config) applyDefaults() {
+	c.ID = strings.TrimSpace(c.ID)
 	c.RunnerReleaseBaseURL = strings.TrimRight(
 		strings.TrimSpace(c.RunnerReleaseBaseURL),
 		"/",
@@ -149,9 +166,13 @@ func (c *Config) applyDefaults() {
 			fleet.AWS.VolumeSizeGB = defaultVolumeSizeGB
 		}
 		fleet.ID = strings.TrimSpace(fleet.ID)
+		fleet.AWS.Region = strings.TrimSpace(fleet.AWS.Region)
 		fleet.AWS.Architecture = strings.ToLower(strings.TrimSpace(fleet.AWS.Architecture))
 		fleet.AWS.SubnetIDs = nonEmpty(fleet.AWS.SubnetIDs)
 		fleet.AWS.SecurityGroupIDs = nonEmpty(fleet.AWS.SecurityGroupIDs)
+		fleet.AWS.CloudWatch.LogGroupName = strings.TrimSpace(
+			fleet.AWS.CloudWatch.LogGroupName,
+		)
 		fleet.Docker.Image = strings.TrimSpace(fleet.Docker.Image)
 		fleet.Docker.Architecture = strings.ToLower(
 			strings.TrimSpace(fleet.Docker.Architecture),
@@ -170,6 +191,8 @@ func (c *Config) validate() error {
 	switch {
 	case strings.TrimSpace(c.SuperPlaneURL) == "":
 		return fmt.Errorf("superplaneUrl is required")
+	case c.ID == "":
+		return fmt.Errorf("id is required")
 	case strings.TrimSpace(c.InstallationAdminToken) == "":
 		return fmt.Errorf("installationAdminToken is required")
 	case c.ReconcileIntervalSeconds < 1:
@@ -188,8 +211,6 @@ func (c *Config) validate() error {
 			"latest",
 		):
 			return fmt.Errorf("runnerReleaseBaseUrl must not use latest")
-		case strings.TrimSpace(c.AWSRegion) == "":
-			return fmt.Errorf("awsRegion is required")
 		}
 	}
 
@@ -223,6 +244,8 @@ func (c *Config) validate() error {
 			)
 		case fleet.Provider == ProviderDocker:
 			break
+		case fleet.AWS.Region == "":
+			return fmt.Errorf("%s.aws.region is required", prefix)
 		case strings.TrimSpace(fleet.AWS.AMI) == "":
 			return fmt.Errorf("%s.aws.ami is required", prefix)
 		case fleet.AWS.Architecture != "amd64" && fleet.AWS.Architecture != "arm64":

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { FACTORY_SIDE_HANDLE_ID, factoryRunLeafEdgeKey, layoutFactoryRunLeafGraph } from "./factoryRunLeafLayout";
+import { FACTORY_NODE_CARD_WIDTH, FACTORY_NODE_STEP_CARD_WIDTH } from "@/lib/factoryCanvasChrome";
+import { factoryRunLeafEdgeKey, layoutFactoryRunLeafGraph } from "./factoryRunLeafLayout";
 
 function expectNoOverlaps(positions: Map<string, { x: number; y: number }>, width = 280, height = 104, gap = 8) {
   const ids = [...positions.keys()];
@@ -106,7 +107,7 @@ describe("layoutFactoryRunLeafGraph", () => {
     expect(secondGutter).toBe(firstGutter);
   });
 
-  it("keeps the longest non-leaf path on the spine and parks leaves to the right", () => {
+  it("keeps the longest chain on the spine and parks extra leaves to the right", () => {
     const result = layoutFactoryRunLeafGraph(
       [{ id: "a" }, { id: "b" }, { id: "leaf1" }, { id: "leaf2" }, { id: "d" }, { id: "e" }],
       [
@@ -132,16 +133,17 @@ describe("layoutFactoryRunLeafGraph", () => {
 
     expect(leaf1.x).toBeGreaterThan(b.x);
     expect(leaf2.x).toBe(leaf1.x);
-    expect(e.x).toBeGreaterThan(d.x);
+    expect(e.x).toBe(d.x);
+    expect(e.y).toBeGreaterThan(d.y);
     expect(result.sideHandleNodeIds.has("b")).toBe(true);
-    expect(result.sideHandleNodeIds.has("d")).toBe(true);
+    expect(result.sideHandleNodeIds.has("d")).toBe(false);
     expect(result.leafEdgeKeys.has(factoryRunLeafEdgeKey("b", "leaf1", "default"))).toBe(true);
     expect(result.leafEdgeKeys.has(factoryRunLeafEdgeKey("b", "d", "default"))).toBe(false);
-    expect(result.leafEdgeKeys.has(factoryRunLeafEdgeKey("d", "e", "default"))).toBe(true);
+    expect(result.spineEdgeKeys.has(factoryRunLeafEdgeKey("d", "e", "default"))).toBe(true);
     expectNoOverlaps(result.positions);
   });
 
-  it("parks a terminal leaf one column right when extra roots merge into the spine", () => {
+  it("keeps a merged chain in one column when extra roots join it", () => {
     const result = layoutFactoryRunLeafGraph(
       [
         { id: "onComment" },
@@ -167,13 +169,31 @@ describe("layoutFactoryRunLeafGraph", () => {
     const onReviewComment = result.positions.get("onReviewComment")!;
 
     expect(addActivity.x).toBe(findPr.x);
-    expect(claude.x).toBe(onReview.x);
-    expect(claude.x).toBeLessThan(onReviewComment.x);
-    expect(claude.y).toBe(addActivity.y);
+    expect(claude.x).toBe(addActivity.x);
+    expect(claude.y).toBeGreaterThan(addActivity.y);
+    expect(onReview.x).toBeGreaterThan(findPr.x);
+    expect(onReviewComment.x).toBeGreaterThan(onReview.x);
     expectNoOverlaps(result.positions);
   });
 
-  it("treats a terminal-only successor as a side leaf", () => {
+  it("aligns card centers when one card is wider", () => {
+    const result = layoutFactoryRunLeafGraph(
+      [
+        { id: "find", width: FACTORY_NODE_CARD_WIDTH },
+        { id: "run", width: FACTORY_NODE_STEP_CARD_WIDTH },
+      ],
+      [{ source: "find", target: "run", sourceHandle: "found" }],
+    );
+
+    const find = result.positions.get("find")!;
+    const run = result.positions.get("run")!;
+
+    expect(find.x + FACTORY_NODE_CARD_WIDTH / 2).toBe(run.x + FACTORY_NODE_STEP_CARD_WIDTH / 2);
+    expect(run.y).toBeGreaterThan(find.y);
+    expect(result.spineEdgeKeys.has(factoryRunLeafEdgeKey("find", "run", "found"))).toBe(true);
+  });
+
+  it("keeps a single successor in the same column", () => {
     const result = layoutFactoryRunLeafGraph(
       [{ id: "a" }, { id: "b" }],
       [{ source: "a", target: "b", sourceHandle: "default" }],
@@ -181,10 +201,10 @@ describe("layoutFactoryRunLeafGraph", () => {
 
     const a = result.positions.get("a")!;
     const b = result.positions.get("b")!;
-    expect(b.x).toBeGreaterThan(a.x);
-    expect(result.sideHandleNodeIds.has("a")).toBe(true);
-    expect(result.leafEdgeKeys.size).toBe(1);
-    expect(FACTORY_SIDE_HANDLE_ID).toBe("__factorySide");
+    expect(b.x).toBe(a.x);
+    expect(b.y).toBeGreaterThan(a.y);
+    expect(result.sideHandleNodeIds.has("a")).toBe(false);
+    expect(result.spineEdgeKeys.has(factoryRunLeafEdgeKey("a", "b", "default"))).toBe(true);
   });
 
   it("puts the shorter fork to the right as a subtree when a router has two non-leaf branches", () => {
@@ -212,9 +232,11 @@ describe("layoutFactoryRunLeafGraph", () => {
     expect(s1.y).toBeGreaterThan(success.y);
 
     expect(failed.x).toBeGreaterThan(router.x);
-    expect(f1.x).toBeGreaterThan(failed.x);
+    expect(f1.x).toBe(failed.x);
+    expect(f1.y).toBeGreaterThan(failed.y);
 
-    expect(s2.x).toBeGreaterThan(s1.x);
+    expect(s2.x).toBe(s1.x);
+    expect(s2.y).toBeGreaterThan(s1.y);
     expect(result.leafEdgeKeys.has(factoryRunLeafEdgeKey("router", "failed", "false"))).toBe(true);
     expect(result.leafEdgeKeys.has(factoryRunLeafEdgeKey("router", "success", "true"))).toBe(false);
     expect(result.displaySourceNodeIds.has("router")).toBe(true);

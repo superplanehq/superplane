@@ -3,7 +3,8 @@
  *
  * Sugiyama-inspired:
  * - Rank nodes by longest-path layer from roots.
- * - Spine column = deepest non-leaf chain; forks get columns to the right.
+ * - A single successor stays in the spine column, including a node that ends the graph.
+ * - When a node forks, the longest continuing chain stays on the spine and other branches go to the right.
  * - Each node placed once (merges share one slot).
  * - Side vs spine edge class is decided from final geometry only.
  *

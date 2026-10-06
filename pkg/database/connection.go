@@ -101,6 +101,10 @@ func buildPostgresDSN(c DSNConfig, statementTimeout, idleInTxTimeout time.Durati
 	return u.String()
 }
 
+func openAppDB(dsn string, cfg *gorm.Config) (*gorm.DB, error) {
+	return gorm.Open(postgres.Open(dsn), cfg)
+}
+
 func OpenDedicatedSQLDB(applicationName string, maxOpenConns int) (*sql.DB, error) {
 	c := dsnConfigFromEnv()
 	if applicationName != "" {
@@ -109,7 +113,7 @@ func OpenDedicatedSQLDB(applicationName string, maxOpenConns int) (*sql.DB, erro
 	cfg := LoadConfig()
 	dsn := buildPostgresDSN(c, cfg.StatementTimeout, cfg.IdleInTransactionSessionTimeout)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := openAppDB(dsn, &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -125,6 +129,7 @@ func OpenDedicatedSQLDB(applicationName string, maxOpenConns int) (*sql.DB, erro
 	sqlDB.SetMaxOpenConns(maxOpenConns)
 	sqlDB.SetMaxIdleConns(maxOpenConns)
 	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
+	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	return sqlDB, nil
 }
@@ -142,7 +147,7 @@ func connect() *gorm.DB {
 	})
 	logger := newGormTimeoutLogger(baseLogger)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger})
+	db, err := openAppDB(dsn, &gorm.Config{Logger: logger})
 	if err != nil {
 		panic(err)
 	}
@@ -155,6 +160,7 @@ func connect() *gorm.DB {
 	sqlDB.SetMaxOpenConns(dbPoolSize())
 	sqlDB.SetMaxIdleConns(dbPoolSize())
 	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
+	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	log.Printf(
 		"[database] enforced timeouts: max_open=%d DB_STATEMENT_TIMEOUT=%s DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT=%s host=%s dbname=%s",
@@ -224,6 +230,7 @@ func TruncateTables() error {
 			role_metadata,
 			group_metadata,
 			installation_metadata,
+			installation_licenses,
 			workflows,
 			workflow_runs,
 			workflow_nodes,

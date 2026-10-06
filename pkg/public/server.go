@@ -33,6 +33,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/mcpserver"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -96,6 +97,13 @@ type Server struct {
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
 	isDev                 bool
+	licenseService        *licensing.Service
+}
+
+// SetLicenseService connects the installation license. Without it, the server
+// runs in Community mode and grants no Enterprise features.
+func (s *Server) SetLicenseService(service *licensing.Service) {
+	s.licenseService = service
 }
 
 // WebsocketHub returns the websocket hub for this server

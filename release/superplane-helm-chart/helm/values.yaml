@@ -67,6 +67,15 @@ encryption:
   secretName: ""
   key: ""
 
+#
+# Optional Enterprise license from an existing Kubernetes secret. When set,
+# the mounted file is the only license source and administrators cannot
+# change the license in the UI. Leave empty to install the license in the UI.
+#
+license:
+  secretName: ""
+  secretKey: "license.jws"
+
 telemetry:
   secretName: ""
   opentelemetry:

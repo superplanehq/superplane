@@ -946,6 +946,20 @@ CREATE TABLE public.hosted_llm_providers (
 
 
 --
+-- Name: installation_licenses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_licenses (
+    id integer NOT NULL,
+    encrypted_license bytea NOT NULL,
+    installed_by uuid,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT installation_licenses_singleton CHECK ((id = 1))
+);
+
+
+--
 -- Name: installation_llm_settings; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2425,6 +2439,14 @@ ALTER TABLE ONLY public.hosted_llm_providers
 
 ALTER TABLE ONLY public.factory_pull_request_runs
     ADD CONSTRAINT idx_factory_pull_request_runs_run_unique UNIQUE (run_id);
+
+
+--
+-- Name: installation_licenses installation_licenses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_licenses
+    ADD CONSTRAINT installation_licenses_pkey PRIMARY KEY (id);
 
 
 --
@@ -4955,6 +4977,14 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
+-- Name: installation_licenses installation_licenses_installed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_licenses
+    ADD CONSTRAINT installation_licenses_installed_by_fkey FOREIGN KEY (installed_by) REFERENCES public.accounts(id) ON DELETE SET NULL;
+
+
+--
 -- Name: organization_hosted_model_allowlists organization_hosted_model_allowlists_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5506,7 +5536,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261004143358	f
+20261005155229	f
 \.
 
 

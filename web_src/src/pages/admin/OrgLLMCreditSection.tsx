@@ -18,6 +18,7 @@ import {
   utcCalendarDate,
   type CreditBalanceBucket,
   type CreditBalanceInputs,
+  type OrganizationBillingPlan,
   type OrganizationLLMCredit,
 } from "./useOrgLLMCredit";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -60,6 +61,7 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
           credit={credit.credit}
           polarManaged={credit.plan?.polar_managed === true}
           planKnown={credit.plan != null}
+          savedPlan={credit.plan}
           savedTrialEndsAt={credit.plan?.trial_ends_at ?? null}
         />
       ) : null}
@@ -157,6 +159,7 @@ function OrgHostedCreditCard(args: {
   grants: OrganizationsOrganizationCreditGrant[];
   polarManaged: boolean;
   planKnown: boolean;
+  savedPlan: OrganizationBillingPlan | null;
   balanceInputs: CreditBalanceInputs;
   setBalanceInput: (bucket: CreditBalanceBucket, value: string) => void;
   note: string;
@@ -178,7 +181,7 @@ function OrgHostedCreditCard(args: {
   saveMarkup: () => void;
   savePlan: () => void;
 }) {
-  const trialActive = isTrialCreditActive(args.credit.welcome_credit_expires_at);
+  const trialFieldLocked = trialBalanceLocked(args.credit.welcome_credit_expires_at, args.savedPlan);
 
   return (
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 p-4 dark:bg-gray-900 dark:outline-gray-700/70">
@@ -194,7 +197,7 @@ function OrgHostedCreditCard(args: {
         savingPlan={args.savingPlan}
         savePlan={args.savePlan}
       />
-      <CreditBalanceMetrics credit={args.credit} trialActive={trialActive} />
+      <CreditBalanceMetrics credit={args.credit} />
       <div className="mt-6">
         <Heading level={3} className="text-gray-800 text-sm dark:text-gray-100">
           Set balances
@@ -210,7 +213,7 @@ function OrgHostedCreditCard(args: {
               currentCents={creditRemainingCents(args.credit, bucket)}
               value={args.balanceInputs[bucket]}
               onChange={(value) => args.setBalanceInput(bucket, value)}
-              disabledReason={bucket === "trial" && !trialActive ? ADMIN_NO_ACTIVE_TRIAL_COPY : null}
+              disabledReason={bucket === "trial" && trialFieldLocked ? ADMIN_NO_ACTIVE_TRIAL_COPY : null}
               saving={args.savingBalance === bucket}
               busy={args.savingBalance !== null}
               onSave={() => args.saveBalance(bucket)}
@@ -240,7 +243,8 @@ function OrgHostedCreditCard(args: {
   );
 }
 
-function CreditBalanceMetrics({ credit, trialActive }: { credit: OrganizationLLMCredit; trialActive: boolean }) {
+function CreditBalanceMetrics({ credit }: { credit: OrganizationLLMCredit }) {
+  const trialActive = isTrialCreditActive(credit.welcome_credit_expires_at);
   return (
     <>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -409,6 +413,21 @@ function balanceChangeCopy(changeCents: number | null): string {
     return "No change.";
   }
   return `Ledger change: ${formatCreditGrantAmount(changeCents)}`;
+}
+
+function trialBalanceLocked(
+  welcomeExpiresAt: string | null | undefined,
+  savedPlan: OrganizationBillingPlan | null,
+): boolean {
+  return !isTrialCreditActive(welcomeExpiresAt) && !isOpenNonPolarTrial(savedPlan);
+}
+
+function isOpenNonPolarTrial(plan: OrganizationBillingPlan | null, now: Date = new Date()): boolean {
+  if (plan == null || plan.polar_managed || plan.plan !== "trial" || plan.trial_ends_at == null) {
+    return false;
+  }
+  const endsAt = new Date(plan.trial_ends_at);
+  return !Number.isNaN(endsAt.getTime()) && endsAt.getTime() > now.getTime();
 }
 
 function isTrialCreditActive(expiresAt: string | null | undefined, now: Date = new Date()): boolean {
