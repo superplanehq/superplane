@@ -8,10 +8,9 @@ import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
   boardCardLoadsConfidenceChecks,
   clarityScoreFromChecks,
-  confidenceCheckLevel,
   confidenceScoreFromChecks,
 } from "../lib/confidenceScore";
-import { planningReviewFromChecks } from "../lib/planningReviewScore";
+import { planningReviewFromChecks, planningReviewLevel } from "../lib/planningReviewScore";
 import { LOADING_REVEAL_CLASSNAME } from "../lib/loadingReveal";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -159,7 +158,7 @@ function cardScores(
       name: check.name ?? "",
       score: check.score ?? 0,
       maxScore: check.maxScore ?? 5,
-      level: confidenceCheckLevel(check.score ?? 0),
+      level: planningReviewLevel(check.score ?? 0),
     })),
   );
   if (review) {

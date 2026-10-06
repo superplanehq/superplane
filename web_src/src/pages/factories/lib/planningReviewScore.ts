@@ -66,6 +66,17 @@ export function planningReviewHeadline(metrics: PlanningReviewMetric[]): WorkOrd
   };
 }
 
+/** Same bands as the review agent: 4–5 healthy, 3 caution, 1–2 critical. */
+export function planningReviewLevel(score: number): WorkOrderCheckLevel {
+  if (score >= 4) {
+    return "positive";
+  }
+  if (score >= 3) {
+    return "caution";
+  }
+  return "critical";
+}
+
 export function planningReviewFromChecks(checks: WorkOrderCheckPresentation[] | undefined): {
   headline: WorkOrderCheckPresentation;
   metrics: PlanningReviewMetric[];

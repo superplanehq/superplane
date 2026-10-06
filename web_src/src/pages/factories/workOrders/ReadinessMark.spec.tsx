@@ -72,8 +72,8 @@ describe("CardScoreBadges", () => {
     const confidence = screen.getByTestId("badges-confidence");
     expect(clarity).toHaveTextContent("Clarity5/5");
     expect(clarity).toHaveClass("text-emerald-700");
-    expect(confidence).toHaveTextContent("Confidence2/5");
-    expect(confidence).toHaveClass("text-red-700");
+    expect(confidence).toHaveTextContent("Confidence2");
+    expect(screen.getByTestId("badges-confidence-meter")).toBeInTheDocument();
     expect(screen.getByTestId("badges")).toHaveAttribute("data-tone", "caution");
     expect(screen.getByTestId("badges")).toHaveAttribute(
       "aria-label",
@@ -87,18 +87,18 @@ describe("CardScoreBadges", () => {
     const clarity = screen.getByTestId("badges-clarity");
     expect(clarity).toHaveTextContent("Clarity–");
     expect(clarity).toHaveClass("text-muted-foreground");
-    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence4/5");
-    expect(screen.getByTestId("badges-confidence")).toHaveClass("text-emerald-700");
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence4");
+    expect(screen.getByTestId("badges-confidence-meter")).toBeInTheDocument();
   });
 
   it("hides a score when that Planning toggle is off", () => {
     render(<CardScoreBadges clarity={5} confidence={2} showClarity={false} testId="badges" />);
 
     expect(screen.queryByTestId("badges-clarity")).not.toBeInTheDocument();
-    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence2/5");
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence2");
   });
 
-  it("shows one Confidence badge when review metrics are present", async () => {
+  it("shows one Confidence meter when review metrics are present", async () => {
     const user = userEvent.setup();
     render(
       <CardScoreBadges
@@ -114,7 +114,8 @@ describe("CardScoreBadges", () => {
     );
 
     expect(screen.queryByTestId("badges-clarity")).not.toBeInTheDocument();
-    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence3/5");
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence3");
+    expect(screen.getByTestId("badges-confidence-meter")).toBeInTheDocument();
     expect(screen.getByTestId("badges")).toHaveAttribute("data-tone", "caution");
 
     await user.hover(screen.getByTestId("badges"));
@@ -125,6 +126,31 @@ describe("CardScoreBadges", () => {
     expect(tip).toHaveTextContent("Moderate");
     expect(tip).toHaveTextContent("Verifiability");
     expect(tip).toHaveTextContent("Provable");
+    expect(screen.getByText("Clear")).toHaveClass("text-emerald-300");
+    expect(screen.getByText("Moderate")).toHaveClass("text-amber-300");
+    expect(screen.getByText("Provable")).toHaveClass("text-emerald-300");
+  });
+
+  it("uses Unclear Hard and Unproven for a score of 2", async () => {
+    const user = userEvent.setup();
+    render(
+      <CardScoreBadges
+        confidence={2}
+        reviewMetrics={[
+          { key: "clarity", name: "Clarity", score: 2 },
+          { key: "complexity", name: "Complexity", score: 2 },
+          { key: "verifiability", name: "Verifiability", score: 2 },
+        ]}
+        testId="badges"
+      />,
+    );
+
+    await user.hover(screen.getByTestId("badges"));
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("Unclear");
+    expect(tip).toHaveTextContent("Hard");
+    expect(tip).toHaveTextContent("Unproven");
+    expect(tip).not.toHaveTextContent("Partial");
   });
 
   it("keeps the verdict headline in the tooltip", async () => {

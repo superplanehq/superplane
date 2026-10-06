@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { planningReviewFromChecks, planningReviewHeadline } from "./planningReviewScore";
+import { planningReviewFromChecks, planningReviewHeadline, planningReviewLevel } from "./planningReviewScore";
 import type { WorkOrderCheckPresentation } from "./workOrderChecks";
 
 function check(
@@ -57,5 +57,15 @@ describe("planningReviewFromChecks", () => {
 describe("planningReviewHeadline", () => {
   it("returns undefined for an empty list", () => {
     expect(planningReviewHeadline([])).toBeUndefined();
+  });
+});
+
+describe("planningReviewLevel", () => {
+  it("matches the stored review bands, not the headline confidence bands", () => {
+    expect(planningReviewLevel(5)).toBe("positive");
+    expect(planningReviewLevel(4)).toBe("positive");
+    expect(planningReviewLevel(3)).toBe("caution");
+    expect(planningReviewLevel(2)).toBe("critical");
+    expect(planningReviewLevel(1)).toBe("critical");
   });
 });

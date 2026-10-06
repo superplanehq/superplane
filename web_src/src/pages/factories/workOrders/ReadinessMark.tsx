@@ -12,7 +12,9 @@ import {
   type ConfidenceBand,
 } from "../lib/confidenceScore";
 import { DRAFT_READINESS_SHORT_LABEL, draftReadiness, type DraftReadinessTone } from "../lib/draftReadiness";
+import { planningReviewLevel } from "../lib/planningReviewScore";
 import { workOrderCheckStatus, type WorkOrderCheckLevel } from "../lib/workOrderChecks";
+import { ConfidenceMeter } from "./ConfidenceMeter";
 
 const DOT_TONE: Record<DraftReadinessTone, string> = {
   analyzing: "text-[color:var(--status-draft-dot)]",
@@ -57,10 +59,26 @@ const BADGE_TONE: Record<ConfidenceBand, string> = {
 
 const BADGE_MUTED = "border-border bg-muted/40 text-muted-foreground";
 
+const NUMBER_TONE: Record<ConfidenceBand, string> = {
+  High: "text-success",
+  Medium: "text-warning",
+  Low: "text-destructive",
+};
+
 /**
- * Board card scores as two light badges, name and score out of the maximum,
- * tinted by band. Same pill style as the Agent question chip. The tooltip
- * carries the verdict headline.
+ * Tooltip uses `bg-foreground`, so it is dark in light mode and light in
+ * dark mode. Invert the usual card tones.
+ */
+const TOOLTIP_RESULT_TONE: Record<WorkOrderCheckLevel, string> = {
+  positive: "text-emerald-300 dark:text-emerald-700",
+  neutral: "text-slate-300 dark:text-slate-700",
+  caution: "text-amber-300 dark:text-amber-700",
+  critical: "text-red-300 dark:text-red-700",
+};
+
+/**
+ * Board card scores: Clarity stays a pill. Confidence uses the same step
+ * meter as the plan card. The tooltip carries the verdict headline.
  */
 export function CardScoreBadges({
   clarity,
@@ -104,19 +122,23 @@ export function CardScoreBadges({
           data-tone={readiness.tone}
           className={cn("pointer-events-auto inline-flex shrink-0 items-center gap-1", className)}
         >
-          {rows.map((row) => (
-            <span
-              key={row.key}
-              data-testid={testId ? `${testId}-${row.key}` : undefined}
-              className={cn(
-                "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none",
-                row.score == null ? BADGE_MUTED : BADGE_TONE[confidenceBandForScore(clampConfidenceScore(row.score))],
-              )}
-            >
-              <span>{row.short}</span>
-              <span className="tabular-nums">{scoreText(row.score)}</span>
-            </span>
-          ))}
+          {rows.map((row) =>
+            row.key === "confidence" ? (
+              <ConfidenceChip key={row.key} score={row.score} testId={testId ? `${testId}-${row.key}` : undefined} />
+            ) : (
+              <span
+                key={row.key}
+                data-testid={testId ? `${testId}-${row.key}` : undefined}
+                className={cn(
+                  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none",
+                  row.score == null ? BADGE_MUTED : BADGE_TONE[confidenceBandForScore(clampConfidenceScore(row.score))],
+                )}
+              >
+                <span>{row.short}</span>
+                <span className="tabular-nums">{scoreText(row.score)}</span>
+              </span>
+            ),
+          )}
         </span>
       </TooltipTrigger>
       <TooltipContent>
@@ -130,7 +152,7 @@ export function CardScoreBadges({
               return (
                 <Fragment key={metric.key}>
                   <span>{metric.name}</span>
-                  <span className={status.className}>{status.label}</span>
+                  <span className={tooltipResultTone(metric)}>{status.label}</span>
                 </Fragment>
               );
             })}
@@ -138,6 +160,31 @@ export function CardScoreBadges({
         ) : null}
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+function ConfidenceChip({ score, testId }: { score?: number; testId?: string }) {
+  const value = score == null ? undefined : clampConfidenceScore(score);
+  return (
+    <span
+      data-testid={testId}
+      className="inline-flex items-center gap-1 whitespace-nowrap text-[10px] font-medium leading-none text-muted-foreground"
+    >
+      <span>Confidence</span>
+      {value == null ? (
+        <span>–</span>
+      ) : (
+        <>
+          <ConfidenceMeter
+            score={value}
+            showTooltip={false}
+            decorative
+            testId={testId ? `${testId}-meter` : undefined}
+          />
+          <span className={cn("tabular-nums", NUMBER_TONE[confidenceBandForScore(value)])}>{value}</span>
+        </>
+      )}
+    </span>
   );
 }
 
@@ -150,14 +197,8 @@ function reviewMetricStatus(metric: { key: string; name: string; score: number; 
   });
 }
 
-function planningReviewLevel(score: number): WorkOrderCheckLevel {
-  if (score >= 4) {
-    return "positive";
-  }
-  if (score >= 3) {
-    return "caution";
-  }
-  return "critical";
+function tooltipResultTone(metric: { score: number; level?: WorkOrderCheckLevel }) {
+  return TOOLTIP_RESULT_TONE[metric.level ?? planningReviewLevel(metric.score)];
 }
 
 function scoreText(score?: number) {
