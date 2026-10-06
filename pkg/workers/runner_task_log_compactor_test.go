@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"io"
@@ -299,4 +300,64 @@ func TestRunnerTaskLogCompactorSerializesWorkers(t *testing.T) {
 	provider.release <- struct{}{}
 	require.NoError(t, <-firstDone)
 	assert.Equal(t, int32(1), provider.finalPuts.Load())
+}
+
+func TestClaimLogArchivingIncludesFleetLabels(t *testing.T) {
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+	fleet := models.RunnerFleet{
+		ID:            uuid.New(),
+		Slug:          "claim-fleet-labels",
+		ScopeType:     models.RunnerFleetScopeInstallation,
+		Enabled:       true,
+		Spec:          datatypes.NewJSONType(models.RunnerFleetSpec{}),
+		RunnerVersion: "0.1.0",
+	}
+	require.NoError(t, fleet.Create(db))
+	task := models.RunnerTask{
+		ID:                uuid.New(),
+		OrganizationID:    resource.Organization.ID,
+		FleetID:           fleet.ID,
+		Backend:           models.RunnerTaskBackendIntegrated,
+		State:             models.RunnerTaskStateSucceeded,
+		PayloadCiphertext: []byte("{}"),
+		QueuedAt:          time.Now(),
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
+	}
+	require.NoError(t, db.Create(&task).Error)
+	require.NoError(t, db.Create(&models.RunnerTaskLogLifecycle{
+		TaskID:      task.ID,
+		ActiveStore: runnerlogs.StoreFS,
+		State:       models.RunnerTaskLogStateArchivable,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}).Error)
+
+	now := time.Now()
+	candidate, err := claimLogArchiving(db, now, now.Add(time.Minute))
+	require.NoError(t, err)
+	require.NotNil(t, candidate)
+	assert.Equal(t, fleet.Slug, candidate.FleetSlug)
+	assert.Equal(t, models.RunnerFleetScopeInstallation, candidate.FleetScopeType)
+}
+
+func TestWriteGzipStreamReportsUncompressedSize(t *testing.T) {
+	reader, writer := io.Pipe()
+	done := make(chan gzipWriteResult, 1)
+	go func() {
+		written, err := writeGzipStream(writer, bytes.NewReader([]byte("first\nsecond\n")))
+		done <- gzipWriteResult{written: written, err: err}
+	}()
+
+	gzipReader, err := gzip.NewReader(reader)
+	require.NoError(t, err)
+	content, err := io.ReadAll(gzipReader)
+	require.NoError(t, err)
+	require.NoError(t, gzipReader.Close())
+	assert.Equal(t, "first\nsecond\n", string(content))
+
+	result := <-done
+	require.NoError(t, result.err)
+	assert.Equal(t, int64(len("first\nsecond\n")), result.written)
 }

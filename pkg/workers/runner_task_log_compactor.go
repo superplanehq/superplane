@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -121,24 +122,32 @@ func (w *RunnerTaskLogCompactor) processTask(ctx context.Context, candidate LogA
 	}
 
 	key := runnerlogs.FinalKey(w.installationID, candidate.OrganizationID, candidate.TaskID)
-	if err := w.writeFinalObject(ctx, key, active.Content); err != nil {
+	logSize, err := w.writeFinalObject(ctx, key, active.Content)
+	if err != nil {
 		return err
 	}
 	now := time.Now()
-	return candidate.markArchived(
+	if err := candidate.markArchived(
 		database.DB(ctx),
 		key,
 		active.Truncated,
 		now.Add(w.liveReaderGrace),
 		now,
-	)
+	); err != nil {
+		return err
+	}
+	if candidate.FleetScopeType == models.RunnerFleetScopeInstallation {
+		telemetry.RecordRunnerTaskLogSize(ctx, candidate.FleetSlug, logSize)
+	}
+	return nil
 }
 
-func (w *RunnerTaskLogCompactor) writeFinalObject(ctx context.Context, key string, active io.Reader) error {
+func (w *RunnerTaskLogCompactor) writeFinalObject(ctx context.Context, key string, active io.Reader) (int64, error) {
 	reader, writer := io.Pipe()
-	writeDone := make(chan error, 1)
+	writeDone := make(chan gzipWriteResult, 1)
 	go func() {
-		writeDone <- writeGzipStream(writer, active)
+		written, err := writeGzipStream(writer, active)
+		writeDone <- gzipWriteResult{written: written, err: err}
 	}()
 
 	err := w.provider.Put(
@@ -151,35 +160,43 @@ func (w *RunnerTaskLogCompactor) writeFinalObject(ctx context.Context, key strin
 		},
 	)
 	_ = reader.Close()
-	writeErr := <-writeDone
-	if writeErr != nil {
-		return writeErr
+	result := <-writeDone
+	if result.err != nil {
+		return 0, result.err
 	}
 	if err != nil {
-		return fmt.Errorf("store final log object: %w", err)
+		return 0, fmt.Errorf("store final log object: %w", err)
 	}
-	return nil
+	return result.written, nil
 }
 
-func writeGzipStream(writer *io.PipeWriter, active io.Reader) error {
+type gzipWriteResult struct {
+	written int64
+	err     error
+}
+
+func writeGzipStream(writer *io.PipeWriter, active io.Reader) (int64, error) {
 	gzipWriter := gzip.NewWriter(writer)
-	if _, err := io.Copy(gzipWriter, active); err != nil {
+	written, err := io.Copy(gzipWriter, active)
+	if err != nil {
 		_ = writer.CloseWithError(err)
-		return fmt.Errorf("copy active task log: %w", err)
+		return 0, fmt.Errorf("copy active task log: %w", err)
 	}
 	if err := gzipWriter.Close(); err != nil {
 		_ = writer.CloseWithError(err)
-		return fmt.Errorf("close gzip stream: %w", err)
+		return 0, fmt.Errorf("close gzip stream: %w", err)
 	}
 	if err := writer.Close(); err != nil {
-		return fmt.Errorf("close final log stream: %w", err)
+		return 0, fmt.Errorf("close final log stream: %w", err)
 	}
-	return nil
+	return written, nil
 }
 
 type LogArchivingCandidate struct {
 	TaskID          uuid.UUID
 	OrganizationID  uuid.UUID
+	FleetSlug       string
+	FleetScopeType  string
 	ActiveStore     string
 	State           string
 	ProcessingUntil time.Time
@@ -194,9 +211,11 @@ func claimLogArchiving(tx *gorm.DB, now, processingUntil time.Time) (*LogArchivi
 		err := tx.Table("runner_task_log_lifecycles AS lifecycles").
 			Select(
 				"lifecycles.task_id, tasks.organization_id, "+
+					"fleets.slug AS fleet_slug, fleets.scope_type AS fleet_scope_type, "+
 					"lifecycles.active_store, lifecycles.state",
 			).
 			Joins("JOIN runner_tasks AS tasks ON tasks.id = lifecycles.task_id").
+			Joins("JOIN runner_fleets AS fleets ON fleets.id = tasks.fleet_id").
 			Clauses(clause.Locking{
 				Strength: "UPDATE",
 				Table:    clause.Table{Name: "lifecycles"},

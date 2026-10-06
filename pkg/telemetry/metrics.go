@@ -90,14 +90,18 @@ var durationSecondsHistogramBoundaries = []float64{
 }
 
 func durationSecondsHistogramView() sdkmetric.Option {
+	return explicitBucketView("*duration.seconds", "s", durationSecondsHistogramBoundaries)
+}
+
+func explicitBucketView(name, unit string, boundaries []float64) sdkmetric.Option {
 	return sdkmetric.WithView(sdkmetric.NewView(
 		sdkmetric.Instrument{
-			Name: "*duration.seconds",
-			Unit: "s",
+			Name: name,
+			Unit: unit,
 		},
 		sdkmetric.Stream{
 			Aggregation: sdkmetric.AggregationExplicitBucketHistogram{
-				Boundaries: durationSecondsHistogramBoundaries,
+				Boundaries: boundaries,
 			},
 		},
 	))
@@ -120,6 +124,10 @@ func InitMetrics(ctx context.Context) error {
 			sdkmetric.NewPeriodicReader(exporter),
 		),
 		durationSecondsHistogramView(),
+		explicitBucketView("runner.state.occupancy.seconds", "s", longDurationSecondsBoundaries),
+		explicitBucketView("runner_task.queue.wait.seconds", "s", longDurationSecondsBoundaries),
+		explicitBucketView("runner_task.run.seconds", "s", longDurationSecondsBoundaries),
+		explicitBucketView("runner_task.log.bytes", "By", logByteBoundaries),
 	)
 
 	otel.SetMeterProvider(provider)
@@ -518,6 +526,11 @@ func InitMetrics(ctx context.Context) error {
 	}
 
 	err = registerWebSocketMetrics()
+	if err != nil {
+		return err
+	}
+
+	err = registerRunnerMetrics()
 	if err != nil {
 		return err
 	}

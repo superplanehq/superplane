@@ -14,9 +14,19 @@ func (r *Runner) MarkLost(tx *gorm.DB, lastSeenBefore, now time.Time) error {
 		return nil
 	}
 
+	previousState := r.State
+	var idleStartedAt time.Time
+	if previousState == RunnerStateIdle {
+		idleStartedAt = r.idleStartedAt(tx)
+	}
+
 	task, taskErr := r.FindActiveTask(tx)
+	var lostTask *RunnerTask
+	var lostFromState string
 	switch {
 	case taskErr == nil && task.State == RunnerTaskStateReserved:
+		lostTask = task
+		lostFromState = task.State
 		if err := tx.Model(task).Updates(map[string]any{
 			"state":       RunnerTaskStateLost,
 			"finished_at": now,
@@ -25,6 +35,8 @@ func (r *Runner) MarkLost(tx *gorm.DB, lastSeenBefore, now time.Time) error {
 			return err
 		}
 	case taskErr == nil && task.State == RunnerTaskStateRunning:
+		lostTask = task
+		lostFromState = task.State
 		if err := tx.Model(task).Updates(map[string]any{
 			"state":       RunnerTaskStateLost,
 			"finished_at": now,
@@ -65,5 +77,36 @@ func (r *Runner) MarkLost(tx *gorm.DB, lastSeenBefore, now time.Time) error {
 	r.CurrentConnectionID = nil
 	r.CreationIdempotencyKey = nil
 	r.CreationRequestHash = nil
+	r.recordLostMetrics(tx, previousState, idleStartedAt, lostTask, lostFromState, now)
 	return nil
+}
+
+func (r *Runner) recordLostMetrics(
+	tx *gorm.DB,
+	previousState string,
+	idleStartedAt time.Time,
+	task *RunnerTask,
+	taskState string,
+	now time.Time,
+) {
+	switch previousState {
+	case RunnerStateIdle:
+		if !idleStartedAt.IsZero() {
+			recordRunnerStateOccupancy(tx, r.FleetID, RunnerStateIdle, now.Sub(idleStartedAt))
+		}
+	case RunnerStateBusy:
+		if task != nil && task.StartedAt != nil {
+			recordRunnerStateOccupancy(tx, r.FleetID, RunnerStateBusy, now.Sub(*task.StartedAt))
+		}
+	}
+
+	if task == nil {
+		return
+	}
+	switch taskState {
+	case RunnerTaskStateReserved:
+		recordRunnerTaskQueueWait(tx, task.FleetID, RunnerQueueWaitLost, task.QueuedAt, now)
+	case RunnerTaskStateRunning:
+		recordRunnerTaskRun(tx, task.FleetID, RunnerTaskStateLost, task.StartedAt, now)
+	}
 }
