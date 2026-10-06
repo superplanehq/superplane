@@ -25,6 +25,17 @@ type forgeDeliveryBody struct {
 // bootstrap call. The Forge Invocation Token is the credential. The system
 // token is encrypted and cached. It is never written to the log.
 func (s *Server) HandleBitbucketForgeDelivery(w http.ResponseWriter, r *http.Request) {
+	s.handleBitbucketForgeDelivery(w, r, false)
+}
+
+// HandleBitbucketForgeUninstall accepts the Forge preUninstall call. Forge
+// has no uninstall lifecycle event, so this route always clears the cached
+// system token.
+func (s *Server) HandleBitbucketForgeUninstall(w http.ResponseWriter, r *http.Request) {
+	s.handleBitbucketForgeDelivery(w, r, true)
+}
+
+func (s *Server) handleBitbucketForgeDelivery(w http.ResponseWriter, r *http.Request, uninstallRoute bool) {
 	cfg := config.LoadBitbucketForgeAppConfig()
 	if !cfg.Enabled() {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -52,7 +63,7 @@ func (s *Server) HandleBitbucketForgeDelivery(w http.ResponseWriter, r *http.Req
 	}
 	eventType := strings.TrimSpace(body.EventType)
 	installerAccountID := strings.TrimSpace(body.InstallerAccountID)
-	uninstall := strings.Contains(strings.ToLower(eventType), "uninstall")
+	uninstall := uninstallRoute || strings.Contains(strings.ToLower(eventType), "uninstall")
 
 	var ciphertext []byte
 	if !uninstall {

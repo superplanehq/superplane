@@ -14,6 +14,9 @@ modules:
       events:
         - avi:forge:installed:app
         - avi:forge:upgraded:app
+  preUninstall:
+    - key: uninstall
+      endpoint: uninstall
   scheduledTrigger:
     - key: token-refresh
       endpoint: token-refresh
@@ -38,6 +41,13 @@ endpoint:
     remote: superplane
     route:
       path: /api/v1/bitbucket/forge/scheduled
+    auth:
+      appSystemToken:
+        enabled: true
+  - key: uninstall
+    remote: superplane
+    route:
+      path: /api/v1/bitbucket/forge/uninstall
     auth:
       appSystemToken:
         enabled: true

@@ -772,6 +772,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/lifecycle", s.HandleBitbucketForgeDelivery).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/scheduled", s.HandleBitbucketForgeDelivery).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/bootstrap", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/uninstall", s.HandleBitbucketForgeUninstall).Methods("POST")
 	sentryAppUserRoute := r.NewRoute().Subrouter()
 	sentryAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/install", s.HandleSentryAppInstall).Methods("GET")
