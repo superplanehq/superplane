@@ -140,6 +140,7 @@ function useIntakeSettingsActions({
         settings: intakeSettingsToApi(next),
         ...datadogServiceRebind(intake, next),
         ...linearProjectRebind(intake, next),
+        ...sentryProjectRebind(intake, next),
       });
       await automationRefetch();
     },
@@ -183,6 +184,21 @@ function linearProjectRebind(
     return {};
   }
   const projects = next.linearProjectIds.join(",");
+  const current = intake.resourceId?.trim() ?? "";
+  if (!projects || projects === current || !intake.integrationId) {
+    return {};
+  }
+  return { integrationId: intake.integrationId, resourceId: projects };
+}
+
+function sentryProjectRebind(
+  intake: ConfiguredLineIntakeSource,
+  next: IntakeSourceSettings,
+): { integrationId?: string; resourceId?: string } {
+  if (intake.source.id !== "sentry-exceptions") {
+    return {};
+  }
+  const projects = next.sentryProjectIds.join(",");
   const current = intake.resourceId?.trim() ?? "";
   if (!projects || projects === current || !intake.integrationId) {
     return {};

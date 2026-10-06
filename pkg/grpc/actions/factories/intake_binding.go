@@ -275,14 +275,14 @@ func resolveSentryIntakeBinding(
 	tx *gorm.DB,
 	factory *models.Factory,
 	integrationID string,
-	projectSlug string,
+	resourceID string,
 ) (*intakeBinding, error) {
 	integrationID = strings.TrimSpace(integrationID)
-	projectSlug = strings.TrimSpace(projectSlug)
-	if integrationID == "" && projectSlug == "" {
+	projectIDs := sentryProjectIDsFromResource(resourceID)
+	if integrationID == "" && len(projectIDs) == 0 {
 		return nil, nil
 	}
-	if integrationID == "" || projectSlug == "" {
+	if integrationID == "" || len(projectIDs) == 0 {
 		return nil, invalidArgument("Sentry integration and project are required")
 	}
 
@@ -302,12 +302,14 @@ func resolveSentryIntakeBinding(
 		return nil, invalidArgument("Sentry integration is not ready")
 	}
 
+	configuration := map[string]any{}
+	applySentryProjectConfiguration(configuration, projectIDs)
 	return &intakeBinding{
 		Integration: &yaml.IntegrationRef{
 			ID:   integration.ID.String(),
 			Name: integration.InstallationName,
 		},
-		Configuration: map[string]any{"project": projectSlug},
+		Configuration: configuration,
 		Installation:  integration,
 	}, nil
 }

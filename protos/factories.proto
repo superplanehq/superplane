@@ -1309,6 +1309,9 @@ message FactoryIntake {
     // Label names that still create a task. Empty means every label.
     // Linear issue intakes only.
     repeated string linear_labels = 22;
+    // Projects that still create a task. Required for a Sentry intake.
+    // Sentry exception intakes only. Values are project slugs.
+    repeated string sentry_project_ids = 23;
   }
 
   string id = 1;
