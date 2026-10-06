@@ -413,7 +413,7 @@ func Test__CancelOrganizationSubscriptionForDeletionSkipsWhenNothingToCancel(t *
 
 	t.Run("admin plan", func(t *testing.T) {
 		r, db := deletionCancelFixture(t)
-		_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness)
+		_, err := models.SetAdminOrganizationPlan(db, r.Organization.ID, models.BillingPlanBusiness, nil)
 		require.NoError(t, err)
 		assertDeletionCancelSkipsPolar(t, db, r.Organization.ID, true)
 	})
