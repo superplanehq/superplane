@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -29,7 +31,12 @@ type Repository struct {
 	Name     string         `json:"name" mapstructure:"name"`
 	FullName string         `json:"full_name" mapstructure:"full_name"`
 	Slug     string         `json:"slug" mapstructure:"slug"`
+	Mainbranch *Branch    `json:"mainbranch,omitempty" mapstructure:"mainbranch,omitempty"`
 	Links    RepositoryLink `json:"links" mapstructure:"links"`
+}
+
+type Branch struct {
+	Name string `json:"name" mapstructure:"name"`
 }
 
 type RepositoryLink struct {
@@ -66,6 +73,21 @@ func NewClient(authType string, httpContext core.HTTPContext, integration core.I
 		return &Client{
 			AuthType: AuthTypeWorkspaceAccessToken,
 			Token:    string(token),
+			HTTP:     httpContext,
+		}, nil
+
+	case AuthTypeForgeApp:
+		metadata := Metadata{}
+		if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
+			return nil, fmt.Errorf("failed to decode integration metadata: %w", err)
+		}
+		token, _, err := bitbucketapp.CurrentSystemToken(metadata.ForgeInstallationID)
+		if err != nil {
+			return nil, fmt.Errorf("Reconnect Bitbucket")
+		}
+		return &Client{
+			AuthType: AuthTypeForgeApp,
+			Token:    token,
 			HTTP:     httpContext,
 		}, nil
 	}
