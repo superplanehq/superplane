@@ -132,6 +132,7 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     expect(within(summary).queryByRole("button", { name: "Merge confidence" })).not.toBeInTheDocument();
 
     const card = screen.getByTestId("redesign-console-column-backlog");
+    fireEvent.click(within(card).getByRole("tab", { name: /Checks/ }));
     expect(within(card).getByText("Clarity")).toBeInTheDocument();
     expect(within(card).getByText("Complexity")).toBeInTheDocument();
     expect(within(card).getByText("Verifiability")).toBeInTheDocument();
