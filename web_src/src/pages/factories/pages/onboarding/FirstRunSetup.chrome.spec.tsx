@@ -135,7 +135,7 @@ function withRepository(): OnboardingSetupApi {
   return { ...setupState(), selectedRepo: "acme/api" };
 }
 
-function LiveRepositorySetup({ finish }: { finish: ReturnType<typeof vi.fn> }) {
+function LiveRepositorySetup({ finish }: { finish: OnboardingPageModel["finish"] }) {
   const setup = useOnboardingSetupState("Payments Service", {
     simulateDiscovery: false,
     initial: { vcsHost: "github", selectedRepo: "acme/api", issuesChoice: "vcs" },
@@ -387,7 +387,7 @@ describe("FirstRunSetup chrome", () => {
 
   it("clears the import choice when the repository changes", async () => {
     const user = userEvent.setup();
-    const finish = vi.fn();
+    const finish = vi.fn<OnboardingPageModel["finish"]>();
     render(
       <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup?step=issues"]}>
         <LiveRepositorySetup finish={finish} />
