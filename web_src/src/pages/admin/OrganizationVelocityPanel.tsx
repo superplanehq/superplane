@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
@@ -25,11 +25,13 @@ import {
   type VelocityComparison,
 } from "@/pages/factories/pages/velocityCards";
 
+import { formatDateTime } from "./formatDate";
 import { useAdminOrganizationVelocity, type AdminVelocityFactory } from "./useAdminOrganizationVelocity";
 
 const NO_WORKSPACES = "This organization has no workspaces.";
 const NO_VELOCITY = "There is no velocity in this period.";
 const LOAD_ERROR = "Could not load velocity.";
+const REFRESH_ERROR = "Could not refresh velocity.";
 
 export function OrganizationVelocityPanel({ orgId }: { orgId: string }) {
   const [periodDays, setPeriodDays] = useState<VelocityPeriodDays>(30);
@@ -41,30 +43,75 @@ export function OrganizationVelocityPanel({ orgId }: { orgId: string }) {
   }
 
   if (velocity.error && !velocity.data) {
+    return <VelocityLoadError onRetry={() => void velocity.refetch()} />;
+  }
+
+  return (
+    <LoadedVelocity
+      factories={velocity.data?.factories ?? []}
+      factoryId={requestedFactoryId ?? velocity.data?.factoryId}
+      report={velocity.data ? toVelocityReport(velocity.data) : undefined}
+      periodDays={periodDays}
+      onPeriodDays={setPeriodDays}
+      onFactory={setRequestedFactoryId}
+      refreshError={refreshErrorFor(velocity, () => void velocity.refetch())}
+    />
+  );
+}
+
+function refreshErrorFor(velocity: { isError: boolean; data?: unknown; dataUpdatedAt: number }, onRetry: () => void) {
+  if (!velocity.isError || !velocity.data) {
+    return null;
+  }
+  return <VelocityRefreshError loadedAt={velocity.dataUpdatedAt} onRetry={onRetry} />;
+}
+
+function VelocityLoadError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <Text className="text-sm text-gray-500 dark:text-gray-400">{LOAD_ERROR}</Text>
+      <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+        Try again
+      </Button>
+    </div>
+  );
+}
+
+function LoadedVelocity({
+  factories,
+  factoryId,
+  report,
+  periodDays,
+  onPeriodDays,
+  onFactory,
+  refreshError,
+}: {
+  factories: AdminVelocityFactory[];
+  factoryId?: string;
+  report?: VelocityReport;
+  periodDays: VelocityPeriodDays;
+  onPeriodDays: (days: VelocityPeriodDays) => void;
+  onFactory: (factoryId: string) => void;
+  refreshError: ReactNode;
+}) {
+  if (factories.length === 0) {
     return (
       <div className="flex flex-col items-start gap-3">
-        <Text className="text-sm text-gray-500 dark:text-gray-400">{LOAD_ERROR}</Text>
-        <Button type="button" variant="outline" size="sm" onClick={() => void velocity.refetch()}>
-          Try again
-        </Button>
+        {refreshError}
+        <Text className="text-sm text-gray-500 dark:text-gray-400">{NO_WORKSPACES}</Text>
       </div>
     );
   }
 
-  const factories = velocity.data?.factories ?? [];
-  if (factories.length === 0) {
-    return <Text className="text-sm text-gray-500 dark:text-gray-400">{NO_WORKSPACES}</Text>;
-  }
-
-  const selected = selectedFactory(factories, requestedFactoryId ?? velocity.data?.factoryId);
-  const report = velocity.data ? toVelocityReport(velocity.data) : undefined;
+  const selected = selectedFactory(factories, factoryId);
 
   return (
     <TooltipProvider delayDuration={150}>
       <div className="space-y-5" data-testid="admin-organization-velocity">
+        {refreshError}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <WorkspaceControl factories={factories} selectedId={selected?.id} onSelect={setRequestedFactoryId} />
-          <PeriodControl periodDays={periodDays} onPeriodDays={setPeriodDays} />
+          <WorkspaceControl factories={factories} selectedId={selected?.id} onSelect={onFactory} />
+          <PeriodControl periodDays={periodDays} onPeriodDays={onPeriodDays} />
         </div>
         {report && hasVelocityOutput(report) ? (
           <VelocityCards report={report} periodDays={periodDays} />
@@ -73,6 +120,22 @@ export function OrganizationVelocityPanel({ orgId }: { orgId: string }) {
         )}
       </div>
     </TooltipProvider>
+  );
+}
+
+function VelocityRefreshError({ loadedAt, onRetry }: { loadedAt: number; onRetry: () => void }) {
+  const loadedLabel = loadedAt > 0 ? formatDateTime(new Date(loadedAt).toISOString()) : "";
+
+  return (
+    <div className="flex flex-col items-start gap-2" role="alert" data-testid="admin-velocity-refresh-error">
+      <Text className="text-sm text-red-600 dark:text-red-400">{REFRESH_ERROR}</Text>
+      {loadedLabel ? (
+        <Text className="text-sm text-gray-500 dark:text-gray-400">Last loaded {loadedLabel}.</Text>
+      ) : null}
+      <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+        Try again
+      </Button>
+    </div>
   );
 }
 

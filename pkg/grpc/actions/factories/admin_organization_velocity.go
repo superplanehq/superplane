@@ -97,7 +97,8 @@ type AdminOrganizationVelocity struct {
 // Installation Admin. It reuses the velocity loader and does not build people.
 //
 // An omitted factoryID selects the workspace updated most recently. A missing,
-// foreign, deleted, or malformed id is not found. An organization with no
+// foreign, deleted, or malformed id is not found, including when the
+// organization has no workspaces. An omitted id on an organization with no
 // workspaces returns an empty list and no report.
 func DescribeAdminOrganizationVelocity(
 	ctx context.Context,
@@ -155,28 +156,27 @@ func adminVelocityFactories(factories []models.Factory) []AdminVelocityFactory {
 }
 
 func selectAdminVelocityFactory(factories []models.Factory, factoryID string) (*models.Factory, error) {
+	requested := strings.TrimSpace(factoryID)
+	if requested != "" {
+		id, err := uuid.Parse(requested)
+		if err != nil {
+			return nil, models.ErrFactoryNotFound
+		}
+		for i := range factories {
+			if factories[i].ID != id {
+				continue
+			}
+			selected := factories[i]
+			return &selected, nil
+		}
+		return nil, models.ErrFactoryNotFound
+	}
+
 	if len(factories) == 0 {
 		return nil, nil
 	}
-
-	requested := strings.TrimSpace(factoryID)
-	if requested == "" {
-		selected := factories[0]
-		return &selected, nil
-	}
-
-	id, err := uuid.Parse(requested)
-	if err != nil {
-		return nil, models.ErrFactoryNotFound
-	}
-	for i := range factories {
-		if factories[i].ID != id {
-			continue
-		}
-		selected := factories[i]
-		return &selected, nil
-	}
-	return nil, models.ErrFactoryNotFound
+	selected := factories[0]
+	return &selected, nil
 }
 
 func buildAdminVelocityReport(

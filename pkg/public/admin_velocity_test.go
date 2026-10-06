@@ -191,6 +191,23 @@ func TestAdminOrganizationVelocity(t *testing.T) {
 		assert.NotContains(t, raw, "repository")
 		assert.NotContains(t, raw, "people")
 	})
+
+	t.Run("supplied workspace on an empty organization returns 404", func(t *testing.T) {
+		empty, err := models.CreateOrganization(support.RandomName("empty-velocity-id"), "")
+		require.NoError(t, err)
+
+		for _, query := range []string{
+			"factory_id=not-a-workspace",
+			"factory_id=" + uuid.NewString(),
+		} {
+			response := execRequest(server, requestParams{
+				method:     "GET",
+				path:       adminVelocityPath(empty.ID.String(), query),
+				authCookie: token,
+			})
+			assert.Equal(t, http.StatusNotFound, response.Code, query)
+		}
+	})
 }
 
 func adminVelocityPath(orgID, query string) string {

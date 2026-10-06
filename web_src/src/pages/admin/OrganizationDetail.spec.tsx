@@ -39,7 +39,7 @@ function renderPage() {
         ),
       ),
     );
-  return render(<OrganizationDetail />, { wrapper });
+  return { queryClient, ...render(<OrganizationDetail />, { wrapper }) };
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -362,6 +362,29 @@ describe("OrganizationDetail", () => {
     expect(screen.getByText("Quiet")).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "30d" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByTestId("velocity-summary")).not.toBeInTheDocument();
+  });
+
+  it("shows a failed refresh next to the saved velocity report", async () => {
+    const user = userEvent.setup();
+    const { queryClient } = renderPage();
+
+    await user.click(await screen.findByRole("tab", { name: "Velocity" }));
+    expect(await screen.findByTestId("velocity-summary")).toBeInTheDocument();
+
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/velocity`)) {
+        return new Response("error", { status: 500 });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    await queryClient.invalidateQueries({ queryKey: ["admin", "organizations", ORG_ID, "velocity"] });
+
+    expect(await screen.findByTestId("admin-velocity-refresh-error")).toBeInTheDocument();
+    expect(screen.getByText("Could not refresh velocity.")).toBeInTheDocument();
+    expect(screen.getByText(/^Last loaded /)).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-summary")).toBeInTheDocument();
+    expect(screen.getByText("Refunds")).toBeInTheDocument();
   });
 
   it("does not load credits until the credits tab opens", async () => {
