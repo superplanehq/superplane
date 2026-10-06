@@ -3,6 +3,7 @@ package public
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"io"
 	"net/http"
 	"testing"
@@ -165,4 +166,22 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, gzipReader.Close())
 	assert.Equal(t, "final\n", string(content))
+
+	const signedURL = "https://storage.example/logs"
+	blob.SetCurrent(signingBlobProvider{Provider: provider, signedURL: signedURL})
+	signed := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+	require.Equal(t, http.StatusNoContent, signed.Code)
+	assert.Equal(t, signedURL, signed.Header().Get(runnerlogs.HeaderURL))
+	assert.Equal(t, models.RunnerTaskLogStateArchived, signed.Header().Get(runnerlogs.HeaderState))
+	assert.Equal(t, finalCursor, signed.Header().Get(runnerlogs.HeaderCursor))
+	assert.Empty(t, signed.Body.String())
+}
+
+type signingBlobProvider struct {
+	blob.Provider
+	signedURL string
+}
+
+func (p signingBlobProvider) SignedGetURL(context.Context, string, time.Duration) (string, error) {
+	return p.signedURL, nil
 }
