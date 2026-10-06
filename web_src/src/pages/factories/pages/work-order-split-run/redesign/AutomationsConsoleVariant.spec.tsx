@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { OPEN_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
+import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
 import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../../__fixtures__/lineMetricsBoardOrders";
 import { OPEN_WORK_ORDER_CHECKS } from "../../../__fixtures__/workOrderCheckFixtures";
 import { TWO_HOURS_AGO } from "../../../__fixtures__/factoryPageIds";
@@ -70,6 +70,73 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     fireEvent.click(header);
     expect(within(checks).getByText("Blast radius")).toBeInTheDocument();
     expect(within(checks).queryByText("Confidence score")).not.toBeInTheDocument();
+  });
+
+  it("keeps planning review scores off Merge confidence", () => {
+    renderConsole(
+      splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+        demoArtifacts: false,
+        checks: [
+          {
+            id: "check-confidence",
+            key: "confidence",
+            name: "Confidence score",
+            score: 2,
+            maxScore: 5,
+            level: "LEVEL_CAUTION",
+          },
+          {
+            id: "check-clarity",
+            key: "clarity",
+            name: "Clarity score",
+            score: 3,
+            maxScore: 3,
+            level: "LEVEL_POSITIVE",
+          },
+          {
+            id: "check-complexity",
+            key: "complexity",
+            name: "Complexity",
+            score: 2,
+            maxScore: 3,
+            level: "LEVEL_CAUTION",
+          },
+          {
+            id: "check-verifiability",
+            key: "verifiability",
+            name: "Verifiability",
+            score: 3,
+            maxScore: 3,
+            level: "LEVEL_POSITIVE",
+          },
+        ],
+        analysisRuns: [
+          {
+            canvasId: "canvas-backlog",
+            workOrderId: DRAFT_WORK_ORDER.id ?? "",
+            run: {
+              id: "run-backlog",
+              canvasId: "canvas-backlog",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-28T12:00:00Z",
+              finishedAt: "2026-08-28T12:00:20Z",
+            },
+          },
+        ],
+      }),
+    );
+
+    const summary = screen.getByTestId("redesign-console-summary");
+    expect(within(summary).queryByTestId("redesign-console-checks")).not.toBeInTheDocument();
+    expect(within(summary).queryByRole("button", { name: "Merge confidence" })).not.toBeInTheDocument();
+
+    const card = screen.getByTestId("redesign-console-column-backlog");
+    fireEvent.click(within(card).getByRole("tab", { name: /Checks/ }));
+    expect(within(card).getByText("Clarity")).toBeInTheDocument();
+    expect(within(card).getByText("Complexity")).toBeInTheDocument();
+    expect(within(card).getByText("Verifiability")).toBeInTheDocument();
+    expect(within(card).queryByText("Confidence score")).not.toBeInTheDocument();
   });
 
   it("lists each column app that ran for the task as its own card", () => {
