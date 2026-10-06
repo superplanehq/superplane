@@ -78,6 +78,7 @@ func SelectFactoryVCSProviderRepository(
 		repositoryID := repository.RepositoryID
 		if updateErr := factory.UpdateOnboarding(tx, models.FactoryOnboardingPatch{
 			VCSIntegrationID:    &integrationID,
+			VCSProvider:         &provider,
 			AppRepository:       &repository.FullName,
 			AppRepositoryID:     &repositoryID,
 			BacklogRepository:   &repository.FullName,

@@ -8,6 +8,7 @@ import {
   type IssuesChoiceId,
   type VcsHostId,
 } from "./onboardingFixtures";
+import { readOnboardingVcsHostChoice, writeOnboardingVcsHostChoice } from "./onboardingVcsHostChoice";
 import { isPlaceholderWorkspaceName, workspaceNameFromRepository } from "./workspaceNames";
 
 export type OnboardingSetupState = {
@@ -70,6 +71,8 @@ export function useOnboardingSetupState(
     remainingCreditCents?: number;
     simulateDiscovery?: boolean;
     initial?: InitialOnboardingSetupState;
+    /** Keeps the host choice when the page reloads before a repository is saved. */
+    persistVcsHostKey?: string;
   },
 ) {
   const [workspaceName, setWorkspaceName] = useState(() => initialName.trim());
@@ -79,7 +82,11 @@ export function useOnboardingSetupState(
     () => initialName.trim().length > 0 && !isPlaceholderWorkspaceName(initialName),
   );
   const [localConnected, setLocalConnected] = useState<Set<IntegrationId>>(() => new Set());
-  const [vcsHost, setVcsHost] = useState<VcsHostId | null>(() => options?.initial?.vcsHost ?? null);
+  const [vcsHost, setVcsHost] = useState<VcsHostId | null>(() => {
+    if (options?.initial?.vcsHost) return options.initial.vcsHost;
+    if (options?.persistVcsHostKey) return readOnboardingVcsHostChoice(options.persistVcsHostKey);
+    return null;
+  });
   const [selectedRepo, setSelectedRepo] = useState<string | null>(() => options?.initial?.selectedRepo ?? null);
   /** True after Continue to issues — starts repository analysis. */
   const [repoCommitted, setRepoCommitted] = useState(false);
@@ -136,12 +143,13 @@ export function useOnboardingSetupState(
     (host: VcsHostId) => {
       // Re-clicking the active host must not clear repo / issues selections.
       if (host === vcsHost) return;
+      if (options?.persistVcsHostKey) writeOnboardingVcsHostChoice(options.persistVcsHostKey, host);
       setVcsHost(host);
       setSelectedRepo(null);
       setRepoCommitted(false);
       resetIssuesState();
     },
-    [vcsHost, resetIssuesState],
+    [options?.persistVcsHostKey, vcsHost, resetIssuesState],
   );
 
   const selectRepo = useCallback(

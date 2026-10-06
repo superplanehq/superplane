@@ -499,8 +499,8 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	return defaultIntakeSettings()
 }
 
-func intakeRefinementConfiguration(agent *intakeAgent, githubName string) map[string]any {
-	configuration := intakeRunnerConfiguration(agent, githubName)
+func intakeRefinementConfiguration(agent *intakeAgent, vcsName string) map[string]any {
+	configuration := intakeRunnerConfiguration(agent, vcsName)
 	configuration["steps"] = []any{
 		map[string]any{
 			"name":    "Clone repository",
@@ -517,9 +517,9 @@ func intakeRefinementConfiguration(agent *intakeAgent, githubName string) map[st
 	return configuration
 }
 
-func intakeRunnerConfiguration(agent *intakeAgent, githubName string) map[string]any {
-	if strings.TrimSpace(githubName) == "" {
-		githubName = intakeGitHubAppName
+func intakeRunnerConfiguration(agent *intakeAgent, vcsName string) map[string]any {
+	if strings.TrimSpace(vcsName) == "" {
+		vcsName = intakeGitHubAppName
 	}
 
 	configuration := map[string]any{
@@ -529,7 +529,7 @@ func intakeRunnerConfiguration(agent *intakeAgent, githubName string) map[string
 			map[string]any{
 				"source": "integration",
 				"integration": map[string]any{
-					"name": githubName,
+					"name": vcsName,
 				},
 			},
 		},

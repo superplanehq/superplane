@@ -30,6 +30,7 @@ var (
 	ErrFactoryOnboardingInvalidAppID             = errors.New("invalid provisioned app id")
 	ErrFactoryOnboardingInvalidLineID            = errors.New("invalid provisioned line id")
 	ErrFactoryOnboardingInvalidRepository        = errors.New("repository must use the owner/name format")
+	ErrFactoryOnboardingInvalidVCSProvider       = errors.New("invalid version control provider")
 	ErrFactoryOnboardingVCSIntegrationRequired   = errors.New("version control integration id is required")
 	ErrFactoryOnboardingAgentIntegrationRequired = errors.New("agent integration id is required")
 	ErrFactoryOnboardingHostedAgentUnavailable   = errors.New("hosted agent credentials are not available")
@@ -48,16 +49,18 @@ var factoryOnboardingRepositoryPattern = regexp.MustCompile(`^[^/\s]+/[^/\s]+$`)
 type FactoryOnboardingConfig struct {
 	InitialOnboardingAttemptID string `json:"initial_onboarding_attempt_id,omitempty"`
 	VCSIntegrationID           string `json:"vcs_integration_id,omitempty"`
-	AgentIntegrationID         string `json:"agent_integration_id,omitempty"`
-	AppRepository              string `json:"app_repository,omitempty"`
-	AppRepositoryID            int64  `json:"app_repository_id,omitempty"`
-	BacklogRepository          string `json:"backlog_repository,omitempty"`
-	BacklogRepositoryID        int64  `json:"backlog_repository_id,omitempty"`
-	DefaultBranch              string `json:"default_branch,omitempty"`
-	IssuesSource               string `json:"issues_source,omitempty"`
-	AgentHarness               string `json:"agent_harness,omitempty"`
-	ProvisionedAppID           string `json:"provisioned_app_id,omitempty"`
-	ProvisionedLineID          string `json:"provisioned_line_id,omitempty"`
+	// VCSProvider is the Git host. Empty means GitHub. Existing rows stay empty.
+	VCSProvider         string `json:"vcs_provider,omitempty"`
+	AgentIntegrationID  string `json:"agent_integration_id,omitempty"`
+	AppRepository       string `json:"app_repository,omitempty"`
+	AppRepositoryID     int64  `json:"app_repository_id,omitempty"`
+	BacklogRepository   string `json:"backlog_repository,omitempty"`
+	BacklogRepositoryID int64  `json:"backlog_repository_id,omitempty"`
+	DefaultBranch       string `json:"default_branch,omitempty"`
+	IssuesSource        string `json:"issues_source,omitempty"`
+	AgentHarness        string `json:"agent_harness,omitempty"`
+	ProvisionedAppID    string `json:"provisioned_app_id,omitempty"`
+	ProvisionedLineID   string `json:"provisioned_line_id,omitempty"`
 }
 
 // FactoryOnboardingPatch carries optional field updates for a partial merge.
@@ -66,6 +69,7 @@ type FactoryOnboardingConfig struct {
 // cleared to the empty string).
 type FactoryOnboardingPatch struct {
 	VCSIntegrationID    *string
+	VCSProvider         *string
 	AgentIntegrationID  *string
 	AppRepository       *string
 	AppRepositoryID     *int64
@@ -89,6 +93,74 @@ func ValidateFactoryOnboardingIssuesSource(source string) error {
 	default:
 		return ErrFactoryOnboardingInvalidIssuesSource
 	}
+}
+
+func ValidateFactoryOnboardingVCSProvider(provider string) error {
+	switch strings.TrimSpace(provider) {
+	case "", ProviderGitHub, ProviderBitbucket:
+		return nil
+	default:
+		return ErrFactoryOnboardingInvalidVCSProvider
+	}
+}
+
+// EffectiveVCSProvider returns the stored Git host. An empty value means GitHub.
+func (c FactoryOnboardingConfig) EffectiveVCSProvider() string {
+	provider := strings.TrimSpace(c.VCSProvider)
+	if provider == "" {
+		return ProviderGitHub
+	}
+	return provider
+}
+
+// VCSProviderForIntegrationApp maps an integration app name to a workspace Git host.
+func VCSProviderForIntegrationApp(appName string) (string, bool) {
+	switch appName {
+	case ProviderGitHub, ProviderBitbucket:
+		return appName, true
+	default:
+		return "", false
+	}
+}
+
+// VCSRepositoryCloneURL returns the HTTPS clone URL for an owner/name
+// repository on the provider. An empty provider means GitHub.
+func VCSRepositoryCloneURL(provider, repository string) string {
+	repository = strings.TrimSuffix(strings.TrimSpace(repository), ".git")
+	if provider == ProviderBitbucket {
+		return "https://bitbucket.org/" + repository + ".git"
+	}
+	return "https://github.com/" + repository + ".git"
+}
+
+// FactoryVCSCapabilities is the set of factory automations a Git host can run.
+type FactoryVCSCapabilities struct {
+	PRClosure       bool
+	PRFeedback      bool
+	PRChecks        bool
+	MergeConfidence bool
+	Velocity        bool
+	BoardMerge      bool
+	BoardClose      bool
+	VCSIssueIntake  bool
+}
+
+// FactoryVCSCapabilitiesFor returns the automations a provider can run.
+// An empty provider uses the GitHub set. Bitbucket stays off until its own step.
+func FactoryVCSCapabilitiesFor(provider string) FactoryVCSCapabilities {
+	if strings.TrimSpace(provider) == "" || provider == ProviderGitHub {
+		return FactoryVCSCapabilities{
+			PRClosure:       true,
+			PRFeedback:      true,
+			PRChecks:        true,
+			MergeConfidence: true,
+			Velocity:        true,
+			BoardMerge:      true,
+			BoardClose:      true,
+			VCSIssueIntake:  true,
+		}
+	}
+	return FactoryVCSCapabilities{}
 }
 
 func ValidateFactoryOnboardingAgentHarness(harness string) error {
@@ -207,6 +279,13 @@ func mergeFactoryOnboardingConfig(current FactoryOnboardingConfig, patch Factory
 			return FactoryOnboardingConfig{}, err
 		}
 		next.VCSIntegrationID = value
+	}
+	if patch.VCSProvider != nil {
+		value := strings.TrimSpace(*patch.VCSProvider)
+		if err := ValidateFactoryOnboardingVCSProvider(value); err != nil {
+			return FactoryOnboardingConfig{}, err
+		}
+		next.VCSProvider = value
 	}
 	if patch.AgentIntegrationID != nil {
 		value := strings.TrimSpace(*patch.AgentIntegrationID)
