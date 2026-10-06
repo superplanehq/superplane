@@ -25,4 +25,9 @@ func grantIntakeCatalogAccess(t *testing.T, organizationID uuid.UUID) {
 	} {
 		require.NoError(t, models.EnableExperimentalFeatureInTransaction(db, organizationID, featureID))
 	}
+
+	linear, err := models.FindIntakeCatalogEntry(db, models.FactoryIntakeSourceLinearIssues)
+	require.NoError(t, err)
+	status := models.IntakeStatusBeta
+	require.NoError(t, linear.Update(db, models.IntakeCatalogPatch{Status: &status}, nil))
 }
