@@ -254,8 +254,6 @@ func TruncateTables() error {
 			factory_planning_session_work_orders,
 			factory_planning_session_activities,
 			workspace_usage_events,
-			usage_price_books,
-			usage_price_book_rates,
 			hosted_llm_providers,
 			organization_byok_model_allowlists,
 			organization_hosted_model_allowlists,
