@@ -54,6 +54,42 @@ const SYSTEM_PROMPT =
   "Do not use Markdown: no bold/italic markers, headings, links, tables, or fenced code blocks. " +
   "Prefer plain paths, shell commands, and simple indentation.";
 
+function loadConfirmPromptRule() {
+  const candidates = [
+    path.join(__dirname, "confirm_prompt.js"),
+    path.join(__dirname, "..", "confirm_prompt.js"),
+  ];
+  for (const file of candidates) {
+    try {
+      return require(file).CONFIRM_PROMPT_RULE;
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  throw new Error("confirm prompt rule is missing");
+}
+
+function claudeAppendSystemPrompt(env = process.env) {
+  let prompt = `${SYSTEM_PROMPT} ${loadConfirmPromptRule()}`;
+  if (planningMCPEnabled(env)) {
+    prompt += planningSystemPrompt(env);
+  }
+  return prompt;
+}
+
+function claudeRunEnv(taskDir, baseEnv = process.env) {
+  const guard = path.join(taskDir, "confirm_prompt.js");
+  try {
+    fs.chmodSync(guard, 0o755);
+  } catch (_err) {
+    // The broker writes this file as executable. A missing file fails the prefix.
+  }
+  return {
+    ...baseEnv,
+    CLAUDE_CODE_SHELL_PREFIX: guard,
+  };
+}
+
 function loadAnalysisProtocolModule() {
   const candidates = [
     path.join(__dirname, "analysis_protocol.js"),
@@ -411,13 +447,11 @@ async function runPrompt(promptFile, model, thinking) {
     "--add-dir",
     ".",
     "--append-system-prompt",
-    SYSTEM_PROMPT,
+    claudeAppendSystemPrompt(),
   ];
   if (planningToolsEnabled) {
     println("Planning session tools enabled");
     println(`permission mode: ${claudePermissionMode()}`);
-    claudeArgs[claudeArgs.length - 1] =
-      SYSTEM_PROMPT + planningSystemPrompt();
   }
   const mcpConfigPath = writeClaudeMCPConfig(sp, process.env, toolsEnabled);
   if (mcpConfigPath) {
@@ -459,6 +493,7 @@ async function runPrompt(promptFile, model, thinking) {
   );
   const child = spawn(command, args, {
     stdio: ["ignore", "pipe", "pipe"],
+    env: claudeRunEnv(sp),
   });
   const stderrDone = pipeRedactedStderr(child.stderr);
 
@@ -1366,6 +1401,8 @@ module.exports = {
   claudeSessionIDFromEvent,
   formatStreamJsonLines,
   planningSystemPrompt,
+  claudeAppendSystemPrompt,
+  claudeRunEnv,
   thinkingArgs,
   workspaceMCPServers,
   writeClaudeMCPConfig,
