@@ -349,26 +349,48 @@ func (s *Server) adminListAccounts(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	account, ok := middleware.GetAccountFromContext(ctx)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	search, limit, offset := parsePagination(r)
 	sortBy, sortDirection := parseSorting(r)
+	db := database.DB(ctx)
 
-	organizations, total, err := listAllOrganizations(ctx, search, limit, offset, sortBy, sortDirection)
+	pinnedOrganizations, err := models.ListPinnedOrganizationsForAccount(db, account.ID)
+	if err != nil {
+		log.Errorf("admin: failed to list pinned organizations: %v", err)
+		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
+		return
+	}
+
+	excludeIDs := make([]uuid.UUID, 0, len(pinnedOrganizations))
+	for _, organization := range pinnedOrganizations {
+		excludeIDs = append(excludeIDs, organization.ID)
+	}
+
+	organizations, total, matchTotal, err := listUnpinnedOrganizations(ctx, search, limit, offset, sortBy, sortDirection, excludeIDs)
 	if err != nil {
 		log.Errorf("admin: failed to list organizations: %v", err)
 		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
 		return
 	}
 
-	type orgItem = adminOrgItem
-
 	items := serializeAdminOrganizations(ctx, organizations)
+	pinned := serializeAdminOrganizations(ctx, pinnedOrganizations)
+	for i := range pinned {
+		pinned[i].Pinned = true
+	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(paginatedResponse{
-		Items:  items,
-		Total:  total,
-		Limit:  limit,
-		Offset: offset,
+	respondJSON(w, adminOrganizationListResponse{
+		Items:      items,
+		Pinned:     pinned,
+		Total:      total,
+		MatchTotal: matchTotal,
+		Limit:      limit,
+		Offset:     offset,
 	})
 }
 
@@ -378,7 +400,14 @@ func (s *Server) adminGetOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	organization, err := models.FindOrganizationWithCounts(database.DB(r.Context()), orgID)
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	db := database.DB(r.Context())
+	organization, err := models.FindOrganizationWithCounts(db, orgID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			http.Error(w, "Organization not found", http.StatusNotFound)
@@ -389,7 +418,61 @@ func (s *Server) adminGetOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, serializeAdminOrganization(*organization))
+	pinned, err := models.IsOrganizationPinnedForAccount(db, account.ID, orgID)
+	if err != nil {
+		log.Errorf("admin: failed to load organization pin %s: %v", orgID, err)
+		http.Error(w, "Failed to load organization", http.StatusInternalServerError)
+		return
+	}
+
+	item := serializeAdminOrganization(*organization)
+	item.Pinned = pinned
+	respondJSON(w, item)
+}
+
+func (s *Server) adminPinOrganization(w http.ResponseWriter, r *http.Request) {
+	account, orgID, ok := adminOrganizationPinRequest(w, r)
+	if !ok {
+		return
+	}
+
+	if err := models.PinOrganizationForAccount(database.DB(r.Context()), account.ID, orgID); err != nil {
+		log.Errorf("admin: failed to pin organization %s: %v", orgID, err)
+		http.Error(w, "Failed to pin organization", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, adminOrganizationPinState{Pinned: true})
+}
+
+func (s *Server) adminUnpinOrganization(w http.ResponseWriter, r *http.Request) {
+	account, orgID, ok := adminOrganizationPinRequest(w, r)
+	if !ok {
+		return
+	}
+
+	if err := models.UnpinOrganizationForAccount(database.DB(r.Context()), account.ID, orgID); err != nil {
+		log.Errorf("admin: failed to unpin organization %s: %v", orgID, err)
+		http.Error(w, "Failed to unpin organization", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, adminOrganizationPinState{Pinned: false})
+}
+
+func adminOrganizationPinRequest(w http.ResponseWriter, r *http.Request) (*models.Account, uuid.UUID, bool) {
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil, uuid.Nil, false
+	}
+
+	orgID, ok := parseAdminOrgID(w, r)
+	if !ok {
+		return nil, uuid.Nil, false
+	}
+
+	return account, orgID, true
 }
 
 // adminListCanvases returns paginated canvases for a given organization.
@@ -933,13 +1016,27 @@ type adminOrgItem struct {
 	MemberCount   int64   `json:"member_count"`
 	CreatedAt     *string `json:"created_at,omitempty"`
 	UpdatedAt     *string `json:"updated_at,omitempty"`
+	Pinned        bool    `json:"pinned"`
 }
 
-func listAllOrganizations(ctx context.Context, search string, limit, offset int, sortBy, sortDirection string) (organizations []models.OrganizationWithCounts, total int64, err error) {
+type adminOrganizationListResponse struct {
+	Items      []adminOrgItem `json:"items"`
+	Pinned     []adminOrgItem `json:"pinned"`
+	Total      int64          `json:"total"`
+	MatchTotal int64          `json:"match_total"`
+	Limit      int            `json:"limit"`
+	Offset     int            `json:"offset"`
+}
+
+type adminOrganizationPinState struct {
+	Pinned bool `json:"pinned"`
+}
+
+func listUnpinnedOrganizations(ctx context.Context, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) (organizations []models.OrganizationWithCounts, unpinnedTotal int64, matchTotal int64, err error) {
 	ctx, done := telemetry.Span(ctx, "organizations.list")
 	defer done(&err)
 
-	return models.ListAllOrganizations(database.DB(ctx), search, limit, offset, sortBy, sortDirection)
+	return models.ListUnpinnedOrganizations(database.DB(ctx), search, limit, offset, sortBy, sortDirection, excludeIDs)
 }
 
 func serializeAdminOrganizations(ctx context.Context, organizations []models.OrganizationWithCounts) []adminOrgItem {

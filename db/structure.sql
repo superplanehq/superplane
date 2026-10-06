@@ -946,6 +946,18 @@ CREATE TABLE public.hosted_llm_providers (
 
 
 --
+-- Name: installation_admin_organization_pins; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_admin_organization_pins (
+    account_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    pinned_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: installation_license_keys; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2454,6 +2466,14 @@ ALTER TABLE ONLY public.hosted_llm_providers
 
 ALTER TABLE ONLY public.factory_pull_request_runs
     ADD CONSTRAINT idx_factory_pull_request_runs_run_unique UNIQUE (run_id);
+
+
+--
+-- Name: installation_admin_organization_pins installation_admin_organization_pins_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_admin_organization_pins
+    ADD CONSTRAINT installation_admin_organization_pins_pkey PRIMARY KEY (account_id, organization_id);
 
 
 --
@@ -4092,6 +4112,13 @@ CREATE INDEX index_organizations_on_created_by_account_id ON public.organization
 
 
 --
+-- Name: installation_admin_organization_pins_account_pinned_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX installation_admin_organization_pins_account_pinned_at_idx ON public.installation_admin_organization_pins USING btree (account_id, pinned_at DESC);
+
+
+--
 -- Name: organizations_slug_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5000,6 +5027,22 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
+-- Name: installation_admin_organization_pins installation_admin_organization_pins_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_admin_organization_pins
+    ADD CONSTRAINT installation_admin_organization_pins_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: installation_admin_organization_pins installation_admin_organization_pins_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_admin_organization_pins
+    ADD CONSTRAINT installation_admin_organization_pins_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: installation_licenses installation_licenses_installed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5559,7 +5602,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261005202819	f
+20261006140645	f
 \.
 
 

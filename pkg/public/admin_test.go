@@ -226,6 +226,248 @@ func TestAdminGetOrganization(t *testing.T) {
 	})
 }
 
+func TestAdminOrganizationPins(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Run("pins and unpins from the list and detail responses", func(t *testing.T) {
+		org, err := models.CreateOrganization("Pinned Customer", "customer")
+		require.NoError(t, err)
+
+		pinResponse := execRequest(server, requestParams{
+			method:     http.MethodPut,
+			path:       adminOrganizationPinPath(org.ID),
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, pinResponse.Code)
+		assertPinState(t, pinResponse, true)
+
+		page := listAdminOrganizations(t, server, token, "")
+		assert.Equal(t, []string{org.ID.String()}, adminOrganizationIDs(page.Pinned))
+		assert.NotContains(t, adminOrganizationIDs(page.Items), org.ID.String())
+		assert.Equal(t, page.MatchTotal-1, page.Total)
+
+		detail := getAdminOrganization(t, server, token, org.ID)
+		assert.True(t, detail.Pinned)
+
+		reloaded := listAdminOrganizations(t, server, token, "")
+		assert.Equal(t, adminOrganizationIDs(page.Pinned), adminOrganizationIDs(reloaded.Pinned))
+
+		unpinResponse := execRequest(server, requestParams{
+			method:     http.MethodDelete,
+			path:       adminOrganizationPinPath(org.ID),
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, unpinResponse.Code)
+		assertPinState(t, unpinResponse, false)
+
+		afterUnpin := listAdminOrganizations(t, server, token, "")
+		assert.NotContains(t, adminOrganizationIDs(afterUnpin.Pinned), org.ID.String())
+		assert.Contains(t, adminOrganizationIDs(afterUnpin.Items), org.ID.String())
+		assert.False(t, getAdminOrganization(t, server, token, org.ID).Pinned)
+	})
+
+	t.Run("keeps the original pin position when pinned again", func(t *testing.T) {
+		first, err := models.CreateOrganization("First Pin", "")
+		require.NoError(t, err)
+		second, err := models.CreateOrganization("Second Pin", "")
+		require.NoError(t, err)
+
+		require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, first.ID).Code)
+		time.Sleep(20 * time.Millisecond)
+		require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, second.ID).Code)
+		time.Sleep(20 * time.Millisecond)
+		require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, first.ID).Code)
+
+		page := listAdminOrganizations(t, server, token, "sort_by=name&sort_direction=asc")
+		assert.Equal(t, []string{second.ID.String(), first.ID.String()}, leadingOrganizationIDs(page.Pinned, 2))
+		assert.NotContains(t, adminOrganizationIDs(page.Items), first.ID.String())
+		assert.NotContains(t, adminOrganizationIDs(page.Items), second.ID.String())
+	})
+
+	t.Run("keeps a non-matching pin in the pinned section", func(t *testing.T) {
+		matchingPin, err := models.CreateOrganization("Search Pin Match", "")
+		require.NoError(t, err)
+		unpinnedMatch, err := models.CreateOrganization("Search Row Match", "")
+		require.NoError(t, err)
+		other, err := models.CreateOrganization("Search Other", "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, matchingPin.ID).Code)
+		require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, other.ID).Code)
+
+		page := listAdminOrganizations(t, server, token, "search=Match&sort_by=name&sort_direction=asc")
+		assert.Contains(t, adminOrganizationIDs(page.Pinned), matchingPin.ID.String())
+		assert.Contains(t, adminOrganizationIDs(page.Pinned), other.ID.String())
+		assert.Equal(t, []string{unpinnedMatch.ID.String()}, adminOrganizationIDs(page.Items))
+		assert.Equal(t, int64(1), page.Total)
+		assert.Equal(t, int64(2), page.MatchTotal)
+	})
+
+	t.Run("excludes pinned organizations from every page", func(t *testing.T) {
+		before := listAdminOrganizations(t, server, token, "")
+		first, err := models.CreateOrganization("Page One", "")
+		require.NoError(t, err)
+		_, err = models.CreateOrganization("Page Two", "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, first.ID).Code)
+
+		firstPage := listAdminOrganizations(t, server, token, "limit=1&offset=0")
+		secondPage := listAdminOrganizations(t, server, token, "limit=1&offset=1")
+
+		assert.Equal(t, before.MatchTotal+2, firstPage.MatchTotal)
+		assert.Equal(t, before.Total+1, firstPage.Total)
+		assert.Equal(t, firstPage.Total, secondPage.Total)
+		assert.Contains(t, adminOrganizationIDs(firstPage.Pinned), first.ID.String())
+		assert.Contains(t, adminOrganizationIDs(secondPage.Pinned), first.ID.String())
+		assert.NotContains(t, adminOrganizationIDs(firstPage.Items), first.ID.String())
+		assert.NotContains(t, adminOrganizationIDs(secondPage.Items), first.ID.String())
+		assert.LessOrEqual(t, len(firstPage.Items), 1)
+		assert.LessOrEqual(t, len(secondPage.Items), 1)
+	})
+
+	t.Run("does not show pins to another admin", func(t *testing.T) {
+		otherAccount, err := models.CreateAccount("Other Admin", "other-admin-pins@example.com")
+		require.NoError(t, err)
+		require.NoError(t, models.PromoteToInstallationAdmin(otherAccount.ID.String()))
+		signer := jwt.NewSigner("test-client-secret")
+		otherToken, err := authentication.GenerateAccountToken(signer, otherAccount.ID.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+
+		require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, r.Organization.ID).Code)
+
+		otherPage := listAdminOrganizations(t, server, otherToken, "")
+		assert.NotContains(t, adminOrganizationIDs(otherPage.Pinned), r.Organization.ID.String())
+		assert.Contains(t, adminOrganizationIDs(otherPage.Items), r.Organization.ID.String())
+		assert.False(t, getAdminOrganization(t, server, otherToken, r.Organization.ID).Pinned)
+		assert.True(t, getAdminOrganization(t, server, token, r.Organization.ID).Pinned)
+	})
+
+	t.Run("unpin of an organization that is not pinned succeeds", func(t *testing.T) {
+		org, err := models.CreateOrganization("Never Pinned", "")
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     http.MethodDelete,
+			path:       adminOrganizationPinPath(org.ID),
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+		assertPinState(t, response, false)
+	})
+
+	t.Run("returns 404 for unknown or deleted organizations", func(t *testing.T) {
+		unknown := execRequest(server, requestParams{
+			method:     http.MethodPut,
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/pin",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, unknown.Code)
+
+		deleted, err := models.CreateOrganization("Deleted Pin Org", "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, pinAdminOrganization(t, server, token, deleted.ID).Code)
+		require.NoError(t, models.SoftDeleteOrganization(deleted.ID.String()))
+
+		page := listAdminOrganizations(t, server, token, "")
+		assert.NotContains(t, adminOrganizationIDs(page.Pinned), deleted.ID.String())
+
+		pinDeleted := execRequest(server, requestParams{
+			method:     http.MethodPut,
+			path:       adminOrganizationPinPath(deleted.ID),
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, pinDeleted.Code)
+
+		unpinDeleted := execRequest(server, requestParams{
+			method:     http.MethodDelete,
+			path:       adminOrganizationPinPath(deleted.ID),
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, unpinDeleted.Code)
+	})
+
+	t.Run("non-admin cannot pin an organization", func(t *testing.T) {
+		account, err := models.CreateAccount("Regular Pin User", "regular-pin@example.com")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test-client-secret")
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     http.MethodPut,
+			path:       adminOrganizationPinPath(r.Organization.ID),
+			authCookie: regularToken,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+}
+
+func adminOrganizationPinPath(orgID uuid.UUID) string {
+	return "/admin/api/organizations/" + orgID.String() + "/pin"
+}
+
+func pinAdminOrganization(t *testing.T, server *Server, token string, orgID uuid.UUID) *httptest.ResponseRecorder {
+	t.Helper()
+	return execRequest(server, requestParams{
+		method:     http.MethodPut,
+		path:       adminOrganizationPinPath(orgID),
+		authCookie: token,
+	})
+}
+
+func listAdminOrganizations(t *testing.T, server *Server, token, query string) adminOrganizationListResponse {
+	t.Helper()
+	path := "/admin/api/organizations"
+	if query != "" {
+		path += "?" + query
+	}
+	response := execRequest(server, requestParams{
+		method:     http.MethodGet,
+		path:       path,
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, response.Code)
+
+	var page adminOrganizationListResponse
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &page))
+	return page
+}
+
+func getAdminOrganization(t *testing.T, server *Server, token string, orgID uuid.UUID) adminOrgItem {
+	t.Helper()
+	response := execRequest(server, requestParams{
+		method:     http.MethodGet,
+		path:       "/admin/api/organizations/" + orgID.String(),
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, response.Code)
+
+	var organization adminOrgItem
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &organization))
+	return organization
+}
+
+func assertPinState(t *testing.T, response *httptest.ResponseRecorder, pinned bool) {
+	t.Helper()
+	var state adminOrganizationPinState
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &state))
+	assert.Equal(t, pinned, state.Pinned)
+}
+
+func adminOrganizationIDs(organizations []adminOrgItem) []string {
+	ids := make([]string, 0, len(organizations))
+	for _, organization := range organizations {
+		ids = append(ids, organization.ID)
+	}
+	return ids
+}
+
+func leadingOrganizationIDs(organizations []adminOrgItem, count int) []string {
+	if len(organizations) < count {
+		return adminOrganizationIDs(organizations)
+	}
+	return adminOrganizationIDs(organizations[:count])
+}
+
 func TestAdminInstallationNetworkSettings(t *testing.T) {
 	unsetEnvForAdminTest(t, "BLOCKED_HTTP_HOSTS")
 	unsetEnvForAdminTest(t, "BLOCKED_PRIVATE_IP_RANGES")
