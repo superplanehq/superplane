@@ -276,7 +276,9 @@ describe("LiveLogStream integrated polling", () => {
 
     try {
       const onLogLine = vi.fn();
-      const final = await new LiveLogStream("organization-1", "canvas-1", "execution-1", 0).pump(handlers({ onLogLine }));
+      const final = await new LiveLogStream("organization-1", "canvas-1", "execution-1", 0).pump(
+        handlers({ onLogLine }),
+      );
 
       expect(final).toBe(true);
       expect(fetchMock.mock.calls[2]?.[0]).toBe("https://storage.example/logs");

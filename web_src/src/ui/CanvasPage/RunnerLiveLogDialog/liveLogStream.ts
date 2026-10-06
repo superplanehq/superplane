@@ -333,6 +333,36 @@ function processCompleteLines(buffer: string, handlers: LiveLogStreamHandlers): 
   return remainder;
 }
 
+async function pumpIntegratedLogResponse(
+  res: Response,
+  handlers: LiveLogStreamHandlers,
+  signal: AbortSignal,
+): Promise<void> {
+  const signedURL = res.headers.get(LOG_URL_HEADER)?.trim();
+  if (signedURL) {
+    await pumpSignedLog(signedURL, handlers, signal);
+    return;
+  }
+  if (res.body) {
+    await pumpReaderNdjson(requireBodyReader(res), handlers);
+  }
+}
+
+async function pumpSignedLog(signedURL: string, handlers: LiveLogStreamHandlers, signal: AbortSignal): Promise<void> {
+  const objectRes = await fetch(signedURL, {
+    method: "GET",
+    credentials: "omit",
+    signal,
+    headers: { Accept: "application/x-ndjson" },
+  });
+  if (!objectRes.ok) {
+    throw liveLogRequestErrorFromResponse(objectRes, await objectRes.text());
+  }
+  if (objectRes.body) {
+    await pumpReaderNdjson(requireBodyReader(objectRes), handlers);
+  }
+}
+
 async function pumpReaderNdjson(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   handlers: LiveLogStreamHandlers,
@@ -429,23 +459,7 @@ export class LiveLogStream {
         handlers.onOpen?.();
         opened = true;
       }
-      const signedURL = res.headers.get(LOG_URL_HEADER)?.trim();
-      if (signedURL) {
-        const objectRes = await fetch(signedURL, {
-          method: "GET",
-          credentials: "omit",
-          signal: this.abortController.signal,
-          headers: { Accept: "application/x-ndjson" },
-        });
-        if (!objectRes.ok) {
-          throw liveLogRequestErrorFromResponse(objectRes, await objectRes.text());
-        }
-        if (objectRes.body) {
-          await pumpReaderNdjson(requireBodyReader(objectRes), handlers);
-        }
-      } else if (res.body) {
-        await pumpReaderNdjson(requireBodyReader(res), handlers);
-      }
+      await pumpIntegratedLogResponse(res, handlers, this.abortController.signal);
 
       const nextCursor = res.headers.get(LOG_CURSOR_HEADER);
       if (nextCursor !== null) {
