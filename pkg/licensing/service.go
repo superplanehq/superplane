@@ -22,6 +22,9 @@ const RefreshInterval = 30 * time.Second
 // that comes from SUPERPLANE_LICENSE_PATH.
 var ErrManagedByFile = errors.New("the license is managed by the installation configuration")
 
+// ErrKeySyncUnavailable is returned when the service does not manage keys.
+var ErrKeySyncUnavailable = errors.New("license key updates are not available")
+
 type State string
 
 const (
@@ -69,6 +72,19 @@ func Allows(entitlements Entitlements, feature Feature) bool {
 	}
 
 	return entitlements.IsEntitled(feature)
+}
+
+// ErrNotLicensed reports that the installation license does not grant an
+// Enterprise feature.
+var ErrNotLicensed = errors.New("this action requires a SuperPlane Enterprise license")
+
+// Require returns ErrNotLicensed unless the entitlements grant the feature.
+func Require(entitlements Entitlements, feature Feature) error {
+	if !Allows(entitlements, feature) {
+		return ErrNotLicensed
+	}
+
+	return nil
 }
 
 type snapshot struct {
@@ -256,6 +272,34 @@ func (s *Service) Status() Status {
 
 func (s *Service) IsEntitled(feature Feature) bool {
 	return s.Status().IsEntitled(feature)
+}
+
+// TrustedKeys reports the trusted key list. It returns false when the service
+// does not sync keys.
+func (s *Service) TrustedKeys() (KeySyncStatus, bool) {
+	if s.keySync == nil {
+		return KeySyncStatus{}, false
+	}
+
+	return s.keySync.Status(), true
+}
+
+// InstallKeyList trusts a key list that an administrator uploads and then
+// reloads the license, which may use a key from the list.
+func (s *Service) InstallKeyList(ctx context.Context, raw []byte) error {
+	if s.keySync == nil {
+		return ErrKeySyncUnavailable
+	}
+
+	if _, err := s.keySync.Install(ctx, raw); err != nil {
+		return err
+	}
+
+	if err := s.Refresh(ctx); err != nil {
+		log.WithError(err).Warn("Licensing: license refresh after a key list upload failed")
+	}
+
+	return nil
 }
 
 // Install verifies a license and stores it. It accepts only a license that is

@@ -319,6 +319,10 @@ func ensureFactoryMergeabilityWebhookForRepository(
 		return nil
 	}
 
+	if factory.OnboardingConfigValue().EffectiveVCSProvider() != models.ProviderGitHub {
+		return nil
+	}
+
 	repository = strings.TrimSpace(repository)
 	integrationID := strings.TrimSpace(factory.OnboardingConfigValue().VCSIntegrationID)
 	if repository == "" || integrationID == "" {

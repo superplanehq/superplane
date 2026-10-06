@@ -48,6 +48,15 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
+	t.Run("known id returns bitbucket workspaces feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryBitbucket)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryBitbucket, f.ID)
+		assert.Equal(t, "Bitbucket Workspaces", f.Label)
+		assert.Equal(t, "Connect a Bitbucket workspace and open pull requests from Implement", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceModels)
 		assert.True(t, ok)
@@ -122,7 +131,7 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, FeatureSuperPlaneMCPServer, f.ID)
 		assert.Equal(t, "MCP Server", f.Label)
 		assert.Equal(t, "Allow Cursor and other MCP clients to connect to workspaces in this organization", f.Description)
-		assert.Nil(t, f.Released)
+		assert.True(t, IsReleased(FeatureSuperPlaneMCPServer))
 	})
 
 	t.Run("known id returns mobile board feature", func(t *testing.T) {
@@ -171,6 +180,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
 	assert.True(t, Exists(FeatureFactoryLinearIntake))
+	assert.True(t, Exists(FeatureFactoryBitbucket))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))

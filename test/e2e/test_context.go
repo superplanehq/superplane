@@ -14,6 +14,8 @@ import (
 	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/licensing"
+	"github.com/superplanehq/superplane/pkg/licensing/licensingtest"
 	"github.com/superplanehq/superplane/pkg/server"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
@@ -86,6 +88,10 @@ func (s *TestContext) Start() {
 	s.AgentProvider = support.NewAgentProvider()
 	s.ResetAgentProvider()
 	server.SetAgentProviderForTests(s.AgentProvider)
+	server.SetLicenseServiceForTests(licensingtest.EnterpriseService(
+		licensing.FeatureCustomRoles,
+		licensing.FeatureGroups,
+	))
 
 	s.startVite()
 	s.startAppServer()

@@ -3,7 +3,7 @@
   "project": ["src/**/*.{ts,tsx}", ".storybook/**/*.{ts,tsx}", "scripts/**/*.mjs"],
   "ignoreDependencies": ["tippy.js", "@happy-dom/global-registrator"],
   "ignoreBinaries": ["bun"],
-  "ignore": ["src/test/bun-preload.ts", "src/test/bun-test.d.ts"],
+  "ignore": ["src/test/bun-preload.ts", "src/test/bun-test.d.ts", "scripts/serve-monaco-worker-check.mjs"],
   "paths": {
     "@factory-templates/*": ["../pkg/grpc/actions/factories/templates/*"]
   },

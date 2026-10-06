@@ -92,8 +92,9 @@ type productiveIntakeItemSource struct {
 }
 
 type sentryIntakeItemSource struct {
-	sentry  *sentry.Client
-	project string
+	sentry   *sentry.Client
+	project  string
+	projects []string
 }
 
 type datadogIntakeItemSource struct {
@@ -402,9 +403,8 @@ func newSentryIntakeItemSource(
 	trigger *models.Node,
 	integration *models.Integration,
 ) (intakeItemSource, error) {
-	project, _ := trigger.Configuration["project"].(string)
-	project = strings.TrimSpace(project)
-	if project == "" {
+	projects := sentryProjectIDsFromConfiguration(trigger.Configuration)
+	if len(projects) == 0 {
 		return nil, errIntakeNotConnected
 	}
 
@@ -413,7 +413,7 @@ func newSentryIntakeItemSource(
 		return nil, fmt.Errorf("%w: %s", errIntakeNotConnected, err)
 	}
 
-	return &sentryIntakeItemSource{sentry: client, project: project}, nil
+	return &sentryIntakeItemSource{sentry: client, projects: projects}, nil
 }
 
 func newDatadogIntakeItemSource(
@@ -770,13 +770,33 @@ func productiveTaskItem(task productive.Task, organizationID string) IntakeItem 
 }
 
 func (s *sentryIntakeItemSource) Search(_ context.Context, query string, limit int) ([]IntakeItem, error) {
-	issues, err := s.sentry.SearchUnresolvedIssues(s.project, query, limit)
-	if err != nil {
-		return nil, err
+	projects := s.projectSlugs()
+	if len(projects) == 0 {
+		return nil, errIntakeNotConnected
 	}
 
-	items := make([]IntakeItem, 0, len(issues))
-	for _, issue := range issues {
+	matched := make([]sentry.Issue, 0, limit)
+	var firstErr error
+	loaded := 0
+	for _, project := range projects {
+		issues, err := s.sentry.SearchUnresolvedIssues(project, query, limit)
+		if err != nil {
+			if firstErr == nil {
+				firstErr = err
+			}
+			log.WithError(err).Warnf("sentry intake search skipped project %s", project)
+			continue
+		}
+		loaded++
+		matched = append(matched, issues...)
+	}
+	if loaded == 0 {
+		return nil, firstErr
+	}
+	matched = mergeNewestSentryIssues(matched, limit)
+
+	items := make([]IntakeItem, 0, len(matched))
+	for _, issue := range matched {
 		items = append(items, sentryIssueItem(issue))
 	}
 	return items, nil
@@ -805,7 +825,18 @@ func (s *sentryIntakeItemSource) Get(_ context.Context, id string) (*IntakeItem,
 	return &item, nil
 }
 
-// ownsIssue reports whether the issue belongs to the project this intake
+func (s *sentryIntakeItemSource) projectSlugs() []string {
+	if len(s.projects) > 0 {
+		return s.projects
+	}
+	project := strings.TrimSpace(s.project)
+	if project == "" {
+		return nil
+	}
+	return []string{project}
+}
+
+// ownsIssue reports whether the issue belongs to a project this intake
 // listens on. An issue without a readable project slug is rejected, so a
 // missing field cannot widen the boundary.
 func (s *sentryIntakeItemSource) ownsIssue(issue *sentry.Issue) bool {
@@ -813,7 +844,15 @@ func (s *sentryIntakeItemSource) ownsIssue(issue *sentry.Issue) bool {
 		return false
 	}
 	slug := strings.TrimSpace(issue.Project.Slug)
-	return slug != "" && strings.EqualFold(slug, s.project)
+	if slug == "" {
+		return false
+	}
+	for _, project := range s.projectSlugs() {
+		if strings.EqualFold(slug, project) {
+			return true
+		}
+	}
+	return false
 }
 
 func sentryIssueItem(issue sentry.Issue) IntakeItem {

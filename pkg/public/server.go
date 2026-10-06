@@ -107,6 +107,14 @@ func (s *Server) SetLicenseService(service *licensing.Service) {
 	s.licenseService = service
 }
 
+func (s *Server) entitlements() licensing.Entitlements {
+	if s.licenseService == nil {
+		return licensing.Community
+	}
+
+	return s.licenseService
+}
+
 // WebsocketHub returns the websocket hub for this server
 func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
@@ -278,7 +286,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 	ctx := context.Background()
 
-	authorizer := authorization.NewGatewayAuthorizer(s.authService)
+	authorizer := authorization.NewGatewayAuthorizer(s.authService).WithEntitlements(s.entitlements())
 
 	var grpcGatewayMux *runtime.ServeMux
 	grpcGatewayMux = runtime.NewServeMux(
@@ -790,6 +798,10 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminDisableOrgExperimentalFeature).Methods("DELETE")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminUpdateInstallationNetworkSettings).Methods("PATCH")
+	adminRoute.HandleFunc("/installation/license", s.adminGetInstallationLicense).Methods("GET")
+	adminRoute.HandleFunc("/installation/license", s.adminInstallInstallationLicense).Methods("PUT")
+	adminRoute.HandleFunc("/installation/license", s.adminRemoveInstallationLicense).Methods("DELETE")
+	adminRoute.HandleFunc("/installation/license/keys", s.adminInstallLicenseKeyList).Methods("PUT")
 	adminRoute.HandleFunc("/installation/llm-settings", s.adminGetInstallationLLMSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/llm-settings", s.adminUpdateInstallationLLMSettings).Methods("PATCH")
 	adminRoute.HandleFunc("/installation/llm-providers/{provider}", s.adminUpdateHostedLLMProvider).Methods("PATCH")
@@ -802,6 +814,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminGetOrganizationBillingPlan).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/spending-report", s.adminGetOrganizationSpendingReport).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/velocity", s.adminGetOrganizationVelocity).Methods("GET")
 	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks", s.adminListPolarWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks/endpoints", s.adminListPolarWebhookEndpoints).Methods("GET")
@@ -1466,6 +1479,54 @@ type AccountResponse struct {
 	LinkedAccounts               []AccountLinkedAccountResponse       `json:"linked_accounts"`
 	OrganizationsPendingDeletion []AccountOrganizationPendingDeletion `json:"organizations_pending_deletion"`
 	Impersonation                *AccountImpersonation                `json:"impersonation,omitempty"`
+	License                      AccountLicense                       `json:"license"`
+}
+
+// HideLicenseExpiryBannerEnv hides the license expiry banner when it is "yes"
+// or "true". The default is "no", so the banner stays visible.
+const HideLicenseExpiryBannerEnv = "SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER"
+
+// AccountLicense tells the UI which Enterprise features are available. Only
+// installation administrators receive the license state and expiry.
+type AccountLicense struct {
+	Edition          string     `json:"edition"`
+	Features         []string   `json:"features"`
+	State            string     `json:"state,omitempty"`
+	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
+	HideExpiryBanner bool       `json:"hide_expiry_banner,omitempty"`
+}
+
+func hideLicenseExpiryBanner() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(HideLicenseExpiryBannerEnv))) {
+	case "yes", "true":
+		return true
+	default:
+		return false
+	}
+}
+
+func accountLicense(status licensing.Status, installationAdmin bool) AccountLicense {
+	license := AccountLicense{
+		Edition:          string(status.Edition),
+		Features:         []string{},
+		HideExpiryBanner: hideLicenseExpiryBanner(),
+	}
+
+	if status.Edition == licensing.EditionEnterprise && status.License != nil {
+		license.Features = featureKeys(status.License.Features)
+	}
+
+	if !installationAdmin {
+		return license
+	}
+
+	license.State = string(status.State)
+	if status.License != nil {
+		expiresAt := status.License.ExpiresAt.UTC()
+		license.ExpiresAt = &expiresAt
+	}
+
+	return license
 }
 
 func accountOrganizationsPendingDeletion(organizations []models.Organization) []AccountOrganizationPendingDeletion {
@@ -1532,6 +1593,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		Providers:                    accountProviderResponses(providers),
 		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
 		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
+		License:                      accountLicense(s.licenseStatus(), account.IsInstallationAdmin()),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
@@ -2118,6 +2180,14 @@ func (l *lazyWebhookFactory) UpdatePullRequestActivity(params core.UpdatePullReq
 		return nil, err
 	}
 	return inner.UpdatePullRequestActivity(params)
+}
+
+func (l *lazyWebhookFactory) VCSProvider() (string, error) {
+	inner, err := l.load()
+	if err != nil {
+		return "", err
+	}
+	return inner.VCSProvider()
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, string, error) {

@@ -155,3 +155,34 @@ func Test__DescribeRun(t *testing.T) {
 		assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
 	})
 }
+
+func Test__DescribeRun__IncludesUsageTotalsAndModels(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "score", "start")
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, entry, "default", nil, map[string]any{
+		"workOrder": map[string]any{"id": uuid.New().String()},
+	})
+	run := createFinishedRun(t, rootEvent, models.CanvasRunResultPassed)
+	require.NoError(t, models.RecordUsage(db, models.WorkspaceUsageEventInput{
+		OrganizationID:  r.Organization.ID,
+		CanvasRunID:     run.ID,
+		NodeExecutionID: uuid.New(),
+		NodeID:          "prompt",
+		Provider:        models.UsageProviderAnthropic,
+		Model:           "claude-sonnet-4-6",
+		InputTokens:     1_000_000,
+		TotalTokens:     1_000_000,
+		FundingSource:   models.UsageFundingSourceHosted,
+	}))
+
+	response, err := DescribeRun(context.Background(), db, canvas, run.ID.String())
+	require.NoError(t, err)
+	require.NotNil(t, response.Run)
+	assert.Equal(t, run.ID.String(), response.Run.GetId())
+	assert.EqualValues(t, 1_000_000, response.Run.GetTotalTokens())
+	assert.Positive(t, response.Run.GetCostCents())
+	assert.Equal(t, []string{"anthropic/claude-sonnet-4-6"}, response.Run.GetModels())
+}

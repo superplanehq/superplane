@@ -87,7 +87,7 @@ describe("PlanningReviewPopup", () => {
     expect(screen.queryByTestId("planning-review-nav")).not.toBeInTheDocument();
     const settings = screen.getByTestId("planning-review-settings");
     expect(within(settings).getByText("Concurrency")).toBeInTheDocument();
-    expect(within(settings).getByText("Model used")).toBeInTheDocument();
+    expect(within(settings).getByText("Model")).toBeInTheDocument();
     expect(within(settings).queryByText("Environment")).not.toBeInTheDocument();
     expect(within(settings).queryByText("Working directory")).not.toBeInTheDocument();
     expect(within(settings).queryByText("Credentials")).not.toBeInTheDocument();
@@ -110,7 +110,7 @@ describe("PlanningReviewPopup", () => {
     expect(screen.queryByTestId("planning-review-component-toggle-implementation-agent")).not.toBeInTheDocument();
     expect(within(implementation).getByText("Steps")).toBeInTheDocument();
     expect(within(implementation).getByText("Concurrency")).toBeInTheDocument();
-    expect(within(implementation).getByText("Model used")).toBeInTheDocument();
+    expect(within(implementation).getByText("Model")).toBeInTheDocument();
     expect(within(implementation).queryByText("Working directory")).not.toBeInTheDocument();
     expect(within(implementation).queryByText("Credentials")).not.toBeInTheDocument();
     expect(within(implementation).queryByText("Environment from")).not.toBeInTheDocument();

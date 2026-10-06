@@ -225,7 +225,11 @@ func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	data, err := buildArtifactData(config)
+	provider, err := workOrderArtifactProvider(config.ArtifactType, ctx.Factory)
+	if err != nil {
+		return err
+	}
+	data, err := buildArtifactData(config, provider)
 	if err != nil {
 		return err
 	}
@@ -276,7 +280,14 @@ func (c *AddWorkOrderArtifact) HandleHook(ctx core.ActionHookContext) error {
 // buildArtifactData folds the free-form list into a map and layers the
 // typed inputs on top, so a user who defines both `url` and a `url`
 // row still ends up with the typed value on the wire.
-func buildArtifactData(config AddWorkOrderArtifactConfiguration) (map[string]any, error) {
+func workOrderArtifactProvider(artifactType string, factory core.FactoryContext) (string, error) {
+	if artifactType != "branch" || factory == nil {
+		return "", nil
+	}
+	return factory.VCSProvider()
+}
+
+func buildArtifactData(config AddWorkOrderArtifactConfiguration, provider string) (map[string]any, error) {
 	data := artifactDataToMap(config.Data)
 
 	typed := map[string]string{
@@ -296,7 +307,7 @@ func buildArtifactData(config AddWorkOrderArtifactConfiguration) (map[string]any
 		data[key] = value
 	}
 
-	data = applyBranchTreeURL(config, data)
+	data = applyBranchTreeURL(provider, config, data)
 	if err := requireReachableBranchURL(config.ArtifactType, data); err != nil {
 		return nil, err
 	}

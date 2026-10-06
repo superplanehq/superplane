@@ -1,5 +1,7 @@
 import { Text } from "@/components/Text/text";
 import { Timestamp } from "@/components/Timestamp";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 
 import AdminPagination from "./AdminPagination";
@@ -8,6 +10,7 @@ import {
   SENTRY_WEBHOOKS_EMPTY,
   SENTRY_WEBHOOKS_HELP,
   SENTRY_WEBHOOKS_PAGE_EMPTY,
+  SENTRY_WEBHOOKS_PROJECT_EMPTY,
   sentryWebhookIssueLabel,
   sentryWebhookOutcomeLabel,
   type SentryWebhookReceipt,
@@ -16,21 +19,42 @@ import { useSentryWebhooks } from "./useSentryWebhooks";
 
 export function SentryWebhooks() {
   const pageState = useSentryWebhooks();
+  const isFirstLoad = pageState.loading && pageState.data === null && pageState.loadError === "";
   useReportPageReady(!pageState.loading || pageState.data !== null || pageState.loadError !== "");
-
-  if (pageState.loading && pageState.data === null && pageState.loadError === "") {
-    return (
-      <div className="flex flex-col items-center space-y-4 py-12">
-        <div className="h-8 w-8 animate-spin rounded-full border-b border-gray-500 dark:border-gray-400"></div>
-        <Text className="text-gray-500 dark:text-gray-400">Loading Sentry webhooks...</Text>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
       <Text className="text-sm text-gray-500 dark:text-gray-400">{SENTRY_WEBHOOKS_HELP}</Text>
-      <SentryWebhooksBody pageState={pageState} />
+      <SentryWebhooksProjectFilter value={pageState.project} onChange={pageState.setProject} />
+      {isFirstLoad ? <SentryWebhooksLoading /> : <SentryWebhooksBody pageState={pageState} />}
+    </div>
+  );
+}
+
+function SentryWebhooksProjectFilter({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="flex flex-wrap items-end gap-4">
+      <div>
+        <Label htmlFor="sentry-webhooks-project" className="mb-1.5 block text-xs text-gray-500 dark:text-gray-400">
+          Project
+        </Label>
+        <Input
+          id="sentry-webhooks-project"
+          data-testid="sentry-webhooks-project"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className="h-9 w-56"
+        />
+      </div>
+    </div>
+  );
+}
+
+function SentryWebhooksLoading() {
+  return (
+    <div className="flex flex-col items-center space-y-4 py-12">
+      <div className="h-8 w-8 animate-spin rounded-full border-b border-gray-500 dark:border-gray-400"></div>
+      <Text className="text-gray-500 dark:text-gray-400">Loading Sentry webhooks...</Text>
     </div>
   );
 }
@@ -43,7 +67,8 @@ function SentryWebhooksBody({ pageState }: { pageState: ReturnType<typeof useSen
   const items = pageState.data?.items ?? [];
   if (items.length === 0) {
     if (pageState.offset === 0) {
-      return <SentryWebhooksNotice message={SENTRY_WEBHOOKS_EMPTY} />;
+      const message = pageState.project.trim() === "" ? SENTRY_WEBHOOKS_EMPTY : SENTRY_WEBHOOKS_PROJECT_EMPTY;
+      return <SentryWebhooksNotice message={message} />;
     }
     return (
       <div className="space-y-4">

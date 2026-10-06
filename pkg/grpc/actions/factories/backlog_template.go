@@ -103,7 +103,7 @@ func createBacklogCanvas(
 	canvasDoc := buildBacklogCanvas(backlogCanvasRequest{
 		Name:           name,
 		Agent:          resolveIntakeAgent(db, factoryModel),
-		GitHubName:     resolveGitHubInstallationName(db, factoryModel),
+		VCSName:        resolveVCSInstallationName(db, factoryModel),
 		PlanningReview: organizationPlanningReviewEnabled(db, factoryModel.OrganizationID),
 	})
 
@@ -152,9 +152,9 @@ func createBacklogCanvas(
 }
 
 type backlogCanvasRequest struct {
-	Name       string
-	Agent      *intakeAgent
-	GitHubName string
+	Name    string
+	Agent   *intakeAgent
+	VCSName string
 	// PlanningReview selects the 1 through 3 prompt pack for organizations
 	// on the task planning review flow.
 	PlanningReview bool
@@ -218,7 +218,7 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 					Name:          "Refine Task",
 					Type:          yaml.NodeTypeAction,
 					Component:     request.Agent.component(),
-					Configuration: intakeRefinementConfiguration(request.Agent, request.GitHubName, request.PlanningReview),
+					Configuration: intakeRefinementConfiguration(request.Agent, request.VCSName, request.PlanningReview),
 					Concurrency:   intakeConcurrency(),
 					Position:      yaml.Position{X: 160, Y: 440},
 				},

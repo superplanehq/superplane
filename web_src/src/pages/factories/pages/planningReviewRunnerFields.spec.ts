@@ -18,7 +18,7 @@ describe("planningReviewModelUsedField", () => {
 
     expect(field).toMatchObject({
       name: "model",
-      label: "Model used",
+      label: "Model",
       type: "hosted-model",
       typeOptions: { hostedModel: { provider: HOSTED_MODEL_ALL_PROVIDERS } },
     });
@@ -29,7 +29,7 @@ describe("planningReviewModelUsedField", () => {
 
     expect(field?.type).toBe("hosted-model");
     expect(field?.typeOptions?.hostedModel?.provider).toBe(HOSTED_MODEL_ALL_PROVIDERS);
-    expect(field?.label).toBe("Model used");
+    expect(field?.label).toBe("Model");
     expect(field?.typeOptions?.select?.options).toBeUndefined();
   });
 

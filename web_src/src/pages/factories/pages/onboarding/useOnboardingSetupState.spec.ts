@@ -1,10 +1,49 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 
 import type { IntegrationId } from "./onboardingFixtures";
+import { writeOnboardingVcsHostChoice } from "./onboardingVcsHostChoice";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";
 
 describe("useOnboardingSetupState", () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("keeps a Bitbucket host when setup is created again before a repository is saved", () => {
+    const first = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        persistVcsHostKey: "factory-1",
+      }),
+    );
+    act(() => first.result.current.selectVcsHost("bitbucket"));
+    first.unmount();
+
+    const second = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        connected: new Set<IntegrationId>(["github", "bitbucket"]),
+        simulateDiscovery: false,
+        persistVcsHostKey: "factory-1",
+      }),
+    );
+
+    expect(second.result.current.vcsHost).toBe("bitbucket");
+  });
+
+  it("keeps the workspace host that onboarding already saved", () => {
+    writeOnboardingVcsHostChoice("factory-1", "bitbucket");
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        persistVcsHostKey: "factory-1",
+        initial: { vcsHost: "github" },
+      }),
+    );
+
+    expect(result.current.vcsHost).toBe("github");
+  });
+
   it("hydrates saved repository choices only when the state is created", () => {
     const connected = new Set<IntegrationId>(["github"]);
     const { result, rerender } = renderHook(() =>

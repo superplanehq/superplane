@@ -11,6 +11,15 @@ interface SettingsAutomationCanvasProps {
   runParticipantNodeIds?: string[];
   fitAllRequest?: number | null;
   fitAllFocusNodeIds?: string[];
+  onNodeSelect?: (nodeId: string) => void;
+  showStatusControls?: boolean;
+  showFindControls?: boolean;
+  focusNodeId?: string | null;
+  focusNonce?: number;
+  /** When false, selecting a node does not move the viewport. */
+  focusFit?: boolean;
+  lockNativeZoom?: boolean;
+  layoutFitNonce?: number | null;
 }
 
 /**
@@ -26,6 +35,14 @@ export function SettingsAutomationCanvas({
   runParticipantNodeIds,
   fitAllRequest = null,
   fitAllFocusNodeIds,
+  onNodeSelect,
+  showStatusControls = true,
+  showFindControls = true,
+  focusNodeId = null,
+  focusNonce = 0,
+  focusFit = true,
+  lockNativeZoom = false,
+  layoutFitNonce = null,
 }: SettingsAutomationCanvasProps) {
   return (
     <CanvasPage
@@ -34,6 +51,7 @@ export function SettingsAutomationCanvas({
       factoryId={graph.factoryId}
       factoryEmbed
       factoryDisplayLayout
+      lockNativeZoom={lockNativeZoom}
       isEditing={false}
       readOnly
       hidePageChrome
@@ -46,8 +64,21 @@ export function SettingsAutomationCanvas({
       runCanvasLoading={runCanvasLoading}
       runNodeDetailRun={selectedRun}
       runParticipantNodeIds={runParticipantNodeIds}
-      fitAllRequest={fitAllRequest}
+      fitAllRequest={layoutFitNonce ?? fitAllRequest}
       fitAllFocusNodeIds={fitAllFocusNodeIds}
+      onNodeClick={onNodeSelect}
+      showBottomStatusControls={showStatusControls}
+      showCanvasFindControls={showFindControls}
+      focusRequest={
+        focusNodeId && focusNonce > 0
+          ? {
+              nodeId: focusNodeId,
+              requestId: focusNonce,
+              targetMode: "live",
+              fit: focusFit,
+            }
+          : null
+      }
     />
   );
 }
