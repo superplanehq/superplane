@@ -807,6 +807,29 @@ service Factories {
     };
   }
 
+  rpc CreateFactoryMCPAPIToken(CreateFactoryMCPAPITokenRequest) returns (CreateFactoryMCPAPITokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/mcp-api-tokens"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a workspace MCP API token";
+      description: "Creates a named bearer token for this workspace. The secret is returned one time.";
+      tags: "Factory";
+    };
+  }
+
+  rpc RevokeFactoryMCPAPIToken(RevokeFactoryMCPAPITokenRequest) returns (RevokeFactoryMCPAPITokenResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/mcp-api-tokens/{token_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Revoke a workspace MCP API token";
+      description: "Deletes a workspace MCP API token. Access stops at once.";
+      tags: "Factory";
+    };
+  }
+
   rpc DescribePlanningSession(DescribePlanningSessionRequest) returns (DescribePlanningSessionResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/planning-sessions/{session_id}"
@@ -2944,6 +2967,8 @@ message FactoryMCPClient {
   string user_email = 5;
   google.protobuf.Timestamp created_at = 6;
   string user_avatar_url = 7;
+  string kind = 8;
+  google.protobuf.Timestamp last_used_at = 9;
 }
 
 message ListFactoryMCPClientsRequest {
@@ -2960,3 +2985,21 @@ message RevokeFactoryMCPClientRequest {
 }
 
 message RevokeFactoryMCPClientResponse {}
+
+message CreateFactoryMCPAPITokenRequest {
+  string factory_id = 1;
+  string name = 2;
+  string resource = 3;
+}
+
+message CreateFactoryMCPAPITokenResponse {
+  FactoryMCPClient token = 1;
+  string plaintext = 2;
+}
+
+message RevokeFactoryMCPAPITokenRequest {
+  string factory_id = 1;
+  string token_id = 2;
+}
+
+message RevokeFactoryMCPAPITokenResponse {}

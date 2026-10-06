@@ -46,11 +46,14 @@ describe("workspaceMCPClientConfig", () => {
     const openCodeConfig = (url: string) =>
       JSON.stringify(
         {
-          mcp: {
+          servers: {
             superplane: {
               type: "remote",
               url,
-              enabled: true,
+              oauth: false,
+              headers: {
+                Authorization: "Bearer {file:/path/to/superplane.key}",
+              },
             },
           },
         },
@@ -60,6 +63,7 @@ describe("workspaceMCPClientConfig", () => {
 
     expect(workspaceMCPOpenCodeConfig(ORIGIN)).toBe(openCodeConfig(URL));
     expect(workspaceMCPOpenCodeConfig("https://app.example.com/")).toBe(openCodeConfig("https://app.example.com/mcp"));
+    expect(workspaceMCPOpenCodeConfig(ORIGIN)).not.toContain("sp_mcp_");
   });
 
   it("selects the snippet for each tool", () => {

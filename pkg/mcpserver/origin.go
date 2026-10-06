@@ -4,6 +4,8 @@ import (
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const (
@@ -30,11 +32,7 @@ var CursorRedirectURIs = []string{
 	"cursor://anysphere.cursor-mcp/oauth/callback",
 }
 
-var GrantedScopes = []string{
-	"work_orders:read",
-	"work_orders:create",
-	"work_orders:update",
-}
+var GrantedScopes = models.MCPGrantedScopes
 
 func PublicOrigin(r *http.Request, fallback string) string {
 	host := strings.TrimSpace(r.Host)

@@ -370,6 +370,18 @@ func TestMCPClientRoutesRequireSuperPlaneMCPServerFeature(t *testing.T) {
 	assert.Equal(t, "factories", revokeRule.Resource)
 	assert.Equal(t, "update", revokeRule.Action)
 	assert.Equal(t, required, revokeRule.RequiredExperimentalFeatures)
+
+	createTokenRule, ok := rules[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/mcp-api-tokens"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", createTokenRule.Resource)
+	assert.Equal(t, "update", createTokenRule.Action)
+	assert.Equal(t, required, createTokenRule.RequiredExperimentalFeatures)
+
+	revokeTokenRule, ok := rules[HTTPRoute{Method: http.MethodDelete, Pattern: "/api/v1/factories/{factory_id}/mcp-api-tokens/{token_id}"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", revokeTokenRule.Resource)
+	assert.Equal(t, "update", revokeTokenRule.Action)
+	assert.Equal(t, required, revokeTokenRule.RequiredExperimentalFeatures)
 }
 
 func TestMCPToolAndOAuthRoutesRequireWorkspaceMCPFeature(t *testing.T) {

@@ -2,11 +2,13 @@ package public
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/mcp"
@@ -232,13 +234,8 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 	origin := s.mcpOrigin(r)
 	resource := mcpserver.ResourceURL(origin)
 	token := bearerToken(r.Header.Get("Authorization"))
-	claims, err := mcpserver.ParseAccessToken(s.jwt, token, resource)
+	claims, apiTokenID, err := s.mcpAccessClaims(r, token, resource)
 	if err != nil {
-		w.Header().Set("WWW-Authenticate", mcpserver.WWWAuthenticate(origin))
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-	if mcpserver.UserAccountBlocked(database.DB(r.Context()), claims.UserID) {
 		w.Header().Set("WWW-Authenticate", mcpserver.WWWAuthenticate(origin))
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -247,10 +244,8 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if !mcpserver.AccessGrantIsActive(database.DB(r.Context()), claims, time.Now()) {
-		w.Header().Set("WWW-Authenticate", mcpserver.WWWAuthenticate(origin))
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+	if apiTokenID != uuid.Nil {
+		_ = models.TouchMCPAPITokenLastUsed(database.DB(r.Context()), apiTokenID, time.Now())
 	}
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
@@ -283,6 +278,26 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(response)
 }
+
+func (s *Server) mcpAccessClaims(r *http.Request, token, resource string) (*mcpserver.AccessClaims, uuid.UUID, error) {
+	db := database.DB(r.Context())
+	if mcpserver.IsAPIToken(token) {
+		return mcpserver.ClaimsForAPIToken(db, token, resource)
+	}
+	claims, err := mcpserver.ParseAccessToken(s.jwt, token, resource)
+	if err != nil {
+		return nil, uuid.Nil, err
+	}
+	if mcpserver.UserAccountBlocked(db, claims.UserID) {
+		return nil, uuid.Nil, errUnauthorizedMCP
+	}
+	if !mcpserver.AccessGrantIsActive(db, claims, time.Now()) {
+		return nil, uuid.Nil, errUnauthorizedMCP
+	}
+	return claims, uuid.Nil, nil
+}
+
+var errUnauthorizedMCP = errors.New("unauthorized")
 
 func (s *Server) mcpHTTPClient() mcp.HTTPDoer {
 	if s.registry != nil {

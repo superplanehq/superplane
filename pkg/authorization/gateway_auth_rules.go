@@ -69,6 +69,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureSuperPlaneMCPServer},
 		},
+		{Method: "DELETE", Pattern: "/api/v1/factories/{factory_id}/mcp-api-tokens/{token_id}"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureSuperPlaneMCPServer},
+		},
 		{Method: "DELETE", Pattern: "/api/v1/groups/{group_name}"}: {
 			Resource:   "groups",
 			Action:     "delete",
@@ -883,6 +889,12 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:                       "update",
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceMCP},
+		},
+		{Method: "POST", Pattern: "/api/v1/factories/{factory_id}/mcp-api-tokens"}: {
+			Resource:                     "factories",
+			Action:                       "update",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureSuperPlaneMCPServer},
 		},
 		{Method: "POST", Pattern: "/api/v1/groups"}: {
 			Resource:                "groups",

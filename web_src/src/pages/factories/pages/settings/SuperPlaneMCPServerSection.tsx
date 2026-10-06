@@ -22,6 +22,7 @@ import { useMemo, useState } from "react";
 
 import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
 import { FactorySettingsCard } from "./FactorySettingsCard";
+import { MCPAPITokenSecretDialog, MCPConfigSnippet, OpenCodeTokenConnect } from "./SuperPlaneMCPOpenCodeConnect";
 import { SuperPlaneMCPClientsEmptyIllustration } from "./SuperPlaneMCPClientsEmptyIllustration";
 import { SUPERPLANE_MCP_SERVER_COPY } from "./superplaneMCPServerCopy";
 
@@ -56,6 +57,7 @@ export function SuperPlaneMCPServerSection({
 }) {
   const [pendingRevoke, setPendingRevoke] = useState<FactoriesFactoryMcpClient | undefined>();
   const [connectOpenInternal, setConnectOpenInternal] = useState(false);
+  const [revealedSecret, setRevealedSecret] = useState<string | null>(null);
   const connectOpen = connectDialogOpenProp ?? connectOpenInternal;
   const setConnectOpen = onConnectDialogOpenChange ?? setConnectOpenInternal;
   const revokeClient = useRevokeFactoryMCPClient(organizationId, factoryId);
@@ -92,7 +94,7 @@ export function SuperPlaneMCPServerSection({
           />
         )}
       </FactorySettingsCard>
-      <Dialog open={connectOpen} onOpenChange={(open) => setConnectOpen(open)}>
+      <Dialog open={connectOpen} onOpenChange={(open) => closeConnectDialog(open, setConnectOpen, setRevealedSecret)}>
         <DialogContent
           className="flex max-h-[min(42rem,85vh)] max-w-lg flex-col gap-3 overflow-y-auto sm:max-w-2xl"
           data-testid="superplane-mcp-connect-dialog"
@@ -100,14 +102,21 @@ export function SuperPlaneMCPServerSection({
           <DialogHeader>
             <DialogTitle>{SUPERPLANE_MCP_SERVER_COPY.connectTitle}</DialogTitle>
           </DialogHeader>
-          <SuperPlaneMCPClientSetup origin={window.location.origin} />
+          <SuperPlaneMCPClientSetup
+            origin={window.location.origin}
+            organizationId={organizationId}
+            factoryId={factoryId}
+            canUpdate={canUpdate}
+            onSecret={setRevealedSecret}
+          />
         </DialogContent>
       </Dialog>
+      <MCPAPITokenSecretDialog secret={revealedSecret} onClose={() => setRevealedSecret(null)} />
       <FactoryDeleteDialog
         open={Boolean(pendingRevoke)}
         factoryName={pendingName}
         title={SUPERPLANE_MCP_SERVER_COPY.revokeTitle(pendingName)}
-        description={SUPERPLANE_MCP_SERVER_COPY.revokeDescription}
+        description={mcpRevokeDescription(pendingRevoke)}
         confirmLabel={SUPERPLANE_MCP_SERVER_COPY.revoke}
         loadingText={SUPERPLANE_MCP_SERVER_COPY.revoking}
         canDelete={canUpdate}
@@ -118,7 +127,7 @@ export function SuperPlaneMCPServerSection({
             return;
           }
           try {
-            await revokeClient.mutateAsync(pendingRevoke.id);
+            await revokeClient.mutateAsync({ id: pendingRevoke.id, kind: pendingRevoke.kind });
             showSuccessToast(SUPERPLANE_MCP_SERVER_COPY.revoked);
           } catch (error) {
             showErrorToast(getApiErrorMessage(error) || SUPERPLANE_MCP_SERVER_COPY.revokeFailed);
@@ -216,11 +225,47 @@ function SuperPlaneMCPServerEmptyState() {
   );
 }
 
-function SuperPlaneMCPClientSetup({ origin }: { origin: string }) {
+function closeConnectDialog(
+  open: boolean,
+  setConnectOpen: (open: boolean) => void,
+  clearSecret: (secret: string | null) => void,
+) {
+  setConnectOpen(open);
+  if (!open) {
+    clearSecret(null);
+  }
+}
+
+function mcpRevokeDescription(client?: FactoriesFactoryMcpClient) {
+  if (client?.kind === "api_token") {
+    return SUPERPLANE_MCP_SERVER_COPY.revokeTokenDescription;
+  }
+  return SUPERPLANE_MCP_SERVER_COPY.revokeDescription;
+}
+
+function SuperPlaneMCPClientSetup({
+  origin,
+  organizationId,
+  factoryId,
+  canUpdate,
+  onSecret,
+}: {
+  origin: string;
+  organizationId: string;
+  factoryId: string;
+  canUpdate: boolean;
+  onSecret: (secret: string) => void;
+}) {
   return (
     <div className="space-y-3">
       <MCPServerURLRow url={workspaceMCPServerURL(origin)} />
-      <MCPClientSetupTabs origin={origin} />
+      <MCPClientSetupTabs
+        origin={origin}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        canUpdate={canUpdate}
+        onSecret={onSecret}
+      />
     </div>
   );
 }
@@ -249,7 +294,19 @@ function MCPServerURLRow({ url }: { url: string }) {
   );
 }
 
-function MCPClientSetupTabs({ origin }: { origin: string }) {
+function MCPClientSetupTabs({
+  origin,
+  organizationId,
+  factoryId,
+  canUpdate,
+  onSecret,
+}: {
+  origin: string;
+  organizationId: string;
+  factoryId: string;
+  canUpdate: boolean;
+  onSecret: (secret: string) => void;
+}) {
   return (
     <Tabs defaultValue="cursor">
       <TabsList className="h-auto w-full flex-wrap justify-start" data-testid="superplane-mcp-client-tools">
@@ -261,7 +318,17 @@ function MCPClientSetupTabs({ origin }: { origin: string }) {
       </TabsList>
       {MCP_CLIENT_TOOLS.map((tool) => (
         <TabsContent key={tool} value={tool} className="mt-3 space-y-3">
-          <MCPClientToolGuide tool={tool} origin={origin} />
+          {tool === "opencode" ? (
+            <OpenCodeTokenConnect
+              origin={origin}
+              organizationId={organizationId}
+              factoryId={factoryId}
+              canUpdate={canUpdate}
+              onSecret={onSecret}
+            />
+          ) : (
+            <MCPClientToolGuide tool={tool} origin={origin} />
+          )}
         </TabsContent>
       ))}
     </Tabs>
@@ -286,27 +353,6 @@ function MCPClientToolGuide({ tool, origin }: { tool: WorkspaceMCPClientTool; or
         testId={`superplane-mcp-config-copy-${tool}`}
       />
     </>
-  );
-}
-
-function MCPConfigSnippet({
-  text,
-  ariaLabel,
-  copiedAriaLabel,
-  testId,
-}: {
-  text: string;
-  ariaLabel: string;
-  copiedAriaLabel: string;
-  testId: string;
-}) {
-  return (
-    <div className="relative w-full overflow-hidden rounded-md border border-border bg-muted/40 text-left">
-      <div className="absolute right-2 top-2 z-10">
-        <CopyButton text={text} ariaLabel={ariaLabel} copiedAriaLabel={copiedAriaLabel} data-testid={testId} />
-      </div>
-      <pre className="overflow-x-auto px-4 py-3 pr-12 text-[12px] leading-relaxed text-foreground">{text}</pre>
-    </div>
   );
 }
 

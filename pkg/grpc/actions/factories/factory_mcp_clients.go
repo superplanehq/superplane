@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,6 +19,11 @@ import (
 // import mcpserver because mcpserver already imports factory actions.
 const localMCPClientID = "superplane-local"
 const localMCPClientName = "Cursor"
+
+const (
+	mcpClientKindOAuth    = "oauth"
+	mcpClientKindAPIToken = "api_token"
+)
 
 func ListFactoryMCPClients(
 	ctx context.Context,
@@ -41,8 +47,12 @@ func ListFactoryMCPClients(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list MCP clients")
 	}
+	apiTokens, err := models.ListMCPAPITokensForFactory(db, orgID, factory.ID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to list MCP clients")
+	}
 
-	clients, err := serializeFactoryMCPClients(db, orgID, tokens)
+	clients, err := serializeFactoryMCPClients(db, orgID, tokens, apiTokens)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list MCP clients")
 	}
@@ -106,22 +116,31 @@ func parseMCPClientID(raw string) (uuid.UUID, error) {
 	return id, nil
 }
 
-func serializeFactoryMCPClients(tx *gorm.DB, orgID uuid.UUID, tokens []models.MCPOAuthRefreshToken) ([]*pb.FactoryMCPClient, error) {
-	out := make([]*pb.FactoryMCPClient, 0, len(tokens))
-	if len(tokens) == 0 {
+func serializeFactoryMCPClients(
+	tx *gorm.DB,
+	orgID uuid.UUID,
+	tokens []models.MCPOAuthRefreshToken,
+	apiTokens []models.MCPAPIToken,
+) ([]*pb.FactoryMCPClient, error) {
+	out := make([]*pb.FactoryMCPClient, 0, len(tokens)+len(apiTokens))
+	if len(tokens) == 0 && len(apiTokens) == 0 {
 		return out, nil
 	}
 
-	userIDs := make([]string, 0, len(tokens))
+	userIDs := make([]string, 0, len(tokens)+len(apiTokens))
 	clientIDs := make([]string, 0, len(tokens))
 	seenUsers := map[string]struct{}{}
 	seenClients := map[string]struct{}{}
-	for _, token := range tokens {
-		userID := token.UserID.String()
-		if _, ok := seenUsers[userID]; !ok {
-			seenUsers[userID] = struct{}{}
-			userIDs = append(userIDs, userID)
+	collectUser := func(userID uuid.UUID) {
+		id := userID.String()
+		if _, ok := seenUsers[id]; ok {
+			return
 		}
+		seenUsers[id] = struct{}{}
+		userIDs = append(userIDs, id)
+	}
+	for _, token := range tokens {
+		collectUser(token.UserID)
 		if token.ClientID == "" {
 			continue
 		}
@@ -130,6 +149,9 @@ func serializeFactoryMCPClients(tx *gorm.DB, orgID uuid.UUID, tokens []models.MC
 		}
 		seenClients[token.ClientID] = struct{}{}
 		clientIDs = append(clientIDs, token.ClientID)
+	}
+	for _, token := range apiTokens {
+		collectUser(token.UserID)
 	}
 
 	users, err := models.FindUsersByIDsInOrganization(tx, orgID.String(), userIDs)
@@ -161,20 +183,48 @@ func serializeFactoryMCPClients(tx *gorm.DB, orgID uuid.UUID, tokens []models.MC
 		token := tokens[i]
 		client := &pb.FactoryMCPClient{
 			Id:         token.ID.String(),
+			Kind:       mcpClientKindOAuth,
 			ClientName: mcpClientName(token.ClientID, clientsByID),
 			UserId:     token.UserID.String(),
 			CreatedAt:  timestamppb.New(token.CreatedAt),
 		}
-		if user, ok := usersByID[token.UserID]; ok {
-			client.UserName = user.Name
-			client.UserEmail = user.GetEmail()
-		}
-		if avatarURL, ok := avatarURLs[token.UserID]; ok {
-			client.UserAvatarUrl = avatarURL
-		}
+		applyMCPClientUser(client, token.UserID, usersByID, avatarURLs)
 		out = append(out, client)
 	}
+	for i := range apiTokens {
+		token := apiTokens[i]
+		client := &pb.FactoryMCPClient{
+			Id:         token.ID.String(),
+			Kind:       mcpClientKindAPIToken,
+			ClientName: strings.TrimSpace(token.Name),
+			UserId:     token.UserID.String(),
+			CreatedAt:  timestamppb.New(token.CreatedAt),
+		}
+		if token.LastUsedAt != nil {
+			client.LastUsedAt = timestamppb.New(*token.LastUsedAt)
+		}
+		applyMCPClientUser(client, token.UserID, usersByID, avatarURLs)
+		out = append(out, client)
+	}
+	slices.SortStableFunc(out, func(a, b *pb.FactoryMCPClient) int {
+		return b.GetCreatedAt().AsTime().Compare(a.GetCreatedAt().AsTime())
+	})
 	return out, nil
+}
+
+func applyMCPClientUser(
+	client *pb.FactoryMCPClient,
+	userID uuid.UUID,
+	usersByID map[uuid.UUID]models.User,
+	avatarURLs map[uuid.UUID]string,
+) {
+	if user, ok := usersByID[userID]; ok {
+		client.UserName = user.Name
+		client.UserEmail = user.GetEmail()
+	}
+	if avatarURL, ok := avatarURLs[userID]; ok {
+		client.UserAvatarUrl = avatarURL
+	}
 }
 
 func mcpClientName(clientID string, clients map[string]models.MCPOAuthClient) string {

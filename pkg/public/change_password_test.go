@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -221,6 +222,8 @@ func TestChangePassword_Success(t *testing.T) {
 	// Seed a named personal API token so we can verify it gets revoked too.
 	personalToken := models.NewUserAPIToken(r.User, "CI token", crypto.HashToken("some-personal-token"))
 	require.NoError(t, models.CreateUserAPIToken(database.Conn(), personalToken))
+	mcpToken := models.NewMCPAPIToken(r.User, r.Organization.ID, uuid.New(), "Build server", "http://localhost:8000/mcp", crypto.HashToken("sp_mcp_old"), nil)
+	require.NoError(t, models.CreateMCPAPIToken(database.Conn(), mcpToken))
 
 	// Drop a stale impersonation cookie on the request to verify it is cleared.
 	staleImpersonation := &http.Cookie{Name: impersonation.CookieName, Value: "stale-token-value"}
@@ -260,6 +263,8 @@ func TestChangePassword_Success(t *testing.T) {
 	tokens, err := models.ListUserAPITokens(database.Conn(), r.User)
 	require.NoError(t, err)
 	assert.Empty(t, tokens, "personal API tokens should have been revoked on password change")
+	_, err = models.FindMCPAPITokenByHash(database.Conn(), crypto.HashToken("sp_mcp_old"))
+	assert.ErrorIs(t, err, models.ErrMCPAPITokenNotFound)
 
 	// Cookies were set: a refreshed account_token AND a cleared impersonation_token.
 	cookies := res.Result().Cookies()

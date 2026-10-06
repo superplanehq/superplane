@@ -122,6 +122,14 @@ func ClientDisplayName(tx *gorm.DB, clientID string) string {
 			return name
 		}
 	}
+	if id, err := uuid.Parse(clientID); err == nil {
+		if token, err := models.FindMCPAPITokenByID(tx, id); err == nil {
+			name := strings.TrimSpace(token.Name)
+			if name != "" {
+				return name
+			}
+		}
+	}
 	return models.DefaultMCPClientName
 }
 

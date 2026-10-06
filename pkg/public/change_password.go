@@ -134,7 +134,10 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		return models.DeleteUserAPITokensForAccount(tx, account.ID)
+		if err := models.DeleteUserAPITokensForAccount(tx, account.ID); err != nil {
+			return err
+		}
+		return models.DeleteMCPAPITokensForAccount(tx, account.ID)
 	})
 
 	if err != nil {

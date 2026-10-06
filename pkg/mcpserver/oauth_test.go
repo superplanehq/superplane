@@ -386,3 +386,10 @@ func TestRefreshTokensRejectsBlockedAccount(t *testing.T) {
 	})
 	require.NoError(t, err)
 }
+
+func TestClientDisplayNameUsesMCPAPITokenName(t *testing.T) {
+	r := support.Setup(t)
+	token := models.NewMCPAPIToken(r.User, r.Organization.ID, uuid.New(), "Build server", "http://localhost:8000/mcp", "hash-display", nil)
+	require.NoError(t, models.CreateMCPAPIToken(database.Conn(), token))
+	require.Equal(t, "Build server", ClientDisplayName(database.Conn(), token.ID.String()))
+}
