@@ -1,22 +1,12 @@
 import type { FactoriesFactory } from "@/api-client";
 import { Input } from "@/components/ui/input";
-import { useAccount } from "@/contexts/useAccount";
-import { usePermissions } from "@/contexts/usePermissions";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useFactories, useFactory } from "@/hooks/useFactoryData";
-import { useAvailableIntegrations } from "@/hooks/useIntegrations";
-import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import {
-  FEATURE_ORGANIZATION_BYOK,
-  FEATURE_SUPERPLANE_MCP_SERVER,
-  FEATURE_WORKSPACE_MCP,
-  FEATURE_WORKSPACE_SKILLS,
-} from "@/lib/experimentalFeatures";
 import { IntegrationsBasePathProvider } from "@/lib/integrationSettingsPaths";
 import { OrganizationSettingsPathsProvider } from "@/lib/organizationSettingsPaths";
 import { cn } from "@/lib/utils";
-import { Search } from "lucide-react";
+import { ChevronLeft, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, NavLink, Outlet, useLocation, useParams, useSearchParams } from "react-router";
 import {
@@ -26,62 +16,26 @@ import {
   resolveFactoryByKey,
 } from "../../lib/factoryKeyResolution";
 import { FactoriesSidebar } from "../../layout/FactoriesSidebar";
-import { factoryListPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
+import { factoryListPath, factorySettingsPath, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
+import { MobileSettingsBottomBar } from "../../mobile/MobileSettingsBottomBar";
+import { MOBILE_SETTINGS_COPY } from "../../mobile/mobileCopy";
+import { useMobileFactoryShell } from "../../mobile/useMobileFactoryShell";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import {
-  type FactorySettingsNavGroup,
-  type FactorySettingsNavItem,
-  filterFactorySettingsNavGroupsByPermission,
-} from "./settingsNavItems";
+  factorySettingsNavGroupHeading,
+  type FactorySettingsNavHeadingLabels,
+  useFactorySettingsNavHeadingLabels,
+} from "./settingsNavHeadings";
+import type { FactorySettingsNavGroup, FactorySettingsNavItem } from "./settingsNavItems";
 import {
-  buildFactorySettingsSearchIndex,
   factorySettingsSearchResultPath,
   searchFactorySettings,
   type FactorySettingsSearchResult,
 } from "./settingsSearch";
-import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
+import { useFactorySettingsSearchIndex } from "./useFactorySettingsSearchIndex";
 import { useFactorySettingsSectionScroll } from "./useFactorySettingsSectionScroll";
-
-/** Nav item id for Agent settings (MCP servers and skills). */
-const WORKSPACE_AGENT_NAV_ITEM_ID = "workspace-agent";
-
-/** Nav item id for the SuperPlane MCP Server (inbound MCP clients). */
-const WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID = "workspace-superplane-mcp-server";
-
-/** Nav item id for the organization LLM Models settings page, gated behind `FEATURE_ORGANIZATION_BYOK`. */
-const ORGANIZATION_MODELS_NAV_ITEM_ID = "organization-models";
-
-/**
- * Drops nav items whose experimental features are off, and skips any group
- * left with no items. The source groups stay static so other consumers
- * (e.g. route lookups) keep seeing the full, approved list.
- */
-function visibleFactorySettingsNavGroups(
-  groups: FactorySettingsNavGroup[],
-  hasExperimentalFeature: (featureId: string) => boolean,
-): FactorySettingsNavGroup[] {
-  const hiddenNavItemIds = new Set<string>();
-  if (!hasExperimentalFeature(FEATURE_WORKSPACE_MCP) && !hasExperimentalFeature(FEATURE_WORKSPACE_SKILLS)) {
-    hiddenNavItemIds.add(WORKSPACE_AGENT_NAV_ITEM_ID);
-  }
-  if (!hasExperimentalFeature(FEATURE_SUPERPLANE_MCP_SERVER)) {
-    hiddenNavItemIds.add(WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID);
-  }
-  if (!hasExperimentalFeature(FEATURE_ORGANIZATION_BYOK)) {
-    hiddenNavItemIds.add(ORGANIZATION_MODELS_NAV_ITEM_ID);
-  }
-  if (hiddenNavItemIds.size === 0) {
-    return groups;
-  }
-
-  return groups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => !hiddenNavItemIds.has(item.id)),
-    }))
-    .filter((group) => group.items.length > 0);
-}
+import { useVisibleFactorySettingsNavGroups } from "./useVisibleFactorySettingsNavGroups";
 
 export function FactorySettingsLayout() {
   const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
@@ -148,25 +102,14 @@ function FactorySettingsLayoutContent({
 }) {
   useFactoriesThemeClass();
   useFactorySettingsSectionScroll();
-  const settingsNavGroups = useFactorySettingsNavGroups();
-  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const isMobile = useIsMobile();
+  const showMobileBottomBar = useMobileFactoryShell(organizationId);
+  const { pathname } = useLocation();
   const { data: describedFactory, isLoading, error } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId);
-  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const { data: availableIntegrations = [] } = useAvailableIntegrations();
   const [navQuery, setNavQuery] = useState("");
-  const navGroups = visibleFactorySettingsNavGroups(
-    filterFactorySettingsNavGroupsByPermission(settingsNavGroups, canAct, permissionsLoading),
-    hasExperimentalFeature,
-  );
-  const searchIndex = useMemo(
-    () =>
-      buildFactorySettingsSearchIndex({
-        navGroups,
-        integrations: availableIntegrations,
-      }),
-    [availableIntegrations, navGroups],
-  );
+  const navGroups = useVisibleFactorySettingsNavGroups(organizationId);
+  const searchIndex = useFactorySettingsSearchIndex(navGroups);
   const searchResults = useMemo(() => searchFactorySettings(searchIndex, navQuery), [navQuery, searchIndex]);
   const isSearching = navQuery.trim().length > 0;
 
@@ -197,43 +140,93 @@ function FactorySettingsLayoutContent({
       factorySettingsSectionPath(organizationId, factoryKey, "organization", `secrets/${secretId}`),
   };
   const integrationsPath = factorySettingsSectionPath(organizationId, factoryKey, "organization", "integrations");
+  const settingsIndexPath = factorySettingsPath(organizationId, factoryKey);
+  const isSettingsIndex = pathname.replace(/\/+$/, "") === settingsIndexPath;
+
+  /*
+    Gray canvas behind white panels, like the Velocity report. Dark mode
+    keeps the darker page, because the factories theme paints the sidebar
+    and the panels the same color.
+  */
+  const main = (
+    <main
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-sidebar dark:bg-background"
+      data-testid="factory-settings-main"
+    >
+      <Outlet />
+    </main>
+  );
 
   return (
     <FactorySettingsLayoutContext.Provider value={{ organizationId, factoryId, factory }}>
       <OrganizationSettingsPathsProvider paths={organizationSettingsPaths}>
         <IntegrationsBasePathProvider basePath={integrationsPath}>
-          <div className="flex h-screen w-full bg-background text-foreground" data-testid="factory-settings-layout">
-            <FactoriesSidebar
-              organizationId={organizationId}
-              factoryKey={factoryKey}
-              factory={factory}
-              factories={factories}
-            />
-            <FactorySettingsSidebar
-              organizationId={organizationId}
-              factoryKey={factoryKey}
-              factory={factory}
-              navQuery={navQuery}
-              onNavQueryChange={setNavQuery}
-              isSearching={isSearching}
-              searchResults={searchResults}
-              navGroups={navGroups}
-            />
-            {/*
-              Gray canvas behind white panels, like the Velocity report. Dark
-              mode keeps the darker page, because the factories theme paints
-              the sidebar and the panels the same color.
-            */}
-            <main
-              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto bg-sidebar dark:bg-background"
-              data-testid="factory-settings-main"
+          {isMobile ? (
+            <div
+              className="flex h-dvh w-full flex-col bg-background text-foreground [--workspace-navigation-width:0px]"
+              data-testid="factory-settings-layout"
             >
-              <Outlet />
-            </main>
-          </div>
+              {isSettingsIndex ? null : <MobileSettingsBar href={settingsIndexPath} />}
+              {main}
+              {showMobileBottomBar ? (
+                <MobileSettingsBottomBar
+                  organizationId={organizationId}
+                  factoryId={factoryId}
+                  routeSegment={factoryKey}
+                  factory={factory}
+                  factories={factories}
+                />
+              ) : null}
+            </div>
+          ) : (
+            <div className="flex h-screen w-full bg-background text-foreground" data-testid="factory-settings-layout">
+              <FactoriesSidebar
+                organizationId={organizationId}
+                factoryKey={factoryKey}
+                factory={factory}
+                factories={factories}
+              />
+              <FactorySettingsSidebar
+                organizationId={organizationId}
+                factoryKey={factoryKey}
+                factory={factory}
+                navQuery={navQuery}
+                onNavQueryChange={setNavQuery}
+                isSearching={isSearching}
+                searchResults={searchResults}
+                navGroups={navGroups}
+              />
+              {main}
+            </div>
+          )}
         </IntegrationsBasePathProvider>
       </OrganizationSettingsPathsProvider>
     </FactorySettingsLayoutContext.Provider>
+  );
+}
+
+/**
+ * Phone title bar for one settings page. The back control is labeled with
+ * the parent screen, the way native settings do, and the page keeps its own
+ * title below so the section name is not shown twice.
+ */
+function MobileSettingsBar({ href }: { href: string }) {
+  return (
+    <header
+      className="shrink-0 border-b border-border bg-background px-1 pt-[env(safe-area-inset-top)]"
+      data-testid="factory-settings-mobile-bar"
+    >
+      <div className="flex h-12 items-center">
+        <Link
+          to={href}
+          className="inline-flex h-10 items-center gap-0.5 rounded-md pr-3 pl-1 text-[15px] text-foreground hover:bg-accent"
+          data-testid="factory-settings-mobile-back"
+        >
+          <ChevronLeft className="size-5" aria-hidden />
+          {MOBILE_SETTINGS_COPY.title}
+        </Link>
+      </div>
+    </header>
   );
 }
 
@@ -256,12 +249,7 @@ function FactorySettingsSidebar({
   searchResults: FactorySettingsSearchResult[];
   navGroups: FactorySettingsNavGroup[];
 }) {
-  const { account } = useAccount();
-  const { data: organization } = useOrganization(organizationId);
-  const accountLabel = account?.name?.trim() || "Account";
-  const organizationName = organization?.metadata?.name?.trim() || "Organization";
-  const workspaceName = factory.name?.trim() || "Workspace";
-  const workspaceKey = factory.key ?? factoryKey;
+  const headingLabels = useFactorySettingsNavHeadingLabels(organizationId, factory, factoryKey);
 
   return (
     <aside
@@ -297,10 +285,7 @@ function FactorySettingsSidebar({
               key={group.id}
               organizationId={organizationId}
               factoryKey={factoryKey}
-              accountLabel={accountLabel}
-              organizationName={organizationName}
-              workspaceName={workspaceName}
-              workspaceKey={workspaceKey}
+              headingLabels={headingLabels}
               group={group}
             />
           ))
@@ -361,48 +346,23 @@ function SettingsSearchResults({
 function SettingsNavGroup({
   organizationId,
   factoryKey,
-  accountLabel,
-  organizationName,
-  workspaceName,
-  workspaceKey,
+  headingLabels,
   group,
 }: {
   organizationId: string;
   factoryKey: string;
-  accountLabel: string;
-  organizationName: string;
-  workspaceName: string;
-  workspaceKey: string;
+  headingLabels: FactorySettingsNavHeadingLabels;
   group: FactorySettingsNavGroup;
 }) {
+  const heading = factorySettingsNavGroupHeading(group.id, headingLabels);
   return (
     <section data-testid={`factory-settings-${group.id}-nav`}>
-      {group.id === "workspace" ? (
-        <SettingsNavGroupHeading
-          name={workspaceName}
-          helper={`Workspace · ${workspaceKey}`}
-          testId="factory-settings-workspace-heading"
-        />
-      ) : group.id === "organization" ? (
-        <SettingsNavGroupHeading
-          name={organizationName}
-          helper="Organization"
-          testId="factory-settings-organization-heading"
-        />
-      ) : (
-        <SettingsNavGroupHeading name={accountLabel} testId="factory-settings-account-heading" />
-      )}
+      <div className="mb-1 px-2.5 py-1" data-testid={heading.testId}>
+        <h2 className="truncate text-[13px] font-medium tracking-[-0.01em] text-foreground">{heading.name}</h2>
+        {heading.helper ? <p className="truncate text-[11px] text-muted-foreground">{heading.helper}</p> : null}
+      </div>
       <SettingsNavItems organizationId={organizationId} factoryKey={factoryKey} items={group.items} />
     </section>
-  );
-}
-
-function SettingsNavGroupHeading({ name, helper, testId }: { name: string; helper?: string; testId?: string }) {
-  return (
-    <div className="mb-1 px-2.5 py-1" data-testid={testId}>
-      <h2 className="truncate text-[13px] font-medium tracking-[-0.01em] text-foreground">{name}</h2>
-      {helper ? <p className="truncate text-[11px] text-muted-foreground">{helper}</p> : null}
-    </div>
   );
 }
 

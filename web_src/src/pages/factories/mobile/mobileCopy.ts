@@ -18,6 +18,13 @@ export const MOBILE_BOARD_COPY = {
   loadMore: "Load more",
 } as const;
 
+export const MOBILE_SETTINGS_COPY = {
+  title: "Settings",
+  backToWorkspace: "Back to workspace",
+  findPlaceholder: "Find settings",
+  noResults: "No matching settings.",
+} as const;
+
 export const MOBILE_TASK_COPY = {
   back: "Back to board",
   loading: "Loading task…",
