@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 
 import { FirstRunArtPane } from "./FirstRunArtPane";
 import type { FirstRunArtScene } from "./firstRunArtScene";
+import type { OnboardingArtMountOptions } from "./onboardingArt";
 
 const welcome: FirstRunArtScene = {
   mode: "school",
@@ -31,7 +32,7 @@ describe("FirstRunArtPane", () => {
     const setColors = vi.fn((_background: string, _arrowColor: string, _durationMs: number, onDone?: () => void) => {
       onDone?.();
     });
-    const mount = vi.fn(() => ({ setColors, destroy }));
+    const mount = vi.fn((_target: HTMLElement, _options: OnboardingArtMountOptions) => ({ setColors, destroy }));
     window.THREE = {};
     window.SuperplaneArt = { mount };
 
