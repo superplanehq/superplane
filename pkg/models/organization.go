@@ -221,6 +221,20 @@ func LockOrganization(tx *gorm.DB, orgID uuid.UUID) (*Organization, error) {
 	)
 }
 
+func LockOrganizationIncludingDeleted(tx *gorm.DB, orgID uuid.UUID) (*Organization, error) {
+	var organization Organization
+	err := tx.
+		Unscoped().
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", orgID).
+		First(&organization).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &organization, nil
+}
+
 func FindOrganizationByName(name string) (*Organization, error) {
 	organization := Organization{}
 
