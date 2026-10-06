@@ -11,7 +11,11 @@ import type {
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_RISK_SCORE } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
+  FEATURE_FACTORY_LINEAR_INTAKE,
+  FEATURE_FACTORY_RISK_SCORE,
+} from "@/lib/experimentalFeatures";
 import { intakeCatalogAvailability, seededIntakeCatalog } from "@/test/intakeCatalog";
 import { unmockedSrc } from "@/test/unmockedModule";
 
@@ -29,6 +33,7 @@ import {
   factoryHomePath,
   factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
+  factoryLinearIntakeSetupPath,
   factoryPlanningPath,
   factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
@@ -1212,11 +1217,13 @@ describe("LinesPage board extras", () => {
     );
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
     await user.click(screen.getByTestId("add-intake-template-datadog"));
+    await user.click(screen.getByTestId("add-intake-template-linear-issues"));
 
     expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("productive-intake-setup")).not.toBeInTheDocument();
@@ -1244,6 +1251,27 @@ describe("LinesPage board extras", () => {
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
+  it("opens guided Linear setup from the overflow menu", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_LINEAR_INTAKE);
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    const linear = screen.getByTestId("add-intake-template-linear-issues");
+    expect(linear).toBeEnabled();
+    expect(linear).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+
+    await user.click(linear);
+
+    expect(screen.getByTestId("linear-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryLinearIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
   it("opens guided Sentry setup from the overflow menu", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
@@ -1255,6 +1283,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
@@ -1462,24 +1491,28 @@ describe("LinesPage board editing", () => {
     await resetLinesBoardMocks();
   });
 
-  it("renames the board title on Enter", async () => {
-    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+  it("shows the workspace name and does not rename the line", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-board-title"));
-    const input = await screen.findByTestId("lines-board-title-input");
-    await waitFor(() => expect(input).toHaveFocus());
-    await user.clear(input);
-    await user.type(input, "Refund line");
-    await user.keyboard("{Enter}");
+    const title = screen.getByTestId("workspace-page-header-title");
+    expect(title).toHaveTextContent("Semaphore");
+    expect(title).not.toHaveTextContent("Plan and Implement");
+    await user.click(title);
+    expect(screen.queryByTestId("lines-board-title-input")).not.toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
 
-    await waitFor(() => {
-      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith({
-        lineId: REFUND_LINE_PLAN_ID,
-        name: "Refund line",
-      });
-    });
+  it("shows an emoji workspace name as stored", () => {
+    renderLinesBoard(undefined, vi.fn(), { ...REFUND_FACTORY, name: "SuperPlane Prod 🚀" });
+
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent("SuperPlane Prod 🚀");
+  });
+
+  it("shows Workspace when the workspace name is empty", () => {
+    renderLinesBoard(undefined, vi.fn(), { ...REFUND_FACTORY, name: "   " });
+
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent(/^Workspace$/);
   });
 
   it("renames a column title on Enter", async () => {

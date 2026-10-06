@@ -149,15 +149,13 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 		"id":      "risk-score",
 		"version": float64(factoryTemplateVersion),
 	}, entrypoint.Metadata[factoryTemplateMetadataKey])
+	assert.Equal(t, "github.onPullRequest", entrypoint.Component)
+	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
 	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
+	assert.Equal(t, true, entrypoint.Configuration["ignoreDrafts"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, entrypoint.Integration)
-
-	gate := findYAMLNode(t, canvas, "should-assess")
-	assert.Equal(
-		t,
-		`root().data.pull_request.base.ref == "main" && root().data.pull_request.draft != true`,
-		gate.Configuration["expression"],
-	)
+	assert.NotContains(t, result.canvasYAML, "should-assess")
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "on-pr-risk", TargetID: "assess-risk", Channel: "default"})
 
 	agent := findYAMLNode(t, canvas, "assess-risk")
 	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
@@ -167,45 +165,17 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.Contains(t, prompt, "Additive database changes = 3 (medium).")
 	assert.Contains(t, prompt, "Authorization changes = 4 (high).")
 	assert.Contains(t, prompt, "Enabled checks: risk, performance, security, drift, reversibility.")
+	assert.Contains(t, prompt, "report_merge_check")
 	assert.NotContains(t, prompt, "install_params.riskRules")
 	assert.NotContains(t, prompt, "install_params.enabledChecks")
 	assert.Contains(t, result.canvasYAML, `gh api -H "Accept: application/vnd.github.v3.diff"`)
 	assert.Contains(t, result.canvasYAML, `/compare/${base_ref}...${revision}" > /tmp/pr.diff`)
-
-	format := findYAMLNode(t, canvas, "format-merge-confidence")
-	assert.Contains(t, format.Configuration["script"], "Math.min(5")
-
-	report := findYAMLNode(t, canvas, "report-risk-score")
-	assert.Equal(t, "risk-review", report.Configuration["checkKey"])
-	assert.Equal(t, "Blast radius", report.Configuration["name"])
-	assert.Equal(t, "5", report.Configuration["maxScore"])
-	assert.Equal(t, "lowerIsBetter", report.Configuration["direction"])
-	assert.Equal(t, float64(3), report.Configuration["cautionAt"])
-	assert.Equal(t, float64(4), report.Configuration["criticalAt"])
-
-	performance := findYAMLNode(t, canvas, "report-performance")
-	assert.Equal(t, "performance-review", performance.Configuration["checkKey"])
-	assert.Equal(t, "higherIsBetter", performance.Configuration["direction"])
-	assert.Equal(t, float64(3), performance.Configuration["cautionAt"])
-	assert.Equal(t, float64(2), performance.Configuration["criticalAt"])
-
-	security := findYAMLNode(t, canvas, "report-security")
-	assert.Equal(t, "security-review", security.Configuration["checkKey"])
-	assert.Equal(t, "higherIsBetter", security.Configuration["direction"])
-
-	drift := findYAMLNode(t, canvas, "report-drift")
-	assert.Equal(t, "drift-review", drift.Configuration["checkKey"])
-	assert.Equal(t, "Drift from Specification", drift.Configuration["name"])
-	assert.Equal(t, "lowerIsBetter", drift.Configuration["direction"])
-	assert.Equal(t, float64(3), drift.Configuration["cautionAt"])
-	assert.Equal(t, float64(4), drift.Configuration["criticalAt"])
-
-	reversibility := findYAMLNode(t, canvas, "report-reversibility")
-	assert.Equal(t, "reversibility-review", reversibility.Configuration["checkKey"])
-	assert.Equal(t, "Reversibility", reversibility.Configuration["name"])
-	assert.Equal(t, "higherIsBetter", reversibility.Configuration["direction"])
-	assert.Equal(t, float64(3), reversibility.Configuration["cautionAt"])
-	assert.Equal(t, float64(2), reversibility.Configuration["criticalAt"])
+	assert.Contains(t, result.canvasYAML, "SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID")
+	assert.Contains(t, result.canvasYAML, `root().data.workOrder.id`)
+	assert.NotContains(t, result.canvasYAML, "findPullRequest")
+	assert.NotContains(t, result.canvasYAML, "reportWorkOrderCheck")
+	assert.NotContains(t, result.canvasYAML, "merge-confidence.json")
+	assert.Len(t, canvas.Spec.Nodes, 2)
 
 	assert.NotContains(t, result.canvasYAML, "github.createIssueComment")
 	assert.NotContains(t, result.canvasYAML, "github.publishCommitStatus")
@@ -416,15 +386,15 @@ func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
 	assert.Equal(t, "if", hasGitHubOrigin.Component)
 	assert.Equal(
 		t,
-		`$["Find Pull Request"].data.workOrder.origin != nil && split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[0] == "" && len(split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")) == 2`,
+		`root().data.workOrder.origin != nil && split(root().data.workOrder.origin.url, "https://github.com/")[0] == "" && len(split(root().data.workOrder.origin.url, "/issues/")) == 2`,
 		hasGitHubOrigin.Configuration["expression"],
 	)
 
 	comment := findYAMLNode(t, canvas, "comment-source-issue")
 	assert.Equal(t, "github.createIssueComment", comment.Component)
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, comment.Integration)
-	assert.Equal(t, `{{ split(split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}`, comment.Configuration["repository"])
-	assert.Equal(t, `{{ split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")[1] }}`, comment.Configuration["issueNumber"])
+	assert.Equal(t, `{{ split(split(root().data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}`, comment.Configuration["repository"])
+	assert.Equal(t, `{{ split(root().data.workOrder.origin.url, "/issues/")[1] }}`, comment.Configuration["issueNumber"])
 	assert.Equal(
 		t,
 		`SuperPlane completed this task in pull request [#{{ root().data.pull_request.number }}]({{ root().data.pull_request.html_url }}).`,
@@ -603,6 +573,11 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, refinement.Configuration["credentials"])
+	prompt := implementationStep(t, refinement, "Refine Task")
+	text, ok := prompt["prompt"].(string)
+	require.True(t, ok)
+	assert.Contains(t, text, runner.PlanningSessionUserPromptMarkdown())
+	assert.Contains(t, text, "Task:\n{{ root().data.workOrder }}")
 }
 
 func agentPrompt(t *testing.T, agent *yaml.Node) string {

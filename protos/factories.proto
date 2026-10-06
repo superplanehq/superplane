@@ -1222,6 +1222,7 @@ message FactoryIntake {
     SOURCE_JIRA_ISSUES = 5;
     SOURCE_DEPENDABOT_ALERTS = 6;
     SOURCE_DATADOG = 7;
+    SOURCE_LINEAR_ISSUES = 8;
   }
 
   enum InitialImportStatus {
@@ -1313,6 +1314,12 @@ message FactoryIntake {
     // Environments that still create a task. Empty means every environment.
     // Datadog intakes only.
     repeated string datadog_environments = 20;
+    // Projects that still create a task. Required for a Linear intake.
+    // Linear issue intakes only.
+    repeated string linear_project_ids = 21;
+    // Label names that still create a task. Empty means every label.
+    // Linear issue intakes only.
+    repeated string linear_labels = 22;
   }
 
   string id = 1;
@@ -1552,6 +1559,7 @@ message FactoryPullRequestRun {
   int64 total_tokens = 3;
   int64 cost_cents = 4;
   Superplane.Canvases.CanvasRunRef run = 5;
+  repeated string models = 6;
 }
 
 message FactoryPullRequestRevision {
@@ -1571,6 +1579,7 @@ message FactoryPullRequestActivity {
   optional int32 attempt_limit = 8;
   int64 total_tokens = 9;
   int64 cost_cents = 10;
+  repeated string models = 11;
 }
 
 message FactoryPullRequest {

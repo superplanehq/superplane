@@ -39,7 +39,7 @@ function renderPage() {
         ),
       ),
     );
-  return render(<OrganizationDetail />, { wrapper });
+  return { queryClient, ...render(<OrganizationDetail />, { wrapper }) };
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -109,6 +109,32 @@ describe("OrganizationDetail", () => {
             enabled: ["factories"],
           });
         }
+        if (url.startsWith(`/admin/api/organizations/${ORG_ID}/spending-report`)) {
+          return jsonResponse({
+            kpiTotals: {
+              costCents: "100",
+              totalTokens: "10",
+              durationSeconds: "5",
+              hostedCostCents: "100",
+              byokCostCents: "0",
+            },
+            explorerTotals: {
+              costCents: "100",
+              totalTokens: "10",
+              durationSeconds: "5",
+              hostedCostCents: "100",
+              byokCostCents: "0",
+            },
+            series: [],
+            seriesKeys: [],
+            breakdown: [],
+            credit: { remainingCreditCents: "5000", grantTotalCents: "5000" },
+            catalogs: { workspaces: [], users: [], models: [], machines: [] },
+          });
+        }
+        if (url.startsWith(`/admin/api/organizations/${ORG_ID}/velocity`)) {
+          return jsonResponse(adminVelocityReport());
+        }
         if (url.includes("/llm-credit")) {
           return jsonResponse({
             remaining_credit_cents: 5000,
@@ -149,6 +175,8 @@ describe("OrganizationDetail", () => {
       "Automations",
       "Connections",
       "Features",
+      "Spending",
+      "Velocity",
       "Credits",
     ]);
     expect(await screen.findByText("Acme")).toBeInTheDocument();
@@ -223,6 +251,142 @@ describe("OrganizationDetail", () => {
     expect(screen.queryByPlaceholderText("Search users...")).not.toBeInTheDocument();
   });
 
+  it("loads spending from the admin API after the spending tab opens", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
+    const urlsBefore = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    expect(urlsBefore.some((url) => url.includes("spending-report"))).toBe(false);
+
+    await user.click(screen.getByRole("tab", { name: "Spending" }));
+
+    expect(await screen.findByTestId("spending-redesign-page")).toBeInTheDocument();
+    expect(screen.getByTestId("spending-kpi-hosted")).toBeInTheDocument();
+
+    const urls = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    const spendingCalls = urls.filter((url) => url.includes("spending-report"));
+    expect(spendingCalls.length).toBeGreaterThan(0);
+    expect(spendingCalls.every((url) => url.startsWith(`/admin/api/organizations/${ORG_ID}/spending-report`))).toBe(
+      true,
+    );
+    expect(spendingCalls.some((url) => url.includes("usageKind=model"))).toBe(true);
+    expect(spendingCalls.some((url) => url.includes("usageKind=compute"))).toBe(true);
+    expect(urls.some((url) => url.includes("/api/v1/organizations/"))).toBe(false);
+  });
+
+  it("opens velocity from the admin API and hides people, sync, and cycle time", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("Acme")).toBeInTheDocument();
+    const urlsBefore = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    expect(urlsBefore.some((url) => url.includes("/velocity"))).toBe(false);
+
+    await user.click(screen.getByRole("tab", { name: "Velocity" }));
+
+    expect(await screen.findByTestId("velocity-summary")).toBeInTheDocument();
+    expect(screen.getByText("Tasks closed")).toBeInTheDocument();
+    expect(screen.getByText("Task waste")).toBeInTheDocument();
+    expect(screen.getByText("Cost per task")).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-delivery")).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-cost")).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-task-cost")).toBeInTheDocument();
+    const automations = screen.getByTestId("velocity-automations");
+    expect(within(automations).getByText("Nightly close")).toBeInTheDocument();
+    expect(within(automations).queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByText("Refunds")).toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-people")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "People" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-overflow-menu")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-refresh-data")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-sync-progress")).not.toBeInTheDocument();
+    expect(screen.queryByText("Median cycle time")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-task-time")).not.toBeInTheDocument();
+    expect(screen.queryByText("Manual work")).not.toBeInTheDocument();
+
+    const urls = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    const velocityCalls = urls.filter((url) => url.includes("/velocity"));
+    expect(velocityCalls).toEqual([`/admin/api/organizations/${ORG_ID}/velocity?period_days=30`]);
+    expect(urls.some((url) => url.includes("/api/v1/"))).toBe(false);
+  });
+
+  it("says when the organization has no workspaces", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}`) {
+        return jsonResponse(organizationOverview());
+      }
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/velocity`)) {
+        return jsonResponse({ factories: [] });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole("tab", { name: "Velocity" }));
+
+    expect(await screen.findByText("This organization has no workspaces.")).toBeInTheDocument();
+    expect(screen.queryByTestId("velocity-summary")).not.toBeInTheDocument();
+  });
+
+  it("says when the selected workspace has no velocity in the period", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}`) {
+        return jsonResponse(organizationOverview());
+      }
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/velocity`)) {
+        return jsonResponse({
+          factories: [{ id: "factory-1", name: "Quiet" }],
+          factoryId: "factory-1",
+          periodDays: 30,
+          hasPeopleCohort: false,
+          hasPreviousWindow: false,
+          totals: {},
+          previousTotals: {},
+          points: [],
+          intakeSources: [],
+          automations: [],
+        });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    renderPage();
+
+    await user.click(await screen.findByRole("tab", { name: "Velocity" }));
+
+    expect(await screen.findByText("There is no velocity in this period.")).toBeInTheDocument();
+    expect(screen.getByText("Quiet")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "30d" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByTestId("velocity-summary")).not.toBeInTheDocument();
+  });
+
+  it("shows a failed refresh next to the saved velocity report", async () => {
+    const user = userEvent.setup();
+    const { queryClient } = renderPage();
+
+    await user.click(await screen.findByRole("tab", { name: "Velocity" }));
+    expect(await screen.findByTestId("velocity-summary")).toBeInTheDocument();
+
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/velocity`)) {
+        return new Response("error", { status: 500 });
+      }
+      return new Response("not found", { status: 404 });
+    });
+    await queryClient.invalidateQueries({ queryKey: ["admin", "organizations", ORG_ID, "velocity"] });
+
+    expect(await screen.findByTestId("admin-velocity-refresh-error")).toBeInTheDocument();
+    expect(screen.getByText("Could not refresh velocity.")).toBeInTheDocument();
+    expect(screen.getByText(/^Last loaded /)).toBeInTheDocument();
+    expect(screen.getByTestId("velocity-summary")).toBeInTheDocument();
+    expect(screen.getByText("Refunds")).toBeInTheDocument();
+  });
+
   it("does not load credits until the credits tab opens", async () => {
     renderPage();
 
@@ -248,7 +412,7 @@ describe("OrganizationDetail", () => {
     await user.click(screen.getByRole("tab", { name: "Credits" }));
 
     expect(await screen.findByText("Hosted credit")).toBeVisible();
-    expect(await screen.findByTestId("admin-org-credit-amount")).toBeVisible();
+    expect(await screen.findByTestId("admin-org-credit-topup-target")).toBeVisible();
     expect(screen.queryByText("Factories")).not.toBeInTheDocument();
   });
 
@@ -258,18 +422,18 @@ describe("OrganizationDetail", () => {
 
     await user.click(screen.getByRole("tab", { name: "Credits" }));
 
-    const amount = await screen.findByTestId("admin-org-credit-amount");
+    const amount = await screen.findByTestId("admin-org-credit-topup-target");
     await user.clear(amount);
     await user.type(amount, "12.50");
 
     await user.click(screen.getByRole("tab", { name: "Users" }));
     expect(await screen.findByText("Ada Lovelace")).toBeVisible();
     expect(screen.getByRole("tabpanel", { name: "Credits" })).toHaveAttribute("data-state", "inactive");
-    expect(screen.getByTestId("admin-org-credit-amount")).toHaveValue("12.50");
+    expect(screen.getByTestId("admin-org-credit-topup-target")).toHaveValue("12.50");
 
     await user.click(screen.getByRole("tab", { name: "Credits" }));
     expect(screen.getByRole("tabpanel", { name: "Credits" })).toHaveAttribute("data-state", "active");
-    expect(await screen.findByTestId("admin-org-credit-amount")).toHaveValue("12.50");
+    expect(await screen.findByTestId("admin-org-credit-topup-target")).toHaveValue("12.50");
   });
 
   it("retries overview load after an error", async () => {
@@ -304,3 +468,75 @@ describe("OrganizationDetail", () => {
     expect(await screen.findByText("Acme")).toBeInTheDocument();
   });
 });
+
+function organizationOverview() {
+  return {
+    id: ORG_ID,
+    name: "Acme",
+    slug: "acme",
+    description: "Builds widgets",
+    canvas_count: 2,
+    task_count: 4,
+    done_task_count: 6,
+    member_count: 3,
+    created_at: "2024-01-15T12:00:00Z",
+    updated_at: "2024-02-20T12:00:00Z",
+  };
+}
+
+function adminVelocityReport() {
+  return {
+    factories: [{ id: "factory-1", name: "Refunds" }],
+    factoryId: "factory-1",
+    periodDays: 30,
+    hasPeopleCohort: false,
+    hasPreviousWindow: true,
+    totals: {
+      superplaneMerged: 2,
+      peopleMerged: 0,
+      waste: 1,
+      costCents: 500,
+      modelCostCents: 400,
+      computeCostCents: 100,
+      tokens: 1000,
+      wasteCostCents: 50,
+      tasksClosed: 3,
+      tasksWaste: 1,
+    },
+    previousTotals: {
+      superplaneMerged: 1,
+      peopleMerged: 0,
+      waste: 0,
+      costCents: 100,
+      tasksClosed: 1,
+      tasksWaste: 0,
+    },
+    points: [
+      {
+        day: "Mon 1",
+        superplaneMerged: 2,
+        peopleMerged: 0,
+        waste: 1,
+        costCents: 500,
+        modelCostCents: 400,
+        computeCostCents: 100,
+        tokens: 1000,
+        wasteCostCents: 50,
+        medianTaskModelCostCents: 200,
+        medianTaskComputeCostCents: 50,
+        intake: [{ key: "manual", merged: 2 }],
+      },
+    ],
+    intakeSources: [{ key: "manual", label: "Manually created", merged: 2 }],
+    automations: [
+      {
+        id: "canvas-9",
+        name: "Nightly close",
+        runs: 4,
+        failed: 1,
+        costCents: 300,
+        averageDurationHours: 0.5,
+      },
+    ],
+  };
+}

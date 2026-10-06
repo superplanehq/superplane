@@ -25,7 +25,7 @@ import { FactorySettingsCard } from "./FactorySettingsCard";
 import { SuperPlaneMCPClientsEmptyIllustration } from "./SuperPlaneMCPClientsEmptyIllustration";
 import { SUPERPLANE_MCP_SERVER_COPY } from "./superplaneMCPServerCopy";
 
-const MCP_CLIENT_TOOLS: WorkspaceMCPClientTool[] = ["cursor", "claudeCode", "vscode"];
+const MCP_CLIENT_TOOLS: WorkspaceMCPClientTool[] = ["cursor", "claudeCode", "vscode", "codex", "opencode"];
 
 export function SuperPlaneMCPServerSection({
   organizationId,
@@ -271,7 +271,7 @@ function MCPClientSetupTabs({ origin }: { origin: string }) {
 function MCPClientToolGuide({ tool, origin }: { tool: WorkspaceMCPClientTool; origin: string }) {
   const guide = SUPERPLANE_MCP_SERVER_COPY.tools[tool];
   const snippet = workspaceMCPClientSnippet(tool, origin);
-  const isCommand = tool === "claudeCode";
+  const isCommand = tool === "claudeCode" || tool === "codex";
   return (
     <>
       <ol className="list-decimal space-y-1 pl-4 text-left text-[12px] leading-relaxed text-muted-foreground">

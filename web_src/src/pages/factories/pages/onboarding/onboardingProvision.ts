@@ -27,6 +27,7 @@ export const DEFAULT_LINE_NAME = "implement";
 
 export const GITHUB_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_GITHUB_ISSUES";
 export const JIRA_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_JIRA_ISSUES";
+export const LINEAR_INTAKE_SOURCE: FactoriesFactoryIntakeSource = "SOURCE_LINEAR_ISSUES";
 
 const PRIMARY_LINE_APP_ENTRYPOINT = ONBOARDING_LINE_APPS[0].entrypointNodeId;
 
@@ -173,10 +174,20 @@ export type CreateFactoryIntake = (input: {
 export type DeleteFactoryIntake = (intakeId: string) => Promise<unknown>;
 
 function isBacklogIntake(intake: FactoriesFactoryIntake): boolean {
-  return intake.source === GITHUB_INTAKE_SOURCE || intake.source === JIRA_INTAKE_SOURCE;
+  return (
+    intake.source === GITHUB_INTAKE_SOURCE ||
+    intake.source === JIRA_INTAKE_SOURCE ||
+    intake.source === LINEAR_INTAKE_SOURCE
+  );
 }
 
-function jiraIntakeMatches(intake: FactoriesFactoryIntake, integrationId: string, resourceId: string): boolean {
+function backlogSourceForChoice(choice: IssuesChoiceId | null): FactoriesFactoryIntakeSource {
+  if (choice === "jira") return JIRA_INTAKE_SOURCE;
+  if (choice === "linear") return LINEAR_INTAKE_SOURCE;
+  return GITHUB_INTAKE_SOURCE;
+}
+
+function intakeBindingMatches(intake: FactoriesFactoryIntake, integrationId: string, resourceId: string): boolean {
   const binding = onboardingIntakeBinding(intake);
   return binding.integrationId === integrationId && binding.resourceId === resourceId;
 }
@@ -217,7 +228,7 @@ export async function provisionJiraIntake(args: {
 }): Promise<FactoriesFactoryIntake> {
   const intakes = await args.listIntakes();
   const existing = intakes.find((intake) => intake.source === JIRA_INTAKE_SOURCE);
-  if (existing && jiraIntakeMatches(existing, args.integrationId, args.resourceId)) {
+  if (existing && intakeBindingMatches(existing, args.integrationId, args.resourceId)) {
     return existing;
   }
   if (existing) {
@@ -237,6 +248,40 @@ export async function provisionJiraIntake(args: {
   return created;
 }
 
+function linearIntakeResourceId(projectIds: string[]): string {
+  return projectIds.join(",");
+}
+
+export async function provisionLinearIntake(args: {
+  listIntakes: ListFactoryIntakes;
+  createIntake: CreateFactoryIntake;
+  deleteIntake: DeleteFactoryIntake;
+  integrationId: string;
+  projectIds: string[];
+}): Promise<FactoriesFactoryIntake> {
+  const resourceId = linearIntakeResourceId(args.projectIds);
+  const intakes = await args.listIntakes();
+  const existing = intakes.find((intake) => intake.source === LINEAR_INTAKE_SOURCE);
+  if (existing && intakeBindingMatches(existing, args.integrationId, resourceId)) {
+    return existing;
+  }
+  if (existing) {
+    await removeProvisionedIntake(args.deleteIntake, existing);
+  }
+
+  const created = await args.createIntake({
+    source: LINEAR_INTAKE_SOURCE,
+    integrationId: args.integrationId,
+    resourceId,
+    settings: { linearProjectIds: args.projectIds },
+  });
+  rememberOnboardingIntakeBinding(created.id, {
+    integrationId: args.integrationId,
+    resourceId,
+  });
+  return created;
+}
+
 // Create the selected backlog intake and remove a leftover intake from an
 // earlier failed finish, so analysis follows the source the user chose.
 export async function provisionOnboardingIntake(args: {
@@ -249,30 +294,46 @@ export async function provisionOnboardingIntake(args: {
     projectId: string;
     settings?: FactoriesFactoryIntakeSettings;
   };
+  linear?: {
+    integrationId: string;
+    projectIds: string[];
+  };
 }): Promise<FactoriesFactoryIntake | undefined> {
   const intakes = await args.listIntakes();
-  const desiredSource = args.issuesChoice === "jira" ? JIRA_INTAKE_SOURCE : GITHUB_INTAKE_SOURCE;
+  const desiredSource = backlogSourceForChoice(args.issuesChoice);
   for (const intake of intakes) {
     if (!isBacklogIntake(intake) || intake.source === desiredSource) continue;
     await removeProvisionedIntake(args.deleteIntake, intake);
   }
 
-  if (args.issuesChoice !== "jira") {
-    return provisionGithubIntake({
+  if (args.issuesChoice === "jira") {
+    if (!args.jira?.integrationId || !args.jira.projectId) {
+      throw new Error("Connect Jira, then choose a project.");
+    }
+    return provisionJiraIntake({
       listIntakes: args.listIntakes,
       createIntake: args.createIntake,
+      deleteIntake: args.deleteIntake,
+      integrationId: args.jira.integrationId,
+      resourceId: args.jira.projectId,
+      settings: args.jira.settings,
     });
   }
-  if (!args.jira?.integrationId || !args.jira.projectId) {
-    throw new Error("Connect Jira, then choose a project.");
+  if (args.issuesChoice === "linear") {
+    if (!args.linear?.integrationId || args.linear.projectIds.length === 0) {
+      throw new Error("Connect Linear, then choose a project.");
+    }
+    return provisionLinearIntake({
+      listIntakes: args.listIntakes,
+      createIntake: args.createIntake,
+      deleteIntake: args.deleteIntake,
+      integrationId: args.linear.integrationId,
+      projectIds: args.linear.projectIds,
+    });
   }
-  return provisionJiraIntake({
+  return provisionGithubIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
-    deleteIntake: args.deleteIntake,
-    integrationId: args.jira.integrationId,
-    resourceId: args.jira.projectId,
-    settings: args.jira.settings,
   });
 }
 

@@ -41,13 +41,14 @@ import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnbo
 import { useFinishSetupAction } from "./useFinishSetupAction";
 import { useOnboardingAgentContext } from "./useOnboardingAgentPlan";
 import { useOnboardingJiraBinding } from "./useOnboardingJiraBinding";
+import { useOnboardingLinearBinding } from "./useOnboardingLinearBinding";
 import {
   useOnboardingSetupState,
   type InitialOnboardingSetupState,
   type OnboardingSetupApi,
 } from "./useOnboardingSetupState";
 
-const ONBOARDING_INTEGRATIONS = ["jira", ...AGENT_PROVIDER_IDS];
+const ONBOARDING_INTEGRATIONS = ["jira", "linear", ...AGENT_PROVIDER_IDS];
 
 // Agent keys stay unselected so a new workspace can use the canonical
 // SuperPlane template when hosted credit is available.
@@ -67,6 +68,7 @@ function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
     const ready = new Set<IntegrationId>();
     if (selections.github?.ready) ready.add("github");
     if (selections.jira?.ready) ready.add("jira");
+    if (selections.linear?.ready) ready.add("linear");
     for (const name of AGENT_PROVIDER_IDS) {
       if (selections[name]?.ready) ready.add(name);
     }
@@ -201,6 +203,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     args.mutations;
   const githubIntegrationId = args.integrations.selections.github?.ready ? args.integrations.selections.github.id : "";
   const jira = useOnboardingJiraBinding(args.organizationId, args.factoryId, args.integrations.selections.jira);
+  const linear = useOnboardingLinearBinding(args.organizationId, args.factoryId, args.integrations.selections.linear);
   const takenNames = useMemo(
     () => otherWorkspaceNames(args.factories, args.factoryId),
     [args.factories, args.factoryId],
@@ -236,6 +239,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     githubOwner,
     jiraProjectId: jira.jiraProjectId,
     jiraCompletion: jira.jiraCompletion,
+    linearProjectIds: linear.linearProjectIds,
     updateOrganization: async (identity) => {
       const response = await updateOrganization.mutateAsync(identity);
       return response.data?.organization?.metadata?.slug;
@@ -271,6 +275,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     finishSetup,
     selectCatalogRepository,
     jira,
+    linear,
     installer,
     createIntake,
   };
@@ -393,5 +398,6 @@ export function useOnboardingPageModel(args: {
     // Names the finished organization row on the GitHub stepper card.
     githubOwner: wired.githubOwner,
     ...wired.jira,
+    ...wired.linear,
   };
 }

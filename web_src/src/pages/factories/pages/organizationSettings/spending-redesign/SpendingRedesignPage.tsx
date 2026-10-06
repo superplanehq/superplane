@@ -44,6 +44,11 @@ export interface SpendingRedesignPageProps extends SpendingRedesignControlledSta
    */
   isFetching?: boolean;
   errorMessage?: string;
+  /**
+   * Organization settings owns the document title. The installation admin
+   * tab reuses this page and leaves the admin shell title unchanged.
+   */
+  setDocumentTitle?: boolean;
 }
 
 /**
@@ -53,8 +58,16 @@ export interface SpendingRedesignPageProps extends SpendingRedesignControlledSta
  * the spending-report API.
  */
 export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
-  const { credit, catalogs, isLoading = false, isFetching = false, errorMessage, ...modelArgs } = props;
-  usePageTitle(["Spending"]);
+  const {
+    credit,
+    catalogs,
+    isLoading = false,
+    isFetching = false,
+    errorMessage,
+    setDocumentTitle = true,
+    ...modelArgs
+  } = props;
+  usePageTitle(["Spending"], { enabled: setDocumentTitle });
   const view = useSpendingRedesignPageModel({ ...modelArgs, catalogs });
   const metrics = spendingMetricCopy(view.rangeTotals);
   // Reports from a real query are only present once the first fetch

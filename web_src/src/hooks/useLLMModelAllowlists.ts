@@ -8,6 +8,9 @@ import {
   organizationsListByokllmModels,
   organizationsListHostedCreditProducts,
   organizationsUpdateByokllmModels,
+  organizationsListOrganizationHostedLlmModels,
+  organizationsUpdateOrganizationHostedLlmModels,
+  type OrganizationsListOrganizationHostedLlmModelsResponse,
 } from "@/api-client";
 import { getResponseErrorMessage } from "@/lib/errors";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -16,6 +19,55 @@ import { factoryQueryKeys } from "./useFactoryData";
 import { hostedLLMModelsQueryKey } from "./useHostedLLMModels";
 
 const BYOK_PROVIDERS = ["anthropic", "openai", "openrouter"] as const;
+
+export function organizationHostedLLMModelsQueryKey(organizationId: string) {
+  return ["organizations", organizationId, "hosted-models"] as const;
+}
+
+export function useOrganizationHostedLLMModels(organizationId: string) {
+  return useQuery({
+    queryKey: organizationHostedLLMModelsQueryKey(organizationId),
+    queryFn: async () => {
+      const response = await organizationsListOrganizationHostedLlmModels(
+        withOrganizationHeader({ organizationId, path: { id: organizationId } }),
+      );
+      return response.data ?? {};
+    },
+    enabled: Boolean(organizationId),
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useUpdateOrganizationHostedLLMModels(organizationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (allowedModels: string[]) => {
+      const response = await organizationsUpdateOrganizationHostedLlmModels(
+        withOrganizationHeader({ organizationId, path: { id: organizationId }, body: { allowedModels } }),
+      );
+      return response.data ?? {};
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        organizationHostedLLMModelsQueryKey(organizationId),
+        (previous: OrganizationsListOrganizationHostedLlmModelsResponse | undefined) => ({
+          ...previous,
+          selected: data.selected ?? [],
+        }),
+      );
+      void queryClient.invalidateQueries({ queryKey: organizationHostedLLMModelsQueryKey(organizationId) });
+      void queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "selectable-llm-models"] });
+      void queryClient.invalidateQueries({ queryKey: ["organizations", organizationId, "hosted-llm-models"] });
+      void queryClient.invalidateQueries({
+        predicate: (query) =>
+          query.queryKey[0] === "factories" &&
+          query.queryKey[1] === organizationId &&
+          query.queryKey[3] === "llm-models" &&
+          query.queryKey[5] === "hosted",
+      });
+    },
+  });
+}
 
 export function byokLLMModelsQueryKey(organizationId: string, provider: string, factoryId?: string) {
   return ["organizations", organizationId, "byok-models", provider, factoryId ?? ""] as const;

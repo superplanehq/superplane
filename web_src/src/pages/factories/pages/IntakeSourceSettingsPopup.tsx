@@ -15,6 +15,7 @@ import {
 } from "./intakeSourceSettingsModel";
 import { DependabotIntakeFilterFields } from "./DependabotIntakeFilterFields";
 import { DatadogIntakeFilterFields } from "./DatadogIntakeFilterFields";
+import { LinearIntakeFilterFields } from "./LinearIntakeFilterFields";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
 import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
@@ -251,6 +252,7 @@ function IntakeSettingsTabPanel({
         organizationId={agent.organizationId}
         factoryId={agent.factoryId}
         factoryKey={agent.factoryKey}
+        automationId={agent.automationId}
         isLoading={agent.isLoading}
         showAutomationNote={false}
         showCancel={false}
@@ -347,6 +349,13 @@ function IntakeGeneralTab({
             organizationId={organizationId}
             integrationId={integrationId}
             resourceId={resourceId}
+          />
+          <LinearIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
           />
         </div>
       </div>

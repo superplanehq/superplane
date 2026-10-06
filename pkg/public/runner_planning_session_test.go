@@ -702,14 +702,25 @@ func TestRunnerPlanningSessionRejectsTaskCreationKind(t *testing.T) {
 	db := database.DB(t.Context())
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
-	canvas, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "planning", "start")
-	session, err := factoryModel.StartPlanningSession(db, models.StartPlanningSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        canvas.ID,
-		Entrypoint:      entrypoint,
-	})
+	canvas, _ := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "planning", "start")
+	run, err := models.CreateCanvasRunInTransaction(db, canvas.ID, "start", models.CanvasRunStateStarted, "")
 	require.NoError(t, err)
+	now := time.Now()
+	session := &models.FactoryPlanningSession{
+		ID:              uuid.New(),
+		OrganizationID:  r.Organization.ID,
+		FactoryID:       factoryModel.ID,
+		CreatedByUserID: &r.User,
+		Repository:      "acme/payments",
+		Kind:            models.PlanningSessionKindTaskCreation,
+		State:           models.PlanningSessionStateRunning,
+		CanvasID:        &canvas.ID,
+		CanvasRunID:     &run.ID,
+		HeartbeatAt:     now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	require.NoError(t, db.Create(session).Error)
 	token := mustPlanningRunnerToken(t, signer, session)
 
 	requests := []struct {

@@ -24,6 +24,7 @@ describe("lineIntakeModel", () => {
       "pagerduty-incidents",
       "productive-tasks",
       "datadog",
+      "linear-issues",
     ]);
 
     const github = lineIntakeSourceById("github-issues");
@@ -271,7 +272,7 @@ describe("lineIntakeModel", () => {
 
     expect(fixture.phases.map((phase) => [phase.id, phase.status, phase.duration])).toEqual([
       ["ingest", "passed", "2s"],
-      ["analyze", "running", "3m 12s so far"],
+      ["analyze", "running", "3m 12s"],
       ["plan", "pending", "—"],
       ["score", "pending", "—"],
     ]);
@@ -358,5 +359,6 @@ describe("lineIntakeModel", () => {
 
     expect(apiIntakeSource("productive-tasks")).toBe("SOURCE_PRODUCTIVE_TASKS");
     expect(apiIntakeSource("dependabot-alerts")).toBe("SOURCE_DEPENDABOT_ALERTS");
+    expect(apiIntakeSource("linear-issues")).toBe("SOURCE_LINEAR_ISSUES");
   });
 });

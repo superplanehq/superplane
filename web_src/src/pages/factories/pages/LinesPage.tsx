@@ -39,7 +39,6 @@ import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
-import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
@@ -139,6 +138,7 @@ import { type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
 import { columnAppsFromFactoryApps, splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
+import { useColumnAppCheckRuns } from "./work-order-split-run/useColumnAppCheckRuns";
 import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFooterCloser";
 import {
   factoryAppConfigurePath,
@@ -149,6 +149,7 @@ import {
   factoryIntakePath,
   factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
+  factoryLinearIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
@@ -170,7 +171,6 @@ import {
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
-import { humanizeLineName } from "../lib/humanizeLineName";
 import { WorkspaceLoadingScreen } from "../layout/WorkspaceLoadingScreen";
 import {
   factoryKanbanPageClassName,
@@ -444,7 +444,7 @@ export function LinesPage() {
     peekHint,
   );
 
-  usePageTitle([selectedLine ? humanizeLineName(selectedLine.name) : "Board", factory?.name ?? "Workspace"]);
+  usePageTitle([factory?.name?.trim() || "Workspace"]);
 
   const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
   const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
@@ -583,6 +583,12 @@ export function LinesPage() {
     if (template.id === "datadog") {
       if (selectedLine.id) {
         navigate(factoryDatadogIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+      }
+      return;
+    }
+    if (template.id === "linear-issues") {
+      if (selectedLine.id) {
+        navigate(factoryLinearIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
       }
       return;
     }
@@ -860,7 +866,6 @@ function LineDetailHeader({
   colorView: LineBoardColumnColorView;
   onColorViewChange: (view: LineBoardColumnColorView) => void;
 }) {
-  const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const { data: orgUsers = [] } = useOrganizationUsers(organizationId);
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const showPullRequestMerge = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
@@ -877,39 +882,17 @@ function LineDetailHeader({
       ),
     [entries, orgUsers],
   );
-  const title = humanizeLineName(line.name);
   const visibleFilterCount =
     countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge)) - state.filters.lineIds.length;
   const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
   const factoryKey = factoryRouteSegment(factory);
-
-  const handleRename = async (name: string) => {
-    if (!line.id) {
-      return;
-    }
-    try {
-      await updateLine.mutateAsync({ lineId: line.id, name });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to rename line"));
-    }
-  };
 
   return (
     <>
       <WorkspacePageHeader
         className={factorySectionHeaderClassName}
         data-testid="lines-detail-header"
-        title={
-          <ClickToRename
-            value={title}
-            onSave={(name) => void handleRename(name)}
-            canEdit={canUpdate && Boolean(line.id)}
-            busy={updateLine.isPending}
-            testId="lines-board-title"
-            ariaLabel="Line name"
-            inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
-          />
-        }
+        title={factory?.name?.trim() || "Workspace"}
         leading={
           nextStepsRestore || hostedCreditHeaderKicker ? (
             <>
@@ -1238,40 +1221,46 @@ function LineBoardSplitRunPopup({
   const closer = useSplitRunFooterCloser(organizationId, factoryId, popupOrder);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const resolvedLineName = lineName?.trim();
+  const columnApps = columnAppsFromFactoryApps(factoryApps);
+  const columnAppCheckRuns = useColumnAppCheckRuns(describedOrder?.checks, columnApps, peekPullRequests);
   return (
-    <WorkOrderSplitRunPopup
-      key={peekOrderId}
-      organizationId={organizationId}
-      factoryId={factoryId}
-      factoryKey={factoryKey}
-      orderId={peekOrderId}
-      orderNumber={popupOrder.number}
-      lineId={lineId}
-      fixture={splitRunFixtureForWorkOrder(popupOrder, {
-        checks: describedOrder?.checks,
-        artifacts: peekArtifacts,
-        lineId,
-        lineName: resolvedLineName,
-        demoArtifacts: false,
-        prFeedbackRuns,
-        analysisRuns,
-        columnApps: columnAppsFromFactoryApps(factoryApps),
-        isAnalyzing,
-        stoppedBy: closer.actor,
-        closer,
-        resolveUser,
-      })}
-      canDispatch={canDispatch && Boolean(resolvedLineName)}
-      canUpdate={canUpdate}
-      isDispatching={isDispatching}
-      onDispatch={
-        resolvedLineName
-          ? (model, thinkingLevel) => onDispatch(peekOrderId, { lineName: resolvedLineName, model, thinkingLevel })
-          : undefined
-      }
-      onClose={onClose}
-      fixed
-    />
+    <>
+      {columnAppCheckRuns.queries}
+      <WorkOrderSplitRunPopup
+        key={peekOrderId}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        orderId={peekOrderId}
+        orderNumber={popupOrder.number}
+        lineId={lineId}
+        fixture={splitRunFixtureForWorkOrder(popupOrder, {
+          checks: describedOrder?.checks,
+          artifacts: peekArtifacts,
+          lineId,
+          lineName: resolvedLineName,
+          demoArtifacts: false,
+          prFeedbackRuns,
+          analysisRuns,
+          columnApps,
+          isAnalyzing,
+          stoppedBy: closer.actor,
+          closer,
+          resolveUser,
+          columnAppRuns: columnAppCheckRuns.lookup,
+        })}
+        canDispatch={canDispatch && Boolean(resolvedLineName)}
+        canUpdate={canUpdate}
+        isDispatching={isDispatching}
+        onDispatch={
+          resolvedLineName
+            ? (model, thinkingLevel) => onDispatch(peekOrderId, { lineName: resolvedLineName, model, thinkingLevel })
+            : undefined
+        }
+        onClose={onClose}
+        fixed
+      />
+    </>
   );
 }
 

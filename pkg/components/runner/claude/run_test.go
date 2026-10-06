@@ -106,6 +106,20 @@ func TestAllowedClaudeToolsOmitsDisabledPlanningScores(t *testing.T) {
 	assert.NotContains(t, confidenceOnly, "mcp__superplane__propose_clarity")
 }
 
+func TestAllowedClaudeToolsAllowsMergeConfidenceReport(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "token",
+		"SUPERPLANE_BASE_URL":               "https://app.example",
+	})
+
+	assert.Contains(t, tools, "Bash")
+	assert.Contains(t, tools, "Read")
+	assert.Contains(t, tools, "mcp__superplane")
+	assert.Contains(t, tools, "mcp__superplane__report_merge_check")
+	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+	assert.NotContains(t, tools, "mcp__superplane__upload_artifact")
+}
+
 func TestAllowedClaudeToolsIncludesWorkspaceMCPNames(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "workspace_mcp.json")
 	require.NoError(t, os.WriteFile(configPath, []byte(`{"servers":[{"name":"docs","url":"https://mcp.example.com/mcp"}]}`), 0o644))

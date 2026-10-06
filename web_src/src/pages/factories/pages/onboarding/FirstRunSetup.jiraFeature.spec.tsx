@@ -13,7 +13,12 @@ import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
-const feature = vi.hoisted(() => ({ jiraIntake: true, organizationReady: true, isLoading: false }));
+const feature = vi.hoisted(() => ({
+  jiraIntake: true,
+  linearIntake: false,
+  organizationReady: true,
+  isLoading: false,
+}));
 
 vi.mock("@/hooks/useIntakeCatalogAvailability", () => ({
   useIntakeCatalogAvailability: () => {
@@ -76,6 +81,7 @@ vi.mock("./useGitHubOnboarding", () => ({
     startInstallation: { mutateAsync: vi.fn() },
     configureInstallation: { mutateAsync: vi.fn() },
   }),
+  useGitHubInstallationChecks: vi.fn(),
 }));
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
@@ -139,6 +145,13 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     jiraProjectsLoading: false,
     jiraProjectsError: false,
     retryJiraProjects: vi.fn(),
+    linearIntegrationId: "",
+    linearProjectIds: [],
+    toggleLinearProject: vi.fn(),
+    linearProjects: [],
+    linearProjectsLoading: false,
+    linearProjectsError: false,
+    retryLinearProjects: vi.fn(),
     ...overrides,
   };
 }
@@ -156,6 +169,7 @@ function renderLiveSetup(model: OnboardingPageModel, setupOptions: SetupOptions)
 describe("FirstRunSetup Jira intake feature", () => {
   beforeEach(() => {
     feature.jiraIntake = true;
+    feature.linearIntake = false;
     feature.organizationReady = true;
     feature.isLoading = false;
   });
@@ -237,9 +251,37 @@ describe("FirstRunSetup Jira intake feature", () => {
 
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraLookupLoading)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearLookupLoading)).toBeInTheDocument();
     expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).not.toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Coming soon")).toHaveLength(1);
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
+  });
+
+  it("shows Linear when the organization feature is on", async () => {
+    feature.linearIntake = true;
+    const user = userEvent.setup();
+    const model = pageModel({
+      hostedAgentReady: true,
+      hostedModelsAvailable: true,
+      linearIntegrationId: "linear-1",
+      linearProjectIds: ["project-1"],
+      linearProjects: [{ id: "project-1", name: "Platform" }],
+    });
+
+    renderLiveSetup(model, {
+      simulateDiscovery: false,
+      connected: new Set(["linear"]),
+      initial: { issuesChoice: "linear" },
+    });
+
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linear).closest('[data-soon="true"]')).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-linear-projects")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("linear-project-project-1"));
+    expect(model.toggleLinearProject).toHaveBeenCalledWith("project-1");
   });
 });
 

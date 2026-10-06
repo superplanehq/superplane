@@ -1389,6 +1389,8 @@ The On Pull Request trigger starts a workflow execution when pull request events
 
 - **Repository**: Select the GitHub repository to monitor
 - **Actions**: Select which PR actions to listen for (opened, edited, closed, synchronize, etc.)
+- **Ignore draft pull requests**: Do not start a run when the pull request is a draft.
+- **Only pull requests in this factory**: Start a run only when the pull request belongs to this factory. The event then includes the factory pull request and the task.
 
 ### Event Data
 
@@ -1398,6 +1400,8 @@ Each PR event includes:
 - **pull_request**: Complete PR information including title, body, state, labels
 - **repository**: Repository information
 - **sender**: User who triggered the event
+- **pullRequest**: The factory pull request. Present only when **Only pull requests in this factory** is on and the pull request belongs to this factory.
+- **workOrder**: The task for that pull request. Present in the same case.
 
 ### Webhook Setup
 

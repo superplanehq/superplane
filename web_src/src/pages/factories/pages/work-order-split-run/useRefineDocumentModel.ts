@@ -4,7 +4,7 @@ import type { FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { analysisPlanBody, hasAnalysisPlan } from "../../lib/analysisOutcome";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
-import type { ComposerScore } from "./ComposerPlanControls";
+import type { ComposerScore } from "./PlanningReview";
 import { latestPlanScore } from "./latestPlanScore";
 import { usePlanChipStatus } from "./planChipStatus";
 import { useRefineLayoutPreference } from "./refineLayoutPreference";
@@ -81,10 +81,12 @@ export function useRefineDocumentModel({
   const panes = refinePaneLayout(refineOpen, planPaneOpen, split.percent);
   const planStatus = usePlanChipStatus(analysisPlanBody(artifacts), planOpenedHere && planPaneOpen);
 
+  const document = splitRunIntentDocument({ artifacts, description, skipDescriptionFallback });
+
   return {
     refineOpen,
     split,
-    document: splitRunIntentDocument({ artifacts, description, skipDescriptionFallback }),
+    document,
     sessionTitle: title.trim() || SESSION_TITLE_FALLBACK,
     ...panes,
     showClosedDecision: refineOpen && resultFooter != null,
@@ -92,6 +94,7 @@ export function useRefineDocumentModel({
       analysis,
       planPaneOpen,
       hasPlan,
+      planTitle: document.title,
       layout,
       planStatus,
       clarity: refineClarity(analysis, clarity),
@@ -106,6 +109,7 @@ function bindRefineChat({
   analysis,
   planPaneOpen,
   hasPlan,
+  planTitle,
   layout,
   planStatus,
   clarity,
@@ -116,6 +120,7 @@ function bindRefineChat({
   analysis?: IntentAnalysisChat;
   planPaneOpen: boolean;
   hasPlan: boolean;
+  planTitle: string;
   layout: ReturnType<typeof useRefineLayoutPreference>;
   planStatus: ReturnType<typeof usePlanChipStatus>;
   clarity: ComposerScore;
@@ -134,6 +139,7 @@ function bindRefineChat({
       layout.togglePlan();
     },
     canTogglePlan: hasPlan,
+    planTitle,
     clarity,
     confidence,
     planStatus,

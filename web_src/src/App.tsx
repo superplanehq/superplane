@@ -34,7 +34,6 @@ import {
   AutomationsPage,
   CreateWorkOrderComposeRedirect,
   FactoriesIndexPage,
-  FactoriesLayout,
   FactoryAppCanvasPage,
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
@@ -51,7 +50,6 @@ import {
   OnboardingPage,
   VelocityPage,
   WikiPage,
-  WorkOrderDetailPage,
   WorkOrdersPage,
   WorkspaceOverviewPage,
   ChecksPRFeedbackSetupPage,
@@ -60,6 +58,7 @@ import {
   DiscussionPRFeedbackSetupPage,
   GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
+  LinearIntakeSetupPage,
   ProductiveIntakeSetupPage,
   PlanningSetupPage,
   RiskScoreSetupPage,
@@ -68,6 +67,7 @@ import {
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { isPublicFactoryLinePath } from "./pages/factories/lib/publicFactoryLinePath";
 import { FactoryLineAccessGate } from "./pages/factories/pages/FactoryLineAccessGate";
+import { FactoryWorkspaceLayoutSwitch, WorkOrderDetailRouteSwitch } from "./pages/factories/mobile/MobileShellSwitch";
 import { WorkspaceLoadingProvider } from "./pages/factories/layout/workspaceLoading";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
@@ -149,7 +149,10 @@ function organizationScopedRouteTree() {
       <Route path="workspaces">
         <Route index element={withAuthPermissionAndFactoriesFeature(FactoriesIndexPage, "factories", "read")} />
         <Route path="new" element={withAuthPermissionAndFactoriesFeature(NewWorkspacePage, "factories", "create")} />
-        <Route path=":factoryKey" element={withAuthPermissionAndFactoriesFeature(FactoriesLayout, "factories", "read")}>
+        <Route
+          path=":factoryKey"
+          element={withAuthPermissionAndFactoriesFeature(FactoryWorkspaceLayoutSwitch, "factories", "read")}
+        >
           <Route element={<OnboardingGate />}>
             <Route index element={<FactoryHomeRedirect />} />
             <Route path="setup" element={<OnboardingPage />} />
@@ -163,7 +166,7 @@ function organizationScopedRouteTree() {
               <Route path="new" element={<CreateWorkOrderComposeGate />} />
               <Route path=":orderId" element={<LegacyWorkOrderDetailRedirect />} />
             </Route>
-            <Route path="task/:orderNumber" element={<WorkOrderDetailPage />} />
+            <Route path="task/:orderNumber" element={<WorkOrderDetailRouteSwitch />} />
             {/* Back-compat for bookmarks made before `work-order(s)` was renamed to `task(s)`. */}
             <Route path="work-orders/*" element={<LegacyWorkOrdersRedirect />} />
             <Route path="work-order/:orderNumber" element={<LegacyWorkOrderPermalinkRedirect />} />
@@ -187,6 +190,7 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/setup/datadog" element={<DatadogIntakeSetupPage />} />
               <Route path=":lineId/setup/dependabot" element={<DependabotIntakeSetupPage />} />
               <Route path=":lineId/setup/jira" element={<JiraIntakeSetupPage />} />
+              <Route path=":lineId/setup/linear" element={<LinearIntakeSetupPage />} />
               <Route path=":lineId/setup/productive" element={<ProductiveIntakeSetupPage />} />
             </Route>
             <Route path="automations">

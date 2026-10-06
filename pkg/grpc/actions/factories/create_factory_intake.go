@@ -106,11 +106,6 @@ func CreateFactoryIntake(
 		log.Warnf("factory %s: intake starts without a Backlog scorer: %v", factory.ID, err)
 	}
 
-	binding, err := resolveIntakeBinding(db, factory, source, req.GetIntegrationId(), req.GetResourceId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to create factory intake")
-	}
-
 	settings := defaultIntakeSettings()
 	switch source {
 	case models.FactoryIntakeSourceJiraIssues:
@@ -121,10 +116,30 @@ func CreateFactoryIntake(
 		settings = defaultProductiveIntakeSettings()
 	case models.FactoryIntakeSourceDependabotAlerts:
 		settings = defaultDependabotIntakeSettings()
+	case models.FactoryIntakeSourceDatadog:
+		settings = defaultDatadogIntakeSettings()
+	case models.FactoryIntakeSourceLinearIssues:
+		settings = defaultLinearIntakeSettings()
 	}
 	settings = parseIntakeSettings(settings, req.GetSettings())
 	if req.GetSettings() != nil && req.GetSettings().GetConfidencePct() == 0 {
 		settings.ConfidencePct = DefaultIntakeConfidencePct
+	}
+	if source == models.FactoryIntakeSourceLinearIssues && len(settings.LinearProjectIDs) == 0 {
+		settings.LinearProjectIDs = linearProjectIDsFromResource(req.GetResourceId())
+	}
+
+	resourceID := req.GetResourceId()
+	if source == models.FactoryIntakeSourceLinearIssues && len(settings.LinearProjectIDs) > 0 {
+		resourceID = strings.Join(settings.LinearProjectIDs, ",")
+	}
+
+	binding, err := resolveIntakeBinding(db, factory, source, req.GetIntegrationId(), resourceID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		binding = withLinearSeedLabels(binding, settings.LinearLabels)
 	}
 
 	canvasID, err := createIntakeCanvas(ctx, deps, intakeCanvasRequest{

@@ -231,7 +231,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		require.NoError(t, err)
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 10)
+		assert.Len(t, liveVersion.Nodes, 9)
 		var foundWait bool
 		for _, node := range liveVersion.Nodes {
 			if node.ID == prFeedbackWaitChecksNodeID {
