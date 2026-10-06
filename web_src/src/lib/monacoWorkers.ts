@@ -36,17 +36,18 @@ export function workerUrlForLabel(workers: MonacoWorkers, label: string): string
 export function setupMonacoEditor<Editor>(editor: Editor, loader: MonacoLoader<Editor>, workers: MonacoWorkers): void {
   loader.config({ monaco: editor });
 
+  const bootstrapUrls = new Map<string, string>();
   const host = globalThis as typeof globalThis & MonacoEnvironmentHost;
   const current = host.MonacoEnvironment;
   host.MonacoEnvironment = {
     ...current,
     getWorker(_workerId, label) {
-      return createMonacoWorker(workerUrlForLabel(workers, label));
+      return createMonacoWorker(workerUrlForLabel(workers, label), bootstrapUrls);
     },
   };
 }
 
-function createMonacoWorker(scriptUrl: string): Worker {
+function createMonacoWorker(scriptUrl: string, bootstrapUrls: Map<string, string>): Worker {
   if (import.meta.env.DEV) {
     return new Worker(scriptUrl, { type: "module" });
   }
@@ -55,19 +56,26 @@ function createMonacoWorker(scriptUrl: string): Worker {
     return new Worker(scriptUrl);
   }
 
-  return new Worker(bootstrapUrl(scriptUrl));
+  return new Worker(bootstrapUrl(scriptUrl, bootstrapUrls));
 }
 
 function sharesPageOrigin(scriptUrl: string): boolean {
   return new URL(scriptUrl, pageUrl()).origin === pageOrigin();
 }
 
-function bootstrapUrl(scriptUrl: string): string {
+function bootstrapUrl(scriptUrl: string, bootstrapUrls: Map<string, string>): string {
   const absoluteScriptUrl = new URL(scriptUrl, pageUrl()).href;
+  const cached = bootstrapUrls.get(absoluteScriptUrl);
+  if (cached) {
+    return cached;
+  }
+
   const bootstrap = new Blob([`importScripts(${JSON.stringify(absoluteScriptUrl)})`], {
     type: "text/javascript",
   });
-  return URL.createObjectURL(bootstrap);
+  const objectUrl = URL.createObjectURL(bootstrap);
+  bootstrapUrls.set(absoluteScriptUrl, objectUrl);
+  return objectUrl;
 }
 
 function pageUrl(): string {

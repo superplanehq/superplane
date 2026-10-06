@@ -156,12 +156,41 @@ describe("setupMonacoEditor", () => {
     }
 
     const scriptUrls = labels.map((label) => workerUrlForLabel(workers, label));
-    expect(doubles.started.map((worker) => String(worker.scriptUrl))).toEqual(doubles.objectUrls);
+    const uniqueScriptUrls = [...new Set(scriptUrls)];
+    expect(doubles.objectUrls).toHaveLength(uniqueScriptUrls.length);
+    expect(doubles.started.map((worker) => String(worker.scriptUrl))).toEqual(
+      scriptUrls.map((scriptUrl) => doubles.objectUrls[uniqueScriptUrls.indexOf(scriptUrl)]),
+    );
     expect(doubles.started.every((worker) => worker.options === undefined)).toBe(true);
-    for (const scriptUrl of scriptUrls) {
+    for (const scriptUrl of uniqueScriptUrls) {
       expect(doubles.started.map((worker) => String(worker.scriptUrl))).not.toContain(scriptUrl);
     }
-    expect(doubles.blobs.map(blobSource)).toEqual(scriptUrls.map(importScriptsSource));
+    expect(doubles.blobs.map(blobSource)).toEqual(uniqueScriptUrls.map(importScriptsSource));
+    expect(doubles.revoked).toEqual([]);
+  });
+
+  it("reuses one bootstrap URL when the same worker restarts", () => {
+    setDevelopmentMode(false);
+    window.history.replaceState(null, "", PAGE_URL);
+    const doubles = installWorkerDoubles();
+    restoreDoubles = doubles.restore;
+
+    setupMonacoEditor(editor, loaderConfig(), workers);
+    const { getWorker } = monacoEnvironment();
+    getWorker("workerMain.js", "json");
+    getWorker("workerMain.js", "json");
+    getWorker("workerMain.js", "javascript");
+
+    expect(doubles.objectUrls).toEqual(["blob:monaco-worker-0", "blob:monaco-worker-1"]);
+    expect(doubles.started.map((worker) => String(worker.scriptUrl))).toEqual([
+      "blob:monaco-worker-0",
+      "blob:monaco-worker-0",
+      "blob:monaco-worker-1",
+    ]);
+    expect(doubles.blobs.map(blobSource)).toEqual([
+      importScriptsSource(workers.json),
+      importScriptsSource(workers.typescript),
+    ]);
     expect(doubles.revoked).toEqual([]);
   });
 
