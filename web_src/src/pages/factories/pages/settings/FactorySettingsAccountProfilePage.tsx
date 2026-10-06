@@ -31,6 +31,35 @@ function linkedProviderAccounts(linkedAccounts: AccountLinkedAccount[] | undefin
     .map((account) => ({ providerId: account.provider_id, username: account.username.trim() }));
 }
 
+function connectProviderEnabled(data: unknown, provider: string) {
+  if (!data || typeof data !== "object") {
+    return false;
+  }
+  const providers = (data as { connectProviders?: unknown }).connectProviders;
+  return Array.isArray(providers) && providers.includes(provider);
+}
+
+function useBitbucketLinkEnabled() {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/auth/config")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: unknown) => {
+        if (!cancelled) {
+          setEnabled(connectProviderEnabled(data, "bitbucket"));
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return enabled;
+}
+
 export function FactorySettingsAccountProfilePage() {
   const { account, refreshAccount } = useAccount();
   const organizationId = useOrganizationId();
@@ -39,6 +68,7 @@ export function FactorySettingsAccountProfilePage() {
   const [passwordOpen, setPasswordOpen] = useState(false);
   const location = useAccountSettingsAuthResults(refreshAccount);
   const tokensPanel = usePersonalTokensPanel(organizationId);
+  const bitbucketLinkEnabled = useBitbucketLinkEnabled();
 
   useEffect(() => {
     if (account?.name) {
@@ -121,6 +151,7 @@ export function FactorySettingsAccountProfilePage() {
               "Bitbucket link removed.",
               "Failed to remove the Bitbucket link.",
             )}
+            bitbucketLinkEnabled={bitbucketLinkEnabled}
           />
         }
         security={

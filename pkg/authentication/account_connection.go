@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -55,6 +56,18 @@ func isConnectOnlyProvider(provider string) bool {
 	return slices.ContainsFunc(connectOnlyProviders, func(candidate string) bool {
 		return strings.EqualFold(candidate, provider)
 	})
+}
+
+func configuredConnectProviders() []string {
+	names := make([]string, 0)
+	for _, name := range connectOnlyProviders {
+		if _, err := goth.GetProvider(name); err != nil {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func rejectsConnectOnlySignIn(r *http.Request) bool {

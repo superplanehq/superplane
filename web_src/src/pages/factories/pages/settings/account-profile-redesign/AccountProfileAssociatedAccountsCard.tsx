@@ -27,6 +27,7 @@ type AssociatedProvider = {
   linkedDescription: (username: string) => string;
   linkLabel: string;
   linkAnotherLabel: string;
+  linkEnabled: boolean;
   removeDescription: string;
   onLink: () => void;
   onRemove: (providerId: string) => void;
@@ -39,6 +40,7 @@ export function AccountProfileAssociatedAccountsCard({
   onLinkBitbucket,
   onRemoveGithub,
   onRemoveBitbucket,
+  bitbucketLinkEnabled = true,
 }: {
   githubAccounts: LinkedIdentity[];
   bitbucketAccounts: LinkedIdentity[];
@@ -46,6 +48,7 @@ export function AccountProfileAssociatedAccountsCard({
   onLinkBitbucket: () => void;
   onRemoveGithub: (providerId: string) => void;
   onRemoveBitbucket: (providerId: string) => void;
+  bitbucketLinkEnabled?: boolean;
 }) {
   const [accountToRemove, setAccountToRemove] = useState<AccountToRemove | null>(null);
   const providers = associatedProviders({
@@ -55,6 +58,7 @@ export function AccountProfileAssociatedAccountsCard({
     onLinkBitbucket,
     onRemoveGithub,
     onRemoveBitbucket,
+    bitbucketLinkEnabled,
   });
 
   return (
@@ -95,6 +99,7 @@ function associatedProviders({
   onLinkBitbucket,
   onRemoveGithub,
   onRemoveBitbucket,
+  bitbucketLinkEnabled,
 }: {
   githubAccounts: LinkedIdentity[];
   bitbucketAccounts: LinkedIdentity[];
@@ -102,8 +107,9 @@ function associatedProviders({
   onLinkBitbucket: () => void;
   onRemoveGithub: (providerId: string) => void;
   onRemoveBitbucket: (providerId: string) => void;
+  bitbucketLinkEnabled: boolean;
 }): AssociatedProvider[] {
-  return [
+  const providers: AssociatedProvider[] = [
     {
       key: "github",
       title: "GitHub",
@@ -115,6 +121,7 @@ function associatedProviders({
         `Linked as ${username}. Velocity uses this GitHub account to credit your pull requests.`,
       linkLabel: "Link GitHub",
       linkAnotherLabel: "Link another GitHub account",
+      linkEnabled: true,
       removeDescription:
         "Velocity reports will no longer credit pull requests from this GitHub account. Your sign-in methods do not change.",
       onLink: onLinkGithub,
@@ -130,11 +137,13 @@ function associatedProviders({
       linkedDescription: (username) => `Linked as ${username}. This link does not change how you sign in.`,
       linkLabel: "Link Bitbucket",
       linkAnotherLabel: "Link another Bitbucket account",
+      linkEnabled: bitbucketLinkEnabled,
       removeDescription: "SuperPlane removes this Bitbucket link. Your sign-in methods do not change.",
       onLink: onLinkBitbucket,
       onRemove: onRemoveBitbucket,
     },
   ];
+  return providers.filter((provider) => provider.linkEnabled || provider.accounts.length > 0);
 }
 
 function AssociatedProviderList({
@@ -175,7 +184,7 @@ function AssociatedProviderList({
                 />
               </li>
             ))}
-            {provider.accounts.length === 0 ? (
+            {provider.accounts.length === 0 && provider.linkEnabled ? (
               <li>
                 <SettingsActionRow
                   title={<ProviderTitle icon={provider.icon} title={provider.title} />}
@@ -190,7 +199,7 @@ function AssociatedProviderList({
               </li>
             ) : null}
           </ul>
-          {provider.accounts.length > 0 ? (
+          {provider.accounts.length > 0 && provider.linkEnabled ? (
             <Button type="button" size="sm" variant="outline" className="mt-4" onClick={provider.onLink}>
               {provider.linkAnotherLabel}
             </Button>

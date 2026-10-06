@@ -229,6 +229,42 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(onRemoveBitbucket).toHaveBeenCalledWith("bb-2");
   });
 
+  it("hides Link Bitbucket when the provider is not configured", () => {
+    render(
+      <AccountProfileAssociatedAccountsCard
+        githubAccounts={[]}
+        bitbucketAccounts={[]}
+        bitbucketLinkEnabled={false}
+        onLinkGithub={vi.fn()}
+        onLinkBitbucket={vi.fn()}
+        onRemoveGithub={vi.fn()}
+        onRemoveBitbucket={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Link Bitbucket" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("account-redesign-associated-bitbucket")).not.toBeInTheDocument();
+  });
+
+  it("keeps a linked Bitbucket account removable when linking is not configured", () => {
+    render(
+      <AccountProfileAssociatedAccountsCard
+        githubAccounts={[]}
+        bitbucketAccounts={[{ providerId: "bb-1", username: "ada" }]}
+        bitbucketLinkEnabled={false}
+        onLinkGithub={vi.fn()}
+        onLinkBitbucket={vi.fn()}
+        onRemoveGithub={vi.fn()}
+        onRemoveBitbucket={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("account-redesign-associated-bitbucket")).toHaveTextContent("Linked as ada.");
+    expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Link another Bitbucket account" })).not.toBeInTheDocument();
+  });
+
   it("turns task emails off and hides events", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();

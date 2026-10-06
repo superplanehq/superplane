@@ -487,12 +487,14 @@ func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 
 	response := struct {
 		Providers                   []string `json:"providers"`
+		ConnectProviders            []string `json:"connectProviders"`
 		PasswordLoginEnabled        bool     `json:"passwordLoginEnabled"`
 		SignupEnabled               bool     `json:"signupEnabled"`
 		SignupsBlockedByEnvironment bool     `json:"signupsBlockedByEnvironment"`
 		MagicCodeEnabled            bool     `json:"magicCodeEnabled"`
 	}{
 		Providers:                   providerNames,
+		ConnectProviders:            configuredConnectProviders(),
 		PasswordLoginEnabled:        a.passwordLoginEnabled,
 		SignupEnabled:               a.SignupsEnabled(),
 		SignupsBlockedByEnvironment: a.SignupsBlockedByEnvironment(),

@@ -57,11 +57,42 @@ func TestHandler_handleAuthConfig_OmitsBitbucket(t *testing.T) {
 	require.Equal(t, http.StatusOK, recorder.Code)
 
 	var response struct {
-		Providers []string `json:"providers"`
+		Providers        []string `json:"providers"`
+		ConnectProviders []string `json:"connectProviders"`
 	}
 	require.NoError(t, json.NewDecoder(recorder.Body).Decode(&response))
 	assert.Contains(t, response.Providers, models.ProviderGitHub)
 	assert.NotContains(t, response.Providers, models.ProviderBitbucket)
+	assert.Equal(t, []string{models.ProviderBitbucket}, response.ConnectProviders)
+}
+
+func TestHandler_handleAuthConfig_OmitsUnconfiguredBitbucketLink(t *testing.T) {
+	t.Cleanup(goth.ClearProviders)
+	goth.ClearProviders()
+
+	handler := &Handler{}
+	handler.InitializeProviders(map[string]ProviderConfig{
+		models.ProviderGitHub: {
+			Key:         "github-id",
+			Secret:      "github-secret",
+			CallbackURL: "https://app.example/auth/github/callback",
+		},
+		models.ProviderBitbucket: {
+			CallbackURL: "https://app.example/auth/bitbucket/callback",
+		},
+	})
+
+	recorder := httptest.NewRecorder()
+	handler.handleAuthConfig(recorder, httptest.NewRequest(http.MethodGet, "/auth/config", nil))
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	var response struct {
+		Providers        []string `json:"providers"`
+		ConnectProviders []string `json:"connectProviders"`
+	}
+	require.NoError(t, json.NewDecoder(recorder.Body).Decode(&response))
+	assert.NotContains(t, response.Providers, models.ProviderBitbucket)
+	assert.Empty(t, response.ConnectProviders)
 }
 
 func TestHandler_handleAuth_RejectsBitbucketSignIn(t *testing.T) {
