@@ -52,6 +52,7 @@ import {
   DRAFT_WORK_ORDER,
   factoryWithPlanning,
   GITHUB_ISSUES_INTAKE,
+  GITHUB_ISSUES_INTAKE_APP,
   GITHUB_ISSUES_INTAKE_ID,
   OPEN_WORK_ORDER,
   PRIMARY_FACTORY_ID,
@@ -660,9 +661,8 @@ describe("LinesPage board", () => {
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
     expect(screen.getByTestId("lines-test-location")).toHaveTextContent(`intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`);
     expect(screen.getByTestId("lines-test-location")).not.toHaveTextContent("settings=automation");
-    expect(screen.getByTestId("merge-confidence-config")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Automation" })).toHaveAttribute("data-state", "active");
-    expect(screen.queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("intake-source-settings")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
   });
 
   it("opens an existing phase automation in the board view popup", async () => {
@@ -1400,16 +1400,21 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByTestId(`line-intake-source-${PAGERDUTY_INTAKE_ID}`)).not.toBeInTheDocument();
   });
 
-  it("opens GitHub intake in the step configuration window", async () => {
+  it("opens intake settings from the row and links to the factory canvas editor", async () => {
     useFactoryIntakes.mockReturnValue({ data: [GITHUB_ISSUES_INTAKE] });
     const user = userEvent.setup();
     renderLinesBoard(undefined, vi.fn(), REFUND_FACTORY, LANE_BANNERS);
 
     await user.click(screen.getByRole("button", { name: `Open ${GITHUB_ISSUES_INTAKE.name} settings` }));
+    await user.click(screen.getByRole("tab", { name: "Automation" }));
 
-    expect(screen.getByTestId("merge-confidence-config")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Automation" })).toHaveAttribute("data-state", "active");
-    expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
+      "href",
+      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, GITHUB_ISSUES_INTAKE_APP.id!, {
+        from: "lines",
+        lineId: REFUND_LINE_PLAN_ID,
+      }),
+    );
   });
 
   it("opens the settings of the intake whose row was used", async () => {
@@ -1425,7 +1430,7 @@ describe("LinesPage board extras", () => {
     await user.click(screen.getByRole("button", { name: "Open Triage issues settings" }));
 
     expect(
-      within(screen.getByTestId("merge-confidence-config")).getByRole("heading", { name: "Triage issues" }),
+      within(screen.getByTestId("intake-source-settings")).getByRole("heading", { name: "Intake Triage issues" }),
     ).toBeInTheDocument();
   });
 

@@ -135,15 +135,16 @@ export function PlanningReviewStepList({
 
 function AddStepLink({ onAdd }: { onAdd: () => void }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       onClick={onAdd}
       data-testid="planning-review-add-step"
-      className="inline-flex w-fit items-center gap-1.5 py-1 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+      className="h-auto w-fit justify-start gap-1.5 px-0 py-1 text-[13px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
     >
       <Plus className="size-3.5" aria-hidden />
       Add step
-    </button>
+    </Button>
   );
 }
 

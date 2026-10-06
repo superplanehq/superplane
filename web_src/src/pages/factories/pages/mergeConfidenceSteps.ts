@@ -19,11 +19,19 @@ const CHECK_SECTIONS: ReadonlyArray<{ id: MergeConfidenceCheck; label: string; m
   },
 ];
 
-const NEW_CHECK_PROMPT = [
-  "Describe what this check looks for.",
-  "Score from 1 to 5. A higher score means a worse result.",
-  "Write the summary as one sentence.",
-].join("\n");
+function newCheckPrompt(id: string): string {
+  return [
+    "Describe what this check looks for.",
+    "The repository is checked out at the pull request head.",
+    "The pull request diff is in /tmp/pr.diff.",
+    "Report this check with the report_merge_check tool.",
+    "Call the tool once.",
+    `check is ${id}.`,
+    "score is an integer from 1 to 5. A higher score means a worse result.",
+    "summary is one sentence.",
+    "Do not write a file.",
+  ].join("\n");
+}
 
 /** A merge confidence agent stores one prompt step per check. */
 export function isMergeConfidenceSteps(steps: readonly PlanningReviewStep[]): boolean {
@@ -46,11 +54,12 @@ export function expandMergeConfidenceSteps(steps: readonly PlanningReviewStep[])
 
 /** The next custom check. The id stays on the step when the name changes. */
 export function newMergeConfidenceStep(steps: readonly PlanningReviewStep[]): PlanningReviewStep {
+  const id = nextCheckId(steps);
   return {
     name: "New check",
     type: "prompt",
     workingDirectory: "repo",
-    prompt: `Merge check: ${nextCheckId(steps)}.\n${NEW_CHECK_PROMPT}\n`,
+    prompt: `Merge check: ${id}.\n${newCheckPrompt(id)}\n`,
   };
 }
 

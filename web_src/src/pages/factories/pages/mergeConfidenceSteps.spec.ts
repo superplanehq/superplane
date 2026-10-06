@@ -75,6 +75,8 @@ describe("newMergeConfidenceStep", () => {
     expect(first.name).toBe("New check");
     expect(first.type).toBe("prompt");
     expect(mergeCheckPromptBody(first.prompt)).toContain("Describe what this check looks for.");
+    expect(mergeCheckPromptBody(first.prompt)).toContain("report_merge_check");
+    expect(mergeCheckPromptBody(first.prompt)).toContain("check is new-check.");
     expect(mergeCheckPromptBody(first.prompt)).not.toContain("Merge check:");
     expect(second.prompt?.startsWith("Merge check: new-check-2.\n")).toBe(true);
 
