@@ -521,7 +521,7 @@ describe("FactorySettingsMCPPage", () => {
     expect(await screen.findByTestId("superplane-mcp-clients-empty")).toBeInTheDocument();
   }, 10000);
 
-  it("truncates a long MCP client name and keeps Revoke in the row", async () => {
+  it("shows the full MCP client name on hover and in the revoke dialog", async () => {
     const longClientId = "mcp-client-codex";
     const longClientName = "https://chatgpt.com/oauth/codex/workspace-example/client.json";
     renderSuperplaneMcpServer([
@@ -530,16 +530,13 @@ describe("FactorySettingsMCPPage", () => {
     ]);
 
     const longRow = await screen.findByTestId(`superplane-mcp-client-${longClientId}`, {}, { timeout: 8000 });
-    const longName = within(longRow).getByTitle(longClientName);
+    const longName = within(longRow).getByTestId(`superplane-mcp-client-name-${longClientId}`);
     expect(screen.getByTestId("superplane-mcp-client-mcp-client-cursor")).toHaveTextContent("Cursor");
-    expect(
-      within(screen.getByTestId("superplane-mcp-client-mcp-client-cursor")).getByRole("button", { name: "Revoke" }),
-    ).toBeInTheDocument();
-    expect(longName).toHaveClass("truncate");
+    expect(longName).toHaveAttribute("title", longClientName);
     expect(longName).toHaveTextContent(longClientName);
-    expect(within(longRow).getByTestId(`superplane-mcp-client-revoke-${longClientId}`)).toBeInTheDocument();
+    expect(within(longRow).getByRole("button", { name: "Revoke" })).toBeEnabled();
 
-    await userEvent.setup().click(within(longRow).getByTestId(`superplane-mcp-client-revoke-${longClientId}`));
+    await userEvent.setup().click(within(longRow).getByRole("button", { name: "Revoke" }));
     expect(screen.getByText(`Revoke "${longClientName}"?`)).toBeInTheDocument();
   }, 10000);
 });
