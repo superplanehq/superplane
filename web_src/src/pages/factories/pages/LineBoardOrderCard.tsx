@@ -8,8 +8,10 @@ import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
   boardCardLoadsConfidenceChecks,
   clarityScoreFromChecks,
+  confidenceCheckLevel,
   confidenceScoreFromChecks,
 } from "../lib/confidenceScore";
+import { planningReviewFromChecks } from "../lib/planningReviewScore";
 import { LOADING_REVEAL_CLASSNAME } from "../lib/loadingReveal";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -145,10 +147,30 @@ function cardScores(
   visibility: { showClarity: boolean; showConfidence: boolean },
 ): Pick<
   ComponentProps<typeof WorkOrderCard>,
-  "clarityScore" | "confidenceScore" | "isAnalyzing" | "showClarity" | "showConfidenceScore"
+  "clarityScore" | "confidenceScore" | "isAnalyzing" | "showClarity" | "showConfidenceScore" | "reviewMetrics"
 > {
   if (!showConfidence) {
     return { isAnalyzing: false, showClarity: false, showConfidenceScore: false };
+  }
+  const review = planningReviewFromChecks(
+    checks?.map((check) => ({
+      id: check.key || check.name || "check",
+      key: check.key,
+      name: check.name ?? "",
+      score: check.score ?? 0,
+      maxScore: check.maxScore ?? 5,
+      level: confidenceCheckLevel(check.score ?? 0),
+    })),
+  );
+  if (review) {
+    return {
+      clarityScore: undefined,
+      confidenceScore: review.headline.score,
+      showClarity: false,
+      showConfidenceScore: visibility.showConfidence,
+      reviewMetrics: review.metrics,
+      isAnalyzing: draftCardAgentIsWorking(session, backlogAnalyzing, review.headline.score),
+    };
   }
   const clarityScore = visibility.showClarity ? clarityScoreFromChecks(checks) : undefined;
   const confidenceScore = visibility.showConfidence ? confidenceScoreFromChecks(checks) : undefined;

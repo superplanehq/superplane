@@ -25,6 +25,9 @@ var analysisProtocolScript string
 //go:embed analysis_protocol.md
 var analysisProtocolMarkdown string
 
+//go:embed analysis_protocol_review.md
+var analysisProtocolReviewMarkdown string
+
 //go:embed analysis_user_prompt.md
 var analysisUserPromptMarkdown string
 
@@ -81,6 +84,10 @@ func PlanningSessionProtocolMarkdownFile() BrokerTaskFile {
 	return BrokerTaskFile{Path: "analysis_protocol.md", Content: analysisProtocolMarkdown, Mode: "0644"}
 }
 
+func PlanningSessionReviewProtocolMarkdownFile() BrokerTaskFile {
+	return BrokerTaskFile{Path: "analysis_protocol_review.md", Content: analysisProtocolReviewMarkdown, Mode: "0644"}
+}
+
 // PlanningSessionMCPFiles returns the MCP server, attachment limit, static
 // config, and analysis protocol task files. Only attach these when
 // HasPlanningSessionToken is true.
@@ -91,6 +98,7 @@ func PlanningSessionMCPFiles() []BrokerTaskFile {
 		PlanningSessionMCPConfigFile(),
 		PlanningSessionProtocolFile(),
 		PlanningSessionProtocolMarkdownFile(),
+		PlanningSessionReviewProtocolMarkdownFile(),
 	}
 }
 

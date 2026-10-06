@@ -4,7 +4,12 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { isCompactStatusText, planningClarityEnabled, planningConfidenceEnabled } = require("./analysis_protocol");
+const {
+  isCompactStatusText,
+  planningClarityEnabled,
+  planningConfidenceEnabled,
+  planningReviewEnabled,
+} = require("./analysis_protocol");
 const { MAX_ATTACHMENT_BYTES } = require("./attachment_limit");
 
 const MAX_INSPECTABLE_ATTACHMENT_BYTES = MAX_ATTACHMENT_BYTES;
@@ -108,6 +113,48 @@ function writeAnalysisOutputs({ spec, score, summary }, env = process.env) {
   } catch (_err) {
     // Publish already succeeded. The exit graph reads these files when it can.
   }
+}
+
+function scoreField(input, name) {
+  const raw = input && input[name];
+  if (!raw || typeof raw !== "object") {
+    throw new Error(`${name} is required`);
+  }
+  const score = Number(raw.score);
+  if (!Number.isFinite(score)) {
+    throw new Error(`${name} score is required`);
+  }
+  const summary = String(raw.summary || "").trim();
+  if (!summary) {
+    throw new Error(`${name} summary is required`);
+  }
+  return { score, summary };
+}
+
+async function proposeUpdate(input) {
+  const body = {};
+  if (input && input.scores) {
+    body.scores = {
+      clarity: scoreField(input.scores, "clarity"),
+      complexity: scoreField(input.scores, "complexity"),
+      risk: scoreField(input.scores, "risk"),
+    };
+  }
+  const spec = String((input && input.spec) || "").trim();
+  if (spec) {
+    body.spec = spec;
+  }
+  if (input && input.survey) {
+    body.survey = { questions: surveyQuestions(input.survey) };
+  }
+  if (!body.scores && !body.spec && !body.survey) {
+    throw new Error("scores, spec, or survey is required");
+  }
+  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/updates", body);
+  if (body.spec) {
+    writeAnalysisOutputs({ spec: body.spec });
+  }
+  return result;
 }
 
 async function proposeSpec(input) {
@@ -294,6 +341,64 @@ async function recordAgentMessage(text) {
   );
 }
 
+const UPDATE_TOOL = {
+  name: "propose_update",
+  description:
+    "Publish scores, the specification, and an optional survey in one call. Pass scores as clarity, complexity, and risk. Each score is an integer from 1 through 5 with a one-sentence summary. Pass spec as the full markdown body. Pass survey only when you ask a question. The first plan turn must include scores.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      scores: {
+        type: "object",
+        properties: {
+          clarity: {
+            type: "object",
+            properties: {
+              score: { type: "number", description: "Integer from 1 through 5." },
+              summary: { type: "string", description: "One sentence." },
+            },
+            required: ["score", "summary"],
+          },
+          complexity: {
+            type: "object",
+            properties: {
+              score: { type: "number", description: "Integer from 1 through 5." },
+              summary: { type: "string", description: "One sentence." },
+            },
+            required: ["score", "summary"],
+          },
+          risk: {
+            type: "object",
+            properties: {
+              score: { type: "number", description: "Integer from 1 through 5." },
+              summary: { type: "string", description: "One sentence." },
+            },
+            required: ["score", "summary"],
+          },
+        },
+        required: ["clarity", "complexity", "risk"],
+      },
+      spec: { type: "string", description: "Full specification markdown." },
+      survey: {
+        type: "object",
+        properties: {
+          questions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                prompt: { type: "string" },
+                options: { type: "array", items: { type: "string" } },
+              },
+              required: ["prompt", "options"],
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
 const TOOLS = [
   {
     name: "propose_spec",
@@ -434,7 +539,16 @@ async function handleRequest(message) {
     const args = (params && params.arguments) || {};
     try {
       let result;
-      if (name === "propose_spec") {
+      if (name === "propose_update") {
+        if (!planningReviewEnabled()) {
+          sendError(id, -32601, "Unknown tool: propose_update");
+          return;
+        }
+        result = await proposeUpdate(args);
+      } else if (planningReviewEnabled() && name !== "inspect_attachment") {
+        sendError(id, -32601, `Unknown tool: ${name}`);
+        return;
+      } else if (name === "propose_spec") {
         result = await proposeSpec(args);
       } else if (name === "propose_clarity") {
         if (!planningClarityEnabled()) {
@@ -608,6 +722,9 @@ if (require.main === module) {
 }
 
 function planningTools(env = process.env) {
+  if (planningReviewEnabled(env)) {
+    return [UPDATE_TOOL, TOOLS.find((tool) => tool.name === "inspect_attachment")];
+  }
   return TOOLS.filter((tool) => {
     if (tool.name === "propose_clarity") {
       return planningClarityEnabled(env);
@@ -620,6 +737,7 @@ function planningTools(env = process.env) {
 }
 
 module.exports = {
+  proposeUpdate,
   proposeSpec,
   proposeClarity,
   proposeConfidence,

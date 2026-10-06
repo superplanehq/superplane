@@ -16,10 +16,12 @@ export function PlanningSettingsFields({
   draft,
   lines,
   onUpdate,
+  planningReviewEnabled = false,
 }: {
   draft: PlanningDraftSettings;
   lines: PlanningAutoStartLine[];
   onUpdate: PlanningUpdate;
+  planningReviewEnabled?: boolean;
 }) {
   return (
     <>
@@ -30,13 +32,21 @@ export function PlanningSettingsFields({
         onCheckedChange={(enabled) => onUpdate("enabled", enabled)}
         testId="planning-settings-enabled"
       />
-      <PlanningChecksSection draft={draft} onUpdate={onUpdate} />
+      <PlanningChecksSection draft={draft} onUpdate={onUpdate} planningReviewEnabled={planningReviewEnabled} />
       <AutoStartSection draft={draft} lines={lines} onUpdate={onUpdate} />
     </>
   );
 }
 
-function PlanningChecksSection({ draft, onUpdate }: { draft: PlanningDraftSettings; onUpdate: PlanningUpdate }) {
+function PlanningChecksSection({
+  draft,
+  onUpdate,
+  planningReviewEnabled,
+}: {
+  draft: PlanningDraftSettings;
+  onUpdate: PlanningUpdate;
+  planningReviewEnabled: boolean;
+}) {
   const disabled = !draft.enabled;
   return (
     <section className="space-y-3" data-testid="planning-settings-checks" aria-disabled={disabled}>
@@ -54,20 +64,26 @@ function PlanningChecksSection({ draft, onUpdate }: { draft: PlanningDraftSettin
       >
         <PlanningToggleRow
           title={PLANNING_SETTINGS_COPY.confidenceLabel}
-          description={PLANNING_SETTINGS_COPY.confidenceHelper}
+          description={
+            planningReviewEnabled
+              ? PLANNING_SETTINGS_COPY.confidenceReviewHelper
+              : PLANNING_SETTINGS_COPY.confidenceHelper
+          }
           checked={draft.confidence}
           disabled={disabled}
           onCheckedChange={(confidence) => onUpdate("confidence", confidence)}
           testId="planning-settings-confidence"
         />
-        <PlanningToggleRow
-          title={PLANNING_SETTINGS_COPY.clarityLabel}
-          description={PLANNING_SETTINGS_COPY.clarityHelper}
-          checked={draft.clarity}
-          disabled={disabled}
-          onCheckedChange={(clarity) => onUpdate("clarity", clarity)}
-          testId="planning-settings-clarity"
-        />
+        {planningReviewEnabled ? null : (
+          <PlanningToggleRow
+            title={PLANNING_SETTINGS_COPY.clarityLabel}
+            description={PLANNING_SETTINGS_COPY.clarityHelper}
+            checked={draft.clarity}
+            disabled={disabled}
+            onCheckedChange={(clarity) => onUpdate("clarity", clarity)}
+            testId="planning-settings-clarity"
+          />
+        )}
       </div>
     </section>
   );

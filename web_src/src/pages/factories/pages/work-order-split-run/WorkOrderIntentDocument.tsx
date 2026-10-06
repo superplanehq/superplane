@@ -16,7 +16,8 @@ import { useRefineDocumentModel } from "./useRefineDocumentModel";
 import { WorkOrderIntentConfidenceFooter } from "./WorkOrderIntentConfidenceFooter";
 import { IntentDocumentSkeleton } from "./IntentDocumentSkeleton";
 import { WorkOrderIntentPlan } from "./WorkOrderIntentPlan";
-import { WorkOrderIntentRequest, type IntentAnalysisChat } from "./WorkOrderIntentRequest";
+import type { IntentAnalysisChat } from "./intentAnalysisChat";
+import { WorkOrderIntentRequest } from "./WorkOrderIntentRequest";
 import type { SplitRunSource } from "./splitRunSource";
 
 const REQUEST_PANE_BASE_CLASS = "flex min-h-0 min-w-0 w-full flex-1 flex-col";
@@ -24,7 +25,7 @@ const REQUEST_PANE_SPLIT_CLASS =
   "flex min-h-0 min-w-0 w-full flex-1 flex-col border-b border-border lg:w-[var(--intent-left)] lg:min-w-[14rem] lg:flex-none lg:border-r lg:border-b-0";
 const REFINE_SPLIT_EASE = "lg:duration-300 lg:ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:lg:transition-none";
 
-export type { IntentAnalysisChat } from "./WorkOrderIntentRequest";
+export type { IntentAnalysisChat } from "./intentAnalysisChat";
 
 /**
  * Description-tab reading pane. Refine chat starts as one column. A
@@ -38,6 +39,7 @@ type WorkOrderIntentDocumentProps = {
   artifacts: FactoriesWorkOrderArtifact[];
   clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
+  reviewMetrics?: WorkOrderCheckPresentation[];
   isAnalyzing?: boolean;
   files?: FilesFile[];
   resultAfterBody?: ReactNode;
@@ -56,6 +58,7 @@ export function WorkOrderIntentDocument({
   artifacts,
   clarity,
   confidence,
+  reviewMetrics,
   isAnalyzing = false,
   files,
   resultAfterBody,
@@ -84,6 +87,7 @@ export function WorkOrderIntentDocument({
     artifacts,
     clarity,
     confidence,
+    reviewMetrics,
     isAnalyzing,
     resultFooter,
     analysis,

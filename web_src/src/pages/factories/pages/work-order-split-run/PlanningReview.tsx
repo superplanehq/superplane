@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
 import { ReadinessDot } from "../../workOrders/ReadinessMark";
+import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { ScoreEvidenceRow, type ScoreEvidenceValue } from "../../workOrders/ScoreEvidence";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { PlanChipStatus } from "./planChipStatus";
@@ -26,6 +27,7 @@ export function PlanningReview({
   title,
   clarity,
   confidence,
+  reviewMetrics,
   showClarity = true,
   showConfidence = true,
   isAnalyzing = false,
@@ -38,6 +40,7 @@ export function PlanningReview({
   title?: string;
   clarity?: ComposerScore;
   confidence?: ComposerScore;
+  reviewMetrics?: WorkOrderCheckPresentation[];
   showClarity?: boolean;
   showConfidence?: boolean;
   isAnalyzing?: boolean;
@@ -82,6 +85,19 @@ export function PlanningReview({
           ) : null}
         </div>
       </FramePanel>
+      {reviewMetrics && reviewMetrics.length > 0 ? (
+        <ul className="border-t border-border px-3.5 py-2" data-testid="split-run-intent-review-metrics">
+          {reviewMetrics.map((metric) => (
+            <li key={metric.key ?? metric.id} className="flex items-start justify-between gap-3 py-1 text-[12px]">
+              <span className="min-w-0">
+                <span className="font-medium text-foreground">{metric.name}</span>
+                {metric.summary ? <span className="mt-0.5 block text-muted-foreground">{metric.summary}</span> : null}
+              </span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">{metric.score}/5</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </Frame>
   );
 }

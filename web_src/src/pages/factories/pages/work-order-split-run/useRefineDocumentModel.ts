@@ -9,7 +9,7 @@ import { latestPlanScore } from "./latestPlanScore";
 import { usePlanChipStatus } from "./planChipStatus";
 import { useRefineLayoutPreference } from "./refineLayoutPreference";
 import { splitRunIntentDocument } from "./splitRunPopupModel";
-import type { IntentAnalysisChat } from "./WorkOrderIntentRequest";
+import type { IntentAnalysisChat } from "./intentAnalysisChat";
 import {
   DEFAULT_INTENT_LEFT_PERCENT,
   DEFAULT_REFINE_INTENT_LEFT_PERCENT,
@@ -51,6 +51,7 @@ export function useRefineDocumentModel({
   artifacts,
   clarity,
   confidence,
+  reviewMetrics,
   isAnalyzing,
   resultFooter,
   analysis,
@@ -62,6 +63,7 @@ export function useRefineDocumentModel({
   artifacts: FactoriesWorkOrderArtifact[];
   clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
+  reviewMetrics?: WorkOrderCheckPresentation[];
   isAnalyzing: boolean;
   resultFooter?: ReactNode;
   analysis?: IntentAnalysisChat;
@@ -99,6 +101,7 @@ export function useRefineDocumentModel({
       planStatus,
       clarity: refineClarity(analysis, clarity),
       confidence: refineConfidence(confidence),
+      reviewMetrics,
       isAnalyzing,
       onOpenPlan: () => setPlanOpenedHere(true),
     }),
@@ -114,6 +117,7 @@ function bindRefineChat({
   planStatus,
   clarity,
   confidence,
+  reviewMetrics,
   isAnalyzing,
   onOpenPlan,
 }: {
@@ -125,6 +129,7 @@ function bindRefineChat({
   planStatus: ReturnType<typeof usePlanChipStatus>;
   clarity: ComposerScore;
   confidence: ComposerScore;
+  reviewMetrics?: WorkOrderCheckPresentation[];
   isAnalyzing: boolean;
   onOpenPlan: () => void;
 }): IntentAnalysisChat | undefined {
@@ -142,6 +147,8 @@ function bindRefineChat({
     planTitle,
     clarity,
     confidence,
+    reviewMetrics,
+    showClarity: reviewMetrics && reviewMetrics.length > 0 ? false : analysis.showClarity,
     planStatus,
     isAnalyzing,
   };

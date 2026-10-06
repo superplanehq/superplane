@@ -11,6 +11,7 @@ export const PLANNING_SETTINGS_COPY = {
   checksOffHelper: "Turn Planning on to use these checks.",
   confidenceLabel: "Confidence estimate",
   confidenceHelper: "The agent checks if one run can finish the task and offers to split work that is too big.",
+  confidenceReviewHelper: "The agent scores Clarity, Complexity, and Risk. Confidence is the weakest of those scores.",
   clarityLabel: "Clarity check",
   clarityHelper: "The agent grades how clear the request is and keeps asking until the gaps are closed.",
   autoStartLabel: "Auto-start",

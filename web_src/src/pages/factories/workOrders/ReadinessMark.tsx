@@ -66,6 +66,7 @@ export function CardScoreBadges({
   confidence,
   showClarity = true,
   showConfidence = true,
+  reviewMetrics,
   className,
   testId,
 }: {
@@ -73,15 +74,21 @@ export function CardScoreBadges({
   confidence?: number;
   showClarity?: boolean;
   showConfidence?: boolean;
+  reviewMetrics?: { key: string; name: string; score: number }[];
   className?: string;
   testId?: string;
 }) {
+  const hasReview = Boolean(reviewMetrics && reviewMetrics.length > 0);
   const readiness = draftReadiness({
-    clarity: showClarity ? clarity : undefined,
+    clarity: hasReview || !showClarity ? undefined : clarity,
     confidence: showConfidence ? confidence : undefined,
   });
-  const rows = scoreRows(clarity, confidence, { showClarity, showConfidence });
-  const speech = [readiness.headline, ...rows.map(scoreSpeech)].join(". ");
+  const rows = scoreRows(clarity, confidence, {
+    showClarity: hasReview ? false : showClarity,
+    showConfidence,
+  });
+  const metricSpeech = (reviewMetrics ?? []).map((metric) => `${metric.name} ${scoreText(metric.score)}`);
+  const speech = [readiness.headline, ...(metricSpeech.length > 0 ? metricSpeech : rows.map(scoreSpeech))].join(". ");
 
   return (
     <Tooltip>
@@ -112,6 +119,16 @@ export function CardScoreBadges({
         <span className="block font-medium" data-testid={testId ? `${testId}-verdict` : undefined}>
           {readiness.headline}
         </span>
+        {reviewMetrics && reviewMetrics.length > 0 ? (
+          <span className="mt-1 grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5">
+            {reviewMetrics.map((metric) => (
+              <Fragment key={metric.key}>
+                <span>{metric.name}</span>
+                <span className="tabular-nums">{scoreText(metric.score)}</span>
+              </Fragment>
+            ))}
+          </span>
+        ) : null}
       </TooltipContent>
     </Tooltip>
   );

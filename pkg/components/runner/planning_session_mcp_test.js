@@ -9,6 +9,7 @@ const assert = require("node:assert/strict");
 
 const { analysisProtocol, withoutEmbeddedAnalysisProtocol, withAnalysisContinuation, isCompactStatusText } = require("./analysis_protocol");
 const {
+  proposeUpdate,
   proposeSpec,
   proposeClarity,
   proposeConfidence,
@@ -65,6 +66,24 @@ test("analysis protocol omits a disabled score tool", () => {
   assert.doesNotMatch(neither, /question turn/);
   assert.doesNotMatch(neither, /Clarity summary/);
   assert.doesNotMatch(neither, / {2,}/);
+});
+
+test("planningTools uses propose_update when review is on", () => {
+  const { planningTools } = require("./planning_session_mcp");
+  assert.deepEqual(
+    planningTools({ SUPERPLANE_PLANNING_REVIEW: "true" }).map((tool) => tool.name),
+    ["propose_update", "inspect_attachment"],
+  );
+});
+
+test("analysis protocol uses the review wiring when the flag is on", () => {
+  const review = analysisProtocol({ SUPERPLANE_PLANNING_REVIEW: "true" });
+  assert.match(review, /propose_update/);
+  assert.doesNotMatch(review, /Call propose_clarity/);
+  assert.doesNotMatch(review, /Call propose_confidence/);
+  assert.match(review, /Do not call propose_spec, propose_clarity, propose_confidence, or survey/);
+  assert.match(review, /weakest sub-parameter/);
+  assert.match(review, /name only the weakest/);
 });
 
 test("planningTools omits disabled score tools", () => {
@@ -274,6 +293,49 @@ test("writeAnalysisOutputs maps a 0-5 score to the exit-graph percentage", () =>
     summary: "The CRUD files already exist.",
     reasons: [],
   });
+});
+
+test("proposeUpdate publishes scores spec and survey on one route", async () => {
+  const previousBaseURL = process.env.SUPERPLANE_BASE_URL;
+  const previousToken = process.env.SUPERPLANE_RUN_TOKEN;
+  const previousFetch = global.fetch;
+  const calls = [];
+  process.env.SUPERPLANE_BASE_URL = "https://superplane.example";
+  process.env.SUPERPLANE_RUN_TOKEN = "runner-token";
+  global.fetch = async (url, options) => {
+    calls.push({ url, options });
+    return { ok: true, text: async () => '{"status":"shown"}' };
+  };
+
+  try {
+    const result = await proposeUpdate({
+      scores: {
+        clarity: { score: 4, summary: "Outcome is clear." },
+        complexity: { score: 3, summary: "One run can finish." },
+        risk: { score: 5, summary: "A revert is enough." },
+      },
+      spec: "# Retry refunds\n",
+      survey: { questions: [{ prompt: "Which service?", options: ["Payments", "Billing"] }] },
+    });
+    assert.deepEqual(result, { status: "shown" });
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].url, "https://superplane.example/api/v1/runner/planning-sessions/updates");
+    assert.deepEqual(JSON.parse(calls[0].options.body), {
+      scores: {
+        clarity: { score: 4, summary: "Outcome is clear." },
+        complexity: { score: 3, summary: "One run can finish." },
+        risk: { score: 5, summary: "A revert is enough." },
+      },
+      spec: "# Retry refunds",
+      survey: { questions: [{ prompt: "Which service?", options: ["Payments", "Billing"] }] },
+    });
+  } finally {
+    global.fetch = previousFetch;
+    if (previousBaseURL === undefined) delete process.env.SUPERPLANE_BASE_URL;
+    else process.env.SUPERPLANE_BASE_URL = previousBaseURL;
+    if (previousToken === undefined) delete process.env.SUPERPLANE_RUN_TOKEN;
+    else process.env.SUPERPLANE_RUN_TOKEN = previousToken;
+  }
 });
 
 test("proposeSpec, proposeClarity, and proposeConfidence publish on separate routes", async () => {

@@ -98,6 +98,32 @@ describe("CardScoreBadges", () => {
     expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence2/5");
   });
 
+  it("shows one Confidence badge when review metrics are present", async () => {
+    const user = userEvent.setup();
+    render(
+      <CardScoreBadges
+        clarity={5}
+        confidence={3}
+        reviewMetrics={[
+          { key: "clarity", name: "Clarity", score: 5 },
+          { key: "complexity", name: "Complexity", score: 3 },
+          { key: "risk", name: "Risk", score: 5 },
+        ]}
+        testId="badges"
+      />,
+    );
+
+    expect(screen.queryByTestId("badges-clarity")).not.toBeInTheDocument();
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence3/5");
+    expect(screen.getByTestId("badges")).toHaveAttribute("data-tone", "caution");
+
+    await user.hover(screen.getByTestId("badges"));
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("Clarity");
+    expect(tip).toHaveTextContent("Complexity");
+    expect(tip).toHaveTextContent("Risk");
+  });
+
   it("keeps the verdict headline in the tooltip", async () => {
     const user = userEvent.setup();
     render(<CardScoreBadges clarity={2} confidence={5} testId="badges" />);
