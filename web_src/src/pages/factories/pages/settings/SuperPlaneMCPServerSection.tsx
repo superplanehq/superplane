@@ -169,19 +169,27 @@ function SuperPlaneMCPClientsTable({
           {SUPERPLANE_MCP_SERVER_COPY.clientsSearchEmpty}
         </p>
       ) : (
-        <table className="w-full text-left" data-testid="superplane-mcp-clients-list">
-          <tbody>
-            {filteredClients.map((client) => (
-              <SuperPlaneMCPClientRow
-                key={client.id}
-                client={client}
-                canUpdate={canUpdate}
-                isRevoking={isRevoking && pendingRevokeId === client.id}
-                onRevoke={() => onRevoke(client)}
-              />
-            ))}
-          </tbody>
-        </table>
+        <div className="min-w-0 overflow-x-hidden">
+          <table className="w-full table-fixed text-left" data-testid="superplane-mcp-clients-list">
+            <colgroup>
+              <col className="w-48" />
+              <col />
+              <col className="w-36" />
+              <col className="w-24" />
+            </colgroup>
+            <tbody>
+              {filteredClients.map((client) => (
+                <SuperPlaneMCPClientRow
+                  key={client.id}
+                  client={client}
+                  canUpdate={canUpdate}
+                  isRevoking={isRevoking && pendingRevokeId === client.id}
+                  onRevoke={() => onRevoke(client)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -328,7 +336,7 @@ function SuperPlaneMCPClientRow({
 
   return (
     <tr className="border-b border-border last:border-b-0" data-testid={`superplane-mcp-client-${client.id}`}>
-      <td className="max-w-[12rem] py-2.5 pr-3">
+      <td className="w-48 overflow-hidden py-2.5 pr-3">
         <div className="flex min-w-0 items-center gap-2">
           <Avatar
             src={client.userAvatarUrl?.trim() || undefined}
@@ -339,11 +347,15 @@ function SuperPlaneMCPClientRow({
           <span className="truncate text-[13px] font-medium text-foreground">{userName}</span>
         </div>
       </td>
-      <td className="py-2.5 pr-3 text-[13px] text-foreground">{clientName}</td>
-      <td className="whitespace-nowrap py-2.5 pr-3 text-[13px] text-muted-foreground" title={absoluteWhen}>
+      <td className="max-w-0 overflow-hidden py-2.5 pr-3 text-[13px] text-foreground">
+        <div className="min-w-0 truncate" title={clientName}>
+          {clientName}
+        </div>
+      </td>
+      <td className="w-36 whitespace-nowrap py-2.5 pr-3 text-[13px] text-muted-foreground" title={absoluteWhen}>
         {when}
       </td>
-      <td className="py-2.5 text-right">
+      <td className="w-24 py-2.5 text-right">
         <PermissionTooltip allowed={canUpdate} message={SUPERPLANE_MCP_SERVER_COPY.noUpdatePermission}>
           <Button
             type="button"
