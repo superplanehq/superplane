@@ -5,9 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/go-github/v84/github"
 )
@@ -23,7 +25,12 @@ const (
 	waitChecksOutcomeFailed   = "failed"
 	waitChecksOutcomeTimedOut = "timedOut"
 	waitChecksOutcomePending  = "pending"
+
+	maxCheckSummaryBytes      = 16 * 1024
+	maxTotalCheckSummaryBytes = 96 * 1024
 )
+
+var htmlTablePattern = regexp.MustCompile(`(?is)<table\b[^>]*>.*?</table\s*>`)
 
 var nonFailingConclusions = map[string]bool{
 	"success":   true,
@@ -85,9 +92,9 @@ func normalizePullRequestChecks(checkRuns *github.ListCheckRunsResults, combined
 			}
 			description := ""
 			summary := ""
-			if run.GetOutput() != nil {
-				description = strings.TrimSpace(run.GetOutput().GetTitle())
-				summary = firstLine(run.GetOutput().GetSummary())
+			if output := run.GetOutput(); output != nil {
+				description = strings.TrimSpace(output.GetTitle())
+				summary = checkRunOutputBody(output)
 			}
 			latest[key] = PullRequestCheck{
 				Key:         key,
@@ -272,15 +279,144 @@ func checkFingerprint(checks []PullRequestCheck) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func firstLine(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
+func storedCheckLists(evaluation waitChecksEvaluation) (checks, selected, failed []PullRequestCheck) {
+	return withoutCheckSummaries(evaluation.Checks),
+		limitCheckSummaries(evaluation.SelectedChecks),
+		limitCheckSummaries(evaluation.FailedChecks)
+}
+
+func withoutCheckSummaries(checks []PullRequestCheck) []PullRequestCheck {
+	out := make([]PullRequestCheck, len(checks))
+	for i, check := range checks {
+		check.Summary = ""
+		out[i] = check
+	}
+	return out
+}
+
+func limitCheckSummaries(checks []PullRequestCheck) []PullRequestCheck {
+	out := make([]PullRequestCheck, len(checks))
+	remaining := maxTotalCheckSummaryBytes
+	for i, check := range checks {
+		check.Summary = limitCheckSummary(check.Summary, min(maxCheckSummaryBytes, remaining))
+		remaining -= len(check.Summary)
+		out[i] = check
+	}
+	return out
+}
+
+func checkRunOutputBody(output *github.CheckRunOutput) string {
+	summary := strings.TrimSpace(output.GetSummary())
+	text := strings.TrimSpace(output.GetText())
+	body := joinDistinctCheckOutput(summary, text)
+	if body == "" {
 		return ""
 	}
-	if index := strings.IndexAny(trimmed, "\n\r"); index >= 0 {
-		return strings.TrimSpace(trimmed[:index])
+	return limitCheckSummary("\n\n"+body, maxCheckSummaryBytes)
+}
+
+func limitCheckSummary(summary string, maxBytes int) string {
+	if maxBytes <= 0 || summary == "" {
+		return ""
 	}
-	return trimmed
+	if len(summary) <= maxBytes {
+		return summary
+	}
+
+	ellipsis := "\n..."
+	budget := maxBytes - len(ellipsis)
+	if budget < 1 {
+		return truncateToBytes(summary, maxBytes)
+	}
+
+	tables := packHTMLTables(htmlTables(summary), budget)
+	packed := strings.Join(tables, "\n\n")
+	separator := ""
+	if packed != "" {
+		separator = "\n\n"
+	}
+	remaining := budget - len(separator) - len(packed)
+	if remaining < 1 {
+		return packed + ellipsis
+	}
+
+	prefix := trimSummaryCut(truncateToBytes(summary, remaining))
+	missing := missingHTMLTables(prefix, tables)
+	if len(missing) == 0 {
+		return prefix + ellipsis
+	}
+	return prefix + separator + strings.Join(missing, "\n\n") + ellipsis
+}
+
+func packHTMLTables(tables []string, budget int) []string {
+	var kept []string
+	used := 0
+	for _, table := range tables {
+		need := len(table)
+		if len(kept) > 0 {
+			need += len("\n\n")
+		}
+		if used+need > budget {
+			continue
+		}
+		kept = append(kept, table)
+		used += need
+	}
+	return kept
+}
+
+func htmlTables(value string) []string {
+	return htmlTablePattern.FindAllString(value, -1)
+}
+
+func missingHTMLTables(prefix string, tables []string) []string {
+	var missing []string
+	for _, table := range tables {
+		if !strings.Contains(prefix, table) {
+			missing = append(missing, table)
+		}
+	}
+	return missing
+}
+
+func trimSummaryCut(value string) string {
+	return strings.TrimRight(value, " \t\r\n")
+}
+
+func truncateToBytes(value string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if len(value) <= maxBytes {
+		return value
+	}
+	for maxBytes > 0 && !utf8.ValidString(value[:maxBytes]) {
+		maxBytes--
+	}
+	truncated := value[:maxBytes]
+	if i := unclosedHTMLTagIndex(truncated); i >= 0 {
+		truncated = truncated[:i]
+	}
+	return truncated
+}
+
+func unclosedHTMLTagIndex(value string) int {
+	lastOpen := strings.LastIndex(value, "<")
+	lastClose := strings.LastIndex(value, ">")
+	if lastOpen > lastClose {
+		return lastOpen
+	}
+	return -1
+}
+
+func joinDistinctCheckOutput(summary, text string) string {
+	if text == "" || strings.Contains(summary, text) {
+		return summary
+	}
+	if summary == "" {
+		return text
+	}
+	return summary + "\n\n" + text
 }
 
 func firstNonEmpty(values ...string) string {

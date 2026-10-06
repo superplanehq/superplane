@@ -346,7 +346,8 @@ func prFeedbackChecksMarkdownListSource(checksExpr string) string {
 func prFeedbackCheckMarkdownItemSource() string {
 	label := `.name + ((.description ?? "") != "" ? ": " + .description : "")`
 	linked := `((.detailsUrl ?? "") != "" ? "[" + (` + label + `) + "](" + .detailsUrl + ")" : (` + label + `))`
-	return `"· " + ` + linked + ` + ((.summary ?? "") != "" ? ": " + .summary : "")`
+	summary := `((.summary ?? "") != "" ? ((.summary[:1] == "\n") ? .summary : ": " + .summary) : "")`
+	return `"· " + ` + linked + ` + ` + summary
 }
 
 func prFeedbackChecksActivityExpressions(nodeID string) (string, string, bool) {
