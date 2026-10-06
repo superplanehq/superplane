@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import { useCanvasRuntimeWebsocket } from "@/hooks/useCanvasWebsocket";
 import { Pencil } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { SettingsAutomationCanvas } from "./SettingsAutomationCanvas";
 import { FactoryAutomationRunsSidebar } from "./factoryAutomationRunsSidebar/FactoryAutomationRunsSidebar";
@@ -21,6 +21,15 @@ interface SettingsAutomationWorkspaceProps {
   editHref?: string;
   editLabel?: string;
   editTestId?: string;
+  onNodeSelect?: (nodeId: string) => void;
+  showRuns?: boolean;
+  /** Select the newest listed run once, when this workspace opens. */
+  selectLatestRun?: boolean;
+  showStatusControls?: boolean;
+  showFindControls?: boolean;
+  focusNodeId?: string | null;
+  focusNonce?: number;
+  layoutFitNonce?: number | null;
 }
 
 const DEFAULT_EDIT_LABEL = "Edit automation";
@@ -67,15 +76,36 @@ export function SettingsAutomationWorkspace({
   editHref,
   editLabel = DEFAULT_EDIT_LABEL,
   editTestId = DEFAULT_EDIT_TEST_ID,
+  onNodeSelect,
+  showRuns = true,
+  selectLatestRun = false,
+  showStatusControls = true,
+  showFindControls = true,
+  focusNodeId = null,
+  focusNonce = 0,
+  layoutFitNonce = null,
 }: SettingsAutomationWorkspaceProps) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const latestRunSelected = useRef(false);
   const resolvedCanvasId = canvasId ?? "";
   const organizationId = graph.organizationId ?? "";
   useCanvasRuntimeWebsocket(resolvedCanvasId, organizationId, Boolean(resolvedCanvasId && organizationId));
   const runsQuery = useInfiniteCanvasRuns(resolvedCanvasId, {}, Boolean(resolvedCanvasId));
+  const listedRuns = useMemo(() => runsQuery.data?.pages.flatMap((page) => page?.runs ?? []) ?? [], [runsQuery.data]);
+  useEffect(() => {
+    if (!selectLatestRun || latestRunSelected.current || selectedRunId) {
+      return;
+    }
+    const latestRunId = listedRuns.find((run) => run.id)?.id;
+    if (!latestRunId) {
+      return;
+    }
+    latestRunSelected.current = true;
+    setSelectedRunId(latestRunId);
+  }, [listedRuns, selectLatestRun, selectedRunId]);
   const selectedRunFromList = useMemo(
-    () => runsQuery.data?.pages.flatMap((page) => page?.runs ?? []).find((run) => run.id === selectedRunId) ?? null,
-    [runsQuery.data, selectedRunId],
+    () => listedRuns.find((run) => run.id === selectedRunId) ?? null,
+    [listedRuns, selectedRunId],
   );
   const runCanvas = useSettingsAutomationRunCanvas({
     organizationId: graph.organizationId,
@@ -93,7 +123,7 @@ export function SettingsAutomationWorkspace({
       data-selected-run-id={selectedRunId ?? undefined}
     >
       <div className="flex min-h-[18rem] min-w-0 flex-1 overflow-hidden">
-        {canvasId ? (
+        {canvasId && showRuns ? (
           <FactoryAutomationRunsSidebar
             canvasId={canvasId}
             organizationId={graph.organizationId}
@@ -112,6 +142,12 @@ export function SettingsAutomationWorkspace({
             runParticipantNodeIds={runCanvas.runParticipantNodeIds}
             fitAllRequest={runCanvas.fitAllRequest}
             fitAllFocusNodeIds={runCanvas.fitAllFocusNodeIds}
+            onNodeSelect={onNodeSelect}
+            showStatusControls={showStatusControls}
+            showFindControls={showFindControls}
+            focusNodeId={focusNodeId}
+            focusNonce={focusNonce}
+            layoutFitNonce={layoutFitNonce}
           />
         </div>
       </div>
