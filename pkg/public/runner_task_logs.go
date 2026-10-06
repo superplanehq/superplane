@@ -89,6 +89,12 @@ func (s *Server) serveRunnerTaskLogs(
 			writeRunnerLogReset(w)
 			return
 		}
+		// The lifecycle row is created when the task starts. Until then the
+		// execution already has a task ID, so this is a wait, not a missing log.
+		if !task.IsTerminal() {
+			writeRunnerLogNotReady(w)
+			return
+		}
 		s.serveFinalRunnerTaskLog(w, r, task, nil)
 		return
 	}
@@ -164,6 +170,16 @@ func writeRunnerLogState(w http.ResponseWriter, state, cursor string) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set(runnerlogs.HeaderState, state)
 	w.Header().Set(runnerlogs.HeaderCursor, cursor)
+}
+
+func writeRunnerLogNotReady(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set(runneraction.LiveLogErrorCodeHeader, runneraction.LiveLogSessionNotReadyErrorCode)
+	http.Error(
+		w,
+		"Logs are not available for this execution yet. Check again shortly.",
+		http.StatusNotFound,
+	)
 }
 
 func writeRunnerLogReset(w http.ResponseWriter) {
