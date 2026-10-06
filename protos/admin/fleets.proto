@@ -171,10 +171,13 @@ message ListFleetTasksRequest {
   string fleet_id = 1;
   repeated string states = 2;
   optional int32 limit = 3;
+  optional string after_id = 4;
 }
 
 message ListFleetTasksResponse {
   repeated Task tasks = 1;
+  int64 total_count = 2;
+  bool has_next_page = 3;
 }
 
 message CreateRunnerRequest {
@@ -196,10 +199,13 @@ message ListRunnersRequest {
   string fleet_id = 1;
   repeated string states = 2;
   optional int32 limit = 3;
+  optional string after_id = 4;
 }
 
 message ListRunnersResponse {
   repeated Runner runners = 1;
+  int64 total_count = 2;
+  bool has_next_page = 3;
 }
 
 message DescribeRunnerRequest {
