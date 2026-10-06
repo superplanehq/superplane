@@ -33,7 +33,7 @@ describe("FactorySettingsMCPPage", () => {
     Element.prototype.scrollIntoView ??= vi.fn();
   });
 
-  it("hides the nav items when the feature is off", async () => {
+  it("hides Agent nav and shows MCP Server when workspace features are off", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
@@ -43,9 +43,9 @@ describe("FactorySettingsMCPPage", () => {
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-agent")).not.toBeInTheDocument();
-    expect(
-      within(sidebar).queryByTestId("factory-settings-nav-workspace-superplane-mcp-server"),
-    ).not.toBeInTheDocument();
+    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-superplane-mcp-server")).toHaveTextContent(
+      "MCP Server",
+    );
   }, 10000);
 
   it("shows the nav items when both features are on", async () => {
@@ -59,9 +59,9 @@ describe("FactorySettingsMCPPage", () => {
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(within(sidebar).getByTestId("factory-settings-nav-workspace-agent")).toHaveTextContent("Agent");
-    expect(
-      within(sidebar).queryByTestId("factory-settings-nav-workspace-superplane-mcp-server"),
-    ).not.toBeInTheDocument();
+    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-superplane-mcp-server")).toHaveTextContent(
+      "MCP Server",
+    );
   }, 10000);
 
   it("shows only MCP nav when only workspace_mcp is on", async () => {
@@ -75,9 +75,9 @@ describe("FactorySettingsMCPPage", () => {
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(within(sidebar).getByTestId("factory-settings-nav-workspace-agent")).toHaveTextContent("Agent");
-    expect(
-      within(sidebar).queryByTestId("factory-settings-nav-workspace-superplane-mcp-server"),
-    ).not.toBeInTheDocument();
+    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-superplane-mcp-server")).toHaveTextContent(
+      "MCP Server",
+    );
   }, 10000);
 
   it("shows only Skills nav when only workspace_skills is on", async () => {
@@ -91,9 +91,9 @@ describe("FactorySettingsMCPPage", () => {
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(within(sidebar).getByTestId("factory-settings-nav-workspace-agent")).toHaveTextContent("Agent");
-    expect(
-      within(sidebar).queryByTestId("factory-settings-nav-workspace-superplane-mcp-server"),
-    ).not.toBeInTheDocument();
+    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-superplane-mcp-server")).toHaveTextContent(
+      "MCP Server",
+    );
   }, 10000);
 
   it("redirects away from the route when the feature is off", async () => {
