@@ -45,7 +45,7 @@ interface MergeConfidenceConfigModalProps {
 
 type MergeConfidenceConfigTab = "automation" | "runs";
 
-/** Merge confidence configuration. The automation stays visible until a step is selected. */
+/** Merge confidence configuration. The first component starts selected. */
 export function MergeConfidenceConfigModal({
   title,
   graph,
@@ -64,12 +64,26 @@ export function MergeConfidenceConfigModal({
 }: MergeConfidenceConfigModalProps) {
   const [tab, setTab] = useState<MergeConfidenceConfigTab>("automation");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const initialNodeId = firstComponentId(graph);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(initialNodeId);
+  const appliedInitialNode = useRef(initialNodeId !== null);
   const [focusNonce, setFocusNonce] = useState(0);
   const [layoutFitNonce, setLayoutFitNonce] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const panelWasOpen = useRef(false);
   const split = useSplitRunPanePercent({ defaultPercent: 50, minPercent: 28, maxPercent: 72 });
+
+  useEffect(() => {
+    if (appliedInitialNode.current) {
+      return;
+    }
+    const nextId = firstComponentId(graph);
+    if (!nextId) {
+      return;
+    }
+    appliedInitialNode.current = true;
+    setSelectedNodeId(nextId);
+  }, [graph]);
   const selectedNode =
     tab === "automation" && selectedNodeId ? graph?.specNodes?.find((node) => node.id === selectedNodeId) : undefined;
 
@@ -144,6 +158,8 @@ export function MergeConfidenceConfigModal({
                 onNodeSelect={setSelectedNodeId}
                 focusNodeId={selectedNodeId}
                 focusNonce={focusNonce}
+                focusFit={false}
+                lockNativeZoom
                 layoutFitNonce={layoutFitNonce}
               />
             )}
@@ -215,6 +231,18 @@ function panelFactoryId(factoryId: string | undefined, graph: IntakeAutomationGr
   return factoryId ?? graph?.factoryId;
 }
 
+function firstComponentId(graph: IntakeAutomationGraph | undefined): string | null {
+  const specNodes = graph?.specNodes ?? [];
+  const trigger = specNodes.find((node) => node.type === "TYPE_TRIGGER" && node.id?.trim());
+  if (trigger?.id) {
+    return trigger.id;
+  }
+
+  const targets = new Set(graph?.edges?.map((edge) => edge.target).filter(Boolean));
+  const root = specNodes.find((node) => node.id && !targets.has(node.id));
+  return root?.id?.trim() || specNodes[0]?.id?.trim() || null;
+}
+
 function MergeConfidenceCanvas({
   graph,
   loading,
@@ -229,6 +257,8 @@ function MergeConfidenceCanvas({
   onNodeSelect,
   focusNodeId = null,
   focusNonce = 0,
+  focusFit = true,
+  lockNativeZoom = false,
   layoutFitNonce = null,
 }: {
   graph?: IntakeAutomationGraph;
@@ -244,6 +274,8 @@ function MergeConfidenceCanvas({
   onNodeSelect?: (nodeId: string) => void;
   focusNodeId?: string | null;
   focusNonce?: number;
+  focusFit?: boolean;
+  lockNativeZoom?: boolean;
   layoutFitNonce?: number | null;
 }) {
   if (!graph || graph.nodes.length === 0) {
@@ -278,6 +310,8 @@ function MergeConfidenceCanvas({
       showFindControls={false}
       focusNodeId={focusNodeId}
       focusNonce={focusNonce}
+      focusFit={focusFit}
+      lockNativeZoom={lockNativeZoom}
       layoutFitNonce={layoutFitNonce}
       className="settings-graph"
     />
