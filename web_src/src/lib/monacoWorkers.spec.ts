@@ -142,8 +142,22 @@ describe("setupMonacoEditor", () => {
 
     expect(getWorker("workerMain.js", "json")).toEqual({ url: "blob:monaco-worker" });
     expect(workerCalls).toEqual([{ url: "blob:monaco-worker", options: undefined }]);
-    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:monaco-worker");
     await expect(blobs[0]?.text()).resolves.toBe(`importScripts(${JSON.stringify(scriptUrl)});`);
+  });
+
+  it("revokes the blob URL when the fallback worker fails to start", () => {
+    setPageUrl("https://app.superplane.com/editor");
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:monaco-worker");
+    const revoke = vi.spyOn(URL, "revokeObjectURL");
+    vi.spyOn(globalThis, "Worker").mockImplementation(() => {
+      throw new Error("worker start failed");
+    });
+
+    const getWorker = installWorkers(workerThatThrows(new DOMException("blocked worker", "SecurityError")), workerUrls);
+
+    expect(() => getWorker("workerMain.js", "json")).toThrow("worker start failed");
+    expect(revoke).toHaveBeenCalledWith("blob:monaco-worker");
   });
 
   it("resolves a worker URL against the page location before importScripts", async () => {

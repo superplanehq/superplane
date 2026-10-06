@@ -51,7 +51,12 @@ function absoluteWorkerUrl(scriptUrl: string, pageLocation: Pick<Location, "href
 function classicWorker(scriptUrl: string, pageLocation: Pick<Location, "href">): Worker {
   const source = `importScripts(${JSON.stringify(absoluteWorkerUrl(scriptUrl, pageLocation))});`;
   const blob = new Blob([source], { type: "application/javascript" });
-  return new Worker(URL.createObjectURL(blob));
+  const url = URL.createObjectURL(blob);
+  try {
+    return new Worker(url);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 function startWorker(create: MonacoWorkerConstructor, scriptUrl: string): Worker {
