@@ -169,19 +169,21 @@ function SuperPlaneMCPClientsTable({
           {SUPERPLANE_MCP_SERVER_COPY.clientsSearchEmpty}
         </p>
       ) : (
-        <table className="w-full text-left" data-testid="superplane-mcp-clients-list">
-          <tbody>
-            {filteredClients.map((client) => (
-              <SuperPlaneMCPClientRow
-                key={client.id}
-                client={client}
-                canUpdate={canUpdate}
-                isRevoking={isRevoking && pendingRevokeId === client.id}
-                onRevoke={() => onRevoke(client)}
-              />
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left" data-testid="superplane-mcp-clients-list">
+            <tbody>
+              {filteredClients.map((client) => (
+                <SuperPlaneMCPClientRow
+                  key={client.id}
+                  client={client}
+                  canUpdate={canUpdate}
+                  isRevoking={isRevoking && pendingRevokeId === client.id}
+                  onRevoke={() => onRevoke(client)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
