@@ -42,6 +42,11 @@ type adminUpdateIntakeCatalogEntryRequest struct {
 	StatusNote *string `json:"status_note"`
 }
 
+func (s *Server) adminGetIntakeCatalogEntry(w http.ResponseWriter, r *http.Request) {
+	db := database.DB(r.Context())
+	s.respondIntakeCatalogEntry(w, db, mux.Vars(r)["key"])
+}
+
 func (s *Server) adminListIntakeCatalog(w http.ResponseWriter, r *http.Request) {
 	db := database.DB(r.Context())
 	entries, err := models.ListIntakeCatalogEntries(db)

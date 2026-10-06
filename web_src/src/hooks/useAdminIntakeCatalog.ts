@@ -19,6 +19,7 @@ export interface UpdateAdminIntakeInput {
 export const adminIntakeCatalogKeys = {
   all: ["adminIntakeCatalog"] as const,
   list: () => [...adminIntakeCatalogKeys.all, "list"] as const,
+  entry: (key: string) => [...adminIntakeCatalogKeys.all, "entry", key] as const,
 };
 
 const BASE_PATH = "/admin/api/intake-catalog";
@@ -56,6 +57,19 @@ export function useAdminIntakeCatalog() {
   });
 }
 
+async function fetchAdminIntakeEntry(key: string): Promise<AdminIntakeEntry> {
+  return requestJSON<AdminIntakeEntry>(entryPath(key));
+}
+
+export function useAdminIntakeCatalogEntry(key: string) {
+  return useQuery({
+    queryKey: adminIntakeCatalogKeys.entry(key),
+    queryFn: () => fetchAdminIntakeEntry(key),
+    enabled: Boolean(key),
+    staleTime: 30 * 1000,
+  });
+}
+
 function replaceEntry(entries: AdminIntakeEntry[] | undefined, entry: AdminIntakeEntry): AdminIntakeEntry[] {
   const list = entries ?? [];
   if (!list.some((item) => item.key === entry.key)) {
@@ -72,6 +86,7 @@ function useEntryMutation<TVariables>(mutationFn: (variables: TVariables) => Pro
       queryClient.setQueryData<AdminIntakeEntry[]>(adminIntakeCatalogKeys.list(), (entries) =>
         replaceEntry(entries, entry),
       );
+      queryClient.setQueryData<AdminIntakeEntry>(adminIntakeCatalogKeys.entry(entry.key), entry);
     },
   });
 }

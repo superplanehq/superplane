@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import {
-  useAdminIntakeCatalog,
+  useAdminIntakeCatalogEntry,
   useDeleteAdminIntake,
   useUpdateAdminIntake,
   type UpdateAdminIntakeInput,
@@ -18,8 +18,7 @@ import { MaturityStepper } from "./MaturityStepper";
 
 export function IntakeDetailPage() {
   const { key = "" } = useParams();
-  const { data: entries, isLoading, isError } = useAdminIntakeCatalog();
-  const entry = entries?.find((item) => item.key === key);
+  const { data: entry, isLoading, isError } = useAdminIntakeCatalogEntry(key);
   usePageTitle([entry?.name ?? "Intake", "Intakes", "Installation Admin"]);
 
   if (isLoading) {

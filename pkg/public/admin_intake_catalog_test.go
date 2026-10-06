@@ -83,6 +83,13 @@ func TestAdminIntakeCatalog(t *testing.T) {
 		assert.False(t, byKey["gitlab"].Implemented)
 	})
 
+	t.Run("gets one entry by key", func(t *testing.T) {
+		code, body := request("GET", "/admin/api/intake-catalog/datadog", nil)
+		require.Equal(t, http.StatusOK, code)
+		entry := decodeEntry(t, body)
+		assert.Equal(t, models.FactoryIntakeSourceDatadog, entry.Key)
+	})
+
 	t.Run("updates status and note", func(t *testing.T) {
 		restoreDatadog(t)
 

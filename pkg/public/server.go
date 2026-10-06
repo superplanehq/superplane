@@ -819,6 +819,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/polar/webhooks/{eventId}/redeliver", s.adminRedeliverPolarWebhook).Methods("POST")
 	adminRoute.HandleFunc("/intake-catalog", s.adminListIntakeCatalog).Methods("GET")
 	adminRoute.HandleFunc("/intake-catalog", s.adminCreateIntakeCatalogEntry).Methods("POST")
+	adminRoute.HandleFunc("/intake-catalog/{key}", s.adminGetIntakeCatalogEntry).Methods("GET")
 	adminRoute.HandleFunc("/intake-catalog/{key}", s.adminUpdateIntakeCatalogEntry).Methods("PATCH")
 	adminRoute.HandleFunc("/intake-catalog/{key}", s.adminDeleteIntakeCatalogEntry).Methods("DELETE")
 	adminRoute.HandleFunc("/price-books", s.adminGetPriceBooks).Methods("GET")
