@@ -4,14 +4,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { OrganizationSpendingExplorer } from "@/pages/factories/pages/organizationSettings/spending-redesign/OrganizationSpendingExplorer";
 import { ArrowLeft, Pin, PinOff } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { OrgCanvasesTable } from "./OrgCanvasesTable";
 import { OrgExperimentalFeaturesTable } from "./OrgExperimentalFeaturesTable";
 import { OrgIntegrationsTable } from "./OrgIntegrationsTable";
 import { OrgLLMCreditSection } from "./OrgLLMCreditSection";
-import { OrgOverviewPanel } from "./OrgOverviewPanel";
+import { OrgOverviewPanel, type OrganizationOverview } from "./OrgOverviewPanel";
 import { OrgUsersTable } from "./OrgUsersTable";
 import { OrganizationVelocityPanel } from "./OrganizationVelocityPanel";
 import { useAdminOrganizationSpendingReport } from "./useAdminOrganizationSpendingReport";
@@ -33,35 +33,23 @@ function isOrganizationTab(value: string): value is OrganizationTab {
   return ORGANIZATION_TABS.some((tab) => tab === value);
 }
 
-function OrganizationPinControl({ orgId }: { orgId: string }) {
-  const [pinned, setPinned] = useState<boolean | null>(null);
+function OrganizationPinControl({
+  orgId,
+  pinned,
+  onPinnedChange,
+}: {
+  orgId: string;
+  pinned: boolean | null;
+  onPinnedChange: (orgId: string, pinned: boolean) => void;
+}) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestID = useRef(0);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        const response = await fetch(`/admin/api/organizations/${orgId}`, { credentials: "include" });
-        if (!response.ok) {
-          return;
-        }
-        const data: { pinned?: boolean } = await response.json();
-        if (!cancelled) {
-          setPinned(Boolean(data.pinned));
-        }
-      } catch {
-        if (!cancelled) {
-          setPinned(null);
-        }
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
+    requestID.current += 1;
+    setPending(false);
+    setError(null);
   }, [orgId]);
 
   if (pinned === null) {
@@ -69,23 +57,35 @@ function OrganizationPinControl({ orgId }: { orgId: string }) {
   }
 
   const togglePin = async () => {
+    const id = requestID.current + 1;
+    requestID.current = id;
+    const targetOrgId = orgId;
+    const wasPinned = pinned;
     setPending(true);
     setError(null);
     try {
-      const response = await fetch(`/admin/api/organizations/${orgId}/pin`, {
-        method: pinned ? "DELETE" : "PUT",
+      const response = await fetch(`/admin/api/organizations/${targetOrgId}/pin`, {
+        method: wasPinned ? "DELETE" : "PUT",
         credentials: "include",
       });
+      if (id !== requestID.current) {
+        return;
+      }
       if (!response.ok) {
-        setError(pinned ? "Could not unpin this organization." : "Could not pin this organization.");
+        setError(wasPinned ? "Could not unpin this organization." : "Could not pin this organization.");
         return;
       }
       const data: { pinned?: boolean } = await response.json();
-      setPinned(Boolean(data.pinned));
+      onPinnedChange(targetOrgId, Boolean(data.pinned));
     } catch {
-      setError(pinned ? "Could not unpin this organization." : "Could not pin this organization.");
+      if (id !== requestID.current) {
+        return;
+      }
+      setError(wasPinned ? "Could not unpin this organization." : "Could not pin this organization.");
     } finally {
-      setPending(false);
+      if (id === requestID.current) {
+        setPending(false);
+      }
     }
   };
 
@@ -100,8 +100,77 @@ function OrganizationPinControl({ orgId }: { orgId: string }) {
   );
 }
 
+function useAdminOrganizationDetail(orgId: string | undefined) {
+  const [organization, setOrganization] = useState<OrganizationOverview | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(Boolean(orgId));
+  const [reloadToken, setReloadToken] = useState(0);
+  const [loadedOrgId, setLoadedOrgId] = useState(orgId);
+
+  if (orgId !== loadedOrgId) {
+    setLoadedOrgId(orgId);
+    setOrganization(null);
+    setError(null);
+    setLoading(Boolean(orgId));
+  }
+
+  useEffect(() => {
+    if (!orgId) {
+      return;
+    }
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(`/admin/api/organizations/${orgId}`, { credentials: "include" });
+        if (!response.ok) {
+          throw new Error("Could not load this organization.");
+        }
+        const data: OrganizationOverview = await response.json();
+        if (!cancelled) {
+          setOrganization(data);
+        }
+      } catch {
+        if (!cancelled) {
+          setOrganization(null);
+          setError("Could not load this organization.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, reloadToken]);
+
+  const setPinned = (targetOrgId: string, pinned: boolean) => {
+    setOrganization((current) => {
+      if (!current || current.id !== targetOrgId) {
+        return current;
+      }
+      return { ...current, pinned };
+    });
+  };
+
+  return {
+    organization,
+    error,
+    loading,
+    retry: () => setReloadToken((token) => token + 1),
+    setPinned,
+  };
+}
+
 const OrganizationDetail: React.FC = () => {
   const { orgId } = useParams<{ orgId: string }>();
+  const detail = useAdminOrganizationDetail(orgId);
   const [tab, setTab] = useState<OrganizationTab>("overview");
   const [creditsVisited, setCreditsVisited] = useState(false);
   const [spendingVisited, setSpendingVisited] = useState(false);
@@ -119,7 +188,13 @@ const OrganizationDetail: React.FC = () => {
           <ArrowLeft size={14} />
           All organizations
         </Link>
-        {orgId ? <OrganizationPinControl orgId={orgId} /> : null}
+        {orgId ? (
+          <OrganizationPinControl
+            orgId={orgId}
+            pinned={detail.organization ? Boolean(detail.organization.pinned) : null}
+            onPinnedChange={detail.setPinned}
+          />
+        ) : null}
       </div>
       <Tabs
         value={tab}
@@ -150,7 +225,12 @@ const OrganizationDetail: React.FC = () => {
           <TabsTrigger value="credits">Credits</TabsTrigger>
         </TabsList>
         <TabsContent value="overview" className="mt-3">
-          <OrgOverviewPanel orgId={orgId!} />
+          <OrgOverviewPanel
+            organization={detail.organization}
+            loading={detail.loading}
+            error={detail.error}
+            onRetry={detail.retry}
+          />
         </TabsContent>
         <TabsContent value="users" className="mt-3">
           <OrgUsersTable orgId={orgId!} />

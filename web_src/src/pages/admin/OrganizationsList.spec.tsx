@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
@@ -135,7 +135,107 @@ describe("OrganizationsList", () => {
       credentials: "include",
     });
   });
+
+  it("moves to the previous page when a pin empties the last page", async () => {
+    const user = userEvent.setup();
+    let pinned = false;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pin") && init?.method === "PUT") {
+        pinned = true;
+        return jsonResponse({ pinned: true });
+      }
+      const offset = Number(new URL(url, "http://localhost").searchParams.get("offset") ?? "0");
+      if (offset > 0) {
+        return jsonResponse({
+          items: pinned ? [] : [organization("org-2", "Last Org")],
+          pinned: pinned ? [organization("org-2", "Last Org")] : [],
+          total: pinned ? 50 : 51,
+          match_total: 51,
+        });
+      }
+      return jsonResponse({
+        items: [organization("org-1", "Acme")],
+        pinned: pinned ? [organization("org-2", "Last Org")] : [],
+        total: pinned ? 50 : 51,
+        match_total: 51,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <MemoryRouter>
+        <OrganizationsList />
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    await user.click(await screen.findByRole("button", { name: "Pin organization" }));
+
+    expect(await screen.findByRole("heading", { name: "Pinned" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Last Org" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Acme" })).toBeInTheDocument();
+    expect(screen.queryByText("Showing 51–51 of 51")).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(([input]) => String(input).includes("offset=0") && String(input).includes("limit=50")),
+    ).toBe(true);
+  });
+
+  it("does not replace the current search when a pin request finishes later", async () => {
+    const user = userEvent.setup();
+    let releasePin: (response: Response) => void = () => {};
+    const pinResponse = new Promise<Response>((resolve) => {
+      releasePin = resolve;
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pin") && init?.method === "PUT") {
+        return pinResponse;
+      }
+      const search = new URL(url, "http://localhost").searchParams.get("search") ?? "";
+      if (search === "Beta") {
+        return jsonResponse({
+          items: [organization("org-2", "Beta Org")],
+          pinned: [],
+          total: 1,
+          match_total: 1,
+        });
+      }
+      return jsonResponse({
+        items: [organization("org-1", "Acme")],
+        pinned: [],
+        total: 1,
+        match_total: 1,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <MemoryRouter>
+        <OrganizationsList />
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Pin organization" }));
+    await user.type(screen.getByPlaceholderText("Search by name or ID..."), "Beta");
+    expect(await screen.findByRole("link", { name: "Beta Org" })).toBeInTheDocument();
+
+    const listCallsBeforePinResult = listCalls(fetchMock).length;
+    releasePin(jsonResponse({ pinned: true }));
+
+    await waitFor(() => {
+      const calls = listCalls(fetchMock).slice(listCallsBeforePinResult);
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls.every(([input]) => String(input).includes("search=Beta"))).toBe(true);
+    });
+    expect(screen.getByRole("link", { name: "Beta Org" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Acme" })).not.toBeInTheDocument();
+  });
 });
+
+function listCalls(fetchMock: ReturnType<typeof vi.fn>) {
+  return fetchMock.mock.calls.filter(([input]) => String(input).includes("/admin/api/organizations?"));
+}
 
 function organization(id: string, name: string) {
   return {

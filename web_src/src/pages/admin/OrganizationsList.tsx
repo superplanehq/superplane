@@ -2,27 +2,23 @@ import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Building, CircleCheck, ClipboardList, Palette, Pin, PinOff, User } from "lucide-react";
-import React, { useCallback, useEffect, useState } from "react";
+import React from "react";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Link, useNavigate } from "react-router";
 import AdminPagination from "./AdminPagination";
 import AdminSearchHeader from "./AdminSearchHeader";
 import { formatDate } from "./formatDate";
 import { SortableHeader, type SortDirection } from "./SortableHeader";
+import {
+  ORGANIZATION_PAGE_SIZE,
+  useOrganizationsList,
+  type AdminOrganization,
+  type OrganizationSortField,
+} from "./useOrganizationsList";
 
-interface AdminOrganization {
-  id: string;
-  name: string;
-  canvas_count: number;
-  task_count: number;
-  done_task_count: number;
-  member_count: number;
-  created_at?: string;
-}
+type SortField = OrganizationSortField;
 
-type SortField = "canvas_count" | "created_at" | "done_task_count" | "member_count" | "name" | "task_count";
-
-const PAGE_SIZE = 50;
+const PAGE_SIZE = ORGANIZATION_PAGE_SIZE;
 
 interface OrganizationsTableProps {
   organizations: AdminOrganization[];
@@ -237,7 +233,11 @@ function OrganizationTables({
     <>
       {pinnedOrganizations.length > 0 ? (
         <section className="mb-6" aria-labelledby="pinned-organizations-heading">
-          <Heading id="pinned-organizations-heading" level={2} className="mb-2 text-base text-gray-800 dark:text-gray-100">
+          <Heading
+            id="pinned-organizations-heading"
+            level={2}
+            className="mb-2 text-base text-gray-800 dark:text-gray-100"
+          >
             Pinned
           </Heading>
           <OrganizationsTable
@@ -268,82 +268,11 @@ function OrganizationTables({
 }
 
 const OrganizationsList: React.FC = () => {
-  const [organizations, setOrganizations] = useState<AdminOrganization[]>([]);
-  const [pinnedOrganizations, setPinnedOrganizations] = useState<AdminOrganization[]>([]);
-  const [total, setTotal] = useState(0);
-  const [matchTotal, setMatchTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<SortField>("created_at");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [pinError, setPinError] = useState<string | null>(null);
-  const [pendingPinID, setPendingPinID] = useState<string | null>(null);
+  const list = useOrganizationsList();
+  const hasOrganizations = list.organizations.length > 0 || list.pinnedOrganizations.length > 0;
+  useReportPageReady(!list.loading || hasOrganizations);
 
-  const fetchOrganizations = useCallback(
-    async (searchTerm: string, pageOffset: number, sort: SortField, direction: SortDirection) => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(pageOffset) });
-        if (searchTerm) params.set("search", searchTerm);
-        params.set("sort_by", sort);
-        params.set("sort_direction", direction);
-        const response = await fetch(`/admin/api/organizations?${params}`, { credentials: "include" });
-        if (response.ok) {
-          const data = await response.json();
-          setOrganizations(data.items ?? []);
-          setPinnedOrganizations(data.pinned ?? []);
-          setTotal(data.total ?? 0);
-          setMatchTotal(typeof data.match_total === "number" ? data.match_total : (data.total ?? 0));
-        }
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setOffset(0);
-      fetchOrganizations(search, 0, sortBy, sortDirection);
-    }, 200);
-    return () => clearTimeout(timeout);
-  }, [search, sortBy, sortDirection, fetchOrganizations]);
-
-  const handleSort = (field: SortField) => {
-    if (field === sortBy) {
-      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
-    } else {
-      setSortBy(field);
-      setSortDirection(field === "name" ? "asc" : "desc");
-    }
-  };
-
-  const togglePin = async (organization: AdminOrganization, pinned: boolean) => {
-    setPinError(null);
-    setPendingPinID(organization.id);
-    try {
-      const response = await fetch(`/admin/api/organizations/${organization.id}/pin`, {
-        method: pinned ? "DELETE" : "PUT",
-        credentials: "include",
-      });
-      if (!response.ok) {
-        setPinError(pinned ? "Could not unpin this organization." : "Could not pin this organization.");
-        return;
-      }
-      await fetchOrganizations(search, offset, sortBy, sortDirection);
-    } catch {
-      setPinError(pinned ? "Could not unpin this organization." : "Could not pin this organization.");
-    } finally {
-      setPendingPinID(null);
-    }
-  };
-
-  const hasOrganizations = organizations.length > 0 || pinnedOrganizations.length > 0;
-  useReportPageReady(!loading || hasOrganizations);
-
-  if (loading && !hasOrganizations) {
+  if (list.loading && !hasOrganizations) {
     return (
       <div className="flex flex-col items-center space-y-4 py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b border-gray-500 dark:border-gray-400"></div>
@@ -356,36 +285,31 @@ const OrganizationsList: React.FC = () => {
     <div>
       <AdminSearchHeader
         title="All Organizations"
-        subtitle={`${matchTotal} organization${matchTotal !== 1 ? "s" : ""} across this installation`}
-        search={search}
-        onSearchChange={setSearch}
+        subtitle={`${list.matchTotal} organization${list.matchTotal !== 1 ? "s" : ""} across this installation`}
+        search={list.search}
+        onSearchChange={list.setSearch}
         placeholder="Search by name or ID..."
       />
-      {pinError ? <Text className="mb-3 text-sm text-red-600 dark:text-red-400">{pinError}</Text> : null}
+      {list.pinError ? <Text className="mb-3 text-sm text-red-600 dark:text-red-400">{list.pinError}</Text> : null}
       {!hasOrganizations ? (
         <div className="text-center py-12">
           <Text className="text-gray-500 dark:text-gray-400">
-            {search ? "No organizations match your search." : "No organizations found."}
+            {list.search ? "No organizations match your search." : "No organizations found."}
           </Text>
         </div>
       ) : (
-        <>
-          <OrganizationTables
-            organizations={organizations}
-            pinnedOrganizations={pinnedOrganizations}
-            pendingPinID={pendingPinID}
-            sortBy={sortBy}
-            sortDirection={sortDirection}
-            onSort={handleSort}
-            onTogglePin={togglePin}
-            offset={offset}
-            total={total}
-            onPageChange={(pageOffset: number) => {
-              setOffset(pageOffset);
-              void fetchOrganizations(search, pageOffset, sortBy, sortDirection);
-            }}
-          />
-        </>
+        <OrganizationTables
+          organizations={list.organizations}
+          pinnedOrganizations={list.pinnedOrganizations}
+          pendingPinID={list.pendingPinID}
+          sortBy={list.sortBy}
+          sortDirection={list.sortDirection}
+          onSort={list.handleSort}
+          onTogglePin={list.togglePin}
+          offset={list.offset}
+          total={list.total}
+          onPageChange={list.changePage}
+        />
       )}
     </div>
   );
