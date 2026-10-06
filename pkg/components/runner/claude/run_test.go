@@ -2,6 +2,7 @@ package claude
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -866,4 +868,93 @@ func latestTurnMessage(t *testing.T, turns []map[string]any, turn float64) strin
 	}
 	require.True(t, found, "missing turn %v", turn)
 	return message
+}
+
+func TestClaudeAppendSystemPromptIncludesConfirmPromptRule(t *testing.T) {
+	implement := claudeAppendSystemPromptFromScript(t, map[string]string{})
+	assertConfirmPromptRule(t, implement)
+	assert.NotContains(t, implement, "propose_spec")
+
+	planning := claudeAppendSystemPromptFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+	})
+	assertConfirmPromptRule(t, planning)
+	assert.Contains(t, planning, "propose_spec")
+}
+
+func TestClaudeRunEnvFailsBlockedConfirmWithoutAnswering(t *testing.T) {
+	env := claudeRunEnvFromScript(t, "/task/run")
+	assert.Equal(t, "/task/run/confirm_prompt.js", env["CLAUDE_CODE_SHELL_PREFIX"])
+}
+
+func TestConfirmPromptGuardReturnsBlockedOverwritePrompt(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := runConfirmPromptGuard(ctx, `printf '%s\n' '? The file card.tsx already exists. Would you like to overwrite? › (y/N)'; sleep 30`)
+	require.Error(t, err)
+	assert.Contains(t, out, "card.tsx")
+	assert.NotContains(t, out, "ANSWER:")
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, 1, exitErr.ExitCode())
+}
+
+func TestConfirmPromptGuardLeavesAFinishedPromptAlone(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := runConfirmPromptGuard(ctx, `printf '%s\n' '? The file card.tsx already exists. Would you like to overwrite? › (y/N)'`)
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "card.tsx")
+}
+
+func TestConfirmPromptGuardLeavesFinishedCommandsAlone(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := runConfirmPromptGuard(ctx, "printf '%s\n' hello")
+	require.NoError(t, err, out)
+	assert.Contains(t, out, "hello")
+}
+
+func claudeAppendSystemPromptFromScript(t *testing.T, env map[string]string) string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	payload, err := json.Marshal(env)
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { claudeAppendSystemPrompt } = require(process.argv[1]); process.stdout.write(claudeAppendSystemPrompt(JSON.parse(process.argv[2])));`, script, string(payload))
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func claudeRunEnvFromScript(t *testing.T, taskDir string) map[string]string {
+	t.Helper()
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { claudeRunEnv } = require(process.argv[1]); process.stdout.write(JSON.stringify(claudeRunEnv(process.argv[2], {})));`, script, taskDir)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	var env map[string]string
+	require.NoError(t, json.Unmarshal(out, &env))
+	return env
+}
+
+func runConfirmPromptGuard(ctx context.Context, command string) (string, error) {
+	script, err := filepath.Abs(filepath.Join("..", "confirm_prompt.js"))
+	if err != nil {
+		return "", err
+	}
+	cmd := exec.CommandContext(ctx, "node", "-e", `const { runConfirmPromptGuard } = require(process.argv[1]); runConfirmPromptGuard(process.argv[2]).then((code) => process.exit(code));`, script, command)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+func assertConfirmPromptRule(t *testing.T, text string) {
+	t.Helper()
+	assert.Contains(t, text, "Do not run a command that waits for a person.")
+	assert.Contains(t, text, "decide from the task whether to keep it or replace it")
+	assert.Contains(t, text, "pass the overwrite flag")
+	assert.Contains(t, text, "Do not end the run.")
+	assert.Contains(t, text, "Do not wait for a person to answer.")
 }

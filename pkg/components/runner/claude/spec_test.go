@@ -149,7 +149,7 @@ func TestBuildClaudeCodeBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Contains(t, task.Commands[4].Command, `source "$SUPERPLANE_TASK_DIR/steps/04-push.sh"`)
 	assert.Contains(t, task.Commands[4].Command, `node "$SUPERPLANE_TASK_DIR/llm_usage.js" merge`)
 
-	require.Len(t, task.Files, 9)
+	require.Len(t, task.Files, 10)
 	assert.Equal(t, runScript, requireTaskFile(t, task.Files, "run.js").Content)
 	assert.Equal(t, runner.LLMUsageScript, requireTaskFile(t, task.Files, "llm_usage.js").Content)
 	assert.Equal(t, runner.TurnTelemetryScript, requireTaskFile(t, task.Files, "turn_telemetry.js").Content)
