@@ -24,10 +24,6 @@ const FeatureFactories = "factories"
 // still uses the legacy IntegrationCreateDialog path.
 const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
 
-// FeatureFactoryJiraIntake gates the manual "Add intake" entry for Jira
-// in the Backlog column menu until the flow is generally available.
-const FeatureFactoryJiraIntake = "factory_jira_intake"
-
 // FeatureFactoryProductiveIntake gates the manual "Add intake" entry for
 // Productive.io in the Backlog column menu until the flow is generally
 // available.
@@ -103,7 +99,6 @@ var registry = []Feature{
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
-	{ID: FeatureFactoryJiraIntake, Label: "Factory Jira Intake", Description: "Add Jira intake from the Backlog column menu"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
 	{ID: FeatureFactoryLinearIntake, Label: "Factory Linear Intake", Description: "Add Linear intake from the Backlog column menu"},
