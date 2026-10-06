@@ -270,7 +270,7 @@ describe("RunnerTasks", () => {
     expect(screen.getByText("Loading fleets...")).toBeInTheDocument();
   });
 
-  it("ignores an older fleet list that finishes after a newer list", async () => {
+  it("shows a fleet list that finishes after the next poll is due", async () => {
     vi.useFakeTimers();
     const listResponses: Array<(response: Response) => void> = [];
     vi.stubGlobal(
@@ -285,17 +285,14 @@ describe("RunnerTasks", () => {
         if (url.pathname === "/admin/api/runner/tasks") {
           return json({ configured: false, tasks: [] });
         }
-        if (url.pathname.includes("/fleets/kept-fleet/runners")) {
-          return runnersBody({ id: "kept-fleet", runners: [{ id: "kept-runner" }] });
-        }
-        if (url.pathname.includes("/fleets/removed-fleet/runners")) {
-          return runnersBody({ id: "removed-fleet", runners: [{ id: "removed-runner" }] });
+        if (url.pathname.includes("/fleets/slow-fleet/runners")) {
+          return runnersBody({ id: "slow-fleet", runners: [{ id: "slow-runner" }] });
         }
         if (url.pathname.endsWith("/capacity")) {
-          return capacityBody({ id: "fleet", queued: "1", idle: "1", busy: "1" });
+          return capacityBody({ id: "slow-fleet", queued: "1", idle: "1", busy: "1" });
         }
         if (url.pathname.endsWith("/tasks")) {
-          return tasksBody({ id: "fleet" });
+          return tasksBody({ id: "slow-fleet" });
         }
         return json({});
       }),
@@ -303,21 +300,133 @@ describe("RunnerTasks", () => {
 
     renderPage();
     await act(async () => {
+      await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS * 3);
+    });
+    expect(listResponses).toHaveLength(1);
+    expect(screen.getByText("Loading fleets...")).toBeInTheDocument();
+
+    await act(async () => {
+      listResponses[0](fleetListBody([{ id: "slow-fleet" }]));
+    });
+
+    expect(await screen.findByText("slow-runner")).toBeInTheDocument();
+    expect(screen.queryByText("Loading fleets...")).not.toBeInTheDocument();
+
+    await act(async () => {
       await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS);
     });
     expect(listResponses).toHaveLength(2);
+  });
 
-    listResponses[1](fleetListBody([{ id: "kept-fleet" }]));
-    expect(await screen.findByText("kept-runner")).toBeInTheDocument();
+  it("shows fleet capacity when the detail reply finishes after the next poll is due", async () => {
+    vi.useFakeTimers();
+    let capacityCalls = 0;
+    let releaseCapacity: ((response: Response) => void) | null = null;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input), "http://localhost");
+        if (url.pathname === "/admin/api/installation/fleets") {
+          return fleetListBody([{ id: "slow-fleet" }]);
+        }
+        if (url.pathname === "/admin/api/runner/tasks") {
+          return json({ configured: false, tasks: [] });
+        }
+        if (url.pathname.endsWith("/capacity")) {
+          capacityCalls += 1;
+          return new Promise<Response>((resolve) => {
+            releaseCapacity = resolve;
+          });
+        }
+        if (url.pathname.endsWith("/runners")) {
+          return runnersBody({ id: "slow-fleet", runners: [{ id: "slow-runner" }] });
+        }
+        if (url.pathname.endsWith("/tasks")) {
+          return tasksBody({ id: "slow-fleet" });
+        }
+        return json({});
+      }),
+    );
 
-    listResponses[0](fleetListBody([{ id: "removed-fleet" }]));
+    renderPage();
+    expect(await screen.findByText("Loading fleet capacity...")).toBeInTheDocument();
     await act(async () => {
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(REFRESH_INTERVAL_MS * 3);
+    });
+    expect(capacityCalls).toBe(1);
+
+    await act(async () => {
+      releaseCapacity?.(capacityBody({ id: "slow-fleet", queued: "2", idle: "1", busy: "0" }));
+    });
+    expect(await screen.findByText("slow-runner")).toBeInTheDocument();
+    expect(screen.getByText("Queued tasks").parentElement).toHaveTextContent("2");
+    expect(screen.queryByText("Loading fleet capacity...")).not.toBeInTheDocument();
+  });
+
+  it("loads the selected fleet while an older detail request is still running", async () => {
+    const detailResponses: Array<{ url: string; resolve: (response: Response) => void }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = new URL(String(input), "http://localhost");
+        if (url.pathname === "/admin/api/installation/fleets") {
+          return fleetListBody([{ id: "first-fleet" }, { id: "second-fleet" }]);
+        }
+        if (url.pathname === "/admin/api/runner/tasks") {
+          return json({ configured: false, tasks: [] });
+        }
+        if (
+          url.pathname.includes("/fleets/") &&
+          (url.pathname.endsWith("/capacity") || url.pathname.endsWith("/runners") || url.pathname.endsWith("/tasks"))
+        ) {
+          return new Promise<Response>((resolve) => {
+            detailResponses.push({ url: url.pathname, resolve });
+          });
+        }
+        return json({});
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("Loading fleet capacity...")).toBeInTheDocument();
+
+    await user.click(screen.getByTestId("admin-fleet-machine-type"));
+    await user.click(screen.getByRole("option", { name: "second-fleet" }));
+    await waitFor(() => {
+      const paths = detailResponses
+        .filter((pending) => pending.url.includes("/fleets/second-fleet/"))
+        .map((pending) => pending.url);
+      expect(paths.some((path) => path.endsWith("/capacity"))).toBe(true);
+      expect(paths.some((path) => path.endsWith("/runners"))).toBe(true);
+      expect(paths.some((path) => path.endsWith("/tasks"))).toBe(true);
     });
 
-    expect(screen.getByText("kept-runner")).toBeInTheDocument();
-    expect(screen.queryByText("removed-runner")).not.toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "removed-fleet" })).not.toBeInTheDocument();
+    const resolveFleet = (fleetId: string) => {
+      for (const pending of detailResponses) {
+        if (!pending.url.includes(`/fleets/${fleetId}/`)) {
+          continue;
+        }
+        if (pending.url.endsWith("/capacity")) {
+          pending.resolve(capacityBody({ id: fleetId, queued: "1", idle: "1", busy: "1" }));
+        } else if (pending.url.endsWith("/runners")) {
+          pending.resolve(runnersBody({ id: fleetId, runners: [{ id: `${fleetId}-runner` }] }));
+        } else if (pending.url.endsWith("/tasks")) {
+          pending.resolve(tasksBody({ id: fleetId }));
+        }
+      }
+    };
+
+    await act(async () => {
+      resolveFleet("second-fleet");
+    });
+    expect(await screen.findByText("second-fleet-runner")).toBeInTheDocument();
+
+    await act(async () => {
+      resolveFleet("first-fleet");
+    });
+    expect(screen.getByText("second-fleet-runner")).toBeInTheDocument();
+    expect(screen.queryByText("first-fleet-runner")).not.toBeInTheDocument();
   });
 
   it("keeps a later runner page when a refresh has no active rows", async () => {

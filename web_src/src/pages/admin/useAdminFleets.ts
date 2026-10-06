@@ -37,8 +37,13 @@ const useFleetCatalog = () => {
   }, []);
 
   const catalogRequest = useRef(0);
+  const catalogInFlight = useRef(false);
 
   const loadFleets = useCallback(async () => {
+    if (catalogInFlight.current) {
+      return;
+    }
+    catalogInFlight.current = true;
     const requestID = ++catalogRequest.current;
     try {
       const nextFleets = await fetchInstallationFleets();
@@ -55,6 +60,10 @@ const useFleetCatalog = () => {
       showErrorToast(error instanceof Error ? error.message : "Failed to load fleets");
       setFleetLoadFailed(true);
       setFleets((current) => current ?? []);
+    } finally {
+      if (requestID === catalogRequest.current) {
+        catalogInFlight.current = false;
+      }
     }
   }, [chooseFleet]);
 
@@ -75,11 +84,13 @@ const useFleetRecords = (selectedFleetId: string | null) => {
   const [tasks, setTasks] = useState<RecordPage<FleetTask> | null>(null);
   const [cursorFleetId, setCursorFleetId] = useState<string | null>(null);
   const detailsRequest = useRef(0);
+  const detailsInFlight = useRef(false);
   const selectedFleetIdRef = useRef(selectedFleetId);
   selectedFleetIdRef.current = selectedFleetId;
 
   useLayoutEffect(() => {
     detailsRequest.current += 1;
+    detailsInFlight.current = false;
   }, [selectedFleetId]);
 
   useEffect(() => {
@@ -92,6 +103,10 @@ const useFleetRecords = (selectedFleetId: string | null) => {
   }, [selectedFleetId]);
 
   const loadDetails = useCallback(async (fleetId: string, runnerCursor: string | null, taskCursor: string | null) => {
+    if (detailsInFlight.current) {
+      return;
+    }
+    detailsInFlight.current = true;
     const requestID = ++detailsRequest.current;
     try {
       const details = await fetchFleetDetails(fleetId, runnerCursor, taskCursor);
@@ -106,6 +121,10 @@ const useFleetRecords = (selectedFleetId: string | null) => {
         return;
       }
       showErrorToast(error instanceof Error ? error.message : "Failed to load fleet");
+    } finally {
+      if (requestID === detailsRequest.current) {
+        detailsInFlight.current = false;
+      }
     }
   }, []);
 
