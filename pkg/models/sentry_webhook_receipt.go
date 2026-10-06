@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -135,9 +136,14 @@ func sentryWebhookReceiptQuery(tx *gorm.DB, project string) *gorm.DB {
 }
 
 func clipWebhookField(value string) string {
+	const maxBytes = 200
 	value = strings.TrimSpace(value)
-	if len(value) <= 200 {
+	if len(value) <= maxBytes {
 		return value
 	}
-	return value[:200]
+	end := maxBytes
+	for end > 0 && !utf8.RuneStart(value[end]) {
+		end--
+	}
+	return value[:end]
 }

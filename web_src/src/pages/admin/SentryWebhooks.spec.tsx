@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
 
@@ -24,6 +24,7 @@ const renderPage = () =>
 
 describe("SentryWebhooks", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -177,6 +178,49 @@ describe("SentryWebhooks", () => {
     expect(projectRequests).toHaveLength(1);
     expect(projectRequests[0]).toContain("page=1");
     expect(projectRequests[0]).not.toContain("page=2");
+  });
+
+  it("waits until typing pauses before it loads the project filter", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn().mockImplementation(async (input: string) => {
+      if (String(input).includes("project=")) {
+        return {
+          ok: true,
+          json: async () => ({ items: [sentryReceipt("production")], total: 1, page: 1, limit: 50 }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ items: [sentryReceipt("page-1")], total: 1, page: 1, limit: 50 }),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPage();
+    await act(async () => {});
+
+    const field = screen.getByTestId("sentry-webhooks-project");
+    fireEvent.change(field, { target: { value: "p" } });
+    fireEvent.change(field, { target: { value: "pr" } });
+    fireEvent.change(field, { target: { value: "production" } });
+
+    const projectRequests = () =>
+      fetchMock.mock.calls.map(([input]) => String(input)).filter((url) => url.includes("project="));
+    expect(projectRequests()).toHaveLength(0);
+    expect(screen.queryByText("page-1")).not.toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(199);
+    });
+    expect(projectRequests()).toHaveLength(0);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(projectRequests()).toHaveLength(1);
+    expect(projectRequests()[0]).toContain("project=production");
+    expect(projectRequests()[0]).toContain("page=1");
+    expect(await screen.findByText("production")).toBeInTheDocument();
   });
 
   it("keeps the project field when the list fails to load", async () => {

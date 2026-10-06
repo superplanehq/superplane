@@ -6,6 +6,8 @@ import {
   type SentryWebhooksResponse,
 } from "./sentryWebhookReceipts";
 
+const PROJECT_FILTER_PAUSE_MS = 200;
+
 function sentryWebhooksURL(offset: number, project: string) {
   const page = Math.floor(offset / SENTRY_WEBHOOK_PAGE_SIZE) + 1;
   const params = new URLSearchParams({
@@ -22,6 +24,7 @@ function sentryWebhooksURL(offset: number, project: string) {
 export function useSentryWebhooks() {
   const [offset, setOffset] = useState(0);
   const [project, setProjectValue] = useState("");
+  const [appliedProject, setAppliedProject] = useState("");
   const [data, setData] = useState<SentryWebhooksResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -33,6 +36,11 @@ export function useSentryWebhooks() {
     setLoadError("");
     setLoading(true);
   }, []);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setAppliedProject(project), PROJECT_FILTER_PAUSE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [project]);
 
   const load = useCallback(async (nextOffset: number, nextProject: string, signal?: AbortSignal) => {
     setLoading(true);
@@ -48,8 +56,11 @@ export function useSentryWebhooks() {
   }, []);
 
   useEffect(() => {
+    if (project !== appliedProject) {
+      return;
+    }
     const controller = new AbortController();
-    load(offset, project, controller.signal)
+    load(offset, appliedProject, controller.signal)
       .then((next) => {
         if (!controller.signal.aborted) {
           setData(next);
@@ -64,7 +75,7 @@ export function useSentryWebhooks() {
         setLoading(false);
       });
     return () => controller.abort();
-  }, [load, offset, project]);
+  }, [appliedProject, load, offset, project]);
 
   return { offset, setOffset, project, setProject, data, loading, loadError };
 }

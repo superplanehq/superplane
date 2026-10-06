@@ -124,6 +124,13 @@ func TestAdminSentryWebhooks(t *testing.T) {
 		assert.Equal(t, literalID, literal.Items[0].ID)
 		assert.Nil(t, findSentryReceipt(literal.Items, wildcardID))
 	})
+
+	t.Run("keeps a multibyte project filter inside the field limit", func(t *testing.T) {
+		project := strings.Repeat("a", 199) + "é"
+		filtered := listAdminSentryWebhooks(t, server, token, project)
+		assert.Equal(t, 0, filtered.Total)
+		assert.Empty(t, filtered.Items)
+	})
 }
 
 func createAdminSentryReceipt(t *testing.T, projectSlug string) string {
