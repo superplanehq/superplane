@@ -5,14 +5,16 @@ import { cn } from "@/lib/utils";
 import { Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { ADD_INTAKE_COPY, ADD_INTAKE_TEMPLATES, type AddIntakeTemplate } from "./lineIntakeModel";
+import { ADD_INTAKE_COPY, type AddIntakeTemplate } from "./lineIntakeModel";
 
 interface AddIntakePickerProps {
   open: boolean;
   onClose: () => void;
   onSelect: (template: AddIntakeTemplate) => void;
-  /** Templates offered by the picker. Defaults to the full template catalog. */
-  templates?: AddIntakeTemplate[];
+  /** Templates offered by the picker, from the organization's intake catalog. */
+  templates: AddIntakeTemplate[];
+  loading?: boolean;
+  loadFailed?: boolean;
   /** Source ids that already have an intake. Those cards stay disabled. */
   takenSourceIds?: readonly string[];
 }
@@ -32,7 +34,9 @@ export function AddIntakePicker({
   open,
   onClose,
   onSelect,
-  templates: availableTemplates = ADD_INTAKE_TEMPLATES,
+  templates: availableTemplates,
+  loading = false,
+  loadFailed = false,
   takenSourceIds = [],
 }: AddIntakePickerProps) {
   const [query, setQuery] = useState("");
@@ -86,46 +90,81 @@ export function AddIntakePicker({
           className="grid max-h-[min(24rem,50vh)] grid-cols-2 gap-2 overflow-y-auto p-3 [scrollbar-width:thin]"
           data-testid="add-intake-templates"
         >
-          {templates.length === 0 ? (
+          {loading || loadFailed || templates.length === 0 ? (
             <li className="col-span-2 px-2 py-8 text-center">
-              <p className="workspace-body-text text-muted-foreground">No intakes match this search.</p>
+              <p className="workspace-body-text text-muted-foreground">{pickerEmptyMessage(loading, loadFailed)}</p>
             </li>
           ) : (
-            templates.map((template) => {
-              const taken = takenSourceIds.includes(template.id);
-              const unavailable = Boolean(template.soon) || taken;
-              return (
-                <li key={template.id}>
-                  <button
-                    type="button"
-                    disabled={unavailable}
-                    onClick={() => {
-                      if (unavailable) {
-                        return;
-                      }
-                      onSelect(template);
-                    }}
-                    data-testid={`add-intake-template-${template.id}`}
-                    className={cn(
-                      "flex h-full min-h-24 w-full flex-col items-start gap-1 rounded-lg border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-colors",
-                      unavailable ? "cursor-not-allowed opacity-60" : "hover:border-foreground/20 hover:bg-accent/40",
-                    )}
-                  >
-                    <TemplateGlyph template={template} />
-                    <span className="text-[13px] font-medium tracking-[-0.01em] leading-5 text-foreground">
-                      {template.name}
-                    </span>
-                    <span className="workspace-body-text text-muted-foreground">
-                      {intakeTemplateStatus(template, taken)}
-                    </span>
-                  </button>
-                </li>
-              );
-            })
+            templates.map((template) => (
+              <TemplateCard
+                key={template.id}
+                template={template}
+                taken={takenSourceIds.includes(template.id)}
+                onSelect={onSelect}
+              />
+            ))
           )}
         </ul>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function pickerEmptyMessage(loading: boolean, loadFailed: boolean): string {
+  if (loading) {
+    return ADD_INTAKE_COPY.loading;
+  }
+  if (loadFailed) {
+    return ADD_INTAKE_COPY.loadFailed;
+  }
+  return "No intakes match this search.";
+}
+
+interface TemplateCardProps {
+  template: AddIntakeTemplate;
+  taken: boolean;
+  /** Omit to render the card read-only. */
+  onSelect?: (template: AddIntakeTemplate) => void;
+}
+
+export function TemplateCard({ template, taken, onSelect }: TemplateCardProps) {
+  const unavailable = Boolean(template.soon) || taken;
+  const readOnly = !onSelect;
+  return (
+    <li>
+      <button
+        type="button"
+        disabled={unavailable}
+        tabIndex={readOnly ? -1 : undefined}
+        onClick={() => {
+          if (unavailable || !onSelect) {
+            return;
+          }
+          onSelect(template);
+        }}
+        data-testid={`add-intake-template-${template.id}`}
+        className={cn(
+          "flex h-full min-h-24 w-full flex-col items-start gap-1 rounded-lg border border-border bg-card px-3 py-2.5 text-left shadow-sm transition-colors",
+          unavailable && "cursor-not-allowed opacity-60",
+          !unavailable && !readOnly && "hover:border-foreground/20 hover:bg-accent/40",
+          readOnly && "pointer-events-none",
+        )}
+      >
+        <TemplateGlyph template={template} />
+        <span className="flex items-center gap-1.5 text-[13px] font-medium tracking-[-0.01em] leading-5 text-foreground">
+          {template.name}
+          {template.beta ? (
+            <span
+              data-testid="add-intake-beta-badge"
+              className="rounded-full border border-amber-300/70 bg-amber-50 px-1.5 text-[10px] font-medium leading-4 text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+            >
+              {ADD_INTAKE_COPY.beta}
+            </span>
+          ) : null}
+        </span>
+        <span className="workspace-body-text text-muted-foreground">{intakeTemplateStatus(template, taken)}</span>
+      </button>
+    </li>
   );
 }
 

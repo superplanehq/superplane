@@ -1,11 +1,5 @@
 import type { MeVcsProviderRepository } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
-import {
-  FEATURE_FACTORY_BITBUCKET,
-  FEATURE_FACTORY_JIRA_INTAKE,
-  FEATURE_FACTORY_LINEAR_INTAKE,
-} from "@/lib/experimentalFeatures";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
 
@@ -33,6 +27,7 @@ import {
 } from "./githubInstallReturn";
 import { githubConnectReturnPath } from "./onboardingGitHubConnect";
 import { useFirstRunBlockingAction, type FirstRunBlocking } from "./useFirstRunBlockingAction";
+import { useFirstRunIntakeAvailability } from "./useFirstRunIntakeAvailability";
 import {
   githubOnboardingMessage,
   navigateGitHubWindow,
@@ -405,7 +400,7 @@ function savedFlaggedChoiceBlock(args: {
   return null;
 }
 
-/** A saved Jira choice cannot continue until the feature lookup confirms Jira. */
+/** A saved Jira choice cannot continue until the intake catalog confirms Jira. */
 export function savedJiraChoiceBlock(args: {
   issuesChoice: IssuesChoiceId | null;
   featureLoading: boolean;
@@ -447,47 +442,42 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setupFinished,
     connectedBefore: Boolean(model.setup.selectedRepo),
   });
-  const intakeFeatures = useExperimentalFeature(organizationId);
-  const intakeFeatureLoading = intakeFeatures.isLoading;
-  const jiraAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_JIRA_INTAKE);
-  const linearAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_LINEAR_INTAKE);
-  const bitbucketAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_BITBUCKET);
-  const bitbucket = { available: bitbucketAvailable, loading: intakeFeatureLoading };
+  const intake = useFirstRunIntakeAvailability(organizationId);
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
     bringYourOwnKey: model.bringYourOwnKey,
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
-  const navigation = useFirstRunNavigation(model, agentGate, connection, githubReady, bitbucket);
+  const navigation = useFirstRunNavigation(model, agentGate, connection, githubReady, intake.bitbucket);
   const commands = useFirstRunCommands({
     model,
     agentGate,
     connection,
     navigation,
     blocking,
-    jiraAvailable,
-    linearAvailable,
-    bitbucketAvailable,
+    jiraAvailable: intake.jiraAvailable,
+    linearAvailable: intake.linearAvailable,
+    bitbucketAvailable: intake.bitbucketAvailable,
     installScope,
   });
-  // A saved Jira choice is not valid when the organization does not have the
-  // Jira intake feature. Clear it only after the organization lookup confirms
-  // the feature is off. A failed lookup has no organization data and must not
+  // A saved Jira or Linear choice is not valid when the intake catalog does
+  // not let the organization use that intake. Clear it only after the catalog
+  // loads and confirms that. A failed lookup has no catalog data and must not
   // replace the saved choice with the GitHub Issues default.
   const issuesChoice = model.setup.issuesChoice;
   const setIssuesChoice = model.setup.setIssuesChoice;
-  const organizationReady = intakeFeatures.organizationReady;
+  const organizationReady = intake.organizationReady;
   const jiraChoiceArgs = {
     issuesChoice,
-    featureLoading: intakeFeatureLoading,
-    jiraAvailable,
+    featureLoading: intake.intakesLoading,
+    jiraAvailable: intake.jiraAvailable,
     organizationReady,
   };
   const linearChoiceArgs = {
     issuesChoice,
-    featureLoading: intakeFeatureLoading,
-    linearAvailable,
+    featureLoading: intake.intakesLoading,
+    linearAvailable: intake.linearAvailable,
     organizationReady,
   };
   const clearSavedJiraChoice = shouldClearSavedJiraChoice(jiraChoiceArgs);
@@ -502,8 +492,8 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     ...navigation,
     ...commands,
     vcsHost: model.setup.vcsHost,
-    bitbucketAvailable,
-    bitbucketFeatureLoading: intakeFeatureLoading,
+    bitbucketAvailable: intake.bitbucketAvailable,
+    bitbucketFeatureLoading: intake.bitbucketFeatureLoading,
     // The ticket screen is the last screen, so it finishes setup.
     ticketsFinishSetup: agentGate === "skip" || agentGate === "first",
     skipAgentScreen: agentGate === "skip",
@@ -512,11 +502,14 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     selectCredentialChoice: model.setAgentCredentialChoice,
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
-    jiraAvailable,
-    jiraFeatureLoading: intakeFeatureLoading,
+    jiraAvailable: intake.jiraAvailable,
+    intakeState: intake.intakeState,
+    intakesLoading: intake.intakesLoading,
+    ticketIntakes: intake.ticketIntakes,
+    jiraFeatureLoading: intake.jiraFeatureLoading,
     jiraChoiceBlock,
-    linearAvailable,
-    linearFeatureLoading: intakeFeatureLoading,
+    linearAvailable: intake.linearAvailable,
+    linearFeatureLoading: intake.linearFeatureLoading,
     linearChoiceBlock,
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
     repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
