@@ -244,6 +244,17 @@ service Factories {
     };
   }
 
+  rpc ListFactoryIntakeCatalog(ListFactoryIntakeCatalogRequest) returns (ListFactoryIntakeCatalogResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factory-intake-catalog"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List the intake catalog";
+      description: "Returns every intake and repository provider, with its maturity status and whether the organization can use it";
+      tags: "Factory";
+    };
+  }
+
   rpc CreateFactoryIntake(CreateFactoryIntakeRequest) returns (CreateFactoryIntakeResponse) {
     option (google.api.http) = {
       post: "/api/v1/factories/{factory_id}/intakes"
@@ -1369,6 +1380,26 @@ message ListFactoryIntakesRequest {
 
 message ListFactoryIntakesResponse {
   repeated FactoryIntake intakes = 1;
+}
+
+message ListFactoryIntakeCatalogRequest {}
+
+message FactoryIntakeCatalogEntry {
+  // Intake source id, such as github-issues, or repository provider id, such as gitlab.
+  string key = 1;
+  string name = 2;
+  // One of issue_tracking, error_tracking, incident_management, security_alerts, repository_provider.
+  string category = 3;
+  // One of planned, alpha, beta, ga, deprecated.
+  string status = 4;
+  string status_note = 5;
+  // True when the organization may see this intake. Status still decides
+  // Coming soon, Beta, and whether a new intake can be created.
+  bool available = 6;
+}
+
+message ListFactoryIntakeCatalogResponse {
+  repeated FactoryIntakeCatalogEntry entries = 1;
 }
 
 message CreateFactoryIntakeRequest {

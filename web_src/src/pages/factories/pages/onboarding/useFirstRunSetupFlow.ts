@@ -1,7 +1,7 @@
 import type { MeVcsProviderRepository } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useIntakeCatalogAvailability } from "@/hooks/useIntakeCatalogAvailability";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
-import { FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_LINEAR_INTAKE } from "@/lib/experimentalFeatures";
+import { isIntakeSelectable } from "@/lib/intakeCatalog";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
 
@@ -358,7 +358,7 @@ function savedFlaggedChoiceBlock(args: {
   return null;
 }
 
-/** A saved Jira choice cannot continue until the feature lookup confirms Jira. */
+/** A saved Jira choice cannot continue until the intake catalog confirms Jira. */
 export function savedJiraChoiceBlock(args: {
   issuesChoice: IssuesChoiceId | null;
   featureLoading: boolean;
@@ -400,12 +400,12 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setupFinished,
     connectedBefore: Boolean(model.setup.selectedRepo),
   });
-  const intakeFeatures = useExperimentalFeature(organizationId);
-  const intakeFeatureLoading = intakeFeatures.isLoading;
+  const intakeCatalog = useIntakeCatalogAvailability(organizationId);
+  const intakeFeatureLoading = intakeCatalog.loading;
   const jiraFeatureLoading = intakeFeatureLoading;
   const linearFeatureLoading = intakeFeatureLoading;
-  const jiraAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_JIRA_INTAKE);
-  const linearAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_LINEAR_INTAKE);
+  const jiraAvailable = isIntakeSelectable(intakeCatalog.stateOf("jira-issues"));
+  const linearAvailable = isIntakeSelectable(intakeCatalog.stateOf("linear-issues"));
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
@@ -423,13 +423,13 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     linearAvailable,
     installScope,
   });
-  // A saved Jira choice is not valid when the organization does not have the
-  // Jira intake feature. Clear it only after the organization lookup confirms
-  // the feature is off. A failed lookup has no organization data and must not
+  // A saved Jira or Linear choice is not valid when the intake catalog does
+  // not let the organization use that intake. Clear it only after the catalog
+  // loads and confirms that. A failed lookup has no catalog data and must not
   // replace the saved choice with the GitHub Issues default.
   const issuesChoice = model.setup.issuesChoice;
   const setIssuesChoice = model.setup.setIssuesChoice;
-  const organizationReady = intakeFeatures.organizationReady;
+  const organizationReady = intakeCatalog.loaded;
   const jiraChoiceArgs = {
     issuesChoice,
     featureLoading: jiraFeatureLoading,
@@ -462,7 +462,9 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
     jiraAvailable,
-    jiraFeatureLoading,
+    intakeState: intakeCatalog.stateOf,
+    intakesLoading: jiraFeatureLoading,
+    ticketIntakes: intakeCatalog.loaded ? intakeCatalog.entriesFor("onboardingTickets") : null,
     jiraChoiceBlock,
     linearAvailable,
     linearFeatureLoading,

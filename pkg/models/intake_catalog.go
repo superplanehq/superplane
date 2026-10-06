@@ -1,0 +1,386 @@
+package models
+
+import (
+	"errors"
+	"regexp"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/superplanehq/superplane/pkg/features"
+	"gorm.io/gorm"
+)
+
+const (
+	IntakeCategoryIssueTracking      = "issue_tracking"
+	IntakeCategoryErrorTracking      = "error_tracking"
+	IntakeCategoryIncidentManagement = "incident_management"
+	IntakeCategorySecurityAlerts     = "security_alerts"
+	IntakeCategoryRepositoryProvider = "repository_provider"
+
+	IntakeStatusPlanned    = "planned"
+	IntakeStatusAlpha      = "alpha"
+	IntakeStatusBeta       = "beta"
+	IntakeStatusGA         = "ga"
+	IntakeStatusDeprecated = "deprecated"
+
+	intakeCatalogKeyMaxLength  = 64
+	intakeCatalogNameMaxLength = 255
+	postgresUniqueViolation    = "23505"
+)
+
+var (
+	ErrIntakeCatalogEntryNotFound     = errors.New("intake catalog entry not found")
+	ErrIntakeCatalogEntryExists       = errors.New("an intake with this key already exists")
+	ErrIntakeCatalogKeyInvalid        = errors.New("key must use lowercase letters, numbers, and dashes")
+	ErrIntakeCatalogNameRequired      = errors.New("name is required")
+	ErrIntakeCatalogCategoryInvalid   = errors.New("category is not valid")
+	ErrIntakeCatalogStatusInvalid     = errors.New("status is not valid")
+	ErrIntakeCatalogNotImplemented    = errors.New("the intake is not implemented, so its status stays planned")
+	ErrIntakeCatalogDeleteImplemented = errors.New("only planned intakes that are not implemented can be deleted")
+)
+
+var intakeCatalogKeyPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
+var intakeCategories = []string{
+	IntakeCategoryIssueTracking,
+	IntakeCategoryErrorTracking,
+	IntakeCategoryIncidentManagement,
+	IntakeCategorySecurityAlerts,
+	IntakeCategoryRepositoryProvider,
+}
+
+var intakeStatuses = []string{
+	IntakeStatusPlanned,
+	IntakeStatusAlpha,
+	IntakeStatusBeta,
+	IntakeStatusGA,
+	IntakeStatusDeprecated,
+}
+
+// implementedRepositoryProviders lists the VCS providers that factory
+// onboarding can connect. Keep it in sync with SelectFactoryVCSProviderRepository.
+var implementedRepositoryProviders = []string{ProviderGitHub}
+
+// IntakeCatalogEntry records the maturity of one intake source or repository
+// provider. The code decides whether the intake exists. Experimental features
+// decide which organizations can see an intake that has a feature flag.
+// Status is the label an admin sets.
+type IntakeCatalogEntry struct {
+	Key        string `gorm:"primaryKey"`
+	Name       string
+	Category   string
+	Status     string
+	StatusNote string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	UpdatedBy  *uuid.UUID
+
+	UpdatedByName string `gorm:"->;-:migration"`
+}
+
+// IntakeCatalogPatch holds the fields an admin can change. Nil fields stay
+// as they are.
+type IntakeCatalogPatch struct {
+	Name       *string
+	Category   *string
+	Status     *string
+	StatusNote *string
+}
+
+// IntakeAvailability is one catalog entry as seen by one organization.
+type IntakeAvailability struct {
+	Entry     IntakeCatalogEntry
+	Available bool
+}
+
+func NewIntakeCatalogEntry(key, name, category, statusNote string) (*IntakeCatalogEntry, error) {
+	entry := &IntakeCatalogEntry{
+		Key:        strings.TrimSpace(key),
+		Name:       strings.TrimSpace(name),
+		Category:   strings.TrimSpace(category),
+		Status:     IntakeStatusPlanned,
+		StatusNote: strings.TrimSpace(statusNote),
+	}
+	if err := entry.validate(); err != nil {
+		return nil, err
+	}
+	return entry, nil
+}
+
+func ValidIntakeCategory(category string) bool {
+	return slices.Contains(intakeCategories, category)
+}
+
+func ValidIntakeStatus(status string) bool {
+	return slices.Contains(intakeStatuses, status)
+}
+
+// IntakeImplemented reports whether SuperPlane has code for the intake or
+// repository provider with this key.
+func IntakeImplemented(key string) bool {
+	return ValidFactoryIntakeSource(key) || slices.Contains(implementedRepositoryProviders, key)
+}
+
+func (IntakeCatalogEntry) TableName() string {
+	return "intake_catalog_entries"
+}
+
+func (e *IntakeCatalogEntry) Implemented() bool {
+	return IntakeImplemented(e.Key)
+}
+
+// IntakeFeatureID returns the experimental feature that controls who can see
+// this intake. The second result is false when every organization can see it.
+func IntakeFeatureID(key string) (string, bool) {
+	switch key {
+	case FactoryIntakeSourceJiraIssues:
+		return features.FeatureFactoryJiraIntake, true
+	case FactoryIntakeSourceProductiveTasks:
+		return features.FeatureFactoryProductiveIntake, true
+	case FactoryIntakeSourceDatadog:
+		return features.FeatureFactoryDatadogIntake, true
+	case FactoryIntakeSourcePagerDutyIncidents:
+		return features.FeatureFactoryPagerDutyIntake, true
+	case FactoryIntakeSourceLinearIssues:
+		return features.FeatureFactoryLinearIntake, true
+	default:
+		return "", false
+	}
+}
+
+// VisibleTo reports whether the organization may see the intake. A feature
+// flag hides it until that flag is on. Status does not add or remove
+// organizations. Deprecated intakes are not offered for new use.
+func (e *IntakeCatalogEntry) VisibleTo(featureEnabled bool) bool {
+	if e.Status == IntakeStatusDeprecated {
+		return false
+	}
+	featureID, gated := IntakeFeatureID(e.Key)
+	if !gated || features.IsReleased(featureID) {
+		return true
+	}
+	return featureEnabled
+}
+
+// Creatable reports whether the organization can create a new intake.
+// Planned intakes stay visible as Coming soon. Deprecated intakes cannot be created.
+func (e *IntakeCatalogEntry) Creatable(featureEnabled bool) bool {
+	if !e.Implemented() || !e.VisibleTo(featureEnabled) {
+		return false
+	}
+	switch e.Status {
+	case IntakeStatusAlpha, IntakeStatusBeta, IntakeStatusGA:
+		return true
+	default:
+		return false
+	}
+}
+
+func (e *IntakeCatalogEntry) Deletable() bool {
+	return !e.Implemented() && e.Status == IntakeStatusPlanned
+}
+
+func (e *IntakeCatalogEntry) applyPatch(patch IntakeCatalogPatch) error {
+	if patch.Name != nil {
+		e.Name = strings.TrimSpace(*patch.Name)
+	}
+	if patch.Category != nil {
+		e.Category = strings.TrimSpace(*patch.Category)
+	}
+	if patch.StatusNote != nil {
+		e.StatusNote = strings.TrimSpace(*patch.StatusNote)
+	}
+	if patch.Status != nil {
+		e.Status = strings.TrimSpace(*patch.Status)
+	}
+
+	return e.validate()
+}
+
+func (e *IntakeCatalogEntry) validate() error {
+	if len(e.Key) > intakeCatalogKeyMaxLength || !intakeCatalogKeyPattern.MatchString(e.Key) {
+		return ErrIntakeCatalogKeyInvalid
+	}
+	if e.Name == "" || len(e.Name) > intakeCatalogNameMaxLength {
+		return ErrIntakeCatalogNameRequired
+	}
+	if !ValidIntakeCategory(e.Category) {
+		return ErrIntakeCatalogCategoryInvalid
+	}
+	if !ValidIntakeStatus(e.Status) {
+		return ErrIntakeCatalogStatusInvalid
+	}
+	if e.Status != IntakeStatusPlanned && !e.Implemented() {
+		return ErrIntakeCatalogNotImplemented
+	}
+	return nil
+}
+
+func CreateIntakeCatalogEntry(tx *gorm.DB, entry *IntakeCatalogEntry, accountID *uuid.UUID) error {
+	if err := entry.validate(); err != nil {
+		return err
+	}
+
+	now := time.Now()
+	entry.CreatedAt = now
+	entry.UpdatedAt = now
+	entry.UpdatedBy = accountID
+
+	err := tx.Omit("UpdatedByName").Create(entry).Error
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == postgresUniqueViolation {
+		return ErrIntakeCatalogEntryExists
+	}
+	return err
+}
+
+func FindIntakeCatalogEntry(tx *gorm.DB, key string) (*IntakeCatalogEntry, error) {
+	var entry IntakeCatalogEntry
+	err := intakeCatalogEntriesWithEditor(tx).
+		Where("intake_catalog_entries.key = ?", key).
+		First(&entry).
+		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrIntakeCatalogEntryNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &entry, nil
+}
+
+func ListIntakeCatalogEntries(tx *gorm.DB) ([]IntakeCatalogEntry, error) {
+	var entries []IntakeCatalogEntry
+	err := intakeCatalogEntriesWithEditor(tx).
+		Order("intake_catalog_entries.category ASC").
+		Order("intake_catalog_entries.name ASC").
+		Find(&entries).
+		Error
+	return entries, err
+}
+
+func (e *IntakeCatalogEntry) Update(tx *gorm.DB, patch IntakeCatalogPatch, accountID *uuid.UUID) error {
+	updated := *e
+	if err := updated.applyPatch(patch); err != nil {
+		return err
+	}
+
+	if patch.Name == nil && patch.Category == nil && patch.Status == nil && patch.StatusNote == nil {
+		return nil
+	}
+
+	updated.UpdatedAt = time.Now()
+	updated.UpdatedBy = accountID
+
+	updates := map[string]any{
+		"updated_at": updated.UpdatedAt,
+		"updated_by": updated.UpdatedBy,
+	}
+	if patch.Name != nil {
+		updates["name"] = updated.Name
+	}
+	if patch.Category != nil {
+		updates["category"] = updated.Category
+	}
+	if patch.Status != nil {
+		updates["status"] = updated.Status
+	}
+	if patch.StatusNote != nil {
+		updates["status_note"] = updated.StatusNote
+	}
+
+	err := tx.Model(&IntakeCatalogEntry{}).
+		Where("key = ?", e.Key).
+		Updates(updates).
+		Error
+	if err != nil {
+		return err
+	}
+
+	*e = updated
+	return nil
+}
+
+func (e *IntakeCatalogEntry) Delete(tx *gorm.DB) error {
+	if !e.Deletable() {
+		return ErrIntakeCatalogDeleteImplemented
+	}
+	return tx.Where("key = ?", e.Key).Delete(&IntakeCatalogEntry{}).Error
+}
+
+// ListIntakeCatalogForOrganization returns every catalog entry with whether
+// the organization may see it. Status still decides Coming soon and Beta.
+func ListIntakeCatalogForOrganization(tx *gorm.DB, organizationID uuid.UUID) ([]IntakeAvailability, error) {
+	entries, err := ListIntakeCatalogEntries(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	enabled, err := enabledIntakeFeatures(tx, organizationID)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]IntakeAvailability, 0, len(entries))
+	for _, entry := range entries {
+		result = append(result, IntakeAvailability{
+			Entry:     entry,
+			Available: entry.VisibleTo(enabled[intakeFeatureKey(entry.Key)]),
+		})
+	}
+	return result, nil
+}
+
+// IsIntakeAvailableForOrganization reports whether the organization can
+// create a new intake (or connect a repository provider) with this key.
+// A key with no catalog entry is not available.
+func IsIntakeAvailableForOrganization(tx *gorm.DB, key string, organizationID uuid.UUID) (bool, error) {
+	entry, err := FindIntakeCatalogEntry(tx, key)
+	if errors.Is(err, ErrIntakeCatalogEntryNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	enabled, err := enabledIntakeFeatures(tx, organizationID)
+	if err != nil {
+		return false, err
+	}
+	return entry.Creatable(enabled[intakeFeatureKey(entry.Key)]), nil
+}
+
+func intakeFeatureKey(key string) string {
+	featureID, ok := IntakeFeatureID(key)
+	if !ok {
+		return ""
+	}
+	return featureID
+}
+
+func enabledIntakeFeatures(tx *gorm.DB, organizationID uuid.UUID) (map[string]bool, error) {
+	organization, err := FindOrganizationByIDInTransaction(tx, organizationID.String())
+	if err != nil {
+		return nil, err
+	}
+	enabled := map[string]bool{}
+	for _, featureID := range []string{
+		features.FeatureFactoryJiraIntake,
+		features.FeatureFactoryProductiveIntake,
+		features.FeatureFactoryDatadogIntake,
+		features.FeatureFactoryPagerDutyIntake,
+		features.FeatureFactoryLinearIntake,
+	} {
+		enabled[featureID] = organization.HasExperimentalFeature(featureID)
+	}
+	return enabled, nil
+}
+
+func intakeCatalogEntriesWithEditor(tx *gorm.DB) *gorm.DB {
+	return tx.Model(&IntakeCatalogEntry{}).
+		Select("intake_catalog_entries.*, COALESCE(accounts.name, '') AS updated_by_name").
+		Joins("LEFT JOIN accounts ON accounts.id = intake_catalog_entries.updated_by")
+}
