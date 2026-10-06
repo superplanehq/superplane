@@ -1,11 +1,10 @@
 import React, { useCallback, useState } from "react";
 import { posthog, isPostHogEnabled } from "@/posthog";
+import { FirstRunShell } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
 import { LicenseStep } from "./ownerSetup/LicenseStep";
 import { OwnerStep } from "./ownerSetup/OwnerStep";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
-import { cn } from "@/lib/utils";
 import { newOrganizationLandingPath } from "./newOrganizationLandingPath";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
@@ -181,43 +180,52 @@ const OwnerSetup: React.FC = () => {
     }
   }, [pendingOrganizationSlug]);
 
+  const onEditionStep = step === "license";
+
   return (
-    <div
-      className={cn("min-h-screen flex items-center justify-center bg-slate-100 px-4 py-8", appDarkModeClasses.surface)}
+    <FirstRunShell
+      testId="owner-setup"
+      contentSpacing="compact"
+      chrome={
+        step === "survey"
+          ? undefined
+          : {
+              stepIndex: onEditionStep ? 1 : 0,
+              stepCount: 2,
+              email: onEditionStep ? email : undefined,
+              onLogOut: onEditionStep ? () => (window.location.href = "/logout") : undefined,
+            }
+      }
+      sphere={{
+        level: onEditionStep ? 0.4 : 0.22,
+        caption: onEditionStep ? "Awaiting edition" : "Awaiting owner",
+      }}
     >
-      <div
-        className={cn(
-          "max-w-md w-full rounded-lg bg-white p-8 shadow-sm",
-          appDarkModeClasses.modalEdge,
-          appDarkModeClasses.surfaceRaised,
-        )}
-      >
-        {step === "owner" && (
-          <OwnerStep
-            email={email}
-            firstName={firstName}
-            lastName={lastName}
-            password={password}
-            confirmPassword={confirmPassword}
-            loading={loading}
-            error={error}
-            fieldErrors={fieldErrors}
-            onEmailChange={setEmail}
-            onFirstNameChange={setFirstName}
-            onLastNameChange={setLastName}
-            onPasswordChange={setPassword}
-            onConfirmPasswordChange={setConfirmPassword}
-            onSubmit={handleOwnerSubmit}
-          />
-        )}
+      {step === "owner" && (
+        <OwnerStep
+          email={email}
+          firstName={firstName}
+          lastName={lastName}
+          password={password}
+          confirmPassword={confirmPassword}
+          loading={loading}
+          error={error}
+          fieldErrors={fieldErrors}
+          onEmailChange={setEmail}
+          onFirstNameChange={setFirstName}
+          onLastNameChange={setLastName}
+          onPasswordChange={setPassword}
+          onConfirmPasswordChange={setConfirmPassword}
+          onSubmit={handleOwnerSubmit}
+        />
+      )}
 
-        {step === "license" && pendingOrganizationSlug && <LicenseStep onContinue={handleLicenseContinue} />}
+      {step === "license" && pendingOrganizationSlug && <LicenseStep onContinue={handleLicenseContinue} />}
 
-        {step === "survey" && activeSurvey && pendingOrganizationSlug && (
-          <PostHogSurveyForm survey={activeSurvey} redirectTo={newOrganizationLandingPath(pendingOrganizationSlug)} />
-        )}
-      </div>
-    </div>
+      {step === "survey" && activeSurvey && pendingOrganizationSlug && (
+        <PostHogSurveyForm survey={activeSurvey} redirectTo={newOrganizationLandingPath(pendingOrganizationSlug)} />
+      )}
+    </FirstRunShell>
   );
 };
 

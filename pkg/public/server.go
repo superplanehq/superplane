@@ -1481,19 +1481,34 @@ type AccountResponse struct {
 	License                      AccountLicense                       `json:"license"`
 }
 
+// HideLicenseExpiryBannerEnv hides the license expiry banner when it is "yes"
+// or "true". The default is "no", so the banner stays visible.
+const HideLicenseExpiryBannerEnv = "SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER"
+
 // AccountLicense tells the UI which Enterprise features are available. Only
 // installation administrators receive the license state and expiry.
 type AccountLicense struct {
-	Edition   string     `json:"edition"`
-	Features  []string   `json:"features"`
-	State     string     `json:"state,omitempty"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	Edition          string     `json:"edition"`
+	Features         []string   `json:"features"`
+	State            string     `json:"state,omitempty"`
+	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
+	HideExpiryBanner bool       `json:"hide_expiry_banner,omitempty"`
+}
+
+func hideLicenseExpiryBanner() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(HideLicenseExpiryBannerEnv))) {
+	case "yes", "true":
+		return true
+	default:
+		return false
+	}
 }
 
 func accountLicense(status licensing.Status, installationAdmin bool) AccountLicense {
 	license := AccountLicense{
-		Edition:  string(status.Edition),
-		Features: []string{},
+		Edition:          string(status.Edition),
+		Features:         []string{},
+		HideExpiryBanner: hideLicenseExpiryBanner(),
 	}
 
 	if status.Edition == licensing.EditionEnterprise && status.License != nil {

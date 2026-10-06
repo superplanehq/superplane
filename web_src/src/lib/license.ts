@@ -31,6 +31,7 @@ export type AccountLicense = {
   features: string[];
   state?: LicenseState;
   expires_at?: string;
+  hide_expiry_banner?: boolean;
 };
 
 export const ENTERPRISE_FEATURES = [

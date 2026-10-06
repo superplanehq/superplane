@@ -76,6 +76,25 @@ describe("InstallationLicense", () => {
     expect(JSON.parse(String(putCall?.[1]?.body))).toEqual({ license: "header.claims.sig" });
   });
 
+  it("installs a license from a file", async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
+      init?.method === "PUT" ? jsonResponse(enterpriseStatus) : jsonResponse(communityStatus),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPage();
+
+    const file = new File(["  header.claims.sig\n"], "acme.license", { type: "text/plain" });
+    fireEvent.change(await screen.findByTestId("license-file-input"), { target: { files: [file] } });
+
+    expect(await screen.findByTestId("license-file-selected")).toHaveTextContent("acme.license");
+    fireEvent.click(screen.getByTestId("license-install"));
+
+    await waitFor(() => expect(screen.getByText("SuperPlane Enterprise")).toBeInTheDocument());
+    const putCall = fetchMock.mock.calls.find(([, init]) => init?.method === "PUT");
+    expect(JSON.parse(String(putCall?.[1]?.body))).toEqual({ license: "header.claims.sig" });
+  });
+
   it("shows the server error when the license is rejected", async () => {
     vi.stubGlobal(
       "fetch",

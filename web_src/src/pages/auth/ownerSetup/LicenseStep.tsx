@@ -1,14 +1,16 @@
-import superplaneLogo from "@/assets/superplane.svg";
 import { LicenseInstallForm } from "@/components/License/LicenseInstallForm";
-import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { ENTERPRISE_FEATURES, fetchInstallationLicenseWhenKeysReady, type InstallationLicense } from "@/lib/license";
-import { CheckCircle2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { FirstRunHeading, FirstRunPanel } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
+import { Check } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
 type LicenseStepProps = {
   onContinue: () => void;
 };
+
+type EditionChoice = "community" | "enterprise";
 
 const featureLabels = (license: InstallationLicense) =>
   ENTERPRISE_FEATURES.filter((feature) => license.license?.features.includes(feature.key)).map(
@@ -16,22 +18,62 @@ const featureLabels = (license: InstallationLicense) =>
   );
 
 const ActivatedSummary = ({ license, onContinue }: { license: InstallationLicense; onContinue: () => void }) => (
-  <div className="space-y-4 text-center" data-testid="owner-setup-license-active">
-    <CheckCircle2 size={32} className="mx-auto text-emerald-600 dark:text-emerald-400" />
-    <div>
-      <h4 className="mb-1 text-xl font-medium text-gray-800 dark:text-white">SuperPlane Enterprise is active</h4>
-      <Text className="text-gray-800 dark:text-gray-300">
+  <div data-testid="owner-setup-license-active">
+    <FirstRunHeading headline="SuperPlane Enterprise is active" size="display">
+      <p className="text-[15px] leading-6 text-muted-foreground">
         Enabled features: {featureLabels(license).join(", ") || "none"}.
-      </Text>
-    </div>
-    <Button type="button" className="w-full" onClick={onContinue}>
+      </p>
+    </FirstRunHeading>
+    <Button type="button" className="mt-8 min-w-40" onClick={onContinue}>
       Continue
     </Button>
   </div>
 );
 
+const EditionOption = ({
+  selected,
+  title,
+  description,
+  testId,
+  onSelect,
+  children,
+}: {
+  selected: boolean;
+  title: string;
+  description: string;
+  testId: string;
+  onSelect: () => void;
+  children?: React.ReactNode;
+}) => (
+  <div
+    className={cn(
+      "rounded-lg border px-4 py-3 text-left transition-colors",
+      selected ? "border-foreground bg-accent/40" : "border-border bg-background",
+    )}
+  >
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      data-testid={testId}
+      onClick={onSelect}
+      className="flex w-full items-start text-left"
+    >
+      <span className="min-w-0">
+        <span className="flex items-center gap-2 text-[13px] font-medium tracking-[-0.01em]">
+          {title}
+          {selected ? <Check className="size-3.5" strokeWidth={2.5} aria-hidden /> : null}
+        </span>
+        <span className="mt-0.5 block text-[12px] text-muted-foreground">{description}</span>
+      </span>
+    </button>
+    {children}
+  </div>
+);
+
 export const LicenseStep: React.FC<LicenseStepProps> = ({ onContinue }) => {
   const [license, setLicense] = useState<InstallationLicense | null>(null);
+  const [edition, setEdition] = useState<EditionChoice>("community");
 
   useEffect(() => {
     fetchInstallationLicenseWhenKeysReady()
@@ -47,10 +89,9 @@ export const LicenseStep: React.FC<LicenseStepProps> = ({ onContinue }) => {
 
   if (!license) {
     return (
-      <div className="flex flex-col items-center space-y-4 py-8" data-testid="owner-setup-license-loading">
-        <div className="h-8 w-8 animate-spin rounded-full border-b border-gray-500 dark:border-gray-400"></div>
-        <Text className="text-gray-500 dark:text-gray-400">Preparing license verification...</Text>
-      </div>
+      <p className="text-[15px] text-muted-foreground" data-testid="owner-setup-license-loading">
+        Preparing license verification...
+      </p>
     );
   }
 
@@ -60,27 +101,49 @@ export const LicenseStep: React.FC<LicenseStepProps> = ({ onContinue }) => {
 
   return (
     <div data-testid="owner-setup-license">
-      <div className="mb-6 text-center">
-        <img
-          src={superplaneLogo}
-          alt="SuperPlane logo"
-          className="mx-auto mb-4 h-8 w-8 dark:brightness-0 dark:invert"
-        />
-        <h4 className="mb-1 text-xl font-medium text-gray-800 dark:text-white">Activate SuperPlane Enterprise</h4>
-        <Text className="text-gray-800 dark:text-gray-300">
-          Optional. Paste your license key to enable Enterprise features. You can also do this later in the installation
-          admin settings.
-        </Text>
+      <FirstRunHeading headline="Choose an edition" size="display">
+        <p className="text-[15px] leading-6 text-muted-foreground">
+          Community is ready without a license. Add Enterprise only if you have one. You can add a license later in the
+          installation admin settings.
+        </p>
+      </FirstRunHeading>
+
+      <div className="mt-8">
+        <FirstRunPanel>
+          <div role="radiogroup" aria-label="Edition" className="space-y-3">
+            <EditionOption
+              selected={edition === "community"}
+              title="Community"
+              description="Start now. No license required."
+              testId="owner-setup-edition-community"
+              onSelect={() => setEdition("community")}
+            />
+            <EditionOption
+              selected={edition === "enterprise"}
+              title="Enterprise"
+              description="Use a license file, or paste the key. This enables the features that license includes."
+              testId="owner-setup-edition-enterprise"
+              onSelect={() => setEdition("enterprise")}
+            >
+              {edition === "enterprise" ? (
+                <div className="mt-4 border-t border-border pt-4">
+                  <LicenseInstallForm submitLabel="Activate Enterprise" onInstalled={setLicense} />
+                </div>
+              ) : null}
+            </EditionOption>
+          </div>
+        </FirstRunPanel>
       </div>
-      <LicenseInstallForm
-        submitLabel="Activate"
-        onInstalled={setLicense}
-        secondaryAction={
-          <Button type="button" variant="outline" data-testid="owner-setup-license-skip" onClick={onContinue}>
-            Skip for now
-          </Button>
-        }
-      />
+
+      <Button
+        type="button"
+        variant={edition === "community" ? "default" : "ghost"}
+        className={cn("mt-8 min-w-40", edition === "enterprise" && "text-muted-foreground hover:text-foreground")}
+        data-testid="owner-setup-license-skip"
+        onClick={onContinue}
+      >
+        Continue with Community
+      </Button>
     </div>
   );
 };

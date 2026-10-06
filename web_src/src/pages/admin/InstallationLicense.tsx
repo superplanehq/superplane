@@ -101,8 +101,7 @@ const CurrentLicenseSection = ({ status }: { status: InstallationLicenseStatus }
 
     {status.state === "expired" ? (
       <Text className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-        Enterprise features are not available. Existing custom roles and groups continue to work, but you cannot create
-        new ones. Install a renewed license to enable them again.
+        Enterprise features on this license are not available. Install a renewed license to enable them again.
       </Text>
     ) : null}
 
@@ -217,8 +216,8 @@ const RemoveLicenseDialog = ({ open, removing, onClose, onConfirm }: RemoveLicen
   <Dialog open={open} onClose={onClose} size="md">
     <DialogTitle className="text-gray-800 dark:text-gray-100">Remove the license?</DialogTitle>
     <DialogDescription className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-      This installation returns to SuperPlane Community. Existing custom roles and groups continue to work, but nobody
-      can create or change them until you install a license again.
+      This installation returns to SuperPlane Community. Enterprise features on this license will not be available until
+      you install a license that includes them.
     </DialogDescription>
     <DialogActions>
       <Button variant="destructive" onClick={onConfirm} disabled={removing}>
@@ -244,8 +243,8 @@ const InstallSection = ({ status, onInstalled, onRemoveClick }: InstallSectionPr
     <section className={sectionClass}>
       <p className={eyebrowClass}>{hasStoredLicense ? "Replace license" : "Install license"}</p>
       <Text className="mt-2 mb-4 max-w-2xl text-sm text-gray-600 dark:text-gray-400">
-        SuperPlane verifies the license on this server. It does not send the license to SuperPlane. To renew or add
-        features, install the new license that you receive.
+        Choose the license file you received, or paste the key. SuperPlane verifies it on this server and does not send
+        it anywhere. To renew or add features, install the new license.
       </Text>
       <div className="max-w-2xl">
         <LicenseInstallForm

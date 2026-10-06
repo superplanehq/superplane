@@ -229,11 +229,25 @@ func TestAccountLicenseHidesStateFromNonAdmins(t *testing.T) {
 	admin := accountLicense(status, true)
 	assert.Equal(t, "active", admin.State)
 	require.NotNil(t, admin.ExpiresAt)
+	assert.False(t, admin.HideExpiryBanner)
 
 	status.Edition = licensing.EditionCommunity
 	status.State = licensing.StateExpired
 	expired := accountLicense(status, false)
 	assert.Equal(t, []string{}, expired.Features)
+}
+
+func TestAccountLicenseHidesExpiryBanner(t *testing.T) {
+	status := licensing.Status{Edition: licensing.EditionCommunity, State: licensing.StateNone}
+
+	t.Setenv(HideLicenseExpiryBannerEnv, "no")
+	assert.False(t, accountLicense(status, true).HideExpiryBanner)
+
+	t.Setenv(HideLicenseExpiryBannerEnv, "yes")
+	assert.True(t, accountLicense(status, true).HideExpiryBanner)
+
+	t.Setenv(HideLicenseExpiryBannerEnv, "true")
+	assert.True(t, accountLicense(status, false).HideExpiryBanner)
 }
 
 func TestAdminLicenseKeyList(t *testing.T) {

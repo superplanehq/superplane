@@ -12,7 +12,7 @@ const LicenseExpiryBanner: React.FC = () => {
   const dismissalKey = license?.expires_at ? `${license.state}:${license.expires_at}` : "";
   const [dismissed, setDismissed] = useState(() => sessionStorage.getItem(DISMISSED_KEY));
 
-  if (!account?.installation_admin || dismissed === dismissalKey) {
+  if (!account?.installation_admin || license?.hide_expiry_banner || dismissed === dismissalKey) {
     return null;
   }
 

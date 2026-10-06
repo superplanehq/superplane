@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 describe("LicenseStep", () => {
-  it("lets the owner skip the step", async () => {
+  it("continues with Community without asking for a license", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => jsonResponse(communityStatus)),
@@ -22,7 +22,9 @@ describe("LicenseStep", () => {
 
     render(<LicenseStep onContinue={onContinue} />);
 
-    fireEvent.click(await screen.findByTestId("owner-setup-license-skip"));
+    expect(await screen.findByTestId("owner-setup-edition-community")).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByTestId("license-file-input")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("owner-setup-license-skip"));
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
 
@@ -92,6 +94,7 @@ describe("LicenseStep", () => {
 
     render(<LicenseStep onContinue={onContinue} />);
 
+    fireEvent.click(await screen.findByTestId("owner-setup-edition-enterprise"));
     fireEvent.change(await screen.findByTestId("license-key-input"), { target: { value: "a.b.c" } });
     fireEvent.click(screen.getByTestId("license-install"));
 

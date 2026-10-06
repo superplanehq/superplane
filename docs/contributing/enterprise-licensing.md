@@ -17,9 +17,14 @@ without them.
 ## Installing a license
 
 Installation administrators manage the license on the **Installation Admin >
-License** page, and the owner can install one during owner setup. SuperPlane
+License** page. During owner setup, Community is the default. The owner adds
+an Enterprise license only if they have one, and can add it later. SuperPlane
 accepts only a license that is valid now. To renew a license or add features,
 install the new license.
+
+Installation administrators see a banner when the license is expired or expires
+within 30 days. `SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER` hides that banner when
+it is `yes` or `true`. The default is `no`. Hosted SuperPlane sets it to `yes`.
 
 ## Enterprise code
 
