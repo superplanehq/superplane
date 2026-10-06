@@ -312,29 +312,19 @@ function useFirstRunCommands(args: {
         throw error;
       }
     });
-  const connectJira = () =>
-    blocking.runUntilNavigation("connecting-jira", async () => {
-      if (!jiraAvailable) return false;
-      model.setup.setIssuesChoice("jira");
-      if (!(await model.saveIssues("jira"))) return false;
+  const connectIssueTracker = (source: "jira" | "linear") =>
+    blocking.runUntilNavigation(source === "jira" ? "connecting-jira" : "connecting-linear", async () => {
+      if (source === "jira" ? !jiraAvailable : !linearAvailable) return false;
+      model.setup.setIssuesChoice(source);
+      if (!(await model.saveIssues(source))) return false;
       await waitForBrowserPaint();
-      return model.requestConnect("jira");
-    });
-  const connectLinear = () =>
-    blocking.runUntilNavigation("connecting-linear", async () => {
-      if (!linearAvailable) return false;
-      model.setup.setIssuesChoice("linear");
-      if (!(await model.saveIssues("linear"))) return false;
-      await waitForBrowserPaint();
-      return model.requestConnect("linear");
-    });
-  const finishSetup = () =>
-    blocking.run("finishing-setup", async () => {
-      await model.finish();
+      return model.requestConnect(source);
     });
   const continueFromAgent = () => {
     if (agentGate === "first") return navigation.goToScreen("tickets");
-    return finishSetup();
+    return blocking.run("finishing-setup", async () => {
+      await model.finish();
+    });
   };
   const selectTicketSource = (source: FirstRunTicketSource) => {
     if (source === "jira" && !jiraAvailable) return;
@@ -346,8 +336,8 @@ function useFirstRunCommands(args: {
     chooseVcsHost,
     connectBitbucket,
     connectGitHub,
-    connectJira,
-    connectLinear,
+    connectJira: () => connectIssueTracker("jira"),
+    connectLinear: () => connectIssueTracker("linear"),
     continueFromRepository,
     continueFromTickets,
     continueFromAgent,
@@ -459,8 +449,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   });
   const intakeFeatures = useExperimentalFeature(organizationId);
   const intakeFeatureLoading = intakeFeatures.isLoading;
-  const jiraFeatureLoading = intakeFeatureLoading;
-  const linearFeatureLoading = intakeFeatureLoading;
   const jiraAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_JIRA_INTAKE);
   const linearAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_LINEAR_INTAKE);
   const bitbucketAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_BITBUCKET);
@@ -492,13 +480,13 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const organizationReady = intakeFeatures.organizationReady;
   const jiraChoiceArgs = {
     issuesChoice,
-    featureLoading: jiraFeatureLoading,
+    featureLoading: intakeFeatureLoading,
     jiraAvailable,
     organizationReady,
   };
   const linearChoiceArgs = {
     issuesChoice,
-    featureLoading: linearFeatureLoading,
+    featureLoading: intakeFeatureLoading,
     linearAvailable,
     organizationReady,
   };
@@ -525,10 +513,10 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
     jiraAvailable,
-    jiraFeatureLoading,
+    jiraFeatureLoading: intakeFeatureLoading,
     jiraChoiceBlock,
     linearAvailable,
-    linearFeatureLoading,
+    linearFeatureLoading: intakeFeatureLoading,
     linearChoiceBlock,
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
     repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
