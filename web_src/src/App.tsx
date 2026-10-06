@@ -89,11 +89,13 @@ import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
 import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
+import InstallationLicenseAdmin from "./pages/admin/InstallationLicense";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
 import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
 import { Webhooks as WebhooksAdmin } from "./pages/admin/Webhooks";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
+import LicenseExpiryBanner from "./components/LicenseExpiryBanner";
 import { usePageObservability } from "./hooks/usePageObservability";
 
 // Create a client
@@ -254,6 +256,7 @@ function AppRouter() {
       <PageObservabilityScope />
       <div className="flex h-dvh flex-col overflow-hidden">
         <ImpersonationBanner />
+        <LicenseExpiryBanner />
         <div className="relative flex-1 overflow-auto">
           <SetupGuard>
             <GlobalCommandPalette />
@@ -267,6 +270,7 @@ function AppRouter() {
                 <Route index element={<OrganizationsListAdmin />} />
                 <Route path="accounts" element={<AccountsListAdmin />} />
                 <Route path="settings" element={<InstallationSettingsAdmin />} />
+                <Route path="license" element={<InstallationLicenseAdmin />} />
                 <Route path="price-books" element={<PriceBooksAdmin />} />
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="polar-webhooks" element={<PolarWebhooksAdmin />} />
