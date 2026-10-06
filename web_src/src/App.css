@@ -1211,6 +1211,50 @@
   animation: sp-confidence-why-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.sp-confidence-drawer {
+  animation: sp-confidence-drawer-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sp-confidence-drawer[data-side="below"] {
+  animation-name: sp-confidence-drawer-in-below;
+}
+
+.sp-confidence-drawer .sp-review-metric {
+  animation: sp-review-metric-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sp-confidence-drawer .sp-review-metric:nth-child(2) {
+  animation-delay: 50ms;
+}
+
+.sp-confidence-drawer .sp-review-metric:nth-child(3) {
+  animation-delay: 100ms;
+}
+
+@keyframes sp-confidence-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sp-confidence-drawer-in-below {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes sp-text-reveal {
   from {
     opacity: 0;
@@ -1226,6 +1270,17 @@
   from {
     opacity: 0;
     transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sp-review-metric-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -1581,7 +1636,9 @@
     opacity: 1 !important;
   }
 
-  .sp-confidence-why[data-state="open"] {
+  .sp-confidence-why[data-state="open"],
+  .sp-confidence-drawer,
+  .sp-confidence-drawer .sp-review-metric {
     animation: none;
   }
 
