@@ -45,6 +45,9 @@ spec:
       labels:
         app: superplane
         service: {{ .Release.Name }}-websocket
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       terminationGracePeriodSeconds: 75
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
@@ -150,6 +153,8 @@ spec:
               value: {{ .Values.installation.type | quote }}
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
+            - name: BLOB_STORAGE_ACCOUNT
+              value: {{ .Values.blobStorage.account | quote }}
             - name: BLOB_STORAGE_BUCKET
               value: {{ .Values.blobStorage.bucket | quote }}
             - name: BLOB_STORAGE_REGION

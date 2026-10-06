@@ -18,6 +18,9 @@ spec:
       labels:
         app: superplane
         service: {{ .Release.Name }}-workers
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
@@ -128,6 +131,8 @@ spec:
               value: "yes"
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
+            - name: BLOB_STORAGE_ACCOUNT
+              value: {{ .Values.blobStorage.account | quote }}
             - name: BLOB_STORAGE_BUCKET
               value: {{ .Values.blobStorage.bucket | quote }}
             - name: BLOB_STORAGE_REGION
@@ -136,6 +141,16 @@ spec:
               value: {{ .Values.blobStorage.localPath | quote }}
             - name: BLOB_STORAGE_CREDENTIALS_FILE
               value: {{ .Values.blobStorage.credentialsFile | quote }}
+            - name: START_RUNNER_LOG_COMPACTOR
+{{- if .Values.runnerAPI.enabled }}
+              value: "yes"
+{{- else }}
+              value: "no"
+{{- end }}
+{{- if .Values.runnerAPI.enabled }}
+            - name: RUNNER_ACTIVE_LOG_FS_PATH
+              value: {{ .Values.runnerLogs.path | quote }}
+{{- end }}
             - name: START_FILE_CLEANUP_WORKER
               value: "yes"
 
@@ -146,6 +161,10 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
             - name: blob-data
               mountPath: {{ .Values.blobStorage.localPath }}
+{{- end }}
+{{- if .Values.runnerAPI.enabled }}
+            - name: runner-logs
+              mountPath: {{ .Values.runnerLogs.path }}
 {{- end }}
 
           securityContext:
@@ -166,4 +185,13 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
         - name: blob-data
           emptyDir: {}
+{{- end }}
+{{- if .Values.runnerAPI.enabled }}
+        - name: runner-logs
+{{- if .Values.runnerLogs.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.runnerLogs.existingClaim }}
+{{- else }}
+          emptyDir: {}
+{{- end }}
 {{- end }}
