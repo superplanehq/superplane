@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
+import type { FactoriesFactoryMcpClient } from "@/api-client";
 import {
   FEATURE_SUPERPLANE_MCP_SERVER,
   FEATURE_WORKSPACE_MCP,
@@ -26,6 +27,31 @@ const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
 const superplaneMcpServerPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/superplane-mcp-server`;
 const mcpConfigurePath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
 const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
+
+function connectedMcpClient(id: string, clientName: string): FactoriesFactoryMcpClient {
+  return {
+    id,
+    clientName,
+    userId: STORYBOOK_ME_USER_ID,
+    userName: STORYBOOK_ME_USER_NAME,
+    userAvatarUrl: "/storybook/leonardo-dicaprio.jpg",
+    createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+  };
+}
+
+function renderSuperplaneMcpServer(clients?: FactoriesFactoryMcpClient[]) {
+  render(
+    <FactoriesHarness
+      pathSuffix={superplaneMcpServerPath}
+      factoriesFixture={
+        clients
+          ? { ...defaultFactoriesFixture, mcpClientsByFactoryId: { [PRIMARY_FACTORY_ID]: clients } }
+          : defaultFactoriesFixture
+      }
+      experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
+    />,
+  );
+}
 
 describe("FactorySettingsMCPPage", () => {
   beforeAll(() => {
@@ -371,13 +397,7 @@ describe("FactorySettingsMCPPage", () => {
   }, 10000);
 
   it("shows how to connect when no SuperPlane MCP clients exist", async () => {
-    render(
-      <FactoriesHarness
-        pathSuffix={superplaneMcpServerPath}
-        factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
-      />,
-    );
+    renderSuperplaneMcpServer();
 
     expect(
       await screen.findByText(
@@ -404,13 +424,7 @@ describe("FactorySettingsMCPPage", () => {
 
   it("shows Claude Code and VS Code setup after the matching tab", async () => {
     const user = userEvent.setup();
-    render(
-      <FactoriesHarness
-        pathSuffix={superplaneMcpServerPath}
-        factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
-      />,
-    );
+    renderSuperplaneMcpServer();
 
     expect(await screen.findByTestId("superplane-mcp-clients-empty", {}, { timeout: 8000 })).toBeInTheDocument();
     await user.click(screen.getByTestId("superplane-mcp-connect-client"));
@@ -447,13 +461,7 @@ describe("FactorySettingsMCPPage", () => {
 
   it("shows OpenCode setup and copies the configuration", async () => {
     const user = userEvent.setup();
-    render(
-      <FactoriesHarness
-        pathSuffix={superplaneMcpServerPath}
-        factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
-      />,
-    );
+    renderSuperplaneMcpServer();
 
     expect(await screen.findByTestId("superplane-mcp-clients-empty", {}, { timeout: 8000 })).toBeInTheDocument();
     await user.click(screen.getByTestId("superplane-mcp-connect-client"));
@@ -499,27 +507,7 @@ describe("FactorySettingsMCPPage", () => {
   it("lists a connected SuperPlane MCP client and revokes it", async () => {
     const user = userEvent.setup();
     const clientId = "mcp-client-cursor";
-    render(
-      <FactoriesHarness
-        pathSuffix={superplaneMcpServerPath}
-        factoriesFixture={{
-          ...defaultFactoriesFixture,
-          mcpClientsByFactoryId: {
-            [PRIMARY_FACTORY_ID]: [
-              {
-                id: clientId,
-                clientName: "Cursor",
-                userId: STORYBOOK_ME_USER_ID,
-                userName: STORYBOOK_ME_USER_NAME,
-                userAvatarUrl: "/storybook/leonardo-dicaprio.jpg",
-                createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-              },
-            ],
-          },
-        }}
-        experimentalFeatures={[FEATURE_SUPERPLANE_MCP_SERVER]}
-      />,
-    );
+    renderSuperplaneMcpServer([connectedMcpClient(clientId, "Cursor")]);
 
     expect(await screen.findByTestId("superplane-mcp-clients-list", {}, { timeout: 8000 })).toHaveTextContent("Cursor");
     expect(screen.getByTestId(`superplane-mcp-client-${clientId}`)).toHaveTextContent(STORYBOOK_ME_USER_NAME);
@@ -531,5 +519,27 @@ describe("FactorySettingsMCPPage", () => {
       expect(screen.queryByTestId("superplane-mcp-clients-list")).not.toBeInTheDocument();
     });
     expect(await screen.findByTestId("superplane-mcp-clients-empty")).toBeInTheDocument();
+  }, 10000);
+
+  it("shows the full MCP client name on hover and in the revoke dialog", async () => {
+    const longClientId = "mcp-client-codex";
+    const longClientName = "https://chatgpt.com/oauth/codex/workspace-example/client.json";
+    renderSuperplaneMcpServer([
+      connectedMcpClient("mcp-client-cursor", "Cursor"),
+      connectedMcpClient(longClientId, longClientName),
+    ]);
+
+    const table = await screen.findByRole("table", { name: "Connected clients" }, { timeout: 8000 });
+    const longRow = within(table).getByRole("row", { name: (name) => name.includes(longClientName) });
+    expect(within(longRow).getAllByRole("cell")).toHaveLength(4);
+    expect(within(table).getByRole("columnheader", { name: "Client" })).toBeInTheDocument();
+    const longName = within(longRow).getByTestId(`superplane-mcp-client-name-${longClientId}`);
+    expect(screen.getByTestId("superplane-mcp-client-mcp-client-cursor")).toHaveTextContent("Cursor");
+    expect(longName).toHaveAttribute("title", longClientName);
+    expect(longName).toHaveTextContent(longClientName);
+    expect(within(longRow).getByRole("button", { name: "Revoke" })).toBeEnabled();
+
+    await userEvent.setup().click(within(longRow).getByRole("button", { name: "Revoke" }));
+    expect(screen.getByText(`Revoke "${longClientName}"?`)).toBeInTheDocument();
   }, 10000);
 });
