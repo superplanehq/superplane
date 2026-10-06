@@ -25,6 +25,8 @@ export function IssuesSourceOptions({
   onRequestConnect: (id: IntegrationId) => void;
 }) {
   const hostIssuesState = host === "github" ? intakeState("github-issues") : undefined;
+  const linearIssuesState = intakeState("linear-issues");
+  const jiraIssuesState = intakeState("jira-issues");
 
   return (
     <>
@@ -41,28 +43,30 @@ export function IssuesSourceOptions({
           onSelect={() => setup.setIssuesChoice("vcs")}
         />
       ) : null}
-      {intakeState("linear-issues") !== "hidden" ? (
+      {linearIssuesState !== "hidden" ? (
         <ConnectOptionRow
           icon={<IntegrationChoiceIcon name="linear" />}
           title="Linear"
           detail="Find agent-ready work in your Linear backlog."
+          meta={linearIssuesState === "beta" ? "Beta" : undefined}
           selected={setup.issuesChoice === "linear"}
           connectLabel="Linear"
           connected={setup.connected.has("linear")}
-          soon
+          soon={linearIssuesState === "soon"}
           onSelect={() => setup.setIssuesChoice("linear")}
           onConnect={() => onRequestConnect("linear")}
         />
       ) : null}
-      {intakeState("jira-issues") !== "hidden" ? (
+      {jiraIssuesState !== "hidden" ? (
         <ConnectOptionRow
           icon={<IntegrationChoiceIcon name="jira" />}
           title="Jira"
           detail="Find agent-ready work in your Jira backlog."
+          meta={jiraIssuesState === "beta" ? "Beta" : undefined}
           selected={setup.issuesChoice === "jira"}
           connectLabel="Jira"
           connected={setup.connected.has("jira")}
-          soon
+          soon={jiraIssuesState === "soon"}
           onSelect={() => setup.setIssuesChoice("jira")}
           onConnect={() => onRequestConnect("jira")}
         />
