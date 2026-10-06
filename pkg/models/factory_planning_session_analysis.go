@@ -135,7 +135,7 @@ func analysisSessionMatchesWorkOrder(session *FactoryPlanningSession, workOrderI
 }
 
 func (s *FactoryPlanningSession) ProposeSpec(tx *gorm.DB, body string) error {
-	markdown := strings.TrimSpace(body)
+	markdown := unwrapPlanningMarkdown(body)
 	if markdown == "" {
 		return fmt.Errorf("%w: spec body is required", ErrFactoryPlanningSessionInvalid)
 	}
@@ -153,6 +153,24 @@ func (s *FactoryPlanningSession) ProposeSpec(tx *gorm.DB, body string) error {
 		}
 		return upsertPlanningSpecArtifact(inner, order, stored, s.CanvasRunID)
 	})
+}
+
+// unwrapPlanningMarkdown accepts a spec that an agent JSON-encoded twice.
+// propose_update nests markdown in one JSON object, and the model sometimes
+// sends "\"# Title\\n\\nBody\"" instead of real line breaks.
+func unwrapPlanningMarkdown(body string) string {
+	trimmed := strings.TrimSpace(body)
+	if trimmed == "" || trimmed[0] != '"' {
+		return trimmed
+	}
+	var decoded string
+	if err := json.Unmarshal([]byte(trimmed), &decoded); err != nil {
+		return trimmed
+	}
+	if strings.TrimSpace(decoded) == "" {
+		return trimmed
+	}
+	return decoded
 }
 
 func planningSpecMarkdownForStorage(tx *gorm.DB, order *FactoryWorkOrder, markdown string) (string, error) {
@@ -694,7 +712,7 @@ func planningSpecBody(tx *gorm.DB, order *FactoryWorkOrder) (string, error) {
 		if json.Unmarshal(artifacts[i].Data, &data) != nil {
 			continue
 		}
-		if body := extractArtifactString(data, "body"); body != "" {
+		if body := unwrapPlanningMarkdown(extractArtifactString(data, "body")); body != "" {
 			return body, nil
 		}
 	}

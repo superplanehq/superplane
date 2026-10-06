@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -46,6 +47,48 @@ func TestFactoryPlanningSession_ProposeUpdateWritesScoresSpecAndSurvey(t *testin
 
 	require.NoError(t, session.reloadMessages(db))
 	assert.Equal(t, "Which service?", session.CurrentSurvey().Questions[0].Prompt)
+}
+
+func TestFactoryPlanningSession_ProposeUpdateStoresJSONEncodedSpecAsMarkdown(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-update-encoded-spec")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
+
+	err := session.ProposeUpdate(db, PlanningSessionUpdate{
+		Scores: reviewScores(5, 5, 5),
+		Spec:   `"# Retry refunds\n\nStop double charges.\n"`,
+	})
+	require.NoError(t, err)
+
+	spec, err := planningSpecBody(db, order)
+	require.NoError(t, err)
+	assert.Equal(t, "# Retry refunds\n\nStop double charges.", strings.TrimSpace(spec))
+	assert.NotContains(t, spec, `\n`)
+}
+
+func TestPlanningSpecBodyUnwrapsJSONEncodedArtifact(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-spec-encoded-read")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, _ := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
+	_, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+		Type: FactoryWorkOrderArtifactTypeMarkdown,
+		Key:  planningSpecArtifactKey(order.ID),
+		Data: map[string]any{
+			"name": PlanningSpecArtifactTitle,
+			"body": `"# Retry refunds\n\nStop double charges.\n"`,
+		},
+	})
+	require.NoError(t, err)
+
+	spec, err := planningSpecBody(db, order)
+	require.NoError(t, err)
+	assert.Equal(t, "# Retry refunds\n\nStop double charges.", strings.TrimSpace(spec))
 }
 
 func TestFactoryPlanningSession_ProposeUpdateRejectsPartialScores(t *testing.T) {

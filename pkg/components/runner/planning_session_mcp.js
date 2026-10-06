@@ -140,7 +140,7 @@ async function proposeUpdate(input) {
       risk: scoreField(input.scores, "risk"),
     };
   }
-  const spec = String((input && input.spec) || "").trim();
+  const spec = unwrapMarkdown(input && input.spec);
   if (spec) {
     body.spec = spec;
   }
@@ -157,8 +157,24 @@ async function proposeUpdate(input) {
   return result;
 }
 
+function unwrapMarkdown(value) {
+  const text = String(value || "").trim();
+  if (!text.startsWith('"')) {
+    return text;
+  }
+  try {
+    const decoded = JSON.parse(text);
+    if (typeof decoded === "string" && decoded.trim()) {
+      return decoded;
+    }
+  } catch (_err) {
+    // The value is not a JSON string.
+  }
+  return text;
+}
+
 async function proposeSpec(input) {
-  const body = String((input && input.body) || "").trim();
+  const body = unwrapMarkdown(input && input.body);
   if (!body) {
     throw new Error("body is required");
   }

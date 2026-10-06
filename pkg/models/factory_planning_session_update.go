@@ -94,7 +94,7 @@ func (s *FactoryPlanningSession) ProposeUpdate(tx *gorm.DB, update PlanningSessi
 				}
 			}
 		}
-		if spec := strings.TrimSpace(update.Spec); spec != "" {
+		if spec := unwrapPlanningMarkdown(update.Spec); spec != "" {
 			if err := s.ProposeSpec(inner, spec); err != nil {
 				return err
 			}
