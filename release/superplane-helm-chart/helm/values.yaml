@@ -78,6 +78,8 @@ license:
   # URL of the signed license key list. Use "none" without network access.
   # Leave empty to use the SuperPlane issuer.
   keysURL: ""
+  # Hide the license expiry banner. Self-hosted installations keep it visible.
+  hideExpiryBanner: false
 
 telemetry:
   secretName: ""
