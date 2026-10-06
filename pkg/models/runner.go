@@ -446,6 +446,7 @@ func (r *Runner) Terminate(tx *gorm.DB, reason string) error {
 		return releaseReservedRunnerTask(tx, r.ID, time.Now())
 	}
 
+	previousState := r.State
 	now := time.Now()
 	result := tx.Model(r).
 		Where("state IN ?", []string{RunnerStatePending, RunnerStateIdle}).
@@ -489,10 +490,16 @@ func (r *Runner) Terminate(tx *gorm.DB, reason string) error {
 		Error; err != nil {
 		return err
 	}
-	return tx.Model(&RunnerRegistration{}).
+	if err := tx.Model(&RunnerRegistration{}).
 		Where("runner_id = ? AND revoked_at IS NULL", r.ID).
 		Update("revoked_at", now).
-		Error
+		Error; err != nil {
+		return err
+	}
+	if previousState == RunnerStateIdle {
+		recordRunnerStateOccupancy(tx, r.FleetID, RunnerStateIdle, now.Sub(r.idleStartedAt(tx)))
+	}
+	return nil
 }
 
 func releaseReservedRunnerTask(tx *gorm.DB, runnerID uuid.UUID, now time.Time) error {

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 //
@@ -41,6 +42,7 @@ func (p *Periodic) report() {
 	p.reportStuckQueueItems()
 	p.reportPendingEvents()
 	p.reportPendingExecutions()
+	p.reportRunnerFleetCounts()
 }
 
 func (p *Periodic) reportDatabasePoolStats() {
@@ -110,6 +112,54 @@ func (p *Periodic) reportPendingEvents() {
 	}
 
 	RecordPendingEventsCount(p.ctx, count)
+}
+
+func (p *Periodic) reportRunnerFleetCounts() {
+	counts, err := listRunnerFleetCounts()
+	if err != nil {
+		return
+	}
+
+	for _, count := range counts {
+		organizationID := ""
+		if count.ScopeType == models.RunnerFleetScopeOrganization && count.ScopeID != nil {
+			organizationID = *count.ScopeID
+		}
+		RecordRunnerFleetCount(p.ctx, count.FleetSlug, organizationID, models.RunnerStateIdle, count.IdleCount)
+		RecordRunnerFleetCount(p.ctx, count.FleetSlug, organizationID, models.RunnerStateBusy, count.BusyCount)
+	}
+}
+
+type runnerFleetCount struct {
+	FleetSlug string
+	ScopeType string
+	ScopeID   *string
+	IdleCount int64
+	BusyCount int64
+}
+
+func listRunnerFleetCounts() ([]runnerFleetCount, error) {
+	var rows []runnerFleetCount
+	err := database.Conn().Raw(`
+		SELECT
+			fleets.slug AS fleet_slug,
+			fleets.scope_type AS scope_type,
+			CAST(fleets.scope_id AS text) AS scope_id,
+			COUNT(runners.id) FILTER (WHERE runners.state = ?) AS idle_count,
+			COUNT(runners.id) FILTER (WHERE runners.state = ?) AS busy_count
+		FROM runner_fleets AS fleets
+		LEFT JOIN runners
+			ON runners.fleet_id = fleets.id
+			AND runners.state IN (?, ?)
+		WHERE fleets.deleted_at IS NULL
+		GROUP BY fleets.id, fleets.slug, fleets.scope_type, fleets.scope_id
+	`,
+		models.RunnerStateIdle,
+		models.RunnerStateBusy,
+		models.RunnerStateIdle,
+		models.RunnerStateBusy,
+	).Scan(&rows).Error
+	return rows, err
 }
 
 func (p *Periodic) reportPendingExecutions() {

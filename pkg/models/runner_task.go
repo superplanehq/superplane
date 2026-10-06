@@ -128,6 +128,7 @@ func (t *RunnerTask) RequestCancel(tx *gorm.DB, now time.Time) error {
 		t.State = RunnerTaskStateCanceled
 		t.FinishedAt = &now
 		t.UpdatedAt = now
+		recordRunnerTaskQueueWait(tx, t.FleetID, RunnerQueueWaitCanceled, t.QueuedAt, now)
 		return nil
 	}
 
@@ -274,6 +275,8 @@ func (t *RunnerTask) Start(tx *gorm.DB, runner *Runner, activeLogStore string, n
 	t.UpdatedAt = now
 	runner.State = RunnerStateBusy
 	runner.UpdatedAt = now
+	recordRunnerStateOccupancy(tx, runner.FleetID, RunnerStateIdle, now.Sub(runner.idleStartedAt(tx)))
+	recordRunnerTaskQueueWait(tx, t.FleetID, RunnerQueueWaitStarted, t.QueuedAt, now)
 	return nil
 }
 
@@ -370,6 +373,10 @@ func (t *RunnerTask) Complete(
 	t.FinishedAt = &now
 	t.UpdatedAt = now
 	runner.UpdatedAt = now
+	if t.StartedAt != nil {
+		recordRunnerStateOccupancy(tx, runner.FleetID, RunnerStateBusy, now.Sub(*t.StartedAt))
+	}
+	recordRunnerTaskRun(tx, t.FleetID, state, t.StartedAt, now)
 	return nil
 }
 
