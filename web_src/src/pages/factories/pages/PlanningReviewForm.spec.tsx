@@ -206,7 +206,7 @@ describe("PlanningReviewForm model options", () => {
 
     renderForm(superPlaneDraft());
 
-    expect(screen.getByText("Model used")).toBeInTheDocument();
+    expect(screen.getByText("Model")).toBeInTheDocument();
     await user.click(screen.getByTestId("field-model-hosted-model"));
     await user.hover(screen.getByTestId("field-model-hosted-model-list"));
     expect(await screen.findByRole("menuitem", { name: "qwen/qwen3.7-max" })).toBeInTheDocument();
