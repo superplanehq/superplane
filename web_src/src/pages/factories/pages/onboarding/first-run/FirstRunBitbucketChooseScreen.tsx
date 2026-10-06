@@ -38,7 +38,7 @@ export function FirstRunBitbucketChooseScreen({
 }) {
   if (!connected) {
     return (
-      <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere}>
+      <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere} visual="preview">
         <FirstRunHeading headline={copy.connectHeadline}>
           <p className="text-[15px] leading-6 text-muted-foreground">{copy.connectBody}</p>
         </FirstRunHeading>
@@ -59,6 +59,7 @@ export function FirstRunBitbucketChooseScreen({
       busy={busy}
       contentSpacing="compact"
       sphere={sphere}
+      visual="preview"
     >
       <FirstRunHeading headline={chooseCopy.headline}>
         <p className="text-[13px] text-muted-foreground">{copy.repositoryHelper}</p>
