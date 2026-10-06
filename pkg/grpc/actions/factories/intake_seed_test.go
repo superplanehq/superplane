@@ -32,6 +32,7 @@ import (
 
 func Test__IntakeSeed(t *testing.T) {
 	r := support.Setup(t)
+	grantIntakeCatalogAccess(t, r.Organization.ID)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 	deps := IntakeDependencies{
@@ -439,6 +440,7 @@ func Test__SentryIssueEvents(t *testing.T) {
 
 func Test__SentrySeedSkipsKnownIssues(t *testing.T) {
 	r := support.Setup(t)
+	grantIntakeCatalogAccess(t, r.Organization.ID)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 	deps := IntakeDependencies{
@@ -542,6 +544,7 @@ func Test__SentrySeedSkipsKnownIssues(t *testing.T) {
 
 func Test__JiraSeedSkipsKnownIssues(t *testing.T) {
 	r := support.Setup(t)
+	grantIntakeCatalogAccess(t, r.Organization.ID)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 	deps := IntakeDependencies{
@@ -845,6 +848,7 @@ func Test__DatadogIssueEvents(t *testing.T) {
 
 func Test__DatadogSeedSkipsKnownIssues(t *testing.T) {
 	r := support.Setup(t)
+	grantIntakeCatalogAccess(t, r.Organization.ID)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 	deps := IntakeDependencies{
