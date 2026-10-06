@@ -21,24 +21,21 @@ type runnerMetricSpy struct {
 }
 
 type runnerOccupancySample struct {
-	slug           string
-	organizationID string
-	state          string
-	duration       time.Duration
+	slug     string
+	state    string
+	duration time.Duration
 }
 
 type runnerQueueWaitSample struct {
-	slug           string
-	organizationID string
-	outcome        string
-	duration       time.Duration
+	slug     string
+	outcome  string
+	duration time.Duration
 }
 
 type runnerRunSample struct {
-	slug           string
-	organizationID string
-	state          string
-	duration       time.Duration
+	slug     string
+	state    string
+	duration time.Duration
 }
 
 func (s *runnerMetricSpy) install(t *testing.T) {
@@ -46,26 +43,23 @@ func (s *runnerMetricSpy) install(t *testing.T) {
 	previous := models.SetRunnerMetrics(models.RunnerMetrics{
 		StateOccupancy: func(labels models.RunnerFleetLabels, state string, d time.Duration) {
 			s.occupancy = append(s.occupancy, runnerOccupancySample{
-				slug:           labels.FleetSlug,
-				organizationID: labels.OrganizationID,
-				state:          state,
-				duration:       d,
+				slug:     labels.FleetSlug,
+				state:    state,
+				duration: d,
 			})
 		},
 		TaskQueueWait: func(labels models.RunnerFleetLabels, outcome string, d time.Duration) {
 			s.queueWait = append(s.queueWait, runnerQueueWaitSample{
-				slug:           labels.FleetSlug,
-				organizationID: labels.OrganizationID,
-				outcome:        outcome,
-				duration:       d,
+				slug:     labels.FleetSlug,
+				outcome:  outcome,
+				duration: d,
 			})
 		},
 		TaskRun: func(labels models.RunnerFleetLabels, state string, d time.Duration) {
 			s.run = append(s.run, runnerRunSample{
-				slug:           labels.FleetSlug,
-				organizationID: labels.OrganizationID,
-				state:          state,
-				duration:       d,
+				slug:     labels.FleetSlug,
+				state:    state,
+				duration: d,
 			})
 		},
 	})
@@ -159,6 +153,46 @@ func TestRunnerMetricsFollowTaskLifecycle(t *testing.T) {
 	require.Equal(t, 10*time.Second, spy.occupancy[len(spy.occupancy)-1].duration)
 	require.Equal(t, models.RunnerStateIdle, spy.occupancy[len(spy.occupancy)-1].state)
 	require.Equal(t, 10*time.Second, spy.queueWait[len(spy.queueWait)-1].duration)
+}
+
+func TestOrganizationFleetSkipsRunnerMetrics(t *testing.T) {
+	resource := support.Setup(t)
+	db := database.DB(t.Context())
+	fleet := newOrganizationTestRunnerFleet(resource.Organization.ID, "org-metrics")
+	require.NoError(t, fleet.Create(db))
+
+	spy := &runnerMetricSpy{}
+	spy.install(t)
+
+	registeredAt := time.Now().Add(-time.Minute).Truncate(time.Millisecond)
+	runner := &models.Runner{
+		ID:            uuid.New(),
+		FleetID:       fleet.ID,
+		State:         models.RunnerStateIdle,
+		RunnerVersion: "0.1.0",
+		RegisteredAt:  &registeredAt,
+		CreatedAt:     registeredAt,
+		UpdatedAt:     registeredAt,
+	}
+	require.NoError(t, db.Create(runner).Error)
+	task := newMetricRunnerTask(resource.Organization.ID, fleet.ID, registeredAt)
+	require.NoError(t, db.Create(task).Error)
+	require.NoError(t, task.Reserve(db, runner.ID))
+	require.NoError(t, task.Start(db, runner, "test-store", registeredAt.Add(time.Second)))
+	require.NoError(t, task.Complete(
+		db,
+		runner,
+		"completion-hash",
+		datatypes.JSON([]byte(`{}`)),
+		0,
+		"",
+		false,
+		registeredAt.Add(2*time.Second),
+	))
+
+	require.Empty(t, spy.occupancy)
+	require.Empty(t, spy.queueWait)
+	require.Empty(t, spy.run)
 }
 
 func TestCanceledQueuedTaskRecordsQueueWait(t *testing.T) {

@@ -14,12 +14,10 @@ const (
 	RunnerQueueWaitLost     = "lost"
 )
 
-// RunnerFleetLabels identify the fleet on a runner or task metric.
-// OrganizationID is set only for organization-scoped fleets so two
-// organizations can reuse one fleet slug without sharing a time series.
+// RunnerFleetLabels identify an installation fleet on a runner or task metric.
+// Organization fleets are omitted.
 type RunnerFleetLabels struct {
-	FleetSlug      string
-	OrganizationID string
+	FleetSlug string
 }
 
 // RunnerMetrics receives runner and task observations after a durable
@@ -53,19 +51,14 @@ func currentRunnerMetrics() RunnerMetrics {
 
 func runnerFleetLabels(tx *gorm.DB, fleetID uuid.UUID) (RunnerFleetLabels, bool) {
 	var fleet RunnerFleet
-	err := tx.Select("slug", "scope_type", "scope_id").
+	err := tx.Select("slug", "scope_type").
 		Where("id = ?", fleetID).
 		First(&fleet).
 		Error
-	if err != nil || fleet.Slug == "" {
+	if err != nil || fleet.Slug == "" || fleet.ScopeType != RunnerFleetScopeInstallation {
 		return RunnerFleetLabels{}, false
 	}
-
-	labels := RunnerFleetLabels{FleetSlug: fleet.Slug}
-	if fleet.ScopeType == RunnerFleetScopeOrganization && fleet.ScopeID != nil {
-		labels.OrganizationID = fleet.ScopeID.String()
-	}
-	return labels, true
+	return RunnerFleetLabels{FleetSlug: fleet.Slug}, true
 }
 
 // idleStartedAt is when this runner last entered idle.

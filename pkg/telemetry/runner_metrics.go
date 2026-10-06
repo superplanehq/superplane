@@ -41,7 +41,7 @@ func registerRunnerMetrics() error {
 
 	runnerFleetCountGauge, err = meter.Int64Gauge(
 		"runner.fleet.count",
-		metric.WithDescription("Idle and busy runners in each fleet"),
+		metric.WithDescription("Idle and busy runners in each installation fleet"),
 		metric.WithUnit("1"),
 	)
 	if err != nil {
@@ -86,72 +86,69 @@ func registerRunnerMetrics() error {
 
 	models.SetRunnerMetrics(models.RunnerMetrics{
 		StateOccupancy: func(labels models.RunnerFleetLabels, state string, d time.Duration) {
-			RecordRunnerStateOccupancy(context.Background(), labels.FleetSlug, labels.OrganizationID, state, d)
+			RecordRunnerStateOccupancy(context.Background(), labels.FleetSlug, state, d)
 		},
 		TaskQueueWait: func(labels models.RunnerFleetLabels, outcome string, d time.Duration) {
-			RecordRunnerTaskQueueWait(context.Background(), labels.FleetSlug, labels.OrganizationID, outcome, d)
+			RecordRunnerTaskQueueWait(context.Background(), labels.FleetSlug, outcome, d)
 		},
 		TaskRun: func(labels models.RunnerFleetLabels, state string, d time.Duration) {
-			RecordRunnerTaskRun(context.Background(), labels.FleetSlug, labels.OrganizationID, state, d)
+			RecordRunnerTaskRun(context.Background(), labels.FleetSlug, state, d)
 		},
 	})
 	return nil
 }
 
-func RecordRunnerFleetCount(ctx context.Context, fleetSlug, organizationID, state string, count int64) {
+func RecordRunnerFleetCount(ctx context.Context, fleetSlug, state string, count int64) {
 	if !metricsReady.Load() || runnerFleetCountGauge == nil || fleetSlug == "" {
 		return
 	}
 
-	runnerFleetCountGauge.Record(ctx, count, fleetAttributes(fleetSlug, organizationID,
+	runnerFleetCountGauge.Record(ctx, count, fleetAttributes(fleetSlug,
 		attribute.String("state", state),
 	))
 }
 
-func RecordRunnerStateOccupancy(ctx context.Context, fleetSlug, organizationID, state string, d time.Duration) {
+func RecordRunnerStateOccupancy(ctx context.Context, fleetSlug, state string, d time.Duration) {
 	if !metricsReady.Load() || runnerStateOccupancySeconds == nil || fleetSlug == "" || d < 0 {
 		return
 	}
 
-	runnerStateOccupancySeconds.Record(ctx, d.Seconds(), fleetAttributes(fleetSlug, organizationID,
+	runnerStateOccupancySeconds.Record(ctx, d.Seconds(), fleetAttributes(fleetSlug,
 		attribute.String("state", state),
 	))
 }
 
-func RecordRunnerTaskQueueWait(ctx context.Context, fleetSlug, organizationID, outcome string, d time.Duration) {
+func RecordRunnerTaskQueueWait(ctx context.Context, fleetSlug, outcome string, d time.Duration) {
 	if !metricsReady.Load() || runnerTaskQueueWaitSeconds == nil || fleetSlug == "" || d < 0 {
 		return
 	}
 
-	runnerTaskQueueWaitSeconds.Record(ctx, d.Seconds(), fleetAttributes(fleetSlug, organizationID,
+	runnerTaskQueueWaitSeconds.Record(ctx, d.Seconds(), fleetAttributes(fleetSlug,
 		attribute.String("outcome", outcome),
 	))
 }
 
-func RecordRunnerTaskRun(ctx context.Context, fleetSlug, organizationID, state string, d time.Duration) {
+func RecordRunnerTaskRun(ctx context.Context, fleetSlug, state string, d time.Duration) {
 	if !metricsReady.Load() || runnerTaskRunSeconds == nil || fleetSlug == "" || d < 0 {
 		return
 	}
 
-	runnerTaskRunSeconds.Record(ctx, d.Seconds(), fleetAttributes(fleetSlug, organizationID,
+	runnerTaskRunSeconds.Record(ctx, d.Seconds(), fleetAttributes(fleetSlug,
 		attribute.String("state", state),
 	))
 }
 
-func RecordRunnerTaskLogSize(ctx context.Context, fleetSlug, organizationID string, size int64) {
+func RecordRunnerTaskLogSize(ctx context.Context, fleetSlug string, size int64) {
 	if !metricsReady.Load() || runnerTaskLogBytes == nil || fleetSlug == "" || size < 0 {
 		return
 	}
 
-	runnerTaskLogBytes.Record(ctx, size, fleetAttributes(fleetSlug, organizationID))
+	runnerTaskLogBytes.Record(ctx, size, fleetAttributes(fleetSlug))
 }
 
-func fleetAttributes(fleetSlug, organizationID string, extra ...attribute.KeyValue) metric.MeasurementOption {
-	attrs := make([]attribute.KeyValue, 0, 2+len(extra))
+func fleetAttributes(fleetSlug string, extra ...attribute.KeyValue) metric.MeasurementOption {
+	attrs := make([]attribute.KeyValue, 0, 1+len(extra))
 	attrs = append(attrs, attribute.String("fleet", fleetSlug))
-	if organizationID != "" {
-		attrs = append(attrs, attribute.String("organization_id", organizationID))
-	}
 	attrs = append(attrs, extra...)
 	return metric.WithAttributes(attrs...)
 }

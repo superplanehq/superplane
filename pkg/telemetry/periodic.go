@@ -121,19 +121,13 @@ func (p *Periodic) reportRunnerFleetCounts() {
 	}
 
 	for _, count := range counts {
-		organizationID := ""
-		if count.ScopeType == models.RunnerFleetScopeOrganization && count.ScopeID != nil {
-			organizationID = *count.ScopeID
-		}
-		RecordRunnerFleetCount(p.ctx, count.FleetSlug, organizationID, models.RunnerStateIdle, count.IdleCount)
-		RecordRunnerFleetCount(p.ctx, count.FleetSlug, organizationID, models.RunnerStateBusy, count.BusyCount)
+		RecordRunnerFleetCount(p.ctx, count.FleetSlug, models.RunnerStateIdle, count.IdleCount)
+		RecordRunnerFleetCount(p.ctx, count.FleetSlug, models.RunnerStateBusy, count.BusyCount)
 	}
 }
 
 type runnerFleetCount struct {
 	FleetSlug string
-	ScopeType string
-	ScopeID   *string
 	IdleCount int64
 	BusyCount int64
 }
@@ -143,8 +137,6 @@ func listRunnerFleetCounts() ([]runnerFleetCount, error) {
 	err := database.Conn().Raw(`
 		SELECT
 			fleets.slug AS fleet_slug,
-			fleets.scope_type AS scope_type,
-			CAST(fleets.scope_id AS text) AS scope_id,
 			COUNT(runners.id) FILTER (WHERE runners.state = ?) AS idle_count,
 			COUNT(runners.id) FILTER (WHERE runners.state = ?) AS busy_count
 		FROM runner_fleets AS fleets
@@ -152,12 +144,14 @@ func listRunnerFleetCounts() ([]runnerFleetCount, error) {
 			ON runners.fleet_id = fleets.id
 			AND runners.state IN (?, ?)
 		WHERE fleets.deleted_at IS NULL
-		GROUP BY fleets.id, fleets.slug, fleets.scope_type, fleets.scope_id
+			AND fleets.scope_type = ?
+		GROUP BY fleets.id, fleets.slug
 	`,
 		models.RunnerStateIdle,
 		models.RunnerStateBusy,
 		models.RunnerStateIdle,
 		models.RunnerStateBusy,
+		models.RunnerFleetScopeInstallation,
 	).Scan(&rows).Error
 	return rows, err
 }

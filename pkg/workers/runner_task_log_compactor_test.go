@@ -308,8 +308,7 @@ func TestClaimLogArchivingIncludesFleetLabels(t *testing.T) {
 	fleet := models.RunnerFleet{
 		ID:            uuid.New(),
 		Slug:          "claim-fleet-labels",
-		ScopeType:     models.RunnerFleetScopeOrganization,
-		ScopeID:       &resource.Organization.ID,
+		ScopeType:     models.RunnerFleetScopeInstallation,
 		Enabled:       true,
 		Spec:          datatypes.NewJSONType(models.RunnerFleetSpec{}),
 		RunnerVersion: "0.1.0",
@@ -340,10 +339,7 @@ func TestClaimLogArchivingIncludesFleetLabels(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, candidate)
 	assert.Equal(t, fleet.Slug, candidate.FleetSlug)
-	assert.Equal(t, models.RunnerFleetScopeOrganization, candidate.FleetScopeType)
-	require.NotNil(t, candidate.FleetScopeID)
-	assert.Equal(t, resource.Organization.ID.String(), *candidate.FleetScopeID)
-	assert.Equal(t, resource.Organization.ID.String(), candidate.fleetOrganizationID())
+	assert.Equal(t, models.RunnerFleetScopeInstallation, candidate.FleetScopeType)
 }
 
 func TestWriteGzipStreamReportsUncompressedSize(t *testing.T) {

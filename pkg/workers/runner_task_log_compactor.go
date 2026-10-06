@@ -136,7 +136,9 @@ func (w *RunnerTaskLogCompactor) processTask(ctx context.Context, candidate LogA
 	); err != nil {
 		return err
 	}
-	telemetry.RecordRunnerTaskLogSize(ctx, candidate.FleetSlug, candidate.fleetOrganizationID(), logSize)
+	if candidate.FleetScopeType == models.RunnerFleetScopeInstallation {
+		telemetry.RecordRunnerTaskLogSize(ctx, candidate.FleetSlug, logSize)
+	}
 	return nil
 }
 
@@ -195,17 +197,9 @@ type LogArchivingCandidate struct {
 	OrganizationID  uuid.UUID
 	FleetSlug       string
 	FleetScopeType  string
-	FleetScopeID    *string
 	ActiveStore     string
 	State           string
 	ProcessingUntil time.Time
-}
-
-func (f LogArchivingCandidate) fleetOrganizationID() string {
-	if f.FleetScopeType != models.RunnerFleetScopeOrganization || f.FleetScopeID == nil {
-		return ""
-	}
-	return *f.FleetScopeID
 }
 
 /*
@@ -218,7 +212,6 @@ func claimLogArchiving(tx *gorm.DB, now, processingUntil time.Time) (*LogArchivi
 			Select(
 				"lifecycles.task_id, tasks.organization_id, "+
 					"fleets.slug AS fleet_slug, fleets.scope_type AS fleet_scope_type, "+
-					"CAST(fleets.scope_id AS text) AS fleet_scope_id, "+
 					"lifecycles.active_store, lifecycles.state",
 			).
 			Joins("JOIN runner_tasks AS tasks ON tasks.id = lifecycles.task_id").

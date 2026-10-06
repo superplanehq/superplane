@@ -16,7 +16,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-func TestListRunnerFleetCountsSeparatesStateAndScope(t *testing.T) {
+func TestListRunnerFleetCountsIgnoresOrganizationFleets(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
 	now := time.Now()
@@ -74,15 +74,10 @@ func TestListRunnerFleetCountsSeparatesStateAndScope(t *testing.T) {
 
 	assert.Equal(t, int64(1), bySlug["count-installation"].IdleCount)
 	assert.Equal(t, int64(1), bySlug["count-installation"].BusyCount)
-	assert.Nil(t, bySlug["count-installation"].ScopeID)
-
 	assert.Equal(t, int64(0), bySlug["count-empty"].IdleCount)
 	assert.Equal(t, int64(0), bySlug["count-empty"].BusyCount)
-
-	assert.Equal(t, int64(0), bySlug["count-organization"].IdleCount)
-	assert.Equal(t, int64(1), bySlug["count-organization"].BusyCount)
-	require.NotNil(t, bySlug["count-organization"].ScopeID)
-	assert.Equal(t, organization.ID.String(), *bySlug["count-organization"].ScopeID)
+	_, foundOrganizationFleet := bySlug["count-organization"]
+	assert.False(t, foundOrganizationFleet)
 
 	require.NoError(t, db.Delete(empty).Error)
 	rows, err = listRunnerFleetCounts()
@@ -110,12 +105,12 @@ func TestRecordRunnerMetricsWhenReady(t *testing.T) {
 	metricsReady.Store(true)
 
 	ctx := context.Background()
-	RecordRunnerFleetCount(ctx, "e1-large-amd64", "", models.RunnerStateIdle, 2)
-	RecordRunnerFleetCount(ctx, "e1-large-amd64", "", models.RunnerStateBusy, 1)
-	RecordRunnerStateOccupancy(ctx, "e1-large-amd64", "", models.RunnerStateIdle, 30*time.Second)
-	RecordRunnerTaskQueueWait(ctx, "custom", "org-1", models.RunnerQueueWaitStarted, time.Minute)
-	RecordRunnerTaskRun(ctx, "e1-large-amd64", "", models.RunnerTaskStateSucceeded, 2*time.Minute)
-	RecordRunnerTaskLogSize(ctx, "e1-large-amd64", "", 13)
+	RecordRunnerFleetCount(ctx, "e1-large-amd64", models.RunnerStateIdle, 2)
+	RecordRunnerFleetCount(ctx, "e1-large-amd64", models.RunnerStateBusy, 1)
+	RecordRunnerStateOccupancy(ctx, "e1-large-amd64", models.RunnerStateIdle, 30*time.Second)
+	RecordRunnerTaskQueueWait(ctx, "e1-large-amd64", models.RunnerQueueWaitStarted, time.Minute)
+	RecordRunnerTaskRun(ctx, "e1-large-amd64", models.RunnerTaskStateSucceeded, 2*time.Minute)
+	RecordRunnerTaskLogSize(ctx, "e1-large-amd64", 13)
 
 	var collected metricdata.ResourceMetrics
 	require.NoError(t, reader.Collect(ctx, &collected))
@@ -124,7 +119,6 @@ func TestRecordRunnerMetricsWhenReady(t *testing.T) {
 	assert.Equal(t, int64(1), gaugeValue(t, collected, "runner.fleet.count", "busy"))
 	assert.InDelta(t, 30, histogramSum(t, collected, "runner.state.occupancy.seconds"), 0.001)
 	assert.InDelta(t, 60, histogramSum(t, collected, "runner_task.queue.wait.seconds"), 0.001)
-	assert.Equal(t, "org-1", histogramAttribute(t, collected, "runner_task.queue.wait.seconds", "organization_id"))
 	assert.InDelta(t, 120, histogramSum(t, collected, "runner_task.run.seconds"), 0.001)
 	assert.Equal(t, int64(13), intHistogramSum(t, collected, "runner_task.log.bytes"))
 }
@@ -132,11 +126,11 @@ func TestRecordRunnerMetricsWhenReady(t *testing.T) {
 func TestRecordRunnerMetricsNoPanicWhenNotReady(t *testing.T) {
 	metricsReady.Store(false)
 	ctx := context.Background()
-	RecordRunnerFleetCount(ctx, "e1-large-amd64", "", models.RunnerStateIdle, 1)
-	RecordRunnerStateOccupancy(ctx, "e1-large-amd64", "", models.RunnerStateBusy, time.Second)
-	RecordRunnerTaskQueueWait(ctx, "e1-large-amd64", "", models.RunnerQueueWaitCanceled, time.Second)
-	RecordRunnerTaskRun(ctx, "e1-large-amd64", "", models.RunnerTaskStateFailed, time.Second)
-	RecordRunnerTaskLogSize(ctx, "e1-large-amd64", "", 4)
+	RecordRunnerFleetCount(ctx, "e1-large-amd64", models.RunnerStateIdle, 1)
+	RecordRunnerStateOccupancy(ctx, "e1-large-amd64", models.RunnerStateBusy, time.Second)
+	RecordRunnerTaskQueueWait(ctx, "e1-large-amd64", models.RunnerQueueWaitCanceled, time.Second)
+	RecordRunnerTaskRun(ctx, "e1-large-amd64", models.RunnerTaskStateFailed, time.Second)
+	RecordRunnerTaskLogSize(ctx, "e1-large-amd64", 4)
 }
 
 func gaugeValue(t *testing.T, collected metricdata.ResourceMetrics, name, state string) int64 {
@@ -162,18 +156,6 @@ func histogramSum(t *testing.T, collected metricdata.ResourceMetrics, name strin
 	}
 	t.Fatalf("histogram %s not found", name)
 	return 0
-}
-
-func histogramAttribute(t *testing.T, collected metricdata.ResourceMetrics, name, key string) string {
-	t.Helper()
-	for _, point := range metricDataPoints(t, collected, name) {
-		histogram, ok := point.(metricdata.HistogramDataPoint[float64])
-		if ok {
-			return attributeString(histogram.Attributes, key)
-		}
-	}
-	t.Fatalf("histogram %s not found", name)
-	return ""
 }
 
 func intHistogramSum(t *testing.T, collected metricdata.ResourceMetrics, name string) int64 {
