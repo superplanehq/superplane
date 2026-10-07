@@ -2,12 +2,16 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 
+import { seededIntakeCatalog } from "@/test/intakeCatalog";
+
 import { AddIntakePicker } from "./AddIntakePicker";
-import { ADD_INTAKE_COPY, ADD_INTAKE_TEMPLATES } from "./lineIntakeModel";
+import { ADD_INTAKE_COPY, addIntakeTemplatesFromCatalog, type AddIntakeTemplate } from "./lineIntakeModel";
+
+const SEEDED_TEMPLATES = addIntakeTemplatesFromCatalog(seededIntakeCatalog());
 
 function renderPicker(
   onSelect = vi.fn(),
-  extras: { takenSourceIds?: string[]; templates?: typeof ADD_INTAKE_TEMPLATES } = {},
+  extras: { takenSourceIds?: string[]; templates?: AddIntakeTemplate[]; loading?: boolean } = {},
 ) {
   render(
     <AddIntakePicker
@@ -15,28 +19,38 @@ function renderPicker(
       onClose={vi.fn()}
       onSelect={onSelect}
       takenSourceIds={extras.takenSourceIds}
-      templates={extras.templates}
+      templates={extras.templates ?? SEEDED_TEMPLATES}
+      loading={extras.loading}
     />,
   );
   return { onSelect };
 }
 
 describe("AddIntakePicker", () => {
-  it("offers GitHub, Jira, Sentry, Productive.io, Datadog, and coming-soon Notion sources", () => {
+  it("offers the catalog sources and marks the ones the company cannot use as coming soon", () => {
     renderPicker();
 
     const picker = screen.getByTestId("add-intake-picker");
     expect(within(picker).getByRole("heading", { name: ADD_INTAKE_COPY.pickerTitle })).toBeInTheDocument();
     expect(within(picker).getByText(ADD_INTAKE_COPY.pickerDescription)).toBeInTheDocument();
-    expect(within(picker).getByTestId("add-intake-search")).toBeInTheDocument();
-    expect(within(picker).getAllByTestId(/^add-intake-template-/)).toHaveLength(ADD_INTAKE_TEMPLATES.length);
-    expect(within(picker).getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
-    expect(within(picker).getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
-    expect(within(picker).getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(within(picker).getByTestId("add-intake-template-productive-tasks")).toBeInTheDocument();
-    expect(within(picker).getByTestId("add-intake-template-datadog")).toBeInTheDocument();
+    expect(within(picker).getByTestId("add-intake-template-github-issues")).toBeEnabled();
+    expect(within(picker).getByTestId("add-intake-template-sentry-exceptions")).toBeEnabled();
+    expect(within(picker).getByTestId("add-intake-template-dependabot-alerts")).toBeEnabled();
+    for (const id of ["jira-issues", "productive-tasks", "datadog", "linear-issues", "pagerduty-incidents"]) {
+      expect(within(picker).queryByTestId(`add-intake-template-${id}`)).not.toBeInTheDocument();
+    }
     expect(within(picker).getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(within(picker).queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
+  });
+
+  it("shows a Beta badge on a Beta source that the company can use", () => {
+    renderPicker(vi.fn(), { templates: addIntakeTemplatesFromCatalog(seededIntakeCatalog(["datadog"])) });
+
+    const datadog = screen.getByTestId("add-intake-template-datadog");
+    expect(datadog).toBeEnabled();
+    expect(within(datadog).getByTestId("add-intake-beta-badge")).toHaveTextContent(ADD_INTAKE_COPY.beta);
+    expect(
+      within(screen.getByTestId("add-intake-template-github-issues")).queryByTestId("add-intake-beta-badge"),
+    ).toBeNull();
   });
 
   it("marks a configured source as already set up", () => {
@@ -69,22 +83,16 @@ describe("AddIntakePicker", () => {
     const user = userEvent.setup();
     renderPicker();
 
-    await user.type(screen.getByTestId("add-intake-search"), "jira");
+    await user.type(screen.getByTestId("add-intake-search"), "notion");
 
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
+    expect(screen.getByTestId("add-intake-template-notion")).toBeInTheDocument();
     expect(screen.queryByTestId("add-intake-template-github-issues")).not.toBeInTheDocument();
   });
 
-  it("restricts the list to the supplied templates", () => {
-    const restricted = ADD_INTAKE_TEMPLATES.filter((template) =>
-      ["github-issues", "sentry-exceptions"].includes(template.id),
-    );
-    renderPicker(vi.fn(), { templates: restricted });
+  it("tells the user that the sources load", () => {
+    renderPicker(vi.fn(), { templates: [], loading: true });
 
-    const picker = screen.getByTestId("add-intake-picker");
-    expect(within(picker).getAllByTestId(/^add-intake-template-/)).toHaveLength(2);
-    expect(within(picker).getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
-    expect(within(picker).getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(within(picker).queryByTestId("add-intake-template-jira-issues")).not.toBeInTheDocument();
+    expect(screen.getByText(ADD_INTAKE_COPY.loading)).toBeInTheDocument();
+    expect(screen.queryAllByTestId(/^add-intake-template-/)).toHaveLength(0);
   });
 });

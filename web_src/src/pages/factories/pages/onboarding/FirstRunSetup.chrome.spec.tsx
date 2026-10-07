@@ -13,6 +13,7 @@ import { FirstRunSetup } from "./FirstRunSetup";
 import type { OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
+import { intakeCatalogAvailability, seededIntakeCatalog } from "@/test/intakeCatalog";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
@@ -36,6 +37,10 @@ vi.mock("@/contexts/useAccount", () => ({
 
 vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "user-1" } }),
+}));
+
+vi.mock("@/hooks/useIntakeCatalogAvailability", () => ({
+  useIntakeCatalogAvailability: () => intakeCatalogAvailability(seededIntakeCatalog(["jira-issues"])),
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
