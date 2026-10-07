@@ -102,6 +102,7 @@ type listCommand struct {
 	FleetID string
 	States  []string
 	Limit   int32
+	AfterID string
 }
 
 func newListCommand(options core.BindOptions) *cobra.Command {
@@ -110,6 +111,7 @@ func newListCommand(options core.BindOptions) *cobra.Command {
 	cmd.Flags().StringVar(&handler.FleetID, "fleet", "", "fleet ID")
 	cmd.Flags().StringSliceVar(&handler.States, "state", nil, "runner state filter (repeatable)")
 	cmd.Flags().Int32Var(&handler.Limit, "limit", 200, "maximum number of runners (1-1000)")
+	cmd.Flags().StringVar(&handler.AfterID, "after-id", "", "return rows after this ID")
 	_ = cmd.MarkFlagRequired("fleet")
 	core.Bind(cmd, handler, options)
 	return cmd
@@ -128,6 +130,9 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 	request := ctx.API.RunnersAPI.RunnersListRunners(ctx.Context, c.FleetID).Limit(c.Limit)
 	if len(c.States) > 0 {
 		request = request.States(c.States)
+	}
+	if afterID := strings.TrimSpace(c.AfterID); afterID != "" {
+		request = request.AfterId(afterID)
 	}
 	response, _, err := request.Execute()
 	if err != nil {

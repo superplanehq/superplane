@@ -1,7 +1,7 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { Text } from "@/components/Text/text";
 import { useAccount } from "@/contexts/useAccount";
-import { ArrowLeft, BookOpen, Building, Inbox, Network, Shield, Terminal, Users, Webhook } from "lucide-react";
+import { ArrowLeft, BookOpen, Building, Inbox, KeyRound, Network, Shield, Terminal, Users, Webhook } from "lucide-react";
 import React from "react";
 import { Link, Navigate, NavLink, Outlet } from "react-router";
 
@@ -61,6 +61,10 @@ const AdminLayout: React.FC = () => {
                 <Network size={14} />
                 Settings
               </NavLink>
+              <NavLink to="/admin/license" className={navLinkClass}>
+                <KeyRound size={14} />
+                License
+              </NavLink>
               <NavLink to="/admin/intakes" className={navLinkClass}>
                 <Inbox size={14} />
                 Intakes
@@ -71,7 +75,7 @@ const AdminLayout: React.FC = () => {
               </NavLink>
               <NavLink to="/admin/runner-tasks" className={navLinkClass}>
                 <Terminal size={14} />
-                Runner Tasks
+                Fleets
               </NavLink>
               <NavLink to="/admin/polar-webhooks" className={navLinkClass}>
                 <Webhook size={14} />

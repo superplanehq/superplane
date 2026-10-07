@@ -5,6 +5,7 @@ import { FEATURE_TASK_PLANNING_REVIEW } from "@/lib/experimentalFeatures";
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 
 import { CLARITY_CHECK_NAME, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../lib/confidenceScore";
+import { isPlanningReviewMetric, planningReviewFromChecks } from "../../lib/planningReviewScore";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { getWorkOrderRunHref } from "../../lib/workOrderExecutions";
 import { WorkOrderCheckComment } from "../../WorkOrderCheckComment";
@@ -96,9 +97,7 @@ export function WorkOrderSplitRunOverview({
       />
     );
   }
-  const clarity = checks.find((check) => check.name === CLARITY_CHECK_NAME);
-  const confidence = checks.find((check) => check.name === CONFIDENCE_CHECK_NAME);
-  const otherChecks = checks.filter((check) => !isScoreCheckName(check.name));
+  const { clarity, confidence, otherChecks, reviewMetrics } = overviewScores(checks);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-work-order-tab">
@@ -111,6 +110,7 @@ export function WorkOrderSplitRunOverview({
         artifacts={artifacts}
         clarity={clarity}
         confidence={confidence}
+        reviewMetrics={reviewMetrics}
         isAnalyzing={isAnalyzing}
         files={files}
         resultAfterBody={
@@ -138,6 +138,16 @@ export function WorkOrderSplitRunOverview({
       />
     </div>
   );
+}
+
+function overviewScores(checks: WorkOrderCheckPresentation[]) {
+  const review = planningReviewFromChecks(checks);
+  return {
+    clarity: review ? undefined : checks.find((check) => check.name === CLARITY_CHECK_NAME),
+    confidence: review?.headline ?? checks.find((check) => check.name === CONFIDENCE_CHECK_NAME),
+    reviewMetrics: review?.metrics,
+    otherChecks: checks.filter((check) => !isScoreCheckName(check.name) && !isPlanningReviewMetric(check)),
+  };
 }
 
 function analysisWithWorkspace(analysis: IntentAnalysisChat | undefined, organizationId?: string, factoryId?: string) {

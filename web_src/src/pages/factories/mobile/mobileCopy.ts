@@ -15,7 +15,16 @@ export const MOBILE_BOARD_COPY = {
   closeSearch: "Close search",
   switchLine: "Switch line",
   lines: "Lines",
-  loadMore: "Load more",
+  loadingMore: "Loading more",
+  loadMoreError: "SuperPlane could not load more tasks.",
+  loadMoreRetry: "Try again",
+} as const;
+
+export const MOBILE_SETTINGS_COPY = {
+  title: "Settings",
+  backToWorkspace: "Back to workspace",
+  findPlaceholder: "Find settings",
+  noResults: "No matching settings.",
 } as const;
 
 export const MOBILE_TASK_COPY = {

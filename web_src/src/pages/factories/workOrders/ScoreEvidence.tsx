@@ -16,7 +16,26 @@ import { CONFIDENCE_ANALYZING_LABEL, CONFIDENCE_ANALYZING_TOOLTIP, ConfidenceMet
 
 const ITEM_CLASS = "inline-flex h-7 items-center gap-1.5 px-1.5 text-[12px] leading-none";
 
-export type ScoreEvidenceValue = ScoreSummaryValue;
+const CHIP_BUTTON_CLASS =
+  "rounded-md transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none";
+
+export type ScoreEvidenceValue = ScoreSummaryValue & {
+  /** Top of the scale: 5 for legacy scores, 3 for review scores. */
+  maxScore?: number;
+};
+
+/**
+ * External control for the confidence drawer. The chip reports hover and
+ * click; the owner renders the drawer wherever it belongs (for example
+ * above the plan card).
+ */
+export type ScoreEvidenceDrawer = {
+  open: boolean;
+  pinned: boolean;
+  controlsId: string;
+  onHoverChange: (hovering: boolean) => void;
+  onToggle: () => void;
+};
 
 const SCORE_LABEL: Record<ScoreKind, { short: string; name: string }> = {
   clarity: { short: "Clarity", name: CLARITY_CHECK_NAME },
@@ -40,6 +59,7 @@ export function ScoreEvidenceRow({
   isAnalyzing = false,
   showClarity = true,
   showConfidence = true,
+  confidenceDrawer,
   testIds,
   className,
 }: {
@@ -48,6 +68,8 @@ export function ScoreEvidenceRow({
   isAnalyzing?: boolean;
   showClarity?: boolean;
   showConfidence?: boolean;
+  /** Hands the confidence chip over to an owner-rendered drawer. */
+  confidenceDrawer?: ScoreEvidenceDrawer;
   testIds?: Partial<Record<ScoreKind, string>>;
   className?: string;
 }) {
@@ -71,6 +93,7 @@ export function ScoreEvidenceRow({
             value={values[kind]}
             isAnalyzing={isAnalyzing}
             testId={testIds?.[kind]}
+            drawer={kind === "confidence" ? confidenceDrawer : undefined}
           />
         );
       })}
@@ -83,11 +106,13 @@ export function ScoreEvidence({
   value,
   isAnalyzing = false,
   testId,
+  drawer,
 }: {
   kind: ScoreKind;
   value?: ScoreEvidenceValue;
   isAnalyzing?: boolean;
   testId?: string;
+  drawer?: ScoreEvidenceDrawer;
 }) {
   const label = SCORE_LABEL[kind];
   const score = value?.score;
@@ -115,23 +140,74 @@ export function ScoreEvidence({
     return <ScoreEvidencePlaceholder label={label.short} ariaLabel={`${label.short}. No score yet`} testId={testId} />;
   }
 
-  return (
-    <ScoreEvidenceCard
-      name={label.name}
-      body={summary}
-      label={`${label.short} ${score}/${CONFIDENCE_SCORE_MAX}`}
-      testId={testId}
-    >
+  const max = value?.maxScore || CONFIDENCE_SCORE_MAX;
+  const chipLabel = `${label.short} ${score}/${max}`;
+  const content = (
+    <>
       <ScoreEvidenceLabel>{label.short}</ScoreEvidenceLabel>
       <ConfidenceMeter
         score={score}
+        max={max}
         label={label.name}
         showTooltip={false}
         decorative
         testId={testId ? `${testId}-meter` : undefined}
       />
-      <span className={cn("tabular-nums font-semibold", NUMBER_TONE[confidenceBandForScore(score)])}>{score}</span>
+      <span className={cn("tabular-nums font-semibold", NUMBER_TONE[confidenceBandForScore(score, max)])}>{score}</span>
+    </>
+  );
+
+  if (drawer) {
+    return (
+      <ScoreEvidenceDrawerChip label={chipLabel} testId={testId} drawer={drawer}>
+        {content}
+      </ScoreEvidenceDrawerChip>
+    );
+  }
+
+  return (
+    <ScoreEvidenceCard name={label.name} body={summary} label={chipLabel} testId={testId}>
+      {content}
     </ScoreEvidenceCard>
+  );
+}
+
+/**
+ * The chip for an owner-rendered drawer. Hover peeks the drawer, click
+ * pins it; the owner holds the state and renders the drawer itself.
+ */
+function ScoreEvidenceDrawerChip({
+  label,
+  testId,
+  drawer,
+  children,
+}: {
+  label: string;
+  testId?: string;
+  drawer: ScoreEvidenceDrawer;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-expanded={drawer.open}
+      aria-pressed={drawer.pinned}
+      aria-controls={drawer.open ? drawer.controlsId : undefined}
+      data-testid={testId}
+      data-state={drawer.open ? "open" : "closed"}
+      className={cn(ITEM_CLASS, CHIP_BUTTON_CLASS, drawer.pinned && "bg-muted/70")}
+      onMouseEnter={() => drawer.onHoverChange(true)}
+      onMouseLeave={() => drawer.onHoverChange(false)}
+      onFocus={() => drawer.onHoverChange(true)}
+      onBlur={() => drawer.onHoverChange(false)}
+      onClick={(event) => {
+        event.preventDefault();
+        drawer.onToggle();
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -158,7 +234,10 @@ function ScoreEvidencePlaceholder({
   );
 }
 
-/** Hover peeks, click pins. A pinned card stays until the next click. */
+/**
+ * Hover peeks, click pins. A pinned card stays until the next click.
+ * The card floats above the trigger, so it never pushes the composer.
+ */
 function ScoreEvidenceCard({
   name,
   body,
@@ -200,11 +279,7 @@ function ScoreEvidenceCard({
           aria-pressed={pinned}
           data-testid={testId}
           data-state={open ? "open" : "closed"}
-          className={cn(
-            ITEM_CLASS,
-            "rounded-md transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
-            pinned && "bg-muted/70",
-          )}
+          className={cn(ITEM_CLASS, CHIP_BUTTON_CLASS, pinned && "bg-muted/70")}
           onClick={(event) => {
             event.preventDefault();
             togglePinned();
@@ -215,9 +290,9 @@ function ScoreEvidenceCard({
       </HoverCardTrigger>
       <HoverCardContent
         side="top"
-        align="start"
+        align="end"
         sideOffset={8}
-        avoidCollisions={false}
+        collisionPadding={12}
         className="sp-confidence-why z-[80] w-80 p-3"
       >
         <p className="text-[12px] text-muted-foreground">{name}</p>

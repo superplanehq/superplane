@@ -744,9 +744,10 @@ func materializeBacklogDefaults(
 	version *models.CanvasVersion,
 ) (*materializedFactoryTemplate, error) {
 	defaults := buildBacklogCanvas(backlogCanvasRequest{
-		Name:    canvas.Name,
-		Agent:   resetFactoryIntakeAgent(tx, factory, version.Nodes),
-		VCSName: resolveVCSInstallationName(tx, factory),
+		Name:           canvas.Name,
+		Agent:          resetFactoryIntakeAgent(tx, factory, version.Nodes),
+		VCSName:        resolveVCSInstallationName(tx, factory),
+		PlanningReview: organizationPlanningReviewEnabled(tx, canvas.OrganizationID),
 	})
 	defaults.Metadata.ID = canvas.ID.String()
 	for i := range defaults.Spec.Nodes {

@@ -246,6 +246,60 @@ func (s *Server) handleRunnerPlanningWait(w http.ResponseWriter, r *http.Request
 	}
 }
 
+type planningReviewScoresRequest struct {
+	Clarity       planningScoreRequest `json:"clarity"`
+	Complexity    planningScoreRequest `json:"complexity"`
+	Verifiability planningScoreRequest `json:"verifiability"`
+}
+
+type planningUpdateRequest struct {
+	Scores *planningReviewScoresRequest `json:"scores"`
+	Spec   string                       `json:"spec"`
+	Survey *planningSurveyRequest       `json:"survey"`
+}
+
+func (s *Server) handleRunnerPlanningUpdate(w http.ResponseWriter, r *http.Request) {
+	scope, ok := s.authenticatePlanningSessionRunner(w, r)
+	if !ok {
+		return
+	}
+	var req planningUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	session, err := s.loadAnalysisPlanningSessionForRunner(r, scope)
+	if err != nil {
+		writeRunnerPlanningError(w, r, session, err)
+		return
+	}
+	db := database.DB(r.Context())
+	update := models.PlanningSessionUpdate{Spec: req.Spec}
+	if req.Scores != nil {
+		update.Scores = &models.PlanningReviewScores{
+			Clarity:       models.PlanningScoreValue{Score: req.Scores.Clarity.Score, Summary: req.Scores.Clarity.Summary},
+			Complexity:    models.PlanningScoreValue{Score: req.Scores.Complexity.Score, Summary: req.Scores.Complexity.Summary},
+			Verifiability: models.PlanningScoreValue{Score: req.Scores.Verifiability.Score, Summary: req.Scores.Verifiability.Summary},
+		}
+	}
+	if req.Survey != nil {
+		update.Survey = &models.PlanningSessionSurvey{Questions: req.Survey.Questions}
+	}
+	hadSpec := messages.HasPlanningReadyPlan(db, session)
+	if err := session.ProposeUpdate(db, update); err != nil {
+		writeRunnerPlanningError(w, r, session, err)
+		return
+	}
+	if update.Scores != nil {
+		publishPlanningScore(session)
+	}
+	if strings.TrimSpace(update.Spec) != "" && !hadSpec {
+		messages.PublishPlanningPlanReady(db, session)
+	}
+	messages.PublishPlanningBoardStatus(session)
+	writeJSON(w, http.StatusOK, map[string]any{"status": "shown"})
+}
+
 func (s *Server) handleRunnerPlanningSpec(w http.ResponseWriter, r *http.Request) {
 	scope, ok := s.authenticatePlanningSessionRunner(w, r)
 	if !ok {

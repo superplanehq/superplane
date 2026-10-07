@@ -13,6 +13,12 @@ import { FirstRunWorkspaceSwitch } from "./FirstRunWorkspaceSwitch";
 
 export const FIRST_RUN_STEP_COUNT = 5;
 
+function firstRunSide(aside: ReactNode | undefined, sphere: FirstRunSphereProps | undefined) {
+  if (aside) return aside;
+  if (!sphere) return null;
+  return <FirstRunSpherePane {...sphere} />;
+}
+
 export function FirstRunShell({
   children,
   testId,
@@ -21,6 +27,7 @@ export function FirstRunShell({
   width = "narrow",
   contentSpacing = "default",
   sphere,
+  aside,
 }: {
   children: ReactNode;
   testId: string;
@@ -29,9 +36,11 @@ export function FirstRunShell({
   width?: "narrow" | "wide";
   contentSpacing?: "default" | "compact";
   sphere?: FirstRunSphereProps;
+  aside?: ReactNode;
 }) {
   useFactoriesThemeClass();
   const controlsDisabled = busy || Boolean(chrome?.busy);
+  const side = firstRunSide(aside, sphere);
 
   return (
     <div
@@ -41,7 +50,7 @@ export function FirstRunShell({
     >
       <FirstRunTopBar chrome={chrome} disabled={controlsDisabled} />
 
-      {sphere ? (
+      {side ? (
         <div className="flex h-full">
           <div
             className={cn(
@@ -55,7 +64,7 @@ export function FirstRunShell({
               <FirstRunBack onBack={chrome?.onBack} disabled={controlsDisabled} />
             </div>
           </div>
-          <FirstRunSpherePane {...sphere} />
+          {side}
         </div>
       ) : (
         <div
