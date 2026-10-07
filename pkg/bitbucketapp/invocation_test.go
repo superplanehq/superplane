@@ -54,6 +54,41 @@ func TestParseInvocationRejectsADifferentApp(t *testing.T) {
 	assert.Contains(t, err.Error(), "different app")
 }
 
+func TestParseInvocationReadsBitbucketWorkspaceClaims(t *testing.T) {
+	key := testRSAKey(t)
+	const appID = "ari:cloud:ecosystem::app/11111111-1111-1111-1111-111111111111"
+	const workspaceID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	for _, test := range []struct {
+		name     string
+		context  map[string]any
+		contexts []map[string]any
+	}{
+		{name: "frontend workspace", context: map[string]any{"workspaceId": workspaceID}},
+		{name: "backend installation context", context: map[string]any{}, contexts: []map[string]any{
+			{"name": "jira", "cloudId": "other-site"},
+			{"name": "bitbucket", "workspaceId": workspaceID},
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fit := jwtlib.NewWithClaims(jwtlib.SigningMethodRS256, jwtlib.MapClaims{
+				"aud": appID,
+				"exp": time.Now().Add(time.Minute).Unix(),
+				"app": map[string]any{
+					"id":             appID,
+					"installationId": "install-1",
+					"installation":   map[string]any{"id": "install-1", "contexts": test.contexts},
+				},
+				"context": test.context,
+			})
+			signed, err := fit.SignedString(key)
+			require.NoError(t, err)
+			invocation, err := ParseInvocation(signed, signSystemToken(t, time.Now().Add(time.Hour)), appID, rsaKeyfunc(key))
+			require.NoError(t, err)
+			assert.Equal(t, workspaceID, invocation.WorkspaceUUID)
+		})
+	}
+}
+
 func testRSAKey(t *testing.T) *rsa.PrivateKey {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)

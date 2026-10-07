@@ -147,9 +147,9 @@ func (d Directory) RepositoriesVisibleTo(
 	return repositories, nil
 }
 
-// VisibleRepositories reads the account's effective repository permissions in
-// the workspace, then returns the repositories the account can push to.
-// Workspace membership alone does not make a repository visible. An account
+// VisibleRepositories returns repositories the account can push to.
+// Explicit repository permissions do not include access a workspace owner
+// inherits, so an owner sees every repository in the workspace. A member
 // without a push permission, or a workspace Bitbucket does not know, yields
 // an empty list.
 func (d Directory) VisibleRepositories(ctx context.Context, token, workspaceRef, accountUUID string) ([]VisibleRepository, error) {
@@ -157,15 +157,23 @@ func (d Directory) VisibleRepositories(ctx context.Context, token, workspaceRef,
 	if err != nil {
 		return nil, err
 	}
-	if len(grants) == 0 {
+	role, roleSlug, err := d.workspaceRole(ctx, token, workspaceRef, accountUUID)
+	if err != nil {
+		return nil, err
+	}
+	owner := strings.EqualFold(role, "owner") || strings.EqualFold(role, "admin")
+	if len(grants) == 0 && !owner {
 		return nil, nil
 	}
-	slug := workspaceSlugFromGrants(grants, workspaceRef)
+	slug := roleSlug
+	if slug == "" {
+		slug = workspaceSlugFromGrants(grants, workspaceRef)
+	}
 	records, err := d.listRepositories(ctx, token, slug)
 	if err != nil {
 		return nil, err
 	}
-	repositories := make([]VisibleRepository, 0, len(grants))
+	repositories := make([]VisibleRepository, 0, len(records))
 	for _, record := range records {
 		fullName := strings.TrimSpace(record.FullName)
 		if fullName == "" {
@@ -175,7 +183,7 @@ func (d Directory) VisibleRepositories(ctx context.Context, token, workspaceRef,
 		if err != nil {
 			continue
 		}
-		if _, granted := grants[repositoryUUID]; !granted {
+		if _, granted := grants[repositoryUUID]; !granted && !owner {
 			continue
 		}
 		repositories = append(repositories, VisibleRepository{
@@ -189,10 +197,41 @@ func (d Directory) VisibleRepositories(ctx context.Context, token, workspaceRef,
 	return repositories, nil
 }
 
-// listPushGrants returns the repositories, by uuid, where the account holds a
-// push permission. Bitbucket reports effective permissions, so grants through
-// groups and projects are included. A 404 means the workspace is unknown to
-// this token and yields no grants.
+type workspaceMembership struct {
+	Permission string `json:"permission"`
+	Workspace  struct {
+		Slug string `json:"slug"`
+	} `json:"workspace"`
+}
+
+type workspaceMembershipPage struct {
+	Values []workspaceMembership `json:"values"`
+}
+
+// workspaceRole reads the account's workspace permission. Bitbucket does not
+// copy an owner's access into each repository permission, so callers use this
+// role to decide whether the account can open every repository. A missing
+// membership returns an empty role.
+func (d Directory) workspaceRole(ctx context.Context, token, workspaceRef, accountUUID string) (string, string, error) {
+	nextURL, err := d.workspacePermissionsURL(workspaceRef, accountUUID)
+	if err != nil {
+		return "", "", err
+	}
+	var page workspaceMembershipPage
+	status, err := d.getJSON(ctx, token, nextURL, &page)
+	if err != nil {
+		return "", "", err
+	}
+	if status == http.StatusNotFound || len(page.Values) == 0 {
+		return "", "", nil
+	}
+	membership := page.Values[0]
+	return strings.TrimSpace(membership.Permission), strings.TrimSpace(membership.Workspace.Slug), nil
+}
+
+// listPushGrants returns repositories, by uuid, where the account has an
+// effective push permission, including access inherited from groups. A 404
+// means the workspace is unknown to this token and yields no grants.
 func (d Directory) listPushGrants(ctx context.Context, token, workspaceRef, accountUUID string) (map[string]permissionRecord, error) {
 	nextURL, err := d.permissionsURL(workspaceRef, accountUUID)
 	if err != nil {
@@ -296,8 +335,22 @@ func (d Directory) getJSON(ctx context.Context, token, rawURL string, dest any) 
 	return response.StatusCode, nil
 }
 
-// permissionsURL filters the workspace repository permissions to one account.
-// The app bot may call this endpoint with read:repository:bitbucket.
+// workspacePermissionsURL filters workspace roles to one account.
+func (d Directory) workspacePermissionsURL(workspaceRef, accountUUID string) (string, error) {
+	account, err := NormalizeAccountID(accountUUID)
+	if err != nil {
+		return "", err
+	}
+	workspace, err := workspacePath(workspaceRef)
+	if err != nil {
+		return "", err
+	}
+	query := url.Values{}
+	query.Set("q", fmt.Sprintf(`user.uuid="{%s}"`, account))
+	query.Set("pagelen", "10")
+	return fmt.Sprintf("%s/workspaces/%s/permissions?%s", strings.TrimRight(d.base(), "/"), workspace, query.Encode()), nil
+}
+
 func (d Directory) permissionsURL(workspaceRef, accountUUID string) (string, error) {
 	account, err := NormalizeAccountID(accountUUID)
 	if err != nil {

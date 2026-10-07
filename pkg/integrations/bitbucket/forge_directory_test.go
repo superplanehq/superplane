@@ -92,6 +92,38 @@ func TestDirectoryDoesNotListRepositoriesForAMemberWithoutGrants(t *testing.T) {
 	assert.False(t, listed)
 }
 
+func TestDirectoryListsEveryRepositoryForAWorkspaceOwner(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "Bearer system-token", r.Header.Get("Authorization"))
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case testPermissionsPath:
+			_, _ = w.Write([]byte(`{"values":[]}`))
+		case "/workspaces/acme/permissions":
+			assert.Equal(t, testPermissionQuery, r.URL.Query().Get("q"))
+			_, _ = w.Write([]byte(`{"values":[{"permission":"owner","workspace":{"slug":"acme"}}]}`))
+		case "/workspaces/acme/members":
+			_, _ = w.Write([]byte(`{"values":[{"user":{"uuid":"{11111111-1111-1111-1111-111111111111}"},"workspace":{"slug":"acme"}}]}`))
+		case "/repositories/acme":
+			_, _ = w.Write([]byte(`{"values":[
+				{"uuid":"{22222222-2222-2222-2222-222222222222}","full_name":"acme/api","is_private":true,"mainbranch":{"name":"develop"}},
+				{"uuid":"{33333333-3333-3333-3333-333333333333}","full_name":"acme/web","is_private":false}
+			]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	directory := Directory{BaseURL: server.URL, HTTP: server.Client()}
+	repositories, err := directory.VisibleRepositories(context.Background(), "system-token", "acme", testAccountID)
+	require.NoError(t, err)
+	require.Len(t, repositories, 2)
+	assert.Equal(t, "acme/api", repositories[0].FullName)
+	assert.Equal(t, "acme/web", repositories[1].FullName)
+	assert.Equal(t, "acme", repositories[0].WorkspaceSlug)
+}
+
 func TestDirectoryFollowsPermissionPagesAndFallsBackToMain(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

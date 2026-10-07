@@ -37,11 +37,17 @@ type invocationApp struct {
 	ID             string `json:"id"`
 	InstallationID string `json:"installationId"`
 	APIBaseURL     string `json:"apiBaseUrl"`
+	Installation   struct {
+		Contexts []struct {
+			WorkspaceID string `json:"workspaceId"`
+		} `json:"contexts"`
+	} `json:"installation"`
 }
 
 type invocationContext struct {
 	InstallContext string `json:"installContext"`
 	CloudID        string `json:"cloudId"`
+	WorkspaceID    string `json:"workspaceId"`
 }
 
 // ParseInvocation verifies a Forge Invocation Token and reads the system token
@@ -90,7 +96,7 @@ func ParseInvocation(fit, systemToken, expectedAppID string, keyfunc jwtlib.Keyf
 		AppID:              expectedAppID,
 		InstallationID:     installationID,
 		APIBaseURL:         strings.TrimSpace(claims.App.APIBaseURL),
-		WorkspaceUUID:      workspaceUUID(claims.Context),
+		WorkspaceUUID:      workspaceUUID(claims),
 		SystemToken:        systemToken,
 		SystemTokenExpires: expires,
 	}, nil
@@ -105,10 +111,20 @@ func audienceMatches(audience jwtlib.ClaimStrings, appID string) bool {
 	return false
 }
 
-func workspaceUUID(context invocationContext) string {
-	raw := strings.TrimSpace(context.InstallContext)
+func workspaceUUID(claims *invocationClaims) string {
+	raw := strings.TrimSpace(claims.Context.WorkspaceID)
 	if raw == "" {
-		raw = strings.TrimSpace(context.CloudID)
+		raw = strings.TrimSpace(claims.Context.InstallContext)
+	}
+	if raw == "" {
+		for _, context := range claims.App.Installation.Contexts {
+			if raw = strings.TrimSpace(context.WorkspaceID); raw != "" {
+				break
+			}
+		}
+	}
+	if raw == "" {
+		raw = strings.TrimSpace(claims.Context.CloudID)
 	}
 	const marker = "workspace/"
 	if index := strings.LastIndex(raw, marker); index >= 0 {

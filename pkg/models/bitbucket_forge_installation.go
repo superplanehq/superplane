@@ -64,64 +64,23 @@ type BitbucketForgeDelivery struct {
 // SaveBitbucketForgeDelivery stores a Forge delivery. A token is written only
 // when it expires later than the cached token. LastDeliveryAt still moves
 // forward so a short-lived token does not make a fresh installation look stale.
+// Deliveries are serialized per installation, including the first delivery.
 func SaveBitbucketForgeDelivery(tx *gorm.DB, delivery BitbucketForgeDelivery) (*BitbucketForgeInstallation, error) {
-	installationID := strings.TrimSpace(delivery.InstallationID)
-	if installationID == "" {
+	delivery.InstallationID = strings.TrimSpace(delivery.InstallationID)
+	if delivery.InstallationID == "" {
 		return nil, errors.New("forge installation id is required")
 	}
-	now := delivery.DeliveredAt
-	if now.IsZero() {
-		now = time.Now()
-	}
-
-	var row BitbucketForgeInstallation
-	created := false
-	err := tx.Where("installation_id = ?", installationID).First(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		created = true
-		row = BitbucketForgeInstallation{
-			InstallationID: installationID,
-			InstalledAt:    now,
-			CreatedAt:      now,
+	var row *BitbucketForgeInstallation
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		lockKey := "bitbucket-forge-delivery:" + delivery.InstallationID
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
+			return err
 		}
-	} else if err != nil {
-		return nil, err
-	}
-
-	row.LastDeliveryAt = now
-	row.UpdatedAt = now
-	if value := strings.TrimSpace(delivery.WorkspaceUUID); value != "" {
-		row.WorkspaceUUID = value
-	}
-	if value := strings.TrimSpace(delivery.WorkspaceSlug); value != "" {
-		row.WorkspaceSlug = value
-	}
-	if value := strings.TrimSpace(delivery.InstallerAccountID); value != "" {
-		row.InstallerAccountID = value
-	}
-	if value := strings.TrimSpace(delivery.APIBaseURL); value != "" {
-		row.APIBaseURL = value
-	}
-	if delivery.Uninstall {
-		row.UninstalledAt = &now
-		row.SystemToken = nil
-		row.TokenExpiresAt = time.Time{}
-	} else if delivery.TokenExpiresAt.After(row.TokenExpiresAt) && len(delivery.SystemToken) > 0 {
-		row.SystemToken = delivery.SystemToken
-		row.TokenExpiresAt = delivery.TokenExpiresAt
-		row.UninstalledAt = nil
-	}
-
-	if created {
-		if err := tx.Create(&row).Error; err != nil {
-			return nil, err
-		}
-		return &row, nil
-	}
-	if err := tx.Save(&row).Error; err != nil {
-		return nil, err
-	}
-	return &row, nil
+		var err error
+		row, err = saveBitbucketForgeDelivery(tx, delivery)
+		return err
+	})
+	return row, err
 }
 
 // FindBitbucketForgeInstallation loads one Forge installation by id.
@@ -217,4 +176,67 @@ func ListActiveBitbucketForgeInstallations(tx *gorm.DB) ([]BitbucketForgeInstall
 		return nil, err
 	}
 	return rows, nil
+}
+
+func saveBitbucketForgeDelivery(tx *gorm.DB, delivery BitbucketForgeDelivery) (*BitbucketForgeInstallation, error) {
+	installationID := delivery.InstallationID
+	now := delivery.DeliveredAt
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	var row BitbucketForgeInstallation
+	created := false
+	err := tx.Where("installation_id = ?", installationID).First(&row).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		created = true
+		row = BitbucketForgeInstallation{
+			InstallationID: installationID,
+			InstalledAt:    now,
+			CreatedAt:      now,
+		}
+	} else if err != nil {
+		return nil, err
+	}
+	// Reinstallation gets a new installation id. A delayed refresh must not
+	// restore credentials for an installation that Forge already removed.
+	if row.UninstalledAt != nil {
+		return &row, nil
+	}
+
+	if now.After(row.LastDeliveryAt) {
+		row.LastDeliveryAt = now
+	}
+	row.UpdatedAt = now
+	if value := strings.TrimSpace(delivery.WorkspaceUUID); value != "" {
+		row.WorkspaceUUID = value
+	}
+	if value := strings.TrimSpace(delivery.WorkspaceSlug); value != "" {
+		row.WorkspaceSlug = value
+	}
+	if value := strings.TrimSpace(delivery.InstallerAccountID); value != "" {
+		row.InstallerAccountID = value
+	}
+	if value := strings.TrimSpace(delivery.APIBaseURL); value != "" {
+		row.APIBaseURL = value
+	}
+	if delivery.Uninstall {
+		row.UninstalledAt = &now
+		row.SystemToken = nil
+		row.TokenExpiresAt = time.Time{}
+	} else if delivery.TokenExpiresAt.After(row.TokenExpiresAt) && len(delivery.SystemToken) > 0 {
+		row.SystemToken = delivery.SystemToken
+		row.TokenExpiresAt = delivery.TokenExpiresAt
+	}
+
+	if created {
+		if err := tx.Create(&row).Error; err != nil {
+			return nil, err
+		}
+		return &row, nil
+	}
+	if err := tx.Save(&row).Error; err != nil {
+		return nil, err
+	}
+	return &row, nil
 }
