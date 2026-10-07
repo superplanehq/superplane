@@ -78,6 +78,9 @@ describe("OrganizationDetail", () => {
             total: 1,
           });
         }
+        if (url === `/admin/api/organizations/${ORG_ID}/backlog-defaults/reset` && init?.method === "POST") {
+          return jsonResponse({ reset: 1, failures: [] });
+        }
         if (url.startsWith(`/admin/api/organizations/${ORG_ID}/canvases`)) {
           return jsonResponse({
             items: [{ id: "canvas-1", name: "Deploy pipeline", description: "Deploys the app" }],
@@ -248,6 +251,7 @@ describe("OrganizationDetail", () => {
 
     expect(await screen.findByPlaceholderText("Search automations...")).toBeInTheDocument();
     expect(await screen.findByText("Deploy pipeline")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset Backlog defaults" })).toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Search users...")).not.toBeInTheDocument();
   });
 

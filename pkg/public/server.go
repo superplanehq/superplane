@@ -791,6 +791,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}", s.adminGetOrganization).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/backlog-defaults/reset", s.adminResetOrganizationBacklogDefaults).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/users", s.adminListOrgUsers).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/integrations", s.adminListOrgIntegrations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features", s.adminListOrgExperimentalFeatures).Methods("GET")
