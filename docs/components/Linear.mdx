@@ -40,12 +40,14 @@ SuperPlane connects to Linear with OAuth. The person who authorizes the connecti
 4. Set the webhook URL to the SuperPlane address plus `/api/v1/linear/webhook`.
 5. Select **Issues**, **Comments**, and **Issue attachments**.
 6. Create the application.
-7. Copy the **Client ID**, the **Client Secret**, and the **Webhook signing secret** into SuperPlane.
-8. Click **Save**. SuperPlane opens Linear so you can authorize the connection.
+7. Copy the **Client ID** into the **Client ID** field.
+8. Copy the **Client Secret** into the **Client Secret** field.
+9. Copy the **Webhook signing secret** into the **Webhook signing secret** field.
+10. Click **Save**. SuperPlane opens Linear so you can authorize the connection.
+
+You can also leave the fields empty and click **Save**. SuperPlane opens Linear's application form with the callback URL and the webhook URL filled in. Copy the **Client ID**, the **Client Secret**, and the **Webhook signing secret** into the fields above, then click **Save** again.
 
 When the webhook signing secret is set, the connection requests the **read** and **write** scopes. Write covers creating and editing issues, comments, attachments, and reactions. When the secret is empty, the connection also requests the **admin** scope so SuperPlane can create a webhook for each trigger. A workspace admin must authorize that connection.
-
-You can also leave the fields empty and click **Save**. SuperPlane opens Linear's application form with the callback URL and the webhook URL filled in. Copy the credentials into the fields above, then click **Save** again.
 
 Linear lets only a comment's own author edit it, so **Update Issue Comment** can only change comments that this same connection posted.
 
