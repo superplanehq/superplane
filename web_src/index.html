@@ -11,8 +11,7 @@
     <meta name="apple-mobile-web-app-title" content="SuperPlane" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#14120b" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" />
     
     <!-- Material Icons Fonts -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
@@ -34,6 +33,11 @@
         document.documentElement.style.colorScheme = prefersDark ? "dark" : "light";
         if (prefersDark) {
           document.documentElement.classList.add("dark");
+        }
+        var themeColorMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeColorMeta) {
+          themeColorMeta.setAttribute("content", prefersDark ? "#14120b" : "#ffffff");
+          themeColorMeta.removeAttribute("media");
         }
       })();
     </script>
