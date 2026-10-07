@@ -10,7 +10,7 @@ import {
 import { Badge } from "@/components/reui/badge";
 import { cn } from "@/lib/utils";
 import { Check, Circle, Clock, LoaderCircle, X } from "lucide-react";
-import { type ReactNode } from "react";
+import { type ReactNode, useMemo } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 
@@ -32,6 +32,7 @@ import {
   type ConsoleColumnId,
 } from "./automationsViewModel";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
+import { fixtureWithStartedReruns, useStageAutomationRerun } from "./useStageAutomationRerun";
 
 /**
  * Variant B: automation console. Backlog, Implement, Verify, and Done sit
@@ -68,7 +69,7 @@ type AutomationsConsoleVariantProps = {
   canStopRun?: boolean;
   actionBusy?: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
-  /** Reruns a failed line step. The card footer Retry uses this. */
+  /** Reruns a failed line step through line dispatch. */
   onRerunStep?: (phase: SplitRunPhase) => void;
 };
 
@@ -93,22 +94,37 @@ export function AutomationsConsoleVariant({
   onStopRun,
   onRerunStep,
 }: AutomationsConsoleVariantProps) {
-  const outcome = outcomeSummary(fixture);
-  const groups = stagesFromFixture(fixture);
+  const knownRunIds = useMemo(
+    () => fixture.phases.flatMap((phase) => (phase.runId ? [phase.runId] : [])),
+    [fixture.phases],
+  );
+  const stageRerun = useStageAutomationRerun(organizationId, factoryId, orderId, knownRunIds);
+  const shownFixture = useMemo(
+    () => fixtureWithStartedReruns(fixture, stageRerun.attempts),
+    [fixture, stageRerun.attempts],
+  );
+  const outcome = outcomeSummary(shownFixture);
+  const groups = stagesFromFixture(shownFixture);
   const stages = allStages(groups);
-  const columns = consoleColumns(groups, fixture.footer.run?.appId);
+  const columns = consoleColumns(groups, shownFixture.footer.run?.appId);
   const currentColumn = reachedColumns(columns);
   const markers = columns.map((column, index) => columnMarker(column, index, currentColumn));
   const anyLive = hasLiveAutomation(columns);
-  const expandIdleCards = !anyLive && (fixture.lineStatus === "pending" || fixture.footerTone === "draft");
-  const liveRun = liveRunTarget(fixture);
+  const expandIdleCards = !anyLive && (shownFixture.lineStatus === "pending" || shownFixture.footerTone === "draft");
+  const liveRun = liveRunTarget(shownFixture);
   const stopLiveRun = canStopRun && onStopRun && liveRun ? () => onStopRun(liveRun) : undefined;
   const showIntake = Boolean(source) || Boolean(taskDescription?.trim()) || canEditDescription;
+  const rerunAutomation = (phase: SplitRunPhase) => {
+    if (!phase.appId || !phase.runId) {
+      return;
+    }
+    void stageRerun.rerun({ sourcePhaseId: phase.id, appId: phase.appId, runId: phase.runId });
+  };
 
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]" data-testid="redesign-console-variant">
       <ConsoleTimeline
-        fixture={fixture}
+        fixture={shownFixture}
         columns={columns}
         markers={markers}
         currentColumn={currentColumn}
@@ -126,9 +142,10 @@ export function AutomationsConsoleVariant({
         factoryKey={factoryKey}
         orderNumber={orderNumber}
         canStopRun={canStopRun}
-        actionBusy={actionBusy}
+        actionBusy={actionBusy || stageRerun.pending}
         onStopRun={onStopRun}
         onRerunStep={onRerunStep}
+        onRerunAutomation={rerunAutomation}
       />
       <ConsoleSummaryPanel
         fixture={fixture}
@@ -195,6 +212,7 @@ function ConsoleTimeline({
   actionBusy,
   onStopRun,
   onRerunStep,
+  onRerunAutomation,
 }: {
   fixture: SplitRunFixture;
   columns: ConsoleColumn[];
@@ -217,6 +235,7 @@ function ConsoleTimeline({
   actionBusy: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
   onRerunStep?: (phase: SplitRunPhase) => void;
+  onRerunAutomation?: (phase: SplitRunPhase) => void;
 }) {
   const offset = showIntake ? 1 : 0;
   const timings = timingsForConsoleColumns(fixture);
@@ -255,6 +274,7 @@ function ConsoleTimeline({
             actionBusy={actionBusy}
             onStopRun={onStopRun}
             onRerunStep={onRerunStep}
+            onRerunAutomation={onRerunAutomation}
           />
         ))}
       </Timeline>
@@ -278,6 +298,7 @@ function ColumnTimelineItem({
   actionBusy,
   onStopRun,
   onRerunStep,
+  onRerunAutomation,
 }: {
   column: ConsoleColumn;
   index: number;
@@ -294,6 +315,7 @@ function ColumnTimelineItem({
   actionBusy: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
   onRerunStep?: (phase: SplitRunPhase) => void;
+  onRerunAutomation?: (phase: SplitRunPhase) => void;
 }) {
   const emptyCopy = emptyColumnCopy(column.id, index, currentColumn, fixture);
   return (
@@ -329,6 +351,7 @@ function ColumnTimelineItem({
               actionBusy={actionBusy}
               onStopRun={onStopRun}
               onRerunStep={onRerunStep}
+              onRerunAutomation={onRerunAutomation}
             />
           ))
         )}
