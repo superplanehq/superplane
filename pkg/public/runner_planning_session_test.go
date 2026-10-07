@@ -168,6 +168,52 @@ func TestRunnerPlanningSessionUpdateAfterWorkspaceDeleteReturnsEnded(t *testing.
 	assert.Empty(t, checks)
 }
 
+func TestRunnerPlanningSessionUpdateEndsLeftoverSessionAfterWorkspaceDelete(t *testing.T) {
+	r := support.Setup(t)
+	transport := bindTestSentryHub(t)
+	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, db.Unscoped().Model(&models.Factory{}).
+		Where("id = ?", factoryModel.ID).
+		Update("deleted_at", time.Now()).Error)
+
+	stillOpen, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateRunning, stillOpen.State)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/updates", bytes.NewReader([]byte(`{
+		"scores": {
+			"clarity": {"score": 3, "summary": "Outcome, scope, and done are defined."},
+			"complexity": {"score": 2, "summary": "One agent can finish this in one run."},
+			"verifiability": {"score": 3, "summary": "Existing tests cover the change."}
+		},
+		"spec": "# Retry refunds\n\nStop double charges.\n"
+	}`)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Equal(t, "planning session has ended\n", rec.Body.String())
+	assert.Empty(t, transport.Events())
+
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, reloaded.State)
+	assert.Equal(t, models.PlanningWaitKindEnded, reloaded.WaitKind)
+	require.NotNil(t, reloaded.EndedAt)
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	assert.Empty(t, artifacts)
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	assert.Empty(t, checks)
+}
+
 func TestRunnerPlanningWaitAfterWorkspaceDeleteReturnsEnded(t *testing.T) {
 	r := support.Setup(t)
 	transport := bindTestSentryHub(t)

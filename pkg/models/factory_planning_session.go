@@ -275,22 +275,6 @@ func (s *FactoryPlanningSession) End(tx *gorm.DB) error {
 	return s.saveEndedState(tx)
 }
 
-func (f *Factory) endOpenPlanningSessions(tx *gorm.DB) error {
-	var sessions []FactoryPlanningSession
-	err := tx.
-		Where("organization_id = ? AND factory_id = ? AND state <> ?", f.OrganizationID, f.ID, PlanningSessionStateEnded).
-		Find(&sessions).Error
-	if err != nil {
-		return err
-	}
-	for i := range sessions {
-		if err := sessions[i].End(tx); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s *FactoryPlanningSession) Reopen(tx *gorm.DB) error {
 	if s.State != PlanningSessionStateEnded {
 		return nil
@@ -489,4 +473,20 @@ func (s *FactoryPlanningSession) saveSurvey(tx *gorm.DB) error {
 		"survey":     s.Survey,
 		"updated_at": s.UpdatedAt,
 	}).Error
+}
+
+func (f *Factory) endOpenPlanningSessions(tx *gorm.DB) error {
+	var sessions []FactoryPlanningSession
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND state <> ?", f.OrganizationID, f.ID, PlanningSessionStateEnded).
+		Find(&sessions).Error
+	if err != nil {
+		return err
+	}
+	for i := range sessions {
+		if err := sessions[i].End(tx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
