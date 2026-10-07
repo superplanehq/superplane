@@ -18,10 +18,15 @@ const (
 	OAuthAccessToken  = "accessToken"
 	OAuthRefreshToken = "refreshToken"
 
-	// scopeList is requested comma-separated on the authorize URL. The admin
-	// scope is needed because the On Issue trigger manages webhooks, which
-	// Linear restricts to workspace admins or OAuth tokens with admin scope.
-	scopeList = "read,write,admin"
+	// scopeWithAdmin is requested when SuperPlane creates webhooks through the
+	// API. Linear allows webhookCreate only for a workspace admin or a token
+	// with the admin scope. scopeReadWrite is enough when the Linear OAuth
+	// application sends events to SuperPlane's webhook URL.
+	scopeWithAdmin = "read,write,admin"
+	scopeReadWrite = "read,write"
+
+	// WebhookSecretConfig is the signing secret of a customer Linear OAuth application.
+	WebhookSecretConfig = "webhookSecret"
 
 	// tokenRefreshMargin is how much of the access token lifetime is left when
 	// it gets refreshed. Linear rotates refresh tokens, so only the most
@@ -53,6 +58,7 @@ type Metadata struct {
 	User                 *User   `json:"user,omitempty" mapstructure:"user,omitempty"`
 	Teams                []Team  `json:"teams" mapstructure:"teams"`
 	Organization         string  `json:"organization,omitempty" mapstructure:"organization,omitempty"`
+	OrganizationID       string  `json:"organizationId,omitempty" mapstructure:"organizationId,omitempty"`
 	URLKey               string  `json:"urlKey,omitempty" mapstructure:"urlKey,omitempty"`
 	AccessTokenExpiresAt string  `json:"accessTokenExpiresAt,omitempty" mapstructure:"accessTokenExpiresAt,omitempty"`
 	// HostedOAuth is true when this connection uses SuperPlane's Linear OAuth app.
@@ -62,28 +68,42 @@ type Metadata struct {
 }
 
 const installationInstructions = `
-SuperPlane connects to Linear with OAuth. A workspace admin must authorize the connection, because the triggers register webhooks. That person must also be a member of each private team you want to listen to.
-
-The connection requests the **read**, **write**, and **admin** scopes. Write covers creating and editing issues, comments, attachments, and reactions. Admin lets SuperPlane register webhooks.
+SuperPlane connects to Linear with OAuth. The person who authorizes the connection must be a member of each private team you want to listen to.
 
 1. Open Linear, then **Settings**, then **Administration**, then **API**.
 2. Under **OAuth applications**, click **Create new**.
-3. Set the callback URL to the address SuperPlane shows, then create the application.
-4. Copy the **Client ID** into the **Client ID** field.
-5. Copy the **Client Secret** into the **Client Secret** field.
-6. Click **Save**. SuperPlane opens Linear so a workspace admin can authorize the connection.
+3. Set the callback URL to the address SuperPlane shows.
+4. Set the webhook URL to the SuperPlane address plus ` + "`/api/v1/linear/webhook`" + `.
+5. Select **Issues**, **Comments**, and **Issue attachments**.
+6. Create the application.
+7. Copy the **Client ID** into the **Client ID** field.
+8. Copy the **Client Secret** into the **Client Secret** field.
+9. Copy the **Webhook signing secret** into the **Webhook signing secret** field.
+10. Click **Save**. SuperPlane opens Linear so you can authorize the connection.
 
-You can also leave both fields empty and click **Save**. SuperPlane opens Linear's application form with the callback URL filled in. Copy the **Client ID** and **Client Secret** from the credentials page into the fields above, then click **Save** again.
+You can also leave the fields empty and click **Save**. SuperPlane opens Linear's application form with the callback URL and the webhook URL filled in. Copy the **Client ID**, the **Client Secret**, and the **Webhook signing secret** into the fields above, then click **Save** again.
+
+When the webhook signing secret is set, the connection requests the **read** and **write** scopes. Write covers creating and editing issues, comments, attachments, and reactions. When the secret is empty, the connection also requests the **admin** scope so SuperPlane can create a webhook for each trigger. A workspace admin must authorize that connection.
 
 Linear lets only a comment's own author edit it, so **Update Issue Comment** can only change comments that this same connection posted.
 `
 
 const hostedInstallationInstructions = `
-Click **Connect** to authorize SuperPlane in your Linear workspace. A workspace admin must approve the connection. That person must also be a member of each private team you want to listen to.
+Click **Connect** to authorize SuperPlane in your Linear workspace. The person who authorizes the connection must be a member of each private team you want to listen to.
 
 The connection requests the **read**, **write**, and **admin** scopes. Write covers creating and editing issues. Admin lets SuperPlane register webhooks.
 
 To use your own OAuth application instead, open the manual setup and paste its **Client ID** and **Client Secret**.
+`
+
+const hostedAppWebhookInstructions = `
+Click **Connect** to authorize SuperPlane in your Linear workspace. The person who authorizes the connection must be a member of each private team you want to listen to.
+
+The connection requests the **read** and **write** scopes. Write covers creating and editing issues.
+
+On the Linear OAuth application, set the webhook URL to the SuperPlane address plus ` + "`/api/v1/linear/webhook`" + `. Select **Issues**, **Comments**, and **Issue attachments**. Copy the webhook signing secret into ` + "`SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET`" + `.
+
+To use your own OAuth application instead, open the manual setup and paste its **Client ID**, **Client Secret**, and **Webhook signing secret**.
 `
 
 func (l *Linear) Name() string {
@@ -104,6 +124,9 @@ func (l *Linear) Description() string {
 
 func (l *Linear) Instructions() string {
 	if UseHostedOAuth() {
+		if HostedWebhookSecret() != "" {
+			return hostedAppWebhookInstructions
+		}
 		return hostedInstallationInstructions
 	}
 	return installationInstructions
@@ -123,6 +146,13 @@ func (l *Linear) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
 			Description: "OAuth Client Secret from your Linear application",
+		},
+		{
+			Name:        WebhookSecretConfig,
+			Label:       "Webhook signing secret",
+			Type:        configuration.FieldTypeString,
+			Sensitive:   true,
+			Description: "Signing secret from the Linear application webhook. Leave this empty to create webhooks with the admin scope.",
 		},
 	}
 }
@@ -207,6 +237,11 @@ func appCreateURL(baseURL, callbackURL string) string {
 	params.Set("oauth.client_name", "SuperPlane")
 	params.Set("oauth.client_uri", baseURL)
 	params.Set("oauth.redirect_uris", callbackURL)
+	params.Set("webhook.enabled", "true")
+	params.Set("webhook.url", AppWebhookURL(baseURL))
+	for _, resourceType := range appWebhookResourceTypes {
+		params.Add("webhook.resourceTypes", resourceType)
+	}
 
 	return fmt.Sprintf("%s?%s", AppsNewURL, params.Encode())
 }
@@ -232,7 +267,7 @@ func (l *Linear) requestAuthorization(ctx core.SyncContext, app oauthApp, callba
 		AuthorizeURL,
 		url.QueryEscape(clientID),
 		url.QueryEscape(callbackURL),
-		url.QueryEscape(scopeList),
+		url.QueryEscape(OAuthScopes(ctx.Integration)),
 		url.QueryEscape(*metadata.State),
 	)
 
@@ -375,10 +410,15 @@ func (l *Linear) updateMetadata(ctx core.SyncContext) error {
 	// sync refreshes and is unrelated to the workspace data loaded here.
 	//
 	previous := readMetadata(ctx.Integration)
+	organizationID := viewer.Organization.ID
+	if organizationID == "" {
+		organizationID = previous.OrganizationID
+	}
 	ctx.Integration.SetMetadata(Metadata{
 		User:                 viewer.User,
 		Teams:                teams,
 		Organization:         viewer.Organization.Name,
+		OrganizationID:       organizationID,
 		URLKey:               viewer.Organization.URLKey,
 		AccessTokenExpiresAt: previous.AccessTokenExpiresAt,
 		HostedOAuth:          previous.HostedOAuth,

@@ -43,6 +43,8 @@ func Test__Linear__Sync(t *testing.T) {
 		assert.Equal(t, "https://sp.example.com", params.Get("oauth.client_uri"))
 		assert.Contains(t, params.Get("oauth.redirect_uris"), "/api/v1/integrations/")
 		assert.Contains(t, params.Get("oauth.redirect_uris"), "/callback")
+		assert.Equal(t, "https://sp.example.com/api/v1/linear/webhook", params.Get("webhook.url"))
+		assert.Equal(t, []string{IssueResourceType, CommentResourceType, AttachmentResourceType}, params["webhook.resourceTypes"])
 	})
 
 	t.Run("missing client secret - setup wizard", func(t *testing.T) {
@@ -98,6 +100,28 @@ func Test__Linear__Sync(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, metadata.State)
 		assert.Equal(t, *metadata.State, params.Get("state"))
+	})
+
+	t.Run("webhook signing secret omits the admin scope", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":      testClientID,
+				"clientSecret":  testClientSecret,
+				"webhookSecret": "app-signing-secret",
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			Logger:        logrus.NewEntry(logrus.New()),
+		})
+
+		require.NoError(t, err)
+		actionURL, parseErr := url.Parse(integrationContext.BrowserAction.URL)
+		require.NoError(t, parseErr)
+		assert.Equal(t, "read,write", actionURL.Query().Get("scope"))
 	})
 
 	t.Run("state is not regenerated on subsequent syncs", func(t *testing.T) {
@@ -159,6 +183,7 @@ func Test__Linear__Sync(t *testing.T) {
 		require.NotNil(t, metadata.User)
 		assert.Equal(t, "Jane Doe", metadata.User.Name)
 		assert.Equal(t, "Acme", metadata.Organization)
+		assert.Equal(t, "o1", metadata.OrganizationID)
 		assert.Equal(t, "acme", metadata.URLKey)
 		require.Len(t, metadata.Teams, 1)
 		assert.Equal(t, "ENG", metadata.Teams[0].Key)
