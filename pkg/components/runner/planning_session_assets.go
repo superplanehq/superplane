@@ -28,9 +28,6 @@ var analysisProtocolMarkdown string
 //go:embed analysis_protocol_review.md
 var analysisProtocolReviewMarkdown string
 
-//go:embed analysis_user_prompt.md
-var analysisUserPromptMarkdown string
-
 //go:embed analysis_user_prompt_review.md
 var analysisUserPromptReviewMarkdown string
 
@@ -76,16 +73,10 @@ func PlanningSessionProtocolMarkdown() string {
 	return strings.TrimSpace(analysisProtocolMarkdown)
 }
 
-// PlanningSessionUserPromptMarkdown is the default Refine Task prompt: tone,
-// Clarity rules, and plan shape. Factories can edit that node prompt.
+// PlanningSessionUserPromptMarkdown is the default Refine Task prompt:
+// Clarity, Complexity, and Verifiability on a 1 through 3 scale.
+// Factories can edit that node prompt.
 func PlanningSessionUserPromptMarkdown() string {
-	return strings.TrimSpace(analysisUserPromptMarkdown)
-}
-
-// PlanningSessionUserPromptReviewMarkdown is the Refine Task prompt for
-// organizations on the task planning review flow: three sub-parameters on a
-// 1 through 3 scale. Factories can edit that node prompt.
-func PlanningSessionUserPromptReviewMarkdown() string {
 	return strings.TrimSpace(analysisUserPromptReviewMarkdown)
 }
 
