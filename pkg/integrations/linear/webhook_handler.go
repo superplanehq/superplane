@@ -17,6 +17,10 @@ type WebhookConfiguration struct {
 	// its own webhook and SuperPlane filters by project.
 	TeamIDs      []string `json:"teamIds" mapstructure:"teamIds"`
 	ResourceType string   `json:"resourceType" mapstructure:"resourceType"`
+	// AppLevel is true when Linear delivers this subscription through the
+	// OAuth application webhook. Saving a trigger again must not reuse a
+	// subscription whose delivery mode no longer matches.
+	AppLevel bool `json:"appLevel,omitempty" mapstructure:"appLevel,omitempty"`
 }
 
 type WebhookMetadata struct {
@@ -67,11 +71,20 @@ func (h *LinearWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
+	if configA.AppLevel != configB.AppLevel {
+		return false, nil
+	}
+
 	if !slices.Equal(configA.resolvedTeamIDs(), configB.resolvedTeamIDs()) {
 		return false, nil
 	}
 
 	return configA.ResourceType == configB.ResourceType, nil
+}
+
+func (c WebhookConfiguration) withDeliveryMode(integration core.IntegrationContext) WebhookConfiguration {
+	c.AppLevel = AppWebhookSigningSecret(integration) != ""
+	return c
 }
 
 func (h *LinearWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {

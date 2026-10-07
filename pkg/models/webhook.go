@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -77,6 +78,30 @@ func (w *Webhook) MarkFailed(tx *gorm.DB) error {
 
 func (w *Webhook) HasExceededRetries() bool {
 	return w.RetryCount >= w.MaxRetries
+}
+
+// UpdateWebhookConfiguration stores a new configuration and leaves the state unchanged.
+func UpdateWebhookConfiguration(tx *gorm.DB, webhookID uuid.UUID, configuration any) error {
+	if webhookID == uuid.Nil {
+		return fmt.Errorf("missing webhook id")
+	}
+	return tx.Model(&Webhook{}).Where("id = ?", webhookID).Updates(map[string]any{
+		"configuration": datatypes.NewJSONType(configuration),
+		"updated_at":    time.Now(),
+	}).Error
+}
+
+// ReprovisionWebhook marks a webhook pending so Setup runs again.
+func ReprovisionWebhook(tx *gorm.DB, webhookID uuid.UUID, configuration any) error {
+	if webhookID == uuid.Nil {
+		return fmt.Errorf("missing webhook id")
+	}
+	return tx.Model(&Webhook{}).Where("id = ?", webhookID).Updates(map[string]any{
+		"state":         WebhookStatePending,
+		"retry_count":   0,
+		"configuration": datatypes.NewJSONType(configuration),
+		"updated_at":    time.Now(),
+	}).Error
 }
 
 func FindWebhook(id uuid.UUID) (*Webhook, error) {

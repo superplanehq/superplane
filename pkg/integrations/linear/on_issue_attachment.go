@@ -138,7 +138,7 @@ func (i *OnIssueAttachment) Setup(ctx core.TriggerContext) error {
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		TeamID:       config.Team,
 		ResourceType: AttachmentResourceType,
-	})
+	}.withDeliveryMode(ctx.Integration))
 }
 
 func (i *OnIssueAttachment) Hooks() []core.Hook {

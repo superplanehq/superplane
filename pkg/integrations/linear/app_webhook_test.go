@@ -4,11 +4,14 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func TestParseAppEvent(t *testing.T) {
@@ -30,6 +33,7 @@ func TestParseAppEvent(t *testing.T) {
 		ResourceType:   IssueResourceType,
 		TeamID:         "team-1",
 		TeamKey:        "ENG",
+		IssueID:        "issue-1",
 	}, event)
 }
 
@@ -84,6 +88,64 @@ func TestSubscriptionMatches(t *testing.T) {
 		TeamID:       "team-1",
 		ResourceType: IssueResourceType,
 	}, AppEvent{ResourceType: IssueResourceType}, teams))
+}
+
+func TestParseAppEvent__AttachmentUsesParentIssueTeam(t *testing.T) {
+	raw, err := os.ReadFile("example_data_on_issue_attachment.json")
+	require.NoError(t, err)
+
+	var envelope struct {
+		Data json.RawMessage `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &envelope))
+
+	event, err := ParseAppEvent(nil, envelope.Data)
+	require.NoError(t, err)
+	assert.Equal(t, AttachmentResourceType, event.ResourceType)
+	assert.Equal(t, "ENG", event.TeamKey)
+	assert.Empty(t, event.TeamID)
+	assert.NotEmpty(t, event.IssueID)
+
+	teams := []Team{{ID: "team-1", Key: "ENG", Name: "Engineering"}}
+	assert.True(t, SubscriptionMatches(WebhookConfiguration{
+		TeamID:       "team-1",
+		ResourceType: AttachmentResourceType,
+	}, event, teams))
+	assert.False(t, SubscriptionMatches(WebhookConfiguration{
+		TeamID:       "team-2",
+		ResourceType: AttachmentResourceType,
+	}, event, teams))
+}
+
+func TestResolveEventTeam__LooksUpIssueWhenThePayloadHasNoTeam(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			jsonResponse(`{"data":{"issue":{"id":"issue-1","identifier":"ENG-9","team":{"id":"team-9","key":"ENG","name":"Engineering"}}}}`),
+		},
+	}
+
+	event, err := ResolveEventTeam(httpContext, newAuthorizedIntegration(), AppEvent{
+		ResourceType: AttachmentResourceType,
+		IssueID:      "issue-1",
+	}, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, "team-9", event.TeamID)
+	assert.Equal(t, "ENG", event.TeamKey)
+	require.Len(t, httpContext.Requests, 1)
+}
+
+func TestResolveEventTeam__UsesTheKnownTeamKeyWithoutARequest(t *testing.T) {
+	httpContext := &contexts.HTTPContext{}
+	event, err := ResolveEventTeam(httpContext, newAuthorizedIntegration(), AppEvent{
+		ResourceType: AttachmentResourceType,
+		TeamKey:      "ENG",
+		IssueID:      "issue-1",
+	}, []Team{{ID: "team-1", Key: "ENG"}})
+
+	require.NoError(t, err)
+	assert.Equal(t, "team-1", event.TeamID)
+	assert.Empty(t, httpContext.Requests)
 }
 
 func TestSignatureMatches(t *testing.T) {

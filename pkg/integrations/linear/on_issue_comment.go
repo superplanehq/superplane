@@ -144,7 +144,7 @@ func (i *OnIssueComment) Setup(ctx core.TriggerContext) error {
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		TeamID:       config.Team,
 		ResourceType: CommentResourceType,
-	})
+	}.withDeliveryMode(ctx.Integration))
 }
 
 func (i *OnIssueComment) Hooks() []core.Hook {

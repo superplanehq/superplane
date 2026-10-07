@@ -1,6 +1,8 @@
 package linear
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,6 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -65,7 +69,14 @@ type Metadata struct {
 	HostedOAuth bool `json:"hostedOAuth,omitempty" mapstructure:"hostedOAuth,omitempty"`
 	// SetupReturnPath is a same-origin path to open after OAuth, such as the intake wizard.
 	SetupReturnPath string `json:"setupReturnPath,omitempty" mapstructure:"setupReturnPath,omitempty"`
+	// OAuthScopes is the scope list from the last authorize URL.
+	// A delivery-mode change uses it to decide when consent must be requested again.
+	OAuthScopes string `json:"oauthScopes,omitempty" mapstructure:"oauthScopes,omitempty"`
 }
+
+// errNeedsAdminAuthorization tells Sync to stop after asking the user to
+// authorize the admin scope. The connection is not ready until that consent exists.
+var errNeedsAdminAuthorization = errors.New("linear connection needs admin authorization")
 
 const installationInstructions = `
 SuperPlane connects to Linear with OAuth. The person who authorizes the connection must be a member of each private team you want to listen to.
@@ -223,6 +234,13 @@ func (l *Linear) Sync(ctx core.SyncContext) error {
 		return nil
 	}
 
+	if err := l.reconcileWebhookDelivery(ctx); err != nil {
+		if errors.Is(err, errNeedsAdminAuthorization) {
+			return nil
+		}
+		return err
+	}
+
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
 	return nil
@@ -258,6 +276,8 @@ func (l *Linear) requestAuthorization(ctx core.SyncContext, app oauthApp, callba
 		metadata.State = &state
 	}
 	metadata.HostedOAuth = app.Hosted
+	scopes := OAuthScopes(ctx.Integration)
+	metadata.OAuthScopes = scopes
 	ctx.Integration.SetMetadata(metadata)
 
 	clientID := app.ClientID
@@ -267,7 +287,7 @@ func (l *Linear) requestAuthorization(ctx core.SyncContext, app oauthApp, callba
 		AuthorizeURL,
 		url.QueryEscape(clientID),
 		url.QueryEscape(callbackURL),
-		url.QueryEscape(OAuthScopes(ctx.Integration)),
+		url.QueryEscape(scopes),
 		url.QueryEscape(*metadata.State),
 	)
 
@@ -423,9 +443,120 @@ func (l *Linear) updateMetadata(ctx core.SyncContext) error {
 		AccessTokenExpiresAt: previous.AccessTokenExpiresAt,
 		HostedOAuth:          previous.HostedOAuth,
 		SetupReturnPath:      previous.SetupReturnPath,
+		OAuthScopes:          previous.OAuthScopes,
 	})
 
 	return nil
+}
+
+// reconcileWebhookDelivery rebuilds subscriptions when the signing secret
+// appears or disappears. API webhooks need the admin scope, so a connection
+// authorized with read and write must consent again before those webhooks
+// can be created.
+func (l *Linear) reconcileWebhookDelivery(ctx core.SyncContext) error {
+	wantAppLevel := AppWebhookSigningSecret(ctx.Integration) != ""
+	webhooks, err := models.ListIntegrationWebhooks(database.DB(context.Background()), ctx.Integration.ID())
+	if err != nil {
+		return fmt.Errorf("failed to list webhooks: %v", err)
+	}
+
+	var mismatched []models.Webhook
+	for i := range webhooks {
+		webhook := &webhooks[i]
+		config := WebhookConfiguration{}
+		if err := mapstructure.Decode(webhook.Configuration.Data(), &config); err != nil {
+			return fmt.Errorf("failed to decode webhook config: %v", err)
+		}
+
+		appLevel := IsAppLevelWebhook(webhook.Metadata.Data())
+		if appLevel == wantAppLevel {
+			if config.AppLevel == wantAppLevel {
+				continue
+			}
+			config.AppLevel = wantAppLevel
+			if err := models.UpdateWebhookConfiguration(database.DB(context.Background()), webhook.ID, config); err != nil {
+				return fmt.Errorf("failed to update webhook configuration: %v", err)
+			}
+			continue
+		}
+		mismatched = append(mismatched, *webhook)
+	}
+
+	if len(mismatched) == 0 {
+		return nil
+	}
+
+	if !wantAppLevel && !scopeIncludesAdmin(readMetadata(ctx.Integration).OAuthScopes) {
+		if err := ctx.Integration.SetSecret(OAuthAccessToken, []byte("")); err != nil {
+			return err
+		}
+		if err := ctx.Integration.SetSecret(OAuthRefreshToken, []byte("")); err != nil {
+			return err
+		}
+		app := resolveOAuthApp(ctx.Integration)
+		callbackURL := oauthCallbackURL(ctx.BaseURL, ctx.Integration.ID(), app.Hosted)
+		if err := l.requestAuthorization(ctx, app, callbackURL); err != nil {
+			return err
+		}
+		return errNeedsAdminAuthorization
+	}
+
+	if wantAppLevel {
+		if err := deleteLinearWebhooks(ctx, mismatched); err != nil {
+			return err
+		}
+	}
+
+	for i := range mismatched {
+		webhook := &mismatched[i]
+		config := WebhookConfiguration{}
+		if err := mapstructure.Decode(webhook.Configuration.Data(), &config); err != nil {
+			return fmt.Errorf("failed to decode webhook config: %v", err)
+		}
+		config.AppLevel = wantAppLevel
+		if err := models.ReprovisionWebhook(database.DB(context.Background()), webhook.ID, config); err != nil {
+			return fmt.Errorf("failed to reprovision webhook: %v", err)
+		}
+	}
+
+	if ctx.Logger != nil {
+		ctx.Logger.Infof("Marked %d Linear webhooks for setup after a delivery mode change", len(mismatched))
+	}
+	return nil
+}
+
+func deleteLinearWebhooks(ctx core.SyncContext, webhooks []models.Webhook) error {
+	var ids []string
+	for i := range webhooks {
+		metadata := WebhookMetadata{}
+		if err := mapstructure.Decode(webhooks[i].Metadata.Data(), &metadata); err != nil {
+			return fmt.Errorf("failed to decode webhook metadata: %v", err)
+		}
+		ids = append(ids, metadata.webhookIDs()...)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %v", err)
+	}
+
+	for _, id := range ids {
+		if err := client.DeleteWebhook(id); err != nil && !linearWebhookMissing(err) {
+			return fmt.Errorf("error deleting webhook: %v", err)
+		}
+	}
+	return nil
+}
+
+func linearWebhookMissing(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "not found")
 }
 
 func (l *Linear) HandleRequest(ctx core.HTTPRequestContext) {

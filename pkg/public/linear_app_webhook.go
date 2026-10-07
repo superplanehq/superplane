@@ -121,7 +121,15 @@ func (s *Server) deliverLinearAppWebhook(r *http.Request, integration *models.In
 	metadata := linear.Metadata{}
 	_ = mapstructure.Decode(integration.Metadata.Data(), &metadata)
 
+	integrationContext := contexts.NewIntegrationContext(database.DB(r.Context()), nil, integration, s.encryptor, s.registry, nil)
+	event, err = linear.ResolveEventTeam(s.registry.HTTPContext(), integrationContext, event, metadata.Teams)
+	if err != nil {
+		log.WithError(err).WithField("integration_id", integration.ID.String()).Error("failed to resolve the Linear issue team")
+		return http.StatusInternalServerError
+	}
+
 	status := http.StatusOK
+	deliveryKey := linear.DeliveryKey(body)
 	for i := range webhooks {
 		webhook := webhooks[i]
 		if webhook.State != models.WebhookStateReady || !linear.IsAppLevelWebhook(webhook.Metadata.Data()) {
@@ -134,6 +142,15 @@ func (s *Server) deliverLinearAppWebhook(r *http.Request, integration *models.In
 			return http.StatusInternalServerError
 		}
 		if !linear.SubscriptionMatches(config, event, metadata.Teams) {
+			continue
+		}
+
+		accepted, err := models.LinearWebhookDeliveryAccepted(database.DB(r.Context()), webhook.ID, deliveryKey)
+		if err != nil {
+			log.WithError(err).WithField("webhook_id", webhook.ID.String()).Error("failed to read Linear webhook delivery")
+			return http.StatusInternalServerError
+		}
+		if accepted {
 			continue
 		}
 

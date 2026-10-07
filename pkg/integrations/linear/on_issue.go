@@ -167,7 +167,7 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		TeamID:       config.Team,
 		ResourceType: IssueResourceType,
-	})
+	}.withDeliveryMode(ctx.Integration))
 }
 
 func (i *OnIssue) setupProjectWebhooks(ctx core.TriggerContext, projects []string) error {
@@ -188,7 +188,7 @@ func (i *OnIssue) setupProjectWebhooks(ctx core.TriggerContext, projects []strin
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		TeamIDs:      teamIDs,
 		ResourceType: IssueResourceType,
-	})
+	}.withDeliveryMode(ctx.Integration))
 }
 
 func (i *OnIssue) Hooks() []core.Hook {

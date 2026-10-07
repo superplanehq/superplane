@@ -100,6 +100,7 @@ func Test__Linear__Sync(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, metadata.State)
 		assert.Equal(t, *metadata.State, params.Get("state"))
+		assert.Equal(t, "read,write,admin", metadata.OAuthScopes)
 	})
 
 	t.Run("webhook signing secret omits the admin scope", func(t *testing.T) {
@@ -122,6 +123,10 @@ func Test__Linear__Sync(t *testing.T) {
 		actionURL, parseErr := url.Parse(integrationContext.BrowserAction.URL)
 		require.NoError(t, parseErr)
 		assert.Equal(t, "read,write", actionURL.Query().Get("scope"))
+
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.Equal(t, "read,write", metadata.OAuthScopes)
 	})
 
 	t.Run("state is not regenerated on subsequent syncs", func(t *testing.T) {
@@ -147,7 +152,7 @@ func Test__Linear__Sync(t *testing.T) {
 	})
 
 	t.Run("access token present - refreshes and becomes ready", func(t *testing.T) {
-		integrationContext := newAuthorizedIntegration()
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{OAuthScopes: "read,write"})
 
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -185,6 +190,7 @@ func Test__Linear__Sync(t *testing.T) {
 		assert.Equal(t, "Acme", metadata.Organization)
 		assert.Equal(t, "o1", metadata.OrganizationID)
 		assert.Equal(t, "acme", metadata.URLKey)
+		assert.Equal(t, "read,write", metadata.OAuthScopes)
 		require.Len(t, metadata.Teams, 1)
 		assert.Equal(t, "ENG", metadata.Teams[0].Key)
 

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -30,6 +31,8 @@ type AppEvent struct {
 	ResourceType   string
 	TeamID         string
 	TeamKey        string
+	// IssueID is the parent issue when the payload is not itself an issue.
+	IssueID string
 }
 
 // AppWebhookURL is the address to enter on a Linear OAuth application.
@@ -44,6 +47,26 @@ func OAuthScopes(integration core.IntegrationContext) string {
 		return scopeReadWrite
 	}
 	return scopeWithAdmin
+}
+
+// scopeIncludesAdmin reports whether scopes contains the admin scope.
+func scopeIncludesAdmin(scopes string) bool {
+	for _, scope := range strings.Split(scopes, ",") {
+		if strings.EqualFold(strings.TrimSpace(scope), "admin") {
+			return true
+		}
+	}
+	return false
+}
+
+// DeliveryKey identifies one Linear payload. Linear retries send the same body,
+// so a subscription that already accepted this key is not run again.
+func DeliveryKey(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	sum := sha256.Sum256(body)
+	return hex.EncodeToString(sum[:])
 }
 
 // AppWebhookSigningSecret is the secret Linear uses to sign the application webhook.
@@ -101,7 +124,45 @@ func ParseAppEvent(headers http.Header, body []byte) (AppEvent, error) {
 		ResourceType:   eventType,
 		TeamID:         eventTeamID(data),
 		TeamKey:        eventTeamKey(data),
+		IssueID:        eventIssueID(eventType, data),
 	}, nil
+}
+
+// ResolveEventTeam fills the team on events that do not carry one.
+// Attachment payloads identify the parent issue and omit the team. The team
+// list resolves a team key. Otherwise SuperPlane reads the issue from Linear.
+func ResolveEventTeam(httpCtx core.HTTPContext, integration core.IntegrationContext, event AppEvent, teams []Team) (AppEvent, error) {
+	if event.TeamID != "" {
+		return event, nil
+	}
+	if teamID := teamIDForKey(teams, event.TeamKey); teamID != "" {
+		event.TeamID = teamID
+		return event, nil
+	}
+
+	issueID := strings.TrimSpace(event.IssueID)
+	if issueID == "" {
+		return event, nil
+	}
+
+	client, err := NewClient(httpCtx, integration)
+	if err != nil {
+		return event, err
+	}
+
+	issue, err := client.GetIssue(issueID)
+	if err != nil {
+		return event, err
+	}
+	if issue.Team == nil {
+		return event, nil
+	}
+
+	event.TeamID = issue.Team.ID
+	if event.TeamKey == "" {
+		event.TeamKey = issue.Team.Key
+	}
+	return event, nil
 }
 
 // IsAppLevelWebhook reports whether this subscription receives the application webhook.
@@ -164,7 +225,59 @@ func eventTeamKey(data map[string]any) string {
 		return key
 	}
 	issue, _ := data["issue"].(map[string]any)
-	return teamKey(issue)
+	if key := teamKey(issue); key != "" {
+		return key
+	}
+	if key := teamKeyFromIdentifier(webhookString(issue, "identifier")); key != "" {
+		return key
+	}
+	if key := teamKeyFromIdentifier(identifierFromLinearIssueURL(webhookString(issue, "url"))); key != "" {
+		return key
+	}
+	return ""
+}
+
+func eventIssueID(resourceType string, data map[string]any) string {
+	if data == nil {
+		return ""
+	}
+	if strings.EqualFold(resourceType, IssueResourceType) {
+		return webhookString(data, "id")
+	}
+	if issueID := webhookString(data, "issueId"); issueID != "" {
+		return issueID
+	}
+	issue, _ := data["issue"].(map[string]any)
+	return webhookString(issue, "id")
+}
+
+// teamKeyFromIdentifier reads the team key from a Linear issue identifier such as ENG-142.
+func teamKeyFromIdentifier(identifier string) string {
+	identifier = strings.TrimSpace(identifier)
+	dash := strings.LastIndex(identifier, "-")
+	if dash <= 0 || dash == len(identifier)-1 {
+		return ""
+	}
+	for _, char := range identifier[dash+1:] {
+		if char < '0' || char > '9' {
+			return ""
+		}
+	}
+	return identifier[:dash]
+}
+
+func identifierFromLinearIssueURL(raw string) string {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed.Host == "" {
+		return ""
+	}
+	parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+	for i := 0; i+1 < len(parts); i++ {
+		if parts[i] == "issue" && parts[i+1] != "" {
+			return parts[i+1]
+		}
+	}
+	return ""
 }
 
 func teamIDForKey(teams []Team, key string) string {

@@ -134,7 +134,7 @@ func (i *OnIssueLabel) Setup(ctx core.TriggerContext) error {
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		TeamID:       config.Team,
 		ResourceType: IssueResourceType,
-	})
+	}.withDeliveryMode(ctx.Integration))
 }
 
 func (i *OnIssueLabel) Hooks() []core.Hook {
