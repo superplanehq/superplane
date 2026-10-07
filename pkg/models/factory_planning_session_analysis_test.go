@@ -911,7 +911,42 @@ func TestWorkOrderReadyForAutoStartRequiresClarityWhenEnabled(t *testing.T) {
 	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
-	assert.True(t, ready)
+	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartBlocksWhenFirstScoreFallsOffRecentScores(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-first-score-history")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{
+		Scores: reviewScores(3, 3, 2),
+		Spec:   "# Retry refunds\n\nStop double charges.\n",
+	}))
+	for range MaxFactoryWorkOrderCheckRecentScores {
+		require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
+	}
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	var verifiability *FactoryWorkOrderCheck
+	for i := range checks {
+		if checks[i].Key == PlanningVerifiabilityCheckKey {
+			verifiability = &checks[i]
+			break
+		}
+	}
+	require.NotNil(t, verifiability)
+	assert.Equal(t, float64(PlanningReviewScoreMax), verifiability.Score)
+	assert.NotContains(t, []float64(verifiability.RecentScores), float64(2))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
 }
 
 func mustAnalysisOrder(
