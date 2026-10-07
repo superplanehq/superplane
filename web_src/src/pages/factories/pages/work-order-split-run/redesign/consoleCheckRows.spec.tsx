@@ -155,6 +155,37 @@ describe("ConsoleCheckRows", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("shows the result when a check row receives keyboard focus", async () => {
+    const user = userEvent.setup();
+    render(
+      <ConsoleCheckRows
+        checks={[
+          check({
+            id: "risk",
+            key: "risk-review",
+            name: "Risk score",
+            score: 1,
+            level: "positive",
+            summary: "Lower risk because the pull request is documentation only.",
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(mergeConfidenceHeader());
+    await user.tab();
+
+    const row = screen.getByTestId("split-run-check-risk");
+    expect(row).toHaveFocus();
+    expect(row).toHaveAccessibleName(
+      "Blast radius. Low. Lower risk because the pull request is documentation only.",
+    );
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("Low");
+    expect(tip).toHaveTextContent("Lower risk because the pull request is documentation only.");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("describes a calm result as low caution", () => {
     render(
       <ConsoleCheckRows

@@ -164,20 +164,23 @@ function ResultBars({ tone }: { tone: ReturnType<typeof checkTone> }) {
 function ConsoleCheckRow({ check }: { check: WorkOrderCheckPresentation }) {
   const name = workOrderCheckDisplayName(check);
   const status = workOrderCheckStatus(check).label;
+  const valueLabel = check.summary ? `${status}. ${check.summary}` : status;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div
+        <button
+          type="button"
+          aria-label={`${name}. ${valueLabel}`}
           data-testid={`split-run-check-${check.id}`}
-          className="-mx-(--frame-panel-px) flex w-auto min-w-0 items-center justify-between gap-3 px-(--frame-panel-px) py-2 text-left transition-colors hover:bg-muted"
+          className="-mx-(--frame-panel-px) flex w-auto min-w-0 cursor-default items-center justify-between gap-3 px-(--frame-panel-px) py-2 text-left transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
         >
           <span className="flex min-w-0 items-center gap-2">
             <CheckIcon check={check} />
             <span className="min-w-0 truncate text-[13px] font-medium leading-5 text-foreground">{name}</span>
           </span>
           <ResultBars tone={checkTone(check)} />
-        </div>
+        </button>
       </TooltipTrigger>
       <TooltipContent side="right" collisionPadding={8} className="max-w-72 px-4 py-3 text-left">
         <span className={cn("block font-medium", titleToneClass(checkTone(check)))}>{status}</span>
