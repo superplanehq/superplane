@@ -1,18 +1,24 @@
-import { canvasesDescribeRun, canvasesListRuns, canvasesReemitTriggerEvent } from "@/api-client";
+import {
+  canvasesDescribeRun,
+  canvasesListRuns,
+  canvasesReemitTriggerEvent,
+  type CanvasesCanvasRun,
+} from "@/api-client";
 import { invalidateFactoryWorkOrderQueries } from "@/hooks/useFactoryWebsocket";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { findRunInListRunsResponse } from "@/pages/app/sidebarRunLookup";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
-import { selectCreatedRerun } from "@/ui/CanvasPage/runInspectionRerunSelection";
+import { getRunStatus } from "@/ui/Runs/runPresentation";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "../splitRunMocks";
+import type { SplitRunFixture, SplitRunPhase, SplitRunPhaseStatus, SplitRunStreamLine } from "../splitRunMocks";
 
 const RERUN_FAILURE_TOAST = "Failed to restart run";
 const RERUN_SUCCESS_TOAST = "Run restarted";
 const RUN_LOOKUP_PAGE_LIMIT = 25;
+const RERUN_LOOKUP_DELAY_MS = 500;
 
 export type StageAutomationRerunTarget = {
   sourcePhaseId: string;
@@ -21,7 +27,10 @@ export type StageAutomationRerunTarget = {
 };
 
 type StartedStageAutomationRerun = StageAutomationRerunTarget & {
-  createdRunId: string;
+  eventId: string;
+  triggerNodeId: string;
+  createdRunId?: string;
+  status: SplitRunPhaseStatus;
   startedAt: string;
 };
 
@@ -31,11 +40,41 @@ type ReemittedStageAutomation = {
   eventId: string;
 };
 
-export function useStageAutomationRerun(organizationId?: string, factoryId?: string, orderId?: string) {
+export function useStageAutomationRerun(
+  organizationId?: string,
+  factoryId?: string,
+  orderId?: string,
+  knownRunIds: readonly string[] = [],
+) {
   const queryClient = useQueryClient();
   const inFlight = useRef(false);
   const [pending, setPending] = useState(false);
   const [attempts, setAttempts] = useState<StartedStageAutomationRerun[]>([]);
+  const watchers = useRef(new Map<string, AbortController>());
+  const knownRunIdsRef = useRef(knownRunIds);
+  const attemptsRef = useRef(attempts);
+  knownRunIdsRef.current = knownRunIds;
+  attemptsRef.current = attempts;
+
+  useEffect(() => {
+    const known = new Set(knownRunIds);
+    for (const attempt of attemptsRef.current) {
+      if (attempt.createdRunId && known.has(attempt.createdRunId)) {
+        watchers.current.get(attempt.eventId)?.abort();
+      }
+    }
+    setAttempts((current) => dropKnownReruns(current, known));
+  }, [knownRunIds]);
+
+  useEffect(() => {
+    const controllers = watchers.current;
+    return () => {
+      for (const controller of controllers.values()) {
+        controller.abort();
+      }
+      controllers.clear();
+    };
+  }, []);
 
   const rerun = useCallback(
     async (target: StageAutomationRerunTarget) => {
@@ -47,10 +86,15 @@ export function useStageAutomationRerun(organizationId?: string, factoryId?: str
       try {
         const reemitted = await reemitStageAutomation(target, organizationId);
         await refreshStageAutomationQueries(queryClient, organizationId, factoryId, orderId);
-        const createdRunId = reemitted ? await findCreatedRun(target.appId, organizationId, reemitted) : undefined;
-        if (createdRunId) {
-          setAttempts((current) => appendStartedRerun(current, target, createdRunId));
-        }
+        setAttempts((current) => appendAcceptedRerun(current, target, reemitted));
+        watchAcceptedRerun({
+          canvasId: target.appId,
+          organizationId,
+          reemitted,
+          knownRunIds: knownRunIdsRef,
+          watchers,
+          setAttempts,
+        });
         showSuccessToast(RERUN_SUCCESS_TOAST);
       } catch (error) {
         console.error(RERUN_FAILURE_TOAST, error);
@@ -77,7 +121,7 @@ export function fixtureWithStartedReruns(
 async function reemitStageAutomation(
   target: StageAutomationRerunTarget,
   organizationId: string | undefined,
-): Promise<ReemittedStageAutomation | undefined> {
+): Promise<ReemittedStageAutomation> {
   const described = await canvasesDescribeRun(
     withOrganizationHeader({
       organizationId,
@@ -101,55 +145,136 @@ async function reemitStageAutomation(
   );
   const eventId = response.data?.eventId;
   if (!eventId) {
-    return undefined;
+    throw new Error("Restarted event is missing");
   }
 
   return { canvasId: target.appId, triggerNodeId: rootEvent.nodeId, eventId };
 }
 
-async function findCreatedRun(
+function watchAcceptedRerun({
+  canvasId,
+  organizationId,
+  reemitted,
+  knownRunIds,
+  watchers,
+  setAttempts,
+}: {
+  canvasId: string;
+  organizationId: string | undefined;
+  reemitted: ReemittedStageAutomation;
+  knownRunIds: { current: readonly string[] };
+  watchers: { current: Map<string, AbortController> };
+  setAttempts: (update: (current: StartedStageAutomationRerun[]) => StartedStageAutomationRerun[]) => void;
+}) {
+  const controller = new AbortController();
+  watchers.current.get(reemitted.eventId)?.abort();
+  watchers.current.set(reemitted.eventId, controller);
+  void followCreatedRun({ canvasId, organizationId, reemitted, knownRunIds, controller, watchers, setAttempts });
+}
+
+async function followCreatedRun({
+  canvasId,
+  organizationId,
+  reemitted,
+  knownRunIds,
+  controller,
+  watchers,
+  setAttempts,
+}: {
+  canvasId: string;
+  organizationId: string | undefined;
+  reemitted: ReemittedStageAutomation;
+  knownRunIds: { current: readonly string[] };
+  controller: AbortController;
+  watchers: { current: Map<string, AbortController> };
+  setAttempts: (update: (current: StartedStageAutomationRerun[]) => StartedStageAutomationRerun[]) => void;
+}) {
+  const lookupEvent = createdRunLookupEvent(reemitted);
+  try {
+    while (!controller.signal.aborted) {
+      const run = await readCreatedRun(canvasId, organizationId, lookupEvent);
+      if (controller.signal.aborted) {
+        return;
+      }
+      if (run?.id && knownRunIds.current.includes(run.id)) {
+        setAttempts((current) => current.filter((attempt) => attempt.eventId !== reemitted.eventId));
+        return;
+      }
+      if (run?.id) {
+        const status = phaseStatusFromCanvasRun(run);
+        setAttempts((current) => applyCreatedRun(current, reemitted.eventId, run.id ?? "", status));
+        if (isTerminalPhaseStatus(status)) {
+          return;
+        }
+      }
+      await wait(RERUN_LOOKUP_DELAY_MS, controller.signal);
+    }
+  } finally {
+    if (watchers.current.get(reemitted.eventId) === controller) {
+      watchers.current.delete(reemitted.eventId);
+    }
+  }
+}
+
+async function readCreatedRun(
   canvasId: string,
   organizationId: string | undefined,
-  reemitted: ReemittedStageAutomation,
-): Promise<string | undefined> {
+  event: SidebarEvent,
+): Promise<CanvasesCanvasRun | undefined> {
   try {
-    return await createdRunIdForEvent(canvasId, organizationId, reemitted);
+    const response = await canvasesListRuns(
+      withOrganizationHeader({
+        organizationId,
+        path: { canvasId },
+        query: { limit: RUN_LOOKUP_PAGE_LIMIT },
+      }),
+    );
+    return findRunInListRunsResponse(response.data?.runs ?? [], event)?.run;
   } catch (error) {
     console.error("Failed to find restarted run", error);
     return undefined;
   }
 }
 
-async function createdRunIdForEvent(
-  canvasId: string,
-  organizationId: string | undefined,
-  reemitted: ReemittedStageAutomation,
-): Promise<string | undefined> {
-  let createdRunId: string | undefined;
-  await selectCreatedRerun({
-    eventId: reemitted.eventId,
-    triggerNodeId: reemitted.triggerNodeId,
-    fetchRunId: (event) => fetchCreatedRerunId(canvasId, organizationId, event),
-    selectRun: (runId) => {
-      createdRunId = runId;
-    },
-  });
-  return createdRunId;
+function createdRunLookupEvent(reemitted: ReemittedStageAutomation): SidebarEvent {
+  return {
+    id: reemitted.eventId,
+    title: "Re-emitted event",
+    state: "running",
+    isOpen: false,
+    nodeId: reemitted.triggerNodeId,
+    triggerEventId: reemitted.eventId,
+    kind: "trigger",
+  };
 }
 
-async function fetchCreatedRerunId(
-  canvasId: string,
-  organizationId: string | undefined,
-  event: SidebarEvent,
-): Promise<string | null> {
-  const response = await canvasesListRuns(
-    withOrganizationHeader({
-      organizationId,
-      path: { canvasId },
-      query: { limit: RUN_LOOKUP_PAGE_LIMIT },
-    }),
-  );
-  return findRunInListRunsResponse(response.data?.runs ?? [], event)?.runId ?? null;
+function phaseStatusFromCanvasRun(run: CanvasesCanvasRun): SplitRunPhaseStatus {
+  const status = getRunStatus(run);
+  if (status === "failed" || status === "cancelled" || status === "passed") {
+    return status;
+  }
+  return "running";
+}
+
+function isTerminalPhaseStatus(status: SplitRunPhaseStatus): boolean {
+  return status === "failed" || status === "cancelled" || status === "passed";
+}
+
+function wait(ms: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) {
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true },
+    );
+  });
 }
 
 async function refreshStageAutomationQueries(
@@ -165,15 +290,52 @@ async function refreshStageAutomationQueries(
   invalidateFactoryWorkOrderQueries(queryClient, organizationId, factoryId, orderId);
 }
 
-function appendStartedRerun(
+function appendAcceptedRerun(
   attempts: StartedStageAutomationRerun[],
   target: StageAutomationRerunTarget,
-  createdRunId: string,
+  reemitted: ReemittedStageAutomation,
 ): StartedStageAutomationRerun[] {
-  if (attempts.some((attempt) => attempt.createdRunId === createdRunId)) {
+  if (attempts.some((attempt) => attempt.eventId === reemitted.eventId)) {
     return attempts;
   }
-  return [...attempts, { ...target, createdRunId, startedAt: new Date().toISOString() }];
+  return [
+    ...attempts,
+    {
+      ...target,
+      eventId: reemitted.eventId,
+      triggerNodeId: reemitted.triggerNodeId,
+      status: "running",
+      startedAt: new Date().toISOString(),
+    },
+  ];
+}
+
+function applyCreatedRun(
+  attempts: StartedStageAutomationRerun[],
+  eventId: string,
+  createdRunId: string,
+  status: SplitRunPhaseStatus,
+): StartedStageAutomationRerun[] {
+  let changed = false;
+  const next = attempts.map((attempt) => {
+    if (attempt.eventId !== eventId) {
+      return attempt;
+    }
+    if (attempt.createdRunId === createdRunId && attempt.status === status) {
+      return attempt;
+    }
+    changed = true;
+    return { ...attempt, createdRunId, status };
+  });
+  return changed ? next : attempts;
+}
+
+function dropKnownReruns(
+  attempts: StartedStageAutomationRerun[],
+  knownRunIds: ReadonlySet<string>,
+): StartedStageAutomationRerun[] {
+  const next = attempts.filter((attempt) => !attempt.createdRunId || !knownRunIds.has(attempt.createdRunId));
+  return next.length === attempts.length ? attempts : next;
 }
 
 function phasesWithStartedReruns(phases: SplitRunPhase[], attempts: StartedStageAutomationRerun[]): SplitRunPhase[] {
@@ -181,34 +343,41 @@ function phasesWithStartedReruns(phases: SplitRunPhase[], attempts: StartedStage
     return phases;
   }
   const knownRunIds = new Set(phases.flatMap((phase) => (phase.runId ? [phase.runId] : [])));
-  const extras = attempts.flatMap((attempt) => {
-    if (knownRunIds.has(attempt.createdRunId)) {
-      return [];
+  const extras: SplitRunPhase[] = [];
+  for (const attempt of attempts) {
+    if (attempt.createdRunId && knownRunIds.has(attempt.createdRunId)) {
+      continue;
     }
-    const source = phases.find((phase) => phase.id === attempt.sourcePhaseId && phase.appId === attempt.appId);
-    return source ? [startedRerunPhase(source, attempt)] : [];
-  });
+    const source = [...phases, ...extras].find(
+      (phase) => phase.id === attempt.sourcePhaseId && phase.appId === attempt.appId,
+    );
+    if (!source) {
+      continue;
+    }
+    extras.push(startedRerunPhase(source, attempt));
+  }
   return extras.length === 0 ? phases : [...phases, ...extras];
 }
 
 function startedRerunPhase(source: SplitRunPhase, attempt: StartedStageAutomationRerun): SplitRunPhase {
+  const running = attempt.status === "running";
   const line: SplitRunStreamLine = {
-    id: attempt.createdRunId,
+    id: attempt.eventId,
     at: "",
     componentName: source.componentName,
-    status: "running",
+    status: attempt.status,
     duration: "",
-    durationRunning: true,
+    durationRunning: running,
     kind: "action",
     componentType: source.componentName,
-    action: "running",
+    action: running ? "running" : attempt.status,
   };
   return {
-    id: `rerun-${attempt.createdRunId}`,
+    id: `rerun-${attempt.eventId}`,
     name: source.name,
-    status: "running",
+    status: attempt.status,
     duration: "",
-    durationRunning: true,
+    durationRunning: running,
     startedAt: attempt.startedAt,
     componentName: source.componentName,
     artifacts: [],

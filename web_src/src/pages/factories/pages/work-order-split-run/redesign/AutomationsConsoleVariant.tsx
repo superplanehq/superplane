@@ -94,7 +94,11 @@ export function AutomationsConsoleVariant({
   onStopRun,
   onRerunStep,
 }: AutomationsConsoleVariantProps) {
-  const stageRerun = useStageAutomationRerun(organizationId, factoryId, orderId);
+  const knownRunIds = useMemo(
+    () => fixture.phases.flatMap((phase) => (phase.runId ? [phase.runId] : [])),
+    [fixture.phases],
+  );
+  const stageRerun = useStageAutomationRerun(organizationId, factoryId, orderId, knownRunIds);
   const shownFixture = useMemo(
     () => fixtureWithStartedReruns(fixture, stageRerun.attempts),
     [fixture, stageRerun.attempts],

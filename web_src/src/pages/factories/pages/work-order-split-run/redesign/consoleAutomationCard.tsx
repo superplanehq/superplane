@@ -145,11 +145,14 @@ function consoleAutomationRetry({
   onRerunStep?: (phase: SplitRunPhase) => void;
   onRerunAutomation?: (phase: SplitRunPhase) => void;
 }): (() => void) | undefined {
-  if (!canUpdate || status !== "failed" || !phase?.appId || !phase.runId) {
+  if (!canUpdate || status !== "failed" || !phase) {
     return undefined;
   }
   if (phase.stepIndex != null) {
     return onRerunStep ? () => onRerunStep(phase) : undefined;
+  }
+  if (!phase.appId || !phase.runId) {
+    return undefined;
   }
   return onRerunAutomation ? () => onRerunAutomation(phase) : undefined;
 }
