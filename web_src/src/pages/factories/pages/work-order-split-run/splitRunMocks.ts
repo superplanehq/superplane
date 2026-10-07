@@ -32,6 +32,7 @@ import {
 import { VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import {
   clarityScoreFromChecks,
+  CLARITY_CHECK_KEY,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
   confidenceScoreFromChecks,
@@ -361,15 +362,15 @@ function runningFooterNote(current: FactoriesWorkOrderExecution | undefined): Wo
   if (!current) {
     return {
       key: "running-step",
-      headline: "The line is running",
-      text: "SuperPlane works on this order now. The log shows live progress.",
+      headline: "Task in progress",
+      text: "View the log for live progress.",
     };
   }
-  const { name, componentName } = lineAutomationPresentation(current.run, current.step);
+  const { componentName } = lineAutomationPresentation(current.run, current.step);
   return {
     key: "running-step",
-    headline: `${name} is running`,
-    text: `${componentName} works on this step now. The log shows live progress.`,
+    headline: `${componentName} in progress`,
+    text: "View the log for live progress.",
   };
 }
 
@@ -614,12 +615,31 @@ function draftReviewSurface(
       note: credit ? draftCreditFooterNote(credit) : draftFooterNote(order),
       status: "draft",
       isAnalyzing: credit ? false : draftIsAnalyzing(input),
-      clarityScore: clarityScoreFromChecks(checks),
-      confidenceScore: confidenceScoreFromChecks(checks),
+      ...draftFooterScores(checks),
     }),
     [],
     checks,
   );
+}
+
+/** Review tasks score Clarity, Complexity, and Verifiability. The headline is Confidence on a 1–3 scale. */
+function draftFooterScores(checks: WorkOrderCheckPresentation[]): {
+  clarityScore?: number;
+  confidenceScore?: number;
+  scoreMax?: number;
+} {
+  const review = planningReviewFromChecks(checks);
+  if (!review) {
+    return {
+      clarityScore: clarityScoreFromChecks(checks),
+      confidenceScore: confidenceScoreFromChecks(checks),
+    };
+  }
+  return {
+    clarityScore: review.metrics.find((metric) => metric.key === CLARITY_CHECK_KEY)?.score,
+    confidenceScore: review.headline.score,
+    scoreMax: review.headline.maxScore,
+  };
 }
 
 function stoppedReviewSurface(

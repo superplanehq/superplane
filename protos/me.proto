@@ -230,6 +230,8 @@ message DescribeVCSProviderOnboardingRequest {
 message VCSProviderIdentity {
   int64 user_id = 1;
   string login = 2;
+  // Bitbucket account UUID. GitHub leaves this empty and uses user_id.
+  string provider_user_id = 3;
 }
 
 message VCSProviderRepository {
@@ -240,6 +242,8 @@ message VCSProviderRepository {
   string default_branch = 5;
   string account_login = 6;
   string account_type = 7;
+  // Bitbucket repository UUID. GitHub leaves this empty and uses repository_id.
+  string external_id = 8;
 }
 
 message VCSProviderInstallRequest {
@@ -256,6 +260,8 @@ message DescribeVCSProviderOnboardingResponse {
   repeated VCSProviderInstallRequest pending_requests = 4;
   bool synchronizing = 5;
   repeated VCSProviderIdentity identities = 6;
+  // Forge distribution link for Bitbucket. Empty for GitHub.
+  string install_url = 7;
 }
 
 message SelectVCSProviderOnboardingIdentityRequest {

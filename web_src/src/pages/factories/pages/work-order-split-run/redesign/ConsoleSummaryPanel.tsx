@@ -252,8 +252,8 @@ function ConsoleLiveNote({
   const note = footer.kind === "running" ? footer.note : undefined;
   // The automation name, as on the card. A stage name can be an activity title.
   const stageName = stage ? stage.componentName.trim() || stage.name : undefined;
-  const headline = note?.headline ?? (stageName ? `${stageName} is running` : "An automation is running");
-  const text = note?.text ?? "The log shows live progress.";
+  const headline = note?.headline ?? (stageName ? `${stageName} in progress` : "Automation in progress");
+  const text = note?.text ?? "View the log for live progress.";
   return (
     <FramePanel
       className="border-[color:var(--status-running-border)] bg-[color:var(--status-running-bg)] py-3"

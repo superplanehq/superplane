@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoadAppliesAWSDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
@@ -71,6 +72,75 @@ func TestLoadRejectsSnakeCaseFields(t *testing.T) {
 func TestLoadRejectsRemovedTaskSpecificField(t *testing.T) {
 	_, err := Load(writeConfig(t, `{"fleets":[{"taskSpecific":true}]}`))
 	if err == nil || !strings.Contains(err.Error(), `unknown field "taskSpecific"`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLoadDefaultsToLongPolling(t *testing.T) {
+	config, err := Load(writeConfig(t, validDockerConfig("")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.PollTimeout() != 30*time.Second {
+		t.Fatalf("poll timeout = %s", config.PollTimeout())
+	}
+	if config.ReconciliationInterval() != 0 {
+		t.Fatalf("reconciliation interval = %s", config.ReconciliationInterval())
+	}
+	if config.ErrorRetryInterval() != 15*time.Second {
+		t.Fatalf("error retry interval = %s", config.ErrorRetryInterval())
+	}
+	if config.RequestTimeout() != 90*time.Second {
+		t.Fatalf("request timeout = %s", config.RequestTimeout())
+	}
+}
+
+func TestLoadAcceptsPeriodicReconciliation(t *testing.T) {
+	config, err := Load(writeConfig(t, validDockerConfig(`
+		"reconciliation":{
+			"interval":"2s",
+			"errorRetryInterval":"3s"
+		},
+		"http":{"requestTimeout":"4s"},`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.PollTimeout() != 0 {
+		t.Fatalf("poll timeout = %s", config.PollTimeout())
+	}
+	if config.ReconciliationInterval() != 2*time.Second {
+		t.Fatalf("reconciliation interval = %s", config.ReconciliationInterval())
+	}
+	if config.ErrorRetryInterval() != 3*time.Second {
+		t.Fatalf("error retry interval = %s", config.ErrorRetryInterval())
+	}
+	if config.RequestTimeout() != 4*time.Second {
+		t.Fatalf("request timeout = %s", config.RequestTimeout())
+	}
+}
+
+func TestLoadRejectsAmbiguousReconciliationStrategy(t *testing.T) {
+	_, err := Load(writeConfig(t, validDockerConfig(`
+		"reconciliation":{
+			"pollTimeout":"20s",
+			"interval":"2s"
+		},`)))
+	if err == nil || !strings.Contains(
+		err.Error(),
+		"reconciliation.pollTimeout and reconciliation.interval are mutually exclusive",
+	) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLoadRejectsRequestTimeoutNotLongerThanPollTimeout(t *testing.T) {
+	_, err := Load(writeConfig(t, validDockerConfig(`
+		"reconciliation":{"pollTimeout":"30s"},
+		"http":{"requestTimeout":"30s"},`)))
+	if err == nil || !strings.Contains(
+		err.Error(),
+		"http.requestTimeout must be longer than reconciliation.pollTimeout",
+	) {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -178,6 +248,11 @@ func TestLoadYAML(t *testing.T) {
 id: fleet-manager
 superplaneUrl: http://app:8000
 installationAdminToken: personal-token
+reconciliation:
+  interval: 2s
+  errorRetryInterval: 3s
+http:
+  requestTimeout: 4s
 fleets:
   - id: e1-large-amd64
     provider: docker
@@ -199,6 +274,12 @@ fleets:
 			}
 			if config.Fleets[0].Docker.Image != "runner:dev" {
 				t.Fatalf("image = %q", config.Fleets[0].Docker.Image)
+			}
+			if config.ReconciliationInterval() != 2*time.Second {
+				t.Fatalf(
+					"reconciliation interval = %s",
+					config.ReconciliationInterval(),
+				)
 			}
 		})
 	}
@@ -465,6 +546,23 @@ func TestLoadRejectsInvalidGCPFleets(t *testing.T) {
 			}
 		})
 	}
+}
+
+func validDockerConfig(extra string) string {
+	return `{
+		"id":"fleet-manager",
+		"superplaneUrl":"http://app:8000",
+		"installationAdminToken":"personal-token",
+		` + extra + `
+		"fleets":[{
+			"id":"e1-large-amd64",
+			"provider":"docker",
+			"docker":{
+				"image":"runner:dev",
+				"architecture":"amd64"
+			}
+		}]
+	}`
 }
 
 func writeConfig(t *testing.T, body string) string {

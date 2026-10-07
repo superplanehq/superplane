@@ -17,7 +17,6 @@ import {
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-  FEATURE_FACTORY_RISK_SCORE,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
@@ -1046,12 +1045,11 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-column-automation-picker")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-discussion")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-checks")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-column-automation-template-risk-score")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-risk-score")).toBeInTheDocument();
     expect(screen.queryByTestId("add-column-automation-template-custom")).not.toBeInTheDocument();
   });
 
   it("opens the risk score setup page from the Verify catalog", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1066,7 +1064,6 @@ describe("LinesPage board extras", () => {
 
   it("opens the name dialog when Verify only has custom automation left", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
