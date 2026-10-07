@@ -16,8 +16,8 @@ function hostedComposer(count: number): string {
 
 describe("useAnalysisComposerImages", () => {
   it("counts composer hosted videos when choosing uploads", async () => {
-    const onUploadFiles = vi.fn(async (files: File[]) =>
-      files.map((file, index) => ({
+    const onUploadFiles = vi.fn(async (files: FileList | File[]) =>
+      Array.from(files).map((file, index) => ({
         id: `file-${index}`,
         filename: file.name,
         contentType: file.type,

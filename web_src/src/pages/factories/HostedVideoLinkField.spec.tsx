@@ -6,7 +6,7 @@ import { HostedVideoLinkField } from "./HostedVideoLinkField";
 describe("HostedVideoLinkField", () => {
   it("adds a video link without submitting the parent form", () => {
     const onAdd = vi.fn(() => true);
-    const onSubmit = vi.fn((event: Event) => event.preventDefault());
+    const onSubmit = vi.fn();
     render(
       <form onSubmit={onSubmit}>
         <HostedVideoLinkField onAdd={onAdd} />
@@ -26,7 +26,7 @@ describe("HostedVideoLinkField", () => {
 
   it("does not submit the parent form when Enter is pressed in the link field", () => {
     const onAdd = vi.fn(() => true);
-    const onSubmit = vi.fn((event: Event) => event.preventDefault());
+    const onSubmit = vi.fn();
     render(
       <form onSubmit={onSubmit}>
         <HostedVideoLinkField onAdd={onAdd} />
