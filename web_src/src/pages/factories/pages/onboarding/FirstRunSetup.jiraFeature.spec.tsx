@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_LINEAR_INTAKE } from "@/lib/experimentalFeatures";
+import { intakeCatalogAvailability, seededIntakeCatalog } from "@/test/intakeCatalog";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
@@ -16,19 +16,35 @@ type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 const feature = vi.hoisted(() => ({
   jiraIntake: true,
   linearIntake: false,
+  linearStatus: "planned",
   organizationReady: true,
   isLoading: false,
 }));
 
+vi.mock("@/hooks/useIntakeCatalogAvailability", () => ({
+  useIntakeCatalogAvailability: () => {
+    if (feature.isLoading) {
+      return intakeCatalogAvailability(null);
+    }
+    if (!feature.organizationReady) {
+      return { ...intakeCatalogAvailability(null), loading: false, error: true };
+    }
+    const granted = [
+      ...(feature.jiraIntake ? ["jira-issues"] : []),
+      ...(feature.linearIntake ? ["linear-issues"] : []),
+    ];
+    return intakeCatalogAvailability(
+      seededIntakeCatalog(granted, feature.linearIntake ? { "linear-issues": { status: feature.linearStatus } } : {}),
+    );
+  },
+}));
+
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: (id: string) => {
-      if (id === FEATURE_FACTORY_JIRA_INTAKE) return feature.jiraIntake;
-      if (id === FEATURE_FACTORY_LINEAR_INTAKE) return feature.linearIntake;
-      return false;
-    },
-    isLoading: feature.isLoading,
-    organizationReady: feature.organizationReady,
+    has: () => false,
+    isLoading: false,
+    organizationReady: true,
+    enabledExperimentalFeatures: [],
   }),
 }));
 
@@ -182,6 +198,7 @@ describe("FirstRunSetup Jira intake feature", () => {
   beforeEach(() => {
     feature.jiraIntake = true;
     feature.linearIntake = false;
+    feature.linearStatus = "planned";
     feature.organizationReady = true;
     feature.isLoading = false;
   });
@@ -203,11 +220,10 @@ describe("FirstRunSetup Jira intake feature", () => {
       initial: { issuesChoice: "jira" },
     });
 
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).toBeInTheDocument();
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraHelper)).not.toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jira)).not.toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.tickets.linear)).not.toBeInTheDocument();
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
     expect(screen.queryByTestId("first-run-jira-choice-notice")).not.toBeInTheDocument();
     await waitFor(() => expect(setupRef.current?.issuesChoice).toBeNull());
 
@@ -270,8 +286,9 @@ describe("FirstRunSetup Jira intake feature", () => {
     expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
   });
 
-  it("shows Linear when the organization feature is on", async () => {
+  it("shows Linear when the organization can use it", async () => {
     feature.linearIntake = true;
+    feature.linearStatus = "ga";
     const user = userEvent.setup();
     const model = pageModel({
       hostedAgentReady: true,

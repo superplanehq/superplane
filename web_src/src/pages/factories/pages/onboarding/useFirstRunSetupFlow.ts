@@ -1,11 +1,9 @@
 import type { MeVcsProviderRepository } from "@/api-client";
+import { useIntakeCatalogAvailability } from "@/hooks/useIntakeCatalogAvailability";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
-import {
-  FEATURE_FACTORY_BITBUCKET,
-  FEATURE_FACTORY_JIRA_INTAKE,
-  FEATURE_FACTORY_LINEAR_INTAKE,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_BITBUCKET } from "@/lib/experimentalFeatures";
+import { isIntakeSelectable } from "@/lib/intakeCatalog";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
 
@@ -205,11 +203,13 @@ function waitForBrowserPaint(): Promise<void> {
 
 function selectedIssuesChoice(
   model: OnboardingPageModel,
+  vcsAvailable: boolean,
   jiraAvailable: boolean,
   linearAvailable: boolean,
 ): IssuesChoiceId | null {
   const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice);
   const issuesChoice = issuesChoiceForTicketSource(ticketSource);
+  if (issuesChoice === "vcs" && !vcsAvailable) return null;
   if (issuesChoice === "jira" && !jiraAvailable) return null;
   if (issuesChoice === "linear" && !linearAvailable) return null;
   if (issuesChoice === "linear" && (model.linearProjectsLoading || model.linearProjectsError)) return null;
@@ -252,6 +252,7 @@ function useFirstRunCommands(args: {
   connection: GitHubConnectionState;
   navigation: ReturnType<typeof useFirstRunNavigation>;
   blocking: FirstRunBlocking;
+  vcsAvailable: boolean;
   jiraAvailable: boolean;
   linearAvailable: boolean;
   bitbucketAvailable: boolean;
@@ -264,6 +265,7 @@ function useFirstRunCommands(args: {
     connection,
     navigation,
     blocking,
+    vcsAvailable,
     jiraAvailable,
     linearAvailable,
     bitbucketAvailable,
@@ -288,7 +290,7 @@ function useFirstRunCommands(args: {
   };
   const continueFromTickets = () =>
     blocking.run("saving-ticket-source", async () => {
-      const issuesChoice = selectedIssuesChoice(model, jiraAvailable, linearAvailable);
+      const issuesChoice = selectedIssuesChoice(model, vcsAvailable, jiraAvailable, linearAvailable);
       if (!issuesChoice) return;
       model.setup.setIssuesChoice(issuesChoice);
       model.setup.commitIssuesStep();
@@ -358,13 +360,22 @@ function useFirstRunCommands(args: {
 }
 
 import {
+  savedVcsChoiceBlock,
   savedJiraChoiceBlock,
   savedLinearChoiceBlock,
+  shouldClearSavedVcsChoice,
   shouldClearSavedJiraChoice,
   shouldClearSavedLinearChoice,
 } from "./firstRunFlaggedChoice";
 
-export { savedJiraChoiceBlock, savedLinearChoiceBlock, shouldClearSavedJiraChoice, shouldClearSavedLinearChoice };
+export {
+  savedVcsChoiceBlock,
+  savedJiraChoiceBlock,
+  savedLinearChoiceBlock,
+  shouldClearSavedVcsChoice,
+  shouldClearSavedJiraChoice,
+  shouldClearSavedLinearChoice,
+};
 export type { SavedFlaggedChoiceBlock } from "./firstRunFlaggedChoice";
 
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
@@ -378,12 +389,22 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     connectedBefore: Boolean(model.setup.selectedRepo),
   });
   const bitbucketConnect = useFirstRunBitbucket({ organizationId, setupFinished, blocking });
+  const intakeCatalog = useIntakeCatalogAvailability(organizationId);
   const intakeFeatures = useExperimentalFeature(organizationId);
   const intakeFeatureLoading = intakeFeatures.isLoading;
-  const jiraAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_JIRA_INTAKE);
-  const linearAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_LINEAR_INTAKE);
   const bitbucketAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_BITBUCKET);
   const bitbucket = { available: bitbucketAvailable, loading: intakeFeatureLoading };
+  const organizationReady = intakeCatalog.loaded;
+  const intakeState = intakeCatalog.stateOf;
+  const intakesLoading = intakeCatalog.loading;
+  const ticketIntakes = organizationReady ? intakeCatalog.entriesFor("onboardingTickets") : null;
+  const vcsAvailable = organizationReady
+    ? isIntakeSelectable(intakeState("github-issues"))
+    : intakeCatalog.error
+      ? true
+      : false;
+  const jiraAvailable = isIntakeSelectable(intakeState("jira-issues"));
+  const linearAvailable = isIntakeSelectable(intakeState("linear-issues"));
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
@@ -397,39 +418,47 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     connection,
     navigation,
     blocking,
+    vcsAvailable,
     jiraAvailable,
     linearAvailable,
     bitbucketAvailable,
     forgeConfigured: bitbucketConnect.configured,
     installScope,
   });
-  // A saved Jira choice is not valid when the organization does not have the
-  // Jira intake feature. Clear it only after the organization lookup confirms
-  // the feature is off. A failed lookup has no organization data and must not
+  // A saved VCS/Jira/Linear choice is not valid when the intake catalog does
+  // not let the organization use that intake. Clear it only after the catalog
+  // loads and confirms that. A failed lookup has no catalog data and must not
   // replace the saved choice with the GitHub Issues default.
   const issuesChoice = model.setup.issuesChoice;
   const setIssuesChoice = model.setup.setIssuesChoice;
-  const organizationReady = intakeFeatures.organizationReady;
+  const vcsChoiceArgs = {
+    issuesChoice,
+    featureLoading: intakesLoading,
+    vcsAvailable,
+    organizationReady,
+  };
   const jiraChoiceArgs = {
     issuesChoice,
-    featureLoading: intakeFeatureLoading,
+    featureLoading: intakesLoading,
     jiraAvailable,
     organizationReady,
   };
   const linearChoiceArgs = {
     issuesChoice,
-    featureLoading: intakeFeatureLoading,
+    featureLoading: intakesLoading,
     linearAvailable,
     organizationReady,
   };
+  const clearSavedVcsChoice = shouldClearSavedVcsChoice(vcsChoiceArgs);
   const clearSavedJiraChoice = shouldClearSavedJiraChoice(jiraChoiceArgs);
   const clearSavedLinearChoice = shouldClearSavedLinearChoice(linearChoiceArgs);
+  const vcsChoiceBlock = savedVcsChoiceBlock(vcsChoiceArgs);
   const jiraChoiceBlock = savedJiraChoiceBlock(jiraChoiceArgs);
   const linearChoiceBlock = savedLinearChoiceBlock(linearChoiceArgs);
   useEffect(() => {
-    if (!clearSavedJiraChoice && !clearSavedLinearChoice) return;
+    if (!clearSavedVcsChoice && !clearSavedJiraChoice && !clearSavedLinearChoice) return;
     setIssuesChoice(null);
-  }, [clearSavedJiraChoice, clearSavedLinearChoice, setIssuesChoice]);
+  }, [clearSavedVcsChoice, clearSavedJiraChoice, clearSavedLinearChoice, setIssuesChoice]);
   return {
     ...navigation,
     ...commands,
@@ -456,10 +485,14 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
     jiraAvailable,
-    jiraFeatureLoading: intakeFeatureLoading,
+    intakeState,
+    intakesLoading,
+    ticketIntakes,
+    vcsChoiceBlock,
+    jiraFeatureLoading: intakesLoading,
     jiraChoiceBlock,
     linearAvailable,
-    linearFeatureLoading: intakeFeatureLoading,
+    linearFeatureLoading: intakesLoading,
     linearChoiceBlock,
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
     repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
