@@ -11,11 +11,11 @@ import {
 } from "./analysisOutcome";
 
 describe("analysisFirstResultDelivered", () => {
-  it("is true when a score and spec.md exist", () => {
+  it("is true when a score and plan.md exist", () => {
     expect(
       analysisFirstResultDelivered({
         checks: [{ name: "Confidence score", key: "confidence", score: 4 }],
-        artifacts: [{ data: { name: "spec.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" } }],
+        artifacts: [{ data: { name: "plan.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" } }],
       }),
     ).toBe(true);
   });
@@ -24,7 +24,7 @@ describe("analysisFirstResultDelivered", () => {
     expect(
       analysisFirstResultDelivered({
         checks: [],
-        artifacts: [{ data: { name: "spec.md", body: "# Add breed\n" } }],
+        artifacts: [{ data: { name: "plan.md", body: "# Add breed\n" } }],
       }),
     ).toBe(false);
   });
@@ -46,6 +46,43 @@ describe("analysisFirstResultDelivered", () => {
     expect(hasAnalysisScore([{ key: "clarity", score: 3 }])).toBe(true);
     expect(hasAnalysisScore([{ name: "Clarity score", score: 3 }])).toBe(true);
     expect(hasAnalysisScore([{ name: "Risk score", score: 3 }])).toBe(false);
+  });
+
+  it("accepts a leftover spec.md as the plan", () => {
+    expect(hasAnalysisPlan([{ data: { name: "spec.md", body: "A retry loop." } }])).toBe(true);
+    expect(analysisPlanBody([{ data: { title: "spec.md", body: "A retry loop." } }])).toBe("A retry loop.");
+  });
+
+  it("keeps the saved plan when a later file uses the same name", () => {
+    const savedKey = "spec:11111111-1111-4111-8111-111111111111";
+    expect(
+      analysisPlanBody([
+        { key: "workflow-plan", data: { name: "plan.md", body: "Workflow plan." } },
+        { key: savedKey, data: { name: "plan.md", body: "Saved plan." } },
+      ]),
+    ).toBe("Saved plan.");
+    expect(
+      analysisPlanBody([
+        { data: { name: "plan.md", body: "Workflow plan." } },
+        { key: savedKey, data: { name: "plan.md", body: "   " } },
+      ]),
+    ).toBeUndefined();
+  });
+
+  it("prefers plan.md over spec.md and intent.md", () => {
+    expect(
+      analysisPlanBody([
+        { data: { name: "intent.md", body: "Old intent." } },
+        { data: { name: "spec.md", body: "Leftover spec." } },
+        { data: { name: "plan.md", body: "Current plan." } },
+      ]),
+    ).toBe("Current plan.");
+    expect(
+      analysisPlanBody([
+        { data: { name: "intent.md", body: "Old intent." } },
+        { data: { name: "spec.md", body: "Leftover spec." } },
+      ]),
+    ).toBe("Leftover spec.");
   });
 
   it("accepts intent.md as the plan", () => {
@@ -73,7 +110,7 @@ describe("analysisFinishedStatus", () => {
 describe("analysisResultDeliveredForRun", () => {
   const scoreAndPlan = {
     checks: [{ name: "Confidence score", key: "confidence", score: 4, runId: "run-b" }],
-    artifacts: [{ data: { name: "spec.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" } }],
+    artifacts: [{ data: { name: "plan.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" } }],
   };
 
   it("attributes the first result to the run that reported the score", () => {
@@ -87,7 +124,7 @@ describe("analysisResultDeliveredForRun", () => {
         { id: "run-a" },
         {
           checks: [{ name: "Confidence score", key: "confidence", score: 4 }],
-          artifacts: [{ data: { name: "spec.md", body: "# Add breed\n" } }],
+          artifacts: [{ data: { name: "plan.md", body: "# Add breed\n" } }],
           isLast: true,
         },
       ),
@@ -100,7 +137,7 @@ describe("analysisResultDeliveredForRun", () => {
         { id: "run-a" },
         {
           checks: [{ name: "Confidence score", key: "confidence", score: 4 }],
-          artifacts: [{ data: { name: "spec.md", body: "# Add breed\n" } }],
+          artifacts: [{ data: { name: "plan.md", body: "# Add breed\n" } }],
           isLast: false,
         },
       ),

@@ -260,7 +260,7 @@ describe("phasesWithRunArtifacts", () => {
     const spec: FactoriesWorkOrderArtifact = {
       id: "art-spec",
       type: "TYPE_MARKDOWN",
-      data: { name: "spec.md", title: "spec.md", body: "# Plan", canvasRunId: "run-analysis" },
+      data: { name: "plan.md", title: "plan.md", body: "# Plan", canvasRunId: "run-analysis" },
     };
     const index = streamArtifactIndexFromEvents([], [spec]);
 
