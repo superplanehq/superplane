@@ -50,6 +50,27 @@ describe("draftReadiness", () => {
   it("prefers the Clarity block over a low Confidence", () => {
     expect(draftReadiness({ clarity: 1, confidence: 1 }).tone).toBe("blocked");
   });
+
+  it("treats a review score of 3 as ready and 1 or 2 as not ready", () => {
+    expect(draftReadiness({ confidence: 3, scoreMax: 3 })).toEqual({
+      tone: "ready",
+      ...DRAFT_READINESS_NOTES.ready,
+    });
+    expect(draftReadiness({ confidence: 2, scoreMax: 3 })).toEqual({
+      tone: "caution",
+      ...DRAFT_READINESS_NOTES.uncertain,
+    });
+    expect(draftReadiness({ confidence: 1, scoreMax: 3 })).toEqual({
+      tone: "caution",
+      ...DRAFT_READINESS_NOTES.agentFit,
+    });
+    expect(draftReadiness({ clarity: 1, scoreMax: 3 }).tone).toBe("blocked");
+  });
+
+  it("keeps a score of 3 as caution when the scale is absent", () => {
+    expect(draftReadiness({ confidence: 3 }).tone).toBe("caution");
+    expect(draftReadiness({ clarity: 3, confidence: 5, scoreMax: 5 }).tone).toBe("caution");
+  });
 });
 
 describe("liveDraftReadiness", () => {

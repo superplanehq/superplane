@@ -614,12 +614,26 @@ function draftReviewSurface(
       note: credit ? draftCreditFooterNote(credit) : draftFooterNote(order),
       status: "draft",
       isAnalyzing: credit ? false : draftIsAnalyzing(input),
-      clarityScore: clarityScoreFromChecks(checks),
-      confidenceScore: confidenceScoreFromChecks(checks),
+      ...draftFooterScores(checks),
     }),
     [],
     checks,
   );
+}
+
+function draftFooterScores(checks: WorkOrderCheckPresentation[]): {
+  clarityScore?: number;
+  confidenceScore?: number;
+  scoreMax?: number;
+} {
+  const review = planningReviewFromChecks(checks);
+  if (review) {
+    return { confidenceScore: review.headline.score, scoreMax: review.headline.maxScore };
+  }
+  return {
+    clarityScore: clarityScoreFromChecks(checks),
+    confidenceScore: confidenceScoreFromChecks(checks),
+  };
 }
 
 function stoppedReviewSurface(

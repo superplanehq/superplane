@@ -60,9 +60,7 @@ export function ComposerPlanStack({
   const analyzing = Boolean(isAnalyzing) && !creditVerdict;
   const readiness = composerReadiness({
     creditVerdict,
-    clarity: showClarity ? clarity?.score : undefined,
-    confidence: showConfidence ? confidence?.score : undefined,
-    isAnalyzing: analyzing,
+    ...stripScores({ clarity, confidence, showClarity, showConfidence, isAnalyzing: analyzing }),
   });
   const showControls = canTogglePlan || Boolean(modelSelect) || Boolean(actions);
   return (
@@ -91,6 +89,27 @@ export function ComposerPlanStack({
       </FramePanel>
     </Frame>
   );
+}
+
+function stripScores({
+  clarity,
+  confidence,
+  showClarity,
+  showConfidence,
+  isAnalyzing,
+}: {
+  clarity?: ComposerScore;
+  confidence?: ComposerScore;
+  showClarity: boolean;
+  showConfidence: boolean;
+  isAnalyzing: boolean;
+}) {
+  return {
+    clarity: showClarity ? clarity?.score : undefined,
+    confidence: showConfidence ? confidence?.score : undefined,
+    scoreMax: confidence?.maxScore,
+    isAnalyzing,
+  };
 }
 
 function composerReadiness({
