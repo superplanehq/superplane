@@ -23,6 +23,7 @@ import (
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/blob"
 	blobfilesystem "github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/blob/gcs"
@@ -732,6 +733,10 @@ func Start() {
 	} else {
 		encryptorInstance = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
 	}
+
+	bitbucketapp.SetSystemTokenSource(func(installationID string) (string, time.Time, error) {
+		return bitbucketapp.LoadSystemToken(context.Background(), database.Conn(), encryptorInstance, installationID, time.Now())
+	})
 
 	if err := llm.SeedDevHostedOpenRouterFromEnv(context.Background(), database.Conn(), encryptorInstance); err != nil {
 		log.WithError(err).Error("development hosted OpenRouter seed skipped")
