@@ -59,6 +59,9 @@ func UpdateFactoryRepository(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory repository")
 	}
+	if factory.OnboardingConfigValue().EffectiveVCSProvider() == models.ProviderBitbucket {
+		return updateBitbucketFactoryRepository(ctx, deps, orgID, organizationID, actorID, req)
+	}
 	err = db.Transaction(func(tx *gorm.DB) error {
 		loaded, err := models.FindFactory(tx, orgID, factory.ID)
 		if err != nil {
