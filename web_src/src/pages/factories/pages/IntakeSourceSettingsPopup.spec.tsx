@@ -96,19 +96,9 @@ function githubIntakeGraph(): IntakeAutomationGraph {
       spec: {
         nodes: [
           { id: "trigger", name: "On Issue", type: "TYPE_TRIGGER", component: "github.onIssue" },
-          {
-            id: "filter",
-            name: "Matches filters?",
-            type: "TYPE_ACTION",
-            component: "if",
-            configuration: { expression: "true" },
-          },
           { id: "create", name: "Create Task", type: "TYPE_ACTION", component: "createWorkOrder" },
         ],
-        edges: [
-          { channel: "default", sourceId: "trigger", targetId: "filter" },
-          { channel: "true", sourceId: "filter", targetId: "create" },
-        ],
+        edges: [{ channel: "default", sourceId: "trigger", targetId: "create" }],
       },
     },
     triggers: [{ name: "github.onIssue", label: "On Issue" }],
@@ -317,7 +307,7 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(automation).toHaveAccessibleName("Automation");
     expect(within(automation).getByTestId("rf__node-trigger")).toBeInTheDocument();
     expect(within(automation).getAllByText("On Issue").length).toBeGreaterThan(0);
-    expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
+    expect(within(automation).queryByText("Matches filters?")).not.toBeInTheDocument();
     expect(within(automation).getAllByText("Create Task").length).toBeGreaterThan(0);
     const headerRow = screen.getByTestId("settings-automation-header-row");
     expect(within(headerRow).getByRole("tab", { name: "General" })).toBeInTheDocument();

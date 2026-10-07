@@ -82,6 +82,42 @@ func Test__intakeSettingsFromGraph_AuthorsWithAccess(t *testing.T) {
 
 		assert.True(t, parsed.AuthorsWithAccess)
 	})
+
+	t.Run("reads filters from the trigger when those keys are present", func(t *testing.T) {
+		graph := intakeGraph{
+			TriggerNodeID:          intakeTriggerNodeID,
+			FilterNodeID:           "filter",
+			AuthorPermissionNodeID: intakeAuthorPermissionNodeID,
+		}
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				{
+					ID: intakeTriggerNodeID,
+					Configuration: map[string]any{
+						"actions":              []any{"opened"},
+						"labels":               []any{"bug"},
+						"labelFilterMode":      intakeLabelFilterExclude,
+						"assignment":           intakeAssignmentAssigned,
+						"authorsWithAccess":    false,
+						"superplaneLabelAdded": false,
+					},
+				},
+				{
+					ID: "filter",
+					Configuration: map[string]any{
+						"expression": intakeAuthorAccessCondition + " && " + intakeUnassignedCondition,
+					},
+				},
+			},
+		})
+
+		assert.Equal(t, []string{"bug"}, parsed.Labels)
+		assert.Equal(t, intakeLabelFilterExclude, parsed.LabelFilterMode)
+		assert.Equal(t, intakeAssignmentAssigned, parsed.Assignment)
+		assert.False(t, parsed.AuthorsWithAccess)
+		assert.False(t, parsed.SuperplaneLabelAdded)
+		assert.True(t, parsed.NewIssues)
+	})
 }
 
 func Test__intakeTriggerActionsFor(t *testing.T) {

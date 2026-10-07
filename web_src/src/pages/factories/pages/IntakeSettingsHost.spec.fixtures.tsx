@@ -28,19 +28,9 @@ export const GITHUB_INTAKE_CANVAS = {
   spec: {
     nodes: [
       { id: "github-issues-trigger", name: "On Issue", type: "TYPE_TRIGGER", component: "github.onIssue" },
-      {
-        id: "github-issues-filter",
-        name: "Matches filters?",
-        type: "TYPE_ACTION",
-        component: "if",
-        configuration: { expression: "true" },
-      },
       { id: "github-issues-create", name: "Create Task", type: "TYPE_ACTION", component: "createWorkOrder" },
     ],
-    edges: [
-      { channel: "default", sourceId: "github-issues-trigger", targetId: "github-issues-filter" },
-      { channel: "true", sourceId: "github-issues-filter", targetId: "github-issues-create" },
-    ],
+    edges: [{ channel: "default", sourceId: "github-issues-trigger", targetId: "github-issues-create" }],
   },
 };
 

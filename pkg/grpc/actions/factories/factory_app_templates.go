@@ -723,6 +723,9 @@ func materializeIntakeDefaults(
 			node.Configuration["expression"] = intakeFilterExpressionFor(intake.Source, settings)
 		}
 		if node.ID == intakeTriggerNodeID {
+			if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+				applyGitHubIssueFilterConfiguration(node.Configuration, settings)
+			}
 			node.Metadata = models.FactoryAppTemplateMetadata("intake:"+intake.Source, factoryTemplateVersion)
 		}
 	}

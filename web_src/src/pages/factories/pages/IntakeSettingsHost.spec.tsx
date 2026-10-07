@@ -158,7 +158,7 @@ describe("IntakeSettingsHost", () => {
                 executions: [
                   {
                     id: "exec-filter-1",
-                    nodeId: "github-issues-filter",
+                    nodeId: "github-issues-create",
                     state: "STATE_FINISHED",
                     result: "RESULT_PASSED",
                   },
@@ -208,7 +208,8 @@ describe("IntakeSettingsHost", () => {
     expect(useCanvas).toHaveBeenCalledWith("org-1", "app-github-issues-intake", { enabled: true });
     const automation = within(screen.getByTestId("intake-source-settings")).getByTestId("intake-source-automation");
     expect(within(automation).getByTestId("rf__node-github-issues-trigger")).toBeInTheDocument();
-    expect(within(automation).getByText("Matches filters?")).toBeInTheDocument();
+    expect(within(automation).getByText("Create Task")).toBeInTheDocument();
+    expect(within(automation).queryByText("Matches filters?")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Automation menu" })).not.toBeInTheDocument();
     const edit = within(automation).getByRole("link", { name: "Edit automation" });
     expect(edit).toHaveAttribute(
@@ -237,7 +238,7 @@ describe("IntakeSettingsHost", () => {
     expect(automation).toHaveAttribute("data-selected-run-id", "run-intake-1");
     expect(automation.querySelector(".sp-canvas-live")).not.toBeNull();
     expect(within(automation).getByTestId("rf__node-github-issues-trigger")).toBeInTheDocument();
-    expect(within(automation).getByTestId("rf__node-github-issues-filter")).toBeInTheDocument();
+    expect(within(automation).queryByTestId("rf__node-github-issues-filter")).not.toBeInTheDocument();
     expect(within(automation).getByTestId("rf__node-github-issues-create")).toBeInTheDocument();
   });
 

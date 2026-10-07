@@ -592,7 +592,31 @@ func TestMaterializeIntakeDefaults(t *testing.T) {
 		AuthorsWithAccess:    true,
 		SuperplaneLabelAdded: true,
 	}
-	findYAMLNode(t, current, intakeFilterNodeID).Configuration["expression"] = intakeFilterExpressionFor(source, settings)
+	filter := yaml.Node{
+		ID:        intakeFilterNodeID,
+		Name:      "Matches filters?",
+		Type:      yaml.NodeTypeAction,
+		Component: intakeFilterComponent,
+		Configuration: map[string]any{
+			"expression": intakeFilterExpressionFor(source, settings),
+		},
+	}
+	for i := range current.Spec.Nodes {
+		if current.Spec.Nodes[i].ID != intakeTriggerNodeID {
+			continue
+		}
+		delete(current.Spec.Nodes[i].Configuration, intakeConfigLabels)
+		delete(current.Spec.Nodes[i].Configuration, intakeConfigLabelFilterMode)
+		delete(current.Spec.Nodes[i].Configuration, intakeConfigAssignment)
+		delete(current.Spec.Nodes[i].Configuration, intakeConfigAuthorsWithAccess)
+		delete(current.Spec.Nodes[i].Configuration, intakeConfigSuperplaneLabelAdded)
+	}
+	current.Spec.Nodes = append(current.Spec.Nodes, filter, yaml.Node{
+		ID:        intakeAuthorPermissionNodeID,
+		Name:      "Get Author Repository Permission",
+		Type:      yaml.NodeTypeAction,
+		Component: intakeAuthorPermissionComponent,
+	})
 
 	factoryID := uuid.New()
 	canvasID := uuid.New()
@@ -620,11 +644,15 @@ func TestMaterializeIntakeDefaults(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, canvasID.String(), defaults.Metadata.ID)
 	assert.Equal(t, "GitHub backlog", defaults.Metadata.Name)
-	assert.Equal(
-		t,
-		intakeFilterExpressionFor(source, settings),
-		findYAMLNode(t, defaults, intakeFilterNodeID).Configuration["expression"],
-	)
+	for _, node := range defaults.Spec.Nodes {
+		assert.NotEqual(t, intakeFilterNodeID, node.ID)
+	}
+	trigger := findYAMLNode(t, defaults, intakeTriggerNodeID)
+	assert.Equal(t, []any{"factory", "urgent"}, trigger.Configuration["labels"])
+	assert.Equal(t, true, trigger.Configuration["authorsWithAccess"])
+	assert.Equal(t, true, trigger.Configuration["superplaneLabelAdded"])
+	assert.Equal(t, "assigned", trigger.Configuration["assignment"])
+	assert.NotContains(t, trigger.Configuration, "labelFilterMode")
 }
 
 func TestMaterializeBacklogDefaults(t *testing.T) {

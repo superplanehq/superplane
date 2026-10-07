@@ -200,8 +200,8 @@ func intakeDefaultDescription(source string) string {
 }
 
 // buildIntakeCanvas returns the canvas document for a new intake: listen on the
-// source and create a work order. GitHub intakes keep a filter node so label
-// and assignment settings have somewhere to live. Planning happens
+// source and create a work order. GitHub filters live on the On Issue trigger,
+// so that canvas is the trigger and then Create Task. Planning happens
 // on the factory Backlog canvas after the work order exists.
 func buildIntakeCanvas(request intakeCanvasRequest) (*yaml.Canvas, error) {
 	spec, ok := intakeSpecsBySource[request.Source]
@@ -329,94 +329,6 @@ func ensureIntakeFilterNode(
 	return nodes, edges, graph, nil
 }
 
-func configureIntakeAuthorAccess(
-	nodes []models.Node,
-	edges []models.Edge,
-	graph intakeGraph,
-	enabled bool,
-) ([]models.Node, []models.Edge, error) {
-	if !enabled {
-		nodes = slices.DeleteFunc(nodes, func(node models.Node) bool {
-			return node.ID == graph.AuthorPermissionNodeID || node.ID == graph.AuthorFilterNodeID
-		})
-		edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
-			return edge.SourceID == graph.AuthorPermissionNodeID ||
-				edge.TargetID == graph.AuthorPermissionNodeID ||
-				edge.SourceID == graph.AuthorFilterNodeID ||
-				edge.TargetID == graph.AuthorFilterNodeID
-		})
-		return nodes, ensureIntakeEdge(edges, models.Edge{
-			Channel:  "true",
-			SourceID: graph.FilterNodeID,
-			TargetID: graph.CreateNodeID,
-		}), nil
-	}
-
-	trigger := findIntakeNode(nodes, graph.TriggerNodeID)
-	if trigger == nil {
-		return nil, nil, fmt.Errorf("intake automation has no GitHub trigger")
-	}
-	repository, _ := trigger.Configuration["repository"].(string)
-	if strings.TrimSpace(repository) == "" {
-		return nil, nil, fmt.Errorf("intake automation has no GitHub repository")
-	}
-	if trigger.IntegrationID == nil || strings.TrimSpace(*trigger.IntegrationID) == "" {
-		return nil, nil, fmt.Errorf("intake automation has no GitHub integration")
-	}
-
-	permissionNode := models.Node{
-		ID:   intakeAuthorPermissionNodeID,
-		Name: "Get Author Repository Permission",
-		Type: models.NodeTypeComponent,
-		Ref: models.NodeRef{
-			Component: &models.ComponentRef{Name: intakeAuthorPermissionComponent},
-		},
-		Configuration: map[string]any{
-			"repository": repository,
-			"username":   "{{ root().data.issue.user.login }}",
-		},
-		Position:      models.Position{X: 160, Y: 440},
-		Concurrency:   intakeModelConcurrency(),
-		IntegrationID: trigger.IntegrationID,
-	}
-	authorFilterNode := models.Node{
-		ID:   intakeAuthorFilterNodeID,
-		Name: "Author Has Repository Access?",
-		Type: models.NodeTypeComponent,
-		Ref: models.NodeRef{
-			Component: &models.ComponentRef{Name: intakeFilterComponent},
-		},
-		Configuration: map[string]any{
-			"expression": `root().data.permission != "none"`,
-		},
-		Position:    models.Position{X: 160, Y: 620},
-		Concurrency: intakeModelConcurrency(),
-	}
-	nodes = upsertIntakeNode(nodes, permissionNode)
-	nodes = upsertIntakeNode(nodes, authorFilterNode)
-
-	edges = slices.DeleteFunc(edges, func(edge models.Edge) bool {
-		return edge.SourceID == graph.FilterNodeID &&
-			(edge.TargetID == graph.CreateNodeID || edge.TargetID == intakeAuthorPermissionNodeID)
-	})
-	edges = ensureIntakeEdge(edges, models.Edge{
-		Channel:  "true",
-		SourceID: graph.FilterNodeID,
-		TargetID: intakeAuthorPermissionNodeID,
-	})
-	edges = ensureIntakeEdge(edges, models.Edge{
-		Channel:  "default",
-		SourceID: intakeAuthorPermissionNodeID,
-		TargetID: intakeAuthorFilterNodeID,
-	})
-	edges = ensureIntakeEdge(edges, models.Edge{
-		Channel:  "true",
-		SourceID: intakeAuthorFilterNodeID,
-		TargetID: graph.CreateNodeID,
-	})
-	return nodes, edges, nil
-}
-
 func intakeModelConcurrency() *models.ConcurrencySpec {
 	max := intakeConcurrencyMax
 	return &models.ConcurrencySpec{Max: &max}
@@ -471,6 +383,9 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 		if len(projects) > 0 {
 			applySentryProjectConfiguration(configuration, projects)
 		}
+	}
+	if request.Source == models.FactoryIntakeSourceGitHubIssues {
+		applyGitHubIssueFilterConfiguration(configuration, intakeSettingsOrDefault(request.Source, request.Settings))
 	}
 
 	return configuration
