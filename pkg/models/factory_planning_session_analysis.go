@@ -135,7 +135,7 @@ func analysisSessionMatchesWorkOrder(session *FactoryPlanningSession, workOrderI
 }
 
 func (s *FactoryPlanningSession) ProposeSpec(tx *gorm.DB, body string) error {
-	markdown := strings.TrimSpace(body)
+	markdown := unwrapPlanningMarkdown(body)
 	if markdown == "" {
 		return fmt.Errorf("%w: spec body is required", ErrFactoryPlanningSessionInvalid)
 	}
@@ -153,6 +153,24 @@ func (s *FactoryPlanningSession) ProposeSpec(tx *gorm.DB, body string) error {
 		}
 		return upsertPlanningSpecArtifact(inner, order, stored, s.CanvasRunID)
 	})
+}
+
+// unwrapPlanningMarkdown accepts a spec that an agent JSON-encoded twice.
+// propose_update nests markdown in one JSON object, and the model sometimes
+// sends "\"# Title\\n\\nBody\"" instead of real line breaks.
+func unwrapPlanningMarkdown(body string) string {
+	trimmed := strings.TrimSpace(body)
+	if trimmed == "" || trimmed[0] != '"' {
+		return trimmed
+	}
+	var decoded string
+	if err := json.Unmarshal([]byte(trimmed), &decoded); err != nil {
+		return trimmed
+	}
+	if strings.TrimSpace(decoded) == "" {
+		return trimmed
+	}
+	return decoded
 }
 
 func planningSpecMarkdownForStorage(tx *gorm.DB, order *FactoryWorkOrder, markdown string) (string, error) {
@@ -216,16 +234,18 @@ func markdownFileRef(file File) string {
 	return fmt.Sprintf("[%s](%s)", label, ref)
 }
 
-// planningScoreKind names one of the two 1 through 5 scores a refine session
-// publishes as a work-order check.
+// planningScoreKind names one score a refine session publishes as a
+// work-order check. The legacy scores run 1 through 5; the review
+// sub-parameters run 1 through 3.
 type planningScoreKind struct {
 	key  string
 	name string
+	max  float64
 }
 
 var (
-	planningClarityScore    = planningScoreKind{key: PlanningClarityCheckKey, name: PlanningClarityCheckName}
-	planningConfidenceScore = planningScoreKind{key: PlanningConfidenceCheckKey, name: PlanningConfidenceCheckName}
+	planningClarityScore    = planningScoreKind{key: PlanningClarityCheckKey, name: PlanningClarityCheckName, max: PlanningScoreMax}
+	planningConfidenceScore = planningScoreKind{key: PlanningConfidenceCheckKey, name: PlanningConfidenceCheckName, max: PlanningScoreMax}
 )
 
 // ProposeClarity publishes how well the task is defined.
@@ -291,9 +311,9 @@ func reportPlanningScore(tx *gorm.DB, session *FactoryPlanningSession, order *Fa
 		Key:      kind.key,
 		Name:     kind.name,
 		Score:    score,
-		MaxScore: PlanningScoreMax,
+		MaxScore: kind.max,
 		Format:   FactoryWorkOrderCheckFormatFraction,
-		Level:    planningScoreLevel(score),
+		Level:    planningScoreLevel(score, kind.max),
 		Summary:  strings.TrimSpace(summary),
 		Run:      run,
 	})
@@ -345,7 +365,17 @@ func upsertPlanningSpecArtifact(tx *gorm.DB, order *FactoryWorkOrder, body strin
 	return err
 }
 
-func planningScoreLevel(score float64) string {
+// Review scores band at 3/2/1. The legacy 1 through 5 scores band at 4-5/3/1-2.
+func planningScoreLevel(score, maxScore float64) string {
+	if maxScore <= PlanningReviewScoreMax {
+		if score >= 3 {
+			return FactoryWorkOrderCheckLevelPositive
+		}
+		if score >= 2 {
+			return FactoryWorkOrderCheckLevelCaution
+		}
+		return FactoryWorkOrderCheckLevelCritical
+	}
 	if score >= 4 {
 		return FactoryWorkOrderCheckLevelPositive
 	}
@@ -358,7 +388,11 @@ func planningScoreLevel(score float64) string {
 func planningScoreCallSentence(tx *gorm.DB, session *FactoryPlanningSession) string {
 	const updateCue = "End an answer, and the first plan, with how to update the plan or the scores. "
 	const startCue = "When every required score is 5, publish each required score on that plan turn. "
+	const reviewStartCue = "When every required score is 3, publish each required score on that plan turn. "
 	const missingCue = "If no score is published yet, this turn is a plan turn. Publish the required scores before you ask or stop. "
+	if organizationHasPlanningReview(tx, session.OrganizationID) {
+		return missingCue + "Call propose_update with scores, spec, and survey in one call. Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + reviewStartCue + updateCue
+	}
 	factoryModel, err := FindFactory(tx, session.OrganizationID, session.FactoryID)
 	if err != nil {
 		return missingCue + "Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
@@ -391,7 +425,7 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	if err != nil {
 		return "", err
 	}
-	if artifacts.spec == "" && artifacts.clarity.score == "" && artifacts.confidence.score == "" && len(messages) == 0 {
+	if artifacts.spec == "" && artifacts.clarity.score == "" && artifacts.confidence.score == "" && artifacts.complexity.score == "" && artifacts.verifiability.score == "" && len(messages) == 0 {
 		return "", nil
 	}
 	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
@@ -399,13 +433,19 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	var b strings.Builder
 	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Follow the task prompt for tone, Clarity and Confidence rules, and specification shape. ")
 	b.WriteString(planningScoreCallSentence(tx, session))
-	b.WriteString("If you write or update a specification this turn, call propose_spec before you stop. Do not leave a written plan unpublished. Call survey only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
+	if organizationHasPlanningReview(tx, session.OrganizationID) {
+		b.WriteString("If you write or update a specification this turn, include spec on propose_update before you stop. Do not leave a written plan unpublished. Include survey on propose_update only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
+	} else {
+		b.WriteString("If you write or update a specification this turn, call propose_spec before you stop. Do not leave a written plan unpublished. Call survey only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
+	}
 	if artifacts.spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
 		b.WriteString(artifacts.spec)
 		b.WriteString("\n")
 	}
 	writePlanningScoreBlock(&b, "Clarity", artifacts.clarity)
+	writePlanningScoreBlock(&b, "Complexity", artifacts.complexity)
+	writePlanningScoreBlock(&b, "Verifiability", artifacts.verifiability)
 	writePlanningScoreBlock(&b, "Confidence", artifacts.confidence)
 	if len(window.Messages) > 0 {
 		b.WriteString("\nRecent messages retained for this rewind:\n")
@@ -521,9 +561,11 @@ type planningScoreText struct {
 }
 
 type analysisContinuationState struct {
-	spec       string
-	clarity    planningScoreText
-	confidence planningScoreText
+	spec          string
+	clarity       planningScoreText
+	confidence    planningScoreText
+	complexity    planningScoreText
+	verifiability planningScoreText
 }
 
 func writePlanningScoreBlock(b *strings.Builder, label string, text planningScoreText) {
@@ -563,6 +605,8 @@ func analysisContinuationArtifacts(tx *gorm.DB, session *FactoryPlanningSession)
 	}
 	state.clarity = planningScoreTextFromChecks(checks, PlanningClarityCheckKey)
 	state.confidence = planningScoreTextFromChecks(checks, PlanningConfidenceCheckKey)
+	state.complexity = planningScoreTextFromChecks(checks, PlanningComplexityCheckKey)
+	state.verifiability = planningScoreTextFromChecks(checks, PlanningVerifiabilityCheckKey)
 	return state, nil
 }
 
@@ -578,7 +622,12 @@ func WorkOrderReadyForAutoStart(
 	if order.State != FactoryWorkOrderStateDraft {
 		return false, nil
 	}
-	if !factoryModel.PlanningEnabled || !factoryModel.PlanningConfidence {
+	if !factoryModel.PlanningEnabled {
+		return false, nil
+	}
+	// Review scoring is not optional, so the Confidence setting only gates
+	// auto-start on the legacy flow.
+	if !factoryModel.PlanningConfidence && !organizationHasPlanningReview(tx, factoryModel.OrganizationID) {
 		return false, nil
 	}
 	if len(session.CurrentSurvey().Questions) > 0 {
@@ -592,11 +641,17 @@ func WorkOrderReadyForAutoStart(
 	if err != nil {
 		return false, err
 	}
-	if !turn.reportedScore(checks, PlanningConfidenceCheckKey, PlanningScoreMax) {
-		return false, nil
-	}
-	if factoryModel.PlanningClarity && !turn.reportedScore(checks, PlanningClarityCheckKey, PlanningScoreMax) {
-		return false, nil
+	if organizationHasPlanningReview(tx, factoryModel.OrganizationID) {
+		if !turn.reportedReviewScores(checks) {
+			return false, nil
+		}
+	} else {
+		if !turn.reportedScore(checks, PlanningConfidenceCheckKey, PlanningScoreMax) {
+			return false, nil
+		}
+		if factoryModel.PlanningClarity && !turn.reportedScore(checks, PlanningClarityCheckKey, PlanningScoreMax) {
+			return false, nil
+		}
 	}
 	spec, err := planningSpecBody(tx, order)
 	if err != nil {
@@ -633,6 +688,15 @@ func currentPlanningTurn(tx *gorm.DB, session *FactoryPlanningSession) (planning
 	return turn, nil
 }
 
+func (turn planningTurn) reportedReviewScores(checks []FactoryWorkOrderCheck) bool {
+	for _, kind := range planningReviewScoreKinds {
+		if !turn.reportedScore(checks, kind.key, kind.max) {
+			return false
+		}
+	}
+	return true
+}
+
 func (turn planningTurn) reportedScore(checks []FactoryWorkOrderCheck, key string, score float64) bool {
 	if turn.runID == uuid.Nil {
 		return false
@@ -666,7 +730,7 @@ func planningSpecBody(tx *gorm.DB, order *FactoryWorkOrder) (string, error) {
 		if json.Unmarshal(artifacts[i].Data, &data) != nil {
 			continue
 		}
-		if body := extractArtifactString(data, "body"); body != "" {
+		if body := unwrapPlanningMarkdown(extractArtifactString(data, "body")); body != "" {
 			return body, nil
 		}
 	}
@@ -678,13 +742,18 @@ func planningScoreTextFromChecks(checks []FactoryWorkOrderCheck, key string) pla
 		if checks[i].Key != key {
 			continue
 		}
-		score := strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.1f", checks[i].Score), "0"), ".")
-		if score == "" {
-			score = "0"
-		}
-		return planningScoreText{score: score + "/5", summary: strings.TrimSpace(checks[i].Summary)}
+		fraction := planningScoreNumberText(checks[i].Score) + "/" + planningScoreNumberText(checks[i].MaxScore)
+		return planningScoreText{score: fraction, summary: strings.TrimSpace(checks[i].Summary)}
 	}
 	return planningScoreText{}
+}
+
+func planningScoreNumberText(value float64) string {
+	text := strings.TrimRight(strings.TrimRight(fmt.Sprintf("%.1f", value), "0"), ".")
+	if text == "" {
+		return "0"
+	}
+	return text
 }
 
 func FindPlanningSessionByDraftWorkOrder(

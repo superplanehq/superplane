@@ -8,7 +8,9 @@ import { type ReactNode } from "react";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
-import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME } from "../../../lib/confidenceScore";
+import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../../lib/confidenceScore";
+import { consoleCheckList, isMergeConfidenceMetric } from "../../../lib/mergeConfidenceScore";
+import { isPlanningReviewMetric } from "../../../lib/planningReviewScore";
 import { workOrderCardPullRequestIsMergeable } from "../../../lib/workOrderCardPullRequest";
 import { splitRunDecisionTone } from "../splitRunFooter";
 import { attentionToneClassName } from "../splitRunNoteActionStyle";
@@ -90,9 +92,19 @@ export function ConsoleSummaryPanel({
             ))}
           </FramePanel>
         ) : null}
-        {panel.checks.length > 0 ? (
+        {panel.mergeChecks.length > 0 ? (
           <FramePanel className="py-3">
-            <ConsoleCheckRows checks={panel.checks} />
+            <ConsoleCheckRows checks={panel.mergeChecks} />
+          </FramePanel>
+        ) : null}
+        {panel.otherChecks.length > 0 ? (
+          <FramePanel className="py-3">
+            <ConsoleCheckRows
+              checks={panel.otherChecks}
+              title="Checks"
+              testId="redesign-console-other-checks"
+              defaultOpen
+            />
           </FramePanel>
         ) : null}
         {panel.panelArtifacts.length > 0 ? (
@@ -173,11 +185,16 @@ function consolePanelFacts({
       : undefined,
     panelPullRequests,
     panelArtifacts,
-    // Every check on the task except Confidence score. That score belongs
-    // to planning. A stage list would drop Risk score when no verify step
-    // ran, because only that step copies checks onto a card.
-    checks: fixture.checks.filter(
-      (check) => check.key !== CONFIDENCE_CHECK_KEY && check.name !== CONFIDENCE_CHECK_NAME,
+    // Merge confidence stays on its own list. Other non-planning checks stay
+    // reachable here when no verify card copied them.
+    mergeChecks: consoleCheckList(fixture.checks)?.metrics ?? [],
+    otherChecks: fixture.checks.filter(
+      (check) =>
+        !isMergeConfidenceMetric(check) &&
+        !isPlanningReviewMetric(check) &&
+        !isScoreCheckName(check.name) &&
+        check.key !== CONFIDENCE_CHECK_KEY &&
+        check.name !== CONFIDENCE_CHECK_NAME,
     ),
     duration: /\d/.test(outcome.duration) ? outcome.duration : undefined,
   };

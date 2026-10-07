@@ -531,8 +531,10 @@ pb.gen.gateway:
 openapi.spec.gen: dev.test.is.running
 	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
 
+# Recreate the output directory in the app container. A host rm and mkdir
+# leaves Docker Desktop with a stale directory, and the generator cannot write.
 openapi.client.gen: dev.test.is.running
-	@rm -rf pkg/openapi_client
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "rm -rf pkg/openapi_client && mkdir -p pkg/openapi_client"
 	@./scripts/docker-pull-retry $(OPENAPI_GENERATOR_IMAGE)
 	@log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
 	if ! docker run --rm --user $(shell id -u):$(shell id -g) \

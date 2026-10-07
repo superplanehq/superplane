@@ -1,3 +1,4 @@
+import type { SuperplaneComponentsNode } from "@/api-client";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,7 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MergeConfidenceCanvasProvider } from "@/lib/mergeConfidenceCanvas";
 import { cn } from "@/lib/utils";
 import { Ellipsis } from "lucide-react";
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomations";
 import { MERGE_CONFIDENCE_CONFIG_COPY } from "./mergeConfidenceCopy";
@@ -45,7 +46,7 @@ interface MergeConfidenceConfigModalProps {
 
 type MergeConfidenceConfigTab = "automation" | "runs";
 
-/** Merge confidence configuration. The automation stays visible until a step is selected. */
+/** Merge confidence configuration. The first component starts selected. */
 export function MergeConfidenceConfigModal({
   title,
   graph,
@@ -64,12 +65,26 @@ export function MergeConfidenceConfigModal({
 }: MergeConfidenceConfigModalProps) {
   const [tab, setTab] = useState<MergeConfidenceConfigTab>("automation");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const initialNodeId = firstComponentId(graph);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(initialNodeId);
+  const appliedInitialNode = useRef(initialNodeId !== null);
   const [focusNonce, setFocusNonce] = useState(0);
   const [layoutFitNonce, setLayoutFitNonce] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const panelWasOpen = useRef(false);
   const split = useSplitRunPanePercent({ defaultPercent: 50, minPercent: 28, maxPercent: 72 });
+
+  useEffect(() => {
+    if (appliedInitialNode.current) {
+      return;
+    }
+    const nextId = firstComponentId(graph);
+    if (!nextId) {
+      return;
+    }
+    appliedInitialNode.current = true;
+    setSelectedNodeId(nextId);
+  }, [graph]);
   const selectedNode =
     tab === "automation" && selectedNodeId ? graph?.specNodes?.find((node) => node.id === selectedNodeId) : undefined;
 
@@ -99,56 +114,31 @@ export function MergeConfidenceConfigModal({
         >
           <SettingsAutomationHeaderRow tabs={<ConfigTabs tab={tab} onTabChange={setTab} />} />
         </PopupHeader>
-        <div
-          ref={split.containerRef}
-          className="flex min-h-0 min-w-0 flex-1"
-          data-testid="merge-confidence-config-body"
-          data-split={selectedNode ? "true" : "false"}
-        >
-          {selectedNode ? (
-            <NodeConfigPanel
-              node={selectedNode}
-              organizationId={graph?.organizationId}
-              factoryId={panelFactoryId(factoryId, graph)}
-              factoryKey={factoryKey}
-              widthPercent={split.percent}
-              onClose={() => setSelectedNodeId(null)}
-              onSave={onSaveNode}
-            />
-          ) : null}
-          {selectedNode ? <ConfigResizeHandle isResizing={split.isResizing} onPointerDown={split.startResize} /> : null}
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            {tab === "runs" ? (
-              <MergeConfidenceCanvas
-                graph={graph}
-                loading={loading}
-                error={error}
-                onRetry={onRetry}
-                canvasId={canvasId}
-                runHrefFor={runHrefFor}
-                showRuns
-                selectLatestRun
-                selectedRunId={selectedRunId}
-                onSelectedRunIdChange={setSelectedRunId}
-                onNodeSelect={() => undefined}
-              />
-            ) : (
-              <MergeConfidenceCanvas
-                graph={graph}
-                loading={loading}
-                error={error}
-                onRetry={onRetry}
-                canvasId={canvasId}
-                runHrefFor={runHrefFor}
-                showRuns={false}
-                onNodeSelect={setSelectedNodeId}
-                focusNodeId={selectedNodeId}
-                focusNonce={focusNonce}
-                layoutFitNonce={layoutFitNonce}
-              />
-            )}
-          </div>
-        </div>
+        <MergeConfidenceConfigBody
+          containerRef={split.containerRef}
+          selectedNode={selectedNode}
+          organizationId={graph?.organizationId}
+          factoryId={panelFactoryId(factoryId, graph)}
+          factoryKey={factoryKey}
+          widthPercent={split.percent}
+          isResizing={split.isResizing}
+          onResizeStart={split.startResize}
+          onClosePanel={() => setSelectedNodeId(null)}
+          onSaveNode={onSaveNode}
+          tab={tab}
+          graph={graph}
+          loading={loading}
+          error={error}
+          onRetry={onRetry}
+          canvasId={canvasId}
+          runHrefFor={runHrefFor}
+          selectedRunId={selectedRunId}
+          onSelectedRunIdChange={setSelectedRunId}
+          onNodeSelect={setSelectedNodeId}
+          selectedNodeId={selectedNodeId}
+          focusNonce={focusNonce}
+          layoutFitNonce={layoutFitNonce}
+        />
         {onDelete ? (
           <MergeConfidenceDeleteDialog
             open={confirmDelete}
@@ -160,6 +150,111 @@ export function MergeConfidenceConfigModal({
         ) : null}
       </PopupShell>
     </MergeConfidenceCanvasProvider>
+  );
+}
+
+function MergeConfidenceConfigBody({
+  containerRef,
+  selectedNode,
+  organizationId,
+  factoryId,
+  factoryKey,
+  widthPercent,
+  isResizing,
+  onResizeStart,
+  onClosePanel,
+  onSaveNode,
+  tab,
+  graph,
+  loading,
+  error,
+  onRetry,
+  canvasId,
+  runHrefFor,
+  selectedRunId,
+  onSelectedRunIdChange,
+  onNodeSelect,
+  selectedNodeId,
+  focusNonce,
+  layoutFitNonce,
+}: {
+  containerRef: RefObject<HTMLDivElement | null>;
+  selectedNode?: SuperplaneComponentsNode;
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  widthPercent: number;
+  isResizing: boolean;
+  onResizeStart: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onClosePanel: () => void;
+  onSaveNode: (update: NodeConfigurationUpdate) => Promise<void> | void;
+  tab: MergeConfidenceConfigTab;
+  graph?: IntakeAutomationGraph;
+  loading: boolean;
+  error: boolean;
+  onRetry?: () => void;
+  canvasId?: string;
+  runHrefFor?: RunsSidebarHrefForRun;
+  selectedRunId: string | null;
+  onSelectedRunIdChange: (runId: string | null) => void;
+  onNodeSelect: (nodeId: string) => void;
+  selectedNodeId: string | null;
+  focusNonce: number;
+  layoutFitNonce: number | null;
+}) {
+  return (
+    <div
+      ref={containerRef}
+      className="flex min-h-0 min-w-0 flex-1"
+      data-testid="merge-confidence-config-body"
+      data-split={selectedNode ? "true" : "false"}
+    >
+      {selectedNode ? (
+        <NodeConfigPanel
+          node={selectedNode}
+          organizationId={organizationId}
+          factoryId={factoryId}
+          factoryKey={factoryKey}
+          widthPercent={widthPercent}
+          onClose={onClosePanel}
+          onSave={onSaveNode}
+        />
+      ) : null}
+      {selectedNode ? <ConfigResizeHandle isResizing={isResizing} onPointerDown={onResizeStart} /> : null}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {tab === "runs" ? (
+          <MergeConfidenceCanvas
+            graph={graph}
+            loading={loading}
+            error={error}
+            onRetry={onRetry}
+            canvasId={canvasId}
+            runHrefFor={runHrefFor}
+            showRuns
+            selectLatestRun
+            selectedRunId={selectedRunId}
+            onSelectedRunIdChange={onSelectedRunIdChange}
+            onNodeSelect={() => undefined}
+          />
+        ) : (
+          <MergeConfidenceCanvas
+            graph={graph}
+            loading={loading}
+            error={error}
+            onRetry={onRetry}
+            canvasId={canvasId}
+            runHrefFor={runHrefFor}
+            showRuns={false}
+            onNodeSelect={onNodeSelect}
+            focusNodeId={selectedNodeId}
+            focusNonce={focusNonce}
+            focusFit={false}
+            lockNativeZoom
+            layoutFitNonce={layoutFitNonce}
+          />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -215,6 +310,18 @@ function panelFactoryId(factoryId: string | undefined, graph: IntakeAutomationGr
   return factoryId ?? graph?.factoryId;
 }
 
+function firstComponentId(graph: IntakeAutomationGraph | undefined): string | null {
+  const specNodes = graph?.specNodes ?? [];
+  const trigger = specNodes.find((node) => node.type === "TYPE_TRIGGER" && node.id?.trim());
+  if (trigger?.id) {
+    return trigger.id;
+  }
+
+  const targets = new Set(graph?.edges?.map((edge) => edge.target).filter(Boolean));
+  const root = specNodes.find((node) => node.id && !targets.has(node.id));
+  return root?.id?.trim() || specNodes[0]?.id?.trim() || null;
+}
+
 function MergeConfidenceCanvas({
   graph,
   loading,
@@ -229,6 +336,8 @@ function MergeConfidenceCanvas({
   onNodeSelect,
   focusNodeId = null,
   focusNonce = 0,
+  focusFit = true,
+  lockNativeZoom = false,
   layoutFitNonce = null,
 }: {
   graph?: IntakeAutomationGraph;
@@ -244,6 +353,8 @@ function MergeConfidenceCanvas({
   onNodeSelect?: (nodeId: string) => void;
   focusNodeId?: string | null;
   focusNonce?: number;
+  focusFit?: boolean;
+  lockNativeZoom?: boolean;
   layoutFitNonce?: number | null;
 }) {
   if (!graph || graph.nodes.length === 0) {
@@ -278,6 +389,8 @@ function MergeConfidenceCanvas({
       showFindControls={false}
       focusNodeId={focusNodeId}
       focusNonce={focusNonce}
+      focusFit={focusFit}
+      lockNativeZoom={lockNativeZoom}
       layoutFitNonce={layoutFitNonce}
       className="settings-graph"
     />

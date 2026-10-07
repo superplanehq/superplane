@@ -20,7 +20,7 @@ import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
-import { sphereFor } from "./first-run/firstRunSphereFor";
+import { repositorySphereFor, sphereFor } from "./first-run/firstRunSphereFor";
 import {
   agentFinishReady,
   isAgentProviderConnected,
@@ -134,7 +134,14 @@ function AgentScreen({
   });
   const showProviders = !modelSource.offered || modelSource.choice === "own-key";
   return (
-    <FirstRunShell testId="first-run-agent" chrome={chrome} busy={saving || loading} width="wide" sphere={sphere}>
+    <FirstRunShell
+      testId="first-run-agent"
+      chrome={chrome}
+      busy={saving || loading}
+      width="wide"
+      sphere={sphere}
+      visual="preview"
+    >
       <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
         <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource, showCustomProvider)}</p>
       </FirstRunHeading>
@@ -250,19 +257,18 @@ function BitbucketChooseHost({
   flow,
   model,
   chrome,
-  sphere,
 }: {
   organizationId: string;
   flow: FirstRunSetupFlow;
   model: OnboardingPageModel;
   chrome: FirstRunChrome;
-  sphere?: FirstRunSphereProps;
 }) {
   const connected = model.setup.connected.has("bitbucket");
   const resources = useIntegrationResources(organizationId, model.bitbucketIntegrationId, "repository", undefined, {
     enabled: connected,
   });
   const repositories = (resources.data ?? []).map((resource) => resource.name ?? "").filter(Boolean);
+  const sphere = connected ? repositorySphereFor(model.setup.selectedRepo) : sphereFor("connect", null);
   return (
     <FirstRunBitbucketChooseScreen
       connected={connected}
@@ -322,15 +328,7 @@ function VcsScreen({
   }
 
   if (flow.vcsHost === "bitbucket") {
-    return (
-      <BitbucketChooseHost
-        organizationId={organizationId}
-        flow={flow}
-        model={model}
-        chrome={chrome}
-        sphere={sphereFor("choose", setup.selectedRepo)}
-      />
-    );
+    return <BitbucketChooseHost organizationId={organizationId} flow={flow} model={model} chrome={chrome} />;
   }
 
   return (

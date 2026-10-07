@@ -249,6 +249,31 @@ func FindRunnerFleet(tx *gorm.DB, id uuid.UUID) (*RunnerFleet, error) {
 	return &fleet, nil
 }
 
+type ListPage struct {
+	States  []string
+	Limit   int
+	AfterID *uuid.UUID
+}
+
+type RunnerListPage struct {
+	Runners     []Runner
+	TotalCount  int64
+	HasNextPage bool
+}
+
+type TaskListPage struct {
+	Tasks       []RunnerTask
+	TotalCount  int64
+	HasNextPage bool
+}
+
+type FleetStateCount struct {
+	FleetID   uuid.UUID
+	FleetSlug string
+	State     string
+	Count     int64
+}
+
 func (f *RunnerFleet) FindRunner(tx *gorm.DB, id uuid.UUID) (*Runner, error) {
 	var runner Runner
 	err := tx.Where("id = ? AND fleet_id = ?", id, f.ID).First(&runner).Error
@@ -261,32 +286,72 @@ func (f *RunnerFleet) FindRunner(tx *gorm.DB, id uuid.UUID) (*Runner, error) {
 	return &runner, nil
 }
 
-func (f *RunnerFleet) ListRunners(tx *gorm.DB, states []string, limit int) ([]Runner, error) {
-	query := tx.Where("fleet_id = ?", f.ID)
-	if len(states) > 0 {
-		query = query.Where("state IN ?", states)
+func (f *RunnerFleet) ListRunners(tx *gorm.DB, page ListPage) (RunnerListPage, error) {
+	total, err := countFleetRecords(tx, &Runner{}, f.ID, page.States)
+	if err != nil {
+		return RunnerListPage{}, err
 	}
-	if limit > 0 {
-		query = query.Limit(limit)
+
+	query := tx.Where("fleet_id = ?", f.ID)
+	if len(page.States) > 0 {
+		query = query.Where("state IN ?", page.States)
+	}
+	if page.AfterID != nil {
+		cursor, found, cursorErr := f.runnerListCursor(tx, *page.AfterID)
+		if cursorErr != nil {
+			return RunnerListPage{}, cursorErr
+		}
+		if !found {
+			return RunnerListPage{Runners: []Runner{}, TotalCount: total}, nil
+		}
+		query = query.Where("(created_at, id) > (?, ?)", cursor.CreatedAt, cursor.ID)
+	}
+
+	query = query.Order("created_at ASC, id ASC")
+	if page.Limit > 0 {
+		query = query.Limit(page.Limit + 1)
 	}
 
 	var runners []Runner
-	err := query.Order("created_at ASC, id ASC").Find(&runners).Error
-	return runners, err
+	if err := query.Find(&runners).Error; err != nil {
+		return RunnerListPage{}, err
+	}
+	runners, hasNext := trimListPage(runners, page.Limit)
+	return RunnerListPage{Runners: runners, TotalCount: total, HasNextPage: hasNext}, nil
 }
 
-func (f *RunnerFleet) ListTasks(tx *gorm.DB, states []string, limit int) ([]RunnerTask, error) {
-	query := tx.Where("fleet_id = ?", f.ID)
-	if len(states) > 0 {
-		query = query.Where("state IN ?", states)
+func (f *RunnerFleet) ListTasks(tx *gorm.DB, page ListPage) (TaskListPage, error) {
+	total, err := countFleetRecords(tx, &RunnerTask{}, f.ID, page.States)
+	if err != nil {
+		return TaskListPage{}, err
 	}
-	if limit > 0 {
-		query = query.Limit(limit)
+
+	query := tx.Where("fleet_id = ?", f.ID)
+	if len(page.States) > 0 {
+		query = query.Where("state IN ?", page.States)
+	}
+	if page.AfterID != nil {
+		cursor, found, cursorErr := f.taskListCursor(tx, *page.AfterID)
+		if cursorErr != nil {
+			return TaskListPage{}, cursorErr
+		}
+		if !found {
+			return TaskListPage{Tasks: []RunnerTask{}, TotalCount: total}, nil
+		}
+		query = query.Where("(queued_at, id) > (?, ?)", cursor.QueuedAt, cursor.ID)
+	}
+
+	query = query.Order("queued_at ASC, id ASC")
+	if page.Limit > 0 {
+		query = query.Limit(page.Limit + 1)
 	}
 
 	var tasks []RunnerTask
-	err := query.Order("queued_at ASC, id ASC").Find(&tasks).Error
-	return tasks, err
+	if err := query.Find(&tasks).Error; err != nil {
+		return TaskListPage{}, err
+	}
+	tasks, hasNext := trimListPage(tasks, page.Limit)
+	return TaskListPage{Tasks: tasks, TotalCount: total, HasNextPage: hasNext}, nil
 }
 
 func (f *RunnerFleet) CountTasks(tx *gorm.DB, state string) (int64, error) {
@@ -322,6 +387,22 @@ func (f *RunnerFleet) CountRunnersByState(tx *gorm.DB) (map[string]int64, error)
 	return counts, nil
 }
 
+func ListRunnerCountsByFleetState(tx *gorm.DB) ([]FleetStateCount, error) {
+	return listCountsByFleetState(tx, &Runner{}, []string{
+		RunnerStatePending,
+		RunnerStateIdle,
+		RunnerStateBusy,
+	})
+}
+
+func ListRunnerTaskCountsByFleetState(tx *gorm.DB) ([]FleetStateCount, error) {
+	return listCountsByFleetState(tx, &RunnerTask{}, []string{
+		RunnerTaskStateQueued,
+		RunnerTaskStateReserved,
+		RunnerTaskStateRunning,
+	})
+}
+
 func (f *RunnerFleet) PinRunnerVersion(tx *gorm.DB, version string) error {
 	version = strings.TrimSpace(version)
 	if version == "" {
@@ -354,4 +435,110 @@ func (f *RunnerFleet) SetEnabled(tx *gorm.DB, enabled bool) error {
 	f.Enabled = enabled
 	f.UpdatedAt = now
 	return nil
+}
+
+func (f *RunnerFleet) runnerListCursor(tx *gorm.DB, id uuid.UUID) (*Runner, bool, error) {
+	var cursor Runner
+	err := tx.Select("id", "created_at").Where("fleet_id = ? AND id = ?", f.ID, id).Take(&cursor).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return &cursor, true, nil
+}
+
+func (f *RunnerFleet) taskListCursor(tx *gorm.DB, id uuid.UUID) (*RunnerTask, bool, error) {
+	var cursor RunnerTask
+	err := tx.Select("id", "queued_at").Where("fleet_id = ? AND id = ?", f.ID, id).Take(&cursor).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return &cursor, true, nil
+}
+
+func countFleetRecords(tx *gorm.DB, model any, fleetID uuid.UUID, states []string) (int64, error) {
+	query := tx.Model(model).Where("fleet_id = ?", fleetID)
+	if len(states) > 0 {
+		query = query.Where("state IN ?", states)
+	}
+	var count int64
+	err := query.Count(&count).Error
+	return count, err
+}
+
+func trimListPage[T any](rows []T, limit int) ([]T, bool) {
+	if rows == nil {
+		return []T{}, false
+	}
+	if limit > 0 && len(rows) > limit {
+		return rows[:limit], true
+	}
+	return rows, false
+}
+
+func listCountsByFleetState(tx *gorm.DB, model any, states []string) ([]FleetStateCount, error) {
+	type fleetRow struct {
+		ID   uuid.UUID
+		Slug string
+	}
+
+	var fleets []fleetRow
+	if err := tx.Model(&RunnerFleet{}).
+		Select("id", "slug").
+		Order("slug ASC, id ASC").
+		Scan(&fleets).
+		Error; err != nil {
+		return nil, err
+	}
+	if len(fleets) == 0 {
+		return []FleetStateCount{}, nil
+	}
+
+	fleetIDs := make([]uuid.UUID, 0, len(fleets))
+	for _, fleet := range fleets {
+		fleetIDs = append(fleetIDs, fleet.ID)
+	}
+
+	type countRow struct {
+		FleetID uuid.UUID
+		State   string
+		Count   int64
+	}
+
+	var rows []countRow
+	if err := tx.Model(model).
+		Select("fleet_id, state, COUNT(*) AS count").
+		Where("fleet_id IN ? AND state IN ?", fleetIDs, states).
+		Group("fleet_id, state").
+		Scan(&rows).
+		Error; err != nil {
+		return nil, err
+	}
+
+	type key struct {
+		FleetID uuid.UUID
+		State   string
+	}
+	counts := make(map[key]int64, len(rows))
+	for _, row := range rows {
+		counts[key{FleetID: row.FleetID, State: row.State}] = row.Count
+	}
+
+	result := make([]FleetStateCount, 0, len(fleets)*len(states))
+	for _, fleet := range fleets {
+		for _, state := range states {
+			result = append(result, FleetStateCount{
+				FleetID:   fleet.ID,
+				FleetSlug: fleet.Slug,
+				State:     state,
+				Count:     counts[key{FleetID: fleet.ID, State: state}],
+			})
+		}
+	}
+	return result, nil
 }

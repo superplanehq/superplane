@@ -1,9 +1,8 @@
 import React from "react";
-import superplaneLogo from "@/assets/superplane.svg";
 import { Input, InputGroup } from "@/components/Input/input";
-import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { FirstRunHeading } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import { ErrorBanner } from "./ErrorBanner";
 
 type OwnerStepProps = {
@@ -23,13 +22,7 @@ type OwnerStepProps = {
   onSubmit: (event: React.FormEvent) => void;
 };
 
-const OwnerStepHeader = (
-  <div className="mb-8 text-center">
-    <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8 dark:brightness-0 dark:invert" />
-    <h4 className="mb-1 text-xl font-medium text-gray-800 dark:text-white">Set up owner account</h4>
-    <Text className="text-gray-800 dark:text-gray-300">Create an account for this SuperPlane instance.</Text>
-  </div>
-);
+const fieldLabelClass = "mb-2 block text-left text-[13px] font-medium";
 
 export const OwnerStep: React.FC<OwnerStepProps> = ({
   email,
@@ -48,13 +41,15 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
   onSubmit,
 }) => (
   <>
-    {OwnerStepHeader}
-    <form onSubmit={onSubmit} className="space-y-4">
+    <FirstRunHeading headline="Create the owner account" size="display">
+      <p className="text-[15px] leading-6 text-muted-foreground">This account administers the installation.</p>
+    </FirstRunHeading>
+    <form onSubmit={onSubmit} className="mt-8 space-y-4 text-left">
       <ErrorBanner message={error} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <Label className="mb-2 block text-left">
-            First Name <span className="text-gray-800 dark:text-gray-100">*</span>
+          <Label className={fieldLabelClass}>
+            First name <span className="text-foreground">*</span>
           </Label>
           <InputGroup>
             <Input
@@ -70,8 +65,8 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
           )}
         </div>
         <div>
-          <Label className="mb-2 block text-left">
-            Last Name <span className="text-gray-800 dark:text-gray-100">*</span>
+          <Label className={fieldLabelClass}>
+            Last name <span className="text-foreground">*</span>
           </Label>
           <InputGroup>
             <Input
@@ -88,8 +83,8 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
         </div>
       </div>
       <div>
-        <Label className="mb-2 block text-left">
-          Email <span className="text-gray-800 dark:text-gray-100">*</span>
+        <Label className={fieldLabelClass}>
+          Email <span className="text-foreground">*</span>
         </Label>
         <InputGroup>
           <Input
@@ -103,8 +98,8 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
         {fieldErrors.email && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.email}</p>}
       </div>
       <div>
-        <Label className="mb-2 block text-left">
-          Password <span className="text-gray-800 dark:text-gray-100">*</span>
+        <Label className={fieldLabelClass}>
+          Password <span className="text-foreground">*</span>
         </Label>
         <InputGroup>
           <Input
@@ -118,14 +113,12 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
         {fieldErrors.password ? (
           <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.password}</p>
         ) : (
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            8+ characters, at least 1 number and 1 capital letter
-          </p>
+          <p className="mt-1 text-xs text-muted-foreground">8+ characters, at least 1 number and 1 capital letter</p>
         )}
       </div>
       <div>
-        <Label className="mb-2 block text-left">
-          Confirm Password <span className="text-gray-800 dark:text-gray-100">*</span>
+        <Label className={fieldLabelClass}>
+          Confirm password <span className="text-foreground">*</span>
         </Label>
         <InputGroup>
           <Input
@@ -140,11 +133,9 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
           <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.confirmPassword}</p>
         )}
       </div>
-      <div className="flex justify-end">
-        <Button type="submit" disabled={loading}>
-          {loading ? "Saving..." : "Finish setup"}
-        </Button>
-      </div>
+      <Button type="submit" className="mt-4 min-w-40" disabled={loading}>
+        {loading ? "Saving..." : "Continue"}
+      </Button>
     </form>
   </>
 );

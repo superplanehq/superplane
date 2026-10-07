@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -22,6 +23,7 @@ const (
 	EnvSuperplanePlanningSessionKind = "SUPERPLANE_PLANNING_SESSION_KIND"
 	EnvSuperplanePlanningClarity     = "SUPERPLANE_PLANNING_CLARITY"
 	EnvSuperplanePlanningConfidence  = "SUPERPLANE_PLANNING_CONFIDENCE"
+	EnvSuperplanePlanningReview      = "SUPERPLANE_PLANNING_REVIEW"
 	EnvSuperplaneAnalysisSpecFile    = "SUPERPLANE_ANALYSIS_SPEC_FILE"
 	EnvSuperplaneAnalysisScoreFile   = "SUPERPLANE_ANALYSIS_SCORE_FILE"
 	EnvSuperplaneBaseURL             = "SUPERPLANE_BASE_URL"
@@ -170,6 +172,9 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 		Name:  EnvSuperplanePlanningConfidence,
 		Value: planningScoreEnvValue(planning.Confidence),
 	}, BrokerEnvironmentVariable{
+		Name:  EnvSuperplanePlanningReview,
+		Value: planningScoreEnvValue(planningReviewEnvEnabled(session.OrganizationID)),
+	}, BrokerEnvironmentVariable{
 		Name:  EnvSuperplaneAnalysisSpecFile,
 		Value: "/tmp/intent.md",
 	}, BrokerEnvironmentVariable{
@@ -177,6 +182,14 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 		Value: "/tmp/intake-analysis.json",
 	})
 	return environment
+}
+
+func planningReviewEnvEnabled(organizationID uuid.UUID) bool {
+	org, err := models.FindOrganizationByIDInTransaction(database.DB(context.Background()), organizationID.String())
+	if err != nil {
+		return false
+	}
+	return org.HasExperimentalFeature(features.FeatureTaskPlanningReview)
 }
 
 func planningScoreEnvValue(enabled bool) string {

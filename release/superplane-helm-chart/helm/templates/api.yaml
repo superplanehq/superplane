@@ -159,6 +159,8 @@ spec:
             - name: SUPERPLANE_LICENSE_KEYS_URL
               value: {{ .Values.license.keysURL | quote }}
 {{- end }}
+            - name: SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER
+              value: {{ ternary "yes" "no" .Values.license.hideExpiryBanner | quote }}
 
           volumeMounts:
             - name: oidc-keys

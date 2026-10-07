@@ -81,6 +81,8 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   showClarity?: boolean;
   /** Hide Confidence when Planning has that score off. */
   showConfidenceScore?: boolean;
+  /** Review sub-parameters for the Confidence tooltip when the headline is derived. */
+  reviewMetrics?: { key: string; name: string; score: number }[];
   /**
    * True while the agent still works on this draft. The card shows
    * thinking states in the meter slot, even after a score exists.
@@ -135,6 +137,7 @@ export function WorkOrderCard({
   confidenceScore,
   showClarity,
   showConfidenceScore,
+  reviewMetrics,
   isAnalyzing = false,
   className,
   selected = false,
@@ -207,6 +210,7 @@ export function WorkOrderCard({
           confidenceScore={confidenceScore}
           showClarity={showClarity}
           showConfidenceScore={showConfidenceScore}
+          reviewMetrics={reviewMetrics}
           isAnalyzing={agentWorking}
           showOwner={showOwner}
         />
@@ -341,6 +345,7 @@ function WorkOrderCardMetaRow({
   confidenceScore,
   showClarity = true,
   showConfidenceScore = true,
+  reviewMetrics,
   isAnalyzing,
   showOwner,
 }: {
@@ -352,6 +357,7 @@ function WorkOrderCardMetaRow({
   confidenceScore?: number;
   showClarity?: boolean;
   showConfidenceScore?: boolean;
+  reviewMetrics?: { key: string; name: string; score: number }[];
   isAnalyzing: boolean;
   showOwner: boolean;
 }) {
@@ -378,6 +384,7 @@ function WorkOrderCardMetaRow({
               confidence={confidenceScore}
               showClarity={showClarity}
               showConfidence={showConfidenceScore}
+              reviewMetrics={reviewMetrics}
               isAnalyzing={isAnalyzing}
             />
           ) : null}
@@ -405,6 +412,7 @@ function CardScores({
   confidence,
   showClarity = true,
   showConfidence = true,
+  reviewMetrics,
   isAnalyzing,
 }: {
   entryId: string;
@@ -412,6 +420,7 @@ function CardScores({
   confidence?: number;
   showClarity?: boolean;
   showConfidence?: boolean;
+  reviewMetrics?: { key: string; name: string; score: number }[];
   isAnalyzing: boolean;
 }) {
   if (isAnalyzing) {
@@ -433,6 +442,7 @@ function CardScores({
       confidence={confidence}
       showClarity={showClarity}
       showConfidence={showConfidence}
+      reviewMetrics={reviewMetrics}
       testId={`work-order-card-score-${entryId}`}
     />
   );

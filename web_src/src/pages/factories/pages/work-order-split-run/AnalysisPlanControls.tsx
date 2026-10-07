@@ -1,6 +1,6 @@
 import { ComposerPlanStack } from "./ComposerPlanControls";
 import { PlanningReview } from "./PlanningReview";
-import type { IntentAnalysisChat } from "./WorkOrderIntentRequest";
+import type { IntentAnalysisChat } from "./intentAnalysisChat";
 
 /** Keep the original controls above the composer until the organization opts in. */
 export function AnalysisPlanControls({
@@ -29,7 +29,7 @@ export function AnalysisPlanControls({
     creditVerdict: analysis.creditVerdict,
   };
   if (inConversation) {
-    return <PlanningReview {...props} title={analysis.planTitle} />;
+    return <PlanningReview {...props} title={analysis.planTitle} reviewMetrics={analysis.reviewMetrics} />;
   }
   return <ComposerPlanStack {...props} actions={analysis.closedDecision} modelSelect={analysis.modelSelect} />;
 }
