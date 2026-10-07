@@ -1258,8 +1258,7 @@ func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
 	mustEnableAutoStart(t, db, factoryModel, line.ID)
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	mustPublishReadyPlanningUpdate(t, db, session)
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 
@@ -1288,8 +1287,7 @@ func TestBeginPlanningWaitAndNotify_SkipsAutoStartWithoutLine(t *testing.T) {
 	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
 	require.NotNil(t, session.DraftWorkOrderID)
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	mustPublishReadyPlanningUpdate(t, db, session)
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 
@@ -1312,8 +1310,7 @@ func TestBeginPlanningWaitAndNotify_FailedAutoStartDoesNotRetry(t *testing.T) {
 	require.NotNil(t, session.DraftWorkOrderID)
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	mustPublishReadyPlanningUpdate(t, db, session)
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 
@@ -1325,9 +1322,15 @@ func TestBeginPlanningWaitAndNotify_FailedAutoStartDoesNotRetry(t *testing.T) {
 	_, err = reloaded.FindActiveLineDispatch(db)
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 
+	// Make dispatch valid so a retry would open the task instead of failing again.
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "retry-step", "start-retry")
+	require.NoError(t, line.Update(db, nil, []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	}, nil))
 	require.NoError(t, session.SendUserMessage(db, "Continue.", uuid.Nil))
 	_, err = session.ConsumeWait(db)
 	require.NoError(t, err)
+	mustPublishReadyPlanningUpdate(t, db, session)
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 
 	reloaded, err = models.FindUnscopedWorkOrder(db, order.ID)
@@ -1335,6 +1338,18 @@ func TestBeginPlanningWaitAndNotify_FailedAutoStartDoesNotRetry(t *testing.T) {
 	assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
 	_, err = reloaded.FindActiveLineDispatch(db)
 	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
+func mustPublishReadyPlanningUpdate(t *testing.T, db *gorm.DB, session *models.FactoryPlanningSession) {
+	t.Helper()
+	require.NoError(t, session.ProposeUpdate(db, models.PlanningSessionUpdate{
+		Spec: "# Retry refunds\n\nStop double charges.\n",
+		Scores: &models.PlanningReviewScores{
+			Clarity:       models.PlanningScoreValue{Score: 3, Summary: "The outcome and scope are defined."},
+			Complexity:    models.PlanningScoreValue{Score: 3, Summary: "One run can finish the task."},
+			Verifiability: models.PlanningScoreValue{Score: 3, Summary: "Existing tests cover the change."},
+		},
+	}))
 }
 
 func mustAutoStartLine(t *testing.T, r *support.ResourceRegistry, factoryModel *models.Factory, withSteps bool) *models.FactoryLine {
