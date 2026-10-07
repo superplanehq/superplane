@@ -156,7 +156,7 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
   });
 
   return (
-    <FirstRunShell testId="first-run-tickets" chrome={screen.chrome} busy={screen.saving} sphere={screen.sphere}>
+    <FirstRunShell testId="first-run-tickets" chrome={screen.chrome} busy={screen.saving} sphere={screen.sphere} visual="preview">
       <FirstRunHeading headline={FIRST_RUN_COPY.tickets.headline}>
         <p className="text-[13px] text-muted-foreground">{FIRST_RUN_COPY.tickets.intro}</p>
       </FirstRunHeading>

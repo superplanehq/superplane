@@ -83,11 +83,18 @@ func (h *AssetHandler) serveAsset(w http.ResponseWriter, r *http.Request) {
 		if mimeType := mime.TypeByExtension(filepath.Ext(path)); mimeType != "" {
 			w.Header().Set("Content-Type", mimeType)
 		}
-		w.Header().Set("Cache-Control", "public, max-age=31536000")
+		w.Header().Set("Cache-Control", assetCacheControl(path))
 		http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 	} else {
 		http.NotFound(w, r)
 	}
+}
+
+func assetCacheControl(path string) string {
+	if strings.Contains(path, "/onboarding/") {
+		return "public, max-age=3600"
+	}
+	return "public, max-age=31536000"
 }
 
 // serveIndex serves the index.html file for SPA routing.

@@ -7,7 +7,7 @@ import { FirstRunBoardExit } from "./FirstRunBoardExit";
 import { FirstRunChooseScreen } from "./FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./FirstRunConnectScreen";
 import { FIRST_RUN_REPOSITORIES, FIRST_RUN_STORY_EMAIL } from "./firstRunMocks";
-import { analysisSphereFor } from "./firstRunSphereFor";
+import { analysisSphereFor, repositorySphereFor, sphereFor } from "./firstRunSphereFor";
 import { FirstRunTicketsScreen } from "./FirstRunTicketsScreen";
 import { canAnalyzeTicketSource } from "./firstRunTicketSource";
 import type { FirstRunAnalysisProgress } from "./firstRunAnalysisProgress";
@@ -74,12 +74,23 @@ export function FirstRunFlow({
 
   if (screen === "welcome") {
     return (
-      <FirstRunWelcomeScreen firstName={firstName} chrome={chromeFor(0)} onGetStarted={() => setScreen("connect")} />
+      <FirstRunWelcomeScreen
+        firstName={firstName}
+        chrome={chromeFor(0)}
+        sphere={sphereFor("welcome", null)}
+        onGetStarted={() => setScreen("connect")}
+      />
     );
   }
 
   if (screen === "connect") {
-    return <FirstRunConnectScreen chrome={chromeFor(1)} onConnectGitHub={() => setScreen("choose")} />;
+    return (
+      <FirstRunConnectScreen
+        chrome={chromeFor(1)}
+        sphere={sphereFor("connect", null)}
+        onConnectGitHub={() => setScreen("choose")}
+      />
+    );
   }
 
   if (screen === "choose") {
@@ -108,6 +119,7 @@ export function FirstRunFlow({
       <FirstRunTicketsScreen
         ticketSource={ticketSource}
         chrome={chromeFor(3, () => setScreen("choose"))}
+        sphere={repositorySphereFor(selectedRepository)}
         intakeState={storyIntakeState}
         jiraConnected={jiraConnected}
         jiraProjects={STORY_JIRA_PROJECTS}

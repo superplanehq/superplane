@@ -260,7 +260,13 @@ describe("FirstRunSetup chrome", () => {
     );
 
     expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.sphere.captionSetup)).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-logo")).toBeInTheDocument();
+    const art = screen.getByTestId("first-run-art-pane");
+    expect(art).toHaveAttribute("data-art-mode", "school");
+    expect(art).toHaveAttribute("data-art-background", "#87ae9d");
+    expect(art).toHaveAttribute("data-art-arrow-color", "#eeede9");
+    expect(art).toHaveAttribute("data-art-count", "");
+    expect(screen.getByTestId("first-run-art-stage")).toContainElement(screen.getByTestId("first-run-signed-in"));
   });
 
   it("shows the model source before the backlog for a bring-your-own-key organization", async () => {
