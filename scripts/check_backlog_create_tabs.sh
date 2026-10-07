@@ -36,4 +36,4 @@ if [[ "${ready}" -ne 1 ]]; then
 fi
 
 cd "${repo_root}"
-STORYBOOK_URL="${url}" go test ./test/browser -count=1 -timeout 5m -run 'TestBacklogCreateMenuScrollsHiddenSourceTabIntoView|TestMCPClientRevokeStaysInsideNarrowCard'
+STORYBOOK_URL="${url}" go test ./test/browser -count=1 -timeout 5m -run 'TestBacklogCreateMenuScrollsHiddenSourceTabIntoView|TestMCPClientRevokeStaysInsideNarrowCard|TestTaskMessageTimeStaysInsideNarrowPane'
