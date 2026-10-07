@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { ArrowRightLeft } from "lucide-react";
-import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
+import { type CSSProperties, type ReactNode } from "react";
 
 import wordmark from "@/assets/superplane-wordmark.svg";
 
@@ -11,13 +11,11 @@ import { useFactoriesThemeClass } from "../../../lib/useFactoriesThemeClass";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunSpherePane, type FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
+import { FirstRunVisualContext, useFirstRunVisual, type FirstRunVisual } from "./firstRunVisual";
 import { FirstRunWorkspaceSwitch } from "./FirstRunWorkspaceSwitch";
 
 export const FIRST_RUN_STEP_COUNT = 5;
-
-export type FirstRunVisual = "app" | "preview";
-
-const FirstRunVisualContext = createContext<FirstRunVisual>("app");
+export type { FirstRunVisual };
 
 const PREVIEW_TOKENS = {
   "--background": "#11110e",
@@ -436,7 +434,7 @@ export function FirstRunHeading({
   size?: "page" | "display";
   children?: ReactNode;
 }) {
-  const preview = useContext(FirstRunVisualContext) === "preview";
+  const preview = useFirstRunVisual() === "preview";
   return (
     <header className={cn("space-y-3", preview ? "max-w-[528px]" : "max-w-lg")}>
       {greeting ? (
