@@ -153,6 +153,7 @@ func Test__Linear__Sync(t *testing.T) {
 
 	t.Run("access token present - refreshes and becomes ready", func(t *testing.T) {
 		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{OAuthScopes: "read,write"})
+		integrationContext.Configuration["webhookSecret"] = "app-signing-secret"
 
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
