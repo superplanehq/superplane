@@ -22,7 +22,7 @@ export function useFirstRunIntakeAvailability(organizationId: string): FirstRunI
   const intakeCatalog = useIntakeCatalogAvailability(organizationId);
   const intakeFeatures = useExperimentalFeature(organizationId);
 
-  const vcsAvailable = isIntakeSelectable(intakeCatalog.stateOf("github-issues"));
+  const vcsAvailable = !intakeCatalog.loaded || isIntakeSelectable(intakeCatalog.stateOf("github-issues"));
   const jiraAvailable = isIntakeSelectable(intakeCatalog.stateOf("jira-issues"));
   const linearAvailable = isIntakeSelectable(intakeCatalog.stateOf("linear-issues"));
 
