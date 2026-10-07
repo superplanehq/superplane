@@ -297,6 +297,75 @@ describe("AutomationsConsoleVariant stage automation retry", () => {
     });
   });
 
+  it("keeps a second retry visible after the first local attempt is stored", async () => {
+    describeRunMock.mockResolvedValue({
+      data: { run: { id: "run-preview", rootEvent: { id: "event-preview", nodeId: "trigger-preview" } } },
+    });
+    reemitMock.mockResolvedValueOnce({ data: { eventId: "event-rerun" } });
+    listRunsMock.mockResolvedValue({
+      data: {
+        runs: [
+          {
+            id: "run-preview-2",
+            state: "STATE_FINISHED",
+            result: "RESULT_FAILED",
+            rootEvent: { id: "event-rerun", nodeId: "trigger-preview" },
+          },
+        ],
+      },
+    });
+    const { rerenderConsole } = renderConsole(consoleWithPreview("failed"), {
+      canStopRun: true,
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      orderId: "order-1",
+    });
+
+    const verify = screen.getByTestId("redesign-console-column-verify");
+    openAutomation("Preview");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => {
+      expect(within(verify).getByText("2 agent runs")).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      openAutomation("Preview");
+      expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+    });
+
+    describeRunMock.mockImplementation(async (args: { path?: { runId?: string } }) => {
+      if (args.path?.runId === "run-preview-2") {
+        return {
+          data: { run: { id: "run-preview-2", rootEvent: { id: "event-rerun", nodeId: "trigger-preview" } } },
+        };
+      }
+      return {
+        data: { run: { id: "run-preview", rootEvent: { id: "event-preview", nodeId: "trigger-preview" } } },
+      };
+    });
+    reemitMock.mockResolvedValueOnce({ data: { eventId: "event-rerun-2" } });
+    listRunsMock.mockResolvedValue({ data: { runs: [] } });
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => {
+      expect(within(verify).getByText("3 agent runs")).toBeInTheDocument();
+    });
+
+    rerenderConsole({
+      ...consoleWithPreview("failed"),
+      phases: [
+        ...consoleWithPreview("failed").phases,
+        {
+          ...previewPhase("failed"),
+          id: "stored-preview-2",
+          runId: "run-preview-2",
+          startedAt: "2026-08-26T11:12:00Z",
+        },
+      ],
+    });
+
+    expect(within(verify).getByText("3 agent runs")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  });
+
   it("keeps Retry closed and keeps looking when the new run is late", async () => {
     vi.useFakeTimers();
     describeRunMock.mockResolvedValue({
@@ -350,5 +419,92 @@ describe("AutomationsConsoleVariant stage automation retry", () => {
     expect(listRunsMock.mock.calls.length).toBeGreaterThanOrEqual(3);
     expect(reemitMock).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+  });
+
+  it("follows a found retry by run id after newer runs fill the list", async () => {
+    vi.useFakeTimers();
+    describeRunMock.mockImplementation(async (args: { path?: { runId?: string } }) => {
+      if (args.path?.runId === "run-preview-2") {
+        return {
+          data: {
+            run: {
+              id: "run-preview-2",
+              state: "STATE_FINISHED",
+              result: "RESULT_FAILED",
+            },
+          },
+        };
+      }
+      return {
+        data: { run: { id: "run-preview", rootEvent: { id: "event-preview", nodeId: "trigger-preview" } } },
+      };
+    });
+    reemitMock.mockResolvedValue({ data: { eventId: "event-rerun" } });
+    listRunsMock.mockResolvedValueOnce({
+      data: {
+        runs: [
+          {
+            id: "run-preview-2",
+            state: "STATE_STARTED",
+            rootEvent: { id: "event-rerun", nodeId: "trigger-preview" },
+          },
+        ],
+      },
+    });
+    listRunsMock.mockResolvedValue({ data: { runs: [] } });
+    renderConsole(consoleWithPreview("failed"), {
+      canStopRun: true,
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      orderId: "order-1",
+    });
+
+    openAutomation("Preview");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(listRunsMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    expect(describeRunMock).toHaveBeenCalledWith(
+      expect.objectContaining({ path: { canvasId: "app-preview", runId: "run-preview-2" } }),
+    );
+    expect(listRunsMock).toHaveBeenCalledTimes(1);
+    openAutomation("Preview");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+  });
+
+  it("does not poll for a retry after the task closes", async () => {
+    vi.useFakeTimers();
+    let releaseDescribe: (value: unknown) => void = () => undefined;
+    describeRunMock.mockReturnValue(
+      new Promise((resolve) => {
+        releaseDescribe = resolve;
+      }),
+    );
+    reemitMock.mockResolvedValue({ data: { eventId: "event-rerun" } });
+    const { unmount } = renderConsole(consoleWithPreview("failed"), {
+      canStopRun: true,
+      organizationId: "org-1",
+      factoryId: "factory-1",
+      orderId: "order-1",
+    });
+
+    openAutomation("Preview");
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    unmount();
+    await act(async () => {
+      releaseDescribe({
+        data: { run: { id: "run-preview", rootEvent: { id: "event-preview", nodeId: "trigger-preview" } } },
+      });
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(reemitMock).toHaveBeenCalledTimes(1);
+    expect(listRunsMock).not.toHaveBeenCalled();
   });
 });
