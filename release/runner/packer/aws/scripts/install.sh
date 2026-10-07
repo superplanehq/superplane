@@ -7,6 +7,7 @@ export DEBIAN_FRONTEND=noninteractive
 : "${OPENCODE_VERSION:?OPENCODE_VERSION is required}"
 : "${CODEX_VERSION:?CODEX_VERSION is required}"
 : "${PLAYWRIGHT_VERSION:?PLAYWRIGHT_VERSION is required}"
+INSTALL_AWS_AGENTS="${INSTALL_AWS_AGENTS:-yes}"
 
 architecture="$(dpkg --print-architecture)"
 case "${architecture}" in
@@ -102,28 +103,31 @@ npm cache clean --force
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 
-aws_architecture="x86_64"
-if [ "${architecture}" = "arm64" ]; then
-  aws_architecture="aarch64"
-fi
-curl --fail --location --silent --show-error \
-  "https://awscli.amazonaws.com/awscli-exe-linux-${aws_architecture}.zip" \
-  --output /tmp/awscliv2.zip
-unzip -q /tmp/awscliv2.zip -d /tmp
-/tmp/aws/install
+# Images for other clouds set INSTALL_AWS_AGENTS=no.
+if [ "${INSTALL_AWS_AGENTS}" = "yes" ]; then
+  aws_architecture="x86_64"
+  if [ "${architecture}" = "arm64" ]; then
+    aws_architecture="aarch64"
+  fi
+  curl --fail --location --silent --show-error \
+    "https://awscli.amazonaws.com/awscli-exe-linux-${aws_architecture}.zip" \
+    --output /tmp/awscliv2.zip
+  unzip -q /tmp/awscliv2.zip -d /tmp
+  /tmp/aws/install
 
-curl --fail --location --silent --show-error \
-  "https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/${architecture}/latest/amazon-cloudwatch-agent.deb" \
-  --output /tmp/amazon-cloudwatch-agent.deb
-dpkg -i /tmp/amazon-cloudwatch-agent.deb
+  curl --fail --location --silent --show-error \
+    "https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/${architecture}/latest/amazon-cloudwatch-agent.deb" \
+    --output /tmp/amazon-cloudwatch-agent.deb
+  dpkg -i /tmp/amazon-cloudwatch-agent.deb
 
-if ! snap list amazon-ssm-agent >/dev/null 2>&1; then
-  snap install amazon-ssm-agent --classic
+  if ! snap list amazon-ssm-agent >/dev/null 2>&1; then
+    snap install amazon-ssm-agent --classic
+  fi
+  snap start --enable amazon-ssm-agent
+  systemctl is-enabled --quiet snap.amazon-ssm-agent.amazon-ssm-agent.service
+  systemctl is-active --quiet snap.amazon-ssm-agent.amazon-ssm-agent.service
+  /snap/amazon-ssm-agent/current/amazon-ssm-agent -version
 fi
-snap start --enable amazon-ssm-agent
-systemctl is-enabled --quiet snap.amazon-ssm-agent.amazon-ssm-agent.service
-systemctl is-active --quiet snap.amazon-ssm-agent.amazon-ssm-agent.service
-/snap/amazon-ssm-agent/current/amazon-ssm-agent -version
 
 git --version
 gh --version
@@ -140,7 +144,9 @@ claude --version
 opencode --version
 codex --version
 playwright --version
-aws --version
+if [ "${INSTALL_AWS_AGENTS}" = "yes" ]; then
+  aws --version
+fi
 
 ffmpeg -version >/dev/null
 ffprobe -version >/dev/null

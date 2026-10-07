@@ -1,0 +1,8 @@
+project_id = "my-gcp-project"
+zone       = "us-central1-a"
+
+# Override these values only when the defaults do not fit the build project.
+# network           = "default"
+# subnetwork        = ""
+# use_iap           = false
+# image_name_prefix = "superplane-runner"
