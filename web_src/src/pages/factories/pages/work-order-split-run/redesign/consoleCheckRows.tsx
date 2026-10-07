@@ -28,16 +28,20 @@ type ChecksTone = "passed" | "attention" | "failed";
  */
 export function ConsoleCheckRows({
   checks,
+  title = MERGE_CONFIDENCE_SCORE_NAME,
   testId = "redesign-console-checks",
+  defaultOpen = false,
 }: {
   checks: WorkOrderCheckPresentation[];
+  title?: string;
   testId?: string;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   if (checks.length === 0) {
     return null;
   }
-  const summary = checksSummary(checks);
+  const summary = checksSummary(checks, title);
   return (
     <div data-testid={testId}>
       <button
@@ -48,9 +52,7 @@ export function ConsoleCheckRows({
         className="flex w-full items-center gap-2.5 text-left"
       >
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-semibold leading-5 text-foreground">
-            {MERGE_CONFIDENCE_SCORE_NAME}
-          </span>
+          <span className="block truncate text-[14px] font-semibold leading-5 text-foreground">{title}</span>
           <span className="block truncate text-[12px] leading-4 text-muted-foreground">{summary.detail}</span>
         </span>
         <ResultBars tone={summary.tone} />
@@ -85,12 +87,14 @@ function checkTone(check: WorkOrderCheckPresentation): ChecksTone | "other" {
   return "other";
 }
 
-function checksSummary(checks: WorkOrderCheckPresentation[]): { title: string; detail: string; tone: ChecksTone } {
+function checksSummary(
+  checks: WorkOrderCheckPresentation[],
+  title: string,
+): { title: string; detail: string; tone: ChecksTone } {
   const tones = checks.map(checkTone);
   const failed = tones.filter((tone) => tone === "failed").length;
   const attention = tones.filter((tone) => tone === "attention").length;
   const total = checks.length;
-  const title = MERGE_CONFIDENCE_SCORE_NAME;
   if (failed > 0) {
     return {
       title,
