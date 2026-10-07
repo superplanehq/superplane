@@ -2230,7 +2230,7 @@ describe("LinesPage backlog search", () => {
     });
     renderLinesBoard();
 
-    const search = within(backlogColumn()).getByRole("textbox", { name: "Search tasks" });
+    const search = within(backlogColumn()).getByRole<HTMLInputElement>("textbox", { name: "Search tasks" });
     expect(search.labels?.[0]).toHaveTextContent("Search tasks");
     expect(search).toHaveAttribute("id", "lines-backlog-search");
     await user.type(backlogSearch(), "alpha");
