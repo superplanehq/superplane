@@ -3,6 +3,7 @@ import { Heading } from "@/components/Heading/heading";
 import { Palette, Search } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import AdminPagination from "./AdminPagination";
+import { OrgResetBacklogDefaults } from "./OrgResetBacklogDefaults";
 
 interface Canvas {
   id: string;
@@ -65,6 +66,8 @@ export function OrgCanvasesTable({ orgId }: { orgId: string }) {
           />
         </div>
       </div>
+
+      <OrgResetBacklogDefaults orgId={orgId} />
 
       {canvases.length === 0 ? (
         <Text className="text-gray-500 text-sm dark:text-gray-400">
