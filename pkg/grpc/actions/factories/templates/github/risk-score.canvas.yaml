@@ -100,21 +100,21 @@ spec:
               Report this check with the report_merge_check tool.
               Call the tool once.
               check is risk.
-              score is an integer from 1 to 5.
+              score is an integer from 1 to 3.
               summary is one sentence.
               Do not write a file.
 
-              score is an integer from 1 to 5. A higher score means more risk.
+              score is an integer from 1 to 3. A higher score means more risk.
               Apply these category rules. If a change matches a category, the score is at least that category score.
               If several categories match, use the highest score.
-              If no category matches, judge the diff and choose a score from 1 to 5.
+              If no category matches, judge the diff and choose a score from 1 to 3.
               Do not invent a category. Name only categories from the rules below.
 
               {{ install_params.riskRules }}
 
               summary is one sentence.
               Start with Higher risk, Moderate risk, or Lower risk.
-              Use Higher risk for high or critical. Use Moderate risk for medium. Use Lower risk for low or very low.
+              Use Higher risk for critical. Use Moderate risk for caution. Use Lower risk for healthy.
               When categories match, say the pull request is introducing the highest matching category.
               End a Lower risk sentence with "only" when every change fits that one category.
               Do not use "only" when the pull request also changes something outside that category.
@@ -152,20 +152,18 @@ spec:
               Report this check with the report_merge_check tool.
               Call the tool once.
               check is performance.
-              score is an integer from 1 to 5.
+              score is an integer from 1 to 3.
               summary is one sentence.
               Do not write a file.
 
-              score is an integer from 1 to 5. A higher score means the change follows the performance practices in this repository.
+              score is an integer from 1 to 3. A higher score means the change follows the performance practices in this repository.
               Read the repository for the performance practices it already states.
               Use docs, comments, and the patterns in the existing code.
               Do not use a generic checklist from outside this repository.
-              5 means the change follows every practice that applies.
-              4 means the change follows the practices that apply, with a small gap.
-              3 means the change follows some practices and breaks one that applies.
-              2 means the change breaks a practice that applies.
-              1 means the change breaks more than one practice that applies.
-              If no performance practice applies, report the check with 5.
+              3 means the change follows the practices that apply, including a small gap.
+              2 means the change follows some practices and breaks one that applies.
+              1 means the change breaks one or more practices that apply.
+              If no performance practice applies, report 3.
               summary is one sentence.
               Name the practice and say whether the change follows it or breaks it.
               If no practice applies, say that no performance practice in this repository applies.
@@ -194,14 +192,14 @@ spec:
               Report this check with the report_merge_check tool.
               Call the tool once.
               check is security.
-              score is an integer from 1 to 5.
+              score is an integer from 1 to 3.
               summary is one sentence.
               Do not write a file.
 
               Use the same rules as Performance, for the security practices in this repository.
               Read the repository for the security practices it already states.
               Do not use a generic checklist from outside this repository.
-              If no security practice applies, report the check with 5.
+              If no security practice applies, report 3.
               Say that no security practice in this repository applies.
               Do not skip the check.
           - name: Drift from Specification
@@ -228,17 +226,15 @@ spec:
               Report this check with the report_merge_check tool.
               Call the tool once.
               check is drift.
-              score is an integer from 1 to 5.
+              score is an integer from 1 to 3.
               summary is one sentence.
               Do not write a file.
 
-              score is an integer from 1 to 5. A higher score means the change moved farther from the original task.
+              score is an integer from 1 to 3. A higher score means the change moved farther from the original task.
               Compare the diff with the task title and the task description.
-              1 means the change does what the task asks.
-              2 means the change does the task and also makes a small extra change.
-              3 means the change does the task and also adds work that raises risk past the task.
-              4 means the change does most of the task and also does something the task did not ask for.
-              5 means the change does something different from the task, or raises risk far past the task.
+              1 means the change does what the task asks, including a small extra change.
+              2 means the change does the task and also adds work that raises risk past the task.
+              3 means the change does something the task did not ask for, or raises risk far past the task.
               If the task title and the task description are empty, use 1.
               summary is one sentence.
               Say what the task asked for and what the change did.
@@ -267,16 +263,14 @@ spec:
               Report this check with the report_merge_check tool.
               Call the tool once.
               check is reversibility.
-              score is an integer from 1 to 5.
+              score is an integer from 1 to 3.
               summary is one sentence.
               Do not write a file.
 
-              score is an integer from 1 to 5. A higher score means the change is easier to undo.
-              5 means a revert undoes the change and no data is lost.
-              4 means a revert undoes the change after one small manual step.
-              3 means a person must repair data or configuration to undo the change.
-              2 means part of the change stays after a revert.
-              1 means you cannot undo the change without data loss or a new change.
+              score is an integer from 1 to 3. A higher score means the change is easier to undo.
+              3 means a revert undoes the change, including after one small manual step, and no data is lost.
+              2 means a person must repair data or configuration to undo the change.
+              1 means part of the change stays after a revert, or the change cannot be undone without data loss or a new change.
               summary is one sentence.
               Say what you must do to undo the change, or say that a revert is enough.
               Do not repeat the score. Do not write a second sentence.

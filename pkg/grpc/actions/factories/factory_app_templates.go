@@ -26,7 +26,7 @@ const (
 var installParamPattern = regexp.MustCompile(`\{\{\s*install_params\.(\w+)\s*\}\}`)
 
 // defaultRiskScoreRules matches the setup page defaults. One line, so it stays inside the prompt block.
-const defaultRiskScoreRules = "Documentation only = 1 (very_low). Tests only = 2 (low). User interface changes = 2 (low). Additive database changes = 3 (medium). Dependency updates = 3 (medium). API behavior changes = 3 (medium). Authorization changes = 4 (high). Authentication changes = 4 (high). Data deletion or migration = 4 (high). Infrastructure changes = 4 (high). Billing and payment changes = 5 (critical). Secrets and credentials = 5 (critical)."
+const defaultRiskScoreRules = "Documentation only = 1 (healthy). Tests only = 1 (healthy). User interface changes = 1 (healthy). Additive database changes = 2 (caution). Dependency updates = 2 (caution). API behavior changes = 2 (caution). Authorization changes = 3 (critical). Authentication changes = 3 (critical). Data deletion or migration = 3 (critical). Infrastructure changes = 3 (critical). Billing and payment changes = 3 (critical). Secrets and credentials = 3 (critical)."
 
 // defaultMergeConfidenceChecks is every check, in prompt order. "none" turns them all off.
 const defaultMergeConfidenceChecks = "risk, performance, security, drift, reversibility"

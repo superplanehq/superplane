@@ -14,7 +14,13 @@ import (
 	"gorm.io/gorm"
 )
 
-const mergeConfidenceMaxScore = 5
+const (
+	mergeConfidenceMaxScore                   = 3
+	mergeConfidenceCautionWhenLowerIsBetter   = 2
+	mergeConfidenceCriticalWhenLowerIsBetter  = 3
+	mergeConfidenceCautionWhenHigherIsBetter  = 2
+	mergeConfidenceCriticalWhenHigherIsBetter = 1
+)
 
 // A custom check uses the same bands as blast radius: a higher score is worse.
 var mergeConfidenceCheckID = regexp.MustCompile(`^[a-z][a-z0-9-]{0,40}$`)
@@ -36,11 +42,11 @@ type mergeConfidenceCheck struct {
 // The names, keys, and thresholds used to live on canvas report nodes.
 // The server owns them so the agent only sends a score and a summary.
 var mergeConfidenceChecks = []mergeConfidenceCheck{
-	{name: "risk", key: "risk-review", label: "Blast radius", direction: CheckDirectionLowerIsBetter, cautionAt: 3, criticalAt: 4},
-	{name: "performance", key: "performance-review", label: "Performance", direction: CheckDirectionHigherIsBetter, cautionAt: 3, criticalAt: 2},
-	{name: "security", key: "security-review", label: "Security", direction: CheckDirectionHigherIsBetter, cautionAt: 3, criticalAt: 2},
-	{name: "drift", key: "drift-review", label: "Drift from Specification", direction: CheckDirectionLowerIsBetter, cautionAt: 3, criticalAt: 4},
-	{name: "reversibility", key: "reversibility-review", label: "Reversibility", direction: CheckDirectionHigherIsBetter, cautionAt: 3, criticalAt: 2},
+	lowerIsBetterCheck("risk", "risk-review", "Blast radius"),
+	higherIsBetterCheck("performance", "performance-review", "Performance"),
+	higherIsBetterCheck("security", "security-review", "Security"),
+	lowerIsBetterCheck("drift", "drift-review", "Drift from Specification"),
+	higherIsBetterCheck("reversibility", "reversibility-review", "Reversibility"),
 }
 
 // ReportMergeConfidenceCheck stores one merge confidence check. enabled is the
@@ -117,13 +123,28 @@ func customMergeConfidenceCheck(name string, labels map[string]string) mergeConf
 	if label == "" {
 		label = name
 	}
+	return lowerIsBetterCheck(name, name+"-review", label)
+}
+
+func lowerIsBetterCheck(name, key, label string) mergeConfidenceCheck {
 	return mergeConfidenceCheck{
 		name:       name,
-		key:        name + "-review",
+		key:        key,
 		label:      label,
 		direction:  CheckDirectionLowerIsBetter,
-		cautionAt:  3,
-		criticalAt: 4,
+		cautionAt:  mergeConfidenceCautionWhenLowerIsBetter,
+		criticalAt: mergeConfidenceCriticalWhenLowerIsBetter,
+	}
+}
+
+func higherIsBetterCheck(name, key, label string) mergeConfidenceCheck {
+	return mergeConfidenceCheck{
+		name:       name,
+		key:        key,
+		label:      label,
+		direction:  CheckDirectionHigherIsBetter,
+		cautionAt:  mergeConfidenceCautionWhenHigherIsBetter,
+		criticalAt: mergeConfidenceCriticalWhenHigherIsBetter,
 	}
 }
 
@@ -138,7 +159,7 @@ func mergeConfidenceCheckByName(name string) (mergeConfidenceCheck, bool) {
 
 func validateMergeConfidenceScore(score float64) error {
 	if math.IsNaN(score) || math.IsInf(score, 0) || math.Trunc(score) != score || score < 1 || score > mergeConfidenceMaxScore {
-		return fmt.Errorf("%w: score must be an integer from 1 through 5", ErrMergeConfidenceInvalid)
+		return fmt.Errorf("%w: score must be an integer from 1 through 3", ErrMergeConfidenceInvalid)
 	}
 	return nil
 }

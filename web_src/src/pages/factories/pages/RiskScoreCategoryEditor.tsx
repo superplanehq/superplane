@@ -97,7 +97,7 @@ function AddCategoryDialog({
   onAdd: (name: string, score: RiskScoreLevel) => void;
 }) {
   const [name, setName] = useState("");
-  const [score, setScore] = useState<RiskScoreLevel>(3);
+  const [score, setScore] = useState<RiskScoreLevel>(2);
   const trimmed = name.trim();
   const duplicate = existingNames.some((existing) => existing.toLowerCase() === trimmed.toLowerCase());
   const invalid = trimmed.length > 0 && !isRiskScoreCategoryName(trimmed);
@@ -105,7 +105,7 @@ function AddCategoryDialog({
   useEffect(() => {
     if (!open) {
       setName("");
-      setScore(3);
+      setScore(2);
     }
   }, [open]);
 

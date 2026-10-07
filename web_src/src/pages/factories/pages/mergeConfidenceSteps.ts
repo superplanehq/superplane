@@ -27,7 +27,7 @@ function newCheckPrompt(id: string): string {
     "Report this check with the report_merge_check tool.",
     "Call the tool once.",
     `check is ${id}.`,
-    "score is an integer from 1 to 5. A higher score means a worse result.",
+    "score is an integer from 1 to 3. A higher score means a worse result.",
     "summary is one sentence.",
     "Do not write a file.",
   ].join("\n");
@@ -112,7 +112,7 @@ function checkPrompt(id: string, shared: string, body: string): string {
     "Report this check with the report_merge_check tool.",
     "Call the tool once.",
     `check is ${id}.`,
-    "score is an integer from 1 to 5.",
+    "score is an integer from 1 to 3.",
     "summary is one sentence.",
     "Do not write a file.",
     "",

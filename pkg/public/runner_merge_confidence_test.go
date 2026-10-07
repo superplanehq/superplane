@@ -68,7 +68,7 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, unauthorizedRec.Code)
 
 	disabled := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
-		`{"check":"performance","score":5,"summary":"No performance practice applies."}`,
+		`{"check":"performance","score":3,"summary":"No performance practice applies."}`,
 	)))
 	disabled.Header.Set("Authorization", "Bearer "+token)
 	disabledRec := httptest.NewRecorder()
@@ -84,7 +84,7 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, missingRunRec.Code)
 
 	report := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
-		`{"check":"risk","score":4,"summary":"Higher risk because the pull request raises the limit."}`,
+		`{"check":"risk","score":3,"summary":"Higher risk because the pull request raises the limit."}`,
 	)))
 	report.Header.Set("Authorization", "Bearer "+token)
 	reportRec := httptest.NewRecorder()
@@ -96,7 +96,7 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	require.Len(t, checks, 1)
 	assert.Equal(t, "risk-review", checks[0].Key)
 	assert.Equal(t, "Blast radius", checks[0].Name)
-	assert.Equal(t, 4.0, checks[0].Score)
+	assert.Equal(t, 3.0, checks[0].Score)
 	assert.Equal(t, models.FactoryWorkOrderCheckLevelCritical, checks[0].Level)
 	assert.Equal(t, "Higher risk because the pull request raises the limit.", checks[0].Summary)
 	require.NotNil(t, checks[0].RunID)
@@ -121,5 +121,5 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	checks, err = order.ListChecks(db)
 	require.NoError(t, err)
 	require.Len(t, checks, 1)
-	assert.Equal(t, 4.0, checks[0].Score)
+	assert.Equal(t, 3.0, checks[0].Score)
 }
