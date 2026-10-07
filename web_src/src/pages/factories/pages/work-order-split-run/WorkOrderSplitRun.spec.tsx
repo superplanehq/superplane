@@ -1028,41 +1028,6 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
   });
 
-  it("opens a compact check in the analysis dialog", async () => {
-    const user = userEvent.setup();
-    renderPopup({
-      fixture: splitRunFixtureForWorkOrder(
-        {
-          ...OPEN_WORK_ORDER,
-          title: "Add refund reason enum to schema",
-          lineDispatches: [
-            {
-              id: "dispatch-verify",
-              line: { id: "line-1", name: "plan-and-implement" },
-              state: "STATE_ACTIVE",
-              stepExecutions: [
-                {
-                  id: "e-verify",
-                  step: "Verify",
-                  stepIndex: 2,
-                  state: "STATE_STARTED",
-                  result: "RESULT_UNKNOWN",
-                },
-              ],
-            },
-          ],
-        },
-        { checks: OPEN_WORK_ORDER_CHECKS },
-      ),
-    });
-
-    await user.click(screen.getByRole("button", { name: "Merge confidence" }));
-    await user.click(screen.getByTestId("split-run-check-check-risk-review"));
-
-    expect(screen.getByRole("heading", { name: "Blast radius" })).toBeInTheDocument();
-    expect(screen.getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
-  });
-
   it("omits the decision footer when logs are complete and the order waits with no note", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({

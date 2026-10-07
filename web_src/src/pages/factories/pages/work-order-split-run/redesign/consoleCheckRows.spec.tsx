@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "bun:test";
 
 import type { WorkOrderCheckPresentation } from "../../../lib/workOrderChecks";
@@ -94,6 +95,95 @@ describe("ConsoleCheckRows", () => {
     expect(screen.queryByText("Close")).not.toBeInTheDocument();
     expect(screen.queryByText("Met")).not.toBeInTheDocument();
     expect(screen.queryByText("Partial")).not.toBeInTheDocument();
+  });
+
+  it("shows the result and message when the row is hovered", async () => {
+    const user = userEvent.setup();
+    render(
+      <ConsoleCheckRows
+        checks={[
+          check({
+            id: "risk",
+            key: "risk-review",
+            name: "Risk score",
+            score: 1,
+            level: "positive",
+            summary: "Lower risk because the pull request is documentation only.",
+          }),
+          check({
+            id: "performance",
+            key: "performance-review",
+            name: "Performance",
+            score: 5,
+            level: "positive",
+            summary: "The change adds no runtime work.",
+          }),
+          check({
+            id: "security",
+            key: "security-review",
+            name: "Security",
+            score: 1,
+            level: "critical",
+            summary: "The change writes a secret into the repository.",
+          }),
+        ]}
+      />,
+    );
+
+    openChecks();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(screen.queryByText("1/5")).not.toBeInTheDocument();
+
+    await user.hover(screen.getByText("Blast radius"));
+    const riskTip = await screen.findByRole("tooltip");
+    expect(riskTip).toHaveTextContent("Low");
+    expect(riskTip).toHaveTextContent("Lower risk because the pull request is documentation only.");
+    expect(riskTip).not.toHaveTextContent("1/5");
+    expect(within(riskTip).getByText("Low")).toHaveClass("text-emerald-400");
+
+    await user.hover(screen.getByText("Performance"));
+    const performanceTip = await screen.findByRole("tooltip");
+    expect(performanceTip).toHaveTextContent("Met");
+    expect(performanceTip).toHaveTextContent("The change adds no runtime work.");
+    expect(performanceTip).not.toHaveTextContent("5/5");
+
+    await user.hover(screen.getByText("Security"));
+    const securityTip = await screen.findByRole("tooltip");
+    expect(within(securityTip).getByText("Missed")).toHaveClass("text-red-400");
+
+    await user.click(screen.getByText("Blast radius"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("shows the result when a check row receives keyboard focus", async () => {
+    const user = userEvent.setup();
+    render(
+      <ConsoleCheckRows
+        checks={[
+          check({
+            id: "risk",
+            key: "risk-review",
+            name: "Risk score",
+            score: 1,
+            level: "positive",
+            summary: "Lower risk because the pull request is documentation only.",
+          }),
+        ]}
+      />,
+    );
+
+    await user.click(mergeConfidenceHeader());
+    await user.tab();
+
+    const row = screen.getByTestId("split-run-check-risk");
+    expect(row).toHaveFocus();
+    expect(row).toHaveAccessibleName(
+      "Blast radius. Low. Lower risk because the pull request is documentation only.",
+    );
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("Low");
+    expect(tip).toHaveTextContent("Lower risk because the pull request is documentation only.");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("describes a calm result as low caution", () => {

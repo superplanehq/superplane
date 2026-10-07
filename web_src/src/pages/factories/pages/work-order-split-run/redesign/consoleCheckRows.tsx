@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
   ChevronDown,
@@ -18,13 +19,13 @@ import {
   workOrderCheckStatus,
   type WorkOrderCheckPresentation,
 } from "../../../lib/workOrderChecks";
-import { WorkOrderCheckDialog } from "../../../WorkOrderCheckDialog";
 
 type ChecksTone = "passed" | "attention" | "failed";
 
 /**
  * Checks in the summary panel. The header states the result. Each row is an
- * icon, the check name, and three vertical bars. A row click opens the analysis.
+ * icon, the check name, and three vertical bars. Hover a row to see the
+ * result and its message.
  */
 export function ConsoleCheckRows({
   checks,
@@ -136,6 +137,13 @@ function CheckIcon({ check }: { check: WorkOrderCheckPresentation }) {
   return <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />;
 }
 
+/** Title color on the dark tooltip. Dark mode inverts the tooltip, so the shade flips with it. */
+function titleToneClass(tone: ReturnType<typeof checkTone>): string {
+  if (tone === "failed") return "text-red-400 dark:text-red-600";
+  if (tone === "passed") return "text-emerald-400 dark:text-emerald-600";
+  return "text-amber-400 dark:text-amber-500";
+}
+
 /** More filled bars means a better result. The color matches that result. */
 function ResultBars({ tone }: { tone: ReturnType<typeof checkTone> }) {
   const filled = tone === "passed" ? 3 : tone === "failed" ? 1 : 2;
@@ -154,26 +162,30 @@ function ResultBars({ tone }: { tone: ReturnType<typeof checkTone> }) {
 }
 
 function ConsoleCheckRow({ check }: { check: WorkOrderCheckPresentation }) {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const status = workOrderCheckStatus(check);
   const name = workOrderCheckDisplayName(check);
+  const status = workOrderCheckStatus(check).label;
+  const valueLabel = check.summary ? `${status}. ${check.summary}` : status;
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setDialogOpen(true)}
-        aria-label={`${name}. ${status.label}`}
-        data-testid={`split-run-check-${check.id}`}
-        className="flex w-full min-w-0 items-center justify-between gap-3 py-2 text-left"
-      >
-        <span className="flex min-w-0 items-center gap-2">
-          <CheckIcon check={check} />
-          <span className="min-w-0 truncate text-[13px] font-medium leading-5 text-foreground">{name}</span>
-        </span>
-        <ResultBars tone={checkTone(check)} />
-      </button>
-      <WorkOrderCheckDialog open={dialogOpen} onClose={() => setDialogOpen(false)} check={check} />
-    </>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={`${name}. ${valueLabel}`}
+          data-testid={`split-run-check-${check.id}`}
+          className="-mx-(--frame-panel-px) flex w-auto min-w-0 cursor-default items-center justify-between gap-3 px-(--frame-panel-px) py-2 text-left transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <CheckIcon check={check} />
+            <span className="min-w-0 truncate text-[13px] font-medium leading-5 text-foreground">{name}</span>
+          </span>
+          <ResultBars tone={checkTone(check)} />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right" collisionPadding={8} className="max-w-72 px-4 py-3 text-left">
+        <span className={cn("block font-medium", titleToneClass(checkTone(check)))}>{status}</span>
+        {check.summary ? <span className="mt-0.5 block font-normal">{check.summary}</span> : null}
+      </TooltipContent>
+    </Tooltip>
   );
 }
