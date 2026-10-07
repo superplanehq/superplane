@@ -19,6 +19,9 @@ spec:
       targetPort: 8000
       protocol: TCP
 ---
+{{- if and .Values.runnerAPI.enabled (gt (int .Values.api.replicas) 1) (not .Values.runnerLogs.existingClaim) }}
+{{- fail "runnerLogs.existingClaim is required when runnerAPI.enabled is true and api.replicas is more than 1" }}
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,6 +32,11 @@ metadata:
     service: {{ .Release.Name }}-api
 spec:
   replicas: {{ .Values.api.replicas }}
+  {{- if and .Values.runnerAPI.enabled (not .Values.runnerLogs.existingClaim) }}
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+  {{- end }}
   selector:
     matchLabels:
       app: superplane
@@ -42,6 +50,10 @@ spec:
     spec:
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
+      {{- end }}
+      {{- if .Values.runnerAPI.enabled }}
+      securityContext:
+        fsGroup: {{ .Values.runnerLogs.fsGroup }}
       {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
@@ -151,6 +163,16 @@ spec:
               value: {{ .Values.blobStorage.credentialsFile | quote }}
             - name: START_FILE_CLEANUP_WORKER
               value: "yes"
+{{- if .Values.runnerAPI.enabled }}
+            - name: START_RUNNER_API
+              value: "yes"
+            - name: START_RUNNER_LOG_COMPACTOR
+              value: "yes"
+            - name: START_RUNNER_CLEANUP_WORKER
+              value: "yes"
+            - name: RUNNER_ACTIVE_LOG_FS_PATH
+              value: {{ .Values.runnerLogs.path | quote }}
+{{- end }}
 {{- if .Values.license.secretName }}
             - name: SUPERPLANE_LICENSE_PATH
               value: /app/license/license.jws
@@ -174,6 +196,10 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
             - name: blob-data
               mountPath: {{ .Values.blobStorage.localPath }}
+{{- end }}
+{{- if .Values.runnerAPI.enabled }}
+            - name: runner-logs
+              mountPath: {{ .Values.runnerLogs.path }}
 {{- end }}
 
           ports:
@@ -220,4 +246,13 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
         - name: blob-data
           emptyDir: {}
+{{- end }}
+{{- if .Values.runnerAPI.enabled }}
+        - name: runner-logs
+{{- if .Values.runnerLogs.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.runnerLogs.existingClaim }}
+{{- else }}
+          emptyDir: {}
+{{- end }}
 {{- end }}
