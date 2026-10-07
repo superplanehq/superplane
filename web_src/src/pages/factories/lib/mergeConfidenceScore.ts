@@ -45,8 +45,37 @@ export interface MergeConfidenceCheckGroup {
   metrics: WorkOrderCheckPresentation[];
 }
 
-export function isMergeConfidenceMetric(check: Pick<WorkOrderCheckPresentation, "key">): boolean {
+export function isMergeConfidenceMetric(check: { key?: string }): boolean {
   return check.key != null && (MERGE_CONFIDENCE_METRIC_KEYS as readonly string[]).includes(check.key);
+}
+
+type MergeConfidenceHeadlineInput = {
+  key?: string;
+  score?: number;
+  maxScore?: number;
+};
+
+/**
+ * Board cards use the same headline as the task summary. A partial set still
+ * scores. Planning checks and other custom checks stay out.
+ */
+export function mergeConfidenceHeadline(
+  checks: readonly MergeConfidenceHeadlineInput[] | undefined,
+): { score: number; maxScore: number } | undefined {
+  const metrics = (checks ?? []).flatMap((check) => {
+    if (!isMergeConfidenceMetric(check) || check.score == null || (check.maxScore ?? 0) <= 0) {
+      return [];
+    }
+    return [{ key: check.key, score: check.score, maxScore: check.maxScore ?? 0 }];
+  });
+  if (metrics.length === 0) {
+    return undefined;
+  }
+  const headline = headlineScore(metrics);
+  if (headline.maxScore <= 0) {
+    return undefined;
+  }
+  return headline;
 }
 
 /**
@@ -63,20 +92,26 @@ export function consoleCheckList(checks: WorkOrderCheckPresentation[]): MergeCon
 
 /** Higher is better. Risk and drift are flipped so 5 means the change is safe to merge. */
 export function mergeConfidenceScore(metrics: WorkOrderCheckPresentation[]): WorkOrderCheckPresentation {
-  const maxScore = metrics[0]?.maxScore ?? 0;
-  const weakest = metrics.reduce((lowest, check) => Math.min(lowest, confidenceRatio(check)), 1);
+  const headline = headlineScore(metrics);
   return {
     id: "merge-confidence",
     key: "merge-confidence",
     name: MERGE_CONFIDENCE_SCORE_NAME,
-    score: maxScore > 0 ? Math.round(weakest * maxScore) : 0,
-    maxScore,
+    score: headline.score,
+    maxScore: headline.maxScore,
     format: "fraction",
     level: weakestLevel(metrics),
   };
 }
 
-function orderMergeConfidenceMetrics(metrics: WorkOrderCheckPresentation[]): WorkOrderCheckPresentation[] {
+function headlineScore(metrics: MergeConfidenceHeadlineInput[]): { score: number; maxScore: number } {
+  const ordered = orderMergeConfidenceMetrics(metrics);
+  const maxScore = ordered[0]?.maxScore ?? 0;
+  const weakest = ordered.reduce((lowest, check) => Math.min(lowest, confidenceRatio(check)), 1);
+  return { score: maxScore > 0 ? Math.round(weakest * maxScore) : 0, maxScore };
+}
+
+function orderMergeConfidenceMetrics<Metric extends { key?: string }>(metrics: Metric[]): Metric[] {
   return [...metrics].sort((left, right) => metricIndex(left.key) - metricIndex(right.key));
 }
 
@@ -85,12 +120,13 @@ function metricIndex(key: string | undefined): number {
   return index === -1 ? MERGE_CONFIDENCE_METRIC_KEYS.length : index;
 }
 
-function confidenceRatio(check: WorkOrderCheckPresentation): number {
-  const maxScore = check.maxScore;
+function confidenceRatio(check: MergeConfidenceHeadlineInput): number {
+  const maxScore = check.maxScore ?? 0;
+  const score = check.score ?? 0;
   if (maxScore <= 0) {
     return 0;
   }
-  const points = check.key != null && LOWER_IS_BETTER_KEYS.has(check.key) ? maxScore + 1 - check.score : check.score;
+  const points = check.key != null && LOWER_IS_BETTER_KEYS.has(check.key) ? maxScore + 1 - score : score;
   return Math.min(maxScore, Math.max(0, points)) / maxScore;
 }
 

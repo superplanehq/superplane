@@ -316,6 +316,23 @@ export const DraftScoredIntakeOnly: Story = {
   },
 };
 
+/** Verify wrote merge confidence. The chip sits beside the owner. */
+export const MergeConfidence: Story = {
+  name: "Merge confidence",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-verify",
+        title: "Ship idempotent refund retries",
+        statusNotes: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    mergeConfidence: { score: 5, maxScore: 5 },
+  },
+};
+
 /**
  * Draft with no score yet. The footer keeps created time and does not
  * leave an empty action area.

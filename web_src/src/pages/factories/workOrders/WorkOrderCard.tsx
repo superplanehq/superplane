@@ -18,7 +18,7 @@ import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { ConfidenceAnalyzingIndicator } from "./ConfidenceMeter";
-import { CardScoreBadges } from "./ReadinessMark";
+import { CardScoreBadges, MergeConfidenceChip } from "./ReadinessMark";
 import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
 import { WorkOrderPullRequestChip, WorkOrderMergeableChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
@@ -81,6 +81,11 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   showClarity?: boolean;
   /** Hide Confidence when Planning has that score off. */
   showConfidenceScore?: boolean;
+  /**
+   * Merge confidence headline from Verify. Independent of Clarity and
+   * Confidence. Absent until at least one merge confidence check exists.
+   */
+  mergeConfidence?: { score: number; maxScore: number };
   /** Review sub-parameters for the Confidence tooltip when the headline is derived. */
   reviewMetrics?: { key: string; name: string; score: number }[];
   /**
@@ -116,8 +121,9 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * attention such as Waiting on status checks. The
  * footer shows when the task was last updated on the left, and the owner
  * given name plus avatar on the right (except on drafts). Reviewed
- * drafts show Clarity and Confidence scores. The owner is display-only
- * on the card.
+ * drafts show Clarity and Confidence scores. After Verify writes a
+ * merge confidence check, that score sits beside the owner. The owner
+ * is display-only on the card.
  */
 export function WorkOrderCard({
   entry,
@@ -137,6 +143,7 @@ export function WorkOrderCard({
   confidenceScore,
   showClarity,
   showConfidenceScore,
+  mergeConfidence,
   reviewMetrics,
   isAnalyzing = false,
   className,
@@ -210,6 +217,7 @@ export function WorkOrderCard({
           confidenceScore={confidenceScore}
           showClarity={showClarity}
           showConfidenceScore={showConfidenceScore}
+          mergeConfidence={mergeConfidence}
           reviewMetrics={reviewMetrics}
           isAnalyzing={agentWorking}
           showOwner={showOwner}
@@ -345,6 +353,7 @@ function WorkOrderCardMetaRow({
   confidenceScore,
   showClarity = true,
   showConfidenceScore = true,
+  mergeConfidence,
   reviewMetrics,
   isAnalyzing,
   showOwner,
@@ -357,14 +366,13 @@ function WorkOrderCardMetaRow({
   confidenceScore?: number;
   showClarity?: boolean;
   showConfidenceScore?: boolean;
+  mergeConfidence?: { score: number; maxScore: number };
   reviewMetrics?: { key: string; name: string; score: number }[];
   isAnalyzing: boolean;
   showOwner: boolean;
 }) {
   const updatedLabel = updatedAt ? formatRelative(updatedAt) : "—";
   const hasScore = (showClarity && clarityScore != null) || (showConfidenceScore && confidenceScore != null);
-  const showActions = hasScore || isAnalyzing;
-  const ownerMark = showOwner || !isDraft ? <CardOwnerMark entry={entry} organizationId={organizationId} /> : null;
 
   return (
     <div className="mt-2 flex items-center justify-between gap-2">
@@ -374,21 +382,76 @@ function WorkOrderCardMetaRow({
       >
         {updatedLabel}
       </span>
-      {ownerMark || showActions ? (
-        <div className="ml-auto flex h-5 min-w-0 items-center gap-1.5">
-          {ownerMark}
-          {showActions ? (
-            <CardScores
-              entryId={entry.id}
-              clarity={clarityScore}
-              confidence={confidenceScore}
-              showClarity={showClarity}
-              showConfidence={showConfidenceScore}
-              reviewMetrics={reviewMetrics}
-              isAnalyzing={isAnalyzing}
-            />
-          ) : null}
-        </div>
+      <CardMetaMarks
+        entry={entry}
+        organizationId={organizationId}
+        isDraft={isDraft}
+        showOwner={showOwner}
+        showActions={hasScore || isAnalyzing}
+        clarityScore={clarityScore}
+        confidenceScore={confidenceScore}
+        showClarity={showClarity}
+        showConfidenceScore={showConfidenceScore}
+        mergeConfidence={mergeConfidence}
+        reviewMetrics={reviewMetrics}
+        isAnalyzing={isAnalyzing}
+      />
+    </div>
+  );
+}
+
+function CardMetaMarks({
+  entry,
+  organizationId,
+  isDraft,
+  showOwner,
+  showActions,
+  clarityScore,
+  confidenceScore,
+  showClarity,
+  showConfidenceScore,
+  mergeConfidence,
+  reviewMetrics,
+  isAnalyzing,
+}: {
+  entry: WorkOrderListEntry;
+  organizationId: string;
+  isDraft: boolean;
+  showOwner: boolean;
+  showActions: boolean;
+  clarityScore?: number;
+  confidenceScore?: number;
+  showClarity: boolean;
+  showConfidenceScore: boolean;
+  mergeConfidence?: { score: number; maxScore: number };
+  reviewMetrics?: { key: string; name: string; score: number }[];
+  isAnalyzing: boolean;
+}) {
+  const ownerMark = showOwner || !isDraft ? <CardOwnerMark entry={entry} organizationId={organizationId} /> : null;
+  if (!ownerMark && !showActions && !mergeConfidence) {
+    return null;
+  }
+
+  return (
+    <div className="ml-auto flex h-5 min-w-0 items-center gap-1.5">
+      {ownerMark}
+      {mergeConfidence ? (
+        <MergeConfidenceChip
+          score={mergeConfidence.score}
+          maxScore={mergeConfidence.maxScore}
+          testId={`work-order-card-merge-${entry.id}`}
+        />
+      ) : null}
+      {showActions ? (
+        <CardScores
+          entryId={entry.id}
+          clarity={clarityScore}
+          confidence={confidenceScore}
+          showClarity={showClarity}
+          showConfidence={showConfidenceScore}
+          reviewMetrics={reviewMetrics}
+          isAnalyzing={isAnalyzing}
+        />
       ) : null}
     </div>
   );

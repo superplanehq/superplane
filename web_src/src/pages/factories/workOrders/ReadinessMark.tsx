@@ -200,6 +200,31 @@ function ConfidenceChip({ score, max, testId }: { score?: number; max: number; t
   );
 }
 
+/** Board footer chip. Visible text is Merge, not Confidence. */
+export function MergeConfidenceChip({ score, maxScore, testId }: { score: number; maxScore: number; testId?: string }) {
+  const value = clampConfidenceScore(score, maxScore);
+  const band = confidenceBandForScore(value, maxScore);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="img"
+          aria-label={`Merge confidence ${value} of ${maxScore}`}
+          data-testid={testId}
+          className={cn(
+            "pointer-events-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none",
+            BADGE_TONE[band],
+          )}
+        >
+          <span>Merge</span>
+          <span className="tabular-nums">{`${value}/${maxScore}`}</span>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Merge confidence</TooltipContent>
+    </Tooltip>
+  );
+}
+
 /**
  * At the top score the verdict already says it all, so the tooltip
  * skips the per-check breakdown.
