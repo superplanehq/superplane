@@ -264,10 +264,58 @@ rabbitmq:
 #
 blobStorage:
   provider: filesystem
+  account: ""
   bucket: ""
   region: ""
   localPath: /var/lib/superplane/blobs
   credentialsFile: ""
+
+#
+# Extra labels for API, worker, and WebSocket pods.
+# AKS workload identity requires azure.workload.identity/use: "true".
+#
+podLabels: {}
+
+#
+# Runner API is off by default. GKE and EKS Terraform leave it off.
+# Azure Terraform turns it on so integrated runners can register.
+#
+runnerAPI:
+  enabled: false
+
+#
+# Active runner logs. Used when runnerAPI.enabled is true.
+# One replica can use emptyDir. More than one replica needs a shared PVC
+# that supports advisory locks, atomic rename, and durable sync.
+#
+runnerLogs:
+  path: /var/lib/superplane/active-runner-logs
+  existingClaim: ""
+
+#
+# Integrated Fleet Manager. Off by default.
+# Supply an existing secret with key fleet-manager.yaml.
+#
+fleetManager:
+  enabled: false
+  existingSecret: ""
+  image:
+    registry: ghcr.io/superplanehq
+    name: superplane-fleet-manager
+    tag: ""
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: false
+    name: ""
+    annotations: {}
+  podLabels: {}
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
 
 #
 # Email configuration

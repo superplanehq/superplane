@@ -25,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/blob"
+	blobazure "github.com/superplanehq/superplane/pkg/blob/azure"
 	blobfilesystem "github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/blob/gcs"
 	s3blob "github.com/superplanehq/superplane/pkg/blob/s3"
@@ -943,6 +944,9 @@ func newBlobProvider() (blob.Provider, error) {
 	case blob.ProviderS3:
 		log.Println("Creating S3 blob storage provider")
 		return s3blob.NewProvider()
+	case blob.ProviderAzure:
+		log.Println("Creating Azure blob storage provider")
+		return blobazure.NewProvider()
 	case blob.ProviderFilesystem:
 		log.Println("Creating filesystem blob storage provider")
 		return blobfilesystem.NewProvider()

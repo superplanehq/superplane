@@ -81,6 +81,22 @@
 {{- end }}
 {{- end }}
 
+{{- define "superplane.fleetManager.serviceAccountName" -}}
+{{- if .Values.fleetManager.serviceAccount.name }}
+{{- .Values.fleetManager.serviceAccount.name }}
+{{- else if .Values.fleetManager.serviceAccount.create }}
+{{- printf "%s-fleet-manager" .Release.Name }}
+{{- else }}
+{{- "default" }}
+{{- end }}
+{{- end }}
+
+{{- define "superplane.podLabels" -}}
+{{- range $key, $value := . }}
+{{ $key }}: {{ $value | toString | quote }}
+{{- end }}
+{{- end }}
+
 {{- define "secrets.encryption.name" }}
 {{- if eq .Values.encryption.secretName "" }}
 {{- printf "%s-encryption" .Release.Name }}
