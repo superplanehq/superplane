@@ -136,19 +136,34 @@ function youtubeId(parsed: URL): string | null {
 
 function vimeoId(parsed: URL): string | null {
   const parts = pathSegments(parsed.pathname);
-  if (parts.length >= 2 && parts[0] === "video" && VIMEO_ID.test(parts[1] ?? "")) {
-    return parts[1] ?? null;
+  return (
+    labeledVimeoId(parts, "video") ||
+    trailingVimeoId(parts, "videos") ||
+    trailingVimeoId(parts, "video") ||
+    vimeoIdAt(parts, 0)
+  );
+}
+
+function labeledVimeoId(parts: string[], label: string): string | null {
+  if (parts[0] !== label) {
+    return null;
   }
-  if (parts.length >= 3 && parts[parts.length - 2] === "videos" && VIMEO_ID.test(parts[parts.length - 1] ?? "")) {
-    return parts[parts.length - 1] ?? null;
+  return vimeoIdAt(parts, 1);
+}
+
+function trailingVimeoId(parts: string[], label: string): string | null {
+  if (parts.length < 3 || parts[parts.length - 2] !== label) {
+    return null;
   }
-  if (parts.length >= 3 && parts[parts.length - 2] === "video" && VIMEO_ID.test(parts[parts.length - 1] ?? "")) {
-    return parts[parts.length - 1] ?? null;
+  return vimeoIdAt(parts, parts.length - 1);
+}
+
+function vimeoIdAt(parts: string[], index: number): string | null {
+  const id = parts[index] || "";
+  if (!VIMEO_ID.test(id)) {
+    return null;
   }
-  if (parts.length >= 1 && VIMEO_ID.test(parts[0] ?? "")) {
-    return parts[0] ?? null;
-  }
-  return null;
+  return id;
 }
 
 function loomId(parsed: URL): string | null {

@@ -17,6 +17,8 @@ describe("parseHostedVideoUrl", () => {
     expect(parseHostedVideoUrl("https://vimeo.com/123456789")?.embedUrl).toBe(
       "https://player.vimeo.com/video/123456789",
     );
+    expect(parseHostedVideoUrl("https://player.vimeo.com/video/123456789")?.id).toBe("123456789");
+    expect(parseHostedVideoUrl("https://vimeo.com/channels/staffpicks/videos/123456789")?.id).toBe("123456789");
     expect(parseHostedVideoUrl("https://www.loom.com/share/0123456789abcdef0123456789abcdef")?.embedUrl).toBe(
       "https://www.loom.com/embed/0123456789abcdef0123456789abcdef",
     );
