@@ -1,6 +1,7 @@
 package runner_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -41,6 +42,53 @@ func TestMergeConfidenceChecksFromSteps(t *testing.T) {
 	assert.Nil(t, labels)
 }
 
+func TestMergeConfidenceCheckScales(t *testing.T) {
+	legacy := "Merge check: performance.\nscore is an integer from 1 to 5.\nIf no performance practice applies, report the check with 5.\n5 means the change follows every practice that applies.\n"
+	current := "Merge check: risk.\nscore is an integer from 1 to 3.\n"
+	custom := "Merge check: api-latency.\nScore the query.\n"
+	scales := runner.MergeConfidenceCheckScales([]runner.AgentStep{
+		{Name: "Performance", Type: runner.AgentStepPrompt, Prompt: &legacy},
+		{Name: "Blast radius", Type: runner.AgentStepPrompt, Prompt: &current},
+		{Name: "API latency", Type: runner.AgentStepPrompt, Prompt: &custom},
+	})
+	assert.Equal(t, map[string]int{"performance": 5, "risk": 3, "api-latency": 5}, scales)
+
+	combined := "Enabled checks: risk, performance.\nscore is an integer from 1 to 3.\n"
+	assert.Equal(t, map[string]int{"risk": 3, "performance": 3}, runner.MergeConfidenceCheckScales([]runner.AgentStep{
+		{Name: "Review", Type: runner.AgentStepPrompt, Prompt: &combined},
+	}))
+
+	oldCombined := "Enabled checks: risk.\nscore is an integer from 1 to 5.\nDocumentation only = 1 (very_low). Secrets = 5 (critical).\n"
+	assert.Equal(t, map[string]int{"risk": 5}, runner.MergeConfidenceCheckScales([]runner.AgentStep{
+		{Name: "Review", Type: runner.AgentStepPrompt, Prompt: &oldCombined},
+	}))
+
+	withTask := strings.Join([]string{
+		"Merge check: risk.",
+		"The original task is the intent for this change.",
+		"Task title: Keep planning scores from 1 through 5",
+		"Task description: Keep planning scores from 1 through 5.",
+		"Cache changes = 5 (critical).",
+		"",
+		"Report this check with the report_merge_check tool.",
+		"score is an integer from 1 to 3.",
+		"Documentation only = 1 (healthy).",
+	}, "\n")
+	legacyWithTask := strings.Join([]string{
+		"Merge check: performance.",
+		"Task title: Use 1 to 3 for planning",
+		"Task description: score is an integer from 1 to 3.",
+		"",
+		"Report this check with the report_merge_check tool.",
+		"score is an integer from 1 to 5.",
+		"If no performance practice applies, report the check with 5.",
+	}, "\n")
+	assert.Equal(t, map[string]int{"risk": 3, "performance": 5}, runner.MergeConfidenceCheckScales([]runner.AgentStep{
+		{Name: "Blast radius", Type: runner.AgentStepPrompt, Prompt: &withTask},
+		{Name: "Performance", Type: runner.AgentStepPrompt, Prompt: &legacyWithTask},
+	}))
+}
+
 func TestMergeConfidenceTokenRoundTrip(t *testing.T) {
 	signer := jwt.NewSigner("merge-secret")
 	scope := runner.MergeConfidenceScope{
@@ -50,6 +98,7 @@ func TestMergeConfidenceTokenRoundTrip(t *testing.T) {
 		CanvasRunID:     uuid.New(),
 		NodeExecutionID: uuid.New(),
 		EnabledChecks:   []string{"risk", "security"},
+		CheckMaxScores:  map[string]int{"risk": 3, "security": 5},
 	}
 	token, err := runner.MintMergeConfidenceToken(signer, scope, time.Hour)
 	require.NoError(t, err)
@@ -118,6 +167,11 @@ func TestAttachMergeConfidenceEnvMintsToken(t *testing.T) {
 	assert.Equal(t, runID, scope.CanvasRunID)
 	assert.Equal(t, executionID, scope.NodeExecutionID)
 	assert.Equal(t, []string{"risk", "security"}, scope.EnabledChecks)
+	assert.Equal(t, map[string]int{"risk": 5, "security": 5}, scope.CheckMaxScores)
+	assert.Equal(t, 5.0, scope.CheckScoreScale("risk"))
+	maxScore, ok := environmentLookup(environment, runner.EnvSuperplaneMergeConfidenceMaxScore)
+	require.True(t, ok)
+	assert.Equal(t, "5", maxScore)
 	baseURL, ok := environmentLookup(environment, runner.EnvSuperplaneBaseURL)
 	require.True(t, ok)
 	assert.Equal(t, "https://app.example", baseURL)

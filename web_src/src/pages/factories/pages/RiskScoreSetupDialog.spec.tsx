@@ -60,6 +60,7 @@ describe("RiskScoreSetupDialog", () => {
     expect(screen.getByTestId("merge-confidence-setup-check-drift")).toHaveTextContent("Drift from Specification");
     expect(screen.getByTestId("merge-confidence-setup-check-reversibility")).toHaveTextContent("Reversibility");
     expect(screen.queryByTestId("risk-score-setup-categories")).not.toBeInTheDocument();
+    expect(screen.getByTestId("risk-score-setup-preview-card")).toHaveTextContent("1/3");
     expect(screen.getByTestId("risk-score-setup-preview-card")).toHaveTextContent("Low risk");
     expect(screen.getByTestId("risk-score-setup-preview-card")).toHaveTextContent("On task");
 

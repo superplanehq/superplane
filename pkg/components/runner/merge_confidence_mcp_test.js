@@ -3,7 +3,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const { reportMergeCheck } = require("./merge_confidence_mcp");
+const { mergeCheckTool, reportMergeCheck } = require("./merge_confidence_mcp");
 
 test("reportMergeCheck posts the score and summary", async () => {
   const previousBaseURL = process.env.SUPERPLANE_BASE_URL;
@@ -58,5 +58,21 @@ test("reportMergeCheck returns the server error", async () => {
     );
   } finally {
     global.fetch = previousFetch;
+  }
+});
+
+test("mergeCheckTool follows the prompt score range", () => {
+  const previous = process.env.SUPERPLANE_MERGE_CONFIDENCE_MAX_SCORE;
+  try {
+    delete process.env.SUPERPLANE_MERGE_CONFIDENCE_MAX_SCORE;
+    assert.match(mergeCheckTool().description, /1 through 3/);
+    assert.doesNotMatch(mergeCheckTool().description, /1 through 5/);
+
+    process.env.SUPERPLANE_MERGE_CONFIDENCE_MAX_SCORE = "5";
+    assert.match(mergeCheckTool().description, /1 through 5 when the prompt says 1 to 5/);
+    assert.match(mergeCheckTool().description, /1 through 3 when the prompt says 1 to 3/);
+  } finally {
+    if (previous === undefined) delete process.env.SUPERPLANE_MERGE_CONFIDENCE_MAX_SCORE;
+    else process.env.SUPERPLANE_MERGE_CONFIDENCE_MAX_SCORE = previous;
   }
 });
