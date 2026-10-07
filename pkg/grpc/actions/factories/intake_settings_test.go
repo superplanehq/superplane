@@ -83,12 +83,46 @@ func Test__intakeSettingsFromGraph_AuthorsWithAccess(t *testing.T) {
 		assert.True(t, parsed.AuthorsWithAccess)
 	})
 
-	t.Run("reads filters from the trigger when those keys are present", func(t *testing.T) {
+	t.Run("keeps old filter nodes when the trigger only has new defaults", func(t *testing.T) {
+		legacy := defaultIntakeSettings()
+		legacy.Labels = []string{"bug"}
+		legacy.LabelFilterMode = intakeLabelFilterExclude
+		legacy.Assignment = intakeAssignmentUnassigned
 		graph := intakeGraph{
 			TriggerNodeID:          intakeTriggerNodeID,
-			FilterNodeID:           "filter",
+			FilterNodeID:           intakeFilterNodeID,
 			AuthorPermissionNodeID: intakeAuthorPermissionNodeID,
 		}
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				{
+					ID: intakeTriggerNodeID,
+					Configuration: map[string]any{
+						"actions":              []any{"opened", "reopened", "labeled"},
+						"labels":               []any{},
+						"authorsWithAccess":    false,
+						"superplaneLabelAdded": false,
+					},
+				},
+				{
+					ID: intakeFilterNodeID,
+					Configuration: map[string]any{
+						"expression": intakeGitHubFilterExpression(legacy),
+					},
+				},
+				{ID: intakeAuthorPermissionNodeID},
+			},
+		})
+
+		assert.Equal(t, []string{"bug"}, parsed.Labels)
+		assert.Equal(t, intakeLabelFilterExclude, parsed.LabelFilterMode)
+		assert.Equal(t, intakeAssignmentUnassigned, parsed.Assignment)
+		assert.True(t, parsed.AuthorsWithAccess)
+		assert.True(t, parsed.SuperplaneLabelAdded)
+	})
+
+	t.Run("reads filters from the trigger after the filter nodes are gone", func(t *testing.T) {
+		graph := intakeGraph{TriggerNodeID: intakeTriggerNodeID}
 		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, models.LiveCanvasSpec{
 			Nodes: []models.Node{
 				{
@@ -102,12 +136,6 @@ func Test__intakeSettingsFromGraph_AuthorsWithAccess(t *testing.T) {
 						"superplaneLabelAdded": false,
 					},
 				},
-				{
-					ID: "filter",
-					Configuration: map[string]any{
-						"expression": intakeAuthorAccessCondition + " && " + intakeUnassignedCondition,
-					},
-				},
 			},
 		})
 
@@ -117,6 +145,26 @@ func Test__intakeSettingsFromGraph_AuthorsWithAccess(t *testing.T) {
 		assert.False(t, parsed.AuthorsWithAccess)
 		assert.False(t, parsed.SuperplaneLabelAdded)
 		assert.True(t, parsed.NewIssues)
+	})
+
+	t.Run("keeps author access when only the permission node remains", func(t *testing.T) {
+		graph := intakeGraph{
+			TriggerNodeID:          intakeTriggerNodeID,
+			AuthorPermissionNodeID: intakeAuthorPermissionNodeID,
+		}
+		parsed := intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, models.LiveCanvasSpec{
+			Nodes: []models.Node{
+				{
+					ID: intakeTriggerNodeID,
+					Configuration: map[string]any{
+						"authorsWithAccess": false,
+					},
+				},
+				{ID: intakeAuthorPermissionNodeID},
+			},
+		})
+
+		assert.True(t, parsed.AuthorsWithAccess)
 	})
 }
 

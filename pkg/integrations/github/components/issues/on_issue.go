@@ -61,6 +61,8 @@ func (i *OnIssue) Documentation() string {
 - **Repository**: Select the GitHub repository to monitor
 - **Actions**: Select which issue actions to listen for (opened, closed, reopened, etc.)
 - **Labels**: Optional. Start a run only when the issue has one of these labels. Leave empty to accept every label.
+- **Label filter**: Optional. Include starts a run when the issue has one of the labels. Exclude starts a run when the issue has none of those labels.
+- **Assignment**: Optional. Start a run only for assigned issues, only for unassigned issues, or for any assignment.
 - **Author is a repository collaborator**: Optional. Start a run only when the author can access the repository.
 - **The "superplane" label is added to the issue**: Optional. For a labeled event, start a run only when that label is added to an open issue.
 
@@ -139,6 +141,39 @@ func (i *OnIssue) Configuration() []configuration.Field {
 					ItemLabel: "Label",
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		},
+		{
+			Name:        "labelFilterMode",
+			Label:       "Label filter",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     "include",
+			Description: "Include starts a run when the issue has one of the labels. Exclude starts a run when the issue has none of those labels.",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Include", Value: "include"},
+						{Label: "Exclude", Value: "exclude"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "assignment",
+			Label:       "Assignment",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     "any",
+			Description: "Start a run only for issues with this assignment.",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Any assignment", Value: "any"},
+						{Label: "Issue is assigned", Value: "assigned"},
+						{Label: "Issue is unassigned", Value: "unassigned"},
 					},
 				},
 			},

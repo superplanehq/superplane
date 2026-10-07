@@ -444,6 +444,57 @@ func Test__RewriteGitHubIntakeGraph(t *testing.T) {
 			TargetID: "format-title",
 		})
 	})
+
+	t.Run("disconnects a legacy analysis route and keeps the extra node", func(t *testing.T) {
+		nodes := []models.Node{
+			{
+				ID:   intakeTriggerNodeID,
+				Name: "On Issue",
+				Type: models.NodeTypeTrigger,
+				Ref:  models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}},
+				Configuration: map[string]any{
+					"repository": "acme/widgets",
+					"actions":    []any{"opened"},
+				},
+				Position: models.Position{X: 160, Y: 80},
+			},
+			componentNode(intakeAnalysisNodeID, "runnerCodex"),
+			componentNode("notify", "slack.postMessage"),
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		}
+		edges := []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeAnalysisNodeID},
+			{Channel: "default", SourceID: intakeAnalysisNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: "notify"},
+		}
+		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{Nodes: nodes, Edges: edges})
+
+		nodes, edges, changed := rewriteGitHubIntakeGraph(nodes, edges, graph, defaultIntakeSettings())
+		require.True(t, changed)
+
+		assert.NotNil(t, findModelNodeOrNil(nodes, intakeAnalysisNodeID))
+		assert.NotNil(t, findModelNodeOrNil(nodes, "notify"))
+		assert.Contains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeTriggerNodeID,
+			TargetID: intakeCreateNodeID,
+		})
+		assert.Contains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeTriggerNodeID,
+			TargetID: "notify",
+		})
+		assert.NotContains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeTriggerNodeID,
+			TargetID: intakeAnalysisNodeID,
+		})
+		assert.NotContains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeAnalysisNodeID,
+			TargetID: intakeCreateNodeID,
+		})
+	})
 }
 
 func findSpecNode(t *testing.T, canvas *yaml.Canvas, nodeID string) yaml.Node {

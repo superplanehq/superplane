@@ -60,6 +60,15 @@ func githubIssueFiltersConfigured(configuration map[string]any) bool {
 	return false
 }
 
+func githubIssueFiltersMigrated(nodes []models.Node) bool {
+	for _, id := range intakeGitHubFilterNodeIDs {
+		if findIntakeNode(nodes, id) != nil {
+			return false
+		}
+	}
+	return true
+}
+
 func githubIssueFiltersFromTrigger(configuration map[string]any, settings intakeSettings) intakeSettings {
 	if labels, ok := configuration[intakeConfigLabels]; ok {
 		settings.Labels = configurationStrings(labels)
@@ -109,12 +118,17 @@ func collapseGitHubIntakeGraph(nodes []models.Node, edges []models.Edge, graph i
 	for _, id := range intakeGitHubFilterNodeIDs {
 		removed[id] = true
 	}
+	bypassed := intakeRouteEdges(edges, graph.TriggerNodeID, graph.CreateNodeID)
 
 	nodes = slices.DeleteFunc(slices.Clone(nodes), func(node models.Node) bool {
 		return removed[node.ID]
 	})
 	edges = slices.DeleteFunc(slices.Clone(edges), func(edge models.Edge) bool {
-		return removed[edge.SourceID] || removed[edge.TargetID]
+		if removed[edge.SourceID] || removed[edge.TargetID] {
+			return true
+		}
+		_, onRoute := bypassed[edge]
+		return onRoute
 	})
 
 	if graph.TriggerNodeID == "" || graph.CreateNodeID == "" {
@@ -144,6 +158,37 @@ func placeCreateUnderTrigger(nodes []models.Node, triggerID, createID string) {
 		}
 		nodes[i].Position = models.Position{X: trigger.Position.X, Y: trigger.Position.Y + intakeNodeSpacing}
 	}
+}
+
+func intakeRouteEdges(edges []models.Edge, sourceID, targetID string) map[models.Edge]struct{} {
+	found := map[models.Edge]struct{}{}
+	if sourceID == "" || targetID == "" || sourceID == targetID {
+		return found
+	}
+
+	var walk func(current string, visited map[string]bool) bool
+	walk = func(current string, visited map[string]bool) bool {
+		reaches := false
+		for _, edge := range edges {
+			if edge.SourceID != current || visited[edge.TargetID] {
+				continue
+			}
+			if edge.TargetID == targetID {
+				found[edge] = struct{}{}
+				reaches = true
+				continue
+			}
+			next := maps.Clone(visited)
+			next[edge.TargetID] = true
+			if walk(edge.TargetID, next) {
+				found[edge] = struct{}{}
+				reaches = true
+			}
+		}
+		return reaches
+	}
+	walk(sourceID, map[string]bool{sourceID: true})
+	return found
 }
 
 func rewriteGitHubIntakeGraph(
