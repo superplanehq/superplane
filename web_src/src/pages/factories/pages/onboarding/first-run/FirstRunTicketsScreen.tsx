@@ -90,7 +90,7 @@ function ticketScanAllowed(args: {
   linearProjectsLoading: boolean;
   linearProjectsError: boolean;
 }): boolean {
-  const vcsSelectionBlocked = args.ticketSource === "vcs" && !args.vcsAvailable;
+  const vcsSelectionBlocked = args.ticketSource === "github-issues" && !args.vcsAvailable;
   const jiraSelectionBlocked = Boolean(args.jiraChoiceBlock) || (args.ticketSource === "jira" && !args.jiraAvailable);
   const linearSelectionBlocked =
     Boolean(args.linearChoiceBlock) || (args.ticketSource === "linear" && !args.linearAvailable);
