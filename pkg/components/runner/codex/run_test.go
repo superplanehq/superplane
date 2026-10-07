@@ -233,9 +233,10 @@ func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
 	joined := strings.Join(args, " ")
 	assert.Contains(t, joined, "developer_instructions=")
 	assert.Contains(t, joined, "propose_update")
-	assert.NotContains(t, joined, "propose_spec")
-	assert.NotContains(t, joined, "propose_clarity")
-	assert.NotContains(t, joined, "propose_confidence")
+	assert.Contains(t, joined, "Do not call propose_spec, propose_clarity, propose_confidence, or survey")
+	assert.NotContains(t, joined, "Call propose_spec")
+	assert.NotContains(t, joined, "Call propose_clarity")
+	assert.NotContains(t, joined, "Call propose_confidence")
 	assert.NotContains(t, joined, "propose_plan")
 	assert.Contains(t, joined, "Use only the analysis tools")
 }
