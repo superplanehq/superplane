@@ -649,6 +649,12 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 
 	log.Info("Running in production mode - serving static web assets")
 
+	releaseAssets, err := web.NewReleaseAssetProxy(web.AssetCDNOrigin())
+	if err != nil {
+		log.Fatalf("release asset proxy: %v", err)
+	}
+	s.Router.PathPrefix("/releases/").Handler(releaseAssets)
+
 	handler := web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath)
 
 	s.Router.PathPrefix(webBasePath).Handler(handler)
