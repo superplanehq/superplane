@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
@@ -361,7 +362,12 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 
 	type orgItem = adminOrgItem
 
-	items := serializeAdminOrganizations(ctx, organizations)
+	items, err := serializeAdminOrganizations(ctx, organizations)
+	if err != nil {
+		log.Errorf("admin: failed to load remaining credit: %v", err)
+		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(paginatedResponse{
@@ -389,7 +395,14 @@ func (s *Server) adminGetOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, serializeAdminOrganization(*organization))
+	remaining, err := remainingCreditCentsByOrganization(r.Context(), []uuid.UUID{organization.ID})
+	if err != nil {
+		log.Errorf("admin: failed to load remaining credit for organization %s: %v", orgID, err)
+		http.Error(w, "Failed to load organization", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, serializeAdminOrganization(*organization, remaining[organization.ID]))
 }
 
 // adminListCanvases returns paginated canvases for a given organization.
@@ -923,16 +936,17 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 }
 
 type adminOrgItem struct {
-	ID            string  `json:"id"`
-	Name          string  `json:"name"`
-	Slug          string  `json:"slug"`
-	Description   string  `json:"description"`
-	CanvasCount   int64   `json:"canvas_count"`
-	TaskCount     int64   `json:"task_count"`
-	DoneTaskCount int64   `json:"done_task_count"`
-	MemberCount   int64   `json:"member_count"`
-	CreatedAt     *string `json:"created_at,omitempty"`
-	UpdatedAt     *string `json:"updated_at,omitempty"`
+	ID                   string  `json:"id"`
+	Name                 string  `json:"name"`
+	Slug                 string  `json:"slug"`
+	Description          string  `json:"description"`
+	CanvasCount          int64   `json:"canvas_count"`
+	TaskCount            int64   `json:"task_count"`
+	DoneTaskCount        int64   `json:"done_task_count"`
+	MemberCount          int64   `json:"member_count"`
+	RemainingCreditCents int64   `json:"remaining_credit_cents"`
+	CreatedAt            *string `json:"created_at,omitempty"`
+	UpdatedAt            *string `json:"updated_at,omitempty"`
 }
 
 func listAllOrganizations(ctx context.Context, search string, limit, offset int, sortBy, sortDirection string) (organizations []models.OrganizationWithCounts, total int64, err error) {
@@ -942,33 +956,55 @@ func listAllOrganizations(ctx context.Context, search string, limit, offset int,
 	return models.ListAllOrganizations(database.DB(ctx), search, limit, offset, sortBy, sortDirection)
 }
 
-func serializeAdminOrganizations(ctx context.Context, organizations []models.OrganizationWithCounts) []adminOrgItem {
-	var err error
+func serializeAdminOrganizations(ctx context.Context, organizations []models.OrganizationWithCounts) (items []adminOrgItem, err error) {
 	ctx, done := telemetry.Span(ctx, "organizations.serialize")
 	defer done(&err)
 
-	items := make([]adminOrgItem, 0, len(organizations))
+	ids := make([]uuid.UUID, len(organizations))
+	for i, org := range organizations {
+		ids[i] = org.ID
+	}
+	remaining, err := remainingCreditCentsByOrganization(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	items = make([]adminOrgItem, 0, len(organizations))
 	for _, org := range organizations {
-		items = append(items, serializeAdminOrganization(org))
+		items = append(items, serializeAdminOrganization(org, remaining[org.ID]))
 	}
 
 	if span := trace.SpanFromContext(ctx); span.IsRecording() {
 		span.SetAttributes(attribute.Int("organizations.count", len(items)))
 	}
 
-	return items
+	return items, nil
 }
 
-func serializeAdminOrganization(org models.OrganizationWithCounts) adminOrgItem {
+func remainingCreditCentsByOrganization(ctx context.Context, organizationIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
+	micros, err := models.RemainingHostedCreditMicros(database.DB(ctx), organizationIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	cents := make(map[uuid.UUID]int64, len(organizationIDs))
+	for _, id := range organizationIDs {
+		cents[id] = pricebook.MicrosToCents(micros[id])
+	}
+	return cents, nil
+}
+
+func serializeAdminOrganization(org models.OrganizationWithCounts, remainingCreditCents int64) adminOrgItem {
 	item := adminOrgItem{
-		ID:            org.ID.String(),
-		Name:          org.Name,
-		Slug:          org.Slug,
-		Description:   org.Description,
-		CanvasCount:   org.CanvasCount,
-		TaskCount:     org.TaskCount,
-		DoneTaskCount: org.DoneTaskCount,
-		MemberCount:   org.MemberCount,
+		ID:                   org.ID.String(),
+		Name:                 org.Name,
+		Slug:                 org.Slug,
+		Description:          org.Description,
+		CanvasCount:          org.CanvasCount,
+		TaskCount:            org.TaskCount,
+		DoneTaskCount:        org.DoneTaskCount,
+		MemberCount:          org.MemberCount,
+		RemainingCreditCents: remainingCreditCents,
 	}
 
 	if org.CreatedAt != nil {

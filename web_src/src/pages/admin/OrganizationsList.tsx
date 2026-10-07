@@ -1,4 +1,5 @@
 import { Text } from "@/components/Text/text";
+import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
 import { Building, CircleCheck, ClipboardList, Palette, User } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
@@ -15,10 +16,18 @@ interface AdminOrganization {
   task_count: number;
   done_task_count: number;
   member_count: number;
+  remaining_credit_cents?: number;
   created_at?: string;
 }
 
-type SortField = "canvas_count" | "created_at" | "done_task_count" | "member_count" | "name" | "task_count";
+type SortField =
+  | "canvas_count"
+  | "created_at"
+  | "done_task_count"
+  | "member_count"
+  | "name"
+  | "remaining_credit_cents"
+  | "task_count";
 
 const PAGE_SIZE = 50;
 
@@ -72,6 +81,13 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
             <SortableHeader
               label="Members"
               field="member_count"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
+            <SortableHeader
+              label="Credits"
+              field="remaining_credit_cents"
               currentSort={sortBy}
               currentDirection={sortDirection}
               onSort={onSort}
@@ -136,6 +152,9 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
                   <User size={13} />
                   {org.member_count}
                 </span>
+              </td>
+              <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap dark:text-gray-400">
+                {formatUsdCents(org.remaining_credit_cents ?? 0)}
               </td>
               <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap dark:text-gray-500">
                 {formatDate(org.created_at)}
