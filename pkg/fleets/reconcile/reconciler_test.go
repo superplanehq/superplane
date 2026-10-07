@@ -1,11 +1,14 @@
 package reconcile
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -210,6 +213,51 @@ func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
 		resourceProvider.bootstrap.RegistrationToken != "registration-token" ||
 		resourceProvider.bootstrap.RunnerAPIURL != "https://superplane.example" {
 		t.Fatalf("provider requests = %#v %#v", resourceProvider.createRequest, resourceProvider.bootstrap)
+	}
+}
+
+func TestReconcileLogsProvisioningActions(t *testing.T) {
+	admin := newFakeAdmin()
+	admin.capacity.RunnableTasks = 1
+	var output bytes.Buffer
+	reconciler, err := New(
+		admin,
+		&fakeArtifactResolver{},
+		&fakeProvider{},
+		Config{
+			FleetID:         "fleet-a",
+			OperatingSystem: "linux",
+			Architecture:    "amd64",
+		},
+		slog.New(slog.NewJSONHandler(&output, nil)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := reconciler.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	messages := loggedMessages(t, output.String())
+	for _, expected := range []string{
+		"describing fleet",
+		"getting fleet capacity",
+		"listing provider resources",
+		"cleaning up terminated provider resources",
+		"listing active runners",
+		"reconciling fleet capacity",
+		"increasing fleet capacity",
+		"creating logical runner",
+		"resolving runner artifact",
+		"building runner bootstrap",
+		"creating provider runner",
+		"provisioned runner",
+		"fleet reconciliation completed",
+	} {
+		if !slices.Contains(messages, expected) {
+			t.Errorf("missing log message %q in %#v", expected, messages)
+		}
 	}
 }
 
@@ -509,6 +557,22 @@ func waitForDescribeCall(t *testing.T, calls <-chan time.Time) time.Time {
 		t.Fatal("reconciliation did not start")
 		return time.Time{}
 	}
+}
+
+func loggedMessages(t *testing.T, output string) []string {
+	t.Helper()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	messages := make([]string, 0, len(lines))
+	for _, line := range lines {
+		var entry struct {
+			Message string `json:"msg"`
+		}
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatal(err)
+		}
+		messages = append(messages, entry.Message)
+	}
+	return messages
 }
 
 func newFakeAdmin() *fakeAdmin {

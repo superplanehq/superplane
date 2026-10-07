@@ -117,30 +117,49 @@ func (r *Reconciler) FleetID() string {
 	return r.config.FleetID
 }
 
+func (r *Reconciler) logAction(message string, attributes ...slog.Attr) {
+	args := make([]any, 0, len(attributes)+2)
+	args = append(
+		args,
+		slog.String("fleet_id", r.config.FleetID),
+		slog.String("provider", r.provider.Name()),
+	)
+	for _, attribute := range attributes {
+		args = append(args, attribute)
+	}
+	r.log.Info(message, args...)
+}
+
 func (r *Reconciler) Reconcile(ctx context.Context) error {
+	r.logAction("describing fleet")
 	fleet, err := r.admin.DescribeFleet(ctx, r.config.FleetID)
 	if err != nil {
 		return fmt.Errorf("describe fleet %s: %w", r.config.FleetID, err)
 	}
 	if !fleet.Enabled {
+		r.logAction("reconciling disabled fleet")
 		r.generation = ""
 		if err := r.reconcileDisabledFleet(ctx); err != nil {
 			return err
 		}
-		r.log.Info(
+		r.logAction(
 			"fleet reconciliation completed",
-			slog.String("fleet_id", r.config.FleetID),
-			slog.String("provider", r.provider.Name()),
 			slog.Bool("enabled", false),
 		)
 		return nil
 	}
+	r.logAction("validating fleet configuration")
 	if err := r.validateFleet(fleet); err != nil {
 		return err
 	}
 
 	previousGeneration := r.generation
 	waitSeconds := r.capacityWaitSeconds()
+	r.logAction(
+		"getting fleet capacity",
+		slog.String("generation", r.generation),
+		slog.Int("wait_seconds", waitSeconds),
+	)
 	capacity, err := r.admin.GetFleetCapacity(
 		ctx,
 		r.config.FleetID,
@@ -152,6 +171,7 @@ func (r *Reconciler) Reconcile(ctx context.Context) error {
 	}
 	r.generation = capacity.Generation
 
+	r.logAction("listing provider resources")
 	resources, err := r.provider.List(ctx, r.config.FleetID)
 	if err != nil {
 		return fmt.Errorf("list %s resources for fleet %s: %w", r.provider.Name(), r.config.FleetID, err)
@@ -159,10 +179,15 @@ func (r *Reconciler) Reconcile(ctx context.Context) error {
 	resourcesByRunner := groupResourcesByRunner(resources)
 
 	var reconcileErrors []error
+	r.logAction(
+		"cleaning up terminated provider resources",
+		slog.Int("provider_resources", len(resources)),
+	)
 	if err := r.deleteTerminatedResources(ctx, resourcesByRunner); err != nil {
 		reconcileErrors = append(reconcileErrors, err)
 	}
 
+	r.logAction("listing active runners")
 	activeRunners, err := r.admin.ListRunners(
 		ctx,
 		r.config.FleetID,
@@ -177,6 +202,11 @@ func (r *Reconciler) Reconcile(ctx context.Context) error {
 		return errors.Join(reconcileErrors...)
 	}
 
+	r.logAction(
+		"reconciling fleet capacity",
+		slog.Int("active_runners", int(capacity.PendingRunners+capacity.IdleRunners)),
+		slog.Int("active_runner_records", len(activeRunners)),
+	)
 	err = r.reconcileCapacity(ctx, fleet, capacity, activeRunners, resourcesByRunner)
 	if err != nil {
 		reconcileErrors = append(reconcileErrors, err)
@@ -185,10 +215,8 @@ func (r *Reconciler) Reconcile(ctx context.Context) error {
 		return err
 	}
 
-	r.log.Info(
+	r.logAction(
 		"fleet reconciliation completed",
-		slog.String("fleet_id", r.config.FleetID),
-		slog.String("provider", r.provider.Name()),
 		slog.Bool("enabled", true),
 		slog.String("generation", capacity.Generation),
 		slog.Bool("generation_changed", capacity.Generation != previousGeneration),
@@ -205,15 +233,21 @@ func (r *Reconciler) Reconcile(ctx context.Context) error {
 }
 
 func (r *Reconciler) reconcileDisabledFleet(ctx context.Context) error {
+	r.logAction("listing provider resources")
 	resources, err := r.provider.List(ctx, r.config.FleetID)
 	if err != nil {
 		return fmt.Errorf("list resources for disabled fleet %s: %w", r.config.FleetID, err)
 	}
 	resourcesByRunner := groupResourcesByRunner(resources)
 	var reconcileErrors []error
+	r.logAction(
+		"cleaning up terminated provider resources",
+		slog.Int("provider_resources", len(resources)),
+	)
 	if err := r.deleteTerminatedResources(ctx, resourcesByRunner); err != nil {
 		reconcileErrors = append(reconcileErrors, err)
 	}
+	r.logAction("listing active runners")
 	runners, err := r.admin.ListRunners(
 		ctx,
 		r.config.FleetID,
@@ -227,6 +261,10 @@ func (r *Reconciler) reconcileDisabledFleet(ctx context.Context) error {
 		)
 		return errors.Join(reconcileErrors...)
 	}
+	r.logAction(
+		"terminating runners for disabled fleet",
+		slog.Int("runner_count", len(runners)),
+	)
 	if err := r.terminateRunners(ctx, runners, resourcesByRunner); err != nil {
 		reconcileErrors = append(reconcileErrors, err)
 	}
@@ -263,6 +301,12 @@ func (r *Reconciler) reconcileCapacity(
 	target := targetActiveRunners(capacity, r.config.WarmCapacity, r.config.MaxCapacity)
 	active := int(capacity.PendingRunners + capacity.IdleRunners)
 	if active < target {
+		r.logAction(
+			"increasing fleet capacity",
+			slog.Int("active_runners", active),
+			slog.Int("target_runners", target),
+			slog.Int("runner_count", target-active),
+		)
 		var provisionErrors []error
 		for range target - active {
 			if err := r.provision(
@@ -277,8 +321,19 @@ func (r *Reconciler) reconcileCapacity(
 		return errors.Join(provisionErrors...)
 	}
 	if active == target {
+		r.logAction(
+			"fleet capacity matches target",
+			slog.Int("active_runners", active),
+			slog.Int("target_runners", target),
+		)
 		return nil
 	}
+	r.logAction(
+		"decreasing fleet capacity",
+		slog.Int("active_runners", active),
+		slog.Int("target_runners", target),
+		slog.Int("runner_count", active-target),
+	)
 	return r.terminateRunners(
 		ctx,
 		oldestRunners(activeRunners, active-target),
@@ -307,6 +362,7 @@ func (r *Reconciler) provision(
 	idempotencyKey string,
 	resourcesByRunner map[string][]provider.Resource,
 ) error {
+	r.logAction("creating logical runner")
 	created, err := r.admin.CreateRunner(ctx, r.config.FleetID, adminclient.CreateRunnerRequest{
 		IdempotencyKey: idempotencyKey,
 		Ephemeral:      true,
@@ -322,9 +378,19 @@ func (r *Reconciler) provision(
 		)
 	}
 	if len(resourcesByRunner[created.Runner.ID]) > 0 {
+		r.logAction(
+			"using existing provider resource",
+			slog.String("runner_id", created.Runner.ID),
+			slog.Int("resource_count", len(resourcesByRunner[created.Runner.ID])),
+		)
 		return nil
 	}
 
+	r.logAction(
+		"resolving runner artifact",
+		slog.String("runner_id", created.Runner.ID),
+		slog.String("runner_version", created.Runner.RunnerVersion),
+	)
 	resolved, err := r.artifacts.Resolve(
 		ctx,
 		created.Runner.RunnerVersion,
@@ -334,6 +400,10 @@ func (r *Reconciler) provision(
 	if err != nil {
 		return r.rollbackProvision(ctx, created.Runner.ID, fmt.Errorf("resolve runner artifact: %w", err))
 	}
+	r.logAction(
+		"building runner bootstrap",
+		slog.String("runner_id", created.Runner.ID),
+	)
 	bootstrap, err := r.provider.BuildBootstrap(provider.RunnerBootstrap{
 		RunnerID:          created.Runner.ID,
 		FleetID:           r.config.FleetID,
@@ -344,6 +414,10 @@ func (r *Reconciler) provision(
 	if err != nil {
 		return r.rollbackProvision(ctx, created.Runner.ID, fmt.Errorf("build runner bootstrap: %w", err))
 	}
+	r.logAction(
+		"creating provider runner",
+		slog.String("runner_id", created.Runner.ID),
+	)
 	resource, err := r.provider.Create(ctx, provider.CreateRequest{
 		RunnerID:      created.Runner.ID,
 		FleetID:       r.config.FleetID,
@@ -354,11 +428,9 @@ func (r *Reconciler) provision(
 		return r.rollbackProvision(ctx, created.Runner.ID, fmt.Errorf("create provider runner: %w", err))
 	}
 	resourcesByRunner[created.Runner.ID] = append(resourcesByRunner[created.Runner.ID], resource)
-	r.log.Info(
+	r.logAction(
 		"provisioned runner",
-		slog.String("fleet_id", r.config.FleetID),
 		slog.String("runner_id", created.Runner.ID),
-		slog.String("provider", r.provider.Name()),
 		slog.String("resource_id", resource.ID),
 	)
 	return nil
@@ -369,6 +441,10 @@ func (r *Reconciler) rollbackProvision(
 	runnerID string,
 	provisionError error,
 ) error {
+	r.logAction(
+		"terminating logical runner after provisioning failure",
+		slog.String("runner_id", runnerID),
+	)
 	_, rollbackError := r.admin.DeleteRunner(ctx, r.config.FleetID, runnerID)
 	if rollbackError != nil {
 		return errors.Join(
@@ -385,6 +461,11 @@ func (r *Reconciler) deleteTerminatedResources(
 ) error {
 	var deleteErrors []error
 	for runnerID, resources := range resourcesByRunner {
+		r.logAction(
+			"describing runner for resource cleanup",
+			slog.String("runner_id", runnerID),
+			slog.Int("resource_count", len(resources)),
+		)
 		runner, err := r.admin.DescribeRunner(ctx, r.config.FleetID, runnerID)
 		if err != nil && !adminclient.IsStatus(err, http.StatusNotFound) {
 			deleteErrors = append(deleteErrors, fmt.Errorf(
@@ -400,6 +481,12 @@ func (r *Reconciler) deleteTerminatedResources(
 
 		deleted := true
 		for _, resource := range resources {
+			r.logAction(
+				"deleting provider resource",
+				slog.String("runner_id", runnerID),
+				slog.String("resource_id", resource.ID),
+				slog.String("reason", "runner_terminated_or_missing"),
+			)
 			if err := r.provider.Delete(ctx, resource); err != nil {
 				deleted = false
 				deleteErrors = append(deleteErrors, fmt.Errorf(
@@ -424,6 +511,10 @@ func (r *Reconciler) terminateRunners(
 ) error {
 	var terminateErrors []error
 	for _, runner := range runners {
+		r.logAction(
+			"terminating logical runner",
+			slog.String("runner_id", runner.ID),
+		)
 		_, err := r.admin.DeleteRunner(ctx, r.config.FleetID, runner.ID)
 		if adminclient.IsStatus(err, http.StatusConflict) {
 			continue
@@ -437,6 +528,12 @@ func (r *Reconciler) terminateRunners(
 			continue
 		}
 		for _, resource := range resourcesByRunner[runner.ID] {
+			r.logAction(
+				"deleting provider resource",
+				slog.String("runner_id", runner.ID),
+				slog.String("resource_id", resource.ID),
+				slog.String("reason", "capacity_reduction"),
+			)
 			if err := r.provider.Delete(ctx, resource); err != nil {
 				terminateErrors = append(terminateErrors, fmt.Errorf(
 					"delete resource %s for runner %s: %w",
