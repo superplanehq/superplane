@@ -586,11 +586,77 @@ func WorkOrderReadyForAutoStart(
 	if !turn.reportedReviewScores(checks) {
 		return false, nil
 	}
+	firstReady, err := firstCheckReportsAtMaximum(tx, order.ID, planningReviewScoreKinds)
+	if err != nil {
+		return false, err
+	}
+	if !firstReady {
+		return false, nil
+	}
 	spec, err := planningSpecBody(tx, order)
 	if err != nil {
 		return false, err
 	}
 	return strings.TrimSpace(spec) != "", nil
+}
+
+func firstCheckReportsAtMaximum(tx *gorm.DB, workOrderID uuid.UUID, kinds []planningScoreKind) (bool, error) {
+	scores, err := firstReportedCheckScores(tx, workOrderID, kinds)
+	if err != nil {
+		return false, err
+	}
+	for _, kind := range kinds {
+		score, ok := scores[kind.key]
+		if !ok || score != kind.max {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func firstReportedCheckScores(tx *gorm.DB, workOrderID uuid.UUID, kinds []planningScoreKind) (map[string]float64, error) {
+	scores := make(map[string]float64, len(kinds))
+	if len(kinds) == 0 {
+		return scores, nil
+	}
+	keys := make([]string, len(kinds))
+	wanted := make(map[string]struct{}, len(kinds))
+	for i, kind := range kinds {
+		keys[i] = kind.key
+		wanted[kind.key] = struct{}{}
+	}
+
+	var events []FactoryWorkOrderEvent
+	err := tx.
+		Where("work_order_id = ?", workOrderID).
+		Where("type = ?", factory.EventTypeOrderCheckReported).
+		Where("data->'check'->>'key' IN ?", keys).
+		Order("created_at ASC").
+		Order("id ASC").
+		Find(&events).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range events {
+		if len(scores) == len(keys) {
+			break
+		}
+		var payload factory.WorkOrderCheckReported
+		if err := json.Unmarshal(events[i].Data, &payload); err != nil {
+			return nil, err
+		}
+		if payload.Check == nil {
+			continue
+		}
+		if _, ok := wanted[payload.Check.Key]; !ok {
+			continue
+		}
+		if _, seen := scores[payload.Check.Key]; seen {
+			continue
+		}
+		scores[payload.Check.Key] = payload.Check.Score
+	}
+	return scores, nil
 }
 
 type planningTurn struct {

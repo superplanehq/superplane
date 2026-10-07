@@ -8,7 +8,7 @@ export const PLANNING_SETTINGS_COPY = {
   planningReviewHelper:
     "An agent plans each task that enters Backlog. It scores Clarity, Complexity, and Verifiability. Confidence is the weakest of those scores.",
   autoStartLabel: "Auto-start",
-  autoStartReviewHelper: "Auto-start tasks that have scored 3/3.",
+  autoStartReviewHelper: "Auto-start tasks when the first score is 3/3.",
   autoStartPlanningOffHelper: "Turn Planning on to use Auto-start.",
   autoStartNoBoardHelper: "Set up a board before you turn Auto-start on.",
   autoStartStartOnLabel: "Start on",
