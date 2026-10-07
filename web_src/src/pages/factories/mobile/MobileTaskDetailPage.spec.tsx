@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
@@ -28,11 +28,39 @@ const useWorkOrder = vi.fn((): { data: FactoriesWorkOrder | undefined; isLoading
   isError: false,
 }));
 
-const { onDispatch, dispatchingIds, canUpdateWorkOrder, runnerModelCalls } = vi.hoisted(() => ({
+const {
+  onDispatch,
+  dispatchingIds,
+  canUpdateWorkOrder,
+  runnerModelCalls,
+  findPlanningSession,
+  sendPlanningMessage,
+  answerPlanningSurvey,
+  liveCanvas,
+} = vi.hoisted(() => ({
   onDispatch: vi.fn(),
   dispatchingIds: { current: new Set<string>() },
   canUpdateWorkOrder: { current: true },
   runnerModelCalls: [] as unknown[][],
+  findPlanningSession: vi.fn(),
+  sendPlanningMessage: vi.fn(),
+  answerPlanningSurvey: vi.fn(),
+  liveCanvas: { current: undefined as unknown },
+}));
+
+vi.mock("../pages/planningSessionClient", () => ({
+  findPlanningSessionByWorkOrder: (...args: unknown[]) => findPlanningSession(...args),
+  sendPlanningSessionMessage: (...args: unknown[]) => sendPlanningMessage(...args),
+  answerPlanningSessionSurvey: (...args: unknown[]) => answerPlanningSurvey(...args),
+}));
+
+vi.mock("../pages/usePlanningSessionLiveRun", () => ({
+  usePlanningSessionLiveRun: (_organizationId: string, view: unknown) => view,
+}));
+
+vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
+  useSplitRunLiveCanvas: () =>
+    liveCanvas.current ?? { enabled: false, isError: false, isLoading: false, canvas: undefined, stream: [] },
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
@@ -113,7 +141,7 @@ function renderTask(
   factory: FactoriesFactory = REFUND_FACTORY,
 ) {
   return render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ThemeProvider>
         <TooltipProvider>
           <MemoryRouter initialEntries={[entry]}>
@@ -141,8 +169,17 @@ function renderTask(
   );
 }
 
+function resetPlanningSession() {
+  findPlanningSession.mockReset();
+  findPlanningSession.mockResolvedValue(null);
+  sendPlanningMessage.mockReset();
+  answerPlanningSurvey.mockReset();
+  liveCanvas.current = undefined;
+}
+
 describe("MobileTaskDetailPage back link", () => {
   beforeEach(() => {
+    resetPlanningSession();
     useWorkOrder.mockReset();
     useWorkOrder.mockReturnValue({ data: undefined, isLoading: true, isError: false });
     onDispatch.mockReset();
@@ -247,6 +284,7 @@ function renderDraft(factory: FactoriesFactory = REFUND_FACTORY, search = `?line
 
 describe("MobileTaskDetailPage model select", () => {
   beforeEach(() => {
+    resetPlanningSession();
     useWorkOrder.mockReset();
     onDispatch.mockReset();
     dispatchingIds.current = new Set();
@@ -386,5 +424,155 @@ describe("MobileTaskDetailPage model select", () => {
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
     expect(runnerModelCalls.map((call) => call[2])).not.toContain("hotfix");
     expect(runnerModelCalls.every((call) => call[2] == null || call[2] === "")).toBe(true);
+  });
+});
+
+const WAITING_SESSION = {
+  id: "session-1",
+  state: "running",
+  executionId: "execution-1",
+  waitState: "pending",
+  messages: [{ id: "agent-1", role: "agent", text: "Which refunds are in scope?" }],
+};
+
+const SURVEY_SESSION = {
+  ...WAITING_SESSION,
+  survey: { id: "survey-1", questions: [{ prompt: "Priority?", options: ["High", "Low"] }] },
+};
+
+describe("MobileTaskDetailPage refine chat", () => {
+  beforeEach(() => {
+    useWorkOrder.mockReset();
+    onDispatch.mockReset();
+    dispatchingIds.current = new Set();
+    canUpdateWorkOrder.current = true;
+    runnerModelCalls.length = 0;
+    resetPlanningSession();
+  });
+
+  it("shows the composer, one Start, and one model control on a Planning draft", async () => {
+    findPlanningSession.mockResolvedValue(WAITING_SESSION);
+    renderDraft();
+
+    expect(await screen.findByTestId("split-run-intent-transcript")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-composer")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Start" })).toHaveLength(1);
+    expect(screen.getAllByTestId("split-run-draft-model")).toHaveLength(1);
+    expect(screen.getByTestId("mobile-task-detail")).toBeInTheDocument();
+  });
+
+  it("sends a text reply through the planning session message path", async () => {
+    findPlanningSession.mockResolvedValue(WAITING_SESSION);
+    sendPlanningMessage.mockResolvedValue(WAITING_SESSION);
+    const user = userEvent.setup();
+    renderDraft();
+
+    const composer = await screen.findByTestId("split-run-intent-composer");
+    await waitFor(() => expect(composer).toBeEnabled());
+    await user.type(composer, "Only card refunds.");
+    await user.click(screen.getByTestId("split-run-intent-composer-send"));
+
+    await waitFor(() => {
+      expect(sendPlanningMessage).toHaveBeenCalledWith("org-1", PRIMARY_FACTORY_ID, "session-1", "Only card refunds.");
+    });
+    expect(answerPlanningSurvey).not.toHaveBeenCalled();
+  });
+
+  it("answers a pending question through the survey answer path", async () => {
+    findPlanningSession.mockResolvedValue(SURVEY_SESSION);
+    answerPlanningSurvey.mockResolvedValue({ ...SURVEY_SESSION, survey: null });
+    const user = userEvent.setup();
+    renderDraft();
+
+    expect(await screen.findByTestId("create-with-agent-survey")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /High/ }));
+    await user.click(screen.getByRole("button", { name: "Send answers" }));
+
+    await waitFor(() => {
+      expect(answerPlanningSurvey).toHaveBeenCalledWith(
+        "org-1",
+        PRIMARY_FACTORY_ID,
+        "session-1",
+        expect.stringContaining("High"),
+      );
+    });
+    expect(sendPlanningMessage).not.toHaveBeenCalled();
+  });
+
+  it("shows the recovery sentence when the session does not load", async () => {
+    findPlanningSession.mockRejectedValue(new Error("boom"));
+    renderDraft();
+
+    expect(
+      await screen.findByText("The refinement session did not load. Refresh the page to try again."),
+    ).toBeInTheDocument();
+  });
+
+  it("lets a viewer read the chat but not send, answer, or start", async () => {
+    canUpdateWorkOrder.current = false;
+    findPlanningSession.mockResolvedValue(WAITING_SESSION);
+    renderDraft();
+
+    expect(await screen.findByTestId("split-run-intent-transcript")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-intent-composer")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the description and Start without a composer when Planning is off", () => {
+    renderDraft(factoryWithPlanning(REFUND_FACTORY, { enabled: false, clarity: false, confidence: false }));
+
+    expect(screen.getByRole("heading", { name: "Description" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-composer")).not.toBeInTheDocument();
+    expect(findPlanningSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("MobileTaskDetailPage phase log", () => {
+  beforeEach(() => {
+    useWorkOrder.mockReset();
+    canUpdateWorkOrder.current = true;
+    resetPlanningSession();
+  });
+
+  it("shows notes and command output in the open phase of a task that is not a draft", async () => {
+    liveCanvas.current = {
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: { key: "live", title: "Implementation", nodes: [], edges: [], statuses: {} },
+      stream: [
+        { id: "node-1", nodeId: "node-1", at: "", componentName: "Run tests", status: "failed", kind: "action" },
+        {
+          id: "step-1",
+          nodeId: "node-1",
+          at: "",
+          note: true,
+          componentType: "bash",
+          componentName: "npm test",
+          detail: "FAIL refund.spec.ts",
+          status: "failed",
+        },
+        {
+          id: "note-1",
+          nodeId: "node-1",
+          at: "",
+          note: true,
+          noteParentId: "step-1",
+          componentType: "note",
+          componentName: "The refund case still fails.",
+          status: "passed",
+        },
+      ],
+    };
+    useWorkOrder.mockReturnValue({ data: RUNNING_WORK_ORDER, isLoading: false, isError: false });
+    renderTask(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${RUNNING_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
+    );
+
+    expect(await screen.findByText("The refund case still fails.")).toBeInTheDocument();
+    expect(screen.getByText("FAIL refund.spec.ts")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-composer")).not.toBeInTheDocument();
+    expect(findPlanningSession).not.toHaveBeenCalled();
   });
 });
