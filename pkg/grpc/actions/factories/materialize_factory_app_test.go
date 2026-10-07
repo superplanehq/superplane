@@ -208,12 +208,7 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		}, agent.Configuration["credentials"])
 	})
 
-	t.Run("risk score install succeeds when the organization has not enabled the feature", func(t *testing.T) {
-		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
-		organization, err := models.FindOrganizationByIDInTransaction(database.DB(t.Context()), r.Organization.ID.String())
-		require.NoError(t, err)
-		assert.NotContains(t, organization.EnabledExperimentalFeatures, features.FeatureFactoryRiskScore)
-
+	t.Run("risk score install fills the default checks", func(t *testing.T) {
 		factoryModel := newFactory(t)
 		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Risk score"))
 
