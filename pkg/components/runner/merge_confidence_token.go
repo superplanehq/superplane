@@ -114,6 +114,7 @@ func MergeConfidenceChecksFromSteps(steps []AgentStep) ([]string, map[string]str
 }
 
 // MergeConfidenceCheckScales reads the score range from each check prompt.
+// It uses the scoring instructions, not the task title or task description.
 // A prompt that still asks for 1 to 5 stays on that scale. A prompt that asks
 // for 1 to 3 uses the new scale. A prompt that names neither stays on 1 to 5.
 func MergeConfidenceCheckScales(steps []AgentStep) map[string]int {
@@ -150,8 +151,9 @@ func promptScale(prompts []string) int {
 	}
 	scale := mergeConfidenceLegacyMaxScore
 	for _, prompt := range prompts {
-		next := mergeConfidencePromptScale(prompt)
-		if next == mergeConfidenceLegacyMaxScore && mergeConfidenceLegacyScore.MatchString(prompt) {
+		instructions := mergeConfidenceScoringText(prompt)
+		next := mergeConfidencePromptScale(instructions)
+		if next == mergeConfidenceLegacyMaxScore && mergeConfidenceLegacyScore.MatchString(instructions) {
 			return mergeConfidenceLegacyMaxScore
 		}
 		if next == mergeConfidenceCurrentMaxScore {
@@ -162,13 +164,57 @@ func promptScale(prompts []string) int {
 }
 
 func mergeConfidencePromptScale(prompt string) int {
-	if mergeConfidenceLegacyScore.MatchString(prompt) {
+	instructions := mergeConfidenceScoringText(prompt)
+	if mergeConfidenceLegacyScore.MatchString(instructions) {
 		return mergeConfidenceLegacyMaxScore
 	}
-	if mergeConfidenceCurrentScore.MatchString(prompt) {
+	if mergeConfidenceCurrentScore.MatchString(instructions) {
 		return mergeConfidenceCurrentMaxScore
 	}
 	return mergeConfidenceLegacyMaxScore
+}
+
+func mergeConfidenceScoringText(prompt string) string {
+	taskStart := mergeConfidenceTaskStart(prompt)
+	if taskStart < 0 {
+		return prompt
+	}
+	instructionAt := mergeConfidenceInstructionStart(prompt, taskStart)
+	if instructionAt < 0 {
+		return prompt
+	}
+	return prompt[:taskStart] + prompt[instructionAt:]
+}
+
+func mergeConfidenceTaskStart(prompt string) int {
+	titleAt := strings.Index(prompt, "Task title:")
+	descriptionAt := strings.Index(prompt, "Task description:")
+	switch {
+	case titleAt >= 0 && (descriptionAt < 0 || titleAt <= descriptionAt):
+		return titleAt
+	case descriptionAt >= 0:
+		return descriptionAt
+	default:
+		return -1
+	}
+}
+
+func mergeConfidenceInstructionStart(prompt string, taskStart int) int {
+	markers := []string{
+		"Report this check with the report_merge_check tool.",
+		"Report each enabled check with the report_merge_check tool.",
+	}
+	start := -1
+	for _, marker := range markers {
+		at := strings.LastIndex(prompt, marker)
+		if at < taskStart {
+			continue
+		}
+		if start < 0 || at < start {
+			start = at
+		}
+	}
+	return start
 }
 
 // CheckScoreScale is the range for one reported check. A token with no scale

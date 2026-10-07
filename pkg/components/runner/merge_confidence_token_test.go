@@ -1,6 +1,7 @@
 package runner_test
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -60,6 +61,31 @@ func TestMergeConfidenceCheckScales(t *testing.T) {
 	oldCombined := "Enabled checks: risk.\nscore is an integer from 1 to 5.\nDocumentation only = 1 (very_low). Secrets = 5 (critical).\n"
 	assert.Equal(t, map[string]int{"risk": 5}, runner.MergeConfidenceCheckScales([]runner.AgentStep{
 		{Name: "Review", Type: runner.AgentStepPrompt, Prompt: &oldCombined},
+	}))
+
+	withTask := strings.Join([]string{
+		"Merge check: risk.",
+		"The original task is the intent for this change.",
+		"Task title: Keep planning scores from 1 through 5",
+		"Task description: Keep planning scores from 1 through 5.",
+		"Cache changes = 5 (critical).",
+		"",
+		"Report this check with the report_merge_check tool.",
+		"score is an integer from 1 to 3.",
+		"Documentation only = 1 (healthy).",
+	}, "\n")
+	legacyWithTask := strings.Join([]string{
+		"Merge check: performance.",
+		"Task title: Use 1 to 3 for planning",
+		"Task description: score is an integer from 1 to 3.",
+		"",
+		"Report this check with the report_merge_check tool.",
+		"score is an integer from 1 to 5.",
+		"If no performance practice applies, report the check with 5.",
+	}, "\n")
+	assert.Equal(t, map[string]int{"risk": 3, "performance": 5}, runner.MergeConfidenceCheckScales([]runner.AgentStep{
+		{Name: "Blast radius", Type: runner.AgentStepPrompt, Prompt: &withTask},
+		{Name: "Performance", Type: runner.AgentStepPrompt, Prompt: &legacyWithTask},
 	}))
 }
 
