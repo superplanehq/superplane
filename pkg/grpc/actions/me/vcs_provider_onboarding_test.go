@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -112,6 +113,57 @@ func TestStartVCSProviderInstallationSignsOrganizationState(t *testing.T) {
 	organizationID, err := githubcommon.VerifyHostedAppInstallState("test-webhook-secret", state)
 	require.NoError(t, err)
 	assert.Equal(t, r.Organization.ID, organizationID)
+}
+
+func TestDescribeVCSProviderOnboardingAcceptsBitbucketAccountID(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv(config.EnvBitbucketForgeAppID, "")
+	t.Setenv(config.EnvBitbucketForgeInstallURL, "")
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	const accountID = "11111111-1111-1111-1111-111111111111"
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		database.Conn(),
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderBitbucket, "{"+accountID+"}", "ada-bb", "", ""),
+	))
+
+	response, err := DescribeVCSProviderOnboarding(ctx, models.ProviderBitbucket)
+	require.NoError(t, err)
+	require.NotNil(t, response.Identity)
+	assert.Equal(t, int64(0), response.Identity.GetUserId())
+	assert.Equal(t, accountID, response.Identity.GetProviderUserId())
+	assert.Equal(t, "ada-bb", response.Identity.GetLogin())
+	assert.False(t, response.GetProviderConfigured())
+	assert.Empty(t, response.GetRepositories())
+	assert.Empty(t, response.GetPendingRequests())
+}
+
+func TestStartBitbucketInstallationReturnsDistributionLink(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv(config.EnvBitbucketForgeAppID, "ari:cloud:ecosystem::app/example")
+	t.Setenv(config.EnvBitbucketForgeInstallURL, "https://developer.atlassian.com/console/install/example")
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		database.Conn(),
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderBitbucket, "11111111-1111-1111-1111-111111111111", "ada-bb", "", ""),
+	))
+
+	response, err := StartVCSProviderInstallation(ctx, models.ProviderBitbucket)
+	require.NoError(t, err)
+	assert.Equal(t, "https://developer.atlassian.com/console/install/example", response.GetUrl())
+	assert.NotContains(t, response.GetUrl(), "state=")
+}
+
+func TestRefreshBitbucketOnboardingDoesNotQueueGitHub(t *testing.T) {
+	r := support.Setup(t)
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+
+	response, err := RefreshVCSProviderOnboarding(ctx, models.ProviderBitbucket, nil)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+
+	var count int64
+	require.NoError(t, database.Conn().Table("vcs_provider_reconcile_jobs").Count(&count).Error)
+	assert.Zero(t, count)
 }
 
 func setVCSProviderGitHubAppEnvironment(t *testing.T) {

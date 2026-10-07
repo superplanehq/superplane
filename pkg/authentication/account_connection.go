@@ -27,7 +27,7 @@ const (
 // connectableProviders lists the services that hold activity SuperPlane can
 // attribute to a member. A linked account is not a sign-in method, so a
 // provider that only proves identity does not belong here.
-var connectableProviders = []string{models.ProviderGitHub}
+var connectableProviders = []string{models.ProviderGitHub, models.ProviderBitbucket}
 
 type connectState struct {
 	AccountID string
@@ -117,8 +117,8 @@ func (a *Handler) completeAccountConnection(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	providerID := strings.TrimSpace(gothUser.UserID)
-	if numericID, parseErr := strconv.ParseInt(providerID, 10, 64); parseErr != nil || numericID <= 0 {
-		http.Error(w, "GitHub returned an invalid user ID", http.StatusBadGateway)
+	if !validLinkedProviderID(gothUser.Provider, providerID) {
+		http.Error(w, invalidLinkedProviderIDMessage(gothUser.Provider), http.StatusBadGateway)
 		return
 	}
 
@@ -176,4 +176,28 @@ func connectSuccessRedirectURL(redirect, provider string) string {
 
 func connectErrorRedirectURL(redirect, code, provider string) string {
 	return appendAuthQuery(redirect, authErrorParam, code, provider)
+}
+
+func validLinkedProviderID(provider, providerID string) bool {
+	providerID = strings.TrimSpace(providerID)
+	if providerID == "" {
+		return false
+	}
+	if strings.EqualFold(provider, models.ProviderBitbucket) {
+		return validBitbucketAccountID(providerID)
+	}
+	numericID, err := strconv.ParseInt(providerID, 10, 64)
+	return err == nil && numericID > 0
+}
+
+func validBitbucketAccountID(providerID string) bool {
+	parsed, err := uuid.Parse(strings.Trim(strings.TrimSpace(providerID), "{}"))
+	return err == nil && parsed != uuid.Nil
+}
+
+func invalidLinkedProviderIDMessage(provider string) string {
+	if strings.EqualFold(provider, models.ProviderBitbucket) {
+		return "Bitbucket returned an invalid user ID"
+	}
+	return "GitHub returned an invalid user ID"
 }
