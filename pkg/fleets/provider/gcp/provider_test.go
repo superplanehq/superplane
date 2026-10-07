@@ -201,6 +201,24 @@ func TestCreateTreatsExistingInstanceAsCreated(t *testing.T) {
 	}
 }
 
+func TestCreateKeepsInstanceWhenOperationResultIsUnknown(t *testing.T) {
+	client := &fakeCompute{insertErrors: []error{
+		fmt.Errorf("%w: wait timed out", errOperationResultUnknown),
+	}}
+	gcpProvider := newTestProvider(t, client, nil)
+
+	resource, err := gcpProvider.Create(context.Background(), testCreateRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resource.ID != "us-central1-a/superplane-runner-"+testRunnerID {
+		t.Fatalf("resource ID = %q", resource.ID)
+	}
+	if len(client.inserts) != 1 {
+		t.Fatalf("insert calls = %d", len(client.inserts))
+	}
+}
+
 func TestListFindsInstancesByFleetManagerAndFleetLabels(t *testing.T) {
 	created := time.Now().UTC().Add(-time.Minute).Truncate(time.Second)
 	runnerID := testRunnerID
@@ -334,10 +352,10 @@ func TestBuildBootstrapRendersValidShellScript(t *testing.T) {
 
 	script := string(body)
 	for _, expected := range []string{
-		`"https://downloads.example/runner/v1.2.3/runner-linux-amd64.tar.gz"`,
+		`'https://downloads.example/runner/v1.2.3/runner-linux-amd64.tar.gz'`,
 		sha + "  $bundle_dir/runner.tar.gz",
-		`RUNNER_API_URL="https://superplane.example"`,
-		`RUNNER_REGISTRATION_TOKEN="registration-token"`,
+		`RUNNER_API_URL='https://superplane.example'`,
+		`RUNNER_REGISTRATION_TOKEN='registration-token'`,
 	} {
 		if !strings.Contains(script, expected) {
 			t.Fatalf("bootstrap is missing %q:\n%s", expected, script)
@@ -347,6 +365,23 @@ func TestBuildBootstrapRendersValidShellScript(t *testing.T) {
 	command.Stdin = strings.NewReader(script)
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("bootstrap shell syntax: %v\n%s", err, output)
+	}
+}
+
+func TestShellQuoteKeepsValuesLiteralInBash(t *testing.T) {
+	for _, value := range []string{
+		"https://downloads.example/$assets/runner.tar.gz",
+		"https://downloads.example/`id`/runner.tar.gz",
+		"it's \"quoted\" \\ $(id)",
+		"",
+	} {
+		output, err := exec.Command("bash", "-c", "printf %s "+shellQuote(value)).CombinedOutput()
+		if err != nil {
+			t.Fatalf("bash failed for %q: %v\n%s", value, err, output)
+		}
+		if string(output) != value {
+			t.Fatalf("bash printed %q, want %q", output, value)
+		}
 	}
 }
 

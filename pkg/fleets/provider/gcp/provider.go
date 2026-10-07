@@ -171,6 +171,16 @@ func (p *Provider) Create(
 	var lastErr error
 	for _, zone := range p.config.Zones {
 		err := p.client.InsertInstance(ctx, p.config.ProjectID, zone, p.instance(request, name, zone))
+		if errors.Is(err, errOperationResultUnknown) {
+			// The VM can be running a task already. List reconciles it later.
+			p.log.Warn(
+				"GCP runner creation result is unknown",
+				slog.String("runner_id", request.RunnerID),
+				slog.String("zone", zone),
+				slog.String("error", err.Error()),
+			)
+			err = nil
+		}
 		if err == nil || isStatus(err, http.StatusConflict) {
 			p.log.Info(
 				"created GCP runner",

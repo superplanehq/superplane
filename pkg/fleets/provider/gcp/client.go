@@ -2,14 +2,27 @@ package gcpprovider
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"slices"
 	"strings"
+	"time"
 
 	compute "google.golang.org/api/compute/v1"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 )
 
-const operationStatusDone = "DONE"
+const (
+	operationStatusDone       = "DONE"
+	warningCodeUnreachable    = "UNREACHABLE"
+	defaultOperationWaitRetry = 2 * time.Second
+)
+
+// errOperationResultUnknown means that Compute Engine accepted the request,
+// but the operation result could not be read. The instance can exist.
+var errOperationResultUnknown = errors.New("compute operation result is unknown")
 
 type ComputeAPI interface {
 	// InsertInstance returns after the zone operation is done.
@@ -30,7 +43,8 @@ func (e *operationError) Error() string {
 }
 
 type sdkCompute struct {
-	service *compute.Service
+	service   *compute.Service
+	waitRetry time.Duration
 }
 
 func NewSDK(ctx context.Context, options ...option.ClientOption) (ComputeAPI, error) {
@@ -38,7 +52,7 @@ func NewSDK(ctx context.Context, options ...option.ClientOption) (ComputeAPI, er
 	if err != nil {
 		return nil, fmt.Errorf("create Compute Engine client: %w", err)
 	}
-	return &sdkCompute{service: service}, nil
+	return &sdkCompute{service: service, waitRetry: defaultOperationWaitRetry}, nil
 }
 
 func (s *sdkCompute) InsertInstance(
@@ -67,13 +81,34 @@ func (s *sdkCompute) ListInstances(
 		Filter(filter).
 		ReturnPartialSuccess(true).
 		Pages(ctx, func(page *compute.InstanceAggregatedList) error {
-			for _, scoped := range page.Items {
-				instances = append(instances, scoped.Instances...)
+			found, err := instancesFromPage(page)
+			if err != nil {
+				return err
 			}
+			instances = append(instances, found...)
 			return nil
 		})
 	if err != nil {
 		return nil, err
+	}
+	return instances, nil
+}
+
+// instancesFromPage fails on unreachable scopes. A partial list would hide
+// instances that Fleet Manager must clean up.
+func instancesFromPage(page *compute.InstanceAggregatedList) ([]*compute.Instance, error) {
+	unreachable := slices.Clone(page.Unreachables)
+	var instances []*compute.Instance
+	for scope, scoped := range page.Items {
+		if scoped.Warning != nil && scoped.Warning.Code == warningCodeUnreachable {
+			unreachable = append(unreachable, scope)
+			continue
+		}
+		instances = append(instances, scoped.Instances...)
+	}
+	if len(unreachable) > 0 {
+		slices.Sort(unreachable)
+		return nil, fmt.Errorf("list instances: unreachable scopes: %s", strings.Join(unreachable, ", "))
 	}
 	return instances, nil
 }
@@ -85,10 +120,13 @@ func (s *sdkCompute) waitZoneOperation(
 ) error {
 	for operation.Status != operationStatusDone {
 		next, err := s.service.ZoneOperations.Wait(project, zone, operation.Name).Context(ctx).Do()
-		if err != nil {
-			return fmt.Errorf("wait for compute operation %s: %w", operation.Name, err)
+		if err == nil {
+			operation = next
+			continue
 		}
-		operation = next
+		if !isTemporary(err) || !sleep(ctx, s.waitRetry) {
+			return fmt.Errorf("%w: wait for compute operation %s: %w", errOperationResultUnknown, operation.Name, err)
+		}
 	}
 	if operation.Error == nil || len(operation.Error.Errors) == 0 {
 		return nil
@@ -101,4 +139,26 @@ func (s *sdkCompute) waitZoneOperation(
 	}
 	failure.message = strings.Join(messages, "; ")
 	return failure
+}
+
+func isTemporary(err error) bool {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var apiError *googleapi.Error
+	if !errors.As(err, &apiError) {
+		return true
+	}
+	return apiError.Code == http.StatusTooManyRequests || apiError.Code >= http.StatusInternalServerError
+}
+
+func sleep(ctx context.Context, duration time.Duration) bool {
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
 }
