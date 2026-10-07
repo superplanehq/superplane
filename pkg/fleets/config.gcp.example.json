@@ -1,0 +1,30 @@
+{
+  "id": "gke",
+  "superplaneUrl": "https://superplane.example",
+  "installationAdminToken": "replace-with-personal-api-token",
+  "runnerReleaseBaseUrl": "https://superplanehq-releases.s3.amazonaws.com/runner",
+  "reconcileIntervalSeconds": 15,
+  "requestTimeoutSeconds": 90,
+  "fleets": [
+    {
+      "id": "e1-large-amd64",
+      "provider": "gcp",
+      "warmCapacity": 0,
+      "maxCapacity": 2,
+      "gcp": {
+        "projectId": "my-gcp-project",
+        "zones": ["us-central1-a", "us-central1-b"],
+        "machineType": "e2-standard-4",
+        "image": "projects/my-gcp-project/global/images/family/superplane-runner-amd64",
+        "architecture": "amd64",
+        "subnetwork": "projects/my-gcp-project/regions/us-central1/subnetworks/superplane-runners",
+        "networkTags": ["superplane-runner"],
+        "diskSizeGb": 30,
+        "diskType": "pd-balanced",
+        "labels": {
+          "environment": "production"
+        }
+      }
+    }
+  ]
+}
