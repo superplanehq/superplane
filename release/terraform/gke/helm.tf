@@ -52,12 +52,64 @@ resource "kubectl_manifest" "letsencrypt_issuer" {
 # SuperPlane Helm Release
 # -----------------------------------------------------------------------------
 
+locals {
+  superplane_chart_local = var.superplane_chart_path != ""
+
+  gcs_blob_storage_values = local.gcs_blob_storage_enabled ? yamlencode({
+    serviceAccount = {
+      create = true
+      name   = local.app_service_account_name
+      annotations = {
+        "iam.gke.io/gcp-service-account" = google_service_account.app[0].email
+      }
+    }
+    blobStorage = {
+      provider = "gcs"
+      bucket   = google_storage_bucket.blobs[0].name
+    }
+  }) : ""
+
+  runner_api_values = local.runners_enabled ? yamlencode({
+    runnerAPI = {
+      enabled = true
+    }
+  }) : ""
+
+  fleet_manager_values = local.fleet_manager_enabled ? yamlencode({
+    fleetManager = {
+      enabled        = true
+      existingSecret = kubernetes_secret.fleet_manager[0].metadata[0].name
+      image = {
+        registry = var.fleet_manager_image_registry
+        tag      = var.fleet_manager_image_tag
+      }
+      serviceAccount = {
+        create = true
+        name   = local.fleet_manager_service_account_name
+        annotations = {
+          "iam.gke.io/gcp-service-account" = google_service_account.fleet_manager[0].email
+        }
+      }
+      podAnnotations = {
+        "checksum/config" = sha256(local.fleet_manager_config)
+      }
+    }
+  }) : ""
+}
+
 resource "helm_release" "superplane" {
   name             = "superplane"
-  repository       = "oci://ghcr.io/superplanehq"
-  chart            = "superplane-chart"
+  repository       = local.superplane_chart_local ? null : "oci://ghcr.io/superplanehq"
+  chart            = local.superplane_chart_local ? var.superplane_chart_path : "superplane-chart"
+  version          = local.superplane_chart_local || var.superplane_chart_version == "" ? null : var.superplane_chart_version
   namespace        = var.superplane_namespace
   create_namespace = false
+
+  values = compact([
+    local.gcs_blob_storage_values,
+    local.runner_api_values,
+    local.fleet_manager_values,
+  ])
 
   # Database configuration
   set {
@@ -263,6 +315,12 @@ resource "helm_release" "superplane" {
     helm_release.cert_manager,
     kubectl_manifest.letsencrypt_issuer,
     kubectl_manifest.frontend_config,
-    google_sql_database.superplane
+    google_sql_database.superplane,
+    google_storage_bucket_iam_member.app_blobs,
+    google_service_account_iam_member.app_sign_blob,
+    google_service_account_iam_member.app_workload_identity,
+    google_project_service.iamcredentials,
+    google_project_iam_member.fleet_manager_instance_admin,
+    google_service_account_iam_member.fleet_manager_workload_identity,
   ]
 }
