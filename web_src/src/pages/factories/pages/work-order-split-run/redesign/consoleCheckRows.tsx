@@ -170,7 +170,7 @@ function ConsoleCheckRow({ check }: { check: WorkOrderCheckPresentation }) {
       <TooltipTrigger asChild>
         <div
           data-testid={`split-run-check-${check.id}`}
-          className="flex w-full min-w-0 items-center justify-between gap-3 py-2 text-left"
+          className="-mx-(--frame-panel-px) flex w-auto min-w-0 items-center justify-between gap-3 px-(--frame-panel-px) py-2 text-left transition-colors hover:bg-muted"
         >
           <span className="flex min-w-0 items-center gap-2">
             <CheckIcon check={check} />
