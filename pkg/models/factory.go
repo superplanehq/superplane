@@ -1129,16 +1129,9 @@ type ListFactoryWorkOrdersFilters struct {
 	PublicBoard bool
 }
 
-func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
-	if filters.Limit <= 0 {
-		filters.Limit = DefaultFactoryWorkOrderListLimit
-	}
-
+func (f *Factory) workOrdersQuery(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) *gorm.DB {
 	query := tx.
 		Model(&FactoryWorkOrder{}).
-		Preload("CreatedBy").
-		Preload("Assignees").
-		Preload("Assignees.User").
 		Where("factory_work_orders.organization_id = ?", f.OrganizationID).
 		Where("factory_work_orders.factory_id = ?", f.ID)
 
@@ -1156,6 +1149,28 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 	} else {
 		query = applyWorkOrderLineFilter(query, filters.LineID)
 	}
+
+	return query
+}
+
+func (f *Factory) CountWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) (int64, error) {
+	var count int64
+	err := f.workOrdersQuery(tx, filters).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
+	if filters.Limit <= 0 {
+		filters.Limit = DefaultFactoryWorkOrderListLimit
+	}
+
+	query := f.workOrdersQuery(tx, filters).
+		Preload("CreatedBy").
+		Preload("Assignees").
+		Preload("Assignees.User")
 
 	if filters.BeforeID != nil {
 		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)

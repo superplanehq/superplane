@@ -276,6 +276,7 @@ export function useFactoryWorkOrdersPage(
     fetchNextPage: query.fetchNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     isFetchNextPageError: query.isFetchNextPageError,
+    totalCount: query.data?.pages[0]?.totalCount,
   };
 }
 
@@ -284,6 +285,7 @@ export type FactoryBoardColumnPage = {
   isFetchingNextPage: boolean;
   isFetchNextPageError: boolean;
   fetchNextPage: () => void;
+  totalCount?: number;
 };
 
 export type FactoryBoardWorkOrders = {
@@ -303,6 +305,7 @@ function boardColumnPage(page: ReturnType<typeof useFactoryWorkOrdersPage>): Fac
     fetchNextPage: () => {
       void page.fetchNextPage();
     },
+    totalCount: page.totalCount,
   };
 }
 

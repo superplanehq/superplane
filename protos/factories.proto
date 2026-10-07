@@ -1761,6 +1761,7 @@ message ListWorkOrdersRequest {
 message ListWorkOrdersResponse {
   repeated WorkOrderSummary orders = 1;
   bool has_next_page = 2;
+  uint32 total_count = 3;
 }
 
 message CreateWorkOrderRequest {
