@@ -1001,6 +1001,8 @@ message SelectFactoryVCSProviderRepositoryRequest {
   string id = 1;
   string provider = 2;
   int64 repository_id = 3;
+  // Bitbucket repository as workspace/slug. GitHub uses repository_id.
+  string repository = 4;
 }
 
 message SelectFactoryVCSProviderRepositoryResponse {
@@ -1047,6 +1049,8 @@ message FactoryOnboarding {
   int64 backlog_repository_id = 13;
   // Git host for this workspace. Empty means GitHub.
   string vcs_provider = 14;
+  // Bitbucket repository UUID. GitHub leaves this empty.
+  string app_repository_external_id = 15;
 }
 
 // Automations the workspace Git host can run. Computed from vcs_provider.

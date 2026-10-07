@@ -25,8 +25,6 @@ export function usePalettePermissions(organizationId: string | null) {
 }
 
 export function useCommandPaletteShortcuts({
-  canvasId,
-  organizationId,
   createCanvas,
   createCanvasDisabled,
   enabled,
@@ -37,8 +35,6 @@ export function useCommandPaletteShortcuts({
   setPage,
   setSearch,
 }: {
-  canvasId: string | null;
-  organizationId: string | null;
   createCanvas: () => Promise<void>;
   createCanvasDisabled: boolean;
   enabled: boolean;
@@ -70,12 +66,6 @@ export function useCommandPaletteShortcuts({
     const onKeyDown = (event: KeyboardEvent) => {
       const usesModifier = event.metaKey || event.ctrlKey;
 
-      if (canToggleCommandPalette({ canvasId, event, open, organizationId, usesModifier })) {
-        event.preventDefault();
-        setOpen((prev) => !prev);
-        return;
-      }
-
       if (usesModifier && event.key === COMMAND_SHORTCUT && !isEditableTarget(event.target)) {
         if (createCanvasDisabled) return;
         event.preventDefault();
@@ -91,7 +81,7 @@ export function useCommandPaletteShortcuts({
 
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [canvasId, organizationId, createCanvas, createCanvasDisabled, enabled, open, page, search, setOpen, setPage]);
+  }, [createCanvas, createCanvasDisabled, enabled, open, page, search, setPage]);
 }
 
 function toPermissionSet(permissions: AuthorizationPermission[]) {
@@ -105,24 +95,4 @@ function toPermissionSet(permissions: AuthorizationPermission[]) {
       })
       .filter((value): value is string => !!value),
   );
-}
-
-function canToggleCommandPalette({
-  canvasId,
-  event,
-  open,
-  organizationId,
-  usesModifier,
-}: {
-  canvasId: string | null;
-  event: KeyboardEvent;
-  open: boolean;
-  organizationId: string | null;
-  usesModifier: boolean;
-}) {
-  if (!usesModifier) return false;
-  if (event.key !== "k") return false;
-  if (canvasId) return false;
-  if (!organizationId) return false;
-  return open || !isEditableTarget(event.target);
 }

@@ -8,11 +8,20 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { Check, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { useFirstRunVisual } from "./first-run/firstRunVisual";
 import { FIXTURE_REPOS, VCS_OPTIONS, vcsLabel, type IntegrationId, type VcsHostId } from "./onboardingFixtures";
 import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
 export function IntegrationChoiceIcon({ name, size = 20 }: { name: IntegrationId | VcsHostId; size?: number }) {
-  return <IntegrationIcon integrationName={name} className={size <= 16 ? "size-3.5" : "size-5"} size={size} />;
+  const onDarkSurface = useFirstRunVisual() === "preview";
+  return (
+    <IntegrationIcon
+      integrationName={name}
+      className={size <= 16 ? "size-3.5" : "size-5"}
+      size={size}
+      onDarkSurface={onDarkSurface}
+    />
+  );
 }
 
 function ComingSoonRibbon() {

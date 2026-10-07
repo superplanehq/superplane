@@ -79,10 +79,6 @@ const FeatureNewRunners = "new_runners"
 // available.
 const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 
-// FeatureFactoryRiskScore gates the merge confidence automation on the Verify
-// column until the flow is generally available.
-const FeatureFactoryRiskScore = "factory_risk_score"
-
 // FeatureSuperPlaneMCPServer is released. Every organization can authorize
 // Cursor and other MCP clients against one workspace. The factories flag
 // still applies.
@@ -93,16 +89,12 @@ const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 // task view on phone-width screens. Desktop screens keep the standard shell.
 const FeatureMobileFactoryBoard = "mobile_factory_board"
 
-// FeatureTaskPlanningReview enables the new task planning UI per organization.
-const FeatureTaskPlanningReview = "task_planning_review"
-
 func released() *bool {
 	v := true
 	return &v
 }
 
 var registry = []Feature{
-	{ID: FeatureTaskPlanningReview, Label: "Task Planning Review", Description: "Show the new plan card, focused questions, and implementation controls"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
@@ -120,7 +112,6 @@ var registry = []Feature{
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureNewRunners, Label: "New Runners", Description: "Run tasks with the integrated SuperPlane runner architecture"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
-	{ID: FeatureFactoryRiskScore, Label: "Factory Merge Confidence", Description: "Add a merge confidence automation to the Verify column"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
 	{ID: FeatureMobileFactoryBoard, Label: "Mobile Board", Description: "Show the mobile workspace shell on phone-width screens"},
 }

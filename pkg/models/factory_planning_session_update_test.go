@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
+	"gorm.io/gorm"
 )
 
 func TestFactoryPlanningSession_ProposeUpdateWritesScoresSpecAndSurvey(t *testing.T) {
@@ -165,7 +165,6 @@ func TestAnalysisContinuationTextUsesProposeUpdateWhenReviewIsOn(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-continue-review")
 	db := database.DB(t.Context())
-	require.NoError(t, EnableExperimentalFeatureInTransaction(db, org.ID, features.FeatureTaskPlanningReview))
 	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Confidence: true}))
 	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
 	_, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
@@ -208,7 +207,30 @@ func TestWorkOrderReadyForAutoStartReviewRequiresAllThreeThrees(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-review")
 	db := database.DB(t.Context())
-	require.NoError(t, EnableExperimentalFeatureInTransaction(db, org.ID, features.FeatureTaskPlanningReview))
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: false}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{
+		Scores: reviewScores(3, 3, 3),
+		Spec:   "# Retry refunds\n\nStop double charges.\n",
+	}))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.True(t, ready)
+
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 2)}))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartReviewBlocksLaterMaximumAfterLowFirstScore(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-review-low-first")
+	db := database.DB(t.Context())
 	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: false}))
 	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
 	line, err := factoryModel.CreateLine(db, "ship", nil)
@@ -226,7 +248,64 @@ func TestWorkOrderReadyForAutoStartReviewRequiresAllThreeThrees(t *testing.T) {
 	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
-	assert.True(t, ready)
+	assert.False(t, ready)
+
+	require.NoError(t, session.SendUserMessage(db, "The refund path changed.", userID))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	nextRun, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, session.AttachAgentRun(db, nextRun.ID, ""))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartReviewIgnoresLegacyClarityScale(t *testing.T) {
+	t.Run("a maximum legacy clarity score does not block the first review scores", func(t *testing.T) {
+		db, factoryModel, order, session := switchDraftToReviewPlanning(t, "auto-start-review-after-legacy-max", 5)
+		require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
+
+		ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+		require.NoError(t, err)
+		assert.True(t, ready)
+	})
+
+	t.Run("a legacy score of 3 does not hide a low first review clarity score", func(t *testing.T) {
+		db, factoryModel, order, session := switchDraftToReviewPlanning(t, "auto-start-review-after-legacy-three", 3)
+		require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(1, 3, 3)}))
+		require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
+
+		ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+		require.NoError(t, err)
+		assert.False(t, ready)
+	})
+}
+
+func switchDraftToReviewPlanning(t *testing.T, slug string, legacyClarity float64) (*gorm.DB, *Factory, *FactoryWorkOrder, *FactoryPlanningSession) {
+	t.Helper()
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, slug)
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, order.StorePlanningSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	_, err = order.ReportCheck(db, FactoryWorkOrderCheckParams{
+		Key:      PlanningClarityCheckKey,
+		Name:     PlanningClarityCheckName,
+		Score:    legacyClarity,
+		MaxScore: PlanningScoreMax,
+		Summary:  "The task is defined.",
+	})
+	require.NoError(t, err)
+	return db, factoryModel, order, session
 }
 
 func reviewScores(clarity, complexity, verifiability float64) *PlanningReviewScores {

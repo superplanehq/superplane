@@ -66,6 +66,26 @@ func TestAssetHandlerNoIndexHeader(t *testing.T) {
 			wantBody:   "<html><body>Hello</body></html>",
 			wantType:   "text/html",
 		},
+		{
+			name:       "web app manifest is the manifest file, not the app page",
+			appEnv:     "production",
+			path:       "/manifest.webmanifest",
+			wantStatus: http.StatusOK,
+			wantHeader: "",
+			wantBody:   `{"name":"SuperPlane","display":"standalone"}`,
+			wantType:   "application/manifest+json",
+			wantCache:  "public, max-age=3600",
+		},
+		{
+			name:       "pwa icon under assets is the image, not the app page",
+			appEnv:     "production",
+			path:       "/assets/pwa/icon-192.png",
+			wantStatus: http.StatusOK,
+			wantHeader: "",
+			wantBody:   "png-bytes",
+			wantType:   "image/png",
+			wantCache:  "public, max-age=3600",
+		},
 	}
 
 	for _, tt := range tests {
@@ -76,6 +96,8 @@ func TestAssetHandlerNoIndexHeader(t *testing.T) {
 				"index.html":                     &fstest.MapFile{Data: []byte("<html><body>Hello</body></html>")},
 				"assets/main.js":                 &fstest.MapFile{Data: []byte("console.log('ok')")},
 				"assets/onboarding/three.min.js": &fstest.MapFile{Data: []byte("window.THREE = {}")},
+				"manifest.webmanifest":           &fstest.MapFile{Data: []byte(`{"name":"SuperPlane","display":"standalone"}`)},
+				"assets/pwa/icon-192.png":        &fstest.MapFile{Data: []byte("png-bytes")},
 			}), "")
 
 			req := httptest.NewRequest(http.MethodGet, tt.path, nil)

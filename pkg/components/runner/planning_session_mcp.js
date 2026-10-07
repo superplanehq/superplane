@@ -6,9 +6,6 @@ const fs = require("fs");
 const path = require("path");
 const {
   isCompactStatusText,
-  planningClarityEnabled,
-  planningConfidenceEnabled,
-  planningReviewEnabled,
 } = require("./analysis_protocol");
 const { MAX_ATTACHMENT_BYTES } = require("./attachment_limit");
 
@@ -417,83 +414,6 @@ const UPDATE_TOOL = {
 
 const TOOLS = [
   {
-    name: "propose_spec",
-    description: "Publish the specification markdown for the open task. Call this before you stop whenever you write or update a specification this turn. Do not leave a written plan unpublished. Pass the full markdown body.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        body: { type: "string" },
-      },
-      required: ["body"],
-    },
-  },
-  {
-    name: "propose_clarity",
-    description:
-      "Publish the 1 through 5 Clarity score: how well the task is defined. Call this on the first message and on a plan turn that also asks a question. Do not call it on an answer turn. Call it before survey. If the user asks to update only the other score, do not call this tool. When every required score is 5, call this on that plan turn even if this score did not change. An unchanged score stays on the card on an answer turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        score: {
-          type: "number",
-          description: "Clarity from 1 through 5.",
-        },
-        summary: {
-          type: "string",
-          description: "Short Clarity summary for the user. Follow the task prompt for length and shape.",
-        },
-      },
-      required: ["score", "summary"],
-    },
-  },
-  {
-    name: "propose_confidence",
-    description:
-      "Publish the 1 through 5 Confidence score: how likely a coding agent completes this task in one run without steering. Call this on the first message and on a plan turn that also asks a question. Do not call it on an answer turn. Call it before survey. If the user asks to update only the other score, do not call this tool. When every required score is 5, call this on that plan turn even if this score did not change. An unchanged score stays on the card on an answer turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        score: {
-          type: "number",
-          description: "Confidence from 1 through 5.",
-        },
-        summary: {
-          type: "string",
-          description: "Short Confidence summary for the user. Follow the task prompt for length and shape.",
-        },
-      },
-      required: ["score", "summary"],
-    },
-  },
-  {
-    name: "survey",
-    description:
-      "Ask one multiple-choice question. Call this only when the task prompt says to ask. Use 2 to 4 short everyday options. On a plan turn, call the required score tools before this call. Call propose_spec first when you write a plan. Then stop and wait. Do not ask the same question in chat.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        questions: {
-          type: "array",
-          description:
-            "A JSON array of question objects. Do not pass XML or a JSON-encoded string.",
-          items: {
-            type: "object",
-            properties: {
-              prompt: { type: "string", description: "One plain question." },
-              options: {
-                type: "array",
-                items: { type: "string" },
-                description: "Short everyday options. Under 12 words each.",
-              },
-            },
-            required: ["prompt", "options"],
-          },
-        },
-      },
-      required: ["questions"],
-    },
-  },
-  {
     name: "inspect_attachment",
     description:
       "Inspect a user image from the task attachments directory. Returns the image so you can see it. Call this for every PNG, JPEG, GIF, or WebP user image. Do not use OCR or the file command.",
@@ -556,30 +476,7 @@ async function handleRequest(message) {
     try {
       let result;
       if (name === "propose_update") {
-        if (!planningReviewEnabled()) {
-          sendError(id, -32601, "Unknown tool: propose_update");
-          return;
-        }
         result = await proposeUpdate(args);
-      } else if (planningReviewEnabled() && name !== "inspect_attachment") {
-        sendError(id, -32601, `Unknown tool: ${name}`);
-        return;
-      } else if (name === "propose_spec") {
-        result = await proposeSpec(args);
-      } else if (name === "propose_clarity") {
-        if (!planningClarityEnabled()) {
-          sendError(id, -32601, "Unknown tool: propose_clarity");
-          return;
-        }
-        result = await proposeClarity(args);
-      } else if (name === "propose_confidence") {
-        if (!planningConfidenceEnabled()) {
-          sendError(id, -32601, "Unknown tool: propose_confidence");
-          return;
-        }
-        result = await proposeConfidence(args);
-      } else if (name === "survey") {
-        result = await proposeSurvey(args);
       } else if (name === "inspect_attachment") {
         result = inspectAttachment(args);
       } else {
@@ -737,19 +634,8 @@ if (require.main === module) {
   main();
 }
 
-function planningTools(env = process.env) {
-  if (planningReviewEnabled(env)) {
-    return [UPDATE_TOOL, TOOLS.find((tool) => tool.name === "inspect_attachment")];
-  }
-  return TOOLS.filter((tool) => {
-    if (tool.name === "propose_clarity") {
-      return planningClarityEnabled(env);
-    }
-    if (tool.name === "propose_confidence") {
-      return planningConfidenceEnabled(env);
-    }
-    return true;
-  });
+function planningTools() {
+  return [UPDATE_TOOL, TOOLS.find((tool) => tool.name === "inspect_attachment")];
 }
 
 module.exports = {

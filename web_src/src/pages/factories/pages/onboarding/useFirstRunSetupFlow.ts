@@ -1,8 +1,22 @@
+import type { MeVcsProviderRepository } from "@/api-client";
+import { useIntakeCatalogAvailability } from "@/hooks/useIntakeCatalogAvailability";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { linkedAccountConnectHref } from "@/lib/accountSettings";
+import {
+  FEATURE_FACTORY_BITBUCKET,
+} from "@/lib/experimentalFeatures";
+import { isIntakeSelectable } from "@/lib/intakeCatalog";
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { DEFAULT_TICKET_SOURCE, ticketSourceFromIssuesChoice } from "./first-run/firstRunTicketSource";
+import type { FirstRunTicketSource } from "./first-run/firstRunTypes";
+import {
+  canAnalyzeTicketSource,
+  DEFAULT_TICKET_SOURCE,
+  issuesChoiceForTicketSource,
+  ticketSourceFromIssuesChoice,
+} from "./first-run/firstRunTicketSource";
 import { type IntegrationId, type IssuesChoiceId, type VcsHostId, type WizardStepId } from "./onboardingFixtures";
 import {
   onboardingAgentGate,
@@ -10,10 +24,23 @@ import {
   type OnboardingAgentGate,
 } from "./onboardingAgentReadiness";
 import { isWizardStepId } from "./onboardingStatus";
-import { useFirstRunBlockingAction } from "./useFirstRunBlockingAction";
-import { useFirstRunCommands } from "./useFirstRunCommands";
-import { useFirstRunIntakeAvailability } from "./useFirstRunIntakeAvailability";
-import { githubOnboardingMessage, useFirstRunGitHub, type GitHubConnectionState } from "./useFirstRunGitHub";
+import { onboardingStepPath } from "./onboardingStepPath";
+import {
+  clearGitHubInstallStarted,
+  githubAccessKeys,
+  markGitHubInstallStarted,
+  type GitHubInstallScope,
+} from "./githubInstallReturn";
+import { githubConnectReturnPath } from "./onboardingGitHubConnect";
+import { useFirstRunBlockingAction, type FirstRunBlocking } from "./useFirstRunBlockingAction";
+import { useFirstRunBitbucket } from "./useFirstRunBitbucket";
+import {
+  githubOnboardingMessage,
+  navigateGitHubWindow,
+  openGitHubWindow,
+  useFirstRunGitHub,
+  type GitHubConnectionState,
+} from "./useFirstRunGitHub";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
@@ -172,126 +199,186 @@ function useFirstRunNavigation(
   };
 }
 
-type FlaggedIssuesChoice = "vcs" | "jira" | "linear";
-
-function shouldClearSavedFlaggedChoice(args: {
-  issuesChoice: IssuesChoiceId | null;
-  source: FlaggedIssuesChoice;
-  featureLoading: boolean;
-  available: boolean;
-  organizationReady: boolean;
-}): boolean {
-  if (args.featureLoading || args.available || args.issuesChoice !== args.source) return false;
-  return args.organizationReady;
+function waitForBrowserPaint(): Promise<void> {
+  return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
-export function shouldClearSavedJiraChoice(args: {
-  issuesChoice: IssuesChoiceId | null;
-  featureLoading: boolean;
-  jiraAvailable: boolean;
-  organizationReady: boolean;
-}): boolean {
-  return shouldClearSavedFlaggedChoice({
-    issuesChoice: args.issuesChoice,
-    source: "jira",
-    featureLoading: args.featureLoading,
-    available: args.jiraAvailable,
-    organizationReady: args.organizationReady,
-  });
+function selectedIssuesChoice(
+  model: OnboardingPageModel,
+  vcsAvailable: boolean,
+  jiraAvailable: boolean,
+  linearAvailable: boolean,
+): IssuesChoiceId | null {
+  const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice);
+  const issuesChoice = issuesChoiceForTicketSource(ticketSource);
+  if (issuesChoice === "vcs" && !vcsAvailable) return null;
+  if (issuesChoice === "jira" && !jiraAvailable) return null;
+  if (issuesChoice === "linear" && !linearAvailable) return null;
+  if (issuesChoice === "linear" && (model.linearProjectsLoading || model.linearProjectsError)) return null;
+  if (
+    !issuesChoice ||
+    !canAnalyzeTicketSource({
+      ticketSource,
+      jiraConnected: model.setup.connected.has("jira"),
+      jiraProjectId: model.jiraProjectId,
+      linearConnected: model.setup.connected.has("linear"),
+      linearProjectIds: model.linearProjectIds,
+    })
+  ) {
+    return null;
+  }
+  return issuesChoice;
 }
 
-export function shouldClearSavedVcsChoice(args: {
-  issuesChoice: IssuesChoiceId | null;
-  featureLoading: boolean;
+function saveSelectedRepository(args: {
+  model: OnboardingPageModel;
+  connection: GitHubConnectionState;
+  forgeConfigured: boolean;
+}): Promise<boolean> {
+  const selectedRepo = args.model.setup.selectedRepo;
+  if (!selectedRepo) return Promise.resolve(false);
+  if (args.model.setup.vcsHost === "bitbucket") {
+    args.model.setup.commitRepoStep();
+    if (args.forgeConfigured) return args.model.selectBitbucketForgeRepository(selectedRepo);
+    return args.model.selectBitbucketRepository(selectedRepo);
+  }
+  const repository = args.connection.repositories.find((candidate) => candidate.fullName === selectedRepo);
+  if (!repository) return Promise.resolve(false);
+  args.model.setup.commitRepoStep();
+  return args.model.selectCatalogRepository(repository);
+}
+
+function useFirstRunCommands(args: {
+  model: OnboardingPageModel;
+  agentGate: OnboardingAgentGate;
+  connection: GitHubConnectionState;
+  navigation: ReturnType<typeof useFirstRunNavigation>;
+  blocking: FirstRunBlocking;
   vcsAvailable: boolean;
-  organizationReady: boolean;
-}): boolean {
-  return shouldClearSavedFlaggedChoice({
-    issuesChoice: args.issuesChoice,
-    source: "vcs",
-    featureLoading: args.featureLoading,
-    available: args.vcsAvailable,
-    organizationReady: args.organizationReady,
-  });
-}
-
-export function shouldClearSavedLinearChoice(args: {
-  issuesChoice: IssuesChoiceId | null;
-  featureLoading: boolean;
-  linearAvailable: boolean;
-  organizationReady: boolean;
-}): boolean {
-  return shouldClearSavedFlaggedChoice({
-    issuesChoice: args.issuesChoice,
-    source: "linear",
-    featureLoading: args.featureLoading,
-    available: args.linearAvailable,
-    organizationReady: args.organizationReady,
-  });
-}
-
-export type SavedFlaggedChoiceBlock = "loading" | "lookup-failed";
-
-function savedFlaggedChoiceBlock(args: {
-  issuesChoice: IssuesChoiceId | null;
-  source: FlaggedIssuesChoice;
-  featureLoading: boolean;
-  available: boolean;
-  organizationReady: boolean;
-}): SavedFlaggedChoiceBlock | null {
-  if (args.available || args.issuesChoice !== args.source) return null;
-  if (args.featureLoading) return "loading";
-  if (!args.organizationReady) return "lookup-failed";
-  return null;
-}
-
-/** A saved Jira choice cannot continue until the intake catalog confirms Jira. */
-export function savedJiraChoiceBlock(args: {
-  issuesChoice: IssuesChoiceId | null;
-  featureLoading: boolean;
   jiraAvailable: boolean;
-  organizationReady: boolean;
-}): SavedFlaggedChoiceBlock | null {
-  return savedFlaggedChoiceBlock({
-    issuesChoice: args.issuesChoice,
-    source: "jira",
-    featureLoading: args.featureLoading,
-    available: args.jiraAvailable,
-    organizationReady: args.organizationReady,
-  });
-}
-
-/** A saved VCS choice cannot continue until the intake catalog confirms it. */
-export function savedVcsChoiceBlock(args: {
-  issuesChoice: IssuesChoiceId | null;
-  featureLoading: boolean;
-  vcsAvailable: boolean;
-  organizationReady: boolean;
-}): SavedFlaggedChoiceBlock | null {
-  return savedFlaggedChoiceBlock({
-    issuesChoice: args.issuesChoice,
-    source: "vcs",
-    featureLoading: args.featureLoading,
-    available: args.vcsAvailable,
-    organizationReady: args.organizationReady,
-  });
-}
-
-/** A saved Linear choice cannot continue until the feature lookup confirms Linear. */
-export function savedLinearChoiceBlock(args: {
-  issuesChoice: IssuesChoiceId | null;
-  featureLoading: boolean;
   linearAvailable: boolean;
-  organizationReady: boolean;
-}): SavedFlaggedChoiceBlock | null {
-  return savedFlaggedChoiceBlock({
-    issuesChoice: args.issuesChoice,
-    source: "linear",
-    featureLoading: args.featureLoading,
-    available: args.linearAvailable,
-    organizationReady: args.organizationReady,
-  });
+  bitbucketAvailable: boolean;
+  forgeConfigured: boolean;
+  installScope: GitHubInstallScope;
+}) {
+  const {
+    model,
+    agentGate,
+    connection,
+    navigation,
+    blocking,
+    vcsAvailable,
+    jiraAvailable,
+    linearAvailable,
+    bitbucketAvailable,
+    forgeConfigured,
+    installScope,
+  } = args;
+  const location = useLocation();
+  const saveRepository = () => saveSelectedRepository({ model, connection, forgeConfigured });
+  const continueFromRepository = () =>
+    blocking.run("saving-repository", async () => {
+      if (await saveRepository()) {
+        navigation.goToScreen(agentGate === "first" ? "agent" : "tickets");
+      }
+    });
+  const chooseVcsHost = (host: VcsHostId) => {
+    if (host === "gitlab" || (host === "bitbucket" && !bitbucketAvailable)) return;
+    model.setup.selectVcsHost(host);
+    navigation.goToScreen(host === "bitbucket" ? "choose" : "connect");
+  };
+  const connectBitbucket = () => {
+    void model.requestConnect("bitbucket");
+  };
+  const continueFromTickets = () =>
+    blocking.run("saving-ticket-source", async () => {
+      const issuesChoice = selectedIssuesChoice(model, vcsAvailable, jiraAvailable, linearAvailable);
+      if (!issuesChoice) return;
+      model.setup.setIssuesChoice(issuesChoice);
+      model.setup.commitIssuesStep();
+      if (!(await model.saveIssues(issuesChoice))) return;
+      if (agentGate === "pending") return;
+      if (agentGate === "show") return navigation.goToScreen("agent");
+      blocking.setAction("finishing-setup");
+      await model.finish(issuesChoice);
+    });
+  const connectGitHub = () =>
+    blocking.runUntilNavigation("opening-github", async () => {
+      const returnPath = githubConnectReturnPath(onboardingStepPath(`${location.pathname}${location.search}`, "repo"));
+      window.location.assign(linkedAccountConnectHref("github", returnPath));
+      return true;
+    });
+  const selectGitHubIdentity = (userId: string) =>
+    blocking.run("switching-github-account", async () => {
+      await connection.onboarding.selectIdentity.mutateAsync(userId);
+      model.setup.clearRepository();
+    });
+  const grantGitHubAccess = () =>
+    blocking.run("opening-github", async () => {
+      markGitHubInstallStarted(installScope, githubAccessKeys(connection.onboarding.data) ?? []);
+      const popup = openGitHubWindow();
+      try {
+        const url = await connection.onboarding.startInstallation.mutateAsync();
+        navigateGitHubWindow(popup, url);
+      } catch (error) {
+        clearGitHubInstallStarted(installScope);
+        popup?.close();
+        throw error;
+      }
+    });
+  const connectIssueTracker = (source: "jira" | "linear") =>
+    blocking.runUntilNavigation(source === "jira" ? "connecting-jira" : "connecting-linear", async () => {
+      if (source === "jira" ? !jiraAvailable : !linearAvailable) return false;
+      model.setup.setIssuesChoice(source);
+      if (!(await model.saveIssues(source))) return false;
+      await waitForBrowserPaint();
+      return model.requestConnect(source);
+    });
+  const continueFromAgent = () => {
+    if (agentGate === "first") return navigation.goToScreen("tickets");
+    return blocking.run("finishing-setup", async () => {
+      await model.finish();
+    });
+  };
+  const selectTicketSource = (source: FirstRunTicketSource) => {
+    if (source === "jira" && !jiraAvailable) return;
+    if (source === "linear" && !linearAvailable) return;
+    const issuesChoice = issuesChoiceForTicketSource(source);
+    if (issuesChoice) model.setup.setIssuesChoice(issuesChoice);
+  };
+  return {
+    chooseVcsHost,
+    connectBitbucket,
+    connectGitHub,
+    connectJira: () => connectIssueTracker("jira"),
+    connectLinear: () => connectIssueTracker("linear"),
+    continueFromRepository,
+    continueFromTickets,
+    continueFromAgent,
+    grantGitHubAccess,
+    selectGitHubIdentity,
+    selectTicketSource,
+  };
 }
+
+import {
+  savedVcsChoiceBlock,
+  savedJiraChoiceBlock,
+  savedLinearChoiceBlock,
+  shouldClearSavedVcsChoice,
+  shouldClearSavedJiraChoice,
+  shouldClearSavedLinearChoice,
+} from "./firstRunFlaggedChoice";
+
+export {
+  savedVcsChoiceBlock,
+  savedJiraChoiceBlock,
+  savedLinearChoiceBlock,
+  shouldClearSavedVcsChoice,
+  shouldClearSavedJiraChoice,
+  shouldClearSavedLinearChoice,
+};
+export type { SavedFlaggedChoiceBlock } from "./firstRunFlaggedChoice";
 
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId, factoryId } = useFactoriesLayout();
@@ -303,49 +390,65 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setupFinished,
     connectedBefore: Boolean(model.setup.selectedRepo),
   });
-  const intake = useFirstRunIntakeAvailability(organizationId);
+  const bitbucketConnect = useFirstRunBitbucket({ organizationId, setupFinished, blocking });
+  const intakeCatalog = useIntakeCatalogAvailability(organizationId);
+  const intakeFeatures = useExperimentalFeature(organizationId);
+  const intakeFeatureLoading = intakeFeatures.isLoading;
+  const bitbucketAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_BITBUCKET);
+  const bitbucket = { available: bitbucketAvailable, loading: intakeFeatureLoading };
+  const organizationReady = intakeCatalog.loaded;
+  const intakeState = intakeCatalog.stateOf;
+  const intakesLoading = intakeCatalog.loading;
+  const ticketIntakes = organizationReady ? intakeCatalog.entriesFor("onboardingTickets") : null;
+  const vcsAvailable = organizationReady
+    ? isIntakeSelectable(intakeState("github-issues"))
+    : intakeCatalog.error
+      ? true
+      : false;
+  const jiraAvailable = isIntakeSelectable(intakeState("jira-issues"));
+  const linearAvailable = isIntakeSelectable(intakeState("linear-issues"));
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
     bringYourOwnKey: model.bringYourOwnKey,
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
-  const navigation = useFirstRunNavigation(model, agentGate, connection, githubReady, intake.bitbucket);
+  const navigation = useFirstRunNavigation(model, agentGate, connection, githubReady, bitbucket);
   const commands = useFirstRunCommands({
     model,
     agentGate,
     connection,
     navigation,
     blocking,
-    vcsAvailable: intake.vcsAvailable,
-    jiraAvailable: intake.jiraAvailable,
-    linearAvailable: intake.linearAvailable,
-    bitbucketAvailable: intake.bitbucketAvailable,
+    vcsAvailable,
+    jiraAvailable,
+    linearAvailable,
+    bitbucketAvailable,
+    forgeConfigured: bitbucketConnect.configured,
     installScope,
   });
-  // A saved Jira or Linear choice is not valid when the intake catalog does
+  // A saved VCS/Jira/Linear choice is not valid when the intake catalog does
   // not let the organization use that intake. Clear it only after the catalog
   // loads and confirms that. A failed lookup has no catalog data and must not
   // replace the saved choice with the GitHub Issues default.
   const issuesChoice = model.setup.issuesChoice;
   const setIssuesChoice = model.setup.setIssuesChoice;
-  const organizationReady = intake.organizationReady;
   const vcsChoiceArgs = {
     issuesChoice,
-    featureLoading: intake.intakesLoading,
-    vcsAvailable: intake.vcsAvailable,
+    featureLoading: intakesLoading,
+    vcsAvailable,
     organizationReady,
   };
   const jiraChoiceArgs = {
     issuesChoice,
-    featureLoading: intake.intakesLoading,
-    jiraAvailable: intake.jiraAvailable,
+    featureLoading: intakesLoading,
+    jiraAvailable,
     organizationReady,
   };
   const linearChoiceArgs = {
     issuesChoice,
-    featureLoading: intake.intakesLoading,
-    linearAvailable: intake.linearAvailable,
+    featureLoading: intakesLoading,
+    linearAvailable,
     organizationReady,
   };
   const clearSavedVcsChoice = shouldClearSavedVcsChoice(vcsChoiceArgs);
@@ -362,8 +465,19 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     ...navigation,
     ...commands,
     vcsHost: model.setup.vcsHost,
-    bitbucketAvailable: intake.bitbucketAvailable,
-    bitbucketFeatureLoading: intake.bitbucketFeatureLoading,
+    bitbucketAvailable,
+    bitbucketFeatureLoading: intakeFeatureLoading,
+    bitbucketForgeConfigured: bitbucketConnect.configured,
+    bitbucketOnboardingPending: bitbucketConnect.pending,
+    bitbucketInstallUrl: bitbucketConnect.installUrl,
+    bitbucketRepositories: bitbucketConnect.repositories,
+    bitbucketIdentityLinked: bitbucketConnect.identityLinked,
+    bitbucketLoadError: bitbucketConnect.loadError,
+    bitbucketLookupFailed: bitbucketConnect.lookupFailed,
+    bitbucketLookupRetrying: bitbucketConnect.lookupRetrying,
+    retryBitbucketLookup: bitbucketConnect.retryLookup,
+    bitbucketConnectHref: bitbucketConnect.connectHref,
+    grantBitbucketAccess: bitbucketConnect.grantAccess,
     // The ticket screen is the last screen, so it finishes setup.
     ticketsFinishSetup: agentGate === "skip" || agentGate === "first",
     skipAgentScreen: agentGate === "skip",
@@ -372,18 +486,18 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     selectCredentialChoice: model.setAgentCredentialChoice,
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
-    jiraAvailable: intake.jiraAvailable,
-    intakeState: intake.intakeState,
-    intakesLoading: intake.intakesLoading,
-    ticketIntakes: intake.ticketIntakes,
+    jiraAvailable,
+    intakeState,
+    intakesLoading,
+    ticketIntakes,
     vcsChoiceBlock,
-    jiraFeatureLoading: intake.jiraFeatureLoading,
+    jiraFeatureLoading: intakesLoading,
     jiraChoiceBlock,
-    linearAvailable: intake.linearAvailable,
-    linearFeatureLoading: intake.linearFeatureLoading,
+    linearAvailable,
+    linearFeatureLoading: intakesLoading,
     linearChoiceBlock,
-    repositories: commands.repositories,
-    repositoryCatalog: commands.repositoryCatalog,
+    repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
+    repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
     repositoriesLoading: connection.onboarding.isPending,
     githubLogin: connection.identity?.login ?? "",
     githubUserId: connection.identity?.userId ?? "",
