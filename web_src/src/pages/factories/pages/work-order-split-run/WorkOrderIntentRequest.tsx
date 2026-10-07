@@ -8,9 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
 import type { UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
 import { useSpokenPhraseDictation, type SpokenPhraseField } from "@/hooks/useSpokenPhraseDictation";
+import { hostedVideoFromClipboard } from "@/lib/hostedVideo";
 import { cn } from "@/lib/utils";
 import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { CreateWorkOrderRequestAttachButton } from "../../CreateWorkOrderRequestAttachButton";
+import { HostedVideoLinkField } from "../../HostedVideoLinkField";
 import { CreateWorkOrderRequestAttachments } from "../../CreateWorkOrderRequestAttachments";
 import { DictateButton } from "../../DictateButton";
 import { PendingWorkOrderFileChips } from "../../PendingWorkOrderFileChips";
@@ -24,7 +26,11 @@ import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import type { IntentAnalysisChat } from "./intentAnalysisChat";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { composerChipsWorking } from "./planChipStatus";
-import { mergeAnalysisTranscriptFiles, useAnalysisComposerImages } from "./useAnalysisComposerImages";
+import {
+  addAnalysisHostedVideo,
+  mergeAnalysisTranscriptFiles,
+  useAnalysisComposerImages,
+} from "./useAnalysisComposerImages";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import {
@@ -106,6 +112,7 @@ function AnalysisRequestChat({
   const images = useAnalysisComposerImages({
     disabled: !analysis.canSend,
     onUploadFiles: analysis.onUploadFiles,
+    markdown: analysis.composer ?? "",
   });
   const transcriptFiles = mergeAnalysisTranscriptFiles(files, images.transcriptFiles);
   const composer = usePlanningComposer(analysis, images.pending.length, state.showSurvey);
@@ -367,7 +374,15 @@ function AnalysisComposerField({
             setCursor(event.target.selectionStart);
           }}
           onSelect={(event) => setCursor(event.currentTarget.selectionStart)}
-          onPaste={images.handlePaste}
+          onPaste={(event) => {
+            const hosted = hostedVideoFromClipboard(event.clipboardData.getData("text/plain"));
+            if (hosted) {
+              event.preventDefault();
+              addAnalysisHostedVideo(analysis, images.pending, hosted);
+              return;
+            }
+            images.handlePaste(event);
+          }}
           onKeyDown={(event) => {
             if (skillKeyboardRef.current?.(event)) {
               return;
@@ -422,6 +437,10 @@ function AnalysisComposerAddons({
           onAttach={(files) => void images.attach(files)}
         />
       ) : null}
+      <HostedVideoLinkField
+        disabled={!analysis.canSend}
+        onAdd={(video) => addAnalysisHostedVideo(analysis, images.pending, video)}
+      />
       <DictateButton dictation={dictation} copy={ANALYSIS_PLANNING_COPY} disabled={!analysis.canSend} />
       {images.previewImages.length > 0 ? (
         <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />

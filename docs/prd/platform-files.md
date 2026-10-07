@@ -207,30 +207,43 @@ At broker-task build, SuperPlane writes `attachments/manifest.json` and
 curls each signed file URL into `$SUPERPLANE_TASK_DIR/attachments/`
 before the model starts. See
 [pkg/components/runner/agent_task.go](../../pkg/components/runner/agent_task.go).
+A hosted video link is not a file. Fetch skips `kind: hosted_video` and
+does not save the page.
 
-When the manifest includes a video or audio file, the runner then runs
-**Process task attachments**. That step probes the actual bytes. For a
-video it extracts timestamped frames and transcribes audio with
-`whisper-cli` and the baked `ggml-tiny.bin` model. For audio it
-transcribes without frames. For an image it lists the local path and
-tells the agent to call `inspect_attachment`. Missing `ffmpeg`,
-`ffprobe`, `whisper-cli`, or the model fails the setup step when video
-or audio is present. Image-only tasks still write `INDEX.md`. Do not
-skip video or audio context.
+When the manifest includes a video, audio file, or hosted video, the
+runner then runs **Process task attachments**. That step probes uploaded
+bytes. For a hosted video it reads metadata with the pinned `yt-dlp`
+(`--dump-single-json`, `--no-playlist`, no cookies). It rejects a live
+stream, a missing duration, or a duration over 300 seconds before
+download. It then downloads one video at up to 720p, with a 256 MiB
+byte cap, into a temp file under the task directory. For a video it
+extracts timestamped frames and transcribes audio with `whisper-cli`
+and the baked `ggml-tiny.bin` model. The temp video is deleted,
+including on failure. SuperPlane does not write the hosted video into
+the file catalog or blob storage. For audio it transcribes without
+frames. For an image it lists the local path and tells the agent to
+call `inspect_attachment`. Missing `ffmpeg`, `ffprobe`, `whisper-cli`,
+`yt-dlp`, or the model fails the setup step when that tool is required.
+Image-only tasks still write `INDEX.md`. Do not skip video or audio
+context. Do not download `yt-dlp` during a task.
 
 A file with no audio is a success. A transcription failure is a partial
-result. Malformed, over-duration, or unsupported media is marked failed
-in the manifest. The agent still receives `INDEX.md`.
+result. Malformed, over-duration, private, or unsupported media is
+marked failed in the manifest. The agent still receives `INDEX.md`.
+Uploaded videos keep the 15-minute limit. Hosted videos use the
+5-minute limit.
 
 The same contract applies to the first refinement turn, later
 refinement messages, and implementation. Follow-up messages include
 `files[]` metadata. The wait loop downloads only unseen files and
-reprocesses new video and audio.
+reprocesses new video and audio. A hosted video entry keeps
+`kind: hosted_video` and is not curled as a file.
 
 The agent reads frames, the transcript, and inspects images.
-SuperPlane does not send raw video or audio into the model. The
-original file stays in `attachments/` and stays an `sp-file://` ref
-for the UI.
+SuperPlane does not send raw video or audio into the model. The agent
+does not fetch a hosted video page URL. The original uploaded file
+stays in `attachments/` and stays an `sp-file://` ref for the UI.
+A hosted video stays a page URL in the task description.
 
 Land and deploy the runner media toolchain before you enable video
 acceptance. Rebuild local and production runners. Verify
@@ -278,7 +291,7 @@ flowchart LR
 | Download | Time-limited GET. Private bucket. |
 | Task bind | Reparent workspace files on create, update, and import. |
 | GitHub ingest | Copy bytes at import. Skip failed fetches. |
-| Runner | Rewrite description and curl into `attachments/`. |
+| Runner | Rewrite description and curl file attachments. Process hosted video links without storing the video. |
 | Delete | GC and factory/org cleanup only. No delete RPC. |
 
 ## Do not confuse with
