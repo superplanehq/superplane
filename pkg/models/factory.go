@@ -449,6 +449,21 @@ func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
 	return factories, nil
 }
 
+func ListFactoriesAll(tx *gorm.DB) ([]Factory, error) {
+	var factories []Factory
+	err := tx.
+		Order("organization_id ASC").
+		Order("name ASC").
+		Order("id ASC").
+		Find(&factories).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return factories, nil
+}
+
 // ListOrganizationFactoriesByRecentUpdate returns non-deleted workspaces of an
 // organization, most recently updated first. Equal update times use id
 // descending so the order stays stable.
