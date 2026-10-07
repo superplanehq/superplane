@@ -17,13 +17,9 @@ import { WorkOrderIntentConfidenceFooter } from "./WorkOrderIntentConfidenceFoot
 import { IntentDocumentSkeleton } from "./IntentDocumentSkeleton";
 import { WorkOrderIntentPlan } from "./WorkOrderIntentPlan";
 import type { IntentAnalysisChat } from "./intentAnalysisChat";
+import { REFINE_SPLIT_EASE, requestPaneClassName } from "./intentRequestPaneClassName";
 import { WorkOrderIntentRequest } from "./WorkOrderIntentRequest";
 import type { SplitRunSource } from "./splitRunSource";
-
-const REQUEST_PANE_BASE_CLASS = "flex min-h-0 min-w-0 w-full flex-1 flex-col";
-const REQUEST_PANE_SPLIT_CLASS =
-  "flex min-h-0 min-w-0 w-full flex-1 flex-col border-b border-border lg:w-[var(--intent-left)] lg:min-w-[14rem] lg:flex-none lg:border-r lg:border-b-0";
-const REFINE_SPLIT_EASE = "lg:duration-300 lg:ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:lg:transition-none";
 
 export type { IntentAnalysisChat } from "./intentAnalysisChat";
 
@@ -49,6 +45,7 @@ type WorkOrderIntentDocumentProps = {
   streamKey?: string;
   streamReady?: boolean;
   source?: SplitRunSource;
+  createdAt?: string | null;
 };
 
 export function WorkOrderIntentDocument({
@@ -68,6 +65,7 @@ export function WorkOrderIntentDocument({
   streamKey,
   streamReady = true,
   source,
+  createdAt,
 }: WorkOrderIntentDocumentProps) {
   const {
     refineOpen,
@@ -112,6 +110,7 @@ export function WorkOrderIntentDocument({
           description={description}
           files={files}
           source={source}
+          createdAt={createdAt}
           contextSidebar={contextSidebar}
           analysis={withClosedDecision(analysisChat, showClosedDecision, resultFooter, planningReviewEnabled)}
         />
@@ -193,24 +192,6 @@ function planningStartTone(analysis: IntentAnalysisChat): DraftReadinessTone {
   }).tone;
 }
 
-function requestPaneClassName(
-  refineOpen: boolean,
-  showPlanPane: boolean,
-  isResizing: boolean,
-  planningReviewEnabled = false,
-) {
-  if (!refineOpen) {
-    return showPlanPane ? REQUEST_PANE_SPLIT_CLASS : REQUEST_PANE_BASE_CLASS;
-  }
-  return cn(
-    REQUEST_PANE_BASE_CLASS,
-    "border-b border-border lg:w-[var(--intent-left)] lg:flex-none lg:border-r lg:border-b-0",
-    showPlanPane && "lg:min-w-[14rem]",
-    showPlanPane && planningReviewEnabled && "max-lg:hidden",
-    !isResizing && `lg:transition-[width] ${REFINE_SPLIT_EASE}`,
-  );
-}
-
 function IntentRequestPane({
   refineOpen,
   showPlanPane,
@@ -221,6 +202,7 @@ function IntentRequestPane({
   description,
   files,
   source,
+  createdAt,
   contextSidebar,
   analysis,
 }: {
@@ -233,6 +215,7 @@ function IntentRequestPane({
   description: string;
   files?: FilesFile[];
   source?: SplitRunSource;
+  createdAt?: string | null;
   contextSidebar?: ReactNode;
   analysis?: IntentAnalysisChat;
 }) {
@@ -253,6 +236,7 @@ function IntentRequestPane({
           files={files}
           analysis={analysis}
           source={source}
+          createdAt={createdAt}
         />
       )}
     </div>

@@ -51,6 +51,7 @@ function SplitRunPopupOverview({
   sidebarNote,
   analysis,
   sourceOnly,
+  createdAt,
 }: Pick<
   SplitRunPopupTabsProps,
   | "fixture"
@@ -65,7 +66,7 @@ function SplitRunPopupOverview({
   | "sidebarNote"
   | "analysis"
   | "sourceOnly"
-> & { files?: FilesFile[] }) {
+> & { files?: FilesFile[]; createdAt?: string | null }) {
   return (
     <WorkOrderSplitRunOverview
       title={edits.title}
@@ -93,6 +94,7 @@ function SplitRunPopupOverview({
       descriptionBusy={sourceOnly ? edits.descriptionBusy : undefined}
       onDescriptionSave={sourceOnly ? edits.saveDescription : undefined}
       sidebarNote={sidebarNote}
+      createdAt={createdAt}
     />
   );
 }
@@ -125,6 +127,7 @@ export function SplitRunPopupTabs({
 }: SplitRunPopupTabsProps) {
   const liveWorkOrder = useWorkOrder(organizationId ?? "", factoryId ?? "", orderId ?? "");
   const files = liveWorkOrder.isSuccess ? liveWorkOrder.data?.files : undefined;
+  const createdAt = liveWorkOrder.data?.createdAt;
   const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, orderId);
   const consoleFixture = useMemo(() => {
     const phases = phasesWithRunArtifacts(fixture.phases, artifactIndex);
@@ -152,6 +155,7 @@ export function SplitRunPopupTabs({
             sidebarNote={sidebarNote}
             analysis={analysis}
             sourceOnly={sourceOnly}
+            createdAt={createdAt}
           />
         </div>
       </>
