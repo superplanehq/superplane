@@ -42,6 +42,95 @@ describe("buildMobileBoardColumns", () => {
       expect(column.emptyDescription).toContain(column.title);
     }
   });
+
+  it("assigns totalCount to backlog and done columns and verify when no stages exist", () => {
+    const columns = buildMobileBoardColumns(PLAN_LINE, [BACKLOG_DRAFT, DONE_ORDER], REFUND_FACTORY_APPS, {
+      backlog: 40,
+      open: 30,
+      done: 80,
+    });
+
+    expect(columns.find((c) => c.key === "backlog")?.totalCount).toBe(40);
+    expect(columns.find((c) => c.key === "done")?.totalCount).toBe(80);
+    expect(columns.find((c) => c.key === "verify")?.totalCount).toBeUndefined();
+  });
+
+  it("does not use the factory open count when Verify has no stages", () => {
+    const columns = buildMobileBoardColumns(
+      { ...PLAN_LINE, steps: [] },
+      [BACKLOG_DRAFT, DONE_ORDER],
+      REFUND_FACTORY_APPS,
+      { backlog: 10, done: 20 },
+    );
+
+    expect(columns.find((c) => c.key === "verify")?.cards).toEqual([]);
+    expect(columns.find((c) => c.key === "verify")?.totalCount).toBeUndefined();
+  });
+
+  it("adds an open task on a Done step to the closed total", () => {
+    const line = {
+      ...PLAN_LINE,
+      steps: [...(PLAN_LINE.steps ?? []), { app: { app: "app-pr-closure" } }],
+    };
+    const openOnDone: FactoriesWorkOrder = {
+      id: "wo-open-done",
+      title: "Closing",
+      state: "STATE_OPEN",
+      lineDispatches: [
+        {
+          id: "dispatch-open-done",
+          line: { id: REFUND_LINE_PLAN_ID },
+          stepExecutions: [
+            {
+              id: "e-done",
+              step: "Done",
+              stepIndex: 2,
+              state: "STATE_STARTED",
+              createdAt: "2026-08-11T13:00:00.000Z",
+              updatedAt: "2026-08-11T13:00:00.000Z",
+              run: { id: "run-done", appId: "app-pr-closure" },
+            },
+          ],
+        },
+      ],
+    };
+
+    const columns = buildMobileBoardColumns(line, [openOnDone], REFUND_FACTORY_APPS, { done: 0 });
+
+    expect(columns.find((c) => c.key === "done")?.cards.map((card) => card.order.id)).toEqual(["wo-open-done"]);
+    expect(columns.find((c) => c.key === "done")?.totalCount).toBe(1);
+  });
+
+  it("keeps unloaded closed tasks in the Done total when an open Done-step task is visible", () => {
+    const line = {
+      ...PLAN_LINE,
+      steps: [...(PLAN_LINE.steps ?? []), { app: { app: "app-pr-closure" } }],
+    };
+    const openOnDone: FactoriesWorkOrder = {
+      id: "wo-open-done",
+      title: "Closing",
+      state: "STATE_OPEN",
+      lineDispatches: [
+        {
+          id: "dispatch-open-done",
+          line: { id: REFUND_LINE_PLAN_ID },
+          stepExecutions: [
+            {
+              id: "e-done",
+              step: "Done",
+              stepIndex: 2,
+              state: "STATE_STARTED",
+              run: { id: "run-done", appId: "app-pr-closure" },
+            },
+          ],
+        },
+      ],
+    };
+
+    const columns = buildMobileBoardColumns(line, [DONE_ORDER, openOnDone], REFUND_FACTORY_APPS, { done: 80 });
+
+    expect(columns.find((c) => c.key === "done")?.totalCount).toBe(81);
+  });
 });
 
 describe("activeColumnIndex", () => {

@@ -95,6 +95,20 @@ export function workOrdersPageStatesFromKey(queryKey: readonly unknown[]): Facto
   return joined.split(",") as FactoriesWorkOrderState[];
 }
 
+function shiftPageTotalCount(page: WorkOrdersPage, delta: number): WorkOrdersPage {
+  if (page.totalCount === undefined || delta === 0) {
+    return page;
+  }
+  return { ...page, totalCount: Math.max(0, page.totalCount + delta) };
+}
+
+function shiftPagesTotalCount(pages: WorkOrdersPage[], delta: number): WorkOrdersPage[] {
+  if (delta === 0) {
+    return pages;
+  }
+  return pages.map((page) => shiftPageTotalCount(page, delta));
+}
+
 export function patchCachedWorkOrderPages(
   data: InfiniteData<WorkOrdersPage> | undefined,
   orderId: string,
@@ -118,10 +132,13 @@ export function patchCachedWorkOrderPages(
     }
     return {
       ...data,
-      pages: data.pages.map((page) => ({
-        ...page,
-        orders: page.orders.filter((order) => order.id !== orderId),
-      })),
+      pages: shiftPagesTotalCount(
+        data.pages.map((page) => ({
+          ...page,
+          orders: page.orders.filter((order) => order.id !== orderId),
+        })),
+        -1,
+      ),
     };
   }
 
@@ -145,13 +162,16 @@ export function patchCachedWorkOrderPages(
 
   return {
     ...data,
-    pages: [
-      {
-        ...first,
-        orders: [patchedWorkOrder({ id: described.id ?? orderId }, described), ...first.orders],
-      },
-      ...rest,
-    ],
+    pages: shiftPagesTotalCount(
+      [
+        {
+          ...first,
+          orders: [patchedWorkOrder({ id: described.id ?? orderId }, described), ...first.orders],
+        },
+        ...rest,
+      ],
+      1,
+    ),
   };
 }
 
@@ -194,10 +214,14 @@ function pageHasNextCursor(page: WorkOrdersPage | undefined): boolean {
 }
 
 function withoutWorkOrderPages(data: InfiniteData<WorkOrdersPage>, orderId: string): InfiniteData<WorkOrdersPage> {
-  const pages = data.pages.map((page) => ({
-    ...page,
-    orders: withoutWorkOrder(page.orders, orderId),
-  }));
+  const removed = data.pages.some((page) => pageContainsWorkOrder(page, orderId));
+  const pages = shiftPagesTotalCount(
+    data.pages.map((page) => ({
+      ...page,
+      orders: withoutWorkOrder(page.orders, orderId),
+    })),
+    removed ? -1 : 0,
+  );
   const pageParams = data.pageParams.slice(0, pages.length);
 
   while (pages.length > 1 && (pages[pages.length - 1]?.orders.length ?? 0) === 0) {
