@@ -49,34 +49,22 @@ describe("WorkOrderIntentDocument score evidence", () => {
     resetStreamMemoryForTests();
   });
 
-  it.each([2, 4])("keeps the original controls when the flag is off at confidence %s", async (score) => {
-    const onStart = vi.fn();
+  it.each([2, 4])("shows the review controls for a stored confidence %s", (score) => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
-        planningReviewEnabled={false}
         artifacts={[INTENT]}
         confidence={{ ...HIGH_CONFIDENCE, score }}
-        resultFooter={
-          <SplitRunReview footer={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer} onStart={onStart} compact />
-        }
         analysis={analysisChat({
-          modelSelect: <button type="button">Model: Auto</button>,
           view: {
             machineStatus: "waiting",
             messages: [{ id: "agent-1", kind: "text", role: "agent", text: "I need one detail." }],
-            survey: { id: "survey-1", questions: [{ prompt: "Which customers?", options: ["Existing customers"] }] },
           },
         })}
       />,
     );
-    expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toBeVisible();
-    expect(screen.getByText("Which customers?")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Model: Auto" })).toBeVisible();
-    expect(screen.queryByRole("region", { name: "Plan" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Override" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Start" }));
-    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "Open plan" })).toBeVisible();
+    expect(screen.getByRole("button", { name: `Confidence ${score}/5` })).toBeVisible();
   });
 
   it.each([

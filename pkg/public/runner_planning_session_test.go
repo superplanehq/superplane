@@ -1258,8 +1258,14 @@ func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
 	mustEnableAutoStart(t, db, factoryModel, line.ID)
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, models.PlanningSessionUpdate{
+		Scores: &models.PlanningReviewScores{
+			Clarity:       models.PlanningScoreValue{Score: 3, Summary: "Outcome, scope, and done are defined."},
+			Complexity:    models.PlanningScoreValue{Score: 3, Summary: "One agent can finish this in one run."},
+			Verifiability: models.PlanningScoreValue{Score: 3, Summary: "Existing tests cover the change."},
+		},
+		Spec: "# Retry refunds\n\nStop double charges.\n",
+	}))
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 
@@ -1288,8 +1294,14 @@ func TestBeginPlanningWaitAndNotify_SkipsAutoStartWithoutLine(t *testing.T) {
 	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
 	require.NotNil(t, session.DraftWorkOrderID)
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, models.PlanningSessionUpdate{
+		Scores: &models.PlanningReviewScores{
+			Clarity:       models.PlanningScoreValue{Score: 3, Summary: "Outcome, scope, and done are defined."},
+			Complexity:    models.PlanningScoreValue{Score: 3, Summary: "One agent can finish this in one run."},
+			Verifiability: models.PlanningScoreValue{Score: 3, Summary: "Existing tests cover the change."},
+		},
+		Spec: "# Retry refunds\n\nStop double charges.\n",
+	}))
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 
@@ -1312,8 +1324,14 @@ func TestBeginPlanningWaitAndNotify_FailedAutoStartDoesNotRetry(t *testing.T) {
 	require.NotNil(t, session.DraftWorkOrderID)
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, models.PlanningSessionUpdate{
+		Scores: &models.PlanningReviewScores{
+			Clarity:       models.PlanningScoreValue{Score: 3, Summary: "Outcome, scope, and done are defined."},
+			Complexity:    models.PlanningScoreValue{Score: 3, Summary: "One agent can finish this in one run."},
+			Verifiability: models.PlanningScoreValue{Score: 3, Summary: "Existing tests cover the change."},
+		},
+		Spec: "# Retry refunds\n\nStop double charges.\n",
+	}))
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 
