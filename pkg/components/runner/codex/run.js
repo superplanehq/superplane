@@ -124,6 +124,33 @@ function planningSystemPrompt(env = process.env) {
   return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
 }
 
+function loadConfirmPromptRule() {
+  const candidates = [
+    path.join(__dirname, "confirm_prompt.js"),
+    path.join(__dirname, "..", "confirm_prompt.js"),
+  ];
+  for (const file of candidates) {
+    try {
+      return require(file).CONFIRM_PROMPT_RULE;
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  throw new Error("confirm prompt rule is missing");
+}
+
+function codexDeveloperInstructions(env = process.env) {
+  const rule = loadConfirmPromptRule();
+  if (!planningEnabled(env)) {
+    return rule;
+  }
+  const protocol = loadAnalysisProtocol(env);
+  if (!protocol) {
+    return rule;
+  }
+  return `${protocol}\n\n${rule}`;
+}
+
 // Codex `exec` has no --ask-for-approval flag, and `exec resume` has no
 // --sandbox flag. Config overrides keep both new and resumed analysis turns
 // read-only without disabling shell commands and file reads.
@@ -157,10 +184,6 @@ function codexExecArgs(
       'approval_policy="never"',
     );
     args.push(...mcpConfigOverrides(mcpScriptPath, env));
-    args.push(
-      "-c",
-      `developer_instructions=${tomlString(loadAnalysisProtocol(env))}`,
-    );
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
     if (artifactEnabled(env) || mergeConfidenceEnabled(env)) {
@@ -169,6 +192,10 @@ function codexExecArgs(
       args.push(...workspaceMCPConfigOverrides(env));
     }
   }
+  args.push(
+    "-c",
+    `developer_instructions=${tomlString(codexDeveloperInstructions(env))}`,
+  );
   if (model) {
     args.push("-m", model);
   }

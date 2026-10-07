@@ -214,6 +214,37 @@ function planningSystemPrompt(env = process.env) {
   return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
 }
 
+function loadConfirmPromptRule() {
+  const candidates = [
+    path.join(__dirname, "confirm_prompt.js"),
+    path.join(__dirname, "..", "confirm_prompt.js"),
+  ];
+  for (const file of candidates) {
+    try {
+      return require(file).CONFIRM_PROMPT_RULE;
+    } catch (_err) {
+      // try the next path
+    }
+  }
+  throw new Error("confirm prompt rule is missing");
+}
+
+function confirmPromptInstructionPath(taskDir) {
+  return path.join(taskDir, "agent_instructions.md");
+}
+
+function writeInstructionFile(filePath, text) {
+  try {
+    fs.writeFileSync(filePath, `${text}\n`);
+  } catch (err) {
+    if (err && err.code === "ENOENT" && !fs.existsSync(path.dirname(filePath))) {
+      return;
+    }
+    const message = err && err.message ? err.message : String(err);
+    throw new Error(`failed to write instruction file ${filePath}: ${message}`);
+  }
+}
+
 function catalogModelId(model) {
   return String(model || "")
     .trim()
@@ -506,15 +537,18 @@ function buildOpenCodeConfig({
     };
   }
   applyWorkspaceMCPDenylist(config, workspaceMCPServers(env));
-  const protocol = planningSystemPrompt(env);
-  if (protocol && taskDir) {
-    const protocolPath = path.join(taskDir, "analysis_protocol.md");
-    try {
-      fs.writeFileSync(protocolPath, `${protocol}\n`);
-    } catch (_err) {
-      // Tests pass a fake task dir. The runner writes this file when the dir exists.
+  if (taskDir) {
+    const instructions = [];
+    const protocol = planningSystemPrompt(env);
+    if (protocol) {
+      const protocolPath = path.join(taskDir, "analysis_protocol.md");
+      writeInstructionFile(protocolPath, protocol);
+      instructions.push(protocolPath);
     }
-    config.instructions = [protocolPath];
+    const rulePath = confirmPromptInstructionPath(taskDir);
+    writeInstructionFile(rulePath, loadConfirmPromptRule());
+    instructions.push(rulePath);
+    config.instructions = instructions;
   }
   return config;
 }
