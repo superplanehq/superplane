@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "bun:test";
 
@@ -8,6 +9,7 @@ import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER } from "../../../__fixtures__/factoryPageResponses";
+import { STORYBOOK_ME_USER_ID } from "../../../__fixtures__/factoryPageIds";
 import { BOARD_IMPLEMENT_FAILED_ORDER } from "../../../__fixtures__/lineMetricsBoardOrders";
 import { OPEN_WORK_ORDER_CHECKS } from "../../../__fixtures__/workOrderCheckFixtures";
 import { TWO_HOURS_AGO } from "../../../__fixtures__/factoryPageIds";
@@ -17,6 +19,22 @@ import { buildSplitRunFooter } from "../splitRunFooter";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "../splitRunMocks";
 import { CREATED_MANUALLY } from "../splitRunSource";
 import { AutomationsConsoleVariant } from "./AutomationsConsoleVariant";
+
+vi.mock("@/hooks/useOrganizationData", () => ({
+  useOrganizationUsers: () => ({
+    data: [
+      {
+        metadata: { id: "storybook-user", email: "john.doe@superplane.dev" },
+        spec: { displayName: "Leonardo DiCaprio" },
+      },
+      {
+        metadata: { id: "user-me", email: "casey@example.com" },
+        spec: { displayName: "Casey Reviewer" },
+      },
+    ],
+    isLoading: false,
+  }),
+}));
 
 type ConsoleProps = Parameters<typeof AutomationsConsoleVariant>[0];
 
@@ -539,5 +557,108 @@ describe("AutomationsConsoleVariant run footer", () => {
     expect(footer).toHaveTextContent("$0.45");
     expect(footer).toHaveTextContent("2.1k");
     expect(footer).toHaveTextContent("sonnet 4-6");
+  });
+});
+
+function checkboxFor(name: string) {
+  const item = screen.getAllByRole("listitem").find((entry) => entry.textContent?.includes(name));
+  if (!item) {
+    throw new Error(`Could not find list item for ${name}`);
+  }
+  return within(item).getByRole("checkbox");
+}
+
+function OwnerEditHost({
+  initialIds,
+  initialOwner,
+  canEditOwner = true,
+  onOwnerSave,
+}: {
+  initialIds: string[];
+  initialOwner: (typeof SPLIT_RUN_RUNNING)["owner"];
+  canEditOwner?: boolean;
+  onOwnerSave: (assigneeIds: string[]) => Promise<void>;
+}) {
+  const [assigneeIds, setAssigneeIds] = useState(initialIds);
+  const [owner, setOwner] = useState(initialOwner);
+  return (
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter>
+        <ThemeProvider>
+          <TooltipProvider>
+            <LiveHeaderSpendProvider>
+              <AutomationsConsoleVariant
+                fixture={SPLIT_RUN_RUNNING}
+                source={SPLIT_RUN_RUNNING.source}
+                organizationId="org-1"
+                assigneeIds={assigneeIds}
+                owner={owner}
+                canEditOwner={canEditOwner}
+                onOwnerSave={async (nextIds) => {
+                  await onOwnerSave(nextIds);
+                  setAssigneeIds(nextIds);
+                  setOwner(
+                    nextIds[0] === "user-me"
+                      ? { id: "user-me", name: "Casey Reviewer", initials: "CR" }
+                      : { id: "", name: "", initials: "" },
+                  );
+                }}
+              />
+            </LiveHeaderSpendProvider>
+          </TooltipProvider>
+        </ThemeProvider>
+      </MemoryRouter>
+    </QueryClientProvider>
+  );
+}
+
+describe("AutomationsConsoleVariant owner", () => {
+  it("saves the selected person as the only owner and shows that person", async () => {
+    const onOwnerSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <OwnerEditHost
+        initialIds={[STORYBOOK_ME_USER_ID]}
+        initialOwner={SPLIT_RUN_RUNNING.owner}
+        onOwnerSave={onOwnerSave}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("popup-edit-owner"));
+    fireEvent.click(checkboxFor("Casey Reviewer"));
+    fireEvent.click(screen.getByTestId("work-order-save-assignees"));
+
+    await waitFor(() => expect(onOwnerSave).toHaveBeenCalledWith(["user-me"]));
+    expect(screen.getByRole("button", { name: "Owner: Casey Reviewer" })).toBeInTheDocument();
+  });
+
+  it("clears the owner and shows the assign label", async () => {
+    const onOwnerSave = vi.fn().mockResolvedValue(undefined);
+    render(
+      <OwnerEditHost
+        initialIds={[STORYBOOK_ME_USER_ID]}
+        initialOwner={SPLIT_RUN_RUNNING.owner}
+        onOwnerSave={onOwnerSave}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("popup-edit-owner"));
+    fireEvent.click(checkboxFor("Leonardo DiCaprio"));
+    fireEvent.click(screen.getByTestId("work-order-save-assignees"));
+
+    await waitFor(() => expect(onOwnerSave).toHaveBeenCalledWith([]));
+    expect(screen.getByRole("button", { name: "Assign owner" })).toBeInTheDocument();
+    expect(screen.queryByText(SPLIT_RUN_RUNNING.owner.name)).not.toBeInTheDocument();
+  });
+
+  it("shows no owner as text when edit is not allowed", () => {
+    renderConsole(
+      { ...SPLIT_RUN_RUNNING, owner: { id: "author", name: "Task Author", initials: "TA" } },
+      { assigneeIds: [], canEditOwner: false, owner: { id: "author", name: "Task Author", initials: "TA" } },
+    );
+
+    const panel = screen.getByTestId("redesign-console-summary");
+    expect(within(panel).queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
+    expect(within(panel).getByText("No owner")).toBeInTheDocument();
+    expect(within(panel).queryByText("Task Author")).not.toBeInTheDocument();
   });
 });
