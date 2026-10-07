@@ -1,8 +1,6 @@
 import { Button } from "@/components/ui/button";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useFactory, useFactoryAutomations, useUpdateFactory } from "@/hooks/useFactoryData";
 import { getApiErrorMessage } from "@/lib/errors";
-import { FEATURE_TASK_PLANNING_REVIEW } from "@/lib/experimentalFeatures";
 import { useState } from "react";
 
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
@@ -104,7 +102,6 @@ function PlanningSettingsLoaded({
   initialTab?: PlanningSettingsTab;
   onClose: () => void;
 }) {
-  const planningReviewEnabled = useExperimentalFeature(organizationId).has(FEATURE_TASK_PLANNING_REVIEW);
   const [saveError, setSaveError] = useState<string | undefined>();
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId, {
@@ -159,7 +156,6 @@ function PlanningSettingsLoaded({
       }
       onClose={onClose}
       initialTab={initialTab}
-      planningReviewEnabled={planningReviewEnabled}
     />
   );
 }

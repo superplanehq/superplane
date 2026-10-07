@@ -515,12 +515,18 @@ export function useSelectFactoryVcsProviderRepository(organizationId: string, fa
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (repositoryId: string) => {
+    mutationFn: async (selection: string | { repositoryId?: string; repository?: string }) => {
+      const repositoryId = typeof selection === "string" ? selection : selection.repositoryId;
+      const repository = typeof selection === "string" ? undefined : selection.repository;
       const response = await factoriesSelectFactoryVcsProviderRepository(
         withOrganizationHeader({
           organizationId,
           path: { id: factoryId },
-          body: { provider, repositoryId },
+          body: {
+            provider,
+            ...(repositoryId ? { repositoryId } : {}),
+            ...(repository ? { repository } : {}),
+          },
         }),
       );
       if (!response.data?.factory) throw new Error("Failed to select the repository");

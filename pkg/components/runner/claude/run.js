@@ -100,38 +100,9 @@ const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 // MCP tools. Edit/Write are intentionally excluded so the agent cannot make
 // changes while drafting a task.
 const PLANNING_READONLY_TOOLS = "Read,Bash";
-const ANALYSIS_BASE_ALLOWED_TOOLS = [
-  "mcp__superplane__propose_spec",
-  "mcp__superplane__survey",
-  "mcp__superplane__inspect_attachment",
-];
 
-function analysisAllowedTools(env = process.env) {
-  const protocol = loadAnalysisProtocolModule();
-  const reviewEnabled =
-    typeof protocol.planningReviewEnabled === "function"
-      ? protocol.planningReviewEnabled(env)
-      : false;
-  if (reviewEnabled) {
-    return ["mcp__superplane__propose_update", "mcp__superplane__inspect_attachment"];
-  }
-  const tools = [...ANALYSIS_BASE_ALLOWED_TOOLS];
-  const clarityEnabled =
-    typeof protocol.planningClarityEnabled === "function"
-      ? protocol.planningClarityEnabled(env)
-      : true;
-  const confidenceEnabled =
-    typeof protocol.planningConfidenceEnabled === "function"
-      ? protocol.planningConfidenceEnabled(env)
-      : true;
-  if (clarityEnabled) {
-    tools.splice(1, 0, "mcp__superplane__propose_clarity");
-  }
-  if (confidenceEnabled) {
-    const insertAt = tools.indexOf("mcp__superplane__propose_clarity") + 1;
-    tools.splice(insertAt > 0 ? insertAt : 1, 0, "mcp__superplane__propose_confidence");
-  }
-  return tools;
+function analysisAllowedTools() {
+  return ["mcp__superplane__propose_update", "mcp__superplane__inspect_attachment"];
 }
 const ARTIFACT_ALLOWED_TOOLS = [
   "mcp__superplane__inspect_screenshot",

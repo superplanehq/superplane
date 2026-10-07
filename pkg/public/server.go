@@ -257,6 +257,16 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 			}
 		}
 	}
+
+	if bitbucketKey := os.Getenv("BITBUCKET_CLIENT_ID"); bitbucketKey != "" {
+		if bitbucketSecret := os.Getenv("BITBUCKET_CLIENT_SECRET"); bitbucketSecret != "" {
+			providers["bitbucket"] = authentication.ProviderConfig{
+				Key:         bitbucketKey,
+				Secret:      bitbucketSecret,
+				CallbackURL: fmt.Sprintf("%s/auth/bitbucket/callback", baseURL),
+			}
+		}
+	}
 	return providers
 }
 
@@ -758,6 +768,12 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Methods("GET", "POST")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/webhook", s.HandleGitHubAppWebhook).Methods("POST")
+	// Forge calls these routes. The Forge Invocation Token authenticates them.
+	// They stay off the gateway authorizer, the same way the GitHub App webhook does.
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/lifecycle", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/scheduled", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/bootstrap", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/uninstall", s.HandleBitbucketForgeUninstall).Methods("POST")
 	sentryAppUserRoute := r.NewRoute().Subrouter()
 	sentryAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/install", s.HandleSentryAppInstall).Methods("GET")
@@ -797,6 +813,8 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features", s.adminListOrgExperimentalFeatures).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminEnableOrgExperimentalFeature).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminDisableOrgExperimentalFeature).Methods("DELETE")
+	adminRoute.HandleFunc("/installation/factory-templates", s.adminListFactoryTemplates).Methods("GET")
+	adminRoute.HandleFunc("/installation/factory-templates/{templateId}/reset", s.adminResetFactoryTemplate).Methods("POST")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminUpdateInstallationNetworkSettings).Methods("PATCH")
 	adminRoute.HandleFunc("/installation/license", s.adminGetInstallationLicense).Methods("GET")

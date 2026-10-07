@@ -149,6 +149,23 @@ SuperPlane requests exactly the `user:email` scope. It stores the GitHub user
 ID and login, but it does not use the OAuth token for repositories,
 collaborators, or automation.
 
+### Bitbucket OAuth consumer
+
+Bitbucket connect links an account. It does not add a sign-in method.
+
+1. Open Bitbucket and create an OAuth consumer.
+2. Set the callback URL to `{BASE_URL}/auth/bitbucket/callback`.
+3. Set the scope to `account`.
+4. Copy the key and secret into `.env` as `BITBUCKET_CLIENT_ID` and `BITBUCKET_CLIENT_SECRET`.
+
+SuperPlane stores the Bitbucket account id and username. It does not use this
+OAuth token to open pull requests.
+
+The Forge app is optional. Its source is in `forge/bitbucket/`. Set
+`SUPERPLANE_BITBUCKET_FORGE_APP_ID` and `SUPERPLANE_BITBUCKET_FORGE_INSTALL_URL`
+when you install that app. When those values are empty, workspace setup keeps
+the Bitbucket token screen.
+
 ### 4. Set the SuperPlane environment
 
 Add these values to `.env`. Do not commit real secrets.
