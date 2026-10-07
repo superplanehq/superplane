@@ -59,9 +59,14 @@ describe("WorkOrderCard merge confidence", () => {
     renderCard(order, { score: 4, maxScore: 5 });
 
     const chip = screen.getByRole("img", { name: "Merge confidence 4 of 5" });
-    expect(chip).toHaveTextContent(/Merge\s*4\/5/);
+    expect(chip).toHaveTextContent(/Merge\s*4/);
+    expect(chip).not.toHaveTextContent("4/5");
     expect(chip).not.toHaveTextContent("Confidence");
-    expect(chip.className).toContain("border-emerald-500/30");
+    expect(chip.className).not.toContain("rounded-full");
+    const meter = screen.getByTestId("work-order-card-merge-wo-verify-meter");
+    expect(meter.querySelectorAll("[data-filled='true']")).toHaveLength(4);
+    expect(meter.querySelector("[data-filled='true']")).toHaveClass("bg-emerald-500");
+    expect(chip.querySelector(".tabular-nums")).toHaveClass("text-success");
     expect(screen.queryByText("Confidence")).not.toBeInTheDocument();
     expect(screen.queryByText("Clarity")).not.toBeInTheDocument();
     const footer = screen.getByText(formatRelative(new Date(order.updatedAt ?? ""))).parentElement;
@@ -76,7 +81,11 @@ describe("WorkOrderCard merge confidence", () => {
     renderCard(verifyOrder("wo-verify-mid"), { score: 3, maxScore: 5 });
 
     const chip = screen.getByRole("img", { name: "Merge confidence 3 of 5" });
-    expect(chip).toHaveTextContent(/Merge\s*3\/5/);
-    expect(chip.className).toContain("border-orange-500/30");
+    expect(chip).toHaveTextContent(/Merge\s*3/);
+    expect(chip).not.toHaveTextContent("3/5");
+    const meter = screen.getByTestId("work-order-card-merge-wo-verify-mid-meter");
+    expect(meter.querySelectorAll("[data-filled='true']")).toHaveLength(3);
+    expect(meter.querySelector("[data-filled='true']")).toHaveClass("bg-orange-500");
+    expect(chip.querySelector(".tabular-nums")).toHaveClass("text-warning");
   });
 });

@@ -149,7 +149,7 @@ describe("LineBoardOrderCard", () => {
       ],
     });
 
-    expect(screen.getByRole("img", { name: "Merge confidence 5 of 5" })).toHaveTextContent(/Merge\s*5\/5/);
+    expect(screen.getByRole("img", { name: "Merge confidence 5 of 5" })).toHaveTextContent(/Merge\s*5/);
     expect(screen.queryByText("Confidence")).not.toBeInTheDocument();
     expect(screen.queryByText("Blast radius")).not.toBeInTheDocument();
   });
@@ -165,7 +165,7 @@ describe("LineBoardOrderCard", () => {
       ],
     });
 
-    expect(screen.getByRole("img", { name: "Merge confidence 3 of 5" })).toHaveTextContent(/Merge\s*3\/5/);
+    expect(screen.getByRole("img", { name: "Merge confidence 3 of 5" })).toHaveTextContent(/Merge\s*3/);
   });
 
   it("hides the merge chip when no merge confidence check exists", () => {
@@ -188,7 +188,7 @@ describe("LineBoardOrderCard", () => {
       checkScores: [{ key: "security-review", name: "Security", score: 4, maxScore: 5 }],
     });
 
-    expect(screen.getByRole("img", { name: "Merge confidence 4 of 5" })).toHaveTextContent(/Merge\s*4\/5/);
+    expect(screen.getByRole("img", { name: "Merge confidence 4 of 5" })).toHaveTextContent(/Merge\s*4/);
   });
 
   it("shows Clarity and Confidence only on a draft", () => {

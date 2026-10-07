@@ -316,7 +316,7 @@ export const DraftScoredIntakeOnly: Story = {
   },
 };
 
-/** Verify wrote merge confidence. The chip sits beside the owner. */
+/** Verify wrote merge confidence. The meter sits beside the owner. */
 export const MergeConfidence: Story = {
   name: "Merge confidence",
   args: {
