@@ -39,6 +39,14 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Datadog intake from the Backlog column menu", f.Description)
 	})
 
+	t.Run("known id returns factory PagerDuty intake feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryPagerDutyIntake)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryPagerDutyIntake, f.ID)
+		assert.Equal(t, "Factory PagerDuty Intake", f.Label)
+		assert.Equal(t, "Add PagerDuty intake from the Backlog column menu", f.Description)
+	})
+
 	t.Run("known id returns factory linear intake feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryLinearIntake)
 		assert.True(t, ok)
@@ -47,7 +55,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add Linear intake from the Backlog column menu", f.Description)
 		assert.Nil(t, f.Released)
 	})
-
 	t.Run("known id returns bitbucket workspaces feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryBitbucket)
 		assert.True(t, ok)
@@ -56,7 +63,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Connect a Bitbucket workspace and open pull requests from Implement", f.Description)
 		assert.Nil(t, f.Released)
 	})
-
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceModels)
 		assert.True(t, ok)
@@ -179,6 +185,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryJiraIntake))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
+	assert.True(t, Exists(FeatureFactoryPagerDutyIntake))
 	assert.True(t, Exists(FeatureFactoryLinearIntake))
 	assert.True(t, Exists(FeatureFactoryBitbucket))
 	assert.True(t, Exists(FeatureWorkspaceModels))

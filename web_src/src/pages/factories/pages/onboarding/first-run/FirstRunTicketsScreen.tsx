@@ -1,8 +1,8 @@
-import { LoadingButton } from "@/components/ui/loading-button";
+import { isIntakeSelectable, type IntakeSurfaceEntry, type IntakeSurfaceState } from "@/lib/intakeCatalog";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
-import { FirstRunTicketChoices } from "./firstRunTicketChoices";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
+import { FirstRunTicketBody } from "./firstRunTicketRows";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import { canAnalyzeTicketSource } from "./firstRunTicketSource";
 import type { FirstRunChrome, FirstRunTicketSource } from "./firstRunTypes";
@@ -15,12 +15,14 @@ type FirstRunTicketsScreenProps = {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
-  /** True when the organization has the Jira intake feature. Shows Jira as coming soon when false and the lookup is done. */
-  jiraAvailable?: boolean;
-  /** True while the feature lookup has not finished. The row does not show Coming soon. */
-  jiraFeatureLoading?: boolean;
+  /** State of each intake for the organization. Undefined until the intake catalog loads. */
+  intakeState?: (key: string) => IntakeSurfaceState | undefined;
+  /** True while the intake catalog loads. Rows do not show Coming soon. */
+  intakesLoading?: boolean;
+  /** Ticket intakes in display order. Null until the intake catalog loads. */
+  ticketIntakes?: IntakeSurfaceEntry[] | null;
   /**
-   * A saved Jira choice cannot continue until the feature lookup confirms Jira.
+   * A saved Jira choice cannot continue until the intake catalog confirms Jira.
    * The notice explains the block.
    */
   jiraChoiceBlock?: FirstRunFlaggedChoiceBlock | null;
@@ -54,8 +56,6 @@ type FirstRunTicketsScreenProps = {
 };
 
 const TICKET_SCREEN_DEFAULTS = {
-  jiraAvailable: false,
-  jiraFeatureLoading: false,
   jiraChoiceBlock: null as FirstRunFlaggedChoiceBlock | null,
   linearAvailable: false,
   linearFeatureLoading: false,
@@ -78,6 +78,7 @@ const TICKET_SCREEN_DEFAULTS = {
 
 function ticketScanAllowed(args: {
   ticketSource: FirstRunTicketSource | null;
+  vcsAvailable: boolean;
   jiraAvailable: boolean;
   jiraChoiceBlock: FirstRunFlaggedChoiceBlock | null;
   jiraConnected: boolean;
@@ -89,11 +90,13 @@ function ticketScanAllowed(args: {
   linearProjectsLoading: boolean;
   linearProjectsError: boolean;
 }): boolean {
+  const vcsSelectionBlocked = args.ticketSource === "github-issues" && !args.vcsAvailable;
   const jiraSelectionBlocked = Boolean(args.jiraChoiceBlock) || (args.ticketSource === "jira" && !args.jiraAvailable);
   const linearSelectionBlocked =
     Boolean(args.linearChoiceBlock) || (args.ticketSource === "linear" && !args.linearAvailable);
   if (args.ticketSource === "linear" && (args.linearProjectsLoading || args.linearProjectsError)) return false;
   return (
+    !vcsSelectionBlocked &&
     !jiraSelectionBlocked &&
     !linearSelectionBlocked &&
     canAnalyzeTicketSource({
@@ -120,145 +123,77 @@ function ticketContinueButton(args: {
   };
 }
 
+function noIntakeState(): IntakeSurfaceState | undefined {
+  return undefined;
+}
+
 export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
-  const {
-    ticketSource,
-    chrome,
-    sphere,
-    jiraAvailable,
-    jiraFeatureLoading,
-    jiraChoiceBlock,
-    linearAvailable,
-    linearFeatureLoading,
-    linearChoiceBlock,
-    continueLabel,
-    continuePending,
-    saving,
-    savingLabel,
-    jiraConnected,
-    jiraProjects,
-    jiraProjectsLoading,
-    jiraProjectsError,
-    jiraProjectId,
-    linearConnected,
-    linearProjects,
-    linearProjectsLoading,
-    linearProjectsError,
-    linearProjectIds,
-    onSelectTicketSource,
-    onAnalyzeTickets,
-    onConnectJira,
-    onSelectJiraProject,
-    onRetryJiraProjects,
-    onConnectLinear,
-    onToggleLinearProject,
-    onRetryLinearProjects,
-  } = { ...TICKET_SCREEN_DEFAULTS, ...props };
-  const copy = FIRST_RUN_COPY.tickets;
+  const screen = { ...TICKET_SCREEN_DEFAULTS, ...props };
+  const intakeState = props.intakeState ?? noIntakeState;
+  const catalogLoaded = screen.ticketIntakes != null;
+  const vcsAvailable = !catalogLoaded || isIntakeSelectable(intakeState("github-issues"));
+  const jiraAvailable = isIntakeSelectable(intakeState("jira-issues"));
+  const linearSelectable = catalogLoaded ? isIntakeSelectable(intakeState("linear-issues")) : screen.linearAvailable;
   const canAnalyze = ticketScanAllowed({
-    ticketSource,
+    ticketSource: screen.ticketSource,
+    vcsAvailable,
     jiraAvailable,
-    jiraChoiceBlock,
-    jiraConnected,
-    jiraProjectId,
-    linearAvailable,
-    linearChoiceBlock,
-    linearConnected,
-    linearProjectIds,
-    linearProjectsLoading,
-    linearProjectsError,
+    jiraChoiceBlock: screen.jiraChoiceBlock,
+    jiraConnected: screen.jiraConnected,
+    jiraProjectId: screen.jiraProjectId,
+    linearAvailable: linearSelectable,
+    linearChoiceBlock: screen.linearChoiceBlock,
+    linearConnected: screen.linearConnected,
+    linearProjectIds: screen.linearProjectIds,
+    linearProjectsLoading: screen.linearProjectsLoading,
+    linearProjectsError: screen.linearProjectsError,
   });
-  const continueButton = ticketContinueButton({ canAnalyze, continuePending, saving, savingLabel });
+  const continueButton = ticketContinueButton({
+    canAnalyze,
+    continuePending: screen.continuePending,
+    saving: screen.saving,
+    savingLabel: screen.savingLabel,
+  });
 
   return (
-    <FirstRunShell testId="first-run-tickets" chrome={chrome} busy={saving} sphere={sphere} visual="preview">
-      <FirstRunHeading headline={copy.headline}>
-        <p className="text-[13px] text-muted-foreground">{copy.intro}</p>
+    <FirstRunShell testId="first-run-tickets" chrome={screen.chrome} busy={screen.saving} sphere={screen.sphere} visual="preview">
+      <FirstRunHeading headline={FIRST_RUN_COPY.tickets.headline}>
+        <p className="text-[13px] text-muted-foreground">{FIRST_RUN_COPY.tickets.intro}</p>
       </FirstRunHeading>
-
-      <div className="mt-8 space-y-4">
-        <FirstRunTicketChoices
-          ticketSource={ticketSource}
-          saving={saving}
-          jiraAvailable={jiraAvailable}
-          jiraFeatureLoading={jiraFeatureLoading}
-          jiraConnected={jiraConnected}
-          jiraProjects={jiraProjects}
-          jiraProjectsLoading={jiraProjectsLoading}
-          jiraProjectsError={jiraProjectsError}
-          jiraProjectId={jiraProjectId}
-          linearAvailable={linearAvailable}
-          linearFeatureLoading={linearFeatureLoading}
-          linearConnected={linearConnected}
-          linearProjects={linearProjects}
-          linearProjectsLoading={linearProjectsLoading}
-          linearProjectsError={linearProjectsError}
-          linearProjectIds={linearProjectIds}
-          onSelectTicketSource={onSelectTicketSource}
-          onConnectJira={onConnectJira}
-          onSelectJiraProject={onSelectJiraProject}
-          onRetryJiraProjects={onRetryJiraProjects}
-          onConnectLinear={onConnectLinear}
-          onToggleLinearProject={onToggleLinearProject}
-          onRetryLinearProjects={onRetryLinearProjects}
-        />
-        <FirstRunChoiceNotice
-          block={jiraChoiceBlock}
-          loading={copy.jiraLookupLoading}
-          failed={copy.jiraLookupFailed}
-          testId="first-run-jira-choice-notice"
-        />
-        <FirstRunChoiceNotice
-          block={linearChoiceBlock}
-          loading={copy.linearLookupLoading}
-          failed={copy.linearLookupFailed}
-          testId="first-run-linear-choice-notice"
-        />
-        <div className="space-y-3">
-          <LoadingButton
-            type="button"
-            className="w-full"
-            disabled={continueButton.disabled}
-            loading={continueButton.loading}
-            loadingText={continueButton.loadingText}
-            onClick={onAnalyzeTickets}
-            data-testid="first-run-analyze-tickets"
-          >
-            {continueLabel}
-          </LoadingButton>
-        </div>
-      </div>
+      <FirstRunTicketBody
+        ticketSource={screen.ticketSource}
+        intakeState={intakeState}
+        intakesLoading={screen.intakesLoading ?? false}
+        ticketIntakes={screen.ticketIntakes}
+        jiraChoiceBlock={screen.jiraChoiceBlock}
+        linearChoiceBlock={screen.linearChoiceBlock}
+        linearSelectable={linearSelectable}
+        linearLoading={catalogLoaded ? false : screen.linearFeatureLoading}
+        jiraAvailable={jiraAvailable}
+        continueLabel={screen.continueLabel}
+        continueDisabled={continueButton.disabled}
+        continueLoading={continueButton.loading}
+        continueLoadingText={continueButton.loadingText}
+        saving={screen.saving}
+        jiraConnected={screen.jiraConnected}
+        jiraProjects={screen.jiraProjects}
+        jiraProjectsLoading={screen.jiraProjectsLoading}
+        jiraProjectsError={screen.jiraProjectsError}
+        jiraProjectId={screen.jiraProjectId}
+        linearConnected={screen.linearConnected}
+        linearProjects={screen.linearProjects}
+        linearProjectsLoading={screen.linearProjectsLoading}
+        linearProjectsError={screen.linearProjectsError}
+        linearProjectIds={screen.linearProjectIds}
+        onSelectTicketSource={screen.onSelectTicketSource}
+        onAnalyzeTickets={screen.onAnalyzeTickets}
+        onConnectJira={screen.onConnectJira}
+        onSelectJiraProject={screen.onSelectJiraProject}
+        onRetryJiraProjects={screen.onRetryJiraProjects}
+        onConnectLinear={screen.onConnectLinear}
+        onToggleLinearProject={screen.onToggleLinearProject}
+        onRetryLinearProjects={screen.onRetryLinearProjects}
+      />
     </FirstRunShell>
-  );
-}
-
-function choiceNoticeCopy(block: FirstRunFlaggedChoiceBlock | null, loading: string, failed: string): string | null {
-  if (block === "lookup-failed") return failed;
-  if (block === "loading") return loading;
-  return null;
-}
-
-function FirstRunChoiceNotice({
-  block,
-  loading,
-  failed,
-  testId,
-}: {
-  block: FirstRunFlaggedChoiceBlock | null;
-  loading: string;
-  failed: string;
-  testId: string;
-}) {
-  const notice = choiceNoticeCopy(block, loading, failed);
-  if (!notice) return null;
-  const lookupFailed = block === "lookup-failed";
-  return (
-    <p
-      className={lookupFailed ? "text-[13px] text-destructive" : "text-[13px] text-muted-foreground"}
-      role={lookupFailed ? "alert" : "status"}
-      data-testid={testId}
-    >
-      {notice}
-    </p>
   );
 }
