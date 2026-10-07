@@ -90,6 +90,10 @@ domain_name       = "superplane.example.com"
 static_ip_name    = "superplane-ip"
 letsencrypt_email = "admin@example.com"
 
+# Required. The plain <git-sha> image loads JS and CSS from
+# assets.superplane.com. That host allows only app.superplane.com.
+superplane_image_tag = "<commit-sha>-selfhosted"
+
 # Recommended. Runners require it.
 enable_gcs_blob_storage = true
 ```
@@ -133,7 +137,7 @@ commit and tags it with the commit SHA. Use versions that are compatible:
 
 | Artifact | Variable or field | Requirement |
 | --- | --- | --- |
-| SuperPlane image | `superplane_image_tag` | Must contain the integrated runner API. Releases `v0.26.0` and earlier do not. Use the full SHA of a later `main` commit. |
+| SuperPlane image | `superplane_image_tag` | Must contain the integrated runner API. Use `<commit-sha>-selfhosted`. The plain `<commit-sha>` image loads the UI from the hosted CDN and fails CORS on your domain. |
 | Helm chart | `superplane_chart_version` | Must contain the `runnerAPI` and `fleetManager` values. Chart `0.26.0` does not. Use `0.0.0-<commit-sha>`. |
 | Fleet Manager image | `fleet_manager_image_tag` | Must contain the GCP provider. Use `<commit-sha>`. |
 | Runner release | `runnerVersion` of the fleet | A published release ID, `v<version>` or `sha:<commit-sha>`. |
@@ -141,7 +145,7 @@ commit and tags it with the commit SHA. Use versions that are compatible:
 Make sure that the images and the chart exist:
 
 ```bash
-docker manifest inspect ghcr.io/superplanehq/superplane:<commit-sha>
+docker manifest inspect ghcr.io/superplanehq/superplane:<commit-sha>-selfhosted
 docker manifest inspect ghcr.io/superplanehq/fleet-manager:<commit-sha>
 helm show chart oci://ghcr.io/superplanehq/superplane-chart --version 0.0.0-<commit-sha>
 ```
@@ -186,7 +190,7 @@ Add these values to `terraform.tfvars`:
 enable_gcs_blob_storage = true
 enable_runners          = true
 
-superplane_image_tag     = "<commit-sha>"
+superplane_image_tag     = "<commit-sha>-selfhosted"
 superplane_chart_version = "0.0.0-<commit-sha>"
 ```
 
@@ -317,6 +321,8 @@ must stop and Fleet Manager must delete it after the task.
 
 | Variable | Default | Description |
 | --- | --- | --- |
+| `superplane_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the SuperPlane image. |
+| `superplane_image_tag` | `stable` | Image tag. Use `<git-sha>-selfhosted` on customer domains. |
 | `enable_gcs_blob_storage` | `false` | Store blobs in GCS. |
 | `blob_bucket_name` | `<project_id>-superplane-blobs` | Name of the blob bucket. |
 | `blob_bucket_force_destroy` | `false` | Delete the bucket objects on destroy. |

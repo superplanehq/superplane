@@ -111,8 +111,14 @@ variable "superplane_namespace" {
   default     = "superplane"
 }
 
+variable "superplane_image_registry" {
+  description = "Registry that hosts the SuperPlane image, without the image name."
+  type        = string
+  default     = "ghcr.io/superplanehq"
+}
+
 variable "superplane_image_tag" {
-  description = "SuperPlane image tag (e.g., stable, beta, v0.4)"
+  description = "SuperPlane image tag. Self-hosted installs must use <git-sha>-selfhosted. The plain <git-sha> image loads UI files from the hosted CDN and fails CORS on a customer domain."
   type        = string
   default     = "stable"
 }

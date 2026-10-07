@@ -54,7 +54,8 @@ letsencrypt_email = "admin@example.com"
 # -----------------------------------------------------------------------------
 
 # superplane_namespace = "superplane"
-# superplane_image_tag = "stable"  # Options: stable, beta, or specific version like v0.4
+# Use <git-sha>-selfhosted. The plain SHA image fails CORS on your domain.
+# superplane_image_tag = "<git-sha>-selfhosted"
 
 # Runners need a chart that has runnerAPI and fleetManager values.
 # main publishes the chart as 0.0.0-<git-sha>.

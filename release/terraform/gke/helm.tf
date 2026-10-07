@@ -151,7 +151,7 @@ resource "helm_release" "superplane" {
   # Image configuration
   set {
     name  = "image.registry"
-    value = "ghcr.io/superplanehq"
+    value = var.superplane_image_registry
   }
 
   set {
