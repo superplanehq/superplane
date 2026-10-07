@@ -12,6 +12,7 @@ Docker image for managing SuperPlane infrastructure on GKE, EKS, and AKS.
 - gcloud
 - gke-gcloud-auth-plugin
 - AWS CLI
+- Azure CLI
 - eksctl
 - vim and jq
 

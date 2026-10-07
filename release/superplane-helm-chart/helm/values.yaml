@@ -285,8 +285,9 @@ runnerAPI:
 
 #
 # Active runner logs. Used when runnerAPI.enabled is true.
-# One replica can use emptyDir. More than one replica needs a shared PVC
-# that supports advisory locks, atomic rename, and durable sync.
+# With no existingClaim, one API replica stores and archives logs on emptyDir.
+# More than one API replica needs existingClaim. The claim must support
+# advisory locks, atomic rename, and durable sync.
 #
 runnerLogs:
   path: /var/lib/superplane/active-runner-logs

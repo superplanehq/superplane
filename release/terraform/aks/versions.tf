@@ -32,7 +32,7 @@ terraform {
 provider "azurerm" {
   storage_use_azuread = true
   features {}
-  subscription_id     = var.subscription_id
+  subscription_id = var.subscription_id
 }
 
 provider "kubernetes" {

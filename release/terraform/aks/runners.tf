@@ -26,6 +26,20 @@ resource "azurerm_role_assignment" "fleet_manager_network" {
   principal_id         = azurerm_user_assigned_identity.fleet_manager.principal_id
 }
 
+# The runner subnet and NSG live in the application resource group.
+# Network Contributor on the runners group cannot join those resources.
+resource "azurerm_role_assignment" "fleet_manager_runner_subnet" {
+  scope                = azurerm_subnet.runners.id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_user_assigned_identity.fleet_manager.principal_id
+}
+
+resource "azurerm_role_assignment" "fleet_manager_runner_nsg" {
+  scope                = azurerm_network_security_group.runners.id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_user_assigned_identity.fleet_manager.principal_id
+}
+
 resource "azurerm_role_assignment" "fleet_manager_gallery" {
   scope                = azurerm_shared_image_gallery.runners.id
   role_definition_name = "Reader"

@@ -243,8 +243,8 @@ func TestBuildBootstrapDownloadsPublicArtifact(t *testing.T) {
 		"--extract",
 		"--gzip",
 		"set +x",
-		`RUNNER_API_URL="https://superplane.example" \`,
-		`RUNNER_REGISTRATION_TOKEN="short-lived-registration-token" \`,
+		`RUNNER_API_URL='https://superplane.example' \`,
+		`RUNNER_REGISTRATION_TOKEN='short-lived-registration-token' \`,
 		`"$bundle_dir/install.sh"`,
 	} {
 		if !strings.Contains(body, expected) {
@@ -259,6 +259,64 @@ func TestBuildBootstrapDownloadsPublicArtifact(t *testing.T) {
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("bootstrap shell syntax: %v\n%s", err, output)
 	}
+}
+
+func TestBuildBootstrapKeepsShellMetacharactersLiteral(t *testing.T) {
+	rawURL := "https://downloads.example/runner/$(echo pwned)/runner.tar.gz"
+	token := "tok$(echo no)'en"
+	azureProvider := newTestProvider(t, &fakeCompute{})
+	script, err := azureProvider.BuildBootstrap(provider.RunnerBootstrap{
+		RunnerID:          "runner-1",
+		FleetID:           "fleet-a",
+		RunnerAPIURL:      "https://superplane.example/runner",
+		RegistrationToken: token,
+		Artifact: artifact.Artifact{
+			URL:    rawURL,
+			SHA256: strings.Repeat("b", 64),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := string(script)
+	if got := evalShellWord(t, shellWordAfter(t, body, "show-error \\\n  ")); got != rawURL {
+		t.Fatalf("artifact URL = %q", got)
+	}
+	if got := evalShellWord(t, shellAssignment(t, body, "RUNNER_REGISTRATION_TOKEN=")); got != token {
+		t.Fatalf("registration token = %q", got)
+	}
+}
+
+func shellWordAfter(t *testing.T, body, marker string) string {
+	t.Helper()
+	index := strings.Index(body, marker)
+	if index < 0 {
+		t.Fatalf("missing %q in:\n%s", marker, body)
+	}
+	rest := body[index+len(marker):]
+	line, _, _ := strings.Cut(rest, "\n")
+	return strings.TrimSuffix(strings.TrimSpace(line), `\`)
+}
+
+func shellAssignment(t *testing.T, body, prefix string) string {
+	t.Helper()
+	index := strings.Index(body, prefix)
+	if index < 0 {
+		t.Fatalf("missing %q in:\n%s", prefix, body)
+	}
+	rest := body[index+len(prefix):]
+	line, _, _ := strings.Cut(rest, "\n")
+	return strings.TrimSuffix(strings.TrimSpace(line), `\`)
+}
+
+func evalShellWord(t *testing.T, word string) string {
+	t.Helper()
+	command := exec.Command("bash", "-c", "printf %s "+word)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		t.Fatalf("bash %q: %v\n%s", word, err, output)
+	}
+	return string(output)
 }
 
 func TestDeleteTreatsMissingAzureVMAsSuccess(t *testing.T) {

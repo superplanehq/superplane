@@ -144,12 +144,12 @@ spec:
             - name: BLOB_STORAGE_CREDENTIALS_FILE
               value: {{ .Values.blobStorage.credentialsFile | quote }}
             - name: START_RUNNER_LOG_COMPACTOR
-{{- if .Values.runnerAPI.enabled }}
+{{- if and .Values.runnerAPI.enabled .Values.runnerLogs.existingClaim }}
               value: "yes"
 {{- else }}
               value: "no"
 {{- end }}
-{{- if .Values.runnerAPI.enabled }}
+{{- if and .Values.runnerAPI.enabled .Values.runnerLogs.existingClaim }}
             - name: RUNNER_ACTIVE_LOG_FS_PATH
               value: {{ .Values.runnerLogs.path | quote }}
 {{- end }}
@@ -164,7 +164,7 @@ spec:
             - name: blob-data
               mountPath: {{ .Values.blobStorage.localPath }}
 {{- end }}
-{{- if .Values.runnerAPI.enabled }}
+{{- if and .Values.runnerAPI.enabled .Values.runnerLogs.existingClaim }}
             - name: runner-logs
               mountPath: {{ .Values.runnerLogs.path }}
 {{- end }}
@@ -188,12 +188,8 @@ spec:
         - name: blob-data
           emptyDir: {}
 {{- end }}
-{{- if .Values.runnerAPI.enabled }}
+{{- if and .Values.runnerAPI.enabled .Values.runnerLogs.existingClaim }}
         - name: runner-logs
-{{- if .Values.runnerLogs.existingClaim }}
           persistentVolumeClaim:
             claimName: {{ .Values.runnerLogs.existingClaim }}
-{{- else }}
-          emptyDir: {}
-{{- end }}
 {{- end }}

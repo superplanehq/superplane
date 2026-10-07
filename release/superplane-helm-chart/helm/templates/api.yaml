@@ -1,3 +1,6 @@
+{{- if and .Values.runnerAPI.enabled (not .Values.runnerLogs.existingClaim) (gt (int .Values.api.replicas) 1) }}
+{{- fail "Set runnerLogs.existingClaim when api.replicas is greater than 1." }}
+{{- end }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -163,6 +166,10 @@ spec:
 {{- if .Values.runnerAPI.enabled }}
             - name: RUNNER_ACTIVE_LOG_FS_PATH
               value: {{ .Values.runnerLogs.path | quote }}
+{{- if not .Values.runnerLogs.existingClaim }}
+            - name: START_RUNNER_LOG_COMPACTOR
+              value: "yes"
+{{- end }}
 {{- end }}
             - name: START_FILE_CLEANUP_WORKER
               value: "yes"

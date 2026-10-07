@@ -4,7 +4,6 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"strconv"
 	"strings"
 	"text/template"
 
@@ -15,8 +14,12 @@ import (
 var userDataTemplateSource string
 
 var userDataTemplate = template.Must(template.New("userdata").Funcs(template.FuncMap{
-	"shellQuote": strconv.Quote,
+	"shellQuote": shellQuote,
 }).Parse(userDataTemplateSource))
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
+}
 
 func buildUserData(request provider.RunnerBootstrap) ([]byte, error) {
 	switch {
