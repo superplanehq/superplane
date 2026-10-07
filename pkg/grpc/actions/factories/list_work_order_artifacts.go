@@ -69,7 +69,15 @@ func serializeArtifact(artifact *models.FactoryWorkOrderArtifact) (*pb.WorkOrder
 		Data:      data,
 		CreatedBy: serializeArtifactCreator(artifact),
 		CreatedAt: timestamppb.New(artifact.CreatedAt),
+		Key:       artifactStorageKey(artifact),
 	}, nil
+}
+
+func artifactStorageKey(artifact *models.FactoryWorkOrderArtifact) string {
+	if artifact.Key == nil {
+		return ""
+	}
+	return *artifact.Key
 }
 
 func serializeArtifactCreator(artifact *models.FactoryWorkOrderArtifact) *pb.UserRef {

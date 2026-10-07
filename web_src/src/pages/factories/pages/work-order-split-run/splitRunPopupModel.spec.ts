@@ -156,6 +156,32 @@ describe("splitRunPopupModel", () => {
     ).toEqual({ title: "", summary: "", plan: "" });
   });
 
+  it("keeps the saved plan when a later file uses the same name", () => {
+    const artifacts = [
+      {
+        id: "workflow-plan",
+        type: "TYPE_MARKDOWN" as const,
+        key: "workflow-plan",
+        data: { name: "plan.md", body: "# Workflow\n\n## Executive summary\n\nWorkflow summary.\n" },
+      },
+      {
+        id: "saved-plan",
+        type: "TYPE_MARKDOWN" as const,
+        key: "spec:11111111-1111-4111-8111-111111111111",
+        data: { name: "plan.md", body: "# Saved\n\n## Executive summary\n\nSaved summary.\n" },
+      },
+    ];
+
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).title).toBe("Saved");
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).summary).toBe("Saved summary.");
+    expect(
+      splitRunIntentDocument({
+        artifacts: [artifacts[0], { ...artifacts[1], data: { name: "plan.md", body: "   " } }],
+        description: "Webhook timeouts.",
+      }),
+    ).toEqual({ title: "", summary: "", plan: "" });
+  });
+
   it("prefers plan.md, then spec.md, then intent.md", () => {
     const artifacts = [
       {

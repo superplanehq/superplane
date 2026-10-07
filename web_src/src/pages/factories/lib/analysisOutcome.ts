@@ -1,5 +1,5 @@
 import { CLARITY_CHECK_KEY, CONFIDENCE_CHECK_KEY, isScoreCheckName } from "./confidenceScore";
-import { isPlanningArtifactName, PLANNING_ARTIFACT_NAMES } from "./intentDocument";
+import { isPlanningArtifactName, PLANNING_ARTIFACT_NAMES, selectPlanningDocument } from "./intentDocument";
 import {
   extractArtifactMarkdownBody,
   extractArtifactName,
@@ -17,7 +17,11 @@ export function hasAnalysisScore(checks?: Array<{ name?: string; key?: string; s
   });
 }
 
-export function analysisPlanBody(artifacts?: Array<{ data?: unknown }>): string | undefined {
+export function analysisPlanBody(artifacts?: Array<{ key?: string; data?: unknown }>): string | undefined {
+  const selected = selectPlanningDocument(artifacts);
+  if (selected.identified) {
+    return selected.body || undefined;
+  }
   const bodies = new Map<string, string>();
   for (const artifact of artifacts ?? []) {
     const data = toArtifactDataRecord(artifact.data);

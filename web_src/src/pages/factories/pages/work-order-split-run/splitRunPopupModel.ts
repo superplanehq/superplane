@@ -6,6 +6,7 @@ import {
   EMPTY_INTENT_DOCUMENT,
   isPlanningArtifactName,
   PLANNING_ARTIFACT_NAMES,
+  selectPlanningDocument,
   type IntentDocument,
   parseIntentDocument,
 } from "../../lib/intentDocument";
@@ -183,6 +184,10 @@ export function splitRunDescriptionMarkdown(artifacts: FactoriesWorkOrderArtifac
 }
 
 export function splitRunIntentMarkdown(artifacts: FactoriesWorkOrderArtifact[]): string {
+  const selected = selectPlanningDocument(artifacts);
+  if (selected.identified) {
+    return selected.body;
+  }
   return firstArtifactMarkdown(artifacts, PLANNING_ARTIFACT_NAMES);
 }
 
@@ -191,6 +196,10 @@ export function splitRunIntentDocument(args: {
   description: string;
   skipDescriptionFallback?: boolean;
 }): IntentDocument {
+  const selected = selectPlanningDocument(args.artifacts);
+  if (selected.identified) {
+    return selected.body ? parseIntentDocument(selected.body) : EMPTY_INTENT_DOCUMENT;
+  }
   const intent = splitRunIntentMarkdown(args.artifacts);
   if (intent) {
     return parseIntentDocument(intent);

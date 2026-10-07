@@ -2230,6 +2230,9 @@ message WorkOrderArtifact {
   google.protobuf.Struct data = 3;
   UserRef created_by = 4;
   google.protobuf.Timestamp created_at = 5;
+  // Stable lookup key. The saved plan uses spec:<work order id>.
+  // Empty when the artifact has no key.
+  string key = 6;
 }
 
 // WorkOrderCheck is a scored assessment an automation reported on a work

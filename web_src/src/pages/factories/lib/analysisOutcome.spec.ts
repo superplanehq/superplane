@@ -53,6 +53,22 @@ describe("analysisFirstResultDelivered", () => {
     expect(analysisPlanBody([{ data: { title: "spec.md", body: "A retry loop." } }])).toBe("A retry loop.");
   });
 
+  it("keeps the saved plan when a later file uses the same name", () => {
+    const savedKey = "spec:11111111-1111-4111-8111-111111111111";
+    expect(
+      analysisPlanBody([
+        { key: "workflow-plan", data: { name: "plan.md", body: "Workflow plan." } },
+        { key: savedKey, data: { name: "plan.md", body: "Saved plan." } },
+      ]),
+    ).toBe("Saved plan.");
+    expect(
+      analysisPlanBody([
+        { data: { name: "plan.md", body: "Workflow plan." } },
+        { key: savedKey, data: { name: "plan.md", body: "   " } },
+      ]),
+    ).toBeUndefined();
+  });
+
   it("prefers plan.md over spec.md and intent.md", () => {
     expect(
       analysisPlanBody([
