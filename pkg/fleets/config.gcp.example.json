@@ -3,8 +3,13 @@
   "superplaneUrl": "https://superplane.example",
   "installationAdminToken": "replace-with-personal-api-token",
   "runnerReleaseBaseUrl": "https://superplanehq-releases.s3.amazonaws.com/runner",
-  "reconcileIntervalSeconds": 15,
-  "requestTimeoutSeconds": 90,
+  "reconciliation": {
+    "pollTimeout": "30s",
+    "errorRetryInterval": "15s"
+  },
+  "http": {
+    "requestTimeout": "90s"
+  },
   "fleets": [
     {
       "id": "e1-large-amd64",

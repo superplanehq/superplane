@@ -416,6 +416,16 @@ func TestLoadDockerProviderDoesNotRequireAWSConfiguration(t *testing.T) {
 	}
 }
 
+func TestExampleConfigsLoad(t *testing.T) {
+	for _, name := range []string{"config.example.json", "config.gcp.example.json"} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Load(filepath.Join("..", name)); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestLoadAppliesGCPDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
 	body := `{
 		"id":"gke",
