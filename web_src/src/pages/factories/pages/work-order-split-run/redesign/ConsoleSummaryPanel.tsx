@@ -138,7 +138,7 @@ export function ConsoleSummaryPanel({
             ownerBusy={ownerBusy}
             onOwnerSave={onOwnerSave}
           />
-          <PanelSource source={source} owner={outcome.owner.id} />
+          <PanelSource source={source} ownerId={displayedOwnerId(owner ?? outcome.owner, assigneeIds)} />
           <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
           {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
           <SummaryRow label="Spend">
@@ -326,15 +326,22 @@ function isBranchArtifact(artifact: FactoriesWorkOrderArtifact): boolean {
   return (artifact.type ?? "").replace(/^TYPE_/i, "").toLowerCase() === "branch";
 }
 
+function displayedOwnerId(owner: SplitRunFixture["owner"], assigneeIds?: string[]): string | undefined {
+  if (assigneeIds !== undefined && assigneeIds.length === 0) {
+    return undefined;
+  }
+  return owner.id || undefined;
+}
+
 /**
  * The source of the task. A task the owner created by hand keeps one
  * "Created manually" row instead of repeating the owner's name.
  */
-function PanelSource({ source, owner }: { source?: SplitRunSource; owner: string }) {
+function PanelSource({ source, ownerId }: { source?: SplitRunSource; ownerId?: string }) {
   if (!source) {
     return null;
   }
-  if (source.kind === "manual" && source.person.id === owner) {
+  if (source.kind === "manual" && ownerId && source.person.id === ownerId) {
     return <SummaryRow label="Source">{source.detail}</SummaryRow>;
   }
   return (
@@ -399,7 +406,8 @@ function SummaryOwnerRow({
         ownerBusy={ownerBusy}
         onOwnerSave={onOwnerSave}
         align="end"
-        nameClassName="text-[13px]"
+        className="max-w-full"
+        nameClassName="min-w-0 truncate text-[13px]"
       />
     </SummaryRow>
   );
@@ -409,7 +417,12 @@ function SummaryRow({ label, children, truncate = true }: { label: string; child
   return (
     <div className="flex items-baseline justify-between gap-3 text-[13px]">
       <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className={cn("min-w-0 text-right text-foreground", truncate ? "truncate tabular-nums" : undefined)}>
+      <span
+        className={cn(
+          "min-w-0 max-w-full text-right text-foreground",
+          truncate ? "truncate tabular-nums" : "flex justify-end overflow-x-hidden",
+        )}
+      >
         {children}
       </span>
     </div>

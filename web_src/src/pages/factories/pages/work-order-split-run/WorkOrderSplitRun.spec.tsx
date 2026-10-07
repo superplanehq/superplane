@@ -1960,7 +1960,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(panel).getByText("Duration")).toBeInTheDocument();
   });
 
-  it("shows a manual source by the owner without repeating the person", () => {
+  it("shows the author on a manual source when the task has no owner", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         ...LINE_BOARD_DONE_RECEIPTS_ORDER,
@@ -1971,10 +1971,25 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     const panel = screen.getByTestId("redesign-console-summary");
+    expect(within(panel).getByText("No owner")).toBeInTheDocument();
+    expect(within(panel).getByTestId("split-run-source")).toHaveTextContent("Igor Šarčević");
+    expect(within(panel).getByText("Created manually")).toBeInTheDocument();
+  });
+
+  it("does not repeat the owner on a manual source", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({
+        ...LINE_BOARD_DONE_RECEIPTS_ORDER,
+        origin: undefined,
+        createdBy: { user: { id: "user-owner-1", name: "Igor Šarčević" } },
+        assignees: [{ id: "user-owner-1", name: "Igor Šarčević" }],
+      }),
+    });
+
+    const panel = screen.getByTestId("redesign-console-summary");
     expect(within(panel).getByText("Created manually")).toBeInTheDocument();
     expect(within(panel).queryByTestId("split-run-source")).not.toBeInTheDocument();
-    expect(within(panel).getByText("No owner")).toBeInTheDocument();
-    expect(within(panel).queryByText("Igor Šarčević")).not.toBeInTheDocument();
+    expect(within(panel).getAllByText("Igor Šarčević", { ignore: "script, style, title" })).toHaveLength(1);
   });
 
   it("shows an unsuccessful result in the summary panel", () => {

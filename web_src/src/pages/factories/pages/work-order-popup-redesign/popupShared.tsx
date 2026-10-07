@@ -203,7 +203,8 @@ export function TaskOwnerControl({
   ownerBusy = false,
   onOwnerSave,
   align = "start",
-  nameClassName = "truncate text-[13px]",
+  className,
+  nameClassName = "min-w-0 truncate text-[13px]",
 }: {
   owner: PopupFixture["owner"];
   assigneeIds?: string[];
@@ -212,14 +213,16 @@ export function TaskOwnerControl({
   ownerBusy?: boolean;
   onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
   align?: "start" | "center" | "end";
+  className?: string;
   nameClassName?: string;
 }) {
   const tracksAssignees = assigneeIds !== undefined;
   const ids = assigneeIds ?? [];
   const hasOwner = !tracksAssignees || ids.length > 0;
   const mark = ownerMark({ hasOwner, canEdit, owner, nameClassName });
+  const controlClassName = cn("inline-flex min-w-0 max-w-full items-center gap-1.5", className);
   if (!canEdit || !tracksAssignees || !organizationId || !onOwnerSave) {
-    return <span className="inline-flex min-w-0 items-center gap-1.5">{mark}</span>;
+    return <span className={controlClassName}>{mark}</span>;
   }
 
   return (
@@ -233,7 +236,7 @@ export function TaskOwnerControl({
     >
       <button
         type="button"
-        className="inline-flex min-w-0 items-center gap-1.5 rounded-sm hover:bg-muted/60"
+        className={cn(controlClassName, "rounded-sm hover:bg-muted/60")}
         aria-label={hasOwner ? `Owner: ${owner.name}` : "Assign owner"}
         data-testid="popup-edit-owner"
         disabled={ownerBusy}
