@@ -471,11 +471,16 @@ func (f *Factory) SoftDelete(tx *gorm.DB) error {
 	now := time.Now()
 	newName := fmt.Sprintf("%s (deleted-%d)", f.Name, now.Unix())
 
-	err := tx.Model(f).Updates(map[string]any{
-		"name":       newName,
-		"deleted_at": now,
-		"updated_at": now,
-	}).Error
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if err := inner.Model(f).Updates(map[string]any{
+			"name":       newName,
+			"deleted_at": now,
+			"updated_at": now,
+		}).Error; err != nil {
+			return err
+		}
+		return f.endOpenPlanningSessions(inner)
+	})
 	if err != nil {
 		return err
 	}

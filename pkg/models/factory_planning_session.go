@@ -474,3 +474,19 @@ func (s *FactoryPlanningSession) saveSurvey(tx *gorm.DB) error {
 		"updated_at": s.UpdatedAt,
 	}).Error
 }
+
+func (f *Factory) endOpenPlanningSessions(tx *gorm.DB) error {
+	var sessions []FactoryPlanningSession
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND state <> ?", f.OrganizationID, f.ID, PlanningSessionStateEnded).
+		Find(&sessions).Error
+	if err != nil {
+		return err
+	}
+	for i := range sessions {
+		if err := sessions[i].End(tx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
