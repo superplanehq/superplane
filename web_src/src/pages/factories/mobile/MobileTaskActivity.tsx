@@ -1,4 +1,5 @@
 import type { FilesFile } from "@/api-client";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -99,12 +100,13 @@ function ActivityRow({
 
   return (
     <div className="flex min-w-0 flex-col" data-testid={`mobile-task-phase-${phase.id}`}>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => canExpand && setExpanded((current) => !current)}
         aria-expanded={canExpand ? expanded : undefined}
         aria-label={canExpand ? (expanded ? MOBILE_TASK_COPY.hideLog : MOBILE_TASK_COPY.showLog) : undefined}
-        className="flex w-full items-start gap-3 px-3 py-2.5 text-left"
+        className="h-auto w-full min-w-0 items-start justify-start gap-3 whitespace-normal rounded-none px-3 py-2.5 text-left font-normal shadow-none hover:bg-transparent dark:text-foreground dark:hover:bg-transparent dark:hover:text-foreground"
       >
         <PhaseGlyph kind={PHASE_GLYPH[phase.status]} className="mt-1" />
         <span className="min-w-0 flex-1">
@@ -126,7 +128,7 @@ function ActivityRow({
             aria-hidden
           />
         ) : null}
-      </button>
+      </Button>
       {expanded && canExpand ? (
         <div className="min-w-0 border-t border-border px-2 py-2" data-testid={`mobile-task-phase-log-${phase.id}`}>
           <PhaseLog phase={phase} organizationId={organizationId} artifactIndex={artifactIndex} files={files} />
