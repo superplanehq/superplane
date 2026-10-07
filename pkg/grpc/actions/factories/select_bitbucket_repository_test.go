@@ -60,8 +60,9 @@ func TestSelectBitbucketRepositoryUsesTheForgeInstallation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 		assert.Equal(t, "Bearer system-token", request.Header.Get("Authorization"))
 		switch request.URL.Path {
-		case "/workspaces/acme/members/{11111111-1111-1111-1111-111111111111}":
-			_, _ = w.Write([]byte(`{"workspace":{"slug":"acme"}}`))
+		case "/workspaces/acme/permissions/repositories":
+			assert.Equal(t, `user.uuid="{11111111-1111-1111-1111-111111111111}"`, request.URL.Query().Get("q"))
+			_, _ = w.Write([]byte(`{"values":[{"type":"repository_permission","permission":"write","repository":{"uuid":"{22222222-2222-2222-2222-222222222222}","full_name":"acme/api"}}]}`))
 		case "/repositories/acme":
 			_, _ = w.Write([]byte(`{"values":[{"uuid":"{22222222-2222-2222-2222-222222222222}","full_name":"acme/api","is_private":true,"mainbranch":{"name":"develop"}}]}`))
 		default:
