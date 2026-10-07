@@ -122,6 +122,51 @@ describe("patchCachedWorkOrderPages", () => {
       ["STATE_DRAFT"],
     );
     expect(next?.pages[0]?.orders).toEqual([]);
+    expect(next?.pages[0]?.totalCount).toBeUndefined();
+  });
+
+  it("decrements totalCount when a loaded row leaves this list", () => {
+    const next = patchCachedWorkOrderPages(
+      {
+        pageParams: [undefined, { beforeId: "wo-1" }],
+        pages: [
+          { orders: [{ id: "wo-1", title: "Old", state: "STATE_DRAFT" }], hasNextPage: true, totalCount: 5 },
+          { orders: [{ id: "wo-2", title: "Later", state: "STATE_DRAFT" }], hasNextPage: false, totalCount: 5 },
+        ],
+      },
+      "wo-2",
+      { id: "wo-2", title: "New", state: "STATE_OPEN", checks: [] },
+      ["STATE_DRAFT"],
+    );
+    expect(next?.pages[0]?.totalCount).toBe(4);
+    expect(next?.pages[1]?.orders).toEqual([]);
+  });
+
+  it("increments totalCount when a row joins this list", () => {
+    const next = patchCachedWorkOrderPages(
+      {
+        pageParams: [undefined],
+        pages: [{ orders: [{ id: "wo-2", title: "Other", state: "STATE_OPEN" }], hasNextPage: false, totalCount: 8 }],
+      },
+      "wo-1",
+      { id: "wo-1", title: "New", state: "STATE_OPEN", checks: [] },
+      ["STATE_OPEN"],
+    );
+    expect(next?.pages[0]?.orders.map((order) => order.id)).toEqual(["wo-1", "wo-2"]);
+    expect(next?.pages[0]?.totalCount).toBe(9);
+  });
+
+  it("keeps totalCount when a loaded row stays on this list", () => {
+    const next = patchCachedWorkOrderPages(
+      {
+        pageParams: [undefined],
+        pages: [{ orders: [{ id: "wo-1", title: "Old", state: "STATE_DRAFT" }], hasNextPage: false, totalCount: 4 }],
+      },
+      "wo-1",
+      { id: "wo-1", title: "New", state: "STATE_DRAFT", checks: [] },
+      ["STATE_DRAFT"],
+    );
+    expect(next?.pages[0]?.totalCount).toBe(4);
   });
 
   it("removes a row that left this result filter", () => {
@@ -241,6 +286,29 @@ describe("removeWorkOrderFromListCaches", () => {
 
     removeWorkOrderFromListCaches(queryClient, "org-1", "factory-1", "wo-gone");
 
+    expect(queryClient.getQueryState(pageKey)?.isInvalidated).toBe(false);
+  });
+
+  it("decrements totalCount when a loaded task is deleted", () => {
+    const queryClient = new QueryClient();
+    const pageKey = factoryWorkOrdersPageKey("org-1", "factory-1", ["STATE_OPEN"]);
+    queryClient.setQueryData<InfiniteData<WorkOrdersPage>>(pageKey, {
+      pageParams: [undefined],
+      pages: [
+        {
+          orders: [
+            { id: "wo-1", title: "Gone" },
+            { id: "wo-2", title: "Other" },
+          ],
+          hasNextPage: false,
+          totalCount: 6,
+        },
+      ],
+    });
+
+    removeWorkOrderFromListCaches(queryClient, "org-1", "factory-1", "wo-1");
+
+    expect(queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(pageKey)?.pages[0]?.totalCount).toBe(5);
     expect(queryClient.getQueryState(pageKey)?.isInvalidated).toBe(false);
   });
 });

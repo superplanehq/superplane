@@ -201,10 +201,9 @@ function useMobileBoardModel({
     }
     return {
       backlog: backlog.totalCount,
-      open: open.totalCount,
       done: done.totalCount,
     };
-  }, [backlog.totalCount, done.totalCount, hasClientFilter, open.totalCount]);
+  }, [backlog.totalCount, done.totalCount, hasClientFilter]);
 
   const columns = useMemo(
     () => buildMobileBoardColumns(line, visibleWorkOrders, apps, totalCounts),

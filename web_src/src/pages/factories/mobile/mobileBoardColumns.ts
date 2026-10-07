@@ -15,7 +15,6 @@ export type MobileBoardPagingKey = "backlog" | "open" | "done";
 
 export type MobileBoardColumnTotalCounts = {
   backlog?: number;
-  open?: number;
   done?: number;
 };
 
@@ -42,6 +41,14 @@ function cardsForOrders(orders: FactoriesWorkOrder[]): MobileBoardCard[] {
   return orders.flatMap((order) => (order.id ? [{ key: order.id, order }] : []));
 }
 
+function doneColumnTotalCount(serverTotal: number | undefined, cards: MobileBoardCard[]): number | undefined {
+  if (serverTotal === undefined) {
+    return undefined;
+  }
+  const openOnDoneStep = cards.filter((card) => card.order.state !== "STATE_CLOSED").length;
+  return serverTotal + openOnDoneStep;
+}
+
 /**
  * One flat list of columns for the phone board, in the same order as the
  * desktop line board: Backlog, each line phase, Verify, Done. The phone shows
@@ -57,7 +64,7 @@ export function buildMobileBoardColumns(
   const verifyOrders = collectLineVerifyOrders(fullBoard);
   const stageColumns = visibleLineStageColumns(fullBoard, verifyOrders);
   const backlogOrders = collectLineBacklogOrders(workOrders);
-  const doneOrders = collectLineDoneOrders(workOrders, line, fullBoard);
+  const doneCards = cardsForOrders(collectLineDoneOrders(workOrders, line, fullBoard));
 
   return [
     {
@@ -84,15 +91,14 @@ export function buildMobileBoardColumns(
       cards: cardsForOrders(verifyOrders),
       paging: "open",
       emptyDescription: "No tasks in Verify.",
-      totalCount: stageColumns.length === 0 ? totalCounts?.open : undefined,
     },
     {
       key: "done",
       title: "Done",
-      cards: cardsForOrders(doneOrders),
+      cards: doneCards,
       paging: "done",
       emptyDescription: "No tasks in Done.",
-      totalCount: totalCounts?.done,
+      totalCount: doneColumnTotalCount(totalCounts?.done, doneCards),
     },
   ];
 }

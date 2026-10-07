@@ -1129,30 +1129,6 @@ type ListFactoryWorkOrdersFilters struct {
 	PublicBoard bool
 }
 
-func (f *Factory) workOrdersQuery(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) *gorm.DB {
-	query := tx.
-		Model(&FactoryWorkOrder{}).
-		Where("factory_work_orders.organization_id = ?", f.OrganizationID).
-		Where("factory_work_orders.factory_id = ?", f.ID)
-
-	if len(filters.States) > 0 {
-		query = query.Where("factory_work_orders.state IN ?", filters.States)
-	}
-
-	if len(filters.Results) > 0 {
-		query = query.Where("factory_work_orders.result IN ?", filters.Results)
-	}
-
-	query = applyWorkOrderUserFilters(query, filters)
-	if filters.PublicBoard {
-		query = applyPublicBoardFilter(query, filters.LineID)
-	} else {
-		query = applyWorkOrderLineFilter(query, filters.LineID)
-	}
-
-	return query
-}
-
 func (f *Factory) CountWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) (int64, error) {
 	var count int64
 	err := f.workOrdersQuery(tx, filters).Count(&count).Error
@@ -1199,6 +1175,30 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 	}
 
 	return orders, nil
+}
+
+func (f *Factory) workOrdersQuery(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) *gorm.DB {
+	query := tx.
+		Model(&FactoryWorkOrder{}).
+		Where("factory_work_orders.organization_id = ?", f.OrganizationID).
+		Where("factory_work_orders.factory_id = ?", f.ID)
+
+	if len(filters.States) > 0 {
+		query = query.Where("factory_work_orders.state IN ?", filters.States)
+	}
+
+	if len(filters.Results) > 0 {
+		query = query.Where("factory_work_orders.result IN ?", filters.Results)
+	}
+
+	query = applyWorkOrderUserFilters(query, filters)
+	if filters.PublicBoard {
+		query = applyPublicBoardFilter(query, filters.LineID)
+	} else {
+		query = applyWorkOrderLineFilter(query, filters.LineID)
+	}
+
+	return query
 }
 
 func applyWorkOrderUserFilters(query *gorm.DB, filters ListFactoryWorkOrdersFilters) *gorm.DB {
