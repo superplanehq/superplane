@@ -125,6 +125,7 @@ describe("buildWorkOrderListEntry", () => {
     expect(entry.sourceId).toBe("github-issues");
     expect(entry.sourceLabel).toBe("GitHub issues");
     expect(entry.searchHaystack).toContain("github issues");
+    expect(entry.searchHaystack).toContain("acme/payments#12");
   });
 
   it("keeps only the first assignee as the owner", () => {

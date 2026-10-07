@@ -118,6 +118,7 @@ export function buildWorkOrderListEntry(
       latestStepName,
       assigneeNames.join(" "),
       source.label,
+      order.origin?.label,
     ]),
     isDispatchable: isDispatchableState(order.state),
   };

@@ -1,10 +1,15 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/usePermissions";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
+import { Loader2, Search } from "lucide-react";
+import { type KeyboardEvent } from "react";
 
 import { WorkOrderBoardLane, workOrderKanbanLaneScrollClassName } from "../workOrders/WorkOrderBoardChrome";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -23,6 +28,8 @@ import { isFirstRunOnboardingFactory, type ConfiguredLineIntakeSource } from "./
 import { BacklogOnboardingCard } from "./onboarding/first-run/BacklogOnboardingCard";
 import { useBacklogCreateMenu } from "./useBacklogCreateMenu";
 import { BACKLOG_REFRESH_COPY, backlogRefreshToast, canRefreshBacklog } from "./backlogRefresh";
+import { BACKLOG_COLUMN_SEARCH_COPY } from "../lib/backlogColumnSearch";
+import { useBacklogColumnSearch, type BacklogColumnPaging } from "./useBacklogColumnSearch";
 
 export type BacklogColumnProps = {
   organizationId: string;
@@ -58,11 +65,7 @@ export type BacklogColumnProps = {
   /** Rows the automation subheader reserves. Shared across the board. Hidden when unset. */
   automationRowCount?: number;
   onAutomationRowAction?: (automation: ColumnAutomation, action: ColumnAutomationRowAction) => void;
-  paging?: {
-    hasMore: boolean;
-    isLoading: boolean;
-    onLoadMore: () => void;
-  };
+  paging?: BacklogColumnPaging;
   cardsPending?: boolean;
 };
 
@@ -106,6 +109,7 @@ export function BacklogColumn({
   cardsPending = false,
 }: BacklogColumnProps) {
   const lane = lineBoardColumnLaneProps(colorId, colorView, { mutedFallback: true });
+  const search = useBacklogColumnSearch(orders, paging);
   const atCapacity = size != null && orders.length >= size;
   const canAdd = canCreateWorkOrder && !atCapacity;
   const createMenu = useBacklogCreateMenu(organizationId, factoryId, onOpenWorkOrder);
@@ -119,6 +123,11 @@ export function BacklogColumn({
     createMenu,
     onCreateWorkOrder,
   });
+  const refreshBacklogAction = canRefreshBacklog(intakesQuery.data, canUpdateWorkOrders)
+    ? () => {
+        void runBacklogRefresh(refreshBacklog.mutateAsync);
+      }
+    : undefined;
 
   return (
     <>
@@ -128,11 +137,11 @@ export function BacklogColumn({
         canRename={canRename}
         onRename={onRename}
         titleTestId="lines-column-title-backlog"
-        count={orders.length}
+        count={search.columnCount}
         tone="neutral"
         surfaceClassName={lane.surfaceClassName}
         emptyDescription="No tasks in the backlog."
-        emptyContent={isFirstRunOnboardingFactory(factoryKey) ? <BacklogOnboardingCard /> : undefined}
+        emptyContent={backlogEmptyContent(factoryKey, search.searchActive)}
         keepChildrenWhenEmpty
         className={lane.className}
         actions={
@@ -144,13 +153,7 @@ export function BacklogColumn({
             onAutomationRowAction={onAutomationRowAction}
             onOpenSettings={onOpenSettings}
             onAddIntake={onAddIntake}
-            onRefreshBacklog={
-              canRefreshBacklog(intakesQuery.data, canUpdateWorkOrders)
-                ? () => {
-                    void runBacklogRefresh(refreshBacklog.mutateAsync);
-                  }
-                : undefined
-            }
+            onRefreshBacklog={refreshBacklogAction}
             refreshBacklogPending={refreshBacklog.isPending}
             colorId={colorId}
             onColorChange={onColorChange}
@@ -163,16 +166,17 @@ export function BacklogColumn({
           onRowAction: onAutomationRowAction,
           testId: "lines-backlog-automation-rows",
         })}
-        banner={<BacklogColumnBanner panel={intakePanel} />}
+        banner={<BacklogColumnSearchBanner query={search.query} onQueryChange={search.setQuery} panel={intakePanel} />}
         testId="lines-backlog-column"
       >
         <BacklogColumnOrderList
-          orders={orders}
+          orders={search.visibleOrders}
           workOrderCardContext={workOrderCardContext}
           onOpenWorkOrder={onOpenWorkOrder}
           analyzingOrderIds={analyzingOrderIds}
           creditFailureLabels={creditFailureLabels}
           atCapacity={atCapacity}
+          search={search}
           createPopover={createPopover}
           paging={paging}
           cardsPending={cardsPending}
@@ -187,6 +191,61 @@ export function BacklogColumn({
         onClose={onCloseSettings}
       />
     </>
+  );
+}
+
+function backlogEmptyContent(factoryKey: string, searchActive: boolean) {
+  if (searchActive || !isFirstRunOnboardingFactory(factoryKey)) {
+    return undefined;
+  }
+  return <BacklogOnboardingCard />;
+}
+
+function BacklogColumnSearchBanner({
+  query,
+  onQueryChange,
+  panel,
+}: {
+  query: string;
+  onQueryChange: (query: string) => void;
+  panel?: BacklogIntakePanel;
+}) {
+  return (
+    <div className="flex shrink-0 flex-col gap-2 pb-2">
+      <BacklogColumnSearch query={query} onQueryChange={onQueryChange} />
+      <BacklogColumnBanner panel={panel} />
+    </div>
+  );
+}
+
+function BacklogColumnSearch({ query, onQueryChange }: { query: string; onQueryChange: (query: string) => void }) {
+  const clearQuery = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Escape") {
+      return;
+    }
+    event.preventDefault();
+    onQueryChange("");
+  };
+
+  return (
+    <div className="relative">
+      <Label htmlFor="lines-backlog-search" className="sr-only">
+        {BACKLOG_COLUMN_SEARCH_COPY.placeholder}
+      </Label>
+      <Search
+        className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
+        aria-hidden
+      />
+      <Input
+        id="lines-backlog-search"
+        value={query}
+        onChange={(event) => onQueryChange(event.target.value)}
+        onKeyDown={clearQuery}
+        placeholder={BACKLOG_COLUMN_SEARCH_COPY.placeholder}
+        className="h-8 w-full bg-background pl-8 text-[13px] shadow-none"
+        data-testid="lines-backlog-search"
+      />
+    </div>
   );
 }
 
@@ -264,6 +323,7 @@ function BacklogColumnOrderList({
   analyzingOrderIds,
   creditFailureLabels,
   atCapacity,
+  search,
   createPopover,
   paging,
   cardsPending,
@@ -279,12 +339,13 @@ function BacklogColumnOrderList({
   | "cardsPending"
 > & {
   atCapacity: boolean;
+  search: ReturnType<typeof useBacklogColumnSearch>;
   createPopover: BacklogCreatePopoverProps;
   scrollPersistenceKey?: string;
 }) {
   const { scrollRef, handleScroll } = useFactoryBoardLaneScroll(scrollPersistenceKey, !cardsPending);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
-    hasMore: paging?.hasMore,
+    hasMore: search.searchActive ? false : paging?.hasMore,
     isLoading: paging?.isLoading,
     onLoadMore: paging?.onLoadMore,
   });
@@ -311,7 +372,38 @@ function BacklogColumnOrderList({
           />
         </li>
       ))}
-      {atCapacity ? null : (
+      {search.showNoMatch ? (
+        <li>
+          <p className="rounded-md border border-dashed border-border/60 px-3 py-6 text-center text-[12px] text-muted-foreground">
+            {BACKLOG_COLUMN_SEARCH_COPY.noMatch}
+          </p>
+        </li>
+      ) : null}
+      {search.showLoadingMore ? (
+        <li>
+          <div
+            role="status"
+            aria-label={BACKLOG_COLUMN_SEARCH_COPY.loadingMore}
+            className="flex items-center justify-center gap-2 py-2 text-[12px] text-muted-foreground"
+          >
+            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+            <span>{BACKLOG_COLUMN_SEARCH_COPY.loadingMore}</span>
+          </div>
+        </li>
+      ) : null}
+      {search.showLoadError ? (
+        <li>
+          <div className="flex flex-col items-center gap-2 px-1 py-2">
+            <p className="text-center text-[12px] text-destructive" role="alert">
+              {BACKLOG_COLUMN_SEARCH_COPY.loadError}
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={search.retryLoadMore}>
+              {BACKLOG_COLUMN_SEARCH_COPY.retry}
+            </Button>
+          </div>
+        </li>
+      ) : null}
+      {atCapacity || search.searchActive ? null : (
         <li data-testid="lines-backlog-create-ghost-item">
           <BacklogCreatePopover variant="ghost" {...createPopover} />
         </li>
