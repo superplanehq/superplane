@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Build the production runner image. On a real main push, also upload CDN
-# assets to R2 and push the image to GHCR.
+# Build the production SuperPlane image. On a real main push, also upload CDN
+# assets to R2 and push images to GHCR.
 #
 # PR / other refs: bake the frontend inside Docker (no CDN, no R2, no push).
-# Main branch push: Vite with the R2 base URL, sync dist to R2, then
-# image.build FRONTEND_PREBUILT=1 and image.push.
+# Main branch push:
+#   1. Vite with the R2 base URL, sync dist to R2, push <sha> for hosted SaaS.
+#   2. Bake the frontend in Docker with same-origin URLs, push <sha>-selfhosted
+#      for customer installs. assets.superplane.com allows only app.superplane.com.
 #
 # Requires a running compose app (make dev.up) and frontend deps
 # (make dev.setup.npm). Main also needs GHCR_PUSH_TOKEN and r2-static-assets.
@@ -63,10 +65,14 @@ publish_main_image() {
     FRONTEND_PREBUILT=1
   make image.auth
   make image.push IMAGE_TAG="${image_tag}"
+
+  echo "Building self-hosted image ${image_tag}-selfhosted"
+  make image.build IMAGE_TAG="${image_tag}-selfhosted"
+  make image.push IMAGE_TAG="${image_tag}-selfhosted"
 }
 
 if is_main_branch_push; then
-  echo "Main branch push: CDN frontend, R2 upload, GHCR push"
+  echo "Main branch push: CDN image, self-hosted image, R2 upload, GHCR push"
   publish_main_image
   exit 0
 fi
