@@ -128,6 +128,28 @@ func ParseAppEvent(headers http.Header, body []byte) (AppEvent, error) {
 	}, nil
 }
 
+// EventNeedsTeamLookup reports whether a team-scoped subscription can match
+// this event only after SuperPlane loads the parent issue. Events that no
+// subscription can use do not need that request.
+func EventNeedsTeamLookup(event AppEvent, configs []WebhookConfiguration, teams []Team) bool {
+	if event.TeamID != "" || teamIDForKey(teams, event.TeamKey) != "" {
+		return false
+	}
+	if strings.TrimSpace(event.IssueID) == "" {
+		return false
+	}
+
+	for _, config := range configs {
+		if config.ResourceType != "" && !strings.EqualFold(config.ResourceType, event.ResourceType) {
+			continue
+		}
+		if len(config.resolvedTeamIDs()) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // ResolveEventTeam fills the team on events that do not carry one.
 // Attachment payloads identify the parent issue and omit the team. The team
 // list resolves a team key. Otherwise SuperPlane reads the issue from Linear.

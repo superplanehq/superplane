@@ -87,6 +87,27 @@ func TestReconcileWebhookDelivery__DeletesAPIWebhooksWhenTheSecretIsSet(t *testi
 	assert.True(t, linearWebhookConfig(t, saved).AppLevel)
 }
 
+func TestReconcileWebhookDelivery__LeavesAProvisioningWebhookAlone(t *testing.T) {
+	r := support.Setup(t)
+	integration := linearDBIntegration(t, r)
+	webhookID := linearDBWebhook(t, integration.ID, map[string]any{
+		"teamId":       "t1",
+		"resourceType": IssueResourceType,
+		"appLevel":     true,
+	}, map[string]any{"appLevel": true})
+	require.NoError(t, database.Conn().Model(&models.Webhook{}).Where("id = ?", webhookID).Update("state", models.WebhookStateProvisioning).Error)
+
+	integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{OAuthScopes: "read,write,admin"})
+	integrationContext.IntegrationID = integration.ID.String()
+
+	err := (&Linear{}).reconcileWebhookDelivery(linearSyncContext(integrationContext, &contexts.HTTPContext{}))
+	require.NoError(t, err)
+
+	saved := reloadLinearWebhook(t, webhookID)
+	assert.Equal(t, models.WebhookStateProvisioning, saved.State)
+	assert.True(t, linearWebhookConfig(t, saved).AppLevel)
+}
+
 func TestReconcileWebhookDelivery__RecordsTheDeliveryModeWithoutRebuilding(t *testing.T) {
 	r := support.Setup(t)
 	integration := linearDBIntegration(t, r)

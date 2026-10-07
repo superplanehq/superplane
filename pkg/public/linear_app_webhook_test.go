@@ -118,6 +118,37 @@ func Test__HandleLinearAppWebhook__RoutesAttachmentByParentIssue(t *testing.T) {
 	require.Len(t, events, 1)
 }
 
+func Test__HandleLinearAppWebhook__IgnoresAnAttachmentWithNoAttachmentTrigger(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	const appSecret = "linear-app-webhook-secret"
+	t.Setenv(config.EnvLinearOAuthClientID, "hosted-client")
+	t.Setenv(config.EnvLinearOAuthClientSecret, "hosted-secret")
+	t.Setenv(config.EnvLinearOAuthWebhookSecret, appSecret)
+
+	r.Registry.Triggers["linear.onIssue"] = &linear.OnIssue{}
+	server := linearAppWebhookServer(t, r)
+
+	integration := readyLinearIntegration(t, r, "org-1", "acme")
+	readyLinearAppWebhook(t, r, integration, "team-1")
+
+	body := []byte(`{
+		"action": "create",
+		"type": "Attachment",
+		"organizationId": "org-1",
+		"url": "https://linear.app/acme/issue/ENG-1",
+		"data": {"id": "attachment-1", "issueId": "issue-1"}
+	}`)
+
+	response := postLinearAppEvent(server, linear.AttachmentResourceType, body, linearSignature(body, appSecret))
+	require.Equal(t, http.StatusOK, response.Code)
+
+	var events []models.CanvasEvent
+	require.NoError(t, database.Conn().Where("node_id = ?", "trigger-1").Find(&events).Error)
+	assert.Empty(t, events)
+}
+
 func Test__HandleLinearAppWebhook__DoesNotRepeatASuccessfulSubscription(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

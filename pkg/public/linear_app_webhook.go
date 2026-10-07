@@ -121,15 +121,12 @@ func (s *Server) deliverLinearAppWebhook(r *http.Request, integration *models.In
 	metadata := linear.Metadata{}
 	_ = mapstructure.Decode(integration.Metadata.Data(), &metadata)
 
-	integrationContext := contexts.NewIntegrationContext(database.DB(r.Context()), nil, integration, s.encryptor, s.registry, nil)
-	event, err = linear.ResolveEventTeam(s.registry.HTTPContext(), integrationContext, event, metadata.Teams)
-	if err != nil {
-		log.WithError(err).WithField("integration_id", integration.ID.String()).Error("failed to resolve the Linear issue team")
-		return http.StatusInternalServerError
+	type readyWebhook struct {
+		webhook models.Webhook
+		config  linear.WebhookConfiguration
 	}
-
-	status := http.StatusOK
-	deliveryKey := linear.DeliveryKey(body)
+	ready := make([]readyWebhook, 0, len(webhooks))
+	configs := make([]linear.WebhookConfiguration, 0, len(webhooks))
 	for i := range webhooks {
 		webhook := webhooks[i]
 		if webhook.State != models.WebhookStateReady || !linear.IsAppLevelWebhook(webhook.Metadata.Data()) {
@@ -141,6 +138,24 @@ func (s *Server) deliverLinearAppWebhook(r *http.Request, integration *models.In
 			log.WithError(err).WithField("webhook_id", webhook.ID.String()).Error("failed to read Linear webhook configuration")
 			return http.StatusInternalServerError
 		}
+		ready = append(ready, readyWebhook{webhook: webhook, config: config})
+		configs = append(configs, config)
+	}
+
+	if linear.EventNeedsTeamLookup(event, configs, metadata.Teams) {
+		integrationContext := contexts.NewIntegrationContext(database.DB(r.Context()), nil, integration, s.encryptor, s.registry, nil)
+		event, err = linear.ResolveEventTeam(s.registry.HTTPContext(), integrationContext, event, metadata.Teams)
+		if err != nil {
+			log.WithError(err).WithField("integration_id", integration.ID.String()).Error("failed to resolve the Linear issue team")
+			return http.StatusInternalServerError
+		}
+	}
+
+	status := http.StatusOK
+	deliveryKey := linear.DeliveryKey(body)
+	for i := range ready {
+		webhook := ready[i].webhook
+		config := ready[i].config
 		if !linear.SubscriptionMatches(config, event, metadata.Teams) {
 			continue
 		}

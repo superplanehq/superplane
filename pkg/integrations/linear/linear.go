@@ -474,9 +474,12 @@ func (l *Linear) reconcileWebhookDelivery(ctx core.SyncContext) error {
 				continue
 			}
 			config.AppLevel = wantAppLevel
-			if err := models.UpdateWebhookConfiguration(database.DB(context.Background()), webhook.ID, config); err != nil {
+			if err := webhook.UpdateConfiguration(database.DB(context.Background()), config); err != nil {
 				return fmt.Errorf("failed to update webhook configuration: %v", err)
 			}
+			continue
+		}
+		if !webhookCanChangeDeliveryMode(webhook.State) {
 			continue
 		}
 		mismatched = append(mismatched, *webhook)
@@ -507,6 +510,7 @@ func (l *Linear) reconcileWebhookDelivery(ctx core.SyncContext) error {
 		}
 	}
 
+	changed := 0
 	for i := range mismatched {
 		webhook := &mismatched[i]
 		config := WebhookConfiguration{}
@@ -514,15 +518,23 @@ func (l *Linear) reconcileWebhookDelivery(ctx core.SyncContext) error {
 			return fmt.Errorf("failed to decode webhook config: %v", err)
 		}
 		config.AppLevel = wantAppLevel
-		if err := models.ReprovisionWebhook(database.DB(context.Background()), webhook.ID, config); err != nil {
+		updated, err := webhook.Reprovision(database.DB(context.Background()), config)
+		if err != nil {
 			return fmt.Errorf("failed to reprovision webhook: %v", err)
+		}
+		if updated {
+			changed++
 		}
 	}
 
-	if ctx.Logger != nil {
-		ctx.Logger.Infof("Marked %d Linear webhooks for setup after a delivery mode change", len(mismatched))
+	if ctx.Logger != nil && changed > 0 {
+		ctx.Logger.Infof("Marked %d Linear webhooks for setup after a delivery mode change", changed)
 	}
 	return nil
+}
+
+func webhookCanChangeDeliveryMode(state string) bool {
+	return state == models.WebhookStateReady || state == models.WebhookStateFailed
 }
 
 func deleteLinearWebhooks(ctx core.SyncContext, webhooks []models.Webhook) error {
