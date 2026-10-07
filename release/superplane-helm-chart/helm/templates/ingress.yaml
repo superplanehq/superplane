@@ -91,9 +91,10 @@ metadata:
   name: http-redirect-proxy
   namespace: {{ .Release.Namespace }}
 spec:
+  # HTTP-01 (Let's Encrypt) needs port 80. A 308 here makes the
+  # ACME challenge return 404 after redirect and the cert never issues.
   redirectToHttps:
-    enabled: true
-    responseCodeName: PERMANENT_REDIRECT
+    enabled: false
 {{- end }}
 {{- if and .Values.ingress.enabled (eq .Values.ingress.className "gce") }}
 ---
