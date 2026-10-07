@@ -18,6 +18,8 @@ VERSION="$1"
 CHART_VERSION="${VERSION#v}"
 
 # The chart uses appVersion as the default SuperPlane image tag.
+# Published charts must use <git-sha>-selfhosted so a Helm install without
+# image.tag still serves the UI from the pod.
 APP_VERSION="${2:-${CHART_VERSION}}"
 
 echo "* Packaging Helm chart for version ${VERSION}"

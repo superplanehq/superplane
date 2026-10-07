@@ -24,9 +24,9 @@ metadata:
     networking.gke.io/v1beta1.FrontendConfig: "http-redirect-proxy"
     {{- end }}
     {{- if and $ssl.enabled (eq $ssl.type "cert-manager") }}
-    # Standard cert-manager trigger
-    cert-manager.io/cluster-issuer: {{ $ssl.certManager.issuerRef.name | quote }}
-    # Tells cert-manager to provide a temp cert while waiting
+    # certificate.yaml owns the TLS secret. Do not set
+    # cert-manager.io/cluster-issuer here. That annotation creates a
+    # second Certificate for the same secret.
     acme.cert-manager.io/http01-edit-in-place: "true"
     {{- end }}
     {{- end }}

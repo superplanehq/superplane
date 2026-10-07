@@ -25,4 +25,4 @@ blocks:
         - name: "Package and Push"
           commands:
             # Helm needs a SemVer version. Release builds publish the release version.
-            - bash release/superplane-helm-chart/build.sh "0.0.0-${SEMAPHORE_GIT_SHA}" "${SEMAPHORE_GIT_SHA}"
+            - bash release/superplane-helm-chart/build.sh "0.0.0-${SEMAPHORE_GIT_SHA}" "${SEMAPHORE_GIT_SHA}-selfhosted"

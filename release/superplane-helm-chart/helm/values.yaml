@@ -6,8 +6,11 @@ image:
   registry: ghcr.io/superplanehq
   name: superplane
   # Self-hosted installs must use <git-sha>-selfhosted. The plain <git-sha>
-  # image loads JS and CSS from assets.superplane.com. That host allows only
-  # app.superplane.com, so the UI fails on a customer domain.
+  # and stable images load JS and CSS from assets.superplane.com. That host
+  # allows only app.superplane.com, so the UI fails on a customer domain.
+  # Empty uses Chart.AppVersion, which published charts set to
+  # <git-sha>-selfhosted.
+  tag: ""
   pullPolicy: IfNotPresent
   pullSecrets: []
 
