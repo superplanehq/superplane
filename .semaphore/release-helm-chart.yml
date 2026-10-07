@@ -1,0 +1,38 @@
+version: v1.0
+name: "Publish Helm Chart"
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+global_job_config:
+  env_vars:
+    - name: HELM_VERSION
+      value: "v3.16.2"
+    - name: HELM_SHA256
+      value: "9318379b847e333460d33d291d4c088156299a26cd93d570a7f5d0c36e50b5bb"
+
+  secrets:
+    - name: ghcr-push-token
+
+  prologue:
+    commands:
+      - checkout
+      - test -n "$SEMAPHORE_GIT_SHA"
+      - test "$(git rev-parse HEAD)" = "$SEMAPHORE_GIT_SHA"
+      - curl -fsSLo /tmp/helm.tar.gz "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+      - echo "${HELM_SHA256}  /tmp/helm.tar.gz" | sha256sum -c -
+      - tar -xzf /tmp/helm.tar.gz -C /tmp
+      - sudo install /tmp/linux-amd64/helm /usr/local/bin/helm
+      - echo "$GHCR_PUSH_TOKEN" | helm registry login ghcr.io -u superplanehq --password-stdin
+
+blocks:
+  - name: "Helm Chart"
+    dependencies: []
+    task:
+      jobs:
+        - name: "Package and Push"
+          commands:
+            # Helm needs a SemVer version. Release builds publish the release version.
+            - bash release/superplane-helm-chart/build.sh "0.0.0-${SEMAPHORE_GIT_SHA}"
