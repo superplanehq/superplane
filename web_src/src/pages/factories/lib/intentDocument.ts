@@ -1,6 +1,14 @@
 export const INTENT_ARTIFACT_NAME = "intent.md";
 
-export const SPEC_ARTIFACT_NAME = "spec.md";
+export const SPEC_ARTIFACT_NAME = "plan.md";
+
+export const LEGACY_SPEC_ARTIFACT_NAME = "spec.md";
+
+export const PLANNING_ARTIFACT_NAMES = [SPEC_ARTIFACT_NAME, LEGACY_SPEC_ARTIFACT_NAME, INTENT_ARTIFACT_NAME] as const;
+
+export function isPlanningArtifactName(name: string): boolean {
+  return (PLANNING_ARTIFACT_NAMES as readonly string[]).includes(name);
+}
 
 export const INTENT_DOCUMENT_TITLE = "What this work will do";
 

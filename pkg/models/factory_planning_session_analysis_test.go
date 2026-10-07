@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -485,12 +486,15 @@ func TestFactoryPlanningSession_ProposeSpecAndConfidence(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, artifacts, 1)
 	assert.Equal(t, planningSpecArtifactKey(order.ID), *artifacts[0].Key)
+	assert.True(t, strings.HasPrefix(*artifacts[0].Key, PlanningSpecArtifactKey+":"))
+	assertPlanningArtifactName(t, artifacts[0].Data, PlanningSpecArtifactTitle)
 	assert.Contains(t, string(artifacts[0].Data), "Stop double charges.")
 
 	require.NoError(t, session.ProposeSpec(db, body+"\n## Problem\n\nThe retry is missing.\n"))
 	artifacts, err = order.ListArtifacts(db)
 	require.NoError(t, err)
 	require.Len(t, artifacts, 1)
+	assertPlanningArtifactName(t, artifacts[0].Data, "plan.md")
 	assert.Contains(t, string(artifacts[0].Data), "The retry is missing.")
 
 	checks, err := order.ListChecks(db)
@@ -1005,4 +1009,12 @@ func analysisWorkOrderCreatedEvent(canvasID, runID, workOrderID uuid.UUID, refin
 			},
 		}),
 	}
+}
+
+func assertPlanningArtifactName(t *testing.T, raw []byte, name string) {
+	t.Helper()
+	var data map[string]any
+	require.NoError(t, json.Unmarshal(raw, &data))
+	assert.Equal(t, name, data["name"])
+	assert.Equal(t, name, data["title"])
 }
