@@ -24,9 +24,9 @@ metadata:
     networking.gke.io/v1beta1.FrontendConfig: "http-redirect-proxy"
     {{- end }}
     {{- if and $ssl.enabled (eq $ssl.type "cert-manager") }}
-    # Standard cert-manager trigger
-    cert-manager.io/cluster-issuer: {{ $ssl.certManager.issuerRef.name | quote }}
-    # Tells cert-manager to provide a temp cert while waiting
+    # certificate.yaml owns the TLS secret. Do not set
+    # cert-manager.io/cluster-issuer here. That annotation creates a
+    # second Certificate for the same secret.
     acme.cert-manager.io/http01-edit-in-place: "true"
     {{- end }}
     {{- end }}
@@ -91,9 +91,10 @@ metadata:
   name: http-redirect-proxy
   namespace: {{ .Release.Namespace }}
 spec:
+  # HTTP-01 (Let's Encrypt) needs port 80. A 308 here makes the
+  # ACME challenge return 404 after redirect and the cert never issues.
   redirectToHttps:
-    enabled: true
-    responseCodeName: PERMANENT_REDIRECT
+    enabled: false
 {{- end }}
 {{- if and .Values.ingress.enabled (eq .Values.ingress.className "gce") }}
 ---

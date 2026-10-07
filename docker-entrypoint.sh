@@ -23,13 +23,20 @@ DB_MIGRATION_LOCK_TIMEOUT="${DB_MIGRATION_LOCK_TIMEOUT:-600}"
 
 [ "${POSTGRES_DB_SSL}" = "true" ] && export PGSSLMODE=require || export PGSSLMODE=disable
 
-echo "Creating DB..."
-PGPASSWORD="${DB_PASSWORD}" createdb -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USERNAME}" "${DB_NAME}" || true
+# Only one process should migrate. If a second migrator is killed while it
+# holds the golang-migrate lock, schema_migrations stays dirty and every
+# replica CrashLoops. Helm runs migrate on the API pod only.
+if [ "${RUN_MIGRATIONS:-yes}" = "yes" ]; then
+  echo "Creating DB..."
+  PGPASSWORD="${DB_PASSWORD}" createdb -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USERNAME}" "${DB_NAME}" || true
 
-echo "Migrating DB with ${DB_MIGRATION_LOCK_TIMEOUT}s lock timeout..."
-DB_URL="postgres://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${PGSSLMODE}"
-migrate -lock-timeout "${DB_MIGRATION_LOCK_TIMEOUT}" -source file:///app/db/migrations -database "${DB_URL}" up
-migrate -lock-timeout "${DB_MIGRATION_LOCK_TIMEOUT}" -source file:///app/db/data_migrations -database "${DB_URL}&x-migrations-table=data_migrations" up
+  echo "Migrating DB with ${DB_MIGRATION_LOCK_TIMEOUT}s lock timeout..."
+  DB_URL="postgres://${DB_USERNAME}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${PGSSLMODE}"
+  migrate -lock-timeout "${DB_MIGRATION_LOCK_TIMEOUT}" -source file:///app/db/migrations -database "${DB_URL}" up
+  migrate -lock-timeout "${DB_MIGRATION_LOCK_TIMEOUT}" -source file:///app/db/data_migrations -database "${DB_URL}&x-migrations-table=data_migrations" up
+else
+  echo "Skipping DB migrate (RUN_MIGRATIONS=${RUN_MIGRATIONS})"
+fi
 
 echo "Starting server..."
 /app/build/superplane
