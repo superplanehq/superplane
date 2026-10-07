@@ -77,8 +77,8 @@ const TOOLTIP_RESULT_TONE: Record<WorkOrderCheckLevel, string> = {
 };
 
 /**
- * Board card scores: Clarity stays a pill. Confidence uses the same step
- * meter as the plan card. The tooltip carries the verdict headline.
+ * Board card scores: Clarity stays a pill. Confidence and Merge use the
+ * same step meter as the plan card. The tooltip carries the verdict.
  */
 export function CardScoreBadges({
   clarity,
@@ -174,14 +174,24 @@ export function CardScoreBadges({
   );
 }
 
-function ConfidenceChip({ score, max, testId }: { score?: number; max: number; testId?: string }) {
+function ScoreMeterLabel({
+  label,
+  score,
+  max,
+  testId,
+}: {
+  label: string;
+  score?: number;
+  max: number;
+  testId?: string;
+}) {
   const value = score == null ? undefined : clampConfidenceScore(score, max);
   return (
     <span
       data-testid={testId}
       className="inline-flex items-center gap-1 whitespace-nowrap text-[10px] font-medium leading-none text-muted-foreground"
     >
-      <span>Confidence</span>
+      <span>{label}</span>
       {value == null ? (
         <span>–</span>
       ) : (
@@ -197,6 +207,29 @@ function ConfidenceChip({ score, max, testId }: { score?: number; max: number; t
         </>
       )}
     </span>
+  );
+}
+
+function ConfidenceChip({ score, max, testId }: { score?: number; max: number; testId?: string }) {
+  return <ScoreMeterLabel label="Confidence" score={score} max={max} testId={testId} />;
+}
+
+/** Board footer score. Same meter as plan Confidence. Visible text is Merge. */
+export function MergeConfidenceChip({ score, maxScore, testId }: { score: number; maxScore: number; testId?: string }) {
+  const value = clampConfidenceScore(score, maxScore);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="img"
+          aria-label={`Merge confidence ${value} of ${maxScore}`}
+          className="pointer-events-auto inline-flex shrink-0"
+        >
+          <ScoreMeterLabel label="Merge" score={value} max={maxScore} testId={testId} />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Merge confidence</TooltipContent>
+    </Tooltip>
   );
 }
 
