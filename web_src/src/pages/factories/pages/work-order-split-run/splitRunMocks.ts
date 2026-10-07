@@ -362,15 +362,15 @@ function runningFooterNote(current: FactoriesWorkOrderExecution | undefined): Wo
   if (!current) {
     return {
       key: "running-step",
-      headline: "The line is running",
-      text: "SuperPlane works on this order now. The log shows live progress.",
+      headline: "Task in progress",
+      text: "View the log for live progress.",
     };
   }
-  const { name, componentName } = lineAutomationPresentation(current.run, current.step);
+  const { componentName } = lineAutomationPresentation(current.run, current.step);
   return {
     key: "running-step",
-    headline: `${name} is running`,
-    text: `${componentName} works on this step now. The log shows live progress.`,
+    headline: `${componentName} in progress`,
+    text: "View the log for live progress.",
   };
 }
 
