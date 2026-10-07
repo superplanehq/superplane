@@ -2,6 +2,7 @@ import type { FactoriesWorkOrder } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/usePermissions";
 import { factoryBoardLaneScrollKey, useFactoryBoardLaneScroll } from "@/hooks/useFactoryBoardLaneScroll";
 import { type RefreshBacklogResult, useFactoryIntakes, useRefreshBacklog } from "@/hooks/useFactoryIntakeData";
@@ -228,16 +229,19 @@ function BacklogColumnSearch({ query, onQueryChange }: { query: string; onQueryC
 
   return (
     <div className="relative">
+      <Label htmlFor="lines-backlog-search" className="sr-only">
+        {BACKLOG_COLUMN_SEARCH_COPY.placeholder}
+      </Label>
       <Search
         className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
         aria-hidden
       />
       <Input
+        id="lines-backlog-search"
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
         onKeyDown={clearQuery}
         placeholder={BACKLOG_COLUMN_SEARCH_COPY.placeholder}
-        aria-label={BACKLOG_COLUMN_SEARCH_COPY.placeholder}
         className="h-8 w-full bg-background pl-8 text-[13px] shadow-none"
         data-testid="lines-backlog-search"
       />

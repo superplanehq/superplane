@@ -2230,7 +2230,9 @@ describe("LinesPage backlog search", () => {
     });
     renderLinesBoard();
 
-    expect(within(backlogColumn()).getByRole("textbox", { name: "Search tasks" })).toBeInTheDocument();
+    const search = within(backlogColumn()).getByRole("textbox", { name: "Search tasks" });
+    expect(search.labels?.[0]).toHaveTextContent("Search tasks");
+    expect(search).toHaveAttribute("id", "lines-backlog-search");
     await user.type(backlogSearch(), "alpha");
 
     expect(within(backlogColumn()).getByText("Alpha refunds")).toBeInTheDocument();
@@ -2266,18 +2268,38 @@ describe("LinesPage backlog search", () => {
   it("keeps loading later pages after the first match", async () => {
     const user = userEvent.setup();
     const fetchNextBacklog = vi.fn();
-    mockBacklogPage([backlogDraft("wo-alpha", "Alpha refunds")], {
+    const orders = [backlogDraft("wo-alpha", "Alpha refunds")];
+    mockBacklogPage(orders, {
       hasNextPage: true,
+      isFetchingNextPage: true,
       fetchNextPage: fetchNextBacklog,
     });
-    renderLinesBoard();
+    const view = renderLinesBoard();
 
     await user.type(backlogSearch(), "alpha");
-
-    await waitFor(() => {
-      expect(fetchNextBacklog).toHaveBeenCalled();
-    });
+    expect(fetchNextBacklog).not.toHaveBeenCalled();
     expect(within(backlogColumn()).getByText("Alpha refunds")).toBeInTheDocument();
+
+    finishBacklogPage(orders, fetchNextBacklog);
+    view.rerender(linesBoardHarness());
+    await waitFor(() => {
+      expect(fetchNextBacklog).toHaveBeenCalledTimes(1);
+    });
+
+    fetchNextBacklog.mockClear();
+    mockBacklogPage(orders, {
+      hasNextPage: true,
+      isFetchingNextPage: true,
+      fetchNextPage: fetchNextBacklog,
+    });
+    view.rerender(linesBoardHarness());
+    expect(fetchNextBacklog).not.toHaveBeenCalled();
+
+    finishBacklogPage(orders, fetchNextBacklog);
+    view.rerender(linesBoardHarness());
+    await waitFor(() => {
+      expect(fetchNextBacklog).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("shows the no-match message after the last backlog page", async () => {
@@ -2408,6 +2430,17 @@ function backlogDraft(id: string, title: string): FactoriesWorkOrder {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+}
+
+function finishBacklogPage(
+  orders: FactoriesWorkOrder[],
+  fetchNextPage: ReturnType<typeof idleBoardPage>["fetchNextPage"],
+) {
+  mockBacklogPage(orders, {
+    hasNextPage: true,
+    isFetchingNextPage: false,
+    fetchNextPage,
+  });
 }
 
 function mockBacklogPage(
