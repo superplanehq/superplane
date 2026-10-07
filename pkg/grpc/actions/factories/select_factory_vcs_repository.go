@@ -41,6 +41,13 @@ func SelectFactoryVCSProviderRepository(
 	}
 
 	db := database.DB(ctx)
+	available, err := models.IsIntakeAvailableForOrganization(db, provider, orgID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to select VCS repository")
+	}
+	if !available {
+		return nil, grpcerrors.FailedPrecondition(nil, "VCS provider is not available for the organization")
+	}
 	providerUserID, err := factoryVCSProviderUserID(ctx, db, organizationID, provider)
 	if err != nil {
 		return nil, err
