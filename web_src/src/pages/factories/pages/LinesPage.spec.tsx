@@ -2210,3 +2210,261 @@ describe("LinesPage Implement phase window", () => {
     expect(screen.getByTestId("lines-backlog-column-scroll").scrollTop).toBe(1760);
   });
 });
+
+describe("LinesPage backlog search", () => {
+  let restoreHeights: (() => void) | undefined;
+
+  beforeEach(async () => {
+    await resetLinesBoardMocks();
+  });
+
+  afterEach(() => {
+    restoreHeights?.();
+    restoreHeights = undefined;
+  });
+
+  it("hides backlog cards that do not match the column search", async () => {
+    const user = userEvent.setup();
+    useFactoryWorkOrders.mockReturnValue({
+      data: [backlogDraft("wo-alpha", "Alpha refunds"), backlogDraft("wo-beta", "Beta ledger")],
+    });
+    renderLinesBoard();
+
+    const search = within(backlogColumn()).getByRole<HTMLInputElement>("textbox", { name: "Search tasks" });
+    expect(search.labels?.[0]).toHaveTextContent("Search tasks");
+    expect(search).toHaveAttribute("id", "lines-backlog-search");
+    await user.type(backlogSearch(), "alpha");
+
+    expect(within(backlogColumn()).getByText("Alpha refunds")).toBeInTheDocument();
+    expect(within(backlogColumn()).queryByText("Beta ledger")).not.toBeInTheDocument();
+    expect(within(backlogColumn()).queryByTestId("lines-backlog-create-ghost")).not.toBeInTheDocument();
+    expect(within(backlogColumn()).getByTestId("lines-backlog-create")).toBeInTheDocument();
+  });
+
+  it("loads a later backlog page for a match without scrolling", async () => {
+    const user = userEvent.setup();
+    const fetchNextBacklog = vi.fn();
+    const firstPage = [backlogDraft("wo-alpha", "Alpha refunds")];
+    mockBacklogPage(firstPage, { hasNextPage: true, fetchNextPage: fetchNextBacklog });
+    const view = renderLinesBoard();
+
+    await user.type(backlogSearch(), "zeta");
+
+    await waitFor(() => {
+      expect(fetchNextBacklog).toHaveBeenCalled();
+    });
+    expect(within(backlogColumn()).queryByText("No tasks match this search.")).not.toBeInTheDocument();
+    expect(within(backlogColumn()).getByRole("status", { name: "Loading more" })).toBeInTheDocument();
+
+    const loaded = [...firstPage, backlogDraft("wo-zeta", "Zeta ledger fix")];
+    mockBacklogPage(loaded, { hasNextPage: false, fetchNextPage: fetchNextBacklog });
+    view.rerender(linesBoardHarness());
+
+    expect(within(backlogColumn()).getByText("Zeta ledger fix")).toBeInTheDocument();
+    expect(within(backlogColumn()).queryByText("Alpha refunds")).not.toBeInTheDocument();
+    expect(within(backlogColumn()).queryByText("No tasks match this search.")).not.toBeInTheDocument();
+  });
+
+  it("keeps loading later pages after the first match", async () => {
+    const user = userEvent.setup();
+    const fetchNextBacklog = vi.fn();
+    const orders = [backlogDraft("wo-alpha", "Alpha refunds")];
+    mockBacklogPage(orders, {
+      hasNextPage: true,
+      isFetchingNextPage: true,
+      fetchNextPage: fetchNextBacklog,
+    });
+    const view = renderLinesBoard();
+
+    await user.type(backlogSearch(), "alpha");
+    expect(fetchNextBacklog).not.toHaveBeenCalled();
+    expect(within(backlogColumn()).getByText("Alpha refunds")).toBeInTheDocument();
+
+    finishBacklogPage(orders, fetchNextBacklog);
+    view.rerender(linesBoardHarness());
+    await waitFor(() => {
+      expect(fetchNextBacklog).toHaveBeenCalledTimes(1);
+    });
+
+    fetchNextBacklog.mockClear();
+    mockBacklogPage(orders, {
+      hasNextPage: true,
+      isFetchingNextPage: true,
+      fetchNextPage: fetchNextBacklog,
+    });
+    view.rerender(linesBoardHarness());
+    expect(fetchNextBacklog).not.toHaveBeenCalled();
+
+    finishBacklogPage(orders, fetchNextBacklog);
+    view.rerender(linesBoardHarness());
+    await waitFor(() => {
+      expect(fetchNextBacklog).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("shows the no-match message after the last backlog page", async () => {
+    const user = userEvent.setup();
+    mockBacklogPage([backlogDraft("wo-alpha", "Alpha refunds")], { hasNextPage: false });
+    renderLinesBoard();
+
+    await user.type(backlogSearch(), "missing");
+
+    expect(within(backlogColumn()).getByText("No tasks match this search.")).toBeInTheDocument();
+    expect(within(backlogColumn()).queryByText("No tasks in the backlog.")).not.toBeInTheDocument();
+    expect(within(backlogColumn()).queryByText("Alpha refunds")).not.toBeInTheDocument();
+  });
+
+  it("stops backlog search requests when the next page fails", async () => {
+    const user = userEvent.setup();
+    const fetchNextBacklog = vi.fn();
+    mockBacklogPage([backlogDraft("wo-alpha", "Alpha refunds")], {
+      hasNextPage: true,
+      fetchNextPage: fetchNextBacklog,
+    });
+    const view = renderLinesBoard();
+
+    await user.type(backlogSearch(), "zeta");
+    await waitFor(() => {
+      expect(fetchNextBacklog).toHaveBeenCalled();
+    });
+    fetchNextBacklog.mockClear();
+
+    mockBacklogPage([backlogDraft("wo-alpha", "Alpha refunds")], {
+      hasNextPage: true,
+      isFetchNextPageError: true,
+      fetchNextPage: fetchNextBacklog,
+    });
+    view.rerender(linesBoardHarness());
+
+    expect(within(backlogColumn()).getByText("SuperPlane could not load more tasks.")).toBeInTheDocument();
+    expect(within(backlogColumn()).queryByText("No tasks match this search.")).not.toBeInTheDocument();
+    expect(fetchNextBacklog).not.toHaveBeenCalled();
+
+    await user.click(within(backlogColumn()).getByRole("button", { name: "Try again" }));
+    expect(fetchNextBacklog).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores the backlog list, create ghost, and scroll-to-load when the query is cleared", async () => {
+    restoreHeights = stubElementHeights({ scrollHeight: 2000, clientHeight: 240 });
+    const user = userEvent.setup();
+    const fetchNextBacklog = vi.fn();
+    mockBacklogPage([backlogDraft("wo-alpha", "Alpha refunds"), backlogDraft("wo-beta", "Beta ledger")], {
+      hasNextPage: true,
+      fetchNextPage: fetchNextBacklog,
+    });
+    renderLinesBoard();
+
+    await user.type(backlogSearch(), "alpha");
+    expect(within(backlogColumn()).queryByTestId("lines-backlog-create-ghost")).not.toBeInTheDocument();
+    fetchNextBacklog.mockClear();
+
+    await user.keyboard("{Escape}");
+
+    expect(backlogSearch()).toHaveValue("");
+    expect(within(backlogColumn()).getByText("Alpha refunds")).toBeInTheDocument();
+    expect(within(backlogColumn()).getByText("Beta ledger")).toBeInTheDocument();
+    expect(within(backlogColumn()).getByTestId("lines-backlog-create-ghost")).toBeInTheDocument();
+
+    const scroller = screen.getByTestId("lines-backlog-column-scroll");
+    scroller.scrollTop = 1760;
+    fireEvent.scroll(scroller);
+    await waitFor(() => {
+      expect(fetchNextBacklog).toHaveBeenCalled();
+    });
+  });
+
+  it("does not load later pages from the board header search", async () => {
+    const user = userEvent.setup();
+    const fetchNextBacklog = vi.fn();
+    mockBacklogPage([backlogDraft("wo-alpha", "Alpha refunds"), backlogDraft("wo-beta", "Beta ledger")], {
+      hasNextPage: true,
+      fetchNextPage: fetchNextBacklog,
+    });
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-search-trigger"));
+    await user.type(screen.getByTestId("work-orders-search-input"), "alpha");
+
+    expect(screen.getByText("Alpha refunds")).toBeInTheDocument();
+    expect(screen.queryByText("Beta ledger")).not.toBeInTheDocument();
+    expect(fetchNextBacklog).not.toHaveBeenCalled();
+  });
+
+  it("hides the onboarding card while a backlog search is active", async () => {
+    const user = userEvent.setup();
+    useFactoryWorkOrders.mockReturnValue({ data: [] });
+    renderLinesBoard(
+      `/org-1/workspaces/${ACME_ONBOARDING_FACTORY_ROUTE_SEGMENT}/lines/${ACME_ONBOARDING_LINE_ID}`,
+      vi.fn(),
+      ACME_ONBOARDING_FACTORY,
+    );
+
+    expect(screen.getByTestId("backlog-onboarding-card")).toBeInTheDocument();
+    await user.type(backlogSearch(), "missing");
+
+    expect(screen.queryByTestId("backlog-onboarding-card")).not.toBeInTheDocument();
+    expect(within(backlogColumn()).getByText("No tasks match this search.")).toBeInTheDocument();
+  });
+});
+
+function linesBoardHarness() {
+  return (
+    <LinesBoardSpecHarness path={`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`} />
+  );
+}
+
+function backlogColumn() {
+  return screen.getByTestId("lines-backlog-column");
+}
+
+function backlogSearch() {
+  return within(backlogColumn()).getByTestId("lines-backlog-search");
+}
+
+function backlogDraft(id: string, title: string): FactoriesWorkOrder {
+  return {
+    id,
+    key: id.toUpperCase(),
+    title,
+    state: "STATE_DRAFT",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function finishBacklogPage(
+  orders: FactoriesWorkOrder[],
+  fetchNextPage: ReturnType<typeof idleBoardPage>["fetchNextPage"],
+) {
+  mockBacklogPage(orders, {
+    hasNextPage: true,
+    isFetchingNextPage: false,
+    fetchNextPage,
+  });
+}
+
+function mockBacklogPage(
+  orders: FactoriesWorkOrder[],
+  backlog: {
+    hasNextPage: boolean;
+    fetchNextPage?: ReturnType<typeof idleBoardPage>["fetchNextPage"];
+    isFetchingNextPage?: boolean;
+    isFetchNextPageError?: boolean;
+  },
+) {
+  const fetchNextPage = backlog.fetchNextPage ?? vi.fn();
+  useFactoryWorkOrders.mockReturnValue({ data: orders });
+  useFactoryBoardWorkOrders.mockReturnValue({
+    workOrders: orders,
+    isLoading: false,
+    isPlaceholderData: false,
+    backlog: {
+      hasNextPage: backlog.hasNextPage,
+      isFetchingNextPage: backlog.isFetchingNextPage ?? false,
+      isFetchNextPageError: backlog.isFetchNextPageError ?? false,
+      fetchNextPage,
+    },
+    open: idleBoardPage(),
+    done: idleBoardPage(),
+  } as ReturnType<typeof useFactoryBoardWorkOrders>);
+}
