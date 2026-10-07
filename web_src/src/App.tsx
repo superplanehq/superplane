@@ -257,7 +257,8 @@ function AppRouter() {
       <div className="flex h-dvh flex-col overflow-hidden">
         <ImpersonationBanner />
         <LicenseExpiryBanner />
-        <div className="relative flex-1 overflow-auto">
+        {/* Phone shells read this region so a fixed shell stays below app banners. */}
+        <div className="relative flex-1 overflow-auto" data-app-content-region="">
           <SetupGuard>
             <GlobalCommandPalette />
             <Routes>
