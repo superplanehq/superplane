@@ -485,11 +485,7 @@ func (l *Linear) reconcileWebhookDelivery(ctx core.SyncContext) error {
 		mismatched = append(mismatched, *webhook)
 	}
 
-	if len(mismatched) == 0 {
-		return nil
-	}
-
-	if !wantAppLevel && !scopeIncludesAdmin(readMetadata(ctx.Integration).OAuthScopes) {
+	if !wantAppLevel && linearNeedsAdminConsent(readMetadata(ctx.Integration).OAuthScopes, len(mismatched) > 0) {
 		if err := ctx.Integration.SetSecret(OAuthAccessToken, []byte("")); err != nil {
 			return err
 		}
@@ -502,6 +498,10 @@ func (l *Linear) reconcileWebhookDelivery(ctx core.SyncContext) error {
 			return err
 		}
 		return errNeedsAdminAuthorization
+	}
+
+	if len(mismatched) == 0 {
+		return nil
 	}
 
 	if wantAppLevel {
@@ -535,6 +535,20 @@ func (l *Linear) reconcileWebhookDelivery(ctx core.SyncContext) error {
 
 func webhookCanChangeDeliveryMode(state string) bool {
 	return state == models.WebhookStateReady || state == models.WebhookStateFailed
+}
+
+// linearNeedsAdminConsent reports whether API webhooks need a new consent.
+// Recorded scopes that omit admin always need consent. Empty scopes are
+// unknown, so consent is requested only when an application webhook must
+// be converted. Existing connections then stay ready.
+func linearNeedsAdminConsent(scopes string, convertingWebhooks bool) bool {
+	if scopeIncludesAdmin(scopes) {
+		return false
+	}
+	if strings.TrimSpace(scopes) == "" {
+		return convertingWebhooks
+	}
+	return true
 }
 
 func deleteLinearWebhooks(ctx core.SyncContext, webhooks []models.Webhook) error {

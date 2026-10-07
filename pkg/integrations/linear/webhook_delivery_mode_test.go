@@ -40,6 +40,37 @@ func TestReconcileWebhookDelivery__AsksForAdminWhenTheSecretIsRemoved(t *testing
 	assert.Equal(t, models.WebhookStateReady, saved.State)
 }
 
+func TestReconcileWebhookDelivery__AsksForAdminBeforeAnyTriggerExists(t *testing.T) {
+	r := support.Setup(t)
+	integration := linearDBIntegration(t, r)
+
+	integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{OAuthScopes: "read,write"})
+	integrationContext.IntegrationID = integration.ID.String()
+
+	err := (&Linear{}).reconcileWebhookDelivery(linearSyncContext(integrationContext, &contexts.HTTPContext{}))
+	require.ErrorIs(t, err, errNeedsAdminAuthorization)
+	require.NotNil(t, integrationContext.BrowserAction)
+	assert.Contains(t, integrationContext.BrowserAction.URL, "admin")
+
+	accessToken, _ := findSecret(integrationContext, OAuthAccessToken)
+	assert.Empty(t, accessToken)
+}
+
+func TestReconcileWebhookDelivery__LeavesAnUnknownScopeConnectionReady(t *testing.T) {
+	r := support.Setup(t)
+	integration := linearDBIntegration(t, r)
+
+	integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{})
+	integrationContext.IntegrationID = integration.ID.String()
+
+	err := (&Linear{}).reconcileWebhookDelivery(linearSyncContext(integrationContext, &contexts.HTTPContext{}))
+	require.NoError(t, err)
+	assert.Nil(t, integrationContext.BrowserAction)
+
+	accessToken, _ := findSecret(integrationContext, OAuthAccessToken)
+	assert.NotEmpty(t, accessToken)
+}
+
 func TestReconcileWebhookDelivery__RecreatesAPIWebhooksWhenAdminIsGranted(t *testing.T) {
 	r := support.Setup(t)
 	integration := linearDBIntegration(t, r)
