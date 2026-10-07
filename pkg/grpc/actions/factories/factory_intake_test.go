@@ -73,8 +73,8 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
-		assert.Len(t, liveVersion.Nodes, 3)
-		assert.Len(t, liveVersion.Edges, 2)
+		assert.Len(t, liveVersion.Nodes, 2)
+		assert.Len(t, liveVersion.Edges, 1)
 	})
 
 	t.Run("creating a Productive.io intake builds a healthy trigger to createWorkOrder canvas", func(t *testing.T) {
@@ -760,18 +760,28 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 
-		expression := ""
-		for _, node := range liveVersion.Nodes {
-			if node.ID == intakeFilterNodeID {
-				expression, _ = node.Configuration["expression"].(string)
+		var trigger *models.Node
+		for i := range liveVersion.Nodes {
+			node := &liveVersion.Nodes[i]
+			assert.NotEqual(t, intakeFilterNodeID, node.ID)
+			assert.NotEqual(t, intakeAuthorPermissionNodeID, node.ID)
+			assert.NotEqual(t, intakeAuthorFilterNodeID, node.ID)
+			if node.ID == intakeTriggerNodeID {
+				trigger = node
 			}
 		}
-		assert.NotContains(t, expression, ">=")
-		assert.Contains(t, expression, `!(any(root().data.issue.labels, .name in ["bug"]))`)
-		assert.Contains(t, expression, "len(root().data.issue.assignees) == 0")
+		require.NotNil(t, trigger)
+		assert.Equal(t, []any{"bug"}, trigger.Configuration["labels"])
+		assert.Equal(t, intakeLabelFilterExclude, trigger.Configuration["labelFilterMode"])
+		assert.Equal(t, intakeAssignmentUnassigned, trigger.Configuration["assignment"])
+		assert.Contains(t, liveVersion.Edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeTriggerNodeID,
+			TargetID: intakeCreateNodeID,
+		})
 	})
 
-	t.Run("the authors filter adds a repository permission gate when on", func(t *testing.T) {
+	t.Run("the authors filter is stored on the trigger", func(t *testing.T) {
 		factory := newFactory(t)
 		integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, "github")
 		backlogRepository := "acme/backlog"
@@ -798,26 +808,22 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 
-		var permissionNode, authorFilterNode *models.Node
-		for _, node := range liveVersion.Nodes {
-			switch node.ID {
-			case intakeAuthorPermissionNodeID:
-				node := node
-				permissionNode = &node
-			case intakeAuthorFilterNodeID:
-				node := node
-				authorFilterNode = &node
+		var trigger *models.Node
+		for i := range liveVersion.Nodes {
+			node := &liveVersion.Nodes[i]
+			assert.NotEqual(t, intakeAuthorPermissionNodeID, node.ID)
+			assert.NotEqual(t, intakeAuthorFilterNodeID, node.ID)
+			assert.NotEqual(t, intakeFilterNodeID, node.ID)
+			if node.ID == intakeTriggerNodeID {
+				trigger = node
 			}
 		}
-		require.NotNil(t, permissionNode)
-		assert.Equal(t, intakeAuthorPermissionComponent, permissionNode.ComponentName())
-		assert.Equal(t, backlogRepository, permissionNode.Configuration["repository"])
-		assert.Equal(t, "{{ root().data.issue.user.login }}", permissionNode.Configuration["username"])
-		require.NotNil(t, authorFilterNode)
-		assert.Equal(t, `root().data.permission != "none"`, authorFilterNode.Configuration["expression"])
+		require.NotNil(t, trigger)
+		assert.Equal(t, true, trigger.Configuration["authorsWithAccess"])
+		assert.Equal(t, backlogRepository, trigger.Configuration["repository"])
 		assert.Contains(t, liveVersion.Edges, models.Edge{
-			Channel:  "true",
-			SourceID: intakeAuthorFilterNodeID,
+			Channel:  "default",
+			SourceID: intakeTriggerNodeID,
 			TargetID: intakeCreateNodeID,
 		})
 
@@ -838,12 +844,10 @@ func Test__FactoryIntakeActions(t *testing.T) {
 		for _, node := range liveVersion.Nodes {
 			assert.NotEqual(t, intakeAuthorPermissionNodeID, node.ID)
 			assert.NotEqual(t, intakeAuthorFilterNodeID, node.ID)
+			if node.ID == intakeTriggerNodeID {
+				assert.NotContains(t, node.Configuration, "authorsWithAccess")
+			}
 		}
-		assert.Contains(t, liveVersion.Edges, models.Edge{
-			Channel:  "true",
-			SourceID: intakeFilterNodeID,
-			TargetID: intakeCreateNodeID,
-		})
 	})
 
 	t.Run("the authors filter stays off by default", func(t *testing.T) {
@@ -869,6 +873,9 @@ func Test__FactoryIntakeActions(t *testing.T) {
 
 		expression := ""
 		for _, node := range liveVersion.Nodes {
+			if node.ID == intakeTriggerNodeID {
+				assert.NotContains(t, node.Configuration, "authorsWithAccess")
+			}
 			if node.ID == intakeFilterNodeID {
 				expression, _ = node.Configuration["expression"].(string)
 			}
@@ -908,8 +915,9 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			switch node.ID {
 			case intakeTriggerNodeID:
 				assert.Equal(t, []any{"labeled"}, node.Configuration["actions"])
+				assert.Equal(t, true, node.Configuration["superplaneLabelAdded"])
 			case intakeFilterNodeID:
-				assert.Contains(t, node.Configuration["expression"], intakeSuperplaneLabelCondition)
+				t.Fatalf("GitHub intake still has a filter node")
 			}
 		}
 	})
