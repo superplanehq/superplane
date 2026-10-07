@@ -18,86 +18,98 @@ import (
 	"gorm.io/gorm"
 )
 
-func TestReconcileFactoryRepositoryPublishesBitbucketCredentials(t *testing.T) {
-	r := support.Setup(t)
-	db := database.DB(t.Context())
-	previousID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
-	selectedID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
-	previousName := integrationName(t, r.Organization.ID, previousID)
-	selectedName := integrationName(t, r.Organization.ID, selectedID)
-	unrelatedID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
-	unrelatedName := integrationName(t, r.Organization.ID, unrelatedID)
-	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-	require.NoError(t, err)
-	provider, repository, branch := models.ProviderBitbucket, "new-workspace/api", "main"
-	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
-		VCSProvider: &provider, VCSIntegrationID: &selectedID,
-		AppRepository: &repository, BacklogRepository: &repository, DefaultBranch: &branch,
-	}))
-	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Implement")
-	nodes := []models.Node{
-		{
-			ID: "find-pr", Name: "Find Pull Request", Type: models.NodeTypeComponent,
-			Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "bitbucket.findPullRequest"}},
-			IntegrationID: &previousID,
-			Configuration: map[string]any{"repository": orderRepositoryExpression, "head": "task-branch"},
-			Metadata:      models.FactoryAppTemplateMetadataFor("line-implementation", 1, models.ProviderBitbucket),
-		},
-		{
-			ID: "implementation-agent-no-issue", Name: "Implement", Type: models.NodeTypeComponent,
-			Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerBash"}},
-			Configuration: map[string]any{
-				"machineType": "e1-large-amd64",
-				"script":      "echo " + previousName,
-				"environmentFrom": []any{
-					map[string]any{"source": "integration", "integration": map[string]any{"name": previousName}},
-					map[string]any{"source": "integration", "integration": map[string]any{"name": unrelatedName}},
+func TestReconcileFactoryRepositoryPublishesManagedRunnerCredentials(t *testing.T) {
+	for _, testCase := range []struct {
+		templateID           string
+		provider             string
+		runnerID             string
+		repositoryExpression string
+	}{
+		{"line-implementation", models.ProviderBitbucket, implementationAgentNodeID, orderRepositoryExpression},
+		{"risk-score", models.ProviderGitHub, "assess-risk", "new-workspace/api"},
+	} {
+		t.Run(testCase.templateID, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.DB(t.Context())
+			previousID := createReadyOnboardingIntegration(t, r.Organization.ID, testCase.provider)
+			selectedID := createReadyOnboardingIntegration(t, r.Organization.ID, testCase.provider)
+			previousName := integrationName(t, r.Organization.ID, previousID)
+			selectedName := integrationName(t, r.Organization.ID, selectedID)
+			unrelatedID := createReadyOnboardingIntegration(t, r.Organization.ID, testCase.provider)
+			unrelatedName := integrationName(t, r.Organization.ID, unrelatedID)
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			provider, repository, branch := testCase.provider, "new-workspace/api", "main"
+			require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+				VCSProvider: &provider, VCSIntegrationID: &selectedID,
+				AppRepository: &repository, BacklogRepository: &repository, DefaultBranch: &branch,
+			}))
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Implement")
+			nodes := []models.Node{
+				{
+					ID: "find-pr", Name: "Find Pull Request", Type: models.NodeTypeComponent,
+					Ref:           models.NodeRef{Component: &models.ComponentRef{Name: testCase.provider + ".findPullRequest"}},
+					IntegrationID: &previousID,
+					Configuration: map[string]any{"repository": "old-workspace/api", "head": "task-branch"},
+					Metadata:      models.FactoryAppTemplateMetadataFor(testCase.templateID, 1, testCase.provider),
 				},
-			},
-		},
-		{
-			ID: "custom-runner", Name: "Clone another repository", Type: models.NodeTypeComponent,
-			Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerBash"}},
-			Configuration: map[string]any{
-				"machineType": "e1-large-amd64",
-				"script":      "git clone https://bitbucket.org/other-workspace/tools.git",
-				"environmentFrom": []any{
-					map[string]any{"source": "integration", "integration": map[string]any{"name": previousName}},
+				{
+					ID: testCase.runnerID, Name: "Implement", Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerBash"}},
+					Configuration: map[string]any{
+						"machineType": "e1-large-amd64",
+						"script":      "echo " + previousName,
+						"environmentFrom": []any{
+							map[string]any{"source": "integration", "integration": map[string]any{"name": previousName}},
+							map[string]any{"source": "integration", "integration": map[string]any{"name": unrelatedName}},
+						},
+					},
 				},
-			},
-		},
+				{
+					ID: "custom-runner", Name: "Clone another repository", Type: models.NodeTypeComponent,
+					Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerBash"}},
+					Configuration: map[string]any{
+						"machineType": "e1-large-amd64",
+						"script":      "git clone https://" + testCase.provider + ".org/other-workspace/tools.git",
+						"environmentFrom": []any{
+							map[string]any{"source": "integration", "integration": map[string]any{"name": previousName}},
+						},
+					},
+				},
+			}
+			deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				return canvases.PublishGeneratedCanvasNodes(t.Context(), tx, canvas, r.User, "Install implementation", nodes, nil,
+					changesets.CanvasPublisherOptions{
+						Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor,
+						AuthService: r.AuthService, WebhookBaseURL: deps.WebhookBaseURL,
+					})
+			}))
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				return reconcileFactoryRepository(t.Context(), tx, deps, factory, r.User,
+					previousID, selectedID, "old-workspace/api", "old-workspace/api", branch, repository)
+			}))
+			reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+			require.NoError(t, err)
+			version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, reloaded)
+			require.NoError(t, err)
+			require.Len(t, version.Nodes, 3)
+			findPR := findIntakeNode(version.Nodes, "find-pr")
+			managedRunner := findIntakeNode(version.Nodes, testCase.runnerID)
+			custom := findIntakeNode(version.Nodes, "custom-runner")
+			require.NotNil(t, findPR)
+			require.NotNil(t, managedRunner)
+			require.NotNil(t, custom)
+			assert.Equal(t, selectedID, *findPR.IntegrationID)
+			assert.Equal(t, testCase.repositoryExpression, findPR.Configuration["repository"])
+			assert.Equal(t, []any{
+				map[string]any{"source": "integration", "integration": map[string]any{"name": selectedName}},
+				map[string]any{"source": "integration", "integration": map[string]any{"name": unrelatedName}},
+			}, managedRunner.Configuration["environmentFrom"])
+			assert.Equal(t, "echo "+previousName, managedRunner.Configuration["script"])
+			assert.Equal(t, nodes[2].Configuration, custom.Configuration)
+		})
 	}
-	deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
-	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		return canvases.PublishGeneratedCanvasNodes(t.Context(), tx, canvas, r.User, "Install implementation", nodes, nil,
-			changesets.CanvasPublisherOptions{
-				Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor,
-				AuthService: r.AuthService, WebhookBaseURL: deps.WebhookBaseURL,
-			})
-	}))
-	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		return reconcileFactoryRepository(t.Context(), tx, deps, factory, r.User,
-			previousID, selectedID, "old-workspace/api", "old-workspace/api", branch, repository)
-	}))
-	reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
-	require.NoError(t, err)
-	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, reloaded)
-	require.NoError(t, err)
-	require.Len(t, version.Nodes, 3)
-	findPR := findIntakeNode(version.Nodes, "find-pr")
-	implementation := findIntakeNode(version.Nodes, implementationAgentNodeID)
-	custom := findIntakeNode(version.Nodes, "custom-runner")
-	require.NotNil(t, findPR)
-	require.NotNil(t, implementation)
-	require.NotNil(t, custom)
-	assert.Equal(t, selectedID, *findPR.IntegrationID)
-	assert.Equal(t, orderRepositoryExpression, findPR.Configuration["repository"])
-	assert.Equal(t, []any{
-		map[string]any{"source": "integration", "integration": map[string]any{"name": selectedName}},
-		map[string]any{"source": "integration", "integration": map[string]any{"name": unrelatedName}},
-	}, implementation.Configuration["environmentFrom"])
-	assert.Equal(t, "echo "+previousName, implementation.Configuration["script"])
-	assert.Equal(t, nodes[2].Configuration, custom.Configuration)
 }
 
 func TestUpdateFactoryRepositorySynchronizesHostedBindingAccess(t *testing.T) {

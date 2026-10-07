@@ -316,6 +316,7 @@ func reconcileFactoryRepository(
 			case "issue-intake":
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousBacklogRepository, to: repository}}) || changed
 			case "risk-score":
+				managedRunnerNodeIDs["assess-risk"] = true
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
 			}
 		}
