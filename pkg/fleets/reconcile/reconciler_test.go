@@ -32,9 +32,13 @@ type fakeAdmin struct {
 	events            *[]string
 }
 
-func (f *fakeAdmin) DescribeFleet(context.Context, string) (adminclient.Fleet, error) {
+func (f *fakeAdmin) DescribeFleet(ctx context.Context, _ string) (adminclient.Fleet, error) {
 	if f.describeCalls != nil {
-		f.describeCalls <- time.Now()
+		select {
+		case f.describeCalls <- time.Now():
+		case <-ctx.Done():
+			return adminclient.Fleet{}, ctx.Err()
+		}
 	}
 	return f.fleet, f.describeError
 }
@@ -343,6 +347,50 @@ func TestTerminatedRunnerDeletesTaggedProviderResource(t *testing.T) {
 	}
 }
 
+func TestDisabledFleetLogsResourceDeletionReason(t *testing.T) {
+	admin := newFakeAdmin()
+	admin.fleet.Enabled = false
+	admin.activeRunners = []adminclient.Runner{{
+		ID:      "runner-idle",
+		FleetID: "fleet-a",
+		State:   adminclient.RunnerStateIdle,
+	}}
+	resourceProvider := &fakeProvider{
+		resources: []provider.Resource{{
+			ID:       "resource-idle",
+			RunnerID: "runner-idle",
+			FleetID:  "fleet-a",
+		}},
+	}
+	var output bytes.Buffer
+	reconciler, err := New(
+		admin,
+		&fakeArtifactResolver{},
+		resourceProvider,
+		Config{
+			FleetID:         "fleet-a",
+			OperatingSystem: "linux",
+			Architecture:    "amd64",
+		},
+		slog.New(slog.NewJSONHandler(&output, nil)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := reconciler.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	reasons := loggedStringValues(t, output.String(), "reason")
+	if !slices.Contains(reasons, "fleet_disabled") {
+		t.Fatalf("deletion reasons = %#v", reasons)
+	}
+	if slices.Contains(reasons, "capacity_reduction") {
+		t.Fatalf("deletion reasons = %#v", reasons)
+	}
+}
+
 func TestTerminatedRunnerCleanupDoesNotDependOnListLimit(t *testing.T) {
 	admin := newFakeAdmin()
 	for i := range listLimit {
@@ -524,6 +572,14 @@ func TestReconciliationLoopUsesStrategySpecificDelay(t *testing.T) {
 			)
 			ctx, cancel := context.WithCancel(context.Background())
 			done := make(chan struct{})
+			t.Cleanup(func() {
+				cancel()
+				select {
+				case <-done:
+				case <-time.After(time.Second):
+					t.Error("reconciliation loop did not stop")
+				}
+			})
 			runConfig := RunConfig{
 				Interval:           test.interval,
 				ErrorRetryInterval: test.errorRetryInterval,
@@ -537,12 +593,6 @@ func TestReconciliationLoopUsesStrategySpecificDelay(t *testing.T) {
 			second := waitForDescribeCall(t, admin.describeCalls)
 			if delay := second.Sub(first); delay < 25*time.Millisecond {
 				t.Fatalf("delay = %s", delay)
-			}
-			cancel()
-			select {
-			case <-done:
-			case <-time.After(time.Second):
-				t.Fatal("reconciliation loop did not stop")
 			}
 		})
 	}
@@ -573,6 +623,22 @@ func loggedMessages(t *testing.T, output string) []string {
 		messages = append(messages, entry.Message)
 	}
 	return messages
+}
+
+func loggedStringValues(t *testing.T, output, key string) []string {
+	t.Helper()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	var values []string
+	for _, line := range lines {
+		var entry map[string]any
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatal(err)
+		}
+		if value, ok := entry[key].(string); ok {
+			values = append(values, value)
+		}
+	}
+	return values
 }
 
 func newFakeAdmin() *fakeAdmin {

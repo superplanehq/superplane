@@ -18,8 +18,10 @@ import (
 )
 
 const (
-	listLimit      = 1000
-	maxPollTimeout = 30 * time.Second
+	listLimit                       = 1000
+	maxPollTimeout                  = 30 * time.Second
+	deletionReasonCapacityReduction = "capacity_reduction"
+	deletionReasonFleetDisabled     = "fleet_disabled"
 )
 
 type AdminClient interface {
@@ -265,7 +267,12 @@ func (r *Reconciler) reconcileDisabledFleet(ctx context.Context) error {
 		"terminating runners for disabled fleet",
 		slog.Int("runner_count", len(runners)),
 	)
-	if err := r.terminateRunners(ctx, runners, resourcesByRunner); err != nil {
+	if err := r.terminateRunners(
+		ctx,
+		runners,
+		resourcesByRunner,
+		deletionReasonFleetDisabled,
+	); err != nil {
 		reconcileErrors = append(reconcileErrors, err)
 	}
 	return errors.Join(reconcileErrors...)
@@ -338,6 +345,7 @@ func (r *Reconciler) reconcileCapacity(
 		ctx,
 		oldestRunners(activeRunners, active-target),
 		resourcesByRunner,
+		deletionReasonCapacityReduction,
 	)
 }
 
@@ -508,6 +516,7 @@ func (r *Reconciler) terminateRunners(
 	ctx context.Context,
 	runners []adminclient.Runner,
 	resourcesByRunner map[string][]provider.Resource,
+	deletionReason string,
 ) error {
 	var terminateErrors []error
 	for _, runner := range runners {
@@ -532,7 +541,7 @@ func (r *Reconciler) terminateRunners(
 				"deleting provider resource",
 				slog.String("runner_id", runner.ID),
 				slog.String("resource_id", resource.ID),
-				slog.String("reason", "capacity_reduction"),
+				slog.String("reason", deletionReason),
 			)
 			if err := r.provider.Delete(ctx, resource); err != nil {
 				terminateErrors = append(terminateErrors, fmt.Errorf(
