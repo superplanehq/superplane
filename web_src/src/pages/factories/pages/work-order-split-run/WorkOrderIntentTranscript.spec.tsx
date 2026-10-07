@@ -300,7 +300,7 @@ describe("WorkOrderIntentTranscript", () => {
     expect(screen.getByText("I published the spec.")).toBeInTheDocument();
   });
 
-  it("shows a sent time on hover or focus and keeps the message text in place", () => {
+  it("labels notes, survey answers, and agent replies with the sent time", () => {
     const sentAt = new Date(2026, 7, 6, 10, 17);
     const later = new Date(2026, 7, 6, 10, 18);
     renderTranscript([
@@ -333,15 +333,14 @@ describe("WorkOrderIntentTranscript", () => {
 
     const noteTimes = screen.getAllByTestId("split-run-intent-user-note").map((note) => within(note).getByRole("time"));
     expect(noteTimes).toHaveLength(2);
-    expectHoverSentTime(noteTimes[0], sentAt, "beside");
-    expectHoverSentTime(noteTimes[1], later, "beside");
+    expectSentTime(noteTimes[0], sentAt);
+    expectSentTime(noteTimes[1], later);
     expect(screen.getAllByTestId("split-run-intent-user-note")[1]).toHaveTextContent("Also keep the helper.");
 
-    const surveyTime = within(screen.getByTestId("split-run-intent-survey-answer")).getByRole("time");
-    expectHoverSentTime(surveyTime, sentAt, "beside");
+    expectSentTime(within(screen.getByTestId("split-run-intent-survey-answer")).getByRole("time"), sentAt);
 
     const agent = screen.getByTestId("split-run-intent-agent-message");
-    expectHoverSentTime(within(agent).getByRole("time"), sentAt, "overlay");
+    expectSentTime(within(agent).getByRole("time"), sentAt);
     expect(agent).toHaveTextContent("Noted.");
     agent.focus();
     expect(agent).toHaveFocus();
@@ -404,7 +403,7 @@ describe("WorkOrderIntentTranscript", () => {
     const { rerender } = renderRequest(sentAt.toISOString());
 
     const request = screen.getByTestId("split-run-description");
-    expectHoverSentTime(within(request).getByRole("time"), sentAt, "overlay");
+    expectSentTime(within(request).getByRole("time"), sentAt);
     expect(request).toHaveTextContent("Show the next action on the empty billing page.");
     request.focus();
     expect(request).toHaveFocus();
@@ -415,26 +414,11 @@ describe("WorkOrderIntentTranscript", () => {
   });
 });
 
-function expectHoverSentTime(time: HTMLElement, sentAt: Date, placement: "beside" | "overlay") {
+function expectSentTime(time: HTMLElement, sentAt: Date) {
   expect(time).toHaveTextContent(`Sent ${formatWorkOrderDateTime(sentAt)}`);
   expect(time).toHaveAttribute("dateTime", sentAt.toISOString());
   expect(time).toHaveAttribute("title", sentAt.toLocaleString());
-  expect(time).toHaveClass(
-    "absolute",
-    "pointer-events-none",
-    "opacity-0",
-    "group-hover/message:opacity-100",
-    "group-focus/message:opacity-100",
-  );
-  const row = time.closest("[class*='group/message']");
-  expect(row).toHaveClass("group/message", "relative");
-  expect(row).toHaveAttribute("tabindex", "0");
-  if (placement === "beside") {
-    expect(time).toHaveClass("end-[calc(100%+0.5rem)]");
-    expect(time).not.toHaveClass("bg-background/95");
-    return;
-  }
-  expect(time).toHaveClass("bg-background/95", "end-2");
+  expect(time.closest("[class*='group/message']")).toHaveAttribute("tabindex", "0");
 }
 
 const REQUEST_VIEW: CreateWithAgentView = {

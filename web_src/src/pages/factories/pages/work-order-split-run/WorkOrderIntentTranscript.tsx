@@ -14,7 +14,7 @@ import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 import { parsePlanningSurveyReply } from "../planningSessionSurvey";
 import { AgentActivityView } from "./AgentActivityView";
-import { MessageSentTime, MessageTimeRow } from "./MessageSentTime";
+import { BesideSentTime, MessageSentTime, MessageTimeRow } from "./MessageSentTime";
 import type { AgentActivity } from "./agentActivity";
 import {
   SENDER_ROW_CLASSNAME,
@@ -218,8 +218,7 @@ function ComposerNoteBubble({
     <MessageTimeRow sentAt={createdAtMs} className={frameClassName}>
       <div className={USER_TURN_CLASSNAME} data-testid="split-run-intent-user-note">
         {sender ? <ChatSenderRow display={sender} /> : null}
-        <div className="relative max-w-full">
-          <MessageSentTime sentAt={createdAtMs} placement="beside" />
+        <BesideSentTime sentAt={createdAtMs}>
           <div className={USER_BUBBLE_CLASSNAME}>
             <WorkOrderDescription
               description={text}
@@ -228,7 +227,7 @@ function ComposerNoteBubble({
               fadeClassName={USER_BUBBLE_FADE_CLASSNAME}
             />
           </div>
-        </div>
+        </BesideSentTime>
       </div>
     </MessageTimeRow>
   );
@@ -253,8 +252,7 @@ function SurveyAnswerBubble({
     <MessageTimeRow sentAt={createdAtMs} className={frameClassName}>
       <div className={USER_TURN_CLASSNAME} data-testid="split-run-intent-survey-answer">
         {sender ? <ChatSenderRow display={sender} prefix={CREATE_WITH_AGENT_COPY.answeredBy} /> : null}
-        <div className="relative max-w-full">
-          <MessageSentTime sentAt={createdAtMs} placement="beside" />
+        <BesideSentTime sentAt={createdAtMs}>
           {pairs.length > 0 ? (
             <ul className="flex w-full flex-col items-end gap-2">
               {pairs.map((pair) => (
@@ -277,7 +275,7 @@ function SurveyAnswerBubble({
               {text}
             </span>
           )}
-        </div>
+        </BesideSentTime>
       </div>
     </MessageTimeRow>
   );
