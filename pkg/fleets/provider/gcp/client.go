@@ -18,6 +18,8 @@ const (
 	operationStatusDone       = "DONE"
 	warningCodeUnreachable    = "UNREACHABLE"
 	defaultOperationWaitRetry = 2 * time.Second
+	// Create blocks the fleet loop, so the wait must end.
+	defaultOperationWaitTimeout = 5 * time.Minute
 )
 
 // errOperationResultUnknown means that Compute Engine accepted the request,
@@ -43,8 +45,9 @@ func (e *operationError) Error() string {
 }
 
 type sdkCompute struct {
-	service   *compute.Service
-	waitRetry time.Duration
+	service     *compute.Service
+	waitRetry   time.Duration
+	waitTimeout time.Duration
 }
 
 func NewSDK(ctx context.Context, options ...option.ClientOption) (ComputeAPI, error) {
@@ -52,7 +55,11 @@ func NewSDK(ctx context.Context, options ...option.ClientOption) (ComputeAPI, er
 	if err != nil {
 		return nil, fmt.Errorf("create Compute Engine client: %w", err)
 	}
-	return &sdkCompute{service: service, waitRetry: defaultOperationWaitRetry}, nil
+	return &sdkCompute{
+		service:     service,
+		waitRetry:   defaultOperationWaitRetry,
+		waitTimeout: defaultOperationWaitTimeout,
+	}, nil
 }
 
 func (s *sdkCompute) InsertInstance(
@@ -118,6 +125,8 @@ func (s *sdkCompute) waitZoneOperation(
 	project, zone string,
 	operation *compute.Operation,
 ) error {
+	ctx, cancel := context.WithTimeout(ctx, s.waitTimeout)
+	defer cancel()
 	for operation.Status != operationStatusDone {
 		next, err := s.service.ZoneOperations.Wait(project, zone, operation.Name).Context(ctx).Do()
 		if err == nil {

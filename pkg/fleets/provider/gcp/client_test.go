@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	compute "google.golang.org/api/compute/v1"
 	"google.golang.org/api/option"
@@ -80,6 +81,23 @@ func TestInsertInstanceReportsUnknownResultWhenWaitFails(t *testing.T) {
 	}
 }
 
+func TestInsertInstanceStopsWaitingAfterTimeout(t *testing.T) {
+	client := newHTTPCompute(t, func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/wait") {
+			http.Error(w, `{"error":{"code":503,"message":"unavailable"}}`, http.StatusServiceUnavailable)
+			return
+		}
+		writeOperation(t, w, "RUNNING")
+	})
+	client.waitRetry = 10 * time.Millisecond
+	client.waitTimeout = 100 * time.Millisecond
+
+	err := client.InsertInstance(context.Background(), "my-project", "us-central1-a", &compute.Instance{Name: "runner"})
+	if !errors.Is(err, errOperationResultUnknown) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func newHTTPCompute(t *testing.T, handler http.HandlerFunc) *sdkCompute {
 	t.Helper()
 	server := httptest.NewServer(handler)
@@ -92,7 +110,7 @@ func newHTTPCompute(t *testing.T, handler http.HandlerFunc) *sdkCompute {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &sdkCompute{service: service}
+	return &sdkCompute{service: service, waitTimeout: time.Minute}
 }
 
 func writeOperation(t *testing.T, w http.ResponseWriter, status string) {
