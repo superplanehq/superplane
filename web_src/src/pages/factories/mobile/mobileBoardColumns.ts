@@ -13,6 +13,12 @@ import {
 
 export type MobileBoardPagingKey = "backlog" | "open" | "done";
 
+export type MobileBoardColumnTotalCounts = {
+  backlog?: number;
+  open?: number;
+  done?: number;
+};
+
 export type MobileBoardCard = {
   /** Stable React key: the task id, or the execution id on a phase column. */
   key: string;
@@ -28,6 +34,8 @@ export type MobileBoardColumn = {
   /** Live state glyph on a phase column. Bookend columns have none. */
   glyph?: PhaseGlyphKind;
   emptyDescription: string;
+  /** Total work orders in this column from the server, when known. */
+  totalCount?: number;
 };
 
 function cardsForOrders(orders: FactoriesWorkOrder[]): MobileBoardCard[] {
@@ -43,6 +51,7 @@ export function buildMobileBoardColumns(
   line: FactoriesFactoryLine,
   workOrders: FactoriesWorkOrder[],
   apps: Array<{ id?: string; name?: string; columnKey?: string }>,
+  totalCounts?: MobileBoardColumnTotalCounts,
 ): MobileBoardColumn[] {
   const fullBoard = buildLinePhaseBoard(line, workOrders, apps);
   const verifyOrders = collectLineVerifyOrders(fullBoard);
@@ -57,6 +66,7 @@ export function buildMobileBoardColumns(
       cards: cardsForOrders(backlogOrders),
       paging: "backlog",
       emptyDescription: "No tasks in Backlog. Tap + to create a task.",
+      totalCount: totalCounts?.backlog,
     },
     ...stageColumns.map(
       (column): MobileBoardColumn => ({
@@ -74,6 +84,7 @@ export function buildMobileBoardColumns(
       cards: cardsForOrders(verifyOrders),
       paging: "open",
       emptyDescription: "No tasks in Verify.",
+      totalCount: stageColumns.length === 0 ? totalCounts?.open : undefined,
     },
     {
       key: "done",
@@ -81,6 +92,7 @@ export function buildMobileBoardColumns(
       cards: cardsForOrders(doneOrders),
       paging: "done",
       emptyDescription: "No tasks in Done.",
+      totalCount: totalCounts?.done,
     },
   ];
 }

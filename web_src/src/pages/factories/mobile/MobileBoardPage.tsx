@@ -192,9 +192,23 @@ function useMobileBoardModel({
     return uniqueWorkOrdersById(workOrders.filter((order) => order.id && visibleIds.has(order.id)));
   }, [currentUserId, entries, listState.filters, listState.scope, listState.search, showPullRequestMerge, workOrders]);
 
+  const hasClientFilter =
+    Boolean(listState.search.trim()) || listState.filterCount - listState.filters.lineIds.length > 0;
+
+  const totalCounts = useMemo(() => {
+    if (hasClientFilter) {
+      return undefined;
+    }
+    return {
+      backlog: backlog.totalCount,
+      open: open.totalCount,
+      done: done.totalCount,
+    };
+  }, [backlog.totalCount, done.totalCount, hasClientFilter, open.totalCount]);
+
   const columns = useMemo(
-    () => buildMobileBoardColumns(line, visibleWorkOrders, apps),
-    [apps, line, visibleWorkOrders],
+    () => buildMobileBoardColumns(line, visibleWorkOrders, apps, totalCounts),
+    [apps, line, totalCounts, visibleWorkOrders],
   );
   const sourceOptions = useMemo(() => buildSourceFilterOptions(factoryIntakes, entries), [entries, factoryIntakes]);
   const assigneeOptions = useMemo(
@@ -438,7 +452,9 @@ function MobileColumnTabs({
           >
             {column.glyph ? <PhaseGlyph kind={column.glyph} className="size-3" /> : null}
             <span className="truncate">{column.title}</span>
-            <span className="tabular-nums text-[12px] text-muted-foreground">{column.cards.length}</span>
+            <span className="tabular-nums text-[12px] text-muted-foreground">
+              {column.totalCount ?? column.cards.length}
+            </span>
           </button>
         );
       })}

@@ -42,6 +42,29 @@ describe("buildMobileBoardColumns", () => {
       expect(column.emptyDescription).toContain(column.title);
     }
   });
+
+  it("assigns totalCount to backlog and done columns and verify when no stages exist", () => {
+    const columns = buildMobileBoardColumns(PLAN_LINE, [BACKLOG_DRAFT, DONE_ORDER], REFUND_FACTORY_APPS, {
+      backlog: 40,
+      open: 30,
+      done: 80,
+    });
+
+    expect(columns.find((c) => c.key === "backlog")?.totalCount).toBe(40);
+    expect(columns.find((c) => c.key === "done")?.totalCount).toBe(80);
+    expect(columns.find((c) => c.key === "verify")?.totalCount).toBeUndefined();
+  });
+
+  it("assigns open totalCount to verify when line has no steps", () => {
+    const columns = buildMobileBoardColumns(
+      { ...PLAN_LINE, steps: [] },
+      [BACKLOG_DRAFT, DONE_ORDER],
+      REFUND_FACTORY_APPS,
+      { backlog: 10, open: 5, done: 20 },
+    );
+
+    expect(columns.find((c) => c.key === "verify")?.totalCount).toBe(5);
+  });
 });
 
 describe("activeColumnIndex", () => {
