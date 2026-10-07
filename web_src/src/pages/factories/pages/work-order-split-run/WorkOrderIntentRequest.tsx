@@ -17,7 +17,7 @@ import { PendingWorkOrderFileChips } from "../../PendingWorkOrderFileChips";
 import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestImages";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
-import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME } from "./chatBubbleStyle";
+import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME, USER_TURN_CLASSNAME } from "./chatBubbleStyle";
 import { AnalysisPlanControls } from "./AnalysisPlanControls";
 import { PlanningImplementationControls } from "./PlanningImplementationControls";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
@@ -36,6 +36,7 @@ import type { SplitRunSource } from "./splitRunSource";
 import { hasPendingPlanningQuestions } from "./planningReviewState";
 import { WorkOrderIntentSurvey } from "./WorkOrderIntentSurvey";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
+import { BesideSentTime, MessageSentTime, MessageTimeRow } from "./MessageSentTime";
 import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
 
 export type { IntentAnalysisChat };
@@ -46,18 +47,33 @@ type WorkOrderIntentRequestProps = {
   files?: FilesFile[];
   analysis?: IntentAnalysisChat;
   source?: SplitRunSource;
+  createdAt?: string | null;
 };
 
-export function WorkOrderIntentRequest({ title, description, files, analysis, source }: WorkOrderIntentRequestProps) {
+export function WorkOrderIntentRequest({
+  title,
+  description,
+  files,
+  analysis,
+  source,
+  createdAt,
+}: WorkOrderIntentRequestProps) {
   if (analysis) {
     return (
-      <AnalysisRequestChat title={title} description={description} files={files} analysis={analysis} source={source} />
+      <AnalysisRequestChat
+        title={title}
+        description={description}
+        files={files}
+        analysis={analysis}
+        source={source}
+        createdAt={createdAt}
+      />
     );
   }
   return (
     <>
       <RequestHeader title={title} />
-      <RequestMessage description={description} files={files} />
+      <RequestMessage description={description} files={files} createdAt={createdAt} />
     </>
   );
 }
@@ -89,6 +105,7 @@ function AnalysisRequestChat({
   files,
   analysis,
   source,
+  createdAt,
 }: WorkOrderIntentRequestProps & { analysis: IntentAnalysisChat }) {
   const state = analysisRequestChatState(analysis);
   const chatSolo = !analysis.planPaneOpen;
@@ -120,7 +137,7 @@ function AnalysisRequestChat({
           data-testid="split-run-intent-chat-log"
         >
           <div className={cn(chatColumnClass, chatSolo ? "py-6" : "py-3")} data-testid="split-run-intent-chat-column">
-            <RequestMessage description={description} files={files} source={source} asChat />
+            <RequestMessage description={description} files={files} source={source} createdAt={createdAt} asChat />
             <WorkOrderIntentTranscript
               messages={analysis.view.messages}
               organizationId={analysis.organizationId}
@@ -433,15 +450,17 @@ function AnalysisComposerAddons({
   );
 }
 
-function RequestMessage({
+export function RequestMessage({
   description,
   files,
   source,
+  createdAt,
   asChat = false,
 }: {
   description: string;
   files?: FilesFile[];
   source?: SplitRunSource;
+  createdAt?: string | null;
   asChat?: boolean;
 }) {
   const body = description.trim() ? (
@@ -458,7 +477,8 @@ function RequestMessage({
   if (!asChat) {
     return (
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        <div className="max-w-[92%]">
+        <MessageTimeRow sentAt={createdAt} className="max-w-[92%]">
+          <MessageSentTime sentAt={createdAt} placement="overlay" />
           <div
             className="rounded-2xl border bg-card px-3.5 py-3"
             data-testid="split-run-description"
@@ -466,21 +486,25 @@ function RequestMessage({
           >
             {body}
           </div>
-        </div>
+        </MessageTimeRow>
       </div>
     );
   }
 
   return (
-    <div className="mb-3 flex w-full justify-end" data-testid="split-run-description">
-      <div className={cn(REQUEST_CARD_CLASSNAME, "max-w-[85%]")}>
-        {source ? (
-          <div className="mb-2">
-            <WorkOrderSplitRunSource source={source} compact />
+    <MessageTimeRow sentAt={createdAt} className="mb-3 flex w-full justify-end" data-testid="split-run-description">
+      <div className={USER_TURN_CLASSNAME}>
+        <BesideSentTime sentAt={createdAt}>
+          <div className={REQUEST_CARD_CLASSNAME}>
+            {source ? (
+              <div className="mb-2">
+                <WorkOrderSplitRunSource source={source} compact />
+              </div>
+            ) : null}
+            {body}
           </div>
-        ) : null}
-        {body}
+        </BesideSentTime>
       </div>
-    </div>
+    </MessageTimeRow>
   );
 }
