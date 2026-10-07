@@ -134,7 +134,7 @@ function RiskScoreSetupPreview({ checks }: { checks: readonly MergeConfidenceChe
                   <li key={check.id} className="flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0">
                     <span className="text-[12px] font-medium text-muted-foreground">{check.label}</span>
                     <span className="flex items-baseline gap-2">
-                      <span className="text-[13px] font-semibold tabular-nums text-foreground">{preview.score}/5</span>
+                      <span className="text-[13px] font-semibold tabular-nums text-foreground">{preview.score}/3</span>
                       <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
                         {preview.status}
                       </span>

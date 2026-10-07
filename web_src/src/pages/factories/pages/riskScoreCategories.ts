@@ -1,6 +1,6 @@
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 
-export type RiskScoreLevel = 1 | 2 | 3 | 4 | 5;
+export type RiskScoreLevel = 1 | 2 | 3;
 
 export type RiskScoreCategory = {
   id: string;
@@ -11,25 +11,23 @@ export type RiskScoreCategory = {
 /** Default category floors. The pull request score is the highest match. */
 export const RISK_SCORE_CATEGORIES: RiskScoreCategory[] = [
   { id: "documentation", name: "Documentation only", score: 1 },
-  { id: "tests", name: "Tests only", score: 2 },
-  { id: "interface", name: "User interface changes", score: 2 },
-  { id: "database-additive", name: "Additive database changes", score: 3 },
-  { id: "dependencies", name: "Dependency updates", score: 3 },
-  { id: "api", name: "API behavior changes", score: 3 },
-  { id: "authorization", name: "Authorization changes", score: 4 },
-  { id: "authentication", name: "Authentication changes", score: 4 },
-  { id: "data-migration", name: "Data deletion or migration", score: 4 },
-  { id: "infrastructure", name: "Infrastructure changes", score: 4 },
-  { id: "billing", name: "Billing and payment changes", score: 5 },
-  { id: "secrets", name: "Secrets and credentials", score: 5 },
+  { id: "tests", name: "Tests only", score: 1 },
+  { id: "interface", name: "User interface changes", score: 1 },
+  { id: "database-additive", name: "Additive database changes", score: 2 },
+  { id: "dependencies", name: "Dependency updates", score: 2 },
+  { id: "api", name: "API behavior changes", score: 2 },
+  { id: "authorization", name: "Authorization changes", score: 3 },
+  { id: "authentication", name: "Authentication changes", score: 3 },
+  { id: "data-migration", name: "Data deletion or migration", score: 3 },
+  { id: "infrastructure", name: "Infrastructure changes", score: 3 },
+  { id: "billing", name: "Billing and payment changes", score: 3 },
+  { id: "secrets", name: "Secrets and credentials", score: 3 },
 ];
 
 const LEVEL_WORD: Record<RiskScoreLevel, string> = {
-  1: "very_low",
-  2: "low",
-  3: "medium",
-  4: "high",
-  5: "critical",
+  1: "healthy",
+  2: "caution",
+  3: "critical",
 };
 
 export function defaultRiskScoreCategories(): RiskScoreCategory[] {
@@ -64,8 +62,9 @@ export function nextRiskScoreCategoryId(categories: RiskScoreCategory[]): string
   return `custom-${Math.max(0, ...used) + 1}`;
 }
 
-const RULE_PATTERN = /([^=\n]+?) = ([1-5]) \((?:very_low|low|medium|high|critical)\)\./g;
-const RULES_LINE_PATTERN = /^(?:[^=\n]+? = [1-5] \((?:very_low|low|medium|high|critical)\)\.\s*)+$/m;
+const LEVEL_WORDS = "very_low|low|medium|high|critical|healthy|caution";
+const RULE_PATTERN = new RegExp(`([^=\\n]+?) = ([1-5]) \\((${LEVEL_WORDS})\\)\\.`, "g");
+const RULES_LINE_PATTERN = new RegExp(`^(?:[^=\\n]+? = [1-5] \\((?:${LEVEL_WORDS})\\)\\.\\s*)+$`, "m");
 
 /** Reads the category rules line from an agent prompt. Returns null when the prompt has no rules line. */
 export function parseRiskScoreRules(prompt: string): RiskScoreCategory[] | null {
@@ -80,7 +79,7 @@ export function parseRiskScoreRules(prompt: string): RiskScoreCategory[] | null 
     categories.push({
       id: known?.id ?? nextRiskScoreCategoryId(categories),
       name,
-      score: Number(match[2]) as RiskScoreLevel,
+      score: scoreFromRule(Number(match[2]), match[3]),
     });
   }
   return categories;
@@ -131,8 +130,29 @@ function draftSteps(draft: PlanningReviewDraft | undefined): PlanningReviewStep[
   return Array.isArray(steps) ? (steps as PlanningReviewStep[]) : [];
 }
 
+function scoreFromRule(raw: number, word: string): RiskScoreLevel {
+  if (word === "healthy" || word === "caution" || (word === "critical" && raw <= 3)) {
+    return clampRiskScoreLevel(raw);
+  }
+  return foldLegacyRiskScore(raw);
+}
+
+function foldLegacyRiskScore(value: number): RiskScoreLevel {
+  if (value <= 2) {
+    return 1;
+  }
+  if (value === 3) {
+    return 2;
+  }
+  return 3;
+}
+
 function clampRiskScoreLevel(value: number): RiskScoreLevel {
-  if (value <= 1) return 1;
-  if (value >= 5) return 5;
-  return Math.round(value) as RiskScoreLevel;
+  if (value <= 1) {
+    return 1;
+  }
+  if (value >= 3) {
+    return 3;
+  }
+  return 2;
 }

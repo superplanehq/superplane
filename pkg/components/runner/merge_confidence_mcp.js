@@ -69,7 +69,7 @@ const TOOLS = [
   {
     name: "report_merge_check",
     description:
-      "Publish one merge confidence check for this pull request. Call this once for the check in the prompt. check is the id from the Merge check line. score is an integer from 1 through 5. summary is one sentence.",
+      "Publish one merge confidence check for this pull request. Call this once for the check in the prompt. check is the id from the Merge check line. score is an integer from 1 through 3. summary is one sentence.",
     inputSchema: {
       type: "object",
       properties: {
@@ -79,7 +79,7 @@ const TOOLS = [
         },
         score: {
           type: "number",
-          description: "Integer from 1 through 5.",
+          description: "Integer from 1 through 3.",
         },
         summary: {
           type: "string",
