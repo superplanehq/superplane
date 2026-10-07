@@ -43,6 +43,20 @@ output "vpc_id" {
 }
 
 # -----------------------------------------------------------------------------
+# Runner Storage Outputs
+# -----------------------------------------------------------------------------
+
+output "runner_active_logs_efs_id" {
+  description = "ID of the EFS file system used for runner active logs"
+  value       = aws_efs_file_system.runner_active_logs.id
+}
+
+output "runner_active_logs_efs_access_point_id" {
+  description = "ID of the EFS access point used for runner active logs"
+  value       = aws_efs_access_point.runner_active_logs.id
+}
+
+# -----------------------------------------------------------------------------
 # SuperPlane Outputs
 # -----------------------------------------------------------------------------
 

@@ -464,6 +464,47 @@ resource "helm_release" "superplane" {
     value = "IfNotPresent"
   }
 
+  # Integrated Runner API, workers, and shared active-log storage
+  set {
+    name  = "runner.api.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "runner.workers.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "runner.activeLogStorage.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "runner.activeLogStorage.backend"
+    value = "fs"
+  }
+
+  set {
+    name  = "runner.activeLogStorage.fs.primary.staticVolume.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "runner.activeLogStorage.fs.primary.staticVolume.capacity"
+    value = var.runner_active_log_volume_capacity
+  }
+
+  set {
+    name  = "runner.activeLogStorage.fs.primary.staticVolume.volumeSource.csi.driver"
+    value = "efs.csi.aws.com"
+  }
+
+  set {
+    name  = "runner.activeLogStorage.fs.primary.staticVolume.volumeSource.csi.volumeHandle"
+    value = "${aws_efs_file_system.runner_active_logs.id}::${aws_efs_access_point.runner_active_logs.id}"
+  }
+
   # Domain configuration
   set {
     name  = "domain.name"
@@ -609,6 +650,8 @@ resource "helm_release" "superplane" {
     kubernetes_secret.oidc,
     helm_release.cert_manager,
     helm_release.nginx_ingress,
+    aws_eks_addon.efs_csi,
+    aws_efs_mount_target.runner_active_logs,
     aws_db_instance.superplane
   ]
 }

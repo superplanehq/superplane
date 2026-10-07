@@ -6,7 +6,7 @@ Deploy SuperPlane to EKS with RDS PostgreSQL.
 
 - [Terraform](https://www.terraform.io/downloads) >= 1.5.0
 - [AWS CLI](https://aws.amazon.com/cli/) installed and configured
-- AWS account with permissions to create EKS, RDS, VPC resources
+- AWS account with permissions to create EKS, EFS, RDS, and VPC resources
 
 ## Deploy
 
@@ -41,6 +41,7 @@ Create a CNAME record in your DNS provider pointing your domain to the ALB DNS n
 ```bash
 kubectl get pods -n superplane
 kubectl get certificate -n superplane
+kubectl get pvc superplane-runner-active-logs -n superplane
 ```
 
 Access SuperPlane at `https://your-domain.com`
@@ -69,6 +70,8 @@ terraform destroy
 Terraform keeps a final RDS snapshot when it deletes the instance.
 The snapshot name has a random suffix.
 The suffix changes when an argument that replaces the instance changes.
+Terraform also deletes the EFS file system and its active runner logs.
+Export any required active logs before you destroy the deployment.
 
 ## Notes
 
@@ -76,3 +79,6 @@ The suffix changes when an argument that replaces the instance changes.
 - DNS must be configured as a CNAME pointing to the ALB DNS name (not an IP)
 - RDS is deployed in private subnets with no public access
 - EKS nodes are in private subnets with NAT gateway for outbound access
+- EFS provides shared active-log storage for the Runner API and workers
+- EFS mount targets are created in each private subnet
+- The EFS access point enforces the UID and GID used by SuperPlane pods

@@ -126,6 +126,12 @@ variable "superplane_image_tag" {
   default     = "stable"
 }
 
+variable "runner_active_log_volume_capacity" {
+  description = "Nominal Kubernetes PV/PVC capacity for runner active logs. EFS grows elastically and does not reserve this capacity."
+  type        = string
+  default     = "1Gi"
+}
+
 # -----------------------------------------------------------------------------
 # Optional Variables - Network
 # -----------------------------------------------------------------------------
