@@ -173,6 +173,21 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		}, events.Payloads[0].Data)
 	})
 
+	t.Run("label filter trims spaces around a configured label", func(t *testing.T) {
+		body := []byte(`{"action":"opened","issue":{"labels":[{"name":"bug"}]}}`)
+		events := &contexts.EventContext{}
+
+		code, _, err := trigger.HandleWebhook(signedIssueContext(body, map[string]any{
+			"repository": "acme/widgets",
+			"actions":    []string{"opened"},
+			"labels":     []string{"  bug  "},
+		}, events, nil))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, events.Count())
+	})
+
 	t.Run("exclude mode drops an issue that has a configured label", func(t *testing.T) {
 		body := []byte(`{"action":"opened","issue":{"labels":[{"name":"bug"}]}}`)
 		events := &contexts.EventContext{}

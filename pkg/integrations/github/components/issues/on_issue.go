@@ -306,6 +306,7 @@ func issueMatchesFilters(data map[string]any, config OnIssueConfiguration) bool 
 }
 
 func issueMatchesLabels(data map[string]any, labels []string, mode string) bool {
+	labels = trimmedIssueLabels(labels)
 	if len(labels) == 0 {
 		return true
 	}
@@ -348,6 +349,17 @@ func issueMatchesAssignment(data map[string]any, assignment string) bool {
 	default:
 		return true
 	}
+}
+
+func trimmedIssueLabels(labels []string) []string {
+	names := make([]string, 0, len(labels))
+	for _, label := range labels {
+		name := strings.TrimSpace(label)
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 func issueLabelNames(data map[string]any) []string {
