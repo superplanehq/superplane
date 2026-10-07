@@ -283,6 +283,11 @@ function LoadedMobileTask({
       {model.columnAppRunQueries}
       <article className="flex flex-col gap-5 px-4 pt-3 pb-8" data-testid="mobile-task-detail">
         <MobileTaskHeader order={order} fixture={fixture} />
+        {refine.sessionMissing ? (
+          <p className="text-[13px] text-muted-foreground" role="status">
+            {MOBILE_TASK_COPY.noRefinementSession}
+          </p>
+        ) : null}
         {review(true)}
         <Section title={MOBILE_TASK_COPY.description}>
           {fixture.descriptionText?.trim() ? (

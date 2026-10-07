@@ -40,4 +40,5 @@ export const MOBILE_TASK_COPY = {
   files: "Files",
   showLog: "Show log",
   hideLog: "Hide log",
+  noRefinementSession: "This task has no refinement session, so replies are not available.",
 } as const;

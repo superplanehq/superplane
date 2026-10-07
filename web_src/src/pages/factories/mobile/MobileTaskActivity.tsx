@@ -9,11 +9,11 @@ import { attachArtifactsToStream, type StreamArtifactIndex } from "../pages/work
 import { canvasNodesForRunnerModel, phaseWithRunnerModel } from "../pages/work-order-split-run/draftStartModel";
 import { PhaseLogCard } from "../pages/work-order-split-run/PhaseLogCard";
 import { SpecificModelIdsProvider } from "../pages/work-order-split-run/specificModelIds";
-import { resolveSplitRunVisual } from "../pages/work-order-split-run/splitRunLiveCanvas";
 import {
   splitRunStatusLabel,
   type SplitRunPhase,
   type SplitRunPhaseStatus,
+  type SplitRunStreamLine,
 } from "../pages/work-order-split-run/splitRunMocks";
 import { SplitRunCheckPills } from "../pages/work-order-split-run/SplitRunReview";
 import { useSplitRunLiveCanvas } from "../pages/work-order-split-run/useSplitRunLiveCanvas";
@@ -137,8 +137,9 @@ function ActivityRow({
 }
 
 /**
- * Live phase log, built the way the desktop popup builds it. The row above
- * already names the phase, so the card hides its own header.
+ * Live phase log. The row above already names the phase, so the card hides
+ * its own header. Example canvas steps are not a log: use the live run when
+ * it has lines, and keep the stored phase summary otherwise.
  */
 function PhaseLog({
   phase,
@@ -152,10 +153,9 @@ function PhaseLog({
   files?: FilesFile[];
 }) {
   const live = useSplitRunLiveCanvas(organizationId, phase);
-  const visual = useMemo(() => resolveSplitRunVisual(phase, live, { demoArtifacts: false }), [live, phase]);
   const stream = useMemo(
-    () => attachArtifactsToStream(visual.stream, artifactIndex, phase.runId),
-    [artifactIndex, phase.runId, visual.stream],
+    () => attachArtifactsToStream(phonePhaseLogStream(phase, live), artifactIndex, phase.runId),
+    [artifactIndex, live, phase],
   );
 
   return (
@@ -171,4 +171,14 @@ function PhaseLog({
       files={files}
     />
   );
+}
+
+function phonePhaseLogStream(
+  phase: SplitRunPhase,
+  live: { isError?: boolean; stream: SplitRunStreamLine[] },
+): SplitRunStreamLine[] {
+  if (live.isError || live.stream.length === 0) {
+    return phase.stream;
+  }
+  return live.stream;
 }

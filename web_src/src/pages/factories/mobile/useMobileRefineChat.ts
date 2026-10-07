@@ -10,9 +10,11 @@ import type { SplitRunFixture } from "../pages/work-order-split-run/splitRunMock
 import { useAnalysisPlanningSession } from "../pages/work-order-split-run/useAnalysisPlanningSession";
 
 export type MobileRefineChat = {
-  /** Refine chat for a Planning draft. Undefined for any other task. */
+  /** Refine chat for a Planning draft that has a session. Undefined otherwise. */
   chat?: IntentAnalysisChat;
   loadFailed: boolean;
+  /** Lookup succeeded, but this draft has no planning session. */
+  sessionMissing: boolean;
 };
 
 /**
@@ -54,10 +56,14 @@ export function useMobileRefineChat({
     analysisDelivered: analysisFirstResultDelivered({ checks: fixture.checks, artifacts }),
   });
   if (!refines) {
-    return { loadFailed: false };
+    return { loadFailed: false, sessionMissing: false };
+  }
+  if (!analysis.showChat && !analysis.queryError) {
+    return { loadFailed: false, sessionMissing: !analysis.isLoading };
   }
   return {
     chat: draftStripAnalysis({ factory, organizationId, factoryKey, fixture, analysis }, modelSelect),
     loadFailed: Boolean(analysis.queryError),
+    sessionMissing: false,
   };
 }
