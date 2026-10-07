@@ -271,6 +271,7 @@ func reconcileFactoryRepository(
 			return err
 		}
 		nodes := slices.Clone(liveVersion.Nodes)
+		edges := slices.Clone(liveVersion.Edges)
 		managedGitHubNodeIDs := map[string]bool{}
 		changed := false
 
@@ -297,7 +298,7 @@ func reconcileFactoryRepository(
 		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
 			graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{
 				Nodes: nodes,
-				Edges: liveVersion.Edges,
+				Edges: edges,
 			})
 			managedGitHubNodeIDs[graph.TriggerNodeID] = true
 			managedGitHubNodeIDs[graph.AuthorPermissionNodeID] = true
@@ -307,7 +308,7 @@ func reconcileFactoryRepository(
 		if _, ok := handlerCanvasIDs[canvas.ID]; ok {
 			addPRFeedbackGitHubNodeIDs(managedGitHubNodeIDs, resolvePRFeedbackGraph(models.LiveCanvasSpec{
 				Nodes: nodes,
-				Edges: liveVersion.Edges,
+				Edges: edges,
 			}))
 			changed = replaceGitHubTriggerRepository(nodes, previousAppRepository, repository) || changed
 		}
@@ -320,6 +321,13 @@ func reconcileFactoryRepository(
 			previousBacklogRepository,
 			repository,
 		) || changed
+		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
+			spec := models.LiveCanvasSpec{Nodes: nodes, Edges: edges}
+			graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
+			var rewritten bool
+			nodes, edges, rewritten = rewriteGitHubIntakeGraph(nodes, edges, graph, intakeSettingsFromGraph(models.FactoryIntakeSourceGitHubIssues, graph, spec))
+			changed = rewritten || changed
+		}
 		if !changed {
 			continue
 		}
@@ -331,7 +339,7 @@ func reconcileFactoryRepository(
 			actorID,
 			"Update workspace repository",
 			nodes,
-			slices.Clone(liveVersion.Edges),
+			edges,
 			changesets.CanvasPublisherOptions{
 				Registry:       deps.Registry,
 				OrgID:          canvas.OrganizationID,

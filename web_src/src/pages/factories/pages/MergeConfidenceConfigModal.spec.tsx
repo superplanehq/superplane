@@ -119,6 +119,27 @@ vi.mock("@/hooks/useIntegrations", () => {
                     },
                   },
                 },
+                {
+                  name: "labels",
+                  label: "Issue has one of these labels",
+                  type: "list",
+                  typeOptions: {
+                    list: {
+                      itemLabel: "Label",
+                      itemDefinition: { type: "string" },
+                    },
+                  },
+                },
+                {
+                  name: "authorsWithAccess",
+                  label: "Author is a repository collaborator",
+                  type: "boolean",
+                },
+                {
+                  name: "superplaneLabelAdded",
+                  label: 'The "superplane" label is added to the issue',
+                  type: "boolean",
+                },
               ],
             },
           ],
@@ -424,8 +445,10 @@ describe("MergeConfidenceConfigModal", () => {
     expect(within(form).getByText("Application repository")).toBeInTheDocument();
     expect(within(form).getByText("Start a run when:")).toBeInTheDocument();
     expect(within(form).getByText("Filters")).toBeInTheDocument();
-    expect(within(form).getByRole("checkbox", { name: "Issue has one of these labels" })).toBeDisabled();
-    expect(within(form).getByRole("checkbox", { name: "Author is a repository collaborator" })).toBeDisabled();
+    expect(within(form).getByText("Issue has one of these labels")).toBeInTheDocument();
+    expect(within(form).getByRole("button", { name: "Add Label" })).toBeEnabled();
+    expect(within(form).getByRole("checkbox", { name: "Author is a repository collaborator" })).toBeEnabled();
+    expect(within(form).getByRole("checkbox", { name: "Author is a repository collaborator" })).not.toBeChecked();
     expect(within(form).getByRole("checkbox", { name: "A new issue is opened" })).toBeChecked();
     expect(within(form).getByRole("checkbox", { name: "A closed issue is re-opened" })).not.toBeChecked();
     expect(

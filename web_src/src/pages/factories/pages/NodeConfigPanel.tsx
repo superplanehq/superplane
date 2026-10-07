@@ -4,7 +4,6 @@ import type {
   OrganizationsIntegration,
   SuperplaneComponentsNode,
 } from "@/api-client";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useComponents } from "@/hooks/useComponentData";
 import { useTriggers, useWidgets } from "@/hooks/useCanvasData";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
@@ -42,6 +41,11 @@ const ISSUE_ACTIONS = [
   { value: "labeled", label: INTAKE_SETTINGS_COPY.superplaneLabelAdded },
 ] as const;
 
+const ISSUE_LABELS_FIELD = "labels";
+const ISSUE_AUTHORS_FIELD = "authorsWithAccess";
+const ISSUE_SUPERPLANE_LABEL_FIELD = "superplaneLabelAdded";
+const LABELED_ACTION = "labeled";
+
 const NODE_CONFIG_COPY = {
   collapseStep: "Collapse step",
   loading: "Loading settings.",
@@ -59,6 +63,14 @@ const PULL_REQUEST_FIELD_GROUPS = [
 
 const ISSUE_FIELD_GROUPS = [
   { label: NODE_CONFIG_COPY.startRunWhen, fieldNames: [PULL_REQUEST_ACTIONS_FIELD] },
+  { label: NODE_CONFIG_COPY.filters, fieldNames: [ISSUE_LABELS_FIELD, ISSUE_AUTHORS_FIELD] },
+] as const;
+
+const ISSUE_HIDDEN_FIELDS = [
+  ...SIMPLIFIED_HIDDEN_FIELDS,
+  "labelFilterMode",
+  "assignment",
+  ISSUE_SUPERPLANE_LABEL_FIELD,
 ] as const;
 
 type CatalogEntry = {
@@ -153,7 +165,7 @@ export function NodeConfigPanel({
                 onSave({
                   nodeId: node.id ?? "",
                   name,
-                  configuration,
+                  configuration: issueConfigurationForSave(node, configuration),
                   integration,
                   concurrency,
                 })
@@ -250,7 +262,7 @@ function nodeSettingsProps(node: SuperplaneComponentsNode, definition: CatalogEn
       configuration,
       presentIssueFields(fields, configuration),
       ISSUE_FIELD_GROUPS,
-      issueFilterPlaceholders(),
+      ISSUE_HIDDEN_FIELDS,
     );
   }
   return {
@@ -269,13 +281,14 @@ function simplifiedTriggerSettings(
   configuration: Record<string, unknown>,
   fields: ConfigurationField[],
   fieldGroups: readonly { label: string; fieldNames: readonly string[] }[],
+  hiddenFieldNames: readonly string[] = SIMPLIFIED_HIDDEN_FIELDS,
   trailingContent?: ReactNode,
 ) {
   return {
     chrome: "fields" as const,
     booleanControl: "checkbox" as const,
     fieldGroups,
-    hiddenFieldNames: SIMPLIFIED_HIDDEN_FIELDS,
+    hiddenFieldNames,
     leadingContent: repositoryLine(repositoryDisplay(configuration.repository)),
     trailingContent,
     configuration,
@@ -283,32 +296,25 @@ function simplifiedTriggerSettings(
   };
 }
 
-/** The issue trigger cannot store these filters yet. */
-function issueFilterPlaceholders() {
-  return (
-    <fieldset className="min-w-0">
-      <legend className="workspace-section-title">{NODE_CONFIG_COPY.filters}</legend>
-      <div className="mt-2 flex flex-col gap-2">
-        <PlaceholderFilter label={INTAKE_SETTINGS_COPY.filterByLabel} />
-        <PlaceholderFilter label={INTAKE_SETTINGS_COPY.authorsWithAccess} />
-      </div>
-    </fieldset>
-  );
-}
-
-function PlaceholderFilter({ label }: { label: string }) {
-  return (
-    <label className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
-      <Checkbox
-        checked={false}
-        disabled
-        onChange={() => undefined}
-        aria-label={label}
-        className="disabled:opacity-100"
-      />
-      <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">{label}</span>
-    </label>
-  );
+function issueConfigurationForSave(node: SuperplaneComponentsNode, configuration: Record<string, unknown>) {
+  if (node.component !== ISSUE_TRIGGER) {
+    return configuration;
+  }
+  const next = { ...configuration };
+  for (const key of ["labelFilterMode", "assignment"] as const) {
+    if (node.configuration && key in node.configuration && !(key in next)) {
+      next[key] = node.configuration[key];
+    }
+  }
+  const actions = Array.isArray(next.actions)
+    ? next.actions.filter((action): action is string => typeof action === "string")
+    : [];
+  if (actions.includes(LABELED_ACTION)) {
+    next[ISSUE_SUPERPLANE_LABEL_FIELD] = true;
+  } else {
+    delete next[ISSUE_SUPERPLANE_LABEL_FIELD];
+  }
+  return next;
 }
 
 function repositoryLine(label: string | undefined) {
@@ -434,6 +440,12 @@ function presentIssueFields(
   configuration: Record<string, unknown>,
 ): ConfigurationField[] {
   return fields.map((field) => {
+    if (field.name === ISSUE_LABELS_FIELD) {
+      return { ...field, label: INTAKE_SETTINGS_COPY.filterByLabel, description: undefined };
+    }
+    if (field.name === ISSUE_AUTHORS_FIELD) {
+      return { ...field, label: INTAKE_SETTINGS_COPY.authorsWithAccess, description: undefined };
+    }
     if (field.name !== PULL_REQUEST_ACTIONS_FIELD) {
       return field;
     }

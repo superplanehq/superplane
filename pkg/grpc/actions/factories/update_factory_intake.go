@@ -250,6 +250,13 @@ func applyIntakeGraphUpdate(
 			return err
 		}
 	}
+	if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+		settingsForTrigger := intakeSettingsFromGraph(intake.Source, graph, spec)
+		if settings != nil {
+			settingsForTrigger = parseIntakeSettings(settingsForTrigger, settings)
+		}
+		nodes, edges, _ = rewriteGitHubIntakeGraph(nodes, edges, graph, settingsForTrigger)
+	}
 
 	return canvases.PublishGeneratedCanvasNodes(
 		ctx,
@@ -279,6 +286,9 @@ func applyIntakeSettingsToGraph(
 	if source == models.FactoryIntakeSourceSentryExceptions && len(updated.SentryProjectIDs) == 0 {
 		return nil, nil, invalidArgument("at least one Sentry project is required")
 	}
+	if source == models.FactoryIntakeSourceGitHubIssues && graph.TriggerNodeID == "" {
+		return nil, nil, invalidArgument("intake automation has no trigger to update")
+	}
 	if intakeSourceHasFilterNode(source) &&
 		intakeSettingsChangeTrigger(source, current, updated) &&
 		graph.TriggerNodeID == "" {
@@ -303,7 +313,7 @@ func applyIntakeSettingsToGraph(
 			}
 			switch source {
 			case models.FactoryIntakeSourceGitHubIssues:
-				configuration["actions"] = intakeTriggerActionsFor(updated)
+				applyGitHubIssueFilterConfiguration(configuration, updated)
 				nodes[i].Configuration = configuration
 			case models.FactoryIntakeSourceSentryExceptions:
 				configuration["actions"] = intakeSentryActionsFor(updated)
@@ -334,14 +344,6 @@ func applyIntakeSettingsToGraph(
 			}
 			configuration["expression"] = expression
 			nodes[i].Configuration = configuration
-		}
-	}
-
-	if source == models.FactoryIntakeSourceGitHubIssues {
-		var err error
-		nodes, edges, err = configureIntakeAuthorAccess(nodes, edges, graph, updated.AuthorsWithAccess)
-		if err != nil {
-			return nil, nil, invalidArgument(err.Error())
 		}
 	}
 
