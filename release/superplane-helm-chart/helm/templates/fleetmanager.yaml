@@ -32,7 +32,7 @@ spec:
         app: superplane
         service: {{ .Release.Name }}-fleet-manager
         {{- with .Values.fleetManager.podLabels }}
-        {{- toYaml . | nindent 8 }}
+        {{- include "superplane.podLabels" . | nindent 8 }}
         {{- end }}
     spec:
       {{- if or .Values.fleetManager.serviceAccount.create .Values.fleetManager.serviceAccount.name }}

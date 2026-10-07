@@ -16,7 +16,7 @@
         "resourceGroup": "superplane-runners",
         "location": "eastus",
         "imageId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane-runners/providers/Microsoft.Compute/galleries/superplanerunners/images/superplane-runner-amd64/versions/1.0.0",
-        "vmSize": "Standard_D4ds_v5",
+        "vmSize": "Standard_D2ds_v4",
         "architecture": "amd64",
         "subnetId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane/providers/Microsoft.Network/virtualNetworks/superplane-vnet/subnets/superplane-runners",
         "networkSecurityGroupId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane/providers/Microsoft.Network/networkSecurityGroups/superplane-runners",

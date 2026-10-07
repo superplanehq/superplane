@@ -39,12 +39,11 @@ resource "azurerm_role_assignment" "fleet_manager_runner_identity" {
 }
 
 resource "azurerm_federated_identity_credential" "fleet_manager" {
-  name                = "${var.cluster_name}-fleet-manager"
-  resource_group_name = azurerm_resource_group.superplane.name
-  parent_id           = azurerm_user_assigned_identity.fleet_manager.id
-  audience            = ["api://AzureADTokenExchange"]
-  issuer              = azurerm_kubernetes_cluster.superplane.oidc_issuer_url
-  subject             = "system:serviceaccount:${var.superplane_namespace}:${var.cluster_name}-fleet-manager"
+  name                      = "${var.cluster_name}-fleet-manager"
+  user_assigned_identity_id = azurerm_user_assigned_identity.fleet_manager.id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = azurerm_kubernetes_cluster.superplane.oidc_issuer_url
+  subject                   = "system:serviceaccount:${var.superplane_namespace}:${var.cluster_name}-fleet-manager"
 }
 
 resource "azurerm_shared_image_gallery" "runners" {

@@ -30,22 +30,23 @@ terraform {
 }
 
 provider "azurerm" {
+  storage_use_azuread = true
   features {}
-  subscription_id = var.subscription_id
+  subscription_id     = var.subscription_id
 }
 
 provider "kubernetes" {
-  host                   = azurerm_kubernetes_cluster.superplane.kube_admin_config[0].host
-  client_certificate     = base64decode(azurerm_kubernetes_cluster.superplane.kube_admin_config[0].client_certificate)
-  client_key             = base64decode(azurerm_kubernetes_cluster.superplane.kube_admin_config[0].client_key)
-  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.superplane.kube_admin_config[0].cluster_ca_certificate)
+  host                   = local.aks_kubeconfig.clusters[0].cluster.server
+  client_certificate     = base64decode(local.aks_kubeconfig.users[0].user["client-certificate-data"])
+  client_key             = base64decode(local.aks_kubeconfig.users[0].user["client-key-data"])
+  cluster_ca_certificate = base64decode(local.aks_kubeconfig.clusters[0].cluster["certificate-authority-data"])
 }
 
 provider "helm" {
   kubernetes {
-    host                   = azurerm_kubernetes_cluster.superplane.kube_admin_config[0].host
-    client_certificate     = base64decode(azurerm_kubernetes_cluster.superplane.kube_admin_config[0].client_certificate)
-    client_key             = base64decode(azurerm_kubernetes_cluster.superplane.kube_admin_config[0].client_key)
-    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.superplane.kube_admin_config[0].cluster_ca_certificate)
+    host                   = local.aks_kubeconfig.clusters[0].cluster.server
+    client_certificate     = base64decode(local.aks_kubeconfig.users[0].user["client-certificate-data"])
+    client_key             = base64decode(local.aks_kubeconfig.users[0].user["client-key-data"])
+    cluster_ca_certificate = base64decode(local.aks_kubeconfig.clusters[0].cluster["certificate-authority-data"])
   }
 }

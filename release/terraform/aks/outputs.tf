@@ -9,8 +9,8 @@ output "cluster_fqdn" {
 }
 
 output "database_fqdn" {
-  description = "PostgreSQL Flexible Server FQDN"
-  value       = azurerm_postgresql_flexible_server.superplane.fqdn
+  description = "PostgreSQL Flexible Server FQDN. Empty when Helm runs Postgres in the cluster."
+  value       = var.create_postgresql_flexible_server ? azurerm_postgresql_flexible_server.superplane[0].fqdn : ""
 }
 
 output "storage_account_name" {

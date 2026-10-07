@@ -52,18 +52,24 @@ variable "kubernetes_version" {
 variable "node_count" {
   description = "Number of nodes in the AKS system pool"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "node_vm_size" {
-  description = "VM size for AKS nodes"
+  description = "VM size for AKS nodes. Default fits a 4-vCPU regional quota."
   type        = string
-  default     = "Standard_D4s_v5"
+  default     = "Standard_D2s_v4"
 }
 
 # -----------------------------------------------------------------------------
 # Optional Variables - PostgreSQL
 # -----------------------------------------------------------------------------
+
+variable "create_postgresql_flexible_server" {
+  description = "Create Azure Database for PostgreSQL Flexible Server. Set false when the subscription has no Flexible Server SKUs in the region (az postgres flexible-server list-skus --location eastus returns []). Helm then runs Postgres in the cluster."
+  type        = bool
+  default     = true
+}
 
 variable "db_server_name" {
   description = "Name of the PostgreSQL Flexible Server"
@@ -78,9 +84,9 @@ variable "db_engine_version" {
 }
 
 variable "db_sku_name" {
-  description = "SKU for PostgreSQL Flexible Server"
+  description = "SKU for PostgreSQL Flexible Server. Default is burstable for small subscriptions."
   type        = string
-  default     = "GP_Standard_D2s_v3"
+  default     = "B_Standard_B2s"
 }
 
 variable "db_storage_mb" {
@@ -124,8 +130,56 @@ variable "superplane_image_tag" {
   default     = "stable"
 }
 
+variable "image_registry" {
+  description = "Container registry for the SuperPlane image. Use an ACR login server for local builds."
+  type        = string
+  default     = "ghcr.io/superplanehq"
+}
+
+variable "image_name" {
+  description = "SuperPlane image repository name"
+  type        = string
+  default     = "superplane"
+}
+
+variable "fleet_manager_image_registry" {
+  description = "Container registry for Fleet Manager. Empty uses image_registry."
+  type        = string
+  default     = ""
+}
+
+variable "fleet_manager_image_name" {
+  description = "Fleet Manager image repository name"
+  type        = string
+  default     = "superplane-fleet-manager"
+}
+
 variable "fleet_manager_image_tag" {
   description = "Fleet Manager image tag. Empty uses superplane_image_tag."
+  type        = string
+  default     = ""
+}
+
+variable "helm_chart_repository" {
+  description = "OCI or HTTP Helm repository. Ignored when helm_chart_path is set."
+  type        = string
+  default     = "oci://ghcr.io/superplanehq"
+}
+
+variable "helm_chart_name" {
+  description = "Helm chart name when helm_chart_path is empty"
+  type        = string
+  default     = "superplane-chart"
+}
+
+variable "helm_chart_path" {
+  description = "Path to the Helm chart in this repository. Empty uses helm_chart_repository."
+  type        = string
+  default     = "../../superplane-helm-chart/helm"
+}
+
+variable "container_registry_id" {
+  description = "Azure Container Registry resource ID. Empty skips the AcrPull role assignment."
   type        = string
   default     = ""
 }
@@ -163,4 +217,16 @@ variable "runner_subnet_cidr" {
   description = "CIDR block for runner virtual machines"
   type        = string
   default     = "10.0.17.0/24"
+}
+
+variable "aks_service_cidr" {
+  description = "Kubernetes service CIDR. Must not overlap the virtual network."
+  type        = string
+  default     = "172.16.0.0/16"
+}
+
+variable "aks_dns_service_ip" {
+  description = "kube-dns address. Must sit inside aks_service_cidr."
+  type        = string
+  default     = "172.16.0.10"
 }

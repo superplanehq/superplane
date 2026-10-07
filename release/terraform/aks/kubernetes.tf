@@ -23,12 +23,12 @@ resource "kubernetes_secret" "db_credentials" {
   }
 
   data = {
-    DB_HOST         = azurerm_postgresql_flexible_server.superplane.fqdn
+    DB_HOST         = local.db_host
     DB_PORT         = "5432"
     DB_NAME         = var.db_name
     DB_USERNAME     = var.db_username
     DB_PASSWORD     = local.db_password
-    POSTGRES_DB_SSL = "true"
+    POSTGRES_DB_SSL = local.db_ssl
   }
 }
 

@@ -37,6 +37,8 @@ resource "azurerm_kubernetes_cluster" "superplane" {
     network_policy      = "azure"
     outbound_type       = "userAssignedNATGateway"
     load_balancer_sku   = "standard"
+    service_cidr        = var.aks_service_cidr
+    dns_service_ip      = var.aks_dns_service_ip
   }
 
   depends_on = [
@@ -49,4 +51,11 @@ resource "azurerm_role_assignment" "aks_network" {
   scope                = azurerm_virtual_network.superplane.id
   role_definition_name = "Network Contributor"
   principal_id         = azurerm_kubernetes_cluster.superplane.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "aks_acr" {
+  count                = trimspace(var.container_registry_id) != "" ? 1 : 0
+  scope                = var.container_registry_id
+  role_definition_name = "AcrPull"
+  principal_id         = azurerm_kubernetes_cluster.superplane.kubelet_identity[0].object_id
 }

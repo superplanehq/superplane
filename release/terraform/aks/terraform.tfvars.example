@@ -15,6 +15,11 @@ letsencrypt_email = "admin@example.com"
 # -----------------------------------------------------------------------------
 
 # superplane_image_tag = "stable"  # Options: stable, beta, or specific version like v0.4
+# image_registry = "ghcr.io/superplanehq"
+# Use an ACR login server for images you build in this repository:
+# image_registry = "myregistry.azurecr.io"
+# container_registry_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane-images/providers/Microsoft.ContainerRegistry/registries/myregistry"
+# helm_chart_path = "../../superplane-helm-chart/helm"
 # superplane_namespace = "superplane"
 
 # Set a Fleet Manager YAML body to start the Deployment.
@@ -33,7 +38,7 @@ letsencrypt_email = "admin@example.com"
 #       resourceGroup: superplane-runners
 #       location: eastus
 #       imageId: /subscriptions/.../images/superplane-runner-amd64/versions/1.0.0
-#       vmSize: Standard_D2ds_v5
+#       vmSize: Standard_D2ds_v4
 #       architecture: amd64
 #       subnetId: /subscriptions/.../subnets/superplane-runners
 #       networkSecurityGroupId: /subscriptions/.../networkSecurityGroups/superplane-runners
@@ -56,16 +61,19 @@ letsencrypt_email = "admin@example.com"
 
 # cluster_name        = "superplane"
 # kubernetes_version  = ""
-# node_count          = 2
-# node_vm_size        = "Standard_D4s_v5"
+# node_count          = 1
+# node_vm_size        = "Standard_D2s_v4"
 
 # -----------------------------------------------------------------------------
 # Optional Variables - PostgreSQL
 # -----------------------------------------------------------------------------
 
+# Set false when `az postgres flexible-server list-skus --location eastus` is empty.
+# create_postgresql_flexible_server = false
+
 # db_server_name   = "superplane-db"
 # db_engine_version = "16"
-# db_sku_name      = "GP_Standard_D2s_v3"
+# db_sku_name      = "B_Standard_B2s"
 # db_storage_mb    = 32768
 # db_name          = "superplane"
 # db_username      = "superplane"
@@ -81,3 +89,5 @@ letsencrypt_email = "admin@example.com"
 # aks_subnet_cidr       = "10.0.0.0/20"
 # postgres_subnet_cidr  = "10.0.16.0/24"
 # runner_subnet_cidr    = "10.0.17.0/24"
+# aks_service_cidr      = "172.16.0.0/16"
+# aks_dns_service_ip    = "172.16.0.10"

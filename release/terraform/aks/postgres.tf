@@ -15,6 +15,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "postgres" {
 }
 
 resource "azurerm_postgresql_flexible_server" "superplane" {
+  count                         = var.create_postgresql_flexible_server ? 1 : 0
   name                          = var.db_server_name
   resource_group_name           = azurerm_resource_group.superplane.name
   location                      = azurerm_resource_group.superplane.location
@@ -27,7 +28,6 @@ resource "azurerm_postgresql_flexible_server" "superplane" {
   private_dns_zone_id           = azurerm_private_dns_zone.postgres.id
   public_network_access_enabled = false
   backup_retention_days         = 7
-  zone                          = "1"
 
   authentication {
     password_auth_enabled = true
@@ -43,14 +43,16 @@ resource "azurerm_postgresql_flexible_server" "superplane" {
 }
 
 resource "azurerm_postgresql_flexible_server_database" "superplane" {
+  count     = var.create_postgresql_flexible_server ? 1 : 0
   name      = var.db_name
-  server_id = azurerm_postgresql_flexible_server.superplane.id
+  server_id = azurerm_postgresql_flexible_server.superplane[0].id
   charset   = "UTF8"
   collation = "en_US.utf8"
 }
 
 resource "azurerm_postgresql_flexible_server_configuration" "require_tls" {
+  count     = var.create_postgresql_flexible_server ? 1 : 0
   name      = "require_secure_transport"
-  server_id = azurerm_postgresql_flexible_server.superplane.id
+  server_id = azurerm_postgresql_flexible_server.superplane[0].id
   value     = "on"
 }

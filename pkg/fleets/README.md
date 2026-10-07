@@ -80,7 +80,7 @@ Its trust policy must allow EC2 to assume the role. The example sets
 Azure fleets also require `runnerReleaseBaseUrl`. Bootstrap uses the same
 archive layout and `install.sh` flow as AWS. Set `azure.imageId` to a
 Compute Gallery image version. Set `azure.vmSize` to a Trusted Launch size.
-`Standard_D4ds_v5` is the default. Set `azure.ephemeralOSDisk` to `true`
+`Standard_D2ds_v4` is the default. Set `azure.ephemeralOSDisk` to `true`
 only when that size has a local SSD. Fleet Manager creates one virtual
 machine per runner. It places the NIC on `azure.subnetId`, applies
 `azure.networkSecurityGroupId`, and assigns `azure.identityId`. It does not

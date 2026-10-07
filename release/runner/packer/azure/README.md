@@ -29,7 +29,7 @@ Copy `runner.pkrvars.hcl.example` and set the gallery names from
 packer build \
   -var-file=release/runner/packer/azure/runner.pkrvars.hcl \
   -var architecture=amd64 \
-  -var vm_size=Standard_D2ds_v5 \
+  -var vm_size=Standard_D2ds_v4 \
   -var image_name=superplane-runner-amd64 \
   -var image_version=1.0.0 \
   release/runner/packer/azure/runner.pkr.hcl

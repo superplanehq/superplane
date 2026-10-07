@@ -55,10 +55,12 @@ resource "helm_release" "nginx_ingress" {
 
 resource "helm_release" "superplane" {
   name             = "superplane"
-  repository       = "oci://ghcr.io/superplanehq"
-  chart            = "superplane-chart"
+  repository       = local.helm_chart_repository
+  chart            = local.helm_chart
   namespace        = var.superplane_namespace
   create_namespace = false
+  timeout          = 1200
+  wait             = true
 
   set {
     name  = "database.secretName"
@@ -67,7 +69,7 @@ resource "helm_release" "superplane" {
 
   set {
     name  = "database.host"
-    value = azurerm_postgresql_flexible_server.superplane.fqdn
+    value = local.db_host
   }
 
   set {
@@ -87,22 +89,22 @@ resource "helm_release" "superplane" {
 
   set {
     name  = "database.ssl"
-    value = "true"
+    value = local.db_ssl
   }
 
   set {
     name  = "database.local.enabled"
-    value = "false"
+    value = var.create_postgresql_flexible_server ? "false" : "true"
   }
 
   set {
     name  = "image.registry"
-    value = "ghcr.io/superplanehq"
+    value = var.image_registry
   }
 
   set {
     name  = "image.name"
-    value = "superplane"
+    value = var.image_name
   }
 
   set {
@@ -243,6 +245,7 @@ resource "helm_release" "superplane" {
   set {
     name  = "podLabels.azure\\.workload\\.identity/use"
     value = "true"
+    type  = "string"
   }
 
   set {
@@ -252,12 +255,12 @@ resource "helm_release" "superplane" {
 
   set {
     name  = "fleetManager.image.registry"
-    value = "ghcr.io/superplanehq"
+    value = local.fleet_manager_image_registry
   }
 
   set {
     name  = "fleetManager.image.name"
-    value = "superplane-fleet-manager"
+    value = var.fleet_manager_image_name
   }
 
   set {
@@ -288,6 +291,7 @@ resource "helm_release" "superplane" {
   set {
     name  = "fleetManager.podLabels.azure\\.workload\\.identity/use"
     value = "true"
+    type  = "string"
   }
 
   set {
@@ -341,6 +345,7 @@ resource "helm_release" "superplane" {
     helm_release.nginx_ingress,
     azurerm_postgresql_flexible_server_database.superplane,
     azurerm_role_assignment.blob_data,
+    azurerm_role_assignment.aks_acr,
     azurerm_federated_identity_credential.superplane,
     azurerm_federated_identity_credential.fleet_manager
   ]

@@ -91,6 +91,12 @@
 {{- end }}
 {{- end }}
 
+{{- define "superplane.podLabels" -}}
+{{- range $key, $value := . }}
+{{ $key }}: {{ $value | toString | quote }}
+{{- end }}
+{{- end }}
+
 {{- define "secrets.encryption.name" }}
 {{- if eq .Values.encryption.secretName "" }}
 {{- printf "%s-encryption" .Release.Name }}

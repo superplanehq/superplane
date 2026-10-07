@@ -46,7 +46,7 @@ spec:
         app: superplane
         service: {{ .Release.Name }}-websocket
         {{- with .Values.podLabels }}
-        {{- toYaml . | nindent 8 }}
+        {{- include "superplane.podLabels" . | nindent 8 }}
         {{- end }}
     spec:
       terminationGracePeriodSeconds: 75
@@ -121,6 +121,8 @@ spec:
               value: /app/rbac/rbac_canvas_policy.csv
             - name: APPLICATION_NAME
               value: superplane
+            - name: RUN_DB_MIGRATIONS
+              value: "no"
             - name: DB_POOL_SIZE
               value: "{{ .Values.websocket.dbPoolSize }}"
             - name: DB_STATEMENT_TIMEOUT

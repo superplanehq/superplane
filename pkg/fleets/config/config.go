@@ -17,7 +17,7 @@ const (
 	defaultReconcileIntervalSeconds = 15
 	defaultRequestTimeoutSeconds    = 90
 	defaultInstanceType             = "t3.micro"
-	defaultAzureVMSize              = "Standard_D4ds_v5"
+	defaultAzureVMSize              = "Standard_D2ds_v4"
 	defaultVolumeSizeGB             = 30
 
 	fleetManagerConfigEnvironment = "FLEET_MANAGER_CONFIG"
