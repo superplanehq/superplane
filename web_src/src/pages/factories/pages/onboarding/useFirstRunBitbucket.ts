@@ -1,4 +1,5 @@
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
+import { useState } from "react";
 import { useLocation } from "react-router";
 
 import { navigateGitHubWindow, openGitHubWindow } from "./useFirstRunGitHub";
@@ -12,12 +13,14 @@ export function useFirstRunBitbucket(args: {
   blocking: FirstRunBlocking;
 }) {
   const location = useLocation();
+  const [installUrl, setInstallUrl] = useState("");
   const onboarding = useBitbucketOnboarding(args.organizationId, { poll: !args.setupFinished });
   const grantAccess = () =>
     args.blocking.run("opening-bitbucket", async () => {
       const popup = openGitHubWindow();
       try {
         const url = await onboarding.startInstallation.mutateAsync();
+        setInstallUrl(url);
         navigateGitHubWindow(popup, url);
       } catch (error) {
         popup?.close();
@@ -27,9 +30,9 @@ export function useFirstRunBitbucket(args: {
   return {
     configured: Boolean(onboarding.data?.providerConfigured),
     pending: onboarding.isPending && !onboarding.data,
-    installUrl: onboarding.data?.installUrl ?? "",
+    installUrl,
     repositories: (onboarding.data?.repositories ?? []).map((repository) => repository.fullName ?? "").filter(Boolean),
-    identityLinked: Boolean(onboarding.data?.identity?.login || onboarding.data?.identity?.providerUserId),
+    identityLinked: Boolean(onboarding.data?.identity?.login || onboarding.data?.identity?.userId),
     loadError: Boolean(onboarding.error),
     lookupFailed: Boolean(onboarding.error) && !onboarding.data,
     lookupRetrying: Boolean(onboarding.isFetching),

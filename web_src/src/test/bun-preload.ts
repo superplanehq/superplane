@@ -27,6 +27,7 @@ if (!GlobalRegistrator.isRegistered) {
       disableJavaScriptFileLoading: true,
       disableCSSFileLoading: true,
       disableIframePageLoading: true,
+      handleDisabledFileLoadingAsSuccess: true,
       // Happy DOM's fetch/XHR use Node http.request. Unmocked /api calls
       // resolve against http://localhost/ (port 80) and print ECONNREFUSED.
       fetch: {

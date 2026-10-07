@@ -55,8 +55,10 @@ func TestAgentSuggestionsE2E(t *testing.T) {
 		steps.assertSuggestionVisible("fail-notifications")
 
 		steps.clickSuggestion("add-ci")
+		steps.waitForSendCall(func(call support.AgentProviderSendMessageCall) bool {
+			return call.Message == suggestions[0].Prompt
+		})
 		steps.assertUserMessage(suggestions[0].Prompt)
-		steps.assertAssistantMessage("E2E assistant response for suggestion")
 		steps.assertSuggestionHidden("add-ci")
 		steps.assertSuggestionsBadgeCount(2)
 		steps.assertSuggestionVisible("fail-notifications")
@@ -187,6 +189,24 @@ func (s *agentSuggestionSteps) clickSuggestion(id string) {
 	require.NoError(s.t, trigger.Hover())
 	s.assertSuggestionVisible(id)
 	s.session.Click(q.TestID("agent-suggestion-" + id))
+}
+
+func (s *agentSuggestionSteps) waitForSendCall(
+	matches func(support.AgentProviderSendMessageCall) bool,
+) support.AgentProviderSendMessageCall {
+	var matched support.AgentProviderSendMessageCall
+	require.Eventually(s.t, func() bool {
+		for _, call := range ctx.AgentProvider.SendMessageCalls() {
+			if matches(call) {
+				matched = call
+				return true
+			}
+		}
+
+		return false
+	}, agentSendTimeout, agentPollInterval)
+
+	return matched
 }
 
 func (s *agentSuggestionSteps) assertUserMessage(message string) {

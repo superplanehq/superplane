@@ -11,13 +11,8 @@ import type {
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
-import {
-  FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
-  FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_JIRA_INTAKE,
-  FEATURE_FACTORY_LINEAR_INTAKE,
-  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS } from "@/lib/experimentalFeatures";
+import { intakeCatalogAvailability, seededIntakeCatalog } from "@/test/intakeCatalog";
 import { unmockedSrc } from "@/test/unmockedModule";
 
 vi.mock("@monaco-editor/react", () => {
@@ -270,6 +265,13 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   }),
 }));
 
+const grantedIntakes: string[] = [];
+const intakeOverrides: Record<string, { status?: string; available?: boolean }> = {};
+
+vi.mock("@/hooks/useIntakeCatalogAvailability", () => ({
+  useIntakeCatalogAvailability: () => intakeCatalogAvailability(seededIntakeCatalog(grantedIntakes, intakeOverrides)),
+}));
+
 const useCanvasMock = vi.hoisted(() => vi.fn());
 const updateCanvasVersionMutateAsync = vi.hoisted(() => vi.fn());
 const commitCanvasStagingMutateAsync = vi.hoisted(() => vi.fn());
@@ -324,6 +326,10 @@ async function resetLinesBoardMocks() {
   importFactoryIntakeItem.mockReset();
   refreshBacklogMutateAsync.mockReset();
   enabledExperimentalFeatures.clear();
+  grantedIntakes.length = 0;
+  for (const key of Object.keys(intakeOverrides)) {
+    delete intakeOverrides[key];
+  }
   useCanvasMock.mockImplementation((_organizationId: string, canvasId: string, options?: { enabled?: boolean }) => {
     if (options?.enabled === false) {
       return { data: undefined, isPending: false, isError: false };
@@ -1190,7 +1196,7 @@ describe("LinesPage board extras", () => {
     expect(screen.queryByTestId("lines-backlog-menu-refresh-backlog")).not.toBeInTheDocument();
   });
 
-  it("marks flagged intake sources as coming soon when the organization feature is off", async () => {
+  it("hides flagged intake sources when the organization feature is off", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1202,28 +1208,17 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-dependabot-alerts")).not.toHaveTextContent(
       ADD_INTAKE_COPY.comingSoon,
     );
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeEnabled();
-    expect(screen.getByTestId("add-intake-template-sentry-exceptions")).not.toHaveTextContent(
-      ADD_INTAKE_COPY.comingSoon,
-    );
-    expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.queryByTestId("add-intake-template-jira-issues")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-productive-tasks")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-datadog")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-linear-issues")).not.toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-
-    await user.click(screen.getByTestId("add-intake-template-jira-issues"));
-    await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
-    await user.click(screen.getByTestId("add-intake-template-datadog"));
-    await user.click(screen.getByTestId("add-intake-template-linear-issues"));
-
-    expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("productive-intake-setup")).not.toBeInTheDocument();
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
   it("opens guided Datadog setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_DATADOG_INTAKE);
+    grantedIntakes.push("datadog");
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1244,7 +1239,8 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Linear setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_LINEAR_INTAKE);
+    grantedIntakes.push("linear-issues");
+    intakeOverrides["linear-issues"] = { status: "ga", available: true };
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1273,12 +1269,12 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.queryByTestId("add-intake-template-jira-issues")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-datadog")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("add-intake-template-linear-issues")).not.toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
-    expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.queryByTestId("add-intake-template-productive-tasks")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("add-intake-template-sentry-exceptions"));
 
@@ -1325,7 +1321,7 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Jira setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
+    grantedIntakes.push("jira-issues");
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1335,7 +1331,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-jira-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.queryByTestId("add-intake-template-productive-tasks")).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     expect(screen.getByTestId("jira-intake-setup")).toBeInTheDocument();
@@ -1346,7 +1342,7 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Productive.io setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_PRODUCTIVE_INTAKE);
+    grantedIntakes.push("productive-tasks");
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1355,7 +1351,7 @@ describe("LinesPage board extras", () => {
 
     const productive = screen.getByTestId("add-intake-template-productive-tasks");
     expect(productive).toBeEnabled();
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.queryByTestId("add-intake-template-jira-issues")).not.toBeInTheDocument();
 
     await user.click(productive);
 

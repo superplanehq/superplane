@@ -90,6 +90,14 @@ func (s *TestSession) Visit(path string) {
 	}
 }
 
+func (s *TestSession) VisitWithTimeout(path string, timeout time.Duration) {
+	timeoutMs := float64(timeout.Milliseconds())
+	_, err := s.page.Goto(s.BaseURL+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(timeoutMs)})
+	if err != nil {
+		s.t.Fatalf("goto: %v", err)
+	}
+}
+
 func (s *TestSession) AssertText(text string) {
 	locator := s.page.Locator("text=" + text).First()
 	if err := locator.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(s.timeoutMs)}); err != nil {
