@@ -627,7 +627,8 @@ func WorkOrderReadyForAutoStart(
 	}
 	// Review scoring is not optional, so the Confidence setting only gates
 	// auto-start on the legacy flow.
-	if !factoryModel.PlanningConfidence && !organizationHasPlanningReview(tx, factoryModel.OrganizationID) {
+	review := organizationHasPlanningReview(tx, factoryModel.OrganizationID)
+	if !factoryModel.PlanningConfidence && !review {
 		return false, nil
 	}
 	if len(session.CurrentSurvey().Questions) > 0 {
@@ -641,7 +642,7 @@ func WorkOrderReadyForAutoStart(
 	if err != nil {
 		return false, err
 	}
-	if organizationHasPlanningReview(tx, factoryModel.OrganizationID) {
+	if review {
 		if !turn.reportedReviewScores(checks) {
 			return false, nil
 		}
@@ -653,11 +654,88 @@ func WorkOrderReadyForAutoStart(
 			return false, nil
 		}
 	}
+	firstReady, err := firstCheckReportsAtMaximum(tx, order.ID, autoStartScoreKinds(factoryModel, review))
+	if err != nil {
+		return false, err
+	}
+	if !firstReady {
+		return false, nil
+	}
 	spec, err := planningSpecBody(tx, order)
 	if err != nil {
 		return false, err
 	}
 	return strings.TrimSpace(spec) != "", nil
+}
+
+func autoStartScoreKinds(factoryModel *Factory, review bool) []planningScoreKind {
+	if review {
+		return planningReviewScoreKinds
+	}
+	kinds := []planningScoreKind{planningConfidenceScore}
+	if factoryModel.PlanningClarity {
+		kinds = append(kinds, planningClarityScore)
+	}
+	return kinds
+}
+
+func firstCheckReportsAtMaximum(tx *gorm.DB, workOrderID uuid.UUID, kinds []planningScoreKind) (bool, error) {
+	scores, err := firstReportedCheckScores(tx, workOrderID, kinds)
+	if err != nil {
+		return false, err
+	}
+	for _, kind := range kinds {
+		score, ok := scores[kind.key]
+		if !ok || score != kind.max {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func firstReportedCheckScores(tx *gorm.DB, workOrderID uuid.UUID, kinds []planningScoreKind) (map[string]float64, error) {
+	scores := make(map[string]float64, len(kinds))
+	for _, kind := range kinds {
+		score, found, err := earliestCheckScore(tx, workOrderID, kind)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			scores[kind.key] = score
+		}
+	}
+	return scores, nil
+}
+
+func earliestCheckScore(tx *gorm.DB, workOrderID uuid.UUID, kind planningScoreKind) (float64, bool, error) {
+	maxScore, err := json.Marshal(kind.max)
+	if err != nil {
+		return 0, false, err
+	}
+	var events []FactoryWorkOrderEvent
+	err = tx.
+		Where("work_order_id = ?", workOrderID).
+		Where("type = ?", factory.EventTypeOrderCheckReported).
+		Where("data->'check'->>'key' = ?", kind.key).
+		Where("data->'check'->>'maxScore' = ?", string(maxScore)).
+		Order("created_at ASC").
+		Order("id ASC").
+		Limit(1).
+		Find(&events).Error
+	if err != nil {
+		return 0, false, err
+	}
+	if len(events) == 0 {
+		return 0, false, nil
+	}
+	var payload factory.WorkOrderCheckReported
+	if err := json.Unmarshal(events[0].Data, &payload); err != nil {
+		return 0, false, err
+	}
+	if payload.Check == nil || payload.Check.Key != kind.key || payload.Check.MaxScore != kind.max {
+		return 0, false, nil
+	}
+	return payload.Check.Score, true, nil
 }
 
 type planningTurn struct {

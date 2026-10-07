@@ -916,7 +916,89 @@ func TestWorkOrderReadyForAutoStartRequiresClarityWhenEnabled(t *testing.T) {
 	require.NoError(t, session.ProposeClarity(db, 5, "The plan is ready."))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
-	assert.True(t, ready)
+	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartBlocksLaterMaximumAfterLowFirstScore(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-low-first")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 4, "One risk remains."))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	nextRun, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, session.AttachAgentRun(db, nextRun.ID, ""))
+	require.NoError(t, session.ProposeConfidence(db, 5, "The new run is ready."))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartBlocksLaterMaximumAfterLowFirstScoreAndUserMessage(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-low-first-user")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 4, "One risk remains."))
+	require.NoError(t, session.SendUserMessage(db, "The refund path changed.", userID))
+	require.NoError(t, session.ProposeConfidence(db, 5, "The new path is covered."))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartBlocksWhenFirstScoreFallsOffRecentScores(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-first-score-history")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	require.NoError(t, session.ProposeConfidence(db, 4, "One risk remains."))
+	for range MaxFactoryWorkOrderCheckRecentScores {
+		require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	}
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	var confidence *FactoryWorkOrderCheck
+	for i := range checks {
+		if checks[i].Key == PlanningConfidenceCheckKey {
+			confidence = &checks[i]
+			break
+		}
+	}
+	require.NotNil(t, confidence)
+	assert.Equal(t, float64(PlanningScoreMax), confidence.Score)
+	assert.NotContains(t, []float64(confidence.RecentScores), float64(4))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
 }
 
 func mustAnalysisOrder(
