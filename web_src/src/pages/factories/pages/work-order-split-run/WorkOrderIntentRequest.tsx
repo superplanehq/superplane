@@ -8,10 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
 import type { UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
 import { useSpokenPhraseDictation, type SpokenPhraseField } from "@/hooks/useSpokenPhraseDictation";
-import { MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
-import type { HostedVideo } from "@/lib/hostedVideo";
 import { hostedVideoFromClipboard } from "@/lib/hostedVideo";
-import { showErrorToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { CreateWorkOrderRequestAttachButton } from "../../CreateWorkOrderRequestAttachButton";
@@ -19,7 +16,7 @@ import { HostedVideoLinkField } from "../../HostedVideoLinkField";
 import { CreateWorkOrderRequestAttachments } from "../../CreateWorkOrderRequestAttachments";
 import { DictateButton } from "../../DictateButton";
 import { PendingWorkOrderFileChips } from "../../PendingWorkOrderFileChips";
-import { appendUploadedWorkOrderImages, insertHostedVideoMarkdown } from "../../lib/createWorkOrderRequestImages";
+import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestImages";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
 import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME } from "./chatBubbleStyle";
@@ -29,7 +26,11 @@ import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import type { IntentAnalysisChat } from "./intentAnalysisChat";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { composerChipsWorking } from "./planChipStatus";
-import { mergeAnalysisTranscriptFiles, useAnalysisComposerImages } from "./useAnalysisComposerImages";
+import {
+  addAnalysisHostedVideo,
+  mergeAnalysisTranscriptFiles,
+  useAnalysisComposerImages,
+} from "./useAnalysisComposerImages";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import {
@@ -111,6 +112,7 @@ function AnalysisRequestChat({
   const images = useAnalysisComposerImages({
     disabled: !analysis.canSend,
     onUploadFiles: analysis.onUploadFiles,
+    markdown: analysis.composer ?? "",
   });
   const transcriptFiles = mergeAnalysisTranscriptFiles(files, images.transcriptFiles);
   const composer = usePlanningComposer(analysis, images.pending.length, state.showSurvey);
@@ -486,22 +488,6 @@ function RequestMessage({
         </div>
       </div>
     );
-  }
-
-  function addAnalysisHostedVideo(
-    analysis: IntentAnalysisChat,
-    pending: ReturnType<typeof useAnalysisComposerImages>["pending"],
-    video: HostedVideo,
-  ): boolean {
-    const next = insertHostedVideoMarkdown(analysis.composer ?? "", video, pending);
-    if (next == null) {
-      showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images, videos, or audio files.`);
-      return false;
-    }
-    if (next !== analysis.composer) {
-      analysis.onComposerChange(next);
-    }
-    return true;
   }
 
   return (

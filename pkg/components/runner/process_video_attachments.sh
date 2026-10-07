@@ -21,6 +21,7 @@ MAX_TRANSCRIPT_ATTEMPTS="${VIDEO_MAX_TRANSCRIPT_ATTEMPTS:-3}"
 HOSTED_MAX_DURATION_SECONDS="${HOSTED_VIDEO_MAX_DURATION_SECONDS:-300}"
 HOSTED_MAX_BYTES="${HOSTED_VIDEO_MAX_BYTES:-268435456}"
 HOSTED_DOWNLOAD_TIMEOUT="${HOSTED_VIDEO_DOWNLOAD_TIMEOUT_SECONDS:-180}"
+HOSTED_METADATA_TIMEOUT="${HOSTED_VIDEO_METADATA_TIMEOUT_SECONDS:-30}"
 
 if [ ! -d "$attachments" ]; then
   printf 'attachments directory is missing.\n' >&2
@@ -36,7 +37,7 @@ export MANIFEST_PATH="$manifest"
 export INDEX_PATH="$index"
 export WHISPER_MODEL
 export MAX_DURATION_SECONDS MAX_FRAMES MAX_WIDTH MAX_HEIGHT MAX_SOURCE_PIXELS PROCESS_TIMEOUT DISK_BUDGET_BYTES MAX_TRANSCRIPT_ATTEMPTS
-export HOSTED_MAX_DURATION_SECONDS HOSTED_MAX_BYTES HOSTED_DOWNLOAD_TIMEOUT
+export HOSTED_MAX_DURATION_SECONDS HOSTED_MAX_BYTES HOSTED_DOWNLOAD_TIMEOUT HOSTED_METADATA_TIMEOUT
 
 python3 - <<'PY'
 import json
@@ -62,6 +63,7 @@ max_transcript_attempts = int(os.environ["MAX_TRANSCRIPT_ATTEMPTS"])
 hosted_max_duration = float(os.environ["HOSTED_MAX_DURATION_SECONDS"])
 hosted_max_bytes = int(os.environ["HOSTED_MAX_BYTES"])
 hosted_download_timeout = int(os.environ["HOSTED_DOWNLOAD_TIMEOUT"])
+hosted_metadata_timeout = int(os.environ["HOSTED_METADATA_TIMEOUT"])
 task_dir = attachments.parent
 
 VIDEO_TYPES = {
@@ -608,9 +610,12 @@ def hosted_duration(meta):
 
 
 def dump_hosted_metadata(url: str):
-    result = run([
-        "yt-dlp", "--no-playlist", "--no-warnings", "--skip-download", "--dump-single-json", url,
-    ], timeout=30)
+    try:
+        result = run([
+            "yt-dlp", "--no-playlist", "--no-warnings", "--skip-download", "--dump-single-json", url,
+        ], timeout=hosted_metadata_timeout)
+    except subprocess.TimeoutExpired:
+        return None, "metadata_failed"
     if result.returncode != 0:
         return None, metadata_failure_reason(result.stderr)
     try:
@@ -664,29 +669,57 @@ def remove_hosted_download(path: Path):
         pass
 
 
-def download_hosted_video(url: str, dest: Path) -> str:
+HOSTED_DOWNLOAD_SUFFIXES = {".mp4", ".webm", ".mkv", ".mov", ".m4v", ".ogv"}
+
+
+def resolve_hosted_download(dest: Path):
+    if dest.is_file() and dest.stat().st_size > 0:
+        return dest
+    preferred = dest.parent / (dest.name + ".mp4")
+    if preferred.is_file() and preferred.stat().st_size > 0:
+        return preferred
+    if not dest.parent.exists():
+        return None
+    matches = []
+    for path in dest.parent.glob(dest.name + ".*"):
+        if not path.is_file() or path.stat().st_size == 0:
+            continue
+        if path.suffix.lower() not in HOSTED_DOWNLOAD_SUFFIXES:
+            continue
+        matches.append(path)
+    if not matches:
+        return None
+    matches.sort(key=lambda path: (path.suffix.lower() != ".mp4", path.name))
+    return matches[0]
+
+
+def download_hosted_video(url: str, dest: Path):
     dest.parent.mkdir(parents=True, exist_ok=True)
-    result = run([
-        "yt-dlp",
-        "--no-playlist",
-        "--no-warnings",
-        "--no-progress",
-        "--no-part",
-        "--max-filesize",
-        str(hosted_max_bytes),
-        "-f",
-        "bv*[height<=720]+ba/b[height<=720]",
-        "--merge-output-format",
-        "mp4",
-        "-o",
-        str(dest),
-        url,
-    ], timeout=hosted_download_timeout)
-    if result.returncode != 0 or not dest.is_file() or dest.stat().st_size == 0:
-        return "download_failed"
-    if dest.stat().st_size > hosted_max_bytes:
-        return "download_too_large"
-    return ""
+    try:
+        result = run([
+            "yt-dlp",
+            "--no-playlist",
+            "--no-warnings",
+            "--no-progress",
+            "--no-part",
+            "--max-filesize",
+            str(hosted_max_bytes),
+            "-f",
+            "bv*[height<=720]+ba/b[height<=720]",
+            "--merge-output-format",
+            "mp4",
+            "-o",
+            str(dest),
+            url,
+        ], timeout=hosted_download_timeout)
+    except subprocess.TimeoutExpired:
+        return None, "download_failed"
+    written = resolve_hosted_download(dest)
+    if result.returncode != 0 or written is None:
+        return None, "download_failed"
+    if written.stat().st_size > hosted_max_bytes:
+        return None, "download_too_large"
+    return written, ""
 
 
 def process_hosted_video(item):
@@ -708,16 +741,16 @@ def process_hosted_video(item):
     require_media_toolchain(("yt-dlp",))
     tmp = task_dir / ".hosted-videos" / dest_name
     try:
-        download_reason = download_hosted_video(url, tmp)
+        written, download_reason = download_hosted_video(url, tmp)
         if download_reason:
             item["status"] = "failed"
             item["reason"] = download_reason
             print(f"{dest_name}: {download_reason}")
             return
         if is_partial(item) and has_existing_frames(item):
-            finish_transcript(item, tmp, float(item.get("duration_seconds") or 0), len(item.get("frames") or []))
+            finish_transcript(item, written, float(item.get("duration_seconds") or 0), len(item.get("frames") or []))
             return
-        process_video(item, tmp, duration_limit=hosted_max_duration)
+        process_video(item, written, duration_limit=hosted_max_duration)
     finally:
         remove_hosted_download(tmp)
 
@@ -759,7 +792,13 @@ if videos or audios:
         process_audio(item, dest)
 
 for item in hosted:
-    process_hosted_video(item)
+    try:
+        process_hosted_video(item)
+    except subprocess.TimeoutExpired:
+        if str(item.get("status") or "").strip().lower() not in {"failed", "ready", "partial"}:
+            item["status"] = "failed"
+            item["reason"] = "download_failed"
+        print(f"{item.get('dest') or 'hosted video'}: timed out")
 
 if not videos and not audios and not hosted:
     print("No video or audio files in task attachments.")

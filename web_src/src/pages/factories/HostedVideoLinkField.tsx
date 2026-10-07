@@ -1,5 +1,5 @@
 import { Video } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,8 +16,7 @@ export function HostedVideoLinkField({
   const [value, setValue] = useState("");
   const error = hostedVideoFieldError(value);
 
-  const apply = (event?: FormEvent) => {
-    event?.preventDefault();
+  const apply = () => {
     const video = parseHostedVideoUrl(value);
     if (!video) {
       return;
@@ -27,6 +26,15 @@ export function HostedVideoLinkField({
     }
     setValue("");
     setOpen(false);
+  };
+
+  const onInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    apply();
   };
 
   return (
@@ -46,7 +54,7 @@ export function HostedVideoLinkField({
           <Video className="size-4" aria-hidden />
         </Button>
         {open ? (
-          <form className="flex min-w-0 items-center gap-1" onSubmit={apply}>
+          <div className="flex min-w-0 items-center gap-1">
             <Input
               aria-label={HOSTED_VIDEO_COPY.label}
               value={value}
@@ -55,16 +63,18 @@ export function HostedVideoLinkField({
               data-testid="hosted-video-link-input"
               className="h-8 w-44 text-[12px]"
               onChange={(event) => setValue(event.target.value)}
+              onKeyDown={onInputKeyDown}
             />
             <Button
-              type="submit"
+              type="button"
               size="sm"
               className="h-8 px-2 text-[12px]"
               disabled={disabled || !parseHostedVideoUrl(value)}
+              onClick={apply}
             >
               {HOSTED_VIDEO_COPY.apply}
             </Button>
-          </form>
+          </div>
         ) : null}
       </div>
       {open ? (

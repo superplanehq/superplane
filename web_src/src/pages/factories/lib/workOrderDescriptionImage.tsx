@@ -10,7 +10,7 @@ import {
   parseWorkOrderFileId,
   resolveWorkOrderFileSrc,
 } from "@/lib/workOrderFiles";
-import { parseHostedVideoUrl } from "@/lib/hostedVideo";
+import { HOSTED_VIDEO_COPY, parseHostedVideoUrl } from "@/lib/hostedVideo";
 import { WorkOrderVideo } from "@/pages/app/WorkOrderVideo";
 import { HostedVideoEmbed } from "@/pages/app/HostedVideoEmbed";
 
@@ -99,7 +99,12 @@ export const WorkOrderImage = Image.extend({
       ];
     }
     if (hosted) {
-      return ["span", { class: "hosted-video-card" }, hosted.providerName];
+      return [
+        "span",
+        { class: "hosted-video-card" },
+        ["span", {}, hosted.providerName],
+        ["a", { href: hosted.pageUrl, target: "_blank", rel: "noopener noreferrer" }, HOSTED_VIDEO_COPY.open],
+      ];
     }
     const src =
       (resolvedSrc as string | undefined | null) ??
