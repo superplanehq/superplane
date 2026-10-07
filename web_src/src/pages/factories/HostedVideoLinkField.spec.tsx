@@ -15,7 +15,12 @@ describe("HostedVideoLinkField", () => {
     );
 
     fireEvent.click(screen.getByTestId("hosted-video-link-toggle"));
-    fireEvent.change(screen.getByTestId("hosted-video-link-input"), {
+    const input = screen.getByTestId("hosted-video-link-input");
+    const label = screen.getByTestId("hosted-video-link-label");
+    expect(label).toHaveTextContent("Video link");
+    expect(label.tagName).toBe("LABEL");
+    expect(label).toHaveAttribute("for", input.id);
+    fireEvent.change(input, {
       target: { value: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));

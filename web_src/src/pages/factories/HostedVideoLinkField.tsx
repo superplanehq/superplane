@@ -1,8 +1,9 @@
 import { Video } from "lucide-react";
-import { useState, type KeyboardEvent } from "react";
+import { useId, useState, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { HOSTED_VIDEO_COPY, hostedVideoFieldError, parseHostedVideoUrl, type HostedVideo } from "@/lib/hostedVideo";
 
 export function HostedVideoLinkField({
@@ -12,6 +13,7 @@ export function HostedVideoLinkField({
   disabled?: boolean;
   onAdd: (video: HostedVideo) => boolean;
 }) {
+  const inputId = useId();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const error = hostedVideoFieldError(value);
@@ -55,7 +57,15 @@ export function HostedVideoLinkField({
         </Button>
         {open ? (
           <div className="flex min-w-0 items-center gap-1">
+            <Label
+              htmlFor={inputId}
+              className="shrink-0 text-xs font-medium text-muted-foreground"
+              data-testid="hosted-video-link-label"
+            >
+              {HOSTED_VIDEO_COPY.label}
+            </Label>
             <Input
+              id={inputId}
               aria-label={HOSTED_VIDEO_COPY.label}
               value={value}
               disabled={disabled}
