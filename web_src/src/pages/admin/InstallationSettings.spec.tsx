@@ -29,6 +29,15 @@ const installationSettingsResponse = {
   smtp_password_configured: false,
 };
 
+const factoryTemplatesResponse = {
+  templates: [
+    { id: "backlog", name: "Backlog", description: "Plan new draft tasks.", count: 0 },
+    { id: "line-implementation", name: "Implement", description: "Create a branch.", count: 0 },
+    { id: "pr-closure", name: "PR Closure", description: "Close the task.", count: 0 },
+    { id: "intake", name: "Intake", description: "Import work.", count: 0 },
+  ],
+};
+
 const llmSettingsResponse = {
   welcome_grant_cents: 5000,
   markup_bps: 2000,
@@ -68,7 +77,11 @@ const mockInstallationSettingsFetch = () => {
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      const body = url.includes("/llm-settings") ? llmSettingsResponse : installationSettingsResponse;
+      const body = url.includes("/llm-settings")
+        ? llmSettingsResponse
+        : url.includes("/factory-templates")
+          ? factoryTemplatesResponse
+          : installationSettingsResponse;
       return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -97,6 +110,7 @@ describe("InstallationSettings", () => {
     renderInstallationSettings();
 
     expect(await screen.findByText("Network policy")).toBeInTheDocument();
+    expect(await screen.findByText("Onboarding templates")).toBeInTheDocument();
     expect(await screen.findByText("SuperPlane-hosted models")).toBeInTheDocument();
     expect(screen.queryByText("Signup access")).not.toBeInTheDocument();
     expect(screen.queryByText("Public signups")).not.toBeInTheDocument();

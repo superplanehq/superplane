@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -20,36 +19,60 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/registryimports"
 )
 
-func TestAdminResetOrganizationBacklogDefaults(t *testing.T) {
+func TestAdminFactoryTemplates(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
-	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/backlog-defaults/reset"
+	server.WebhooksBaseURL = "http://localhost:8000"
+	listPath := "/admin/api/installation/factory-templates"
 
 	t.Run("non-admin gets 404", func(t *testing.T) {
-		account, err := models.CreateAccount("Regular User", "regular-reset@example.com")
+		account, err := models.CreateAccount("Regular User", "regular-factory-templates@example.com")
 		require.NoError(t, err)
 		signer := jwt.NewSigner("test-client-secret")
 		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 
-		response := execRequest(server, requestParams{
-			method:     http.MethodPost,
-			path:       path,
+		listResponse := execRequest(server, requestParams{
+			method:     http.MethodGet,
+			path:       listPath,
 			authCookie: regularToken,
 		})
-		assert.Equal(t, http.StatusNotFound, response.Code)
+		assert.Equal(t, http.StatusNotFound, listResponse.Code)
+
+		resetResponse := execRequest(server, requestParams{
+			method:     http.MethodPost,
+			path:       listPath + "/backlog/reset",
+			authCookie: regularToken,
+		})
+		assert.Equal(t, http.StatusNotFound, resetResponse.Code)
 	})
 
-	t.Run("unknown organization is 404", func(t *testing.T) {
+	t.Run("admin lists onboarding templates", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     http.MethodGet,
+			path:       listPath,
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var payload adminFactoryTemplatesResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &payload))
+		require.Len(t, payload.Templates, 4)
+		assert.Equal(t, "backlog", payload.Templates[0].ID)
+		assert.Equal(t, "line-implementation", payload.Templates[1].ID)
+		assert.Equal(t, "pr-closure", payload.Templates[2].ID)
+		assert.Equal(t, "intake", payload.Templates[3].ID)
+	})
+
+	t.Run("unknown template is 404", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     http.MethodPost,
-			path:       "/admin/api/organizations/" + uuid.NewString() + "/backlog-defaults/reset",
+			path:       listPath + "/risk-score/reset",
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
 	})
 
-	t.Run("admin resets Backlog automations in the organization", func(t *testing.T) {
-		server.WebhooksBaseURL = "http://localhost:8000"
+	t.Run("admin resets Backlog automations on the installation", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		factoryModel, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, "Reset Target", "", "")
 		require.NoError(t, err)
@@ -66,12 +89,12 @@ func TestAdminResetOrganizationBacklogDefaults(t *testing.T) {
 
 		response := execRequest(server, requestParams{
 			method:     http.MethodPost,
-			path:       path,
+			path:       listPath + "/backlog/reset",
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 
-		var result factoryactions.ResetOrganizationBacklogResult
+		var result factoryactions.ResetFactoryTemplateResult
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
 		assert.Equal(t, 1, result.Reset)
 		assert.Empty(t, result.Failures)
