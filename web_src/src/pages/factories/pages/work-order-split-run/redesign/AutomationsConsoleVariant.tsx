@@ -56,6 +56,11 @@ type AutomationsConsoleVariantProps = {
   canEditDescription?: boolean;
   descriptionBusy?: boolean;
   onDescriptionSave?: (next: string) => void | Promise<void>;
+  owner?: SplitRunFixture["owner"];
+  assigneeIds?: string[];
+  canEditOwner?: boolean;
+  ownerBusy?: boolean;
+  onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
   source?: SplitRunSource;
   files?: FilesFile[];
   /** Pull requests tracked on this task, for the summary panel. */
@@ -83,6 +88,11 @@ export function AutomationsConsoleVariant({
   canEditDescription = false,
   descriptionBusy = false,
   onDescriptionSave,
+  owner,
+  assigneeIds,
+  canEditOwner,
+  ownerBusy,
+  onOwnerSave,
   source,
   files,
   pullRequests,
@@ -140,6 +150,12 @@ export function AutomationsConsoleVariant({
         source={source}
         actionBusy={actionBusy}
         onStopLiveRun={stopLiveRun}
+        organizationId={organizationId}
+        owner={owner}
+        assigneeIds={assigneeIds}
+        canEditOwner={canEditOwner}
+        ownerBusy={ownerBusy}
+        onOwnerSave={onOwnerSave}
       />
     </div>
   );
