@@ -32,6 +32,7 @@ import {
 import { VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import {
   clarityScoreFromChecks,
+  CLARITY_CHECK_KEY,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
   confidenceScoreFromChecks,
@@ -614,12 +615,31 @@ function draftReviewSurface(
       note: credit ? draftCreditFooterNote(credit) : draftFooterNote(order),
       status: "draft",
       isAnalyzing: credit ? false : draftIsAnalyzing(input),
-      clarityScore: clarityScoreFromChecks(checks),
-      confidenceScore: confidenceScoreFromChecks(checks),
+      ...draftFooterScores(checks),
     }),
     [],
     checks,
   );
+}
+
+/** Review tasks score Clarity, Complexity, and Verifiability. The headline is Confidence on a 1–3 scale. */
+function draftFooterScores(checks: WorkOrderCheckPresentation[]): {
+  clarityScore?: number;
+  confidenceScore?: number;
+  scoreMax?: number;
+} {
+  const review = planningReviewFromChecks(checks);
+  if (!review) {
+    return {
+      clarityScore: clarityScoreFromChecks(checks),
+      confidenceScore: confidenceScoreFromChecks(checks),
+    };
+  }
+  return {
+    clarityScore: review.metrics.find((metric) => metric.key === CLARITY_CHECK_KEY)?.score,
+    confidenceScore: review.headline.score,
+    scoreMax: review.headline.maxScore,
+  };
 }
 
 function stoppedReviewSurface(
