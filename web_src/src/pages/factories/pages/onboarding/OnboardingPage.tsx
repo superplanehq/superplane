@@ -29,7 +29,7 @@ function WorkspaceOnboardingPage({ layout }: { layout: ResolvedFactoriesLayout }
 
   if (!githubApp.resolved) {
     return (
-      <FirstRunShell testId="workspace-setup-loading" busy>
+      <FirstRunShell testId="workspace-setup-loading" busy visual="preview">
         <p className="inline-flex items-center gap-2 text-[13px] text-muted-foreground" role="status">
           <Loader2 className="size-4 animate-spin" aria-hidden />
           Checking GitHub setup…
