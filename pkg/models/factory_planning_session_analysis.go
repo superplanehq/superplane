@@ -616,47 +616,47 @@ func firstCheckReportsAtMaximum(tx *gorm.DB, workOrderID uuid.UUID, kinds []plan
 
 func firstReportedCheckScores(tx *gorm.DB, workOrderID uuid.UUID, kinds []planningScoreKind) (map[string]float64, error) {
 	scores := make(map[string]float64, len(kinds))
-	if len(kinds) == 0 {
-		return scores, nil
-	}
-	keys := make([]string, len(kinds))
-	wanted := make(map[string]struct{}, len(kinds))
-	for i, kind := range kinds {
-		keys[i] = kind.key
-		wanted[kind.key] = struct{}{}
-	}
-
-	var events []FactoryWorkOrderEvent
-	err := tx.
-		Where("work_order_id = ?", workOrderID).
-		Where("type = ?", factory.EventTypeOrderCheckReported).
-		Where("data->'check'->>'key' IN ?", keys).
-		Order("created_at ASC").
-		Order("id ASC").
-		Find(&events).Error
-	if err != nil {
-		return nil, err
-	}
-	for i := range events {
-		if len(scores) == len(keys) {
-			break
-		}
-		var payload factory.WorkOrderCheckReported
-		if err := json.Unmarshal(events[i].Data, &payload); err != nil {
+	for _, kind := range kinds {
+		score, found, err := earliestCheckScore(tx, workOrderID, kind)
+		if err != nil {
 			return nil, err
 		}
-		if payload.Check == nil {
-			continue
+		if found {
+			scores[kind.key] = score
 		}
-		if _, ok := wanted[payload.Check.Key]; !ok {
-			continue
-		}
-		if _, seen := scores[payload.Check.Key]; seen {
-			continue
-		}
-		scores[payload.Check.Key] = payload.Check.Score
 	}
 	return scores, nil
+}
+
+func earliestCheckScore(tx *gorm.DB, workOrderID uuid.UUID, kind planningScoreKind) (float64, bool, error) {
+	maxScore, err := json.Marshal(kind.max)
+	if err != nil {
+		return 0, false, err
+	}
+	var events []FactoryWorkOrderEvent
+	err = tx.
+		Where("work_order_id = ?", workOrderID).
+		Where("type = ?", factory.EventTypeOrderCheckReported).
+		Where("data->'check'->>'key' = ?", kind.key).
+		Where("data->'check'->>'maxScore' = ?", string(maxScore)).
+		Order("created_at ASC").
+		Order("id ASC").
+		Limit(1).
+		Find(&events).Error
+	if err != nil {
+		return 0, false, err
+	}
+	if len(events) == 0 {
+		return 0, false, nil
+	}
+	var payload factory.WorkOrderCheckReported
+	if err := json.Unmarshal(events[0].Data, &payload); err != nil {
+		return 0, false, err
+	}
+	if payload.Check == nil || payload.Check.Key != kind.key || payload.Check.MaxScore != kind.max {
+		return 0, false, nil
+	}
+	return payload.Check.Score, true, nil
 }
 
 type planningTurn struct {

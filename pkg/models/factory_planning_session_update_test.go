@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/gorm"
 )
 
 func TestFactoryPlanningSession_ProposeUpdateWritesScoresSpecAndSurvey(t *testing.T) {
@@ -262,6 +263,49 @@ func TestWorkOrderReadyForAutoStartReviewBlocksLaterMaximumAfterLowFirstScore(t 
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartReviewIgnoresLegacyClarityScale(t *testing.T) {
+	t.Run("a maximum legacy clarity score does not block the first review scores", func(t *testing.T) {
+		db, factoryModel, order, session := switchDraftToReviewPlanning(t, "auto-start-review-after-legacy-max", 5)
+		require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
+
+		ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+		require.NoError(t, err)
+		assert.True(t, ready)
+	})
+
+	t.Run("a legacy score of 3 does not hide a low first review clarity score", func(t *testing.T) {
+		db, factoryModel, order, session := switchDraftToReviewPlanning(t, "auto-start-review-after-legacy-three", 3)
+		require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(1, 3, 3)}))
+		require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
+
+		ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+		require.NoError(t, err)
+		assert.False(t, ready)
+	})
+}
+
+func switchDraftToReviewPlanning(t *testing.T, slug string, legacyClarity float64) (*gorm.DB, *Factory, *FactoryWorkOrder, *FactoryPlanningSession) {
+	t.Helper()
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, slug)
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, order.StorePlanningSpec(db, "# Retry refunds\n\nStop double charges.\n"))
+	_, err = order.ReportCheck(db, FactoryWorkOrderCheckParams{
+		Key:      PlanningClarityCheckKey,
+		Name:     PlanningClarityCheckName,
+		Score:    legacyClarity,
+		MaxScore: PlanningScoreMax,
+		Summary:  "The task is defined.",
+	})
+	require.NoError(t, err)
+	return db, factoryModel, order, session
 }
 
 func reviewScores(clarity, complexity, verifiability float64) *PlanningReviewScores {
