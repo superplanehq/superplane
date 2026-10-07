@@ -26,6 +26,9 @@ func SelectFactoryVCSProviderRepository(
 		return nil, factoryErrorToStatus(err, "failed to select VCS repository")
 	}
 	provider := strings.ToLower(strings.TrimSpace(req.GetProvider()))
+	if provider == models.ProviderBitbucket {
+		return selectBitbucketFactoryRepository(ctx, orgID, organizationID, req)
+	}
 	if provider != models.ProviderGitHub {
 		return nil, grpcerrors.InvalidArgument(nil, "VCS provider is not supported")
 	}
@@ -78,6 +81,7 @@ func SelectFactoryVCSProviderRepository(
 		repositoryID := repository.RepositoryID
 		if updateErr := factory.UpdateOnboarding(tx, models.FactoryOnboardingPatch{
 			VCSIntegrationID:    &integrationID,
+			VCSProvider:         &provider,
 			AppRepository:       &repository.FullName,
 			AppRepositoryID:     &repositoryID,
 			BacklogRepository:   &repository.FullName,

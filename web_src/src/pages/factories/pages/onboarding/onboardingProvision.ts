@@ -10,8 +10,9 @@ import type {
 } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import {
+  factoryVCSProvider,
   getFactoryDefinition,
-  ONBOARDING_EVENT_APPS,
+  onboardingEventAppsFor,
   ONBOARDING_LINE_APPS,
   type FactoryAgentRewrite,
 } from "@/pages/home/factories";
@@ -59,10 +60,12 @@ async function installOnboardingApp(args: {
   backlogRepository: string;
   defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
+  vcsProvider?: string;
   installFactory: InstallOnboardingApp;
 }): Promise<{ canvasId: string; canvasName: string }> {
   const installed = await args.installFactory({
     factoryId: args.appFactoryId,
+    vcsProvider: args.vcsProvider,
     workspaceFactoryId: args.factoryId,
     integrations: args.selections,
     installParams: {
@@ -89,6 +92,7 @@ async function provisionLineApps(args: {
   backlogRepository: string;
   defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
+  vcsProvider?: string;
   installFactory: InstallOnboardingApp;
 }): Promise<FactoryLineStep[]> {
   const steps: FactoryLineStep[] = [];
@@ -101,6 +105,7 @@ async function provisionLineApps(args: {
       backlogRepository: args.backlogRepository,
       defaultBranch: args.defaultBranch,
       agentRewrite: args.agentRewrite,
+      vcsProvider: args.vcsProvider,
       installFactory: args.installFactory,
     });
     steps.push({
@@ -128,7 +133,7 @@ function matchesEventAppTitle(appName: string | undefined, title: string): boole
 
 // Event apps listen for GitHub events and are not factory line steps. Skip an
 // app whose title already matches an app the workspace has, so a retry after
-// a failed finish does not create a second PR Closure. Known limitation: a
+// a failed finish does not create a second copy. Known limitation: a
 // user-renamed app (to something other than "<title>" or "<title> (N)") is
 // not matched, so onboarding installs another copy — see ListFactoryApps,
 // which does not return the source factory id needed for an exact match.
@@ -139,11 +144,15 @@ export async function provisionEventApps(args: {
   backlogRepository: string;
   defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
+  vcsProvider?: string;
   installFactory: InstallOnboardingApp;
   listApps: ListFactoryApps;
 }): Promise<void> {
+  const eventApps = onboardingEventAppsFor(args.vcsProvider);
+  if (eventApps.length === 0) return;
+
   const apps = await args.listApps();
-  for (const appFactoryId of ONBOARDING_EVENT_APPS) {
+  for (const appFactoryId of eventApps) {
     const title = getFactoryDefinition(appFactoryId).title;
     if (apps.some((app) => matchesEventAppTitle(app.name, title))) {
       continue;
@@ -157,6 +166,7 @@ export async function provisionEventApps(args: {
       backlogRepository: args.backlogRepository,
       defaultBranch: args.defaultBranch,
       agentRewrite: args.agentRewrite,
+      vcsProvider: args.vcsProvider,
       installFactory: args.installFactory,
     });
   }
@@ -285,6 +295,8 @@ export async function provisionLinearIntake(args: {
 // Create the selected backlog intake and remove a leftover intake from an
 // earlier failed finish, so analysis follows the source the user chose.
 export async function provisionOnboardingIntake(args: {
+  /** Workspace Git host. Empty means GitHub. */
+  vcsProvider?: string;
   listIntakes: ListFactoryIntakes;
   createIntake: CreateFactoryIntake;
   deleteIntake: DeleteFactoryIntake;
@@ -331,6 +343,8 @@ export async function provisionOnboardingIntake(args: {
       projectIds: args.linear.projectIds,
     });
   }
+  // GitHub Issues needs a GitHub repository, so other hosts get no intake.
+  if (factoryVCSProvider(args.vcsProvider) !== "github") return undefined;
   return provisionGithubIntake({
     listIntakes: args.listIntakes,
     createIntake: args.createIntake,
@@ -346,6 +360,7 @@ export async function provisionLine(args: {
   backlogRepository: string;
   defaultBranch: string;
   agentRewrite?: FactoryAgentRewrite;
+  vcsProvider?: string;
   installFactory: InstallOnboardingApp;
   createLine: (input: { name: string; steps: FactoryLineStep[] }) => Promise<FactoriesFactoryLine>;
   updateOnboarding: UpdateOnboarding;
@@ -362,6 +377,7 @@ export async function provisionLine(args: {
     backlogRepository: args.backlogRepository,
     defaultBranch: args.defaultBranch,
     agentRewrite: args.agentRewrite,
+    vcsProvider: args.vcsProvider,
     installFactory: args.installFactory,
   });
   const primaryAppId = steps[0]?.app?.app;

@@ -205,7 +205,7 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 	}
 
 	projectSlug := issueProjectSlug(message.Data)
-	if config.Project != "" && config.Project != projectSlug {
+	if !issueProjectAllowed(ctx.Configuration, config, projectSlug) {
 		logSkippedIssueEvent("project", message, config)
 		return nil
 	}
@@ -258,6 +258,51 @@ func logSkippedIssueEvent(reason string, message *WebhookMessage, config OnIssue
 		"project":            issueProjectSlug(message.Data),
 		"configured_project": config.Project,
 	})
+}
+
+func issueProjectAllowed(configuration any, config OnIssueConfiguration, projectSlug string) bool {
+	projects := configuredSentryProjects(configuration)
+	if len(projects) > 0 {
+		return slices.Contains(projects, projectSlug)
+	}
+	return config.Project == "" || config.Project == projectSlug
+}
+
+func configuredSentryProjects(configuration any) []string {
+	values, ok := configuration.(map[string]any)
+	if !ok {
+		return nil
+	}
+	return normalizeConfiguredProjects(values["projects"])
+}
+
+func normalizeConfiguredProjects(value any) []string {
+	var raw []string
+	switch typed := value.(type) {
+	case []string:
+		raw = typed
+	case []any:
+		raw = make([]string, 0, len(typed))
+		for _, item := range typed {
+			text, ok := item.(string)
+			if !ok {
+				continue
+			}
+			raw = append(raw, text)
+		}
+	default:
+		return nil
+	}
+
+	projects := make([]string, 0, len(raw))
+	for _, project := range raw {
+		project = strings.TrimSpace(project)
+		if project == "" || slices.Contains(projects, project) {
+			continue
+		}
+		projects = append(projects, project)
+	}
+	return projects
 }
 
 func issueActionAllowed(configured []string, action string) bool {

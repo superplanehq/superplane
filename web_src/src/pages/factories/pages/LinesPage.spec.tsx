@@ -17,7 +17,6 @@ import {
   FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-  FEATURE_FACTORY_RISK_SCORE,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
@@ -457,7 +456,7 @@ describe("LinesPage board", () => {
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
     const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
     expect(cardScore).toHaveAttribute("data-tone", "ready");
-    expect(cardScore).toHaveTextContent("Clarity5/5Confidence5/5");
+    expect(cardScore).toHaveTextContent("Clarity5/5Confidence5");
     expect(cardScore).toHaveAttribute(
       "aria-label",
       "This task is ready to start. Clarity score 5 of 5. Confidence score 5 of 5",
@@ -478,9 +477,9 @@ describe("LinesPage board", () => {
     expect(within(dialog).getByTestId("split-run-intent-document")).toBeInTheDocument();
     expect(within(dialog).getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
-    );
+    const location = screen.getByTestId("lines-test-location");
+    expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842`);
+    expect(location).not.toHaveTextContent("lineId=");
     expect(screen.getByTestId("lines-detail-page")).not.toHaveClass("animate-in");
 
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -549,9 +548,9 @@ describe("LinesPage board", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
-    );
+    const location = screen.getByTestId("lines-test-location");
+    expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842`);
+    expect(location).not.toHaveTextContent("lineId=");
 
     await user.click(within(screen.getByTestId("work-order-split-run")).getByRole("button", { name: "Close" }));
     await waitFor(() => {
@@ -1046,12 +1045,11 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-column-automation-picker")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-discussion")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-checks")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-column-automation-template-risk-score")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-risk-score")).toBeInTheDocument();
     expect(screen.queryByTestId("add-column-automation-template-custom")).not.toBeInTheDocument();
   });
 
   it("opens the risk score setup page from the Verify catalog", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1066,7 +1064,6 @@ describe("LinesPage board extras", () => {
 
   it("opens the name dialog when Verify only has custom automation left", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },

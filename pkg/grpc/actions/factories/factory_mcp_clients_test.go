@@ -60,17 +60,17 @@ func Test__ListFactoryMCPClientsUsesRegisteredClientName(t *testing.T) {
 	assert.Equal(t, "Cursor Desktop", response.GetClients()[0].GetClientName())
 }
 
-func Test__ListFactoryMCPClientsRequiresFeature(t *testing.T) {
+func Test__ListFactoryMCPClientsDoesNotRequireMCPServerFlag(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 
-	_, err = ListFactoryMCPClients(t.Context(), r.Organization.ID.String(), &pb.ListFactoryMCPClientsRequest{
+	response, err := ListFactoryMCPClients(t.Context(), r.Organization.ID.String(), &pb.ListFactoryMCPClientsRequest{
 		FactoryId: factory.ID.String(),
 	})
-	require.Error(t, err)
-	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+	require.NoError(t, err)
+	assert.Empty(t, response.GetClients())
 }
 
 func Test__RevokeFactoryMCPClient(t *testing.T) {

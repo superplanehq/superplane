@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "bun:test";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FIRST_RUN_STORY_EMAIL, firstRunStoryChrome } from "./firstRunMocks";
+import { sphereFor } from "./firstRunSphereFor";
 import { FirstRunWelcomeScreen } from "./FirstRunWelcomeScreen";
 
 describe("FirstRunWelcomeScreen", () => {
@@ -16,6 +17,7 @@ describe("FirstRunWelcomeScreen", () => {
       <FirstRunWelcomeScreen
         firstName="Ada"
         chrome={{ ...firstRunStoryChrome(0), onLogOut }}
+        sphere={sphereFor("welcome", null)}
         onGetStarted={onGetStarted}
       />,
     );
@@ -26,7 +28,14 @@ describe("FirstRunWelcomeScreen", () => {
     expect(screen.queryByText(FIRST_RUN_COPY.connect.connectGitHub)).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-ticket-list")).not.toBeInTheDocument();
     expect(screen.queryByText("Example: tickets scored from a real backlog.")).not.toBeInTheDocument();
-    expect(screen.getByTestId("first-run-log-out")).toHaveTextContent(FIRST_RUN_COPY.chrome.logOut);
+    expect(screen.getByTestId("first-run-welcome")).toHaveAttribute("data-visual", "preview");
+    expect(screen.getByTestId("first-run-logo")).toHaveAttribute("alt", "SuperPlane");
+    expect(screen.getByTestId("first-run-logo")).toHaveClass("h-[21px]");
+    const bottomRow = screen.getByTestId("first-run-bottom-row");
+    expect(bottomRow).toContainElement(screen.getByTestId("first-run-log-out"));
+    expect(bottomRow).toContainElement(screen.getByTestId("first-run-progress"));
+    expect(screen.getByTestId("first-run-progress").querySelector("button")).toBeNull();
+    expect(screen.getByTestId("first-run-art-stage")).toContainElement(screen.getByTestId("first-run-signed-in"));
     expect(screen.getByTestId("first-run-signed-in")).toHaveTextContent(FIRST_RUN_STORY_EMAIL);
 
     await user.click(screen.getByTestId("first-run-get-started"));

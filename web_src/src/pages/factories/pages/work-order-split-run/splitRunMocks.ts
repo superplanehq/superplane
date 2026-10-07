@@ -1,4 +1,5 @@
 import type {
+  CanvasesCanvasRun,
   FactoriesAutomationRef,
   FactoriesFactoryPullRequest,
   FactoriesFactoryPullRequestRevision,
@@ -31,6 +32,7 @@ import {
 import { VERIFY_STEP_CHECKS } from "../../__fixtures__/workOrderCheckFixtures";
 import {
   clarityScoreFromChecks,
+  CLARITY_CHECK_KEY,
   CONFIDENCE_SCORE_MAX,
   confidenceBandForScore,
   confidenceScoreFromChecks,
@@ -38,6 +40,7 @@ import {
   confidenceSuitabilitySummary,
   isScoreCheckName,
 } from "../../lib/confidenceScore";
+import { planningReviewFromChecks } from "../../lib/planningReviewScore";
 import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import {
   getWorkOrderDisplayStatus,
@@ -47,6 +50,7 @@ import {
 import { workOrderExecutionCreditFailure } from "../../lib/workOrderFailureReason";
 import { presentWorkOrderStatusNotes, type WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
 import {
+  firstPositiveWorkOrderMetric,
   parseWorkOrderMetric,
   type WorkOrderUsageByMachineType,
   type WorkOrderUsageByModel,
@@ -358,15 +362,15 @@ function runningFooterNote(current: FactoriesWorkOrderExecution | undefined): Wo
   if (!current) {
     return {
       key: "running-step",
-      headline: "The line is running",
-      text: "SuperPlane works on this order now. The log shows live progress.",
+      headline: "Task in progress",
+      text: "View the log for live progress.",
     };
   }
-  const { name, componentName } = lineAutomationPresentation(current.run, current.step);
+  const { componentName } = lineAutomationPresentation(current.run, current.step);
   return {
     key: "running-step",
-    headline: `${name} is running`,
-    text: `${componentName} works on this step now. The log shows live progress.`,
+    headline: `${componentName} in progress`,
+    text: "View the log for live progress.",
   };
 }
 
@@ -430,7 +434,50 @@ export type SplitRunFixtureOptions = {
   isAnalyzing?: boolean;
   /** Looks up an org member's display (name, initials, avatar) by id. */
   resolveUser?: OrgUserDisplayLookup;
+  /**
+   * Pull requests that decide whether a column-app check run is already linked.
+   * The card reads this list. Omit it to use the task's own pull requests.
+   */
+  pullRequests?: FactoriesFactoryPullRequest[];
+  /**
+   * Described canvas runs for column-app checks that are not linked on the
+   * pull request. A linked entry already has duration, tokens, cost, and models.
+   * Duration stays blank while an unlinked run id is still loading.
+   */
+  columnAppRuns?: ColumnAppCanvasRunLookup;
 };
+
+export type ColumnAppCanvasRunLookup = {
+  runsById: ReadonlyMap<string, CanvasesCanvasRun>;
+  loadingIds: ReadonlySet<string>;
+};
+
+export type ColumnAppCheckRunTarget = {
+  appId: string;
+  runId: string;
+};
+
+/**
+ * Column-app check runs that are not already linked on the pull request.
+ * Linked entries already include duration, tokens, cost, and models.
+ */
+export function columnAppCheckRunsToDescribe(
+  columnApps: SplitRunColumnApp[],
+  checks: FactoriesWorkOrderCheck[] | undefined,
+  pullRequests: FactoriesFactoryPullRequest[] | undefined,
+): ColumnAppCheckRunTarget[] {
+  const targets: ColumnAppCheckRunTarget[] = [];
+  for (const [runId, runChecks] of columnAppChecksByRun(columnApps, checks)) {
+    if (canvasRunForCheck(runId, pullRequests)) {
+      continue;
+    }
+    const ref = columnAppCheckRef(runChecks[0]);
+    if (ref) {
+      targets.push(ref);
+    }
+  }
+  return targets;
+}
 
 export function splitRunFixtureForWorkOrder(
   order?: FactoriesWorkOrder,
@@ -568,12 +615,31 @@ function draftReviewSurface(
       note: credit ? draftCreditFooterNote(credit) : draftFooterNote(order),
       status: "draft",
       isAnalyzing: credit ? false : draftIsAnalyzing(input),
-      clarityScore: clarityScoreFromChecks(checks),
-      confidenceScore: confidenceScoreFromChecks(checks),
+      ...draftFooterScores(checks),
     }),
     [],
     checks,
   );
+}
+
+/** Review tasks score Clarity, Complexity, and Verifiability. The headline is Confidence on a 1–3 scale. */
+function draftFooterScores(checks: WorkOrderCheckPresentation[]): {
+  clarityScore?: number;
+  confidenceScore?: number;
+  scoreMax?: number;
+} {
+  const review = planningReviewFromChecks(checks);
+  if (!review) {
+    return {
+      clarityScore: clarityScoreFromChecks(checks),
+      confidenceScore: confidenceScoreFromChecks(checks),
+    };
+  }
+  return {
+    clarityScore: review.metrics.find((metric) => metric.key === CLARITY_CHECK_KEY)?.score,
+    confidenceScore: review.headline.score,
+    scoreMax: review.headline.maxScore,
+  };
 }
 
 function stoppedReviewSurface(
@@ -740,7 +806,10 @@ function phasesForOrder(
   ];
   return [
     ...knownPhases,
-    ...phasesForColumnAppChecks(columnApps, apiChecks, options?.artifacts, knownPhases, order.pullRequests),
+    ...phasesForColumnAppChecks(columnApps, apiChecks, options?.artifacts, knownPhases, {
+      pullRequests: options?.pullRequests ?? order.pullRequests,
+      canvasRuns: options?.columnAppRuns,
+    }),
   ];
 }
 
@@ -914,11 +983,16 @@ function sumAnalysisMetric(
 }
 
 function confidenceChecks(apiChecks?: FactoriesWorkOrderCheck[]): WorkOrderCheckPresentation[] | undefined {
-  const reported = (apiChecks ?? []).filter((check) => isScoreCheckName(check.name));
+  const presented = presentWorkOrderChecks(apiChecks ?? []);
+  const review = planningReviewFromChecks(presented);
+  if (review) {
+    return review.metrics;
+  }
+  const reported = presented.filter((check) => isScoreCheckName(check.name));
   if (reported.length === 0) {
     return undefined;
   }
-  return presentWorkOrderChecks(reported);
+  return reported;
 }
 
 function phasesForPRFeedbackRuns(runs: PRFeedbackLogRun[], columnApps: SplitRunColumnApp[] = []): SplitRunPhase[] {
@@ -933,7 +1007,7 @@ function phasesForColumnAppChecks(
   checks: FactoriesWorkOrderCheck[] | undefined,
   artifacts: FactoriesWorkOrderArtifact[] | undefined,
   knownPhases: SplitRunPhase[],
-  pullRequests?: FactoriesFactoryPullRequest[],
+  source?: ColumnAppCheckSource,
 ): SplitRunPhase[] {
   const checksByRun = columnAppChecksByRun(columnApps, checks);
   const extras: SplitRunPhase[] = [];
@@ -944,13 +1018,18 @@ function phasesForColumnAppChecks(
       existing.checks = uniquePresentedChecks([...(existing.checks ?? []), ...presented]);
       continue;
     }
-    const phase = phaseForColumnAppCheck(columnApps, runChecks, artifacts, pullRequests);
+    const phase = phaseForColumnAppCheck(columnApps, runChecks, artifacts, source);
     if (phase) {
       extras.push(phase);
     }
   }
   return extras;
 }
+
+type ColumnAppCheckSource = {
+  pullRequests?: FactoriesFactoryPullRequest[];
+  canvasRuns?: ColumnAppCanvasRunLookup;
+};
 
 function columnAppChecksByRun(
   columnApps: SplitRunColumnApp[],
@@ -989,7 +1068,7 @@ function phaseForColumnAppCheck(
   columnApps: SplitRunColumnApp[],
   checks: FactoriesWorkOrderCheck[],
   artifacts: FactoriesWorkOrderArtifact[] | undefined,
-  pullRequests?: FactoriesFactoryPullRequest[],
+  source?: ColumnAppCheckSource,
 ): SplitRunPhase | undefined {
   const first = checks[0];
   const ref = first ? columnAppCheckRef(first) : undefined;
@@ -1004,29 +1083,16 @@ function phaseForColumnAppCheck(
   const name = phaseNameForColumn(columnKey);
   const componentName = columnAppCheckName(app, first, name);
   const latest = checks[checks.length - 1] ?? first;
-  const run = canvasRunForCheck(ref.runId, pullRequests);
-  const status = run ? statusForCanvasRun(run) : "passed";
-  const span = run ? { createdAt: run.createdAt, updatedAt: run.finishedAt ?? run.updatedAt } : {};
-  const duration = span.createdAt ? durationForExecution(span, status) : "";
-  const line: SplitRunStreamLine = {
-    id: ref.runId,
-    at: clockLabel(span.createdAt ?? latest.updatedAt),
-    componentName,
-    status,
-    duration,
-    kind: "action",
-    componentType: componentName,
-    action: prFeedbackStreamAction(status),
-    iconSlug: "box",
-  };
+  const span = columnAppCheckSpan(ref.runId, source);
+  const line = columnAppCheckLine(ref.runId, componentName, latest.updatedAt, span);
   return {
     id: `column-app-${ref.runId}`,
     name,
-    status,
-    duration,
-    durationRunning: status === "running",
-    startedAt: span.createdAt ?? first.updatedAt,
-    endedAt: status === "running" ? undefined : span.updatedAt,
+    status: span.status,
+    duration: span.duration,
+    durationRunning: span.status === "running",
+    startedAt: span.run?.createdAt ?? first.updatedAt,
+    endedAt: span.status === "running" ? undefined : (span.run?.finishedAt ?? span.run?.updatedAt),
     componentName,
     artifacts: artifactsForCanvasRun(artifacts, ref.runId),
     checks: presentWorkOrderChecks(checks),
@@ -1035,7 +1101,99 @@ function phaseForColumnAppCheck(
     appId: ref.appId,
     runId: ref.runId,
     columnKey,
+    ...columnAppRunLedger(ref.runId, source?.pullRequests, span.lookedUp),
   };
+}
+
+function columnAppCheckSpan(runId: string, source: ColumnAppCheckSource | undefined) {
+  const linked = canvasRunForCheck(runId, source?.pullRequests);
+  const lookedUp = source?.canvasRuns?.runsById.get(runId);
+  const run = linked ?? lookedUp;
+  const loading = !run && Boolean(source?.canvasRuns?.loadingIds.has(runId));
+  const status = run ? statusForCanvasRun(run) : "passed";
+  return {
+    run,
+    lookedUp,
+    status,
+    duration: columnAppCheckDuration(run, status, loading),
+  };
+}
+
+function columnAppCheckDuration(
+  run: { createdAt?: string; finishedAt?: string } | undefined,
+  status: SplitRunPhaseStatus,
+  loading: boolean,
+): string {
+  if (loading || !run?.createdAt) {
+    return "";
+  }
+  return durationForCanvasRun(run, status);
+}
+
+function columnAppCheckLine(
+  runId: string,
+  componentName: string,
+  checkUpdatedAt: string | undefined,
+  span: { run?: { createdAt?: string }; status: SplitRunPhaseStatus; duration: string },
+): SplitRunStreamLine {
+  return {
+    id: runId,
+    at: clockLabel(span.run?.createdAt ?? checkUpdatedAt),
+    componentName,
+    status: span.status,
+    duration: span.duration,
+    kind: "action",
+    componentType: componentName,
+    action: prFeedbackStreamAction(span.status),
+    iconSlug: "box",
+  };
+}
+
+function durationForCanvasRun(run: { createdAt?: string; finishedAt?: string }, status: SplitRunPhaseStatus): string {
+  return durationForExecution({ createdAt: run.createdAt, updatedAt: run.finishedAt }, status);
+}
+
+function columnAppRunLedger(
+  runId: string,
+  pullRequests: FactoriesFactoryPullRequest[] | undefined,
+  lookedUp: CanvasesCanvasRun | undefined,
+): Pick<SplitRunPhase, "costCents" | "totalTokens" | "model"> {
+  const fromRun = recordedRunLedger(lookedUp);
+  if (fromRun.costCents || fromRun.totalTokens || fromRun.model) {
+    return fromRun;
+  }
+  return recordedRunLedger(pullRequestUsageForRun(runId, pullRequests));
+}
+
+function recordedRunLedger(
+  source:
+    | {
+        costCents?: string;
+        totalTokens?: string;
+        models?: string[];
+      }
+    | undefined,
+): Pick<SplitRunPhase, "costCents" | "totalTokens" | "model"> {
+  const model = joinRunnerModels(source?.models ?? []);
+  return {
+    costCents: firstPositiveWorkOrderMetric(source?.costCents),
+    totalTokens: firstPositiveWorkOrderMetric(source?.totalTokens),
+    model: model || undefined,
+  };
+}
+
+function pullRequestUsageForRun(runId: string, pullRequests: FactoriesFactoryPullRequest[] | undefined) {
+  for (const pullRequest of pullRequests ?? []) {
+    const linked = (pullRequest.runs ?? []).find((entry) => entry.run?.id === runId);
+    if (linked) {
+      return linked;
+    }
+    const activity = (pullRequest.activities ?? []).find((entry) => entry.run?.id === runId);
+    if (activity) {
+      return activity;
+    }
+  }
+  return undefined;
 }
 
 function canvasRunForCheck(runId: string, pullRequests: FactoriesFactoryPullRequest[] | undefined) {

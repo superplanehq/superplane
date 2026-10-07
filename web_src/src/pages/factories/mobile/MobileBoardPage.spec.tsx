@@ -21,7 +21,12 @@ import {
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { MobileBoardPage } from "./MobileBoardPage";
 
-const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
+const idleBoardPage = () => ({
+  hasNextPage: false,
+  isFetchingNextPage: false,
+  isFetchNextPageError: false,
+  fetchNextPage: vi.fn(),
+});
 const boardWorkOrders = vi.fn((): FactoriesWorkOrder[] => []);
 const backlogPage = vi.fn(idleBoardPage);
 const openPage = vi.fn(idleBoardPage);
@@ -85,13 +90,26 @@ vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, currentUserId: "user-1", isLoading: false }),
 }));
 
+function stubElementHeights({ scrollHeight, clientHeight }: { scrollHeight: number; clientHeight: number }) {
+  Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, value: scrollHeight });
+  Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, value: clientHeight });
+  return () => {
+    delete (HTMLElement.prototype as unknown as { scrollHeight?: number }).scrollHeight;
+    delete (HTMLElement.prototype as unknown as { clientHeight?: number }).clientHeight;
+  };
+}
+
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="mobile-test-location">{`${location.pathname}${location.search}`}</div>;
 }
 
 function renderBoard(factory = REFUND_FACTORY) {
-  return render(
+  return render(boardElement(factory));
+}
+
+function boardElement(factory = REFUND_FACTORY) {
+  return (
     <QueryClientProvider client={new QueryClient()}>
       <ThemeProvider>
         <TooltipProvider>
@@ -118,7 +136,7 @@ function renderBoard(factory = REFUND_FACTORY) {
           </MemoryRouter>
         </TooltipProvider>
       </ThemeProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
 }
 
@@ -216,21 +234,41 @@ describe("MobileBoardPage", () => {
     expect(screen.getByTestId("mobile-board-line-switcher")).toHaveTextContent("Hotfix");
   });
 
-  it("loads the next page when a column has no cards yet", async () => {
+  it("loads the next page of a visible empty column and leaves hidden columns alone", async () => {
     const user = userEvent.setup();
-    const fetchNextPage = vi.fn();
-    donePage.mockReturnValue({ hasNextPage: true, isFetchingNextPage: false, fetchNextPage });
+    const fetchDone = vi.fn();
+    const fetchBacklog = vi.fn();
+    backlogPage.mockReturnValue({
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      fetchNextPage: fetchBacklog,
+    });
+    donePage.mockReturnValue({
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      fetchNextPage: fetchDone,
+    });
     renderBoard();
 
-    await user.click(screen.getByTestId("mobile-board-tab-done"));
     const done = screen.getByTestId("mobile-board-column-done");
     expect(done).not.toHaveTextContent("No tasks in Done.");
-    await user.click(within(done).getByRole("button", { name: "Load more" }));
+    expect(fetchBacklog).toHaveBeenCalledTimes(1);
+    expect(fetchDone).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Load more", hidden: true })).not.toBeInTheDocument();
 
-    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+    fireEvent.scroll(screen.getByTestId("mobile-board-column-scroll-done"));
+    expect(fetchDone).not.toHaveBeenCalled();
+
+    await user.click(screen.getByTestId("mobile-board-tab-done"));
+
+    expect(fetchDone).toHaveBeenCalledTimes(1);
+    expect(fetchBacklog).toHaveBeenCalledTimes(1);
   });
 
-  it("offers load more when the visible cards do not fill the column", () => {
+  it("loads the next page when the visible list does not fill the screen", () => {
+    const fetchNextPage = vi.fn();
     boardWorkOrders.mockReturnValue([
       {
         id: "wo-draft",
@@ -240,12 +278,142 @@ describe("MobileBoardPage", () => {
         lineDispatches: [],
       },
     ]);
-    backlogPage.mockReturnValue({ hasNextPage: true, isFetchingNextPage: false, fetchNextPage: vi.fn() });
+    backlogPage.mockReturnValue({
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      fetchNextPage,
+    });
     renderBoard();
 
     const backlog = screen.getByTestId("mobile-board-column-backlog");
     expect(within(backlog).getByRole("button", { name: "Open Fix refund rounding" })).toBeInTheDocument();
-    expect(within(backlog).getByRole("button", { name: "Load more" })).toBeInTheDocument();
+    expect(within(backlog).queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads the next page when the visible column is scrolled within 160px of the end", () => {
+    const restoreHeights = stubElementHeights({ scrollHeight: 1000, clientHeight: 400 });
+    try {
+      const fetchNextPage = vi.fn();
+      boardWorkOrders.mockReturnValue([
+        {
+          id: "wo-draft",
+          number: "42",
+          title: "Fix refund rounding",
+          state: "STATE_DRAFT",
+          lineDispatches: [],
+        },
+      ]);
+      backlogPage.mockReturnValue({
+        hasNextPage: true,
+        isFetchingNextPage: false,
+        isFetchNextPageError: false,
+        fetchNextPage,
+      });
+      renderBoard();
+
+      const list = screen.getByTestId("mobile-board-column-scroll-backlog");
+      expect(fetchNextPage).not.toHaveBeenCalled();
+
+      list.scrollTop = 439;
+      fireEvent.scroll(list);
+      expect(fetchNextPage).not.toHaveBeenCalled();
+
+      list.scrollTop = 440;
+      fireEvent.scroll(list);
+      expect(fetchNextPage).toHaveBeenCalledTimes(1);
+
+      fireEvent.scroll(list);
+      expect(fetchNextPage).toHaveBeenCalledTimes(1);
+    } finally {
+      restoreHeights();
+    }
+  });
+
+  it("shows a loading spinner only while the next page loads", () => {
+    const fetchNextPage = vi.fn();
+    backlogPage.mockReturnValue({
+      hasNextPage: true,
+      isFetchingNextPage: true,
+      isFetchNextPageError: false,
+      fetchNextPage,
+    });
+    const view = renderBoard();
+
+    const backlog = screen.getByTestId("mobile-board-column-backlog");
+    const spinner = within(backlog).getByRole("status", { name: "Loading more" });
+    const list = within(backlog).getByTestId("mobile-board-column-scroll-backlog");
+    expect(spinner.tagName).not.toBe("BUTTON");
+    expect(list.compareDocumentPosition(spinner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(backlog).queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    expect(fetchNextPage).not.toHaveBeenCalled();
+
+    backlogPage.mockReturnValue({
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      isFetchNextPageError: false,
+      fetchNextPage,
+    });
+    view.rerender(boardElement());
+
+    expect(screen.queryByRole("status", { name: "Loading more" })).not.toBeInTheDocument();
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops automatic loads after a page error until the user retries", async () => {
+    const user = userEvent.setup();
+    const fetchNextPage = vi.fn();
+    const observers: ResizeObserverCallback[] = [];
+    const originalObserver = globalThis.ResizeObserver;
+    class ImmediateResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        observers.push(callback);
+      }
+      observe() {
+        observers.at(-1)?.([], this as unknown as ResizeObserver);
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    globalThis.ResizeObserver = ImmediateResizeObserver as unknown as typeof ResizeObserver;
+
+    try {
+      boardWorkOrders.mockReturnValue([
+        {
+          id: "wo-draft",
+          number: "42",
+          title: "Fix refund rounding",
+          state: "STATE_DRAFT",
+          lineDispatches: [],
+        },
+      ]);
+      backlogPage.mockReturnValue({
+        hasNextPage: true,
+        isFetchingNextPage: false,
+        isFetchNextPageError: true,
+        fetchNextPage,
+      });
+      const view = renderBoard();
+      const backlog = screen.getByTestId("mobile-board-column-backlog");
+
+      expect(fetchNextPage).not.toHaveBeenCalled();
+      expect(within(backlog).getByRole("alert")).toHaveTextContent("SuperPlane could not load more tasks.");
+      expect(within(backlog).queryByRole("status", { name: "Loading more" })).not.toBeInTheDocument();
+
+      fireEvent.scroll(within(backlog).getByTestId("mobile-board-column-scroll-backlog"));
+      observers.at(-1)?.([], {} as ResizeObserver);
+      expect(fetchNextPage).not.toHaveBeenCalled();
+
+      await user.click(within(backlog).getByRole("button", { name: "Try again" }));
+      expect(fetchNextPage).toHaveBeenCalledTimes(1);
+
+      view.rerender(boardElement());
+      observers.at(-1)?.([], {} as ResizeObserver);
+      expect(fetchNextPage).toHaveBeenCalledTimes(1);
+    } finally {
+      globalThis.ResizeObserver = originalObserver;
+    }
   });
 
   it("opens the closed-task dialog from a status that needs it", async () => {
@@ -270,7 +438,7 @@ describe("MobileBoardPage", () => {
     expect(screen.getByTestId("mobile-board-search-input")).toBeInTheDocument();
   });
 
-  it("opens a task as a full-screen route with the board line in the URL", async () => {
+  it("opens a task without a line id in the URL", async () => {
     const user = userEvent.setup();
     boardWorkOrders.mockReturnValue([
       {
@@ -289,8 +457,8 @@ describe("MobileBoardPage", () => {
       }),
     );
 
-    expect(screen.getByTestId("mobile-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42?lineId=${REFUND_LINE_PLAN_ID}`,
-    );
+    const location = screen.getByTestId("mobile-test-location");
+    expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42`);
+    expect(location).not.toHaveTextContent("lineId=");
   });
 });

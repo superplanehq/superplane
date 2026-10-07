@@ -98,6 +98,7 @@ import {
 import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExecutions";
 import {
   latestDispatchForLine,
+  boardLineIdFromNavigationState,
   canonicalWorkOrderNumber,
   displayedBoardLineId,
   peekOrderFromNavigationState,
@@ -137,6 +138,7 @@ import { type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
 import { columnAppsFromFactoryApps, splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
+import { useColumnAppCheckRuns } from "./work-order-split-run/useColumnAppCheckRuns";
 import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFooterCloser";
 import {
   factoryAppConfigurePath,
@@ -328,21 +330,21 @@ export function LinesPage() {
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const listState = useWorkOrderListState(factoryId);
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
-  const routeOrSearchLineId = displayedBoardLineId(routeLineId, boardLineId, lines, undefined, undefined);
-  const taskLineOrderId = !routeOrSearchLineId && routeOrderNumber ? routeOrderNumber : "";
+  const navigationLineId = boardLineIdFromNavigationState(locationState);
+  const lineSources = { routeLineId, queryLineId: boardLineId, navigationLineId, lines };
+  const knownBoardLineId = displayedBoardLineId(lineSources);
+  const taskLineOrderId = !knownBoardLineId && routeOrderNumber ? routeOrderNumber : "";
   const { data: taskForBoardLine, isLoading: taskLineLoading } = useWorkOrder(
     organizationId,
     factoryId,
     taskLineOrderId,
   );
   const taskLinePending = Boolean(taskLineOrderId) && taskLineLoading && !taskForBoardLine;
-  const selectedLineId = displayedBoardLineId(
-    routeLineId,
-    boardLineId,
-    lines,
-    taskForBoardLine,
-    taskLinePending ? undefined : firstFactoryLineId(factory),
-  );
+  const selectedLineId = displayedBoardLineId({
+    ...lineSources,
+    order: taskForBoardLine,
+    fallbackLineId: taskLinePending ? undefined : firstFactoryLineId(factory),
+  });
   const {
     workOrders,
     isLoading: workOrdersLoading,
@@ -616,8 +618,8 @@ export function LinesPage() {
       setPeekHint(target);
       return;
     }
-    navigate(workOrderDetailPath(organizationId, routeSegment, number, selectedLine.id), {
-      state: { peekOrder: target },
+    navigate(workOrderDetailPath(organizationId, routeSegment, number), {
+      state: { peekOrder: target, lineId: selectedLine.id },
     });
   };
 
@@ -1214,40 +1216,46 @@ function LineBoardSplitRunPopup({
   const closer = useSplitRunFooterCloser(organizationId, factoryId, popupOrder);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const resolvedLineName = lineName?.trim();
+  const columnApps = columnAppsFromFactoryApps(factoryApps);
+  const columnAppCheckRuns = useColumnAppCheckRuns(describedOrder?.checks, columnApps, peekPullRequests);
   return (
-    <WorkOrderSplitRunPopup
-      key={peekOrderId}
-      organizationId={organizationId}
-      factoryId={factoryId}
-      factoryKey={factoryKey}
-      orderId={peekOrderId}
-      orderNumber={popupOrder.number}
-      lineId={lineId}
-      fixture={splitRunFixtureForWorkOrder(popupOrder, {
-        checks: describedOrder?.checks,
-        artifacts: peekArtifacts,
-        lineId,
-        lineName: resolvedLineName,
-        demoArtifacts: false,
-        prFeedbackRuns,
-        analysisRuns,
-        columnApps: columnAppsFromFactoryApps(factoryApps),
-        isAnalyzing,
-        stoppedBy: closer.actor,
-        closer,
-        resolveUser,
-      })}
-      canDispatch={canDispatch && Boolean(resolvedLineName)}
-      canUpdate={canUpdate}
-      isDispatching={isDispatching}
-      onDispatch={
-        resolvedLineName
-          ? (model, thinkingLevel) => onDispatch(peekOrderId, { lineName: resolvedLineName, model, thinkingLevel })
-          : undefined
-      }
-      onClose={onClose}
-      fixed
-    />
+    <>
+      {columnAppCheckRuns.queries}
+      <WorkOrderSplitRunPopup
+        key={peekOrderId}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        orderId={peekOrderId}
+        orderNumber={popupOrder.number}
+        lineId={lineId}
+        fixture={splitRunFixtureForWorkOrder(popupOrder, {
+          checks: describedOrder?.checks,
+          artifacts: peekArtifacts,
+          lineId,
+          lineName: resolvedLineName,
+          demoArtifacts: false,
+          prFeedbackRuns,
+          analysisRuns,
+          columnApps,
+          isAnalyzing,
+          stoppedBy: closer.actor,
+          closer,
+          resolveUser,
+          columnAppRuns: columnAppCheckRuns.lookup,
+        })}
+        canDispatch={canDispatch && Boolean(resolvedLineName)}
+        canUpdate={canUpdate}
+        isDispatching={isDispatching}
+        onDispatch={
+          resolvedLineName
+            ? (model, thinkingLevel) => onDispatch(peekOrderId, { lineName: resolvedLineName, model, thinkingLevel })
+            : undefined
+        }
+        onClose={onClose}
+        fixed
+      />
+    </>
   );
 }
 

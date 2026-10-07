@@ -34,6 +34,7 @@ import {
   initialWizardStep,
   isWizardStepId,
   localIssuesSource,
+  onboardingVcsHost,
 } from "./onboardingStatus";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
@@ -48,7 +49,7 @@ import {
   type OnboardingSetupApi,
 } from "./useOnboardingSetupState";
 
-const ONBOARDING_INTEGRATIONS = ["jira", "linear", ...AGENT_PROVIDER_IDS];
+const ONBOARDING_INTEGRATIONS = ["bitbucket", "jira", "linear", ...AGENT_PROVIDER_IDS];
 
 // Agent keys stay unselected so a new workspace can use the canonical
 // SuperPlane template when hosted credit is available.
@@ -67,6 +68,7 @@ function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
   const connected = useMemo(() => {
     const ready = new Set<IntegrationId>();
     if (selections.github?.ready) ready.add("github");
+    if (selections.bitbucket?.ready) ready.add("bitbucket");
     if (selections.jira?.ready) ready.add("jira");
     if (selections.linear?.ready) ready.add("linear");
     for (const name of AGENT_PROVIDER_IDS) {
@@ -80,7 +82,7 @@ function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
 function initialSetupState(onboarding: FactoriesFactory["onboarding"]): InitialOnboardingSetupState {
   const appRepository = onboarding?.appRepository || null;
   return {
-    vcsHost: onboarding?.vcsIntegrationId ? "github" : null,
+    vcsHost: onboardingVcsHost(onboarding),
     selectedRepo: appRepository,
     issuesRepo: onboarding?.backlogRepository || appRepository,
     issuesChoice: localIssuesSource(onboarding?.issuesSource),
@@ -89,8 +91,9 @@ function initialSetupState(onboarding: FactoriesFactory["onboarding"]): InitialO
 
 function useRestoreIntegrationReadiness(setup: OnboardingSetupApi, selections: IntegrationSelections) {
   const { vcsHost, selectVcsHost, setAgent } = setup;
+  // A ready GitHub connection must not replace a Bitbucket host the user chose.
   useEffect(() => {
-    if (selections.github?.ready && vcsHost !== "github") selectVcsHost("github");
+    if (selections.github?.ready && vcsHost === null) selectVcsHost("github");
   }, [selections.github?.ready, selectVcsHost, vcsHost]);
   useEffect(() => {
     if (!selections.claude?.ready) return;
@@ -169,6 +172,7 @@ function useOnboardingMutations(organizationId: string, factoryId: string) {
   return {
     updateFactory: useUpdateFactory(organizationId, factoryId),
     selectGitHubRepository: useSelectFactoryVcsProviderRepository(organizationId, factoryId, "github"),
+    selectBitbucketForgeRepository: useSelectFactoryVcsProviderRepository(organizationId, factoryId, "bitbucket"),
     updateOnboarding: useFactoryOnboarding(organizationId, factoryId),
     updateOrganization: useUpdateOrganization(organizationId),
     createLine: useCreateFactoryLine(organizationId, factoryId),
@@ -202,6 +206,10 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
   const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, deleteIntake, installer } =
     args.mutations;
   const githubIntegrationId = args.integrations.selections.github?.ready ? args.integrations.selections.github.id : "";
+  const bitbucketIntegrationId = args.integrations.selections.bitbucket?.ready
+    ? args.integrations.selections.bitbucket.id
+    : "";
+  const vcsIntegrationId = args.setup.vcsHost === "bitbucket" ? bitbucketIntegrationId : githubIntegrationId;
   const jira = useOnboardingJiraBinding(args.organizationId, args.factoryId, args.integrations.selections.jira);
   const linear = useOnboardingLinearBinding(args.organizationId, args.factoryId, args.integrations.selections.linear);
   const takenNames = useMemo(
@@ -232,7 +240,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     deleteIntake: deleteIntake.mutateAsync,
     listApps: () => fetchFactoryAutomations(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
-      resolveGithubDefaultBranch(args.organizationId, githubIntegrationId, repository),
+      resolveGithubDefaultBranch(args.organizationId, vcsIntegrationId, repository),
     remainingCreditCents: args.agent.remainingCreditCents,
     hostedModelsLoading: args.agent.hostedModelsLoading,
     plan: args.agent.plan,
@@ -267,13 +275,45 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
       args.setup.selectRepo(fullName);
     });
   };
+  // The backend reads the provider from the integration, so the workspace
+  // becomes a Bitbucket workspace when this save completes.
+  const selectBitbucketForgeRepository = async (fullName: string): Promise<boolean> => {
+    if (!fullName) return false;
+    return runSave(args.setSaving, async () => {
+      const factory = await args.mutations.selectBitbucketForgeRepository.mutateAsync({ repository: fullName });
+      const integrationId = factory.onboarding?.vcsIntegrationId;
+      if (!integrationId) throw new Error("Bitbucket repository selection returned no integration");
+      const installationName = await describeGitHubInstallationName(args.organizationId, integrationId);
+      args.integrations.setSelections((current) => ({
+        ...current,
+        bitbucket: { id: integrationId, name: installationName || "bitbucket", ready: true },
+      }));
+      args.setup.selectVcsHost("bitbucket");
+      args.setup.selectRepo(fullName);
+    });
+  };
+  const selectBitbucketRepository = async (fullName: string): Promise<boolean> => {
+    if (!bitbucketIntegrationId || !fullName) return false;
+    return runSave(args.setSaving, async () => {
+      await updateOnboarding.mutateAsync({
+        vcsIntegrationId: bitbucketIntegrationId,
+        appRepository: fullName,
+        backlogRepository: fullName,
+      });
+      args.setup.selectVcsHost("bitbucket");
+      args.setup.selectRepo(fullName);
+    });
+  };
 
   return {
     githubIntegrationId,
+    bitbucketIntegrationId,
     saves,
     githubOwner,
     finishSetup,
     selectCatalogRepository,
+    selectBitbucketRepository,
+    selectBitbucketForgeRepository,
     jira,
     linear,
     installer,
@@ -317,6 +357,7 @@ export function useOnboardingPageModel(args: {
     remainingCreditCents: agent.remainingCreditCents,
     simulateDiscovery: false,
     initial: initialSetupState(onboarding),
+    persistVcsHostKey: args.factoryId,
   });
   useRestoreIntegrationReadiness(setup, integrations.selections);
   const [searchParams] = useSearchParams();
@@ -381,6 +422,9 @@ export function useOnboardingPageModel(args: {
     setOpenSection,
     requestConnect,
     selectCatalogRepository: wired.selectCatalogRepository,
+    selectBitbucketRepository: wired.selectBitbucketRepository,
+    selectBitbucketForgeRepository: wired.selectBitbucketForgeRepository,
+    bitbucketIntegrationId: wired.bitbucketIntegrationId,
     integrationDialogs: createElement(OnboardingConnectDialogs, {
       connectDialogs: connect.dialogs,
       customProviderOpen: customProviderDialogOpen,

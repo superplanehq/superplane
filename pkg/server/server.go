@@ -18,10 +18,12 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/ee/rbac"
 	"github.com/superplanehq/superplane/pkg/agents"
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/blob"
 	blobazure "github.com/superplanehq/superplane/pkg/blob/azure"
 	blobfilesystem "github.com/superplanehq/superplane/pkg/blob/filesystem"
@@ -30,6 +32,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
@@ -77,6 +80,32 @@ func getAgentProviderOverride() agents.Provider {
 	agentProviderOverride.Lock()
 	defer agentProviderOverride.Unlock()
 	return agentProviderOverride.provider
+}
+
+var licenseServiceOverride = struct {
+	sync.Mutex
+	service *licensing.Service
+}{}
+
+// SetLicenseServiceForTests replaces the license service that Start creates.
+// End-to-end tests use it with licenses signed by ephemeral test keys.
+func SetLicenseServiceForTests(service *licensing.Service) func() {
+	licenseServiceOverride.Lock()
+	previous := licenseServiceOverride.service
+	licenseServiceOverride.service = service
+	licenseServiceOverride.Unlock()
+
+	return func() {
+		licenseServiceOverride.Lock()
+		licenseServiceOverride.service = previous
+		licenseServiceOverride.Unlock()
+	}
+}
+
+func getLicenseServiceOverride() *licensing.Service {
+	licenseServiceOverride.Lock()
+	defer licenseServiceOverride.Unlock()
+	return licenseServiceOverride.service
 }
 
 func buildAgentService(authService authorization.Authorization) (agents.Provider, agentsActions.AgentsService) {
@@ -427,7 +456,11 @@ func buildGRPCServices(
 	oidcProvider oidc.Provider,
 	agentService agentsActions.AgentsService,
 	jwtSigner *jwt.Signer,
+	licenseService *licensing.Service,
 ) (*grpc.Services, error) {
+	features := enterprise.NewRegistry()
+	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
+
 	return grpc.NewServices(grpc.ServicesConfig{
 		BaseURL:          baseURL,
 		WebhooksBaseURL:  webhooksBaseURL,
@@ -438,6 +471,8 @@ func buildGRPCServices(
 		OIDCProvider:     oidcProvider,
 		AgentService:     agentService,
 		JWTSigner:        jwtSigner,
+		Entitlements:     licenseService,
+		Enterprise:       features,
 	})
 }
 
@@ -700,6 +735,10 @@ func Start() {
 		encryptorInstance = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
 	}
 
+	bitbucketapp.SetSystemTokenSource(func(installationID string) (string, time.Time, error) {
+		return bitbucketapp.LoadSystemToken(context.Background(), database.Conn(), encryptorInstance, installationID, time.Now())
+	})
+
 	if err := llm.SeedDevHostedOpenRouterFromEnv(context.Background(), database.Conn(), encryptorInstance); err != nil {
 		log.WithError(err).Error("development hosted OpenRouter seed skipped")
 	}
@@ -813,6 +852,7 @@ func Start() {
 			oidcProvider,
 			agentService,
 			jwtSigner,
+			licenseService,
 		)
 		if err != nil {
 			log.Fatalf("failed to build gRPC services: %v", err)
@@ -850,13 +890,23 @@ func Start() {
 }
 
 func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {
-	keys, err := licensing.TrustedKeySet()
+	if override := getLicenseServiceOverride(); override != nil {
+		return override
+	}
+
+	extraKeys, source := developmentLicense(licensing.SourceFromEnvironment(encryptor))
+	keys, err := licensing.TrustedKeyStore(extraKeys)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load trusted license keys: %v", err))
 	}
 
-	keys, source := developmentLicense(keys, licensing.SourceFromEnvironment(encryptor))
-	service := licensing.NewService(licensing.NewVerifier(keys), source)
+	keysURL, err := licensing.KeysURLFromEnvironment()
+	if err != nil {
+		panic(fmt.Sprintf("failed to configure license key sync: %v", err))
+	}
+
+	keySync := licensing.NewKeySync(keys, licensing.DatabaseKeyListCache{}, keysURL)
+	service := licensing.NewService(licensing.NewVerifier(keys), source, licensing.WithKeySync(keySync))
 	service.Start(context.Background())
 	return service
 }

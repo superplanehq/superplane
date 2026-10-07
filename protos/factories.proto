@@ -990,6 +990,8 @@ message SelectFactoryVCSProviderRepositoryRequest {
   string id = 1;
   string provider = 2;
   int64 repository_id = 3;
+  // Bitbucket repository as workspace/slug. GitHub uses repository_id.
+  string repository = 4;
 }
 
 message SelectFactoryVCSProviderRepositoryResponse {
@@ -1034,6 +1036,22 @@ message FactoryOnboarding {
   bool initial = 11;
   int64 app_repository_id = 12;
   int64 backlog_repository_id = 13;
+  // Git host for this workspace. Empty means GitHub.
+  string vcs_provider = 14;
+  // Bitbucket repository UUID. GitHub leaves this empty.
+  string app_repository_external_id = 15;
+}
+
+// Automations the workspace Git host can run. Computed from vcs_provider.
+message FactoryVCSCapabilities {
+  bool pr_closure = 1;
+  bool pr_feedback = 2;
+  bool pr_checks = 3;
+  bool merge_confidence = 4;
+  bool velocity = 5;
+  bool board_merge = 6;
+  bool board_close = 7;
+  bool vcs_issue_intake = 8;
 }
 
 message Factory {
@@ -1067,6 +1085,7 @@ message Factory {
   string public_badge_token = 12;
   // Stable id in workspace URLs. Does not change when the workspace key changes.
   string url_id = 13;
+  FactoryVCSCapabilities vcs_capabilities = 14;
 }
 
 // Workspace Backlog Planning: chat refine plus optional Clarity and Confidence.
@@ -1309,6 +1328,9 @@ message FactoryIntake {
     // Label names that still create a task. Empty means every label.
     // Linear issue intakes only.
     repeated string linear_labels = 22;
+    // Projects that still create a task. Required for a Sentry intake.
+    // Sentry exception intakes only. Values are project slugs.
+    repeated string sentry_project_ids = 23;
   }
 
   string id = 1;
@@ -1529,6 +1551,7 @@ message FactoryPullRequestRun {
   int64 total_tokens = 3;
   int64 cost_cents = 4;
   Superplane.Canvases.CanvasRunRef run = 5;
+  repeated string models = 6;
 }
 
 message FactoryPullRequestRevision {
@@ -1548,6 +1571,7 @@ message FactoryPullRequestActivity {
   optional int32 attempt_limit = 8;
   int64 total_tokens = 9;
   int64 cost_cents = 10;
+  repeated string models = 11;
 }
 
 message FactoryPullRequest {

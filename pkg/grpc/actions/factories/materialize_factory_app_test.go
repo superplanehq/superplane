@@ -71,6 +71,25 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		assert.Equal(t, backlog.Name, defaults.Metadata.Name)
 	})
 
+	t.Run("bitbucket implement install is rejected when the feature is off", func(t *testing.T) {
+		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryBitbucket))
+		factoryModel := newFactory(t)
+		provider := models.ProviderBitbucket
+		require.NoError(t, factoryModel.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			VCSProvider: &provider,
+		}))
+		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Implement"))
+
+		_, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
+			FactoryId:  factoryModel.ID.String(),
+			TemplateId: "line-implementation",
+			AppId:      canvas.ID.String(),
+		})
+		code, _, ok := grpcerrors.HandlerStatus(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+	})
+
 	t.Run("a newly created app materializes its install template", func(t *testing.T) {
 		factoryModel := newFactory(t)
 		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Implement"))
@@ -100,7 +119,6 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 	})
 
 	t.Run("risk score install attaches the canvas to Verify", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
 		factoryModel := newFactory(t)
 		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Risk score"))
 
@@ -127,7 +145,6 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 	})
 
 	t.Run("risk score install uses the workspace SuperPlane agent", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
 		enableInstanceSuperPlaneDefault(t)
 		factoryModel := newFactory(t)
 		harness := models.FactoryOnboardingAgentHarnessSuperPlane
@@ -160,7 +177,6 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 	})
 
 	t.Run("risk score install keeps an explicit agent", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
 		enableInstanceSuperPlaneDefault(t)
 		factoryModel := newFactory(t)
 		harness := models.FactoryOnboardingAgentHarnessSuperPlane
@@ -192,19 +208,63 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		}, agent.Configuration["credentials"])
 	})
 
-	t.Run("risk score install is rejected when the feature is off", func(t *testing.T) {
-		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
+	t.Run("risk score install fills the default checks", func(t *testing.T) {
 		factoryModel := newFactory(t)
 		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Risk score"))
 
-		_, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
+		response, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
 			FactoryId:  factoryModel.ID.String(),
 			TemplateId: "risk-score",
 			AppId:      canvas.ID.String(),
+			InstallParams: map[string]string{
+				"appRepository": "acme/app",
+				"defaultBranch": "main",
+			},
 		})
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
+		require.NoError(t, err)
+
+		materialized, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+		require.NoError(t, err)
+		agent := findYAMLNode(t, materialized, "assess-risk")
+		for _, name := range []string{"Blast radius", "Performance", "Security", "Drift from Specification", "Reversibility"} {
+			implementationStep(t, agent, name)
+		}
+		assert.Contains(t, agentPrompt(t, agent), "Additive database changes = 3 (medium).")
+
+		reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.ColumnKey)
+		assert.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
+	})
+
+	t.Run("a GitHub app resets with its saved provider after the workspace uses Bitbucket", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryBitbucket))
+		factoryModel := newFactory(t)
+		provider := models.ProviderBitbucket
+		require.NoError(t, factoryModel.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
+			VCSProvider: &provider,
+		}))
+		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("PR Closure"))
+		require.NoError(t, database.DB(t.Context()).Model(&models.CanvasVersion{}).
+			Where("id = ?", *canvas.LiveVersionID).
+			Update("nodes", datatypes.NewJSONSlice([]models.Node{{
+				ID:       "on-pr-closed",
+				Name:     "On Pull Request Closed",
+				Type:     models.NodeTypeTrigger,
+				Ref:      models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onPullRequest"}},
+				Metadata: models.FactoryAppTemplateMetadataFor("pr-closure", 1, models.ProviderGitHub),
+			}})).Error)
+
+		response, err := MaterializeFactoryAutomationDefaults(ctx, orgID, &pb.MaterializeFactoryAutomationDefaultsRequest{
+			FactoryId:    factoryModel.ID.String(),
+			AutomationId: canvas.ID.String(),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "pr-closure", response.GetTemplateId())
+
+		defaults, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+		require.NoError(t, err)
+		assert.Equal(t, "github.onPullRequest", findYAMLNode(t, defaults, "on-pr-closed").Component)
 	})
 
 	t.Run("an app from another factory reports not found", func(t *testing.T) {

@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -104,6 +105,14 @@ type Server struct {
 // runs in Community mode and grants no Enterprise features.
 func (s *Server) SetLicenseService(service *licensing.Service) {
 	s.licenseService = service
+}
+
+func (s *Server) entitlements() licensing.Entitlements {
+	if s.licenseService == nil {
+		return licensing.Community
+	}
+
+	return s.licenseService
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -248,6 +257,16 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 			}
 		}
 	}
+
+	if bitbucketKey := os.Getenv("BITBUCKET_CLIENT_ID"); bitbucketKey != "" {
+		if bitbucketSecret := os.Getenv("BITBUCKET_CLIENT_SECRET"); bitbucketSecret != "" {
+			providers["bitbucket"] = authentication.ProviderConfig{
+				Key:         bitbucketKey,
+				Secret:      bitbucketSecret,
+				CallbackURL: fmt.Sprintf("%s/auth/bitbucket/callback", baseURL),
+			}
+		}
+	}
 	return providers
 }
 
@@ -277,7 +296,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 	ctx := context.Background()
 
-	authorizer := authorization.NewGatewayAuthorizer(s.authService)
+	authorizer := authorization.NewGatewayAuthorizer(s.authService).WithEntitlements(s.entitlements())
 
 	var grpcGatewayMux *runtime.ServeMux
 	grpcGatewayMux = runtime.NewServeMux(
@@ -408,6 +427,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/specs", s.handleRunnerPlanningSpec).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/updates", s.handleRunnerPlanningUpdate).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/clarity", s.handleRunnerPlanningClarity).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/confidence", s.handleRunnerPlanningConfidence).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys", s.handleRunnerPlanningSurvey).Methods("POST")
@@ -748,6 +768,12 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Methods("GET", "POST")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/webhook", s.HandleGitHubAppWebhook).Methods("POST")
+	// Forge calls these routes. The Forge Invocation Token authenticates them.
+	// They stay off the gateway authorizer, the same way the GitHub App webhook does.
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/lifecycle", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/scheduled", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/bootstrap", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/uninstall", s.HandleBitbucketForgeUninstall).Methods("POST")
 	sentryAppUserRoute := r.NewRoute().Subrouter()
 	sentryAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/install", s.HandleSentryAppInstall).Methods("GET")
@@ -786,8 +812,14 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features", s.adminListOrgExperimentalFeatures).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminEnableOrgExperimentalFeature).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminDisableOrgExperimentalFeature).Methods("DELETE")
+	adminRoute.HandleFunc("/installation/factory-templates", s.adminListFactoryTemplates).Methods("GET")
+	adminRoute.HandleFunc("/installation/factory-templates/{templateId}/reset", s.adminResetFactoryTemplate).Methods("POST")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminUpdateInstallationNetworkSettings).Methods("PATCH")
+	adminRoute.HandleFunc("/installation/license", s.adminGetInstallationLicense).Methods("GET")
+	adminRoute.HandleFunc("/installation/license", s.adminInstallInstallationLicense).Methods("PUT")
+	adminRoute.HandleFunc("/installation/license", s.adminRemoveInstallationLicense).Methods("DELETE")
+	adminRoute.HandleFunc("/installation/license/keys", s.adminInstallLicenseKeyList).Methods("PUT")
 	adminRoute.HandleFunc("/installation/llm-settings", s.adminGetInstallationLLMSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/llm-settings", s.adminUpdateInstallationLLMSettings).Methods("PATCH")
 	adminRoute.HandleFunc("/installation/llm-providers/{provider}", s.adminUpdateHostedLLMProvider).Methods("PATCH")
@@ -800,6 +832,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminGetOrganizationBillingPlan).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/spending-report", s.adminGetOrganizationSpendingReport).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/velocity", s.adminGetOrganizationVelocity).Methods("GET")
 	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks", s.adminListPolarWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks/endpoints", s.adminListPolarWebhookEndpoints).Methods("GET")
@@ -1464,6 +1497,54 @@ type AccountResponse struct {
 	LinkedAccounts               []AccountLinkedAccountResponse       `json:"linked_accounts"`
 	OrganizationsPendingDeletion []AccountOrganizationPendingDeletion `json:"organizations_pending_deletion"`
 	Impersonation                *AccountImpersonation                `json:"impersonation,omitempty"`
+	License                      AccountLicense                       `json:"license"`
+}
+
+// HideLicenseExpiryBannerEnv hides the license expiry banner when it is "yes"
+// or "true". The default is "no", so the banner stays visible.
+const HideLicenseExpiryBannerEnv = "SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER"
+
+// AccountLicense tells the UI which Enterprise features are available. Only
+// installation administrators receive the license state and expiry.
+type AccountLicense struct {
+	Edition          string     `json:"edition"`
+	Features         []string   `json:"features"`
+	State            string     `json:"state,omitempty"`
+	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
+	HideExpiryBanner bool       `json:"hide_expiry_banner,omitempty"`
+}
+
+func hideLicenseExpiryBanner() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(HideLicenseExpiryBannerEnv))) {
+	case "yes", "true":
+		return true
+	default:
+		return false
+	}
+}
+
+func accountLicense(status licensing.Status, installationAdmin bool) AccountLicense {
+	license := AccountLicense{
+		Edition:          string(status.Edition),
+		Features:         []string{},
+		HideExpiryBanner: hideLicenseExpiryBanner(),
+	}
+
+	if status.Edition == licensing.EditionEnterprise && status.License != nil {
+		license.Features = featureKeys(status.License.Features)
+	}
+
+	if !installationAdmin {
+		return license
+	}
+
+	license.State = string(status.State)
+	if status.License != nil {
+		expiresAt := status.License.ExpiresAt.UTC()
+		license.ExpiresAt = &expiresAt
+	}
+
+	return license
 }
 
 func accountOrganizationsPendingDeletion(organizations []models.Organization) []AccountOrganizationPendingDeletion {
@@ -1530,6 +1611,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		Providers:                    accountProviderResponses(providers),
 		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
 		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
+		License:                      accountLicense(s.licenseStatus(), account.IsInstallationAdmin()),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
@@ -1996,6 +2078,136 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 	return s.executeActionNode(ctx, body, headers, query, node, onNewEvents, recordExecution)
 }
 
+// lazyWebhookFactory reads the canvas only when a trigger calls it.
+// A webhook must send its response before that lookup.
+type lazyWebhookFactory struct {
+	tx       *gorm.DB
+	canvasID uuid.UUID
+	once     sync.Once
+	inner    core.FactoryContext
+	err      error
+}
+
+func newLazyWebhookFactory(tx *gorm.DB, canvasID uuid.UUID) core.FactoryContext {
+	return &lazyWebhookFactory{tx: tx, canvasID: canvasID}
+}
+
+func (l *lazyWebhookFactory) load() (core.FactoryContext, error) {
+	l.once.Do(func() {
+		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(l.tx, l.canvasID)
+		if err != nil || canvas == nil || canvas.FactoryID == nil {
+			l.err = errors.New("app is not owned by a factory")
+			return
+		}
+		l.inner = contexts.NewFactoryContext(l.tx, canvas, nil)
+	})
+	return l.inner, l.err
+}
+
+func (l *lazyWebhookFactory) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, false, err
+	}
+	return inner.CreateWorkOrder(params)
+}
+
+func (l *lazyWebhookFactory) FindWorkOrder(params core.FindWorkOrderParams) (*core.WorkOrder, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.FindWorkOrder(params)
+}
+
+func (l *lazyWebhookFactory) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, false, err
+	}
+	return inner.UpdateWorkOrderStatus(params)
+}
+
+func (l *lazyWebhookFactory) AddWorkOrderComment(params core.AddWorkOrderCommentParams) error {
+	inner, err := l.load()
+	if err != nil {
+		return err
+	}
+	return inner.AddWorkOrderComment(params)
+}
+
+func (l *lazyWebhookFactory) AddWorkOrderArtifact(params core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.AddWorkOrderArtifact(params)
+}
+
+func (l *lazyWebhookFactory) ReportWorkOrderCheck(params core.ReportWorkOrderCheckParams) (*core.WorkOrderCheck, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.ReportWorkOrderCheck(params)
+}
+
+func (l *lazyWebhookFactory) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNoteParams) (*core.WorkOrderStatusNote, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.SetWorkOrderStatusNote(params)
+}
+
+func (l *lazyWebhookFactory) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.AddPullRequest(params)
+}
+
+func (l *lazyWebhookFactory) UpdatePullRequest(params core.UpdatePullRequestParams) (*core.PullRequest, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.UpdatePullRequest(params)
+}
+
+func (l *lazyWebhookFactory) FindPullRequest(params core.FindPullRequestParams) (*core.PullRequestMatch, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.FindPullRequest(params)
+}
+
+func (l *lazyWebhookFactory) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.AddPullRequestActivity(params)
+}
+
+func (l *lazyWebhookFactory) UpdatePullRequestActivity(params core.UpdatePullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.UpdatePullRequestActivity(params)
+}
+
+func (l *lazyWebhookFactory) VCSProvider() (string, error) {
+	inner, err := l.load()
+	if err != nil {
+		return "", err
+	}
+	return inner.VCSProvider()
+}
+
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, string, error) {
 	tx := database.Conn()
 	skip, err := contexts.SkipPausedIntakeFeed(tx, node.WorkflowID)
@@ -2042,6 +2254,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
 		Events:        events,
 		Integration:   integrationCtx,
+		Factory:       newLazyWebhookFactory(tx, node.WorkflowID),
 	})
 	return code, response, integrationOrganizationID(integration), err
 }

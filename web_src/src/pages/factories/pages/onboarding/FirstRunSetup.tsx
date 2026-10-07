@@ -1,6 +1,7 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useAccount } from "@/contexts/useAccount";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
+import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { organizationMatchesRoute } from "@/lib/accountOrganizations";
 import { posthog } from "@/posthog";
 import { useNavigate } from "react-router";
@@ -8,6 +9,9 @@ import { useNavigate } from "react-router";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep } from "./AgentStep";
 import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
+import { FirstRunBitbucketChooseScreen } from "./first-run/FirstRunBitbucketChooseScreen";
+import { FirstRunBitbucketForgeScreen } from "./first-run/FirstRunBitbucketForgeScreen";
+import { FirstRunHostScreen } from "./first-run/FirstRunHostScreen";
 import { FirstRunModelSourceChoice } from "./first-run/FirstRunModelSourceChoice";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
 import { FirstRunConnectScreen } from "./first-run/FirstRunConnectScreen";
@@ -17,7 +21,7 @@ import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
-import { sphereFor } from "./first-run/firstRunSphereFor";
+import { repositorySphereFor, sphereFor } from "./first-run/firstRunSphereFor";
 import {
   agentFinishReady,
   isAgentProviderConnected,
@@ -37,6 +41,7 @@ import type { OnboardingSetupApi } from "./useOnboardingSetupState";
 
 const STEP_INDEX_FOR_SCREEN: Record<FirstRunScreen, number> = {
   welcome: 0,
+  host: 1,
   connect: 1,
   choose: 2,
   tickets: 3,
@@ -52,7 +57,8 @@ const STEP_INDEX_FOR_SCREEN_AGENT_FIRST: Record<FirstRunScreen, number> = {
 
 // The reverse path walks the exact screens in reverse order.
 const BACK_SCREEN: Partial<Record<FirstRunScreen, FirstRunScreen>> = {
-  connect: "welcome",
+  host: "welcome",
+  connect: "host",
   choose: "connect",
   tickets: "choose",
   agent: "tickets",
@@ -129,7 +135,14 @@ function AgentScreen({
   });
   const showProviders = !modelSource.offered || modelSource.choice === "own-key";
   return (
-    <FirstRunShell testId="first-run-agent" chrome={chrome} busy={saving || loading} width="wide" sphere={sphere}>
+    <FirstRunShell
+      testId="first-run-agent"
+      chrome={chrome}
+      busy={saving || loading}
+      width="wide"
+      sphere={sphere}
+      visual="preview"
+    >
       <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
         <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource, showCustomProvider)}</p>
       </FirstRunHeading>
@@ -182,6 +195,8 @@ function AgentScreen({
 
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
   const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
+  // Bitbucket has no separate connect screen.
+  if (backScreen === "connect" && flow.vcsHost === "bitbucket") return () => flow.goToScreen("host");
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
 }
 
@@ -241,6 +256,140 @@ function TicketsScreenHost({
   );
 }
 
+function bitbucketForgePhase(identityLinked: boolean, repositoryCount: number): "connect" | "grant" | "choose" {
+  if (!identityLinked) return "connect";
+  if (repositoryCount === 0) return "grant";
+  return "choose";
+}
+
+function BitbucketChooseHost({
+  organizationId,
+  flow,
+  model,
+  chrome,
+}: {
+  organizationId: string;
+  flow: FirstRunSetupFlow;
+  model: OnboardingPageModel;
+  chrome: FirstRunChrome;
+}) {
+  const connected = model.setup.connected.has("bitbucket");
+  const resources = useIntegrationResources(organizationId, model.bitbucketIntegrationId, "repository", undefined, {
+    enabled: connected && !flow.bitbucketForgeConfigured,
+  });
+  const repositories = (resources.data ?? []).map((resource) => resource.name ?? "").filter(Boolean);
+  const sphere = connected ? repositorySphereFor(model.setup.selectedRepo) : sphereFor("connect", null);
+  if (flow.bitbucketOnboardingPending || flow.bitbucketForgeConfigured || flow.bitbucketLookupFailed) {
+    return (
+      <FirstRunBitbucketForgeScreen
+        phase={bitbucketForgePhase(flow.bitbucketIdentityLinked, flow.bitbucketRepositories.length)}
+        connectHref={flow.bitbucketConnectHref}
+        installUrl={flow.bitbucketInstallUrl}
+        repositories={flow.bitbucketRepositories}
+        selectedRepository={model.setup.selectedRepo}
+        granting={flow.blockingAction === "opening-bitbucket"}
+        saving={flow.blockingAction === "saving-repository"}
+        loading={flow.bitbucketOnboardingPending}
+        loadError={flow.bitbucketLoadError}
+        lookupFailed={flow.bitbucketLookupFailed}
+        retrying={flow.bitbucketLookupRetrying}
+        chrome={chrome}
+        sphere={sphere}
+        onRetryLookup={flow.retryBitbucketLookup}
+        onGrantAccess={() => void flow.grantBitbucketAccess()}
+        onSelectRepository={model.setup.selectRepo}
+        onContinue={() => void flow.continueFromRepository()}
+      />
+    );
+  }
+  return (
+    <FirstRunBitbucketChooseScreen
+      connected={connected}
+      repositories={repositories}
+      selectedRepository={model.setup.selectedRepo}
+      loading={resources.isLoading}
+      loadError={resources.isError}
+      saving={flow.blockingAction === "saving-repository"}
+      chrome={chrome}
+      sphere={sphere}
+      onConnect={flow.connectBitbucket}
+      onSelectRepository={model.setup.selectRepo}
+      onContinue={() => void flow.continueFromRepository()}
+    />
+  );
+}
+
+/** The Git host choice, the connection, and the repository choice. */
+function VcsScreen({
+  screen,
+  organizationId,
+  flow,
+  model,
+  chrome,
+}: {
+  screen: "host" | "connect" | "choose";
+  organizationId: string;
+  flow: FirstRunSetupFlow;
+  model: OnboardingPageModel;
+  chrome: FirstRunChrome;
+}) {
+  const setup = model.setup;
+  if (screen === "host") {
+    return (
+      <FirstRunHostScreen
+        selectedHost={flow.vcsHost}
+        bitbucketAvailable={flow.bitbucketAvailable}
+        bitbucketFeatureLoading={flow.bitbucketFeatureLoading}
+        chrome={chrome}
+        sphere={sphereFor("host", setup.selectedRepo)}
+        onChooseHost={flow.chooseVcsHost}
+      />
+    );
+  }
+
+  if (screen === "connect") {
+    return (
+      <FirstRunConnectScreen
+        loading={flow.repositoriesLoading}
+        connecting={flow.blockingAction === "opening-github"}
+        connectError={flow.connectError}
+        chrome={chrome}
+        sphere={sphereFor("connect", setup.selectedRepo)}
+        onConnectGitHub={() => void flow.connectGitHub()}
+      />
+    );
+  }
+
+  if (flow.vcsHost === "bitbucket") {
+    return <BitbucketChooseHost organizationId={organizationId} flow={flow} model={model} chrome={chrome} />;
+  }
+
+  return (
+    <FirstRunChooseScreen
+      repositories={flow.repositories}
+      selectedRepository={setup.selectedRepo}
+      githubLogin={flow.githubLogin}
+      githubUserId={flow.githubUserId}
+      githubIdentities={flow.githubIdentities}
+      loading={flow.repositoriesLoading}
+      saving={flow.blockingAction === "saving-repository"}
+      grantingAccess={flow.blockingAction === "opening-github"}
+      switchingGitHubAccount={flow.blockingAction === "switching-github-account"}
+      synchronizing={flow.synchronizing}
+      pendingOrganizations={flow.pendingOrganizations}
+      appConfigured={flow.appConfigured}
+      chrome={chrome}
+      sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
+      onSelectRepository={setup.selectRepo}
+      onClearRepository={setup.clearRepository}
+      onSelectGitHubIdentity={(userId) => void flow.selectGitHubIdentity(userId)}
+      onConnectAnotherGitHubAccount={() => void flow.connectGitHub()}
+      onGrantAccess={() => void flow.grantGitHubAccess()}
+      onContinue={() => void flow.continueFromRepository()}
+    />
+  );
+}
+
 /**
  * Workspace setup, on the first-run screens. Each answer is saved through the
  * setup model. The last screen provisions the workspace and opens it.
@@ -251,7 +400,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
   const navigate = useNavigate();
   const flow = useFirstRunSetupFlow(model);
   const destination = model.provisionedDestination;
-  useGitHubInstallationChecks(organizationId, flow.screen === "choose" && !destination);
+  useGitHubInstallationChecks(organizationId, flow.screen === "choose" && flow.vcsHost !== "bitbucket" && !destination);
   const setup = model.setup;
   const accountOrganizations = useAccountOrganizations();
 
@@ -296,47 +445,19 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         firstName={firstNameOf(account?.name)}
         chrome={chromeFor("welcome")}
         sphere={sphereFor("welcome", setup.selectedRepo)}
-        onGetStarted={() => flow.goToScreen("connect")}
+        onGetStarted={() => flow.goToScreen("host")}
       />
     );
   }
 
-  if (flow.screen === "connect") {
+  if (flow.screen === "host" || flow.screen === "connect" || flow.screen === "choose") {
     return (
-      <FirstRunConnectScreen
-        loading={flow.repositoriesLoading}
-        connecting={flow.blockingAction === "opening-github"}
-        connectError={flow.connectError}
-        chrome={chromeFor("connect")}
-        sphere={sphereFor("connect", setup.selectedRepo)}
-        onConnectGitHub={() => void flow.connectGitHub()}
-      />
-    );
-  }
-
-  if (flow.screen === "choose") {
-    return (
-      <FirstRunChooseScreen
-        repositories={flow.repositories}
-        selectedRepository={setup.selectedRepo}
-        githubLogin={flow.githubLogin}
-        githubUserId={flow.githubUserId}
-        githubIdentities={flow.githubIdentities}
-        loading={flow.repositoriesLoading}
-        saving={flow.blockingAction === "saving-repository"}
-        grantingAccess={flow.blockingAction === "opening-github"}
-        switchingGitHubAccount={flow.blockingAction === "switching-github-account"}
-        synchronizing={flow.synchronizing}
-        pendingOrganizations={flow.pendingOrganizations}
-        appConfigured={flow.appConfigured}
-        chrome={chromeFor("choose")}
-        sphere={sphereFor("choose", setup.selectedRepo, model.githubOwner)}
-        onSelectRepository={setup.selectRepo}
-        onClearRepository={setup.clearRepository}
-        onSelectGitHubIdentity={(userId) => void flow.selectGitHubIdentity(userId)}
-        onConnectAnotherGitHubAccount={() => void flow.connectGitHub()}
-        onGrantAccess={() => void flow.grantGitHubAccess()}
-        onContinue={() => void flow.continueFromRepository()}
+      <VcsScreen
+        screen={flow.screen}
+        organizationId={organizationId}
+        flow={flow}
+        model={model}
+        chrome={chromeFor(flow.screen)}
       />
     );
   }

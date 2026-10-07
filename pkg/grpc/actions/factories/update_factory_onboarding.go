@@ -3,9 +3,11 @@ package factories
 import (
 	"context"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -32,17 +34,28 @@ func UpdateFactoryOnboarding(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
+	setOnboardingVCSProvider(db, orgID, &patch)
+	provider := onboardingPatchVCSProvider(patch)
 
 	if req.Complete != nil && *req.Complete {
 		config, configErr := factory.OnboardingConfigAfter(patch)
 		if configErr != nil {
 			return nil, factoryErrorToStatus(configErr, "failed to update factory onboarding")
 		}
+		if provider == "" {
+			provider = config.EffectiveVCSProvider()
+		}
+		if featureErr := requireBitbucketWorkspace(db, orgID, provider); featureErr != nil {
+			return nil, factoryErrorToStatus(featureErr, "failed to update factory onboarding")
+		}
 		if validationErr := validateFactoryOnboardingResources(db, orgID, factory, config); validationErr != nil {
 			return nil, factoryErrorToStatus(validationErr, "failed to update factory onboarding")
 		}
 		err = factory.CompleteOnboarding(db, patch)
 	} else {
+		if featureErr := requireBitbucketWorkspace(db, orgID, provider); featureErr != nil {
+			return nil, factoryErrorToStatus(featureErr, "failed to update factory onboarding")
+		}
 		err = factory.UpdateOnboarding(db, patch)
 	}
 	if err != nil {
@@ -79,8 +92,8 @@ func validateFactoryOnboardingResources(
 		if err != nil {
 			return err
 		}
-		if integration.AppName != "github" && integration.AppName != "gitlab" {
-			return invalidArgument("version control integration must be GitHub or GitLab")
+		if integration.AppName != models.ProviderGitHub && integration.AppName != "gitlab" && integration.AppName != models.ProviderBitbucket {
+			return invalidArgument("version control integration must be GitHub, GitLab, or Bitbucket")
 		}
 	}
 
@@ -150,6 +163,52 @@ func validateFactoryOnboardingResources(
 	}
 
 	return nil
+}
+
+func onboardingPatchVCSProvider(patch models.FactoryOnboardingPatch) string {
+	if patch.VCSProvider == nil {
+		return ""
+	}
+	return strings.TrimSpace(*patch.VCSProvider)
+}
+
+func requireBitbucketWorkspace(db *gorm.DB, organizationID uuid.UUID, provider string) error {
+	if provider != models.ProviderBitbucket {
+		return nil
+	}
+	organization, err := models.FindOrganizationByIDInTransaction(db, organizationID.String())
+	if err != nil {
+		return err
+	}
+	if !organization.HasExperimentalFeature(features.FeatureFactoryBitbucket) {
+		return errFactoryBitbucketDisabled
+	}
+	return nil
+}
+
+func setOnboardingVCSProvider(db *gorm.DB, organizationID uuid.UUID, patch *models.FactoryOnboardingPatch) {
+	if patch.VCSIntegrationID == nil {
+		return
+	}
+	integrationID := strings.TrimSpace(*patch.VCSIntegrationID)
+	if integrationID == "" {
+		empty := ""
+		patch.VCSProvider = &empty
+		return
+	}
+	id, err := uuid.Parse(integrationID)
+	if err != nil {
+		return
+	}
+	integration, err := models.FindIntegrationInTransaction(db, organizationID, id)
+	if err != nil {
+		return
+	}
+	provider, ok := models.VCSProviderForIntegrationApp(integration.AppName)
+	if !ok {
+		return
+	}
+	patch.VCSProvider = &provider
 }
 
 func findReadyOnboardingIntegration(

@@ -251,6 +251,26 @@ CREATE TABLE public.app_messages (
 
 
 --
+-- Name: bitbucket_forge_installations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bitbucket_forge_installations (
+    installation_id text NOT NULL,
+    workspace_uuid text DEFAULT ''::text NOT NULL,
+    workspace_slug text DEFAULT ''::text NOT NULL,
+    installer_account_id text DEFAULT ''::text NOT NULL,
+    api_base_url text DEFAULT ''::text NOT NULL,
+    system_token bytea,
+    token_expires_at timestamp without time zone,
+    last_delivery_at timestamp without time zone,
+    installed_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uninstalled_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: canvas_memories; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -878,6 +898,7 @@ CREATE TABLE public.factory_work_orders (
     auto_start_line_id uuid,
     mcp_client_id text,
     mcp_client_name text,
+    vcs_provider text,
     CONSTRAINT factory_work_orders_number_positive_check CHECK ((number > 0))
 );
 
@@ -942,6 +963,21 @@ CREATE TABLE public.hosted_llm_providers (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     management_key bytea,
     CONSTRAINT hosted_llm_providers_known CHECK ((provider = ANY (ARRAY['anthropic'::text, 'openai'::text, 'openrouter'::text])))
+);
+
+
+--
+-- Name: installation_license_keys; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_license_keys (
+    id integer NOT NULL,
+    document text NOT NULL,
+    version bigint NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT installation_license_keys_singleton CHECK ((id = 1)),
+    CONSTRAINT installation_license_keys_version_positive CHECK ((version > 0))
 );
 
 
@@ -2090,6 +2126,14 @@ ALTER TABLE ONLY public.app_messages
 
 
 --
+-- Name: bitbucket_forge_installations bitbucket_forge_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bitbucket_forge_installations
+    ADD CONSTRAINT bitbucket_forge_installations_pkey PRIMARY KEY (installation_id);
+
+
+--
 -- Name: canvas_memories canvas_memories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2439,6 +2483,14 @@ ALTER TABLE ONLY public.hosted_llm_providers
 
 ALTER TABLE ONLY public.factory_pull_request_runs
     ADD CONSTRAINT idx_factory_pull_request_runs_run_unique UNIQUE (run_id);
+
+
+--
+-- Name: installation_license_keys installation_license_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_license_keys
+    ADD CONSTRAINT installation_license_keys_pkey PRIMARY KEY (id);
 
 
 --
@@ -2995,6 +3047,13 @@ CREATE INDEX agent_sessions_provider_session_id_idx ON public.agent_sessions USI
 --
 
 CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USING btree (organization_id, user_id, canvas_id);
+
+
+--
+-- Name: bitbucket_forge_installations_workspace_uuid_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX bitbucket_forge_installations_workspace_uuid_idx ON public.bitbucket_forge_installations USING btree (workspace_uuid);
 
 
 --
@@ -5536,7 +5595,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261005155229	f
+20261006160433	f
 \.
 
 

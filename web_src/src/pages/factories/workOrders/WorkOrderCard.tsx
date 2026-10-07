@@ -81,6 +81,8 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   showClarity?: boolean;
   /** Hide Confidence when Planning has that score off. */
   showConfidenceScore?: boolean;
+  /** Review sub-parameters for the Confidence tooltip when the headline is derived. */
+  reviewMetrics?: { key: string; name: string; score: number }[];
   /**
    * True while the agent still works on this draft. The card shows
    * thinking states in the meter slot, even after a score exists.
@@ -112,7 +114,7 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * to the title, with the intake source icon on the right. Optional
  * pills sit on a middle row: an attached pull request, then
  * attention such as Waiting on status checks. The
- * footer shows when the task was created on the left, and the owner
+ * footer shows when the task was last updated on the left, and the owner
  * given name plus avatar on the right (except on drafts). Reviewed
  * drafts show Clarity and Confidence scores. The owner is display-only
  * on the card.
@@ -135,6 +137,7 @@ export function WorkOrderCard({
   confidenceScore,
   showClarity,
   showConfidenceScore,
+  reviewMetrics,
   isAnalyzing = false,
   className,
   selected = false,
@@ -147,7 +150,7 @@ export function WorkOrderCard({
   const destination = interactive
     ? (href ?? workOrderOpenPath(organizationId, factoryKey, entry.order.number, factoryLines[0]?.id))
     : "";
-  const createdAt = entry.createdAtMs > 0 ? new Date(entry.createdAtMs) : null;
+  const updatedAt = entry.updatedAtMs > 0 ? new Date(entry.updatedAtMs) : null;
   const isDraft = entry.displayStatus === "draft";
   const { showAgentQuestion, agentWorking } = draftCardActionFlags(isDraft, isAnalyzing, hasAgentQuestion);
   const cardPullRequest = selectWorkOrderCardPullRequest(pullRequests, entry.id);
@@ -201,12 +204,13 @@ export function WorkOrderCard({
         <WorkOrderCardMetaRow
           entry={entry}
           organizationId={organizationId}
-          createdAt={createdAt}
+          updatedAt={updatedAt}
           isDraft={isDraft}
           clarityScore={clarityScore}
           confidenceScore={confidenceScore}
           showClarity={showClarity}
           showConfidenceScore={showConfidenceScore}
+          reviewMetrics={reviewMetrics}
           isAnalyzing={agentWorking}
           showOwner={showOwner}
         />
@@ -335,27 +339,29 @@ function WorkOrderAgentQuestionChip({ entryId }: { entryId: string }) {
 function WorkOrderCardMetaRow({
   entry,
   organizationId,
-  createdAt,
+  updatedAt,
   isDraft,
   clarityScore,
   confidenceScore,
   showClarity = true,
   showConfidenceScore = true,
+  reviewMetrics,
   isAnalyzing,
   showOwner,
 }: {
   entry: WorkOrderListEntry;
   organizationId: string;
-  createdAt: Date | null;
+  updatedAt: Date | null;
   isDraft: boolean;
   clarityScore?: number;
   confidenceScore?: number;
   showClarity?: boolean;
   showConfidenceScore?: boolean;
+  reviewMetrics?: { key: string; name: string; score: number }[];
   isAnalyzing: boolean;
   showOwner: boolean;
 }) {
-  const createdLabel = createdAt ? formatRelative(createdAt) : "—";
+  const updatedLabel = updatedAt ? formatRelative(updatedAt) : "—";
   const hasScore = (showClarity && clarityScore != null) || (showConfidenceScore && confidenceScore != null);
   const showActions = hasScore || isAnalyzing;
   const ownerMark = showOwner || !isDraft ? <CardOwnerMark entry={entry} organizationId={organizationId} /> : null;
@@ -364,9 +370,9 @@ function WorkOrderCardMetaRow({
     <div className="mt-2 flex items-center justify-between gap-2">
       <span
         className="truncate text-[11px] leading-4 text-muted-foreground"
-        title={createdAt ? `Created ${createdAt.toLocaleString()}` : undefined}
+        title={updatedAt ? `Updated ${updatedAt.toLocaleString()}` : undefined}
       >
-        {createdLabel}
+        {updatedLabel}
       </span>
       {ownerMark || showActions ? (
         <div className="ml-auto flex h-5 min-w-0 items-center gap-1.5">
@@ -378,6 +384,7 @@ function WorkOrderCardMetaRow({
               confidence={confidenceScore}
               showClarity={showClarity}
               showConfidence={showConfidenceScore}
+              reviewMetrics={reviewMetrics}
               isAnalyzing={isAnalyzing}
             />
           ) : null}
@@ -405,6 +412,7 @@ function CardScores({
   confidence,
   showClarity = true,
   showConfidence = true,
+  reviewMetrics,
   isAnalyzing,
 }: {
   entryId: string;
@@ -412,6 +420,7 @@ function CardScores({
   confidence?: number;
   showClarity?: boolean;
   showConfidence?: boolean;
+  reviewMetrics?: { key: string; name: string; score: number }[];
   isAnalyzing: boolean;
 }) {
   if (isAnalyzing) {
@@ -433,6 +442,7 @@ function CardScores({
       confidence={confidence}
       showClarity={showClarity}
       showConfidence={showConfidence}
+      reviewMetrics={reviewMetrics}
       testId={`work-order-card-score-${entryId}`}
     />
   );

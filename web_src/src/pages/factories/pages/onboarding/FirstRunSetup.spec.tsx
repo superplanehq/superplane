@@ -1,4 +1,4 @@
-import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { act, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
@@ -35,6 +35,15 @@ const configureInstallation = vi.fn().mockResolvedValue("https://github.com/sett
 
 vi.mock("@/lib/toast", () => ({
   showErrorToast,
+}));
+
+vi.mock("./useBitbucketOnboarding", () => ({
+  useBitbucketOnboarding: () => ({
+    data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },
+    isPending: false,
+    error: null,
+    startInstallation: { mutateAsync: vi.fn() },
+  }),
 }));
 
 vi.mock("./useGitHubOnboarding", () => ({
@@ -105,6 +114,9 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
+    bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
     saving: false,
@@ -375,9 +387,15 @@ describe("FirstRunSetup GitHub catalog", () => {
       expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
 
       await user.click(screen.getByTestId("first-run-back"));
+      expect(screen.getByTestId("first-run-host")).toBeInTheDocument();
+
+      await user.click(screen.getByTestId("first-run-back"));
       expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
 
       await user.click(screen.getByTestId("first-run-get-started"));
+      expect(screen.getByTestId("first-run-host")).toBeInTheDocument();
+
+      await user.click(within(screen.getByTestId("first-run-host-github")).getByRole("button"));
       expect(await screen.findByTestId("first-run-choose")).toBeInTheDocument();
     });
   });

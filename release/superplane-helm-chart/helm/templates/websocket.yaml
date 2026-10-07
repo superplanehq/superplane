@@ -153,6 +153,8 @@ spec:
               value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
             - name: SUPERPLANE_INSTALLATION_TYPE
               value: {{ .Values.installation.type | quote }}
+            - name: SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER
+              value: {{ ternary "yes" "no" .Values.license.hideExpiryBanner | quote }}
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
             - name: BLOB_STORAGE_ACCOUNT

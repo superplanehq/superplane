@@ -40,6 +40,21 @@ Each command builds one architecture. It writes the AMI ID to
 `release/runner/packer/aws/manifest.json`. AMI IDs are specific to the selected
 AWS region. Copy or consume the manifest before the next build replaces it.
 
+To build in a specific public subnet, pass both `vpc_id` and `subnet_id`. Packer
+gives the temporary build instance a public address so it can provision over
+SSH, then deletes that instance, key pair, and security group. Leave both
+values empty to use the account default VPC.
+
+```bash
+packer build \
+  -var architecture=amd64 \
+  -var instance_type=t3.medium \
+  -var vpc_id=vpc-00000000000000000 \
+  -var subnet_id=subnet-00000000000000000 \
+  -var source_revision="$(git rev-parse HEAD)" \
+  release/runner/packer/aws/runner.pkr.hcl
+```
+
 You can also override optional Packer variables. For example:
 
 ```bash

@@ -4,7 +4,9 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { isCompactStatusText, planningClarityEnabled, planningConfidenceEnabled } = require("./analysis_protocol");
+const {
+  isCompactStatusText,
+} = require("./analysis_protocol");
 const { MAX_ATTACHMENT_BYTES } = require("./attachment_limit");
 
 const MAX_INSPECTABLE_ATTACHMENT_BYTES = MAX_ATTACHMENT_BYTES;
@@ -110,8 +112,66 @@ function writeAnalysisOutputs({ spec, score, summary }, env = process.env) {
   }
 }
 
+function scoreField(input, name) {
+  const raw = input && input[name];
+  if (!raw || typeof raw !== "object") {
+    throw new Error(`${name} is required`);
+  }
+  const score = Number(raw.score);
+  if (!Number.isFinite(score)) {
+    throw new Error(`${name} score is required`);
+  }
+  const summary = String(raw.summary || "").trim();
+  if (!summary) {
+    throw new Error(`${name} summary is required`);
+  }
+  return { score, summary };
+}
+
+async function proposeUpdate(input) {
+  const body = {};
+  if (input && input.scores) {
+    body.scores = {
+      clarity: scoreField(input.scores, "clarity"),
+      complexity: scoreField(input.scores, "complexity"),
+      verifiability: scoreField(input.scores, "verifiability"),
+    };
+  }
+  const spec = unwrapMarkdown(input && input.spec);
+  if (spec) {
+    body.spec = spec;
+  }
+  if (input && input.survey) {
+    body.survey = { questions: surveyQuestions(input.survey) };
+  }
+  if (!body.scores && !body.spec && !body.survey) {
+    throw new Error("scores, spec, or survey is required");
+  }
+  const result = await requestJSON("POST", "/api/v1/runner/planning-sessions/updates", body);
+  if (body.spec) {
+    writeAnalysisOutputs({ spec: body.spec });
+  }
+  return result;
+}
+
+function unwrapMarkdown(value) {
+  const text = String(value || "").trim();
+  if (!text.startsWith('"')) {
+    return text;
+  }
+  try {
+    const decoded = JSON.parse(text);
+    if (typeof decoded === "string" && decoded.trim()) {
+      return decoded;
+    }
+  } catch (_err) {
+    // The value is not a JSON string.
+  }
+  return text;
+}
+
 async function proposeSpec(input) {
-  const body = String((input && input.body) || "").trim();
+  const body = unwrapMarkdown(input && input.body);
   if (!body) {
     throw new Error("body is required");
   }
@@ -294,84 +354,65 @@ async function recordAgentMessage(text) {
   );
 }
 
-const TOOLS = [
-  {
-    name: "propose_spec",
-    description: "Publish the specification markdown for the open task. Call this before you stop whenever you write or update a specification this turn. Do not leave a written plan unpublished. Pass the full markdown body.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        body: { type: "string" },
-      },
-      required: ["body"],
-    },
-  },
-  {
-    name: "propose_clarity",
-    description:
-      "Publish the 1 through 5 Clarity score: how well the task is defined. Call this on the first message and on a plan turn that also asks a question. Do not call it on an answer turn. Call it before survey. If the user asks to update only the other score, do not call this tool. When every required score is 5, call this on that plan turn even if this score did not change. An unchanged score stays on the card on an answer turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        score: {
-          type: "number",
-          description: "Clarity from 1 through 5.",
-        },
-        summary: {
-          type: "string",
-          description: "Short Clarity summary for the user. Follow the task prompt for length and shape.",
-        },
-      },
-      required: ["score", "summary"],
-    },
-  },
-  {
-    name: "propose_confidence",
-    description:
-      "Publish the 1 through 5 Confidence score: how likely a coding agent completes this task in one run without steering. Call this on the first message and on a plan turn that also asks a question. Do not call it on an answer turn. Call it before survey. If the user asks to update only the other score, do not call this tool. When every required score is 5, call this on that plan turn even if this score did not change. An unchanged score stays on the card on an answer turn. Write the summary the way the task prompt asks. You may call this without propose_spec when only the score changes.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        score: {
-          type: "number",
-          description: "Confidence from 1 through 5.",
-        },
-        summary: {
-          type: "string",
-          description: "Short Confidence summary for the user. Follow the task prompt for length and shape.",
-        },
-      },
-      required: ["score", "summary"],
-    },
-  },
-  {
-    name: "survey",
-    description:
-      "Ask one multiple-choice question. Call this only when the task prompt says to ask. Use 2 to 4 short everyday options. On a plan turn, call the required score tools before this call. Call propose_spec first when you write a plan. Then stop and wait. Do not ask the same question in chat.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        questions: {
-          type: "array",
-          description:
-            "A JSON array of question objects. Do not pass XML or a JSON-encoded string.",
-          items: {
+const UPDATE_TOOL = {
+  name: "propose_update",
+  description:
+    "Publish scores, the specification, and an optional survey in one call. Pass scores as clarity, complexity, and verifiability. Each score is an integer from 1 through 3 with a one-sentence summary. Pass spec as the full markdown body. Pass survey only when you ask a question. The first plan turn must include scores.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      scores: {
+        type: "object",
+        properties: {
+          clarity: {
             type: "object",
             properties: {
-              prompt: { type: "string", description: "One plain question." },
-              options: {
-                type: "array",
-                items: { type: "string" },
-                description: "Short everyday options. Under 12 words each.",
-              },
+              score: { type: "number", description: "Integer from 1 through 3." },
+              summary: { type: "string", description: "One sentence." },
             },
-            required: ["prompt", "options"],
+            required: ["score", "summary"],
+          },
+          complexity: {
+            type: "object",
+            properties: {
+              score: { type: "number", description: "Integer from 1 through 3." },
+              summary: { type: "string", description: "One sentence." },
+            },
+            required: ["score", "summary"],
+          },
+          verifiability: {
+            type: "object",
+            properties: {
+              score: { type: "number", description: "Integer from 1 through 3." },
+              summary: { type: "string", description: "One sentence." },
+            },
+            required: ["score", "summary"],
+          },
+        },
+        required: ["clarity", "complexity", "verifiability"],
+      },
+      spec: { type: "string", description: "Full specification markdown." },
+      survey: {
+        type: "object",
+        properties: {
+          questions: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                prompt: { type: "string" },
+                options: { type: "array", items: { type: "string" } },
+              },
+              required: ["prompt", "options"],
+            },
           },
         },
       },
-      required: ["questions"],
     },
   },
+};
+
+const TOOLS = [
   {
     name: "inspect_attachment",
     description:
@@ -434,22 +475,8 @@ async function handleRequest(message) {
     const args = (params && params.arguments) || {};
     try {
       let result;
-      if (name === "propose_spec") {
-        result = await proposeSpec(args);
-      } else if (name === "propose_clarity") {
-        if (!planningClarityEnabled()) {
-          sendError(id, -32601, "Unknown tool: propose_clarity");
-          return;
-        }
-        result = await proposeClarity(args);
-      } else if (name === "propose_confidence") {
-        if (!planningConfidenceEnabled()) {
-          sendError(id, -32601, "Unknown tool: propose_confidence");
-          return;
-        }
-        result = await proposeConfidence(args);
-      } else if (name === "survey") {
-        result = await proposeSurvey(args);
+      if (name === "propose_update") {
+        result = await proposeUpdate(args);
       } else if (name === "inspect_attachment") {
         result = inspectAttachment(args);
       } else {
@@ -607,19 +634,12 @@ if (require.main === module) {
   main();
 }
 
-function planningTools(env = process.env) {
-  return TOOLS.filter((tool) => {
-    if (tool.name === "propose_clarity") {
-      return planningClarityEnabled(env);
-    }
-    if (tool.name === "propose_confidence") {
-      return planningConfidenceEnabled(env);
-    }
-    return true;
-  });
+function planningTools() {
+  return [UPDATE_TOOL, TOOLS.find((tool) => tool.name === "inspect_attachment")];
 }
 
 module.exports = {
+  proposeUpdate,
   proposeSpec,
   proposeClarity,
   proposeConfidence,

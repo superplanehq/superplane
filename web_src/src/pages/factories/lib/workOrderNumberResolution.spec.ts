@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { FactoriesWorkOrder } from "@/api-client";
 import {
+  boardLineIdFromNavigationState,
   canonicalWorkOrderNumber,
   displayedBoardLineId,
   findWorkOrderByRunId,
@@ -138,6 +139,19 @@ describe("resolvePeekWorkOrder", () => {
   });
 });
 
+describe("boardLineIdFromNavigationState", () => {
+  it("reads a line id from navigate state", () => {
+    expect(boardLineIdFromNavigationState({ lineId: "line-plan", peekOrder: ORDERS[0] })).toBe("line-plan");
+  });
+
+  it("rejects empty or malformed state", () => {
+    expect(boardLineIdFromNavigationState(undefined)).toBeUndefined();
+    expect(boardLineIdFromNavigationState({ peekOrder: ORDERS[0] })).toBeUndefined();
+    expect(boardLineIdFromNavigationState({ lineId: "  " })).toBeUndefined();
+    expect(boardLineIdFromNavigationState({ lineId: 12 })).toBeUndefined();
+  });
+});
+
 describe("displayedBoardLineId", () => {
   const lines = [{ id: "line-plan" }, { id: "line-hotfix" }];
   const order: FactoriesWorkOrder = {
@@ -146,19 +160,62 @@ describe("displayedBoardLineId", () => {
   };
 
   it("ignores a deleted task URL line and uses the dispatch line", () => {
-    expect(displayedBoardLineId(undefined, "deleted-line", lines, order, "line-plan")).toBe("line-hotfix");
+    expect(displayedBoardLineId({ queryLineId: "deleted-line", lines, order, fallbackLineId: "line-plan" })).toBe(
+      "line-hotfix",
+    );
   });
 
   it("keeps a task URL line that still exists", () => {
-    expect(displayedBoardLineId(undefined, "line-plan", lines, order, "line-hotfix")).toBe("line-plan");
+    expect(displayedBoardLineId({ queryLineId: "line-plan", lines, order, fallbackLineId: "line-hotfix" })).toBe(
+      "line-plan",
+    );
   });
 
   it("prefers the route line over the task URL line", () => {
-    expect(displayedBoardLineId("line-hotfix", "line-plan", lines, order, "line-plan")).toBe("line-hotfix");
+    expect(
+      displayedBoardLineId({
+        routeLineId: "line-hotfix",
+        queryLineId: "line-plan",
+        lines,
+        order,
+        fallbackLineId: "line-plan",
+      }),
+    ).toBe("line-hotfix");
+  });
+
+  it("uses a navigation line when the task URL has no line", () => {
+    expect(displayedBoardLineId({ navigationLineId: "line-plan", lines, order, fallbackLineId: "line-hotfix" })).toBe(
+      "line-plan",
+    );
+  });
+
+  it("prefers a live query line over the navigation line", () => {
+    expect(
+      displayedBoardLineId({
+        queryLineId: "line-plan",
+        navigationLineId: "line-hotfix",
+        lines,
+        order,
+        fallbackLineId: "line-plan",
+      }),
+    ).toBe("line-plan");
+  });
+
+  it("ignores a deleted navigation line and uses the dispatch line", () => {
+    expect(displayedBoardLineId({ navigationLineId: "deleted-line", lines, order, fallbackLineId: "line-plan" })).toBe(
+      "line-hotfix",
+    );
   });
 
   it("uses the first line when the task has no dispatch", () => {
-    expect(displayedBoardLineId(undefined, "deleted-line", lines, { id: "order-2" }, "line-plan")).toBe("line-plan");
+    expect(
+      displayedBoardLineId({
+        queryLineId: "deleted-line",
+        lines,
+        order: { id: "order-2" },
+        fallbackLineId: "line-plan",
+      }),
+    ).toBe("line-plan");
   });
 });
 

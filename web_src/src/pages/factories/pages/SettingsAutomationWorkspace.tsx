@@ -1,11 +1,12 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
+import { cn } from "@/lib/utils";
 import { Link } from "@/components/Link/link";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import { useCanvasRuntimeWebsocket } from "@/hooks/useCanvasWebsocket";
 import { Pencil } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { SettingsAutomationCanvas } from "./SettingsAutomationCanvas";
 import { FactoryAutomationRunsSidebar } from "./factoryAutomationRunsSidebar/FactoryAutomationRunsSidebar";
@@ -21,6 +22,21 @@ interface SettingsAutomationWorkspaceProps {
   editHref?: string;
   editLabel?: string;
   editTestId?: string;
+  onNodeSelect?: (nodeId: string) => void;
+  showRuns?: boolean;
+  /** Select the newest listed run once, when this workspace opens. */
+  selectLatestRun?: boolean;
+  showStatusControls?: boolean;
+  showFindControls?: boolean;
+  focusNodeId?: string | null;
+  focusNonce?: number;
+  focusFit?: boolean;
+  lockNativeZoom?: boolean;
+  layoutFitNonce?: number | null;
+  /** Keep the chosen run when this workspace unmounts. */
+  selectedRunId?: string | null;
+  onSelectedRunIdChange?: (runId: string | null) => void;
+  className?: string;
 }
 
 const DEFAULT_EDIT_LABEL = "Edit automation";
@@ -67,15 +83,81 @@ export function SettingsAutomationWorkspace({
   editHref,
   editLabel = DEFAULT_EDIT_LABEL,
   editTestId = DEFAULT_EDIT_TEST_ID,
+  onNodeSelect,
+  showRuns = true,
+  selectLatestRun = false,
+  showStatusControls = true,
+  showFindControls = true,
+  focusNodeId = null,
+  focusNonce = 0,
+  focusFit = true,
+  lockNativeZoom = false,
+  layoutFitNonce = null,
+  selectedRunId: controlledRunId,
+  onSelectedRunIdChange,
+  className,
 }: SettingsAutomationWorkspaceProps) {
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const runs = useAutomationRuns({
+    graph,
+    canvasId,
+    selectLatestRun,
+    showRuns,
+    controlledRunId,
+    onSelectedRunIdChange,
+  });
+
+  return (
+    <AutomationWorkspaceLayout
+      graph={graph}
+      testId={testId}
+      canvasId={canvasId}
+      runHrefFor={runHrefFor}
+      editHref={editHref}
+      editLabel={editLabel}
+      editTestId={editTestId}
+      onNodeSelect={onNodeSelect}
+      showStatusControls={showStatusControls}
+      showFindControls={showFindControls}
+      focusNodeId={focusNodeId}
+      focusNonce={focusNonce}
+      focusFit={focusFit}
+      lockNativeZoom={lockNativeZoom}
+      layoutFitNonce={layoutFitNonce}
+      runs={runs}
+      className={className}
+    />
+  );
+}
+
+function useAutomationRuns({
+  graph,
+  canvasId,
+  selectLatestRun,
+  showRuns,
+  controlledRunId,
+  onSelectedRunIdChange,
+}: {
+  graph: IntakeAutomationGraph;
+  canvasId?: string;
+  selectLatestRun: boolean;
+  showRuns: boolean;
+  controlledRunId?: string | null;
+  onSelectedRunIdChange?: (runId: string | null) => void;
+}) {
   const resolvedCanvasId = canvasId ?? "";
   const organizationId = graph.organizationId ?? "";
   useCanvasRuntimeWebsocket(resolvedCanvasId, organizationId, Boolean(resolvedCanvasId && organizationId));
   const runsQuery = useInfiniteCanvasRuns(resolvedCanvasId, {}, Boolean(resolvedCanvasId));
+  const listedRuns = useMemo(() => runsQuery.data?.pages.flatMap((page) => page?.runs ?? []) ?? [], [runsQuery.data]);
+  const { selectedRunId, selectRun } = useSelectedCanvasRun(
+    listedRuns,
+    selectLatestRun,
+    controlledRunId,
+    onSelectedRunIdChange,
+  );
   const selectedRunFromList = useMemo(
-    () => runsQuery.data?.pages.flatMap((page) => page?.runs ?? []).find((run) => run.id === selectedRunId) ?? null,
-    [runsQuery.data, selectedRunId],
+    () => listedRuns.find((run) => run.id === selectedRunId) ?? null,
+    [listedRuns, selectedRunId],
   );
   const runCanvas = useSettingsAutomationRunCanvas({
     organizationId: graph.organizationId,
@@ -85,37 +167,121 @@ export function SettingsAutomationWorkspace({
     liveGraph: graph,
   });
 
+  return { selectedRunId, selectRun, showRunList: Boolean(canvasId) && showRuns, runCanvas };
+}
+
+function AutomationWorkspaceLayout({
+  graph,
+  testId,
+  canvasId,
+  runHrefFor,
+  editHref,
+  editLabel,
+  editTestId,
+  onNodeSelect,
+  showStatusControls,
+  showFindControls,
+  focusNodeId,
+  focusNonce,
+  focusFit,
+  lockNativeZoom,
+  layoutFitNonce,
+  runs,
+  className,
+}: {
+  graph: IntakeAutomationGraph;
+  testId: string;
+  canvasId?: string;
+  runHrefFor?: RunsSidebarHrefForRun;
+  editHref?: string;
+  editLabel: string;
+  editTestId: string;
+  onNodeSelect?: (nodeId: string) => void;
+  showStatusControls: boolean;
+  showFindControls: boolean;
+  focusNodeId: string | null;
+  focusNonce: number;
+  focusFit: boolean;
+  lockNativeZoom: boolean;
+  layoutFitNonce: number | null;
+  runs: ReturnType<typeof useAutomationRuns>;
+  className?: string;
+}) {
   return (
     <section
-      className="relative flex min-h-0 min-w-0 flex-1 flex-col"
+      className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", className)}
       aria-label="Automation"
       data-testid={testId}
-      data-selected-run-id={selectedRunId ?? undefined}
+      data-selected-run-id={runs.selectedRunId ?? undefined}
     >
       <div className="flex min-h-[18rem] min-w-0 flex-1 overflow-hidden">
-        {canvasId ? (
+        {runs.showRunList && canvasId ? (
           <FactoryAutomationRunsSidebar
             canvasId={canvasId}
             organizationId={graph.organizationId}
             factoryId={graph.factoryId}
             runHrefFor={runHrefFor}
-            selectedRunId={selectedRunId}
-            onSelectRun={setSelectedRunId}
+            selectedRunId={runs.selectedRunId}
+            onSelectRun={runs.selectRun}
           />
         ) : null}
         <div className="min-h-0 min-w-0 flex-1">
           <SettingsAutomationCanvas
-            graph={runCanvas.graph}
-            isRunInspectionMode={runCanvas.isRunInspectionMode}
-            runCanvasLoading={runCanvas.runCanvasLoading}
-            selectedRun={runCanvas.selectedRun}
-            runParticipantNodeIds={runCanvas.runParticipantNodeIds}
-            fitAllRequest={runCanvas.fitAllRequest}
-            fitAllFocusNodeIds={runCanvas.fitAllFocusNodeIds}
+            graph={runs.runCanvas.graph}
+            isRunInspectionMode={runs.runCanvas.isRunInspectionMode}
+            runCanvasLoading={runs.runCanvas.runCanvasLoading}
+            selectedRun={runs.runCanvas.selectedRun}
+            runParticipantNodeIds={runs.runCanvas.runParticipantNodeIds}
+            fitAllRequest={runs.runCanvas.fitAllRequest}
+            fitAllFocusNodeIds={runs.runCanvas.fitAllFocusNodeIds}
+            onNodeSelect={onNodeSelect}
+            showStatusControls={showStatusControls}
+            showFindControls={showFindControls}
+            focusNodeId={focusNodeId}
+            focusNonce={focusNonce}
+            focusFit={focusFit}
+            lockNativeZoom={lockNativeZoom}
+            layoutFitNonce={layoutFitNonce}
           />
         </div>
       </div>
       {editHref ? <SettingsAutomationCanvasEdit href={editHref} label={editLabel} testId={editTestId} /> : null}
     </section>
   );
+}
+
+function useSelectedCanvasRun(
+  listedRuns: { id?: string }[],
+  selectLatestRun: boolean,
+  controlledRunId: string | null | undefined,
+  onSelectedRunIdChange?: (runId: string | null) => void,
+) {
+  const [uncontrolledRunId, setUncontrolledRunId] = useState<string | null>(null);
+  const latestRunSelected = useRef(false);
+  const isControlled = onSelectedRunIdChange !== undefined;
+  const selectedRunId = isControlled ? (controlledRunId ?? null) : uncontrolledRunId;
+
+  function selectRun(runId: string | null) {
+    if (!isControlled) {
+      setUncontrolledRunId(runId);
+    }
+    onSelectedRunIdChange?.(runId);
+  }
+
+  useEffect(() => {
+    if (!selectLatestRun || latestRunSelected.current || selectedRunId) {
+      return;
+    }
+    const latestRunId = listedRuns.find((run) => run.id)?.id;
+    if (!latestRunId) {
+      return;
+    }
+    latestRunSelected.current = true;
+    if (!isControlled) {
+      setUncontrolledRunId(latestRunId);
+    }
+    onSelectedRunIdChange?.(latestRunId);
+  }, [isControlled, listedRuns, onSelectedRunIdChange, selectLatestRun, selectedRunId]);
+
+  return { selectedRunId, selectRun };
 }

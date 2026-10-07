@@ -155,7 +155,7 @@ func TestCloneRepositoryUsesMainWhenBranchIsEmpty(t *testing.T) {
 func implementationCloneCommand(t *testing.T) string {
 	t.Helper()
 
-	result, err := materializeFactoryTemplate("line-implementation", factoryTemplateInput{
+	result, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
 		appID:   "app-1",
 		appName: "Implement refunds",
 		installParams: map[string]string{

@@ -48,6 +48,15 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
+	t.Run("known id returns bitbucket workspaces feature", func(t *testing.T) {
+		f, ok := Get(FeatureFactoryBitbucket)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureFactoryBitbucket, f.ID)
+		assert.Equal(t, "Bitbucket Workspaces", f.Label)
+		assert.Equal(t, "Connect a Bitbucket workspace and open pull requests from Implement", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("known id returns workspace models feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceModels)
 		assert.True(t, ok)
@@ -98,13 +107,10 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add skills for workspace agents", f.Description)
 	})
 
-	t.Run("known id returns factory risk score feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryRiskScore)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryRiskScore, f.ID)
-		assert.Equal(t, "Factory Merge Confidence", f.Label)
-		assert.Equal(t, "Add a merge confidence automation to the Verify column", f.Description)
-		assert.Nil(t, f.Released)
+	t.Run("retired merge confidence flag is absent", func(t *testing.T) {
+		feature, ok := Get("factory_risk_score")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
 	})
 
 	t.Run("known id returns pull request merge feature", func(t *testing.T) {
@@ -122,7 +128,7 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, FeatureSuperPlaneMCPServer, f.ID)
 		assert.Equal(t, "MCP Server", f.Label)
 		assert.Equal(t, "Allow Cursor and other MCP clients to connect to workspaces in this organization", f.Description)
-		assert.Nil(t, f.Released)
+		assert.True(t, IsReleased(FeatureSuperPlaneMCPServer))
 	})
 
 	t.Run("known id returns mobile board feature", func(t *testing.T) {
@@ -171,6 +177,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
 	assert.True(t, Exists(FeatureFactoryLinearIntake))
+	assert.True(t, Exists(FeatureFactoryBitbucket))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
@@ -178,9 +185,9 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureWorkspaceMCP))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
-	assert.True(t, Exists(FeatureFactoryRiskScore))
 	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
 	assert.True(t, Exists(FeatureMobileFactoryBoard))
+	assert.False(t, Exists("factory_risk_score"))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("factory_task_console"))
 	assert.False(t, Exists("factory_sentry_intake"))
@@ -198,6 +205,12 @@ func Test__All_omitsRetiredSentryIntakeFlag(t *testing.T) {
 func Test__All_omitsRetiredDependabotIntakeFlag(t *testing.T) {
 	for _, feature := range All() {
 		assert.NotEqual(t, "factory_dependabot_intake", feature.ID)
+	}
+}
+
+func Test__All_omitsRetiredMergeConfidenceFlag(t *testing.T) {
+	for _, feature := range All() {
+		assert.NotEqual(t, "factory_risk_score", feature.ID)
 	}
 }
 

@@ -28,7 +28,7 @@ COMPOSE_UP_EXTRA := --quiet-build
 endif
 endif
 
-PKG_TEST_PACKAGES := ./pkg/...
+PKG_TEST_PACKAGES := ./pkg/... ./ee/...
 E2E_TEST_PACKAGES := ./test/e2e/...
 
 # On CI, overlay docker-compose.ci.yml so the Go module and build caches live in
@@ -337,6 +337,7 @@ check.test.ui.shard: ensure.bun
 	$(COMPOSE) exec -e SHARD_INDEX="$(SHARD_INDEX)" -e SHARD_COUNT="$(SHARD_COUNT)" app bash -lc "bash /app/scripts/test_ui_autoparallel.sh"
 
 check.test.ui.browser:
+	$(COMPOSE) exec app bash -lc "bash /app/scripts/check_monaco_worker_startup.sh"
 	$(COMPOSE) exec app bash -lc "bash /app/scripts/check_backlog_create_tabs.sh"
 
 check.format.js:
@@ -368,9 +369,9 @@ check.lint.ui.baseline.update:
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
 
-# Release check. It reads the live issuer JWKS, so CI does not run it.
-check.license.keys:
-	$(COMPOSE) exec app go run ./scripts/check_license_keys.go
+# Release step. It reads the live issuer key list, so CI does not run it.
+license.keys.update:
+	$(COMPOSE) exec app go run ./scripts/update_license_keys.go
 
 check.generated.artifacts:
 	@tracked="$$(git ls-files -- $(GENERATED_ARTIFACT_PATHS))"; \
@@ -530,8 +531,10 @@ pb.gen.gateway:
 openapi.spec.gen: dev.test.is.running
 	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
 
+# Recreate the output directory in the app container. A host rm and mkdir
+# leaves Docker Desktop with a stale directory, and the generator cannot write.
 openapi.client.gen: dev.test.is.running
-	@rm -rf pkg/openapi_client
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "rm -rf pkg/openapi_client && mkdir -p pkg/openapi_client"
 	@./scripts/docker-pull-retry $(OPENAPI_GENERATOR_IMAGE)
 	@log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
 	if ! docker run --rm --user $(shell id -u):$(shell id -g) \

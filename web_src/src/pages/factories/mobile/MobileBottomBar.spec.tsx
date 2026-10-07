@@ -15,7 +15,7 @@ import {
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
-import { factoryVelocityPath } from "../lib/factoryPagePaths";
+import { factorySettingsPath, factoryVelocityPath } from "../lib/factoryPagePaths";
 import { MobileBottomBar } from "./MobileBottomBar";
 
 vi.mock("@/contexts/useAccount", () => ({
@@ -103,5 +103,15 @@ describe("MobileBottomBar", () => {
       "href",
       `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
     );
+  });
+
+  it("opens the settings index and stays active on every settings page", () => {
+    const settingsIndex = factorySettingsPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT);
+    renderBar(`${settingsIndex}/organization/members`);
+
+    const settingsTab = screen.getByTestId("mobile-tab-settings");
+    expect(settingsTab).toHaveAttribute("href", settingsIndex);
+    expect(settingsTab).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("mobile-tab-velocity")).not.toHaveAttribute("aria-current");
   });
 });

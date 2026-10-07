@@ -8,6 +8,7 @@ import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
+import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { ArrowLeft, ChevronDown, ExternalLink } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -15,6 +16,7 @@ import { useLocation, useNavigate, useParams } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { factoryHomePath, firstFactoryLineId, workOrderBoardLineIdFromSearch } from "../lib/factoryPagePaths";
+import { boardLineIdFromNavigationState, displayedBoardLineId } from "../lib/workOrderNumberResolution";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { formatWorkOrderIdentifier } from "../lib/workspaceKey";
 import { PhaseGlyph } from "../pages/linePhaseGlyph";
@@ -22,6 +24,7 @@ import type { PhaseGlyphKind } from "../lib/linePhaseRuns";
 import { OutputList, OwnerTimeCostRow } from "../pages/work-order-popup-redesign/popupShared";
 import { SplitRunCheckPills, SplitRunReview } from "../pages/work-order-split-run/SplitRunReview";
 import { DRAFT_START_MODEL_AUTO } from "../pages/work-order-split-run/draftStartModel";
+import { factoryPlanningEnabled } from "../pages/planningSettingsModel";
 import {
   columnAppsFromFactoryApps,
   splitRunFixtureForWorkOrder,
@@ -33,8 +36,10 @@ import {
 import { useSplitRunFooterActions } from "../pages/work-order-split-run/useSplitRunFooterActions";
 import { useSplitRunFooterCloser } from "../pages/work-order-split-run/useSplitRunFooterCloser";
 import { draftStartAction, footerMutationHandlers } from "../pages/work-order-split-run/workOrderPopupActions";
+import { useColumnAppCheckRuns } from "../pages/work-order-split-run/useColumnAppCheckRuns";
 import { useWorkOrderPRFeedbackLog } from "../pages/useWorkOrderPRFeedbackRunHref";
 import { MOBILE_TASK_COPY } from "./mobileCopy";
+import { MobileDraftStartModelSelect } from "./MobileDraftStartModelSelect";
 
 const PHASE_GLYPH: Record<SplitRunPhaseStatus, PhaseGlyphKind> = {
   passed: "passed",
@@ -45,6 +50,22 @@ const PHASE_GLYPH: Record<SplitRunPhaseStatus, PhaseGlyphKind> = {
   cancelled: "cancelled",
 };
 
+function taskBackLineId(
+  search: string,
+  locationState: unknown,
+  factory: { lines?: Array<{ id?: string }> } | null | undefined,
+  order: FactoriesWorkOrder | undefined,
+  taskPending: boolean,
+): string | undefined {
+  return displayedBoardLineId({
+    queryLineId: workOrderBoardLineIdFromSearch(search),
+    navigationLineId: boardLineIdFromNavigationState(locationState),
+    lines: factory?.lines ?? [],
+    order,
+    fallbackLineId: taskPending ? undefined : firstFactoryLineId(factory),
+  });
+}
+
 /**
  * Full-screen task view for the phone shell. Everything stacks in one
  * scrolling column so titles, notes, and the activity log stay readable on a
@@ -53,24 +74,30 @@ const PHASE_GLYPH: Record<SplitRunPhaseStatus, PhaseGlyphKind> = {
 export function MobileTaskDetailPage() {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const { orderNumber = "" } = useParams<{ orderNumber?: string }>();
-  const { search } = useLocation();
+  const { search, state: locationState } = useLocation();
   const navigate = useNavigate();
-  const boardLineId = workOrderBoardLineIdFromSearch(search) ?? firstFactoryLineId(factory);
   const { data: order, isLoading, isError } = useWorkOrder(organizationId, factoryId, orderNumber);
-  const backToBoard = () => navigate(factoryHomePath(organizationId, routeSegment, boardLineId));
+  const taskPending = isLoading && !order;
+  const boardLineId = taskBackLineId(search, locationState, factory, order, taskPending);
+  const backToBoard = () => {
+    if (!boardLineId) {
+      return;
+    }
+    navigate(factoryHomePath(organizationId, routeSegment, boardLineId));
+  };
 
   usePageTitle([order?.title ?? "Task", factory?.name ?? "Workspace"]);
 
   if (isLoading && !order) {
     return (
-      <MobileTaskFrame onBack={backToBoard}>
+      <MobileTaskFrame onBack={backToBoard} backDisabled={!boardLineId}>
         <p className="px-4 py-8 text-[13px] text-muted-foreground">{MOBILE_TASK_COPY.loading}</p>
       </MobileTaskFrame>
     );
   }
   if (!order?.id || isError) {
     return (
-      <MobileTaskFrame onBack={backToBoard}>
+      <MobileTaskFrame onBack={backToBoard} backDisabled={!boardLineId}>
         <div className="px-4 py-8" data-testid="mobile-task-not-found">
           <p className="text-[15px] font-semibold text-foreground">{MOBILE_TASK_COPY.notFound}</p>
           <p className="mt-1 text-[13px] text-muted-foreground">{MOBILE_TASK_COPY.notFoundHelp}</p>
@@ -86,6 +113,7 @@ export function MobileTaskDetailPage() {
       lineId={boardLineId}
       lineName={factory?.lines?.find((line) => line.id === boardLineId)?.name}
       onBack={backToBoard}
+      backDisabled={!boardLineId}
     />
   );
 }
@@ -96,12 +124,14 @@ type MobileTaskModel = {
   pullRequests: FactoriesFactoryPullRequest[];
   canUpdate: boolean;
   lineName?: string;
-  onStart: ReturnType<typeof draftStartAction>;
+  planningEnabled: boolean;
+  dispatchDraft?: (model?: string, thinkingLevel?: string) => Promise<void>;
   onArchive: ReturnType<typeof footerMutationHandlers>["onArchive"];
   onReject: ReturnType<typeof footerMutationHandlers>["onReject"];
   onStop: ReturnType<typeof footerMutationHandlers>["onStop"];
   startBusy: boolean;
   actionBusy: boolean;
+  columnAppRunQueries: ReturnType<typeof useColumnAppCheckRuns>["queries"];
 };
 
 /** Loads everything the task screen shows and wires the footer actions. */
@@ -112,7 +142,7 @@ function useMobileTaskModel(
   rawLineName: string | undefined,
   onDone: () => void,
 ): MobileTaskModel {
-  const { organizationId, factoryId } = useFactoriesLayout();
+  const { organizationId, factoryId, factory } = useFactoriesLayout();
   const { canAct } = usePermissions();
   const canUpdate = canAct("work_orders", "update");
   const lineName = rawLineName?.trim() || undefined;
@@ -126,6 +156,8 @@ function useMobileTaskModel(
   const backlogAnalysis = useFactoryBacklogAnalysis(organizationId, factoryId);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
   const footerActions = useSplitRunFooterActions(organizationId, factoryId, orderId);
+  const columnApps = columnAppsFromFactoryApps(apps);
+  const columnAppCheckRuns = useColumnAppCheckRuns(order.checks, columnApps, pullRequests);
 
   const fixture = splitRunFixtureForWorkOrder(order, {
     checks: order.checks,
@@ -135,20 +167,17 @@ function useMobileTaskModel(
     demoArtifacts: false,
     prFeedbackRuns,
     analysisRuns: backlogAnalysis.runsByWorkOrder.get(orderId) ?? [],
-    columnApps: columnAppsFromFactoryApps(apps),
+    columnApps,
     isAnalyzing: backlogAnalysis.analyzingOrderIds.has(orderId),
     stoppedBy: closer.actor,
     closer,
     resolveUser,
+    columnAppRuns: columnAppCheckRuns.lookup,
   });
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, onDone);
-  const onStart = draftStartAction(
-    fixture.footer.kind,
-    lineName
-      ? (model, thinkingLevel) => cardActions.onDispatch(orderId, { lineName, model, thinkingLevel })
-      : undefined,
-    DRAFT_START_MODEL_AUTO,
-  );
+  const dispatchDraft = lineName
+    ? (model?: string, thinkingLevel?: string) => cardActions.onDispatch(orderId, { lineName, model, thinkingLevel })
+    : undefined;
 
   return {
     fixture,
@@ -156,12 +185,14 @@ function useMobileTaskModel(
     pullRequests,
     canUpdate,
     lineName,
-    onStart,
+    planningEnabled: factoryPlanningEnabled(factory),
+    dispatchDraft,
     onArchive: mutations.onArchive,
     onReject: mutations.onReject,
     onStop: mutations.onStop,
     startBusy: cardActions.dispatchingOrderIds.has(orderId),
     actionBusy: footerActions.busy,
+    columnAppRunQueries: columnAppCheckRuns.queries,
   };
 }
 
@@ -171,20 +202,38 @@ function LoadedMobileTask({
   lineId,
   lineName,
   onBack,
+  backDisabled,
 }: {
   order: FactoriesWorkOrder;
   orderId: string;
   lineId?: string;
   lineName?: string;
   onBack: () => void;
+  backDisabled?: boolean;
 }) {
   const { organizationId, factoryId, routeSegment } = useFactoriesLayout();
+  const startLineKey = lineId || lineName || "";
+  const [draftLineKey, setDraftLineKey] = useState(startLineKey);
+  const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
+  const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
+  if (draftLineKey !== startLineKey) {
+    setDraftLineKey(startLineKey);
+    setDraftModel(DRAFT_START_MODEL_AUTO);
+  }
   const model = useMobileTaskModel(order, orderId, lineId, lineName, onBack);
   const { fixture, artifacts, pullRequests } = model;
   const activity = fixture.phases.filter((phase) => !phase.historyRun);
+  const onStart = draftStartAction(
+    fixture.footer.kind,
+    model.dispatchDraft,
+    draftModel,
+    model.planningEnabled ? draftThinking : undefined,
+  );
+  const showModelSelect = showsPhoneDraftModelSelect(model.planningEnabled, fixture.footer);
 
   return (
-    <MobileTaskFrame onBack={onBack}>
+    <MobileTaskFrame onBack={onBack} backDisabled={backDisabled}>
+      {model.columnAppRunQueries}
       <article className="flex flex-col gap-5 px-4 pt-3 pb-8" data-testid="mobile-task-detail">
         <MobileTaskHeader order={order} fixture={fixture} />
 
@@ -197,7 +246,23 @@ function LoadedMobileTask({
           orderNumber={order.number}
           pullRequests={pullRequests}
           canAct={model.canUpdate}
-          onStart={model.onStart}
+          onStart={onStart}
+          modelSelect={
+            showModelSelect ? (
+              <MobileDraftStartModelSelect
+                organizationId={organizationId}
+                factoryId={factoryId}
+                lineName={model.lineName}
+                model={draftModel}
+                thinkingLevel={draftThinking}
+                disabled={!model.canUpdate || model.startBusy}
+                onChange={({ model: nextModel, thinkingLevel }) => {
+                  setDraftModel(nextModel);
+                  setDraftThinking(thinkingLevel);
+                }}
+              />
+            ) : undefined
+          }
           onArchive={model.onArchive}
           onReject={model.onReject}
           onStop={model.onStop}
@@ -245,6 +310,10 @@ function LoadedMobileTask({
   );
 }
 
+function showsPhoneDraftModelSelect(planningEnabled: boolean, footer: SplitRunFixture["footer"]): boolean {
+  return planningEnabled && footer.kind === "draft" && footer.actions.some((action) => action.kind === "start");
+}
+
 /** Key, status, full title, and the owner/time/cost row. The title wraps instead of truncating. */
 function MobileTaskHeader({ order, fixture }: { order: FactoriesWorkOrder; fixture: SplitRunFixture }) {
   const { organizationId, factoryKey } = useFactoriesLayout();
@@ -286,7 +355,15 @@ function MobileTaskHeader({ order, fixture }: { order: FactoriesWorkOrder; fixtu
   );
 }
 
-function MobileTaskFrame({ onBack, children }: { onBack: () => void; children: ReactNode }) {
+function MobileTaskFrame({
+  onBack,
+  backDisabled = false,
+  children,
+}: {
+  onBack: () => void;
+  backDisabled?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="mobile-task-page">
       <div className="flex h-12 shrink-0 items-center border-b border-border px-2 pt-[env(safe-area-inset-top)]">
@@ -295,6 +372,7 @@ function MobileTaskFrame({ onBack, children }: { onBack: () => void; children: R
           variant="ghost"
           size="sm"
           onClick={onBack}
+          disabled={backDisabled}
           className="gap-1.5 text-muted-foreground"
           data-testid="mobile-task-back"
         >

@@ -39,12 +39,70 @@ function useChart() {
   return context;
 }
 
+type ChartBoxSize = {
+  width: number;
+  height: number;
+};
+
+function readPositiveChartBox(element: Element): ChartBoxSize | null {
+  const { width, height } = element.getBoundingClientRect();
+  if (width <= 0 || height <= 0) {
+    return null;
+  }
+  return { width, height };
+}
+
+function assignElementRef<T>(ref: React.Ref<T> | undefined, node: T | null) {
+  if (typeof ref === "function") {
+    ref(node);
+    return;
+  }
+  if (ref) {
+    ref.current = node;
+  }
+}
+
+function useMeasuredChartBox<T extends Element>(forwardedRef?: React.Ref<T>) {
+  const elementRef = React.useRef<T | null>(null);
+  const [size, setSize] = React.useState<ChartBoxSize>({ width: 0, height: 0 });
+  const ref = React.useCallback(
+    (node: T | null) => {
+      elementRef.current = node;
+      assignElementRef(forwardedRef, node);
+    },
+    [forwardedRef],
+  );
+
+  React.useEffect(() => {
+    const element = elementRef.current;
+    if (!element) {
+      return;
+    }
+
+    const update = () => {
+      const next = readPositiveChartBox(element);
+      if (!next) {
+        return;
+      }
+      setSize((current) => (current.width === next.width && current.height === next.height ? current : next));
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return { ref, width: size.width, height: size.height };
+}
+
 function ChartContainer({
   id,
   className,
   children,
   config,
   initialDimension = INITIAL_DIMENSION,
+  ref: forwardedRef,
   ...props
 }: React.ComponentProps<"div"> & {
   config: ChartConfig;
@@ -56,6 +114,8 @@ function ChartContainer({
 }) {
   const uniqueId = React.useId();
   const chartId = `chart-${id ?? uniqueId.replace(/:/g, "")}`;
+  const { ref, width, height } = useMeasuredChartBox<HTMLDivElement>(forwardedRef);
+  const hasPositiveSize = width > 0 && height > 0;
 
   return (
     <ChartContext.Provider value={{ config }}>
@@ -67,11 +127,14 @@ function ChartContainer({
           className,
         )}
         {...props}
+        ref={ref}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer initialDimension={initialDimension}>
-          {children}
-        </RechartsPrimitive.ResponsiveContainer>
+        {hasPositiveSize ? (
+          <RechartsPrimitive.ResponsiveContainer width={width} height={height} initialDimension={initialDimension}>
+            {children}
+          </RechartsPrimitive.ResponsiveContainer>
+        ) : null}
       </div>
     </ChartContext.Provider>
   );

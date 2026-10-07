@@ -252,6 +252,7 @@ function IntakeSettingsTabPanel({
         organizationId={agent.organizationId}
         factoryId={agent.factoryId}
         factoryKey={agent.factoryKey}
+        automationId={agent.automationId}
         isLoading={agent.isLoading}
         showAutomationNote={false}
         showCancel={false}
@@ -331,7 +332,13 @@ function IntakeGeneralTab({
             integrationId={integrationId}
             projectId={resourceId}
           />
-          <SentryIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
+          <SentryIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
+          />
           <DependabotIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
           <ProductiveIntakeFilterFields
             sourceId={sourceId}

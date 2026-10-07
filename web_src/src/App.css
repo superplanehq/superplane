@@ -525,6 +525,25 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Step settings graph. Warm paper, so the pane does not use the cool canvas dots. */
+.theme-factories .settings-graph {
+  background-color: #f4f1ea;
+  background-image:
+    linear-gradient(to right, #e4dccf 1px, transparent 1px),
+    linear-gradient(to bottom, #e4dccf 1px, transparent 1px);
+  background-size: 14px 14px, 14px 14px;
+}
+
+.theme-factories .settings-graph .react-flow,
+.theme-factories .settings-graph .react-flow__background {
+  background: transparent !important;
+}
+
+.theme-factories .settings-graph .react-flow__background pattern,
+.theme-factories .settings-graph .react-flow__background rect {
+  display: none;
+}
+
 .theme-factories.dark,
 .dark .theme-factories {
   --background: #14120b;
@@ -594,6 +613,15 @@
 
   --work-order-mention-fg: #4493f8;
   --work-order-mention-bg: rgba(56, 139, 253, 0.15);
+}
+
+.theme-factories.dark .settings-graph,
+.dark .theme-factories .settings-graph {
+  background-color: #17150f;
+  background-image:
+    linear-gradient(to right, #2e2b24 1px, transparent 1px),
+    linear-gradient(to bottom, #2e2b24 1px, transparent 1px);
+  background-size: 14px 14px, 14px 14px;
 }
 
 /*
@@ -1183,6 +1211,50 @@
   animation: sp-confidence-why-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.sp-confidence-drawer {
+  animation: sp-confidence-drawer-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sp-confidence-drawer[data-side="below"] {
+  animation-name: sp-confidence-drawer-in-below;
+}
+
+.sp-confidence-drawer .sp-review-metric {
+  animation: sp-review-metric-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sp-confidence-drawer .sp-review-metric:nth-child(2) {
+  animation-delay: 50ms;
+}
+
+.sp-confidence-drawer .sp-review-metric:nth-child(3) {
+  animation-delay: 100ms;
+}
+
+@keyframes sp-confidence-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sp-confidence-drawer-in-below {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 @keyframes sp-text-reveal {
   from {
     opacity: 0;
@@ -1198,6 +1270,17 @@
   from {
     opacity: 0;
     transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sp-review-metric-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -1553,7 +1636,9 @@
     opacity: 1 !important;
   }
 
-  .sp-confidence-why[data-state="open"] {
+  .sp-confidence-why[data-state="open"],
+  .sp-confidence-drawer,
+  .sp-confidence-drawer .sp-review-metric {
     animation: none;
   }
 

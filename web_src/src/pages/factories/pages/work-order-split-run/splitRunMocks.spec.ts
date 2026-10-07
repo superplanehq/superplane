@@ -30,8 +30,22 @@ import {
 } from "../../__fixtures__/workOrderCheckFixtures";
 import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCandidates";
 import { splitRunDecisionTone } from "./splitRunFooter";
-import { splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
+import { columnAppCheckRunsToDescribe, splitRunFixtureForWorkOrder, splitRunStatusLabel } from "./splitRunMocks";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
+
+function mergeConfidenceCheck(runId = "run-merge") {
+  return {
+    id: "check-merge",
+    key: "merge-confidence",
+    name: "Merge confidence",
+    score: 4,
+    maxScore: 5,
+    level: "LEVEL_POSITIVE" as const,
+    automation: { appId: "app-merge", appName: "Merge confidence" },
+    runId,
+    updatedAt: "2026-08-26T11:10:00Z",
+  };
+}
 
 function dispatch(state: FactoriesWorkOrderLineDispatch["state"], stepExecutions: FactoriesWorkOrderExecution[]) {
   return {
@@ -124,7 +138,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footerTone).toBe("running");
-    expect(fixture.footer.note?.headline).toBe("Implement is running");
+    expect(fixture.footer.note?.headline).toBe("Implementation in progress");
     expect(fixture.footer.run).toEqual({
       appId: "app-refund-implementer",
       runId: RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[0]?.run?.id,
@@ -2001,6 +2015,110 @@ describe("line board work-order examples", () => {
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Archive", "Start"]);
   });
 
+  it("puts review scores on the analysis phase instead of leftover Confidence", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [
+        {
+          id: "check-confidence",
+          key: "confidence",
+          name: "Confidence score",
+          score: 2,
+          maxScore: 5,
+          format: "FORMAT_FRACTION",
+          level: "LEVEL_CAUTION",
+        },
+        {
+          id: "check-clarity",
+          key: "clarity",
+          name: "Clarity score",
+          score: 3,
+          maxScore: 3,
+          format: "FORMAT_FRACTION",
+          level: "LEVEL_POSITIVE",
+        },
+        {
+          id: "check-complexity",
+          key: "complexity",
+          name: "Complexity",
+          score: 2,
+          maxScore: 3,
+          format: "FORMAT_FRACTION",
+          level: "LEVEL_CAUTION",
+        },
+        {
+          id: "check-verifiability",
+          key: "verifiability",
+          name: "Verifiability",
+          score: 3,
+          maxScore: 3,
+          format: "FORMAT_FRACTION",
+          level: "LEVEL_POSITIVE",
+        },
+      ],
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-review",
+            canvasId: "canvas-backlog",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-28T12:00:00Z",
+            finishedAt: "2026-08-28T12:00:20Z",
+          },
+        },
+      ],
+    });
+
+    const analysis = fixture.phases.find((phase) => phase.id.startsWith("backlog-analysis-"));
+    expect(analysis?.checks?.map((check) => check.name)).toEqual(["Clarity", "Complexity", "Verifiability"]);
+  });
+
+  it("keeps leftover Confidence until all three review scores exist", () => {
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [
+        {
+          id: "check-confidence",
+          key: "confidence",
+          name: "Confidence score",
+          score: 2,
+          maxScore: 5,
+          format: "FORMAT_FRACTION",
+          level: "LEVEL_CAUTION",
+        },
+        {
+          id: "check-clarity",
+          key: "clarity",
+          name: "Clarity score",
+          score: 3,
+          maxScore: 3,
+          format: "FORMAT_FRACTION",
+          level: "LEVEL_POSITIVE",
+        },
+      ],
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-partial",
+            canvasId: "canvas-backlog",
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-28T12:00:00Z",
+            finishedAt: "2026-08-28T12:00:20Z",
+          },
+        },
+      ],
+    });
+
+    const analysis = fixture.phases.find((phase) => phase.id.startsWith("backlog-analysis-"));
+    expect(analysis?.checks?.map((check) => check.name)).toEqual(["Confidence score", "Clarity score"]);
+  });
+
   it("appends matching PR feedback runs after line steps, oldest first", () => {
     const fixture = splitRunFixtureForWorkOrder(LINE_BOARD_VERIFY_PR_REVIEW_ORDER, {
       prFeedbackRuns: [
@@ -2266,6 +2384,140 @@ describe("line board work-order examples", () => {
     });
 
     expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")?.duration).toBe("");
+  });
+
+  it("uses a described canvas run when the pull request has no linked run", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [mergeConfidenceCheck()],
+      columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      columnAppRuns: {
+        runsById: new Map([
+          [
+            "run-merge",
+            {
+              id: "run-merge",
+              canvasId: "app-merge",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T11:00:00Z",
+              finishedAt: "2026-08-26T11:18:08Z",
+              totalTokens: "46200",
+              costCents: "45",
+              models: ["anthropic/claude-sonnet-4-6"],
+            },
+          ],
+        ]),
+        loadingIds: new Set(),
+      },
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")).toMatchObject({
+      duration: "18m 8s",
+      costCents: "45",
+      totalTokens: "46200",
+      model: "anthropic/claude-sonnet-4-6",
+    });
+  });
+
+  it("leaves column-app duration blank while the canvas run lookup is loading", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [mergeConfidenceCheck()],
+      columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      columnAppRuns: {
+        runsById: new Map(),
+        loadingIds: new Set(["run-merge"]),
+      },
+    });
+
+    expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")?.duration).toBe("");
+  });
+
+  it("omits a zero dollar amount on a column-app check card", () => {
+    const fixture = splitRunFixtureForWorkOrder(OPEN_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [mergeConfidenceCheck()],
+      columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      columnAppRuns: {
+        runsById: new Map([
+          [
+            "run-merge",
+            {
+              id: "run-merge",
+              canvasId: "app-merge",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-08-26T11:00:00Z",
+              finishedAt: "2026-08-26T11:04:00Z",
+              totalTokens: "1200",
+              costCents: "0",
+              models: ["anthropic/claude-sonnet-4-6"],
+            },
+          ],
+        ]),
+        loadingIds: new Set(),
+      },
+    });
+    const phase = fixture.phases.find((entry) => entry.id === "column-app-run-merge");
+
+    expect(phase?.costCents).toBeUndefined();
+    expect(phase?.totalTokens).toBe("1200");
+    expect(phase?.model).toBe("anthropic/claude-sonnet-4-6");
+  });
+
+  it("shows the model from the linked pull request without describing the run", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      {
+        ...OPEN_WORK_ORDER,
+        pullRequests: [
+          {
+            number: "12",
+            runs: [
+              {
+                totalTokens: "46200",
+                costCents: "45",
+                models: ["anthropic/claude-sonnet-4-6"],
+                run: {
+                  id: "run-merge",
+                  canvasId: "app-merge",
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                  createdAt: "2026-08-26T11:00:00Z",
+                  finishedAt: "2026-08-26T11:18:08Z",
+                },
+              },
+            ],
+          },
+        ],
+      },
+      {
+        demoArtifacts: false,
+        checks: [mergeConfidenceCheck()],
+        columnApps: [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }],
+      },
+    );
+
+    expect(fixture.phases.find((phase) => phase.id === "column-app-run-merge")).toMatchObject({
+      duration: "18m 8s",
+      costCents: "45",
+      totalTokens: "46200",
+      model: "anthropic/claude-sonnet-4-6",
+    });
+  });
+
+  it("does not describe a column-app check run that the pull request already links", () => {
+    const checks = [mergeConfidenceCheck(), { ...mergeConfidenceCheck(), id: "check-missing", runId: "run-missing" }];
+    const columnApps = [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }];
+    const pullRequests = [
+      {
+        runs: [{ run: { id: "run-merge" } }],
+      },
+    ];
+
+    expect(columnAppCheckRunsToDescribe(columnApps, checks, pullRequests)).toEqual([
+      { appId: "app-merge", runId: "run-missing" },
+    ]);
   });
 
   it("keeps a column-app check card live while the canvas run continues", () => {

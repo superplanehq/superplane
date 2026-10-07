@@ -2,7 +2,6 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { cn } from "@/lib/utils";
 
 import {
   PLANNING_SETTINGS_COPY,
@@ -25,51 +24,13 @@ export function PlanningSettingsFields({
     <>
       <PlanningToggleRow
         title={PLANNING_SETTINGS_COPY.planningLabel}
-        description={PLANNING_SETTINGS_COPY.planningHelper}
+        description={PLANNING_SETTINGS_COPY.planningReviewHelper}
         checked={draft.enabled}
         onCheckedChange={(enabled) => onUpdate("enabled", enabled)}
         testId="planning-settings-enabled"
       />
-      <PlanningChecksSection draft={draft} onUpdate={onUpdate} />
       <AutoStartSection draft={draft} lines={lines} onUpdate={onUpdate} />
     </>
-  );
-}
-
-function PlanningChecksSection({ draft, onUpdate }: { draft: PlanningDraftSettings; onUpdate: PlanningUpdate }) {
-  const disabled = !draft.enabled;
-  return (
-    <section className="space-y-3" data-testid="planning-settings-checks" aria-disabled={disabled}>
-      <div>
-        <h3 className="text-sm font-medium text-gray-800 dark:text-gray-100">{PLANNING_SETTINGS_COPY.checksLabel}</h3>
-        <p className="workspace-body-text mt-1 text-muted-foreground">
-          {disabled ? PLANNING_SETTINGS_COPY.checksOffHelper : PLANNING_SETTINGS_COPY.checksHelper}
-        </p>
-      </div>
-      <div
-        className={cn(
-          "flex flex-col divide-y divide-border rounded-lg border border-border bg-card px-3 transition-opacity",
-          disabled && "opacity-60",
-        )}
-      >
-        <PlanningToggleRow
-          title={PLANNING_SETTINGS_COPY.confidenceLabel}
-          description={PLANNING_SETTINGS_COPY.confidenceHelper}
-          checked={draft.confidence}
-          disabled={disabled}
-          onCheckedChange={(confidence) => onUpdate("confidence", confidence)}
-          testId="planning-settings-confidence"
-        />
-        <PlanningToggleRow
-          title={PLANNING_SETTINGS_COPY.clarityLabel}
-          description={PLANNING_SETTINGS_COPY.clarityHelper}
-          checked={draft.clarity}
-          disabled={disabled}
-          onCheckedChange={(clarity) => onUpdate("clarity", clarity)}
-          testId="planning-settings-clarity"
-        />
-      </div>
-    </section>
   );
 }
 
@@ -98,7 +59,7 @@ function AutoStartSection({
   lines: PlanningAutoStartLine[];
   onUpdate: PlanningUpdate;
 }) {
-  const unavailable = !draft.enabled || !draft.confidence || lines.length === 0;
+  const unavailable = !draft.enabled || lines.length === 0;
   const selected = lines.find((line) => line.id === draft.autoStartLineId);
   const checked = Boolean(selected);
   const showLineSelect = lines.length > 1 && checked;
@@ -155,13 +116,10 @@ function autoStartDescription(draft: PlanningDraftSettings, lines: PlanningAutoS
   if (!draft.enabled) {
     return PLANNING_SETTINGS_COPY.autoStartPlanningOffHelper;
   }
-  if (!draft.confidence) {
-    return PLANNING_SETTINGS_COPY.autoStartConfidenceOffHelper;
-  }
   if (lines.length === 0) {
     return PLANNING_SETTINGS_COPY.autoStartNoBoardHelper;
   }
-  return PLANNING_SETTINGS_COPY.autoStartHelper;
+  return PLANNING_SETTINGS_COPY.autoStartReviewHelper;
 }
 
 function PlanningToggleRow({

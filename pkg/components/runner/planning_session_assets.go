@@ -22,11 +22,11 @@ var planningSessionMCPScript string
 //go:embed analysis_protocol.js
 var analysisProtocolScript string
 
-//go:embed analysis_protocol.md
-var analysisProtocolMarkdown string
+//go:embed analysis_protocol_review.md
+var analysisProtocolReviewMarkdown string
 
-//go:embed analysis_user_prompt.md
-var analysisUserPromptMarkdown string
+//go:embed analysis_user_prompt_review.md
+var analysisUserPromptReviewMarkdown string
 
 //go:embed mcp.json
 var planningSessionMCPConfig string
@@ -67,18 +67,28 @@ func PlanningSessionProtocolFile() BrokerTaskFile {
 // PlanningSessionProtocolMarkdown returns the hardcoded refinement system
 // protocol. Runners append this. The canvas prompt must not replace it.
 func PlanningSessionProtocolMarkdown() string {
-	return strings.TrimSpace(analysisProtocolMarkdown)
+	return strings.TrimSpace(analysisProtocolReviewMarkdown)
 }
 
-// PlanningSessionUserPromptMarkdown is the default Refine Task prompt: tone,
-// Clarity rules, and plan shape. Factories can edit that node prompt.
+// PlanningSessionUserPromptMarkdown is the Refine Task prompt: tone, the
+// 1 through 3 sub-parameters, and plan shape. Factories can edit that node
+// prompt. A saved canvas prompt is not rewritten.
 func PlanningSessionUserPromptMarkdown() string {
-	return strings.TrimSpace(analysisUserPromptMarkdown)
+	return strings.TrimSpace(analysisUserPromptReviewMarkdown)
 }
 
-// PlanningSessionProtocolMarkdownFile ships the canonical protocol to runners.
+// PlanningSessionUserPromptReviewMarkdown is the Refine Task prompt.
+func PlanningSessionUserPromptReviewMarkdown() string {
+	return PlanningSessionUserPromptMarkdown()
+}
+
+// PlanningSessionProtocolMarkdownFile ships the review protocol to runners.
 func PlanningSessionProtocolMarkdownFile() BrokerTaskFile {
-	return BrokerTaskFile{Path: "analysis_protocol.md", Content: analysisProtocolMarkdown, Mode: "0644"}
+	return BrokerTaskFile{Path: "analysis_protocol_review.md", Content: analysisProtocolReviewMarkdown, Mode: "0644"}
+}
+
+func PlanningSessionReviewProtocolMarkdownFile() BrokerTaskFile {
+	return PlanningSessionProtocolMarkdownFile()
 }
 
 // PlanningSessionMCPFiles returns the MCP server, attachment limit, static

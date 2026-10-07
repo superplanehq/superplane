@@ -5,8 +5,6 @@ import type {
   FactoriesWorkOrder,
   FactoriesWorkOrderSummary,
 } from "@/api-client";
-import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
-import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useFactoryBacklogAnalysis } from "@/hooks/useBacklogAnalysisRuns";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -56,18 +54,16 @@ import {
 } from "../lib/workOrderListModel";
 import { canonicalWorkOrderNumber } from "../lib/workOrderNumberResolution";
 import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
-import { LineBoardColumnCardList, LineBoardWorkOrderCard } from "../pages/LineBoardOrderCard";
+import { LineBoardWorkOrderCard } from "../pages/LineBoardOrderCard";
 import { lineBoardColumnLaneProps, normalizeColumnColors } from "../pages/lineBoardColumnColors";
 import { intakeSourcesFromFactoryIntakes } from "../pages/lineIntakeModel";
 import { PhaseGlyph } from "../pages/linePhaseGlyph";
 import { usePRFeedbackWorkOrderAttention } from "../pages/useWorkOrderPRFeedbackRunHref";
 import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
+import { MobileColumn, type ColumnPaging } from "./MobileBoardColumn";
 import { MobileBoardHeader } from "./MobileBoardHeader";
 import { MobileBoardSettings } from "./MobileBoardSettings";
-import { MOBILE_BOARD_COPY } from "./mobileCopy";
 import { activeColumnIndex, buildMobileBoardColumns, type MobileBoardColumn } from "./mobileBoardColumns";
-
-type ColumnPaging = { hasMore: boolean; isLoading: boolean; onLoadMore: () => void };
 
 function boardQueryOptions(
   state: WorkOrderListState,
@@ -111,7 +107,9 @@ export function MobileBoardPage() {
       onOpenWorkOrder={(order) => {
         const number = canonicalWorkOrderNumber(order);
         if (number) {
-          navigate(workOrderDetailPath(organizationId, routeSegment, number, selectedLine.id));
+          navigate(workOrderDetailPath(organizationId, routeSegment, number), {
+            state: { peekOrder: order, lineId: selectedLine.id },
+          });
         }
       }}
     />
@@ -137,6 +135,7 @@ function columnPaging(page: FactoryBoardColumnPage, isPlaceholderData: boolean):
   return {
     hasMore: !isPlaceholderData && page.hasNextPage,
     isLoading: page.isFetchingNextPage,
+    hasPageError: page.isFetchNextPageError,
     onLoadMore: page.fetchNextPage,
   };
 }
@@ -444,64 +443,5 @@ function MobileColumnTabs({
         );
       })}
     </div>
-  );
-}
-
-function MobileColumn({
-  column,
-  hidden,
-  cardsPending,
-  lane,
-  paging,
-  renderCard,
-}: {
-  column: MobileBoardColumn;
-  hidden: boolean;
-  cardsPending: boolean;
-  lane: { className?: string; surfaceClassName?: string };
-  paging: ColumnPaging;
-  renderCard: (order: FactoriesWorkOrder) => ReactNode;
-}) {
-  const loadMoreIfNeeded = useAutoLoadMoreOnScroll(paging);
-  const showEmpty = !cardsPending && column.cards.length === 0 && !paging.hasMore;
-
-  return (
-    <section
-      aria-label={column.title}
-      aria-hidden={hidden || undefined}
-      inert={hidden || undefined}
-      data-testid={`mobile-board-column-${column.key}`}
-      className={cn("flex h-full w-full shrink-0 snap-start flex-col p-3", lane.className, lane.surfaceClassName)}
-    >
-      {showEmpty ? (
-        <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-[13px] text-muted-foreground">
-          {column.emptyDescription}
-        </p>
-      ) : (
-        <LineBoardColumnCardList
-          pending={cardsPending}
-          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 [scrollbar-width:none]"
-          testId={`mobile-board-column-scroll-${column.key}`}
-          onScroll={loadMoreIfNeeded}
-        >
-          {column.cards.map((card) => (
-            <li key={card.key}>{renderCard(card.order)}</li>
-          ))}
-        </LineBoardColumnCardList>
-      )}
-      {paging.hasMore ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="mt-2 w-full shrink-0"
-          disabled={paging.isLoading}
-          onClick={() => paging.onLoadMore()}
-          data-testid={`mobile-board-load-more-${column.key}`}
-        >
-          {MOBILE_BOARD_COPY.loadMore}
-        </Button>
-      ) : null}
-    </section>
   );
 }

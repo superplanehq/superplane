@@ -36,6 +36,7 @@ import type { WorkOrderStatusNotePresentation } from "../lib/workOrderStatusNote
 import {
   intakeSettingsFromApi,
   linearProjectIdsFromResource,
+  sentryProjectIdsFromResource,
   type IntakeSourceSettings,
 } from "./intakeSourceSettingsModel";
 import { intakeCanvasForSource } from "./lineIntakeCanvas";
@@ -326,33 +327,50 @@ export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryI
   return API_SOURCE_BY_LINE_INTAKE_SOURCE_ID[sourceId];
 }
 
+function intakeDisplayName(name: string | undefined, sourceName: string): string {
+  return name?.trim() || sourceName;
+}
+
+function intakeTextFields(intake: FactoriesFactoryIntake) {
+  return {
+    intakeId: intake.id?.trim(),
+    appId: intake.canvasId?.trim() ?? "",
+    datadogService: intake.resourceId?.trim() ?? "",
+    integrationId: intake.integrationId?.trim() || undefined,
+    resourceId: intake.resourceId?.trim() || undefined,
+  };
+}
+
 export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[]): ConfiguredLineIntakeSource[] {
   return intakes.flatMap((intake) => {
-    const intakeId = intake.id?.trim();
+    const textFields = intakeTextFields(intake);
     const source = lineIntakeSourceForApiSource(intake.source);
-    if (!intakeId || !source) {
+    if (!textFields.intakeId || !source) {
       return [];
     }
 
-    const name = intake.name?.trim() || source.name;
+    const name = intakeDisplayName(intake.name, source.name);
     const settings = intakeSettingsFromApi(name, intake.settings);
     if (source.id === "linear-issues" && settings.linearProjectIds.length === 0) {
       settings.linearProjectIds = linearProjectIdsFromResource(intake.resourceId);
     }
+    if (source.id === "sentry-exceptions" && settings.sentryProjectIds.length === 0) {
+      settings.sentryProjectIds = sentryProjectIdsFromResource(intake.resourceId);
+    }
     return [
       {
-        intakeId,
-        appId: intake.canvasId?.trim() ?? "",
+        intakeId: textFields.intakeId,
+        appId: textFields.appId,
         healthy: intake.healthy !== false,
         paused: intake.paused === true,
         settings: {
           ...settings,
-          datadogService: intake.resourceId?.trim() ?? "",
+          datadogService: textFields.datadogService,
         },
         source: { ...source, name },
         health: intake.health,
-        integrationId: intake.integrationId?.trim() || undefined,
-        resourceId: intake.resourceId?.trim() || undefined,
+        integrationId: textFields.integrationId,
+        resourceId: textFields.resourceId,
       },
     ];
   });

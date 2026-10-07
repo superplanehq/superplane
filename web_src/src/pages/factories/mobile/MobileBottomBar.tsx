@@ -8,7 +8,7 @@ import { Link, useLocation } from "react-router";
 import { SidebarUserMenu } from "../layout/SidebarUserMenu";
 import {
   factoryHomePath,
-  factorySettingsWorkspaceGeneralPath,
+  factorySettingsPath,
   factoryVelocityPath,
   firstFactoryLineId,
   workOrderBoardLineIdFromSearch,
@@ -73,7 +73,7 @@ export function MobileBottomBar({ canCreateWorkOrder }: { canCreateWorkOrder: bo
   const boardLineId = useBoardLineId(factory);
   const boardHref = factoryHomePath(organizationId, routeSegment, boardLineId);
   const velocityHref = factoryVelocityPath(organizationId, routeSegment);
-  const settingsHref = factorySettingsWorkspaceGeneralPath(organizationId, routeSegment);
+  const settingsHref = factorySettingsPath(organizationId, routeSegment);
   const boardActive = pathname.includes("/lines/") || pathname.includes("/task/");
 
   return (

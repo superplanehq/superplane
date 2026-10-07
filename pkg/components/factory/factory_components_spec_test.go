@@ -57,6 +57,13 @@ type fakeFactoryContext struct {
 	createCreated bool
 	createOrder   *core.WorkOrder
 	createErr     error
+
+	vcsProvider    string
+	vcsProviderErr error
+}
+
+func (f *fakeFactoryContext) VCSProvider() (string, error) {
+	return f.vcsProvider, f.vcsProviderErr
 }
 
 func (f *fakeFactoryContext) CreateWorkOrder(_ core.WorkOrderParams) (*core.WorkOrder, bool, error) {
@@ -805,7 +812,7 @@ func TestBuildArtifactData_SkipsBlankTypedInputs(t *testing.T) {
 
 func mustBuildArtifactData(t *testing.T, config AddWorkOrderArtifactConfiguration) map[string]any {
 	t.Helper()
-	data, err := buildArtifactData(config)
+	data, err := buildArtifactData(config, "")
 	require.NoError(t, err)
 	return data
 }

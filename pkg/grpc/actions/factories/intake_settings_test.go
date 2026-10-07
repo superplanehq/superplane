@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -580,7 +581,10 @@ func Test__applyIntakeSettingsToGraph_Sentry(t *testing.T) {
 			models.FactoryIntakeSourceSentryExceptions,
 			legacyGraph,
 			models.LiveCanvasSpec{Nodes: legacyNodes(), Edges: legacyEdges},
-			&pb.FactoryIntake_Settings{SentryLevels: []string{"error"}},
+			&pb.FactoryIntake_Settings{
+				SentryLevels:     []string{"error"},
+				SentryProjectIds: []string{"payments"},
+			},
 			legacyNodes(),
 			append([]models.Edge{}, legacyEdges...),
 		)
@@ -620,6 +624,7 @@ func Test__applyIntakeSettingsToGraph_Sentry(t *testing.T) {
 				SentryNewIssues:       proto.Bool(false),
 				SentryRegressedIssues: proto.Bool(false),
 				SentryAssignedIssues:  proto.Bool(false),
+				SentryProjectIds:      []string{"payments"},
 			},
 			nodes,
 			nil,
@@ -628,6 +633,143 @@ func Test__applyIntakeSettingsToGraph_Sentry(t *testing.T) {
 
 		trigger := findModelNode(t, updated, intakeTriggerNodeID)
 		assert.Empty(t, trigger.Configuration["actions"])
+		assert.Equal(t, "payments", trigger.Configuration["project"])
+		assert.Equal(t, []any{"payments"}, trigger.Configuration["projects"])
+	})
+
+	t.Run("rejects an empty project list", func(t *testing.T) {
+		_, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceSentryExceptions,
+			intakeGraph{TriggerNodeID: intakeTriggerNodeID},
+			models.LiveCanvasSpec{Nodes: []models.Node{{
+				ID:            intakeTriggerNodeID,
+				Configuration: map[string]any{"project": "payments", "actions": []any{"created"}},
+			}}},
+			&pb.FactoryIntake_Settings{SentryProjectIds: []string{" ", ""}},
+			[]models.Node{{
+				ID:            intakeTriggerNodeID,
+				Configuration: map[string]any{"project": "payments"},
+			}},
+			nil,
+		)
+		require.ErrorContains(t, err, "at least one Sentry project is required")
+	})
+
+	t.Run("writes several projects and clears the single project field", func(t *testing.T) {
+		nodes, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceSentryExceptions,
+			intakeGraph{TriggerNodeID: intakeTriggerNodeID, FilterNodeID: intakeFilterNodeID},
+			models.LiveCanvasSpec{Nodes: []models.Node{{
+				ID: intakeTriggerNodeID,
+				Configuration: map[string]any{
+					"project": "payments",
+					"actions": []any{"created"},
+				},
+			}}},
+			&pb.FactoryIntake_Settings{SentryProjectIds: []string{" payments ", "growth", "payments", ""}},
+			[]models.Node{{
+				ID: intakeTriggerNodeID,
+				Configuration: map[string]any{
+					"project": "payments",
+					"actions": []any{"created"},
+				},
+			}},
+			nil,
+		)
+		require.NoError(t, err)
+
+		trigger := findModelNode(t, nodes, intakeTriggerNodeID)
+		assert.Equal(t, "", trigger.Configuration["project"])
+		assert.Equal(t, []any{"payments", "growth"}, trigger.Configuration["projects"])
+
+		parsed := intakeSettingsFromGraph(
+			models.FactoryIntakeSourceSentryExceptions,
+			intakeGraph{TriggerNodeID: intakeTriggerNodeID},
+			models.LiveCanvasSpec{Nodes: []models.Node{trigger}},
+		)
+		assert.Equal(t, []string{"payments", "growth"}, parsed.SentryProjectIDs)
+
+		serialized := serializeIntakeSettings(models.FactoryIntakeSourceSentryExceptions, parsed)
+		assert.Equal(t, []string{"payments", "growth"}, serialized.GetSentryProjectIds())
+	})
+
+	t.Run("reads the current project when the list is not stored yet", func(t *testing.T) {
+		parsed := intakeSettingsFromGraph(
+			models.FactoryIntakeSourceSentryExceptions,
+			intakeGraph{TriggerNodeID: intakeTriggerNodeID},
+			models.LiveCanvasSpec{Nodes: []models.Node{{
+				ID:            intakeTriggerNodeID,
+				Configuration: map[string]any{"project": "payments", "actions": []any{"created"}},
+			}}},
+		)
+		assert.Equal(t, []string{"payments"}, parsed.SentryProjectIDs)
+	})
+
+	t.Run("keeps saved projects when the request omits the list", func(t *testing.T) {
+		requested := &pb.FactoryIntake_Settings{}
+		require.NoError(t, protojson.Unmarshal([]byte(`{"sentryNewIssues":false}`), requested))
+		require.Nil(t, requested.SentryProjectIds)
+
+		nodes, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceSentryExceptions,
+			intakeGraph{TriggerNodeID: intakeTriggerNodeID},
+			models.LiveCanvasSpec{Nodes: []models.Node{{
+				ID: intakeTriggerNodeID,
+				Configuration: map[string]any{
+					"project":  "payments",
+					"projects": []any{"payments"},
+					"actions":  []any{"created"},
+				},
+			}}},
+			requested,
+			[]models.Node{{
+				ID: intakeTriggerNodeID,
+				Configuration: map[string]any{
+					"project":  "payments",
+					"projects": []any{"payments"},
+					"actions":  []any{"created"},
+				},
+			}},
+			nil,
+		)
+		require.NoError(t, err)
+
+		trigger := findModelNode(t, nodes, intakeTriggerNodeID)
+		assert.Equal(t, "payments", trigger.Configuration["project"])
+		assert.Equal(t, []any{"payments"}, trigger.Configuration["projects"])
+		assert.Empty(t, trigger.Configuration["actions"])
+	})
+
+	t.Run("keeps saved projects when JSON sends an empty project list", func(t *testing.T) {
+		requested := &pb.FactoryIntake_Settings{}
+		require.NoError(t, protojson.Unmarshal([]byte(`{"sentryProjectIds":[]}`), requested))
+
+		nodes, _, err := applyIntakeSettingsToGraph(
+			models.FactoryIntakeSourceSentryExceptions,
+			intakeGraph{TriggerNodeID: intakeTriggerNodeID},
+			models.LiveCanvasSpec{Nodes: []models.Node{{
+				ID: intakeTriggerNodeID,
+				Configuration: map[string]any{
+					"project":  "payments",
+					"projects": []any{"payments"},
+					"actions":  []any{"created"},
+				},
+			}}},
+			requested,
+			[]models.Node{{
+				ID: intakeTriggerNodeID,
+				Configuration: map[string]any{
+					"project":  "payments",
+					"projects": []any{"payments"},
+				},
+			}},
+			nil,
+		)
+		require.NoError(t, err)
+
+		trigger := findModelNode(t, nodes, intakeTriggerNodeID)
+		assert.Equal(t, "payments", trigger.Configuration["project"])
+		assert.Equal(t, []any{"payments"}, trigger.Configuration["projects"])
 	})
 }
 
