@@ -2,8 +2,10 @@ package bitbucket
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -12,6 +14,7 @@ import (
 const (
 	AuthTypeAPIToken             = "apiToken"
 	AuthTypeWorkspaceAccessToken = "workspaceAccessToken"
+	AuthTypeForgeApp             = "forgeApp"
 
 	installationInstructions = `
 To configure Bitbucket with SuperPlane:
@@ -43,8 +46,10 @@ type Configuration struct {
 }
 
 type Metadata struct {
-	AuthType  string             `json:"authType" mapstructure:"authType"`
-	Workspace *WorkspaceMetadata `json:"workspace,omitempty" mapstructure:"workspace,omitempty"`
+	AuthType            string             `json:"authType" mapstructure:"authType"`
+	Workspace           *WorkspaceMetadata `json:"workspace,omitempty" mapstructure:"workspace,omitempty"`
+	HostedApp           bool               `json:"hostedApp,omitempty" mapstructure:"hostedApp,omitempty"`
+	ForgeInstallationID string             `json:"forgeInstallationId,omitempty" mapstructure:"forgeInstallationId,omitempty"`
 }
 
 type WorkspaceMetadata struct {
@@ -152,6 +157,10 @@ func (b *Bitbucket) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("authType is required")
 	}
 
+	if config.AuthType == AuthTypeForgeApp {
+		return syncForgeApp(ctx)
+	}
+
 	if config.AuthType != AuthTypeAPIToken && config.AuthType != AuthTypeWorkspaceAccessToken {
 		return fmt.Errorf("authType %s is not supported", config.AuthType)
 	}
@@ -177,6 +186,23 @@ func (b *Bitbucket) Sync(ctx core.SyncContext) error {
 
 	ctx.Integration.Ready()
 
+	return nil
+}
+
+func syncForgeApp(ctx core.SyncContext) error {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+	if strings.TrimSpace(metadata.ForgeInstallationID) == "" {
+		ctx.Integration.Error("Reconnect Bitbucket")
+		return fmt.Errorf("Reconnect Bitbucket")
+	}
+	if _, _, err := bitbucketapp.CurrentSystemToken(metadata.ForgeInstallationID); err != nil {
+		ctx.Integration.Error("Reconnect Bitbucket")
+		return fmt.Errorf("Reconnect Bitbucket")
+	}
+	ctx.Integration.Ready()
 	return nil
 }
 

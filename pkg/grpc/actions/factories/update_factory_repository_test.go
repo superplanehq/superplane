@@ -10,10 +10,77 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
 )
+
+func TestReconcileFactoryRepositoryPublishesBitbucketCredentials(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	previousID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
+	selectedID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
+	previousName := integrationName(t, r.Organization.ID, previousID)
+	selectedName := integrationName(t, r.Organization.ID, selectedID)
+	unrelatedID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
+	unrelatedName := integrationName(t, r.Organization.ID, unrelatedID)
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	provider, repository, branch := models.ProviderBitbucket, "new-workspace/api", "main"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSProvider: &provider, VCSIntegrationID: &selectedID,
+		AppRepository: &repository, BacklogRepository: &repository, DefaultBranch: &branch,
+	}))
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Implement")
+	nodes := []models.Node{
+		{
+			ID: "find-pr", Name: "Find Pull Request", Type: models.NodeTypeComponent,
+			Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "bitbucket.findPullRequest"}},
+			IntegrationID: &previousID,
+			Configuration: map[string]any{"repository": orderRepositoryExpression, "head": "task-branch"},
+			Metadata:      models.FactoryAppTemplateMetadataFor("line-implementation", 1, models.ProviderBitbucket),
+		},
+		{
+			ID: "implementation-agent-no-issue", Name: "Implement", Type: models.NodeTypeComponent,
+			Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerBash"}},
+			Configuration: map[string]any{
+				"machineType": "e1-large-amd64",
+				"script":      "echo " + previousName,
+				"environmentFrom": []any{
+					map[string]any{"source": "integration", "integration": map[string]any{"name": previousName}},
+					map[string]any{"source": "integration", "integration": map[string]any{"name": unrelatedName}},
+				},
+			},
+		},
+	}
+	deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return canvases.PublishGeneratedCanvasNodes(t.Context(), tx, canvas, r.User, "Install implementation", nodes, nil,
+			changesets.CanvasPublisherOptions{
+				Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor,
+				AuthService: r.AuthService, WebhookBaseURL: deps.WebhookBaseURL,
+			})
+	}))
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return reconcileFactoryRepository(t.Context(), tx, deps, factory, r.User,
+			previousID, selectedID, "old-workspace/api", "old-workspace/api", branch, repository)
+	}))
+	reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+	require.NoError(t, err)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, reloaded)
+	require.NoError(t, err)
+	require.Len(t, version.Nodes, 2)
+	assert.Equal(t, selectedID, *version.Nodes[0].IntegrationID)
+	assert.Equal(t, orderRepositoryExpression, version.Nodes[0].Configuration["repository"])
+	assert.Equal(t, []any{
+		map[string]any{"source": "integration", "integration": map[string]any{"name": selectedName}},
+		map[string]any{"source": "integration", "integration": map[string]any{"name": unrelatedName}},
+	}, version.Nodes[1].Configuration["environmentFrom"])
+	assert.Equal(t, "echo "+previousName, version.Nodes[1].Configuration["script"])
+}
 
 func TestUpdateFactoryRepositorySynchronizesHostedBindingAccess(t *testing.T) {
 	t.Setenv(config.EnvGitHubAppID, "123")
@@ -115,7 +182,7 @@ func TestReplaceTriggerRepository(t *testing.T) {
 	assert.Equal(t, "acme/custom", nodes[1].Configuration["repository"])
 }
 
-func TestReplaceGitHubNodeIntegration(t *testing.T) {
+func TestReplaceVCSNodeIntegration(t *testing.T) {
 	previousID := "old-integration"
 	unrelatedID := "other-integration"
 	nodes := []models.Node{
@@ -127,7 +194,7 @@ func TestReplaceGitHubNodeIntegration(t *testing.T) {
 		{ID: "other-provider", Ref: models.NodeRef{Component: &models.ComponentRef{Name: "jira.createIssue"}}, IntegrationID: &previousID},
 	}
 
-	changed := replaceGitHubNodeIntegration(
+	changed := replaceVCSNodeIntegration(
 		nodes,
 		map[string]bool{"managed": true},
 		previousID,
