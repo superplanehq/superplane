@@ -388,6 +388,8 @@ The On Issue trigger starts a workflow execution when issue events occur in a Gi
 - **Repository**: Select the GitHub repository to monitor
 - **Actions**: Select which issue actions to listen for (opened, closed, reopened, etc.)
 - **Labels**: Optional. Start a run only when the issue has one of these labels. Leave empty to accept every label.
+- **Label filter**: Optional. Include starts a run when the issue has one of the labels. Exclude starts a run when the issue has none of those labels.
+- **Assignment**: Optional. Start a run only for assigned issues, only for unassigned issues, or for any assignment.
 - **Author is a repository collaborator**: Optional. Start a run only when the author can access the repository.
 - **The "superplane" label is added to the issue**: Optional. For a labeled event, start a run only when that label is added to an open issue.
 
