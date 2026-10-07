@@ -2,6 +2,7 @@ import {
   BookOpen,
   Building2,
   CircleUser,
+  Inbox,
   Key,
   KeyRound,
   Network,
@@ -118,6 +119,13 @@ export const ADMIN_LINKS: Array<{
     description: "Installation network and SMTP settings",
     href: "/admin/settings",
     icon: Network,
+  },
+  {
+    id: "intakes",
+    label: "Intakes",
+    description: "Manage intake maturity and company access",
+    href: "/admin/intakes",
+    icon: Inbox,
   },
   {
     id: "price-books",

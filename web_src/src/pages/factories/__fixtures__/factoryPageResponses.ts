@@ -315,6 +315,8 @@ export const DEFAULT_WORK_ORDERS: FactoriesWorkOrder[] = [
 
 export interface FactoriesFixture {
   organizationId: string;
+  /** Keys enabled for the organization when building the intake catalog response. */
+  intakeCatalogGrantedKeys?: string[];
   factories: FactoriesFactory[];
   workOrdersByFactoryId: Record<string, FactoriesWorkOrder[]>;
   appsByFactoryId: Record<string, FactoryAutomation[]>;
