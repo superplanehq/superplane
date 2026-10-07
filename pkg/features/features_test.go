@@ -113,7 +113,7 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, FeatureFactoryRiskScore, f.ID)
 		assert.Equal(t, "Factory Merge Confidence", f.Label)
 		assert.Equal(t, "Add a merge confidence automation to the Verify column", f.Description)
-		assert.Nil(t, f.Released)
+		assert.True(t, IsReleased(FeatureFactoryRiskScore))
 	})
 
 	t.Run("known id returns pull request merge feature", func(t *testing.T) {
