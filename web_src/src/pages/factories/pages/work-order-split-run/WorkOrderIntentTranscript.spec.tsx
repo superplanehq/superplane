@@ -351,12 +351,14 @@ describe("WorkOrderIntentTranscript", () => {
       { id: "user-1", kind: "text", role: "user", text: "Keep the theme." },
       { id: "agent-1", kind: "text", role: "agent", text: "Noted." },
       { id: "user-2", kind: "text", role: "user", text: "Still no clock.", createdAtMs: Number.NaN },
+      { id: "user-3", kind: "text", role: "user", origin: "survey", text: "Scope? One file" },
     ]);
 
     expect(screen.queryByRole("time")).not.toBeInTheDocument();
     for (const note of screen.getAllByTestId("split-run-intent-user-note")) {
       expect(note.parentElement).not.toHaveAttribute("tabindex");
     }
+    expect(screen.getByTestId("split-run-intent-transcript").querySelector(".pt-7")).toBeNull();
   });
 
   it("does not label a plan card or a tool activity row", () => {

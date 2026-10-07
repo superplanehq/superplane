@@ -46,10 +46,11 @@ export function BesideSentTime({ sentAt, children }: { sentAt?: MessageSentAt; c
   const frameRef = useRef<HTMLDivElement>(null);
   const labelRef = useRef<HTMLSpanElement>(null);
   const [placement, setPlacement] = useState<"beside" | "overlay">("overlay");
+  const hasSentTime = messageSentDate(sentAt) !== null;
 
   useLayoutEffect(() => {
     const frame = frameRef.current;
-    if (!frame || !messageSentDate(sentAt)) {
+    if (!frame || !hasSentTime) {
       return;
     }
 
@@ -73,12 +74,12 @@ export function BesideSentTime({ sentAt, children }: { sentAt?: MessageSentAt; c
       observer.observe(row);
     }
     return () => observer.disconnect();
-  }, [sentAt]);
+  }, [hasSentTime, sentAt]);
 
   return (
     <div ref={frameRef} className="relative max-w-full">
       <MessageSentTime sentAt={sentAt} placement={placement} labelRef={labelRef} />
-      <div className={cn("w-fit max-w-full", placement === "overlay" && "pt-7")}>{children}</div>
+      <div className={cn("w-fit max-w-full", hasSentTime && placement === "overlay" && "pt-7")}>{children}</div>
     </div>
   );
 }

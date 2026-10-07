@@ -64,6 +64,26 @@ export const NarrowPane: Story = {
                 text: "Noted. The empty state stays in the planning chat.",
                 createdAtMs: sentAt,
               },
+              {
+                id: "note-missing",
+                kind: "text",
+                role: "user",
+                text: "No sent time.",
+              },
+              {
+                id: "note-invalid",
+                kind: "text",
+                role: "user",
+                text: "Invalid sent time.",
+                createdAtMs: Number.NaN,
+              },
+              {
+                id: "survey-missing",
+                kind: "text",
+                role: "user",
+                origin: "survey",
+                text: "Scope? No clock",
+              },
             ]}
           />
         </div>

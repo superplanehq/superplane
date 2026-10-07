@@ -14,36 +14,40 @@ import (
 const messageSentTimeStoryID = "factories-pages-task-split-run-message-sent-time--narrow-pane"
 
 type messageTimeLayout struct {
-	PaneWidth         float64 `json:"paneWidth"`
-	ScrollOverflow    float64 `json:"scrollOverflow"`
-	LongTimeLeft      float64 `json:"longTimeLeft"`
-	LongTimeRight     float64 `json:"longTimeRight"`
-	LongTimeWidth     float64 `json:"longTimeWidth"`
-	LongBubbleLeft    float64 `json:"longBubbleLeft"`
-	LongBubbleRight   float64 `json:"longBubbleRight"`
-	LongBodyLeft      float64 `json:"longBodyLeft"`
-	LongBodyTop       float64 `json:"longBodyTop"`
-	LongOpacity       float64 `json:"longOpacity"`
-	LongFocused       bool    `json:"longFocused"`
-	ShortTimeLeft     float64 `json:"shortTimeLeft"`
-	ShortTimeRight    float64 `json:"shortTimeRight"`
-	ShortTimeWidth    float64 `json:"shortTimeWidth"`
-	ShortBubbleLeft   float64 `json:"shortBubbleLeft"`
-	ShortBubbleRight  float64 `json:"shortBubbleRight"`
-	ShortBodyTop      float64 `json:"shortBodyTop"`
-	ShortOpacity      float64 `json:"shortOpacity"`
-	SurveyTimeLeft    float64 `json:"surveyTimeLeft"`
-	SurveyTimeRight   float64 `json:"surveyTimeRight"`
-	SurveyTimeWidth   float64 `json:"surveyTimeWidth"`
-	SurveyBubbleLeft  float64 `json:"surveyBubbleLeft"`
-	SurveyBubbleRight float64 `json:"surveyBubbleRight"`
-	AgentTimeLeft     float64 `json:"agentTimeLeft"`
-	AgentTimeRight    float64 `json:"agentTimeRight"`
-	AgentBodyLeft     float64 `json:"agentBodyLeft"`
-	AgentBodyTop      float64 `json:"agentBodyTop"`
-	AgentOpacity      float64 `json:"agentOpacity"`
-	PaneLeft          float64 `json:"paneLeft"`
-	PaneRight         float64 `json:"paneRight"`
+	PaneWidth           float64 `json:"paneWidth"`
+	ScrollOverflow      float64 `json:"scrollOverflow"`
+	LongTimeLeft        float64 `json:"longTimeLeft"`
+	LongTimeRight       float64 `json:"longTimeRight"`
+	LongTimeWidth       float64 `json:"longTimeWidth"`
+	LongBubbleLeft      float64 `json:"longBubbleLeft"`
+	LongBubbleRight     float64 `json:"longBubbleRight"`
+	LongBodyLeft        float64 `json:"longBodyLeft"`
+	LongBodyTop         float64 `json:"longBodyTop"`
+	LongOpacity         float64 `json:"longOpacity"`
+	LongFocused         bool    `json:"longFocused"`
+	ShortTimeLeft       float64 `json:"shortTimeLeft"`
+	ShortTimeRight      float64 `json:"shortTimeRight"`
+	ShortTimeWidth      float64 `json:"shortTimeWidth"`
+	ShortBubbleLeft     float64 `json:"shortBubbleLeft"`
+	ShortBubbleRight    float64 `json:"shortBubbleRight"`
+	ShortBodyTop        float64 `json:"shortBodyTop"`
+	ShortOpacity        float64 `json:"shortOpacity"`
+	SurveyTimeLeft      float64 `json:"surveyTimeLeft"`
+	SurveyTimeRight     float64 `json:"surveyTimeRight"`
+	SurveyTimeWidth     float64 `json:"surveyTimeWidth"`
+	SurveyBubbleLeft    float64 `json:"surveyBubbleLeft"`
+	SurveyBubbleRight   float64 `json:"surveyBubbleRight"`
+	AgentTimeLeft       float64 `json:"agentTimeLeft"`
+	AgentTimeRight      float64 `json:"agentTimeRight"`
+	AgentBodyLeft       float64 `json:"agentBodyLeft"`
+	AgentBodyTop        float64 `json:"agentBodyTop"`
+	AgentOpacity        float64 `json:"agentOpacity"`
+	PaneLeft            float64 `json:"paneLeft"`
+	PaneRight           float64 `json:"paneRight"`
+	TimedOverlayPadding float64 `json:"timedOverlayPadding"`
+	UntimedNoteCount    float64 `json:"untimedNoteCount"`
+	UntimedSurveyCount  float64 `json:"untimedSurveyCount"`
+	UntimedMaxPadding   float64 `json:"untimedMaxPadding"`
 }
 
 func TestTaskMessageTimeStaysInsideNarrowPane(t *testing.T) {
@@ -149,6 +153,15 @@ func narrowPane(layout messageTimeLayout) error {
 	}
 	if layout.AgentTimeLeft < layout.PaneLeft-1 || layout.AgentTimeRight > layout.PaneRight+1 {
 		return fmt.Errorf("agent time sits outside the pane: %.1f-%.1f", layout.AgentTimeLeft, layout.AgentTimeRight)
+	}
+	if layout.UntimedNoteCount < 2 || layout.UntimedSurveyCount < 1 {
+		return fmt.Errorf("story is missing untimed notes or survey answers: notes %.0f, surveys %.0f", layout.UntimedNoteCount, layout.UntimedSurveyCount)
+	}
+	if layout.UntimedMaxPadding > 1 {
+		return fmt.Errorf("untimed message reserves %.1f px above the bubble", layout.UntimedMaxPadding)
+	}
+	if layout.TimedOverlayPadding < 24 {
+		return fmt.Errorf("timed overlay note does not reserve space: padding %.1f px", layout.TimedOverlayPadding)
 	}
 	return nil
 }
@@ -262,6 +275,19 @@ func readMessageTimeLayout(page pw.Page) (messageTimeLayout, error) {
 		const surveyTimeBox = surveyTime.getBoundingClientRect();
 		const agentTimeBox = agentTime.getBoundingClientRect();
 		const opacity = (element) => Number(getComputedStyle(element).opacity);
+		const reservePadding = (root) => {
+			const frame = root?.querySelector(".relative");
+			const reserve = frame?.lastElementChild;
+			if (!reserve) {
+				return -1;
+			}
+			return Number.parseFloat(getComputedStyle(reserve).paddingTop);
+		};
+		const untimedNotes = notes.filter((note) => !note.querySelector("time"));
+		const untimedSurveys = [...document.querySelectorAll('[data-testid="split-run-intent-survey-answer"]')].filter(
+			(survey) => !survey.querySelector("time"),
+		);
+		const untimedPadding = [...untimedNotes, ...untimedSurveys].map(reservePadding);
 		return {
 			paneLeft: paneBox.left,
 			paneRight: paneBox.right,
@@ -293,6 +319,10 @@ func readMessageTimeLayout(page pw.Page) (messageTimeLayout, error) {
 			agentBodyLeft: agentBox.left,
 			agentBodyTop: agentBox.top,
 			agentOpacity: opacity(agentTime),
+			timedOverlayPadding: reservePadding(longNote),
+			untimedNoteCount: untimedNotes.length,
+			untimedSurveyCount: untimedSurveys.length,
+			untimedMaxPadding: untimedPadding.length === 0 ? -1 : Math.max(...untimedPadding),
 		};
 	}`)
 	if err != nil {
