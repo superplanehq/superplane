@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+const OrganizationSortRemainingCreditCents = "remaining_credit_cents"
 
 type Organization struct {
 	ID uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
@@ -59,6 +62,13 @@ type OrganizationWithCounts struct {
 }
 
 func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
+	if sortBy == OrganizationSortRemainingCreditCents {
+		return listOrganizationsByRemainingCredit(tx, search, limit, offset, sortDirection)
+	}
+	return listOrganizations(tx, search, limit, offset, sortBy, sortDirection)
+}
+
+func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
 	query := tx.
 		Model(&Organization{}).
 		Where("organizations.deleted_at IS NULL")
@@ -96,6 +106,53 @@ func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy,
 	}
 
 	return organizations, total, nil
+}
+
+func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offset int, sortDirection string) ([]OrganizationWithCounts, int64, error) {
+	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc")
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(organizations) == 0 {
+		return []OrganizationWithCounts{}, total, nil
+	}
+
+	ids := make([]uuid.UUID, len(organizations))
+	for i, organization := range organizations {
+		ids[i] = organization.ID
+	}
+	remaining, err := RemainingHostedCreditMicros(tx, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	descending := sortDirection != "asc"
+	sort.SliceStable(organizations, func(i, j int) bool {
+		left := remaining[organizations[i].ID]
+		right := remaining[organizations[j].ID]
+		if left != right {
+			if descending {
+				return left > right
+			}
+			return left < right
+		}
+		return organizations[i].Name < organizations[j].Name
+	})
+
+	return sliceOrganizations(organizations, limit, offset), total, nil
+}
+
+func sliceOrganizations(organizations []OrganizationWithCounts, limit, offset int) []OrganizationWithCounts {
+	if offset >= len(organizations) {
+		return []OrganizationWithCounts{}
+	}
+	if offset > 0 {
+		organizations = organizations[offset:]
+	}
+	if limit > 0 && len(organizations) > limit {
+		organizations = organizations[:limit]
+	}
+	return organizations
 }
 
 func FindOrganizationWithCounts(tx *gorm.DB, id uuid.UUID) (*OrganizationWithCounts, error) {
@@ -174,6 +231,8 @@ func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
 		return "COALESCE(done_task_counts.count, 0) " + direction + ", organizations.name ASC"
 	case "member_count":
 		return "COALESCE(member_counts.count, 0) " + direction + ", organizations.name ASC"
+	case OrganizationSortRemainingCreditCents:
+		return "organizations.name ASC"
 	default:
 		return "organizations.created_at DESC"
 	}
