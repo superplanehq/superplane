@@ -19,6 +19,8 @@ const resetFactoryTemplateCommitMessage = "Reset factory template defaults"
 // template that SuperPlane does not create during onboarding.
 var ErrUnknownOnboardingFactoryTemplate = errors.New("unknown factory template")
 
+var errFactoryTemplateResetStale = errors.New("canvas changed during reset")
+
 const (
 	onboardingTemplateBacklog      = models.FactoryAppTemplateBacklogID
 	onboardingTemplateImplement    = "line-implementation"
@@ -262,6 +264,15 @@ func resetFactoryAppCanvas(
 	nodes = copyLiveNodeMetadata(version.Nodes, nodes)
 
 	return db.Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockCanvasForUpdate(tx, canvas.OrganizationID, canvas.ID)
+		if err != nil {
+			return err
+		}
+		if locked.LiveVersionID == nil || *locked.LiveVersionID != version.ID {
+			return errFactoryTemplateResetStale
+		}
+		*canvas = *locked
+
 		if err := canvases.PublishGeneratedCanvasNodesWithOwner(
 			ctx,
 			tx,

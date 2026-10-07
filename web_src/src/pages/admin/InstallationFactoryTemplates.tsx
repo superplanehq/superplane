@@ -25,7 +25,8 @@ const automationCountLabel = (count: number) => {
 };
 
 export function resetFactoryTemplateResultMessage(name: string, result: ResetFactoryTemplateResult): string {
-  const failed = result.failures?.length ?? 0;
+  const failures = result.failures ?? [];
+  const failed = failures.length;
   if (result.reset === 0 && failed === 0) {
     return `No ${name} automations to reset.`;
   }
@@ -35,8 +36,18 @@ export function resetFactoryTemplateResultMessage(name: string, result: ResetFac
     return resetText;
   }
 
-  const failText = failed === 1 ? "1 failed." : `${failed} failed.`;
-  return `${resetText} ${failText}`;
+  const failText = failed === 1 ? "1 failed" : `${failed} failed`;
+  const details = failures
+    .map((failure) => {
+      const label = failure.name?.trim() || failure.canvas_id;
+      const reason = failure.error?.trim() ?? "";
+      if (reason === "") {
+        return label;
+      }
+      return `${label} (${reason})`;
+    })
+    .join("; ");
+  return `${resetText} ${failText}: ${details}.`;
 }
 
 export function InstallationFactoryTemplates() {
@@ -92,6 +103,7 @@ export function InstallationFactoryTemplates() {
       }));
       await loadTemplates();
     } catch {
+      setConfirmTemplate(null);
       setErrors((current) => ({
         ...current,
         [template.id]: `Could not reset ${template.name} automations.`,

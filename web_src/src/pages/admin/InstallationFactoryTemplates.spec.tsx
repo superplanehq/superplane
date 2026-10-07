@@ -93,5 +93,31 @@ describe("InstallationFactoryTemplates", () => {
     await user.click(screen.getByRole("button", { name: "Reset Intake automations" }));
 
     expect(await screen.findByText("Could not reset Intake automations.")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Reset Intake automations" })).not.toBeInTheDocument();
+  });
+
+  it("names failed automations in the result", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input) === "/admin/api/installation/factory-templates") {
+        return jsonResponse({ templates });
+      }
+      if (init?.method === "POST") {
+        return jsonResponse({
+          reset: 1,
+          failures: [{ canvas_id: "c-2", name: "Old Backlog", error: "canvas changed during reset" }],
+        });
+      }
+      return jsonResponse({ error: "unexpected" }, 500);
+    });
+
+    render(<InstallationFactoryTemplates />);
+
+    await user.click(await screen.findByRole("button", { name: "Reset Backlog" }));
+    await user.click(screen.getByRole("button", { name: "Reset Backlog automations" }));
+
+    expect(
+      await screen.findByText("Reset 1 Backlog automation. 1 failed: Old Backlog (canvas changed during reset)."),
+    ).toBeInTheDocument();
   });
 });
