@@ -1,0 +1,72 @@
+{{- if .Values.fleetManager.enabled }}
+{{- if .Values.fleetManager.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "superplane.fleetManager.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+  {{- with .Values.fleetManager.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-fleet-manager
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: superplane
+    service: {{ .Release.Name }}-fleet-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: superplane
+      service: {{ .Release.Name }}-fleet-manager
+  template:
+    metadata:
+      name: {{ .Release.Name }}-fleet-manager
+      labels:
+        app: superplane
+        service: {{ .Release.Name }}-fleet-manager
+        {{- with .Values.fleetManager.podLabels }}
+        {{- include "superplane.podLabels" . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if or .Values.fleetManager.serviceAccount.create .Values.fleetManager.serviceAccount.name }}
+      serviceAccountName: {{ include "superplane.fleetManager.serviceAccountName" . }}
+      {{- end }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: fleet-manager
+          image: "{{ .Values.fleetManager.image.registry }}/{{ .Values.fleetManager.image.name }}:{{ .Values.fleetManager.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.fleetManager.image.pullPolicy }}
+          env:
+            - name: FLEET_MANAGER_CONFIG_FILE
+              value: /etc/superplane/fleet-manager.yaml
+          volumeMounts:
+            - name: config
+              mountPath: /etc/superplane
+              readOnly: true
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          {{- with .Values.fleetManager.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: config
+          secret:
+            secretName: {{ required "fleetManager.existingSecret is required when fleetManager.enabled is true" .Values.fleetManager.existingSecret }}
+            items:
+              - key: fleet-manager.yaml
+                path: fleet-manager.yaml
+{{- end }}
