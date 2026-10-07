@@ -69,7 +69,7 @@ func cacheFor(jwksURL string) *keyCache {
 func (c *keyCache) key(ctx context.Context, kid string) (*rsa.PublicKey, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if err := c.refreshIfNeeded(ctx, kid); err != nil && len(c.keys) == 0 {
+	if err := c.refreshIfNeeded(ctx, kid); err != nil && c.expired() {
 		return nil, err
 	}
 	if kid != "" {
@@ -87,8 +87,15 @@ func (c *keyCache) key(ctx context.Context, kid string) (*rsa.PublicKey, error) 
 	return nil, fmt.Errorf("forge invocation token has no key id")
 }
 
+// expired reports that the cached keys are too old to trust. A removed key
+// must stop working once Atlassian rotates it, even when the key service is
+// down.
+func (c *keyCache) expired() bool {
+	return c.fetchedAt.IsZero() || time.Since(c.fetchedAt) > jwksTTL
+}
+
 func (c *keyCache) refreshIfNeeded(ctx context.Context, kid string) error {
-	stale := c.fetchedAt.IsZero() || time.Since(c.fetchedAt) > jwksTTL
+	stale := c.expired()
 	missing := kid != "" && c.keys[kid] == nil
 	if !stale && !missing {
 		return nil
