@@ -71,8 +71,17 @@ gcloud compute addresses describe superplane-ip --global --format='get(address)'
 Create an A record for your SuperPlane domain, for example
 `superplane.example.com`. Point it to the static IP address.
 
-The TLS certificate comes from Let's Encrypt. Let's Encrypt can issue the
-certificate only after the DNS record resolves to the static IP address.
+Confirm public DNS before you apply. Let's Encrypt uses public resolvers,
+not your local resolver:
+
+```bash
+dig +short superplane.example.com @8.8.8.8
+```
+
+The answer must be the static IP address. If your local resolver still
+fails, flush it or use `8.8.8.8`. The apex nameservers must match the
+registrar. Mixed nameservers (for example DigitalOcean and Squarespace)
+make some resolvers return `NXDOMAIN`.
 
 ## 2. Install SuperPlane
 
@@ -90,13 +99,32 @@ domain_name       = "superplane.example.com"
 static_ip_name    = "superplane-ip"
 letsencrypt_email = "admin@example.com"
 
-# Required. The plain <git-sha> image loads JS and CSS from
-# assets.superplane.com. That host allows only app.superplane.com.
-superplane_image_tag = "<commit-sha>-selfhosted"
+# Required. Confirm both artifacts exist before you apply.
+superplane_image_tag     = "<commit-sha>-selfhosted"
+superplane_chart_version = "0.0.0-<commit-sha>"
 
 # Recommended. Runners require it.
 enable_gcs_blob_storage = true
 ```
+
+Select a `main` commit that published both artifacts. The image and the
+chart can use different SHAs. Confirm them:
+
+```bash
+export APP_SHA=<commit-sha>
+export CHART_SHA=<commit-sha>
+
+docker manifest inspect ghcr.io/superplanehq/superplane:${APP_SHA}-selfhosted
+helm show chart oci://ghcr.io/superplanehq/superplane-chart --version 0.0.0-${CHART_SHA}
+```
+
+The plain `<commit-sha>` and `stable` images load JS and CSS from
+`assets.superplane.com`. That host allows only `app.superplane.com`.
+The UI then fails on your domain.
+
+If the chart is not published yet, set `superplane_chart_path` to
+`../../superplane-helm-chart/helm` and leave `superplane_chart_version`
+empty.
 
 With `enable_gcs_blob_storage = false`, SuperPlane stores blobs on pod
 volumes. Each pod has its own volume, and the data is lost when a pod restarts.
@@ -120,8 +148,9 @@ kubectl get pods -n superplane
 kubectl get certificate -n superplane
 ```
 
-All pods must be `Running`. The certificate must be `Ready`. The load balancer
-and the certificate can take 15 minutes after the apply.
+All pods must be `Running`. The namespace must have one Certificate, and
+that Certificate must be `Ready`. The load balancer and the certificate
+can take 15 minutes after the apply.
 
 Open `https://superplane.example.com`. Create the owner account. The owner
 account is the installation admin.
@@ -181,6 +210,22 @@ cd release/terraform/gke
 
 The image goes into the `superplane-runner-amd64` image family. Fleet Manager
 uses the newest image in the family.
+
+The default build uses a public IP address and SSH on TCP 22. If the
+network blocks inbound SSH, enable runners in step 3.3 first. Then build
+with Identity-Aware Proxy:
+
+```bash
+packer build \
+  -var project_id="$PROJECT_ID" \
+  -var architecture=amd64 \
+  -var machine_type=e2-standard-4 \
+  -var use_iap=true \
+  -var subnetwork=superplane-runners \
+  release/runner/packer/gce/runner.pkr.hcl
+```
+
+Allow inbound TCP 22 from `35.235.240.0/20` for IAP.
 
 ### 3.3 Enable the runner API and the runner network
 
@@ -322,12 +367,12 @@ must stop and Fleet Manager must delete it after the task.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `superplane_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the SuperPlane image. |
-| `superplane_image_tag` | `stable` | Image tag. Use `<git-sha>-selfhosted` on customer domains. |
+| `superplane_image_tag` | required | Image tag. Must contain `selfhosted`. Published tags are `<git-sha>-selfhosted`. |
 | `enable_gcs_blob_storage` | `false` | Store blobs in GCS. |
 | `blob_bucket_name` | `<project_id>-superplane-blobs` | Name of the blob bucket. |
 | `blob_bucket_force_destroy` | `false` | Delete the bucket objects on destroy. |
 | `superplane_chart_path` | empty | Path to a local chart. Empty installs the published chart. |
-| `superplane_chart_version` | empty | Version of the published chart, for example `0.0.0-<commit-sha>`. Empty installs the latest release. |
+| `superplane_chart_version` | empty | Version of the published chart, for example `0.0.0-<commit-sha>`. Required when `superplane_chart_path` is empty. |
 | `enable_runners` | `false` | Enable the runner API and create the runner network. |
 | `installation_admin_token` | empty | Personal API token of an installation admin. Deploys Fleet Manager. |
 | `fleet_manager_image_registry` | `ghcr.io/superplanehq` | Registry of the Fleet Manager image. |
@@ -353,6 +398,26 @@ For an arm64 fleet, build the arm64 image and use zones that have the machine
 type. For example, T2A machines are not available in all zones.
 
 ## Troubleshooting
+
+**The UI loads HTML but scripts fail CORS.** The image tag is not a
+self-hosted tag. Set `superplane_image_tag` to `<commit-sha>-selfhosted`
+and apply again. Hard-refresh the browser.
+
+**Pods stay in `ImagePullBackOff` with HTTP 403.** You pointed
+`superplane_image_registry` or `fleet_manager_image_registry` at
+`gcr.io/<project>` or Artifact Registry. Terraform grants
+`roles/artifactregistry.reader` to the default Compute Engine service
+account. Wait one minute, then delete the failing pods.
+
+**The certificate is not Ready.** Public DNS must match the static IP:
+
+```bash
+dig +short superplane.example.com @8.8.8.8
+```
+
+One Certificate must exist in the namespace:
+`kubectl get certificate -n superplane`. Let's Encrypt needs HTTP on
+port 80. Wait up to 15 minutes.
 
 **Fleet Manager restarts.** Read the log with
 `kubectl logs -n superplane deploy/superplane-fleet-manager --previous`.

@@ -106,6 +106,13 @@ resource "helm_release" "superplane" {
   create_namespace = false
   timeout          = 900 # GCE Ingress + first-boot migrate exceed the 300s default
 
+  lifecycle {
+    precondition {
+      condition     = local.superplane_chart_local || var.superplane_chart_version != ""
+      error_message = "Set superplane_chart_version or superplane_chart_path. An empty version installs the latest published chart, which may lack GKE ACME and migrate fixes."
+    }
+  }
+
   values = compact([
     local.gcs_blob_storage_values,
     local.runner_api_values,
@@ -321,6 +328,7 @@ resource "helm_release" "superplane" {
     google_service_account_iam_member.app_sign_blob,
     google_service_account_iam_member.app_workload_identity,
     google_project_service.iamcredentials,
+    google_project_iam_member.gke_nodes_artifact_registry,
     google_project_iam_member.fleet_manager_instance_admin,
     google_service_account_iam_member.fleet_manager_workload_identity,
   ]

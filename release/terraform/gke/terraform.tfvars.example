@@ -54,12 +54,13 @@ letsencrypt_email = "admin@example.com"
 # -----------------------------------------------------------------------------
 
 # superplane_namespace = "superplane"
-# Use <git-sha>-selfhosted. The plain SHA image fails CORS on your domain.
-# superplane_image_tag = "<git-sha>-selfhosted"
 
-# Runners need a chart that has runnerAPI and fleetManager values.
-# main publishes the chart as 0.0.0-<git-sha>.
-# superplane_chart_version = "0.0.0-<git-sha>"
+# Required. The plain SHA and stable images fail CORS on your domain.
+superplane_image_tag = "<git-sha>-selfhosted"
+
+# Required unless you set superplane_chart_path. Empty installs the latest
+# published chart, which may lack GKE ACME and migrate fixes.
+superplane_chart_version = "0.0.0-<git-sha>"
 
 # Install the chart from this repository to test changes that are not published.
 # superplane_chart_path = "../../superplane-helm-chart/helm"

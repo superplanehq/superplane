@@ -118,9 +118,13 @@ variable "superplane_image_registry" {
 }
 
 variable "superplane_image_tag" {
-  description = "SuperPlane image tag. Self-hosted installs must use <git-sha>-selfhosted. The plain <git-sha> image loads UI files from the hosted CDN and fails CORS on a customer domain."
+  description = "SuperPlane image tag. Must end with -selfhosted. The plain <git-sha> and stable images load UI files from the hosted CDN and fail CORS on a customer domain."
   type        = string
-  default     = "stable"
+
+  validation {
+    condition     = strcontains(var.superplane_image_tag, "selfhosted")
+    error_message = "Set superplane_image_tag to a tag that contains selfhosted, for example <git-sha>-selfhosted."
+  }
 }
 
 variable "superplane_chart_path" {
@@ -130,7 +134,7 @@ variable "superplane_chart_path" {
 }
 
 variable "superplane_chart_version" {
-  description = "Version of the published SuperPlane Helm chart, for example 0.0.0-<git-sha> for a main build. Leave empty to install the latest version. Not used with superplane_chart_path."
+  description = "Version of the published SuperPlane Helm chart, for example 0.0.0-<git-sha>. Required when superplane_chart_path is empty. Empty version installs the latest chart, which may lack GKE ACME and migrate fixes."
   type        = string
   default     = ""
 }
