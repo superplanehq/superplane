@@ -119,6 +119,25 @@ vi.mock("@/hooks/useIntegrations", () => {
                     },
                   },
                 },
+                {
+                  name: "labels",
+                  label: "Issue has one of these labels",
+                  type: "list",
+                  typeOptions: {
+                    list: {
+                      itemLabel: "Label",
+                      itemDefinition: { type: "string" },
+                    },
+                  },
+                },
+                { name: "labelFilterMode", label: "Label filter", type: "select" },
+                { name: "assignment", label: "Assignment", type: "select" },
+                { name: "authorsWithAccess", label: "Author is a repository collaborator", type: "boolean" },
+                {
+                  name: "superplaneLabelAdded",
+                  label: 'The "superplane" label is added to the issue',
+                  type: "boolean",
+                },
               ],
             },
           ],
@@ -426,6 +445,9 @@ describe("MergeConfidenceConfigModal", () => {
     expect(within(form).getByText("Filters")).toBeInTheDocument();
     expect(within(form).getByRole("checkbox", { name: "Issue has one of these labels" })).toBeDisabled();
     expect(within(form).getByRole("checkbox", { name: "Author is a repository collaborator" })).toBeDisabled();
+    expect(within(form).queryByText("Label filter")).not.toBeInTheDocument();
+    expect(within(form).queryByText("Assignment")).not.toBeInTheDocument();
+    expect(within(form).queryByRole("button", { name: "Add Label" })).not.toBeInTheDocument();
     expect(within(form).getByRole("checkbox", { name: "A new issue is opened" })).toBeChecked();
     expect(within(form).getByRole("checkbox", { name: "A closed issue is re-opened" })).not.toBeChecked();
     expect(
