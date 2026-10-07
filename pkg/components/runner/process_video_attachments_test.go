@@ -327,6 +327,101 @@ func TestProcessVideoAttachmentsScriptTranscribesAudioWithoutFrames(t *testing.T
 	assert.Nil(t, item["frames"])
 }
 
+func TestProcessHostedVideoDeletesDownloadAndKeepsFrames(t *testing.T) {
+	requireLookPath(t, "python3")
+	dir, attachments := newAttachmentDir(t)
+	page := "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "manifest.json"), []byte(`{
+  "version": 1,
+  "policy": {"max_duration_seconds": 900, "hosted_video_max_duration_seconds": 300, "hosted_video_max_bytes": 268435456},
+  "files": [{"filename":"youtube-dQw4w9WgXcQ","url":"`+page+`","dest":"01-youtube-dQw4w9WgXcQ","kind":"hosted_video","status":"pending"}]
+}`), 0o644))
+
+	env := hostedVideoToolEnv(t, dir, `{"duration": 2, "is_live": false, "live_status": "not_live"}`)
+	out := runProcessVideo(t, dir, env)
+	assert.NotContains(t, string(out), "download_failed")
+	assert.NoFileExists(t, filepath.Join(dir, ".hosted-videos", "01-youtube-dQw4w9WgXcQ"))
+	_, hostedDirErr := os.Stat(filepath.Join(dir, ".hosted-videos"))
+	assert.ErrorIs(t, hostedDirErr, os.ErrNotExist)
+	assert.NoFileExists(t, filepath.Join(attachments, "01-youtube-dQw4w9WgXcQ"))
+	item := manifestFile(t, attachments, "01-youtube-dQw4w9WgXcQ")
+	frames, _ := item["frames"].([]any)
+	if len(frames) == 0 {
+		assert.NotEmpty(t, item["reason"])
+	}
+	index := readIndex(t, attachments)
+	assert.Contains(t, index, page)
+	assert.Contains(t, index, "Do not fetch a hosted video page URL.")
+}
+
+func TestProcessHostedVideoDoesNotDownloadWhenDurationExceedsLimit(t *testing.T) {
+	requireLookPath(t, "python3")
+	dir, attachments := newAttachmentDir(t)
+	page := "https://www.loom.com/share/0123456789abcdef0123456789abcdef"
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "manifest.json"), []byte(`{
+  "version": 1,
+  "policy": {"hosted_video_max_duration_seconds": 300},
+  "files": [{"filename":"loom","url":"`+page+`","dest":"01-loom","kind":"hosted_video","status":"pending"}]
+}`), 0o644))
+	downloadLog := filepath.Join(dir, "downloaded.txt")
+	env := hostedVideoToolEnv(t, dir, `{"duration": 301, "is_live": false, "live_status": "not_live"}`)
+	env = append(env, "FAKE_YTDLP_DOWNLOAD_LOG="+downloadLog)
+	_ = runProcessVideo(t, dir, env)
+	assert.NoFileExists(t, downloadLog)
+	assert.NoFileExists(t, filepath.Join(dir, ".hosted-videos", "01-loom"))
+	item := manifestFile(t, attachments, "01-loom")
+	assert.Equal(t, "failed", item["status"])
+	assert.Equal(t, "duration_exceeds_limit", item["reason"])
+}
+
+func hostedVideoToolEnv(t *testing.T, taskDir, metadata string) []string {
+	t.Helper()
+	binDir := t.TempDir()
+	writeFakeTool(t, binDir, "yt-dlp", `#!/usr/bin/env python3
+import os, sys
+args = sys.argv[1:]
+if "--dump-single-json" in args:
+    print(os.environ.get("FAKE_YTDLP_JSON", "{}"))
+    raise SystemExit(0)
+out = None
+for index, arg in enumerate(args):
+    if arg == "-o" and index + 1 < len(args):
+        out = args[index + 1]
+if out:
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "wb") as handle:
+        handle.write(b"short-video")
+log = os.environ.get("FAKE_YTDLP_DOWNLOAD_LOG")
+if log:
+    with open(log, "a", encoding="utf-8") as handle:
+        handle.write("download\n")
+`)
+	writeFakeTool(t, binDir, "ffprobe", `#!/usr/bin/env python3
+import json
+json.dump({"format": {"duration": "1.0", "format_name": "mov,mp4"}, "streams": [{"codec_type": "video", "codec_name": "h264", "width": 16, "height": 16}]}, __import__("sys").stdout)
+`)
+	writeFakeTool(t, binDir, "ffmpeg", `#!/usr/bin/env python3
+import sys
+out = sys.argv[-1]
+if out.endswith(".jpg"):
+    with open(out, "wb") as handle:
+        handle.write(b"\xff\xd8\xff\xd9")
+`)
+	writeFakeTool(t, binDir, "whisper-cli", "#!/bin/sh\nexit 0\n")
+	model := filepath.Join(binDir, "ggml-tiny.bin")
+	require.NoError(t, os.WriteFile(model, []byte("x"), 0o644))
+	return append(os.Environ(),
+		"PATH="+binDir+string(os.PathListSeparator)+os.Getenv("PATH"),
+		"WHISPER_MODEL="+model,
+		"FAKE_YTDLP_JSON="+metadata,
+	)
+}
+
+func writeFakeTool(t *testing.T, dir, name, body string) {
+	t.Helper()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(body), 0o755))
+}
+
 func replaceEnv(env []string, key, value string) []string {
 	prefix := key + "="
 	next := make([]string, 0, len(env)+1)

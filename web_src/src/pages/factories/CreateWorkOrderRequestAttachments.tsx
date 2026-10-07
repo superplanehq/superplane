@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import type { CreateWorkOrderRequestImage } from "./lib/createWorkOrderRequestImages";
+import { HostedVideoEmbed } from "@/pages/app/HostedVideoEmbed";
 
 import "./createWorkOrderRequestAttachments.css";
 
@@ -71,7 +72,11 @@ export function CreateWorkOrderRequestAttachments({ images, onRemove }: CreateWo
             data-testid={`create-work-order-request-attachment-${image.id}`}
             onClick={() => setExpanded(image)}
           >
-            {image.isAudio ? (
+            {image.hostedVideo ? (
+              <span className="flex h-full items-center justify-center px-1 text-center text-[10px] font-medium">
+                {image.hostedVideo.providerName}
+              </span>
+            ) : image.isAudio ? (
               <audio src={image.src} />
             ) : image.isVideo ? (
               <video src={image.src} muted playsInline />
@@ -188,7 +193,9 @@ function RequestImageExpand({
               <X className="size-3.5" aria-hidden />
             </button>
           </div>
-          {image.isAudio ? (
+          {image.hostedVideo ? (
+            <HostedVideoEmbed video={image.hostedVideo} className="t-resize-img" />
+          ) : image.isAudio ? (
             <audio className="t-resize-img" src={image.src} controls aria-label={image.alt} />
           ) : image.isVideo ? (
             <video className="t-resize-img" src={image.src} controls playsInline aria-label={image.alt} />

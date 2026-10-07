@@ -2,7 +2,9 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
+const http = require("node:http");
 const os = require("node:os");
 const path = require("node:path");
 const {
@@ -207,6 +209,43 @@ test("prepareIncomingAttachments processes audio follow-ups", () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(taskDir, "attachments", "manifest.json"), "utf8"));
   assert.equal(manifest.files[0].kind, "audio");
   assert.equal(fs.readFileSync(ran, "utf8"), "fetch\nprocess\n");
+});
+
+test("prepareIncomingAttachments merges a hosted video and does not curl it", { skip: spawnSync("python3", ["--version"]).status !== 0 }, async () => {
+  const taskDir = fs.mkdtempSync(path.join(os.tmpdir(), "follow-up-hosted-"));
+  const hits = [];
+  const server = http.createServer((req, res) => {
+    hits.push(req.url);
+    res.end("<html>page</html>");
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const url = `http://127.0.0.1:${address.port}/watch`;
+  fs.copyFileSync(path.join(__dirname, "fetch_task_attachments.sh"), path.join(taskDir, "fetch_task_attachments.sh"));
+  fs.writeFileSync(path.join(taskDir, "process_video_attachments.sh"), "#!/bin/bash\nexit 0\n");
+  const previousTaskDir = process.env.SUPERPLANE_TASK_DIR;
+  process.env.SUPERPLANE_TASK_DIR = taskDir;
+  try {
+    prepareIncomingAttachments(taskDir, [
+      {
+        filename: "youtube-dQw4w9WgXcQ",
+        url,
+        kind: "hosted_video",
+      },
+    ]);
+  } finally {
+    if (previousTaskDir == null) {
+      delete process.env.SUPERPLANE_TASK_DIR;
+    } else {
+      process.env.SUPERPLANE_TASK_DIR = previousTaskDir;
+    }
+  }
+  await new Promise((resolve) => server.close(resolve));
+  const manifest = JSON.parse(fs.readFileSync(path.join(taskDir, "attachments", "manifest.json"), "utf8"));
+  assert.equal(manifest.files[0].kind, "hosted_video");
+  assert.equal(manifest.files[0].url, url);
+  assert.equal(hits.length, 0);
+  assert.equal(fs.existsSync(path.join(taskDir, "attachments", manifest.files[0].dest)), false);
 });
 
 test("ignores an empty user message", () => {
