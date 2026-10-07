@@ -8,6 +8,7 @@ import { FirstRunSetup } from "./FirstRunSetup";
 import { readOnboardingGitHubConnect, writeOnboardingGitHubConnect } from "./onboardingGitHubConnect";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
+import { intakeCatalogAvailability, seededIntakeCatalog } from "@/test/intakeCatalog";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
@@ -39,7 +40,7 @@ vi.mock("@/lib/toast", () => ({
 
 vi.mock("./useBitbucketOnboarding", () => ({
   useBitbucketOnboarding: () => ({
-    data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },
+    data: { providerConfigured: false, identity: undefined, repositories: [] },
     isPending: false,
     error: null,
     startInstallation: { mutateAsync: vi.fn() },
@@ -88,6 +89,10 @@ vi.mock("@/contexts/useAccount", () => ({
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
   useAccountOrganizations: () => ({ data: [{ id: "org-1", name: "Acme" }] }),
+}));
+
+vi.mock("@/hooks/useIntakeCatalogAvailability", () => ({
+  useIntakeCatalogAvailability: () => intakeCatalogAvailability(seededIntakeCatalog([])),
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({

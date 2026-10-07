@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { findIntakePresentation } from "@/lib/intakePresentation";
 import { cn } from "@/lib/utils";
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -251,19 +252,30 @@ export function RepositoryPicker({
   );
 }
 
+/** Shown until the intake catalog loads. */
+const DEFAULT_OTHER_PROVIDERS: OtherVcsProvider[] = [{ key: "gitlab", name: "GitLab" }];
+
+type OtherVcsProvider = { key: string; name: string; iconSrc?: string };
+
 export function VcsStep({
   github,
   selectedConnectionId,
+  otherProviders = DEFAULT_OTHER_PROVIDERS,
   onSelectConnection,
   onCreateConnection,
 }: {
   github: IntegrationInstanceSummary;
   selectedConnectionId?: string;
+  /**
+   * Repository providers other than GitHub that the intake catalog lists for
+   * the organization. SuperPlane supports only GitHub, so they show as
+   * Coming soon.
+   */
+  otherProviders?: OtherVcsProvider[];
   onSelectConnection: (id: string, name: string) => void;
   onCreateConnection: () => void;
 }) {
   const githubOption = VCS_OPTIONS.find((option) => option.id === "github");
-  const gitlabOption = VCS_OPTIONS.find((option) => option.id === "gitlab");
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -319,18 +331,31 @@ export function VcsStep({
         )}
       </section>
 
-      {gitlabOption ? (
-        <div
-          className="relative flex min-h-44 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-border/70 bg-muted/20 px-6 py-12 opacity-70"
-          aria-disabled="true"
-        >
-          <ComingSoonRibbon />
-          <IntegrationIcon integrationName="gitlab" className="size-10" size={40} />
-          <span className="text-[22px] font-semibold tracking-[-0.02em] text-muted-foreground">
-            {gitlabOption.label}
-          </span>
-        </div>
-      ) : null}
+      {otherProviders.map((provider) => (
+        <ComingSoonProviderCard key={provider.key} provider={provider} />
+      ))}
+    </div>
+  );
+}
+
+/** Exported for the admin preview, which renders the card for one provider. */
+export function ComingSoonProviderCard({ provider }: { provider: OtherVcsProvider }) {
+  const iconSrc = provider.iconSrc ?? findIntakePresentation(provider.key)?.iconSrc;
+  return (
+    <div
+      className="relative flex min-h-44 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-border/70 bg-muted/20 px-6 py-12 opacity-70"
+      aria-disabled="true"
+      data-testid={`vcs-provider-soon-${provider.key}`}
+    >
+      <ComingSoonRibbon />
+      {iconSrc ? (
+        <img src={iconSrc} alt="" className="size-10" />
+      ) : (
+        <span className="flex size-10 items-center justify-center rounded-md bg-muted text-lg font-medium text-muted-foreground">
+          {provider.name.charAt(0).toUpperCase()}
+        </span>
+      )}
+      <span className="text-[22px] font-semibold tracking-[-0.02em] text-muted-foreground">{provider.name}</span>
     </div>
   );
 }
