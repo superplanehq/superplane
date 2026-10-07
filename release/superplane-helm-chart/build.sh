@@ -4,10 +4,11 @@ set -euo pipefail
 IFS=$'\n\t'
 
 if [ "${1-}" = "" ]; then
-  echo "Usage: release/superplane-helm-chart/build.sh <version>"
+  echo "Usage: release/superplane-helm-chart/build.sh <version> [app-version]"
   echo ""
-  echo "Example:"
+  echo "Examples:"
   echo "  release/superplane-helm-chart/build.sh v1.2.3"
+  echo "  release/superplane-helm-chart/build.sh 0.0.0-<git-sha> <git-sha>"
   exit 1
 fi
 
@@ -15,6 +16,9 @@ VERSION="$1"
 
 # Remove 'v' prefix if present for chart version
 CHART_VERSION="${VERSION#v}"
+
+# The chart uses appVersion as the default SuperPlane image tag.
+APP_VERSION="${2:-${CHART_VERSION}}"
 
 echo "* Packaging Helm chart for version ${VERSION}"
 
@@ -27,7 +31,7 @@ echo "* Updating Helm dependencies"
 helm dependency update "${CHART_DIR}"
 
 # Package the chart with the specified version
-helm package "${CHART_DIR}" --version "${CHART_VERSION}" --app-version "${CHART_VERSION}"
+helm package "${CHART_DIR}" --version "${CHART_VERSION}" --app-version "${APP_VERSION}"
 
 # Get the generated chart filename (Helm uses the chart name from Chart.yaml)
 CHART_FILE="${CHART_NAME}-${CHART_VERSION}.tgz"

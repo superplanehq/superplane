@@ -30,6 +30,7 @@ spec:
         - name: {{ .Release.Name }}-workers
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/build/superplane"]
           envFrom:
             - configMapRef:
                 name: {{ .Values.domain.configMapName }}
@@ -110,6 +111,8 @@ spec:
               value: /app/rbac/rbac_canvas_policy.csv
             - name: APPLICATION_NAME
               value: superplane
+            - name: RUN_MIGRATIONS
+              value: "no"
             - name: DB_POOL_SIZE
               value: "{{ .Values.workers.dbPoolSize }}"
             - name: DB_STATEMENT_TIMEOUT
