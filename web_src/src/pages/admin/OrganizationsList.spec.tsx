@@ -79,7 +79,7 @@ describe("OrganizationsList", () => {
 
   it("shows remaining hosted credit and sorts by that amount", async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn(async () =>
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) =>
       jsonResponse({
         items: [
           {
