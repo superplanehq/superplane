@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Probe task videos and audio, extract bounded timestamped frames, and transcribe.
+# Hosted videos are downloaded to a temp file, processed, and deleted.
 # Image-only tasks write INDEX.md and exit without the media toolchain.
 # Fail before the agent starts when video or audio is present and tools are missing.
 set -euo pipefail
@@ -17,6 +18,9 @@ MAX_SOURCE_PIXELS="${VIDEO_MAX_SOURCE_PIXELS:-16777216}"
 PROCESS_TIMEOUT="${VIDEO_PROCESS_TIMEOUT_SECONDS:-120}"
 DISK_BUDGET_BYTES="${VIDEO_DISK_BUDGET_BYTES:-2147483648}"
 MAX_TRANSCRIPT_ATTEMPTS="${VIDEO_MAX_TRANSCRIPT_ATTEMPTS:-3}"
+HOSTED_MAX_DURATION_SECONDS="${HOSTED_VIDEO_MAX_DURATION_SECONDS:-300}"
+HOSTED_MAX_BYTES="${HOSTED_VIDEO_MAX_BYTES:-268435456}"
+HOSTED_DOWNLOAD_TIMEOUT="${HOSTED_VIDEO_DOWNLOAD_TIMEOUT_SECONDS:-180}"
 
 if [ ! -d "$attachments" ]; then
   printf 'attachments directory is missing.\n' >&2
@@ -32,6 +36,7 @@ export MANIFEST_PATH="$manifest"
 export INDEX_PATH="$index"
 export WHISPER_MODEL
 export MAX_DURATION_SECONDS MAX_FRAMES MAX_WIDTH MAX_HEIGHT MAX_SOURCE_PIXELS PROCESS_TIMEOUT DISK_BUDGET_BYTES MAX_TRANSCRIPT_ATTEMPTS
+export HOSTED_MAX_DURATION_SECONDS HOSTED_MAX_BYTES HOSTED_DOWNLOAD_TIMEOUT
 
 python3 - <<'PY'
 import json
@@ -54,6 +59,10 @@ max_source_pixels = int(os.environ["MAX_SOURCE_PIXELS"])
 process_timeout = int(os.environ["PROCESS_TIMEOUT"])
 disk_budget = int(os.environ["DISK_BUDGET_BYTES"])
 max_transcript_attempts = int(os.environ["MAX_TRANSCRIPT_ATTEMPTS"])
+hosted_max_duration = float(os.environ["HOSTED_MAX_DURATION_SECONDS"])
+hosted_max_bytes = int(os.environ["HOSTED_MAX_BYTES"])
+hosted_download_timeout = int(os.environ["HOSTED_DOWNLOAD_TIMEOUT"])
+task_dir = attachments.parent
 
 VIDEO_TYPES = {
     "video/mp4",
@@ -124,9 +133,9 @@ def looks_like_image(item, dest: Path) -> bool:
     return dest.suffix.lower() in IMAGE_SUFFIXES
 
 
-def require_media_toolchain():
+def require_media_toolchain(extra_cmds=()):
     missing = 0
-    for cmd in ("ffmpeg", "ffprobe", "whisper-cli", "python3"):
+    for cmd in ("ffmpeg", "ffprobe", "whisper-cli", "python3", *extra_cmds):
         if shutil.which(cmd) is None:
             print(
                 f"{cmd} is required for video and audio task files. "
@@ -294,15 +303,19 @@ def write_index(manifest):
     lines = [
         "# Task files",
         "",
-        "Read this index first. Original files stay in this directory.",
+        "Read this index first.",
+        "Uploaded files stay in this directory.",
+        "A hosted video is not stored. Use its frames and transcript.",
         "For a video, use the listed frames and transcript.",
         "For audio, use the listed transcript.",
         "For an image, open the listed original path.",
-        "Do not ingest original video or audio bytes into the model.",
+        "Do not ingest original video or audio bytes.",
+        "Do not fetch a hosted video page URL.",
         "",
         "## Policy",
         "",
         f"- Maximum media duration: {int(policy.get('max_duration_seconds', max_duration))} seconds",
+        f"- Maximum hosted video duration: {int(policy.get('hosted_video_max_duration_seconds', hosted_max_duration))} seconds",
         f"- Maximum frames per video: {policy.get('max_frames', max_frames)}",
         f"- Maximum frame width: {policy.get('max_frame_width', max_width)} pixels",
         f"- Maximum frame height: {policy.get('max_frame_height', max_height)} pixels",
@@ -320,7 +333,10 @@ def write_index(manifest):
         lines.append("")
         if item.get("id"):
             lines.append(f"- id: {item['id']}")
-        lines.append(f"- original: attachments/{dest}")
+        if item.get("kind") == "hosted_video":
+            lines.append(f"- page: {item.get('url') or ''}")
+        else:
+            lines.append(f"- original: attachments/{dest}")
         lines.append(f"- status: {item.get('status') or 'downloaded'}")
         if item.get("reason"):
             lines.append(f"- reason: {item['reason']}")
@@ -396,7 +412,8 @@ def finish_transcript(item, dest, duration, frame_count=None):
         print(f"{dest.name}: {frame_count} frames, transcript ready")
 
 
-def process_video(item, dest):
+def process_video(item, dest, duration_limit=None):
+    limit = max_duration if duration_limit is None else duration_limit
     if is_partial(item) and has_existing_frames(item):
         finish_transcript(item, dest, float(item.get("duration_seconds") or 0), len(item.get("frames") or []))
         return
@@ -438,10 +455,10 @@ def process_video(item, dest):
     duration = duration_seconds(payload)
     item["duration_seconds"] = duration
     item["has_audio"] = bool(audio_streams)
-    if duration > max_duration:
+    if duration > limit:
         item["status"] = "failed"
         item["reason"] = "duration_exceeds_limit"
-        print(f"{dest.name}: duration {duration:.1f}s exceeds {max_duration:.0f}s")
+        print(f"{dest.name}: duration {duration:.1f}s exceeds {limit:.0f}s")
         return
 
     stamps = unique_timestamps(duration)
@@ -554,10 +571,167 @@ def needs_media_processing(item) -> bool:
     return True
 
 
+def apply_hosted_policy(manifest):
+    global hosted_max_duration, hosted_max_bytes, hosted_download_timeout
+    policy = manifest.get("policy") or {}
+    if policy.get("hosted_video_max_duration_seconds"):
+        hosted_max_duration = float(policy["hosted_video_max_duration_seconds"])
+    if policy.get("hosted_video_max_bytes"):
+        hosted_max_bytes = int(policy["hosted_video_max_bytes"])
+    if policy.get("hosted_video_download_timeout_seconds"):
+        hosted_download_timeout = int(policy["hosted_video_download_timeout_seconds"])
+
+
+def metadata_failure_reason(stderr: str) -> str:
+    text = (stderr or "").lower()
+    if any(token in text for token in ("private video", "sign in", "log in", "login required", "this video is private")):
+        return "private_video"
+    return "metadata_failed"
+
+
+def hosted_is_live(meta) -> bool:
+    if meta.get("is_live") is True:
+        return True
+    status = str(meta.get("live_status") or "").strip().lower()
+    return status in {"is_live", "is_upcoming", "post_live"}
+
+
+def hosted_duration(meta):
+    raw = meta.get("duration")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(value) or value <= 0:
+        return None
+    return value
+
+
+def dump_hosted_metadata(url: str):
+    result = run([
+        "yt-dlp", "--no-playlist", "--no-warnings", "--skip-download", "--dump-single-json", url,
+    ], timeout=30)
+    if result.returncode != 0:
+        return None, metadata_failure_reason(result.stderr)
+    try:
+        payload = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return None, "metadata_failed"
+    if not isinstance(payload, dict):
+        return None, "metadata_failed"
+    return payload, ""
+
+
+def reject_hosted_metadata(item, meta) -> bool:
+    availability = str(meta.get("availability") or "").strip().lower()
+    if availability in {"private", "needs_auth", "subscriber_only", "premium_only"}:
+        item["status"] = "failed"
+        item["reason"] = "private_video"
+        print(f"{item.get('dest')}: private video")
+        return True
+    if hosted_is_live(meta):
+        item["status"] = "failed"
+        item["reason"] = "live_stream"
+        print(f"{item.get('dest')}: live stream")
+        return True
+    duration = hosted_duration(meta)
+    if duration is None:
+        item["status"] = "failed"
+        item["reason"] = "duration_missing"
+        print(f"{item.get('dest')}: duration missing")
+        return True
+    item["duration_seconds"] = duration
+    if duration > hosted_max_duration:
+        item["status"] = "failed"
+        item["reason"] = "duration_exceeds_limit"
+        print(f"{item.get('dest')}: duration {duration:.1f}s exceeds {hosted_max_duration:.0f}s")
+        return True
+    return False
+
+
+def remove_hosted_download(path: Path):
+    parent = path.parent
+    if path.exists():
+        path.unlink()
+    if parent.name != ".hosted-videos" or not parent.exists():
+        return
+    for extra in parent.glob(path.name + "*"):
+        if extra.is_file():
+            extra.unlink()
+    try:
+        parent.rmdir()
+    except OSError:
+        pass
+
+
+def download_hosted_video(url: str, dest: Path) -> str:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    result = run([
+        "yt-dlp",
+        "--no-playlist",
+        "--no-warnings",
+        "--no-progress",
+        "--no-part",
+        "--max-filesize",
+        str(hosted_max_bytes),
+        "-f",
+        "bv*[height<=720]+ba/b[height<=720]",
+        "--merge-output-format",
+        "mp4",
+        "-o",
+        str(dest),
+        url,
+    ], timeout=hosted_download_timeout)
+    if result.returncode != 0 or not dest.is_file() or dest.stat().st_size == 0:
+        return "download_failed"
+    if dest.stat().st_size > hosted_max_bytes:
+        return "download_too_large"
+    return ""
+
+
+def process_hosted_video(item):
+    url = str(item.get("url") or "").strip()
+    dest_name = str(item.get("dest") or "").strip()
+    if not url.startswith("https://") or not dest_name or "/" in dest_name:
+        item["status"] = "failed"
+        item["reason"] = "metadata_failed"
+        print(f"{dest_name or 'hosted video'}: invalid hosted video")
+        return
+    meta, reason = dump_hosted_metadata(url)
+    if meta is None:
+        item["status"] = "failed"
+        item["reason"] = reason or "metadata_failed"
+        print(f"{dest_name}: {item['reason']}")
+        return
+    if reject_hosted_metadata(item, meta):
+        return
+    require_media_toolchain(("yt-dlp",))
+    tmp = task_dir / ".hosted-videos" / dest_name
+    try:
+        download_reason = download_hosted_video(url, tmp)
+        if download_reason:
+            item["status"] = "failed"
+            item["reason"] = download_reason
+            print(f"{dest_name}: {download_reason}")
+            return
+        if is_partial(item) and has_existing_frames(item):
+            finish_transcript(item, tmp, float(item.get("duration_seconds") or 0), len(item.get("frames") or []))
+            return
+        process_video(item, tmp, duration_limit=hosted_max_duration)
+    finally:
+        remove_hosted_download(tmp)
+
+
 manifest = load_manifest()
+apply_hosted_policy(manifest)
 videos = []
 audios = []
+hosted = []
 for item in manifest.get("files") or []:
+    if (item.get("kind") or "") == "hosted_video":
+        if needs_media_processing(item):
+            hosted.append(item)
+        continue
     dest_name = item.get("dest") or ""
     dest = attachments / dest_name
     if not dest_name or not dest.is_file():
@@ -569,13 +743,25 @@ for item in manifest.get("files") or []:
     elif looks_like_audio(item, dest):
         audios.append((item, dest))
 
+if hosted and shutil.which("yt-dlp") is None:
+    print(
+        "yt-dlp is required for hosted video links. Install the pinned yt-dlp in the runner image. "
+        "Do not download yt-dlp during a task.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 if videos or audios:
     require_media_toolchain()
     for item, dest in videos:
         process_video(item, dest)
     for item, dest in audios:
         process_audio(item, dest)
-else:
+
+for item in hosted:
+    process_hosted_video(item)
+
+if not videos and not audios and not hosted:
     print("No video or audio files in task attachments.")
 
 mark_ready_non_media(manifest, videos, audios)

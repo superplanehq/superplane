@@ -540,31 +540,36 @@ func mintPlanningWait(ctx context.Context, session *models.FactoryPlanningSessio
 	if result.Kind != models.PlanningWaitKindMessage {
 		return result.Text, nil, nil
 	}
-	if session.DraftWorkOrderID == nil {
-		return result.Text, nil, nil
+	text := result.Text
+	var payload []map[string]any
+	if session != nil && session.DraftWorkOrderID != nil && len(blob.FileIDsInMarkdown(result.Text)) > 0 {
+		rewritten, files, err := storedfiles.DescriptionForDispatch(
+			ctx,
+			database.DB(ctx),
+			blob.Current(),
+			session.OrganizationID,
+			session.FactoryID,
+			*session.DraftWorkOrderID,
+			result.Text,
+			blob.DispatchDownloadTTL(0),
+		)
+		if err != nil {
+			return "", nil, err
+		}
+		rewritten, files = runneraction.RewriteLoopbackTaskFileURLs(rewritten, files)
+		text = rewritten
+		payload = make([]map[string]any, 0, len(files))
+		for _, file := range files {
+			payload = append(payload, file.Map())
+		}
 	}
-	if len(blob.FileIDsInMarkdown(result.Text)) == 0 {
-		return result.Text, nil, nil
+	for _, hosted := range runneraction.HostedVideoAttachments(text) {
+		payload = append(payload, hosted.RunnerFile())
 	}
-	rewritten, files, err := storedfiles.DescriptionForDispatch(
-		ctx,
-		database.DB(ctx),
-		blob.Current(),
-		session.OrganizationID,
-		session.FactoryID,
-		*session.DraftWorkOrderID,
-		result.Text,
-		blob.DispatchDownloadTTL(0),
-	)
-	if err != nil {
-		return "", nil, err
+	if len(payload) == 0 {
+		return text, nil, nil
 	}
-	rewritten, files = runneraction.RewriteLoopbackTaskFileURLs(rewritten, files)
-	payload := make([]map[string]any, 0, len(files))
-	for _, file := range files {
-		payload = append(payload, file.Map())
-	}
-	return rewritten, payload, nil
+	return text, payload, nil
 }
 
 func consumeResolvedWait(session *models.FactoryPlanningSession, tx *gorm.DB) (models.PlanningWaitResult, bool, error) {
