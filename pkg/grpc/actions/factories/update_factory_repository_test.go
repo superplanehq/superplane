@@ -55,6 +55,17 @@ func TestReconcileFactoryRepositoryPublishesBitbucketCredentials(t *testing.T) {
 				},
 			},
 		},
+		{
+			ID: "custom-runner", Name: "Clone another repository", Type: models.NodeTypeComponent,
+			Ref: models.NodeRef{Component: &models.ComponentRef{Name: "runnerBash"}},
+			Configuration: map[string]any{
+				"machineType": "e1-large-amd64",
+				"script":      "git clone https://bitbucket.org/other-workspace/tools.git",
+				"environmentFrom": []any{
+					map[string]any{"source": "integration", "integration": map[string]any{"name": previousName}},
+				},
+			},
+		},
 	}
 	deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
@@ -72,14 +83,21 @@ func TestReconcileFactoryRepositoryPublishesBitbucketCredentials(t *testing.T) {
 	require.NoError(t, err)
 	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, reloaded)
 	require.NoError(t, err)
-	require.Len(t, version.Nodes, 2)
-	assert.Equal(t, selectedID, *version.Nodes[0].IntegrationID)
-	assert.Equal(t, orderRepositoryExpression, version.Nodes[0].Configuration["repository"])
+	require.Len(t, version.Nodes, 3)
+	findPR := findIntakeNode(version.Nodes, "find-pr")
+	implementation := findIntakeNode(version.Nodes, implementationAgentNodeID)
+	custom := findIntakeNode(version.Nodes, "custom-runner")
+	require.NotNil(t, findPR)
+	require.NotNil(t, implementation)
+	require.NotNil(t, custom)
+	assert.Equal(t, selectedID, *findPR.IntegrationID)
+	assert.Equal(t, orderRepositoryExpression, findPR.Configuration["repository"])
 	assert.Equal(t, []any{
 		map[string]any{"source": "integration", "integration": map[string]any{"name": selectedName}},
 		map[string]any{"source": "integration", "integration": map[string]any{"name": unrelatedName}},
-	}, version.Nodes[1].Configuration["environmentFrom"])
-	assert.Equal(t, "echo "+previousName, version.Nodes[1].Configuration["script"])
+	}, implementation.Configuration["environmentFrom"])
+	assert.Equal(t, "echo "+previousName, implementation.Configuration["script"])
+	assert.Equal(t, nodes[2].Configuration, custom.Configuration)
 }
 
 func TestUpdateFactoryRepositorySynchronizesHostedBindingAccess(t *testing.T) {

@@ -295,6 +295,7 @@ func reconcileFactoryRepository(
 		}
 		nodes := slices.Clone(liveVersion.Nodes)
 		managedVCSNodeIDs := map[string]bool{}
+		managedRunnerNodeIDs := map[string]bool{}
 		changed := false
 
 		if template, ok := resolveFactoryTemplate(nodes); ok {
@@ -303,6 +304,7 @@ func reconcileFactoryRepository(
 			}
 			switch template.id {
 			case "line-implementation":
+				managedRunnerNodeIDs[implementationAgentNodeID] = true
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{
 					{from: previousAppRepository, to: orderRepositoryExpression},
 					{from: previousDefaultBranch, to: orderDefaultBranchExpression},
@@ -324,14 +326,22 @@ func reconcileFactoryRepository(
 			})
 			managedVCSNodeIDs[graph.TriggerNodeID] = true
 			managedVCSNodeIDs[graph.AuthorPermissionNodeID] = true
+			managedRunnerNodeIDs[graph.AnalysisNodeID] = true
 			changed = replaceTriggerRepository(nodes, "github.onIssue", previousBacklogRepository, repository) || changed
 			changed = replaceTriggerRepository(nodes, "github.onDependabotAlert", previousBacklogRepository, repository) || changed
 		}
 		if _, ok := handlerCanvasIDs[canvas.ID]; ok {
-			addPRFeedbackGitHubNodeIDs(managedVCSNodeIDs, resolvePRFeedbackGraph(models.LiveCanvasSpec{
+			spec := models.LiveCanvasSpec{
 				Nodes: nodes,
 				Edges: liveVersion.Edges,
-			}))
+			}
+			graph := resolvePRFeedbackGraph(spec)
+			addPRFeedbackGitHubNodeIDs(managedVCSNodeIDs, graph)
+			if graph.isChecks() {
+				managedRunnerNodeIDs[graph.RunnerNodeID] = true
+			} else {
+				maps.Copy(managedRunnerNodeIDs, graph.discussionRunnerNodeIDs(spec))
+			}
 			changed = replaceGitHubTriggerRepository(nodes, previousAppRepository, repository) || changed
 		}
 		changed = replaceVCSNodeIntegration(
@@ -343,7 +353,7 @@ func reconcileFactoryRepository(
 			previousBacklogRepository,
 			repository,
 		) || changed
-		changed = replaceRunnerVCSIntegration(nodes, previousIntegrationName, integrationName) || changed
+		changed = replaceRunnerVCSIntegration(nodes, managedRunnerNodeIDs, previousIntegrationName, integrationName) || changed
 		if !changed {
 			continue
 		}
@@ -432,13 +442,13 @@ func replaceVCSNodeIntegration(
 	return changed
 }
 
-func replaceRunnerVCSIntegration(nodes []models.Node, previousName, name string) bool {
+func replaceRunnerVCSIntegration(nodes []models.Node, managedNodeIDs map[string]bool, previousName, name string) bool {
 	if previousName == "" || previousName == name {
 		return false
 	}
 	changed := false
 	for i := range nodes {
-		if !strings.HasPrefix(nodes[i].ComponentName(), "runner") {
+		if !managedNodeIDs[nodes[i].ID] || !strings.HasPrefix(nodes[i].ComponentName(), "runner") {
 			continue
 		}
 		environmentFrom, ok := nodes[i].Configuration["environmentFrom"].([]any)
