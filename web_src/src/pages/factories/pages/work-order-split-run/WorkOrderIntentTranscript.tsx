@@ -254,7 +254,7 @@ function SurveyAnswerBubble({
         {sender ? <ChatSenderRow display={sender} prefix={CREATE_WITH_AGENT_COPY.answeredBy} /> : null}
         <BesideSentTime sentAt={createdAtMs}>
           {pairs.length > 0 ? (
-            <ul className="flex w-full flex-col items-end gap-2">
+            <ul className="flex max-w-full flex-col items-end gap-2">
               {pairs.map((pair) => (
                 <li key={pair.question} className="flex max-w-full flex-col items-end gap-1">
                   <p className="px-1 text-right text-[12px] leading-4 text-muted-foreground">{pair.question}</p>

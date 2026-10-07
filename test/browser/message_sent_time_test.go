@@ -14,40 +14,55 @@ import (
 const messageSentTimeStoryID = "factories-pages-task-split-run-message-sent-time--narrow-pane"
 
 type messageTimeLayout struct {
-	PaneWidth           float64 `json:"paneWidth"`
-	ScrollOverflow      float64 `json:"scrollOverflow"`
-	LongTimeLeft        float64 `json:"longTimeLeft"`
-	LongTimeRight       float64 `json:"longTimeRight"`
-	LongTimeWidth       float64 `json:"longTimeWidth"`
-	LongBubbleLeft      float64 `json:"longBubbleLeft"`
-	LongBubbleRight     float64 `json:"longBubbleRight"`
-	LongBodyLeft        float64 `json:"longBodyLeft"`
-	LongBodyTop         float64 `json:"longBodyTop"`
-	LongOpacity         float64 `json:"longOpacity"`
-	LongFocused         bool    `json:"longFocused"`
-	ShortTimeLeft       float64 `json:"shortTimeLeft"`
-	ShortTimeRight      float64 `json:"shortTimeRight"`
-	ShortTimeWidth      float64 `json:"shortTimeWidth"`
-	ShortBubbleLeft     float64 `json:"shortBubbleLeft"`
-	ShortBubbleRight    float64 `json:"shortBubbleRight"`
-	ShortBodyTop        float64 `json:"shortBodyTop"`
-	ShortOpacity        float64 `json:"shortOpacity"`
-	SurveyTimeLeft      float64 `json:"surveyTimeLeft"`
-	SurveyTimeRight     float64 `json:"surveyTimeRight"`
-	SurveyTimeWidth     float64 `json:"surveyTimeWidth"`
-	SurveyBubbleLeft    float64 `json:"surveyBubbleLeft"`
-	SurveyBubbleRight   float64 `json:"surveyBubbleRight"`
-	AgentTimeLeft       float64 `json:"agentTimeLeft"`
-	AgentTimeRight      float64 `json:"agentTimeRight"`
-	AgentBodyLeft       float64 `json:"agentBodyLeft"`
-	AgentBodyTop        float64 `json:"agentBodyTop"`
-	AgentOpacity        float64 `json:"agentOpacity"`
-	PaneLeft            float64 `json:"paneLeft"`
-	PaneRight           float64 `json:"paneRight"`
-	TimedOverlayPadding float64 `json:"timedOverlayPadding"`
-	UntimedNoteCount    float64 `json:"untimedNoteCount"`
-	UntimedSurveyCount  float64 `json:"untimedSurveyCount"`
-	UntimedMaxPadding   float64 `json:"untimedMaxPadding"`
+	PaneWidth            float64 `json:"paneWidth"`
+	ScrollOverflow       float64 `json:"scrollOverflow"`
+	LongTimeLeft         float64 `json:"longTimeLeft"`
+	LongTimeRight        float64 `json:"longTimeRight"`
+	LongTimeWidth        float64 `json:"longTimeWidth"`
+	LongBubbleLeft       float64 `json:"longBubbleLeft"`
+	LongBubbleRight      float64 `json:"longBubbleRight"`
+	LongBodyLeft         float64 `json:"longBodyLeft"`
+	LongBodyTop          float64 `json:"longBodyTop"`
+	LongOpacity          float64 `json:"longOpacity"`
+	LongFocused          bool    `json:"longFocused"`
+	ShortTimeLeft        float64 `json:"shortTimeLeft"`
+	ShortTimeRight       float64 `json:"shortTimeRight"`
+	ShortTimeWidth       float64 `json:"shortTimeWidth"`
+	ShortBubbleLeft      float64 `json:"shortBubbleLeft"`
+	ShortBubbleRight     float64 `json:"shortBubbleRight"`
+	ShortBodyTop         float64 `json:"shortBodyTop"`
+	ShortOpacity         float64 `json:"shortOpacity"`
+	SurveyTimeLeft       float64 `json:"surveyTimeLeft"`
+	SurveyTimeRight      float64 `json:"surveyTimeRight"`
+	SurveyTimeWidth      float64 `json:"surveyTimeWidth"`
+	SurveyBubbleLeft     float64 `json:"surveyBubbleLeft"`
+	SurveyBubbleRight    float64 `json:"surveyBubbleRight"`
+	AgentTimeLeft        float64 `json:"agentTimeLeft"`
+	AgentTimeRight       float64 `json:"agentTimeRight"`
+	AgentBodyLeft        float64 `json:"agentBodyLeft"`
+	AgentBodyTop         float64 `json:"agentBodyTop"`
+	AgentOpacity         float64 `json:"agentOpacity"`
+	RequestTimeLeft      float64 `json:"requestTimeLeft"`
+	RequestTimeRight     float64 `json:"requestTimeRight"`
+	RequestTimeWidth     float64 `json:"requestTimeWidth"`
+	RequestBubbleLeft    float64 `json:"requestBubbleLeft"`
+	RequestBubbleRight   float64 `json:"requestBubbleRight"`
+	RequestBodyLeft      float64 `json:"requestBodyLeft"`
+	RequestBodyTop       float64 `json:"requestBodyTop"`
+	RequestOpacity       float64 `json:"requestOpacity"`
+	RequestFocused       bool    `json:"requestFocused"`
+	RequestPadding       float64 `json:"requestPadding"`
+	ShortSurveyTimeLeft  float64 `json:"shortSurveyTimeLeft"`
+	ShortSurveyTimeRight float64 `json:"shortSurveyTimeRight"`
+	ShortSurveyTimeWidth float64 `json:"shortSurveyTimeWidth"`
+	ShortSurveyFrameLeft float64 `json:"shortSurveyFrameLeft"`
+	ShortSurveyOpacity   float64 `json:"shortSurveyOpacity"`
+	PaneLeft             float64 `json:"paneLeft"`
+	PaneRight            float64 `json:"paneRight"`
+	TimedOverlayPadding  float64 `json:"timedOverlayPadding"`
+	UntimedNoteCount     float64 `json:"untimedNoteCount"`
+	UntimedSurveyCount   float64 `json:"untimedSurveyCount"`
+	UntimedMaxPadding    float64 `json:"untimedMaxPadding"`
 }
 
 func TestTaskMessageTimeStaysInsideNarrowPane(t *testing.T) {
@@ -89,6 +104,8 @@ func TestTaskMessageTimeStaysInsideNarrowPane(t *testing.T) {
 	})
 	require.LessOrEqual(t, rest.LongOpacity, 0.05)
 	require.LessOrEqual(t, rest.ShortOpacity, 0.05)
+	require.LessOrEqual(t, rest.RequestOpacity, 0.05)
+	require.LessOrEqual(t, rest.ShortSurveyOpacity, 0.05)
 
 	require.NoError(t, longNote.GetByTestId("work-order-description").Hover())
 	hovered := waitForMessageTimeLayout(t, page, func(layout messageTimeLayout) error {
@@ -108,6 +125,18 @@ func TestTaskMessageTimeStaysInsideNarrowPane(t *testing.T) {
 		return sameMessagePosition(layout.LongBodyLeft, layout.LongBodyTop, rest.LongBodyLeft, rest.LongBodyTop)
 	})
 	require.LessOrEqual(t, hidden.LongOpacity, 0.05)
+
+	require.NoError(t, page.Keyboard().Press("Tab"))
+	requestFocused := waitForMessageTimeLayout(t, page, func(layout messageTimeLayout) error {
+		if !layout.RequestFocused {
+			return fmt.Errorf("keyboard focus did not reach the original request")
+		}
+		if err := timeVisibleInsidePane(layout.RequestOpacity, layout.RequestTimeLeft, layout.RequestTimeRight, layout.RequestTimeWidth, layout); err != nil {
+			return err
+		}
+		return sameMessagePosition(layout.RequestBodyLeft, layout.RequestBodyTop, rest.RequestBodyLeft, rest.RequestBodyTop)
+	})
+	require.True(t, requestFocused.RequestFocused)
 
 	require.NoError(t, page.Keyboard().Press("Tab"))
 	focused := waitForMessageTimeLayout(t, page, func(layout messageTimeLayout) error {
@@ -151,6 +180,15 @@ func narrowPane(layout messageTimeLayout) error {
 	if err := timeInsideBubble(layout.SurveyTimeLeft, layout.SurveyTimeRight, layout.SurveyTimeWidth, layout.SurveyBubbleLeft, layout.SurveyBubbleRight, layout); err != nil {
 		return fmt.Errorf("survey answer: %w", err)
 	}
+	if err := timeBesideBubble(layout.ShortSurveyTimeLeft, layout.ShortSurveyTimeRight, layout.ShortSurveyTimeWidth, layout.ShortSurveyFrameLeft, layout); err != nil {
+		return fmt.Errorf("short question answer: %w", err)
+	}
+	if err := timeInsideBubble(layout.RequestTimeLeft, layout.RequestTimeRight, layout.RequestTimeWidth, layout.RequestBubbleLeft, layout.RequestBubbleRight, layout); err != nil {
+		return fmt.Errorf("original request: %w", err)
+	}
+	if layout.RequestPadding < 24 {
+		return fmt.Errorf("original request does not reserve space for the sent time: padding %.1f px", layout.RequestPadding)
+	}
 	if layout.AgentTimeLeft < layout.PaneLeft-1 || layout.AgentTimeRight > layout.PaneRight+1 {
 		return fmt.Errorf("agent time sits outside the pane: %.1f-%.1f", layout.AgentTimeLeft, layout.AgentTimeRight)
 	}
@@ -167,7 +205,7 @@ func narrowPane(layout messageTimeLayout) error {
 }
 
 func timesHiddenBesideBubbles(layout messageTimeLayout) error {
-	if layout.LongOpacity > 0.05 || layout.ShortOpacity > 0.05 || layout.AgentOpacity > 0.05 {
+	if layout.LongOpacity > 0.05 || layout.ShortOpacity > 0.05 || layout.AgentOpacity > 0.05 || layout.RequestOpacity > 0.05 || layout.ShortSurveyOpacity > 0.05 {
 		return fmt.Errorf("sent time is visible before hover or focus")
 	}
 	return nil
@@ -251,7 +289,10 @@ func readMessageTimeLayout(page pw.Page) (messageTimeLayout, error) {
 		const pane = document.querySelector('[data-testid="message-sent-time-pane"]');
 		const scroll = document.querySelector('[data-testid="message-sent-time-scroll"]');
 		const notes = [...document.querySelectorAll('[data-testid="split-run-intent-user-note"]')];
-		const survey = document.querySelector('[data-testid="split-run-intent-survey-answer"]');
+		const surveys = [...document.querySelectorAll('[data-testid="split-run-intent-survey-answer"]')];
+		const survey = surveys.find((node) => node.textContent.includes("helper text"));
+		const shortSurvey = surveys.find((node) => node.textContent.includes("Priority?"));
+		const request = document.querySelector('[data-testid="split-run-description"]');
 		const agent = document.querySelector('[data-testid="split-run-intent-agent-message"]');
 		const longNote = notes[0];
 		const shortNote = notes[1];
@@ -262,7 +303,12 @@ func readMessageTimeLayout(page pw.Page) (messageTimeLayout, error) {
 		const shortTime = shortNote?.querySelector('time');
 		const surveyTime = survey?.querySelector('time');
 		const agentTime = agent?.querySelector('time');
-		if (!pane || !scroll || !longBody || !shortBody || !surveyBody || !longTime || !shortTime || !surveyTime || !agent || !agentTime) {
+		const requestTime = request?.querySelector('time');
+		const requestBody = request?.querySelector('[data-testid="work-order-description"]');
+		const requestBubble = request?.querySelector('.sp-chat-outgoing');
+		const shortSurveyTime = shortSurvey?.querySelector('time');
+		const shortSurveyFrame = shortSurvey?.querySelector('.relative');
+		if (!pane || !scroll || !longBody || !shortBody || !surveyBody || !longTime || !shortTime || !surveyTime || !agent || !agentTime || !request || !requestTime || !requestBody || !requestBubble || !shortSurveyTime || !shortSurveyFrame) {
 			return null;
 		}
 		const paneBox = pane.getBoundingClientRect();
@@ -274,6 +320,10 @@ func readMessageTimeLayout(page pw.Page) (messageTimeLayout, error) {
 		const shortTimeBox = shortTime.getBoundingClientRect();
 		const surveyTimeBox = surveyTime.getBoundingClientRect();
 		const agentTimeBox = agentTime.getBoundingClientRect();
+		const requestTimeBox = requestTime.getBoundingClientRect();
+		const requestBubbleBox = requestBubble.getBoundingClientRect();
+		const shortSurveyTimeBox = shortSurveyTime.getBoundingClientRect();
+		const shortSurveyFrameBox = shortSurveyFrame.getBoundingClientRect();
 		const opacity = (element) => Number(getComputedStyle(element).opacity);
 		const reservePadding = (root) => {
 			const frame = root?.querySelector(".relative");
@@ -319,6 +369,21 @@ func readMessageTimeLayout(page pw.Page) (messageTimeLayout, error) {
 			agentBodyLeft: agentBox.left,
 			agentBodyTop: agentBox.top,
 			agentOpacity: opacity(agentTime),
+			requestTimeLeft: requestTimeBox.left,
+			requestTimeRight: requestTimeBox.right,
+			requestTimeWidth: requestTimeBox.width,
+			requestBubbleLeft: requestBubbleBox.left,
+			requestBubbleRight: requestBubbleBox.right,
+			requestBodyLeft: requestBody.getBoundingClientRect().left,
+			requestBodyTop: requestBody.getBoundingClientRect().top,
+			requestOpacity: opacity(requestTime),
+			requestFocused: document.activeElement === request,
+			requestPadding: reservePadding(request),
+			shortSurveyTimeLeft: shortSurveyTimeBox.left,
+			shortSurveyTimeRight: shortSurveyTimeBox.right,
+			shortSurveyTimeWidth: shortSurveyTimeBox.width,
+			shortSurveyFrameLeft: shortSurveyFrameBox.left,
+			shortSurveyOpacity: opacity(shortSurveyTime),
 			timedOverlayPadding: reservePadding(longNote),
 			untimedNoteCount: untimedNotes.length,
 			untimedSurveyCount: untimedSurveys.length,

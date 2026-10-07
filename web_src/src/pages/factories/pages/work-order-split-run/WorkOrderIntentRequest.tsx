@@ -17,7 +17,7 @@ import { PendingWorkOrderFileChips } from "../../PendingWorkOrderFileChips";
 import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestImages";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
-import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME } from "./chatBubbleStyle";
+import { REQUEST_CARD_CLASSNAME, REQUEST_CARD_FADE_CLASSNAME, USER_TURN_CLASSNAME } from "./chatBubbleStyle";
 import { AnalysisPlanControls } from "./AnalysisPlanControls";
 import { PlanningImplementationControls } from "./PlanningImplementationControls";
 import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
@@ -36,7 +36,7 @@ import type { SplitRunSource } from "./splitRunSource";
 import { hasPendingPlanningQuestions } from "./planningReviewState";
 import { WorkOrderIntentSurvey } from "./WorkOrderIntentSurvey";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
-import { MessageSentTime, MessageTimeRow } from "./MessageSentTime";
+import { BesideSentTime, MessageSentTime, MessageTimeRow } from "./MessageSentTime";
 import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
 
 export type { IntentAnalysisChat };
@@ -450,7 +450,7 @@ function AnalysisComposerAddons({
   );
 }
 
-function RequestMessage({
+export function RequestMessage({
   description,
   files,
   source,
@@ -493,14 +493,17 @@ function RequestMessage({
 
   return (
     <MessageTimeRow sentAt={createdAt} className="mb-3 flex w-full justify-end" data-testid="split-run-description">
-      <MessageSentTime sentAt={createdAt} placement="overlay" />
-      <div className={cn(REQUEST_CARD_CLASSNAME, "max-w-[85%]")}>
-        {source ? (
-          <div className="mb-2">
-            <WorkOrderSplitRunSource source={source} compact />
+      <div className={USER_TURN_CLASSNAME}>
+        <BesideSentTime sentAt={createdAt}>
+          <div className={REQUEST_CARD_CLASSNAME}>
+            {source ? (
+              <div className="mb-2">
+                <WorkOrderSplitRunSource source={source} compact />
+              </div>
+            ) : null}
+            {body}
           </div>
-        ) : null}
-        {body}
+        </BesideSentTime>
       </div>
     </MessageTimeRow>
   );

@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ComponentStoryShell } from "../../__fixtures__/ComponentStoryShell";
 import { withFactoriesTheme } from "../../__fixtures__/factoriesStoryTheme";
+import { RequestMessage } from "./WorkOrderIntentRequest";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
 
 const sentAt = Date.UTC(2026, 7, 6, 10, 17);
@@ -32,6 +33,11 @@ export const NarrowPane: Story = {
     <div className="w-[14rem] overflow-hidden bg-background" data-testid="message-sent-time-pane">
       <div className="overflow-y-auto [scrollbar-gutter:stable]" data-testid="message-sent-time-scroll">
         <div className="px-4 py-3">
+          <RequestMessage
+            description="Show the next action on the empty billing page when this planning pane is narrow."
+            createdAt={new Date(sentAt).toISOString()}
+            asChat
+          />
           <WorkOrderIntentTranscript
             organizationId="org-1"
             messages={[
@@ -48,6 +54,14 @@ export const NarrowPane: Story = {
                 role: "user",
                 text: "Hi",
                 createdAtMs: sentAt + 60_000,
+              },
+              {
+                id: "survey-short",
+                kind: "text",
+                role: "user",
+                origin: "survey",
+                text: "Priority? High",
+                createdAtMs: sentAt,
               },
               {
                 id: "survey-1",
