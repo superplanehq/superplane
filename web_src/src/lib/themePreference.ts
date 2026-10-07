@@ -36,6 +36,11 @@ export function getSystemPrefersDark(): boolean {
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
+const THEME_COLOR_BY_RESOLVED_THEME: Record<ResolvedTheme, string> = {
+  light: "#ffffff",
+  dark: "#14120b",
+};
+
 export function applyResolvedThemeToDocument(resolvedTheme: ResolvedTheme): void {
   if (typeof document === "undefined") {
     return;
@@ -43,6 +48,25 @@ export function applyResolvedThemeToDocument(resolvedTheme: ResolvedTheme): void
 
   document.documentElement.classList.toggle("dark", resolvedTheme === "dark");
   document.documentElement.style.colorScheme = resolvedTheme;
+  applyThemeColor(resolvedTheme);
+}
+
+function applyThemeColor(resolvedTheme: ResolvedTheme): void {
+  const color = THEME_COLOR_BY_RESOLVED_THEME[resolvedTheme];
+  const metas = document.head.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]');
+  const meta = metas[0] ?? document.createElement("meta");
+
+  if (!meta.isConnected) {
+    meta.setAttribute("name", "theme-color");
+    document.head.appendChild(meta);
+  }
+
+  meta.setAttribute("content", color);
+  meta.removeAttribute("media");
+
+  for (const extra of Array.from(metas).slice(1)) {
+    extra.remove();
+  }
 }
 
 export function persistThemePreference(preference: ThemePreference): void {
