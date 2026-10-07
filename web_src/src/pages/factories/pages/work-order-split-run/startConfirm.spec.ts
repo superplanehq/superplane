@@ -45,6 +45,15 @@ describe("startConfirm", () => {
     expect(needsStartConfirm({ confidence: 5 })).toBe(false);
   });
 
+  it("starts a review headline of 3 and still asks for 1 or 2", () => {
+    expect(startConfirmTone({ confidence: 3, scoreMax: 3 })).toBeUndefined();
+    expect(needsStartConfirm({ confidence: 3, scoreMax: 3 })).toBe(false);
+    expect(startConfirmTone({ confidence: 2, scoreMax: 3 })).toBe("mid");
+    expect(startConfirmBody({ confidence: 1, scoreMax: 3 })).toBe(START_CONFIRM_COPY.mid);
+    expect(needsStartConfirm({ confidence: 1, scoreMax: 3 })).toBe(true);
+    expect(needsStartConfirm({ confidence: 2, scoreMax: 3 })).toBe(true);
+  });
+
   it("honors Do not ask again from localStorage", () => {
     persistSkipStartConfirm();
     expect(window.localStorage.getItem(START_CONFIRM_STORAGE_KEY)).toBe("1");

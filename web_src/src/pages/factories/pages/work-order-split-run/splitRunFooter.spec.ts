@@ -11,6 +11,7 @@ import {
   rerunStartStepIndex,
   splitRunCloseNeedsConfirm,
   splitRunDecisionTone,
+  splitRunFooterScores,
   showsArchive,
   SPLIT_RUN_STOP_CHOICES,
 } from "./splitRunFooter";
@@ -104,6 +105,21 @@ describe("buildSplitRunFooter", () => {
     expect(footer.note?.headline).toBe("This task is ready to start");
     expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
     expect(splitRunDecisionTone(footer)).toBe("draft-ready");
+  });
+
+  it("invites Start when a review headline is 3 and warns when it is 1 or 2", () => {
+    const ready = buildSplitRunFooter({ kind: "draft", confidenceScore: 3, scoreMax: 3 });
+    const caution = buildSplitRunFooter({ kind: "draft", confidenceScore: 2, scoreMax: 3 });
+    const low = buildSplitRunFooter({ kind: "draft", confidenceScore: 1, scoreMax: 3 });
+
+    expect(ready.note?.headline).toBe("This task is ready to start");
+    expect(ready.scoreMax).toBe(3);
+    expect(splitRunFooterScores(ready)).toEqual({ clarity: undefined, confidence: 3, scoreMax: 3 });
+    expect(splitRunDecisionTone(ready)).toBe("draft-ready");
+    expect(caution.note?.headline).toBe("Review the plan before you start");
+    expect(splitRunDecisionTone(caution)).toBe("draft-caution");
+    expect(low.note?.headline).toBe("Review before you start");
+    expect(splitRunDecisionTone(low)).toBe("draft-caution");
   });
 
   it("scores an intake draft on Confidence alone", () => {

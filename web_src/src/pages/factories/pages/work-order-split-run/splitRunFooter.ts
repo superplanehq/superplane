@@ -156,10 +156,12 @@ export interface SplitRunFooter {
   attentionCard?: boolean;
   run?: { appId: string; runId: string };
   status?: WorkOrderDisplayStatus;
-  /** Draft Clarity. 0–5. Missing while analysis has not scored yet. */
+  /** Draft Clarity on the 1–5 scale. Missing while analysis has not scored yet. */
   clarityScore?: number;
-  /** Draft Confidence. 0–5. Missing while analysis has not scored yet. */
+  /** Draft Confidence. Missing while analysis has not scored yet. */
   confidenceScore?: number;
+  /** Top of the scale. Absent means 1–5. Review scores use 3. */
+  scoreMax?: number;
 }
 
 export function isTaskResultFooter(footer: SplitRunFooter): boolean {
@@ -211,6 +213,7 @@ export function classicSplitRunFooter(footer: SplitRunFooter): SplitRunFooter {
     note: { ...SPLIT_RUN_CLASSIC_DRAFT_NOTE },
     clarityScore: undefined,
     confidenceScore: undefined,
+    scoreMax: undefined,
     actions: [ARCHIVE, START],
   };
 }
@@ -230,9 +233,9 @@ export type SplitRunDecisionTone =
   | "done"
   | "rejected";
 
-/** Both draft scores in the shape `draftReadiness` and `startConfirm` read. */
-export function splitRunFooterScores(footer: Pick<SplitRunFooter, "clarityScore" | "confidenceScore">) {
-  return { clarity: footer.clarityScore, confidence: footer.confidenceScore };
+/** Draft scores in the shape `draftReadiness` and `startConfirm` read. */
+export function splitRunFooterScores(footer: Pick<SplitRunFooter, "clarityScore" | "confidenceScore" | "scoreMax">) {
+  return { clarity: footer.clarityScore, confidence: footer.confidenceScore, scoreMax: footer.scoreMax };
 }
 
 function creditBillingNote(note?: SplitRunFooterNote): SplitRunFooterNote | undefined {
@@ -384,13 +387,16 @@ type FooterInput = {
   isAnalyzing?: boolean;
   clarityScore?: number;
   confidenceScore?: number;
+  scoreMax?: number;
 };
 
 function withFooterMeta(input: FooterInput, footer: SplitRunFooter): SplitRunFooter {
   const next = input.status ? { ...footer, status: input.status } : footer;
   const withRun = input.run ? { ...next, run: input.run } : next;
   const withClarity = input.clarityScore == null ? withRun : { ...withRun, clarityScore: input.clarityScore };
-  return input.confidenceScore == null ? withClarity : { ...withClarity, confidenceScore: input.confidenceScore };
+  const withConfidence =
+    input.confidenceScore == null ? withClarity : { ...withClarity, confidenceScore: input.confidenceScore };
+  return input.scoreMax == null ? withConfidence : { ...withConfidence, scoreMax: input.scoreMax };
 }
 
 const DRAFT_TONE: Record<DraftReadinessTone, SplitRunDecisionTone> = {
