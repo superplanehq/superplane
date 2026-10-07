@@ -51,7 +51,7 @@ describe("automations view model", () => {
     expect(outcome.spend).toBe("$0.73");
     expect(outcome.tokens).toBe("2.7k tokens");
     expect(outcome.models).toEqual(["claude-sonnet-4-6"]);
-    expect(outcome.headline).toBe("Implement is running");
+    expect(outcome.headline).toBe("Implementation in progress");
   });
 });
 

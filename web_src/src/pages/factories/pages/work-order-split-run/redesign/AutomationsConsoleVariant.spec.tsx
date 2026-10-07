@@ -285,7 +285,7 @@ describe("AutomationsConsoleVariant summary strip", () => {
     renderConsole(SPLIT_RUN_RUNNING, { canStopRun: true, onStopRun });
 
     const note = screen.getByTestId("redesign-console-live-note");
-    expect(note).toHaveTextContent("Implement is running");
+    expect(note).toHaveTextContent("Implementation in progress");
     fireEvent.click(screen.getByTestId("redesign-console-stop-run"));
     expect(onStopRun).toHaveBeenCalledWith(SPLIT_RUN_RUNNING.footer.run);
   });

@@ -14,10 +14,12 @@ import (
 )
 
 const (
-	defaultReconcileIntervalSeconds = 15
-	defaultRequestTimeoutSeconds    = 90
-	defaultInstanceType             = "t3.micro"
-	defaultVolumeSizeGB             = 30
+	defaultPollTimeout        = 30 * time.Second
+	defaultErrorRetryInterval = 15 * time.Second
+	defaultRequestTimeout     = 90 * time.Second
+	maxPollTimeout            = 30 * time.Second
+	defaultInstanceType       = "t3.micro"
+	defaultVolumeSizeGB       = 30
 
 	fleetManagerConfigEnvironment = "FLEET_MANAGER_CONFIG"
 	installationTokenEnvironment  = "INSTALLATION_ADMIN_TOKEN"
@@ -27,13 +29,46 @@ const (
 )
 
 type Config struct {
-	ID                       string  `json:"id"`
-	SuperPlaneURL            string  `json:"superplaneUrl"`
-	InstallationAdminToken   string  `json:"installationAdminToken"`
-	RunnerReleaseBaseURL     string  `json:"runnerReleaseBaseUrl"`
-	ReconcileIntervalSeconds int     `json:"reconcileIntervalSeconds"`
-	RequestTimeoutSeconds    int     `json:"requestTimeoutSeconds"`
-	Fleets                   []Fleet `json:"fleets"`
+	ID                     string               `json:"id"`
+	SuperPlaneURL          string               `json:"superplaneUrl"`
+	InstallationAdminToken string               `json:"installationAdminToken"`
+	RunnerReleaseBaseURL   string               `json:"runnerReleaseBaseUrl"`
+	Reconciliation         ReconciliationConfig `json:"reconciliation"`
+	HTTP                   HTTPConfig           `json:"http"`
+	Fleets                 []Fleet              `json:"fleets"`
+}
+
+type ReconciliationConfig struct {
+	PollTimeout        Duration `json:"pollTimeout"`
+	Interval           Duration `json:"interval"`
+	ErrorRetryInterval Duration `json:"errorRetryInterval"`
+}
+
+type HTTPConfig struct {
+	RequestTimeout Duration `json:"requestTimeout"`
+}
+
+type Duration struct {
+	value time.Duration
+	set   bool
+}
+
+func (d *Duration) UnmarshalJSON(data []byte) error {
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("duration must be a string: %w", err)
+	}
+	value, err := time.ParseDuration(raw)
+	if err != nil {
+		return fmt.Errorf("parse duration %q: %w", raw, err)
+	}
+	d.value = value
+	d.set = true
+	return nil
+}
+
+func newDuration(value time.Duration) Duration {
+	return Duration{value: value, set: true}
 }
 
 type Fleet struct {
@@ -133,12 +168,20 @@ func decodeJSON(reader io.Reader, config *Config) error {
 	return decoder.Decode(config)
 }
 
-func (c *Config) ReconcileInterval() time.Duration {
-	return time.Duration(c.ReconcileIntervalSeconds) * time.Second
+func (c *Config) PollTimeout() time.Duration {
+	return c.Reconciliation.PollTimeout.value
+}
+
+func (c *Config) ReconciliationInterval() time.Duration {
+	return c.Reconciliation.Interval.value
+}
+
+func (c *Config) ErrorRetryInterval() time.Duration {
+	return c.Reconciliation.ErrorRetryInterval.value
 }
 
 func (c *Config) RequestTimeout() time.Duration {
-	return time.Duration(c.RequestTimeoutSeconds) * time.Second
+	return c.HTTP.RequestTimeout.value
 }
 
 func (c *Config) applyDefaults() {
@@ -147,11 +190,14 @@ func (c *Config) applyDefaults() {
 		strings.TrimSpace(c.RunnerReleaseBaseURL),
 		"/",
 	)
-	if c.ReconcileIntervalSeconds == 0 {
-		c.ReconcileIntervalSeconds = defaultReconcileIntervalSeconds
+	if !c.Reconciliation.PollTimeout.set && !c.Reconciliation.Interval.set {
+		c.Reconciliation.PollTimeout = newDuration(defaultPollTimeout)
 	}
-	if c.RequestTimeoutSeconds == 0 {
-		c.RequestTimeoutSeconds = defaultRequestTimeoutSeconds
+	if !c.Reconciliation.ErrorRetryInterval.set {
+		c.Reconciliation.ErrorRetryInterval = newDuration(defaultErrorRetryInterval)
+	}
+	if !c.HTTP.RequestTimeout.set {
+		c.HTTP.RequestTimeout = newDuration(defaultRequestTimeout)
 	}
 	for index := range c.Fleets {
 		fleet := &c.Fleets[index]
@@ -195,10 +241,31 @@ func (c *Config) validate() error {
 		return fmt.Errorf("id is required")
 	case strings.TrimSpace(c.InstallationAdminToken) == "":
 		return fmt.Errorf("installationAdminToken is required")
-	case c.ReconcileIntervalSeconds < 1:
-		return fmt.Errorf("reconcileIntervalSeconds must be positive")
-	case c.RequestTimeoutSeconds < 1:
-		return fmt.Errorf("requestTimeoutSeconds must be positive")
+	case c.Reconciliation.PollTimeout.set && c.Reconciliation.Interval.set:
+		return fmt.Errorf(
+			"reconciliation.pollTimeout and reconciliation.interval are mutually exclusive",
+		)
+	case c.Reconciliation.PollTimeout.value <= 0 &&
+		c.Reconciliation.PollTimeout.set:
+		return fmt.Errorf("reconciliation.pollTimeout must be positive")
+	case c.Reconciliation.PollTimeout.value > maxPollTimeout:
+		return fmt.Errorf(
+			"reconciliation.pollTimeout must not exceed %s",
+			maxPollTimeout,
+		)
+	case c.Reconciliation.PollTimeout.value%time.Second != 0:
+		return fmt.Errorf("reconciliation.pollTimeout must use whole seconds")
+	case c.Reconciliation.Interval.value <= 0 && c.Reconciliation.Interval.set:
+		return fmt.Errorf("reconciliation.interval must be positive")
+	case c.Reconciliation.ErrorRetryInterval.value <= 0:
+		return fmt.Errorf("reconciliation.errorRetryInterval must be positive")
+	case c.HTTP.RequestTimeout.value <= 0:
+		return fmt.Errorf("http.requestTimeout must be positive")
+	case c.Reconciliation.PollTimeout.set &&
+		c.HTTP.RequestTimeout.value <= c.Reconciliation.PollTimeout.value:
+		return fmt.Errorf(
+			"http.requestTimeout must be longer than reconciliation.pollTimeout",
+		)
 	case len(c.Fleets) == 0:
 		return fmt.Errorf("fleets must contain at least one fleet")
 	}
