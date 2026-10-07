@@ -24,6 +24,9 @@ type WebhookMetadata struct {
 	ID string `json:"id" mapstructure:"id"`
 	// IDs holds every Linear webhook this subscription created.
 	IDs []string `json:"ids" mapstructure:"ids"`
+	// AppLevel is true when Linear delivers events to the OAuth application
+	// webhook instead of a webhook created for this subscription.
+	AppLevel bool `json:"appLevel,omitempty" mapstructure:"appLevel,omitempty"`
 }
 
 func (c WebhookConfiguration) resolvedTeamIDs() []string {
@@ -72,6 +75,10 @@ func (h *LinearWebhookHandler) CompareConfig(a, b any) (bool, error) {
 }
 
 func (h *LinearWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
+	if AppWebhookSigningSecret(ctx.Integration) != "" {
+		return &WebhookMetadata{AppLevel: true}, nil
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %v", err)

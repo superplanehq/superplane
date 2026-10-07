@@ -104,6 +104,29 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 
 		require.ErrorContains(t, err, "Only admins can manage webhooks")
 	})
+
+	t.Run("uses the application webhook when a signing secret is set", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		integration := newAuthorizedIntegration()
+		integration.Configuration["webhookSecret"] = "app-signing-secret"
+
+		metadata, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpContext,
+			Integration: integration,
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/hook",
+				Secret:        []byte(testWebhookSecret),
+				Configuration: WebhookConfiguration{TeamID: "t1", ResourceType: IssueResourceType},
+			},
+		})
+
+		require.NoError(t, err)
+		webhookMetadata, ok := metadata.(*WebhookMetadata)
+		require.True(t, ok)
+		assert.True(t, webhookMetadata.AppLevel)
+		assert.Empty(t, webhookMetadata.ID)
+		assert.Empty(t, httpContext.Requests)
+	})
 }
 
 func Test__WebhookHandler__Cleanup(t *testing.T) {
