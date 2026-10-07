@@ -1,7 +1,18 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { Text } from "@/components/Text/text";
 import { useAccount } from "@/contexts/useAccount";
-import { ArrowLeft, BookOpen, Building, Inbox, KeyRound, Network, Shield, Terminal, Users, Webhook } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  Building,
+  Inbox,
+  KeyRound,
+  Network,
+  Shield,
+  Terminal,
+  Users,
+  Webhook,
+} from "lucide-react";
 import React from "react";
 import { Link, Navigate, NavLink, Outlet } from "react-router";
 
