@@ -324,11 +324,22 @@ func (s *FactoryPlanningSession) analysisWorkOrder(tx *gorm.DB) (*FactoryWorkOrd
 	if s.DraftWorkOrderID == nil {
 		return nil, ErrFactoryPlanningSessionNoDraft
 	}
-	factoryModel, err := FindFactory(tx, s.OrganizationID, s.FactoryID)
+	return FindPlanningWorkOrder(tx, s.OrganizationID, s.FactoryID, *s.DraftWorkOrderID)
+}
+
+func FindPlanningWorkOrder(tx *gorm.DB, organizationID, factoryID, orderID uuid.UUID) (*FactoryWorkOrder, error) {
+	var order FactoryWorkOrder
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND id = ?", organizationID, factoryID, orderID).
+		First(&order).
+		Error
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderNotFound
+		}
 		return nil, err
 	}
-	return factoryModel.FindWorkOrder(tx, *s.DraftWorkOrderID)
+	return &order, nil
 }
 
 func planningSpecArtifactKey(orderID uuid.UUID) string {

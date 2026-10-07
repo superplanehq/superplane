@@ -643,6 +643,9 @@ func writeRunnerPlanningError(w http.ResponseWriter, r *http.Request, session *m
 	case errors.Is(err, models.ErrFactoryPlanningSessionNotFound),
 		errors.Is(err, gorm.ErrRecordNotFound):
 		http.Error(w, "planning session not found", http.StatusNotFound)
+	case errors.Is(err, models.ErrFactoryNotFound),
+		errors.Is(err, models.ErrFactoryWorkOrderNotFound):
+		http.Error(w, err.Error(), http.StatusNotFound)
 	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
 		http.Error(w, "planning session has ended", http.StatusConflict)
 	case isPlanningRequestCanceled(r, err):
