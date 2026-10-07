@@ -65,11 +65,25 @@ async function reportMergeCheck(input) {
   });
 }
 
-const TOOLS = [
-  {
+function scoreRangeText() {
+  if (String(process.env.SUPERPLANE_MERGE_CONFIDENCE_MAX_SCORE || "").trim() === "5") {
+    return {
+      sentence:
+        "score is the integer the check prompt asks for. Use 1 through 5 when the prompt says 1 to 5. Use 1 through 3 when the prompt says 1 to 3.",
+      field: "The integer the check prompt asks for.",
+    };
+  }
+  return {
+    sentence: "score is an integer from 1 through 3.",
+    field: "Integer from 1 through 3.",
+  };
+}
+
+function mergeCheckTool() {
+  const range = scoreRangeText();
+  return {
     name: "report_merge_check",
-    description:
-      "Publish one merge confidence check for this pull request. Call this once for the check in the prompt. check is the id from the Merge check line. score is an integer from 1 through 5. summary is one sentence.",
+    description: `Publish one merge confidence check for this pull request. Call this once for the check in the prompt. check is the id from the Merge check line. ${range.sentence} summary is one sentence.`,
     inputSchema: {
       type: "object",
       properties: {
@@ -79,7 +93,7 @@ const TOOLS = [
         },
         score: {
           type: "number",
-          description: "Integer from 1 through 5.",
+          description: range.field,
         },
         summary: {
           type: "string",
@@ -88,8 +102,8 @@ const TOOLS = [
       },
       required: ["check", "score", "summary"],
     },
-  },
-];
+  };
+}
 
 let replyFormat = "ndjson";
 
@@ -130,7 +144,7 @@ async function handleRequest(message) {
     return;
   }
   if (method === "tools/list") {
-    sendResult(id, { tools: TOOLS });
+    sendResult(id, { tools: [mergeCheckTool()] });
     return;
   }
   if (method === "tools/call") {
@@ -233,7 +247,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  TOOLS,
+  mergeCheckTool,
   reportMergeCheck,
   parseFrames,
 };

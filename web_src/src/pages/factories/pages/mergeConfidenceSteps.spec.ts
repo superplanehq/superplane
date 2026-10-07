@@ -41,7 +41,7 @@ describe("expandMergeConfidenceSteps", () => {
     expect(expanded.map((step) => step.name)).toEqual(["Checkout Pull Request", "Blast radius", "Security"]);
     expect(expanded[1]?.prompt?.startsWith("Merge check: risk.\n")).toBe(true);
     expect(expanded[1]?.prompt).toContain("A higher score means more risk.");
-    expect(expanded[1]?.prompt).toContain("The diff is in /tmp/pr.diff.");
+    expect(expanded[1]?.prompt).toContain("score is an integer from 1 to 3.");
     expect(expanded[1]?.prompt).not.toContain("Enabled checks:");
     expect(expanded[2]?.prompt).toContain("check is security.");
     expect(expanded.map((step) => step.name)).not.toContain("Performance");
@@ -76,7 +76,9 @@ describe("newMergeConfidenceStep", () => {
     expect(first.type).toBe("prompt");
     expect(mergeCheckPromptBody(first.prompt)).toContain("Describe what this check looks for.");
     expect(mergeCheckPromptBody(first.prompt)).toContain("report_merge_check");
-    expect(mergeCheckPromptBody(first.prompt)).toContain("check is new-check.");
+    expect(mergeCheckPromptBody(first.prompt)).toContain(
+      "score is an integer from 1 to 3. A higher score means a worse result.",
+    );
     expect(mergeCheckPromptBody(first.prompt)).not.toContain("Merge check:");
     expect(second.prompt?.startsWith("Merge check: new-check-2.\n")).toBe(true);
 

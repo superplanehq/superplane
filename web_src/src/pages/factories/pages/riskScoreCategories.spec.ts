@@ -43,26 +43,26 @@ function draftWithPrompt(prompt: string): PlanningReviewDraft {
 }
 
 describe("formatRiskScoreRules", () => {
-  it("uses medium for additive database changes and high for authorization changes", () => {
+  it("uses caution for additive database changes and critical for authorization changes", () => {
     const rules = formatRiskScoreRules(defaultRiskScoreCategories());
 
-    expect(rules).toContain("Additive database changes = 3 (medium).");
-    expect(rules).toContain("Authorization changes = 4 (high).");
-    expect(rules).toContain("Documentation only = 1 (very_low).");
-    expect(rules).toContain("Secrets and credentials = 5 (critical).");
+    expect(rules).toContain("Additive database changes = 2 (caution).");
+    expect(rules).toContain("Authorization changes = 3 (critical).");
+    expect(rules).toContain("Documentation only = 1 (healthy).");
+    expect(rules).toContain("Secrets and credentials = 3 (critical).");
   });
 
   it("uses the current list, including added and removed categories", () => {
     const categories = defaultRiskScoreCategories()
       .filter((category) => category.id !== "documentation")
-      .map((category) => (category.id === "authorization" ? { ...category, score: 5 as const } : category));
+      .map((category) => (category.id === "authorization" ? { ...category, score: 1 as const } : category));
     categories.push({ id: "custom-1", name: "Cache changes", score: 2 });
 
     const rules = formatRiskScoreRules(categories);
 
     expect(rules).not.toContain("Documentation only");
-    expect(rules).toContain("Authorization changes = 5 (critical).");
-    expect(rules).toContain("Cache changes = 2 (low).");
+    expect(rules).toContain("Authorization changes = 1 (healthy).");
+    expect(rules).toContain("Cache changes = 2 (caution).");
   });
 
   it("skips a name that contains an equals sign", () => {
@@ -78,12 +78,16 @@ describe("parseRiskScoreRules", () => {
     expect(parseRiskScoreRules(prompt)).toEqual(defaultRiskScoreCategories());
   });
 
-  it("gives unknown categories custom ids", () => {
-    const prompt = promptWithRules("Cache changes = 2 (low). Queue changes = 4 (high).");
+  it("folds an old rules line and keeps a new score", () => {
+    const prompt = promptWithRules(
+      "Cache changes = 2 (low). Queue changes = 4 (high). Billing changes = 3 (critical). API changes = 2 (caution).",
+    );
 
     expect(parseRiskScoreRules(prompt)).toEqual([
-      { id: "custom-1", name: "Cache changes", score: 2 },
-      { id: "custom-2", name: "Queue changes", score: 4 },
+      { id: "custom-1", name: "Cache changes", score: 1 },
+      { id: "custom-2", name: "Queue changes", score: 3 },
+      { id: "custom-3", name: "Billing changes", score: 3 },
+      { id: "custom-4", name: "API changes", score: 2 },
     ]);
   });
 
@@ -96,13 +100,13 @@ describe("draftWithRiskScoreCategories", () => {
   it("rewrites only the rules line in the review prompt", () => {
     const draft = draftWithPrompt(promptWithRules(formatRiskScoreRules(defaultRiskScoreCategories())));
     const next = draftWithRiskScoreCategories(draft, [
-      { id: "authorization", name: "Authorization changes", score: 5 },
+      { id: "authorization", name: "Authorization changes", score: 3 },
       { id: "custom-1", name: "Cache changes", score: 2 },
     ]);
 
     expect(next).not.toBeNull();
     expect(riskScoreCategoriesFromDraft(next!)).toEqual([
-      { id: "authorization", name: "Authorization changes", score: 5 },
+      { id: "authorization", name: "Authorization changes", score: 3 },
       { id: "custom-1", name: "Cache changes", score: 2 },
     ]);
     const steps = next!.components[0].configuration.steps as Array<{ prompt?: string; command?: string }>;
@@ -113,5 +117,55 @@ describe("draftWithRiskScoreCategories", () => {
 
   it("returns null when no step has a rules line", () => {
     expect(draftWithRiskScoreCategories(draftWithPrompt("Review the diff."), defaultRiskScoreCategories())).toBeNull();
+  });
+
+  it("rewrites stored 1 to 5 instructions when the categories are saved", () => {
+    const draft = draftWithPrompt(
+      [
+        "score is an integer from 1 to 5.",
+        "choose a score from 1 to 5.",
+        "Use Higher risk for high or critical. Use Moderate risk for medium. Use Lower risk for low or very low.",
+        "Documentation only = 1 (very_low). Secrets and credentials = 5 (critical).",
+      ].join("\n"),
+    );
+    draft.components[0].configuration.steps.push({
+      name: "Performance",
+      type: "prompt",
+      prompt: [
+        "score is an integer from 1 to 5.",
+        "5 means the change follows every practice that applies.",
+        "4 means the change follows the practices that apply, with a small gap.",
+        "3 means the change follows some practices and breaks one that applies.",
+        "2 means the change breaks a practice that applies.",
+        "1 means the change breaks more than one practice that applies.",
+        "If no performance practice applies, report the check with 5.",
+      ].join("\n"),
+    });
+
+    const next = draftWithRiskScoreCategories(draft, [{ id: "secrets", name: "Secrets and credentials", score: 3 }]);
+    const steps = next!.components[0].configuration.steps as Array<{ prompt?: string }>;
+
+    expect(steps[1].prompt).toContain("score is an integer from 1 to 3.");
+    expect(steps[1].prompt).toContain("choose a score from 1 to 3.");
+    expect(steps[1].prompt).toContain("Use Higher risk for critical. Use Moderate risk for caution. Use Lower risk for healthy.");
+    expect(steps[1].prompt).not.toContain("1 to 5");
+    expect(steps[2].prompt).toContain("If no performance practice applies, report 3.");
+    expect(steps[2].prompt).not.toContain("report the check with 5");
+    expect(steps[2].prompt).not.toContain("5 means");
+  });
+
+  it("leaves a custom 5-point rubric on its original scale", () => {
+    const draft = draftWithPrompt(
+      ["score is an integer from 1 to 5.", "5 means the owner asked for a manual score.", "Cache changes = 4 (high)."].join(
+        "\n",
+      ),
+    );
+
+    const next = draftWithRiskScoreCategories(draft, [{ id: "custom-1", name: "Cache changes", score: 2 }]);
+    const steps = next!.components[0].configuration.steps as Array<{ prompt?: string }>;
+
+    expect(steps[1].prompt).toContain("score is an integer from 1 to 5.");
+    expect(steps[1].prompt).toContain("5 means the owner asked for a manual score.");
+    expect(steps[1].prompt).toContain("Cache changes = 2 (caution).");
   });
 });

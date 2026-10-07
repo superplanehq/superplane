@@ -48,6 +48,7 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 		CanvasRunID:     run.ID,
 		NodeExecutionID: nodeExecution.ID,
 		EnabledChecks:   []string{"risk"},
+		CheckMaxScores:  map[string]int{"risk": 3},
 	}, time.Hour)
 	require.NoError(t, err)
 	unknownRun, err := runneraction.MintMergeConfidenceToken(signer, runneraction.MergeConfidenceScope{
@@ -68,12 +69,21 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, unauthorizedRec.Code)
 
 	disabled := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
-		`{"check":"performance","score":5,"summary":"No performance practice applies."}`,
+		`{"check":"performance","score":3,"summary":"No performance practice applies."}`,
 	)))
 	disabled.Header.Set("Authorization", "Bearer "+token)
 	disabledRec := httptest.NewRecorder()
 	server.Router.ServeHTTP(disabledRec, disabled)
 	assert.Equal(t, http.StatusBadRequest, disabledRec.Code)
+
+	rejected := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
+		`{"check":"risk","score":4,"summary":"Higher risk because the pull request raises the limit."}`,
+	)))
+	rejected.Header.Set("Authorization", "Bearer "+token)
+	rejectedRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rejectedRec, rejected)
+	assert.Equal(t, http.StatusBadRequest, rejectedRec.Code)
+	assert.Contains(t, rejectedRec.Body.String(), "1 through 3")
 
 	missingRun := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
 		`{"check":"risk","score":4,"summary":"Higher risk because the pull request raises the limit."}`,
@@ -84,7 +94,7 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, missingRunRec.Code)
 
 	report := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
-		`{"check":"risk","score":4,"summary":"Higher risk because the pull request raises the limit."}`,
+		`{"check":"risk","score":3,"summary":"Higher risk because the pull request raises the limit."}`,
 	)))
 	report.Header.Set("Authorization", "Bearer "+token)
 	reportRec := httptest.NewRecorder()
@@ -96,7 +106,7 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	require.Len(t, checks, 1)
 	assert.Equal(t, "risk-review", checks[0].Key)
 	assert.Equal(t, "Blast radius", checks[0].Name)
-	assert.Equal(t, 4.0, checks[0].Score)
+	assert.Equal(t, 3.0, checks[0].Score)
 	assert.Equal(t, models.FactoryWorkOrderCheckLevelCritical, checks[0].Level)
 	assert.Equal(t, "Higher risk because the pull request raises the limit.", checks[0].Summary)
 	require.NotNil(t, checks[0].RunID)
@@ -109,6 +119,23 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 	assert.Equal(t, nodeID, automation.NodeID)
 	assert.Equal(t, "Assess risk", automation.NodeName)
 
+	legacyToken, err := runneraction.MintMergeConfidenceToken(signer, runneraction.MergeConfidenceScope{
+		OrganizationID:  r.Organization.ID,
+		FactoryID:       factoryModel.ID,
+		WorkOrderID:     order.ID,
+		CanvasRunID:     run.ID,
+		NodeExecutionID: nodeExecution.ID,
+		EnabledChecks:   []string{"performance"},
+	}, time.Hour)
+	require.NoError(t, err)
+	legacy := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
+		`{"check":"performance","score":5,"summary":"No performance practice applies."}`,
+	)))
+	legacy.Header.Set("Authorization", "Bearer "+legacyToken)
+	legacyRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(legacyRec, legacy)
+	require.Equal(t, http.StatusOK, legacyRec.Code, legacyRec.Body.String())
+
 	require.NoError(t, db.Model(nodeExecution).Update("state", models.CanvasNodeExecutionStateFinished).Error)
 	late := httptest.NewRequest(http.MethodPost, "/api/v1/runner/merge-confidence/checks", bytes.NewReader([]byte(
 		`{"check":"risk","score":1,"summary":"Lower risk because the pull request is introducing user interface changes only."}`,
@@ -120,6 +147,15 @@ func TestRunnerMergeConfidenceCheck(t *testing.T) {
 
 	checks, err = order.ListChecks(db)
 	require.NoError(t, err)
-	require.Len(t, checks, 1)
-	assert.Equal(t, 4.0, checks[0].Score)
+	require.Len(t, checks, 2)
+	var performance *models.FactoryWorkOrderCheck
+	for i := range checks {
+		if checks[i].Key == "performance-review" {
+			performance = &checks[i]
+		}
+	}
+	require.NotNil(t, performance)
+	assert.Equal(t, 5.0, performance.Score)
+	assert.Equal(t, 5.0, performance.MaxScore)
+	assert.Equal(t, models.FactoryWorkOrderCheckLevelPositive, performance.Level)
 }
