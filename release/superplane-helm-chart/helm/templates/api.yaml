@@ -35,6 +35,7 @@ spec:
   {{- if and .Values.runnerAPI.enabled (not .Values.runnerLogs.existingClaim) }}
   strategy:
     type: Recreate
+    rollingUpdate: null
   {{- end }}
   selector:
     matchLabels:
