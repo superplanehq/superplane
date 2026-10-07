@@ -38,6 +38,6 @@ export const MOBILE_TASK_COPY = {
   noActivity: "No activity yet. Start the task to run the line.",
   pullRequests: "Pull requests",
   files: "Files",
-  showSteps: "Show steps",
-  hideSteps: "Hide steps",
+  showLog: "Show log",
+  hideLog: "Hide log",
 } as const;
