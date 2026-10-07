@@ -270,6 +270,58 @@ blobStorage:
   credentialsFile: ""
 
 #
+# Integrated runner API. Off by default.
+# When enabled, the API pod also serves the /runner/v1 routes, moves
+# finished runner task logs to blob storage, and removes stale runners.
+# Use a cloud blob storage provider: filesystem blobs stay inside one pod.
+#
+runnerAPI:
+  enabled: false
+
+#
+# Active runner task logs. Used when runnerAPI.enabled is true.
+# Leave existingClaim empty to use an emptyDir volume. An emptyDir volume
+# supports one API replica and loses active logs when the pod restarts.
+# More than one API replica needs a ReadWriteMany claim, such as Filestore.
+#
+runnerLogs:
+  path: /var/lib/superplane/runner-active-logs
+  existingClaim: ""
+  # Group that owns the log volume. The SuperPlane image runs as nobody (65534).
+  fsGroup: 65534
+
+#
+# Integrated Fleet Manager. Off by default.
+# Fleet Manager creates and deletes runner machines for the configured fleets.
+# Put the Fleet Manager configuration in an existing secret, under the key
+# fleet-manager.yaml. See pkg/fleets/README.md for the format.
+# Set serviceAccount.annotations to bind a cloud identity, for example
+# iam.gke.io/gcp-service-account for GKE Workload Identity.
+#
+fleetManager:
+  enabled: false
+  existingSecret: ""
+  image:
+    registry: ghcr.io/superplanehq
+    name: fleet-manager
+    tag: ""
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: false
+    name: ""
+    annotations: {}
+  # Fleet Manager reads its configuration once at start. Change an annotation,
+  # for example a checksum of the configuration, to restart it.
+  podAnnotations: {}
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+#
 # Email configuration
 #
 email:
@@ -287,8 +339,8 @@ feedback:
   discordWebhookUrl: ""
 
 #
-# Kubernetes service account. create stays false.
-# Set name to use an existing account.
+# Kubernetes service account for the API, worker, and WebSocket pods.
+# Set create to true to create it, or set name to use an existing account.
 # Set annotations to bind a cloud identity, for example GKE Workload Identity.
 #
 serviceAccount:
