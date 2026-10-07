@@ -48,6 +48,7 @@ export function WorkOrderSplitRunOverview({
   descriptionBusy = false,
   onDescriptionSave,
   sidebarNote,
+  createdAt,
 }: {
   title: string;
   description: string;
@@ -74,6 +75,7 @@ export function WorkOrderSplitRunOverview({
   descriptionBusy?: boolean;
   onDescriptionSave?: (next: string) => void | Promise<void>;
   sidebarNote?: ReactNode;
+  createdAt?: string | null;
 }) {
   const planningReviewEnabled = useExperimentalFeature(organizationId).has(FEATURE_TASK_PLANNING_REVIEW);
   if (sourceOnly) {
@@ -125,6 +127,7 @@ export function WorkOrderSplitRunOverview({
         resultFooter={resultFooter}
         analysis={analysisWithWorkspace(analysis, organizationId, factoryId)}
         source={source}
+        createdAt={createdAt}
         contextSidebar={overviewContextSidebar({
           showContextSidebar,
           source,

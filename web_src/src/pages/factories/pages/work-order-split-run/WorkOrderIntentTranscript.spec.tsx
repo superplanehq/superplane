@@ -2,8 +2,12 @@ import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { TooltipProvider } from "@/ui/tooltip";
+
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
-import type { CreateWithAgentMessage } from "../createWithAgentTypes";
+import type { CreateWithAgentMessage, CreateWithAgentView } from "../createWithAgentTypes";
+import { formatWorkOrderDateTime } from "../../lib/workOrderDateTime";
+import { WorkOrderIntentRequest } from "./WorkOrderIntentRequest";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
 
 vi.mock("@/hooks/useOrgUserLookup", () => ({
@@ -295,4 +299,166 @@ describe("WorkOrderIntentTranscript", () => {
     expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.planUpdated })).not.toBeInTheDocument();
     expect(screen.getByText("I published the spec.")).toBeInTheDocument();
   });
+
+  it("labels notes, survey answers, and agent replies with the sent time", () => {
+    const sentAt = new Date(2026, 7, 6, 10, 17);
+    const later = new Date(2026, 7, 6, 10, 18);
+    renderTranscript([
+      {
+        id: "user-1",
+        kind: "text",
+        role: "user",
+        userId: "user-ada",
+        text: "Keep the theme.",
+        createdAtMs: sentAt.getTime(),
+      },
+      {
+        id: "user-2",
+        kind: "text",
+        role: "user",
+        userId: "user-ada",
+        text: "Also keep the helper.",
+        createdAtMs: later.getTime(),
+      },
+      {
+        id: "user-3",
+        kind: "text",
+        role: "user",
+        origin: "survey",
+        text: "Scope? One file",
+        createdAtMs: sentAt.getTime(),
+      },
+      { id: "agent-1", kind: "text", role: "agent", text: "Noted.", createdAtMs: sentAt.getTime() },
+    ]);
+
+    const noteTimes = screen.getAllByTestId("split-run-intent-user-note").map((note) => within(note).getByRole("time"));
+    expect(noteTimes).toHaveLength(2);
+    expectSentTime(noteTimes[0], sentAt);
+    expectSentTime(noteTimes[1], later);
+    expect(screen.getAllByTestId("split-run-intent-user-note")[1]).toHaveTextContent("Also keep the helper.");
+
+    expectSentTime(within(screen.getByTestId("split-run-intent-survey-answer")).getByRole("time"), sentAt);
+
+    const agent = screen.getByTestId("split-run-intent-agent-message");
+    expectSentTime(within(agent).getByRole("time"), sentAt);
+    expect(agent).toHaveTextContent("Noted.");
+    agent.focus();
+    expect(agent).toHaveFocus();
+  });
+
+  it("omits a sent time when the message time is missing", () => {
+    renderTranscript([
+      { id: "user-1", kind: "text", role: "user", text: "Keep the theme." },
+      { id: "agent-1", kind: "text", role: "agent", text: "Noted." },
+      { id: "user-2", kind: "text", role: "user", text: "Still no clock.", createdAtMs: Number.NaN },
+      { id: "user-3", kind: "text", role: "user", origin: "survey", text: "Scope? One file" },
+    ]);
+
+    expect(screen.queryByRole("time")).not.toBeInTheDocument();
+    for (const note of screen.getAllByTestId("split-run-intent-user-note")) {
+      expect(note.parentElement).not.toHaveAttribute("tabindex");
+    }
+    expect(screen.getByTestId("split-run-intent-transcript").querySelector(".pt-7")).toBeNull();
+  });
+
+  it("does not label a plan card or a tool activity row", () => {
+    const sentAt = new Date(2026, 7, 6, 10, 17).getTime();
+    render(
+      <WorkOrderIntentTranscript
+        organizationId="org-1"
+        messages={[
+          { id: "plan-1", kind: "plan", role: "plan", score: 4, createdAtMs: sentAt },
+          { id: "agent-1", kind: "text", role: "agent", text: "I updated the plan.", activityId: "activity-1" },
+        ]}
+        activities={[
+          {
+            id: "activity-1",
+            provider: "codex",
+            status: "passed",
+            sequence: 1,
+            items: [
+              {
+                type: "tool",
+                id: "command-1",
+                kind: "bash",
+                name: "Bash",
+                input: "ls",
+                output: "",
+                outputStreams: [],
+                status: "passed",
+                truncated: false,
+              },
+            ],
+            truncated: false,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole("time")).not.toBeInTheDocument();
+    expect(screen.getByTestId("agent-activity-activity-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-plan-updated")).not.toBeInTheDocument();
+  });
+
+  it("shows the original request time only when that time is valid", () => {
+    const sentAt = new Date(2026, 7, 6, 10, 17);
+    const { rerender } = renderRequest(sentAt.toISOString());
+
+    const request = screen.getByTestId("split-run-description");
+    expectSentTime(within(request).getByRole("time"), sentAt);
+    expect(request).toHaveTextContent("Show the next action on the empty billing page.");
+    request.focus();
+    expect(request).toHaveFocus();
+
+    rerender(requestElement("not-a-date"));
+    expect(within(screen.getByTestId("split-run-description")).queryByRole("time")).not.toBeInTheDocument();
+    expect(screen.getByTestId("split-run-description")).not.toHaveAttribute("tabindex");
+  });
 });
+
+function expectSentTime(time: HTMLElement, sentAt: Date) {
+  expect(time).toHaveTextContent(`Sent ${formatWorkOrderDateTime(sentAt)}`);
+  expect(time).toHaveAttribute("dateTime", sentAt.toISOString());
+  expect(time).toHaveAttribute("title", sentAt.toLocaleString());
+  expect(time.closest("[class*='group/message']")).toHaveAttribute("tabindex", "0");
+}
+
+const REQUEST_VIEW: CreateWithAgentView = {
+  repository: "acme/payments",
+  machineStatus: "waiting",
+  canvasId: "",
+  canvasRunId: "",
+  executionId: "",
+  messages: [],
+  composer: "",
+  created: [],
+  right: { kind: "empty" },
+  endConfirmOpen: false,
+  selectableModelKey: "",
+  refining: false,
+};
+
+function requestElement(createdAt?: string) {
+  return (
+    <TooltipProvider>
+      <WorkOrderIntentRequest
+        title="Clearer empty state"
+        description="Show the next action on the empty billing page."
+        createdAt={createdAt}
+        analysis={{
+          organizationId: "org-1",
+          view: REQUEST_VIEW,
+          composer: "",
+          canSend: false,
+          onComposerChange: () => undefined,
+          onSend: () => undefined,
+          onSubmitSurvey: () => undefined,
+        }}
+      />
+    </TooltipProvider>
+  );
+}
+
+function renderRequest(createdAt?: string) {
+  return render(requestElement(createdAt));
+}

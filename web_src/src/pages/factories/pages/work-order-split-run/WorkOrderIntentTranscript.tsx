@@ -14,6 +14,7 @@ import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 import { parsePlanningSurveyReply } from "../planningSessionSurvey";
 import { AgentActivityView } from "./AgentActivityView";
+import { BesideSentTime, MessageSentTime, MessageTimeRow } from "./MessageSentTime";
 import type { AgentActivity } from "./agentActivity";
 import {
   SENDER_ROW_CLASSNAME,
@@ -117,12 +118,27 @@ function TranscriptMessage({
     const frameClassName = userMessageFrameClass(adjacentUserAbove, adjacentUserBelow);
     const sender = sameSenderAbove ? null : senderDisplay(message.userId, resolveUser);
     if (message.origin === "survey") {
-      return <SurveyAnswerBubble text={message.text} sender={sender} frameClassName={frameClassName} />;
+      return (
+        <SurveyAnswerBubble
+          text={message.text}
+          sender={sender}
+          frameClassName={frameClassName}
+          createdAtMs={message.createdAtMs}
+        />
+      );
     }
-    return <ComposerNoteBubble text={message.text} sender={sender} files={files} frameClassName={frameClassName} />;
+    return (
+      <ComposerNoteBubble
+        text={message.text}
+        sender={sender}
+        files={files}
+        frameClassName={frameClassName}
+        createdAtMs={message.createdAtMs}
+      />
+    );
   }
 
-  return <AgentMessage text={message.text} streaming={streaming} files={files} />;
+  return <AgentMessage text={message.text} streaming={streaming} files={files} createdAtMs={message.createdAtMs} />;
 }
 
 function userMessageFrameClass(adjacentUserAbove: boolean, adjacentUserBelow: boolean) {
@@ -146,10 +162,12 @@ const AgentMessage = memo(function AgentMessage({
   text,
   streaming,
   files,
+  createdAtMs,
 }: {
   text: string;
   streaming: boolean;
   files?: FilesFile[];
+  createdAtMs?: number;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
   const animateWords = useRef(streaming).current;
@@ -160,22 +178,27 @@ const AgentMessage = memo(function AgentMessage({
   }, [animateWords]);
 
   return (
-    <div className="flex w-full items-start px-2 py-0.5" data-testid="split-run-intent-agent-message">
+    <MessageTimeRow
+      sentAt={createdAtMs}
+      className="flex w-full items-start px-2 py-0.5"
+      data-testid="split-run-intent-agent-message"
+    >
+      <MessageSentTime sentAt={createdAtMs} placement="overlay" />
       <div
         ref={contentRef}
         className={`min-w-0 flex-1 whitespace-normal break-words text-[14px] leading-5 text-foreground ${animateWords ? "sp-stream-words" : "sp-text-reveal"}`}
       >
         <MarkdownContent content={text} files={files} variant="workspace" className={MESSAGE_MARKDOWN} />
       </div>
-    </div>
+    </MessageTimeRow>
   );
 }, sameAgentMessage);
 
 function sameAgentMessage(
-  previous: { text: string; streaming: boolean; files?: FilesFile[] },
-  next: { text: string; streaming: boolean; files?: FilesFile[] },
+  previous: { text: string; streaming: boolean; files?: FilesFile[]; createdAtMs?: number },
+  next: { text: string; streaming: boolean; files?: FilesFile[]; createdAtMs?: number },
 ): boolean {
-  return previous.text === next.text && previous.files === next.files;
+  return previous.text === next.text && previous.files === next.files && previous.createdAtMs === next.createdAtMs;
 }
 
 function ComposerNoteBubble({
@@ -183,26 +206,30 @@ function ComposerNoteBubble({
   sender,
   files,
   frameClassName,
+  createdAtMs,
 }: {
   text: string;
   sender: OrgUserDisplay | null;
   files?: FilesFile[];
   frameClassName: string;
+  createdAtMs?: number;
 }) {
   return (
-    <div className={frameClassName}>
+    <MessageTimeRow sentAt={createdAtMs} className={frameClassName}>
       <div className={USER_TURN_CLASSNAME} data-testid="split-run-intent-user-note">
         {sender ? <ChatSenderRow display={sender} /> : null}
-        <div className={USER_BUBBLE_CLASSNAME}>
-          <WorkOrderDescription
-            description={text}
-            files={files}
-            previewHeight={FALLBACK_COLLAPSED_MAX_HEIGHT_PX}
-            fadeClassName={USER_BUBBLE_FADE_CLASSNAME}
-          />
-        </div>
+        <BesideSentTime sentAt={createdAtMs}>
+          <div className={USER_BUBBLE_CLASSNAME}>
+            <WorkOrderDescription
+              description={text}
+              files={files}
+              previewHeight={FALLBACK_COLLAPSED_MAX_HEIGHT_PX}
+              fadeClassName={USER_BUBBLE_FADE_CLASSNAME}
+            />
+          </div>
+        </BesideSentTime>
       </div>
-    </div>
+    </MessageTimeRow>
   );
 }
 
@@ -211,42 +238,46 @@ function SurveyAnswerBubble({
   text,
   sender,
   frameClassName,
+  createdAtMs,
 }: {
   text: string;
   sender: OrgUserDisplay | null;
   frameClassName: string;
+  createdAtMs?: number;
 }) {
   const pairs = parsePlanningSurveyReply(text);
   const skipped = text.trim() === CREATE_WITH_AGENT_COPY.surveySkipped;
 
   return (
-    <div className={frameClassName}>
+    <MessageTimeRow sentAt={createdAtMs} className={frameClassName}>
       <div className={USER_TURN_CLASSNAME} data-testid="split-run-intent-survey-answer">
         {sender ? <ChatSenderRow display={sender} prefix={CREATE_WITH_AGENT_COPY.answeredBy} /> : null}
-        {pairs.length > 0 ? (
-          <ul className="flex w-full flex-col items-end gap-2">
-            {pairs.map((pair) => (
-              <li key={pair.question} className="flex max-w-full flex-col items-end gap-1">
-                <p className="px-1 text-right text-[12px] leading-4 text-muted-foreground">{pair.question}</p>
-                {pair.answer === "skipped" ? (
-                  <span className={SURVEY_SKIPPED_CLASSNAME}>{CREATE_WITH_AGENT_COPY.surveyAnswerSkipped}</span>
-                ) : (
-                  <span className={SURVEY_PICK_CLASSNAME} data-testid="split-run-intent-survey-pick">
-                    {pair.answer}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : skipped ? (
-          <span className={SURVEY_SKIPPED_CLASSNAME}>{CREATE_WITH_AGENT_COPY.surveySkipped}</span>
-        ) : (
-          <span className={SURVEY_PICK_CLASSNAME} data-testid="split-run-intent-survey-pick">
-            {text}
-          </span>
-        )}
+        <BesideSentTime sentAt={createdAtMs}>
+          {pairs.length > 0 ? (
+            <ul className="flex w-full flex-col items-end gap-2">
+              {pairs.map((pair) => (
+                <li key={pair.question} className="flex max-w-full flex-col items-end gap-1">
+                  <p className="px-1 text-right text-[12px] leading-4 text-muted-foreground">{pair.question}</p>
+                  {pair.answer === "skipped" ? (
+                    <span className={SURVEY_SKIPPED_CLASSNAME}>{CREATE_WITH_AGENT_COPY.surveyAnswerSkipped}</span>
+                  ) : (
+                    <span className={SURVEY_PICK_CLASSNAME} data-testid="split-run-intent-survey-pick">
+                      {pair.answer}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : skipped ? (
+            <span className={SURVEY_SKIPPED_CLASSNAME}>{CREATE_WITH_AGENT_COPY.surveySkipped}</span>
+          ) : (
+            <span className={SURVEY_PICK_CLASSNAME} data-testid="split-run-intent-survey-pick">
+              {text}
+            </span>
+          )}
+        </BesideSentTime>
       </div>
-    </div>
+    </MessageTimeRow>
   );
 }
 
