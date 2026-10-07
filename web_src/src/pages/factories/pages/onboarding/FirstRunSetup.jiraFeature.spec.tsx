@@ -85,7 +85,7 @@ vi.mock("@/hooks/useIntegrations", () => ({
 
 vi.mock("./useBitbucketOnboarding", () => ({
   useBitbucketOnboarding: () => ({
-    data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },
+    data: { providerConfigured: false, identity: undefined, repositories: [] },
     isPending: false,
     error: null,
     startInstallation: { mutateAsync: vi.fn() },

@@ -26,9 +26,8 @@ const bitbucketOnboarding = vi.hoisted(() => ({
   loaded: true,
   refetch: (() => undefined) as () => unknown,
   providerConfigured: false,
-  identity: undefined as { login?: string; providerUserId?: string } | undefined,
+  identity: undefined as { login?: string; userId?: string } | undefined,
   repositories: [] as Array<{ fullName?: string }>,
-  installUrl: "",
   isPending: false,
   error: null as unknown,
 }));
@@ -57,7 +56,6 @@ vi.mock("./useBitbucketOnboarding", () => ({
           providerConfigured: bitbucketOnboarding.providerConfigured,
           identity: bitbucketOnboarding.identity,
           repositories: bitbucketOnboarding.repositories,
-          installUrl: bitbucketOnboarding.installUrl,
         }
       : undefined,
     isPending: bitbucketOnboarding.isPending,
@@ -191,7 +189,6 @@ describe("FirstRunSetup Bitbucket", () => {
     bitbucketOnboarding.providerConfigured = false;
     bitbucketOnboarding.identity = undefined;
     bitbucketOnboarding.repositories = [];
-    bitbucketOnboarding.installUrl = "";
     bitbucketOnboarding.isPending = false;
     bitbucketOnboarding.error = null;
     experimental.enabled = new Set([FEATURE_FACTORY_BITBUCKET]);
