@@ -6,15 +6,18 @@ import (
 )
 
 const (
-	EnvLinearOAuthClientID     = "SUPERPLANE_LINEAR_OAUTH_CLIENT_ID"
-	EnvLinearOAuthClientSecret = "SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET"
+	EnvLinearOAuthClientID      = "SUPERPLANE_LINEAR_OAUTH_CLIENT_ID"
+	EnvLinearOAuthClientSecret  = "SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET"
+	EnvLinearOAuthWebhookSecret = "SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET"
 )
 
 // LinearHostedOAuthConfig is SuperPlane's public Linear OAuth application.
 // The process holds the credentials. New connections store only tokens.
+// WebhookSecret is the signing secret from the application's webhook settings.
 type LinearHostedOAuthConfig struct {
-	ClientID     string
-	ClientSecret string
+	ClientID      string
+	ClientSecret  string
+	WebhookSecret string
 }
 
 // LoadLinearHostedOAuthConfig reads the public Linear OAuth app from the
@@ -27,8 +30,9 @@ func LoadLinearHostedOAuthConfig() LinearHostedOAuthConfig {
 	}
 
 	return LinearHostedOAuthConfig{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
+		ClientID:      clientID,
+		ClientSecret:  clientSecret,
+		WebhookSecret: strings.TrimSpace(os.Getenv(EnvLinearOAuthWebhookSecret)),
 	}
 }
 
