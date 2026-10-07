@@ -521,6 +521,7 @@ pb.gen: dev.test.is.running
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
 	$(MAKE) openapi.web.client.gen
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc 'date +%s%N > /app/.air-rebuild'
 
 pb.gen.models:
 	@$(COMPOSE) exec app /app/scripts/protoc.sh $(MODULES)
