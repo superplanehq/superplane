@@ -32,6 +32,10 @@ metadata:
     service: {{ .Release.Name }}-api
 spec:
   replicas: {{ .Values.api.replicas }}
+  {{- if and .Values.runnerAPI.enabled (not .Values.runnerLogs.existingClaim) }}
+  strategy:
+    type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       app: superplane
