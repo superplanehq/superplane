@@ -4,9 +4,14 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
+import { intakeCatalogAvailability, seededIntakeCatalog } from "@/test/intakeCatalog";
 import { SetupSections } from "./SetupSections";
 import { VcsStep } from "./onboardingSteps";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";
+
+vi.mock("@/hooks/useIntakeCatalogAvailability", () => ({
+  useIntakeCatalogAvailability: () => intakeCatalogAvailability(seededIntakeCatalog()),
+}));
 
 function githubConnection(id: string, name: string): OrganizationsIntegration {
   return {
@@ -61,6 +66,23 @@ describe("VcsStep", () => {
     await user.click(screen.getByRole("button", { name: "Connect new GitHub" }));
 
     expect(onCreateConnection).toHaveBeenCalledOnce();
+  });
+
+  it("shows each other repository provider from the catalog as coming soon", () => {
+    render(
+      <VcsStep
+        github={githubIntegrations()}
+        otherProviders={[
+          { key: "gitlab", name: "GitLab" },
+          { key: "gitea", name: "Gitea" },
+        ]}
+        onSelectConnection={vi.fn()}
+        onCreateConnection={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("vcs-provider-soon-gitlab")).toHaveTextContent("Coming soon");
+    expect(screen.getByTestId("vcs-provider-soon-gitea")).toHaveTextContent("Gitea");
   });
 
   it("shows a direct connect action when no GitHub connection exists", async () => {
