@@ -127,13 +127,18 @@ polar:
 # When enabled, Connect authorizes this public app.
 # On the Linear application, set the callback URL to
 # {BASE_URL}/api/v1/linear/oauth/callback.
-# Request the read, write, and admin scopes.
+# Set the webhook URL to {BASE_URL}/api/v1/linear/webhook
+# and select Issues, Comments, and Issue attachments.
+# webhookSecret is that application's webhook signing secret.
+# When it is set, Connect requests the read and write scopes.
+# When it is empty, Connect also requests the admin scope.
 #
 linear:
   secretName: ""
   enabled: false
   clientId: ""
   clientSecret: ""
+  webhookSecret: ""
 
 #
 # Secret used to sign JWT session tokens
