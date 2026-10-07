@@ -234,15 +234,20 @@ export function TaskOwnerControl({
       onSave={onOwnerSave}
       align={align}
     >
-      <button
+      <Button
         type="button"
-        className={cn(controlClassName, "rounded-sm hover:bg-muted/60")}
+        variant="ghost"
+        size="xs"
+        className={cn(
+          controlClassName,
+          "h-auto shrink justify-start gap-1.5 whitespace-normal rounded-sm px-1 py-0.5 text-[13px] font-normal hover:bg-muted/60",
+        )}
         aria-label={hasOwner ? `Owner: ${owner.name}` : "Assign owner"}
         data-testid="popup-edit-owner"
         disabled={ownerBusy}
       >
         {mark}
-      </button>
+      </Button>
     </WorkOrderAssigneesPopover>
   );
 }
