@@ -87,10 +87,7 @@ export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
   unique: true,
 };
 
-export function catalogForColumn(
-  key: ColumnKey,
-  options?: { allowCustom?: boolean },
-): ColumnAutomationCatalogEntry[] {
+export function catalogForColumn(key: ColumnKey, options?: { allowCustom?: boolean }): ColumnAutomationCatalogEntry[] {
   const allowCustom = options?.allowCustom === true;
   if (key === "backlog") {
     return [
