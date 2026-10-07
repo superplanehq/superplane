@@ -8,6 +8,7 @@ export type FirstRunIntakeAvailability = {
   intakeState: (key: string) => IntakeSurfaceState | undefined;
   intakesLoading: boolean;
   ticketIntakes: IntakeSurfaceEntry[] | null;
+  vcsAvailable: boolean;
   jiraAvailable: boolean;
   jiraFeatureLoading: boolean;
   linearAvailable: boolean;
@@ -21,6 +22,7 @@ export function useFirstRunIntakeAvailability(organizationId: string): FirstRunI
   const intakeCatalog = useIntakeCatalogAvailability(organizationId);
   const intakeFeatures = useExperimentalFeature(organizationId);
 
+  const vcsAvailable = isIntakeSelectable(intakeCatalog.stateOf("github-issues"));
   const jiraAvailable = isIntakeSelectable(intakeCatalog.stateOf("jira-issues"));
   const linearAvailable = isIntakeSelectable(intakeCatalog.stateOf("linear-issues"));
 
@@ -32,6 +34,7 @@ export function useFirstRunIntakeAvailability(organizationId: string): FirstRunI
     intakeState: intakeCatalog.stateOf,
     intakesLoading: intakeCatalog.loading,
     ticketIntakes: intakeCatalog.loaded ? intakeCatalog.entriesFor("onboardingTickets") : null,
+    vcsAvailable,
     jiraAvailable,
     jiraFeatureLoading: intakeCatalog.loading,
     linearAvailable,

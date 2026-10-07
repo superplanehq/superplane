@@ -78,6 +78,7 @@ const TICKET_SCREEN_DEFAULTS = {
 
 function ticketScanAllowed(args: {
   ticketSource: FirstRunTicketSource | null;
+  vcsAvailable: boolean;
   jiraAvailable: boolean;
   jiraChoiceBlock: FirstRunFlaggedChoiceBlock | null;
   jiraConnected: boolean;
@@ -89,11 +90,13 @@ function ticketScanAllowed(args: {
   linearProjectsLoading: boolean;
   linearProjectsError: boolean;
 }): boolean {
+  const vcsSelectionBlocked = args.ticketSource === "vcs" && !args.vcsAvailable;
   const jiraSelectionBlocked = Boolean(args.jiraChoiceBlock) || (args.ticketSource === "jira" && !args.jiraAvailable);
   const linearSelectionBlocked =
     Boolean(args.linearChoiceBlock) || (args.ticketSource === "linear" && !args.linearAvailable);
   if (args.ticketSource === "linear" && (args.linearProjectsLoading || args.linearProjectsError)) return false;
   return (
+    !vcsSelectionBlocked &&
     !jiraSelectionBlocked &&
     !linearSelectionBlocked &&
     canAnalyzeTicketSource({
@@ -128,10 +131,12 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
   const screen = { ...TICKET_SCREEN_DEFAULTS, ...props };
   const intakeState = props.intakeState ?? noIntakeState;
   const catalogLoaded = screen.ticketIntakes != null;
+  const vcsAvailable = isIntakeSelectable(intakeState("github-issues"));
   const jiraAvailable = isIntakeSelectable(intakeState("jira-issues"));
   const linearSelectable = catalogLoaded ? isIntakeSelectable(intakeState("linear-issues")) : screen.linearAvailable;
   const canAnalyze = ticketScanAllowed({
     ticketSource: screen.ticketSource,
+    vcsAvailable,
     jiraAvailable,
     jiraChoiceBlock: screen.jiraChoiceBlock,
     jiraConnected: screen.jiraConnected,

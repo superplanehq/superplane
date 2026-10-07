@@ -52,6 +52,7 @@ export function StatusNoteEditor({ entry, saving, savedAt, onSave }: StatusNoteE
   const [note, setNote] = useState(entry.status_note);
   const [dirty, setDirty] = useState(false);
   const lastEntryKey = useRef(entry.key);
+  const noteFieldID = `status-note-${entry.key}`;
 
   useEffect(() => {
     if (lastEntryKey.current === entry.key) return;
@@ -80,8 +81,9 @@ export function StatusNoteEditor({ entry, saving, savedAt, onSave }: StatusNoteE
 
   return (
     <div className="flex flex-col gap-2">
+      <Label htmlFor={noteFieldID}>Status note</Label>
       <Textarea
-        aria-label="Status note"
+        id={noteFieldID}
         value={note}
         rows={4}
         placeholder="For example: Works for Jira Cloud. Jira Server is not tested."

@@ -104,11 +104,12 @@ export interface AdminIntakeEntry {
 
 /** A key from a name: lowercase, with dashes between words. */
 export function intakeKeyFromName(name: string): string {
-  return name
+  const normalized = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 64);
+    .replace(/^-+|-+$/g, "");
+
+  return normalized.slice(0, 64).replace(/^-+|-+$/g, "");
 }
 
 export interface IntakeListFilter {

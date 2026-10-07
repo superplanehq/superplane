@@ -25,4 +25,8 @@ describe("intakeKeyFromName", () => {
     expect(intakeKeyFromName("  Azure DevOps Boards! ")).toBe("azure-devops-boards");
     expect(intakeKeyFromName("GitLab")).toBe("gitlab");
   });
+
+  it("does not return a trailing dash after truncation", () => {
+    expect(intakeKeyFromName(`${"a".repeat(63)} Z`)).toBe("a".repeat(63));
+  });
 });

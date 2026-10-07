@@ -183,42 +183,6 @@ func (e *IntakeCatalogEntry) Deletable() bool {
 	return !e.Implemented() && e.Status == IntakeStatusPlanned
 }
 
-func (e *IntakeCatalogEntry) applyPatch(patch IntakeCatalogPatch) error {
-	if patch.Name != nil {
-		e.Name = strings.TrimSpace(*patch.Name)
-	}
-	if patch.Category != nil {
-		e.Category = strings.TrimSpace(*patch.Category)
-	}
-	if patch.StatusNote != nil {
-		e.StatusNote = strings.TrimSpace(*patch.StatusNote)
-	}
-	if patch.Status != nil {
-		e.Status = strings.TrimSpace(*patch.Status)
-	}
-
-	return e.validate()
-}
-
-func (e *IntakeCatalogEntry) validate() error {
-	if len(e.Key) > intakeCatalogKeyMaxLength || !intakeCatalogKeyPattern.MatchString(e.Key) {
-		return ErrIntakeCatalogKeyInvalid
-	}
-	if e.Name == "" || len(e.Name) > intakeCatalogNameMaxLength {
-		return ErrIntakeCatalogNameRequired
-	}
-	if !ValidIntakeCategory(e.Category) {
-		return ErrIntakeCatalogCategoryInvalid
-	}
-	if !ValidIntakeStatus(e.Status) {
-		return ErrIntakeCatalogStatusInvalid
-	}
-	if e.Status != IntakeStatusPlanned && !e.Implemented() {
-		return ErrIntakeCatalogNotImplemented
-	}
-	return nil
-}
-
 func CreateIntakeCatalogEntry(tx *gorm.DB, entry *IntakeCatalogEntry, accountID *uuid.UUID) error {
 	if err := entry.validate(); err != nil {
 		return err
@@ -309,6 +273,42 @@ func (e *IntakeCatalogEntry) Delete(tx *gorm.DB) error {
 		return ErrIntakeCatalogDeleteImplemented
 	}
 	return tx.Where("key = ?", e.Key).Delete(&IntakeCatalogEntry{}).Error
+}
+
+func (e *IntakeCatalogEntry) applyPatch(patch IntakeCatalogPatch) error {
+	if patch.Name != nil {
+		e.Name = strings.TrimSpace(*patch.Name)
+	}
+	if patch.Category != nil {
+		e.Category = strings.TrimSpace(*patch.Category)
+	}
+	if patch.StatusNote != nil {
+		e.StatusNote = strings.TrimSpace(*patch.StatusNote)
+	}
+	if patch.Status != nil {
+		e.Status = strings.TrimSpace(*patch.Status)
+	}
+
+	return e.validate()
+}
+
+func (e *IntakeCatalogEntry) validate() error {
+	if len(e.Key) > intakeCatalogKeyMaxLength || !intakeCatalogKeyPattern.MatchString(e.Key) {
+		return ErrIntakeCatalogKeyInvalid
+	}
+	if e.Name == "" || len(e.Name) > intakeCatalogNameMaxLength {
+		return ErrIntakeCatalogNameRequired
+	}
+	if !ValidIntakeCategory(e.Category) {
+		return ErrIntakeCatalogCategoryInvalid
+	}
+	if !ValidIntakeStatus(e.Status) {
+		return ErrIntakeCatalogStatusInvalid
+	}
+	if e.Status != IntakeStatusPlanned && !e.Implemented() {
+		return ErrIntakeCatalogNotImplemented
+	}
+	return nil
 }
 
 // ListIntakeCatalogForOrganization returns every catalog entry with whether

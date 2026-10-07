@@ -111,6 +111,7 @@ export function useDeleteAdminIntake(key: string) {
       queryClient.setQueryData<AdminIntakeEntry[]>(adminIntakeCatalogKeys.list(), (entries) =>
         (entries ?? []).filter((entry) => entry.key !== key),
       );
+      queryClient.removeQueries({ queryKey: adminIntakeCatalogKeys.entry(key) });
     },
   });
 }

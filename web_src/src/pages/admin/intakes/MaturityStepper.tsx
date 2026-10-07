@@ -98,7 +98,7 @@ function StepItem({ step, index, entry, disabled, onSelect }: StepItemProps) {
     <li className="flex flex-1 items-center last:flex-none">
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
+          <Button
             type="button"
             aria-current={active ? "step" : undefined}
             aria-disabled={locked || undefined}
@@ -110,7 +110,7 @@ function StepItem({ step, index, entry, disabled, onSelect }: StepItemProps) {
               {done ? <Check size={10} /> : index + 1}
             </span>
             {info.label}
-          </button>
+          </Button>
         </TooltipTrigger>
         <TooltipContent className="max-w-64">{locked ? NOT_IMPLEMENTED_REASON : info.summary}</TooltipContent>
       </Tooltip>

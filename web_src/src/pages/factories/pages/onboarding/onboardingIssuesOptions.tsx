@@ -23,7 +23,7 @@ function intakeRowState(state: IntakeSurfaceState | undefined): {
   return {
     hidden: state === "hidden",
     soon: state === "soon",
-    disabled: false,
+    disabled: state === "soon",
     meta: state === "beta" ? "Beta" : undefined,
   };
 }
