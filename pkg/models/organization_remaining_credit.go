@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -82,46 +83,110 @@ func sumHostedBilledMicrosByOrganization(tx *gorm.DB, organizationIDs []uuid.UUI
 	return sums, nil
 }
 
-func billedMicrosAtExpiredGrantExpiries(tx *gorm.DB, grants []OrganizationLLMCreditGrant, now time.Time) (map[uuid.UUID]map[int64]int64, error) {
-	type expiryGroup struct {
-		at   time.Time
-		orgs map[uuid.UUID]struct{}
-	}
+const hostedSpendAtExpiryBatchSize = 100
 
-	groups := map[int64]*expiryGroup{}
-	order := make([]int64, 0)
+type hostedCreditExpiry struct {
+	OrganizationID uuid.UUID
+	At             time.Time
+	Nanos          int64
+}
+
+type expirySpendKey struct {
+	organizationID uuid.UUID
+	nanos          int64
+}
+
+type hostedSpendAtExpiryRow struct {
+	OrganizationID uuid.UUID `gorm:"column:organization_id"`
+	ExpiryNanos    int64     `gorm:"column:expiry_nanos"`
+	CostMicros     int64     `gorm:"column:cost_micros"`
+}
+
+func billedMicrosAtExpiredGrantExpiries(tx *gorm.DB, grants []OrganizationLLMCreditGrant, now time.Time) (map[uuid.UUID]map[int64]int64, error) {
+	pairs := expiredGrantSpendPairs(grants, now)
+	billedAtExpiry := map[uuid.UUID]map[int64]int64{}
+	for start := 0; start < len(pairs); start += hostedSpendAtExpiryBatchSize {
+		end := start + hostedSpendAtExpiryBatchSize
+		if end > len(pairs) {
+			end = len(pairs)
+		}
+		batch := pairs[start:end]
+		sums, err := sumHostedBilledMicrosAtExpiries(tx, batch)
+		if err != nil {
+			return nil, err
+		}
+		for _, pair := range batch {
+			if billedAtExpiry[pair.OrganizationID] == nil {
+				billedAtExpiry[pair.OrganizationID] = map[int64]int64{}
+			}
+			billedAtExpiry[pair.OrganizationID][pair.Nanos] = sums[expirySpendKey{
+				organizationID: pair.OrganizationID,
+				nanos:          pair.Nanos,
+			}]
+		}
+	}
+	return billedAtExpiry, nil
+}
+
+func expiredGrantSpendPairs(grants []OrganizationLLMCreditGrant, now time.Time) []hostedCreditExpiry {
+	seen := map[expirySpendKey]struct{}{}
+	pairs := make([]hostedCreditExpiry, 0)
 	for _, grant := range grants {
 		if !grant.IsExpired(now) || grant.ExpiresAt == nil {
 			continue
 		}
 		at := grant.ExpiresAt.UTC()
-		key := at.UnixNano()
-		group, ok := groups[key]
-		if !ok {
-			group = &expiryGroup{at: at, orgs: map[uuid.UUID]struct{}{}}
-			groups[key] = group
-			order = append(order, key)
+		key := expirySpendKey{organizationID: grant.OrganizationID, nanos: at.UnixNano()}
+		if _, ok := seen[key]; ok {
+			continue
 		}
-		group.orgs[grant.OrganizationID] = struct{}{}
+		seen[key] = struct{}{}
+		pairs = append(pairs, hostedCreditExpiry{
+			OrganizationID: grant.OrganizationID,
+			At:             at,
+			Nanos:          key.nanos,
+		})
+	}
+	return pairs
+}
+
+func sumHostedBilledMicrosAtExpiries(tx *gorm.DB, pairs []hostedCreditExpiry) (map[expirySpendKey]int64, error) {
+	sums := map[expirySpendKey]int64{}
+	if len(pairs) == 0 {
+		return sums, nil
 	}
 
-	billedAtExpiry := map[uuid.UUID]map[int64]int64{}
-	for _, key := range order {
-		group := groups[key]
-		orgIDs := make([]uuid.UUID, 0, len(group.orgs))
-		for id := range group.orgs {
-			orgIDs = append(orgIDs, id)
+	var query strings.Builder
+	args := make([]any, 0, len(pairs)*3+1)
+	query.WriteString(`
+SELECT
+	pairs.organization_id,
+	pairs.expiry_nanos,
+	COALESCE(SUM(events.cost_micros), 0) AS cost_micros
+FROM (VALUES `)
+	for i, pair := range pairs {
+		if i > 0 {
+			query.WriteString(", ")
 		}
-		sums, err := sumHostedBilledMicrosByOrganization(tx, orgIDs, &group.at)
-		if err != nil {
-			return nil, err
-		}
-		for _, id := range orgIDs {
-			if billedAtExpiry[id] == nil {
-				billedAtExpiry[id] = map[int64]int64{}
-			}
-			billedAtExpiry[id][key] = sums[id]
-		}
+		query.WriteString("(CAST(? AS uuid), CAST(? AS bigint), CAST(? AS timestamptz))")
+		args = append(args, pair.OrganizationID, pair.Nanos, pair.At)
 	}
-	return billedAtExpiry, nil
+	query.WriteString(`
+) AS pairs(organization_id, expiry_nanos, expires_at)
+LEFT JOIN workspace_usage_events AS events
+	ON events.organization_id = pairs.organization_id
+	AND events.funding_source = ?
+	AND events.occurred_at <= pairs.expires_at
+GROUP BY pairs.organization_id, pairs.expiry_nanos`)
+	args = append(args, UsageFundingSourceHosted)
+
+	var rows []hostedSpendAtExpiryRow
+	err := tx.Raw(query.String(), args...).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		sums[expirySpendKey{organizationID: row.OrganizationID, nanos: row.ExpiryNanos}] = row.CostMicros
+	}
+	return sums, nil
 }

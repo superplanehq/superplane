@@ -162,8 +162,33 @@ func TestAdminListOrganizationsRemainingCredit(t *testing.T) {
 	_, err = models.AddAdminLLMCreditGrant(db, beta.ID, models.CentsToMicros(1500), "support", nil)
 	require.NoError(t, err)
 
+	sameA, err := models.CreateOrganization("CreditSort SameA", "")
+	require.NoError(t, err)
+	sameZ, err := models.CreateOrganization("CreditSort SameZ", "")
+	require.NoError(t, err)
+	_, err = models.AddAdminLLMCreditGrant(db, sameA.ID, 12_500, "support", nil)
+	require.NoError(t, err)
+	_, err = models.AddAdminLLMCreditGrant(db, sameZ.ID, 19_999, "support", nil)
+	require.NoError(t, err)
+
+	other, err := models.CreateOrganization("CreditSort Other", "")
+	require.NoError(t, err)
+	otherExpired := time.Now().Add(-2 * time.Hour).UTC()
+	require.NoError(t, db.Create(&models.OrganizationLLMCreditGrant{
+		ID:             uuid.New(),
+		OrganizationID: other.ID,
+		Kind:           models.LLMCreditGrantKindWelcome,
+		AmountMicros:   models.CentsToMicros(1000),
+		CreatedAt:      otherExpired.Add(-2 * time.Hour),
+		ExpiresAt:      &otherExpired,
+	}).Error)
+	insertHostedSpend(t, db, other.ID, models.CentsToMicros(400), otherExpired.Add(-time.Minute))
+	insertHostedSpend(t, db, other.ID, models.CentsToMicros(100), time.Now())
+	_, err = models.AddTopupLLMCreditGrant(db, other.ID, models.CentsToMicros(300), uuid.NewString())
+	require.NoError(t, err)
+
 	expected := map[string]int64{}
-	for _, org := range []*models.Organization{high, alpha, beta, none} {
+	for _, org := range []*models.Organization{high, alpha, beta, none, sameA, sameZ, other} {
 		summary, err := models.DescribeOrganizationLLMCredit(db, org.ID)
 		require.NoError(t, err)
 		expected[org.ID.String()] = pricebook.MicrosToCents(summary.RemainingMicros)
@@ -172,17 +197,28 @@ func TestAdminListOrganizationsRemainingCredit(t *testing.T) {
 	assert.Equal(t, int64(1500), expected[alpha.ID.String()])
 	assert.Equal(t, int64(1500), expected[beta.ID.String()])
 	assert.Equal(t, int64(0), expected[none.ID.String()])
+	assert.Equal(t, int64(1), expected[sameA.ID.String()])
+	assert.Equal(t, int64(1), expected[sameZ.ID.String()])
+	assert.Equal(t, int64(200), expected[other.ID.String()])
 
 	page := listAdminOrganizations(t, server, token, "search=CreditSort&sort_by=remaining_credit_cents&sort_direction=desc&limit=50&offset=0")
-	require.Equal(t, int64(4), page.Total)
-	require.Len(t, page.Items, 4)
-	assert.Equal(t, []string{high.ID.String(), alpha.ID.String(), beta.ID.String(), none.ID.String()}, organizationIDs(page.Items))
+	require.Equal(t, int64(7), page.Total)
+	require.Len(t, page.Items, 7)
+	assert.Equal(t, []string{
+		high.ID.String(),
+		alpha.ID.String(),
+		beta.ID.String(),
+		other.ID.String(),
+		sameA.ID.String(),
+		sameZ.ID.String(),
+		none.ID.String(),
+	}, organizationIDs(page.Items))
 	for _, item := range page.Items {
 		assert.Equal(t, expected[item.ID], item.RemainingCreditCents)
 	}
 
 	middle := listAdminOrganizations(t, server, token, "search=CreditSort&sort_by=remaining_credit_cents&sort_direction=desc&limit=1&offset=1")
-	assert.Equal(t, int64(4), middle.Total)
+	assert.Equal(t, int64(7), middle.Total)
 	require.Len(t, middle.Items, 1)
 	assert.Equal(t, alpha.ID.String(), middle.Items[0].ID)
 	assert.Equal(t, expected[alpha.ID.String()], middle.Items[0].RemainingCreditCents)

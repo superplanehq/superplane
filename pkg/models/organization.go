@@ -10,6 +10,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -55,10 +56,11 @@ func (o *Organization) HasExperimentalFeature(id string) bool {
 
 type OrganizationWithCounts struct {
 	Organization
-	CanvasCount   int64 `gorm:"column:canvas_count"`
-	TaskCount     int64 `gorm:"column:task_count"`
-	DoneTaskCount int64 `gorm:"column:done_task_count"`
-	MemberCount   int64 `gorm:"column:member_count"`
+	CanvasCount           int64  `gorm:"column:canvas_count"`
+	TaskCount             int64  `gorm:"column:task_count"`
+	DoneTaskCount         int64  `gorm:"column:done_task_count"`
+	MemberCount           int64  `gorm:"column:member_count"`
+	RemainingCreditMicros *int64 `gorm:"-"`
 }
 
 func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
@@ -128,8 +130,8 @@ func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offse
 
 	descending := sortDirection != "asc"
 	sort.SliceStable(organizations, func(i, j int) bool {
-		left := remaining[organizations[i].ID]
-		right := remaining[organizations[j].ID]
+		left := pricebook.MicrosToCents(remaining[organizations[i].ID])
+		right := pricebook.MicrosToCents(remaining[organizations[j].ID])
 		if left != right {
 			if descending {
 				return left > right
@@ -139,7 +141,12 @@ func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offse
 		return organizations[i].Name < organizations[j].Name
 	})
 
-	return sliceOrganizations(organizations, limit, offset), total, nil
+	page := sliceOrganizations(organizations, limit, offset)
+	for i := range page {
+		micros := remaining[page[i].ID]
+		page[i].RemainingCreditMicros = &micros
+	}
+	return page, total, nil
 }
 
 func sliceOrganizations(organizations []OrganizationWithCounts, limit, offset int) []OrganizationWithCounts {

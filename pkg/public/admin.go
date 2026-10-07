@@ -960,11 +960,7 @@ func serializeAdminOrganizations(ctx context.Context, organizations []models.Org
 	ctx, done := telemetry.Span(ctx, "organizations.serialize")
 	defer done(&err)
 
-	ids := make([]uuid.UUID, len(organizations))
-	for i, org := range organizations {
-		ids[i] = org.ID
-	}
-	remaining, err := remainingCreditCentsByOrganization(ctx, ids)
+	remaining, err := adminOrganizationRemainingCents(ctx, organizations)
 	if err != nil {
 		return nil, err
 	}
@@ -979,6 +975,30 @@ func serializeAdminOrganizations(ctx context.Context, organizations []models.Org
 	}
 
 	return items, nil
+}
+
+func adminOrganizationRemainingCents(ctx context.Context, organizations []models.OrganizationWithCounts) (map[uuid.UUID]int64, error) {
+	cents := make(map[uuid.UUID]int64, len(organizations))
+	missing := make([]uuid.UUID, 0)
+	for _, org := range organizations {
+		if org.RemainingCreditMicros == nil {
+			missing = append(missing, org.ID)
+			continue
+		}
+		cents[org.ID] = pricebook.MicrosToCents(*org.RemainingCreditMicros)
+	}
+	if len(missing) == 0 {
+		return cents, nil
+	}
+
+	calculated, err := remainingCreditCentsByOrganization(ctx, missing)
+	if err != nil {
+		return nil, err
+	}
+	for id, value := range calculated {
+		cents[id] = value
+	}
+	return cents, nil
 }
 
 func remainingCreditCentsByOrganization(ctx context.Context, organizationIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
