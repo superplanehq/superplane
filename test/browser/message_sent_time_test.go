@@ -58,6 +58,7 @@ type messageTimeLayout struct {
 	ShortSurveyFrameLeft float64 `json:"shortSurveyFrameLeft"`
 	ShortSurveyOpacity   float64 `json:"shortSurveyOpacity"`
 	PaneLeft             float64 `json:"paneLeft"`
+	PaneTop              float64 `json:"paneTop"`
 	PaneRight            float64 `json:"paneRight"`
 	TimedOverlayPadding  float64 `json:"timedOverlayPadding"`
 	UntimedNoteCount     float64 `json:"untimedNoteCount"`
@@ -84,7 +85,7 @@ func TestTaskMessageTimeStaysInsideNarrowPane(t *testing.T) {
 	})
 
 	page, err := browser.NewPage(pw.BrowserNewPageOptions{
-		Viewport: &pw.Size{Width: 800, Height: 800},
+		Viewport: &pw.Size{Width: 800, Height: 1400},
 	})
 	require.NoError(t, err)
 
@@ -112,17 +113,17 @@ func TestTaskMessageTimeStaysInsideNarrowPane(t *testing.T) {
 		if err := timeVisibleInsidePane(layout.LongOpacity, layout.LongTimeLeft, layout.LongTimeRight, layout.LongTimeWidth, layout); err != nil {
 			return err
 		}
-		return sameMessagePosition(layout.LongBodyLeft, layout.LongBodyTop, rest.LongBodyLeft, rest.LongBodyTop)
+		return sameMessagePosition(layout.LongBodyLeft, layout.LongBodyTop, layout, rest.LongBodyLeft, rest.LongBodyTop, rest)
 	})
-	require.InDelta(t, rest.LongBodyLeft, hovered.LongBodyLeft, 1)
-	require.InDelta(t, rest.LongBodyTop, hovered.LongBodyTop, 1)
+	require.InDelta(t, rest.LongBodyLeft - rest.PaneLeft, hovered.LongBodyLeft - hovered.PaneLeft, 1)
+	require.InDelta(t, rest.LongBodyTop - rest.PaneTop, hovered.LongBodyTop - hovered.PaneTop, 1)
 
 	require.NoError(t, page.Mouse().Move(700, 20))
 	hidden := waitForMessageTimeLayout(t, page, func(layout messageTimeLayout) error {
 		if layout.LongOpacity > 0.05 {
 			return fmt.Errorf("sent time stayed visible after the pointer left: opacity %.2f", layout.LongOpacity)
 		}
-		return sameMessagePosition(layout.LongBodyLeft, layout.LongBodyTop, rest.LongBodyLeft, rest.LongBodyTop)
+		return sameMessagePosition(layout.LongBodyLeft, layout.LongBodyTop, layout, rest.LongBodyLeft, rest.LongBodyTop, rest)
 	})
 	require.LessOrEqual(t, hidden.LongOpacity, 0.05)
 
@@ -134,7 +135,7 @@ func TestTaskMessageTimeStaysInsideNarrowPane(t *testing.T) {
 		if err := timeVisibleInsidePane(layout.RequestOpacity, layout.RequestTimeLeft, layout.RequestTimeRight, layout.RequestTimeWidth, layout); err != nil {
 			return err
 		}
-		return sameMessagePosition(layout.RequestBodyLeft, layout.RequestBodyTop, rest.RequestBodyLeft, rest.RequestBodyTop)
+		return sameMessagePosition(layout.RequestBodyLeft, layout.RequestBodyTop, layout, rest.RequestBodyLeft, rest.RequestBodyTop, rest)
 	})
 	require.True(t, requestFocused.RequestFocused)
 
@@ -146,7 +147,7 @@ func TestTaskMessageTimeStaysInsideNarrowPane(t *testing.T) {
 		if err := timeVisibleInsidePane(layout.LongOpacity, layout.LongTimeLeft, layout.LongTimeRight, layout.LongTimeWidth, layout); err != nil {
 			return err
 		}
-		return sameMessagePosition(layout.LongBodyLeft, layout.LongBodyTop, rest.LongBodyLeft, rest.LongBodyTop)
+		return sameMessagePosition(layout.LongBodyLeft, layout.LongBodyTop, layout, rest.LongBodyLeft, rest.LongBodyTop, rest)
 	})
 	require.True(t, focused.LongFocused)
 
@@ -158,7 +159,7 @@ func TestTaskMessageTimeStaysInsideNarrowPane(t *testing.T) {
 		if layout.LongOpacity > 0.05 {
 			return fmt.Errorf("sent time stayed visible after keyboard focus left: opacity %.2f", layout.LongOpacity)
 		}
-		return sameMessagePosition(layout.LongBodyLeft, layout.LongBodyTop, rest.LongBodyLeft, rest.LongBodyTop)
+		return sameMessagePosition(layout.LongBodyLeft, layout.LongBodyTop, layout, rest.LongBodyLeft, rest.LongBodyTop, rest)
 	})
 	require.LessOrEqual(t, blurred.LongOpacity, 0.05)
 	require.GreaterOrEqual(t, blurred.ShortOpacity, 0.95)
@@ -251,8 +252,10 @@ func timeVisibleInsidePane(opacity, timeLeft, timeRight, timeWidth float64, layo
 	return nil
 }
 
-func sameMessagePosition(left, top, previousLeft, previousTop float64) error {
-	if abs(left-previousLeft) > 1 || abs(top-previousTop) > 1 {
+func sameMessagePosition(left, top float64, layout messageTimeLayout, previousLeft, previousTop float64, previous messageTimeLayout) error {
+	leftDelta := (left - layout.PaneLeft) - (previousLeft - previous.PaneLeft)
+	topDelta := (top - layout.PaneTop) - (previousTop - previous.PaneTop)
+	if abs(leftDelta) > 1 || abs(topDelta) > 1 {
 		return fmt.Errorf("message moved from %.1f,%.1f to %.1f,%.1f", previousLeft, previousTop, left, top)
 	}
 	return nil
@@ -340,6 +343,7 @@ func readMessageTimeLayout(page pw.Page) (messageTimeLayout, error) {
 		const untimedPadding = [...untimedNotes, ...untimedSurveys].map(reservePadding);
 		return {
 			paneLeft: paneBox.left,
+			paneTop: paneBox.top,
 			paneRight: paneBox.right,
 			paneWidth: paneBox.width,
 			scrollOverflow: scroll.scrollWidth - scroll.clientWidth,

@@ -30,8 +30,11 @@ type Story = StoryObj;
 export const NarrowPane: Story = {
   name: "Narrow pane",
   render: () => (
-    <div className="w-[14rem] overflow-hidden bg-background" data-testid="message-sent-time-pane">
-      <div className="overflow-y-auto [scrollbar-gutter:stable]" data-testid="message-sent-time-scroll">
+    <div className="h-[40rem] w-[14rem] overflow-hidden bg-background" data-testid="message-sent-time-pane">
+      <div
+        className="h-full overflow-x-hidden overflow-y-auto [overflow-anchor:none] [scrollbar-gutter:stable]"
+        data-testid="message-sent-time-scroll"
+      >
         <div className="px-4 py-3">
           <RequestMessage
             description="Show the next action on the empty billing page when this planning pane is narrow."

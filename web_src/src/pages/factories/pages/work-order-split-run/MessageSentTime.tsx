@@ -7,7 +7,7 @@ import { formatWorkOrderDateTime } from "../../lib/workOrderDateTime";
 type MessageSentAt = number | string | null | undefined;
 
 const SENT_TIME_CLASSNAME =
-  "pointer-events-none z-10 whitespace-nowrap text-[11px] leading-4 tabular-nums text-muted-foreground opacity-0 transition-opacity duration-150 select-none group-hover/message:opacity-100 group-focus/message:opacity-100 group-focus-within/message:opacity-100";
+  "pointer-events-none z-10 [overflow-anchor:none] whitespace-nowrap text-[11px] leading-4 tabular-nums text-muted-foreground opacity-0 transition-opacity duration-150 select-none group-hover/message:opacity-100 group-focus/message:opacity-100 group-focus-within/message:opacity-100";
 
 export function MessageSentTime({
   sentAt,
@@ -97,7 +97,7 @@ export function MessageTimeRow({
   return (
     <div
       {...rest}
-      className={cn("group/message relative", className)}
+      className={cn("group/message relative [overflow-anchor:none]", className)}
       data-message-time-row=""
       tabIndex={messageSentDate(sentAt) ? 0 : undefined}
     >
