@@ -107,6 +107,29 @@ const INPUT_SIZE_MIN_HEIGHT: Record<NonNullable<AutoCompleteInputProps["inputSiz
   lg: 44,
 };
 
+function isStartWordBraceInsert(input: {
+  startWord?: string;
+  word: string;
+  previousWordLength: number;
+  insertedChar: string;
+  isInsertAtCursor: boolean;
+  beforeCursor: string;
+  afterCursor: string;
+  allowedToSuggest: boolean;
+}): boolean {
+  const startWord = input.startWord;
+  return Boolean(
+    startWord &&
+      input.word === startWord &&
+      input.previousWordLength < input.word.length &&
+      input.insertedChar === "{" &&
+      input.isInsertAtCursor &&
+      input.beforeCursor.endsWith(startWord) &&
+      !input.afterCursor.startsWith("}") &&
+      !input.allowedToSuggest,
+  );
+}
+
 export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInputProps>(
   function AutoCompleteInputRender(props, forwardedRef) {
     const {
@@ -1165,14 +1188,16 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       const isInsertAtCursor = wasSingleCharInsert && priorValue === `${beforeCursor.slice(0, -1)}${afterCursor}`;
 
       if (
-        startWord &&
-        word === startWord &&
-        previousWordLength.current < word.length &&
-        insertedChar === "{" &&
-        isInsertAtCursor &&
-        beforeCursor.endsWith(startWord) &&
-        !afterCursor.startsWith("}") &&
-        !isAllowedToSuggest(inputValue, cursorPosition)
+        isStartWordBraceInsert({
+          startWord,
+          word,
+          previousWordLength: previousWordLength.current,
+          insertedChar,
+          isInsertAtCursor,
+          beforeCursor,
+          afterCursor,
+          allowedToSuggest: isAllowedToSuggest(inputValue, cursorPosition),
+        })
       ) {
         const composedValue = `${newValue.slice(0, start)}${prefix || ""}${suffix || ""}${newValue.slice(start + word.length)}`;
         setInputValue(composedValue);
