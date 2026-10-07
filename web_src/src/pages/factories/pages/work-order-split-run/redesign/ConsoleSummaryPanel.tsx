@@ -9,6 +9,7 @@ import { type ReactNode } from "react";
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../../lib/confidenceScore";
+import { consoleCheckList, isMergeConfidenceMetric } from "../../../lib/mergeConfidenceScore";
 import { isPlanningReviewMetric } from "../../../lib/planningReviewScore";
 import { workOrderCardPullRequestIsMergeable } from "../../../lib/workOrderCardPullRequest";
 import { splitRunDecisionTone } from "../splitRunFooter";
@@ -91,9 +92,19 @@ export function ConsoleSummaryPanel({
             ))}
           </FramePanel>
         ) : null}
-        {panel.checks.length > 0 ? (
+        {panel.mergeChecks.length > 0 ? (
           <FramePanel className="py-3">
-            <ConsoleCheckRows checks={panel.checks} />
+            <ConsoleCheckRows checks={panel.mergeChecks} />
+          </FramePanel>
+        ) : null}
+        {panel.otherChecks.length > 0 ? (
+          <FramePanel className="py-3">
+            <ConsoleCheckRows
+              checks={panel.otherChecks}
+              title="Checks"
+              testId="redesign-console-other-checks"
+              defaultOpen
+            />
           </FramePanel>
         ) : null}
         {panel.panelArtifacts.length > 0 ? (
@@ -174,10 +185,12 @@ function consolePanelFacts({
       : undefined,
     panelPullRequests,
     panelArtifacts,
-    // Every check on the task except planning scores. Those belong on the
-    // Backlog card. A stage list would drop Risk when no verify step ran.
-    checks: fixture.checks.filter(
+    // Merge confidence stays on its own list. Other non-planning checks stay
+    // reachable here when no verify card copied them.
+    mergeChecks: consoleCheckList(fixture.checks)?.metrics ?? [],
+    otherChecks: fixture.checks.filter(
       (check) =>
+        !isMergeConfidenceMetric(check) &&
         !isPlanningReviewMetric(check) &&
         !isScoreCheckName(check.name) &&
         check.key !== CONFIDENCE_CHECK_KEY &&

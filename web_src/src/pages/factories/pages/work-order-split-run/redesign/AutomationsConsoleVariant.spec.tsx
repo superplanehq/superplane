@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "bun:test";
 
@@ -69,63 +70,65 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     expect(within(checks).queryByText("Blast radius")).not.toBeInTheDocument();
     fireEvent.click(header);
     expect(within(checks).getByText("Blast radius")).toBeInTheDocument();
+    expect(within(checks).queryByText("Code quality")).not.toBeInTheDocument();
     expect(within(checks).queryByText("Confidence score")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("redesign-console-other-checks")).getByText("Code quality")).toBeInTheDocument();
   });
 
-  it("keeps planning review scores off Merge confidence", () => {
-    renderConsole(
-      splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
-        demoArtifacts: false,
-        checks: [
-          {
-            id: "check-confidence",
-            key: "confidence",
-            name: "Confidence score",
-            score: 2,
-            maxScore: 5,
-            level: "LEVEL_CAUTION",
-          },
-          {
-            id: "check-clarity",
-            key: "clarity",
-            name: "Clarity score",
-            score: 3,
-            maxScore: 3,
-            level: "LEVEL_POSITIVE",
-          },
-          {
-            id: "check-complexity",
-            key: "complexity",
-            name: "Complexity",
-            score: 2,
-            maxScore: 3,
-            level: "LEVEL_CAUTION",
-          },
-          {
-            id: "check-verifiability",
-            key: "verifiability",
-            name: "Verifiability",
-            score: 3,
-            maxScore: 3,
-            level: "LEVEL_POSITIVE",
-          },
-        ],
-        analysisRuns: [
-          {
+  it("keeps planning review scores off Merge confidence", async () => {
+    const user = userEvent.setup();
+    const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+      demoArtifacts: false,
+      checks: [
+        {
+          id: "check-confidence",
+          key: "confidence",
+          name: "Confidence score",
+          score: 2,
+          maxScore: 5,
+          level: "LEVEL_CAUTION",
+        },
+        {
+          id: "check-clarity",
+          key: "clarity",
+          name: "Clarity score",
+          score: 3,
+          maxScore: 3,
+          level: "LEVEL_POSITIVE",
+        },
+        {
+          id: "check-complexity",
+          key: "complexity",
+          name: "Complexity",
+          score: 2,
+          maxScore: 3,
+          level: "LEVEL_CAUTION",
+        },
+        {
+          id: "check-verifiability",
+          key: "verifiability",
+          name: "Verifiability",
+          score: 3,
+          maxScore: 3,
+          level: "LEVEL_POSITIVE",
+        },
+      ],
+      analysisRuns: [
+        {
+          canvasId: "canvas-backlog",
+          workOrderId: DRAFT_WORK_ORDER.id ?? "",
+          run: {
+            id: "run-backlog",
             canvasId: "canvas-backlog",
-            workOrderId: DRAFT_WORK_ORDER.id ?? "",
-            run: {
-              id: "run-backlog",
-              canvasId: "canvas-backlog",
-              state: "STATE_FINISHED",
-              result: "RESULT_PASSED",
-              createdAt: "2026-08-28T12:00:00Z",
-              finishedAt: "2026-08-28T12:00:20Z",
-            },
+            state: "STATE_FINISHED",
+            result: "RESULT_PASSED",
+            createdAt: "2026-08-28T12:00:00Z",
+            finishedAt: "2026-08-28T12:00:20Z",
           },
-        ],
-      }),
-    );
+        },
+      ],
+    });
+    renderConsole(fixture);
 
     const summary = screen.getByTestId("redesign-console-summary");
     expect(within(summary).queryByTestId("redesign-console-checks")).not.toBeInTheDocument();
@@ -133,6 +136,20 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     expect(within(summary).queryByText("Clarity")).not.toBeInTheDocument();
     expect(within(summary).queryByText("Complexity")).not.toBeInTheDocument();
     expect(within(summary).queryByText("Verifiability")).not.toBeInTheDocument();
+
+    const card = screen.getByTestId("redesign-console-column-backlog");
+    const toggle = within(card).getByRole("button", { name: /Toggle Backlog details/ });
+    if (toggle.getAttribute("aria-expanded") !== "true") {
+      await user.click(toggle);
+    }
+    const checksTab = within(card).queryByRole("tab", { name: /Checks/ });
+    if (checksTab) {
+      await user.click(checksTab);
+    }
+    expect(within(card).getByText("Clarity")).toBeInTheDocument();
+    expect(within(card).getByText("Complexity")).toBeInTheDocument();
+    expect(within(card).getByText("Verifiability")).toBeInTheDocument();
+    expect(within(card).queryByText("Confidence score")).not.toBeInTheDocument();
   });
 
   it("lists each column app that ran for the task as its own card", () => {
