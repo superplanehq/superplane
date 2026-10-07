@@ -59,7 +59,7 @@ modules:
 
 remotes:
   - key: superplane
-    baseUrl: https://example.invalid
+    baseUrl: https://sp-mbp.tunnel.mytmlt.site
     operations:
       - compute
     auth:
@@ -76,7 +76,7 @@ permissions:
     - read:workspace:bitbucket
 
 app:
-  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  id: ari:cloud:ecosystem::app/670a54a2-2536-4fa3-aae8-09379ab0623c
   runtime:
     name: nodejs22.x
   licensing:
