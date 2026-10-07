@@ -163,8 +163,7 @@ func defaultDatadogIntakeSettings() intakeSettings {
 }
 
 func intakeSourceHasFilterNode(source string) bool {
-	return source == models.FactoryIntakeSourceGitHubIssues ||
-		source == models.FactoryIntakeSourceJiraIssues ||
+	return source == models.FactoryIntakeSourceJiraIssues ||
 		source == models.FactoryIntakeSourceSentryExceptions ||
 		source == models.FactoryIntakeSourceProductiveTasks ||
 		source == models.FactoryIntakeSourceDependabotAlerts ||
@@ -623,8 +622,18 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 		}
 	}
 
+	if source == models.FactoryIntakeSourceGitHubIssues &&
+		trigger != nil &&
+		githubIssueFiltersConfigured(trigger.Configuration) &&
+		githubIssueFiltersMigrated(spec.Nodes) {
+		return githubIssueFiltersFromTrigger(trigger.Configuration, settings).normalized()
+	}
+
 	filter := findIntakeNode(spec.Nodes, graph.FilterNodeID)
 	if filter == nil {
+		if source == models.FactoryIntakeSourceGitHubIssues && graph.AuthorPermissionNodeID != "" {
+			settings.AuthorsWithAccess = true
+		}
 		return settings
 	}
 

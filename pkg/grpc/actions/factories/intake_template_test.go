@@ -60,20 +60,28 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Contains(t, filter.Configuration["expression"], `"bug"`)
 	})
 
-	t.Run("a GitHub issue flows from the trigger through the filter to the work order", func(t *testing.T) {
+	t.Run("a GitHub issue flows from On Issue to Create Task", func(t *testing.T) {
 		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues})
 		require.NoError(t, err)
 
 		assert.Equal(t, []yaml.Edge{
-			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
-			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeCreateNodeID},
 		}, canvas.Spec.Edges)
+		assert.Nil(t, findSpecNodeOrNil(canvas, intakeFilterNodeID))
+		assert.Nil(t, findSpecNodeOrNil(canvas, intakeAuthorPermissionNodeID))
+		assert.Nil(t, findSpecNodeOrNil(canvas, intakeAuthorFilterNodeID))
 		assert.Nil(t, findSpecNodeOrNil(canvas, intakeAnalysisNodeID))
 		assert.Nil(t, findSpecNodeOrNil(canvas, intakeReportConfidenceNodeID))
 
-		filter := findSpecNode(t, canvas, intakeFilterNodeID)
-		assert.Equal(t, intakeFilterComponent, filter.Component)
-		assert.Equal(t, intakeSuperplaneLabelCondition, filter.Configuration["expression"])
+		trigger := findSpecNode(t, canvas, intakeTriggerNodeID)
+		assert.Equal(t, []any{"opened", "reopened", "labeled"}, trigger.Configuration["actions"])
+		assert.Equal(t, []any{}, trigger.Configuration["labels"])
+		assert.Equal(t, true, trigger.Configuration["superplaneLabelAdded"])
+		assert.NotContains(t, trigger.Configuration, "authorsWithAccess")
+
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.Equal(t, 160, create.Position.X)
+		assert.Equal(t, 260, create.Position.Y)
 	})
 
 	t.Run("Jira issues flow from the trigger through the filter to the work order", func(t *testing.T) {
@@ -273,6 +281,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Equal(t, binding.Integration, trigger.Integration)
 		assert.Equal(t, "acme/backlog", trigger.Configuration["repository"])
 		assert.Equal(t, []any{"opened", "reopened", "labeled"}, trigger.Configuration["actions"])
+		assert.Equal(t, true, trigger.Configuration["superplaneLabelAdded"])
 	})
 
 	t.Run("a binding does not leak into the next intake", func(t *testing.T) {
@@ -364,80 +373,127 @@ func Test__ensureIntakeFilterNode(t *testing.T) {
 	})
 }
 
-func Test__ConfigureIntakeAuthorAccess(t *testing.T) {
-	t.Run("adds a repository permission gate", func(t *testing.T) {
+func Test__RewriteGitHubIntakeGraph(t *testing.T) {
+	t.Run("removes filter nodes and keeps an extra node off the generated path", func(t *testing.T) {
 		integrationID := "integration-1"
 		nodes := []models.Node{
 			{
-				ID:            intakeTriggerNodeID,
-				Name:          "On Issue",
-				Type:          models.NodeTypeTrigger,
-				Ref:           models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}},
-				Configuration: map[string]any{"repository": "acme/widgets"},
+				ID:   intakeTriggerNodeID,
+				Name: "On Issue",
+				Type: models.NodeTypeTrigger,
+				Ref:  models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}},
+				Configuration: map[string]any{
+					"repository": "acme/widgets",
+					"actions":    []any{"opened", "reopened", "labeled"},
+				},
 				IntegrationID: &integrationID,
+				Position:      models.Position{X: 160, Y: 80},
 			},
 			componentNode(intakeFilterNodeID, intakeFilterComponent),
-			componentNode(intakeCreateNodeID, intakeCreateComponent),
-		}
-		edges := []models.Edge{
-			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
-			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
-		}
-
-		nodes, edges, err := configureIntakeAuthorAccess(
-			nodes,
-			edges,
-			resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{Nodes: nodes, Edges: edges}),
-			true,
-		)
-		require.NoError(t, err)
-
-		permission := findModelNode(t, nodes, intakeAuthorPermissionNodeID)
-		assert.Equal(t, intakeAuthorPermissionComponent, permission.ComponentName())
-		assert.Equal(t, "acme/widgets", permission.Configuration["repository"])
-		assert.Equal(t, "{{ root().data.issue.user.login }}", permission.Configuration["username"])
-		assert.Equal(t, &integrationID, permission.IntegrationID)
-
-		gate := findModelNode(t, nodes, intakeAuthorFilterNodeID)
-		assert.Equal(t, intakeFilterComponent, gate.ComponentName())
-		assert.Equal(t, `root().data.permission != "none"`, gate.Configuration["expression"])
-		assert.ElementsMatch(t, []models.Edge{
-			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
-			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeAuthorPermissionNodeID},
-			{Channel: "default", SourceID: intakeAuthorPermissionNodeID, TargetID: intakeAuthorFilterNodeID},
-			{Channel: "true", SourceID: intakeAuthorFilterNodeID, TargetID: intakeCreateNodeID},
-		}, edges)
-	})
-
-	t.Run("removes the repository permission gate", func(t *testing.T) {
-		nodes := []models.Node{
-			triggerNode(intakeTriggerNodeID, "github.onIssue"),
-			componentNode(intakeFilterNodeID, intakeFilterComponent),
+			componentNode("format-title", "if"),
 			componentNode(intakeAuthorPermissionNodeID, intakeAuthorPermissionComponent),
 			componentNode(intakeAuthorFilterNodeID, intakeFilterComponent),
-			componentNode(intakeCreateNodeID, intakeCreateComponent),
+			{
+				ID:       intakeCreateNodeID,
+				Name:     intakeCreateNodeName,
+				Type:     models.NodeTypeComponent,
+				Ref:      models.NodeRef{Component: &models.ComponentRef{Name: intakeCreateComponent}},
+				Position: models.Position{X: 400, Y: 900},
+			},
 		}
 		edges := []models.Edge{
 			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
-			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeAuthorPermissionNodeID},
+			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: "format-title"},
+			{Channel: "true", SourceID: "format-title", TargetID: intakeAuthorPermissionNodeID},
 			{Channel: "default", SourceID: intakeAuthorPermissionNodeID, TargetID: intakeAuthorFilterNodeID},
 			{Channel: "true", SourceID: intakeAuthorFilterNodeID, TargetID: intakeCreateNodeID},
 		}
+		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{Nodes: nodes, Edges: edges})
+		settings := defaultIntakeSettings()
+		settings.Labels = []string{"bug"}
+		settings.LabelFilterMode = intakeLabelFilterExclude
+		settings.Assignment = intakeAssignmentAssigned
+		settings.AuthorsWithAccess = true
 
-		nodes, edges, err := configureIntakeAuthorAccess(
-			nodes,
-			edges,
-			resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{Nodes: nodes, Edges: edges}),
-			false,
-		)
-		require.NoError(t, err)
+		nodes, edges, changed := rewriteGitHubIntakeGraph(nodes, edges, graph, settings)
+		require.True(t, changed)
 
+		assert.Nil(t, findModelNodeOrNil(nodes, intakeFilterNodeID))
 		assert.Nil(t, findModelNodeOrNil(nodes, intakeAuthorPermissionNodeID))
 		assert.Nil(t, findModelNodeOrNil(nodes, intakeAuthorFilterNodeID))
-		assert.ElementsMatch(t, []models.Edge{
-			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeFilterNodeID},
-			{Channel: "true", SourceID: intakeFilterNodeID, TargetID: intakeCreateNodeID},
-		}, edges)
+		assert.NotNil(t, findModelNodeOrNil(nodes, "format-title"))
+
+		trigger := findModelNode(t, nodes, intakeTriggerNodeID)
+		assert.Equal(t, []any{"bug"}, trigger.Configuration["labels"])
+		assert.Equal(t, intakeLabelFilterExclude, trigger.Configuration["labelFilterMode"])
+		assert.Equal(t, intakeAssignmentAssigned, trigger.Configuration["assignment"])
+		assert.Equal(t, true, trigger.Configuration["authorsWithAccess"])
+		assert.Equal(t, true, trigger.Configuration["superplaneLabelAdded"])
+		assert.Equal(t, "acme/widgets", trigger.Configuration["repository"])
+
+		create := findModelNode(t, nodes, intakeCreateNodeID)
+		assert.Equal(t, models.Position{X: 160, Y: 260}, create.Position)
+		assert.Contains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeTriggerNodeID,
+			TargetID: intakeCreateNodeID,
+		})
+		assert.NotContains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeTriggerNodeID,
+			TargetID: "format-title",
+		})
+	})
+
+	t.Run("disconnects a legacy analysis route and keeps the extra node", func(t *testing.T) {
+		nodes := []models.Node{
+			{
+				ID:   intakeTriggerNodeID,
+				Name: "On Issue",
+				Type: models.NodeTypeTrigger,
+				Ref:  models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}},
+				Configuration: map[string]any{
+					"repository": "acme/widgets",
+					"actions":    []any{"opened"},
+				},
+				Position: models.Position{X: 160, Y: 80},
+			},
+			componentNode(intakeAnalysisNodeID, "runnerCodex"),
+			componentNode("notify", "slack.postMessage"),
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+		}
+		edges := []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: intakeAnalysisNodeID},
+			{Channel: "default", SourceID: intakeAnalysisNodeID, TargetID: intakeCreateNodeID},
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: "notify"},
+		}
+		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{Nodes: nodes, Edges: edges})
+
+		nodes, edges, changed := rewriteGitHubIntakeGraph(nodes, edges, graph, defaultIntakeSettings())
+		require.True(t, changed)
+
+		assert.NotNil(t, findModelNodeOrNil(nodes, intakeAnalysisNodeID))
+		assert.NotNil(t, findModelNodeOrNil(nodes, "notify"))
+		assert.Contains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeTriggerNodeID,
+			TargetID: intakeCreateNodeID,
+		})
+		assert.Contains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeTriggerNodeID,
+			TargetID: "notify",
+		})
+		assert.NotContains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeTriggerNodeID,
+			TargetID: intakeAnalysisNodeID,
+		})
+		assert.NotContains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeAnalysisNodeID,
+			TargetID: intakeCreateNodeID,
+		})
 	})
 }
 

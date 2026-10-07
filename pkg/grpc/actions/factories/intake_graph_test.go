@@ -19,7 +19,7 @@ func Test__ResolveIntakeGraph(t *testing.T) {
 
 		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, spec)
 		assert.Equal(t, intakeTriggerNodeID, graph.TriggerNodeID)
-		assert.Equal(t, intakeFilterNodeID, graph.FilterNodeID)
+		assert.Empty(t, graph.FilterNodeID)
 		assert.Equal(t, intakeCreateNodeID, graph.CreateNodeID)
 		assert.Empty(t, graph.AnalysisNodeID)
 		assert.True(t, graph.Healthy(spec.Edges))
