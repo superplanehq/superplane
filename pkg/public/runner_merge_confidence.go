@@ -51,7 +51,7 @@ func (s *Server) handleRunnerMergeConfidenceCheck(w http.ResponseWriter, r *http
 		writeMergeConfidenceLookupError(w, err)
 		return
 	}
-	if _, err := factorycomp.ReportMergeConfidenceCheck(db, order, scope.CanvasRunID, automation, req.Check, req.Score, req.Summary, scope.EnabledChecks, scope.CheckLabels); err != nil {
+	if _, err := factorycomp.ReportMergeConfidenceCheck(db, order, scope.CanvasRunID, automation, req.Check, req.Score, req.Summary, scope.EnabledChecks, scope.CheckLabels, scope.CheckScoreScale(req.Check)); err != nil {
 		writeMergeConfidenceReportError(w, err)
 		return
 	}

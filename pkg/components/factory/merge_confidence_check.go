@@ -16,10 +16,14 @@ import (
 
 const (
 	mergeConfidenceMaxScore                   = 3
+	mergeConfidenceLegacyMaxScore             = 5
 	mergeConfidenceCautionWhenLowerIsBetter   = 2
 	mergeConfidenceCriticalWhenLowerIsBetter  = 3
 	mergeConfidenceCautionWhenHigherIsBetter  = 2
 	mergeConfidenceCriticalWhenHigherIsBetter = 1
+	mergeConfidenceLegacyCaution              = 3
+	mergeConfidenceLegacyCriticalLower        = 4
+	mergeConfidenceLegacyCriticalHigher       = 2
 )
 
 // A custom check uses the same bands as blast radius: a higher score is worse.
@@ -51,6 +55,8 @@ var mergeConfidenceChecks = []mergeConfidenceCheck{
 
 // ReportMergeConfidenceCheck stores one merge confidence check. enabled is the
 // list from the runner token. A check that is not in that list is rejected.
+// maxScore is 3 for a prompt that asks for 1 to 3, and 5 for an installed
+// prompt that still asks for 1 to 5.
 func ReportMergeConfidenceCheck(
 	tx *gorm.DB,
 	order *models.FactoryWorkOrder,
@@ -61,8 +67,9 @@ func ReportMergeConfidenceCheck(
 	summary string,
 	enabled []string,
 	labels map[string]string,
+	maxScore float64,
 ) (*models.FactoryWorkOrderCheck, error) {
-	params, err := mergeConfidenceCheckParams(check, score, summary, enabled, labels)
+	params, err := mergeConfidenceCheckParams(check, score, summary, enabled, labels, maxScore)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +84,7 @@ func ReportMergeConfidenceCheck(
 	return order.ReportCheck(tx, params)
 }
 
-func mergeConfidenceCheckParams(check string, score float64, summary string, enabled []string, labels map[string]string) (models.FactoryWorkOrderCheckParams, error) {
+func mergeConfidenceCheckParams(check string, score float64, summary string, enabled []string, labels map[string]string, maxScore float64) (models.FactoryWorkOrderCheckParams, error) {
 	name := strings.ToLower(strings.TrimSpace(check))
 	if !mergeConfidenceCheckID.MatchString(name) {
 		return models.FactoryWorkOrderCheckParams{}, fmt.Errorf("%w: unknown check %q", ErrMergeConfidenceInvalid, check)
@@ -91,9 +98,11 @@ func mergeConfidenceCheckParams(check string, score float64, summary string, ena
 	} else if label := strings.TrimSpace(labels[name]); label != "" {
 		spec.label = label
 	}
-	if err := validateMergeConfidenceScore(score); err != nil {
+	maxScore = normalizeMergeConfidenceMaxScore(maxScore)
+	if err := validateMergeConfidenceScore(score, maxScore); err != nil {
 		return models.FactoryWorkOrderCheckParams{}, err
 	}
+	spec = spec.withScale(maxScore)
 	summary = strings.TrimSpace(summary)
 	if summary == "" {
 		return models.FactoryWorkOrderCheckParams{}, fmt.Errorf("%w: summary is required", ErrMergeConfidenceInvalid)
@@ -111,7 +120,7 @@ func mergeConfidenceCheckParams(check string, score float64, summary string, ena
 		Key:      spec.key,
 		Name:     spec.label,
 		Score:    score,
-		MaxScore: mergeConfidenceMaxScore,
+		MaxScore: maxScore,
 		Format:   factory.CheckFormatFraction,
 		Level:    level,
 		Summary:  summary,
@@ -148,6 +157,27 @@ func higherIsBetterCheck(name, key, label string) mergeConfidenceCheck {
 	}
 }
 
+func (spec mergeConfidenceCheck) withScale(maxScore float64) mergeConfidenceCheck {
+	if maxScore <= mergeConfidenceMaxScore {
+		return spec
+	}
+	if spec.direction == CheckDirectionLowerIsBetter {
+		spec.cautionAt = mergeConfidenceLegacyCaution
+		spec.criticalAt = mergeConfidenceLegacyCriticalLower
+		return spec
+	}
+	spec.cautionAt = mergeConfidenceLegacyCaution
+	spec.criticalAt = mergeConfidenceLegacyCriticalHigher
+	return spec
+}
+
+func normalizeMergeConfidenceMaxScore(maxScore float64) float64 {
+	if maxScore == mergeConfidenceLegacyMaxScore {
+		return mergeConfidenceLegacyMaxScore
+	}
+	return mergeConfidenceMaxScore
+}
+
 func mergeConfidenceCheckByName(name string) (mergeConfidenceCheck, bool) {
 	for _, spec := range mergeConfidenceChecks {
 		if spec.name == name {
@@ -157,9 +187,9 @@ func mergeConfidenceCheckByName(name string) (mergeConfidenceCheck, bool) {
 	return mergeConfidenceCheck{}, false
 }
 
-func validateMergeConfidenceScore(score float64) error {
-	if math.IsNaN(score) || math.IsInf(score, 0) || math.Trunc(score) != score || score < 1 || score > mergeConfidenceMaxScore {
-		return fmt.Errorf("%w: score must be an integer from 1 through 3", ErrMergeConfidenceInvalid)
+func validateMergeConfidenceScore(score, maxScore float64) error {
+	if math.IsNaN(score) || math.IsInf(score, 0) || math.Trunc(score) != score || score < 1 || score > maxScore {
+		return fmt.Errorf("%w: score must be an integer from 1 through %.0f", ErrMergeConfidenceInvalid, maxScore)
 	}
 	return nil
 }

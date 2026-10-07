@@ -31,7 +31,7 @@ func TestMergeConfidenceCheckParams(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			params, err := mergeConfidenceCheckParams(tc.check, tc.score, "One sentence.", enabled, nil)
+			params, err := mergeConfidenceCheckParams(tc.check, tc.score, "One sentence.", enabled, nil, 3)
 			require.NoError(t, err)
 			assert.Equal(t, tc.key, params.Key)
 			assert.Equal(t, tc.label, params.Name)
@@ -44,37 +44,58 @@ func TestMergeConfidenceCheckParams(t *testing.T) {
 }
 
 func TestMergeConfidenceCheckParamsRejectsDisabledAndInvalidScores(t *testing.T) {
-	_, err := mergeConfidenceCheckParams("performance", 3, "One sentence.", []string{"risk"}, nil)
+	_, err := mergeConfidenceCheckParams("performance", 3, "One sentence.", []string{"risk"}, nil, 3)
 	assert.ErrorIs(t, err, ErrMergeConfidenceDisabled)
 
-	_, err = mergeConfidenceCheckParams("risk", 4, "One sentence.", []string{"risk"}, nil)
+	_, err = mergeConfidenceCheckParams("risk", 4, "One sentence.", []string{"risk"}, nil, 3)
 	assert.ErrorIs(t, err, ErrMergeConfidenceInvalid)
 	assert.ErrorContains(t, err, "score must be an integer from 1 through 3")
 
-	_, err = mergeConfidenceCheckParams("risk", 1.5, "One sentence.", []string{"risk"}, nil)
+	_, err = mergeConfidenceCheckParams("risk", 1.5, "One sentence.", []string{"risk"}, nil, 3)
 	assert.ErrorIs(t, err, ErrMergeConfidenceInvalid)
 
-	_, err = mergeConfidenceCheckParams("not a check", 1, "One sentence.", []string{"not a check"}, nil)
+	_, err = mergeConfidenceCheckParams("not a check", 1, "One sentence.", []string{"not a check"}, nil, 3)
 	assert.ErrorIs(t, err, ErrMergeConfidenceInvalid)
 
-	_, err = mergeConfidenceCheckParams("risk", 1, "  ", []string{"risk"}, nil)
+	_, err = mergeConfidenceCheckParams("risk", 1, "  ", []string{"risk"}, nil, 3)
 	assert.ErrorIs(t, err, ErrMergeConfidenceInvalid)
+}
+
+func TestMergeConfidenceCheckParamsKeepsTheLegacyScale(t *testing.T) {
+	enabled := []string{"risk", "performance"}
+
+	healthy, err := mergeConfidenceCheckParams("performance", 5, "No performance practice applies.", enabled, nil, 5)
+	require.NoError(t, err)
+	assert.Equal(t, checkfactory.CheckLevelPositive, healthy.Level)
+	assert.Equal(t, float64(5), healthy.MaxScore)
+
+	critical, err := mergeConfidenceCheckParams("performance", 2, "The change breaks a practice that applies.", enabled, nil, 5)
+	require.NoError(t, err)
+	assert.Equal(t, checkfactory.CheckLevelCritical, critical.Level)
+
+	caution, err := mergeConfidenceCheckParams("risk", 3, "The change matches a medium category.", enabled, nil, 5)
+	require.NoError(t, err)
+	assert.Equal(t, checkfactory.CheckLevelCaution, caution.Level)
+
+	_, err = mergeConfidenceCheckParams("risk", 6, "One sentence.", enabled, nil, 5)
+	assert.ErrorIs(t, err, ErrMergeConfidenceInvalid)
+	assert.ErrorContains(t, err, "score must be an integer from 1 through 5")
 }
 
 func TestMergeConfidenceCustomCheckUsesTheStepName(t *testing.T) {
 	params, err := mergeConfidenceCheckParams("api-latency", 3, "The new query scans the whole table.", []string{"api-latency"}, map[string]string{
 		"api-latency": "API latency",
-	})
+	}, 3)
 	require.NoError(t, err)
 	assert.Equal(t, "api-latency-review", params.Key)
 	assert.Equal(t, "API latency", params.Name)
 	assert.Equal(t, checkfactory.CheckLevelCritical, params.Level)
 	assert.Equal(t, float64(3), params.MaxScore)
 
-	caution, err := mergeConfidenceCheckParams("api-latency", 2, "The new query scans one extra index.", []string{"api-latency"}, nil)
+	caution, err := mergeConfidenceCheckParams("api-latency", 2, "The new query scans one extra index.", []string{"api-latency"}, nil, 3)
 	require.NoError(t, err)
 	assert.Equal(t, checkfactory.CheckLevelCaution, caution.Level)
 
-	_, err = mergeConfidenceCheckParams("api-latency", 3, "The new query scans the whole table.", []string{"risk"}, nil)
+	_, err = mergeConfidenceCheckParams("api-latency", 3, "The new query scans the whole table.", []string{"risk"}, nil, 3)
 	assert.ErrorIs(t, err, ErrMergeConfidenceDisabled)
 }
