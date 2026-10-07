@@ -248,7 +248,7 @@ func resetFactoryAppCanvas(
 		return err
 	}
 
-	defaults, stampNode, stampID, stampVersion, err := materializeFactoryAppReset(db, factory, canvas, version)
+	defaults, stampNode, stampID, stampVersion, stampProvider, err := materializeFactoryAppReset(db, factory, canvas, version)
 	if err != nil {
 		return err
 	}
@@ -285,7 +285,7 @@ func resetFactoryAppCanvas(
 		); err != nil {
 			return err
 		}
-		return canvas.StampFactoryAppTemplate(tx, stampNode, stampID, stampVersion)
+		return canvas.StampFactoryAppTemplateFor(tx, stampNode, stampID, stampVersion, stampProvider)
 	})
 }
 
@@ -294,30 +294,30 @@ func materializeFactoryAppReset(
 	factory *models.Factory,
 	canvas *models.Canvas,
 	version *models.CanvasVersion,
-) (*materializedFactoryTemplate, string, string, int, error) {
+) (*materializedFactoryTemplate, string, string, int, string, error) {
 	intake, err := models.FindFactoryIntakeByCanvasID(db, canvas.ID)
 	if err == nil && intake.FactoryID == factory.ID {
 		defaults, materializeErr := materializeIntakeDefaults(db, canvas, version, intake)
 		if materializeErr != nil {
-			return nil, "", "", 0, materializeErr
+			return nil, "", "", 0, "", materializeErr
 		}
-		return defaults, intakeTriggerNodeID, "intake:" + intake.Source, factoryTemplateVersion, nil
+		return defaults, intakeTriggerNodeID, "intake:" + intake.Source, factoryTemplateVersion, "", nil
 	}
 	if err != nil && !errors.Is(err, models.ErrFactoryIntakeNotFound) {
-		return nil, "", "", 0, err
+		return nil, "", "", 0, "", err
 	}
 
 	if models.IsBacklogFactoryApp(version.Nodes, version.Edges) {
 		defaults, materializeErr := materializeBacklogDefaults(db, factory, canvas, version)
 		if materializeErr != nil {
-			return nil, "", "", 0, materializeErr
+			return nil, "", "", 0, "", materializeErr
 		}
-		return defaults, backlogTriggerNodeID, models.FactoryAppTemplateBacklogID, backlogTemplateVersion, nil
+		return defaults, backlogTriggerNodeID, models.FactoryAppTemplateBacklogID, backlogTemplateVersion, "", nil
 	}
 
 	defaults, err := materializeNonIntakeFactoryAppDefaults(db, factory, canvas, version)
 	if err != nil {
-		return nil, "", "", 0, err
+		return nil, "", "", 0, "", err
 	}
 	resolved, ok := resolveFactoryTemplate(version.Nodes)
 	if !ok {
@@ -327,7 +327,7 @@ func materializeFactoryAppReset(
 	if !ok || stampNode == "" {
 		stampNode = defaults.templateID
 	}
-	return defaults, stampNode, defaults.templateID, factoryTemplateVersion, nil
+	return defaults, stampNode, defaults.templateID, factoryTemplateVersion, resolved.provider, nil
 }
 
 func copyLiveNodeMetadata(liveNodes, proposedNodes []models.Node) []models.Node {

@@ -120,4 +120,31 @@ describe("InstallationFactoryTemplates", () => {
       await screen.findByText("Reset 1 Backlog automation. 1 failed: Old Backlog (canvas changed during reset)."),
     ).toBeInTheDocument();
   });
+
+  it("keeps reset results when the template list refresh fails", async () => {
+    const user = userEvent.setup();
+    let listCalls = 0;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input) === "/admin/api/installation/factory-templates") {
+        listCalls += 1;
+        if (listCalls > 1) {
+          return jsonResponse({ error: "no" }, 500);
+        }
+        return jsonResponse({ templates });
+      }
+      if (init?.method === "POST") {
+        return jsonResponse({ reset: 2, failures: [] });
+      }
+      return jsonResponse({ error: "unexpected" }, 500);
+    });
+
+    render(<InstallationFactoryTemplates />);
+
+    await user.click(await screen.findByRole("button", { name: "Reset Backlog" }));
+    await user.click(screen.getByRole("button", { name: "Reset Backlog automations" }));
+
+    expect(await screen.findByText("Reset 2 Backlog automations.")).toBeInTheDocument();
+    expect(await screen.findByText("Could not load onboarding templates.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset Backlog" })).toBeInTheDocument();
+  });
 });

@@ -42,7 +42,7 @@ func Test__OnboardingFactoryTemplates(t *testing.T) {
 		setRefineTaskPrompt(t, backlog, "CUSTOM OLD BACKLOG PROMPT")
 
 		implement := support.CreateFactoryCanvas(t, r, factoryModel.ID, "Implement")
-		publishOnboardingTemplate(t, ctx, deps, factoryModel, implement, onboardingTemplateImplement)
+		publishOnboardingTemplate(ctx, t, deps, factoryModel, implement, onboardingTemplateImplement)
 
 		otherOrg := support.CreateOrganization(t, r, r.User)
 		otherUser := support.CreateUser(t, r, otherOrg.ID)
@@ -50,7 +50,7 @@ func Test__OnboardingFactoryTemplates(t *testing.T) {
 		otherFactory, err := models.CreateFactory(database.DB(t.Context()), otherOrg.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		otherImplement := createFactoryCanvasInOrg(t, otherOrg.ID, otherFactory.ID, otherUser.ID, "Implement")
-		publishOnboardingTemplate(t, otherCtx, deps, otherFactory, otherImplement, onboardingTemplateImplement)
+		publishOnboardingTemplate(otherCtx, t, deps, otherFactory, otherImplement, onboardingTemplateImplement)
 
 		listed, err := ListOnboardingFactoryTemplates(ctx)
 		require.NoError(t, err)
@@ -97,8 +97,8 @@ func createFactoryCanvasInOrg(t *testing.T, orgID, factoryID, userID uuid.UUID, 
 }
 
 func publishOnboardingTemplate(
-	t *testing.T,
 	ctx context.Context,
+	t *testing.T,
 	deps IntakeDependencies,
 	factory *models.Factory,
 	canvas *models.Canvas,
@@ -133,11 +133,12 @@ func publishOnboardingTemplate(
 	require.True(t, ok)
 	reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), factory.OrganizationID, canvas.ID)
 	require.NoError(t, err)
-	require.NoError(t, reloaded.StampFactoryAppTemplate(
+	require.NoError(t, reloaded.StampFactoryAppTemplateFor(
 		database.DB(t.Context()),
 		template.entrypointNodeID,
 		templateID,
 		factoryTemplateVersion,
+		template.provider,
 	))
 }
 

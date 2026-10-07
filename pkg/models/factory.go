@@ -449,6 +449,7 @@ func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
 	return factories, nil
 }
 
+// ListFactoriesAll returns every factory on the installation.
 func ListFactoriesAll(tx *gorm.DB) ([]Factory, error) {
 	var factories []Factory
 	err := tx.
