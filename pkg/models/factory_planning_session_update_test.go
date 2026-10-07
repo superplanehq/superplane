@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 )
 
 func TestFactoryPlanningSession_ProposeUpdateWritesScoresSpecAndSurvey(t *testing.T) {
@@ -161,11 +160,10 @@ func TestFactoryPlanningSession_ProposeUpdateAllowsLaterSurveyOnly(t *testing.T)
 	assert.Equal(t, "Which service?", session.CurrentSurvey().Questions[0].Prompt)
 }
 
-func TestAnalysisContinuationTextUsesProposeUpdateWhenReviewIsOn(t *testing.T) {
+func TestAnalysisContinuationTextUsesProposeUpdateByDefault(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-continue-review")
 	db := database.DB(t.Context())
-	require.NoError(t, EnableExperimentalFeatureInTransaction(db, org.ID, features.FeatureTaskPlanningReview))
 	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Confidence: true}))
 	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
 	_, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
@@ -208,7 +206,6 @@ func TestWorkOrderReadyForAutoStartReviewRequiresAllThreeThrees(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-review")
 	db := database.DB(t.Context())
-	require.NoError(t, EnableExperimentalFeatureInTransaction(db, org.ID, features.FeatureTaskPlanningReview))
 	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: false}))
 	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
 	line, err := factoryModel.CreateLine(db, "ship", nil)

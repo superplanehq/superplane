@@ -195,7 +195,7 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	assert.Contains(t, text, "Publish the required scores before you ask or stop")
 	assert.Contains(t, text, "Publish the specification only when this turn updates the plan")
 	assert.Contains(t, text, "Publish the scores when the plan changes, a score would change, or the user asks to update a score")
-	assert.Contains(t, text, "When every required score is 5, publish each required score on that plan turn")
+	assert.Contains(t, text, "When every required score is 3, publish each required score on that plan turn")
 	assert.Contains(t, text, "You may update a score without rewriting the specification")
 	assert.NotContains(t, text, "Publish the specification and the scores only when this turn updates the plan")
 	assert.Contains(t, text, "End an answer, and the first plan, with how to update the plan or the scores")
@@ -209,19 +209,6 @@ func TestAnalysisContinuationTextIncludesSpecScoreAndChat(t *testing.T) {
 	assert.Contains(t, text, "Keep the existing retry helper.")
 	assert.Equal(t, 1, strings.Count(text, "Keep the existing retry helper."))
 
-	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: false}))
-	text, err = AnalysisContinuationText(db, session)
-	require.NoError(t, err)
-	assert.Contains(t, text, "If no score is published yet, this turn is a plan turn")
-	assert.Contains(t, text, "Publish the required scores before you ask or stop")
-	assert.Contains(t, text, "Publish the specification only when this turn updates the plan")
-	assert.Contains(t, text, "Publish the Clarity score when the plan changes, the score would change, or the user asks to update that score")
-	assert.Contains(t, text, "When every required score is 5, publish each required score on that plan turn")
-	assert.NotContains(t, text, "Publish the specification and the Clarity score only when this turn updates the plan")
-	assert.Contains(t, text, "End an answer, and the first plan, with how to update the plan or the scores")
-	assert.NotContains(t, text, "propose_confidence")
-	assert.Contains(t, text, "Stop double charges.")
-	assert.Contains(t, text, "Current Confidence: 3/5\nThis issue is a mixed fit for an agent.")
 }
 
 func TestAnalysisConversationWindowKeepsRecentMessagesWithHeadroom(t *testing.T) {
@@ -812,18 +799,18 @@ func TestWorkOrderReadyForAutoStart(t *testing.T) {
 	require.NoError(t, err)
 	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
 	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 
 	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.True(t, ready)
 
-	require.NoError(t, session.ProposeConfidence(db, 4, "One risk remains."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 2, 3)}))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.False(t, ready)
 
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 	order.State = FactoryWorkOrderStateOpen
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
@@ -848,8 +835,7 @@ func TestWorkOrderReadyForAutoStartIgnoresEarlierScore(t *testing.T) {
 	require.NoError(t, err)
 	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
 	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
-	require.NoError(t, session.ProposeClarity(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 
 	require.NoError(t, session.SendUserMessage(db, "The refund path changed.", userID))
 	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
@@ -861,7 +847,7 @@ func TestWorkOrderReadyForAutoStartIgnoresEarlierScore(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, ready)
 
-	require.NoError(t, session.ProposeClarity(db, 5, "The new path is covered."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.True(t, ready)
@@ -873,8 +859,7 @@ func TestWorkOrderReadyForAutoStartIgnoresEarlierScore(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, ready)
 
-	require.NoError(t, session.ProposeConfidence(db, 5, "The new run is ready."))
-	require.NoError(t, session.ProposeClarity(db, 5, "The new run is ready."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.True(t, ready)
@@ -889,34 +874,27 @@ func TestWorkOrderReadyForAutoStartRequiresSpec(t *testing.T) {
 	line, err := factoryModel.CreateLine(db, "ship", nil)
 	require.NoError(t, err)
 	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 
 	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.False(t, ready)
 }
 
-func TestWorkOrderReadyForAutoStartRequiresClarityWhenEnabled(t *testing.T) {
+func TestWorkOrderReadyForAutoStartRejectsLegacyScores(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
-	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-clarity")
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-legacy")
 	db := database.DB(t.Context())
 	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: true, Confidence: true}))
 	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
-	line, err := factoryModel.CreateLine(db, "ship", nil)
-	require.NoError(t, err)
-	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
 	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
 	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
-	require.NoError(t, session.ProposeClarity(db, 4, "One decision is still open."))
+	require.NoError(t, session.ProposeClarity(db, 5, "The plan is ready."))
 
 	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.False(t, ready)
-
-	require.NoError(t, session.ProposeClarity(db, 5, "The plan is ready."))
-	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
-	require.NoError(t, err)
-	assert.True(t, ready)
 }
 
 func mustAnalysisOrder(

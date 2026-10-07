@@ -668,12 +668,8 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 }
 
 func TestBuildBacklogCanvasPlanningReviewPrompt(t *testing.T) {
-	legacy := backlogRefinementPromptText(t, buildBacklogCanvas(backlogCanvasRequest{}))
-	assert.Contains(t, legacy, runner.PlanningSessionUserPromptMarkdown())
-	assert.NotContains(t, legacy, "Clarity, Complexity, and Verifiability")
-
-	review := backlogRefinementPromptText(t, buildBacklogCanvas(backlogCanvasRequest{PlanningReview: true}))
-	assert.Contains(t, review, runner.PlanningSessionUserPromptReviewMarkdown())
+	review := backlogRefinementPromptText(t, buildBacklogCanvas(backlogCanvasRequest{}))
+	assert.Contains(t, review, runner.PlanningSessionUserPromptMarkdown())
 	assert.Contains(t, review, "Task:\n{{ root().data.workOrder }}")
 	assert.NotContains(t, review, "1 through 5")
 }

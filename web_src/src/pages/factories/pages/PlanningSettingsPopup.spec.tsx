@@ -52,7 +52,6 @@ function renderPopup(
   options: {
     agent?: boolean | Partial<PlanningReviewAgentSlot>;
     lines?: PlanningAutoStartLine[];
-    planningReviewEnabled?: boolean;
   } = {},
 ) {
   const agentSlot = options.agent ? defaultAgentSlot(options.agent === true ? {} : options.agent) : undefined;
@@ -68,7 +67,6 @@ function renderPopup(
               onClose={vi.fn()}
               fixed={false}
               agent={agentSlot}
-              planningReviewEnabled={options.planningReviewEnabled}
             />
           </TooltipProvider>
         </ThemeProvider>
@@ -93,24 +91,7 @@ describe("PlanningSettingsPopup", () => {
     } as unknown as ReturnType<typeof useFactoryAgentResources>);
   });
 
-  it("saves Planning and score toggles", async () => {
-    const user = userEvent.setup();
-    const { onSave } = renderPopup();
-
-    expect(screen.getByTestId("planning-settings-health")).toHaveTextContent("Ready");
-    expect(within(screen.getByTestId("planning-settings-clarity")).getByRole("switch")).not.toBeChecked();
-    await user.click(within(screen.getByTestId("planning-settings-clarity")).getByRole("switch"));
-    await user.click(screen.getByTestId("planning-settings-save"));
-
-    expect(onSave).toHaveBeenCalledWith({
-      enabled: true,
-      clarity: true,
-      confidence: true,
-      autoStartLineId: "",
-    });
-  });
-
-  it("disables score toggles when Planning is off and keeps stored flags", async () => {
+  it("saves Planning without changing stored score settings", async () => {
     const user = userEvent.setup();
     const { onSave } = renderPopup(vi.fn(), {
       enabled: true,
@@ -121,8 +102,6 @@ describe("PlanningSettingsPopup", () => {
 
     await user.click(within(screen.getByTestId("planning-settings-enabled")).getByRole("switch"));
     expect(screen.getByTestId("planning-settings-health")).toHaveTextContent("Off");
-    expect(within(screen.getByTestId("planning-settings-clarity")).getByRole("switch")).toBeDisabled();
-    expect(within(screen.getByTestId("planning-settings-confidence")).getByRole("switch")).toBeDisabled();
     await user.click(screen.getByTestId("planning-settings-save"));
 
     expect(onSave).toHaveBeenCalledWith({
@@ -150,10 +129,10 @@ describe("PlanningSettingsPopup", () => {
     );
     const { rerender } = render(popup({ ...DEFAULT_PLANNING_SETTINGS }));
 
-    await user.click(within(screen.getByTestId("planning-settings-clarity")).getByRole("switch"));
+    await user.click(within(screen.getByTestId("planning-settings-enabled")).getByRole("switch"));
     rerender(popup({ ...DEFAULT_PLANNING_SETTINGS }));
 
-    expect(within(screen.getByTestId("planning-settings-clarity")).getByRole("switch")).toBeChecked();
+    expect(within(screen.getByTestId("planning-settings-enabled")).getByRole("switch")).not.toBeChecked();
   });
 
   it("saves Auto-start on the selected line", async () => {
@@ -164,9 +143,9 @@ describe("PlanningSettingsPopup", () => {
     ];
     const { onSave } = renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { lines });
 
-    expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartHelper)).toBeInTheDocument();
+    expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartReviewHelper)).toBeInTheDocument();
     await user.click(within(screen.getByTestId("planning-settings-auto-start")).getByRole("switch"));
-    expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartHelper)).toBeInTheDocument();
+    expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartReviewHelper)).toBeInTheDocument();
     await user.click(screen.getByTestId("planning-settings-auto-start-line"));
     await user.click(screen.getByRole("option", { name: "hotfix" }));
     await user.click(screen.getByTestId("planning-settings-save"));
@@ -192,21 +171,20 @@ describe("PlanningSettingsPopup", () => {
     expect(screen.getByText(PLANNING_SETTINGS_COPY.autoStartPlanningOffHelper)).toBeInTheDocument();
   });
 
-  it("hides the score toggles when Planning Review is on", () => {
-    renderPopup(vi.fn(), DEFAULT_PLANNING_SETTINGS, { planningReviewEnabled: true });
+  it("always uses three-part scoring", () => {
+    renderPopup();
 
     expect(screen.queryByTestId("planning-settings-clarity")).not.toBeInTheDocument();
     expect(screen.queryByTestId("planning-settings-confidence")).not.toBeInTheDocument();
     expect(screen.queryByTestId("planning-settings-checks")).not.toBeInTheDocument();
-    expect(screen.queryByText(PLANNING_SETTINGS_COPY.checksLabel)).not.toBeInTheDocument();
     expect(screen.getByText(PLANNING_SETTINGS_COPY.planningReviewHelper)).toBeInTheDocument();
   });
 
-  it("keeps Auto-start available when Planning Review is on and Confidence was stored off", () => {
+  it("keeps Auto-start available when Confidence was stored off", () => {
     renderPopup(
       vi.fn(),
       { enabled: true, clarity: false, confidence: false, autoStartLineId: "" },
-      { planningReviewEnabled: true, lines: [{ id: "line-implement", name: "implement" }] },
+      { lines: [{ id: "line-implement", name: "implement" }] },
     );
 
     const toggle = within(screen.getByTestId("planning-settings-auto-start")).getByRole("switch");
