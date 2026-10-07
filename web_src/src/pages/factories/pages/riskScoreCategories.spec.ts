@@ -21,7 +21,7 @@ function promptWithRules(rules: string): string {
   ].join("\n");
 }
 
-function draftWithPrompt(prompt: string): PlanningReviewDraft {
+function draftWithPrompt(prompt: string, extraSteps: PlanningReviewStep[] = []): PlanningReviewDraft {
   return {
     title: "Assess Risk",
     components: [
@@ -34,6 +34,7 @@ function draftWithPrompt(prompt: string): PlanningReviewDraft {
           steps: [
             { name: "Checkout Pull Request", type: "bash", command: "git clone" },
             { name: "Review Pull Request", type: "prompt", prompt },
+            ...extraSteps,
           ],
         },
         concurrency: { max: "1", key: "" },
@@ -127,21 +128,22 @@ describe("draftWithRiskScoreCategories", () => {
         "Use Higher risk for high or critical. Use Moderate risk for medium. Use Lower risk for low or very low.",
         "Documentation only = 1 (very_low). Secrets and credentials = 5 (critical).",
       ].join("\n"),
+      [
+        {
+          name: "Performance",
+          type: "prompt",
+          prompt: [
+            "score is an integer from 1 to 5.",
+            "5 means the change follows every practice that applies.",
+            "4 means the change follows the practices that apply, with a small gap.",
+            "3 means the change follows some practices and breaks one that applies.",
+            "2 means the change breaks a practice that applies.",
+            "1 means the change breaks more than one practice that applies.",
+            "If no performance practice applies, report the check with 5.",
+          ].join("\n"),
+        },
+      ],
     );
-    const draftSteps = draft.components[0].configuration.steps as PlanningReviewStep[];
-    draftSteps.push({
-      name: "Performance",
-      type: "prompt",
-      prompt: [
-        "score is an integer from 1 to 5.",
-        "5 means the change follows every practice that applies.",
-        "4 means the change follows the practices that apply, with a small gap.",
-        "3 means the change follows some practices and breaks one that applies.",
-        "2 means the change breaks a practice that applies.",
-        "1 means the change breaks more than one practice that applies.",
-        "If no performance practice applies, report the check with 5.",
-      ].join("\n"),
-    });
 
     const next = draftWithRiskScoreCategories(draft, [{ id: "secrets", name: "Secrets and credentials", score: 3 }]);
     const steps = next!.components[0].configuration.steps as Array<{ prompt?: string }>;
