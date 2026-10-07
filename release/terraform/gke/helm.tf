@@ -104,6 +104,7 @@ resource "helm_release" "superplane" {
   version          = local.superplane_chart_local || var.superplane_chart_version == "" ? null : var.superplane_chart_version
   namespace        = var.superplane_namespace
   create_namespace = false
+  timeout          = 900 # GCE Ingress + first-boot migrate exceed the 300s default
 
   values = compact([
     local.gcs_blob_storage_values,
