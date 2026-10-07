@@ -96,12 +96,12 @@ func main() {
 			artifactResolver,
 			resourceProvider,
 			reconcile.Config{
-				FleetID:             fleet.ID,
-				WarmCapacity:        fleet.WarmCapacity,
-				MaxCapacity:         fleet.MaxCapacity,
-				OperatingSystem:     "linux",
-				Architecture:        architecture,
-				CapacityWaitSeconds: 30,
+				FleetID:         fleet.ID,
+				WarmCapacity:    fleet.WarmCapacity,
+				MaxCapacity:     fleet.MaxCapacity,
+				OperatingSystem: "linux",
+				Architecture:    architecture,
+				PollTimeout:     config.PollTimeout(),
 			},
 			log,
 		)
@@ -116,7 +116,10 @@ func main() {
 		reconcilers = append(reconcilers, fleetReconciler)
 	}
 
-	reconcile.Run(ctx, log, config.ReconcileInterval(), reconcilers)
+	reconcile.Run(ctx, log, reconcile.RunConfig{
+		Interval:           config.ReconciliationInterval(),
+		ErrorRetryInterval: config.ErrorRetryInterval(),
+	}, reconcilers)
 	log.Info(
 		"Fleet Manager started",
 		slog.Int("fleet_count", len(reconcilers)),

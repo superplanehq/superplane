@@ -1,13 +1,17 @@
 package reconcile
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/fleets/adminclient"
 	"github.com/superplanehq/superplane/pkg/fleets/artifact"
@@ -17,16 +21,22 @@ import (
 type fakeAdmin struct {
 	fleet             adminclient.Fleet
 	capacity          adminclient.Capacity
+	describeError     error
+	describeCalls     chan time.Time
 	activeRunners     []adminclient.Runner
 	terminatedRunners []adminclient.Runner
 	createResponse    adminclient.CreateRunnerResponse
 	createRequests    []adminclient.CreateRunnerRequest
 	deletedRunnerIDs  []string
+	capacityWaits     []int
 	events            *[]string
 }
 
 func (f *fakeAdmin) DescribeFleet(context.Context, string) (adminclient.Fleet, error) {
-	return f.fleet, nil
+	if f.describeCalls != nil {
+		f.describeCalls <- time.Now()
+	}
+	return f.fleet, f.describeError
 }
 
 func (f *fakeAdmin) DescribeRunner(
@@ -42,11 +52,12 @@ func (f *fakeAdmin) DescribeRunner(
 }
 
 func (f *fakeAdmin) GetFleetCapacity(
-	context.Context,
-	string,
-	string,
-	int,
+	_ context.Context,
+	_ string,
+	_ string,
+	waitSeconds int,
 ) (adminclient.Capacity, error) {
+	f.capacityWaits = append(f.capacityWaits, waitSeconds)
 	return f.capacity, nil
 }
 
@@ -202,6 +213,51 @@ func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
 		resourceProvider.bootstrap.RegistrationToken != "registration-token" ||
 		resourceProvider.bootstrap.RunnerAPIURL != "https://superplane.example" {
 		t.Fatalf("provider requests = %#v %#v", resourceProvider.createRequest, resourceProvider.bootstrap)
+	}
+}
+
+func TestReconcileLogsProvisioningActions(t *testing.T) {
+	admin := newFakeAdmin()
+	admin.capacity.RunnableTasks = 1
+	var output bytes.Buffer
+	reconciler, err := New(
+		admin,
+		&fakeArtifactResolver{},
+		&fakeProvider{},
+		Config{
+			FleetID:         "fleet-a",
+			OperatingSystem: "linux",
+			Architecture:    "amd64",
+		},
+		slog.New(slog.NewJSONHandler(&output, nil)),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := reconciler.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	messages := loggedMessages(t, output.String())
+	for _, expected := range []string{
+		"describing fleet",
+		"getting fleet capacity",
+		"listing provider resources",
+		"cleaning up terminated provider resources",
+		"listing active runners",
+		"reconciling fleet capacity",
+		"increasing fleet capacity",
+		"creating logical runner",
+		"resolving runner artifact",
+		"building runner bootstrap",
+		"creating provider runner",
+		"provisioned runner",
+		"fleet reconciliation completed",
+	} {
+		if !slices.Contains(messages, expected) {
+			t.Errorf("missing log message %q in %#v", expected, messages)
+		}
 	}
 }
 
@@ -402,6 +458,123 @@ func TestMaximumCapacityTerminatesExcessIdleRunners(t *testing.T) {
 	}
 }
 
+func TestConfiguredPollTimeoutAppliesAfterInitialCapacityRequest(t *testing.T) {
+	admin := newFakeAdmin()
+	reconciler, err := New(
+		admin,
+		&fakeArtifactResolver{},
+		&fakeProvider{},
+		Config{
+			FleetID:         "fleet-a",
+			OperatingSystem: "linux",
+			Architecture:    "amd64",
+			PollTimeout:     20 * time.Second,
+		},
+		slog.Default(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := reconciler.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := reconciler.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(admin.capacityWaits) != 2 ||
+		admin.capacityWaits[0] != 0 ||
+		admin.capacityWaits[1] != 20 {
+		t.Fatalf("capacity waits = %#v", admin.capacityWaits)
+	}
+}
+
+func TestReconciliationLoopUsesStrategySpecificDelay(t *testing.T) {
+	tests := []struct {
+		name               string
+		describeError      error
+		interval           time.Duration
+		errorRetryInterval time.Duration
+	}{
+		{
+			name:               "periodic reconciliation",
+			interval:           30 * time.Millisecond,
+			errorRetryInterval: time.Millisecond,
+		},
+		{
+			name:               "error retry",
+			describeError:      errors.New("admin unavailable"),
+			interval:           time.Millisecond,
+			errorRetryInterval: 30 * time.Millisecond,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			admin := newFakeAdmin()
+			admin.describeError = test.describeError
+			admin.describeCalls = make(chan time.Time, 2)
+			reconciler := newTestReconciler(
+				t,
+				admin,
+				&fakeArtifactResolver{},
+				&fakeProvider{},
+				0,
+				0,
+			)
+			ctx, cancel := context.WithCancel(context.Background())
+			done := make(chan struct{})
+			runConfig := RunConfig{
+				Interval:           test.interval,
+				ErrorRetryInterval: test.errorRetryInterval,
+			}
+			go func() {
+				defer close(done)
+				runOne(ctx, slog.Default(), runConfig, reconciler)
+			}()
+
+			first := waitForDescribeCall(t, admin.describeCalls)
+			second := waitForDescribeCall(t, admin.describeCalls)
+			if delay := second.Sub(first); delay < 25*time.Millisecond {
+				t.Fatalf("delay = %s", delay)
+			}
+			cancel()
+			select {
+			case <-done:
+			case <-time.After(time.Second):
+				t.Fatal("reconciliation loop did not stop")
+			}
+		})
+	}
+}
+
+func waitForDescribeCall(t *testing.T, calls <-chan time.Time) time.Time {
+	t.Helper()
+	select {
+	case calledAt := <-calls:
+		return calledAt
+	case <-time.After(time.Second):
+		t.Fatal("reconciliation did not start")
+		return time.Time{}
+	}
+}
+
+func loggedMessages(t *testing.T, output string) []string {
+	t.Helper()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	messages := make([]string, 0, len(lines))
+	for _, line := range lines {
+		var entry struct {
+			Message string `json:"msg"`
+		}
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatal(err)
+		}
+		messages = append(messages, entry.Message)
+	}
+	return messages
+}
+
 func newFakeAdmin() *fakeAdmin {
 	return &fakeAdmin{
 		fleet: adminclient.Fleet{
@@ -438,12 +611,11 @@ func newTestReconciler(
 ) *Reconciler {
 	t.Helper()
 	reconciler, err := New(admin, resolver, resourceProvider, Config{
-		FleetID:             "fleet-a",
-		WarmCapacity:        warmCapacity,
-		MaxCapacity:         maxCapacity,
-		OperatingSystem:     "linux",
-		Architecture:        "amd64",
-		CapacityWaitSeconds: 0,
+		FleetID:         "fleet-a",
+		WarmCapacity:    warmCapacity,
+		MaxCapacity:     maxCapacity,
+		OperatingSystem: "linux",
+		Architecture:    "amd64",
 	}, slog.Default())
 	if err != nil {
 		t.Fatal(err)
