@@ -663,19 +663,16 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 	prompt := implementationStep(t, refinement, "Refine Task")
 	text, ok := prompt["prompt"].(string)
 	require.True(t, ok)
-	assert.Contains(t, text, runner.PlanningSessionUserPromptMarkdown())
+	assert.Contains(t, text, runner.PlanningSessionUserPromptReviewMarkdown())
 	assert.Contains(t, text, "Task:\n{{ root().data.workOrder }}")
 }
 
-func TestBuildBacklogCanvasPlanningReviewPrompt(t *testing.T) {
-	legacy := backlogRefinementPromptText(t, buildBacklogCanvas(backlogCanvasRequest{}))
-	assert.Contains(t, legacy, runner.PlanningSessionUserPromptMarkdown())
-	assert.NotContains(t, legacy, "Clarity, Complexity, and Verifiability")
-
-	review := backlogRefinementPromptText(t, buildBacklogCanvas(backlogCanvasRequest{PlanningReview: true}))
-	assert.Contains(t, review, runner.PlanningSessionUserPromptReviewMarkdown())
-	assert.Contains(t, review, "Task:\n{{ root().data.workOrder }}")
-	assert.NotContains(t, review, "1 through 5")
+func TestBuildBacklogCanvasUsesReviewPrompt(t *testing.T) {
+	text := backlogRefinementPromptText(t, buildBacklogCanvas(backlogCanvasRequest{}))
+	assert.Contains(t, text, runner.PlanningSessionUserPromptReviewMarkdown())
+	assert.Contains(t, text, "Task:\n{{ root().data.workOrder }}")
+	assert.Contains(t, text, "Clarity, Complexity, and Verifiability")
+	assert.NotContains(t, text, "1 through 5")
 }
 
 func backlogRefinementPromptText(t *testing.T, canvas *yaml.Canvas) string {

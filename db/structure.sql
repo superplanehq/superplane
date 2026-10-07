@@ -251,6 +251,26 @@ CREATE TABLE public.app_messages (
 
 
 --
+-- Name: bitbucket_forge_installations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bitbucket_forge_installations (
+    installation_id text NOT NULL,
+    workspace_uuid text DEFAULT ''::text NOT NULL,
+    workspace_slug text DEFAULT ''::text NOT NULL,
+    installer_account_id text DEFAULT ''::text NOT NULL,
+    api_base_url text DEFAULT ''::text NOT NULL,
+    system_token bytea,
+    token_expires_at timestamp without time zone,
+    last_delivery_at timestamp without time zone,
+    installed_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uninstalled_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: canvas_memories; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2106,6 +2126,14 @@ ALTER TABLE ONLY public.app_messages
 
 
 --
+-- Name: bitbucket_forge_installations bitbucket_forge_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bitbucket_forge_installations
+    ADD CONSTRAINT bitbucket_forge_installations_pkey PRIMARY KEY (installation_id);
+
+
+--
 -- Name: canvas_memories canvas_memories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3019,6 +3047,13 @@ CREATE INDEX agent_sessions_provider_session_id_idx ON public.agent_sessions USI
 --
 
 CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USING btree (organization_id, user_id, canvas_id);
+
+
+--
+-- Name: bitbucket_forge_installations_workspace_uuid_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX bitbucket_forge_installations_workspace_uuid_idx ON public.bitbucket_forge_installations USING btree (workspace_uuid);
 
 
 --
@@ -5560,7 +5595,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261006115204	f
+20261006160433	f
 \.
 
 
