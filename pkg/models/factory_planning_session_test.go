@@ -30,6 +30,47 @@ func TestTaskCreationSessionRequiresCreator(t *testing.T) {
 	assert.Contains(t, err.Error(), "factory_planning_sessions_task_creation_creator_check")
 }
 
+func TestFactorySoftDelete_EndsOpenPlanningSession(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	session := startTestPlanningSession(t, "plan-delete")
+	other := startTestPlanningSession(t, "plan-delete-other")
+	db := database.DB(t.Context())
+	require.NoError(t, session.BeginWait(db))
+	creator := createOrgUser(t, session.OrganizationID, "plan-delete-creator")
+	now := time.Now()
+	taskSession := &FactoryPlanningSession{
+		ID:              uuid.New(),
+		OrganizationID:  session.OrganizationID,
+		FactoryID:       session.FactoryID,
+		CreatedByUserID: &creator.ID,
+		Repository:      "acme/payments",
+		Kind:            PlanningSessionKindTaskCreation,
+		State:           PlanningSessionStateRunning,
+		HeartbeatAt:     now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}
+	require.NoError(t, db.Create(taskSession).Error)
+
+	factoryModel, err := FindFactory(db, session.OrganizationID, session.FactoryID)
+	require.NoError(t, err)
+	require.NoError(t, factoryModel.SoftDelete(db))
+
+	reloaded, err := FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningSessionStateEnded, reloaded.State)
+	assert.Equal(t, PlanningWaitKindEnded, reloaded.WaitKind)
+	require.NotNil(t, reloaded.EndedAt)
+
+	endedTask, err := FindPlanningSession(db, taskSession.OrganizationID, taskSession.FactoryID, taskSession.ID)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningSessionStateEnded, endedTask.State)
+
+	kept, err := FindPlanningSession(db, other.OrganizationID, other.FactoryID, other.ID)
+	require.NoError(t, err)
+	assert.Equal(t, PlanningSessionStateRunning, kept.State)
+}
+
 func TestFactoryPlanningSession_HeartbeatAndEnd(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	session := startTestPlanningSession(t, "plan-hb")
