@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
@@ -126,6 +127,160 @@ func TestAdminListOrganizations(t *testing.T) {
 		})
 		assert.NotEqual(t, http.StatusOK, response.Code)
 	})
+}
+
+func TestAdminListOrganizationsRemainingCredit(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+	db := database.DB(t.Context())
+
+	high, err := models.CreateOrganization("CreditSort Zebra", "")
+	require.NoError(t, err)
+	alpha, err := models.CreateOrganization("CreditSort Alpha", "")
+	require.NoError(t, err)
+	beta, err := models.CreateOrganization("CreditSort Beta", "")
+	require.NoError(t, err)
+	none, err := models.CreateOrganization("CreditSort None", "")
+	require.NoError(t, err)
+
+	expired := time.Now().Add(-time.Hour).UTC()
+	require.NoError(t, db.Create(&models.OrganizationLLMCreditGrant{
+		ID:             uuid.New(),
+		OrganizationID: high.ID,
+		Kind:           models.LLMCreditGrantKindWelcome,
+		AmountMicros:   models.CentsToMicros(5000),
+		CreatedAt:      expired.Add(-2 * time.Hour),
+		ExpiresAt:      &expired,
+	}).Error)
+	insertHostedSpend(t, db, high.ID, models.CentsToMicros(2000), expired.Add(-time.Minute))
+	insertHostedSpend(t, db, high.ID, models.CentsToMicros(500), time.Now())
+	insertHostedSpendWithSource(t, db, high.ID, models.CentsToMicros(9000), time.Now(), models.UsageFundingSourceBYOK)
+	_, err = models.AddTopupLLMCreditGrant(db, high.ID, models.CentsToMicros(8000), uuid.NewString())
+	require.NoError(t, err)
+
+	_, err = models.AddAdminLLMCreditGrant(db, alpha.ID, models.CentsToMicros(1500), "support", nil)
+	require.NoError(t, err)
+	_, err = models.AddAdminLLMCreditGrant(db, beta.ID, models.CentsToMicros(1500), "support", nil)
+	require.NoError(t, err)
+
+	sameA, err := models.CreateOrganization("CreditSort SameA", "")
+	require.NoError(t, err)
+	sameZ, err := models.CreateOrganization("CreditSort SameZ", "")
+	require.NoError(t, err)
+	_, err = models.AddAdminLLMCreditGrant(db, sameA.ID, 12_500, "support", nil)
+	require.NoError(t, err)
+	_, err = models.AddAdminLLMCreditGrant(db, sameZ.ID, 19_999, "support", nil)
+	require.NoError(t, err)
+
+	other, err := models.CreateOrganization("CreditSort Other", "")
+	require.NoError(t, err)
+	otherExpired := time.Now().Add(-2 * time.Hour).UTC()
+	require.NoError(t, db.Create(&models.OrganizationLLMCreditGrant{
+		ID:             uuid.New(),
+		OrganizationID: other.ID,
+		Kind:           models.LLMCreditGrantKindWelcome,
+		AmountMicros:   models.CentsToMicros(1000),
+		CreatedAt:      otherExpired.Add(-2 * time.Hour),
+		ExpiresAt:      &otherExpired,
+	}).Error)
+	insertHostedSpend(t, db, other.ID, models.CentsToMicros(400), otherExpired.Add(-time.Minute))
+	insertHostedSpend(t, db, other.ID, models.CentsToMicros(100), time.Now())
+	_, err = models.AddTopupLLMCreditGrant(db, other.ID, models.CentsToMicros(300), uuid.NewString())
+	require.NoError(t, err)
+
+	expected := map[string]int64{}
+	for _, org := range []*models.Organization{high, alpha, beta, none, sameA, sameZ, other} {
+		summary, err := models.DescribeOrganizationLLMCredit(db, org.ID)
+		require.NoError(t, err)
+		expected[org.ID.String()] = pricebook.MicrosToCents(summary.RemainingMicros)
+	}
+	assert.Equal(t, int64(7500), expected[high.ID.String()])
+	assert.Equal(t, int64(1500), expected[alpha.ID.String()])
+	assert.Equal(t, int64(1500), expected[beta.ID.String()])
+	assert.Equal(t, int64(0), expected[none.ID.String()])
+	assert.Equal(t, int64(1), expected[sameA.ID.String()])
+	assert.Equal(t, int64(1), expected[sameZ.ID.String()])
+	assert.Equal(t, int64(200), expected[other.ID.String()])
+
+	page := listAdminOrganizations(t, server, token, "search=CreditSort&sort_by=remaining_credit_cents&sort_direction=desc&limit=50&offset=0")
+	require.Equal(t, int64(7), page.Total)
+	require.Len(t, page.Items, 7)
+	assert.Equal(t, []string{
+		high.ID.String(),
+		alpha.ID.String(),
+		beta.ID.String(),
+		other.ID.String(),
+		sameA.ID.String(),
+		sameZ.ID.String(),
+		none.ID.String(),
+	}, organizationIDs(page.Items))
+	for _, item := range page.Items {
+		assert.Equal(t, expected[item.ID], item.RemainingCreditCents)
+	}
+
+	middle := listAdminOrganizations(t, server, token, "search=CreditSort&sort_by=remaining_credit_cents&sort_direction=desc&limit=1&offset=1")
+	assert.Equal(t, int64(7), middle.Total)
+	require.Len(t, middle.Items, 1)
+	assert.Equal(t, alpha.ID.String(), middle.Items[0].ID)
+	assert.Equal(t, expected[alpha.ID.String()], middle.Items[0].RemainingCreditCents)
+
+	byName := listAdminOrganizations(t, server, token, "search=CreditSort&sort_by=name&sort_direction=asc&limit=2&offset=0")
+	require.Len(t, byName.Items, 2)
+	assert.Equal(t, alpha.ID.String(), byName.Items[0].ID)
+	assert.Equal(t, expected[alpha.ID.String()], byName.Items[0].RemainingCreditCents)
+}
+
+func listAdminOrganizations(t *testing.T, server *Server, token, query string) struct {
+	Items []adminOrgItem `json:"items"`
+	Total int64          `json:"total"`
+} {
+	t.Helper()
+	response := execRequest(server, requestParams{
+		method:     "GET",
+		path:       "/admin/api/organizations?" + query,
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, response.Code)
+
+	var page struct {
+		Items []adminOrgItem `json:"items"`
+		Total int64          `json:"total"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &page))
+	return page
+}
+
+func organizationIDs(items []adminOrgItem) []string {
+	ids := make([]string, len(items))
+	for i, item := range items {
+		ids[i] = item.ID
+	}
+	return ids
+}
+
+func insertHostedSpend(t *testing.T, db *gorm.DB, orgID uuid.UUID, costMicros int64, occurredAt time.Time) {
+	t.Helper()
+	insertHostedSpendWithSource(t, db, orgID, costMicros, occurredAt, models.UsageFundingSourceHosted)
+}
+
+func insertHostedSpendWithSource(t *testing.T, db *gorm.DB, orgID uuid.UUID, costMicros int64, occurredAt time.Time, fundingSource string) {
+	t.Helper()
+	require.NoError(t, db.Create(&models.WorkspaceUsageEvent{
+		ID:               uuid.New(),
+		OrganizationID:   orgID,
+		CanvasRunID:      uuid.New(),
+		NodeExecutionID:  uuid.New(),
+		NodeID:           "prompt",
+		Provider:         models.UsageProviderAnthropic,
+		Model:            "claude-sonnet-4-6",
+		UsageKind:        models.UsageKindModel,
+		FundingSource:    fundingSource,
+		CostMicros:       costMicros,
+		Currency:         "usd",
+		PriceBookVersion: "test",
+		IdempotencyKey:   uuid.NewString(),
+		OccurredAt:       occurredAt,
+		CreatedAt:        time.Now(),
+	}).Error)
 }
 
 func TestAdminGetOrganization(t *testing.T) {
