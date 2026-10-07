@@ -145,13 +145,13 @@ describe("WorkOrdersBoardView layout", () => {
     expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
   });
 
-  it("shows a status dot, title, created time, and owner", () => {
+  it("shows a status dot, title, update time, and owner", () => {
     const { row } = renderView(WorkOrdersBoardView);
 
     expect(within(row).getByLabelText("Running")).toBeInTheDocument();
     expect(within(row).queryByText("Running")).not.toBeInTheDocument();
     expect(within(row).getByText(entry.title)).toBeInTheDocument();
-    expect(within(row).getByText(formatRelative(new Date(entry.createdAtMs)))).toBeInTheDocument();
+    expect(within(row).getByText(formatRelative(new Date(entry.updatedAtMs)))).toBeInTheDocument();
     const owner = within(row).getByTestId(`work-order-row-assignees-${entry.id}`);
     expect(owner).toBeInTheDocument();
     expect(within(owner).getByText("Ada")).toBeInTheDocument();
@@ -161,8 +161,13 @@ describe("WorkOrdersBoardView layout", () => {
     expect(within(row).queryByText(/verify/i)).not.toBeInTheDocument();
   });
 
-  it("puts created time on the left and the first name with the avatar on the right", () => {
-    const createdAt = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  it("puts the update time on the left and the first name with the avatar on the right", () => {
+    const createdAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+    const updatedAt = new Date(Date.now() - 60 * 60 * 1000);
+    const createdLabel = formatRelative(createdAt);
+    const updatedLabel = formatRelative(updatedAt);
+    expect(createdLabel).not.toBe(updatedLabel);
+
     const recent = buildWorkOrderListEntry(
       {
         id: "wo-recent",
@@ -170,7 +175,7 @@ describe("WorkOrdersBoardView layout", () => {
         title: "Add refund reconciliation test",
         state: "STATE_OPEN",
         createdAt: createdAt.toISOString(),
-        updatedAt: createdAt.toISOString(),
+        updatedAt: updatedAt.toISOString(),
         lineDispatches: [
           {
             id: "dispatch-1",
@@ -185,15 +190,41 @@ describe("WorkOrdersBoardView layout", () => {
     );
 
     const { row } = renderView(WorkOrdersBoardView, [recent]);
-    const createdLabel = formatRelative(createdAt);
-    const time = within(row).getByText(createdLabel);
+    const time = within(row).getByText(updatedLabel);
     const owner = within(row).getByTestId(`work-order-row-assignees-${recent.id}`);
 
-    expect(time).toBeInTheDocument();
+    expect(within(row).queryByText(createdLabel)).not.toBeInTheDocument();
+    expect(time).toHaveAttribute("title", `Updated ${updatedAt.toLocaleString()}`);
     expect(within(owner).getByText("Ada")).toBeInTheDocument();
     expect(time.compareDocumentPosition(owner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(time.parentElement?.className).not.toMatch(/ml-auto/);
     expect(owner.parentElement?.className).toMatch(/ml-auto/);
+  });
+
+  it("shows an em dash when the task has no update time", () => {
+    const missing = buildWorkOrderListEntry(
+      {
+        id: "wo-missing-time",
+        number: "11",
+        title: "Refund batch without a timestamp",
+        state: "STATE_OPEN",
+        lineDispatches: [
+          {
+            id: "dispatch-1",
+            line: { id: "line-a", name: "hotfix" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [{ id: "e1", step: "verify", state: "STATE_STARTED" }],
+          },
+        ],
+        assignees: [{ id: "user-1", name: "Ada Lovelace" }],
+      },
+      factory,
+    );
+
+    const { row } = renderView(WorkOrdersBoardView, [missing]);
+    const time = within(row).getByText("—");
+
+    expect(time).not.toHaveAttribute("title");
   });
 
   it("shows a Run failed label on a waiting card after a failed step", () => {
@@ -226,7 +257,7 @@ describe("WorkOrdersBoardView layout", () => {
     expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
 
     const title = within(row).getByText(waiting.title);
-    const time = within(row).getByText(formatRelative(new Date(waiting.createdAtMs)));
+    const time = within(row).getByText(formatRelative(new Date(waiting.updatedAtMs)));
     const owner = within(row).getByTestId(`work-order-row-assignees-${waiting.id}`);
     expect(chip).toBeInstanceOf(HTMLElement);
     if (!(chip instanceof HTMLElement)) {
@@ -451,7 +482,7 @@ describe("WorkOrderCard attention", () => {
       throw new Error("expected a status pill");
     }
     expect(pill.className).toMatch(/rounded-full/);
-    const time = screen.getByText(formatRelative(new Date(waitingOrder.createdAt ?? "")));
+    const time = screen.getByText(formatRelative(new Date(waitingOrder.updatedAt ?? "")));
     expect(time.parentElement).not.toContainElement(pill);
   });
 
