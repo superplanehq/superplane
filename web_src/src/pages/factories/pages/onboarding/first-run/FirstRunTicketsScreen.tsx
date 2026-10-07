@@ -131,7 +131,11 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
   const screen = { ...TICKET_SCREEN_DEFAULTS, ...props };
   const intakeState = props.intakeState ?? noIntakeState;
   const catalogLoaded = screen.ticketIntakes != null;
-  const vcsAvailable = !catalogLoaded || isIntakeSelectable(intakeState("github-issues"));
+  const vcsAvailable = catalogLoaded
+    ? isIntakeSelectable(intakeState("github-issues"))
+    : screen.intakesLoading
+      ? false
+      : true;
   const jiraAvailable = isIntakeSelectable(intakeState("jira-issues"));
   const linearSelectable = catalogLoaded ? isIntakeSelectable(intakeState("linear-issues")) : screen.linearAvailable;
   const canAnalyze = ticketScanAllowed({

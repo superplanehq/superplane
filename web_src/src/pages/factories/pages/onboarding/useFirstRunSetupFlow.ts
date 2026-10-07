@@ -2,9 +2,7 @@ import type { MeVcsProviderRepository } from "@/api-client";
 import { useIntakeCatalogAvailability } from "@/hooks/useIntakeCatalogAvailability";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
-import {
-  FEATURE_FACTORY_BITBUCKET,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_BITBUCKET } from "@/lib/experimentalFeatures";
 import { isIntakeSelectable } from "@/lib/intakeCatalog";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";

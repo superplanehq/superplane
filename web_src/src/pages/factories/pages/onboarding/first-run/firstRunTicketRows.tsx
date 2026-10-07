@@ -186,6 +186,7 @@ function FirstRunTicketRow(props: FirstRunTicketRowProps) {
   const meta = state === "beta" ? copy.beta : undefined;
 
   if (intakeKey === "github-issues") {
+    const availabilityPending = props.intakesLoading && state === undefined;
     return (
       <ConnectOptionRow
         icon={<IntegrationChoiceIcon name="github" />}
@@ -194,7 +195,7 @@ function FirstRunTicketRow(props: FirstRunTicketRowProps) {
         meta={meta}
         selected={ticketSource === "github-issues"}
         soon={state === "soon"}
-        disabled={saving}
+        disabled={saving || availabilityPending}
         onSelect={() => props.onSelectTicketSource("github-issues")}
       />
     );
