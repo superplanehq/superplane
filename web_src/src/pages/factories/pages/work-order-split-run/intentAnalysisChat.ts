@@ -37,4 +37,6 @@ export type IntentAnalysisChat = {
   startDiscouraged?: boolean;
   closedDecision?: ReactNode;
   modelSelect?: ReactNode;
+  /** Content above the request in the chat log. The phone task page puts the task header and activity here. */
+  leading?: ReactNode;
 };

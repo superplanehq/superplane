@@ -1,0 +1,186 @@
+import type { FilesFile } from "@/api-client";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { ChevronDown } from "lucide-react";
+import { useMemo, useState } from "react";
+
+import type { PhaseGlyphKind } from "../lib/linePhaseRuns";
+import { PhaseGlyph } from "../pages/linePhaseGlyph";
+import { attachArtifactsToStream, type StreamArtifactIndex } from "../pages/work-order-split-run/attachStreamArtifacts";
+import { canvasNodesForRunnerModel, phaseWithRunnerModel } from "../pages/work-order-split-run/draftStartModel";
+import { PhaseLogCard } from "../pages/work-order-split-run/PhaseLogCard";
+import { SpecificModelIdsProvider } from "../pages/work-order-split-run/specificModelIds";
+import {
+  splitRunStatusLabel,
+  type SplitRunPhase,
+  type SplitRunPhaseStatus,
+  type SplitRunStreamLine,
+} from "../pages/work-order-split-run/splitRunMocks";
+import { SplitRunCheckPills } from "../pages/work-order-split-run/SplitRunReview";
+import { useSplitRunLiveCanvas } from "../pages/work-order-split-run/useSplitRunLiveCanvas";
+import { useSplitRunStreamArtifacts } from "../pages/work-order-split-run/useSplitRunStreamArtifacts";
+import { MOBILE_TASK_COPY } from "./mobileCopy";
+
+const PHASE_GLYPH: Record<SplitRunPhaseStatus, PhaseGlyphKind> = {
+  passed: "passed",
+  running: "running",
+  pending: "pending",
+  waiting: "waiting",
+  failed: "failed",
+  cancelled: "cancelled",
+};
+
+type MobileTaskActivityProps = {
+  organizationId: string;
+  factoryId: string;
+  orderId: string;
+  phases: SplitRunPhase[];
+  /** Phase that opens on load. Undefined keeps every phase closed. */
+  expandedPhaseId?: string;
+  files?: FilesFile[];
+};
+
+/**
+ * Automation phases on the task. Each row opens the same phase log as the
+ * desktop task popup, so the phone does not need the full run page.
+ */
+export function MobileTaskActivity({
+  organizationId,
+  factoryId,
+  orderId,
+  phases,
+  expandedPhaseId,
+  files,
+}: MobileTaskActivityProps) {
+  const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, orderId);
+
+  if (phases.length === 0) {
+    return <p className="text-[13px] text-muted-foreground">{MOBILE_TASK_COPY.noActivity}</p>;
+  }
+  return (
+    <SpecificModelIdsProvider organizationId={organizationId}>
+      <ol className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card">
+        {phases.map((phase) => (
+          <li key={phase.id} className="min-w-0">
+            <ActivityRow
+              phase={phase}
+              expandedByDefault={phase.id === expandedPhaseId}
+              organizationId={organizationId}
+              artifactIndex={artifactIndex}
+              files={files}
+            />
+          </li>
+        ))}
+      </ol>
+    </SpecificModelIdsProvider>
+  );
+}
+
+/** A phase has a log when it already carries lines or points at a run. */
+function phaseHasLog(phase: SplitRunPhase): boolean {
+  return phase.stream.length > 0 || Boolean(phase.appId && phase.runId);
+}
+
+/** One automation on the line. Tap to read its log. */
+function ActivityRow({
+  phase,
+  expandedByDefault,
+  organizationId,
+  artifactIndex,
+  files,
+}: {
+  phase: SplitRunPhase;
+  expandedByDefault: boolean;
+  organizationId: string;
+  artifactIndex: StreamArtifactIndex;
+  files?: FilesFile[];
+}) {
+  const canExpand = phaseHasLog(phase);
+  const [expanded, setExpanded] = useState(expandedByDefault && canExpand);
+
+  return (
+    <div className="flex min-w-0 flex-col" data-testid={`mobile-task-phase-${phase.id}`}>
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={() => canExpand && setExpanded((current) => !current)}
+        aria-expanded={canExpand ? expanded : undefined}
+        aria-label={canExpand ? (expanded ? MOBILE_TASK_COPY.hideLog : MOBILE_TASK_COPY.showLog) : undefined}
+        className="h-auto w-full min-w-0 items-start justify-start gap-3 whitespace-normal rounded-none px-3 py-2.5 text-left font-normal shadow-none hover:bg-transparent dark:text-foreground dark:hover:bg-transparent dark:hover:text-foreground"
+      >
+        <PhaseGlyph kind={PHASE_GLYPH[phase.status]} className="mt-1" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] font-medium text-foreground break-words">{phase.name}</span>
+          <span className="block text-[12px] text-muted-foreground">
+            {splitRunStatusLabel(phase.status)}
+            {phase.componentName ? ` · ${phase.componentName}` : ""}
+            {phase.duration ? ` · ${phase.duration}` : ""}
+          </span>
+          {phase.checks && phase.checks.length > 0 ? (
+            <span className="mt-1.5 block">
+              <SplitRunCheckPills checks={phase.checks} testId={`mobile-task-phase-checks-${phase.id}`} />
+            </span>
+          ) : null}
+        </span>
+        {canExpand ? (
+          <ChevronDown
+            className={cn("mt-1 size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")}
+            aria-hidden
+          />
+        ) : null}
+      </Button>
+      {expanded && canExpand ? (
+        <div className="min-w-0 border-t border-border px-2 py-2" data-testid={`mobile-task-phase-log-${phase.id}`}>
+          <PhaseLog phase={phase} organizationId={organizationId} artifactIndex={artifactIndex} files={files} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Live phase log. The row above already names the phase, so the card hides
+ * its own header. Example canvas steps are not a log: use the live run when
+ * it has lines, and keep the stored phase summary otherwise.
+ */
+function PhaseLog({
+  phase,
+  organizationId,
+  artifactIndex,
+  files,
+}: {
+  phase: SplitRunPhase;
+  organizationId: string;
+  artifactIndex: StreamArtifactIndex;
+  files?: FilesFile[];
+}) {
+  const live = useSplitRunLiveCanvas(organizationId, phase);
+  const stream = useMemo(
+    () => attachArtifactsToStream(phonePhaseLogStream(phase, live), artifactIndex, phase.runId),
+    [artifactIndex, live, phase],
+  );
+
+  return (
+    <PhaseLogCard
+      phase={phaseWithRunnerModel(phase, canvasNodesForRunnerModel(live.canvas?.nodes, live.canvas?.statuses))}
+      expanded
+      collapsible={false}
+      showHeader={false}
+      stream={stream ?? phase.stream}
+      streamLoading={live.isLoading}
+      organizationId={organizationId}
+      canvasId={phase.appId}
+      files={files}
+    />
+  );
+}
+
+function phonePhaseLogStream(
+  phase: SplitRunPhase,
+  live: { isError?: boolean; stream: SplitRunStreamLine[] },
+): SplitRunStreamLine[] {
+  if (live.isError || live.stream.length === 0) {
+    return phase.stream;
+  }
+  return live.stream;
+}

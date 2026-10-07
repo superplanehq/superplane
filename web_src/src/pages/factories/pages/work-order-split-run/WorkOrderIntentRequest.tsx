@@ -120,6 +120,7 @@ function AnalysisRequestChat({
           data-testid="split-run-intent-chat-log"
         >
           <div className={cn(chatColumnClass, chatSolo ? "py-6" : "py-3")} data-testid="split-run-intent-chat-column">
+            {analysis.leading}
             <RequestMessage description={description} files={files} source={source} asChat />
             <WorkOrderIntentTranscript
               messages={analysis.view.messages}
