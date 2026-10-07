@@ -232,15 +232,16 @@ func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
 
 	joined := strings.Join(args, " ")
 	assert.Contains(t, joined, "developer_instructions=")
-	assert.Contains(t, joined, "propose_spec")
-	assert.Contains(t, joined, "propose_clarity")
-	assert.Contains(t, joined, "propose_confidence")
+	assert.Contains(t, joined, "propose_update")
+	assert.NotContains(t, joined, "propose_spec")
+	assert.NotContains(t, joined, "propose_clarity")
+	assert.NotContains(t, joined, "propose_confidence")
 	assert.NotContains(t, joined, "propose_plan")
 	assert.Contains(t, joined, "Use only the analysis tools")
 }
 
 func TestCodexExecArgsKeepsProtocolAtDeveloperPriority(t *testing.T) {
-	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol_review.md"))
 	require.NoError(t, err)
 	args := codexExecArgsFromScriptWithPrompt(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
