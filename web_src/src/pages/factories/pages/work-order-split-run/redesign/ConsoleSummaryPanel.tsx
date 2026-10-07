@@ -16,10 +16,9 @@ import { splitRunDecisionTone } from "../splitRunFooter";
 import { attentionToneClassName } from "../splitRunNoteActionStyle";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
 import { pullRequestLabel } from "../../../lib/workOrderPullRequest";
-import { OrgUserReference } from "../../../OrgUserReference";
 import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
 import { WorkOrderMergeableChip, WorkOrderPullRequestChip } from "../../../workOrders/WorkOrderPullRequestChip";
-import { OwnerSpendValue } from "../../work-order-popup-redesign/popupShared";
+import { OwnerSpendValue, TaskOwnerControl } from "../../work-order-popup-redesign/popupShared";
 import { useLiveHeaderSpendOverlay } from "../liveHeaderSpendContext";
 import { ConsoleCheckRows } from "./consoleCheckRows";
 import type { SplitRunFixture } from "../splitRunMocks";
@@ -46,6 +45,12 @@ export function ConsoleSummaryPanel({
   source,
   actionBusy = false,
   onStopLiveRun,
+  organizationId,
+  owner,
+  assigneeIds,
+  canEditOwner = false,
+  ownerBusy = false,
+  onOwnerSave,
 }: {
   fixture: SplitRunFixture;
   outcome: ReturnType<typeof outcomeSummary>;
@@ -58,6 +63,12 @@ export function ConsoleSummaryPanel({
   actionBusy?: boolean;
   /** Cancels the live run. The live note shows Stop only when set. */
   onStopLiveRun?: () => void;
+  organizationId?: string;
+  owner?: SplitRunFixture["owner"];
+  assigneeIds?: string[];
+  canEditOwner?: boolean;
+  ownerBusy?: boolean;
+  onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
 }) {
   const liveSpend = useLiveHeaderSpendOverlay();
   const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, liveSpend);
@@ -119,10 +130,15 @@ export function ConsoleSummaryPanel({
           </FramePanel>
         ) : null}
         <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-context">
-          <SummaryRow label="Owner">
-            <OrgUserReference display={outcome.owner} size="xs" nameClassName="text-[13px]" />
-          </SummaryRow>
-          <PanelSource source={source} owner={outcome.owner.id} />
+          <SummaryOwnerRow
+            owner={owner ?? outcome.owner}
+            assigneeIds={assigneeIds}
+            canEdit={canEditOwner}
+            organizationId={organizationId}
+            ownerBusy={ownerBusy}
+            onOwnerSave={onOwnerSave}
+          />
+          <PanelSource source={source} ownerId={displayedOwnerId(owner ?? outcome.owner, assigneeIds)} />
           <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
           {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
           <SummaryRow label="Spend">
@@ -310,15 +326,22 @@ function isBranchArtifact(artifact: FactoriesWorkOrderArtifact): boolean {
   return (artifact.type ?? "").replace(/^TYPE_/i, "").toLowerCase() === "branch";
 }
 
+function displayedOwnerId(owner: SplitRunFixture["owner"], assigneeIds?: string[]): string | undefined {
+  if (assigneeIds !== undefined && assigneeIds.length === 0) {
+    return undefined;
+  }
+  return owner.id || undefined;
+}
+
 /**
  * The source of the task. A task the owner created by hand keeps one
  * "Created manually" row instead of repeating the owner's name.
  */
-function PanelSource({ source, owner }: { source?: SplitRunSource; owner: string }) {
+function PanelSource({ source, ownerId }: { source?: SplitRunSource; ownerId?: string }) {
   if (!source) {
     return null;
   }
-  if (source.kind === "manual" && source.person.id === owner) {
+  if (source.kind === "manual" && ownerId && source.person.id === ownerId) {
     return <SummaryRow label="Source">{source.detail}</SummaryRow>;
   }
   return (
@@ -358,11 +381,50 @@ function PanelPullRequest({ pullRequest }: { pullRequest: FactoriesFactoryPullRe
   );
 }
 
-function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
+function SummaryOwnerRow({
+  owner,
+  assigneeIds,
+  canEdit,
+  organizationId,
+  ownerBusy,
+  onOwnerSave,
+}: {
+  owner: SplitRunFixture["owner"];
+  assigneeIds?: string[];
+  canEdit: boolean;
+  organizationId?: string;
+  ownerBusy: boolean;
+  onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
+}) {
+  return (
+    <SummaryRow label="Owner" truncate={false}>
+      <TaskOwnerControl
+        owner={owner}
+        assigneeIds={assigneeIds}
+        canEdit={canEdit}
+        organizationId={organizationId}
+        ownerBusy={ownerBusy}
+        onOwnerSave={onOwnerSave}
+        align="end"
+        className="max-w-full"
+        nameClassName="min-w-0 truncate text-[13px]"
+      />
+    </SummaryRow>
+  );
+}
+
+function SummaryRow({ label, children, truncate = true }: { label: string; children: ReactNode; truncate?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-[13px]">
       <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate text-right text-foreground tabular-nums">{children}</span>
+      <span
+        className={cn(
+          "min-w-0 max-w-full text-right text-foreground",
+          truncate ? "truncate tabular-nums" : "flex justify-end overflow-x-hidden",
+        )}
+      >
+        {children}
+      </span>
     </div>
   );
 }

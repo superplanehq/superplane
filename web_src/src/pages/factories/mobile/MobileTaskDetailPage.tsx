@@ -35,6 +35,7 @@ import {
 } from "../pages/work-order-split-run/splitRunMocks";
 import { useSplitRunFooterActions } from "../pages/work-order-split-run/useSplitRunFooterActions";
 import { useSplitRunFooterCloser } from "../pages/work-order-split-run/useSplitRunFooterCloser";
+import { useSplitRunWorkOrderEdits } from "../pages/work-order-split-run/useSplitRunWorkOrderEdits";
 import { draftStartAction, footerMutationHandlers } from "../pages/work-order-split-run/workOrderPopupActions";
 import { useColumnAppCheckRuns } from "../pages/work-order-split-run/useColumnAppCheckRuns";
 import { useWorkOrderPRFeedbackLog } from "../pages/useWorkOrderPRFeedbackRunHref";
@@ -132,6 +133,10 @@ type MobileTaskModel = {
   startBusy: boolean;
   actionBusy: boolean;
   columnAppRunQueries: ReturnType<typeof useColumnAppCheckRuns>["queries"];
+  ownerEdits: Pick<
+    ReturnType<typeof useSplitRunWorkOrderEdits>,
+    "owner" | "assigneeIds" | "canEdit" | "ownerBusy" | "saveOwner"
+  >;
 };
 
 /** Loads everything the task screen shows and wires the footer actions. */
@@ -174,6 +179,17 @@ function useMobileTaskModel(
     resolveUser,
     columnAppRuns: columnAppCheckRuns.lookup,
   });
+  const ownerEdits = useSplitRunWorkOrderEdits({
+    organizationId,
+    factoryId,
+    orderId,
+    canUpdate,
+    title: fixture.title,
+    description: fixture.descriptionText ?? "",
+    owner: fixture.owner,
+    assigneeIds: fixture.assigneeIds ?? [],
+    footerKind: fixture.footer.kind,
+  });
   const mutations = footerMutationHandlers(canUpdate, footerActions, fixture, onDone);
   const dispatchDraft = lineName
     ? (model?: string, thinkingLevel?: string) => cardActions.onDispatch(orderId, { lineName, model, thinkingLevel })
@@ -193,6 +209,7 @@ function useMobileTaskModel(
     startBusy: cardActions.dispatchingOrderIds.has(orderId),
     actionBusy: footerActions.busy,
     columnAppRunQueries: columnAppCheckRuns.queries,
+    ownerEdits,
   };
 }
 
@@ -235,7 +252,12 @@ function LoadedMobileTask({
     <MobileTaskFrame onBack={onBack} backDisabled={backDisabled}>
       {model.columnAppRunQueries}
       <article className="flex flex-col gap-5 px-4 pt-3 pb-8" data-testid="mobile-task-detail">
-        <MobileTaskHeader order={order} fixture={fixture} />
+        <MobileTaskHeader
+          order={order}
+          fixture={fixture}
+          organizationId={organizationId}
+          ownerEdits={model.ownerEdits}
+        />
 
         <SplitRunReview
           footer={fixture.footer}
@@ -315,8 +337,18 @@ function showsPhoneDraftModelSelect(planningEnabled: boolean, footer: SplitRunFi
 }
 
 /** Key, status, full title, and the owner/time/cost row. The title wraps instead of truncating. */
-function MobileTaskHeader({ order, fixture }: { order: FactoriesWorkOrder; fixture: SplitRunFixture }) {
-  const { organizationId, factoryKey } = useFactoriesLayout();
+function MobileTaskHeader({
+  order,
+  fixture,
+  organizationId,
+  ownerEdits,
+}: {
+  order: FactoriesWorkOrder;
+  fixture: SplitRunFixture;
+  organizationId: string;
+  ownerEdits: MobileTaskModel["ownerEdits"];
+}) {
+  const { factoryKey } = useFactoriesLayout();
   const statusMeta = getWorkOrderDisplayStatusMeta(getWorkOrderDisplayStatus(order));
   const identifier = fixture.identifier?.trim() || formatWorkOrderIdentifier(factoryKey, order.number);
 
@@ -340,10 +372,13 @@ function MobileTaskHeader({ order, fixture }: { order: FactoriesWorkOrder; fixtu
         {fixture.title}
       </h1>
       <OwnerTimeCostRow
-        fixture={fixture}
+        fixture={{ ...fixture, owner: ownerEdits.owner }}
         className="mt-0"
         organizationId={organizationId}
-        assigneeIds={fixture.assigneeIds}
+        canEditOwner={ownerEdits.canEdit}
+        assigneeIds={ownerEdits.assigneeIds}
+        ownerBusy={ownerEdits.ownerBusy}
+        onOwnerSave={ownerEdits.saveOwner}
         usageByModel={fixture.usageByModel}
         usageByMachineType={fixture.usageByMachineType}
       >
