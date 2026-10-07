@@ -495,6 +495,81 @@ func Test__RewriteGitHubIntakeGraph(t *testing.T) {
 			TargetID: intakeCreateNodeID,
 		})
 	})
+
+	t.Run("disconnects joined branches and keeps side paths", func(t *testing.T) {
+		nodes := []models.Node{
+			{
+				ID:   intakeTriggerNodeID,
+				Name: "On Issue",
+				Type: models.NodeTypeTrigger,
+				Ref:  models.NodeRef{Trigger: &models.TriggerRef{Name: "github.onIssue"}},
+				Configuration: map[string]any{
+					"repository": "acme/widgets",
+					"actions":    []any{"opened"},
+				},
+				Position: models.Position{X: 160, Y: 80},
+			},
+			componentNode("left", "if"),
+			componentNode("right", "if"),
+			componentNode("join", "if"),
+			componentNode("spin", "if"),
+			componentNode("notify", "slack.postMessage"),
+			componentNode("outside", "if"),
+			componentNode(intakeCreateNodeID, intakeCreateComponent),
+			componentNode("archive", "if"),
+		}
+		edges := []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: "left"},
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: "right"},
+			{Channel: "true", SourceID: "left", TargetID: "join"},
+			{Channel: "false", SourceID: "right", TargetID: "join"},
+			{Channel: "default", SourceID: "join", TargetID: intakeCreateNodeID},
+			{Channel: "default", SourceID: "left", TargetID: "spin"},
+			{Channel: "default", SourceID: "spin", TargetID: "left"},
+			{Channel: "default", SourceID: "left", TargetID: "notify"},
+			{Channel: "default", SourceID: "outside", TargetID: "join"},
+			{Channel: "default", SourceID: intakeCreateNodeID, TargetID: "archive"},
+		}
+		graph := resolveIntakeGraph(models.FactoryIntakeSourceGitHubIssues, models.LiveCanvasSpec{Nodes: nodes, Edges: edges})
+
+		nodes, edges, changed := rewriteGitHubIntakeGraph(nodes, edges, graph, defaultIntakeSettings())
+		require.True(t, changed)
+
+		for _, id := range []string{"left", "right", "join", "spin", "notify", "outside", "archive"} {
+			assert.NotNil(t, findModelNodeOrNil(nodes, id))
+		}
+		assert.Contains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeTriggerNodeID,
+			TargetID: intakeCreateNodeID,
+		})
+		assert.Contains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: "left",
+			TargetID: "notify",
+		})
+		assert.Contains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: "outside",
+			TargetID: "join",
+		})
+		assert.Contains(t, edges, models.Edge{
+			Channel:  "default",
+			SourceID: intakeCreateNodeID,
+			TargetID: "archive",
+		})
+		for _, edge := range []models.Edge{
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: "left"},
+			{Channel: "default", SourceID: intakeTriggerNodeID, TargetID: "right"},
+			{Channel: "true", SourceID: "left", TargetID: "join"},
+			{Channel: "false", SourceID: "right", TargetID: "join"},
+			{Channel: "default", SourceID: "join", TargetID: intakeCreateNodeID},
+			{Channel: "default", SourceID: "left", TargetID: "spin"},
+			{Channel: "default", SourceID: "spin", TargetID: "left"},
+		} {
+			assert.NotContains(t, edges, edge)
+		}
+	})
 }
 
 func findSpecNode(t *testing.T, canvas *yaml.Canvas, nodeID string) yaml.Node {

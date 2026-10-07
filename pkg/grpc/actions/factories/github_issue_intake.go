@@ -166,29 +166,43 @@ func intakeRouteEdges(edges []models.Edge, sourceID, targetID string) map[models
 		return found
 	}
 
-	var walk func(current string, visited map[string]bool) bool
-	walk = func(current string, visited map[string]bool) bool {
-		reaches := false
-		for _, edge := range edges {
-			if edge.SourceID != current || visited[edge.TargetID] {
-				continue
-			}
-			if edge.TargetID == targetID {
-				found[edge] = struct{}{}
-				reaches = true
-				continue
-			}
-			next := maps.Clone(visited)
-			next[edge.TargetID] = true
-			if walk(edge.TargetID, next) {
-				found[edge] = struct{}{}
-				reaches = true
-			}
-		}
-		return reaches
+	outgoing := map[string][]string{}
+	incoming := map[string][]string{}
+	for _, edge := range edges {
+		outgoing[edge.SourceID] = append(outgoing[edge.SourceID], edge.TargetID)
+		incoming[edge.TargetID] = append(incoming[edge.TargetID], edge.SourceID)
 	}
-	walk(sourceID, map[string]bool{sourceID: true})
+
+	reachable := intakeReachableIDs(sourceID, outgoing, targetID)
+	reachesTarget := intakeReachableIDs(targetID, incoming, "")
+	for _, edge := range edges {
+		if edge.SourceID == targetID || !reachable[edge.SourceID] {
+			continue
+		}
+		if edge.TargetID == targetID || reachesTarget[edge.TargetID] {
+			found[edge] = struct{}{}
+		}
+	}
 	return found
+}
+
+func intakeReachableIDs(start string, next map[string][]string, stop string) map[string]bool {
+	seen := map[string]bool{start: true}
+	queue := []string{start}
+	for head := 0; head < len(queue); head++ {
+		current := queue[head]
+		if stop != "" && current == stop {
+			continue
+		}
+		for _, id := range next[current] {
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			queue = append(queue, id)
+		}
+	}
+	return seen
 }
 
 func rewriteGitHubIntakeGraph(
