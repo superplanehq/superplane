@@ -140,7 +140,8 @@ describe("splitRunPopupModel", () => {
     expect(description).toContain("Webhook delivery stops after a transient provider error");
     expect(artifacts.some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
     expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-details"))).toBe(false);
-    expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
+    expect(splitRunLinkedArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-plan"))).toBe(false);
+    expect(splitRunPanelArtifacts(artifacts).some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
     expect(splitRunIntentDocument({ artifacts, description }).summary).toBeTruthy();
     expect(splitRunIntentDocument({ artifacts, description }).plan).toContain("##");
   });
@@ -155,7 +156,7 @@ describe("splitRunPopupModel", () => {
     ).toEqual({ title: "", summary: "", plan: "" });
   });
 
-  it("prefers spec.md over intent.md", () => {
+  it("prefers plan.md, then spec.md, then intent.md", () => {
     const artifacts = [
       {
         id: "art-intent",
@@ -165,16 +166,27 @@ describe("splitRunPopupModel", () => {
       {
         id: "art-spec",
         type: "TYPE_MARKDOWN" as const,
-        data: { name: "spec.md", body: "# New spec\n\n## Executive summary\n\nNew summary.\n" },
+        data: { name: "spec.md", body: "# Leftover spec\n\n## Executive summary\n\nLeftover summary.\n" },
+      },
+      {
+        id: "art-plan",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "plan.md", body: "# New plan\n\n## Executive summary\n\nNew summary.\n" },
       },
     ];
 
-    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).title).toBe("New spec");
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).title).toBe("New plan");
     expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).summary).toBe("New summary.");
     expect(splitRunLinkedArtifacts(artifacts)).toEqual([]);
+    expect(
+      splitRunIntentDocument({
+        artifacts: artifacts.filter((artifact) => artifact.id !== "art-plan"),
+        description: "Webhook timeouts.",
+      }).title,
+    ).toBe("Leftover spec");
   });
 
-  it("keeps intent.md out of the Artifacts list", () => {
+  it("keeps the planning document out of the overview Artifacts list", () => {
     const artifacts = [
       {
         id: "art-intent",
@@ -186,10 +198,15 @@ describe("splitRunPopupModel", () => {
         type: "TYPE_MARKDOWN" as const,
         data: { name: "plan.md", body: "Add a retry." },
       },
+      {
+        id: "art-notes",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "notes.md", body: "A user note." },
+      },
     ];
 
-    expect(splitRunLinkedArtifacts(artifacts).map((artifact) => artifact.id)).toEqual(["art-plan"]);
-    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).summary).toBe("A retry loop.");
+    expect(splitRunLinkedArtifacts(artifacts).map((artifact) => artifact.id)).toEqual(["art-notes"]);
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).summary).toBe("Add a retry.");
   });
 
   it("uses live artifacts for a real task and fixture artifacts in Storybook", () => {
@@ -272,10 +289,10 @@ describe("splitRunPopupModel", () => {
   it("keeps document markdowns in the panel artifact list, oldest first", () => {
     const artifacts = splitRunPanelArtifacts([
       {
-        id: "spec",
+        id: "plan",
         type: "TYPE_MARKDOWN",
         createdAt: "2026-08-25T11:00:00.000Z",
-        data: { name: "spec.md", body: "# Spec" },
+        data: { name: "plan.md", body: "# Plan" },
       },
       {
         id: "description",
@@ -291,16 +308,16 @@ describe("splitRunPopupModel", () => {
       },
     ]);
 
-    expect(artifacts.map((artifact) => artifact.id)).toEqual(["description", "preview", "spec"]);
+    expect(artifacts.map((artifact) => artifact.id)).toEqual(["description", "preview", "plan"]);
   });
 
   it("keeps the input order for panel artifacts without a createdAt", () => {
     const artifacts = splitRunPanelArtifacts([
       { id: "description", type: "TYPE_MARKDOWN", data: { name: "description.md" } },
-      { id: "spec", type: "TYPE_MARKDOWN", data: { name: "spec.md" } },
+      { id: "plan", type: "TYPE_MARKDOWN", data: { name: "plan.md" } },
       { id: "branch", type: "TYPE_BRANCH", data: { name: "feat/duplicate-task" } },
     ]);
 
-    expect(artifacts.map((artifact) => artifact.id)).toEqual(["description", "spec", "branch"]);
+    expect(artifacts.map((artifact) => artifact.id)).toEqual(["description", "plan", "branch"]);
   });
 });

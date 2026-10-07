@@ -355,12 +355,12 @@ describe("splitRunSourceForOrder", () => {
 });
 
 describe("splitRunLinkedArtifacts", () => {
-  it("keeps plan.md and drops the origin ticket from Artifacts", () => {
+  it("hides plan.md and drops the origin ticket from Artifacts", () => {
     const fixture = splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]);
     const artifacts = collectSplitRunArtifacts(fixture);
     const linked = splitRunLinkedArtifacts(artifacts, fixture.source);
 
-    expect(linked.some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
+    expect(linked.some((artifact) => artifact.id?.endsWith("-plan"))).toBe(false);
     expect(linked.some((artifact) => artifact.id?.endsWith("-issue-link"))).toBe(false);
     expect(linked.some((artifact) => artifact.id?.endsWith("-details"))).toBe(false);
   });

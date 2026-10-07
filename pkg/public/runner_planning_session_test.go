@@ -88,6 +88,10 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, artifacts, 1)
 	assert.Equal(t, models.PlanningSpecArtifactKey+":"+order.ID.String(), *artifacts[0].Key)
+	var data map[string]any
+	require.NoError(t, json.Unmarshal(artifacts[0].Data, &data))
+	assert.Equal(t, "plan.md", data["name"])
+	assert.Equal(t, "plan.md", data["title"])
 	assert.Contains(t, string(artifacts[0].Data), "Stop double charges.")
 
 	checks, err := order.ListChecks(db)
