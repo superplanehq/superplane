@@ -1,4 +1,4 @@
-import type { FactoryApp, FactoryLineStep } from "@/api-client";
+import type { FactoryAutomation, FactoryLineStep } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,13 +7,13 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { useEffect, useMemo, useState } from "react";
 import { FactoryLineStepsEditor } from "./FactoryLineStepsEditor";
-import { draftStepsFromLine, draftStepsToProto, emptyStep, type DraftStep } from "./factoryLineFormShared";
+import { draftStepsFromLine, draftStepsToProto, emptyStep, type DraftStep } from "./lib/factoryLineFormShared";
 
 const stepFieldClassName = "w-full min-w-0";
 
 interface FactoryLineFormProps {
   organizationId: string;
-  apps: FactoryApp[];
+  apps: FactoryAutomation[];
   initialName?: string;
   initialSteps?: FactoryLineStep[];
   isSaving: boolean;
@@ -45,7 +45,7 @@ export function FactoryLineForm({
   }, [initialName, initialSteps]);
 
   const appById = useMemo(() => {
-    const map = new Map<string, FactoryApp>();
+    const map = new Map<string, FactoryAutomation>();
     for (const app of apps) {
       if (app.id) {
         map.set(app.id, app);
@@ -62,7 +62,7 @@ export function FactoryLineForm({
     }
 
     if (apps.length === 0) {
-      showErrorToast("Create at least one factory app before defining a line.");
+      showErrorToast("Create at least one automation before you define a line.");
       return;
     }
 
@@ -100,7 +100,7 @@ export function FactoryLineForm({
 
         {apps.length === 0 ? (
           <p className="text-sm text-amber-700 dark:text-amber-300">
-            Create a factory app first — lines run apps owned by this factory.
+            Create an automation first. Lines run automations owned by this workspace.
           </p>
         ) : null}
 

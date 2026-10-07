@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/google/go-github/v84/github"
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -155,10 +154,6 @@ func getCombinedStatus(ctx context.Context, client *common.Client, repository st
 
 	combined.Statuses = statuses
 	return combined, nil
-}
-
-func (c *GetCombinedCommitStatus) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetCombinedCommitStatus) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

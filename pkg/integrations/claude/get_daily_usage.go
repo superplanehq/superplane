@@ -5,7 +5,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -223,10 +222,6 @@ func (c *GetDailyUsage) Configuration() []configuration.Field {
 
 func (c *GetDailyUsage) Setup(ctx core.SetupContext) error {
 	return nil
-}
-
-func (c *GetDailyUsage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetDailyUsage) Execute(ctx core.ExecutionContext) error {

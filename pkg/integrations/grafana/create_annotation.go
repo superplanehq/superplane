@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -249,10 +248,6 @@ func (c *CreateAnnotation) Execute(ctx core.ExecutionContext) error {
 
 func (c *CreateAnnotation) Cancel(_ core.ExecutionContext) error {
 	return nil
-}
-
-func (c *CreateAnnotation) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateAnnotation) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

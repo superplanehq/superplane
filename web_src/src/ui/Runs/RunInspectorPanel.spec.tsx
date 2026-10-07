@@ -1,12 +1,14 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi, afterEach, beforeEach } from "vitest";
+import { describe, expect, it, vi, afterEach, beforeEach } from "bun:test";
 import type * as ApiClient from "@/api-client";
 import type { CanvasesCanvasNodeExecution, SuperplaneMeUser } from "@/api-client";
+import { unmockedSrc } from "@/test/unmockedModule";
 import {
   executions,
   firePointerEvent,
   renderInspector,
   renderInteractiveInspector,
+  run,
   runningExecutions,
   runningRun,
   cancellingRun,
@@ -30,8 +32,8 @@ const describeRunMock = vi.fn();
 const listNodeQueueItemsMock = vi.fn();
 const deleteNodeQueueItemMock = vi.fn();
 
-vi.mock("@/api-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof ApiClient>();
+vi.mock("@/api-client", () => {
+  const actual = unmockedSrc<typeof ApiClient>("api-client");
   return {
     ...actual,
     canvasesReemitTriggerEvent: (...args: unknown[]) => reemitTriggerEventMock(...args),
@@ -569,5 +571,29 @@ describe("RunInspectorPanel", () => {
     firePointerEvent(window, "pointerUp", 680);
 
     expect(localStorage.getItem("superplane.runInspector.width.v3")).toBe("520");
+  });
+});
+
+describe("RunInspectorPanel run errors", () => {
+  it("shows run errors at the top of the inspector", () => {
+    renderInspector({
+      run: { ...run, errors: ["pipeline failed", "tests failed"] },
+    });
+
+    expect(screen.getByTestId("run-errors-card")).toHaveTextContent("This run has errors");
+    expect(screen.getByText("pipeline failed")).toBeInTheDocument();
+    expect(screen.getByText("tests failed")).toBeInTheDocument();
+  });
+
+  it("shows run errors in the factory inspector", () => {
+    renderInspector({
+      factoryContext: true,
+      selectedNodeId: "action-2",
+      run: { ...run, errors: ["task check failed"] },
+    });
+
+    expect(screen.getByTestId("factory-run-node-detail")).toBeInTheDocument();
+    expect(screen.getByTestId("run-errors-card")).toHaveTextContent("This run has an error");
+    expect(screen.getByText("task check failed")).toBeInTheDocument();
   });
 });

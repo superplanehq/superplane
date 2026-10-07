@@ -3,7 +3,6 @@ package organizations
 import (
 	"context"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
@@ -13,8 +12,13 @@ import (
 )
 
 func ListIntegrations(ctx context.Context, registry *registry.Registry, orgID string) (*pb.ListIntegrationsResponse, error) {
+	org, err := resolveOrganizationID(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+
 	db := database.DB(ctx)
-	integrations, err := models.ListIntegrations(db, uuid.MustParse(orgID))
+	integrations, err := models.ListIntegrations(db, org)
 	if err != nil {
 		log.Errorf("failed to list integrations for organization %s: %v", orgID, err)
 		return nil, grpcerrors.Internal(err, "failed to list integrations")

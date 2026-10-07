@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -144,6 +145,29 @@ func FindActiveWebhookNodesInTransaction(tx *gorm.DB, webhookID uuid.UUID) ([]Ca
 	}
 
 	return nodes, nil
+}
+
+// SoftDeleteWebhookIfUnreferenced soft-deletes webhookID when no live canvas
+// node still references it. Live means the node, canvas, and organization are
+// not deleted.
+func SoftDeleteWebhookIfUnreferenced(tx *gorm.DB, webhookID uuid.UUID) error {
+	webhook, err := FindWebhookInTransaction(tx, webhookID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+
+	nodes, err := FindActiveWebhookNodesInTransaction(tx, webhookID)
+	if err != nil {
+		return err
+	}
+	if len(nodes) > 0 {
+		return nil
+	}
+
+	return tx.Delete(webhook).Error
 }
 
 func ListPendingWebhooks() ([]Webhook, error) {

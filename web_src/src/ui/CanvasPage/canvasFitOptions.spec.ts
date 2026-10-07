@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import {
   CANVAS_FIT_VIEW_INCLUDE_HIDDEN,
   CANVAS_NODE_FOCUS_FIT_VIEW_OPTIONS,
+  FACTORY_CONFIGURE_FIT_VIEW_OPTIONS,
   LIVE_CANVAS_FIT_VIEW_OPTIONS,
+  NATIVE_ZOOM_FIT_VIEW_OPTIONS,
   RUN_CANVAS_FIT_VIEW_OPTIONS,
+  nativeZoomViewport,
+  resolveInitialCanvasFitViewOptions,
+  resolveInitialFitViewDuration,
 } from "./canvasFitOptions";
 
 describe("canvasFitOptions", () => {
@@ -16,5 +21,36 @@ describe("canvasFitOptions", () => {
 
   it("does not clamp run participant fitting to a minimum zoom", () => {
     expect(RUN_CANVAS_FIT_VIEW_OPTIONS).not.toHaveProperty("minZoom");
+  });
+
+  it("locks Factory Configure fitting to 100% zoom", () => {
+    expect(FACTORY_CONFIGURE_FIT_VIEW_OPTIONS.minZoom).toBe(1);
+    expect(FACTORY_CONFIGURE_FIT_VIEW_OPTIONS.maxZoom).toBe(1);
+    expect(FACTORY_CONFIGURE_FIT_VIEW_OPTIONS.includeHiddenNodes).toBe(true);
+    expect(FACTORY_CONFIGURE_FIT_VIEW_OPTIONS).toBe(NATIVE_ZOOM_FIT_VIEW_OPTIONS);
+  });
+
+  it("locks the first-load fit to 100% zoom when the preview asks for native zoom", () => {
+    expect(resolveInitialCanvasFitViewOptions(true)).toBe(NATIVE_ZOOM_FIT_VIEW_OPTIONS);
+    expect(resolveInitialCanvasFitViewOptions(false)).toBe(LIVE_CANVAS_FIT_VIEW_OPTIONS);
+  });
+
+  it("centers measured nodes at 100% zoom", () => {
+    expect(
+      nativeZoomViewport(
+        [
+          { position: { x: 120, y: 0 }, width: 280, height: 64 },
+          { position: { x: 120, y: 208 }, measured: { width: 320, height: 258 } },
+        ],
+        1314,
+        677,
+      ),
+    ).toEqual({ x: 377, y: 105.5, zoom: 1 });
+  });
+
+  it("skips fit animation for factory display and Configure enter", () => {
+    expect(resolveInitialFitViewDuration(true, false)).toBe(0);
+    expect(resolveInitialFitViewDuration(false, true)).toBe(0);
+    expect(resolveInitialFitViewDuration(false, false)).toBe(500);
   });
 });

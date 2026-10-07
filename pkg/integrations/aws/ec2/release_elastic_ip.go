@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -177,10 +176,6 @@ func (c *ReleaseElasticIP) Hooks() []core.Hook {
 
 func (c *ReleaseElasticIP) HandleHook(ctx core.ActionHookContext) error {
 	return nil
-}
-
-func (c *ReleaseElasticIP) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *ReleaseElasticIP) Cancel(ctx core.ExecutionContext) error {

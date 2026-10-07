@@ -1,6 +1,12 @@
-import type { ComponentsIntegrationRef, ConfigurationField, OrganizationsIntegration } from "@/api-client";
+import type {
+  ComponentsIntegrationRef,
+  ComponentsConcurrencySpec,
+  ConfigurationField,
+  OrganizationsIntegration,
+} from "@/api-client";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { AutoCompleteInput } from "@/components/AutoCompleteInput/AutoCompleteInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +25,15 @@ import { buildConfigurationDisplayModel } from "./configurationView/buildConfigu
 import { ConfigurationView } from "./configurationView/ConfigurationView";
 import { SimpleTooltip } from "./SimpleTooltip";
 import { cn } from "@/lib/utils";
+import { useFactories } from "@/hooks/useFactoryData";
+import { isAgentHarnessComponent } from "@/lib/agentRunnerSteps";
+import { AgentResourcesEditor } from "@/pages/factories/pages/AgentResourcesEditor";
+import { disabledAgentResourceIds } from "@/pages/factories/pages/disabledAgentResourceIds";
+import {
+  disabledAgentResourceTools,
+  enabledAgentResourceTools,
+} from "@/pages/factories/pages/PlanningReviewDisabledTools";
+import { useParams } from "react-router";
 
 const REQUIRED_FIELD_BADGE_CLASS =
   "ml-2 inline-flex items-center rounded border border-orange-300 px-1 py-0.5 text-[10px] uppercase tracking-wide leading-none text-orange-500 bg-orange-50";
@@ -36,9 +51,18 @@ interface SettingsTabProps {
     updatedConfiguration: Record<string, unknown>,
     updatedNodeName: string,
     integrationRef?: ComponentsIntegrationRef,
+    concurrency?: ComponentsConcurrencySpec,
   ) => void | Promise<void>;
+  // Concurrency section: rendered only when showConcurrency is true
+  // (action nodes except merge, which is inherently unbounded).
+  showConcurrency?: boolean;
+  concurrency?: ComponentsConcurrencySpec;
+  // Loop only honors max (its parallel-session cap): key is hidden
+  // and never saved.
+  concurrencyMaxOnly?: boolean;
   onCancel?: () => void;
   domainId?: string;
+  blockName?: string;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
@@ -48,15 +72,66 @@ interface SettingsTabProps {
   onOpenCreateIntegrationDialog?: () => void;
   onOpenConfigureIntegrationDialog?: (integrationId: string) => void;
   readOnly?: boolean;
+  /** `fill` scrolls inside a parent panel. `sidebar` keeps the canvas sidebar height. */
+  layout?: "sidebar" | "fill";
+  /** `fields` hides the node name and integration. The canvas editor uses `full`. */
+  chrome?: "full" | "fields";
+  /** Field names that stay in the saved configuration but are not shown. */
+  hiddenFieldNames?: readonly string[];
+  /** Shown above the fields when the name and integration are hidden. */
+  leadingContent?: ReactNode;
+  /** `checkbox` draws check rows for boolean fields. The canvas editor uses `switch`. */
+  booleanControl?: "switch" | "checkbox";
+  /** Groups visible fields under section labels. Omitted fields stay in the list. */
+  fieldGroups?: readonly { label: string; fieldNames: readonly string[] }[];
+  /** Shown after the grouped fields. Not part of the saved configuration. */
+  trailingContent?: ReactNode;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
+}
+
+// Concurrency form state: strings, so inputs can be empty while typing.
+interface ConcurrencyDraft {
+  key: string;
+  max: string;
+}
+
+function concurrencyDraftFromSpec(spec?: ComponentsConcurrencySpec): ConcurrencyDraft {
+  return {
+    key: spec?.key ?? "",
+    max: spec?.max ? String(spec.max) : "",
+  };
+}
+
+// Empty or invalid input keeps the implicit default (1).
+function draftMax(draft: ConcurrencyDraft): number | undefined {
+  const parsed = Number.parseInt(draft.max.trim(), 10);
+  return Number.isFinite(parsed) && parsed >= 1 ? parsed : undefined;
+}
+
+// An all-default draft maps to no concurrency spec, so the node keeps
+// the default behavior instead of storing an empty object. With maxOnly,
+// key is dropped even if present in the loaded spec.
+function concurrencyDraftToSpec(draft: ConcurrencyDraft, maxOnly: boolean): ComponentsConcurrencySpec | undefined {
+  const key = maxOnly ? "" : draft.key.trim();
+  const max = draftMax(draft);
+
+  if (key === "" && max === undefined) {
+    return undefined;
+  }
+
+  const spec: ComponentsConcurrencySpec = {};
+  if (key !== "") spec.key = key;
+  if (max !== undefined) spec.max = max;
+  return spec;
 }
 
 function buildAutosaveSnapshot(
   configuration: Record<string, unknown>,
   nodeName: string,
   integrationRef?: ComponentsIntegrationRef,
+  concurrency?: ComponentsConcurrencySpec,
 ): string {
   return JSON.stringify({
     configuration,
@@ -67,6 +142,7 @@ function buildAutosaveSnapshot(
           name: integrationRef.name || "",
         }
       : null,
+    concurrency: concurrency ?? null,
   });
 }
 
@@ -79,6 +155,7 @@ export function SettingsTab({
   onSave,
   onCancel: _onCancel,
   domainId,
+  blockName,
   customField,
   integrationName,
   integrationRef,
@@ -88,9 +165,19 @@ export function SettingsTab({
   onOpenCreateIntegrationDialog,
   onOpenConfigureIntegrationDialog,
   readOnly = false,
+  layout = "sidebar",
+  chrome = "full",
+  hiddenFieldNames = [],
+  leadingContent,
+  booleanControl = "switch",
+  fieldGroups,
+  trailingContent,
   canReadIntegrations,
   canCreateIntegrations,
   canUpdateIntegrations,
+  showConcurrency = false,
+  concurrency,
+  concurrencyMaxOnly = false,
 }: SettingsTabProps) {
   const CONNECT_ANOTHER_INSTANCE_VALUE = "__connect_another_instance__";
   const isReadOnly = readOnly ?? false;
@@ -102,9 +189,18 @@ export function SettingsTab({
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [showValidation, setShowValidation] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<ComponentsIntegrationRef | undefined>(integrationRef);
+  const [concurrencyDraft, setConcurrencyDraft] = useState<ConcurrencyDraft>(() =>
+    concurrencyDraftFromSpec(concurrency),
+  );
+  const concurrencySpec = useMemo(
+    () => concurrencyDraftToSpec(concurrencyDraft, concurrencyMaxOnly),
+    [concurrencyDraft, concurrencyMaxOnly],
+  );
   const savingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
-  const autosaveBaselineSnapshotRef = useRef(buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef));
+  const autosaveBaselineSnapshotRef = useRef(
+    buildAutosaveSnapshot(configuration || {}, nodeName, integrationRef, concurrency),
+  );
   const pendingAutosaveSnapshotRef = useRef<string | null>(null);
   // Use autocompleteExampleObj directly - current node is already filtered out
   const resolvedAutocompleteExampleObj = autocompleteExampleObj;
@@ -112,6 +208,13 @@ export function SettingsTab({
   const defaultValues = useMemo(() => {
     return parseDefaultValues(configurationFields);
   }, [configurationFields]);
+  const { factoryKey } = useParams<{ factoryKey?: string }>();
+  const { data: factories = [] } = useFactories(
+    domainId ?? "",
+    Boolean(domainId && factoryKey && isAgentHarnessComponent(blockName)),
+  );
+  const factory = factories.find((entry) => entry.key?.toLowerCase() === factoryKey?.toLowerCase());
+  const showAgentResources = Boolean(isAgentHarnessComponent(blockName) && domainId && factory?.id && factoryKey);
 
   const defaultValuesWithoutToggles = useMemo(() => {
     const filtered = { ...defaultValues };
@@ -240,14 +343,15 @@ export function SettingsTab({
     }
 
     const filteredConfig = filterVisibleFields(newConfig);
-    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(filteredConfig, nodeName, integrationRef);
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(filteredConfig, nodeName, integrationRef, concurrency);
     pendingAutosaveSnapshotRef.current = null;
     setNodeConfiguration(filteredConfig);
     setCurrentNodeName(nodeName);
     setSelectedIntegration(integrationRef);
+    setConcurrencyDraft(concurrencyDraftFromSpec(concurrency));
     setValidationErrors(new Set());
     setShowValidation(false);
-  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef]);
+  }, [configuration, nodeName, defaultValuesWithoutToggles, filterVisibleFields, integrationRef, concurrency]);
 
   // Auto-select the first installation if none is selected or selection is invalid
   useEffect(() => {
@@ -257,7 +361,12 @@ export function SettingsTab({
 
     if (integrationsOfType.length === 0) {
       if (selectedIntegration) {
-        autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, undefined);
+        autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(
+          nodeConfiguration,
+          currentNodeName,
+          undefined,
+          concurrencySpec,
+        );
         setSelectedIntegration(undefined);
       }
       return;
@@ -276,12 +385,17 @@ export function SettingsTab({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     };
-    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, nextIntegration);
+    autosaveBaselineSnapshotRef.current = buildAutosaveSnapshot(
+      nodeConfiguration,
+      currentNodeName,
+      nextIntegration,
+      concurrencySpec,
+    );
     setSelectedIntegration({
       id: firstIntegration.metadata?.id,
       name: firstIntegration.metadata?.name,
     });
-  }, [integrationsOfType, isReadOnly, selectedIntegration, nodeConfiguration, currentNodeName]);
+  }, [integrationsOfType, isReadOnly, selectedIntegration, nodeConfiguration, currentNodeName, concurrencySpec]);
 
   const shouldShowConfiguration = true;
   const shouldAutosaveOnChangeByFieldType = useCallback((fieldType: ConfigurationField["type"] | undefined) => {
@@ -332,7 +446,7 @@ export function SettingsTab({
       return;
     }
 
-    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
+    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration, concurrencySpec);
     if (snapshot === autosaveBaselineSnapshotRef.current) {
       pendingAutosaveSnapshotRef.current = null;
       return;
@@ -348,7 +462,7 @@ export function SettingsTab({
       return;
     }
 
-    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration);
+    const result = onSave(nodeConfiguration, currentNodeName, selectedIntegration, concurrencySpec);
     if (!(result instanceof Promise)) {
       updateAutosaveBaseline(snapshot);
       return;
@@ -368,6 +482,7 @@ export function SettingsTab({
     currentNodeName,
     selectedIntegration,
     nodeConfiguration,
+    concurrencySpec,
     onSave,
     queuePendingAutosave,
     updateAutosaveBaseline,
@@ -417,7 +532,7 @@ export function SettingsTab({
     if (isReadOnly) {
       return;
     }
-    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration);
+    const snapshot = buildAutosaveSnapshot(nodeConfiguration, currentNodeName, selectedIntegration, concurrencySpec);
     if (snapshot === autosaveBaselineSnapshotRef.current) {
       return;
     }
@@ -433,7 +548,7 @@ export function SettingsTab({
     return () => {
       window.clearTimeout(fallbackTimer);
     };
-  }, [isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration]);
+  }, [isReadOnly, nodeConfiguration, currentNodeName, selectedIntegration, concurrencySpec]);
 
   const configurationDisplayModel = useMemo(
     () =>
@@ -448,9 +563,75 @@ export function SettingsTab({
     [allowIntegrations, configurationFields, integrationName, integrationRef, integrations, nodeConfiguration],
   );
 
+  const fillsParent = layout === "fill";
+  const scrollClassName = cn(
+    "overflow-x-hidden overflow-y-auto",
+    fillsParent ? "px-10 py-6" : "p-4",
+    fillsParent ? "min-h-0 flex-1" : "pb-24",
+  );
+  const scrollStyle = fillsParent ? undefined : { maxHeight: "80vh" };
+
+  const renderConfigurationField = (field: ConfigurationField) => {
+    if (!field.name || field.name === "customName" || hiddenFieldNames.includes(field.name)) {
+      return null;
+    }
+    const fieldName = field.name;
+    return (
+      <ConfigurationFieldRenderer
+        allowExpressions={true}
+        key={fieldName}
+        field={field}
+        value={nodeConfiguration[fieldName]}
+        onChange={(value) => {
+          const previousValue = nodeConfiguration[fieldName];
+          setNodeConfiguration((previousConfiguration) => {
+            const newConfig = {
+              ...previousConfiguration,
+              [fieldName]: value,
+            };
+            return filterVisibleFields(newConfig);
+          });
+          const fieldWasCleared = value === undefined || value === null || value === "";
+          const togglableEnabled = field.togglable === true && previousValue == null && !fieldWasCleared;
+          if (fieldWasCleared || togglableEnabled || shouldAutosaveOnChangeByFieldType(field.type)) {
+            requestAutosave();
+          }
+        }}
+        onValuesChange={(patch) => {
+          setNodeConfiguration((previousConfiguration) => {
+            const next = { ...previousConfiguration, ...patch };
+            if (!patch.thinkingLevel) {
+              delete next.thinkingLevel;
+            }
+            return filterVisibleFields(next);
+          });
+          if (shouldAutosaveOnChangeByFieldType(field.type)) {
+            requestAutosave();
+          }
+        }}
+        allValues={nodeConfiguration}
+        organizationId={domainId}
+        integrationId={selectedIntegration?.id}
+        hasError={
+          showValidation &&
+          (validationErrors.has(fieldName) ||
+            Array.from(validationErrors).some(
+              (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
+            ))
+        }
+        validationErrors={showValidation ? validationErrors : undefined}
+        fieldPath={fieldName}
+        realtimeValidationErrors={realtimeValidationErrors}
+        enableRealtimeValidation={true}
+        autocompleteExampleObj={resolvedAutocompleteExampleObj}
+        booleanControl={booleanControl}
+      />
+    );
+  };
+
   if (isReadOnly) {
     return (
-      <div className="overflow-y-auto p-4 pb-24" style={{ maxHeight: "80vh" }}>
+      <div className={scrollClassName} style={scrollStyle}>
         <div className="space-y-6">
           <ConfigurationView model={configurationDisplayModel} />
           {customField && shouldShowConfiguration && (
@@ -465,8 +646,8 @@ export function SettingsTab({
 
   return (
     <div
-      className="p-4 pb-24 overflow-y-auto overflow-x-hidden"
-      style={{ maxHeight: "80vh" }}
+      className={scrollClassName}
+      style={scrollStyle}
       onBlurCapture={(event) => {
         const target = event.target as HTMLElement | null;
         if (!target) {
@@ -478,32 +659,34 @@ export function SettingsTab({
         }
       }}
     >
-      <div className="space-y-6">
-        {/* Node identification section — always visible */}
-        <div className="flex flex-col gap-2">
-          <Label className="min-w-[100px] text-left">
-            Name
-            <span className="text-gray-800 ml-1">*</span>
-            {hasNodeNameError && <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>}
-          </Label>
-          <Input
-            data-testid="node-name-input"
-            type="text"
-            value={currentNodeName}
-            onChange={(e) => {
-              setCurrentNodeName(e.target.value);
-              requestAutosave();
-            }}
-            placeholder="Enter a name for this node"
-            autoFocus
-            className="shadow-none"
-          />
-        </div>
+      <div className={chrome === "fields" ? "space-y-8" : "space-y-6"}>
+        {leadingContent}
+        {chrome === "full" ? (
+          <div className="flex flex-col gap-2">
+            <Label className="min-w-[100px] text-left">
+              Name
+              <span className="text-gray-800 ml-1">*</span>
+              {hasNodeNameError && <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>}
+            </Label>
+            <Input
+              data-testid="node-name-input"
+              type="text"
+              value={currentNodeName}
+              onChange={(e) => {
+                setCurrentNodeName(e.target.value);
+                requestAutosave();
+              }}
+              placeholder="Enter a name for this node"
+              autoFocus
+              className="shadow-none"
+            />
+          </div>
+        ) : null}
 
         {/* Run title field — rendered right after name, before the separator */}
         {(() => {
           const runTitleField = configurationFields?.find((f) => f.name === "customName");
-          if (!runTitleField || !shouldShowConfiguration) return null;
+          if (!runTitleField || !shouldShowConfiguration || hiddenFieldNames.includes("customName")) return null;
           return (
             <div>
               <ConfigurationFieldRenderer
@@ -530,7 +713,7 @@ export function SettingsTab({
         })()}
 
         {/* Integration section — one container, three states: Connect / error or incomplete / ready */}
-        {integrationName && (
+        {chrome === "full" && integrationName && (
           <div className={SETTINGS_TAB_DIVIDER_CLASS}>
             {!allowIntegrations ? (
               <div className="bg-gray-50 dark:bg-gray-900/30 border border-gray-200 dark:border-gray-700 rounded-md p-3 text-sm text-gray-600 dark:text-gray-300">
@@ -699,57 +882,101 @@ export function SettingsTab({
         )}
 
         {/* Configuration section */}
-        {configurationFields && configurationFields.length > 0 && shouldShowConfiguration && (
+        {configurationFields &&
+          configurationFields.some(
+            (field) => field.name && field.name !== "customName" && !hiddenFieldNames.includes(field.name),
+          ) &&
+          shouldShowConfiguration && (
+            <div
+              className={cn(
+                chrome === "full" && SETTINGS_TAB_DIVIDER_CLASS,
+                fieldGroups
+                  ? "flex flex-col gap-6"
+                  : booleanControl === "checkbox"
+                    ? "flex flex-col gap-2"
+                    : chrome === "fields"
+                      ? "space-y-6"
+                      : "space-y-4",
+              )}
+            >
+              {fieldGroups
+                ? renderGroupedConfigurationFields(fieldGroups, configurationFields, renderConfigurationField)
+                : configurationFields.map((field) => renderConfigurationField(field))}
+              {trailingContent}
+            </div>
+          )}
+
+        {/* Concurrency section */}
+        {showConcurrency && (
           <div className={cn(SETTINGS_TAB_DIVIDER_CLASS, "space-y-4")}>
-            {configurationFields.map((field) => {
-              if (!field.name || field.name === "customName") return null;
-              const fieldName = field.name;
-              return (
-                <ConfigurationFieldRenderer
-                  allowExpressions={true}
-                  key={fieldName}
-                  field={field}
-                  value={nodeConfiguration[fieldName]}
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Concurrency</h3>
+            <div className="flex flex-col gap-2">
+              <Label className="min-w-[100px] text-left">Max parallel executions</Label>
+              <Input
+                data-testid="node-concurrency-max-input"
+                type="number"
+                min={1}
+                value={concurrencyDraft.max}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setConcurrencyDraft((prev) => ({ ...prev, max: value }));
+                }}
+                placeholder="1"
+                className="shadow-none"
+              />
+              <p className="text-xs text-gray-500">
+                Executions above this limit wait in the queue. Default: one execution at a time.
+              </p>
+            </div>
+            {!concurrencyMaxOnly && (
+              <div className="flex flex-col gap-2">
+                <Label className="min-w-[100px] text-left">Key</Label>
+                <AutoCompleteInput
+                  data-testid="node-concurrency-key-input"
+                  exampleObj={resolvedAutocompleteExampleObj ?? null}
+                  value={concurrencyDraft.key}
                   onChange={(value) => {
-                    const previousValue = nodeConfiguration[fieldName];
-                    setNodeConfiguration((previousConfiguration) => {
-                      const newConfig = {
-                        ...previousConfiguration,
-                        [fieldName]: value,
-                      };
-                      return filterVisibleFields(newConfig);
-                    });
-                    const fieldWasCleared = value === undefined || value === null || value === "";
-                    // Enabling a togglable field (null/undefined -> value) is a discrete action
-                    // and must persist immediately. Otherwise a save-on-blur field type (e.g. text
-                    // pre-filled with a default) would keep its value only in local state, so a run
-                    // or reload before the editor blurs would drop the enabled value.
-                    const togglableEnabled = field.togglable === true && previousValue == null && !fieldWasCleared;
-                    if (fieldWasCleared || togglableEnabled || shouldAutosaveOnChangeByFieldType(field.type)) {
-                      requestAutosave();
-                    }
+                    setConcurrencyDraft((prev) => ({ ...prev, key: value }));
                   }}
-                  allValues={nodeConfiguration}
-                  organizationId={domainId}
-                  integrationId={selectedIntegration?.id}
-                  hasError={
-                    showValidation &&
-                    (validationErrors.has(fieldName) ||
-                      // Check for nested errors in this field
-                      Array.from(validationErrors).some(
-                        (error) => error.startsWith(`${fieldName}.`) || error.startsWith(`${fieldName}[`),
-                      ))
-                  }
-                  validationErrors={showValidation ? validationErrors : undefined}
-                  fieldPath={fieldName}
-                  realtimeValidationErrors={realtimeValidationErrors}
-                  enableRealtimeValidation={true}
-                  autocompleteExampleObj={resolvedAutocompleteExampleObj}
+                  placeholder={"ci-{{ $.data.branch }}"}
+                  startWord="{{"
+                  prefix="{{ "
+                  suffix=" }}"
+                  inputSize="md"
+                  quickTip="Tip: type `{{` to start an expression."
+                  className="shadow-none"
                 />
-              );
-            })}
+                <p className="text-xs text-gray-500">
+                  Optional expression that splits the backlog. Each value is a separate queue.
+                </p>
+              </div>
+            )}
           </div>
         )}
+
+        {/* Agent MCP and skills */}
+        {showAgentResources ? (
+          <div className={SETTINGS_TAB_DIVIDER_CLASS}>
+            <AgentResourcesEditor
+              organizationId={domainId}
+              factoryId={factory?.id}
+              factoryKey={factoryKey}
+              disabledIds={disabledAgentResourceIds(nodeConfiguration)}
+              disabledTools={disabledAgentResourceTools(nodeConfiguration)}
+              enabledTools={enabledAgentResourceTools(nodeConfiguration)}
+              onDisabledIdsChange={(ids) =>
+                setNodeConfiguration((current) => ({ ...current, disabledAgentResourceIds: ids }))
+              }
+              onDisabledToolsChange={(tools) =>
+                setNodeConfiguration((current) => ({ ...current, disabledAgentResourceTools: tools }))
+              }
+              onEnabledToolsChange={(tools) =>
+                setNodeConfiguration((current) => ({ ...current, enabledAgentResourceTools: tools }))
+              }
+              compact
+            />
+          </div>
+        ) : null}
 
         {/* Custom field section */}
         {customField && shouldShowConfiguration && (
@@ -759,5 +986,35 @@ export function SettingsTab({
         )}
       </div>
     </div>
+  );
+}
+
+function renderGroupedConfigurationFields(
+  fieldGroups: readonly { label: string; fieldNames: readonly string[] }[],
+  configurationFields: ConfigurationField[] | undefined,
+  renderField: (field: ConfigurationField) => ReactNode,
+) {
+  const fields = configurationFields ?? [];
+  const groupedNames = new Set(fieldGroups.flatMap((group) => group.fieldNames));
+  const ungrouped = fields.filter((field) => field.name && !groupedNames.has(field.name));
+
+  return (
+    <>
+      {fieldGroups.map((group) => {
+        const groupFields = group.fieldNames
+          .map((name) => fields.find((field) => field.name === name))
+          .filter((field): field is ConfigurationField => field !== undefined);
+        if (groupFields.length === 0) {
+          return null;
+        }
+        return (
+          <fieldset key={group.label} className="min-w-0">
+            <legend className="workspace-section-title">{group.label}</legend>
+            <div className="mt-2 flex flex-col gap-2">{groupFields.map((field) => renderField(field))}</div>
+          </fieldset>
+        );
+      })}
+      {ungrouped.map((field) => renderField(field))}
+    </>
   );
 }

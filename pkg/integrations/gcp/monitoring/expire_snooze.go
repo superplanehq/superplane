@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -160,10 +159,6 @@ func expireEndTime(s *snooze, now time.Time) string {
 
 func (e *ExpireSnooze) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (e *ExpireSnooze) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (e *ExpireSnooze) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -192,10 +191,6 @@ func (m *ManageDropletPower) Execute(ctx core.ExecutionContext) error {
 
 func (m *ManageDropletPower) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (m *ManageDropletPower) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (m *ManageDropletPower) Hooks() []core.Hook {

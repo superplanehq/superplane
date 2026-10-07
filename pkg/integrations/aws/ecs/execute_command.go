@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -146,10 +145,6 @@ func (c *ExecuteCommand) Setup(ctx core.SetupContext) error {
 		Cluster: config.Cluster,
 		Task:    config.Task,
 	})
-}
-
-func (c *ExecuteCommand) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *ExecuteCommand) Execute(ctx core.ExecutionContext) error {

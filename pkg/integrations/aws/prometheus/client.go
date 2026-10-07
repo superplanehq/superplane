@@ -261,6 +261,33 @@ func (c *Client) DescribeRuleGroupsNamespace(workspaceID string, name string) (*
 	return &namespace, nil
 }
 
+func (c *Client) PutRuleGroupsNamespace(workspaceID string, name string, data string, clientToken string) (*CreateRuleGroupsNamespaceResponse, error) {
+	payload := map[string]any{
+		"data": base64.StdEncoding.EncodeToString([]byte(data)),
+	}
+	if clientToken != "" {
+		payload["clientToken"] = clientToken
+	}
+
+	response := CreateRuleGroupsNamespaceResponse{}
+	path := "/workspaces/" + url.PathEscape(workspaceID) + "/rulegroupsnamespaces/" + url.PathEscape(name)
+	if err := c.requestJSON(http.MethodPut, path, url.Values{}, payload, &response); err != nil {
+		return nil, err
+	}
+
+	return &response, nil
+}
+
+func (c *Client) DeleteRuleGroupsNamespace(workspaceID string, name string, clientToken string) error {
+	query := url.Values{}
+	if clientToken != "" {
+		query.Set("clientToken", clientToken)
+	}
+
+	path := "/workspaces/" + url.PathEscape(workspaceID) + "/rulegroupsnamespaces/" + url.PathEscape(name)
+	return c.requestJSON(http.MethodDelete, path, query, nil, nil)
+}
+
 func (c *Client) ListRuleGroupsNamespaces(workspaceID string) ([]RuleGroupsNamespaceSummary, error) {
 	namespaces := []RuleGroupsNamespaceSummary{}
 	nextToken := ""

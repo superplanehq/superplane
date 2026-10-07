@@ -1,0 +1,27 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "bun:test";
+
+import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
+import { JumpToLatestPill } from "./JumpToLatestPill";
+
+describe("JumpToLatestPill", () => {
+  it("renders a jump control without the older-messages sentence", () => {
+    render(<JumpToLatestPill onJumpToLatest={vi.fn()} />);
+
+    expect(screen.getByTestId("jump-to-latest")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest })).toBeInTheDocument();
+    expect(screen.queryByText(CREATE_WITH_AGENT_COPY.viewingOlder)).not.toBeInTheDocument();
+  });
+
+  it("fires onJumpToLatest when the action button is clicked", async () => {
+    const user = userEvent.setup();
+    const onJumpToLatest = vi.fn();
+    render(<JumpToLatestPill onJumpToLatest={onJumpToLatest} testId="custom-pill" />);
+
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.jumpToLatest }));
+
+    expect(onJumpToLatest).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("custom-pill")).toBeInTheDocument();
+  });
+});

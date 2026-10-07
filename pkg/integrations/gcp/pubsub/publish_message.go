@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -171,9 +170,6 @@ func (c *PublishMessage) Cancel(_ core.ExecutionContext) error { return nil }
 func (c *PublishMessage) Cleanup(_ core.SetupContext) error    { return nil }
 func (c *PublishMessage) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	return http.StatusOK, nil, nil
-}
-func (c *PublishMessage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *PublishMessage) Hooks() []core.Hook {

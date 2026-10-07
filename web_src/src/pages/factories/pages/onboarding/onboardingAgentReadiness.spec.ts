@@ -1,0 +1,441 @@
+import { describe, expect, it } from "bun:test";
+
+import type { IntegrationId } from "./onboardingFixtures";
+import {
+  agentFinishReady,
+  firstWorkOrderAgentError,
+  hostedCreditGrantCopy,
+  hasHostedDefaultModel,
+  hostedModelsQueriesLoading,
+  isAgentStepReady,
+  isHostedAgentReady,
+  onboardingAgentGate,
+  resolveOnboardingAgent,
+  shouldShowHostedCreditGrant,
+} from "./onboardingAgentReadiness";
+
+function connected(...ids: IntegrationId[]): Set<IntegrationId> {
+  return new Set(ids);
+}
+
+const noHostedModels = {
+  anthropic: [],
+  openai: [],
+  openrouter: [],
+};
+
+describe("isAgentStepReady", () => {
+  it("is ready when remaining hosted credit is greater than zero", () => {
+    expect(isAgentStepReady(connected(), 4124)).toBe(true);
+  });
+
+  it("is ready when Anthropic, OpenAI, or OpenRouter is connected", () => {
+    expect(isAgentStepReady(connected("claude"), 0)).toBe(true);
+    expect(isAgentStepReady(connected("openai"), 0)).toBe(true);
+    expect(isAgentStepReady(connected("openrouter"), 0)).toBe(true);
+    expect(isAgentStepReady(connected("customLlm"), 0)).toBe(true);
+  });
+
+  it("is not ready when credit is empty and no provider is connected", () => {
+    expect(isAgentStepReady(connected(), 0)).toBe(false);
+    expect(isAgentStepReady(connected("github"), 0)).toBe(false);
+  });
+});
+
+describe("resolveOnboardingAgent", () => {
+  it("plans a custom provider with the first model id", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("customLlm"),
+        hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
+        customModels: ["zeta-model", "alpha-model"],
+      }),
+    ).toEqual({
+      providerId: "customLlm",
+      component: "runnerOpenRouter",
+      credentialsSource: "integration",
+      integrationName: "customLlm",
+      harness: "AGENT_HARNESS_CLAUDE_CODE",
+      model: "alpha-model",
+      planningModel: "alpha-model",
+      llmProvider: "custom",
+    });
+  });
+
+  it("does not invent an OpenRouter model when the custom provider returns none", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("customLlm"),
+        hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
+        customModels: [],
+      }),
+    ).toBeUndefined();
+  });
+
+  it("uses a connected OpenRouter integration and an allowlisted model", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("openrouter"),
+        hostedModels: { ...noHostedModels, openrouter: ["openai/gpt-4.1", "anthropic/claude-sonnet-4-6"] },
+      }),
+    ).toEqual({
+      providerId: "openrouter",
+      component: "runnerOpenRouter",
+      credentialsSource: "integration",
+      integrationName: "openrouter",
+      harness: "AGENT_HARNESS_CLAUDE_CODE",
+      model: "anthropic/claude-sonnet-4-6",
+      planningModel: "anthropic/claude-sonnet-4-6",
+    });
+  });
+
+  it("gives planning an Opus id when the allowlist has one", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("openrouter"),
+        hostedModels: {
+          ...noHostedModels,
+          openrouter: ["anthropic/claude-opus-4-6", "anthropic/claude-sonnet-4-6"],
+        },
+      }),
+    ).toMatchObject({
+      model: "anthropic/claude-sonnet-4-6",
+      planningModel: "anthropic/claude-opus-4-6",
+    });
+  });
+
+  it("uses versioned model ids when no allowlist applies", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        hostedModels: noHostedModels,
+      }),
+    ).toMatchObject({
+      credentialsSource: "integration",
+      model: "claude-sonnet-4-6",
+      planningModel: "claude-opus-5-5",
+    });
+  });
+
+  it("gives a Claude key the newest Sonnet for implementation and the newest Opus for planning", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        hostedModels: {
+          ...noHostedModels,
+          anthropic: [
+            "claude-sonnet-4-20250514",
+            "claude-sonnet-4-5-20250929",
+            "claude-sonnet-4-6",
+            "claude-opus-4-1-20250805",
+            "claude-opus-5-5",
+            "claude-haiku-4-5-20251001",
+          ],
+        },
+      }),
+    ).toMatchObject({
+      providerId: "claude",
+      model: "claude-sonnet-4-6",
+      planningModel: "claude-opus-5-5",
+    });
+  });
+
+  it("falls back to another model when a Claude key has no Sonnet or Opus", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        hostedModels: { ...noHostedModels, anthropic: ["claude-haiku-4-5-20251001"] },
+      }),
+    ).toMatchObject({
+      model: "claude-haiku-4-5-20251001",
+      planningModel: "claude-haiku-4-5-20251001",
+    });
+  });
+
+  it("uses hosted SuperPlane when a default model is set", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected(),
+        hostedModels: { ...noHostedModels, openrouter: ["openai/gpt-4.1"] },
+        defaultHostedProvider: "openrouter",
+        defaultHostedModel: "openai/gpt-4.1",
+      }),
+    ).toEqual({
+      component: "runnerSuperPlane",
+      credentialsSource: "hosted",
+      harness: "AGENT_HARNESS_SUPERPLANE",
+      model: "",
+      planningModel: "",
+    });
+  });
+
+  it("does not plan SuperPlane without a default model", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected(),
+        hostedModels: { ...noHostedModels, openai: ["gpt-5", "gpt-4.1"] },
+      }),
+    ).toBeUndefined();
+  });
+
+  it("uses a connected provider when no hosted default is available", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("openai"),
+        hostedModels: { ...noHostedModels, openrouter: ["anthropic/claude-sonnet-4-6"] },
+      })?.providerId,
+    ).toBe("openai");
+  });
+
+  it("uses a connected provider key before hosted models when the organization brings its own key", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        hostedModels: noHostedModels,
+        defaultHostedProvider: "anthropic",
+        defaultHostedModel: "claude-sonnet-4-6",
+        preferOwnKey: true,
+      }),
+    ).toMatchObject({
+      providerId: "claude",
+      credentialsSource: "integration",
+      model: "claude-sonnet-4-6",
+    });
+  });
+
+  it("keeps the hosted model when bring-your-own-key is on and no provider is connected", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected(),
+        hostedModels: noHostedModels,
+        defaultHostedProvider: "anthropic",
+        defaultHostedModel: "claude-sonnet-4-6",
+        preferOwnKey: true,
+      })?.credentialsSource,
+    ).toBe("hosted");
+  });
+
+  it("prefers hosted SuperPlane over a connected org provider when a default model is set", () => {
+    expect(
+      resolveOnboardingAgent({
+        connected: connected("claude"),
+        hostedModels: noHostedModels,
+        defaultHostedProvider: "anthropic",
+        defaultHostedModel: "claude-sonnet-4-6",
+      }),
+    ).toEqual({
+      component: "runnerSuperPlane",
+      credentialsSource: "hosted",
+      harness: "AGENT_HARNESS_SUPERPLANE",
+      model: "",
+      planningModel: "",
+    });
+  });
+});
+
+describe("hostedModelsQueriesLoading", () => {
+  it("waits until every hosted model query has fetched when credit remains", () => {
+    expect(hostedModelsQueriesLoading(true, [{ isFetched: true }, { isFetched: false }])).toBe(true);
+    expect(hostedModelsQueriesLoading(true, [{ isFetched: true }, { isFetched: true }])).toBe(false);
+  });
+
+  it("does not wait when hosted models are not required", () => {
+    expect(hostedModelsQueriesLoading(false, [{ isFetched: false }])).toBe(false);
+  });
+});
+
+describe("isHostedAgentReady", () => {
+  it("is ready when the plan is Run SuperPlane Agent", () => {
+    expect(
+      isHostedAgentReady({
+        component: "runnerSuperPlane",
+        credentialsSource: "hosted",
+        harness: "AGENT_HARNESS_SUPERPLANE",
+        model: "",
+        planningModel: "",
+      }),
+    ).toBe(true);
+  });
+
+  it("is not ready when the plan needs a connected provider", () => {
+    expect(
+      isHostedAgentReady({
+        providerId: "openrouter",
+        component: "runnerOpenRouter",
+        credentialsSource: "integration",
+        integrationName: "openrouter",
+        harness: "AGENT_HARNESS_CLAUDE_CODE",
+        model: "openai/gpt-4.1",
+        planningModel: "openai/gpt-4.1",
+      }),
+    ).toBe(false);
+  });
+
+  it("is not ready without a plan", () => {
+    expect(isHostedAgentReady(undefined)).toBe(false);
+  });
+});
+
+describe("hasHostedDefaultModel", () => {
+  it("is true when the installation sets a hosted provider and model", () => {
+    expect(hasHostedDefaultModel({ defaultHostedProvider: "anthropic", defaultHostedModel: "claude-sonnet-4-6" })).toBe(
+      true,
+    );
+  });
+
+  it("is false when the hosted provider or model is missing", () => {
+    expect(hasHostedDefaultModel({ defaultHostedProvider: "anthropic", defaultHostedModel: " " })).toBe(false);
+    expect(hasHostedDefaultModel({})).toBe(false);
+  });
+});
+
+describe("onboardingAgentGate", () => {
+  const gate = (
+    overrides: Partial<Parameters<typeof onboardingAgentGate>[0]> = {},
+  ): ReturnType<typeof onboardingAgentGate> =>
+    onboardingAgentGate({
+      hostedModelsAvailable: false,
+      hostedModelsAvailableLoading: false,
+      bringYourOwnKey: false,
+      bringYourOwnKeyLoading: false,
+      ...overrides,
+    });
+
+  it("skips the agent screen when hosted models cover the agent", () => {
+    expect(gate({ hostedModelsAvailable: true })).toBe("skip");
+  });
+
+  it("puts the agent screen before the tickets when the organization can bring its own key", () => {
+    expect(gate({ hostedModelsAvailable: true, bringYourOwnKey: true })).toBe("first");
+  });
+
+  it("shows the agent screen after the tickets when only a provider key can run the agent", () => {
+    expect(gate({ bringYourOwnKey: true })).toBe("show");
+  });
+
+  it("waits while the bring-your-own-key flag is still loading", () => {
+    expect(gate({ hostedModelsAvailable: true, bringYourOwnKeyLoading: true })).toBe("pending");
+  });
+
+  it("waits while hosted model availability is still loading", () => {
+    expect(gate({ hostedModelsAvailableLoading: true, bringYourOwnKey: true })).toBe("pending");
+  });
+
+  it("shows the agent screen when no hosted model is available", () => {
+    expect(gate()).toBe("show");
+  });
+});
+
+describe("agentFinishReady", () => {
+  const ready = {
+    modelSourceChoice: true,
+    credentialChoice: null,
+    providerConnected: true,
+    agentReady: true,
+    hostedAgentReady: true,
+  } as const;
+
+  it("waits for a model source when the organization can choose one", () => {
+    expect(agentFinishReady(ready)).toBe(false);
+  });
+
+  it("requires a connected provider when the organization chose its own key", () => {
+    expect(agentFinishReady({ ...ready, credentialChoice: "own-key", providerConnected: false })).toBe(false);
+    expect(
+      agentFinishReady({
+        ...ready,
+        credentialChoice: "own-key",
+        providerConnected: true,
+        agentReady: false,
+        hostedAgentReady: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("allows hosted models when the organization chose them", () => {
+    expect(
+      agentFinishReady({ ...ready, credentialChoice: "hosted", providerConnected: false, agentReady: false }),
+    ).toBe(true);
+  });
+
+  it("allows hosted models when no model source choice is offered", () => {
+    expect(
+      agentFinishReady({
+        ...ready,
+        modelSourceChoice: false,
+        providerConnected: false,
+        agentReady: false,
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("firstWorkOrderAgentError", () => {
+  it("asks the user to connect a provider when credit is empty", () => {
+    expect(
+      firstWorkOrderAgentError({
+        remainingCreditCents: 0,
+        hostedModelsLoading: false,
+        plan: undefined,
+      }),
+    ).toBe("Connect Anthropic, OpenAI, or OpenRouter, or use hosted credit.");
+  });
+
+  it("asks the user to wait when hosted models are still loading", () => {
+    expect(
+      firstWorkOrderAgentError({
+        remainingCreditCents: 5000,
+        hostedModelsLoading: true,
+        plan: undefined,
+      }),
+    ).toBe("Hosted models are still loading. Try again.");
+  });
+
+  it("asks an admin to set a SuperPlane agent model when credit remains without a default", () => {
+    expect(
+      firstWorkOrderAgentError({
+        remainingCreditCents: 5000,
+        hostedModelsLoading: false,
+        plan: undefined,
+      }),
+    ).toBe("Ask an installation admin to set a SuperPlane agent model.");
+  });
+
+  it("allows a hosted plan when credit is empty", () => {
+    expect(
+      firstWorkOrderAgentError({
+        remainingCreditCents: 0,
+        hostedModelsLoading: false,
+        plan: {
+          component: "runnerSuperPlane",
+          credentialsSource: "hosted",
+          harness: "AGENT_HARNESS_SUPERPLANE",
+          model: "",
+          planningModel: "",
+        },
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("hosted credit grant copy", () => {
+  it("hides the grant block when the organization has no grant", () => {
+    expect(shouldShowHostedCreditGrant(0)).toBe(false);
+  });
+
+  it("shows the grant block when a grant exists, even if remaining credit is empty", () => {
+    expect(shouldShowHostedCreditGrant(5000)).toBe(true);
+  });
+
+  it("explains that remaining credit lets the user continue without keys", () => {
+    expect(hostedCreditGrantCopy(5000)).toBe(
+      "This organization has $50.00 of trial usage for machines and managed models. Subscribe to Business to keep hosted runs after the trial.",
+    );
+  });
+
+  it("asks the user to connect a provider when remaining credit is empty", () => {
+    expect(hostedCreditGrantCopy(0)).toBe(
+      "Trial credit is used up. Subscribe to Business or connect a provider to continue.",
+    );
+  });
+});

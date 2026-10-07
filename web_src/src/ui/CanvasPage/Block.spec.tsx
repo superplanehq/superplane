@@ -1,23 +1,26 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 vi.mock("@xyflow/react", () => ({
   Handle: ({
     type,
     id,
+    position,
     className,
     style,
     children,
   }: {
     type: string;
     id?: string;
+    position?: string;
     className?: string;
     style?: { pointerEvents?: string };
     children?: React.ReactNode;
   }) => (
     <div
       data-testid={`handle-${type}-${id || "default"}`}
+      data-position={position}
       data-highlighted={className?.includes("highlighted") ? "true" : "false"}
       data-pointer-events={style?.pointerEvents || "auto"}
       data-class-name={className}
@@ -28,6 +31,8 @@ vi.mock("@xyflow/react", () => ({
   Position: {
     Left: "left",
     Right: "right",
+    Top: "top",
+    Bottom: "bottom",
   },
 }));
 
@@ -192,6 +197,75 @@ describe("Block fallback rendering", () => {
     expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-pointer-events", "none");
   });
 
+  it("places handles top-to-bottom for vertical factory flow", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="component-node"
+        data={{
+          label: "Component",
+          state: "pending",
+          type: "component",
+          outputChannels: ["default"],
+          _flowDirection: "vertical",
+          component: {
+            title: "Component",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [
+            {
+              source: "component-node",
+              sourceHandle: "default",
+              target: "next-node",
+            },
+            {
+              source: "prev-node",
+              sourceHandle: "default",
+              target: "component-node",
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId("handle-target-default")).toHaveAttribute("data-position", "top");
+    expect(screen.getByTestId("handle-source-default")).toHaveAttribute("data-position", "bottom");
+  });
+
+  it("hides channel stems when factory run display ports are active", () => {
+    render(
+      <Block
+        canvasMode="live"
+        nodeId="runner"
+        data={{
+          label: "Run Claude Code",
+          state: "pending",
+          type: "component",
+          outputChannels: ["passed", "failed"],
+          _flowDirection: "vertical",
+          _factoryRunDisplaySource: true,
+          _factorySpineSource: true,
+          component: {
+            title: "Run Claude Code",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [
+            { source: "runner", sourceHandle: "passed", target: "loop" },
+            { source: "runner", sourceHandle: "failed", target: "loop" },
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.queryByText("passed")).not.toBeInTheDocument();
+    expect(screen.queryByText("failed")).not.toBeInTheDocument();
+    expect(screen.getByTestId("handle-source-__factorySpine")).toHaveAttribute("data-position", "bottom");
+    expect(screen.queryByTestId("handle-source-passed")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("handle-source-failed")).not.toBeInTheDocument();
+  });
+
   it("shows an append connector button for end nodes in edit mode", () => {
     const onAppendFromNode = vi.fn();
 
@@ -218,6 +292,7 @@ describe("Block fallback rendering", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add next component" }));
 
     expect(onAppendFromNode).toHaveBeenCalledWith("end-node", "default");
+    expect(screen.getByTestId("append-connector-stem")).toBeInTheDocument();
   });
 
   it("highlights the append connector source handle during compatible connection drags", () => {
@@ -275,6 +350,34 @@ describe("Block fallback rendering", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add next component (failure)" }));
 
     expect(onAppendFromNode).toHaveBeenCalledWith("router-node", "failure");
+  });
+
+  it("centers the factory append plus on the vertical stem", () => {
+    render(
+      <Block
+        canvasMode="edit"
+        nodeId="finder"
+        onAppendFromNode={vi.fn()}
+        data={{
+          label: "Find Pull Request",
+          state: "pending",
+          type: "component",
+          outputChannels: ["found", "notFound"],
+          _flowDirection: "vertical",
+          component: {
+            title: "Find Pull Request",
+            iconSlug: "box",
+            collapsed: false,
+          },
+          _allEdges: [{ source: "finder", sourceHandle: "found", target: "next" }],
+        }}
+      />,
+    );
+
+    const plus = screen.getByRole("button", { name: "Add next component (notFound)" });
+
+    expect(plus.style.left).toBe("50%");
+    expect(plus.style.transform).toBe("translateX(-50%)");
   });
 
   it("keeps node body content visible and fades opacity during edge-hover dimming", () => {

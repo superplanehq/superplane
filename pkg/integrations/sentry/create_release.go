@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -241,10 +240,6 @@ func (c *CreateRelease) Setup(ctx core.SetupContext) error {
 	return ctx.Metadata.Set(CreateReleaseNodeMetadata{
 		Project: project,
 	})
-}
-
-func (c *CreateRelease) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateRelease) Execute(ctx core.ExecutionContext) error {

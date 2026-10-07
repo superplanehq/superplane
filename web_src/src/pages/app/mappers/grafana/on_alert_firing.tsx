@@ -6,7 +6,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import type { MetadataItem } from "@/ui/metadataList";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import type { OnAlertFiringConfiguration, OnAlertFiringEventData } from "./types";
-import { stringOrDash, formatTimestamp } from "../utils";
+import { stringOrDash, formatTimestamp } from "../eventDisplay";
 
 /**
  * Renderer for the "grafana.onAlertFiring" trigger

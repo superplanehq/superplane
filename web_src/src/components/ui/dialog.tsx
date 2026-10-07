@@ -3,7 +3,6 @@ import { XIcon } from "lucide-react";
 import * as React from "react";
 
 import { hasDialogChildOfType } from "@/lib/dialogAccessibility";
-import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -59,8 +58,7 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg p-6 shadow-lg duration-200 dark:bg-gray-900",
-          appDarkModeClasses.modalEdge,
+          "bg-popover text-popover-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-border p-6 shadow-lg duration-200",
           size === "default" && "w-full max-w-[calc(100%-2rem)] sm:max-w-lg",
           size === "90vw" && "w-[90vw] max-w-none h-[90vh]",
           className,
@@ -73,7 +71,7 @@ function DialogContent({
           <DialogPrimitive.Close
             data-slot="dialog-close"
             className={cn(
-              "absolute top-2 right-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full leading-none hover:bg-slate-950/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none dark:hover:bg-white/10",
+              "absolute top-2 right-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full leading-none hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none",
               closeButtonClassName,
             )}
           >
@@ -121,7 +119,7 @@ function DialogDescription({ className, ...props }: React.ComponentProps<typeof 
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn("text-sm text-gray-600 dark:text-gray-400", className)}
+      className={cn("text-sm text-muted-foreground", className)}
       {...props}
     />
   );

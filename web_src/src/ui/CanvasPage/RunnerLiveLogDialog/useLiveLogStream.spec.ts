@@ -1,11 +1,53 @@
-import { describe, expect, it } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
+import { LIVE_LOG_SESSION_NOT_READY_CODE, LiveLogRequestError } from "./liveLogErrors";
 import type { LogState } from "./types";
 import {
   finalizeRunningCommandSections,
   terminalCommandStatusForExecution,
   terminalTimeMsForExecution,
+  useLiveLogStream,
 } from "./useLiveLogStream";
+
+const { captureExceptionMock, pumpMock, stopMock } = vi.hoisted(() => ({
+  captureExceptionMock: vi.fn(),
+  pumpMock: vi.fn(),
+  stopMock: vi.fn(),
+}));
+
+vi.mock("@/sentry", () => ({
+  Sentry: { captureException: captureExceptionMock },
+}));
+
+vi.mock("./liveLogStream", () => {
+  class LiveLogStreamMock {
+    pump = pumpMock;
+    stop = stopMock;
+  }
+
+  return { LiveLogStream: LiveLogStreamMock };
+});
+
+vi.mock("@/hooks/useOrganizationId", () => ({
+  useOrganizationId: () => undefined,
+}));
+
+vi.mock("@/hooks/useCanvasId", () => ({
+  useCanvasId: () => undefined,
+}));
+
+const liveLogSession = { organizationId: "organization-1", canvasId: "canvas-1" };
+const sessionNotReadyError = new LiveLogRequestError(
+  "Logs are not available for this execution yet. Check again shortly.",
+  LIVE_LOG_SESSION_NOT_READY_CODE,
+);
+
+beforeEach(() => {
+  captureExceptionMock.mockReset();
+  pumpMock.mockReset();
+  stopMock.mockReset();
+});
 
 function baseLogState(): LogState {
   return {
@@ -14,6 +56,7 @@ function baseLogState(): LogState {
         index: 0,
         text: "completed",
         lines: [],
+        events: [],
         status: "passed",
         duration_ms: 100,
         started_at: 1_000,
@@ -23,6 +66,7 @@ function baseLogState(): LogState {
         index: 1,
         text: "Set up DevEnv",
         lines: ["docker compose up"],
+        events: [],
         status: "running",
         duration_ms: null,
         started_at: 2_000,
@@ -31,6 +75,7 @@ function baseLogState(): LogState {
     ],
     orphanLines: [],
     error: null,
+    isLoading: false,
     isStreaming: false,
   };
 }
@@ -73,6 +118,51 @@ describe("runner live log state", () => {
     });
   });
 
+  it("closes nested running tools when the execution ends", () => {
+    const finalized = finalizeRunningCommandSections(
+      {
+        ...baseLogState(),
+        sections: [
+          {
+            index: 5,
+            text: "Implementation",
+            kind: "prompt",
+            lines: [],
+            events: [
+              {
+                kind: "tools",
+                id: "5-tools-0",
+                tools: [
+                  {
+                    id: "5-tool-0",
+                    kind: "read",
+                    text: "pkg/foo.go",
+                    lines: [],
+                    status: "running",
+                    duration_ms: null,
+                  },
+                ],
+              },
+            ],
+            status: "running",
+            duration_ms: null,
+            started_at: 2_000,
+            collapsed: false,
+          },
+        ],
+      },
+      "failed",
+      5_000,
+    );
+
+    const tools = finalized.sections[0]?.events[0];
+    expect(tools?.kind).toBe("tools");
+    if (tools?.kind !== "tools") {
+      throw new Error("expected tools group");
+    }
+    expect(tools.tools[0]).toMatchObject({ status: "failed", duration_ms: 0 });
+  });
+
   it("maps terminal execution result to command status", () => {
     expect(terminalCommandStatusForExecution(execution({ result: "RESULT_PASSED" }))).toBe("passed");
     expect(terminalCommandStatusForExecution(execution({ result: "RESULT_FAILED" }))).toBe("failed");
@@ -98,5 +188,277 @@ describe("runner live log state", () => {
         }),
       ),
     ).toBeNull();
+  });
+});
+
+describe("useLiveLogStream", () => {
+  it("does not start a session when organization or canvas ids are missing", () => {
+    renderHook(() => useLiveLogStream("execution-1", false, "failed", null));
+
+    expect(pumpMock).not.toHaveBeenCalled();
+  });
+
+  it("stops loading after the live log response opens", async () => {
+    let openStream: (() => void) | undefined;
+    pumpMock.mockImplementation(
+      (handlers: { onOpen?: () => void }) =>
+        new Promise<void>((resolve) => {
+          openStream = () => {
+            handlers.onOpen?.();
+            resolve();
+          };
+        }),
+    );
+
+    const { result } = renderHook(() =>
+      useLiveLogStream("execution-1", false, "passed", null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    expect(result.current.isLoading).toBe(true);
+    act(() => openStream?.());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+  });
+
+  it("reports a request error and retries the terminal log session on demand", async () => {
+    pumpMock.mockRejectedValue(new Error("Failed to fetch"));
+    const { result } = renderHook(() =>
+      useLiveLogStream("execution-1", false, "failed", null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    await waitFor(() => expect(result.current.error).toBe("Failed to fetch"));
+    expect(captureExceptionMock).toHaveBeenCalledOnce();
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Failed to fetch" }),
+      expect.objectContaining({
+        fingerprint: ["runner-live-logs", "request"],
+        extra: {
+          organizationId: "organization-1",
+          canvasId: "canvas-1",
+          executionId: "execution-1",
+        },
+      }),
+    );
+
+    act(() => result.current.retry());
+
+    await waitFor(() => expect(pumpMock).toHaveBeenCalledTimes(2));
+  });
+
+  it("ignores a benign CloudWatch log-stream-not-found broker error without reporting it", async () => {
+    pumpMock.mockImplementation(
+      (handlers: { onOpen?: () => void; onStreamError: (message: string) => void }) =>
+        new Promise<void>((resolve) => {
+          handlers.onOpen?.();
+          handlers.onStreamError(
+            "operation error CloudWatch Logs: GetLogEvents, https response error StatusCode: 400, " +
+              "RequestID: bffc49eb-3863-4426-a5e1-dfd28b43bbe3, ResourceNotFoundException: " +
+              "The specified log stream does not exist.",
+          );
+          resolve();
+        }),
+    );
+
+    const { result } = renderHook(() =>
+      useLiveLogStream("execution-1", false, "passed", null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+  });
+
+  it("does not report a not-ready session as an error after the run finishes", async () => {
+    pumpMock.mockRejectedValue(sessionNotReadyError);
+    const { result } = renderHook(() => useLiveLogStream("execution-1", false, "passed", null, liveLogSession));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.error).toBeNull();
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(pumpMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["network error", "Failed to fetch", "NetworkError when attempting to fetch resource."] as const)(
+    "reconnects an in-progress browser drop (%s) without a failure or report",
+    async (message) => {
+      const failure = message === "Failed to fetch" ? new Error(message) : new TypeError(message);
+      pumpMock.mockImplementationOnce(
+        async (handlers: {
+          onOpen?: () => void;
+          onCmdStart?: (
+            index: number,
+            text: string,
+            startedAtMs: number | null,
+            kind?: string,
+            preview?: string,
+          ) => void;
+          onLogLine: (line: string, commandIndex?: number) => void;
+        }) => {
+          handlers.onOpen?.();
+          handlers.onCmdStart?.(0, "Run tests", 1, "bash", "make test");
+          handlers.onLogLine("existing output", 0);
+          throw failure;
+        },
+      );
+      pumpMock.mockImplementationOnce(() => new Promise<void>(() => undefined));
+
+      const { result } = renderHook(() => useLiveLogStream("execution-1", true, null, null, liveLogSession));
+
+      await waitFor(() => expect(pumpMock).toHaveBeenCalledTimes(2), { timeout: 5000 });
+      expect(result.current.error).toBeNull();
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+      expect(result.current.sections[0]?.lines).toEqual(["existing output"]);
+    },
+  );
+
+  it("reports a finished-run browser network drop", async () => {
+    pumpMock.mockRejectedValue(new TypeError("network error"));
+    const { result } = renderHook(() => useLiveLogStream("execution-1", false, "failed", null, liveLogSession));
+
+    await waitFor(() => expect(result.current.error).toBe("network error"));
+    expect(captureExceptionMock).toHaveBeenCalledOnce();
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "TypeError", message: "network error" }),
+      expect.objectContaining({
+        fingerprint: ["runner-live-logs", "request"],
+      }),
+    );
+  });
+
+  it("reports an in-progress HTTP failure that uses browser disconnect text", async () => {
+    pumpMock.mockRejectedValue(new LiveLogRequestError("Failed to fetch"));
+    const { result } = renderHook(() => useLiveLogStream("execution-1", true, null, null, liveLogSession));
+
+    await waitFor(() => expect(result.current.error).toBe("Failed to fetch"));
+    expect(captureExceptionMock).toHaveBeenCalledOnce();
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "Failed to fetch" }),
+      expect.objectContaining({
+        fingerprint: ["runner-live-logs", "request"],
+      }),
+    );
+  });
+
+  it("reconnects while in flight when the session is not ready yet", async () => {
+    pumpMock.mockRejectedValue(sessionNotReadyError);
+    const { result } = renderHook(() => useLiveLogStream("execution-1", true, null, null, liveLogSession));
+
+    await waitFor(() => expect(pumpMock).toHaveBeenCalledTimes(2), { timeout: 5000 });
+    expect(result.current.error).toBeNull();
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+  });
+
+  it("reports a CloudWatch log-group-not-found broker error", async () => {
+    const message =
+      "operation error CloudWatch Logs: GetLogEvents, https response error StatusCode: 400, " +
+      "RequestID: bffc49eb-3863-4426-a5e1-dfd28b43bbe3, ResourceNotFoundException: " +
+      "The specified log group does not exist.";
+    pumpMock.mockImplementation(
+      (handlers: { onOpen?: () => void; onStreamError: (message: string) => void }) =>
+        new Promise<void>((resolve) => {
+          handlers.onOpen?.();
+          handlers.onStreamError(message);
+          resolve();
+        }),
+    );
+
+    const { result } = renderHook(() =>
+      useLiveLogStream("execution-1", false, "passed", null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    await waitFor(() => expect(result.current.error).toBe(message));
+    expect(captureExceptionMock).toHaveBeenCalledOnce();
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message }),
+      expect.objectContaining({
+        fingerprint: ["runner-live-logs", "broker"],
+      }),
+    );
+  });
+
+  it("reports a non-benign broker stream error", async () => {
+    pumpMock.mockImplementation(
+      (handlers: { onOpen?: () => void; onStreamError: (message: string) => void }) =>
+        new Promise<void>((resolve) => {
+          handlers.onOpen?.();
+          handlers.onStreamError("broker connection reset");
+          resolve();
+        }),
+    );
+
+    const { result } = renderHook(() =>
+      useLiveLogStream("execution-1", false, "passed", null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    await waitFor(() => expect(result.current.error).toBe("broker connection reset"));
+    expect(captureExceptionMock).toHaveBeenCalledOnce();
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "broker connection reset" }),
+      expect.objectContaining({
+        fingerprint: ["runner-live-logs", "broker"],
+      }),
+    );
+  });
+
+  it("reports a broker stream error that uses browser disconnect text", async () => {
+    pumpMock.mockImplementation(
+      (handlers: { onOpen?: () => void; onStreamError: (message: string) => void }) =>
+        new Promise<void>((resolve) => {
+          handlers.onOpen?.();
+          handlers.onStreamError("network error");
+          resolve();
+        }),
+    );
+
+    const { result } = renderHook(() => useLiveLogStream("execution-1", false, "passed", null, liveLogSession));
+
+    await waitFor(() => expect(result.current.error).toBe("network error"));
+    expect(captureExceptionMock).toHaveBeenCalledOnce();
+    expect(captureExceptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "network error" }),
+      expect.objectContaining({
+        fingerprint: ["runner-live-logs", "broker"],
+      }),
+    );
+  });
+
+  it("preserves existing logs when a retry opens a healthy stream", async () => {
+    pumpMock.mockImplementationOnce(async (handlers: { onOpen?: () => void; onLogLine: (line: string) => void }) => {
+      handlers.onOpen?.();
+      handlers.onLogLine("existing output");
+      throw new Error("Request failed (502)");
+    });
+    pumpMock.mockImplementationOnce((handlers: { onOpen?: () => void }) => {
+      handlers.onOpen?.();
+      return new Promise<void>(() => undefined);
+    });
+    const { result } = renderHook(() =>
+      useLiveLogStream("execution-1", true, null, null, {
+        organizationId: "organization-1",
+        canvasId: "canvas-1",
+      }),
+    );
+
+    await waitFor(() => expect(result.current.error).toBe("Request failed (502)"));
+    expect(result.current.orphanLines).toEqual(["existing output"]);
+    act(() => result.current.retry());
+
+    await waitFor(() => expect(result.current.error).toBeNull());
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.orphanLines).toEqual(["existing output"]);
   });
 });

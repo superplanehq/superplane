@@ -47,6 +47,40 @@
 {{- end }}
 {{- end }}
 
+{{- define "secrets.posthog.name" }}
+{{- if eq .Values.posthog.secretName "" }}
+{{- printf "%s-posthog" .Release.Name }}
+{{- else }}
+{{- .Values.posthog.secretName }}
+{{- end }}
+{{- end }}
+
+{{- define "secrets.polar.name" }}
+{{- if eq .Values.polar.secretName "" }}
+{{- printf "%s-polar" .Release.Name }}
+{{- else }}
+{{- .Values.polar.secretName }}
+{{- end }}
+{{- end }}
+
+{{- define "secrets.linear.name" }}
+{{- if eq .Values.linear.secretName "" }}
+{{- printf "%s-linear" .Release.Name }}
+{{- else }}
+{{- .Values.linear.secretName }}
+{{- end }}
+{{- end }}
+
+{{- define "superplane.serviceAccountName" -}}
+{{- if .Values.serviceAccount.name }}
+{{- .Values.serviceAccount.name }}
+{{- else if .Values.serviceAccount.create }}
+{{- .Release.Name }}
+{{- else }}
+{{- "default" }}
+{{- end }}
+{{- end }}
+
 {{- define "secrets.encryption.name" }}
 {{- if eq .Values.encryption.secretName "" }}
 {{- printf "%s-encryption" .Release.Name }}
@@ -85,4 +119,8 @@
 {{- else }}
 {{- .Values.email.secretName }}
 {{- end }}
+{{- end }}
+
+{{- define "secrets.feedback.name" }}
+{{- printf "%s-feedback" .Release.Name }}
 {{- end }}

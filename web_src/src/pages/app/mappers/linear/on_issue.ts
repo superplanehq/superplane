@@ -5,8 +5,8 @@ import type { TriggerProps } from "@/ui/trigger";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
-import { stringOrDash } from "../utils";
-import { formatPredicate } from "../utils";
+import { stringOrDash } from "../eventDisplay";
+import { formatPredicate } from "../eventDisplay";
 import { addTeamMetadata, getIssueLabel } from "./utils";
 import type { LinearNodeMetadata, LinearWebhookEvent, OnIssueConfiguration } from "./types";
 
@@ -51,30 +51,13 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as LinearNodeMetadata | undefined;
     const configuration = node.configuration as OnIssueConfiguration | undefined;
-    const metadataItems: MetadataItem[] = [];
-
-    addTeamMetadata(metadataItems, metadata?.team, configuration?.team);
-
-    if (configuration?.actions && configuration.actions.length > 0) {
-      metadataItems.push({
-        icon: "funnel",
-        label: configuration.actions.map((action) => actionLabel(action)).join(", "),
-      });
-    }
-
-    if (configuration?.labels && configuration.labels.length > 0) {
-      metadataItems.push({
-        icon: "tag",
-        label: configuration.labels.map((label) => formatPredicate(label)).join(", "),
-      });
-    }
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: linearIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: issueMetadataItems(metadata, configuration),
     };
 
     if (lastEvent) {
@@ -91,3 +74,35 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     return props;
   },
 };
+
+function issueMetadataItems(metadata?: LinearNodeMetadata, configuration?: OnIssueConfiguration): MetadataItem[] {
+  const metadataItems: MetadataItem[] = [];
+
+  addTeamMetadata(metadataItems, metadata?.team, configuration?.team);
+  appendActionMetadata(metadataItems, configuration?.actions);
+  appendLabelMetadata(metadataItems, configuration?.labels);
+
+  return metadataItems;
+}
+
+function appendActionMetadata(metadataItems: MetadataItem[], actions?: string[]): void {
+  if (!actions || actions.length === 0) {
+    return;
+  }
+
+  metadataItems.push({
+    icon: "funnel",
+    label: actions.map((action) => actionLabel(action)).join(", "),
+  });
+}
+
+function appendLabelMetadata(metadataItems: MetadataItem[], labels?: OnIssueConfiguration["labels"]): void {
+  if (!labels || labels.length === 0) {
+    return;
+  }
+
+  metadataItems.push({
+    icon: "tag",
+    label: labels.map((label) => formatPredicate(label)).join(", "),
+  });
+}

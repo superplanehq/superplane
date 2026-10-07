@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-07-17T09:30:00Z",
+  "type": "jira.alert",
+  "data": {
+    "action": "created",
+    "alert": {
+      "alertId": "9e1c6a9e-1234-4a1a-8f1a-0a1b2c3d4e5f",
+      "tinyId": "123",
+      "message": "CPU usage above 90% on payments-api",
+      "priority": "P2",
+      "tags": ["production", "payments"],
+      "source": "Datadog"
+    }
+  }
+}

@@ -1,13 +1,42 @@
-import { ArrowLeft } from "lucide-react";
-import React from "react";
-import { Link, useParams } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
+import { OrganizationSpendingExplorer } from "@/pages/factories/pages/organizationSettings/spending-redesign/OrganizationSpendingExplorer";
+import { ArrowLeft } from "lucide-react";
+import React, { useState } from "react";
+import { Link, useParams } from "react-router";
+
 import { OrgCanvasesTable } from "./OrgCanvasesTable";
 import { OrgExperimentalFeaturesTable } from "./OrgExperimentalFeaturesTable";
+import { OrgIntegrationsTable } from "./OrgIntegrationsTable";
+import { OrgLLMCreditSection } from "./OrgLLMCreditSection";
+import { OrgOverviewPanel } from "./OrgOverviewPanel";
 import { OrgUsersTable } from "./OrgUsersTable";
+import { OrganizationVelocityPanel } from "./OrganizationVelocityPanel";
+import { useAdminOrganizationSpendingReport } from "./useAdminOrganizationSpendingReport";
+
+const ORGANIZATION_TABS = [
+  "overview",
+  "users",
+  "automations",
+  "connections",
+  "features",
+  "spending",
+  "velocity",
+  "credits",
+] as const;
+
+type OrganizationTab = (typeof ORGANIZATION_TABS)[number];
+
+function isOrganizationTab(value: string): value is OrganizationTab {
+  return ORGANIZATION_TABS.some((tab) => tab === value);
+}
 
 const OrganizationDetail: React.FC = () => {
   const { orgId } = useParams<{ orgId: string }>();
+  const [tab, setTab] = useState<OrganizationTab>("overview");
+  const [creditsVisited, setCreditsVisited] = useState(false);
+  const [spendingVisited, setSpendingVisited] = useState(false);
+  const [velocityVisited, setVelocityVisited] = useState(false);
 
   useReportPageReady(true);
 
@@ -20,9 +49,75 @@ const OrganizationDetail: React.FC = () => {
         <ArrowLeft size={14} />
         All organizations
       </Link>
-      <OrgUsersTable orgId={orgId!} />
-      <OrgCanvasesTable orgId={orgId!} />
-      <OrgExperimentalFeaturesTable orgId={orgId!} />
+      <Tabs
+        value={tab}
+        onValueChange={(nextTab) => {
+          if (!isOrganizationTab(nextTab)) {
+            return;
+          }
+          if (nextTab === "credits") {
+            setCreditsVisited(true);
+          }
+          if (nextTab === "spending") {
+            setSpendingVisited(true);
+          }
+          if (nextTab === "velocity") {
+            setVelocityVisited(true);
+          }
+          setTab(nextTab);
+        }}
+      >
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="automations">Automations</TabsTrigger>
+          <TabsTrigger value="connections">Connections</TabsTrigger>
+          <TabsTrigger value="features">Features</TabsTrigger>
+          <TabsTrigger value="spending">Spending</TabsTrigger>
+          <TabsTrigger value="velocity">Velocity</TabsTrigger>
+          <TabsTrigger value="credits">Credits</TabsTrigger>
+        </TabsList>
+        <TabsContent value="overview" className="mt-3">
+          <OrgOverviewPanel orgId={orgId!} />
+        </TabsContent>
+        <TabsContent value="users" className="mt-3">
+          <OrgUsersTable orgId={orgId!} />
+        </TabsContent>
+        <TabsContent value="automations" className="mt-3">
+          <OrgCanvasesTable orgId={orgId!} />
+        </TabsContent>
+        <TabsContent value="connections" className="mt-3">
+          <OrgIntegrationsTable orgId={orgId!} />
+        </TabsContent>
+        <TabsContent value="features" className="mt-3">
+          <OrgExperimentalFeaturesTable orgId={orgId!} />
+        </TabsContent>
+        <TabsContent
+          value="spending"
+          forceMount={spendingVisited || undefined}
+          className="mt-3 data-[state=inactive]:hidden"
+        >
+          <OrganizationSpendingExplorer
+            organizationId={orgId!}
+            setDocumentTitle={false}
+            useReport={useAdminOrganizationSpendingReport}
+          />
+        </TabsContent>
+        <TabsContent
+          value="velocity"
+          forceMount={velocityVisited || undefined}
+          className="mt-3 data-[state=inactive]:hidden"
+        >
+          <OrganizationVelocityPanel orgId={orgId!} />
+        </TabsContent>
+        <TabsContent
+          value="credits"
+          forceMount={creditsVisited || undefined}
+          className="mt-3 data-[state=inactive]:hidden"
+        >
+          <OrgLLMCreditSection orgId={orgId!} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

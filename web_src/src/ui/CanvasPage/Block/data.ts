@@ -38,6 +38,8 @@ export function getSafeComponentProps(data: BlockData): ComponentBaseProps {
       typeof component.title === "string" && component.title.trim()
         ? component.title
         : getBlockLabel(data, "Component"),
+    componentLabel: typeof component.componentLabel === "string" ? component.componentLabel : undefined,
+    nodeName: typeof component.nodeName === "string" ? component.nodeName : undefined,
     error: typeof component.error === "string" ? component.error : "",
     warning: typeof component.warning === "string" ? component.warning : "",
     metadata: Array.isArray(component.metadata) ? component.metadata : undefined,
@@ -63,6 +65,8 @@ export function getSafeTriggerProps(data: BlockData): TriggerProps {
   return {
     ...trigger,
     title: typeof trigger.title === "string" && trigger.title.trim() ? trigger.title : getBlockLabel(data, "Trigger"),
+    componentLabel: typeof trigger.componentLabel === "string" ? trigger.componentLabel : undefined,
+    nodeName: typeof trigger.nodeName === "string" ? trigger.nodeName : undefined,
     iconSlug: typeof trigger.iconSlug === "string" ? trigger.iconSlug : "bolt",
     metadata: Array.isArray(trigger.metadata) ? trigger.metadata : [],
     error: typeof trigger.error === "string" ? trigger.error : "",
@@ -85,6 +89,8 @@ export function getSafeCompositeProps(data: BlockData): CompositeProps {
       typeof composite.title === "string" && composite.title.trim()
         ? composite.title
         : getBlockLabel(data, "Composite"),
+    componentLabel: typeof composite.componentLabel === "string" ? composite.componentLabel : undefined,
+    nodeName: typeof composite.nodeName === "string" ? composite.nodeName : undefined,
     metadata: Array.isArray(composite.metadata) ? composite.metadata : undefined,
     parameters: Array.isArray(composite.parameters) ? composite.parameters : [],
     iconSlug: typeof composite.iconSlug === "string" ? composite.iconSlug : "component",

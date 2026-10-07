@@ -1,0 +1,450 @@
+package models
+
+import (
+	"errors"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+const (
+	FactoryOnboardingIssuesSourceVCS    = "vcs"
+	FactoryOnboardingIssuesSourceLinear = "linear"
+	FactoryOnboardingIssuesSourceJira   = "jira"
+	FactoryOnboardingIssuesSourceSkip   = "skip"
+
+	FactoryOnboardingAgentHarnessClaudeCode = "claude-code"
+	FactoryOnboardingAgentHarnessCursor     = "cursor"
+	FactoryOnboardingAgentHarnessCodex      = "codex"
+	FactoryOnboardingAgentHarnessSuperPlane = "superplane"
+)
+
+var (
+	ErrFactoryOnboardingInvalidIssuesSource      = errors.New("invalid issues source")
+	ErrFactoryOnboardingInvalidAgentHarness      = errors.New("invalid agent harness")
+	ErrFactoryOnboardingInvalidIntegrationID     = errors.New("invalid integration id")
+	ErrFactoryOnboardingInvalidAppID             = errors.New("invalid provisioned app id")
+	ErrFactoryOnboardingInvalidLineID            = errors.New("invalid provisioned line id")
+	ErrFactoryOnboardingInvalidRepository        = errors.New("repository must use the owner/name format")
+	ErrFactoryOnboardingInvalidVCSProvider       = errors.New("invalid version control provider")
+	ErrFactoryOnboardingVCSIntegrationRequired   = errors.New("version control integration id is required")
+	ErrFactoryOnboardingAgentIntegrationRequired = errors.New("agent integration id is required")
+	ErrFactoryOnboardingHostedAgentUnavailable   = errors.New("hosted agent credentials are not available")
+	ErrFactoryOnboardingAppRepositoryRequired    = errors.New("app repository is required")
+	ErrFactoryOnboardingBacklogRepoRequired      = errors.New("backlog repository is required")
+	ErrFactoryOnboardingIssuesSourceRequired     = errors.New("issues source is required")
+	ErrFactoryOnboardingAgentHarnessRequired     = errors.New("agent harness is required")
+	ErrFactoryOnboardingAppIDRequired            = errors.New("provisioned app id is required")
+	ErrFactoryOnboardingLineIDRequired           = errors.New("provisioned line id is required")
+)
+
+var factoryOnboardingRepositoryPattern = regexp.MustCompile(`^[^/\s]+/[^/\s]+$`)
+
+// FactoryOnboardingConfig stores durable wizard choices and provisioned
+// resource IDs. Empty strings mean the field has not been saved yet.
+type FactoryOnboardingConfig struct {
+	InitialOnboardingAttemptID string `json:"initial_onboarding_attempt_id,omitempty"`
+	VCSIntegrationID           string `json:"vcs_integration_id,omitempty"`
+	// VCSProvider is the Git host. Empty means GitHub. Existing rows stay empty.
+	VCSProvider         string `json:"vcs_provider,omitempty"`
+	AgentIntegrationID  string `json:"agent_integration_id,omitempty"`
+	AppRepository       string `json:"app_repository,omitempty"`
+	AppRepositoryID     int64  `json:"app_repository_id,omitempty"`
+	BacklogRepository   string `json:"backlog_repository,omitempty"`
+	BacklogRepositoryID int64  `json:"backlog_repository_id,omitempty"`
+	DefaultBranch       string `json:"default_branch,omitempty"`
+	IssuesSource        string `json:"issues_source,omitempty"`
+	AgentHarness        string `json:"agent_harness,omitempty"`
+	ProvisionedAppID    string `json:"provisioned_app_id,omitempty"`
+	ProvisionedLineID   string `json:"provisioned_line_id,omitempty"`
+}
+
+// FactoryOnboardingPatch carries optional field updates for a partial merge.
+// A nil pointer means "leave unchanged"; a non-nil pointer replaces the value
+// (including clearing when the pointed string is empty, or when an enum is
+// cleared to the empty string).
+type FactoryOnboardingPatch struct {
+	VCSIntegrationID    *string
+	VCSProvider         *string
+	AgentIntegrationID  *string
+	AppRepository       *string
+	AppRepositoryID     *int64
+	BacklogRepository   *string
+	BacklogRepositoryID *int64
+	DefaultBranch       *string
+	IssuesSource        *string
+	AgentHarness        *string
+	ProvisionedAppID    *string
+	ProvisionedLineID   *string
+}
+
+func ValidateFactoryOnboardingIssuesSource(source string) error {
+	switch source {
+	case "",
+		FactoryOnboardingIssuesSourceVCS,
+		FactoryOnboardingIssuesSourceLinear,
+		FactoryOnboardingIssuesSourceJira,
+		FactoryOnboardingIssuesSourceSkip:
+		return nil
+	default:
+		return ErrFactoryOnboardingInvalidIssuesSource
+	}
+}
+
+func ValidateFactoryOnboardingVCSProvider(provider string) error {
+	switch strings.TrimSpace(provider) {
+	case "", ProviderGitHub, ProviderBitbucket:
+		return nil
+	default:
+		return ErrFactoryOnboardingInvalidVCSProvider
+	}
+}
+
+// EffectiveVCSProvider returns the stored Git host. An empty value means GitHub.
+func (c FactoryOnboardingConfig) EffectiveVCSProvider() string {
+	provider := strings.TrimSpace(c.VCSProvider)
+	if provider == "" {
+		return ProviderGitHub
+	}
+	return provider
+}
+
+// VCSProviderForIntegrationApp maps an integration app name to a workspace Git host.
+func VCSProviderForIntegrationApp(appName string) (string, bool) {
+	switch appName {
+	case ProviderGitHub, ProviderBitbucket:
+		return appName, true
+	default:
+		return "", false
+	}
+}
+
+// VCSRepositoryCloneURL returns the HTTPS clone URL for an owner/name
+// repository on the provider. An empty provider means GitHub.
+func VCSRepositoryCloneURL(provider, repository string) string {
+	repository = strings.TrimSuffix(strings.TrimSpace(repository), ".git")
+	if provider == ProviderBitbucket {
+		return "https://bitbucket.org/" + repository + ".git"
+	}
+	return "https://github.com/" + repository + ".git"
+}
+
+// FactoryVCSCapabilities is the set of factory automations a Git host can run.
+type FactoryVCSCapabilities struct {
+	PRClosure       bool
+	PRFeedback      bool
+	PRChecks        bool
+	MergeConfidence bool
+	Velocity        bool
+	BoardMerge      bool
+	BoardClose      bool
+	VCSIssueIntake  bool
+}
+
+// FactoryVCSCapabilitiesFor returns the automations a provider can run.
+// An empty provider uses the GitHub set. Bitbucket stays off until its own step.
+func FactoryVCSCapabilitiesFor(provider string) FactoryVCSCapabilities {
+	if strings.TrimSpace(provider) == "" || provider == ProviderGitHub {
+		return FactoryVCSCapabilities{
+			PRClosure:       true,
+			PRFeedback:      true,
+			PRChecks:        true,
+			MergeConfidence: true,
+			Velocity:        true,
+			BoardMerge:      true,
+			BoardClose:      true,
+			VCSIssueIntake:  true,
+		}
+	}
+	return FactoryVCSCapabilities{}
+}
+
+func ValidateFactoryOnboardingAgentHarness(harness string) error {
+	switch harness {
+	case "",
+		FactoryOnboardingAgentHarnessClaudeCode,
+		FactoryOnboardingAgentHarnessCursor,
+		FactoryOnboardingAgentHarnessCodex,
+		FactoryOnboardingAgentHarnessSuperPlane:
+		return nil
+	default:
+		return ErrFactoryOnboardingInvalidAgentHarness
+	}
+}
+
+func (f *Factory) IsOnboardingComplete() bool {
+	return f.OnboardingCompletedAt != nil
+}
+
+// IsInitialOnboarding reports whether account onboarding created the workspace.
+func (f *Factory) IsInitialOnboarding() bool {
+	return f.OnboardingConfigValue().InitialOnboardingAttemptID != ""
+}
+
+// IsPendingInitialOnboarding reports whether this workspace is the unfinished
+// first-run organization setup for an account.
+func (f *Factory) IsPendingInitialOnboarding() bool {
+	return f.IsInitialOnboarding() && !f.IsOnboardingComplete()
+}
+
+func (f *Factory) OnboardingConfigValue() FactoryOnboardingConfig {
+	return f.OnboardingConfig.Data()
+}
+
+func (f *Factory) OnboardingConfigAfter(patch FactoryOnboardingPatch) (FactoryOnboardingConfig, error) {
+	return mergeFactoryOnboardingConfig(f.OnboardingConfigValue(), patch)
+}
+
+// SetInitialOnboardingAttempt records the server-owned retry key for a
+// workspace created during account onboarding. It is not part of the
+// user-editable onboarding patch.
+func (f *Factory) SetInitialOnboardingAttempt(tx *gorm.DB, attemptID uuid.UUID) error {
+	config := f.OnboardingConfigValue()
+	config.InitialOnboardingAttemptID = attemptID.String()
+	return f.persistOnboarding(tx, config, f.OnboardingCompletedAt)
+}
+
+func (f *Factory) HasInitialOnboardingAttempt(attemptID uuid.UUID) bool {
+	return f.OnboardingConfigValue().InitialOnboardingAttemptID == attemptID.String()
+}
+
+// UpdateOnboarding merges a partial patch into the stored config. It does not
+// change completion status.
+func (f *Factory) UpdateOnboarding(tx *gorm.DB, patch FactoryOnboardingPatch) error {
+	merged, err := f.OnboardingConfigAfter(patch)
+	if err != nil {
+		return err
+	}
+
+	return f.persistOnboarding(tx, merged, f.OnboardingCompletedAt)
+}
+
+// CompleteOnboarding merges an optional patch, validates readiness, and sets
+// onboarding_completed_at. When already complete, the existing timestamp is
+// preserved (idempotent).
+func (f *Factory) CompleteOnboarding(tx *gorm.DB, patch FactoryOnboardingPatch) error {
+	merged, err := f.OnboardingConfigAfter(patch)
+	if err != nil {
+		return err
+	}
+	if err := validateFactoryOnboardingReady(merged); err != nil {
+		return err
+	}
+
+	completedAt := f.OnboardingCompletedAt
+	if completedAt == nil {
+		now := time.Now()
+		completedAt = &now
+	}
+
+	return f.persistOnboarding(tx, merged, completedAt)
+}
+
+func (f *Factory) persistOnboarding(tx *gorm.DB, config FactoryOnboardingConfig, completedAt *time.Time) error {
+	now := time.Now()
+	updates := map[string]any{
+		"onboarding_config": datatypes.NewJSONType(config),
+		"updated_at":        now,
+	}
+	if completedAt != nil {
+		updates["onboarding_completed_at"] = *completedAt
+	} else {
+		updates["onboarding_completed_at"] = nil
+	}
+
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Updates(updates).
+		Error
+	if err != nil {
+		return err
+	}
+
+	f.OnboardingConfig = datatypes.NewJSONType(config)
+	f.OnboardingCompletedAt = completedAt
+	f.UpdatedAt = now
+	return nil
+}
+
+func mergeFactoryOnboardingConfig(current FactoryOnboardingConfig, patch FactoryOnboardingPatch) (FactoryOnboardingConfig, error) {
+	next := current
+
+	if patch.VCSIntegrationID != nil {
+		value := strings.TrimSpace(*patch.VCSIntegrationID)
+		if err := validateOptionalUUID(value, ErrFactoryOnboardingInvalidIntegrationID); err != nil {
+			return FactoryOnboardingConfig{}, err
+		}
+		next.VCSIntegrationID = value
+	}
+	if patch.VCSProvider != nil {
+		value := strings.TrimSpace(*patch.VCSProvider)
+		if err := ValidateFactoryOnboardingVCSProvider(value); err != nil {
+			return FactoryOnboardingConfig{}, err
+		}
+		next.VCSProvider = value
+	}
+	if patch.AgentIntegrationID != nil {
+		value := strings.TrimSpace(*patch.AgentIntegrationID)
+		if err := validateOptionalUUID(value, ErrFactoryOnboardingInvalidIntegrationID); err != nil {
+			return FactoryOnboardingConfig{}, err
+		}
+		next.AgentIntegrationID = value
+	}
+	if patch.AppRepository != nil {
+		value := strings.TrimSpace(*patch.AppRepository)
+		if err := validateOptionalFactoryRepository(value); err != nil {
+			return FactoryOnboardingConfig{}, err
+		}
+		next.AppRepository = value
+	}
+	if patch.AppRepositoryID != nil {
+		next.AppRepositoryID = *patch.AppRepositoryID
+	}
+	if patch.BacklogRepository != nil {
+		value := strings.TrimSpace(*patch.BacklogRepository)
+		if err := validateOptionalFactoryRepository(value); err != nil {
+			return FactoryOnboardingConfig{}, err
+		}
+		next.BacklogRepository = value
+	}
+	if patch.BacklogRepositoryID != nil {
+		next.BacklogRepositoryID = *patch.BacklogRepositoryID
+	}
+	if patch.DefaultBranch != nil {
+		next.DefaultBranch = strings.TrimSpace(*patch.DefaultBranch)
+	}
+	if patch.IssuesSource != nil {
+		value := strings.TrimSpace(*patch.IssuesSource)
+		if err := ValidateFactoryOnboardingIssuesSource(value); err != nil {
+			return FactoryOnboardingConfig{}, err
+		}
+		next.IssuesSource = value
+	}
+	if patch.AgentHarness != nil {
+		value := strings.TrimSpace(*patch.AgentHarness)
+		if err := ValidateFactoryOnboardingAgentHarness(value); err != nil {
+			return FactoryOnboardingConfig{}, err
+		}
+		next.AgentHarness = value
+	}
+	if patch.ProvisionedAppID != nil {
+		value := strings.TrimSpace(*patch.ProvisionedAppID)
+		if err := validateOptionalUUID(value, ErrFactoryOnboardingInvalidAppID); err != nil {
+			return FactoryOnboardingConfig{}, err
+		}
+		next.ProvisionedAppID = value
+	}
+	if patch.ProvisionedLineID != nil {
+		value := strings.TrimSpace(*patch.ProvisionedLineID)
+		if err := validateOptionalUUID(value, ErrFactoryOnboardingInvalidLineID); err != nil {
+			return FactoryOnboardingConfig{}, err
+		}
+		next.ProvisionedLineID = value
+	}
+
+	return next, nil
+}
+
+func validateFactoryOnboardingReady(config FactoryOnboardingConfig) error {
+	if strings.TrimSpace(config.AppRepository) == "" {
+		return ErrFactoryOnboardingAppRepositoryRequired
+	}
+	if strings.TrimSpace(config.BacklogRepository) == "" {
+		return ErrFactoryOnboardingBacklogRepoRequired
+	}
+	if strings.TrimSpace(config.VCSIntegrationID) == "" {
+		return ErrFactoryOnboardingVCSIntegrationRequired
+	}
+	if config.IssuesSource == "" {
+		return ErrFactoryOnboardingIssuesSourceRequired
+	}
+	if err := ValidateFactoryOnboardingIssuesSource(config.IssuesSource); err != nil {
+		return err
+	}
+	if strings.TrimSpace(config.AgentHarness) == "" {
+		return ErrFactoryOnboardingAgentHarnessRequired
+	}
+	if err := ValidateFactoryOnboardingAgentHarness(config.AgentHarness); err != nil {
+		return err
+	}
+	if strings.TrimSpace(config.ProvisionedAppID) == "" {
+		return ErrFactoryOnboardingAppIDRequired
+	}
+	if err := validateOptionalUUID(config.ProvisionedAppID, ErrFactoryOnboardingInvalidAppID); err != nil {
+		return err
+	}
+	if strings.TrimSpace(config.ProvisionedLineID) == "" {
+		return ErrFactoryOnboardingLineIDRequired
+	}
+	return validateOptionalUUID(config.ProvisionedLineID, ErrFactoryOnboardingInvalidLineID)
+}
+
+// CountFactoriesUsingVCSIntegration counts workspaces in the organization
+// that still store this integration as their version-control connection.
+func CountFactoriesUsingVCSIntegration(tx *gorm.DB, organizationID, integrationID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.Model(&Factory{}).
+		Where("organization_id = ?", organizationID).
+		Where("onboarding_config->>'vcs_integration_id' = ?", integrationID.String()).
+		Count(&count).
+		Error
+	return count, err
+}
+
+// OrganizationIDsPendingInitialOnboardingOnly returns organizations whose
+// only workspaces are unfinished first-run setup. Organizations that also
+// have a completed workspace are omitted.
+func OrganizationIDsPendingInitialOnboardingOnly(tx *gorm.DB, organizationIDs []uuid.UUID) (map[uuid.UUID]struct{}, error) {
+	pending := make(map[uuid.UUID]struct{})
+	if len(organizationIDs) == 0 {
+		return pending, nil
+	}
+
+	completed := tx.Model(&Factory{}).
+		Select("organization_id").
+		Where("organization_id IN ?", organizationIDs).
+		Where("onboarding_completed_at IS NOT NULL")
+
+	var ids []uuid.UUID
+	err := tx.Model(&Factory{}).
+		Select("organization_id").
+		Where("organization_id IN ?", organizationIDs).
+		Where("onboarding_completed_at IS NULL").
+		Where("NULLIF(onboarding_config->>'initial_onboarding_attempt_id', '') IS NOT NULL").
+		Where("organization_id NOT IN (?)", completed).
+		Distinct("organization_id").
+		Pluck("organization_id", &ids).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, id := range ids {
+		pending[id] = struct{}{}
+	}
+	return pending, nil
+}
+
+func validateOptionalFactoryRepository(repository string) error {
+	if repository == "" {
+		return nil
+	}
+	if !factoryOnboardingRepositoryPattern.MatchString(repository) {
+		return ErrFactoryOnboardingInvalidRepository
+	}
+	return nil
+}
+
+func validateOptionalUUID(value string, invalid error) error {
+	if value == "" {
+		return nil
+	}
+	if _, err := uuid.Parse(value); err != nil {
+		return invalid
+	}
+	return nil
+}

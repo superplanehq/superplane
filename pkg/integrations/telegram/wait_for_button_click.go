@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -231,10 +230,6 @@ func (c *WaitForButtonClick) Setup(ctx core.SetupContext) error {
 	}
 
 	return ctx.Metadata.Set(metadata)
-}
-
-func (c *WaitForButtonClick) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *WaitForButtonClick) Execute(ctx core.ExecutionContext) error {

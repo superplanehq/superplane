@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { approveWorkflowMapper } from "./approve_workflow";
 import { eventStateRegistry } from "./index";

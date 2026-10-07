@@ -1,14 +1,14 @@
-import type { FactoryApp } from "@/api-client";
+import type { FactoryAutomation } from "@/api-client";
 import { Fragment } from "react";
 import { LineStepAddButton, LineStepArrow, LineStepFlow } from "./FactoryLineStepFlow";
-import type { DraftStep } from "./factoryLineFormShared";
+import type { DraftStep } from "./lib/factoryLineFormShared";
 import { FactoryLineStepEditor } from "./FactoryLineStepEditor";
 
 interface FactoryLineStepsEditorProps {
   organizationId: string;
   steps: DraftStep[];
-  apps: FactoryApp[];
-  appById: Map<string, FactoryApp>;
+  apps: FactoryAutomation[];
+  appById: Map<string, FactoryAutomation>;
   onStepsChange: (steps: DraftStep[]) => void;
   onAddStep: () => void;
 }

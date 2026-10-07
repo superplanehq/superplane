@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -141,10 +140,6 @@ func (c *CancelDeploy) Setup(ctx core.SetupContext) error {
 	))
 
 	return nil
-}
-
-func (c *CancelDeploy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CancelDeploy) Execute(ctx core.ExecutionContext) error {

@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+#
+# Ensure a Docker image is present locally. Pull with retries if it is missing.
+#
+# The OpenAPI generator tag is pinned, so a local copy is reused as-is. A
+# registry check on every run would add latency and fail on transient 5xx
+# responses even when the image is already available.
+#
+# When a pull is required, registry errors (5xx, rate limits, TCP/DNS blips)
+# are retried with exponential backoff so `docker run` can stay offline.
+#
+# Usage:
+#   scripts/docker-pull-retry <image>
+#
+# Tunable via environment:
+#   DOCKER_PULL_MAX_RETRIES    attempts before giving up (default 3)
+#   DOCKER_PULL_INITIAL_DELAY  seconds before the first retry (default 5)
+#   DOCKER_PULL_MAX_DELAY      cap on backoff delay in seconds (default 60)
+
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+  echo "usage: $0 <image>" >&2
+  exit 2
+fi
+
+IMAGE="$1"
+MAX_RETRIES="${DOCKER_PULL_MAX_RETRIES:-3}"
+DELAY="${DOCKER_PULL_INITIAL_DELAY:-5}"
+MAX_DELAY="${DOCKER_PULL_MAX_DELAY:-60}"
+
+image_is_local() {
+  docker image inspect "$1" >/dev/null 2>&1
+}
+
+if image_is_local "$IMAGE"; then
+  exit 0
+fi
+
+attempt=1
+while true; do
+  if docker pull "$IMAGE"; then
+    exit 0
+  fi
+
+  if [ "$attempt" -ge "$MAX_RETRIES" ]; then
+    echo "docker pull ${IMAGE} failed after ${MAX_RETRIES} attempt(s)." >&2
+    exit 1
+  fi
+
+  echo "docker pull ${IMAGE} failed (attempt ${attempt}/${MAX_RETRIES}); retrying in ${DELAY}s..." >&2
+  sleep "$DELAY"
+
+  attempt=$((attempt + 1))
+  DELAY=$((DELAY * 2))
+  if [ "$DELAY" -gt "$MAX_DELAY" ]; then
+    DELAY="$MAX_DELAY"
+  fi
+done

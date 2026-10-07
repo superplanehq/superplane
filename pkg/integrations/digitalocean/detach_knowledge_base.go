@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -148,10 +147,6 @@ func (d *DetachKnowledgeBase) Execute(ctx core.ExecutionContext) error {
 
 func (d *DetachKnowledgeBase) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (d *DetachKnowledgeBase) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (d *DetachKnowledgeBase) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

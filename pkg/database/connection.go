@@ -86,6 +86,7 @@ func buildPostgresDSN(c DSNConfig, statementTimeout, idleInTxTimeout time.Durati
 
 	q := url.Values{}
 	q.Set("sslmode", c.Ssl)
+	q.Set("default_query_exec_mode", "describe_exec")
 	if c.ApplicationName != "" {
 		q.Set("application_name", c.ApplicationName)
 	}
@@ -100,6 +101,10 @@ func buildPostgresDSN(c DSNConfig, statementTimeout, idleInTxTimeout time.Durati
 	return u.String()
 }
 
+func openAppDB(dsn string, cfg *gorm.Config) (*gorm.DB, error) {
+	return gorm.Open(postgres.Open(dsn), cfg)
+}
+
 func OpenDedicatedSQLDB(applicationName string, maxOpenConns int) (*sql.DB, error) {
 	c := dsnConfigFromEnv()
 	if applicationName != "" {
@@ -108,7 +113,7 @@ func OpenDedicatedSQLDB(applicationName string, maxOpenConns int) (*sql.DB, erro
 	cfg := LoadConfig()
 	dsn := buildPostgresDSN(c, cfg.StatementTimeout, cfg.IdleInTransactionSessionTimeout)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := openAppDB(dsn, &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -124,6 +129,7 @@ func OpenDedicatedSQLDB(applicationName string, maxOpenConns int) (*sql.DB, erro
 	sqlDB.SetMaxOpenConns(maxOpenConns)
 	sqlDB.SetMaxIdleConns(maxOpenConns)
 	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
+	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	return sqlDB, nil
 }
@@ -141,7 +147,7 @@ func connect() *gorm.DB {
 	})
 	logger := newGormTimeoutLogger(baseLogger)
 
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger})
+	db, err := openAppDB(dsn, &gorm.Config{Logger: logger})
 	if err != nil {
 		panic(err)
 	}
@@ -154,6 +160,7 @@ func connect() *gorm.DB {
 	sqlDB.SetMaxOpenConns(dbPoolSize())
 	sqlDB.SetMaxIdleConns(dbPoolSize())
 	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
+	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	log.Printf(
 		"[database] enforced timeouts: max_open=%d DB_STATEMENT_TIMEOUT=%s DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT=%s host=%s dbname=%s",
@@ -194,6 +201,18 @@ func TruncateTables() error {
 
 	return Conn().Exec(`
 		truncate table
+			runner_task_log_lifecycles,
+			runner_registrations,
+			runner_credentials,
+			runner_tasks,
+			runners,
+			runner_fleets,
+			vcs_provider_installation_reconcile_requesters,
+			vcs_provider_install_requests,
+			vcs_provider_install_request_refreshes,
+			vcs_provider_installation_reconcile_jobs,
+			vcs_provider_reconcile_jobs,
+			vcs_provider_installations,
 			secrets,
 			account_magic_codes,
 			account_password_auth,
@@ -211,6 +230,8 @@ func TruncateTables() error {
 			role_metadata,
 			group_metadata,
 			installation_metadata,
+			installation_licenses,
+			installation_license_keys,
 			workflows,
 			workflow_runs,
 			workflow_nodes,
@@ -221,7 +242,15 @@ func TruncateTables() error {
 			workflow_node_requests,
 			webhooks,
 			agent_sessions,
-			agent_session_messages
+			agent_session_messages,
+			factory_planning_sessions,
+			factory_planning_session_messages,
+			factory_planning_session_work_orders,
+			workspace_usage_events,
+			files,
+			mcp_oauth_clients,
+			mcp_oauth_codes,
+			mcp_oauth_refresh_tokens
 		restart identity cascade;
 	`).Error
 }

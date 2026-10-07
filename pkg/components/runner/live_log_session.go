@@ -17,9 +17,11 @@ import (
 var extraRunnerComponents sync.Map
 
 const (
-	LiveLogStreamTokenPurpose  = "runner_live_logs"
-	LiveLogStreamTokenAudience = "task_broker"
-	liveLogStreamTokenTTL      = 5 * time.Minute
+	LiveLogStreamTokenPurpose       = "runner_live_logs"
+	LiveLogStreamTokenAudience      = "task_broker"
+	LiveLogErrorCodeHeader          = "X-Superplane-Error-Code"
+	LiveLogSessionNotReadyErrorCode = "live_log_session_not_ready"
+	liveLogStreamTokenTTL           = 5 * time.Minute
 )
 
 var (
@@ -40,6 +42,7 @@ type LiveLogStreamTokenClaims struct {
 
 // LiveLogSession is returned to the browser after SuperPlane authorizes log access.
 type LiveLogSession struct {
+	Backend   string    `json:"backend"`
 	StreamURL string    `json:"stream_url"`
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expires_at"`
@@ -48,6 +51,7 @@ type LiveLogSession struct {
 // LiveLogAccessContext is the resolved runner execution context for live log access.
 type LiveLogAccessContext struct {
 	BrokerTaskID string
+	TaskBackend  string
 }
 
 func IsRunnerComponent(name string) bool {
@@ -109,7 +113,10 @@ func ResolveLiveLogAccess(orgID uuid.UUID, canvasID uuid.UUID, executionID uuid.
 		return nil, ErrLiveLogBrokerTaskMissing
 	}
 
-	return &LiveLogAccessContext{BrokerTaskID: brokerTaskID}, nil
+	return &LiveLogAccessContext{
+		BrokerTaskID: brokerTaskID,
+		TaskBackend:  TaskBackendFromExecutionMetadata(execution.Metadata.Data()),
+	}, nil
 }
 
 func taskBrokerBaseURL() (string, error) {
@@ -120,16 +127,42 @@ func taskBrokerBaseURL() (string, error) {
 	return base, nil
 }
 
-func LiveLogStreamURL(brokerTaskID string) (string, error) {
+func taskBrokerLiveLogBaseURL() (string, error) {
+	public := strings.TrimRight(strings.TrimSpace(os.Getenv("TASK_BROKER_PUBLIC_URL")), "/")
+	if public != "" {
+		return public, nil
+	}
 	base, err := taskBrokerBaseURL()
 	if err != nil {
 		return "", err
 	}
+	return browserTaskBrokerBaseURL(base), nil
+}
+
+func liveLogURL(base, brokerTaskID string) (string, error) {
 	brokerTaskID = strings.TrimSpace(brokerTaskID)
 	if brokerTaskID == "" {
 		return "", fmt.Errorf("broker task id is empty")
 	}
 	return base + "/v1/tasks/" + brokerTaskID + "/live-logs", nil
+}
+
+func LiveLogStreamURL(brokerTaskID string) (string, error) {
+	base, err := taskBrokerLiveLogBaseURL()
+	if err != nil {
+		return "", err
+	}
+	return liveLogURL(base, brokerTaskID)
+}
+
+// liveLogInternalStreamURL is for SuperPlane server fetches inside Docker.
+// LiveLogStreamURL is the browser URL (TASK_BROKER_PUBLIC_URL).
+func liveLogInternalStreamURL(brokerTaskID string) (string, error) {
+	base, err := taskBrokerBaseURL()
+	if err != nil {
+		return "", err
+	}
+	return liveLogURL(base, brokerTaskID)
 }
 
 func taskBrokerAuthToken() (string, error) {
@@ -173,7 +206,15 @@ func MintLiveLogStreamToken(brokerTaskID string, now time.Time) (string, time.Ti
 }
 
 func NewLiveLogSession(brokerTaskID string, now time.Time) (*LiveLogSession, error) {
-	streamURL, err := LiveLogStreamURL(brokerTaskID)
+	return newLiveLogSession(brokerTaskID, now, LiveLogStreamURL)
+}
+
+func newInternalLiveLogSession(brokerTaskID string, now time.Time) (*LiveLogSession, error) {
+	return newLiveLogSession(brokerTaskID, now, liveLogInternalStreamURL)
+}
+
+func newLiveLogSession(brokerTaskID string, now time.Time, streamURL func(string) (string, error)) (*LiveLogSession, error) {
+	url, err := streamURL(brokerTaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +225,8 @@ func NewLiveLogSession(brokerTaskID string, now time.Time) (*LiveLogSession, err
 	}
 
 	return &LiveLogSession{
-		StreamURL: streamURL,
+		Backend:   "legacy",
+		StreamURL: url,
 		Token:     token,
 		ExpiresAt: expiresAt,
 	}, nil

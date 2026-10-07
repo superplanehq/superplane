@@ -146,7 +146,7 @@ func Test__RunCodeAgent__buildEnvironmentConfig(t *testing.T) {
 
 func Test__RunCodeAgent__buildPrompt__repository(t *testing.T) {
 	spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug", BaseBranch: "main"}
-	got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, nil)
+	got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
 	assert.Contains(t, got, "git clone https://x-access-token:$GITHUB_TOKEN@github.com/owner/repo.git")
 	assert.Contains(t, got, "git checkout -b claude/agent-abc")
 	assert.Contains(t, got, "fix the bug")
@@ -160,7 +160,7 @@ func Test__RunCodeAgent__buildPrompt__repository(t *testing.T) {
 func Test__RunCodeAgent__buildPrompt__actAsUser(t *testing.T) {
 	spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug"}
 	attr := commitAttribution{AuthorName: "Octo Cat", AuthorEmail: "1+octocat@users.noreply.github.com"}
-	got := buildPrompt(spec, nil, "claude/agent-abc", false, attr, nil)
+	got := buildPrompt(spec, nil, "claude/agent-abc", attr, nil)
 	assert.Contains(t, got, `git config user.name "Octo Cat"`)
 	assert.Contains(t, got, `git config user.email "1+octocat@users.noreply.github.com"`)
 	assert.Contains(t, got, "Co-Authored-By")
@@ -168,11 +168,65 @@ func Test__RunCodeAgent__buildPrompt__actAsUser(t *testing.T) {
 
 func Test__RunCodeAgent__buildPrompt__pr(t *testing.T) {
 	pr := &pullRequestInfo{BaseRepo: "owner/repo", HeadRef: "feature-x", HTMLURL: "https://github.com/owner/repo/pull/9"}
-	got := buildPrompt(Spec{SourceMode: "pr", Task: "address review"}, pr, "feature-x", false, commitAttribution{}, nil)
+	got := buildPrompt(Spec{SourceMode: "pr", Task: "address review"}, pr, "feature-x", commitAttribution{}, nil)
 	assert.Contains(t, got, "git switch feature-x")
 	assert.Contains(t, got, "do NOT open a new pull request")
 	assert.Contains(t, got, "address review")
 	assert.Contains(t, got, "https://github.com/owner/repo/pull/9")
+}
+
+func Test__RunCodeAgent__buildPrompt__resolvesIssue(t *testing.T) {
+	t.Run("same-repo issue origin adds backlink", func(t *testing.T) {
+		spec := Spec{
+			SourceMode:    "repository",
+			Repository:    "owner/repo",
+			Task:          "fix the bug",
+			ResolvesIssue: &IssueRef{Repository: "owner/repo", Number: 12},
+		}
+		got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
+		assert.Contains(t, got, `Include "This resolves #12" in the pull request description`)
+	})
+
+	t.Run("cross-repo issue origin uses owner/repo#N", func(t *testing.T) {
+		spec := Spec{
+			SourceMode:    "repository",
+			Repository:    "owner/repo",
+			Task:          "fix the bug",
+			ResolvesIssue: &IssueRef{Repository: "other-owner/other-repo", Number: 12},
+		}
+		got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
+		assert.Contains(t, got, `Include "This resolves other-owner/other-repo#12" in the pull request description`)
+	})
+
+	t.Run("no origin: no backlink instruction", func(t *testing.T) {
+		spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug"}
+		got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
+		assert.NotContains(t, got, "This resolves")
+	})
+
+	t.Run("autoCreatePr disabled: no backlink instruction even with an issue origin", func(t *testing.T) {
+		no := false
+		spec := Spec{
+			SourceMode:    "repository",
+			Repository:    "owner/repo",
+			Task:          "fix the bug",
+			AutoCreatePr:  &no,
+			ResolvesIssue: &IssueRef{Repository: "owner/repo", Number: 12},
+		}
+		got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, nil)
+		assert.NotContains(t, got, "This resolves")
+	})
+
+	t.Run("update-existing-PR path never gets a backlink instruction", func(t *testing.T) {
+		pr := &pullRequestInfo{BaseRepo: "owner/repo", HeadRef: "feature-x", HTMLURL: "https://github.com/owner/repo/pull/9"}
+		spec := Spec{
+			SourceMode:    "pr",
+			Task:          "address review",
+			ResolvesIssue: &IssueRef{Repository: "owner/repo", Number: 12},
+		}
+		got := buildPrompt(spec, pr, "feature-x", commitAttribution{}, nil)
+		assert.NotContains(t, got, "This resolves")
+	})
 }
 
 func Test__RunCodeAgent__buildPrompt__structuredOutput(t *testing.T) {
@@ -182,7 +236,7 @@ func Test__RunCodeAgent__buildPrompt__structuredOutput(t *testing.T) {
 		"required":   []any{"summary"},
 	}
 	spec := Spec{SourceMode: "repository", Repository: "owner/repo", Task: "fix the bug"}
-	got := buildPrompt(spec, nil, "claude/agent-abc", false, commitAttribution{}, schema)
+	got := buildPrompt(spec, nil, "claude/agent-abc", commitAttribution{}, schema)
 
 	assert.Contains(t, got, "fenced json code block")
 	assert.Contains(t, got, `"summary"`)
@@ -251,6 +305,60 @@ func Test__RunCodeAgent__Execute__repositoryMode_schedulesPoll(t *testing.T) {
 	body, _ := io.ReadAll(sendReq.Body)
 	assert.Contains(t, string(body), "git clone")
 	assert.Contains(t, string(body), "do the thing")
+}
+
+func Test__RunCodeAgent__Execute__sessionErrorFailsAndReclaims(t *testing.T) {
+	a := &RunCodeAgent{}
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{"id":"agent_1"}`),
+		resp(`{"id":"env_1"}`),
+		resp(`{"id":"vault_1"}`),
+		resp(`{}`),
+		resp(`{"id":"sess_1","status":"terminated"}`),
+		resp(`{}`),
+		resp(`{"id":"sess_1","status":"terminated"}`),
+		resp(`{"data":[{"type":"session.status_terminated"},{"type":"session.error","error":{"type":"usage_limit_error","message":"Workspace usage limit reached"}}]}`),
+		resp(`{}`),
+		resp(`{}`),
+		resp(`{}`),
+		resp(`{}`),
+	}}
+	metadataCtx := &contexts.MetadataContext{}
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	execCtx := core.ExecutionContext{
+		ID:             uuid.New(),
+		Configuration:  repoConfig(),
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{"gh/token": []byte("ghp_123")}},
+		Metadata:       metadataCtx,
+		ExecutionState: execState,
+		Requests:       &contexts.RequestContext{},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	err := a.Execute(execCtx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Workspace usage limit reached")
+	assert.False(t, execState.Finished, "the worker (not Execute itself) fails the execution")
+
+	var sessionDeleted, envDeleted, vaultDeleted, agentArchived bool
+	for _, r := range httpCtx.Requests {
+		switch {
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/sessions/sess_1"):
+			sessionDeleted = true
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/environments/env_1"):
+			envDeleted = true
+		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/vaults/vault_1"):
+			vaultDeleted = true
+		case r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/agents/agent_1/archive"):
+			agentArchived = true
+		}
+	}
+	assert.True(t, sessionDeleted, "session should be deleted")
+	assert.True(t, envDeleted, "environment should be deleted")
+	assert.True(t, vaultDeleted, "vault should be deleted")
+	assert.True(t, agentArchived, "agent should be archived")
 }
 
 func Test__RunCodeAgent__Execute__structuredOutputInPrompt(t *testing.T) {
@@ -439,6 +547,34 @@ func Test__RunCodeAgent__poll__terminalExtractsPR(t *testing.T) {
 	assert.Equal(t, "migration-notes.md", out.Artifacts[0].Filename)
 	assert.Equal(t, "text", out.Artifacts[0].Encoding)
 	assert.Equal(t, "# Migration notes\n", out.Artifacts[0].Content)
+}
+
+func Test__RunCodeAgent__poll__sessionErrorFailsExecution(t *testing.T) {
+	a := &RunCodeAgent{}
+	httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+		resp(`{"id":"sess_1","status":"terminated"}`),
+		resp(`{"data":[{"type":"session.status_terminated"},{"type":"session.error","error":{"type":"usage_limit_error","message":"Workspace usage limit reached"}}]}`),
+		resp(`{}`), resp(`{}`), resp(`{}`), resp(`{}`),
+	}}
+	execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	hookCtx := core.ActionHookContext{
+		Name:           "poll",
+		Parameters:     map[string]any{"attempt": float64(1), "errors": float64(0)},
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "k"}},
+		Metadata:       terminalMeta(),
+		ExecutionState: execState,
+		Requests:       &contexts.RequestContext{},
+		Logger:         logrus.NewEntry(logrus.New()),
+	}
+
+	err := a.HandleHook(hookCtx)
+	require.NoError(t, err)
+	require.True(t, execState.Finished)
+	assert.False(t, execState.Passed)
+	assert.Equal(t, "error", execState.FailureReason)
+	assert.Contains(t, execState.FailureMessage, "Workspace usage limit reached")
+	assert.Empty(t, execState.Payloads, "no payload should be emitted for a failed session")
 }
 
 func Test__RunCodeAgent__poll__structuredOutput(t *testing.T) {

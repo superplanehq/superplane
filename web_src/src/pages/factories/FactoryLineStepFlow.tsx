@@ -13,13 +13,12 @@ export function LineStepArrow({ className }: { className?: string }) {
 }
 
 interface LineStepDisplayNodeProps {
-  stepName: string;
   appName: string;
   entrypoint?: string;
   className?: string;
 }
 
-export function LineStepDisplayNode({ stepName, appName, entrypoint, className }: LineStepDisplayNodeProps) {
+export function LineStepDisplayNode({ appName, entrypoint, className }: LineStepDisplayNodeProps) {
   return (
     <div
       className={cn(
@@ -27,9 +26,8 @@ export function LineStepDisplayNode({ stepName, appName, entrypoint, className }
         className,
       )}
     >
-      <p className="text-sm font-medium text-slate-900 dark:text-gray-100">{stepName || "Unnamed step"}</p>
-      <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{appName}</p>
-      {entrypoint ? <p className="mt-0.5 truncate text-[11px] text-gray-400 dark:text-gray-500">{entrypoint}</p> : null}
+      <p className="text-sm font-medium text-slate-900 dark:text-gray-100">{appName || "Unnamed automation"}</p>
+      {entrypoint ? <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">{entrypoint}</p> : null}
     </div>
   );
 }

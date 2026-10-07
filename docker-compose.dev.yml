@@ -35,9 +35,15 @@ services:
       # Lock Playwright browsers location so install and runtime match
       PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"
       START_PUBLIC_API: "yes"
+      START_RUNNER_API: "yes"
+      RUNNER_ACTIVE_LOG_FS_PATH: "/var/lib/superplane/active-runner-logs"
+      START_RUNNER_LOG_COMPACTOR: "yes"
+      START_RUNNER_CLEANUP_WORKER: "yes"
       START_CONSUMERS: "yes"
       PUBLIC_API_BASE_PATH: /api/v1
       START_WEB_SERVER: "yes"
+      START_WEBSOCKET_SERVER: "yes"
+      START_GRPC_GATEWAY: "yes"
       PUBLIC_API_PORT: ${PUBLIC_API_PORT:-8000}
       PORT: ${PORT:-${PUBLIC_API_PORT:-8000}}
       API_PORT: ${API_PORT:-${PUBLIC_API_PORT:-8000}}
@@ -58,9 +64,11 @@ services:
       START_CANVAS_CLEANUP_WORKER: "yes"
       START_NODE_REQUEST_CLEANUP_WORKER: "yes"
       START_ORGANIZATION_CLEANUP_WORKER: "yes"
+      START_FACTORY_CLEANUP_WORKER: "yes"
+      START_FACTORY_VELOCITY_SYNC_WORKER: "yes"
+      START_PRICE_BOOK_SYNC_WORKER: "yes"
+      START_PLANNING_SESSION_CLEANUP_WORKER: "yes"
       START_EVENT_RETENTION_WORKER: "yes"
-      START_USAGE_SYNC_WORKER: "yes"
-      START_REPOSITORY_PROVISIONER: "yes"
       WEB_BASE_PATH: ""
       SENTRY_DSN: ""
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
@@ -77,28 +85,50 @@ services:
       OIDC_KEYS_PATH: /app/test/fixtures/oidc-keys
       NO_ENCRYPTION: "yes"
       SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
-      GITHUB_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
-      GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-1234567890abcdefghijklmnopqrstuv}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-1234567890abcdefghijklmnopqrstuv}
       GOOGLE_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       # Browser / links. For tunnels: match your public UI URL if you load the app through it.
       BASE_URL: ${BASE_URL:-http://localhost:8000}
+      # URL returned to integrated runners. Set this to a tunnel URL for remote runners.
+      RUNNER_API_BASE_URL: ${RUNNER_API_BASE_URL:-}
       # Runner + node webhooks: URLs sent to externals use this origin (must reach this process on PUBLIC_API_PORT).
-      # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL=https://<subdomain>.ngrok-free.app (no trailing slash).
-      WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
-      # Task broker /v1 (Runner component). Base URL has no trailing slash.
+      # Default reaches this app from containers on the Compose network.
+      # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL in .env (no trailing slash).
+      WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://app:8000}
+      # Legacy broker settings remain available for old executions during the
+      # hosted rollout. The default local stack uses integrated runners.
       TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-}
+      TASK_BROKER_PUBLIC_URL: ${TASK_BROKER_PUBLIC_URL:-}
       TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
-      # Bearer; must match broker AUTH_TOKEN when auth is enabled
       TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-}
       ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_AGENT_ID: ${ANTHROPIC_AGENT_ID:-}
       ANTHROPIC_ENVIRONMENT_ID: ${ANTHROPIC_ENVIRONMENT_ID:-}
+      SUPERPLANE_GITHUB_APP_ID: ${SUPERPLANE_GITHUB_APP_ID:-}
+      SUPERPLANE_GITHUB_APP_SLUG: ${SUPERPLANE_GITHUB_APP_SLUG:-}
+      SUPERPLANE_GITHUB_APP_PRIVATE_KEY: ${SUPERPLANE_GITHUB_APP_PRIVATE_KEY:-}
+      SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET: ${SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET:-}
+      SUPERPLANE_SENTRY_APP_SLUG: ${SUPERPLANE_SENTRY_APP_SLUG:-}
+      SUPERPLANE_SENTRY_APP_CLIENT_ID: ${SUPERPLANE_SENTRY_APP_CLIENT_ID:-}
+      SUPERPLANE_SENTRY_APP_CLIENT_SECRET: ${SUPERPLANE_SENTRY_APP_CLIENT_SECRET:-}
+      SUPERPLANE_JIRA_OAUTH_CLIENT_ID: ${SUPERPLANE_JIRA_OAUTH_CLIENT_ID:-}
+      SUPERPLANE_JIRA_OAUTH_CLIENT_SECRET: ${SUPERPLANE_JIRA_OAUTH_CLIENT_SECRET:-}
+      SUPERPLANE_LINEAR_OAUTH_CLIENT_ID: ${SUPERPLANE_LINEAR_OAUTH_CLIENT_ID:-}
+      SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET: ${SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET:-}
+      SUPERPLANE_DEV_HOSTED_OPENROUTER: ${SUPERPLANE_DEV_HOSTED_OPENROUTER:-}
+      SUPERPLANE_DEV_OPENROUTER_API_KEY: ${SUPERPLANE_DEV_OPENROUTER_API_KEY:-}
+      SUPERPLANE_DEV_OPENROUTER_MANAGEMENT_KEY: ${SUPERPLANE_DEV_OPENROUTER_MANAGEMENT_KEY:-}
+      SUPERPLANE_DEV_OPENROUTER_MODELS: ${SUPERPLANE_DEV_OPENROUTER_MODELS:-}
+      SUPERPLANE_DEV_OPENROUTER_BASE_URL: ${SUPERPLANE_DEV_OPENROUTER_BASE_URL:-}
+      SUPERPLANE_DEV_HOSTED_DEFAULT_MODEL: ${SUPERPLANE_DEV_HOSTED_DEFAULT_MODEL:-}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}
       EMAIL_FROM_ADDRESS: ${EMAIL_FROM_ADDRESS:-noreply@notifications.superplane.com}
+      DISCORD_FEEDBACK_WEBHOOK_URL: ${DISCORD_FEEDBACK_WEBHOOK_URL:-}
       BLOCK_SIGNUP: ${BLOCK_SIGNUP:-yes}
       ENABLE_PASSWORD_LOGIN: "yes"
       OTEL_ENABLED: "yes"
@@ -108,25 +138,26 @@ services:
       PPROF_ENABLED: ${PPROF_ENABLED:-yes}
       PPROF_PORT: ${PPROF_PORT:-6060}
       OWNER_SETUP_ENABLED: "yes"
-      USAGE_GRPC_URL: ${USAGE_GRPC_URL:-}
-      VITE_FORCE_USAGE_PAGE: ${VITE_FORCE_USAGE_PAGE:-true}
+      POLAR_ACCESS_TOKEN: ${POLAR_ACCESS_TOKEN:-}
+      POLAR_BUSINESS_PRODUCT_ID: ${POLAR_BUSINESS_PRODUCT_ID:-}
+      POLAR_ENVIRONMENT: ${POLAR_ENVIRONMENT:-sandbox}
+      POLAR_WEBHOOK_SECRET: ${POLAR_WEBHOOK_SECRET:-}
+      POLAR_API_VERSION: ${POLAR_API_VERSION:-}
+      SUPERPLANE_LICENSE_PATH: ${SUPERPLANE_LICENSE_PATH:-}
+      SUPERPLANE_LICENSE_KEYS_URL: ${SUPERPLANE_LICENSE_KEYS_URL:-}
+      SUPERPLANE_LICENSE_DEV_ROOT_JWKS_PATH: ${SUPERPLANE_LICENSE_DEV_ROOT_JWKS_PATH:-}
+      SUPERPLANE_LICENSE_DEV_ENTERPRISE: ${SUPERPLANE_LICENSE_DEV_ENTERPRISE:-true}
+      SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER: ${SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER:-no}
 
       #
-      # Git storage configuration.
-      # For development environment, we use supergit.
-      # The only required configuration for supergit is the base URL.
-      # See: https://github.com/superplanehq/supergit
+      # Platform blob storage. Development uses a local directory. Hosted
+      # SuperPlane uses GCS (BLOB_STORAGE_PROVIDER=gcs).
       #
-      GIT_STORAGE_PROVIDER: ${GIT_STORAGE_PROVIDER:-supergit}
-      GIT_STORAGE_SUPERGIT_BASE_URL: ${GIT_STORAGE_SUPERGIT_BASE_URL:-http://supergit:8080/api}
-
-      #
-      # These are required if codestorage is used as the git storage.
-      # See: https://code.storage
-      #
-      GIT_STORAGE_CODE_STORAGE_NAME: ${GIT_STORAGE_CODE_STORAGE_NAME:-}
-      GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY: ${GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY:-}
-      GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY_PATH: ${GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY_PATH:-}
+      BLOB_STORAGE_PROVIDER: ${BLOB_STORAGE_PROVIDER:-filesystem}
+      BLOB_STORAGE_LOCAL_PATH: ${BLOB_STORAGE_LOCAL_PATH:-/var/lib/superplane/blobs}
+      BLOB_STORAGE_BUCKET: ${BLOB_STORAGE_BUCKET:-}
+      BLOB_STORAGE_CREDENTIALS_FILE: ${BLOB_STORAGE_CREDENTIALS_FILE:-}
+      START_FILE_CLEANUP_WORKER: ${START_FILE_CLEANUP_WORKER:-yes}
 
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}
@@ -134,6 +165,9 @@ services:
       - ${STORYBOOK_PORT:-6006}:${STORYBOOK_PORT:-6006}
       - ${PUBLIC_API_PORT:-8000}:${PUBLIC_API_PORT:-8000}
       - ${PPROF_PORT:-6060}:${PPROF_PORT:-6060}
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
     links:
       - db:db
@@ -144,36 +178,18 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      supergit:
-        condition: service_healthy
 
     volumes:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
-
-  supergit:
-    image: ghcr.io/superplanehq/supergit:0.1.1
-    environment:
-      SUPERGIT_ROOT: /var/lib/supergit/repos
-      SUPERGIT_PORT: "8080"
-      SUPERGIT_DEFAULT_BRANCH: ${CANVAS_STORAGE_DEFAULT_BRANCH:-main}
-      SUPERGIT_MAX_FILE_BYTES: ${CANVAS_STORAGE_MAX_FILE_BYTES:-10485760}
-      SUPERGIT_MAX_COMMIT_BYTES: ${CANVAS_STORAGE_MAX_COMMIT_BYTES:-26214400}
-    ports:
-      - ${SUPERGIT_PORT:-8080}:8080
-    volumes:
-      - supergit-data:/var/lib/supergit/repos
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
-      interval: 3s
-      timeout: 3s
-      retries: 5
+      - blob-data:/var/lib/superplane/blobs
+      - runner-active-log-data:/var/lib/superplane/active-runner-logs
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
     profiles: [dev]
-    command: [ "--config=/etc/otel-collector-config.yaml" ]
+    command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
       - ./otel-collector-config.dev.yaml:/etc/otel-collector-config.yaml:ro
     ports:
@@ -188,7 +204,7 @@ services:
       POSTGRES_PASSWORD: "the-cake-is-a-lie"
     restart: "on-failure"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 3s
       timeout: 3s
       retries: 5
@@ -221,12 +237,53 @@ services:
       timeout: 3s
       retries: 5
 
-volumes:
-  supergit-data:
-    driver: local
+  # Build-only service. Fleet Manager starts ephemeral containers from this
+  # image when a task is queued.
+  runner:
+    profiles: [local-runner-image]
+    image: superplane-runner-local:dev
+    build:
+      context: .
+      dockerfile: release/runner/Dockerfile
+      target: local
+    entrypoint: ["/usr/local/bin/runner"]
+    command: ["--help"]
 
+  fleet-manager:
+    profiles: [local-runner]
+    image: superplane-fleet-manager-local:dev
+    build:
+      context: .
+      dockerfile: release/fleet-manager/Dockerfile
+      target: local
+    environment:
+      FLEET_MANAGER_CONFIG: ${FLEET_MANAGER_CONFIG:-}
+      FLEET_MANAGER_CONFIG_FILE: /etc/superplane/fleet-manager.yaml
+      INSTALLATION_ADMIN_TOKEN: ${INSTALLATION_ADMIN_TOKEN:-}
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: superplane_dev
+      DB_USERNAME: postgres
+      DB_PASSWORD: the-cake-is-a-lie
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config/fleet-manager.local.yaml:/etc/superplane/fleet-manager.yaml:ro
+    depends_on:
+      app:
+        condition: service_started
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+volumes:
   go-pkg-cache:
     driver: local
 
   postgres-data:
+    driver: local
+
+  blob-data:
+    driver: local
+
+  runner-active-log-data:
     driver: local

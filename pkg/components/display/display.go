@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -160,10 +159,6 @@ func (c *Display) Execute(ctx core.ExecutionContext) error {
 		"display.executed",
 		[]any{map[string]any{}},
 	)
-}
-
-func (c *Display) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *Display) Setup(ctx core.SetupContext) error {

@@ -7,7 +7,7 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { QueryTracesConfiguration } from "./types";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import { countGrafanaQueryResponseRows } from "./queryResponse";
 import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
 import { truncate } from "../safeMappers";

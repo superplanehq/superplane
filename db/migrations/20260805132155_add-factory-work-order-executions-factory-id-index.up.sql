@@ -1,0 +1,2 @@
+CREATE INDEX idx_factory_work_order_executions_factory_id
+ON public.factory_work_order_executions USING btree (factory_id);

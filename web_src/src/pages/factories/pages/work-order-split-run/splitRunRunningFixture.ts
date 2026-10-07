@@ -1,0 +1,172 @@
+import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
+
+import { OPEN_WORK_ORDER_ARTIFACTS } from "../../__fixtures__/factoryPageFixtureVariants";
+import { LINE_RUN_IMPLEMENT_ID } from "../../__fixtures__/factoryPageIds";
+import {
+  HOUR_AGO,
+  OPEN_WORK_ORDER,
+  RUNNING_WORK_ORDER,
+  STORYBOOK_ME_USER_AVATAR_URL,
+  STORYBOOK_ME_USER_ID,
+  STORYBOOK_ME_USER_NAME,
+  TWO_HOURS_AGO,
+} from "../../__fixtures__/factoryPageResponses";
+import { DESCRIPTION_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
+import { buildSplitRunFooter } from "./splitRunFooter";
+import type { SplitRunFixture } from "./splitRunMocks";
+import { splitRunSourceForOrder } from "./splitRunSource";
+
+const OWNER: OrgUserDisplay = {
+  id: STORYBOOK_ME_USER_ID,
+  name: STORYBOOK_ME_USER_NAME,
+  initials: getUserInitials(STORYBOOK_ME_USER_NAME),
+  avatarUrl: STORYBOOK_ME_USER_AVATAR_URL,
+};
+
+export const SPLIT_RUN_RUNNING: SplitRunFixture = {
+  title: "Add refund reconciliation test",
+  descriptionText: OPEN_WORK_ORDER.description ?? "",
+  owner: OWNER,
+  assigneeIds: [STORYBOOK_ME_USER_ID],
+  elapsed: "4 min",
+  startedLabel: "Started 1h ago",
+  costUsd: "$0.73",
+  tokensLabel: "2.7k tokens",
+  usageByModel: [{ provider: "anthropic", model: "claude-sonnet-4-6", totalTokens: "2700", costCents: "45" }],
+  usageByMachineType: [{ machineType: "e1-large-amd64", durationSeconds: "90", costCents: "28" }],
+  lineName: "plan-and-implement",
+  currentStepIndex: 0,
+  lineStatus: "running",
+  currentPhaseId: "implement",
+  waitingNotes: [],
+  checks: [],
+  footer: buildSplitRunFooter({
+    kind: "running",
+    note: {
+      key: "running-step",
+      headline: "Implement is running",
+      text: "Implementation works on this step now. The log shows live progress.",
+    },
+    run: { appId: "app-refund-implementer", runId: LINE_RUN_IMPLEMENT_ID },
+  }),
+  footerTone: "running",
+  source: splitRunSourceForOrder(RUNNING_WORK_ORDER),
+  phases: [
+    {
+      id: "backlog",
+      name: "Backlog",
+      status: "passed",
+      duration: "2s",
+      startedAt: TWO_HOURS_AGO,
+      componentName: "Ingest",
+      artifacts: [DESCRIPTION_ARTIFACT],
+      canvasKey: "intake",
+      triggerName: "On Issue Label",
+      appId: "app-refund-backlog",
+      stream: [
+        {
+          id: "backlog-create",
+          at: "12:24:02",
+          componentName: "Create Task",
+          status: "passed",
+          duration: "2s",
+          detail: "description.md",
+        },
+      ],
+      canvasSteps: [
+        {
+          id: "create-work-order",
+          title: "Create task",
+          componentName: "Create Task",
+          provider: "superplane",
+          status: "passed",
+          detail: "description.md",
+          duration: "2s",
+        },
+      ],
+    },
+    {
+      id: "implement",
+      name: "Implement",
+      status: "running",
+      duration: "4m",
+      startedAt: HOUR_AGO,
+      componentName: "Implementation",
+      artifacts: OPEN_WORK_ORDER_ARTIFACTS.filter((artifact) => artifact.id === "art-branch-1"),
+      canvasKey: "implementation",
+      model: "anthropic/claude-sonnet-4-6",
+      appId: "app-refund-implementer",
+      runId: LINE_RUN_IMPLEMENT_ID,
+      stepIndex: 0,
+      stream: [
+        {
+          id: "impl-branch",
+          at: "12:25:14",
+          componentName: "Create Branch",
+          status: "passed",
+          duration: "4s",
+          detail: "feature/refund-retry",
+        },
+        {
+          id: "impl-read",
+          at: "12:25:18",
+          componentName: "Read Artifact",
+          status: "passed",
+          duration: "3s",
+          detail: "plan.md",
+        },
+        {
+          id: "impl-write-file",
+          at: "12:25:22",
+          componentName: "Write File",
+          status: "passed",
+          duration: "11s",
+          detail: "reconciliation_worker_test.go",
+        },
+        {
+          id: "impl-agent",
+          at: "12:25:33",
+          componentName: "Implementation",
+          status: "running",
+          duration: "4m",
+          detail: "reconciliation_worker_test.go",
+        },
+        {
+          id: "impl-pr",
+          at: "—",
+          componentName: "Create Pull Request",
+          status: "pending",
+          detail: "Waits on Implementation",
+        },
+      ],
+      canvasSteps: [
+        {
+          id: "read-plan",
+          title: "Read plan",
+          componentName: "Read Artifact",
+          provider: "superplane",
+          status: "passed",
+          detail: "plan.md",
+          duration: "3s",
+        },
+        {
+          id: "refund-implementer",
+          title: "Write test",
+          componentName: "Implementation",
+          provider: "superplane",
+          status: "running",
+          detail: "reconciliation_worker_test.go",
+          duration: "4m",
+        },
+        {
+          id: "open-pr",
+          title: "Open draft PR",
+          componentName: "Create Pull Request",
+          provider: "github",
+          status: "pending",
+          detail: "Waits on Implementation",
+        },
+      ],
+    },
+  ],
+};

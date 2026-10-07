@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -151,10 +150,6 @@ func (c *GetFeatureFlag) Execute(ctx core.ExecutionContext) error {
 		"launchdarkly.flag",
 		[]any{flag},
 	)
-}
-
-func (c *GetFeatureFlag) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetFeatureFlag) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

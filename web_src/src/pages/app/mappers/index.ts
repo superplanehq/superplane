@@ -55,6 +55,11 @@ import {
   eventStateRegistry as pagerdutyEventStateRegistry,
 } from "./pagerduty/index";
 import {
+  componentMappers as productiveComponentMappers,
+  triggerRenderers as productiveTriggerRenderers,
+  eventStateRegistry as productiveEventStateRegistry,
+} from "./productive/index";
+import {
   componentMappers as dash0ComponentMappers,
   triggerRenderers as dash0TriggerRenderers,
   eventStateRegistry as dash0EventStateRegistry,
@@ -136,7 +141,11 @@ import {
   triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
 } from "./aws";
-import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
+import {
+  componentMappers as bitbucketComponentMappers,
+  triggerRenderers as bitbucketTriggerRenderers,
+  eventStateRegistry as bitbucketEventStateRegistry,
+} from "./bitbucket/index";
 import { componentMappers as coolifyComponentMappers } from "./coolify/index";
 import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
 import {
@@ -212,6 +221,11 @@ import {
   eventStateRegistry as perplexityEventStateRegistry,
 } from "./perplexity/index";
 import {
+  componentMappers as openrouterComponentMappers,
+  triggerRenderers as openrouterTriggerRenderers,
+  eventStateRegistry as openrouterEventStateRegistry,
+} from "./openrouter/index";
+import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
   triggerRenderers as prometheusTriggerRenderers,
@@ -265,10 +279,11 @@ import {
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { forEachMapper, FOR_EACH_STATE_REGISTRY } from "./forEach";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
-import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
+import { agentHarnessMapper, runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
 import { loopMapper, LOOP_STATE_REGISTRY } from "./loop";
+import { addRunErrorMapper } from "./addRunError";
 import { runAppMapper, RUN_APP_STATE_REGISTRY } from "./runApp";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
 import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
@@ -277,6 +292,7 @@ import { onBroadcastTriggerRenderer } from "./messages/on_broadcast";
 import { onRunTriggerRenderer } from "./messages/on_run";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
 import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
+import { registerMapperLookups } from "./mapperLookup";
 
 /**
  * Registry mapping trigger names to their renderers.
@@ -307,7 +323,10 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   runnerJS: runnerMapper,
   runnerBash: runnerMapper,
   runnerPython: runnerMapper,
-  runnerClaudeCode: runnerMapper,
+  runnerSuperPlane: agentHarnessMapper,
+  runnerClaudeCode: agentHarnessMapper,
+  runnerCodex: agentHarnessMapper,
+  runnerOpenRouter: agentHarnessMapper,
   timeGate: timeGateMapper,
   filter: filterMapper,
   forEach: forEachMapper,
@@ -315,6 +334,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   approval: approvalMapper,
   merge: mergeMapper,
   runApp: runAppMapper,
+  addRunError: addRunErrorMapper,
 };
 
 const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
@@ -322,12 +342,14 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cloudsmith: cloudsmithComponentMappers,
   digitalocean: digitaloceanComponentMappers,
   semaphore: semaphoreComponentMappers,
+  bitbucket: bitbucketComponentMappers,
   github: githubComponentMappers,
   gitlab: gitlabComponentMappers,
   jira: jiraComponentMappers,
   linear: linearComponentMappers,
   grafana: grafanaComponentMappers,
   pagerduty: pagerdutyComponentMappers,
+  productive: productiveComponentMappers,
   dash0: dash0ComponentMappers,
   daytona: daytonaComponentMappers,
   datadog: datadogComponentMappers,
@@ -352,6 +374,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   claude: claudeComponentMappers,
   logfire: logfireComponentMappers,
   perplexity: perplexityComponentMappers,
+  openrouter: openrouterComponentMappers,
   gcp: gcpComponentMappers,
   prometheus: prometheusComponentMappers,
   cursor: cursorComponentMappers,
@@ -377,6 +400,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   jira: jiraTriggerRenderers,
   linear: linearTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
+  productive: productiveTriggerRenderers,
   dash0: dash0TriggerRenderers,
   daytona: daytonaTriggerRenderers,
   datadog: datadogTriggerRenderers,
@@ -401,6 +425,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   claude: claudeTriggerRenderers,
   logfire: logfireTriggerRenderers,
   perplexity: perplexityTriggerRenderers,
+  openrouter: openrouterTriggerRenderers,
   gcp: gcpTriggerRenderers,
   grafana: grafanaTriggerRenderers,
   bitbucket: bitbucketTriggerRenderers,
@@ -421,8 +446,10 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cloudsmith: cloudsmithEventStateRegistry,
   digitalocean: digitaloceanEventStateRegistry,
   semaphore: semaphoreEventStateRegistry,
+  bitbucket: bitbucketEventStateRegistry,
   github: githubEventStateRegistry,
   pagerduty: pagerdutyEventStateRegistry,
+  productive: productiveEventStateRegistry,
   dash0: dash0EventStateRegistry,
   daytona: daytonaEventStateRegistry,
   datadog: datadogEventStateRegistry,
@@ -445,6 +472,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   claude: claudeEventStateRegistry,
   logfire: logfireEventStateRegistry,
   perplexity: perplexityEventStateRegistry,
+  openrouter: openrouterEventStateRegistry,
   gcp: gcpEventStateRegistry,
   statuspage: statuspageEventStateRegistry,
   aws: awsEventStateRegistry,
@@ -473,7 +501,10 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   runnerJS: RUNNER_STATE_REGISTRY,
   runnerBash: RUNNER_STATE_REGISTRY,
   runnerPython: RUNNER_STATE_REGISTRY,
+  runnerSuperPlane: RUNNER_STATE_REGISTRY,
   runnerClaudeCode: RUNNER_STATE_REGISTRY,
+  runnerCodex: RUNNER_STATE_REGISTRY,
+  runnerOpenRouter: RUNNER_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
   forEach: FOR_EACH_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
@@ -675,3 +706,9 @@ function withCustomName(renderer: TriggerRenderer): TriggerRenderer {
     },
   };
 }
+
+registerMapperLookups({
+  getState,
+  getStateMap,
+  getTriggerRenderer,
+});

@@ -1,60 +1,321 @@
 package models
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
+	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
-const factoryNameUniqueConstraint = "factories_organization_id_name_key"
+const (
+	factoryNameUniqueConstraint  = "factories_organization_id_name_key"
+	factoryKeyUniqueConstraint   = "factories_organization_id_key_active_key"
+	factoryURLIDUniqueConstraint = "factories_url_id_key"
+
+	FactoryKeyMinLength = 2
+	FactoryKeyMaxLength = 5
+	FactoryURLIDLength  = 8
+
+	DefaultFactoryWorkOrderListLimit = 100
+	maxFactoryURLIDAttempts          = 8
+	factoryURLIDAlphabet             = "abcdefghijklmnopqrstuvwxyz0123456789"
+)
 
 var ErrFactoryNameAlreadyExists = errors.New("factory name already exists")
+var ErrFactoryNameRequired = errors.New("factory name is required")
 var ErrFactoryNotFound = errors.New("factory not found")
 var ErrFactoryWorkOrderTitleRequired = errors.New("title is required")
+var ErrFactoryKeyRequired = errors.New("factory key is required")
+var ErrFactoryKeyInvalid = errors.New("factory key must be 2 to 5 uppercase letters")
+var ErrFactoryKeyAlreadyExists = errors.New("factory key already exists in this organization")
+var ErrFactoryURLIDAlreadyExists = errors.New("factory url id already exists")
+var ErrFactoryHostedSpendBudgetNegative = errors.New("hosted spend limit cannot be negative")
+var ErrFactoryOnboardingNotComplete = errors.New("factory onboarding is not complete")
+
+var factoryKeyPattern = regexp.MustCompile(`^[A-Z]{2,5}$`)
+var factoryURLIDPattern = regexp.MustCompile(`^[a-z0-9]{8}$`)
+var factoryRouteSegmentPattern = regexp.MustCompile(`^[A-Za-z]{2,5}-([a-z0-9]{8})$`)
 
 type Factory struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
 	Name           string
 	Description    string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	Key            string
+	// URLID is the stable workspace id used in URLs. It does not change when
+	// the workspace key changes.
+	URLID                   string `gorm:"column:url_id"`
+	NextWorkOrderNumber     int64
+	OnboardingConfig        datatypes.JSONType[FactoryOnboardingConfig]
+	OnboardingCompletedAt   *time.Time
+	HostedSpendBudgetCents  *int64
+	PlanningEnabled         bool
+	PlanningClarity         bool
+	PlanningConfidence      bool
+	PlanningSetupCompleted  bool
+	PlanningAutoStartLineID *uuid.UUID
+	// Public lets anyone with the line URL view the board. They cannot open
+	// tasks, logs, or settings.
+	Public              bool
+	PublicBadgeEnabled  bool
+	PublicBadgeShowCost bool
+	PublicBadgeToken    *string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	DeletedAt           gorm.DeletedAt `gorm:"index"`
 }
 
-func MapFactoryNameUniqueConstraintError(err error) error {
+// FactoryPlanning is the workspace toggle for draft chat plus the two
+// optional checks. New workspaces start with Planning and the Confidence
+// estimate on. The Clarity check is opt-in because it makes the agent ask
+// more questions before a task is ready.
+type FactoryPlanning struct {
+	Enabled         bool
+	Clarity         bool
+	Confidence      bool
+	SetupCompleted  bool
+	AutoStartLineID *uuid.UUID
+}
+
+func DefaultFactoryPlanning() FactoryPlanning {
+	return FactoryPlanning{Enabled: true, Clarity: false, Confidence: true, SetupCompleted: false}
+}
+
+// NormalizeFactoryKey uppercases and trims whitespace so callers can accept
+// user input in any case, then re-check it with ValidateFactoryKey.
+func NormalizeFactoryKey(key string) string {
+	return strings.ToUpper(strings.TrimSpace(key))
+}
+
+// ValidateFactoryKey rejects empty or malformed keys with a stable error
+// that API handlers translate into an `InvalidArgument` response. Callers
+// should normalize input with NormalizeFactoryKey first.
+func ValidateFactoryKey(key string) error {
+	if key == "" {
+		return ErrFactoryKeyRequired
+	}
+	if !factoryKeyPattern.MatchString(key) {
+		return ErrFactoryKeyInvalid
+	}
+	return nil
+}
+
+// GenerateFactoryKeyFromName produces a stable candidate key from a factory
+// name (letters only, uppercased, trimmed to the max length). Callers still
+// need to check organization uniqueness before persisting.
+func GenerateFactoryKeyFromName(name string) string {
+	letters := regexp.MustCompile(`[^A-Za-z]`).ReplaceAllString(name, "")
+	upper := strings.ToUpper(letters)
+	if len(upper) > FactoryKeyMaxLength {
+		upper = upper[:FactoryKeyMaxLength]
+	}
+	if len(upper) < FactoryKeyMinLength {
+		return ""
+	}
+	return upper
+}
+
+// MapFactoryConstraintError converts Postgres unique-constraint violations
+// into the domain-specific errors that upper layers know how to translate
+// into user-facing responses.
+func MapFactoryConstraintError(err error) error {
 	if err == nil {
 		return nil
 	}
 
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.ConstraintName == factoryNameUniqueConstraint {
-		return ErrFactoryNameAlreadyExists
+	if errors.As(err, &pgErr) {
+		switch pgErr.ConstraintName {
+		case factoryNameUniqueConstraint:
+			return ErrFactoryNameAlreadyExists
+		case factoryKeyUniqueConstraint:
+			return ErrFactoryKeyAlreadyExists
+		case factoryURLIDUniqueConstraint:
+			return ErrFactoryURLIDAlreadyExists
+		}
 	}
 
 	return err
 }
 
-func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description string) (*Factory, error) {
+// MapFactoryNameUniqueConstraintError is a compatibility shim; call
+// MapFactoryConstraintError instead in new code.
+func MapFactoryNameUniqueConstraintError(err error) error {
+	return MapFactoryConstraintError(err)
+}
+
+// WorkOrderKey returns the display identifier used for a work order that
+// belongs to this factory. Format matches `<KEY>-<number>` (for example
+// `SP-42`).
+func (f *Factory) WorkOrderKey(number int64) string {
+	return fmt.Sprintf("%s-%d", f.Key, number)
+}
+
+// RouteSegment is the canonical workspace URL segment: lowercase key, hyphen,
+// then the stable url id. Example: `eng-k7m2xqab`.
+func (f *Factory) RouteSegment() string {
+	if f == nil || f.Key == "" || f.URLID == "" {
+		return ""
+	}
+	return strings.ToLower(f.Key) + "-" + f.URLID
+}
+
+var newFactoryURLID = generateFactoryURLID
+
+func generateFactoryURLID() (string, error) {
+	raw := make([]byte, FactoryURLIDLength)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	out := make([]byte, FactoryURLIDLength)
+	for i, b := range raw {
+		out[i] = factoryURLIDAlphabet[int(b)%len(factoryURLIDAlphabet)]
+	}
+	return string(out), nil
+}
+
+func CreateFactory(tx *gorm.DB, organizationID uuid.UUID, name, description, key string) (*Factory, error) {
+	normalizedKey := NormalizeFactoryKey(key)
+	if normalizedKey == "" {
+		// Callers that omit the key (tests, CLI, backfill utilities) get a
+		// deterministic name-derived key with a numeric suffix on collision.
+		generated, err := GenerateUniqueFactoryKey(tx, organizationID, name)
+		if err != nil {
+			return nil, err
+		}
+		normalizedKey = generated
+	}
+	if err := ValidateFactoryKey(normalizedKey); err != nil {
+		return nil, err
+	}
+
+	planning := DefaultFactoryPlanning()
 	now := time.Now()
 	factory := &Factory{
-		ID:             uuid.New(),
-		OrganizationID: organizationID,
-		Name:           name,
-		Description:    description,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:                     uuid.New(),
+		OrganizationID:         organizationID,
+		Name:                   name,
+		Description:            description,
+		Key:                    normalizedKey,
+		NextWorkOrderNumber:    1,
+		OnboardingConfig:       datatypes.NewJSONType(FactoryOnboardingConfig{}),
+		OnboardingCompletedAt:  nil,
+		PlanningEnabled:        planning.Enabled,
+		PlanningClarity:        planning.Clarity,
+		PlanningConfidence:     planning.Confidence,
+		PlanningSetupCompleted: planning.SetupCompleted,
+		CreatedAt:              now,
+		UpdatedAt:              now,
 	}
 
-	if err := tx.Clauses(clause.Returning{}).Create(factory).Error; err != nil {
-		return nil, MapFactoryNameUniqueConstraintError(err)
+	return insertFactoryWithUniqueURLID(tx, factory)
+}
+
+func insertFactoryWithUniqueURLID(tx *gorm.DB, factory *Factory) (*Factory, error) {
+	var created *Factory
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		for attempt := 0; attempt < maxFactoryURLIDAttempts; attempt++ {
+			savepoint := fmt.Sprintf("factory_url_id_%d", attempt)
+			if err := inner.SavePoint(savepoint).Error; err != nil {
+				return fmt.Errorf("factory url id savepoint: %w", err)
+			}
+
+			urlID, err := newFactoryURLID()
+			if err != nil {
+				return err
+			}
+			factory.URLID = urlID
+			err = inner.Clauses(clause.Returning{}).Create(factory).Error
+			if err == nil {
+				created = factory
+				return nil
+			}
+
+			mapped := MapFactoryConstraintError(err)
+			if !errors.Is(mapped, ErrFactoryURLIDAlreadyExists) {
+				return mapped
+			}
+			// GORM stores the unique-violation on inner.Error and then skips
+			// later statements. Clear it so ROLLBACK TO SAVEPOINT can run.
+			inner.Error = nil
+			if rollbackErr := inner.RollbackTo(savepoint).Error; rollbackErr != nil {
+				return fmt.Errorf("rollback factory url id: %w", rollbackErr)
+			}
+		}
+
+		return fmt.Errorf("could not allocate a unique workspace url id")
+	})
+	if err != nil {
+		return nil, err
+	}
+	return created, nil
+}
+
+// GenerateUniqueFactoryKey picks a key that is unique among active
+// factories in the given organization. It first tries the name-derived
+// seed, then walks through letter-only variants. Used by tests and by the
+// CLI, where callers may not care about picking a specific key.
+//
+// Keys are letters-only by the schema check constraint, so we cannot fall
+// back to numeric suffixes. Instead we pad with `X` and cycle through the
+// last character.
+func GenerateUniqueFactoryKey(tx *gorm.DB, organizationID uuid.UUID, name string) (string, error) {
+	seed := GenerateFactoryKeyFromName(name)
+	if seed == "" {
+		seed = "WS"
+	}
+	if len(seed) < FactoryKeyMinLength {
+		seed = seed + strings.Repeat("X", FactoryKeyMinLength-len(seed))
 	}
 
-	return factory, nil
+	baseCandidates := []string{seed}
+	for length := FactoryKeyMinLength; length <= FactoryKeyMaxLength; length++ {
+		if length == len(seed) {
+			continue
+		}
+		if len(seed) >= length {
+			baseCandidates = append(baseCandidates, seed[:length])
+			continue
+		}
+		baseCandidates = append(baseCandidates, seed+strings.Repeat("X", length-len(seed)))
+	}
+
+	tried := map[string]bool{}
+	for _, base := range baseCandidates {
+		for letter := 'A'; letter <= 'Z'; letter++ {
+			candidate := base
+			if tried[candidate] {
+				candidate = base[:len(base)-1] + string(letter)
+			}
+			if tried[candidate] {
+				continue
+			}
+			tried[candidate] = true
+
+			var count int64
+			err := tx.Model(&Factory{}).
+				Where("organization_id = ? AND key = ?", organizationID, candidate).
+				Count(&count).Error
+			if err != nil {
+				return "", err
+			}
+			if count == 0 {
+				return candidate, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("could not generate unique factory key from %q", name)
 }
 
 func FindFactory(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*Factory, error) {
@@ -73,6 +334,106 @@ func FindFactory(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*Factory, er
 	return &factory, nil
 }
 
+// FindFactoryByPublicBadgeToken loads the workspace that owns a public badge
+// link. An empty token is not a match. Soft-deleted workspaces are excluded.
+func FindFactoryByPublicBadgeToken(tx *gorm.DB, token string) (*Factory, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil, ErrFactoryNotFound
+	}
+
+	var factory Factory
+	err := tx.Where("public_badge_token = ?", token).First(&factory).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryNotFound
+		}
+		return nil, err
+	}
+	return &factory, nil
+}
+
+func FindFactoryByID(tx *gorm.DB, factoryID uuid.UUID) (*Factory, error) {
+	var factory Factory
+	err := tx.Where("id = ?", factoryID).First(&factory).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrFactoryNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &factory, nil
+}
+
+func FindFactoryByKey(tx *gorm.DB, organizationID uuid.UUID, key string) (*Factory, error) {
+	normalized := NormalizeFactoryKey(key)
+	if err := ValidateFactoryKey(normalized); err != nil {
+		return nil, err
+	}
+
+	var factory Factory
+	err := tx.
+		Where("organization_id = ? AND key = ?", organizationID, normalized).
+		First(&factory).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryNotFound
+		}
+		return nil, err
+	}
+
+	return &factory, nil
+}
+
+func FindFactoryByURLID(tx *gorm.DB, organizationID uuid.UUID, urlID string) (*Factory, error) {
+	if !factoryURLIDPattern.MatchString(urlID) {
+		return nil, ErrFactoryNotFound
+	}
+
+	var factory Factory
+	err := tx.
+		Where("organization_id = ? AND url_id = ?", organizationID, urlID).
+		First(&factory).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryNotFound
+		}
+		return nil, err
+	}
+
+	return &factory, nil
+}
+
+func FactoryURLIDFromRouteSegment(segment string) (string, bool) {
+	matches := factoryRouteSegmentPattern.FindStringSubmatch(strings.TrimSpace(segment))
+	if matches == nil {
+		return "", false
+	}
+	return matches[1], true
+}
+
+// FindFactoryByRef resolves ref to a factory. ref is a UUID, a workspace
+// key, or a `key-urlId` route segment. Workspace names are not accepted.
+//
+// Names can contain spaces, so they do not belong in `/factories/{id}`.
+// Names are also not unique in an organization.
+func FindFactoryByRef(tx *gorm.DB, organizationID uuid.UUID, ref string) (*Factory, error) {
+	trimmed := strings.TrimSpace(ref)
+	if trimmed == "" {
+		return nil, ErrFactoryNotFound
+	}
+	if id, err := uuid.Parse(trimmed); err == nil {
+		return FindFactory(tx, organizationID, id)
+	}
+	if urlID, ok := FactoryURLIDFromRouteSegment(trimmed); ok {
+		return FindFactoryByURLID(tx, organizationID, urlID)
+	}
+
+	return FindFactoryByKey(tx, organizationID, trimmed)
+}
+
 func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
 	var factories []Factory
 	err := tx.
@@ -86,6 +447,267 @@ func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
 	}
 
 	return factories, nil
+}
+
+// ListFactoriesAll returns every factory on the installation.
+func ListFactoriesAll(tx *gorm.DB) ([]Factory, error) {
+	var factories []Factory
+	err := tx.
+		Order("organization_id ASC").
+		Order("name ASC").
+		Order("id ASC").
+		Find(&factories).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return factories, nil
+}
+
+// ListOrganizationFactoriesByRecentUpdate returns non-deleted workspaces of an
+// organization, most recently updated first. Equal update times use id
+// descending so the order stays stable.
+func ListOrganizationFactoriesByRecentUpdate(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
+	var factories []Factory
+	err := tx.
+		Where("organization_id = ?", organizationID).
+		Order("updated_at DESC").
+		Order("id DESC").
+		Find(&factories).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return factories, nil
+}
+
+func (f *Factory) SoftDelete(tx *gorm.DB) error {
+	now := time.Now()
+	newName := fmt.Sprintf("%s (deleted-%d)", f.Name, now.Unix())
+
+	err := tx.Model(f).Updates(map[string]any{
+		"name":       newName,
+		"deleted_at": now,
+		"updated_at": now,
+	}).Error
+	if err != nil {
+		return err
+	}
+
+	f.Name = newName
+	f.DeletedAt = gorm.DeletedAt{Time: now, Valid: true}
+	f.UpdatedAt = now
+	return nil
+}
+
+func (f *Factory) Update(tx *gorm.DB, name, description, key *string) error {
+	updates := map[string]any{}
+
+	if name != nil {
+		nextName := strings.TrimSpace(*name)
+		if nextName == "" {
+			return ErrFactoryNameRequired
+		}
+		if f.Name != nextName {
+			updates["name"] = nextName
+		}
+	}
+
+	if description != nil && f.Description != *description {
+		updates["description"] = *description
+	}
+
+	if key != nil {
+		nextKey := NormalizeFactoryKey(*key)
+		if err := ValidateFactoryKey(nextKey); err != nil {
+			return err
+		}
+		if f.Key != nextKey {
+			updates["key"] = nextKey
+		}
+	}
+
+	if len(updates) == 0 {
+		return nil
+	}
+
+	now := time.Now()
+	updates["updated_at"] = now
+
+	err := MapFactoryConstraintError(
+		tx.Model(f).
+			Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+			Updates(updates).
+			Error,
+	)
+	if err != nil {
+		return err
+	}
+
+	if nextName, ok := updates["name"].(string); ok {
+		f.Name = nextName
+	}
+	if nextDescription, ok := updates["description"].(string); ok {
+		f.Description = nextDescription
+	}
+	if nextKey, ok := updates["key"].(string); ok {
+		f.Key = nextKey
+	}
+	f.UpdatedAt = now
+	return nil
+}
+
+func (f *Factory) UpdateHostedSpendBudget(tx *gorm.DB, budgetCents *int64) error {
+	if budgetCents != nil && *budgetCents < 0 {
+		return ErrFactoryHostedSpendBudgetNegative
+	}
+
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("hosted_spend_budget_cents", "updated_at").
+		Updates(map[string]any{
+			"hosted_spend_budget_cents": budgetCents,
+			"updated_at":                now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.HostedSpendBudgetCents = budgetCents
+	f.UpdatedAt = now
+	return nil
+}
+
+func (f *Factory) Planning() FactoryPlanning {
+	return FactoryPlanning{
+		Enabled:         f.PlanningEnabled,
+		Clarity:         f.PlanningClarity,
+		Confidence:      f.PlanningConfidence,
+		SetupCompleted:  f.PlanningSetupCompleted,
+		AutoStartLineID: f.PlanningAutoStartLineID,
+	}
+}
+
+func (f *Factory) UpdatePlanning(tx *gorm.DB, planning FactoryPlanning) error {
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select(
+			"planning_enabled",
+			"planning_clarity",
+			"planning_confidence",
+			"planning_setup_completed",
+			"planning_auto_start_line_id",
+			"updated_at",
+		).
+		Updates(map[string]any{
+			"planning_enabled":            planning.Enabled,
+			"planning_clarity":            planning.Clarity,
+			"planning_confidence":         planning.Confidence,
+			"planning_setup_completed":    planning.SetupCompleted,
+			"planning_auto_start_line_id": planning.AutoStartLineID,
+			"updated_at":                  now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.PlanningEnabled = planning.Enabled
+	f.PlanningClarity = planning.Clarity
+	f.PlanningConfidence = planning.Confidence
+	f.PlanningSetupCompleted = planning.SetupCompleted
+	f.PlanningAutoStartLineID = planning.AutoStartLineID
+	f.UpdatedAt = now
+	return nil
+}
+
+func (f *Factory) SetPublic(tx *gorm.DB, public bool) error {
+	if f.OnboardingCompletedAt == nil {
+		return ErrFactoryOnboardingNotComplete
+	}
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("public", "updated_at").
+		Updates(map[string]any{
+			"public":     public,
+			"updated_at": now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.Public = public
+	f.UpdatedAt = now
+	return nil
+}
+
+// UpdatePublicBadgeEnabled turns the public badge on or off. The first enable
+// stores a random URL-safe token. A later enable keeps that token, including
+// when two first enables run together, so a README link stays valid.
+func (f *Factory) UpdatePublicBadgeEnabled(tx *gorm.DB, enabled bool) error {
+	now := time.Now()
+	updates := map[string]any{
+		"public_badge_enabled": enabled,
+		"updated_at":           now,
+	}
+	columns := []string{"public_badge_enabled", "updated_at"}
+	if enabled {
+		token, err := newPublicBadgeToken()
+		if err != nil {
+			return err
+		}
+		updates["public_badge_token"] = gorm.Expr("COALESCE(NULLIF(public_badge_token, ''), ?)", token)
+		columns = append(columns, "public_badge_token")
+	}
+
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select(columns).
+		Updates(updates).Error
+	if err != nil {
+		return err
+	}
+	if enabled {
+		var stored Factory
+		err = tx.Select("public_badge_token").
+			Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+			First(&stored).Error
+		if err != nil {
+			return err
+		}
+		f.PublicBadgeToken = stored.PublicBadgeToken
+	}
+	f.PublicBadgeEnabled = enabled
+	f.UpdatedAt = now
+	return nil
+}
+
+// UpdatePublicBadgeShowCost stores the cost switch on its own. Turning the
+// badge off does not clear this value.
+func (f *Factory) UpdatePublicBadgeShowCost(tx *gorm.DB, showCost bool) error {
+	now := time.Now()
+	err := tx.Model(f).
+		Where("organization_id = ? AND id = ?", f.OrganizationID, f.ID).
+		Select("public_badge_show_cost", "updated_at").
+		Updates(map[string]any{
+			"public_badge_show_cost": showCost,
+			"updated_at":             now,
+		}).Error
+	if err != nil {
+		return err
+	}
+	f.PublicBadgeShowCost = showCost
+	f.UpdatedAt = now
+	return nil
+}
+
+func newPublicBadgeToken() (string, error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(raw), nil
 }
 
 func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {
@@ -103,28 +725,246 @@ func (f *Factory) ListCanvases(tx *gorm.DB) ([]Canvas, error) {
 	return canvases, nil
 }
 
-func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID) (*FactoryWorkOrder, error) {
+func ListDeletedFactories(tx *gorm.DB) ([]Factory, error) {
+	var factories []Factory
+	err := tx.
+		Model(&Factory{}).
+		Unscoped().
+		Joins("JOIN organizations ON organizations.id = factories.organization_id").
+		Select(
+			"factories.id",
+			"factories.organization_id",
+			"factories.name",
+			"factories.description",
+			"factories.key",
+			"factories.next_work_order_number",
+			"factories.created_at",
+			"factories.updated_at",
+			// Earliest deletion wins so neither factory nor org soft-delete resets grace.
+			"LEAST(factories.deleted_at, organizations.deleted_at) AS deleted_at",
+		).
+		Where("factories.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
+		Find(&factories).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return factories, nil
+}
+
+func LockDeletedFactory(tx *gorm.DB, id uuid.UUID) (*Factory, error) {
+	var factory Factory
+	err := tx.
+		Unscoped().
+		Model(&Factory{}).
+		Joins("JOIN organizations ON organizations.id = factories.organization_id").
+		Select(
+			"factories.id",
+			"factories.organization_id",
+			"factories.name",
+			"factories.description",
+			"factories.key",
+			"factories.next_work_order_number",
+			"factories.created_at",
+			"factories.updated_at",
+			"LEAST(factories.deleted_at, organizations.deleted_at) AS deleted_at",
+		).
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "factories"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("factories.id = ?", id).
+		Where("factories.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
+		First(&factory).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &factory, nil
+}
+
+func (f *Factory) CountCanvases(tx *gorm.DB) (int64, error) {
+	var count int64
+	err := tx.Unscoped().
+		Model(&Canvas{}).
+		Where("factory_id = ?", f.ID).
+		Count(&count).
+		Error
+	return count, err
+}
+
+func (f *Factory) SoftDeleteCanvases(tx *gorm.DB) error {
+	canvases, err := f.ListCanvases(tx)
+	if err != nil {
+		return err
+	}
+
+	for i := range canvases {
+		if err := canvases[i].SoftDeleteInTransaction(tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// CountFactoriesByIDs counts the active factories in the organization
+// matching the given IDs. Callers use it to verify a caller-provided
+// workspace list before persisting references to it.
+func CountFactoriesByIDs(tx *gorm.DB, organizationID uuid.UUID, ids []uuid.UUID) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+
+	var count int64
+	err := tx.Model(&Factory{}).
+		Where("organization_id = ?", organizationID).
+		Where("id IN ?", ids).
+		Count(&count).
+		Error
+	return count, err
+}
+
+func CountFactoriesByOrganization(tx *gorm.DB, organizationID uuid.UUID) (int64, error) {
+	var count int64
+	err := tx.Unscoped().
+		Model(&Factory{}).
+		Where("organization_id = ?", organizationID).
+		Count(&count).
+		Error
+	return count, err
+}
+
+func SoftDeleteOrganizationFactories(tx *gorm.DB, organizationID uuid.UUID) error {
+	var factories []Factory
+	err := tx.
+		Where("organization_id = ?", organizationID).
+		Find(&factories).
+		Error
+	if err != nil {
+		return err
+	}
+
+	for i := range factories {
+		if factories[i].DeletedAt.Valid {
+			continue
+		}
+		if err := factories[i].SoftDelete(tx); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, createdBy *uuid.UUID, assignees []uuid.UUID, sourceRunID *uuid.UUID) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil, nil)
+}
+
+func (f *Factory) CreateWorkOrderWithAutoStart(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	autoStartLineID *uuid.UUID,
+) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, nil, autoStartLineID)
+}
+
+// SnapshotWorkOrderRepository records the current repository before a
+// workspace switches repositories. A nil snapshot is a legacy row, so
+// preserve an existing value from an earlier switch. The Git host is
+// part of that snapshot.
+func (f *Factory) SnapshotWorkOrderRepository(tx *gorm.DB, repository, defaultBranch, provider string) error {
+	updates := map[string]any{
+		"repository":     gorm.Expr("COALESCE(repository, ?)", repository),
+		"default_branch": gorm.Expr("COALESCE(default_branch, ?)", defaultBranch),
+		"vcs_provider":   gorm.Expr("COALESCE(vcs_provider, ?)", provider),
+	}
+
+	return tx.Model(&FactoryWorkOrder{}).
+		Where("factory_id = ?", f.ID).
+		Updates(updates).
+		Error
+}
+
+func (f *Factory) CreateWorkOrderWithOrigin(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	origin WorkOrderOrigin,
+) (*FactoryWorkOrder, error) {
+	return f.createWorkOrder(tx, title, description, createdBy, assignees, sourceRunID, &origin, nil)
+}
+
+func (f *Factory) createWorkOrder(
+	tx *gorm.DB,
+	title, description string,
+	createdBy *uuid.UUID,
+	assignees []uuid.UUID,
+	sourceRunID *uuid.UUID,
+	origin *WorkOrderOrigin,
+	autoStartLineID *uuid.UUID,
+) (*FactoryWorkOrder, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, ErrFactoryWorkOrderTitleRequired
 	}
+	if autoStartLineID != nil {
+		if _, err := f.FindLine(tx, *autoStartLineID); err != nil {
+			return nil, err
+		}
+	}
+
+	// Allocate the sequence number atomically: the UPDATE ... RETURNING
+	// increments `next_work_order_number` and hands back the previous
+	// value in one round-trip, so concurrent inserts cannot collide even
+	// without an explicit row lock. The parent transaction rolls the
+	// counter back if anything below fails.
+	nextNumber, err := f.allocateNextWorkOrderNumber(tx)
+	if err != nil {
+		return nil, err
+	}
 
 	now := time.Now()
 	order := &FactoryWorkOrder{
-		ID:             uuid.New(),
-		OrganizationID: f.OrganizationID,
-		FactoryID:      f.ID,
-		Title:          title,
-		Description:    description,
-		State:          FactoryWorkOrderStateOpen,
-		Result:         "",
-		CreatedByID:    createdBy,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:              uuid.New(),
+		OrganizationID:  f.OrganizationID,
+		FactoryID:       f.ID,
+		Number:          nextNumber,
+		Title:           title,
+		Description:     description,
+		State:           FactoryWorkOrderStateDraft,
+		Result:          "",
+		CreatedByID:     createdBy,
+		SourceRunID:     sourceRunID,
+		AutoStartLineID: autoStartLineID,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
+	config := f.OnboardingConfigValue()
+	if config.AppRepository != "" && config.DefaultBranch != "" {
+		provider := config.EffectiveVCSProvider()
+		order.Repository = &config.AppRepository
+		order.DefaultBranch = &config.DefaultBranch
+		order.VCSProvider = &provider
+	}
+	applyWorkOrderOrigin(order, origin)
 
 	if err := tx.Clauses(clause.Returning{}).Create(order).Error; err != nil {
 		return nil, err
+	}
+
+	if sourceRunID != nil {
+		if err := attachUsageEventsToWorkOrder(tx, f.ID, order.ID, *sourceRunID); err != nil {
+			return nil, err
+		}
 	}
 
 	if len(assignees) > 0 {
@@ -133,17 +973,43 @@ func (f *Factory) CreateWorkOrder(tx *gorm.DB, title, description string, create
 		}
 	}
 
+	// Creation is a status transition into `draft` (fromState == "").
+	// For orders spawned by a canvas run we snapshot the originating
+	// run + app here so the very first timeline entry links back to
+	// the run that created the order — matching the enrichment
+	// UpdateStatus performs on the draft → open promotion.
+	initialStatus := statusUpdatedRecord{
+		Actor:   createdBy,
+		ToState: FactoryWorkOrderStateDraft,
+	}
+	if sourceRunID != nil {
+		sourceRun, sourceApp, err := order.loadSourceRunRefs(tx)
+		if err != nil {
+			return nil, err
+		}
+		initialStatus.Run = sourceRun
+		initialStatus.App = sourceApp
+	}
+	if err := order.RecordStatusUpdated(tx, initialStatus); err != nil {
+		return nil, err
+	}
+
 	return f.FindWorkOrder(tx, order.ID)
 }
 
-func (f *Factory) FindWorkOrder(tx *gorm.DB, orderID uuid.UUID) (*FactoryWorkOrder, error) {
-	var order FactoryWorkOrder
+// FindWorkOrderByArtifactKey resolves a work order from one of its
+// artifacts' `key` values, then delegates to FindWorkOrder so the result
+// gets the same preloads/scoping as every other lookup path.
+func (f *Factory) FindWorkOrderByArtifactKey(tx *gorm.DB, key string) (*FactoryWorkOrder, error) {
+	trimmedKey := strings.TrimSpace(key)
+	if trimmedKey == "" {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+
+	var artifact FactoryWorkOrderArtifact
 	err := tx.
-		Preload("CreatedBy").
-		Preload("Assignees").
-		Preload("Assignees.User").
-		Where("organization_id = ? AND factory_id = ? AND id = ?", f.OrganizationID, f.ID, orderID).
-		First(&order).
+		Where("organization_id = ? AND factory_id = ? AND key = ?", f.OrganizationID, f.ID, trimmedKey).
+		First(&artifact).
 		Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -152,17 +1018,122 @@ func (f *Factory) FindWorkOrder(tx *gorm.DB, orderID uuid.UUID) (*FactoryWorkOrd
 		return nil, err
 	}
 
-	return &order, nil
+	return f.FindWorkOrder(tx, artifact.WorkOrderID)
+}
+
+// ListWorkOrdersByArtifactKeys resolves work orders from artifact keys in one
+// query. Missing keys are omitted rather than reported as not found.
+func (f *Factory) ListWorkOrdersByArtifactKeys(tx *gorm.DB, keys []string) (map[string]FactoryWorkOrder, error) {
+	ordersByKey := map[string]FactoryWorkOrder{}
+	uniqueKeys := make([]string, 0, len(keys))
+	seen := map[string]bool{}
+	for _, key := range keys {
+		trimmed := strings.TrimSpace(key)
+		if trimmed == "" || seen[trimmed] {
+			continue
+		}
+		seen[trimmed] = true
+		uniqueKeys = append(uniqueKeys, trimmed)
+	}
+	if len(uniqueKeys) == 0 {
+		return ordersByKey, nil
+	}
+
+	var artifacts []FactoryWorkOrderArtifact
+	err := tx.
+		Where("organization_id = ? AND factory_id = ? AND key IN ?", f.OrganizationID, f.ID, uniqueKeys).
+		Find(&artifacts).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	orderIDs := make([]uuid.UUID, 0, len(artifacts))
+	orderIDSeen := map[uuid.UUID]bool{}
+	for _, artifact := range artifacts {
+		if orderIDSeen[artifact.WorkOrderID] {
+			continue
+		}
+		orderIDSeen[artifact.WorkOrderID] = true
+		orderIDs = append(orderIDs, artifact.WorkOrderID)
+	}
+	if len(orderIDs) == 0 {
+		return ordersByKey, nil
+	}
+
+	var orders []FactoryWorkOrder
+	err = tx.Where("organization_id = ? AND factory_id = ? AND id IN ?", f.OrganizationID, f.ID, orderIDs).Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+
+	ordersByID := make(map[uuid.UUID]FactoryWorkOrder, len(orders))
+	for _, order := range orders {
+		ordersByID[order.ID] = order
+	}
+
+	for _, artifact := range artifacts {
+		if artifact.Key == nil {
+			continue
+		}
+		order, ok := ordersByID[artifact.WorkOrderID]
+		if !ok {
+			continue
+		}
+		ordersByKey[*artifact.Key] = order
+	}
+
+	return ordersByKey, nil
+}
+
+func (f *Factory) FindWorkOrder(tx *gorm.DB, orderID uuid.UUID) (*FactoryWorkOrder, error) {
+	return f.findWorkOrder(tx, "id = ?", orderID)
+}
+
+func (f *Factory) FindWorkOrderByNumber(tx *gorm.DB, number int64) (*FactoryWorkOrder, error) {
+	return f.findWorkOrder(tx, "number = ?", number)
+}
+
+// FindWorkOrderByRef resolves ref to a work order in this factory. ref is
+// tried as a UUID first, then as the factory-scoped sequence number, then
+// as the display key (for example `SP-42`).
+func (f *Factory) FindWorkOrderByRef(tx *gorm.DB, ref string) (*FactoryWorkOrder, error) {
+	trimmed := strings.TrimSpace(ref)
+	if trimmed == "" {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+	if id, err := uuid.Parse(trimmed); err == nil {
+		return f.FindWorkOrder(tx, id)
+	}
+	if number, err := strconv.ParseInt(trimmed, 10, 64); err == nil && number > 0 {
+		return f.FindWorkOrderByNumber(tx, number)
+	}
+	return f.findWorkOrderByKey(tx, trimmed)
 }
 
 type ListFactoryWorkOrdersFilters struct {
-	AssigneeIDs []uuid.UUID
-	States      []string
-	Results     []string
-	Unassigned  *bool
+	States     []string
+	Results    []string
+	Unassigned *bool
+	UserID     *uuid.UUID
+	// Limit pages the result. Zero uses DefaultFactoryWorkOrderListLimit.
+	Limit int
+	// BeforeID is a keyset cursor. The query returns rows older than that
+	// order in updated_at DESC, id DESC order.
+	BeforeID *uuid.UUID
+	// LineID keeps orders that ran on this line, plus orders with no line.
+	LineID *uuid.UUID
+	// PublicBoard keeps the orders a public line board can show. Drafts stay
+	// even after a run on another line. Closed rejected orders are omitted
+	// so they do not consume the page.
+	PublicBoard bool
 }
 
 func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
+	if filters.Limit <= 0 {
+		filters.Limit = DefaultFactoryWorkOrderListLimit
+	}
+
 	query := tx.
 		Model(&FactoryWorkOrder{}).
 		Preload("CreatedBy").
@@ -179,32 +1150,199 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 		query = query.Where("factory_work_orders.result IN ?", filters.Results)
 	}
 
-	if filters.Unassigned != nil && *filters.Unassigned {
-		query = query.Where(`
+	query = applyWorkOrderUserFilters(query, filters)
+	if filters.PublicBoard {
+		query = applyPublicBoardFilter(query, filters.LineID)
+	} else {
+		query = applyWorkOrderLineFilter(query, filters.LineID)
+	}
+
+	if filters.BeforeID != nil {
+		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return []FactoryWorkOrder{}, nil
+			}
+			return nil, err
+		}
+		query = query.Where(
+			"(factory_work_orders.updated_at, factory_work_orders.id) < (?, ?)",
+			cursor.UpdatedAt,
+			cursor.ID,
+		)
+	}
+
+	query = query.
+		Order("factory_work_orders.updated_at DESC").
+		Order("factory_work_orders.id DESC").
+		Limit(filters.Limit)
+
+	var orders []FactoryWorkOrder
+	err := query.Find(&orders).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return orders, nil
+}
+
+func applyWorkOrderUserFilters(query *gorm.DB, filters ListFactoryWorkOrdersFilters) *gorm.DB {
+	unassigned := filters.Unassigned != nil && *filters.Unassigned
+	if filters.UserID == nil && !unassigned {
+		return query
+	}
+
+	if filters.UserID != nil && unassigned {
+		return query.Where(`
+			(
+				NOT EXISTS (
+					SELECT 1 FROM factory_work_order_assignees
+					WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+				)
+				OR EXISTS (
+					SELECT 1 FROM factory_work_order_assignees
+					WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
+					AND factory_work_order_assignees.user_id = ?
+				)
+				OR factory_work_orders.created_by_id = ?
+			)`, *filters.UserID, *filters.UserID)
+	}
+
+	if unassigned {
+		return query.Where(`
 			NOT EXISTS (
 				SELECT 1 FROM factory_work_order_assignees
 				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
 			)`)
 	}
 
-	if len(filters.AssigneeIDs) > 0 {
-		query = query.Where(`
+	return query.Where(`
+		(
 			EXISTS (
 				SELECT 1 FROM factory_work_order_assignees
 				WHERE factory_work_order_assignees.work_order_id = factory_work_orders.id
-				AND factory_work_order_assignees.user_id IN ?
-			)`, filters.AssigneeIDs)
-	}
+				AND factory_work_order_assignees.user_id = ?
+			)
+			OR factory_work_orders.created_by_id = ?
+		)`, *filters.UserID, *filters.UserID)
+}
 
-	var orders []FactoryWorkOrder
-	err := query.
-		Order("factory_work_orders.created_at DESC").
-		Order("factory_work_orders.id DESC").
-		Find(&orders).
-		Error
+func applyPublicBoardFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {
+	query = query.Where(`
+		(
+			factory_work_orders.state IN ?
+			OR (
+				factory_work_orders.state = ?
+				AND factory_work_orders.result IN ?
+			)
+		)`,
+		[]string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen},
+		FactoryWorkOrderStateClosed,
+		[]string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed},
+	)
+	if lineID == nil {
+		return query
+	}
+	return query.Where(`
+		(
+			factory_work_orders.state = ?
+			OR EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+				AND factory_work_order_line_dispatches.line_id = ?
+			)
+			OR NOT EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+			)
+		)`, FactoryWorkOrderStateDraft, *lineID)
+}
+
+func applyWorkOrderLineFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {
+	if lineID == nil {
+		return query
+	}
+	return query.Where(`
+		(
+			EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+				AND factory_work_order_line_dispatches.line_id = ?
+			)
+			OR NOT EXISTS (
+				SELECT 1 FROM factory_work_order_line_dispatches
+				WHERE factory_work_order_line_dispatches.work_order_id = factory_work_orders.id
+			)
+		)`, *lineID)
+}
+
+func (f *Factory) workOrderListCursor(tx *gorm.DB, beforeID uuid.UUID) (*FactoryWorkOrder, error) {
+	var cursor FactoryWorkOrder
+	err := tx.
+		Select("id", "updated_at").
+		Where("factory_work_orders.organization_id = ?", f.OrganizationID).
+		Where("factory_work_orders.factory_id = ?", f.ID).
+		Where("factory_work_orders.id = ?", beforeID).
+		Take(&cursor).Error
 	if err != nil {
 		return nil, err
 	}
+	return &cursor, nil
+}
 
-	return orders, nil
+func (f *Factory) findWorkOrderByKey(tx *gorm.DB, key string) (*FactoryWorkOrder, error) {
+	prefix := f.Key + "-"
+	if !strings.HasPrefix(strings.ToUpper(key), strings.ToUpper(prefix)) {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+	number, err := strconv.ParseInt(key[len(prefix):], 10, 64)
+	if err != nil || number <= 0 {
+		return nil, ErrFactoryWorkOrderNotFound
+	}
+	return f.FindWorkOrderByNumber(tx, number)
+}
+
+func (f *Factory) findWorkOrder(tx *gorm.DB, cond string, arg any) (*FactoryWorkOrder, error) {
+	var order FactoryWorkOrder
+	err := tx.
+		Preload("CreatedBy").
+		Preload("Assignees").
+		Preload("Assignees.User").
+		Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID).
+		Where(cond, arg).
+		First(&order).
+		Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderNotFound
+		}
+		return nil, err
+	}
+
+	return &order, nil
+}
+
+// allocateNextWorkOrderNumber atomically increments the factory's counter
+// and returns the value that the new work order should use. The UPDATE ...
+// RETURNING pattern serializes concurrent inserts inside Postgres without
+// requiring an application-level lock; if the surrounding transaction
+// rolls back the counter reverts with it.
+func (f *Factory) allocateNextWorkOrderNumber(tx *gorm.DB) (int64, error) {
+	var allocated int64
+	err := tx.Raw(`
+		UPDATE factories
+		SET next_work_order_number = next_work_order_number + 1,
+		    updated_at = NOW()
+		WHERE id = ? AND organization_id = ?
+		RETURNING next_work_order_number - 1
+	`, f.ID, f.OrganizationID).Scan(&allocated).Error
+	if err != nil {
+		return 0, err
+	}
+	if allocated <= 0 {
+		return 0, fmt.Errorf("factory %s: could not allocate work order number", f.ID)
+	}
+
+	f.NextWorkOrderNumber = allocated + 1
+	return allocated, nil
 }

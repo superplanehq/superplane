@@ -2,16 +2,51 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/go-github/v84/github"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "repository":
+		metadata := common.Metadata{}
+		if decodeErr := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); decodeErr != nil {
+			return nil, fmt.Errorf("failed to decode GitHub integration metadata: %w", decodeErr)
+		}
+		binding, err := models.FindVCSProviderIntegrationBinding(database.Conn(), ctx.Integration.ID())
+		if err == nil {
+			if binding.Provider != models.ProviderGitHub {
+				return nil, fmt.Errorf("hosted GitHub integration has provider %q", binding.Provider)
+			}
+			repositories, listErr := models.ListVCSProviderBindingRepositories(database.Conn(), ctx.Integration.ID())
+			if listErr != nil {
+				return nil, fmt.Errorf("failed to list cached repositories: %w", listErr)
+			}
+			resources := make([]core.IntegrationResource, 0, len(repositories))
+			for _, repository := range repositories {
+				resources = append(resources, core.IntegrationResource{
+					Type: "repository",
+					Name: repository.FullName,
+					ID:   fmt.Sprintf("%d", repository.RepositoryID),
+				})
+			}
+			return resources, nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("failed to resolve GitHub App binding: %w", err)
+		}
+		if metadata.HostedApp {
+			return nil, fmt.Errorf("hosted GitHub integration has no global installation binding")
+		}
+
 		client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create client: %w", err)
@@ -26,6 +61,18 @@ func (g *GitHub) ListResources(resourceType string, ctx core.ListResourcesContex
 
 	case "branch":
 		return g.listBranchResources(ctx)
+
+	case "default_branch":
+		return g.listDefaultBranchResource(ctx)
+
+	case "label":
+		return g.listLabelResources(ctx)
+
+	case "status_check":
+		return g.listStatusCheckResources(ctx)
+
+	case "review_bot":
+		return g.listReviewBotResources(ctx)
 
 	default:
 		return []core.IntegrationResource{}, nil
@@ -45,6 +92,97 @@ func toIntegrationResources(repositories []*github.Repository) []core.Integratio
 			Type: "repository",
 			Name: name,
 			ID:   fmt.Sprintf("%d", repo.GetID()),
+		})
+	}
+	return resources
+}
+
+// listDefaultBranchResource resolves the default branch of a single
+// repository, identified by ctx.Parameters["repository"]. It is used by
+// onboarding to write the real default branch (main, master, staging, ...)
+// into generated automations instead of hardcoding "main".
+func (g *GitHub) listDefaultBranchResource(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	repository := ctx.Parameters["repository"]
+	if repository == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
+	}
+
+	repo, err := client.FindRepository(repository)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repository: %w", err)
+	}
+
+	return toDefaultBranchResources(repo), nil
+}
+
+// toDefaultBranchResources returns the resolved default branch as a single
+// IntegrationResource, falling back to "main" when GitHub reports no default
+// branch (this can happen for empty repositories).
+func toDefaultBranchResources(repo *github.Repository) []core.IntegrationResource {
+	branch := repo.GetDefaultBranch()
+	if branch == "" {
+		branch = "main"
+	}
+
+	return []core.IntegrationResource{
+		{
+			Type: "default_branch",
+			Name: branch,
+			ID:   branch,
+		},
+	}
+}
+
+// listLabelResources lists the issue labels that exist in the repository
+// identified by ctx.Parameters["repository"].
+func (g *GitHub) listLabelResources(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	repository := ctx.Parameters["repository"]
+	if repository == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
+	}
+
+	var allLabels []*github.Label
+	opts := &github.ListOptions{PerPage: 100}
+
+	for {
+		labels, resp, err := client.ListLabelsForRepository(context.Background(), repository, opts)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list labels: %w", err)
+		}
+
+		allLabels = append(allLabels, labels...)
+		if resp.NextPage == 0 {
+			break
+		}
+
+		opts.Page = resp.NextPage
+	}
+
+	return toLabelResources(allLabels), nil
+}
+
+func toLabelResources(labels []*github.Label) []core.IntegrationResource {
+	resources := make([]core.IntegrationResource, 0, len(labels))
+	for _, label := range labels {
+		name := label.GetName()
+		if name == "" {
+			continue
+		}
+
+		resources = append(resources, core.IntegrationResource{
+			Type: "label",
+			Name: name,
+			ID:   name,
 		})
 	}
 	return resources

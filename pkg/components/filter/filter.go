@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -121,10 +120,6 @@ func (f *Filter) Execute(ctx core.ExecutionContext) error {
 
 func (f *Filter) Setup(ctx core.SetupContext) error {
 	return nil
-}
-
-func (f *Filter) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (f *Filter) Cancel(ctx core.ExecutionContext) error {

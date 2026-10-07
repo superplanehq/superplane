@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -140,10 +139,6 @@ func (g *GetGPUDroplet) Execute(ctx core.ExecutionContext) error {
 
 func (g *GetGPUDroplet) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (g *GetGPUDroplet) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (g *GetGPUDroplet) Hooks() []core.Hook {

@@ -14,6 +14,10 @@ interface OnReleaseEventData {
   release?: Release;
 }
 
+function releaseAssetSuffix(assetCount: number): string {
+  return assetCount === 1 ? "" : "s";
+}
+
 /**
  * Renderer for the "github.onRelease" trigger
  */
@@ -24,7 +28,7 @@ export const onReleaseTriggerRenderer: TriggerRenderer = {
     const releaseName = eventData?.release?.name || eventData?.release?.tag_name || "Release";
 
     return {
-      title: `${releaseName} (${assetCount} asset${assetCount !== 1 ? "s" : ""})`,
+      title: `${releaseName} (${assetCount} asset${releaseAssetSuffix(assetCount)})`,
       subtitle: buildGithubSubtitle(eventData?.action || "", context.event?.createdAt),
     };
   },

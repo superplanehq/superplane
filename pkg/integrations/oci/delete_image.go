@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -54,10 +53,6 @@ func (c *DeleteImage) Setup(ctx core.SetupContext) error {
 		return err
 	}
 	return ctx.Metadata.Set(resolveImageNodeMetadata(ctx, imageNodeMetadata{ImageID: config.ImageID}))
-}
-
-func (c *DeleteImage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return defaultProcessQueue(ctx)
 }
 
 func (c *DeleteImage) Execute(ctx core.ExecutionContext) error {

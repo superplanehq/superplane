@@ -16,16 +16,28 @@ import (
 
 var ErrCanvasNameAlreadyExists = errors.New("canvas name already exists")
 
-const canvasNameUniqueConstraint = "workflows_organization_id_name_key"
+// Canvas names are unique inside the factory that owns the canvas, and unique
+// per organization for canvases that no factory owns.
+var canvasNameUniqueConstraints = []string{
+	"workflows_organization_id_name_active_key",
+	"workflows_factory_id_name_active_key",
+}
+
+const (
+	CanvasColumnKeyVerify = "verify"
+	CanvasColumnKeyDone   = "done"
+)
 
 type Canvas struct {
-	ID                          uuid.UUID
-	OrganizationID              uuid.UUID
-	FactoryID                   *uuid.UUID
-	LiveVersionID               *uuid.UUID
-	CanvasFolderID              *uuid.UUID `gorm:"column:folder_id"`
-	Name                        string
-	Description                 string
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	FactoryID      *uuid.UUID
+	LiveVersionID  *uuid.UUID
+	Name           string
+	Description    string
+	// ColumnKey is the line-board column this factory event automation is
+	// shown on. Empty when the canvas is not attached to Verify or Done.
+	ColumnKey                   *string
 	CreatedBy                   *uuid.UUID
 	DismissedAgentSuggestionIDs datatypes.JSONSlice[string]
 	CreatedAt                   *time.Time
@@ -72,11 +84,22 @@ func MapCanvasNameUniqueConstraintError(err error) error {
 	}
 
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.ConstraintName == canvasNameUniqueConstraint {
+	if errors.As(err, &pgErr) && slices.Contains(canvasNameUniqueConstraints, pgErr.ConstraintName) {
 		return ErrCanvasNameAlreadyExists
 	}
 
 	return err
+}
+
+// scopeToCanvasNameOwner narrows a query to the scope a canvas name is unique
+// in: the factory when one owns the canvas, the organization otherwise.
+func scopeToCanvasNameOwner(tx *gorm.DB, organizationID uuid.UUID, factoryID *uuid.UUID) *gorm.DB {
+	query := tx.Where("organization_id = ?", organizationID)
+	if factoryID == nil {
+		return query.Where("factory_id IS NULL")
+	}
+
+	return query.Where("factory_id = ?", *factoryID)
 }
 
 func withActiveCanvas(tx *gorm.DB, workflowIDColumn string) *gorm.DB {
@@ -159,6 +182,33 @@ func (c *Canvas) SoftDelete() error {
 	return c.SoftDeleteInTransaction(database.Conn())
 }
 
+func ValidCanvasColumnKey(key string) bool {
+	return key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone
+}
+
+// SetColumnKey attaches this factory canvas to Verify or Done. An empty key
+// clears the attachment.
+func (c *Canvas) SetColumnKey(tx *gorm.DB, key string) error {
+	var stored *string
+	if key != "" {
+		if !ValidCanvasColumnKey(key) {
+			return fmt.Errorf("canvas column key is not valid")
+		}
+		stored = &key
+	}
+
+	now := time.Now()
+	if err := tx.Model(c).Updates(map[string]any{
+		"column_key": stored,
+		"updated_at": now,
+	}).Error; err != nil {
+		return err
+	}
+	c.ColumnKey = stored
+	c.UpdatedAt = &now
+	return nil
+}
+
 func (c *Canvas) SoftDeleteInTransaction(tx *gorm.DB) error {
 	now := time.Now()
 	timestamp := now.Unix()
@@ -174,14 +224,13 @@ func FindCanvas(orgID, id uuid.UUID) (*Canvas, error) {
 	return FindCanvasInTransaction(database.Conn(), orgID, id)
 }
 
-func FindCanvasByName(name string, organizationID uuid.UUID) (*Canvas, error) {
-	return FindCanvasByNameInTransaction(database.Conn(), name, organizationID)
-}
-
-func FindCanvasByNameInTransaction(tx *gorm.DB, name string, organizationID uuid.UUID) (*Canvas, error) {
+// FindCanvasByName looks a canvas up in the scope its name is unique in. Pass
+// the factory ID to search inside a factory, or nil to search the canvases that
+// no factory owns.
+func FindCanvasByName(tx *gorm.DB, organizationID uuid.UUID, factoryID *uuid.UUID, name string) (*Canvas, error) {
 	var canvas Canvas
-	err := tx.
-		Where("name = ? AND organization_id = ?", name, organizationID).
+	err := scopeToCanvasNameOwner(tx, organizationID, factoryID).
+		Where("name = ?", name).
 		First(&canvas).
 		Error
 
@@ -259,6 +308,22 @@ func FindUnscopedCanvasInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error)
 	return &canvas, nil
 }
 
+// LockUnscopedCanvas locks a canvas row whether or not it is soft-deleted.
+// Callers that decide cleanup from deleted_at must lock first, because a
+// restore can clear that timestamp after an unlocked read.
+func LockUnscopedCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
+	var canvas Canvas
+	err := tx.Unscoped().
+		Clauses(clause.Locking{Strength: lockingForUpdateNoKey, Options: "SKIP LOCKED"}).
+		Where("id = ?", id).
+		First(&canvas).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &canvas, nil
+}
+
 func ListCanvasesPaginated(orgID, search string, limit, offset int) ([]Canvas, int64, error) {
 	query := database.Conn().Model(&Canvas{}).Where("organization_id = ?", orgID)
 
@@ -302,6 +367,37 @@ func ListCanvases(orgID string) ([]Canvas, error) {
 	return canvases, nil
 }
 
+// AvailableCanvasName returns preferred, or preferred with the lowest " (n)"
+// suffix that no other canvas in the same scope holds. A generated canvas has to
+// pick a free name before insert. Pass the factory ID for a canvas the factory
+// owns, or nil for an organization-level canvas.
+func AvailableCanvasName(tx *gorm.DB, organizationID uuid.UUID, factoryID *uuid.UUID, preferred string) (string, error) {
+	var names []string
+	err := scopeToCanvasNameOwner(tx.Model(&Canvas{}), organizationID, factoryID).
+		Where("name = ? OR name LIKE ?", preferred, preferred+" (%)").
+		Pluck("name", &names).
+		Error
+	if err != nil {
+		return "", err
+	}
+
+	taken := make(map[string]bool, len(names))
+	for _, name := range names {
+		taken[name] = true
+	}
+
+	if !taken[preferred] {
+		return preferred, nil
+	}
+
+	for suffix := 2; ; suffix++ {
+		candidate := fmt.Sprintf("%s (%d)", preferred, suffix)
+		if !taken[candidate] {
+			return candidate, nil
+		}
+	}
+}
+
 func ListOrganizationCanvases(tx *gorm.DB, organizationID uuid.UUID) ([]Canvas, error) {
 	var canvases []Canvas
 	err := tx.
@@ -326,7 +422,6 @@ func ListDeletedCanvases(db *gorm.DB) ([]Canvas, error) {
 			"workflows.id",
 			"workflows.organization_id",
 			"workflows.live_version_id",
-			"workflows.folder_id",
 			"workflows.name",
 			"workflows.description",
 			"workflows.created_by",
@@ -356,7 +451,6 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 			"workflows.id",
 			"workflows.organization_id",
 			"workflows.live_version_id",
-			"workflows.folder_id",
 			"workflows.name",
 			"workflows.description",
 			"workflows.created_by",

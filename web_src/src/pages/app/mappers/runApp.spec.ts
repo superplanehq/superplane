@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { runAppMapper, runAppStateFunction } from "./runApp";
 import type { ComponentBaseContext, ComponentDefinition, ExecutionInfo, NodeInfo } from "./types";

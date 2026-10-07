@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Command as CommandPrimitive } from "cmdk";
 import { Check, MoreVertical, Pencil, Search, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 
 const SWITCHER_HEIGHT_CLASS = "h-7";
 const SWITCHER_WIDTH_CLASS = "w-[320px] min-w-[320px] max-w-full";

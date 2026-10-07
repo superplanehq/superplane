@@ -2,9 +2,15 @@
 title: "Datadog"
 ---
 
-Create events in Datadog
+React to Error Tracking alerts and create events in Datadog
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Error Tracking Alert" href="#on-error-tracking-alert" description="Listen to Datadog Error Tracking monitor alerts" />
+</CardGrid>
 
 ## Actions
 
@@ -16,10 +22,77 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 To configure Datadog to work with SuperPlane:
 
-1. **Get API Keys**: In Datadog, go to Organization Settings > API Keys to get your API Key
-2. **Get Application Key**: Go to Organization Settings > Application Keys to create an Application Key
-3. **Select Site**: Choose the Datadog site that matches your account (US1, US3, US5, EU, or AP1)
-4. **Enter Credentials**: Provide your API Key, Application Key, and Site in the integration configuration
+1. **Get API Key**: In Datadog, go to Organization Settings > API Keys and copy an API Key. The API key has no scopes.
+2. **Get Application Key**: Go to Organization Settings > Application Keys and create an Application Key.
+3. **Grant the minimum permissions**: If you restrict the application key, grant only these permissions:
+
+- `create_webhooks` creates the SuperPlane webhook.
+- `manage_integrations` updates and removes that webhook.
+- `error_tracking_read` lists Error Tracking issues and reads issue details for an alert.
+- `monitors_read` finds an existing Error Tracking monitor for a service.
+- `monitors_write` creates and removes the Error Tracking monitor for a service.
+
+Grant these optional permissions. `apm_read` or `logs_read_data` lists services that have no open issues. These permissions also add the error sample and related logs to each task:
+
+- `apm_read` reads the sample error span: trace, request, user, and environment.
+- `logs_read_data` reads log samples and the logs that share the sample trace.
+- `rum_apps_read` reads the sample for browser and mobile errors.
+
+An unrestricted application key also works.
+4. **Select Site**: Choose the Datadog site that matches your account (US1, US3, US5, EU, or AP1)
+5. **Enter Credentials**: Provide your API Key, Application Key, and Site in the integration configuration
+6. **Select a service**: SuperPlane creates an Error Tracking monitor for that service when you save an intake.
+
+<a id="on-error-tracking-alert"></a>
+
+## On Error Tracking Alert
+
+**Trigger key:** `datadog.onErrorTrackingAlert`
+
+The On Error Tracking Alert trigger starts a workflow when Datadog sends a Triggered Error Tracking monitor alert to SuperPlane.
+
+### Setup
+
+Connect Datadog in SuperPlane. SuperPlane creates a webhook named `superplane`. When you select a service, SuperPlane creates an Error Tracking monitor for that service.
+
+Select a service to keep alerts of that service.
+
+Select the alert transitions to keep. Empty keeps Triggered. A Re-Triggered alert can create a second task for the same issue.
+
+### Event Data
+
+The trigger emits:
+- **title**: error type and message when SuperPlane can load the issue. Otherwise the monitor title
+- **description**: markdown for the work order. SuperPlane loads the Error Tracking issue and includes the error message, file, function, service, versions, impact, ownership, and a sample stack trace when Datadog returns them. With `apm_read` or `logs_read_data`, it also adds the error sample (time, environment, request, user, request ID, and trace link) and up to 25 logs that share the sample trace
+- **body**: the same markdown as description, so an existing intake still receives the issue details
+- **link**: Datadog link from the alert
+- **alert_id**: alerting monitor ID
+- **tags**: comma-separated tags from the alert
+- **alert_query**: monitor query that fired
+- **alert_scope**: tags that triggered the alert
+- **alert_transition**: alert transition, such as Triggered
+- **environment**: env tag from the alert scope, then from the tags, then from the error sample
+
+### Example Data
+
+```json
+{
+  "data": {
+    "alert_id": "98765",
+    "alert_query": "error-tracking(\"service:checkout\").source(\"backend\").new().rollup(\"count\").by(\"@issue.id\").last(\"1d\") \u003e 0",
+    "alert_scope": "service:checkout,env:prod",
+    "alert_transition": "Triggered",
+    "body": "InventoryTimeout: checkout failed: inventory timeout",
+    "event_type": "error_tracking_alert",
+    "id": "1234567",
+    "link": "https://app.datadoghq.com/monitors/98765",
+    "tags": "service:checkout,env:prod,monitor",
+    "title": "[Triggered] checkout new issues"
+  },
+  "timestamp": "2026-09-27T19:51:32.010Z",
+  "type": "datadog.errorTrackingAlert"
+}
+```
 
 <a id="create-event"></a>
 

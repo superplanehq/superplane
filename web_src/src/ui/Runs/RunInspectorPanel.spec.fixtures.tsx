@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createEvent, fireEvent, render } from "@testing-library/react";
 import { useState } from "react";
-import { vi } from "vitest";
+import { vi } from "bun:test";
 import type {
   ActionsAction,
   CanvasesCanvasNodeExecution,
@@ -82,6 +82,7 @@ export function renderInspector({
   runNavigation,
   onNavigateRun,
   onNavigateOlder,
+  factoryContext = false,
   run: inspectedRun = run,
   workflowNodes: inspectedWorkflowNodes = workflowNodes,
   componentDefinitions: inspectedComponentDefinitions = componentDefinitions,
@@ -96,6 +97,7 @@ export function renderInspector({
   runNavigation?: { newerRunId?: string | null; olderRunId?: string | null; canNavigateOlder?: boolean } | null;
   onNavigateRun?: (runId: string) => void;
   onNavigateOlder?: () => void;
+  factoryContext?: boolean;
   run?: CanvasesCanvasRun;
   workflowNodes?: SuperplaneComponentsNode[];
   componentDefinitions?: ActionsAction[];
@@ -125,6 +127,7 @@ export function renderInspector({
           account: account ? { ...account, has_password: account.has_password ?? false } : null,
           loading: false,
           setupRequired: false,
+          refreshAccount: async () => undefined,
         }}
       >
         <ThemeProvider>
@@ -146,6 +149,7 @@ export function renderInspector({
             runNavigation={runNavigation}
             onNavigateRun={onNavigateRun}
             onNavigateOlder={onNavigateOlder}
+            factoryContext={factoryContext}
             onClose={onClose}
           />
         </ThemeProvider>

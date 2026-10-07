@@ -7,7 +7,7 @@ import { SidebarEventActionsMenu } from "./SidebarEventActionsMenu";
 import JsonView from "@uiw/react-json-view";
 import { SimpleTooltip } from "../SimpleTooltip";
 import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase/eventState";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
 
 export interface TabData {

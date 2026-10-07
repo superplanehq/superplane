@@ -143,6 +143,32 @@ func ListCanvasEventsByIDsInTransaction(tx *gorm.DB, ids []uuid.UUID) ([]CanvasE
 	return events, nil
 }
 
+// ListRootEventsForRuns returns the event that started each run, keyed by run
+// id. A root event is the one with no execution behind it.
+func ListRootEventsForRuns(tx *gorm.DB, canvasID uuid.UUID, runIDs []uuid.UUID) (map[uuid.UUID]CanvasEvent, error) {
+	eventsByRunID := make(map[uuid.UUID]CanvasEvent, len(runIDs))
+	if len(runIDs) == 0 {
+		return eventsByRunID, nil
+	}
+
+	var events []CanvasEvent
+	err := tx.
+		Where("workflow_id = ?", canvasID).
+		Where("run_id IN ?", runIDs).
+		Where("execution_id IS NULL").
+		Find(&events).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for _, event := range events {
+		eventsByRunID[event.RunID] = event
+	}
+
+	return eventsByRunID, nil
+}
+
 func ListCanvasEvents(db *gorm.DB, canvasID uuid.UUID, nodeID string, limit int, before *time.Time) ([]CanvasEvent, error) {
 	var events []CanvasEvent
 	query := db.

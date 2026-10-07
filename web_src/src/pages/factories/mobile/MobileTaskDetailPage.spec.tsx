@@ -1,0 +1,390 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
+
+import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { TooltipProvider } from "@/ui/tooltip";
+
+import {
+  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
+  PRIMARY_FACTORY_ROUTE_SEGMENT,
+  REFUND_FACTORY,
+  REFUND_LINE_HOTFIX_ID,
+  REFUND_LINE_PLAN_ID,
+  DRAFT_WORK_ORDER,
+  RUNNING_WORK_ORDER,
+  factoryWithPlanning,
+} from "../__fixtures__/factoryPageResponses";
+import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
+import { MobileTaskDetailPage } from "./MobileTaskDetailPage";
+
+const useWorkOrder = vi.fn((): { data: FactoriesWorkOrder | undefined; isLoading: boolean; isError: boolean } => ({
+  data: undefined,
+  isLoading: true,
+  isError: false,
+}));
+
+const { onDispatch, dispatchingIds, canUpdateWorkOrder, runnerModelCalls } = vi.hoisted(() => ({
+  onDispatch: vi.fn(),
+  dispatchingIds: { current: new Set<string>() },
+  canUpdateWorkOrder: { current: true },
+  runnerModelCalls: [] as unknown[][],
+}));
+
+vi.mock("@/hooks/useFactoryData", () => ({
+  useWorkOrder: () => useWorkOrder(),
+  useWorkOrderArtifacts: () => ({ data: [] }),
+  useFactoryAutomations: () => ({ data: [] }),
+  useWorkOrderEvents: () => ({ data: { pages: [] } }),
+  useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
+vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
+  useFactoryPRFeedbackHandlers: () => ({ data: [] }),
+}));
+
+vi.mock("@/hooks/useWorkOrderCardActions", () => ({
+  useWorkOrderCardActions: () => ({
+    dispatchingOrderIds: dispatchingIds.current,
+    isAssigneesSaving: false,
+    onDispatch,
+    onAssigneesSave: vi.fn(),
+  }),
+}));
+
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({ canAct: () => canUpdateWorkOrder.current, currentUserId: "user-1", isLoading: false }),
+}));
+
+vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
+  useFactoryLineRunnerModels: (...args: unknown[]) => {
+    runnerModelCalls.push(args);
+    return {
+      data: [
+        { id: "claude-opus-4-6", name: "claude-opus-4-6" },
+        { id: "long-model", name: "Anthropic Claude Opus 4.6 with extended context" },
+      ],
+      isLoading: false,
+    };
+  },
+}));
+
+vi.mock("@/hooks/useOrganizationData", () => ({
+  useOrganizationUsers: () => ({ data: [], isLoading: false }),
+}));
+
+vi.mock("@/hooks/useFactoryIntakeData", () => ({
+  useFactoryIntakes: () => ({ data: [] }),
+}));
+
+beforeAll(() => {
+  Element.prototype.hasPointerCapture ??= () => false;
+  Element.prototype.setPointerCapture ??= () => {};
+  Element.prototype.releasePointerCapture ??= () => {};
+  Element.prototype.scrollIntoView ??= () => {};
+});
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="mobile-task-location">{`${location.pathname}${location.search}`}</div>;
+}
+
+function TestLineSwitch() {
+  const [, setSearchParams] = useSearchParams();
+  return (
+    <button
+      type="button"
+      data-testid="mobile-task-test-line"
+      onClick={() => setSearchParams({ lineId: REFUND_LINE_HOTFIX_ID })}
+    >
+      Switch test line
+    </button>
+  );
+}
+
+function renderTask(
+  entry: string | { pathname: string; search?: string; state?: unknown },
+  factory: FactoriesFactory = REFUND_FACTORY,
+) {
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      <ThemeProvider>
+        <TooltipProvider>
+          <MemoryRouter initialEntries={[entry]}>
+            <FactoriesLayoutContext.Provider
+              value={{
+                organizationId: "org-1",
+                factoryId: PRIMARY_FACTORY_ID,
+                factoryKey: PRIMARY_FACTORY_KEY,
+                routeSegment: PRIMARY_FACTORY_ROUTE_SEGMENT,
+                factory,
+                factories: [factory],
+                openCreateWorkOrder: vi.fn(),
+              }}
+            >
+              <TestLineSwitch />
+              <Routes>
+                <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<MobileTaskDetailPage />} />
+                <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<LocationProbe />} />
+              </Routes>
+            </FactoriesLayoutContext.Provider>
+          </MemoryRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>,
+  );
+}
+
+describe("MobileTaskDetailPage back link", () => {
+  beforeEach(() => {
+    useWorkOrder.mockReset();
+    useWorkOrder.mockReturnValue({ data: undefined, isLoading: true, isError: false });
+    onDispatch.mockReset();
+    dispatchingIds.current = new Set();
+    canUpdateWorkOrder.current = true;
+    runnerModelCalls.length = 0;
+  });
+
+  it("returns to the clicked line when the task URL has no line id", async () => {
+    const user = userEvent.setup();
+    renderTask({
+      pathname: `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42`,
+      state: { lineId: REFUND_LINE_HOTFIX_ID },
+    });
+
+    await user.click(screen.getByTestId("mobile-task-back"));
+
+    expect(screen.getByTestId("mobile-task-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`,
+    );
+  });
+
+  it("returns to the line in the task URL when that line still exists", async () => {
+    const user = userEvent.setup();
+    renderTask(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42?lineId=${REFUND_LINE_HOTFIX_ID}`);
+
+    await user.click(screen.getByTestId("mobile-task-back"));
+
+    expect(screen.getByTestId("mobile-task-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`,
+    );
+  });
+
+  it("does not open the first line while a refreshed task is loading", async () => {
+    const user = userEvent.setup();
+    renderTask(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42`);
+
+    const back = screen.getByTestId("mobile-task-back");
+    expect(back).toBeDisabled();
+    await user.click(back);
+
+    expect(screen.queryByTestId("mobile-task-location")).toBeNull();
+    expect(screen.getByText("Loading task…")).toBeTruthy();
+  });
+
+  it("returns to the task dispatch line after a refresh", async () => {
+    useWorkOrder.mockReturnValue({
+      data: {
+        id: "wo-42",
+        number: "42",
+        title: "Fix refund rounding",
+        lineDispatches: [
+          { id: "dispatch-hotfix", createdAt: "2026-09-28T00:00:00.000Z", line: { id: REFUND_LINE_HOTFIX_ID } },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderTask(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42`);
+
+    await user.click(screen.getByTestId("mobile-task-back"));
+
+    expect(screen.getByTestId("mobile-task-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_HOTFIX_ID}`,
+    );
+  });
+
+  it("ignores a deleted line id and uses the task dispatch line", async () => {
+    useWorkOrder.mockReturnValue({
+      data: {
+        id: "wo-42",
+        number: "42",
+        title: "Fix refund rounding",
+        lineDispatches: [
+          { id: "dispatch-plan", createdAt: "2026-09-28T00:00:00.000Z", line: { id: REFUND_LINE_PLAN_ID } },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    renderTask(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42?lineId=deleted-line`);
+
+    await user.click(screen.getByTestId("mobile-task-back"));
+
+    expect(screen.getByTestId("mobile-task-location")).toHaveTextContent(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
+    );
+  });
+});
+
+const PLAN_LINE_NAME = "plan-and-implement";
+
+function renderDraft(factory: FactoriesFactory = REFUND_FACTORY, search = `?lineId=${REFUND_LINE_PLAN_ID}`) {
+  useWorkOrder.mockReturnValue({ data: DRAFT_WORK_ORDER, isLoading: false, isError: false });
+  return renderTask(
+    `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${DRAFT_WORK_ORDER.number}${search}`,
+    factory,
+  );
+}
+
+describe("MobileTaskDetailPage model select", () => {
+  beforeEach(() => {
+    useWorkOrder.mockReset();
+    onDispatch.mockReset();
+    dispatchingIds.current = new Set();
+    canUpdateWorkOrder.current = true;
+    runnerModelCalls.length = 0;
+  });
+
+  it("shows a model control next to Start on a draft when planning is on", () => {
+    renderDraft();
+
+    expect(screen.getByRole("button", { name: "Model: Auto Medium" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
+  });
+
+  it("opens model and thinking choices in one menu and updates the closed label", async () => {
+    const user = userEvent.setup();
+    renderDraft();
+
+    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+
+    expect(screen.getByRole("menuitem", { name: "Auto" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "claude-opus-4-6" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Low" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Medium" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "High" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
+
+    expect(screen.getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toBeInTheDocument();
+  });
+
+  it("keeps the full model name in the accessible label", async () => {
+    const user = userEvent.setup();
+    renderDraft();
+
+    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(screen.getByRole("menuitem", { name: "Anthropic Claude Opus 4.6 with extended context" }));
+
+    expect(
+      screen.getByRole("button", { name: "Model: Anthropic Claude Opus 4.6 with extended context Medium" }),
+    ).toBeInTheDocument();
+  });
+
+  it("starts on Auto without a model id and sends the thinking level", async () => {
+    const user = userEvent.setup();
+    renderDraft();
+
+    await user.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
+      lineName: PLAN_LINE_NAME,
+      model: undefined,
+      thinkingLevel: "medium",
+    });
+  });
+
+  it("sends the chosen model and thinking level when Start runs", async () => {
+    const user = userEvent.setup();
+    renderDraft();
+
+    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(screen.getByRole("menuitem", { name: "High" }));
+    await user.click(screen.getByRole("button", { name: "Model: Auto High" }));
+    await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
+    await user.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
+      lineName: PLAN_LINE_NAME,
+      model: "claude-opus-4-6",
+      thinkingLevel: "high",
+    });
+  });
+
+  it("does not start with a model from the previous line", async () => {
+    const user = userEvent.setup();
+    renderDraft();
+
+    await user.click(screen.getByRole("button", { name: "Model: Auto Medium" }));
+    await user.click(screen.getByRole("menuitem", { name: "High" }));
+    await user.click(screen.getByRole("button", { name: "Model: Auto High" }));
+    await user.click(screen.getByRole("menuitem", { name: "claude-opus-4-6" }));
+    await user.click(screen.getByTestId("mobile-task-test-line"));
+
+    expect(screen.getByRole("button", { name: "Model: Auto High" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
+      lineName: "hotfix",
+      model: undefined,
+      thinkingLevel: "high",
+    });
+  });
+
+  it("hides the model control on a running task", () => {
+    useWorkOrder.mockReturnValue({ data: RUNNING_WORK_ORDER, isLoading: false, isError: false });
+    renderTask(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${RUNNING_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
+    );
+
+    expect(screen.queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
+  });
+
+  it("hides the model control and omits thinking when planning is off", async () => {
+    const user = userEvent.setup();
+    renderDraft(factoryWithPlanning(REFUND_FACTORY, { enabled: false, clarity: false, confidence: false }));
+
+    expect(screen.queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(onDispatch).toHaveBeenCalledWith(DRAFT_WORK_ORDER.id, {
+      lineName: PLAN_LINE_NAME,
+      model: undefined,
+      thinkingLevel: undefined,
+    });
+  });
+
+  it("disables the model control while start is busy", () => {
+    dispatchingIds.current = new Set([DRAFT_WORK_ORDER.id ?? ""]);
+    renderDraft();
+
+    expect(screen.getByRole("button", { name: "Model: Auto Medium" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+  });
+
+  it("keeps Start disabled and does not list models from another line when the start line has no name", () => {
+    renderDraft(
+      {
+        ...REFUND_FACTORY,
+        lines: [
+          { id: REFUND_LINE_PLAN_ID, name: " " },
+          { id: REFUND_LINE_HOTFIX_ID, name: "hotfix" },
+        ],
+      },
+      `?lineId=${REFUND_LINE_PLAN_ID}`,
+    );
+
+    expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
+    expect(runnerModelCalls.map((call) => call[2])).not.toContain("hotfix");
+    expect(runnerModelCalls.every((call) => call[2] == null || call[2] === "")).toBe(true);
+  });
+});

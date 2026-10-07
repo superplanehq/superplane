@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { getSuggestions } from "./core";
 
 describe("getSuggestions", () => {
@@ -38,6 +38,11 @@ describe("getSuggestions", () => {
   it("includes built-in functions by prefix", () => {
     const suggestions = getSuggestions("tr", 2, {});
     expect(suggestions.some((item) => item.label === "trim")).toBe(true);
+  });
+
+  it("suggests task() by prefix", () => {
+    const suggestions = getSuggestions("ta", 2, {});
+    expect(suggestions.some((item) => item.label === "task")).toBe(true);
   });
 
   it("suggests the memory namespace by prefix", () => {
@@ -116,6 +121,36 @@ describe("getSuggestions", () => {
     expect(labels).toContain("name");
     expect(labels).toContain("description");
     expect(labels).toContain("url");
+  });
+
+  it("suggests order() fields after dot", () => {
+    const suggestions = getSuggestions("order().", "order().".length, {
+      __order: {
+        id: "order-1",
+        title: "Ship feature",
+        artifacts: [{ type: "pr" }],
+        comments: [{ body: "Looks good" }],
+      },
+    });
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("id");
+    expect(labels).toContain("title");
+    expect(labels).toContain("artifacts");
+    expect(labels).toContain("comments");
+  });
+
+  it("suggests task() fields after dot as an order() alias", () => {
+    const suggestions = getSuggestions("task().", "task().".length, {
+      __order: {
+        id: "order-1",
+        title: "Ship feature",
+        artifacts: [{ type: "pr" }],
+      },
+    });
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("id");
+    expect(labels).toContain("title");
+    expect(labels).toContain("artifacts");
   });
 
   it("suggests previous(n) payload fields after dot", () => {

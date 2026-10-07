@@ -9,6 +9,7 @@ import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
 import { ExpressionFieldRenderer } from "./ExpressionFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
+import { HostedModelFieldRenderer } from "./HostedModelFieldRenderer";
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
 import { AppFieldRenderer } from "./AppFieldRenderer";
 import { AppCanvasNodeFieldRenderer } from "./AppCanvasNodeFieldRenderer";
@@ -17,8 +18,8 @@ import { ListFieldRenderer } from "./ListFieldRenderer";
 import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
 import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
-import { RepositoryFileFieldRenderer } from "./RepositoryFileFieldRenderer";
 import { RoleFieldRenderer } from "./RoleFieldRenderer";
+import { RunnerFleetFieldRenderer } from "./RunnerFleetFieldRenderer";
 import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
 import { IntegrationFieldRenderer, type IntegrationRefValue } from "./IntegrationFieldRenderer";
 import { SecretFieldRenderer, type SecretRefValue } from "./SecretFieldRenderer";
@@ -301,8 +302,6 @@ function renderReferenceField(commonProps: FieldRendererProps) {
   switch (commonProps.field.type) {
     case "git-ref":
       return <GitRefFieldRenderer {...commonProps} />;
-    case "repository-file":
-      return <RepositoryFileFieldRenderer {...commonProps} />;
     case "timezone":
       return <TimezoneFieldRenderer {...commonProps} />;
     default:
@@ -318,6 +317,10 @@ function renderFallbackField(commonProps: FieldRendererProps) {
       return <NumberFieldRenderer {...commonProps} />;
     case "boolean":
       return <BooleanFieldRenderer {...commonProps} />;
+    case "hosted-model":
+      return <HostedModelFieldRenderer {...commonProps} />;
+    case "runner-fleet":
+      return <RunnerFleetFieldRenderer {...commonProps} />;
     case "select":
       return <SelectFieldRenderer {...commonProps} />;
     case "multi-select":
@@ -347,10 +350,5 @@ function isDateTimeField(fieldType: string | undefined): boolean {
 }
 
 function isReferenceField(fieldType: string | undefined): boolean {
-  return (
-    fieldType === "git-ref" ||
-    fieldType === "repository-file" ||
-    fieldType === "timezone" ||
-    fieldType === "any-predicate-list"
-  );
+  return fieldType === "git-ref" || fieldType === "timezone" || fieldType === "any-predicate-list";
 }

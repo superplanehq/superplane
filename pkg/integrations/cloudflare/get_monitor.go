@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -133,10 +132,6 @@ func (c *GetMonitor) Execute(ctx core.ExecutionContext) error {
 
 func (c *GetMonitor) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *GetMonitor) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetMonitor) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

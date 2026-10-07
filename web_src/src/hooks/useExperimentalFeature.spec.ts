@@ -2,7 +2,7 @@ import type { OrganizationsOrganization } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 const { useOrganizationIdMock } = vi.hoisted(() => ({
   useOrganizationIdMock: vi.fn(),
@@ -13,12 +13,14 @@ vi.mock("./useOrganizationId", () => ({
 }));
 
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import * as experimentalFeaturesModule from "@/hooks/useExperimentalFeatures";
 import {
   experimentalFeaturesKeys,
   type ExperimentalFeature,
   type ExperimentalFeaturesRegistry,
 } from "@/hooks/useExperimentalFeatures";
 import { organizationKeys } from "@/hooks/useOrganizationData";
+import * as organizationDataModule from "@/hooks/useOrganizationData";
 
 const ORG_ID = "org-1";
 
@@ -78,7 +80,13 @@ describe("useExperimentalFeature", () => {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(Object.keys(result.current).sort()).toEqual(["enabledExperimentalFeatures", "has", "isLoading"]);
+    expect(Object.keys(result.current).sort()).toEqual([
+      "enabledExperimentalFeatures",
+      "has",
+      "isLoading",
+      "lookupFailed",
+      "organizationReady",
+    ]);
     expect(result.current.has).toEqual(expect.any(Function));
     expect(result.current.enabledExperimentalFeatures).toEqual(expect.any(Array));
   });
@@ -228,6 +236,7 @@ describe("useExperimentalFeature", () => {
     });
 
     expect(result.current.isLoading).toBe(false);
+    expect(result.current.organizationReady).toBe(true);
     expect(result.current.has("alpha")).toBe(true);
   });
 
@@ -253,6 +262,29 @@ describe("useExperimentalFeature", () => {
     expect(result.current.enabledExperimentalFeatures).toEqual(["alpha", "beta"]);
   });
 
+  it("returns organization-enabled features when the registry lookup fails", () => {
+    const queryClient = createQueryClient();
+    seedQueries(queryClient, {
+      organization: {
+        spec: { enabledExperimentalFeatures: ["organization_byok"] },
+      } as OrganizationsOrganization,
+    });
+    const registrySpy = vi.spyOn(experimentalFeaturesModule, "useExperimentalFeaturesRegistry").mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+    } as ReturnType<typeof experimentalFeaturesModule.useExperimentalFeaturesRegistry>);
+
+    const { result } = renderHook(() => useExperimentalFeature(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.lookupFailed).toBe(true);
+    expect(result.current.has("organization_byok")).toBe(true);
+    expect(result.current.enabledExperimentalFeatures).toEqual(["organization_byok"]);
+    registrySpy.mockRestore();
+  });
+
   it("returns an empty list while the registry has not loaded yet", () => {
     const queryClient = createQueryClient();
     seedQueries(queryClient, {
@@ -266,5 +298,29 @@ describe("useExperimentalFeature", () => {
     });
 
     expect(result.current.enabledExperimentalFeatures).toEqual([]);
+  });
+
+  it("does not mark the organization ready when the organization lookup fails", () => {
+    const queryClient = createQueryClient();
+    seedQueries(queryClient, {
+      registry: {
+        features: [makeFeature({ id: "factory_jira_intake" })],
+      },
+    });
+    const organizationSpy = vi.spyOn(organizationDataModule, "useOrganization").mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isSuccess: false,
+      isError: true,
+    } as ReturnType<typeof organizationDataModule.useOrganization>);
+
+    const { result } = renderHook(() => useExperimentalFeature(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.organizationReady).toBe(false);
+    expect(result.current.has("factory_jira_intake")).toBe(false);
+    organizationSpy.mockRestore();
   });
 });

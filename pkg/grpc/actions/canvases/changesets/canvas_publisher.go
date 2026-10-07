@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -73,7 +73,6 @@ type CanvasPublishResult struct {
 
 type CanvasPublisherOptions struct {
 	Registry       *registry.Registry
-	GitProvider    gitprovider.Provider
 	OrgID          uuid.UUID
 	Encryptor      crypto.Encryptor
 	AuthService    authorization.Authorization
@@ -265,6 +264,7 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 		CreatedAt:         &now,
 		UpdatedAt:         &now,
 	}
+	newNode.SetConcurrencySpec(node.Concurrency)
 
 	//
 	// If node update led to an error, set the node to error state.
@@ -278,6 +278,14 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 		newNode.StateReason = nil
 	}
 
+	deletedNode, err := models.FindUnscopedCanvasNode(p.tx, p.live.WorkflowID, nodeID)
+	if err == nil && deletedNode.DeletedAt.Valid {
+		return p.restoreDeletedNode(node, *deletedNode, appInstallationID, newNode)
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+
 	//
 	// Insert first so Setup() (and sibling lookups during a later Setup) can
 	// find the workflow_node row. Setup itself is deferred until every AddNode
@@ -288,19 +296,52 @@ func (p *CanvasPublisher) addNode(ctx context.Context, change *Change) error {
 		return err
 	}
 
-	p.allNodes[newNode.NodeID] = newNode
+	return p.rememberAddedNode(node, newNode)
+}
 
-	//
-	// If node is already in error state, no need to run Setup() for it.
-	//
-	if newNode.State == models.CanvasNodeStateError {
-		node.Metadata = newNode.Metadata.Data()
+func (p *CanvasPublisher) restoreDeletedNode(
+	node models.Node,
+	existing models.CanvasNode,
+	appInstallationID *uuid.UUID,
+	replacement models.CanvasNode,
+) error {
+	now := time.Now()
+	existing.Name = replacement.Name
+	existing.Type = replacement.Type
+	existing.Ref = replacement.Ref
+	existing.Configuration = datatypes.NewJSONType(withoutAppSubscriptionID(replacement.Configuration.Data()))
+	existing.Metadata = datatypes.NewJSONType(withoutAppSubscriptionID(replacement.Metadata.Data()))
+	existing.Position = replacement.Position
+	existing.IsCollapsed = replacement.IsCollapsed
+	existing.AppInstallationID = appInstallationID
+	existing.WebhookID = nil
+	existing.State = replacement.State
+	existing.StateReason = replacement.StateReason
+	existing.ConcurrencyKey = replacement.ConcurrencyKey
+	existing.ConcurrencyMax = replacement.ConcurrencyMax
+	existing.DeletedAt = gorm.DeletedAt{}
+	existing.UpdatedAt = &now
+	node.Configuration = withoutAppSubscriptionID(node.Configuration)
+	node.Metadata = withoutAppSubscriptionID(node.Metadata)
+
+	if err := p.tx.Unscoped().Save(&existing).Error; err != nil {
+		return err
+	}
+
+	return p.rememberAddedNode(node, existing)
+}
+
+func (p *CanvasPublisher) rememberAddedNode(node models.Node, canvasNode models.CanvasNode) error {
+	p.allNodes[canvasNode.NodeID] = canvasNode
+
+	if canvasNode.State == models.CanvasNodeStateError {
+		node.Metadata = canvasNode.Metadata.Data()
 		p.finalNodes[node.ID] = node
 		return nil
 	}
 
 	p.pendingSetups = append(p.pendingSetups, pendingNodeSetup{
-		canvasNode: newNode,
+		canvasNode: canvasNode,
 		draftID:    node.ID,
 	})
 	p.finalNodes[node.ID] = node
@@ -357,8 +398,12 @@ func (p *CanvasPublisher) updateNode(ctx context.Context, change *Change) error 
 	existingNode.Type = updatedNode.Type
 	existingNode.Ref = datatypes.NewJSONType(updatedNode.Ref)
 	existingNode.Configuration = datatypes.NewJSONType(updatedNode.Configuration)
+	existingNode.Metadata = datatypes.NewJSONType(withoutAppSubscriptionID(
+		mergeNodeMetadata(existingNode.Metadata.Data(), updatedNode.Metadata),
+	))
 	existingNode.Position = datatypes.NewJSONType(updatedNode.Position)
 	existingNode.IsCollapsed = updatedNode.IsCollapsed
+	existingNode.SetConcurrencySpec(updatedNode.Concurrency)
 	existingNode.AppInstallationID = appInstallationID
 	existingNode.UpdatedAt = &now
 
@@ -403,7 +448,9 @@ func (p *CanvasPublisher) runPendingSetups(ctx context.Context) error {
 			draftNode.ErrorMessage = &errorMsg
 		}
 
-		draftNode.Metadata = node.Metadata.Data()
+		merged := mergeNodeMetadata(draftNode.Metadata, node.Metadata.Data())
+		draftNode.Metadata = merged
+		node.Metadata = datatypes.NewJSONType(merged)
 		p.finalNodes[pending.draftID] = draftNode
 		p.allNodes[node.NodeID] = node
 		if err := p.tx.Save(&node).Error; err != nil {
@@ -419,6 +466,11 @@ func (p *CanvasPublisher) deleteNode(change *Change) error {
 	if !exists {
 		return nil
 	}
+
+	// Do not call Datadog here. This method runs inside the publish
+	// transaction. A later failure restores the intake, but Datadog
+	// would not restore a monitor deleted now. The cleanup worker
+	// deletes the monitor after the removal is committed.
 
 	delete(p.allNodes, existingNode.NodeID)
 	result, err := models.DeleteCanvasNodeWithResult(p.tx, existingNode)
@@ -523,6 +575,18 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 		return err
 	}
 
+	triggerCtx, err := p.triggerContext(ctx, node)
+	if err != nil {
+		return err
+	}
+	if triggerCtx.Integration != nil && triggerCtx.Logger != nil {
+		triggerCtx.Logger.WithField("source", "trigger_setup").Info("Integration operation may write secrets")
+	}
+
+	return trigger.Setup(triggerCtx)
+}
+
+func (p *CanvasPublisher) triggerContext(ctx context.Context, node *models.CanvasNode) (core.TriggerContext, error) {
 	logger := logging.ForNode(*node)
 	triggerCtx := core.TriggerContext{
 		Configuration: node.Configuration.Data(),
@@ -537,7 +601,7 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 	if node.AppInstallationID != nil {
 		integration, err := models.FindUnscopedIntegrationInTransaction(p.tx, *node.AppInstallationID)
 		if err != nil {
-			return fmt.Errorf("failed to find app installation: %v", err)
+			return core.TriggerContext{}, fmt.Errorf("failed to find app installation: %v", err)
 		}
 
 		logger = logging.WithIntegration(logger, *integration)
@@ -549,11 +613,10 @@ func (p *CanvasPublisher) setupTrigger(ctx context.Context, node *models.CanvasN
 			p.options.Registry,
 			nil,
 		)
-		logger.WithField("source", "trigger_setup").Info("Integration operation may write secrets")
 	}
 
 	triggerCtx.Logger = logger
-	return trigger.Setup(triggerCtx)
+	return triggerCtx, nil
 }
 
 func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNode) error {
@@ -571,7 +634,6 @@ func (p *CanvasPublisher) setupAction(ctx context.Context, node *models.CanvasNo
 		Requests:      contexts.NewNodeRequestContext(p.tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, p.tx, p.options.Encryptor, node, p.options.WebhookBaseURL),
 		Auth:          contexts.NewAuthReader(p.tx, p.options.OrgID, p.options.AuthService, nil),
-		Files:         contexts.NewRepositoryFilesContextInTransaction(p.options.GitProvider, p.live.WorkflowID, p.tx),
 		Apps:          contexts.NewAppContext(p.tx, p.canvas, node),
 	}
 
@@ -622,4 +684,38 @@ func (p *CanvasPublisher) ensureNewNodeID(node models.Node) string {
 	node.ID = newNodeID
 	p.finalNodes[newNodeID] = node
 	return newNodeID
+}
+
+const appSubscriptionIDKey = "appSubscriptionID"
+
+func mergeNodeMetadata(base map[string]any, overlay any) map[string]any {
+	merged := map[string]any{}
+	maps.Copy(merged, base)
+	overlayMap, ok := overlay.(map[string]any)
+	if !ok {
+		if len(merged) == 0 {
+			return base
+		}
+		return merged
+	}
+	maps.Copy(merged, overlayMap)
+	if len(merged) == 0 {
+		return nil
+	}
+	return merged
+}
+
+func withoutAppSubscriptionID(values map[string]any) map[string]any {
+	if values == nil {
+		return nil
+	}
+
+	cleaned := make(map[string]any, len(values))
+	for key, value := range values {
+		if key == appSubscriptionIDKey {
+			continue
+		}
+		cleaned[key] = value
+	}
+	return cleaned
 }

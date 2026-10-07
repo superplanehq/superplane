@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -228,10 +227,6 @@ func (c *CopyPackageVersions) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("at least one version is required")
 	}
 	return nil
-}
-
-func (c *CopyPackageVersions) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CopyPackageVersions) Execute(ctx core.ExecutionContext) error {

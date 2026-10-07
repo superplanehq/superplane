@@ -20,7 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -36,7 +36,6 @@ var ErrRecordLocked = errors.New("record locked")
 type NodeExecutor struct {
 	encryptor      crypto.Encryptor
 	registry       *registry.Registry
-	gitProvider    gitprovider.Provider
 	authService    authorization.Authorization
 	oidcProvider   oidc.Provider
 	baseURL        string
@@ -48,11 +47,10 @@ type NodeExecutor struct {
 	consumer    *tackle.Consumer
 }
 
-func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, gitProvider gitprovider.Provider, oidcProvider oidc.Provider, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
+func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
 	return &NodeExecutor{
 		encryptor:      encryptor,
 		registry:       registry,
-		gitProvider:    gitProvider,
 		oidcProvider:   oidcProvider,
 		baseURL:        baseURL,
 		webhookBaseURL: webhookBaseURL,
@@ -65,6 +63,15 @@ func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, gi
 
 func (w *NodeExecutor) Name() string {
 	return "NodeExecutor"
+}
+
+func (w *NodeExecutor) factoryIntakeDeps() factoryactions.IntakeDependencies {
+	return factoryactions.IntakeDependencies{
+		Registry:       w.registry,
+		Encryptor:      w.encryptor,
+		AuthService:    w.authService,
+		WebhookBaseURL: w.webhookBaseURL,
+	}
 }
 
 func (w *NodeExecutor) Start(ctx context.Context) {
@@ -108,7 +115,8 @@ func (w *NodeExecutor) Start(ctx context.Context) {
 						return
 					}
 
-					w.logger.Errorf("Error processing node execution - node=%s, execution=%s: %v", execution.NodeID, execution.ID, err)
+					logging.WithCanvasWorkspace(w.logger, canvasForLog(execution.WorkflowID)).
+						Errorf("Error processing node execution - node=%s, execution=%s: %v", execution.NodeID, execution.ID, err)
 				}(execution)
 			}
 
@@ -179,8 +187,24 @@ func (w *NodeExecutor) Consume(delivery tackle.Delivery) error {
 		return nil
 	}
 
-	w.logger.Errorf("Error processing node execution - execution=%s: %v", executionID, err)
+	logger := w.logger
+	if canvasID, parseErr := uuid.Parse(data.CanvasId); parseErr == nil {
+		logger = logging.WithCanvasWorkspace(logger, canvasForLog(canvasID))
+	}
+	logger.Errorf("Error processing node execution - execution=%s: %v", executionID, err)
 	return err
+}
+
+func canvasForLog(canvasID uuid.UUID) *models.Canvas {
+	return unscopedCanvas(database.Conn(), canvasID)
+}
+
+func unscopedCanvas(tx *gorm.DB, canvasID uuid.UUID) *models.Canvas {
+	canvas, err := models.FindUnscopedCanvasInTransaction(tx, canvasID)
+	if err != nil {
+		return nil
+	}
+	return canvas
 }
 
 func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
@@ -235,6 +259,48 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		})
 	}
 
+	type pendingFactoryWorkOrderUpdate struct {
+		factoryID string
+		orderID   string
+		reason    string
+	}
+	pendingFactoryWorkOrderUpdates := []pendingFactoryWorkOrderUpdate{}
+	onFactoryWorkOrderUpdated := func(factoryID, orderID, reason string) {
+		pendingFactoryWorkOrderUpdates = append(pendingFactoryWorkOrderUpdates, pendingFactoryWorkOrderUpdate{
+			factoryID: factoryID,
+			orderID:   orderID,
+			reason:    reason,
+		})
+	}
+
+	type pendingGitHubPullRequest struct {
+		organizationID uuid.UUID
+		factoryID      uuid.UUID
+		pullRequestID  uuid.UUID
+	}
+	pendingGitHubPullRequests := []pendingGitHubPullRequest{}
+	onGitHubPullRequestRecorded := func(organizationID, factoryID, pullRequestID uuid.UUID) {
+		pendingGitHubPullRequests = append(pendingGitHubPullRequests, pendingGitHubPullRequest{
+			organizationID: organizationID,
+			factoryID:      factoryID,
+			pullRequestID:  pullRequestID,
+		})
+	}
+
+	// Notification payloads are collected during the transaction and
+	// published after commit, so no email is sent for rolled-back work.
+	pendingWorkOrderNotifications := []messages.FactoryWorkOrderNotificationMessage{}
+	onFactoryWorkOrderNotification := func(notification messages.FactoryWorkOrderNotificationMessage) {
+		pendingWorkOrderNotifications = append(pendingWorkOrderNotifications, notification)
+	}
+
+	pendingFileBindCleanups := []contexts.FileBindCleanup{}
+	onFileBindCleanup := func(job contexts.FileBindCleanup) {
+		pendingFileBindCleanups = append(pendingFileBindCleanups, job)
+	}
+
+	runCancellations := &RunCancellationNotifier{}
+
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		//
 		// Try to lock the execution record for update.
@@ -271,7 +337,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 
 		metricComponent = node.ComponentName()
-		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated)
+		processErr := w.executeActionNode(tx, execution, node, onNewEvents, onMemoryChanged, onPendingRunCreated, onFactoryWorkOrderUpdated, onFactoryWorkOrderNotification, onGitHubPullRequestRecorded, onFileBindCleanup, runCancellations)
 		if processErr != nil {
 			metricOutcome = executorOutcomeFailed
 			metricReason = classifyAttemptFailure(processErr, execution)
@@ -287,8 +353,11 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	})
 
 	if err != nil {
+		contexts.ApplyFileBindCleanups(pendingFileBindCleanups, err)
 		return err
 	}
+
+	contexts.ApplyFileBindCleanups(pendingFileBindCleanups, nil)
 
 	for _, event := range newEvents {
 		messages.PublishCanvasEventCreatedMessage(&event)
@@ -306,6 +375,30 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		}
 	}
 
+	for _, update := range pendingFactoryWorkOrderUpdates {
+		if err := messages.PublishFactoryWorkOrderUpdated(update.factoryID, update.orderID, update.reason); err != nil {
+			w.logger.Errorf("failed to publish factory work order updated RabbitMQ message: %v", err)
+		}
+	}
+
+	for _, recorded := range pendingGitHubPullRequests {
+		factoryactions.ScheduleFactoryPullRequestMergeabilityRefresh(
+			context.Background(),
+			w.factoryIntakeDeps(),
+			recorded.organizationID,
+			recorded.factoryID,
+			recorded.pullRequestID,
+		)
+	}
+
+	for _, notification := range pendingWorkOrderNotifications {
+		if err := notification.Publish(); err != nil {
+			w.logger.Errorf("failed to publish factory work order notification RabbitMQ message: %v", err)
+		}
+	}
+
+	runCancellations.Publish()
+
 	return nil
 }
 
@@ -316,23 +409,42 @@ func (w *NodeExecutor) executeActionNode(
 	onNewEvents func([]models.CanvasEvent),
 	onMemoryChanged func(uuid.UUID),
 	onPendingRunCreated func(workflowID, runID uuid.UUID),
+	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
+	onFactoryWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage),
+	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
+	onFileBindCleanup func(contexts.FileBindCleanup),
+	runCancellations *RunCancellationNotifier,
 ) error {
 	logger := logging.WithExecution(
 		logging.WithNode(w.logger, *node),
 		execution,
 	)
 
-	err := execution.StartInTransaction(tx)
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
+	if err != nil {
+		logger.Errorf("failed to find workflow: %v", err)
+		return fmt.Errorf("failed to find workflow: %v", err)
+	}
+	logger = logging.WithCanvasWorkspace(logger, workflow)
+
+	err = execution.StartInTransaction(tx)
 	if err != nil {
 		logger.Errorf("failed to start execution: %v", err)
 		return fmt.Errorf("failed to start execution: %w", err)
 	}
 
 	ref := node.Ref.Data()
-	action, err := w.registry.GetAction(ref.Component.Name)
+	componentName := ""
+	if ref.Component != nil {
+		componentName = ref.Component.Name
+	}
+	if frozen := execution.FrozenComponentName(); frozen != "" {
+		componentName = frozen
+	}
+	action, err := w.registry.GetAction(componentName)
 	if err != nil {
-		logger.Errorf("action %s not found: %v", ref.Component.Name, err)
-		return fmt.Errorf("action %s not found: %w", ref.Component.Name, err)
+		logger.Errorf("action %s not found: %v", componentName, err)
+		return fmt.Errorf("action %s not found: %w", componentName, err)
 	}
 
 	inputEvent, err := models.FindCanvasEventInTransaction(tx, execution.EventID)
@@ -342,12 +454,6 @@ func (w *NodeExecutor) executeActionNode(
 	}
 
 	input := inputEvent.Data.Data()
-
-	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, node.WorkflowID)
-	if err != nil {
-		logger.Errorf("failed to find workflow: %v", err)
-		return fmt.Errorf("failed to find workflow: %v", err)
-	}
 
 	builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 		WithNodeID(node.NodeID).
@@ -360,6 +466,7 @@ func (w *NodeExecutor) executeActionNode(
 
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
+		RunID:          execution.RunID,
 		WorkflowID:     execution.WorkflowID.String(),
 		OrganizationID: workflow.OrganizationID.String(),
 		CanvasName:     workflow.Name,
@@ -378,15 +485,26 @@ func (w *NodeExecutor) executeActionNode(
 		Secrets:        contexts.NewSecretsContext(tx, w.registry, workflow.OrganizationID, w.encryptor),
 		CanvasMemory: contexts.NewCanvasMemoryContext(tx, execution.WorkflowID).
 			WithChangeCallback(func() { onMemoryChanged(execution.WorkflowID) }),
-		Files:       contexts.NewRepositoryFilesContext(w.gitProvider, execution.WorkflowID),
 		Webhook:     contexts.NewNodeWebhookContext(context.Background(), tx, w.encryptor, node, w.webhookBaseURL),
 		Expressions: contexts.NewExpressionContext(builder),
 		OIDC:        w.oidcProvider,
 		Apps:        contexts.NewAppExecutionContext(tx, workflow, node, execution),
 		Runs:        contexts.NewRunExecutionContext(tx, workflow, node, execution).WithPendingRunCreated(onPendingRunCreated),
-		Factory:     contexts.NewFactoryContext(tx, workflow, execution),
+		Factory: contexts.NewFactoryContext(tx, workflow, execution).
+			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
+			WithWorkOrderNotification(onFactoryWorkOrderNotification).
+			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
+			WithFileBindCleanup(onFileBindCleanup).
+			WithRemoteImageIngest(w.encryptor, w.registry),
+		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
+		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
+		RunnerTasks: contexts.NewRunnerTaskContext(
+			tx,
+			w.encryptor,
+			workflow.OrganizationID,
+		),
+		Logger: logger,
 	}
-
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)
 		if err != nil {
@@ -405,13 +523,63 @@ func (w *NodeExecutor) executeActionNode(
 
 	ctx.Logger = logger
 	if err := action.Execute(ctx); err != nil {
+		logger = withFactoryOrder(logger, tx, execution.RunID)
+		logger = withRejectedHostedCredit(logger, workflow.OrganizationID, err)
 		logger.Errorf("failed to execute action: %v", err)
-		return ctx.ExecutionState.Fail(models.CanvasNodeExecutionResultReasonError, err.Error())
+		return failNodeExecution(tx, ctx.ExecutionState, execution.RunID, err)
 	}
 
 	logger.Info("Action executed successfully")
 
 	return tx.Save(execution).Error
+}
+
+// withFactoryOrder adds order_id when the run belongs to a factory step.
+// Runs outside a factory step keep the logger unchanged.
+func withFactoryOrder(logger *log.Entry, tx *gorm.DB, runID uuid.UUID) *log.Entry {
+	step, err := models.FindWorkOrderExecutionForRun(tx, runID)
+	if err != nil {
+		return logger
+	}
+
+	return logger.WithField("order_id", step.WorkOrderID)
+}
+
+// withRejectedHostedCredit adds the credit buckets that made the hosted
+// check fail. The next log line can then be compared with the billing page.
+func withRejectedHostedCredit(logger *log.Entry, orgID uuid.UUID, err error) *log.Entry {
+	if logger == nil || !errors.Is(err, models.ErrHostedCreditEmpty) || orgID == uuid.Nil {
+		return logger
+	}
+
+	summary, describeErr := models.DescribeOrganizationLLMCredit(database.Conn(), orgID)
+	if describeErr != nil {
+		return logger.WithField("hosted_credit_lookup_error", describeErr.Error())
+	}
+
+	return logger.WithFields(log.Fields{
+		"remaining_micros":          summary.RemainingMicros,
+		"welcome_remaining_micros":  summary.WelcomeRemainingMicros,
+		"included_remaining_micros": summary.IncludedRemainingMicros,
+		"topup_remaining_micros":    summary.PurchasedRemainingMicros,
+		"admin_remaining_micros":    summary.AdminRemainingMicros,
+	})
+}
+
+// failNodeExecution fails the node execution with the action error. A
+// SuperPlane hosted credit error also stores its reason on the factory
+// step, so the task shows why it did not run.
+func failNodeExecution(tx *gorm.DB, state core.ExecutionStateContext, runID uuid.UUID, err error) error {
+	reason := models.WorkOrderExecutionFailureReasonFor(err)
+	if reason == "" {
+		return state.Fail(models.CanvasNodeExecutionResultReasonError, err.Error())
+	}
+
+	if err := models.RecordWorkOrderExecutionFailureReason(tx, runID, reason); err != nil {
+		return fmt.Errorf("failed to record factory step failure reason: %w", err)
+	}
+
+	return state.Fail(models.CanvasNodeExecutionResultReasonError, models.SuperPlaneRunnerReadinessMessage(err))
 }
 
 const (

@@ -1,6 +1,8 @@
 package models_test
 
 import (
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -170,6 +172,110 @@ func Test__CanvasRun__CalculateResult__Cancelled(t *testing.T) {
 	}).Error)
 
 	result, err := run.CalculateResult(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultCancelled, result)
+}
+
+func Test__CanvasRun__CalculateResult__CompletionRequested(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+	require.NoError(t, db.Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultCancelled,
+		"updated_at": time.Now(),
+	}).Error)
+
+	run.State = models.CanvasRunStateCancelling
+	run.Result = models.CanvasRunResultPassed
+	result, err := run.CalculateResult(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultPassed, result)
+}
+
+func Test__CanvasRun__RequestCompletion__StopsRunAndIsIdempotent(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+
+	for range 2 {
+		require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+			_, err := run.RequestCompletion(tx, nil)
+			return err
+		}))
+	}
+
+	updatedRun, err := models.FindCanvasRunInTransaction(db, run.WorkflowID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultPassed, updatedRun.Result)
+
+	updatedExecution, err := models.FindNodeExecutionInTransaction(db, run.WorkflowID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStateCancelling, updatedExecution.State)
+}
+
+func Test__CanvasRun__RequestCompletion__DoesNotRewriteFinishedRun(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		[]models.Edge{},
+	)
+	run := createRunWithState(t, canvas.ID, models.CanvasRunStateFinished, models.CanvasRunResultCancelled)
+	db := database.DB(t.Context())
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := run.RequestCompletion(tx, nil)
+		return err
+	}))
+
+	updatedRun, err := models.FindCanvasRunInTransaction(db, run.WorkflowID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+	assert.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
+}
+
+func Test__CanvasRun__RequestCancellation__OverridesCompletionRequest(t *testing.T) {
+	run, _ := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		if _, err := run.RequestCompletion(tx, nil); err != nil {
+			return err
+		}
+		_, err := run.RequestCancellation(tx, nil)
+		return err
+	}))
+
+	updatedRun, err := models.FindCanvasRunInTransaction(db, run.WorkflowID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, updatedRun.State)
+	assert.Empty(t, updatedRun.Result)
+
+	result, err := updatedRun.CalculateResult(db)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultCancelled, result)
+}
+
+func Test__CanvasRun__RequestCompletion__DoesNotOverrideCancellationRequest(t *testing.T) {
+	run, _ := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		if _, err := run.RequestCancellation(tx, nil); err != nil {
+			return err
+		}
+		_, err := run.RequestCompletion(tx, nil)
+		return err
+	}))
+
+	updatedRun, err := models.FindCanvasRunInTransaction(db, run.WorkflowID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, updatedRun.State)
+	assert.Empty(t, updatedRun.Result)
+
+	result, err := updatedRun.CalculateResult(db)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunResultCancelled, result)
 }
@@ -481,4 +587,173 @@ func createSubRun(
 	}
 	require.NoError(t, database.Conn().Create(&run).Error)
 	return &run
+}
+
+func Test__CanvasRun__AddError(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		[]models.Edge{},
+	)
+
+	run, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+
+	t.Run("appends error entries on the run", func(t *testing.T) {
+		err := run.AddError(database.Conn(), "pipeline failed", 1024)
+		require.NoError(t, err)
+
+		err = run.AddError(database.Conn(), "tests failed", 1024)
+		require.NoError(t, err)
+
+		updated, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []models.RunError{
+			{Message: "pipeline failed"},
+			{Message: "tests failed"},
+		}, []models.RunError(updated.Errors))
+	})
+
+	t.Run("rejects empty message", func(t *testing.T) {
+		otherRun, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+
+		err = otherRun.AddError(database.Conn(), "", 1024)
+		require.ErrorIs(t, err, models.ErrRunErrorMessageRequired)
+	})
+
+	t.Run("rejects errors larger than max size", func(t *testing.T) {
+		otherRun, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+
+		err = otherRun.AddError(database.Conn(), strings.Repeat("a", 128), 32)
+		require.ErrorIs(t, err, models.ErrRunErrorsTooLarge)
+	})
+
+	t.Run("concurrent appends keep both messages", func(t *testing.T) {
+		otherRun, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+
+		messages := []string{"pipeline failed", "tests failed"}
+		var started sync.WaitGroup
+		started.Add(len(messages))
+
+		var wg sync.WaitGroup
+		errs := make([]error, len(messages))
+		for i, message := range messages {
+			wg.Add(1)
+			go func(idx int, message string) {
+				defer wg.Done()
+				errs[idx] = database.Conn().Transaction(func(tx *gorm.DB) error {
+					var current models.CanvasRun
+					if err := tx.Where("id = ?", otherRun.ID).First(&current).Error; err != nil {
+						started.Done()
+						return err
+					}
+
+					started.Done()
+					started.Wait()
+					return current.AddError(tx, message, 1024)
+				})
+			}(i, message)
+		}
+		wg.Wait()
+
+		for _, err := range errs {
+			require.NoError(t, err)
+		}
+
+		updated, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, otherRun.ID)
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []models.RunError{
+			{Message: "pipeline failed"},
+			{Message: "tests failed"},
+		}, []models.RunError(updated.Errors))
+	})
+
+	t.Run("does not block child event inserts while the lock is held", func(t *testing.T) {
+		otherRun, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+		require.NoError(t, err)
+
+		holding := make(chan struct{})
+		release := make(chan struct{})
+		holdErr := make(chan error, 1)
+
+		go func() {
+			holdErr <- database.Conn().Transaction(func(tx *gorm.DB) error {
+				if err := otherRun.AddError(tx, "pipeline failed", 1024); err != nil {
+					return err
+				}
+
+				close(holding)
+				<-release
+				return nil
+			})
+		}()
+
+		select {
+		case <-holding:
+		case err := <-holdErr:
+			require.NoError(t, err)
+			t.Fatal("lock holder transaction ended before the child insert")
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting to hold the run lock")
+		}
+
+		insertErr := database.Conn().Transaction(func(tx *gorm.DB) error {
+			if err := tx.Exec("SET LOCAL lock_timeout = '500ms'").Error; err != nil {
+				return err
+			}
+
+			now := time.Now()
+			event := models.CanvasEvent{
+				WorkflowID: canvas.ID,
+				NodeID:     "trigger",
+				Channel:    "default",
+				Data:       models.NewJSONValue(map[string]any{"key": "value"}),
+				State:      models.CanvasEventStatePending,
+				RunID:      otherRun.ID,
+				CreatedAt:  &now,
+			}
+			return tx.Create(&event).Error
+		})
+		require.NoError(t, insertErr)
+
+		close(release)
+		require.NoError(t, <-holdErr)
+	})
+}
+
+func Test__CanvasRun__CalculateResult__WithErrors(t *testing.T) {
+	r := support.Setup(t)
+
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		[]models.Edge{},
+	)
+
+	run, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "trigger", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+
+	err = run.AddError(database.Conn(), "pipeline failed", 1024)
+	require.NoError(t, err)
+
+	updated, err := models.FindCanvasRunInTransaction(database.Conn(), canvas.ID, run.ID)
+	require.NoError(t, err)
+
+	result, err := updated.CalculateResult(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultFailed, result)
+}
+
+func Test__CanvasRun__ErrorMessages(t *testing.T) {
+	run := models.CanvasRun{}
+	assert.Nil(t, run.ErrorMessages())
+
+	run.Errors = []models.RunError{
+		{Message: "pipeline failed"},
+		{Message: "tests failed"},
+	}
+	assert.Equal(t, []string{"pipeline failed", "tests failed"}, run.ErrorMessages())
 }

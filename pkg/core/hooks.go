@@ -33,8 +33,11 @@ type ActionHookContext struct {
 	Requests       RequestContext
 	Integration    IntegrationContext
 	Secrets        SecretsContext
-	Files          RepositoryFilesContext
 	Runs           RunExecutionContext
+	Factory        FactoryContext
+	Usage          UsageRecorder
+	HostedLLM      HostedLLMContext
+	RunnerTasks    RunnerTaskContext
 }
 
 /*

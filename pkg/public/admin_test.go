@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -124,6 +125,104 @@ func TestAdminListOrganizations(t *testing.T) {
 			path:   "/admin/api/organizations",
 		})
 		assert.NotEqual(t, http.StatusOK, response.Code)
+	})
+}
+
+func TestAdminGetOrganization(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	path := "/admin/api/organizations/" + r.Organization.ID.String()
+
+	t.Run("admin can load organization", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       path,
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var org adminOrgItem
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &org))
+		assert.Equal(t, r.Organization.ID.String(), org.ID)
+		assert.Equal(t, r.Organization.Name, org.Name)
+		assert.Equal(t, r.Organization.Slug, org.Slug)
+		assert.Equal(t, r.Organization.Description, org.Description)
+		assert.GreaterOrEqual(t, org.MemberCount, int64(0))
+		assert.GreaterOrEqual(t, org.CanvasCount, int64(0))
+		assert.GreaterOrEqual(t, org.TaskCount, int64(0))
+		assert.GreaterOrEqual(t, org.DoneTaskCount, int64(0))
+		require.NotNil(t, org.CreatedAt)
+		require.NotNil(t, org.UpdatedAt)
+	})
+
+	t.Run("returns exact task counts", func(t *testing.T) {
+		org, err := models.CreateOrganization("Counted Tasks Org", "counts")
+		require.NoError(t, err)
+		db := database.DB(t.Context())
+		factory, err := models.CreateFactory(db, org.ID, "Factory", "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateWorkOrder(db, "Open task", "", nil, nil, nil)
+		require.NoError(t, err)
+		done, err := factory.CreateWorkOrder(db, "Done task", "", nil, nil, nil)
+		require.NoError(t, err)
+		require.NoError(t, db.Model(done).Updates(map[string]any{
+			"state":  models.FactoryWorkOrderStateClosed,
+			"result": models.FactoryWorkOrderResultCompleted,
+		}).Error)
+		rejected, err := factory.CreateWorkOrder(db, "Rejected task", "", nil, nil, nil)
+		require.NoError(t, err)
+		require.NoError(t, db.Model(rejected).Updates(map[string]any{
+			"state":  models.FactoryWorkOrderStateClosed,
+			"result": models.FactoryWorkOrderResultRejected,
+		}).Error)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + org.ID.String(),
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body adminOrgItem
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.Equal(t, int64(3), body.TaskCount)
+		assert.Equal(t, int64(1), body.DoneTaskCount)
+	})
+
+	t.Run("returns 404 for unknown organization", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("returns 404 for deleted organization", func(t *testing.T) {
+		deleted, err := models.CreateOrganization("Deleted Admin Org", "gone")
+		require.NoError(t, err)
+		require.NoError(t, models.SoftDeleteOrganization(deleted.ID.String()))
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + deleted.ID.String(),
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("non-admin gets 404", func(t *testing.T) {
+		account, err := models.CreateAccount("Regular User", "regular-org-get@example.com")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test-client-secret")
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       path,
+			authCookie: regularToken,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
 	})
 }
 
@@ -858,6 +957,70 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 	})
 }
 
+func TestAdminListOrgExperimentalFeatures(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+
+	foreignOrg, err := models.CreateOrganization("admin-flags-foreign", "")
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = models.DisableExperimentalFeature(foreignOrg.ID, features.FeatureFactories)
+	})
+
+	t.Run("returns registry and enabled features without org membership", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(foreignOrg.ID, features.FeatureFactories))
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + foreignOrg.ID.String() + "/experimental-features",
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var body struct {
+			Features []map[string]any `json:"features"`
+			Enabled  []string         `json:"enabled"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		require.NotEmpty(t, body.Features)
+		assert.Contains(t, body.Enabled, features.FeatureFactories)
+
+		ids := make([]string, 0, len(body.Features))
+		for _, f := range body.Features {
+			id, _ := f["id"].(string)
+			ids = append(ids, id)
+		}
+		assert.Contains(t, ids, features.FeatureFactories)
+	})
+
+	t.Run("returns an empty enabled list when none are on", func(t *testing.T) {
+		require.NoError(t, models.DisableExperimentalFeature(foreignOrg.ID, features.FeatureFactories))
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + foreignOrg.ID.String() + "/experimental-features",
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var body struct {
+			Enabled []string `json:"enabled"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.Empty(t, body.Enabled)
+		assert.NotNil(t, body.Enabled)
+	})
+
+	t.Run("returns 404 for non-existent org", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+}
+
 func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
@@ -1065,5 +1228,83 @@ func TestAdminBlockAndUnblockAccount(t *testing.T) {
 		})
 		assert.Equal(t, http.StatusBadRequest, response.Code)
 		assert.Contains(t, response.Body.String(), "Cannot block yourself")
+	})
+}
+
+func TestAdminDeleteAccount(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Run("deletes the account, its organization, and its workspaces", func(t *testing.T) {
+		target, err := models.CreateAccount("Delete Target", "delete-target@example.com")
+		require.NoError(t, err)
+		organization, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.SetOrganizationCreatedByAccount(database.Conn(), organization.ID, target.ID))
+		owner, err := models.CreateUserInTransaction(database.Conn(), organization.ID, target.ID, target.Email, target.Name)
+		require.NoError(t, err)
+		require.NoError(t, models.SetUserIsOwner(database.Conn(), owner.ID, true))
+		factory, err := models.CreateFactory(database.Conn(), organization.ID, "Workspace", "", "WSP")
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/accounts/" + target.ID.String(),
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+
+		var body struct {
+			DeletedOrganizationIDs []string `json:"deleted_organization_ids"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.Equal(t, []string{organization.ID.String()}, body.DeletedOrganizationIDs)
+
+		_, err = models.FindAccountByID(target.ID.String())
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		_, err = models.FindAccountByEmail("delete-target@example.com")
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		_, err = models.FindOrganizationByID(organization.ID.String())
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+
+		var remainingFactories int64
+		require.NoError(t, database.Conn().Model(&models.Factory{}).Where("id = ?", factory.ID).Count(&remainingFactories).Error)
+		assert.Zero(t, remainingFactories)
+	})
+
+	t.Run("keeps organizations that have another owner", func(t *testing.T) {
+		target := support.CreateUser(t, r, r.Organization.ID)
+
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/accounts/" + target.AccountID.String(),
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+
+		_, err := models.FindAccountByID(target.AccountID.String())
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+		_, err = models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects self-delete", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/accounts/" + r.Account.ID.String(),
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+
+		_, err := models.FindAccountByID(r.Account.ID.String())
+		require.NoError(t, err)
+	})
+
+	t.Run("returns not found for an unknown account", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/accounts/" + uuid.NewString(),
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
 	})
 }

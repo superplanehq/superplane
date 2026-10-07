@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -119,10 +118,6 @@ func (d *DeleteHTTPSyntheticCheck) Execute(ctx core.ExecutionContext) error {
 
 func (d *DeleteHTTPSyntheticCheck) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (d *DeleteHTTPSyntheticCheck) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (d *DeleteHTTPSyntheticCheck) Hooks() []core.Hook {

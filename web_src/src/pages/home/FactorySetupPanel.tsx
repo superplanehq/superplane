@@ -9,11 +9,10 @@ import { SecretPickerFieldRenderer } from "@/ui/configurationFieldRenderer/Secre
 import { Bug, FilePenLine, TestTube2, Workflow, type LucideIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
-import { getFactoryDefinition, type FactoryDefinition, type FactoryStartingTask } from "./factories";
+import { getFactoryDefinition, type FactoryDefinition, type FactoryStartingTask, type InstallParam } from "./factories";
 import { IntegrationsSection, type IntegrationSelections } from "./InstallIntegrationsSection";
 import { requiredIntegrationsReady } from "./homeIntegrationStatus";
 import { homeInstallPanelClassName } from "./homePageStyles";
-import type { InstallParam } from "../install/types";
 
 const STARTING_TASK_ICONS: Record<string, { icon: LucideIcon; iconClassName: string }> = {
   "improve-agents-md": { icon: FilePenLine, iconClassName: "text-violet-500" },

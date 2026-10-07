@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -156,10 +155,6 @@ func (s *ScanPackage) Execute(ctx core.ExecutionContext) error {
 
 func (s *ScanPackage) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (s *ScanPackage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (s *ScanPackage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

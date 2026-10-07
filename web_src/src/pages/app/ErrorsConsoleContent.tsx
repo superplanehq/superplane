@@ -8,6 +8,7 @@ import type {
 import { Timestamp } from "@/components/Timestamp";
 import { withEventStatusBadgeClasses } from "@/lib/eventStatusBadge";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { findNode, getStatusBadgeProps, resolveNodeIconSlug } from "@/pages/app/lib/canvas-runs";
@@ -23,7 +24,7 @@ function NodeIcon({
   const iconSrc = getHeaderIconSrc(node?.component);
   const iconSlug = resolveNodeIconSlug(node, componentIconMap);
   if (iconSrc) {
-    return <img src={iconSrc} alt={name} className="h-4 w-4 object-contain" />;
+    return <img src={iconSrc} alt={name} className={cn("h-4 w-4 object-contain", logoDarkInvertClass(iconSrc))} />;
   }
   return React.createElement(resolveIcon(iconSlug || "box"), {
     size: 14,

@@ -2,6 +2,8 @@ package models
 
 import (
 	"fmt"
+	"maps"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -127,6 +129,47 @@ func ListIntegrations(db *gorm.DB, orgID uuid.UUID) ([]Integration, error) {
 		return nil, err
 	}
 	return integrations, nil
+}
+
+// ListIntegrationsPage returns one page of connections for an organization.
+// Search matches the app name or the connection name. Results are ordered by
+// app name, then connection name.
+func ListIntegrationsPage(tx *gorm.DB, orgID uuid.UUID, search string, limit, offset int) ([]Integration, int64, error) {
+	query := tx.Model(&Integration{}).Where("organization_id = ?", orgID)
+	if search != "" {
+		like := containsLikePattern(search)
+		query = query.Where(
+			"app_name ILIKE ? ESCAPE '\\' OR installation_name ILIKE ? ESCAPE '\\'",
+			like,
+			like,
+		)
+	}
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	var integrations []Integration
+	err := query.Order("app_name ASC, installation_name ASC").Find(&integrations).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return integrations, total, nil
+}
+
+// containsLikePattern matches the search text inside a name. Percent and
+// underscore stay literal characters.
+func containsLikePattern(search string) string {
+	escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(search)
+	return "%" + escaped + "%"
 }
 
 func CountIntegrationsByOrganization(orgID string) (int64, error) {
@@ -436,4 +479,237 @@ func (a *Integration) HasCapabilityEnabled(name string) bool {
 	}
 
 	return false
+}
+
+// FindGitHubIntegrationByAppState finds the pending GitHub connection that
+// started an install with this CSRF state.
+func FindGitHubIntegrationByAppState(tx *gorm.DB, state string) (*Integration, error) {
+	if state == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.
+		Where("app_name = ? AND metadata->>'state' = ?", "github", state).
+		First(&integration).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
+// FindJiraIntegrationByOAuthState finds the pending Jira connection that
+// started authorization with this CSRF state.
+func FindJiraIntegrationByOAuthState(tx *gorm.DB, state string) (*Integration, error) {
+	if state == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.
+		Where("app_name = ? AND metadata->>'state' = ?", "jira", state).
+		First(&integration).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
+// ClaimHostedJiraOAuthState finds the pending hosted Jira connection for this
+// CSRF state and removes that state in the same transaction. A later callback
+// with the same state then fails to find the connection. The returned
+// integration still holds the claimed state in memory so this request can
+// finish authorization.
+func ClaimHostedJiraOAuthState(tx *gorm.DB, state string) (*Integration, error) {
+	if state == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if err := inner.
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("app_name = ? AND metadata->>'state' = ?", "jira", state).
+			First(&integration).Error; err != nil {
+			return err
+		}
+
+		data := maps.Clone(integration.Metadata.Data())
+		if data == nil {
+			return gorm.ErrRecordNotFound
+		}
+		hosted, _ := data["hostedOAuth"].(bool)
+		current, _ := data["state"].(string)
+		if !hosted || current == "" || current != state {
+			return gorm.ErrRecordNotFound
+		}
+
+		persisted := maps.Clone(data)
+		delete(persisted, "state")
+		integration.Metadata = datatypes.NewJSONType(persisted)
+		if err := inner.Save(&integration).Error; err != nil {
+			return err
+		}
+
+		data["state"] = state
+		integration.Metadata = datatypes.NewJSONType(data)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
+// ClaimHostedLinearOAuthState finds the pending hosted Linear connection for
+// this CSRF state and removes that state in the same transaction. A later
+// callback with the same state then fails to find the connection. The
+// returned integration still holds the claimed state in memory so this
+// request can finish authorization.
+func ClaimHostedLinearOAuthState(tx *gorm.DB, state string) (*Integration, error) {
+	if state == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if err := inner.
+			Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("app_name = ? AND metadata->>'state' = ?", "linear", state).
+			First(&integration).Error; err != nil {
+			return err
+		}
+
+		data := maps.Clone(integration.Metadata.Data())
+		if data == nil {
+			return gorm.ErrRecordNotFound
+		}
+		hosted, _ := data["hostedOAuth"].(bool)
+		current, _ := data["state"].(string)
+		if !hosted || current == "" || current != state {
+			return gorm.ErrRecordNotFound
+		}
+
+		persisted := maps.Clone(data)
+		delete(persisted, "state")
+		integration.Metadata = datatypes.NewJSONType(persisted)
+		if err := inner.Save(&integration).Error; err != nil {
+			return err
+		}
+
+		data["state"] = state
+		integration.Metadata = datatypes.NewJSONType(data)
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
+// ListGitHubIntegrationsByInstallationID finds GitHub connections bound to a
+// GitHub App installation. One installation can belong to more than one
+// SuperPlane organization.
+func ListGitHubIntegrationsByInstallationID(tx *gorm.DB, installationID string) ([]Integration, error) {
+	if installationID == "" {
+		return nil, nil
+	}
+
+	var integrations []Integration
+	err := tx.
+		Where("app_name = ? AND metadata->>'installationId' = ?", "github", installationID).
+		Find(&integrations).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return integrations, nil
+}
+
+// FindSentryIntegrationByAppState finds the pending Sentry connection that
+// started an install with this CSRF state.
+func FindSentryIntegrationByAppState(tx *gorm.DB, state string) (*Integration, error) {
+	if state == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.
+		Where("app_name = ? AND metadata->>'state' = ?", "sentry", state).
+		First(&integration).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
+// FindPendingHostedSentryIntegration finds the newest unbound hosted Sentry
+// connection started by this SuperPlane user.
+func FindPendingHostedSentryIntegration(tx *gorm.DB, startedByUserID string) (*Integration, error) {
+	if startedByUserID == "" {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var integration Integration
+	err := tx.
+		Where(
+			"app_name = ? AND metadata->>'hostedApp' = ? AND metadata->>'startedByUserID' = ? AND COALESCE(metadata->>'installationUUID', '') = ''",
+			"sentry",
+			"true",
+			startedByUserID,
+		).
+		Order("created_at DESC").
+		First(&integration).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
+// FindReadyHostedSentryIntegration finds a SuperPlane Sentry connection that
+// already holds a public Sentry app install for this organization.
+func FindReadyHostedSentryIntegration(tx *gorm.DB, organizationID, excludeID uuid.UUID) (*Integration, error) {
+	if organizationID == uuid.Nil {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	query := tx.Where(
+		"organization_id = ? AND app_name = ? AND state = ? AND metadata->>'hostedApp' = ? AND COALESCE(metadata->>'installationUUID', '') <> ''",
+		organizationID,
+		"sentry",
+		IntegrationStateReady,
+		"true",
+	)
+	if excludeID != uuid.Nil {
+		query = query.Where("id <> ?", excludeID)
+	}
+
+	var integration Integration
+	err := query.Order("updated_at DESC").First(&integration).Error
+	if err != nil {
+		return nil, err
+	}
+	return &integration, nil
+}
+
+// ListSentryIntegrationsByInstallationUUID finds Sentry connections bound to
+// a public Sentry app installation.
+func ListSentryIntegrationsByInstallationUUID(tx *gorm.DB, installationUUID string) ([]Integration, error) {
+	if installationUUID == "" {
+		return nil, nil
+	}
+
+	var integrations []Integration
+	err := tx.
+		Where("app_name = ? AND metadata->>'installationUUID' = ?", "sentry", installationUUID).
+		Find(&integrations).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return integrations, nil
 }

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -130,10 +129,6 @@ func decodeGetLastWorkflowConfiguration(config any) (GetLastWorkflowConfiguratio
 func (c *GetLastWorkflow) Setup(ctx core.SetupContext) error {
 	_, err := decodeGetLastWorkflowConfiguration(ctx.Configuration)
 	return err
-}
-
-func (c *GetLastWorkflow) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetLastWorkflow) Execute(ctx core.ExecutionContext) error {

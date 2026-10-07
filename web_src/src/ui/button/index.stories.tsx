@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ChevronRight, Loader2, Mail, Settings, Trash2 } from "lucide-react";
 
 import { Button, type ButtonProps } from "./index";

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
@@ -27,15 +28,12 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 		r.Registry,
 		jwt.NewSigner("test-client-secret"),
 		support.NewOIDCProvider(),
-		r.GitProvider,
 		"",
 		"",
 		"",
 		"test",
 		"/app/templates",
-		r.AuthService,
-		nil,
-		false,
+		r.AuthService, false,
 	)
 	require.NoError(t, err)
 
@@ -71,4 +69,21 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 
 	_, err = models.FindEmailSettings(models.EmailProviderSMTP)
 	require.Error(t, err)
+
+	organization, err := models.FindOrganizationByName("Demo")
+	require.NoError(t, err)
+	credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CentsToMicros(models.DefaultWelcomeGrantCents), credit.GrantMicros)
+
+	owner, err := models.FindAccountByEmail("owner@example.com")
+	require.NoError(t, err)
+	assert.True(t, owner.HasReceivedWelcomeCredit())
+
+	var fleets []models.RunnerFleet
+	require.NoError(t, database.Conn().
+		Where("scope_type = ?", models.RunnerFleetScopeInstallation).
+		Find(&fleets).Error)
+	require.Empty(t, fleets)
+	assert.True(t, organization.HasExperimentalFeature(features.FeatureNewRunners))
 }

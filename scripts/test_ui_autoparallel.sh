@@ -1,33 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Shard Vitest UI unit tests across CI workers.
-# Usage (Semaphore example):
-#   make check.test.ui.shard INDEX=$SEMAPHORE_JOB_INDEX TOTAL=$SEMAPHORE_JOB_COUNT
+# Run Bun UI unit tests with compact dots output and a JUnit report
+# at the repo root (same path Semaphore publishes for Go tests).
 #
-# Environment:
-#   INDEX - 1-based index of this shard (defaults to 1)
-#   TOTAL - total number of shards (defaults to 1)
+# Usage:
+#   bash scripts/test_ui_autoparallel.sh
+#   FILES="src/lib/duration.spec.ts" bash scripts/test_ui_autoparallel.sh
+#   SHARD_INDEX=1 SHARD_COUNT=2 bash scripts/test_ui_autoparallel.sh
 
-INDEX="${INDEX:-${SEMAPHORE_JOB_INDEX:-1}}"
-TOTAL="${TOTAL:-${SEMAPHORE_JOB_COUNT:-1}}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+cd "${repo_root}/web_src"
 
-if ! [[ "$INDEX" =~ ^[0-9]+$ ]] || ! [[ "$TOTAL" =~ ^[0-9]+$ ]]; then
-  echo "INDEX and TOTAL must be positive integers (got INDEX=${INDEX}, TOTAL=${TOTAL})" >&2
-  exit 1
+junit_file="${JUNIT_FILE:-${repo_root}/junit-report.xml}"
+args=(
+  --dots
+  --reporter=junit
+  --reporter-outfile="${junit_file}"
+)
+
+if [[ -n "${SHARD_COUNT:-}" ]]; then
+  source "${script_dir}/lib/shard_args.sh"
+  echo "Running UI unit tests shard ${SHARD_INDEX}/${SHARD_COUNT}"
+  args+=(--parallel --shard="${SHARD_INDEX}/${SHARD_COUNT}")
+else
+  args+=(--isolate)
 fi
 
-if [[ "$TOTAL" -lt 1 ]]; then
-  echo "TOTAL must be >= 1 (got ${TOTAL})" >&2
-  exit 1
+file_args=()
+if [[ -n "${FILES:-}" ]]; then
+  read -r -a file_args <<< "${FILES}"
 fi
 
-if [[ "$INDEX" -lt 1 || "$INDEX" -gt "$TOTAL" ]]; then
-  echo "INDEX must be between 1 and TOTAL (${TOTAL}), got ${INDEX}" >&2
-  exit 1
-fi
+bun_status=0
+bun test "${args[@]}" "${file_args[@]}" || bun_status=$?
 
-echo "Running UI unit tests shard ${INDEX}/${TOTAL}"
-
-cd web_src
-npm run test:run -- --shard="${INDEX}/${TOTAL}"
+bun "${script_dir}/flatten_junit.mjs" "${junit_file}"
+exit "${bun_status}"

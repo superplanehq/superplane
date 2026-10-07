@@ -7,11 +7,11 @@ import { REFUND_FACTORY_LINES } from "./__fixtures__/factoryPageResponses";
 import { DispatchWorkOrderPopover } from "./DispatchWorkOrderPopover";
 
 /**
- * Popover for dispatching a work order to a specific factory line. Wraps
+ * Popover for dispatching a task to a specific factory line. Wraps
  * any trigger element via `children`; opens a line picker + Dispatch button.
  */
 const meta = {
-  title: "Factories/DispatchWorkOrderPopover",
+  title: "Factories/Components/DispatchWorkOrderPopover",
   component: DispatchWorkOrderPopover,
   parameters: { layout: "centered" },
   decorators: [
@@ -34,8 +34,8 @@ export const WithLines: Story = {
     isSaving: false,
     canDispatch: true,
     align: "center",
-    onDispatch: async (lineName) => {
-      console.log("dispatch to", lineName);
+    onDispatch: async (input) => {
+      console.log("dispatch to", input);
     },
     children: <Button type="button">Dispatch</Button>,
   },

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -60,22 +61,45 @@ func FindLatestNodeExecutionKVValueInTransaction(tx *gorm.DB, executionID uuid.U
 	return rec.Value, nil
 }
 
+// FirstNodeExecutionByKVInTransaction resolves the execution a key/value
+// pair points at, e.g. an external correlation ID stored by a component.
+// Values are expected to identify exactly one execution within a node.
+// When more than one execution matches, the oldest wins — preserved
+// behavior — and an error is logged, because a collision means a
+// component stored a value that is not unique per execution and webhooks
+// or integration messages may be routed to the wrong execution.
 func FirstNodeExecutionByKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID, key, value string) (*CanvasNodeExecution, error) {
-	var execution CanvasNodeExecution
-
+	var executionIDs []uuid.UUID
 	err := tx.
-		Model(&CanvasNodeExecution{}).
-		Where("id IN (?)", tx.
-			Select("execution_id").
-			Table("workflow_node_execution_kvs").
-			Where("key = ? AND value = ?", key, value).
-			Where("workflow_id = ?", workflowID).
-			Where("node_id = ?", nodeID)).
+		Table("workflow_node_execution_kvs").
+		Distinct("execution_id").
+		Where("key = ? AND value = ?", key, value).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Pluck("execution_id", &executionIDs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	if len(executionIDs) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	if len(executionIDs) > 1 {
+		log.Errorf(
+			"KV %s=%s on node %s in workflow %s matches %d executions — values must be unique per execution; using the oldest",
+			key, value, nodeID, workflowID, len(executionIDs),
+		)
+	}
+
+	var execution CanvasNodeExecution
+	err = tx.
+		Where("workflow_id = ?", workflowID).
+		Where("id IN ?", executionIDs).
 		Order("created_at ASC").
-		Limit(1).
 		First(&execution).
 		Error
-
 	if err != nil {
 		return nil, err
 	}

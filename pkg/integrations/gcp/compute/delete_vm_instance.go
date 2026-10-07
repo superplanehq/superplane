@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -215,10 +214,6 @@ func (d *DeleteVMInstance) Execute(ctx core.ExecutionContext) error {
 
 func (d *DeleteVMInstance) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (d *DeleteVMInstance) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (d *DeleteVMInstance) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

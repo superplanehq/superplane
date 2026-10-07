@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -244,10 +243,6 @@ func validateGroupBy(usageType, groupBy string) error {
 	default:
 		return fmt.Errorf("invalid group by: %s", groupBy)
 	}
-}
-
-func (c *GetUsage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetUsage) Execute(ctx core.ExecutionContext) error {

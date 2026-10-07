@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/logging"
 )
 
 type OnIssue struct{}
@@ -52,12 +54,13 @@ func (t *OnIssue) Documentation() string {
 
 The trigger emits the full Sentry webhook payload, including:
 - **action**: the issue event action
-- **data.issue**: the Sentry issue object
+- **data.issue**: the Sentry issue object from the webhook
+- **description**: Markdown of the Sentry issue and preferred event (event link, highlights, message, stack, request, user, tags, contexts, breadcrumbs). SuperPlane fetches this from the Sentry API. Use this instead of interpolating ` + "`data.issue`" + `, which renders as a Go map
 - **actor**: the user or team that triggered the event when available
 
 ## Setup
 
-This trigger uses the webhook URL configured on your Sentry internal integration. SuperPlane verifies each webhook signature using your Sentry client secret before routing the event to matching triggers.`
+This trigger uses issue webhooks from the connected Sentry organization. SuperPlane verifies each webhook signature before it routes the event to matching triggers.`
 }
 
 func (t *OnIssue) Icon() string {
@@ -111,8 +114,17 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 	}
 
 	metadata := OnIssueMetadata{}
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode trigger metadata: %w", err)
+	if ctx.Metadata != nil {
+		if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+			return fmt.Errorf("failed to decode trigger metadata: %w", err)
+		}
+	}
+
+	if ctx.Integration == nil {
+		if config.Project != "" {
+			return fmt.Errorf("Sentry integration is not connected")
+		}
+		return setOnIssueMetadata(ctx.Metadata, metadata)
 	}
 
 	if config.Project != "" {
@@ -131,10 +143,14 @@ func (t *OnIssue) Setup(ctx core.TriggerContext) error {
 	}
 
 	metadata.AppSubscriptionID = subscriptionID
-	return ctx.Metadata.Set(metadata)
+	return setOnIssueMetadata(ctx.Metadata, metadata)
 }
 
 func (t *OnIssue) subscribe(ctx core.TriggerContext, metadata OnIssueMetadata) (*string, error) {
+	if ctx.Integration == nil {
+		return nil, fmt.Errorf("Sentry integration is not connected")
+	}
+
 	if metadata.AppSubscriptionID != nil {
 		// Verify the subscription still exists — it may be gone if the integration was
 		// deleted and re-created. If the current integration has no subscriptions, create one.
@@ -179,15 +195,18 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 	}
 
 	if message.Resource != "issue" {
+		logSkippedIssueEvent("resource", message, config)
 		return nil
 	}
 
-	if len(config.Actions) > 0 && !slices.Contains(config.Actions, message.Action) {
+	if !issueActionAllowed(config.Actions, message.Action) {
+		logSkippedIssueEvent("action", message, config)
 		return nil
 	}
 
 	projectSlug := issueProjectSlug(message.Data)
-	if config.Project != "" && config.Project != projectSlug {
+	if !issueProjectAllowed(ctx.Configuration, config, projectSlug) {
+		logSkippedIssueEvent("project", message, config)
 		return nil
 	}
 
@@ -198,14 +217,108 @@ func (t *OnIssue) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		"data":         message.Data,
 		"actor":        message.Actor,
 		"timestamp":    eventTimestamp(message),
+		"description":  t.issueDescription(ctx, message.Data["issue"]),
+	}
+	if receiptID := strings.TrimSpace(message.ReceiptID); receiptID != "" {
+		payload[SuperplaneReceiptField] = receiptID
 	}
 
 	return ctx.Events.Emit("sentry.issue", payload)
 }
 
+func (t *OnIssue) issueDescription(ctx core.IntegrationMessageContext, issue any) string {
+	if ctx.HTTP == nil || ctx.Integration == nil {
+		return IssueDescription(issue, nil)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.Warnf("failed to create sentry client for issue enrichment: %v", err)
+		}
+		return IssueDescription(issue, nil)
+	}
+
+	return FetchedIssueDescription(client, issue, ctx.Logger)
+}
+
 func (t *OnIssue) Cleanup(ctx core.TriggerContext) error {
 	// Integration subscriptions are tied to the node lifecycle and are cleaned up by the platform.
 	return nil
+}
+
+func logSkippedIssueEvent(reason string, message *WebhookMessage, config OnIssueConfiguration) {
+	if message == nil {
+		return
+	}
+	logging.LogSentryWebhookInfo("Sentry issue event was not emitted", map[string]any{
+		"reason":             reason,
+		"resource":           message.Resource,
+		"action":             message.Action,
+		"project":            issueProjectSlug(message.Data),
+		"configured_project": config.Project,
+	})
+}
+
+func issueProjectAllowed(configuration any, config OnIssueConfiguration, projectSlug string) bool {
+	projects := configuredSentryProjects(configuration)
+	if len(projects) > 0 {
+		return slices.Contains(projects, projectSlug)
+	}
+	return config.Project == "" || config.Project == projectSlug
+}
+
+func configuredSentryProjects(configuration any) []string {
+	values, ok := configuration.(map[string]any)
+	if !ok {
+		return nil
+	}
+	return normalizeConfiguredProjects(values["projects"])
+}
+
+func normalizeConfiguredProjects(value any) []string {
+	var raw []string
+	switch typed := value.(type) {
+	case []string:
+		raw = typed
+	case []any:
+		raw = make([]string, 0, len(typed))
+		for _, item := range typed {
+			text, ok := item.(string)
+			if !ok {
+				continue
+			}
+			raw = append(raw, text)
+		}
+	default:
+		return nil
+	}
+
+	projects := make([]string, 0, len(raw))
+	for _, project := range raw {
+		project = strings.TrimSpace(project)
+		if project == "" || slices.Contains(projects, project) {
+			continue
+		}
+		projects = append(projects, project)
+	}
+	return projects
+}
+
+func issueActionAllowed(configured []string, action string) bool {
+	if configured == nil {
+		return true
+	}
+
+	return slices.Contains(configured, action)
+}
+
+func setOnIssueMetadata(writer core.MetadataWriter, metadata OnIssueMetadata) error {
+	if writer == nil {
+		return nil
+	}
+
+	return writer.Set(metadata)
 }
 
 func decodeWebhookMessage(message any) (*WebhookMessage, error) {
@@ -265,6 +378,10 @@ func issueProjectSlug(data map[string]any) string {
 }
 
 func findProject(integration core.IntegrationContext, slug string) *ProjectSummary {
+	if integration == nil {
+		return nil
+	}
+
 	metadata := Metadata{}
 	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
 		return nil

@@ -9,8 +9,10 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -156,10 +158,17 @@ func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			if errors.Is(impersonationErr, models.ErrAccountBlocked) {
 				impersonation.ClearCookie(w, r)
 			}
+			adminAccountID := ""
+			if info != nil {
+				adminAccountID = info.AdminAccountID
+			}
 			if impAccount != nil {
 				ctx = context.WithValue(ctx, EffectiveAccountContextKey, impAccount)
 				ctx = context.WithValue(ctx, ImpersonationContextKey, info)
 			}
+			loggedAccount, adminAccountID := requestLogAccountIdentity(account, impAccount, adminAccountID)
+			SetRequestLogAccount(ctx, loggedAccount)
+			SetRequestLogImpersonator(ctx, adminAccountID)
 
 			authentication.MaybeRefreshAccountSession(w, r, jwtSigner, account)
 
@@ -235,6 +244,7 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				}
 
 				ctx = context.WithValue(ctx, UserContextKey, user)
+				SetRequestLogUser(ctx, user)
 				if scopedClaims != nil {
 					ctx = context.WithValue(ctx, ScopedTokenClaimsContextKey, scopedClaims)
 				}
@@ -264,8 +274,10 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			}
 
 			ctx = context.WithValue(ctx, UserContextKey, user)
+			SetRequestLogUser(ctx, user)
 			if impersonationInfo != nil {
 				ctx = context.WithValue(ctx, ImpersonationContextKey, impersonationInfo)
+				SetRequestLogImpersonator(ctx, impersonationInfo.AdminAccountID)
 			}
 
 			if account, err := getValidatedAccountFromCookie(r, jwtSigner); err == nil {
@@ -299,6 +311,25 @@ func authenticateUserByToken(ctx context.Context, r *http.Request, jwtSigner *jw
 	}
 
 	hashedToken := crypto.HashToken(token)
+
+	//
+	// Next, try to authenticate the token as a named personal API token.
+	// A hit here still resolves to (and authenticates as) the parent
+	// human user.
+	//
+	user, err = authenticateUserByPersonalToken(ctx, hashedToken)
+	if err == nil {
+		return user, nil, nil
+	}
+	if errors.Is(err, models.ErrAccountBlocked) {
+		return nil, nil, err
+	}
+
+	//
+	// Fall back to the legacy users.token_hash column. This keeps org API
+	// keys (which still store their token hash there) and any personal
+	// token not yet migrated to user_api_tokens working.
+	//
 	user, err = models.FindActiveUserByTokenHashInTransaction(database.DB(ctx), hashedToken)
 	if err != nil {
 		return nil, nil, err
@@ -311,6 +342,38 @@ func authenticateUserByToken(ctx context.Context, r *http.Request, jwtSigner *jw
 	}
 
 	return user, nil, nil
+}
+
+// authenticateUserByPersonalToken resolves a hashed Bearer token against the
+// user_api_tokens table. On success it returns the parent human user and
+// best-effort records the token's last-used time; a touch failure never
+// fails the request.
+func authenticateUserByPersonalToken(ctx context.Context, hashedToken string) (*models.User, error) {
+	db := database.DB(ctx)
+
+	personalToken, err := models.FindUserAPITokenByHash(db, hashedToken)
+	if err != nil {
+		return nil, err
+	}
+
+	user, err := models.FindActiveUserByIDAnyOrg(db, personalToken.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !user.IsHuman() {
+		return nil, fmt.Errorf("personal token does not belong to a human user")
+	}
+
+	if err := rejectIfCredentialAccountBlocked(user); err != nil {
+		return nil, err
+	}
+
+	if err := models.TouchUserAPITokenLastUsed(db, personalToken.ID, time.Now()); err != nil {
+		log.Warnf("failed to update last_used_at for personal token %s: %v", personalToken.ID, err)
+	}
+
+	return user, nil
 }
 
 func getBearerToken(r *http.Request) (string, error) {
@@ -390,9 +453,9 @@ func authenticateUserByCookie(
 		return nil, nil, errors.New(AccountNotFoundError)
 	}
 
-	organizationID := findOrganizationID(r)
-	if organizationID == "" {
-		return nil, nil, errors.New(OrganizationNotFoundError)
+	organizationID, err := resolveOrganizationRef(ctx, findOrganizationID(r))
+	if err != nil {
+		return nil, nil, err
 	}
 
 	user, err = models.FindActiveUserByEmailInTransaction(database.DB(ctx), organizationID, account.Email)
@@ -401,6 +464,24 @@ func authenticateUserByCookie(
 	}
 
 	return user, nil, nil
+}
+
+// resolveOrganizationRef resolves a client-supplied organization identifier
+// (the x-organization-id header or organization_id query parameter, which
+// may be a UUID or a slug) to the organization's UUID. Cookie-based auth
+// looks up the user by organization_id, a UUID column, so a slug must be
+// resolved before that lookup runs.
+func resolveOrganizationRef(ctx context.Context, ref string) (string, error) {
+	if ref == "" {
+		return "", errors.New(OrganizationNotFoundError)
+	}
+
+	organization, err := models.FindOrganizationByIDOrSlug(database.DB(ctx), ref)
+	if err != nil {
+		return "", errors.New(OrganizationNotFoundError)
+	}
+
+	return organization.ID.String(), nil
 }
 
 // isActiveImpersonation returns true if there's a valid, non-expired
@@ -483,9 +564,9 @@ func resolveImpersonatedUser(ctx context.Context, jwtSigner *jwt.Signer, r *http
 	}
 
 	// Find the user in the org from the request header
-	organizationID := findOrganizationID(r)
-	if organizationID == "" {
-		return nil, nil, errors.New(OrganizationNotFoundError)
+	organizationID, err := resolveOrganizationRef(ctx, findOrganizationID(r))
+	if err != nil {
+		return nil, nil, err
 	}
 
 	user, err := models.FindActiveUserByEmailInTransaction(database.DB(ctx), organizationID, impAccount.Email)
@@ -557,7 +638,7 @@ func isAccountAPIPath(path string) bool {
 	}
 
 	switch path {
-	case "/account", "/organizations", "/apps/install/preview", "/apps/install":
+	case "/account", "/organizations":
 		return true
 	default:
 		return strings.HasPrefix(path, "/api/v1/invite-links/")

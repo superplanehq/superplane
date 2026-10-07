@@ -80,6 +80,127 @@ function AutoFocusToggleButton({ enabled, onToggle }: { enabled: boolean; onTogg
   );
 }
 
+function ScreenshotToolbarButton({
+  screenshotName,
+  onScreenshot,
+}: {
+  screenshotName?: string;
+  onScreenshot: () => void;
+}) {
+  if (!screenshotName) {
+    return null;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={onScreenshot}>
+          <Camera className="h-3 w-3" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Download screenshot (Ctrl/Cmd + Shift + S)</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function SnapToGridToggleButton({ enabled, onToggle }: { enabled?: boolean; onToggle?: () => void }) {
+  if (!onToggle) {
+    return null;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={onToggle}>
+          {enabled ? <CircleDot className="h-3 w-3" /> : <CircleDotDashed className="h-3 w-3" />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{enabled ? "Disable snap to grid" : "Enable snap to grid"}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function AutoLayoutOnUpdateToggleButton({
+  enabled,
+  onToggle,
+  disabled,
+  disabledTooltip,
+}: {
+  enabled?: boolean;
+  onToggle?: () => void;
+  disabled?: boolean;
+  disabledTooltip?: string;
+}) {
+  if (!onToggle) {
+    return null;
+  }
+
+  const tooltipMessage =
+    disabledTooltip ||
+    (enabled
+      ? "Auto-layout on add is enabled. New nodes reflow their connected graph."
+      : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="h-7 w-7"
+            onClick={onToggle}
+            disabled={disabled}
+            aria-pressed={enabled}
+          >
+            {enabled ? <LayoutGrid className="h-3 w-3" /> : <LayoutDashboard className="h-3 w-3" />}
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{tooltipMessage}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+type ZoomSliderKeyboardActions = {
+  zoomIn: (options?: { duration?: number }) => unknown;
+  zoomOut: (options?: { duration?: number }) => unknown;
+  zoomTo: (zoomLevel: number, options?: { duration?: number }) => unknown;
+  fitView: (options?: object) => unknown;
+  handleScreenshot: () => void;
+};
+
+function handleZoomSliderKeyDown(event: KeyboardEvent, actions: ZoomSliderKeyboardActions, screenshotName?: string) {
+  if (isZoomInShortcut(event)) {
+    event.preventDefault();
+    actions.zoomIn({ duration: 300 });
+    return;
+  }
+
+  if (isZoomOutShortcut(event)) {
+    event.preventDefault();
+    actions.zoomOut({ duration: 300 });
+    return;
+  }
+
+  if (isResetZoomShortcut(event)) {
+    event.preventDefault();
+    actions.zoomTo(1, { duration: 300 });
+    return;
+  }
+
+  if (isFitViewShortcut(event)) {
+    event.preventDefault();
+    actions.fitView({ duration: 300, ...LIVE_CANVAS_FIT_VIEW_OPTIONS });
+    return;
+  }
+
+  if (isScreenshotShortcut(event, screenshotName)) {
+    event.preventDefault();
+    actions.handleScreenshot();
+  }
+}
+
 export const ZoomSlider = memo(function ZoomSlider({
   className,
   orientation = "horizontal",
@@ -95,6 +216,7 @@ export const ZoomSlider = memo(function ZoomSlider({
   isAutoFocusEnabled,
   onAutoFocusToggle,
   usePanel = true,
+  showFitView = true,
   ...props
 }: Omit<PanelProps, "children"> & {
   orientation?: "horizontal" | "vertical";
@@ -110,6 +232,7 @@ export const ZoomSlider = memo(function ZoomSlider({
   isAutoFocusEnabled?: boolean;
   onAutoFocusToggle?: () => void;
   usePanel?: boolean;
+  showFitView?: boolean;
 }) {
   const { zoom } = useViewport();
   const { zoomTo, zoomIn, zoomOut, fitView, getNodes } = useReactFlow();
@@ -170,38 +293,13 @@ export const ZoomSlider = memo(function ZoomSlider({
     });
   }, [getNodes, screenshotName]);
 
-  // Add keyboard shortcuts for zoom controls
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Zoom in: Ctrl/Cmd + = or Ctrl/Cmd + Plus
-      if (isZoomInShortcut(e)) {
-        e.preventDefault();
-        zoomIn({ duration: 300 });
-      }
-      // Zoom out: Ctrl/Cmd + - or Ctrl/Cmd + Minus
-      else if (isZoomOutShortcut(e)) {
-        e.preventDefault();
-        zoomOut({ duration: 300 });
-      }
-      // Reset zoom: Ctrl/Cmd + 0
-      else if (isResetZoomShortcut(e)) {
-        e.preventDefault();
-        zoomTo(1, { duration: 300 });
-      }
-      // Fit view: Ctrl/Cmd + 1
-      else if (isFitViewShortcut(e)) {
-        e.preventDefault();
-        fitView({ duration: 300, ...LIVE_CANVAS_FIT_VIEW_OPTIONS });
-      }
-      // Screenshot: Ctrl/Cmd + Shift + S
-      else if (isScreenshotShortcut(e, screenshotName)) {
-        e.preventDefault();
-        handleScreenshot();
-      }
+    const onKeyDown = (event: KeyboardEvent) => {
+      handleZoomSliderKeyDown(event, { zoomIn, zoomOut, zoomTo, fitView, handleScreenshot }, screenshotName);
     };
 
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [zoomIn, zoomOut, zoomTo, fitView, handleScreenshot, screenshotName]);
 
   const baseClassName = cn(
@@ -210,12 +308,6 @@ export const ZoomSlider = memo(function ZoomSlider({
     orientation === "horizontal" ? "flex-row" : "flex-col",
     className,
   );
-  const isAutoLayoutToggleDisabled = !onAutoLayoutOnUpdateToggle || autoLayoutOnUpdateDisabled;
-  const autoLayoutTooltipMessage =
-    autoLayoutOnUpdateDisabledTooltip ||
-    (isAutoLayoutOnUpdateEnabled
-      ? "Auto-layout on add is enabled. New nodes reflow their connected graph."
-      : "Auto-layout on add is disabled. Click to enable connected-graph layout for newly added nodes.");
 
   const content = (
     <>
@@ -268,63 +360,31 @@ export const ZoomSlider = memo(function ZoomSlider({
         </TooltipTrigger>
         <TooltipContent>Reset zoom to 100% (Ctrl/Cmd + 0)</TooltipContent>
       </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="h-7 w-7"
-            onClick={() => fitView({ duration: 300, ...LIVE_CANVAS_FIT_VIEW_OPTIONS })}
-          >
-            <Eye className="h-3 w-3" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Fit all components in view (Ctrl/Cmd + 1)</TooltipContent>
-      </Tooltip>
+      {showFitView ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="h-7 w-7"
+              aria-label="Fit all components in view"
+              onClick={() => fitView({ duration: 300, ...LIVE_CANVAS_FIT_VIEW_OPTIONS })}
+            >
+              <Eye className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Fit all components in view (Ctrl/Cmd + 1)</TooltipContent>
+        </Tooltip>
+      ) : null}
       {leadingContent}
-      {screenshotName && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={handleScreenshot}>
-              <Camera className="h-3 w-3" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Download screenshot (Ctrl/Cmd + Shift + S)</TooltipContent>
-        </Tooltip>
-      )}
-      {onSnapToGridToggle && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={onSnapToGridToggle}>
-              {isSnapToGridEnabled ? <CircleDot className="h-3 w-3" /> : <CircleDotDashed className="h-3 w-3" />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{isSnapToGridEnabled ? "Disable snap to grid" : "Enable snap to grid"}</TooltipContent>
-        </Tooltip>
-      )}
-      {onAutoLayoutOnUpdateToggle && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="inline-flex">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="h-7 w-7"
-                onClick={onAutoLayoutOnUpdateToggle}
-                disabled={isAutoLayoutToggleDisabled}
-                aria-pressed={isAutoLayoutOnUpdateEnabled}
-              >
-                {isAutoLayoutOnUpdateEnabled ? (
-                  <LayoutGrid className="h-3 w-3" />
-                ) : (
-                  <LayoutDashboard className="h-3 w-3" />
-                )}
-              </Button>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{autoLayoutTooltipMessage}</TooltipContent>
-        </Tooltip>
-      )}
+      <ScreenshotToolbarButton screenshotName={screenshotName} onScreenshot={handleScreenshot} />
+      <SnapToGridToggleButton enabled={isSnapToGridEnabled} onToggle={onSnapToGridToggle} />
+      <AutoLayoutOnUpdateToggleButton
+        enabled={isAutoLayoutOnUpdateEnabled}
+        onToggle={onAutoLayoutOnUpdateToggle}
+        disabled={autoLayoutOnUpdateDisabled}
+        disabledTooltip={autoLayoutOnUpdateDisabledTooltip}
+      />
       {onAutoFocusToggle && (
         <AutoFocusToggleButton enabled={Boolean(isAutoFocusEnabled)} onToggle={onAutoFocusToggle} />
       )}

@@ -15,7 +15,7 @@ import (
 func TestApproval_HandleHook_Approved_UsesCorrectChannel(t *testing.T) {
 	approval := &Approval{}
 
-	role := models.RoleOrgOwner
+	role := models.RoleOrgAdmin
 	group := "release-approvers"
 
 	testCases := []struct {
@@ -81,7 +81,7 @@ func TestApproval_HandleHook_Approved_UsesCorrectChannel(t *testing.T) {
 func TestApproval_HandleHook_Rejected_UsesCorrectChannel(t *testing.T) {
 	approval := &Approval{}
 
-	role := models.RoleOrgOwner
+	role := models.RoleOrgAdmin
 	group := "release-approvers"
 
 	testCases := []struct {
@@ -190,7 +190,7 @@ func TestApproval_HandleHook_RejectImmediatelyFinishes(t *testing.T) {
 func TestApproval_HandleHook_StillPending_DoesNotCallPass(t *testing.T) {
 	approval := &Approval{}
 
-	role := models.RoleOrgOwner
+	role := models.RoleOrgAdmin
 	group := "release-approvers"
 
 	testCases := []struct {
@@ -508,7 +508,7 @@ func TestApproval_Execute(t *testing.T) {
 		stateCtx := &contexts.ExecutionStateContext{}
 		metadataCtx := &contexts.MetadataContext{}
 
-		role := models.RoleOrgOwner
+		role := models.RoleOrgAdmin
 		group := "release-approvers"
 
 		ctx := core.ExecutionContext{

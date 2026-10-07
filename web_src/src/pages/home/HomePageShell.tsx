@@ -2,7 +2,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 
 const pageShellClassName = cn("min-h-screen flex flex-col bg-slate-100", appDarkModeClasses.surface);
 

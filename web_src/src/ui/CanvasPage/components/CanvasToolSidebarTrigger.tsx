@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sparkle, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { AgentSuggestionsHoverCard, type AgentSuggestion } from "./AgentSuggestionsHoverCard";
 import {
   canvasSidebarToggleActiveClassName,

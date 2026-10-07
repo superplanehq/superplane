@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { syncRunInspectionViewportTransition, type CanvasViewport } from "./run-inspection-viewport";
 
 function ref<T>(current: T): { current: T } {

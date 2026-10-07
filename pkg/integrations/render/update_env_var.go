@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -176,10 +175,6 @@ func decodeUpdateEnvVarConfiguration(configuration any) (UpdateEnvVarConfigurati
 func (c *UpdateEnvVar) Setup(ctx core.SetupContext) error {
 	_, err := decodeUpdateEnvVarConfiguration(ctx.Configuration)
 	return err
-}
-
-func (c *UpdateEnvVar) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *UpdateEnvVar) Execute(ctx core.ExecutionContext) error {

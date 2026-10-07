@@ -1,13 +1,17 @@
 package e2e
 
 import (
+	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 )
@@ -141,4 +145,114 @@ func (steps *TestLoginPageSteps) SetInvalidAuthCookie() {
 		HttpOnly: pw.Bool(true),
 	}})
 	assert.NoError(steps.t, err)
+}
+
+const googleDevAccountEmail = "dev@superplane.local"
+
+func TestGoogleSSONoAccountSignup(t *testing.T) {
+	runProviderSSONoAccountSignup(t, providerSSOCase{
+		provider:      "google",
+		continueLabel: "Continue with Google",
+		screenshot:    "sso-no-account",
+	})
+}
+
+func TestGitHubSSONoAccountSignup(t *testing.T) {
+	runProviderSSONoAccountSignup(t, providerSSOCase{
+		provider:      "github",
+		continueLabel: "Continue with GitHub",
+		screenshot:    "sso-github-no-account",
+	})
+}
+
+type providerSSOCase struct {
+	provider      string
+	continueLabel string
+	screenshot    string
+}
+
+func runProviderSSONoAccountSignup(t *testing.T, spec providerSSOCase) {
+	t.Helper()
+
+	t.Run(spec.provider+" sign-in without an account creates one", func(t *testing.T) {
+		steps := &providerSSONoAccountSteps{t: t, spec: spec}
+		steps.start()
+		steps.visitLoginPage()
+		steps.capture("01-login")
+		steps.clickContinue()
+		steps.assertAccountCreatedAndSignedIn()
+		steps.capture("02-after-create")
+	})
+
+	t.Run("existing "+spec.provider+" user signs in from the login page", func(t *testing.T) {
+		steps := &providerSSONoAccountSteps{t: t, spec: spec}
+		steps.start()
+		steps.givenTheDevAccountExists()
+		steps.visitLoginPage()
+		steps.clickContinue()
+		steps.assertLeftLoginPage()
+	})
+}
+
+type providerSSONoAccountSteps struct {
+	t       *testing.T
+	session *session.TestSession
+	spec    providerSSOCase
+}
+
+func (s *providerSSONoAccountSteps) start() {
+	s.session = ctx.NewSession(s.t)
+	s.session.Start()
+}
+
+func (s *providerSSONoAccountSteps) visitLoginPage() {
+	s.session.Visit("/login")
+	s.session.AssertVisible(q.Text(s.spec.continueLabel))
+}
+
+func (s *providerSSONoAccountSteps) clickContinue() {
+	s.session.Click(q.Text(s.spec.continueLabel))
+}
+
+func (s *providerSSONoAccountSteps) assertAccountCreatedAndSignedIn() {
+	waitErr := s.session.Page().WaitForURL("**/welcome**", pw.PageWaitForURLOptions{
+		Timeout: pw.Float(s.sessionTimeout()),
+	})
+	require.NoError(s.t, waitErr)
+	assert.NotContains(s.t, s.session.Page().URL(), "auth_error")
+
+	account, err := models.FindAccountByEmail(googleDevAccountEmail)
+	require.NoError(s.t, err)
+	assert.Equal(s.t, googleDevAccountEmail, account.Email)
+}
+
+func (s *providerSSONoAccountSteps) givenTheDevAccountExists() {
+	_, err := models.CreateAccount("Dev User", googleDevAccountEmail)
+	require.NoError(s.t, err)
+}
+
+func (s *providerSSONoAccountSteps) assertLeftLoginPage() {
+	s.session.WaitUntilURLDoesNotContain("/login")
+	currentURL := s.session.Page().URL()
+	assert.NotContains(s.t, currentURL, "auth_error")
+}
+
+func (s *providerSSONoAccountSteps) capture(name string) {
+	s.session.Sleep(300)
+	path := fmt.Sprintf("/app/tmp/screenshots/%s-%s.png", s.spec.screenshot, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		s.t.Fatalf("screenshot dir %s: %v", path, err)
+	}
+
+	if _, err := s.session.Page().Screenshot(pw.PageScreenshotOptions{
+		Path:     pw.String(path),
+		FullPage: pw.Bool(true),
+		Type:     pw.ScreenshotTypePng,
+	}); err != nil {
+		s.t.Fatalf("screenshot %s: %v", name, err)
+	}
+}
+
+func (s *providerSSONoAccountSteps) sessionTimeout() float64 {
+	return 15000
 }

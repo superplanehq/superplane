@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -94,10 +93,6 @@ func decodeGetFlakyTestsConfiguration(config any) (GetFlakyTestsConfiguration, e
 func (c *GetFlakyTests) Setup(ctx core.SetupContext) error {
 	_, err := decodeGetFlakyTestsConfiguration(ctx.Configuration)
 	return err
-}
-
-func (c *GetFlakyTests) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetFlakyTests) Execute(ctx core.ExecutionContext) error {

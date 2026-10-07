@@ -5,11 +5,17 @@ import { cn } from "@/lib/utils";
 
 const RESET_DELAY_MS = 2000;
 
+function iconAriaLabel(copied: boolean, ariaLabel: string, copiedAriaLabel: string): string {
+  return copied ? copiedAriaLabel : ariaLabel;
+}
+
 interface CopyButtonProps {
   text: string;
   /** "icon" (default) renders a compact icon-only button;
-   *  "button" renders a labeled outline button for primary copy actions. */
+   *  "button" renders a labeled button for copy actions. */
   variant?: "icon" | "button";
+  /** Button chrome when `variant` is `"button"`. Defaults to outline. */
+  buttonVariant?: "outline" | "default";
   children?: React.ReactNode;
   /** Label briefly shown after a successful copy (button variant). */
   copiedLabel?: React.ReactNode;
@@ -17,6 +23,10 @@ interface CopyButtonProps {
   dark?: boolean;
   /** Fires when `navigator.clipboard.writeText` rejects. */
   onCopyError?: (err: unknown) => void;
+  /** Accessible label for the icon variant. */
+  ariaLabel?: string;
+  /** Accessible label while the icon variant shows success. */
+  copiedAriaLabel?: string;
   className?: string;
   "data-testid"?: string;
 }
@@ -24,15 +34,19 @@ interface CopyButtonProps {
 export function CopyButton({
   text,
   variant = "icon",
+  buttonVariant = "outline",
   children,
   copiedLabel = "Copied!",
   dark,
   onCopyError,
+  ariaLabel = "Copy to clipboard",
+  copiedAriaLabel = "Copied to clipboard",
   className,
   "data-testid": dataTestId,
 }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentAriaLabel = iconAriaLabel(copied, ariaLabel, copiedAriaLabel);
 
   useEffect(() => {
     return () => {
@@ -40,7 +54,7 @@ export function CopyButton({
     };
   }, []);
 
-  const handleCopy = async (e: React.MouseEvent) => {
+  const handleCopy = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     try {
       await navigator.clipboard.writeText(text);
@@ -57,9 +71,10 @@ export function CopyButton({
     return (
       <Button
         type="button"
-        variant="outline"
+        variant={buttonVariant}
         onClick={handleCopy}
         aria-live="polite"
+        data-copied={copied || undefined}
         data-testid={dataTestId}
         className={cn("flex items-center gap-1", className)}
       >
@@ -82,15 +97,16 @@ export function CopyButton({
     <button
       type="button"
       onClick={handleCopy}
-      aria-label={copied ? "Copied to clipboard" : "Copy to clipboard"}
+      aria-label={currentAriaLabel}
       aria-live="polite"
+      data-copied={copied || undefined}
       data-testid={dataTestId}
       className={cn(
         "p-1 rounded transition-colors shrink-0",
         dark ? "hover:bg-gray-700" : "hover:bg-gray-200 dark:hover:bg-gray-700",
         className,
       )}
-      title={copied ? "Copied to clipboard" : "Copy to clipboard"}
+      title={currentAriaLabel}
     >
       {copied ? (
         <Check size={13} className={dark ? "text-green-400" : "text-green-600 dark:text-green-400"} />

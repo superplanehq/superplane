@@ -1,20 +1,43 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import type { FactoriesWorkOrder } from "@/api-client";
+import type {
+  FactoriesFactoryPullRequest,
+  FactoriesWorkOrder,
+  FactoriesWorkOrderArtifact,
+  FactoriesWorkOrderEvent,
+} from "@/api-client";
 
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
 import {
+  CLOSED_FAILED_WORK_ORDER,
   CLOSED_WORK_ORDER,
+  DRAFT_WORK_ORDER,
   FACTORIES_ORGANIZATION_ID,
   FAILED_WORK_ORDER,
   OPEN_WORK_ORDER,
-  PRIMARY_FACTORY_ID,
-  REFUND_FACTORY,
+  PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
   RUNNING_WORK_ORDER,
 } from "./__fixtures__/factoryPageResponses";
+import { OPEN_WORK_ORDER_ARTIFACTS, OPEN_WORK_ORDER_PULL_REQUESTS } from "./__fixtures__/factoryPageFixtureVariants";
+import {
+  CLOSED_FAILED_WORK_ORDER_EVENTS,
+  CLOSED_WORK_ORDER_EVENTS,
+  DRAFT_WORK_ORDER_EVENTS,
+  FAILED_WORK_ORDER_EVENTS,
+  OPEN_WORK_ORDER_EVENTS,
+  RICH_OPEN_WORK_ORDER_EVENTS,
+  RUNNING_WORK_ORDER_EVENTS,
+} from "./__fixtures__/factoryPageEventFixtures";
+import {
+  CRITICAL_WORK_ORDER_CHECKS,
+  OPEN_WORK_ORDER_CHECKS,
+  RUNNING_WORK_ORDER_CHECKS,
+} from "./__fixtures__/workOrderCheckFixtures";
+import { presentWorkOrderChecks, type WorkOrderCheckPresentation } from "./lib/workOrderChecks";
+import { presentWorkOrderStatusNotes } from "./lib/workOrderStatusNote";
 import { WorkOrderDetailLoadedView } from "./WorkOrderDetailLoadedView";
-import { getWorkOrderDetailDerived } from "./workOrderProgress";
+import { getWorkOrderDetailDerived } from "./lib/workOrderProgress";
 
 /**
  * Direct-props stories for `WorkOrderDetailLoadedView` — the pure composed
@@ -26,13 +49,13 @@ import { getWorkOrderDetailDerived } from "./workOrderProgress";
  * `WorkOrderDetailPage.stories.tsx`.
  */
 const meta = {
-  title: "Factories/WorkOrderDetailLoadedView",
+  title: "Factories/Components/WorkOrderDetailLoadedView",
   component: WorkOrderDetailLoadedView,
   parameters: { layout: "fullscreen" },
   decorators: [
     (Story) => (
       <ComponentStoryShell
-        initialPath={`/${FACTORIES_ORGANIZATION_ID}/factories/${PRIMARY_FACTORY_ID}`}
+        initialPath={`/${FACTORIES_ORGANIZATION_ID}/workspaces/${PRIMARY_FACTORY_KEY}`}
         className="min-h-screen w-full bg-gray-50 dark:bg-gray-950"
       >
         <Story />
@@ -45,69 +68,181 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const factoryHref = `/${FACTORIES_ORGANIZATION_ID}/factories/${PRIMARY_FACTORY_ID}`;
+interface BuildLoadedViewOverrides {
+  events?: FactoriesWorkOrderEvent[];
+  artifacts?: FactoriesWorkOrderArtifact[];
+  pullRequests?: FactoriesFactoryPullRequest[];
+  checks?: WorkOrderCheckPresentation[];
+}
 
-function buildLoadedViewArgs(order: FactoriesWorkOrder) {
+function buildLoadedViewArgs(order: FactoriesWorkOrder, overrides: BuildLoadedViewOverrides = {}) {
   const derived = getWorkOrderDetailDerived(order);
   return {
-    factory: REFUND_FACTORY,
-    factoryHref,
     organizationId: FACTORIES_ORGANIZATION_ID,
+    factoryKey: PRIMARY_FACTORY_KEY,
     order,
+    events: overrides.events ?? [],
+    artifacts: overrides.artifacts ?? [],
+    pullRequests: overrides.pullRequests ?? [],
+    statusNotes: presentWorkOrderStatusNotes(order.statusNotes, derived.displayStatus ?? undefined),
+    checks: overrides.checks,
+    isArtifactsLoading: false,
     displayStatus: derived.displayStatus!,
     statusMeta: derived.statusMeta!,
     assigneeIds: derived.assigneeIds,
     assigneeNames: derived.assigneeNames,
     factoryLines: REFUND_FACTORY_LINES,
     isOpen: derived.isOpen,
+    isDispatchable: derived.isDispatchable,
+    isClosed: derived.isClosed,
     canDispatch: true,
     canClose: true,
     canAssign: true,
+    canManage: true,
     permissionsLoading: false,
     isDispatching: false,
     isCompleting: false,
     isRejecting: false,
     isClosing: false,
     isAssigneesSaving: false,
-    onDispatch: async (lineName: string) => {
-      console.log("dispatch", lineName);
+    isUpdatingStatus: false,
+    isAddingComment: false,
+    onDispatch: async (input: { lineName: string }) => {
+      console.log("dispatch", input);
     },
-    onClose: (result: "RESULT_COMPLETED" | "RESULT_REJECTED") => {
+    onClose: (result: "RESULT_COMPLETED" | "RESULT_REJECTED" | "RESULT_FAILED") => {
       console.log("close", result);
     },
     onAssigneesSave: async (assigneeIds: string[]) => {
       console.log("save assignees", assigneeIds);
+    },
+    onStatusChange: async (state: string, result?: string) => {
+      console.log("status change", state, result);
+    },
+    onAddComment: async (body: string) => {
+      console.log("comment", body);
     },
   };
 }
 
 /** Open — assignees + full action row (Dispatch / Complete / Reject). */
 export const Open: Story = {
-  args: buildLoadedViewArgs(OPEN_WORK_ORDER),
+  args: buildLoadedViewArgs(OPEN_WORK_ORDER, { events: OPEN_WORK_ORDER_EVENTS }),
 };
 
 /** Running — action row still visible; badge shows the running spinner. */
 export const Running: Story = {
-  args: buildLoadedViewArgs(RUNNING_WORK_ORDER),
+  args: buildLoadedViewArgs(RUNNING_WORK_ORDER, { events: RUNNING_WORK_ORDER_EVENTS }),
 };
 
 /** Failed — failed step surfaced in the timeline. */
 export const Failed: Story = {
-  args: buildLoadedViewArgs(FAILED_WORK_ORDER),
+  args: buildLoadedViewArgs(FAILED_WORK_ORDER, { events: FAILED_WORK_ORDER_EVENTS }),
 };
 
-/** Closed — action row hidden, "Closed as completed" footer visible. */
+/** Closed — reopen actions available, "Closed as completed" footer visible. */
 export const Closed: Story = {
-  args: buildLoadedViewArgs(CLOSED_WORK_ORDER),
+  args: buildLoadedViewArgs(CLOSED_WORK_ORDER, { events: CLOSED_WORK_ORDER_EVENTS }),
 };
 
-/** Read-only viewer — permissions off; assignees edit button disabled. */
+/** Draft — Dispatch surfaces alongside the scoping notes. */
+export const Draft: Story = {
+  args: buildLoadedViewArgs(DRAFT_WORK_ORDER, { events: DRAFT_WORK_ORDER_EVENTS }),
+};
+
+/** Rich detail — inline comments, both artifact kinds, and the sidebar list. */
+export const WithCommentsAndArtifacts: Story = {
+  name: "With Comments & Artifacts",
+  args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
+    events: RICH_OPEN_WORK_ORDER_EVENTS,
+    artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+    pullRequests: OPEN_WORK_ORDER_PULL_REQUESTS,
+  }),
+};
+
+/** Checks — automation-reported scorecards (risk, coverage, confidence) plus a passing boolean CI check above Activity. Click a card to open the full analysis. */
+export const WithChecks: Story = {
+  name: "With Checks",
+  args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
+    events: RICH_OPEN_WORK_ORDER_EVENTS,
+    artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+    pullRequests: OPEN_WORK_ORDER_PULL_REQUESTS,
+    checks: presentWorkOrderChecks(OPEN_WORK_ORDER_CHECKS),
+  }),
+};
+
+/** Failing boolean check — CI reads Fail next to two scored checks while the line retries. Status notes stay visible; Update manually matches the header (Complete and Reject). */
+export const WithFailingCICheck: Story = {
+  name: "With Failing CI Check",
+  args: {
+    ...buildLoadedViewArgs(RUNNING_WORK_ORDER, {
+      events: RUNNING_WORK_ORDER_EVENTS,
+      checks: presentWorkOrderChecks(RUNNING_WORK_ORDER_CHECKS),
+    }),
+    statusNotes: presentWorkOrderStatusNotes(OPEN_WORK_ORDER.statusNotes),
+  },
+};
+
+/** Single critical check — the smallest checks state, with the critical accent. */
+export const WithCriticalCheck: Story = {
+  name: "With Critical Check",
+  args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
+    events: OPEN_WORK_ORDER_EVENTS,
+    checks: presentWorkOrderChecks(CRITICAL_WORK_ORDER_CHECKS),
+  }),
+};
+
+/**
+ * Status notes — automations announce the next step and what resolves
+ * it. Each note has a key so several notes can sit
+ * side by side; cleared on any state change. Shown whenever the order
+ * has notes, including while a line is still running.
+ */
+export const WithStatusNote: Story = {
+  name: "With Status Note",
+  args: buildLoadedViewArgs(OPEN_WORK_ORDER, {
+    events: RICH_OPEN_WORK_ORDER_EVENTS,
+    artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+    pullRequests: OPEN_WORK_ORDER_PULL_REQUESTS,
+  }),
+};
+
+/** Two notes with distinct keys — PR review plus a second informational wait. */
+export const WithTwoStatusNotes: Story = {
+  name: "With Two Status Notes",
+  args: {
+    ...buildLoadedViewArgs(OPEN_WORK_ORDER, {
+      events: RICH_OPEN_WORK_ORDER_EVENTS,
+      artifacts: OPEN_WORK_ORDER_ARTIFACTS,
+      pullRequests: OPEN_WORK_ORDER_PULL_REQUESTS,
+    }),
+    statusNotes: presentWorkOrderStatusNotes([
+      ...(OPEN_WORK_ORDER.statusNotes ?? []),
+      {
+        key: "deploy-window",
+        kind: "info",
+        headline: "Waiting on the deploy window",
+        body: "The change is ready. SuperPlane will complete this task after the next deploy window.",
+        updatedAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      },
+    ]),
+  },
+};
+
+/** Closed as failed — failed badge, reopen actions, markdown artifact + failed close. */
+export const ClosedFailed: Story = {
+  name: "Closed (failed)",
+  args: buildLoadedViewArgs(CLOSED_FAILED_WORK_ORDER, { events: CLOSED_FAILED_WORK_ORDER_EVENTS }),
+};
+
+/** Read-only viewer — permissions off; every action button is disabled. */
 export const ReadOnly: Story = {
   name: "Read Only",
   args: {
-    ...buildLoadedViewArgs(OPEN_WORK_ORDER),
+    ...buildLoadedViewArgs(OPEN_WORK_ORDER, { events: OPEN_WORK_ORDER_EVENTS }),
     canDispatch: false,
     canClose: false,
     canAssign: false,
+    canManage: false,
   },
 };

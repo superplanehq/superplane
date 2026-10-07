@@ -7,12 +7,60 @@ import type { BaseNodeMetadata, Issue } from "./types";
 import { buildGithubSubtitle } from "./utils";
 
 interface OnIssueConfiguration {
-  actions: string[];
+  actions?: string[];
+  labels?: unknown;
+  authorsWithAccess?: boolean;
 }
 
 interface OnIssueEventData {
   action?: string;
   issue?: Issue;
+}
+
+function issueEventTitle(eventData?: OnIssueEventData): string {
+  return `#${eventData?.issue?.number} - ${eventData?.issue?.title}`;
+}
+
+function buildOnIssueMetadataItems(metadata?: BaseNodeMetadata, configuration?: OnIssueConfiguration) {
+  const metadataItems = [];
+
+  if (metadata?.repository?.name) {
+    metadataItems.push({
+      icon: "book",
+      label: metadata.repository.name,
+    });
+  }
+
+  if (configuration?.actions) {
+    metadataItems.push({
+      icon: "funnel",
+      label: configuration.actions.join(", "),
+    });
+  }
+
+  const labels = configuredLabels(configuration?.labels);
+  if (labels.length > 0) {
+    metadataItems.push({
+      icon: "tag",
+      label: labels.join(", "),
+    });
+  }
+
+  if (configuration?.authorsWithAccess) {
+    metadataItems.push({
+      icon: "user",
+      label: "Author is a repository collaborator",
+    });
+  }
+
+  return metadataItems;
+}
+
+function configuredLabels(labels: unknown): string[] {
+  if (!Array.isArray(labels)) {
+    return [];
+  }
+  return labels.filter((label): label is string => typeof label === "string" && label.trim() !== "");
 }
 
 /**
@@ -23,7 +71,7 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as OnIssueEventData;
 
     return {
-      title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
+      title: issueEventTitle(eventData),
       subtitle: buildGithubSubtitle(eventData?.action || "", context.event?.createdAt),
     };
   },
@@ -38,35 +86,20 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as BaseNodeMetadata;
     const configuration = node.configuration as unknown as OnIssueConfiguration;
-    const metadataItems = [];
-
-    if (metadata?.repository?.name) {
-      metadataItems.push({
-        icon: "book",
-        label: metadata.repository.name,
-      });
-    }
-
-    if (configuration?.actions) {
-      metadataItems.push({
-        icon: "funnel",
-        label: configuration.actions.join(", "),
-      });
-    }
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: githubIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: buildOnIssueMetadataItems(metadata, configuration),
     };
 
     if (lastEvent) {
       const eventData = lastEvent.data as OnIssueEventData;
 
       props.lastEventData = {
-        title: `#${eventData?.issue?.number} - ${eventData?.issue?.title}`,
+        title: issueEventTitle(eventData),
         subtitle: buildGithubSubtitle(eventData?.action || "", lastEvent.createdAt),
         receivedAt: new Date(lastEvent.createdAt),
         state: "triggered",

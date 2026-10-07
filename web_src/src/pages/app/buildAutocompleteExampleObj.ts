@@ -78,6 +78,69 @@ function buildRunExample(): Record<string, unknown> {
   };
 }
 
+// Representative work-order shape for order() autocomplete / preview.
+// Real values come from the factory execution at runtime; this is only a stub.
+const EXAMPLE_ORDER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+const EXAMPLE_FACTORY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
+const EXAMPLE_ORDER_NUMBER = 12;
+
+// Task permalinks are workspace-scoped
+// (`/{org}/workspaces/{workspaceKey}/task/{number}`), so the example is
+// only meaningful on a workspace app page, where order() also resolves.
+function exampleOrderUrl(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const { origin, pathname } = window.location;
+  const workspacePath = pathname.match(/^\/[^/]+\/workspaces\/[^/]+/)?.[0];
+  return workspacePath ? `${origin}${workspacePath}/task/${EXAMPLE_ORDER_NUMBER}` : "";
+}
+
+function buildOrderExample(): Record<string, unknown> {
+  return {
+    id: EXAMPLE_ORDER_ID,
+    title: "Ship feature",
+    description: "Implement and open PR",
+    factory_id: EXAMPLE_FACTORY_ID,
+    state: "open",
+    result: "",
+    repository: "acme/service",
+    repository_url: "https://github.com/acme/service.git",
+    default_branch: "main",
+    url: exampleOrderUrl(),
+    source: {
+      issue: { number: 42, title: "Fix login" },
+    },
+    artifacts: [
+      {
+        id: "c3d4e5f6-a7b8-9012-cdef-123456789012",
+        type: "pr",
+        data: { url: "https://github.com/org/repo/pull/7", number: 7 },
+      },
+    ],
+    comments: [
+      {
+        id: "d4e5f6a7-b8c9-0123-defa-234567890123",
+        body: "Looks good, merging.",
+        author: { kind: "user", user_id: "e5f6a7b8-c9d0-1234-efab-345678901234" },
+        created_at: "2024-01-01T00:00:00Z",
+      },
+    ],
+  };
+}
+
+function buildWorkspaceExample(): Record<string, unknown> {
+  return {
+    id: EXAMPLE_FACTORY_ID,
+    key: "SP",
+    name: "Example workspace",
+    repository: "acme/service",
+    backlog_repository: "acme/service",
+    default_branch: "main",
+  };
+}
+
 function collectChainNodeIds(
   nodeId: string,
   currentNode: ComponentsNode | undefined,
@@ -250,6 +313,8 @@ type BuildNamedExampleObjInput = {
   incomingNodeIdsByTargetId: Map<string, string[]>;
   appExample: Record<string, unknown>;
   runExample: Record<string, unknown>;
+  orderExample: Record<string, unknown>;
+  workspaceExample: Record<string, unknown>;
 };
 
 function buildNamedExampleObj({
@@ -263,6 +328,8 @@ function buildNamedExampleObj({
   incomingNodeIdsByTargetId,
   appExample,
   runExample,
+  orderExample,
+  workspaceExample,
 }: BuildNamedExampleObjInput): Record<string, unknown> | null {
   const rootNodeId = canvasNodes.find((node) => {
     if (!node.id || !chainNodeIds.has(node.id)) return false;
@@ -312,6 +379,8 @@ function buildNamedExampleObj({
 
   namedExampleObj.__app = appExample;
   namedExampleObj.__run = runExample;
+  namedExampleObj.__order = orderExample;
+  namedExampleObj.__workspace = workspaceExample;
 
   const currentNodeName = currentNode?.name?.trim();
   const currentNodeId = currentNode?.id;
@@ -364,6 +433,8 @@ export function buildAutocompleteExampleObj(
     previousByDepth,
     appExample: buildAppExample(context.app),
     runExample: buildRunExample(),
+    orderExample: buildOrderExample(),
+    workspaceExample: buildWorkspaceExample(),
     canvasNodes: context.canvasNodes,
     incomingNodeIdsByTargetId: context.incomingNodeIdsByTargetId,
   });

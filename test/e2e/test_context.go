@@ -1,10 +1,12 @@
 package e2e
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +14,8 @@ import (
 	"github.com/google/uuid"
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/licensing"
+	"github.com/superplanehq/superplane/pkg/licensing/licensingtest"
 	"github.com/superplanehq/superplane/pkg/server"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
@@ -65,10 +69,29 @@ func (s *TestContext) Start() {
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
 	os.Setenv("ENABLE_MAGIC_CODE_LOGIN", "yes")
+	os.Setenv("BLOCK_SIGNUP", "no")
+	if os.Getenv("GOOGLE_CLIENT_ID") == "" {
+		os.Setenv("GOOGLE_CLIENT_ID", "e2e-google-client-id")
+		os.Setenv("GOOGLE_CLIENT_SECRET", "e2e-google-client-secret")
+	}
+	if os.Getenv("GITHUB_CLIENT_ID") == "" {
+		os.Setenv("GITHUB_CLIENT_ID", "e2e-github-client-id")
+		os.Setenv("GITHUB_CLIENT_SECRET", "e2e-github-client-secret")
+	}
+	if os.Getenv("BLOB_STORAGE_PROVIDER") == "" {
+		os.Setenv("BLOB_STORAGE_PROVIDER", "filesystem")
+	}
+	if os.Getenv("BLOB_STORAGE_LOCAL_PATH") == "" {
+		os.Setenv("BLOB_STORAGE_LOCAL_PATH", filepath.Join(os.TempDir(), "superplane-e2e-blobs"))
+	}
 
 	s.AgentProvider = support.NewAgentProvider()
 	s.ResetAgentProvider()
 	server.SetAgentProviderForTests(s.AgentProvider)
+	server.SetLicenseServiceForTests(licensingtest.EnterpriseService(
+		licensing.FeatureCustomRoles,
+		licensing.FeatureGroups,
+	))
 
 	s.startVite()
 	s.startAppServer()
@@ -121,8 +144,12 @@ func (s *TestContext) launchBrowser() {
 
 func (s *TestContext) startAppServer() {
 	go server.Start()
-	time.Sleep(500 * time.Millisecond)
 	s.baseURL = os.Getenv("BASE_URL")
+	// server.Start logs "SuperPlane is UP" before ListenAndServe. A fixed
+	// sleep races on CI: the first test then times out on /setup and, when
+	// that test reset owner setup, later tests in the shard stay on /setup.
+	waitForHTTP(s.baseURL+"/health", 60*time.Second)
+	waitForHTTP(s.baseURL+"/setup", 60*time.Second)
 }
 
 func (s *TestContext) Shutdown() {
@@ -151,16 +178,29 @@ func (s *TestContext) startVite() {
 	}
 
 	s.viteCmd = cmd
+	waitForHTTP("http://127.0.0.1:5173/", 60*time.Second)
+}
 
-	deadline := time.Now().Add(30 * time.Second)
+func waitForHTTP(url string, timeout time.Duration) {
+	deadline := time.Now().Add(timeout)
+	var lastErr error
 	for time.Now().Before(deadline) {
-		resp, err := http.Get("http://127.0.0.1:5173/")
+		resp, err := http.Get(url)
 		if err == nil {
 			resp.Body.Close()
-			break
+			if resp.StatusCode < 500 {
+				return
+			}
+			lastErr = fmt.Errorf("status %d", resp.StatusCode)
+		} else {
+			lastErr = err
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no response")
+	}
+	panic("wait for " + url + ": " + lastErr.Error())
 }
 
 const initScript = `

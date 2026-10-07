@@ -1,0 +1,79 @@
+import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-client";
+
+import { SEND_WORK_ORDER_TO_BACKLOG_COPY } from "./sendWorkOrderToBacklog";
+import { isWorkOrderRecoveryStatus, type WorkOrderDisplayStatus } from "./workOrderProgress";
+
+export type WorkOrderStatusActionKind = "complete" | "reject" | "reject-draft" | "reopen" | "send-to-backlog";
+
+export interface WorkOrderStatusAction {
+  kind: WorkOrderStatusActionKind;
+  label: string;
+  disabled: boolean;
+}
+
+export interface WorkOrderStatusActionInput {
+  displayStatus: WorkOrderDisplayStatus;
+  isOpen: boolean;
+  isDispatchable: boolean;
+  isClosed: boolean;
+  canClose: boolean;
+  canManage: boolean;
+  isClosing: boolean;
+  isUpdatingStatus: boolean;
+}
+
+/** Lifecycle items for the work-order overflow menu and the status-note menu. */
+export function buildWorkOrderStatusActions(input: WorkOrderStatusActionInput): WorkOrderStatusAction[] {
+  const actions: WorkOrderStatusAction[] = [];
+  const isDraft = input.isDispatchable && !input.isOpen && !input.isClosed;
+  const closeDisabled = !input.canClose || input.isClosing;
+  const manageDisabled = !input.canManage || input.isUpdatingStatus;
+
+  if (input.isOpen) {
+    actions.push(
+      { kind: "complete", label: "Complete", disabled: closeDisabled },
+      { kind: "reject", label: "Reject", disabled: closeDisabled },
+    );
+  }
+
+  if (isDraft) {
+    actions.push({ kind: "reject-draft", label: "Reject", disabled: closeDisabled });
+  }
+
+  if (input.isClosed) {
+    if (isWorkOrderRecoveryStatus(input.displayStatus)) {
+      actions.push({
+        kind: "send-to-backlog",
+        label: SEND_WORK_ORDER_TO_BACKLOG_COPY.action,
+        disabled: manageDisabled,
+      });
+    }
+    actions.push({ kind: "reopen", label: "Reopen", disabled: manageDisabled });
+  }
+
+  return actions;
+}
+
+export function applyWorkOrderStatusAction(
+  kind: WorkOrderStatusActionKind,
+  handlers: {
+    onClose: (result: FactoriesWorkOrderResult) => void;
+    onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
+    onSendToBacklog?: () => void;
+  },
+): void {
+  switch (kind) {
+    case "complete":
+      handlers.onClose("RESULT_COMPLETED");
+      return;
+    case "reject":
+    case "reject-draft":
+      handlers.onClose("RESULT_REJECTED");
+      return;
+    case "reopen":
+      void handlers.onStatusChange("STATE_OPEN");
+      return;
+    case "send-to-backlog":
+      handlers.onSendToBacklog?.();
+  }
+}

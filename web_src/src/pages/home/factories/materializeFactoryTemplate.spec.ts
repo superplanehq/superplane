@@ -1,23 +1,42 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
+import yaml from "js-yaml";
 
-import { getFactoryDefinition } from "./index";
+import { getFactoryDefinition, onboardingEventAppsFor } from "./index";
 import {
   FACTORY_CANVAS_ID_PLACEHOLDER,
   buildFactoryRunParameters,
+  factoryAppTemplateAgentFromRewrite,
   materializeFactoryCanvas,
   materializeFactoryConsole,
+  normalizeFactoryInstallParams,
   substituteInstallParams,
   wireFactoryIntegrations,
 } from "./materializeFactoryTemplate";
 
-function materializeSoftwareFactory() {
+type AgentStep = { name?: string; command?: string; workingDirectory?: string };
+
+type CanvasNode = {
+  id?: string;
+  configuration?: { steps?: AgentStep[] };
+};
+
+function canvasNodes(canvasYaml: string): CanvasNode[] {
+  const doc = yaml.load(canvasYaml) as { spec?: { nodes?: CanvasNode[] } };
+  return doc.spec?.nodes ?? [];
+}
+
+function nodeStepsByName(nodes: CanvasNode[], nodeId: string): Record<string, AgentStep> {
+  const node = nodes.find((candidate) => candidate.id === nodeId);
+  const steps = node?.configuration?.steps ?? [];
+  return Object.fromEntries(steps.map((step) => [step.name ?? "", step]));
+}
+
+function materializeSoftwareFactory(installParams: Record<string, string> = { repository: "acme/web" }) {
   return materializeFactoryCanvas({
     definition: getFactoryDefinition("software-factory"),
     canvasName: "My Factory",
     canvasId: "canvas-123",
-    installParams: {
-      repository: "acme/web",
-    },
+    installParams,
     integrations: {
       github: { id: "int-1", name: "acme-github", ready: true },
       claude: { id: "int-2", name: "acme-claude", ready: true },
@@ -27,16 +46,53 @@ function materializeSoftwareFactory() {
 
 describe("materializeFactoryTemplate", () => {
   it("substitutes install_params placeholders", () => {
-    const yaml = 'repository: "{{ install_params.repository }}"';
+    const yaml = 'repository: "{{ install_params.appRepository }}"';
     expect(
       substituteInstallParams(yaml, {
-        repository: "acme/web",
+        appRepository: "acme/web",
       }),
     ).toBe('repository: "acme/web"');
   });
 
   it("leaves unknown install_params placeholders unresolved", () => {
     expect(substituteInstallParams("x: {{ install_params.missing }}", {})).toBe("x: {{ install_params.missing }}");
+  });
+
+  it("maps legacy repository onto app and backlog repositories", () => {
+    expect(normalizeFactoryInstallParams({ repository: "acme/web" })).toEqual({
+      repository: "acme/web",
+      appRepository: "acme/web",
+      backlogRepository: "acme/web",
+      defaultBranch: "main",
+    });
+    expect(
+      normalizeFactoryInstallParams({
+        repository: "acme/web",
+        appRepository: "acme/app",
+        backlogRepository: "acme/backlog",
+      }),
+    ).toEqual({
+      repository: "acme/web",
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+      defaultBranch: "main",
+    });
+  });
+
+  it("substitutes the default branch placeholder", () => {
+    expect(
+      substituteInstallParams("base: {{ install_params.defaultBranch }}", {
+        defaultBranch: "staging",
+      }),
+    ).toBe("base: staging");
+  });
+
+  it("defaults defaultBranch to main when absent or blank", () => {
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app" }).defaultBranch).toBe("main");
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "" }).defaultBranch).toBe("main");
+    expect(normalizeFactoryInstallParams({ appRepository: "acme/app", defaultBranch: "staging" }).defaultBranch).toBe(
+      "staging",
+    );
   });
 
   it("wires integration refs onto matching components", () => {
@@ -71,6 +127,30 @@ spec:
     expect(wired).not.toMatch(/credentials:[\s\S]*name: claude\b/);
   });
 
+  it("rewrites environmentFrom to the installation name", () => {
+    const wired = wireFactoryIntegrations(
+      `
+apiVersion: v1
+kind: Canvas
+spec:
+  nodes:
+    - id: implement
+      component: runnerClaudeCode
+      configuration:
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+`,
+      {},
+      { github: { id: "int-1", name: "github-acme", ready: true } },
+    );
+
+    expect(wired).toMatch(/environmentFrom:[\s\S]*name: github-acme/);
+    expect(wired).not.toContain("name: GitHub");
+    expect(wired).not.toMatch(/name: github\s*$/m);
+  });
+
   it("materializes factory identity, repo, and github wiring", () => {
     const canvasYaml = materializeSoftwareFactory();
     const definition = getFactoryDefinition("software-factory");
@@ -78,11 +158,84 @@ spec:
     expect(canvasYaml).toContain("name: My Factory");
     expect(canvasYaml).toContain("acme/web");
     expect(canvasYaml).toContain("create-task-start");
+    expect(canvasYaml).toContain("work-order-dispatch");
     expect(canvasYaml).toContain("id: int-1");
     expect(canvasYaml).toContain("app: canvas-123");
     expect(canvasYaml).not.toContain(FACTORY_CANVAS_ID_PLACEHOLDER);
     expect(canvasYaml).not.toContain("{{ install_params.");
     expect(definition.integrations).toEqual(["github", "claude"]);
+  });
+
+  it("uses the Bitbucket integration type for a Bitbucket workspace", () => {
+    const definition = getFactoryDefinition("line-implementation", "bitbucket");
+
+    expect(definition.integrations).toEqual(["bitbucket", "claude"]);
+    expect(Object.keys(definition.componentIntegrations).sort()).toEqual([
+      "bitbucket.createPullRequest",
+      "bitbucket.createPullRequestComment",
+      "bitbucket.findPullRequest",
+      "bitbucket.updatePullRequest",
+    ]);
+  });
+
+  it("installs no GitHub event apps for a Bitbucket workspace", () => {
+    expect(onboardingEventAppsFor("bitbucket")).toEqual([]);
+    expect(onboardingEventAppsFor(undefined)).toEqual(["pr-closure"]);
+  });
+
+  it("routes issue work to backlog and branch/PR/CI work to app repositories", () => {
+    const canvasYaml = materializeSoftwareFactory({
+      appRepository: "acme/app",
+      backlogRepository: "acme/backlog",
+    });
+
+    expect(canvasYaml).toContain("acme/app");
+    expect(canvasYaml).toContain("acme/backlog");
+    expect(canvasYaml).toContain("fixes acme/backlog#");
+    expect(canvasYaml).toMatch(/component: github\.onIssue[\s\S]*repository: acme\/backlog/);
+    expect(canvasYaml).toMatch(/component: github\.createIssue[\s\S]*repository: acme\/backlog/);
+    expect(canvasYaml).toMatch(/component: github\.createPullRequest[\s\S]*repository: acme\/app/);
+    expect(canvasYaml).toMatch(/component: github\.onPullRequest[\s\S]*repository: acme\/app/);
+    expect(canvasYaml).toMatch(/id: runner-create-branch-2[\s\S]*name: REPO[\s\S]*value: acme\/app/);
+    expect(canvasYaml).toMatch(/id: analyze-create-issue[\s\S]*name: REPO[\s\S]*value: acme\/app/);
+    expect(canvasYaml).not.toContain("{{ install_params.");
+    expect(canvasYaml).not.toContain("install_params.repository");
+  });
+
+  it("connects work-order dispatch onRun to the create-task pipeline", () => {
+    const canvasYaml = materializeSoftwareFactory();
+
+    expect(canvasYaml).toMatch(/id: work-order-dispatch[\s\S]*component: onRun/);
+    expect(canvasYaml).toContain("sourceId: work-order-dispatch");
+    expect(canvasYaml).toContain("targetId: analyze-create-issue");
+    expect(canvasYaml).toContain("targetId: submit-task-memory");
+    expect(canvasYaml).toContain("order() != nil");
+    expect(canvasYaml).toContain("order().title");
+    expect(canvasYaml).toContain("order().description");
+    expect(canvasYaml).toContain("root().data.description");
+  });
+
+  it("fails software-factory implementation when the agent pushes no file commits", () => {
+    const canvasYaml = materializeSoftwareFactory();
+    const steps = nodeStepsByName(canvasNodes(canvasYaml), "run-claude-code-implementation");
+    const checkout = steps["Checkout branch"]?.command ?? "";
+    const commit = steps["Commit and push"]?.command ?? "";
+
+    expect(checkout).toContain("set -euo pipefail");
+    expect(commit).toContain("No file changes and no unpushed commits");
+    expect(commit).toContain("exit 1");
+    expect(commit).not.toContain("already up to date on origin");
+    expect(commit).toContain("git status");
+    expect(commit).toContain("git log --oneline -5");
+  });
+
+  it("runs software-factory implementation prompt and commit steps in the cloned repo", () => {
+    const canvasYaml = materializeSoftwareFactory();
+    const steps = nodeStepsByName(canvasNodes(canvasYaml), "run-claude-code-implementation");
+
+    expect(steps["Set Up DCO Signing"]?.workingDirectory).toBe("repo");
+    expect(steps["Implementation"]?.workingDirectory).toBe("repo");
+    expect(steps["Commit and push"]?.workingDirectory).toBe("repo");
   });
 
   it("materializes runners with integration-sourced credentials", () => {
@@ -117,6 +270,73 @@ spec:
     expect(buildFactoryRunParameters(definition, "fix a bug")).toEqual({
       template: "Create Task",
       description: "fix a bug",
+    });
+  });
+
+  it("materializes hosted SuperPlane agents without credentials or model", () => {
+    const canvasYaml = materializeFactoryCanvas({
+      definition: getFactoryDefinition("software-factory"),
+      canvasName: "My Factory",
+      canvasId: "canvas-123",
+      installParams: { repository: "acme/web" },
+      integrations: {
+        github: { id: "int-1", name: "acme-github", ready: true },
+      },
+      agentRewrite: {
+        component: "runnerSuperPlane",
+        model: "",
+        planningModel: "",
+      },
+    });
+
+    const doc = yaml.load(canvasYaml) as {
+      spec?: { nodes?: Array<{ component?: string; configuration?: Record<string, unknown> }> };
+    };
+    const agents = (doc.spec?.nodes ?? []).filter((node) => node.component === "runnerSuperPlane");
+    expect(agents.length).toBeGreaterThan(0);
+    expect(canvasYaml).not.toContain("runnerClaudeCode");
+    for (const agent of agents) {
+      expect(agent.configuration?.credentials).toBeUndefined();
+      expect(agent.configuration?.model).toBeUndefined();
+      expect(agent.configuration?.maxTurns).toBeUndefined();
+    }
+  });
+
+  it("exposes separate app and backlog install params on the bundled definition", () => {
+    const definition = getFactoryDefinition("software-factory");
+    expect(definition.installParams.map((param) => param.name)).toEqual(["appRepository", "backlogRepository"]);
+  });
+
+  it("maps SuperPlane rewrites to hosted credential source for the backend template", () => {
+    expect(
+      factoryAppTemplateAgentFromRewrite({
+        component: "runnerSuperPlane",
+        model: "",
+        planningModel: "",
+      }),
+    ).toEqual({
+      component: "runnerSuperPlane",
+      model: "",
+      planningModel: "",
+      credentialSource: "hosted",
+      credentialIntegrationName: undefined,
+    });
+  });
+
+  it("maps integration rewrites to the selected installation name", () => {
+    expect(
+      factoryAppTemplateAgentFromRewrite({
+        component: "runnerClaudeCode",
+        model: "sonnet",
+        planningModel: "opus",
+        credentials: { source: "integration", name: "acme-claude" },
+      }),
+    ).toEqual({
+      component: "runnerClaudeCode",
+      model: "sonnet",
+      planningModel: "opus",
+      credentialSource: "integration",
+      credentialIntegrationName: "acme-claude",
     });
   });
 });

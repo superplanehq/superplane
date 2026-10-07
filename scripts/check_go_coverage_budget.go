@@ -60,6 +60,7 @@ func main() {
 	updateBaseline := flag.Bool("update-baseline", false, "write the current coverage as the new baseline")
 	profilePath := flag.String("profile", defaultProfilePath, "coverage profile path")
 	baselinePath := flag.String("baseline", defaultBaselinePath, "coverage baseline file path")
+	ignoreMissingPackages := flag.Bool("ignore-missing-packages", false, "skip total coverage and packages absent from this profile (sharded CI runs)")
 	flag.Parse()
 
 	existingBaseline, err := readBaseline(*baselinePath)
@@ -93,7 +94,7 @@ func main() {
 		}
 
 		fmt.Printf("Updated Go coverage baseline to total coverage %.1f%% across %d package(s).\n", stats.TotalCoverage, len(stats.CoverageByPackage))
-		printCoverageVsBudget(stats, newBaseline)
+		printCoverageVsBudget(stats, newBaseline, false)
 		fmt.Printf("WITHIN BUDGET %.1f/%.1f\n", stats.TotalCoverage, stats.TotalCoverage)
 		return
 	}
@@ -105,11 +106,19 @@ func main() {
 
 	totalRegression := roundCoverage(existingBaseline.MinTotalCoverage - stats.TotalCoverage)
 	packageRegressions := findPackageRegressions(stats.CoverageByPackage, existingBaseline.MinCoverageByPackage)
-	missingPackages := findMissingPackages(stats.CoverageByPackage, existingBaseline.MinCoverageByPackage)
+	missingPackages := []string{}
+	if !*ignoreMissingPackages {
+		missingPackages = findMissingPackages(stats.CoverageByPackage, existingBaseline.MinCoverageByPackage)
+	}
 
-	if totalRegression > tolerancePercentage || len(packageRegressions) > 0 || len(missingPackages) > 0 {
+	failedTotal := !*ignoreMissingPackages && totalRegression > tolerancePercentage
+	if failedTotal || len(packageRegressions) > 0 || len(missingPackages) > 0 {
 		fmt.Fprintln(os.Stderr, "Go coverage budget exceeded.")
-		fmt.Fprintf(os.Stderr, "- Total coverage: %.1f%% (allowed %.1f%%)\n", stats.TotalCoverage, existingBaseline.MinTotalCoverage)
+		if *ignoreMissingPackages {
+			fmt.Fprintf(os.Stderr, "- Shard coverage: %.1f%% (total budget is skipped for sharded runs)\n", stats.TotalCoverage)
+		} else {
+			fmt.Fprintf(os.Stderr, "- Total coverage: %.1f%% (allowed %.1f%%)\n", stats.TotalCoverage, existingBaseline.MinTotalCoverage)
+		}
 
 		if len(packageRegressions) > 0 {
 			fmt.Fprintln(os.Stderr, "- Package regressions:")
@@ -125,12 +134,12 @@ func main() {
 			}
 		}
 
-		printCoverageVsBudget(stats, *existingBaseline)
+		printCoverageVsBudget(stats, *existingBaseline, *ignoreMissingPackages)
 		fmt.Fprintf(os.Stderr, "FAILED %.1f/%.1f\n", stats.TotalCoverage, existingBaseline.MinTotalCoverage)
 		os.Exit(1)
 	}
 
-	printCoverageVsBudget(stats, *existingBaseline)
+	printCoverageVsBudget(stats, *existingBaseline, *ignoreMissingPackages)
 	fmt.Printf("WITHIN BUDGET %.1f/%.1f\n", stats.TotalCoverage, existingBaseline.MinTotalCoverage)
 }
 
@@ -312,7 +321,7 @@ func findMissingPackages(currentByPackage map[string]float64, minByPackage map[s
 	return missing
 }
 
-func printCoverageVsBudget(stats coverageStats, budget baseline) {
+func printCoverageVsBudget(stats coverageStats, budget baseline, onlyPresentPackages bool) {
 	fmt.Println("Coverage vs budget:")
 	fmt.Printf("- total: %.1f/%.1f\n", stats.TotalCoverage, budget.MinTotalCoverage)
 
@@ -323,10 +332,13 @@ func printCoverageVsBudget(stats coverageStats, budget baseline) {
 
 	sortedPackages := mapsKeys(budget.MinCoverageByPackage)
 	for _, pkg := range sortedPackages {
-		currentCoverage := stats.CoverageByPackage[pkg]
+		currentCoverage, present := stats.CoverageByPackage[pkg]
+		if onlyPresentPackages && !present {
+			continue
+		}
 		minCoverage := budget.MinCoverageByPackage[pkg]
 		status := ""
-		if roundCoverage(minCoverage-currentCoverage) > tolerancePercentage {
+		if present && roundCoverage(minCoverage-currentCoverage) > tolerancePercentage {
 			status = " !!! OVER BUDGET"
 		}
 		fmt.Printf("- %s: %.1f/%.1f%s\n", pkg, currentCoverage, minCoverage, status)

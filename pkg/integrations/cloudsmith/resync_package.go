@@ -3,7 +3,6 @@ package cloudsmith
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -84,10 +83,6 @@ func (r *ResyncPackage) Execute(ctx core.ExecutionContext) error {
 
 func (r *ResyncPackage) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (r *ResyncPackage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return defaultProcessQueueItem(ctx)
 }
 
 func (r *ResyncPackage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

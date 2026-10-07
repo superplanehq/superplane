@@ -16,9 +16,16 @@ interface CreateFactoryAppDialogProps {
   isSaving: boolean;
   onClose: () => void;
   onCreate: (input: { name: string; description: string }) => Promise<void>;
+  showDescription?: boolean;
 }
 
-export function CreateFactoryAppDialog({ open, isSaving, onClose, onCreate }: CreateFactoryAppDialogProps) {
+export function CreateFactoryAppDialog({
+  open,
+  isSaving,
+  onClose,
+  onCreate,
+  showDescription = true,
+}: CreateFactoryAppDialogProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [nameError, setNameError] = useState("");
@@ -51,10 +58,10 @@ export function CreateFactoryAppDialog({ open, isSaving, onClose, onCreate }: Cr
         description: description.trim(),
       });
     } catch (error) {
-      const message = getApiErrorMessage(error, "Failed to create app");
+      const message = getApiErrorMessage(error, "Failed to create automation");
       showErrorToast(message);
       if (message.toLowerCase().includes("already") || message.toLowerCase().includes("exists")) {
-        setNameError("An app with this name already exists");
+        setNameError("An automation with this name already exists");
       }
     }
   };
@@ -70,7 +77,7 @@ export function CreateFactoryAppDialog({ open, isSaving, onClose, onCreate }: Cr
     >
       <DialogContent showCloseButton={false} className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create factory app</DialogTitle>
+          <DialogTitle>Create automation</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -94,20 +101,22 @@ export function CreateFactoryAppDialog({ open, isSaving, onClose, onCreate }: Cr
             {nameError ? <p className="text-xs text-red-600">{nameError}</p> : null}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="factory-app-description-input">Description</Label>
-            <Textarea
-              id="factory-app-description-input"
-              value={description}
-              onChange={(event) => {
-                if (event.target.value.length <= MAX_DESCRIPTION_LENGTH) {
-                  setDescription(event.target.value);
-                }
-              }}
-              maxLength={MAX_DESCRIPTION_LENGTH}
-              rows={3}
-            />
-          </div>
+          {showDescription ? (
+            <div className="space-y-2">
+              <Label htmlFor="factory-app-description-input">Description</Label>
+              <Textarea
+                id="factory-app-description-input"
+                value={description}
+                onChange={(event) => {
+                  if (event.target.value.length <= MAX_DESCRIPTION_LENGTH) {
+                    setDescription(event.target.value);
+                  }
+                }}
+                maxLength={MAX_DESCRIPTION_LENGTH}
+                rows={3}
+              />
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter className="flex-row justify-start gap-3 sm:justify-start">

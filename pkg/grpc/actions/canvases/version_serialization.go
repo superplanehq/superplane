@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
 func canvasMetadataFromCanvas(canvas *models.Canvas) (name, description string) {
@@ -45,6 +46,20 @@ func SerializeCanvasVersionMetadata(version *models.CanvasVersionMetadata, organ
 }
 
 func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string, ownersByID map[string]*models.User) *pb.CanvasVersion {
+	return serializeCanvasVersionWithReadiness(nil, nil, version, organizationID, ownersByID)
+}
+
+func serializeCanvasVersionWithReadiness(
+	tx *gorm.DB,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+	organizationID string,
+	ownersByID map[string]*models.User,
+) *pb.CanvasVersion {
+	if canvas != nil {
+		organizationID = canvas.OrganizationID.String()
+	}
+
 	var owner *pb.UserRef
 	if version.OwnerID != nil {
 		owner = canvasVersionOwnerRef(organizationID, version.OwnerID.String(), ownersByID)
@@ -64,10 +79,15 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 		metadata.UpdatedAt = timestamppb.New(*version.UpdatedAt)
 	}
 
+	nodes := version.Nodes
+	if canvas != nil {
+		nodes = prepareCanvasNodesForResponse(tx, canvas, version.Nodes)
+	}
+
 	return &pb.CanvasVersion{
 		Metadata: metadata,
 		Spec: &pb.Canvas_Spec{
-			Nodes: actions.NodesToProto(version.Nodes),
+			Nodes: actions.NodesToProto(nodes),
 			Edges: actions.EdgesToProto(version.Edges),
 		},
 	}

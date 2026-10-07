@@ -2,11 +2,13 @@ package changesets
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
@@ -109,7 +111,23 @@ func (p *CanvasPatcher) ApplyChangeset(changeset *CanvasChangeset) error {
 	}
 
 	p.finalVersion = finalVersion
+	models.RewriteHostedProviderRunnerNodes(p.finalVersion.Nodes)
+	p.annotateSuperPlaneRunnerNodes()
 	return CheckForCycles(p.finalVersion.Nodes, p.finalVersion.Edges)
+}
+
+func (p *CanvasPatcher) annotateSuperPlaneRunnerNodes() {
+	if p.finalVersion == nil {
+		return
+	}
+	var factoryID *uuid.UUID
+	if p.originalVersion.WorkflowID != uuid.Nil {
+		canvas, err := models.FindCanvasInTransaction(p.tx, p.orgID, p.originalVersion.WorkflowID)
+		if err == nil {
+			factoryID = canvas.FactoryID
+		}
+	}
+	_ = models.AnnotateSuperPlaneRunnerNodes(p.tx, p.orgID, factoryID, p.finalVersion.Nodes)
 }
 
 func (p *CanvasPatcher) handleChange(change *Change) error {
@@ -157,8 +175,10 @@ func (p *CanvasPatcher) addNode(change *Change) error {
 	}
 
 	newNode := models.Node{
-		ID:   nodeID,
-		Name: node.Name,
+		ID:          nodeID,
+		Name:        node.Name,
+		Concurrency: node.Concurrency,
+		Metadata:    maps.Clone(node.Metadata),
 	}
 	if node.IsCollapsed != nil {
 		newNode.IsCollapsed = *node.IsCollapsed
@@ -184,6 +204,10 @@ func (p *CanvasPatcher) addNode(change *Change) error {
 	// node will be in an error state.
 	//
 
+	if node.Configuration != nil {
+		newNode.Configuration = node.Configuration.AsMap()
+	}
+
 	integrationID, err := p.validateIntegration(node)
 	if err != nil {
 		errorMessage := err.Error()
@@ -201,12 +225,9 @@ func (p *CanvasPatcher) addNode(change *Change) error {
 		return nil
 	}
 
-	var nodeConfiguration map[string]any
-	if node.Configuration != nil {
-		nodeConfiguration = node.Configuration.AsMap()
-	}
+	nodeConfiguration := newNode.Configuration
 
-	err = configuration.ValidateConfiguration(schema, nodeConfiguration)
+	err = p.validateNodeConfiguration(nodeType, *nodeRef, schema, nodeConfiguration)
 	if err != nil {
 		errorMessage := err.Error()
 		newNode.ErrorMessage = &errorMessage
@@ -308,6 +329,10 @@ func (p *CanvasPatcher) updateNode(change *Change) error {
 		currentNode.IsCollapsed = *node.IsCollapsed
 	}
 
+	if node.Metadata != nil {
+		currentNode.Metadata = maps.Clone(node.Metadata)
+	}
+
 	if node.Block != "" {
 		existingImplementation := nodeImplementationName(currentNode)
 		if existingImplementation != "" && existingImplementation != strings.TrimSpace(node.Block) {
@@ -365,7 +390,7 @@ func (p *CanvasPatcher) updateNode(change *Change) error {
 			currentNode.Configuration = node.Configuration.AsMap()
 		}
 
-		err = configuration.ValidateConfiguration(schema, currentNode.Configuration)
+		err = p.validateNodeConfiguration(currentNode.Type, currentNode.Ref, schema, currentNode.Configuration)
 		if err != nil {
 			errorMessage := err.Error()
 			currentNode.ErrorMessage = &errorMessage
@@ -378,6 +403,25 @@ func (p *CanvasPatcher) updateNode(change *Change) error {
 
 	p.nodes[nodeID] = currentNode
 	return nil
+}
+
+func (p *CanvasPatcher) validateNodeConfiguration(nodeType string, nodeRef models.NodeRef, schema []configuration.Field, config map[string]any) error {
+	if err := configuration.ValidateConfiguration(schema, config); err != nil {
+		return err
+	}
+	if nodeType != models.NodeTypeComponent || nodeRef.Component == nil {
+		return nil
+	}
+
+	action, err := p.registry.GetAction(nodeRef.Component.Name)
+	if err != nil {
+		return err
+	}
+	validator, ok := action.(core.NodeConfigurationValidator)
+	if !ok {
+		return nil
+	}
+	return validator.ValidateNodeConfiguration(config)
 }
 
 func (p *CanvasPatcher) findConfigurationSchemaForNode(nodeType string, nodeRef models.NodeRef) ([]configuration.Field, error) {

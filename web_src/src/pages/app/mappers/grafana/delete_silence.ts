@@ -1,5 +1,5 @@
 import type { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, OutputPayload } from "../types";
-import { formatTimestamp } from "../utils";
+import { formatTimestamp } from "../eventDisplay";
 import { grafanaComponentBaseProps, grafanaCreatedAtSubtitle } from "./base";
 import { buildSilenceSelectionMetadata, type SilenceSelectionNodeMetadata } from "./silenceMetadata";
 

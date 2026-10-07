@@ -3,6 +3,20 @@ import type { ResolvedConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import * as path from "path";
+import { keepWebAppManifestLinkOnPageOrigin } from "./src/lib/webAppManifestLink.ts";
+
+// Vite applies `base` to every root-absolute link, including the web app
+// manifest. Install checks then resolve start_url and icons on the asset host.
+// Put only that link back on the page origin after the base rewrite.
+const keepWebAppManifestOnPageOriginPlugin = {
+  name: "keep-web-app-manifest-on-page-origin",
+  transformIndexHtml: {
+    order: "post" as const,
+    handler(html: string) {
+      return keepWebAppManifestLinkOnPageOrigin(html);
+    },
+  },
+};
 
 // Plugin that sets HMR port to be the same as server port
 // This is useful when you can't use WebSockets in your proxy
@@ -30,13 +44,16 @@ export default defineConfig(() => {
   const assetBaseUrl = process.env.VITE_ASSET_BASE_URL?.trim();
 
   return {
-    plugins: [react(), tailwindcss(), setHmrPortFromPortPlugin],
+    plugins: [react(), tailwindcss(), setHmrPortFromPortPlugin, keepWebAppManifestOnPageOriginPlugin],
     // Empty env vars are common in Docker ARG defaults; ?? alone would yield base: "".
     base: assetBaseUrl ? assetBaseUrl : "/",
     server: {
       port: devPort,
       strictPort: true,
       host: true,
+      fs: {
+        allow: [import.meta.dirname, path.resolve(import.meta.dirname, "../pkg/grpc/actions/factories/templates")],
+      },
       headers: !isProduction ? { "X-Robots-Tag": "noindex" } : undefined,
       watch: {
         usePolling: true,
@@ -44,6 +61,12 @@ export default defineConfig(() => {
       },
       proxy: {
         "/api": {
+          target: `http://localhost:${apiPort}`,
+          changeOrigin: true,
+          secure: false,
+        },
+        // Admin JSON API (keep `/admin` itself on Vite for the React admin UI)
+        "/admin/api": {
           target: `http://localhost:${apiPort}`,
           changeOrigin: true,
           secure: false,
@@ -68,9 +91,13 @@ export default defineConfig(() => {
     },
     resolve: {
       alias: {
-        "@/canvas": path.resolve(__dirname, "src/pages/canvas"),
-        "@": path.resolve(__dirname, "src"),
+        "@/canvas": path.resolve(import.meta.dirname, "src/pages/canvas"),
+        "@factory-templates": path.resolve(import.meta.dirname, "../pkg/grpc/actions/factories/templates"),
+        "@": path.resolve(import.meta.dirname, "src"),
       },
+    },
+    optimizeDeps: {
+      include: ["@pierre/diffs/react"],
     },
     build: {
       target: "es2020",
@@ -78,6 +105,19 @@ export default defineConfig(() => {
       emptyOutDir: true,
       sourcemap: true,
       manifest: false, // do not generate manifest.json
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: "monaco-editor",
+                test: /monaco-editor/,
+                includeDependenciesRecursively: false,
+              },
+            ],
+          },
+        },
+      },
       // rollupOptions: {
       //   input: {
       //     app: path.resolve('./src/main.tsx'),

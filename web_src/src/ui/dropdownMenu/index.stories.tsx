@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Mail, Plus, PlusCircle, Search, UserPlus } from "lucide-react";
 
 import {

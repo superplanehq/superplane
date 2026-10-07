@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -128,10 +127,6 @@ func (d *DeleteAnnotation) Execute(ctx core.ExecutionContext) error {
 
 func (d *DeleteAnnotation) Cancel(_ core.ExecutionContext) error {
 	return nil
-}
-
-func (d *DeleteAnnotation) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (d *DeleteAnnotation) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

@@ -3,9 +3,14 @@ package factories
 import (
 	"context"
 
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
@@ -15,14 +20,14 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to close work order")
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
 	}
 
-	orderID, err := parseOrderID(req.GetOrderId())
+	closedBy, err := uuid.Parse(userID)
 	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to close work order")
+		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to create work order")
 	}
 
 	result, err := closeWorkOrderResult(req.GetResult())
@@ -31,25 +36,35 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
 	logger := logging.ForFactory(*factory)
-	order, err := factory.FindWorkOrder(db, orderID)
+	order, err := findWorkOrder(db, factory, req.GetOrderId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
+	orderID := order.ID
 
 	logger = logging.WithWorkOrder(logger, *order)
-	order, err = order.Close(db, result)
+	fromState := order.State
+	wasClosed := order.IsClosed()
+	order, err = order.Close(db, result, &closedBy)
 	if err != nil {
 		logger.WithError(err).Error("close work order failed")
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
-	serialized, err := loadAndSerializeWorkOrder(ctx, order)
+	publishWorkOrderClosed(orgID, factory, order, &closedBy, fromState, result, wasClosed)
+
+	order, err = factory.FindWorkOrder(db, orderID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to close work order")
+	}
+
+	serialized, err := loadAndSerializeWorkOrder(ctx, factory, order)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
@@ -57,4 +72,43 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	return &pb.CloseWorkOrderResponse{
 		Order: serialized,
 	}, nil
+}
+
+func publishWorkOrderClosed(
+	orgID uuid.UUID,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	closedBy *uuid.UUID,
+	fromState string,
+	result string,
+	wasClosed bool,
+) {
+	logger := logging.WithWorkOrder(logging.ForFactory(*factory), *order)
+	if err := messages.PublishFactoryWorkOrderUpdated(
+		factory.ID.String(),
+		order.ID.String(),
+		factoryevents.EventTypeOrderStatusUpdated,
+	); err != nil {
+		logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
+	}
+
+	if wasClosed {
+		return
+	}
+
+	notification := messages.FactoryWorkOrderNotificationMessage{
+		OrganizationID: orgID.String(),
+		FactoryID:      factory.ID.String(),
+		OrderID:        order.ID.String(),
+		EventType:      factoryevents.EventTypeOrderStatusUpdated,
+		FromState:      fromState,
+		ToState:        models.FactoryWorkOrderStateClosed,
+		Result:         result,
+	}
+	if closedBy != nil {
+		notification.ActorUserID = closedBy.String()
+	}
+	if err := notification.Publish(); err != nil {
+		logger.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
+	}
 }

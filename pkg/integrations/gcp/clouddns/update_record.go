@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -178,6 +177,3 @@ func (c *UpdateRecord) HandleWebhook(_ core.WebhookRequestContext) (int, *core.W
 
 func (c *UpdateRecord) Cancel(_ core.ExecutionContext) error { return nil }
 func (c *UpdateRecord) Cleanup(_ core.SetupContext) error    { return nil }
-func (c *UpdateRecord) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}

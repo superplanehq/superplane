@@ -7,7 +7,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
-import { stringOrDash } from "../utils";
+import { stringOrDash } from "../eventDisplay";
 import { baseProps } from "./base";
 import { buildGithubExecutionSubtitle } from "./utils";
 

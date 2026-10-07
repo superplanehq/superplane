@@ -314,6 +314,10 @@ function PanelYamlDiffModal({
   draftYaml: string;
   filename: string;
 }) {
+  if (!open) {
+    return null;
+  }
+
   return (
     <Suspense fallback={null}>
       <CanvasYamlDiffModal

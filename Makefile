@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg profile.cpu profile.heap profile.goroutines check.grpc.actions.status
+.PHONY: lint test test.coverage test.coverage.autoparallel test.license.check check.generated.artifacts dev.up dev.setup dev.setup.app dev.setup.go dev.clean.go.cache dev.server dev.server.fg dev.runners dev.logs.runners runner.new doctor-local profile.cpu profile.heap profile.goroutines check.grpc.actions.status simulate.usage simulate-usage db.reset.billing.trial db.reset.after.onboarding db.snapshot db.restore ensure.bun check.test.ui check.test.ui.shard check.test.ui.browser
 
 MAKE=make
 MAKEFLAGS+=--no-print-directory
@@ -12,18 +12,44 @@ export
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 BASE_URL?=https://app.superplane.com
+LOCAL_RUNNER_NETWORK?=superplane_default
 
+# Quiet BuildKit and Compose progress in CI. Use DEBUG=1 for full logs.
+COMPOSE_PROGRESS := auto
+COMPOSE_UP_EXTRA :=
 ifeq ($(DEBUG),1)
 export BUILDKIT_PROGRESS := plain
+COMPOSE_PROGRESS := plain
 else
 export BUILDKIT_PROGRESS := quiet
+ifneq ($(strip $(CI)),)
+COMPOSE_PROGRESS := quiet
+COMPOSE_UP_EXTRA := --quiet-build
+endif
 endif
 
-PKG_TEST_PACKAGES := ./pkg/...
+PKG_TEST_PACKAGES := ./pkg/... ./ee/...
 E2E_TEST_PACKAGES := ./test/e2e/...
 
-COMPOSE=docker compose -f docker-compose.dev.yml
+# On CI, overlay docker-compose.ci.yml so the Go module and build caches live in
+# host directories that the CI cache can restore and store between jobs.
+# Runner services live in docker-compose.dev.yml under the local-runner profile.
+# CI does not enable that profile, so it does not build the worker image.
+COMPOSE_FILES := -f docker-compose.dev.yml
+GO_CACHE_DIRS :=
+ifneq ($(strip $(CI)),)
+COMPOSE_FILES += -f docker-compose.ci.yml
+GO_CACHE_DIRS := tmp/go tmp/go-build
+endif
+
+COMPOSE=docker compose $(COMPOSE_FILES)
+COMPOSE_RUNNER=$(COMPOSE) --profile local-runner --profile local-runner-image
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
+OPENAPI_GENERATOR_IMAGE := openapitools/openapi-generator-cli:v7.13.0
+
+# Tests must not inherit compose local-broker defaults. Empty values
+# override docker-compose.dev.yml for this command only.
+TEST_TASK_BROKER_ENV := -e TASK_BROKER_BASE_URL= -e TASK_BROKER_AUTH_TOKEN= -e TASK_BROKER_FLEET_ID= -e TASK_BROKER_PUBLIC_URL=
 
 #
 # Long sausage command to run tests with gotestsum
@@ -33,7 +59,7 @@ GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client
 # - exports junit report
 # - sets parallelism to 1
 #
-GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml 
+GOTESTSUM=$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots app gotestsum --format short --junitfile junit-report.xml
 
 #
 # Targets for test environment
@@ -46,10 +72,10 @@ tidy:
 	$(COMPOSE) exec app go mod tidy
 
 test.e2e:
-	$(COMPOSE) exec -e DB_NAME=superplane_test app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -timeout 30m
+	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -timeout 30m
 
 test.e2e.autoparallel:
-	$(COMPOSE) exec -e DB_NAME=superplane_test -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
+	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
 
 test.e2e.single:
 	bash ./scripts/vscode_run_tests.sh line $(FILE) $(LINE)
@@ -65,6 +91,9 @@ test.coverage.check:
 	$(MAKE) test.coverage
 	$(MAKE) check.coverage.go
 
+test.coverage.autoparallel:
+	$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -e SHARD_INDEX -e SHARD_COUNT -v $(PWD)/tmp/screenshots:/app/test/screenshots app bash -lc "cd /app && bash scripts/test_unit_autoparallel.sh"
+
 test.coverage.baseline.update:
 	$(MAKE) test.coverage
 	$(MAKE) check.coverage.go.baseline.update
@@ -76,7 +105,7 @@ test.watch:
 	$(GOTESTSUM) --packages="$(PKG_TEST_PACKAGES)" --watch -- -p 1
 
 test.shell:
-	$(COMPOSE) run --rm -e DB_NAME=superplane_test -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash	
+	$(COMPOSE) run --rm -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -v $(PWD)/tmp/screenshots:/app/test/screenshots app /bin/bash
 
 #
 # Code formatting
@@ -94,12 +123,21 @@ format.js:
 format.js.check:
 	cd web_src && npm run format:check
 
+terraform.format:
+	$(MAKE) -C release/terraform format
+
 dev.test.is.running:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 
 dev.up:
-	@mkdir -p tmp/screenshots
-	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
+	@mkdir -p tmp/screenshots $(GO_CACHE_DIRS)
+	@echo "Starting development containers..."
+	$(COMPOSE) --progress $(COMPOSE_PROGRESS) up -d --wait --build --pull always --quiet-pull $(COMPOSE_UP_EXTRA)
+ifeq ($(strip $(CI)),)
+	$(COMPOSE_RUNNER) --progress $(COMPOSE_PROGRESS) build runner fleet-manager
+	@echo "Runner images built."
+endif
+	@echo "Development containers are ready."
 
 dev.setup:
 	@$(MAKE) dev.test.is.running
@@ -108,11 +146,12 @@ dev.setup:
 	$(MAKE) dev.setup.go
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
+	@$(COMPOSE) exec app ./scripts/db_seed_local_runner_fleet.sh superplane_dev
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 dev.setup.npm:
-	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --silent"
+	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --loglevel error"
 
 dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
@@ -133,10 +172,23 @@ dev.server:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 	$(COMPOSE) exec -d app bash /app/docker-entrypoint.dev.sh
 	@bash ./scripts/wait-for-app
+ifeq ($(strip $(CI)),)
+	@$(MAKE) dev.runners
+endif
 
 dev.server.fg:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
+ifeq ($(strip $(CI)),)
+	@$(MAKE) dev.runners
+endif
 	$(COMPOSE) exec app bash /app/docker-entrypoint.dev.sh
+
+dev.runners:
+	$(COMPOSE_RUNNER) up -d --no-build --no-deps fleet-manager
+	@echo "Fleet Manager is running with ephemeral Docker runners."
+
+runner.new:
+	@bash ./scripts/runner-new
 
 dev.start.ephemeral:
 	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)
@@ -153,8 +205,81 @@ dev.logs.app:
 dev.logs.otel:
 	$(COMPOSE) logs -f otel
 
+dev.logs.runners:
+	@seen=" "; \
+	pids=""; \
+	waiting_message_printed=0; \
+	cleanup() { \
+	  if [ -n "$$pids" ]; then kill $$pids 2>/dev/null || true; fi; \
+	}; \
+	trap cleanup EXIT; \
+	trap 'exit 0' INT TERM; \
+	while true; do \
+	  found=0; \
+	  for id in $$(docker ps -q \
+	    --filter label=superplane.managed-runner=true \
+	    --filter network=$(LOCAL_RUNNER_NETWORK)); do \
+	    found=1; \
+	    case "$$seen" in *" $$id "*) continue ;; esac; \
+	    seen="$$seen$$id "; \
+	    name="$$(docker inspect --format '{{.Name}}' "$$id" | tr -d /)"; \
+	    echo "Following logs for $$name"; \
+	    (docker logs --follow "$$id" 2>&1 | while IFS= read -r line; do \
+	      printf '[%s] %s\n' "$$name" "$$line"; \
+	    done) & \
+	    pids="$$pids $$!"; \
+	  done; \
+	  if [ "$$found" -eq 0 ] && [ "$$waiting_message_printed" -eq 0 ]; then \
+	    echo "Waiting for local runner containers. Press Ctrl-C to stop."; \
+	    waiting_message_printed=1; \
+	  fi; \
+	  sleep 1; \
+	done
+
 dev.down:
-	$(COMPOSE) down --remove-orphans
+	@$(COMPOSE_RUNNER) stop fleet-manager >/dev/null 2>&1 || true
+	@ids="$$(docker ps -aq \
+	  --filter label=superplane.managed-runner=true \
+	  --filter network=$(LOCAL_RUNNER_NETWORK))"; \
+	if [ -n "$$ids" ]; then \
+	  echo "Removing local runner containers..."; \
+	  docker rm -f $$ids; \
+	fi
+	$(COMPOSE_RUNNER) down --remove-orphans
+
+doctor-local:
+	$(COMPOSE_RUNNER) run --rm -T --no-deps --entrypoint sh runner -c '\
+	  missing=0; \
+	  for cmd in claude codex opencode playwright node git gh jq python3 bash ffmpeg ffprobe whisper-cli; do \
+	    if ! command -v "$$cmd" >/dev/null 2>&1; then \
+	      echo "$$cmd missing" >&2; \
+	      missing=1; \
+	      continue; \
+	    fi; \
+	    echo "$$cmd=$$(command -v "$$cmd")"; \
+	  done; \
+	  echo "claude=$$(claude --version 2>/dev/null | head -n1)"; \
+	  echo "codex=$$(codex --version 2>/dev/null | head -n1)"; \
+	  echo "opencode=$$(opencode --version 2>/dev/null | head -n1)"; \
+	  echo "playwright=$$(playwright --version 2>/dev/null | head -n1)"; \
+	  playwright cli --help >/dev/null 2>&1 || missing=1; \
+	  echo "node=$$(node --version 2>/dev/null)"; \
+	  echo "gh=$$(gh --version 2>/dev/null | head -n1)"; \
+	  echo "ffmpeg=$$(ffmpeg -version 2>/dev/null | head -n1)"; \
+	  echo "ffprobe=$$(ffprobe -version 2>/dev/null | head -n1)"; \
+	  whisper-cli --help >/dev/null 2>&1 || missing=1; \
+	  model=$${WHISPER_MODEL:-/usr/local/share/whisper/ggml-tiny.bin}; \
+	  if [ ! -s "$$model" ]; then \
+	    echo "whisper model missing: $$model" >&2; \
+	    missing=1; \
+	  else \
+	    echo "whisper-model=$$model"; \
+	  fi; \
+	  shot=$$(mktemp /tmp/playwright-doctor.XXXXXX.png); \
+	  playwright screenshot about:blank "$$shot" >/dev/null 2>&1 || missing=1; \
+	  test -s "$$shot" || missing=1; \
+	  rm -f "$$shot"; \
+	  test "$$missing" -eq 0'
 
 dev.console:
 	$(COMPOSE) run --rm app /bin/bash
@@ -202,14 +327,35 @@ check.build.ui:
 check.build.storybook:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build-storybook"
 
-check.test.ui:
-	$(COMPOSE) exec app bash -c "cd web_src && npm run test:run"
+ensure.bun:
+	$(COMPOSE) exec app bash -lc 'command -v bun >/dev/null || bash /app/scripts/docker/install-bun.sh'
 
-check.test.ui.shard:
-	$(COMPOSE) exec -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_ui_autoparallel.sh"
+check.test.ui: ensure.bun
+	$(COMPOSE) exec -e FILES="$(FILES)" app bash -lc "bash /app/scripts/test_ui_autoparallel.sh"
+
+check.test.ui.shard: ensure.bun
+	$(COMPOSE) exec -e SHARD_INDEX="$(SHARD_INDEX)" -e SHARD_COUNT="$(SHARD_COUNT)" app bash -lc "bash /app/scripts/test_ui_autoparallel.sh"
+
+check.test.ui.browser:
+	$(COMPOSE) exec app bash -lc "bash /app/scripts/check_monaco_worker_startup.sh"
+	$(COMPOSE) exec app bash -lc "bash /app/scripts/check_backlog_create_tabs.sh"
 
 check.format.js:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"
+
+terraform.check:
+	$(MAKE) -C release/terraform check
+
+check.tool.configs:
+	bash ./scripts/check_tool_config_guard.sh
+
+check.fast.security:
+	bash ./scripts/check_fast_security.sh
+
+check.npm.audit.critical:
+	@echo "==> npm audit (critical, production, lockfile only)"
+	$(COMPOSE) exec app bash -c "cd web_src && npm audit --omit=dev --audit-level=critical --package-lock-only"
+	@echo "==> npm audit: PASS"
 
 check.lint.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:budget"
@@ -222,6 +368,10 @@ check.lint.ui.baseline.update:
 
 check.build.app:
 	$(COMPOSE) exec app go build cmd/server/main.go
+
+# Release step. It reads the live issuer key list, so CI does not run it.
+license.keys.update:
+	$(COMPOSE) exec app go run ./scripts/update_license_keys.go
 
 check.generated.artifacts:
 	@tracked="$$(git ls-files -- $(GENERATED_ARTIFACT_PATHS))"; \
@@ -284,6 +434,48 @@ db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
+# Local only. Writes this worktree's superplane_dev to
+# .local/superplane_dev.dump so a later restore can skip owner setup
+# and GitHub connection. Postgres in this stack is db:5432.
+# The dump is gitignored.
+db.snapshot:
+	@$(COMPOSE) exec app ./scripts/db_snapshot.sh superplane_dev
+
+# Local only. Replaces this worktree's superplane_dev from
+# .local/superplane_dev.dump, then applies pending migrations. Use this
+# to create a new local environment without owner setup or GitHub
+# connection. It does not touch superplane_test. Restart make
+# dev.server after restore if it is already running.
+db.restore:
+	@$(COMPOSE) exec app ./scripts/db_restore.sh superplane_dev
+
+# Local only. Puts every org on a 14-day trial, clears Polar ids, and
+# deletes usage ledger rows in superplane_dev. Cancel the Polar sandbox
+# subscription separately.
+db.reset.billing.trial:
+	@$(COMPOSE) exec app ./scripts/db_reset_billing_trial.sh superplane_dev
+
+# Local only. Keeps org, workspace, GitHub, apps, lines, and intakes in
+# superplane_dev. Wipes tasks, runs, usage, subscription, and credits, then
+# reseeds intake from GitHub. Cancel the Polar sandbox subscription
+# separately. Run `make dev.server` so seeded intake events become tasks.
+db.reset.after.onboarding:
+	@$(COMPOSE) exec app ./scripts/db_reset_after_onboarding.sh superplane_dev
+
+# Local only. Inserts fake hosted model + runner VM usage into superplane_dev.
+# MONEY is the total dollar amount. It is spread across TASKS (default 20)
+# over DAYS (default 30). Requires an organization and a factory.
+# Example: make simulate.usage MONEY=20 TASKS=30 DAYS=30
+# Optional: ORGANIZATION_ID=<uuid> FACTORY_ID=<uuid>
+simulate.usage simulate-usage:
+	@$(COMPOSE) exec \
+		-e MONEY="$(MONEY)" \
+		-e TASKS="$(TASKS)" \
+		-e DAYS="$(DAYS)" \
+		-e ORGANIZATION_ID="$(ORGANIZATION_ID)" \
+		-e FACTORY_ID="$(FACTORY_ID)" \
+		app ./scripts/db_simulate_usage.sh superplane_dev
+
 db.console:
 	$(COMPOSE) exec -it --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
 
@@ -319,8 +511,8 @@ check.components.docs:
 	$(COMPOSE) run --rm app bash -c "go run scripts/generate_components_docs.go"
 	git diff --exit-code docs/components
 
-MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents,usage,runners
-REST_API_MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,canvas_folders,api_keys,agents
+MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,canvases,api_keys,agents,files,admin/fleets
+REST_API_MODULES := authorization,organizations,integrations,factories,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,canvases,api_keys,agents,files,admin/fleets
 
 pb.gen: dev.test.is.running
 	$(MAKE) pb.gen.models
@@ -339,11 +531,14 @@ pb.gen.gateway:
 openapi.spec.gen: dev.test.is.running
 	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
 
+# Recreate the output directory in the app container. A host rm and mkdir
+# leaves Docker Desktop with a stale directory, and the generator cannot write.
 openapi.client.gen: dev.test.is.running
-	@rm -rf pkg/openapi_client
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "rm -rf pkg/openapi_client && mkdir -p pkg/openapi_client"
+	@./scripts/docker-pull-retry $(OPENAPI_GENERATOR_IMAGE)
 	@log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
 	if ! docker run --rm --user $(shell id -u):$(shell id -g) \
-		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
+		-v ${PWD}:/local $(OPENAPI_GENERATOR_IMAGE) generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g go \
 		-o /local/pkg/openapi_client \
@@ -371,25 +566,39 @@ cli.build:
 	$(MAKE) pb.gen
 	$(COMPOSE) exec -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o build/cli cmd/cli/main.go'
 
+admincli.build:
+	$(MAKE) pb.gen
+	$(COMPOSE) exec -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -o build/admin cmd/admin/main.go'
+
 cli.build.m1:
 	$(MAKE) cli.build OS=darwin ARCH=arm64
+
+admincli.build.m1:
+	$(MAKE) admincli.build OS=darwin ARCH=arm64
 
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
+DEV_BASE_IMAGE?=ghcr.io/superplanehq/superplane-dev-base:app-latest
 VITE_ASSET_BASE_URL?=
 FRONTEND_PREBUILT?=0
 # pb.gen runs in the compose app container; run `make dev.up` first.
+# Pass host Go caches into the builder when CI restored tmp/go and tmp/go-build.
 image.build:
 	$(MAKE) pb.gen
+	mkdir -p tmp/go tmp/go-build
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner \
+	  --build-context ci-go-mod=tmp/go \
+	  --build-context ci-go-build=tmp/go-build \
+	  --cache-from $(DEV_BASE_IMAGE) \
 	  --build-arg BASE_URL=$(BASE_URL) \
 	  --build-arg VITE_ASSET_BASE_URL=$(VITE_ASSET_BASE_URL) \
 	  --build-arg FRONTEND_PREBUILT=$(FRONTEND_PREBUILT) \
 	  --progress plain -t $(IMAGE):$(IMAGE_TAG) .
 
 image.auth:
-	@printf "%s" "$(GITHUB_TOKEN)" | docker login ghcr.io -u superplanehq --password-stdin
+	@test -n "$$GHCR_PUSH_TOKEN" || (echo "GHCR_PUSH_TOKEN is empty" >&2; exit 1)
+	@printf "%s" "$$GHCR_PUSH_TOKEN" | docker login ghcr.io -u superplanehq --password-stdin
 
 image.push:
 	docker tag $(IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)

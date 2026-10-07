@@ -12,20 +12,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
 
 func TestInvitations(t *testing.T) {
-	t.Run("accepting invite link assigns viewer role", func(t *testing.T) {
+	t.Run("accepting invite link assigns operator role", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
 		token := steps.createInviteLink()
 		invitee := steps.createInviteeAccount()
 		steps.loginAs(invitee)
 		steps.acceptInvite(token)
-		steps.assertInviteeViewerRole(invitee.Email)
+		steps.assertInviteeOperatorRole(invitee.Email)
 	})
 
 	t.Run("following invite link and creating password account", func(t *testing.T) {
@@ -44,7 +45,7 @@ func TestInvitations(t *testing.T) {
 		steps.fillSignupForm(firstName, lastName, email, password)
 		steps.submitSignup()
 		steps.waitForOrganizationRedirect()
-		steps.assertInviteeViewerRole(email)
+		steps.assertInviteeOperatorRole(email)
 	})
 
 	t.Run("disabled invite link no longer works", func(t *testing.T) {
@@ -56,7 +57,7 @@ func TestInvitations(t *testing.T) {
 		steps.assertInviteLinkDisabled()
 	})
 
-	t.Run("viewer sees invite link access message", func(t *testing.T) {
+	t.Run("operator sees invite link access message", func(t *testing.T) {
 		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
 		token := steps.createInviteLink()
@@ -64,7 +65,7 @@ func TestInvitations(t *testing.T) {
 		steps.loginAs(invitee)
 		steps.acceptInvite(token)
 		steps.visitMembersSettings()
-		steps.assertViewerInviteLinkMessage()
+		steps.assertOperatorInviteLinkMessage()
 	})
 }
 
@@ -115,8 +116,8 @@ func (s *invitationSteps) acceptInvite(token string) {
 }
 
 func (s *invitationSteps) waitForOrganizationRedirect() {
-	waitErr := s.session.Page().WaitForURL("**/"+s.session.OrgID.String()+"*", pw.PageWaitForURLOptions{
-		Timeout: pw.Float(10000),
+	waitErr := s.session.Page().WaitForURL("**/"+s.session.OrgSlug+"*", pw.PageWaitForURLOptions{
+		Timeout: pw.Float(30000),
 	})
 	require.NoError(s.t, waitErr)
 }
@@ -132,37 +133,27 @@ func (s *invitationSteps) visitMembersSettings() {
 func (s *invitationSteps) followInviteLinkToLogin(token string) {
 	s.session.Visit("/invite/" + token)
 	waitErr := s.session.Page().WaitForURL("**/login?redirect=**", pw.PageWaitForURLOptions{
-		Timeout: pw.Float(10000),
+		Timeout: pw.Float(30000),
 	})
 	require.NoError(s.t, waitErr)
 }
 
 func (s *invitationSteps) openSignupForm() {
-	// With magic code enabled, toggle to password login first
-	// so the "Create an account" link becomes visible.
-	toggle := s.session.Page().Locator("text=Sign in with password instead").First()
-	if err := toggle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(3000)}); err == nil {
-		require.NoError(s.t, toggle.Click())
-	}
-
-	button := s.session.Page().Locator("text=Create an account").First()
-	require.NoError(s.t, button.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible}))
-	require.NoError(s.t, button.Click())
+	s.session.AssertVisible(q.Text("Continue with email"))
+	s.session.Click(q.Text("Sign in with password instead"))
+	s.session.Click(q.Text("Create an account"))
 }
 
 func (s *invitationSteps) fillSignupForm(firstName, lastName, email, password string) {
-	page := s.session.Page()
-
-	require.NoError(s.t, page.Locator(`input[placeholder="First name"]`).Fill(firstName))
-	require.NoError(s.t, page.Locator(`input[placeholder="Last name"]`).Fill(lastName))
-	require.NoError(s.t, page.Locator(`input[placeholder="Email"]`).Fill(email))
-	require.NoError(s.t, page.Locator(`input[placeholder="Password"]`).Fill(password))
-	require.NoError(s.t, page.Locator(`input[placeholder="Repeat password"]`).Fill(password))
+	s.session.FillIn(q.Locator(`input[placeholder="First name"]`), firstName)
+	s.session.FillIn(q.Locator(`input[placeholder="Last name"]`), lastName)
+	s.session.FillIn(q.Locator(`input[placeholder="Email"]`), email)
+	s.session.FillIn(q.Locator(`input[placeholder="Password"]`), password)
+	s.session.FillIn(q.Locator(`input[placeholder="Repeat password"]`), password)
 }
 
 func (s *invitationSteps) submitSignup() {
-	button := s.session.Page().Locator("text=Create account").First()
-	require.NoError(s.t, button.Click())
+	s.session.Click(q.Text("Create account"))
 }
 
 func (s *invitationSteps) disableInviteLink(token string) {
@@ -177,7 +168,7 @@ func (s *invitationSteps) assertInviteLinkDisabled() {
 	s.session.AssertText("Invite link not available")
 }
 
-func (s *invitationSteps) assertViewerInviteLinkMessage() {
+func (s *invitationSteps) assertOperatorInviteLinkMessage() {
 	s.session.AssertText("Invite link to add members")
 	s.session.AssertText("You don't have permission to manage invite links.")
 
@@ -186,7 +177,7 @@ func (s *invitationSteps) assertViewerInviteLinkMessage() {
 	require.False(s.t, copyLinkVisible)
 }
 
-func (s *invitationSteps) assertInviteeViewerRole(email string) {
+func (s *invitationSteps) assertInviteeOperatorRole(email string) {
 	user, err := models.FindActiveUserByEmail(s.session.OrgID.String(), email)
 	require.NoError(s.t, err)
 
@@ -200,5 +191,5 @@ func (s *invitationSteps) assertInviteeViewerRole(email string) {
 	require.Equal(s.t, len(roles), 1)
 
 	role := roles[0]
-	assert.Equal(s.t, role.Name, models.RoleOrgViewer)
+	assert.Equal(s.t, role.Name, models.RoleOrgOperator)
 }

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -129,10 +128,6 @@ func (c *CreateLoadBalancer) Setup(ctx core.SetupContext) error {
 	}
 
 	return nil
-}
-
-func (c *CreateLoadBalancer) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateLoadBalancer) Execute(ctx core.ExecutionContext) error {

@@ -229,7 +229,7 @@ export function useCanvasYamlDiffModal({
     onShowNodeDiff: hasUnpublishedDraftChanges ? onShowNodeDiff : undefined,
     yamlDiffModal: (
       <>
-        {payload ? (
+        {payload && open ? (
           <Suspense fallback={null}>
             <CanvasYamlDiffModal
               open={open}
@@ -240,10 +240,10 @@ export function useCanvasYamlDiffModal({
             />
           </Suspense>
         ) : null}
-        {nodePayload ? (
+        {nodePayload && nodeDiffId ? (
           <Suspense fallback={null}>
             <CanvasYamlDiffModal
-              open={!!nodeDiffId}
+              open
               onOpenChange={(nextOpen) => {
                 if (!nextOpen) {
                   setNodeDiffId(null);

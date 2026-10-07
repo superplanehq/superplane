@@ -1,14 +1,18 @@
 package contexts
 
 import (
+	"errors"
 	"fmt"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 )
+
+const datadogIntegrationApp = "datadog"
 
 type IntegrationSubscriptionContext struct {
 	tx             *gorm.DB
@@ -88,6 +92,21 @@ func (c *IntegrationSubscriptionContext) sendMessageToAction(message any) error 
 }
 
 func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error {
+	intake, skip, err := intakeForFeed(c.tx, c.node.WorkflowID)
+	if err != nil {
+		return err
+	}
+	if skip {
+		return nil
+	}
+
+	if _, err := models.FindLiveCanvasVersionInTransaction(c.tx, c.node.WorkflowID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+
 	nodeRef := c.subscription.NodeRef.Data()
 	if nodeRef.Trigger == nil {
 		return fmt.Errorf("invalid trigger ref")
@@ -111,9 +130,76 @@ func (c *IntegrationSubscriptionContext) sendMessageToTrigger(message any) error
 		Integration:       c.integrationCtx,
 		Message:           message,
 		Events:            NewEventContext(c.tx, c.node, nil, c.onNewEvents),
-		Logger:            logging.WithIntegration(logging.ForNode(*c.node), *c.integration),
+		Logger:            c.triggerLogger(intake),
 		FindExecutionByKV: c.findExecutionByKV,
 	})
+}
+
+func (c *IntegrationSubscriptionContext) triggerLogger(intake *models.FactoryIntake) *log.Entry {
+	logger := logging.WithIntegration(logging.ForNode(*c.node), *c.integration)
+	if c.integration.AppName != datadogIntegrationApp {
+		return logger
+	}
+	return logging.WithDatadogWebhookIdentity(logger, func() log.Fields {
+		return c.datadogDeliveryLogFields(intake)
+	})
+}
+
+func (c *IntegrationSubscriptionContext) datadogDeliveryLogFields(intake *models.FactoryIntake) log.Fields {
+	fields := log.Fields{
+		"organization_id":   c.integration.OrganizationID.String(),
+		"organization_name": "",
+		"integration_id":    c.integration.ID.String(),
+		"workspace_id":      "",
+		"workspace_name":    "",
+		"intake_id":         "",
+		"intake_name":       "",
+	}
+
+	organization, err := models.FindOrganizationByIDInTransaction(c.tx, c.integration.OrganizationID.String())
+	if err == nil && organization != nil {
+		fields["organization_name"] = organization.Name
+	}
+
+	canvas := intakeCanvas(intake)
+	if canvas == nil {
+		loaded, canvasErr := models.FindCanvasInTransaction(c.tx, c.integration.OrganizationID, c.node.WorkflowID)
+		if canvasErr == nil {
+			canvas = loaded
+		}
+	}
+	if canvas != nil && canvas.FactoryID != nil {
+		fields["workspace_id"] = canvas.FactoryID.String()
+		factory, factoryErr := models.FindFactory(c.tx, c.integration.OrganizationID, *canvas.FactoryID)
+		if factoryErr == nil && factory != nil {
+			fields["workspace_name"] = factory.Name
+		}
+	}
+
+	if intake == nil {
+		return fields
+	}
+
+	fields["intake_id"] = intake.ID.String()
+	fields["intake_name"] = intakeCanvasName(canvas, intake)
+	return fields
+}
+
+func intakeCanvas(intake *models.FactoryIntake) *models.Canvas {
+	if intake == nil {
+		return nil
+	}
+	return intake.Canvas
+}
+
+func intakeCanvasName(canvas *models.Canvas, intake *models.FactoryIntake) string {
+	if canvas != nil && canvas.Name != "" {
+		return canvas.Name
+	}
+	if intake == nil {
+		return ""
+	}
+	return intake.Name()
 }
 
 func (c *IntegrationSubscriptionContext) findExecutionByKV(key string, value string) (*core.ExecutionContext, error) {

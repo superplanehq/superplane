@@ -9,10 +9,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/telemetry"
@@ -35,6 +38,7 @@ const (
 type RunFinalizer struct {
 	logger      *log.Entry
 	registry    *registry.Registry
+	encryptor   crypto.Encryptor
 	rabbitMQURL string
 }
 
@@ -43,6 +47,18 @@ func NewRunFinalizer(rabbitMQURL string, registry *registry.Registry) *RunFinali
 		logger:      log.WithFields(log.Fields{"worker": "RunFinalizer"}),
 		registry:    registry,
 		rabbitMQURL: rabbitMQURL,
+	}
+}
+
+func (w *RunFinalizer) WithEncryptor(encryptor crypto.Encryptor) *RunFinalizer {
+	w.encryptor = encryptor
+	return w
+}
+
+func (w *RunFinalizer) factoryIntakeDeps() factoryactions.IntakeDependencies {
+	return factoryactions.IntakeDependencies{
+		Registry:  w.registry,
+		Encryptor: w.encryptor,
 	}
 }
 
@@ -354,7 +370,10 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	}
 
 	var finalized bool
-	var nextFactoryLineRun *factoryLinePendingRun
+	var skippedAsFinished bool
+	var nextFactoryLineRuns []factoryLinePendingRun
+	var factoryOrderUpdates []factoryWorkOrderUpdate
+	var mergeabilityRefresh *factoryPullRequestMergeabilityRefresh
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var skipReason string
 		var err error
@@ -366,12 +385,25 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		if err != nil {
 			return err
 		}
+		skippedAsFinished = skipReason == runFinalizerReasonAlreadyFinished
 		if !finalized {
 			return nil
 		}
 
-		nextFactoryLineRun, err = w.executeNextFactoryLineStep(tx, runID)
-		return err
+		activityUpdate, activityMergeability, err := finalizePullRequestActivityForRun(tx, runID)
+		if err != nil {
+			return err
+		}
+
+		nextFactoryLineRuns, factoryOrderUpdates, err = w.executeNextFactoryLineStep(tx, runID)
+		if err != nil {
+			return err
+		}
+		if activityUpdate != nil {
+			factoryOrderUpdates = append(factoryOrderUpdates, *activityUpdate)
+		}
+		mergeabilityRefresh = activityMergeability
+		return nil
 	})
 
 	if err != nil {
@@ -379,6 +411,13 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		outcome = executorOutcomeFailed
 		reason = classifyProcessError(err)
 		return err
+	}
+
+	// Retry cached spend after the finish transaction. A rollup error must not
+	// block the factory line, but a later pass still has to fill total_tokens
+	// and cost_cents from ledger rows.
+	if finalized || skippedAsFinished {
+		rollUpFactoryUsageBestEffort(logger, database.Conn(), runID)
 	}
 
 	if !finalized {
@@ -403,11 +442,36 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		}
 	}
 
-	if nextFactoryLineRun != nil {
+	for _, nextFactoryLineRun := range nextFactoryLineRuns {
 		if err := messages.NewCanvasRunMessage(nextFactoryLineRun.workflowID.String(), nextFactoryLineRun.runID.String()).PublishPending(); err != nil {
 			w.logger.WithError(err).Warnf("Failed to publish pending run message for run %s", nextFactoryLineRun.runID)
 			return err
 		}
+	}
+
+	// The finished run's own work order is refreshed by the run-state
+	// fan-out above; admitted orders are other work orders whose queued →
+	// started transition the UI would otherwise miss until their run starts.
+	publishPlanningBoardStatusForRun(w.logger, runID)
+
+	for _, update := range factoryOrderUpdates {
+		if err := messages.PublishFactoryWorkOrderUpdated(
+			update.factoryID.String(),
+			update.orderID.String(),
+			factoryevents.EventTypeLineStepExecutionCreated,
+		); err != nil {
+			w.logger.WithError(err).Warnf("Failed to publish factory work order updated for order %s", update.orderID)
+		}
+	}
+
+	if mergeabilityRefresh != nil {
+		factoryactions.ScheduleFactoryPullRequestMergeabilityRefresh(
+			context.Background(),
+			w.factoryIntakeDeps(),
+			mergeabilityRefresh.organizationID,
+			mergeabilityRefresh.factoryID,
+			mergeabilityRefresh.pullRequestID,
+		)
 	}
 
 	return nil
@@ -463,6 +527,10 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, "", err
 	}
 
+	if err := models.EndPlanningSessionForFinishedRun(tx, run.ID, result); err != nil {
+		return false, "", err
+	}
+
 	err = NewRunCallbackDispatcher(tx, w.registry, run).
 		WithEventCollector(eventCollector).
 		WithExecutionCollector(executionCollector).
@@ -480,69 +548,194 @@ type factoryLinePendingRun struct {
 	runID      uuid.UUID
 }
 
-func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) (*factoryLinePendingRun, error) {
+// publishPlanningBoardStatusForRun reloads the lines board after an analysis
+// session changes with its canvas run. The list flags say whether the agent is
+// still working.
+func publishPlanningBoardStatusForRun(logger *log.Entry, runID uuid.UUID) {
+	session, err := models.FindPlanningSessionByRun(database.Conn(), runID)
+	if errors.Is(err, models.ErrFactoryPlanningSessionNotFound) {
+		return
+	}
+	if err != nil {
+		logger.WithError(err).Warnf("failed to load planning session for finished run %s", runID)
+		return
+	}
+	messages.PublishPlanningBoardStatus(session)
+}
+
+// factoryWorkOrderUpdate identifies a work order whose factory websocket
+// clients must refresh after the finalize transaction commits.
+type factoryWorkOrderUpdate struct {
+	factoryID uuid.UUID
+	orderID   uuid.UUID
+}
+
+type factoryPullRequestMergeabilityRefresh struct {
+	organizationID uuid.UUID
+	factoryID      uuid.UUID
+	pullRequestID  uuid.UUID
+}
+
+// factoryAdmissionOutcomes converts admitted step results into the pending
+// run and work-order update fan-outs the caller publishes after commit.
+func factoryAdmissionOutcomes(admitted []*models.FactoryLineStepResult) ([]factoryLinePendingRun, []factoryWorkOrderUpdate) {
+	var pendingRuns []factoryLinePendingRun
+	var orderUpdates []factoryWorkOrderUpdate
+	for _, admission := range admitted {
+		if admission.Run != nil {
+			pendingRuns = append(pendingRuns, factoryLinePendingRun{
+				workflowID: admission.Run.WorkflowID,
+				runID:      admission.Run.ID,
+			})
+		}
+		if admission.Execution != nil {
+			orderUpdates = append(orderUpdates, factoryWorkOrderUpdate{
+				factoryID: admission.Execution.FactoryID,
+				orderID:   admission.Execution.WorkOrderID,
+			})
+		}
+	}
+	return pendingRuns, orderUpdates
+}
+
+func (w *RunFinalizer) executeNextFactoryLineStep(tx *gorm.DB, runID uuid.UUID) ([]factoryLinePendingRun, []factoryWorkOrderUpdate, error) {
 	//
 	// Finish current factory work order execution.
 	//
 	execution, err := models.FindWorkOrderExecutionByRunID(tx, runID)
 	if err != nil {
 		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return nil, err
+		return nil, nil, err
 	}
 
 	run, err := models.LockCanvasRunInTransaction(tx, runID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	// Fill cached spend even when this step is already finished. A previous
+	// pass can mark the step finished after a rollup error, and a later pass
+	// must still copy ledger totals into total_tokens / cost_cents.
+	if err := execution.RollupUsage(tx); err != nil {
+		w.logger.WithError(err).WithField("run_id", runID).Error("failed to roll up factory usage")
 	}
 
 	if execution.Status == models.FactoryWorkOrderExecutionStatusFinished {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	if err := execution.MarkFinished(tx, run.Result); err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	//
+	// The finished run freed a slot at its step: admit queued work orders
+	// while slots are free. Failed and cancelled runs free their slot the
+	// same way passed runs do.
+	//
+	admitted, err := models.AdmitQueuedForStep(tx, execution.LineID, execution.StepIndex)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pendingRuns, orderUpdates := factoryAdmissionOutcomes(admitted)
+
+	//
+	// Advance (or finish) the line dispatch this step run belongs to. The
+	// dispatch's steps snapshot — not the live line — is authoritative for
+	// what comes next, so a mid-traversal line edit can't change it.
+	//
+	dispatch, err := models.LockWorkOrderLineDispatch(tx, execution.LineDispatchID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	//
+	// A rerun can start a step on this traversal while the run of an
+	// earlier step is finalized. That step owns the traversal now, so
+	// this pass must neither finish nor advance it — doing so would
+	// cancel a live run or open a second step on the same traversal.
+	//
+	openWork, err := dispatch.HasOpenWork(tx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if openWork {
+		return pendingRuns, orderUpdates, nil
 	}
 
 	if run.Result != models.CanvasRunResultPassed {
-		return nil, nil
+		return pendingRuns, orderUpdates, dispatch.Finish(tx, run.Result)
 	}
 
-	//
-	// Start next step in the factory line.
-	//
 	factory, err := models.FindFactory(tx, execution.OrganizationID, execution.FactoryID)
 	if err != nil {
-		return nil, err
-	}
-
-	line, err := factory.FindLine(tx, execution.LineID)
-	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	workOrder, err := factory.FindWorkOrder(tx, execution.WorkOrderID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
+	// The order closed while this step was running. The traversal is
+	// abandoned, not just paused: finish it as cancelled so the order
+	// doesn't keep a zombie active dispatch (which would block any
+	// re-dispatch after a reopen).
 	if !workOrder.IsOpen() {
-		return nil, nil
+		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultCancelled)
 	}
 
 	nextIndex := execution.StepIndex + 1
-	if nextIndex >= len(line.Steps) {
-		return nil, nil
+	if nextIndex >= len(dispatch.Steps) {
+		return pendingRuns, orderUpdates, dispatch.Finish(tx, models.CanvasRunResultPassed)
 	}
 
-	result, err := line.StartStep(tx, workOrder, nextIndex)
+	result, err := dispatch.EnqueueOrStartStep(tx, workOrder, nextIndex)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &factoryLinePendingRun{
-		workflowID: result.Run.WorkflowID,
-		runID:      result.Run.ID,
-	}, nil
+	if result.Run != nil {
+		pendingRuns = append(pendingRuns, factoryLinePendingRun{
+			workflowID: result.Run.WorkflowID,
+			runID:      result.Run.ID,
+		})
+	}
+
+	return pendingRuns, orderUpdates, nil
+}
+
+func finalizePullRequestActivityForRun(tx *gorm.DB, runID uuid.UUID) (*factoryWorkOrderUpdate, *factoryPullRequestMergeabilityRefresh, error) {
+	activity, err := models.FindPullRequestActivityByRunID(tx, runID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestActivityNotFound) {
+			return nil, nil, nil
+		}
+		return nil, nil, err
+	}
+
+	run, err := models.FindUnscopedCanvasRun(tx, runID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := activity.Finalize(tx, run); err != nil {
+		return nil, nil, err
+	}
+
+	var pullRequest models.FactoryPullRequest
+	if err := tx.Where("id = ?", activity.PullRequestID).First(&pullRequest).Error; err != nil {
+		return nil, nil, err
+	}
+
+	return &factoryWorkOrderUpdate{
+			factoryID: pullRequest.FactoryID,
+			orderID:   pullRequest.WorkOrderID,
+		}, &factoryPullRequestMergeabilityRefresh{
+			organizationID: pullRequest.OrganizationID,
+			factoryID:      pullRequest.FactoryID,
+			pullRequestID:  pullRequest.ID,
+		}, nil
 }

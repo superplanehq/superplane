@@ -127,7 +127,7 @@ func TestUpdateFromFile(t *testing.T) {
 
 	dir := t.TempDir()
 	path := dir + "/group.yaml"
-	content := []byte("apiVersion: v1\nkind: Group\nmetadata:\n  name: engineers\nspec:\n  displayName: FromFile\n  role: org_viewer\n")
+	content := []byte("apiVersion: v1\nkind: Group\nmetadata:\n  name: engineers\nspec:\n  displayName: FromFile\n  role: org_operator\n")
 	require.NoError(t, os.WriteFile(path, content, 0644))
 
 	cmd, got := newUpdateContext(t, server, map[string]string{
@@ -137,7 +137,7 @@ func TestUpdateFromFile(t *testing.T) {
 	require.NoError(t, cmd.Execute(got.ctx))
 	require.Equal(t, "engineers", seen.Group.Metadata.Name)
 	require.Equal(t, "FromFile", seen.Group.Spec.DisplayName)
-	require.Equal(t, "org_viewer", seen.Group.Spec.Role)
+	require.Equal(t, "org_operator", seen.Group.Spec.Role)
 }
 
 func TestUpdateFromStdin(t *testing.T) {
@@ -153,7 +153,7 @@ func TestUpdateFromStdin(t *testing.T) {
 	require.Equal(t, "engineers", seen.Group.Metadata.Name)
 	require.Equal(t, "Engineers", seen.Group.Spec.DisplayName)
 	require.Equal(t, "Engineering team", seen.Group.Spec.Description)
-	require.Equal(t, "org_viewer", seen.Group.Spec.Role)
+	require.Equal(t, "org_operator", seen.Group.Spec.Role)
 }
 
 func TestUpdateFromFileRequiresMetadataName(t *testing.T) {

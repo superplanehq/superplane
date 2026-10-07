@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -124,10 +123,6 @@ func (c *UpdateAlertRule) Execute(ctx core.ExecutionContext) error {
 
 func (c *UpdateAlertRule) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *UpdateAlertRule) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *UpdateAlertRule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

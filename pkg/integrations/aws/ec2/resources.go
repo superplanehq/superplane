@@ -462,35 +462,6 @@ func ListInstanceProfiles(ctx core.ListResourcesContext, resourceType string) ([
 	return resources, nil
 }
 
-func ListAlarms(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
-	creds, err := common.CredentialsFromInstallation(ctx.Integration)
-	if err != nil {
-		return nil, err
-	}
-
-	region := strings.TrimSpace(ctx.Parameters["region"])
-	if region == "" {
-		return nil, fmt.Errorf("region is required")
-	}
-
-	client := NewClient(ctx.HTTP, creds, region)
-	alarms, err := client.ListAlarms()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list CloudWatch alarms: %w", err)
-	}
-
-	resources := make([]core.IntegrationResource, 0, len(alarms))
-	for _, alarm := range alarms {
-		resources = append(resources, core.IntegrationResource{
-			Type: resourceType,
-			Name: alarm.AlarmName,
-			ID:   alarm.AlarmName,
-		})
-	}
-
-	return resources, nil
-}
-
 func ListInstanceAlarms(ctx core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {

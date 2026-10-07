@@ -80,14 +80,36 @@ func (h *AssetHandler) serveAsset(w http.ResponseWriter, r *http.Request) {
 	defer f.Close()
 
 	if fi, _ := f.Stat(); fi != nil && !fi.IsDir() {
-		if mimeType := mime.TypeByExtension(filepath.Ext(path)); mimeType != "" {
-			w.Header().Set("Content-Type", mimeType)
+		if contentType := assetContentType(path); contentType != "" {
+			w.Header().Set("Content-Type", contentType)
 		}
-		w.Header().Set("Cache-Control", "public, max-age=31536000")
+		w.Header().Set("Cache-Control", assetCacheControl(path))
 		http.ServeContent(w, r, fi.Name(), fi.ModTime(), f)
 	} else {
 		http.NotFound(w, r)
 	}
+}
+
+// assetContentType returns the content type for an asset path.
+// Go's mime package does not know the .webmanifest extension,
+// so the web app manifest type is set explicitly.
+func assetContentType(path string) string {
+	if strings.HasSuffix(path, ".webmanifest") {
+		return "application/manifest+json"
+	}
+	return mime.TypeByExtension(filepath.Ext(path))
+}
+
+// assetCacheControl keeps content-hashed Vite assets on a one-year cache,
+// but uses a short cache for files that are referenced by a stable URL:
+// the onboarding scripts, the web app manifest, and the PWA icons.
+func assetCacheControl(path string) string {
+	if strings.HasSuffix(path, ".webmanifest") ||
+		strings.Contains(path, "/onboarding/") ||
+		strings.Contains(path, "/pwa/") {
+		return "public, max-age=3600"
+	}
+	return "public, max-age=31536000"
 }
 
 // serveIndex serves the index.html file for SPA routing.

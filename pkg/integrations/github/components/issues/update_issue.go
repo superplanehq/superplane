@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/google/go-github/v84/github"
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -233,10 +232,6 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 		"github.issue",
 		[]any{issue},
 	)
-}
-
-func (c *UpdateIssue) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *UpdateIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

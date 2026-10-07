@@ -209,7 +209,7 @@ Use PRD example; namespace must match canvas memory keys. Row actions target **t
 
 ```bash
 # Frontend unit tests (console package)
-cd web_src && npm run test:run -- src/pages/app/console
+make check.test.ui FILES=src/pages/app/console
 
 # After UI edits (Docker dev env)
 make format.js

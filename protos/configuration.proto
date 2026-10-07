@@ -36,6 +36,11 @@ message TypeOptions {
   optional AppCanvasNodeTypeOptions app_canvas_node = 14;
   optional AppTypeOptions app = 15;
   optional IntegrationTypeOptions integration = 16;
+  optional HostedModelTypeOptions hosted_model = 17;
+}
+
+message HostedModelTypeOptions {
+  string provider = 1;
 }
 
 message IntegrationTypeOptions {

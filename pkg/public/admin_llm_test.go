@@ -1,0 +1,573 @@
+package public
+
+import (
+	"encoding/json"
+	"math"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
+)
+
+func TestResolveHostedListModelsBaseURL(t *testing.T) {
+	proxy := "https://proxy.example/v1"
+	stored := "https://saved.example/v1"
+
+	assert.Equal(t, proxy, resolveHostedListModelsBaseURL(&proxy, stored))
+	empty := ""
+	assert.Equal(t, "", resolveHostedListModelsBaseURL(&empty, stored))
+	assert.Equal(t, stored, resolveHostedListModelsBaseURL(nil, stored))
+	assert.Equal(t, "", resolveHostedListModelsBaseURL(nil, ""))
+}
+
+func TestAdminLLMSettings(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	_, err := models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
+		WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+		MarkupBPS:           models.DefaultMarkupBPS,
+		WarningThresholdBPS: models.DefaultWarningThresholdBPS,
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = models.UpdateInstallationLLMSettings(database.Conn(), models.InstallationLLMSettings{
+			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+			MarkupBPS:           models.DefaultMarkupBPS,
+			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
+		})
+		_ = database.Conn().Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
+		_ = database.Conn().Where("provider = ?", models.UsageProviderOpenRouter).Delete(&models.HostedLLMProvider{})
+	})
+
+	t.Run("non-admin gets 404", func(t *testing.T) {
+		account, err := models.CreateAccount("Regular User", "regular-llm@example.com")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test-client-secret")
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/installation/llm-settings",
+			authCookie: regularToken,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("admin can load defaults and update welcome grant", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/installation/llm-settings",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var settings installationLLMSettingsResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+		assert.Equal(t, models.DefaultWelcomeGrantCents, settings.WelcomeGrantCents)
+		assert.Equal(t, models.DefaultMarkupBPS, settings.MarkupBPS)
+		assert.Empty(t, settings.DefaultHostedProvider)
+		assert.Empty(t, settings.DefaultHostedModel)
+		require.Len(t, settings.Providers, 3)
+
+		body, err := json.Marshal(map[string]any{
+			"welcome_grant_cents": 2500,
+			"markup_bps":          1000,
+		})
+		require.NoError(t, err)
+		response = execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/llm-settings",
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+		assert.Equal(t, int64(2500), settings.WelcomeGrantCents)
+		assert.Equal(t, 1000, settings.MarkupBPS)
+	})
+
+	t.Run("admin can save a hosted provider", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{
+			"enabled":        true,
+			"api_key":        "sk-test",
+			"allowed_models": []string{"claude-sonnet-4-6"},
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/llm-providers/anthropic",
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var settings installationLLMSettingsResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+		var anthropic hostedLLMProviderResponse
+		for _, provider := range settings.Providers {
+			if provider.Provider == "anthropic" {
+				anthropic = provider
+			}
+		}
+		assert.True(t, anthropic.Enabled)
+		assert.True(t, anthropic.APIKeyConfigured)
+		assert.False(t, anthropic.ManagementKeyConfigured)
+		assert.Equal(t, []string{"claude-sonnet-4-6"}, anthropic.AllowedModels)
+
+		body, err = json.Marshal(map[string]any{
+			"default_hosted_provider": "anthropic",
+			"default_hosted_model":    "claude-sonnet-4-6",
+		})
+		require.NoError(t, err)
+		response = execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/llm-settings",
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+		assert.Equal(t, "anthropic", settings.DefaultHostedProvider)
+		assert.Equal(t, "claude-sonnet-4-6", settings.DefaultHostedModel)
+	})
+
+	t.Run("admin cannot enable OpenRouter without a provisioning key", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{
+			"enabled":        true,
+			"api_key":        "sk-or-inference",
+			"allowed_models": []string{"anthropic/claude-sonnet-4-6"},
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/installation/llm-providers/openrouter",
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "provisioning API key is required")
+	})
+
+	t.Run("admin GET reports when a provisioning key is stored", func(t *testing.T) {
+		_, err := models.UpsertHostedLLMProvider(database.Conn(), models.HostedLLMProvider{
+			Provider:      models.UsageProviderOpenRouter,
+			Enabled:       false,
+			APIKey:        []byte("encrypted-inference"),
+			ManagementKey: []byte("encrypted-mgmt"),
+			AllowedModels: datatypes.JSONSlice[string]{"anthropic/claude-sonnet-4-6"},
+		})
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/installation/llm-settings",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var settings installationLLMSettingsResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &settings))
+		var openrouterProvider hostedLLMProviderResponse
+		for _, provider := range settings.Providers {
+			if provider.Provider == "openrouter" {
+				openrouterProvider = provider
+			}
+		}
+		assert.True(t, openrouterProvider.APIKeyConfigured)
+		assert.True(t, openrouterProvider.ManagementKeyConfigured)
+		assert.NotContains(t, response.Body.String(), "encrypted-mgmt")
+	})
+
+	t.Run("admin can grant credit and set markup override", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/llm-credit",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var credit organizationLLMCreditResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
+		assert.Greater(t, credit.RemainingCreditCents, int64(0))
+		assert.Equal(t, models.DefaultWelcomeGrantCents, credit.SuperplaneGrantCents)
+		assert.Equal(t, int64(0), credit.PurchasedCreditCents)
+
+		body, err := json.Marshal(map[string]any{
+			"amount_cents": 1000,
+			"note":         "restore",
+		})
+		require.NoError(t, err)
+		response = execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/admin/api/organizations/" + r.Organization.ID.String() + "/llm-credit/grants",
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
+		assert.GreaterOrEqual(t, credit.GrantTotalCents, int64(6000))
+		assert.GreaterOrEqual(t, credit.SuperplaneGrantCents, int64(6000))
+		assert.Equal(t, int64(0), credit.PurchasedCreditCents)
+
+		body, err = json.Marshal(map[string]any{"markup_bps": 0})
+		require.NoError(t, err)
+		response = execRequest(server, requestParams{
+			method:      "PATCH",
+			path:        "/admin/api/organizations/" + r.Organization.ID.String() + "/llm-settings",
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
+		require.NotNil(t, credit.MarkupOverrideBPS)
+		assert.Equal(t, 0, *credit.MarkupOverrideBPS)
+	})
+}
+
+func TestAdminOrganizationCreditBalances(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	creditPath := "/admin/api/organizations/" + r.Organization.ID.String() + "/llm-credit"
+	balancesPath := creditPath + "/balances"
+	setBalance := func(authCookie string, body map[string]any) *httptest.ResponseRecorder {
+		encoded, err := json.Marshal(body)
+		require.NoError(t, err)
+		return execRequest(server, requestParams{
+			method:      "PUT",
+			path:        balancesPath,
+			authCookie:  authCookie,
+			body:        encoded,
+			contentType: "application/json",
+		})
+	}
+
+	t.Run("non-admin gets 404", func(t *testing.T) {
+		account, err := models.CreateAccount("Regular User", "regular-credit-balance@example.com")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test-client-secret")
+		regularToken, err := authentication.GenerateAccountToken(signer, account.ID.String(), time.Now(), time.Hour)
+		require.NoError(t, err)
+
+		response := setBalance(regularToken, map[string]any{"bucket": "grant", "target_cents": 100})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+		response = execRequest(server, requestParams{method: "GET", path: creditPath + "/grants", authCookie: regularToken})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("admin sets trial balance and sees the adjustment in history", func(t *testing.T) {
+		response := execRequest(server, requestParams{method: "GET", path: creditPath, authCookie: token})
+		require.Equal(t, http.StatusOK, response.Code)
+		var credit organizationLLMCreditResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
+		assert.Equal(t, models.DefaultWelcomeGrantCents, credit.WelcomeRemainingCents)
+		assert.NotNil(t, credit.WelcomeCreditExpiresAt)
+
+		response = setBalance(token, map[string]any{
+			"bucket":                   "trial",
+			"target_cents":             1000,
+			"expected_remaining_cents": credit.WelcomeRemainingCents,
+			"note":                     "support",
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
+		assert.Equal(t, int64(1000), credit.WelcomeRemainingCents)
+		assert.Equal(t, int64(1000), credit.RemainingCreditCents)
+
+		response = execRequest(server, requestParams{method: "GET", path: creditPath + "/grants", authCookie: token})
+		require.Equal(t, http.StatusOK, response.Code)
+		var history struct {
+			Grants []map[string]any `json:"grants"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &history))
+		require.Len(t, history.Grants, 2)
+		latest := history.Grants[0]
+		assert.Equal(t, models.LLMCreditGrantKindTrialAdjustment, latest["kind"])
+		assert.Equal(t, "-4000", latest["amountCents"])
+		assert.Equal(t, "support", latest["note"])
+		assert.NotEmpty(t, latest["actorName"])
+	})
+
+	t.Run("stale expected balance returns 409", func(t *testing.T) {
+		response := setBalance(token, map[string]any{
+			"bucket":                   "trial",
+			"target_cents":             2000,
+			"expected_remaining_cents": 5000,
+		})
+		assert.Equal(t, http.StatusConflict, response.Code)
+		assert.Contains(t, response.Body.String(), "The balance changed")
+	})
+
+	t.Run("negative target and unknown credit type return 400", func(t *testing.T) {
+		response := setBalance(token, map[string]any{"bucket": "grant", "target_cents": -100})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		response = setBalance(token, map[string]any{"bucket": "included", "target_cents": 100})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+	})
+
+	t.Run("target outside the safe cent range returns 400", func(t *testing.T) {
+		response := setBalance(token, map[string]any{
+			"bucket":                   "grant",
+			"target_cents":             math.MaxInt64,
+			"expected_remaining_cents": 0,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+
+		response = setBalance(token, map[string]any{
+			"bucket":                   "grant",
+			"target_cents":             math.MinInt64,
+			"expected_remaining_cents": 0,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+
+		response = execRequest(server, requestParams{method: "GET", path: creditPath, authCookie: token})
+		require.Equal(t, http.StatusOK, response.Code)
+		var credit organizationLLMCreditResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &credit))
+		assert.Equal(t, int64(0), credit.AdminRemainingCents)
+	})
+}
+
+func TestAdminOrganizationBillingPlan(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+
+	t.Run("admin can set a plan when Polar is not set up", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{"plan": "business"})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+		assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
+		assert.False(t, plan.PolarManaged)
+	})
+
+	t.Run("PUT allows a plan when only a Polar customer exists", func(t *testing.T) {
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+		require.NoError(t, models.SetOrganizationPolarCustomerID(database.Conn(), r.Organization.ID, "cust_polar"))
+
+		body, err := json.Marshal(map[string]any{
+			"plan":          "trial",
+			"trial_ends_at": time.Now().Add(20 * 24 * time.Hour).UTC().Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		assert.Equal(t, models.BillingPlanTrial, plan.Plan)
+		assert.Equal(t, models.BillingPlanSourceAdmin, plan.PlanSource)
+		assert.False(t, plan.PolarManaged)
+	})
+
+	t.Run("GET syncs Polar paid over an admin plan", func(t *testing.T) {
+		periodStart := time.Now().UTC().Truncate(time.Second)
+		periodEnd := periodStart.AddDate(0, 1, 0)
+		polarServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "/subscriptions/", req.URL.Path)
+			require.NoError(t, json.NewEncoder(w).Encode(map[string]any{
+				"items": []map[string]any{
+					{
+						"id":                   "sub_admin_sync",
+						"status":               "active",
+						"current_period_start": periodStart.Format(time.RFC3339),
+						"current_period_end":   periodEnd.Format(time.RFC3339),
+						"customer_id":          "cust_polar_1",
+						"external_customer_id": r.Organization.ID.String(),
+						"customer": map[string]any{
+							"id":          "cust_polar_1",
+							"external_id": r.Organization.ID.String(),
+						},
+					},
+				},
+				"pagination": map[string]any{"max_page": 1},
+			}))
+		}))
+		t.Cleanup(polarServer.Close)
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+		t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+		t.Setenv("POLAR_API_BASE_URL", polarServer.URL)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       path,
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		assert.Equal(t, models.BillingPlanBusiness, plan.Plan)
+		assert.Equal(t, models.BillingPlanSourcePolar, plan.PlanSource)
+		assert.True(t, plan.PolarManaged)
+	})
+
+	t.Run("PUT rejects Polar-managed organizations", func(t *testing.T) {
+		now := time.Now()
+		end := now.AddDate(0, 1, 0)
+		_, _, err := models.ApplyPolarSubscription(database.Conn(), r.Organization.ID, models.PolarSubscriptionApply{
+			ID:          "sub_admin_put",
+			Status:      models.PolarSubscriptionStatusActive,
+			PeriodStart: &now,
+			PeriodEnd:   &end,
+		})
+		require.NoError(t, err)
+		t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+
+		body, err := json.Marshal(map[string]any{
+			"plan":          "trial",
+			"trial_ends_at": time.Now().Add(20 * 24 * time.Hour).UTC().Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "Cancel or change the subscription in Polar")
+	})
+}
+
+func TestAdminOrganizationBillingPlanTrialEnd(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+
+	t.Run("PUT trial rejects a missing end", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{"plan": "trial"})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "trial end date is required")
+	})
+
+	t.Run("PUT trial rejects an end that is not in the future", func(t *testing.T) {
+		body, err := json.Marshal(map[string]any{
+			"plan":          "trial",
+			"trial_ends_at": time.Now().Add(-time.Hour).UTC().Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+		assert.Contains(t, response.Body.String(), "choose a future date")
+	})
+
+	t.Run("PUT trial stores the end and reopens expired welcome credit", func(t *testing.T) {
+		ended := time.Now().Add(-time.Hour)
+		require.NoError(t, database.Conn().Model(&models.OrganizationLLMCreditGrant{}).
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			Update("expires_at", ended).Error)
+		var before models.OrganizationLLMCreditGrant
+		require.NoError(t, database.Conn().
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			First(&before).Error)
+
+		trialEnd := time.Now().Add(18 * 24 * time.Hour).UTC().Truncate(time.Second)
+		body, err := json.Marshal(map[string]any{
+			"plan":          "trial",
+			"trial_ends_at": trialEnd.Format(time.RFC3339),
+		})
+		require.NoError(t, err)
+		response := execRequest(server, requestParams{
+			method:      "PUT",
+			path:        path,
+			authCookie:  token,
+			body:        body,
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var plan organizationBillingPlanResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &plan))
+		require.NotNil(t, plan.TrialEndsAt)
+		parsed, err := time.Parse(time.RFC3339, *plan.TrialEndsAt)
+		require.NoError(t, err)
+		assert.True(t, parsed.Equal(trialEnd))
+
+		var welcome models.OrganizationLLMCreditGrant
+		require.NoError(t, database.Conn().
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			First(&welcome).Error)
+		require.NotNil(t, welcome.ExpiresAt)
+		assert.True(t, welcome.ExpiresAt.Equal(trialEnd))
+		assert.Equal(t, before.AmountMicros, welcome.AmountMicros)
+
+		summary, err := models.DescribeOrganizationLLMCredit(database.Conn(), r.Organization.ID)
+		require.NoError(t, err)
+		assert.Equal(t, welcome.AmountMicros, summary.WelcomeRemainingMicros)
+	})
+
+	t.Run("PUT business and none ignore trial end", func(t *testing.T) {
+		var before models.OrganizationLLMCreditGrant
+		require.NoError(t, database.Conn().
+			Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+			First(&before).Error)
+		ignored := time.Now().Add(90 * 24 * time.Hour).UTC().Format(time.RFC3339)
+
+		for _, planName := range []string{"business", "none"} {
+			body, err := json.Marshal(map[string]any{
+				"plan":          planName,
+				"trial_ends_at": ignored,
+			})
+			require.NoError(t, err)
+			response := execRequest(server, requestParams{
+				method:      "PUT",
+				path:        path,
+				authCookie:  token,
+				body:        body,
+				contentType: "application/json",
+			})
+			assert.Equal(t, http.StatusOK, response.Code, planName)
+
+			var welcome models.OrganizationLLMCreditGrant
+			require.NoError(t, database.Conn().
+				Where("organization_id = ? AND kind = ?", r.Organization.ID, models.LLMCreditGrantKindWelcome).
+				First(&welcome).Error)
+			require.NotNil(t, welcome.ExpiresAt)
+			require.NotNil(t, before.ExpiresAt)
+			assert.True(t, welcome.ExpiresAt.Equal(*before.ExpiresAt), planName)
+		}
+	})
+}

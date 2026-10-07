@@ -12,12 +12,42 @@ const OPTIONS: Array<{ value: ThemePreference; label: string; Icon: typeof Sun }
   { value: "system", label: "System", Icon: Monitor },
 ];
 
-export function ThemePreferenceControl() {
+interface ThemePreferenceControlProps {
+  /** `org` matches organization settings. `workspace` uses workspace sidebar tokens. `settings` is for Account Profile. */
+  variant?: "org" | "workspace" | "settings";
+}
+
+function toggleButtonClass(isActive: boolean, variant: "org" | "workspace" | "settings") {
+  if (variant === "workspace" || variant === "settings") {
+    return isActive ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground";
+  }
+  return isActive ? SEGMENTED_NAV_TAB_ACTIVE_CLASSES : SEGMENTED_NAV_TAB_INACTIVE_CLASSES;
+}
+
+function wrapperClass(variant: "org" | "workspace" | "settings") {
+  if (variant === "settings") {
+    return undefined;
+  }
+  if (variant === "workspace") {
+    return "mt-2 flex justify-center border-t border-sidebar-border pt-3";
+  }
+  return cn("-mx-4 mt-2 border-t px-4 pt-4 pb-3", appDarkModeClasses.sidebarDivider);
+}
+
+export function ThemePreferenceControl({ variant = "org" }: ThemePreferenceControlProps) {
   const { preference, setPreference } = useTheme();
 
   return (
-    <div className={cn("-mx-4 mt-2 border-t px-4 pt-4 pb-3", appDarkModeClasses.sidebarDivider)}>
-      <div className="inline-flex h-8 w-fit gap-1 rounded-full bg-slate-100 p-1 dark:bg-gray-800">
+    <div className={wrapperClass(variant)}>
+      <div
+        className={cn(
+          "inline-flex h-8 w-fit gap-1 rounded-full p-1",
+          variant === "org" ? "bg-slate-100 dark:bg-gray-800" : "bg-muted",
+        )}
+        role="group"
+        aria-label="Appearance"
+        data-testid={variant === "settings" ? "account-redesign-theme" : undefined}
+      >
         {OPTIONS.map(({ value, label, Icon }) => {
           const isActive = preference === value;
 
@@ -28,10 +58,11 @@ export function ThemePreferenceControl() {
                   type="button"
                   aria-label={label}
                   aria-pressed={isActive}
+                  data-testid={`theme-preference-${value}`}
                   onClick={() => setPreference(value)}
                   className={cn(
                     "flex size-6 items-center justify-center rounded-full transition-colors",
-                    isActive ? SEGMENTED_NAV_TAB_ACTIVE_CLASSES : SEGMENTED_NAV_TAB_INACTIVE_CLASSES,
+                    toggleButtonClass(isActive, variant),
                   )}
                 >
                   <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />

@@ -3,11 +3,16 @@ import { createRoot } from "react-dom/client";
 import "./dash0.ts";
 import "./index.css";
 import "@xyflow/react/dist/style.css";
+import "./installLocalMonaco";
 import App from "./App.tsx";
 import { setupApiInterceptor } from "./lib/api-interceptor.ts";
 import { Sentry } from "./sentry.ts";
 import "./posthog.ts";
 import { ErrorPage } from "./components/ErrorPage.tsx";
+
+import { initGoogleTagManager } from "./lib/googleTagManager";
+
+initGoogleTagManager();
 
 // Setup the API interceptor to handle 401 responses
 setupApiInterceptor();

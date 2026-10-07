@@ -1,0 +1,476 @@
+package models
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+const (
+	PlanningSessionStateRunning = "running"
+	PlanningSessionStateEnded   = "ended"
+
+	PlanningSessionKindTaskCreation      = "task_creation"
+	PlanningSessionKindWorkOrderAnalysis = "work_order_analysis"
+
+	PlanningSessionMessageRoleUser  = "user"
+	PlanningSessionMessageRoleAgent = "agent"
+	PlanningSessionMessageRolePlan  = "plan"
+
+	PlanningWaitIdle     = ""
+	PlanningWaitPending  = "pending"
+	PlanningWaitResolved = "resolved"
+
+	PlanningWaitKindMessage = "message"
+	PlanningWaitKindCreated = "created"
+	PlanningWaitKindSkipped = "skipped"
+	PlanningWaitKindEnded   = "ended"
+
+	PlanningSessionHeartbeatStale = 5 * time.Minute
+
+	maxPlanningSurveyQuestions = 5
+	maxPlanningSurveyOptions   = 6
+)
+
+var (
+	ErrFactoryPlanningSessionInvalid  = errors.New("invalid planning session")
+	ErrFactoryPlanningSessionNotFound = errors.New("planning session not found")
+	ErrFactoryPlanningSessionEnded    = errors.New("planning session has ended")
+	ErrFactoryPlanningSessionNoDraft  = errors.New("planning session has no draft")
+	ErrFactoryPlanningWaitIdle        = errors.New("planning session is not waiting")
+)
+
+type PlanningSessionDraft struct {
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	WorkOrderID string `json:"work_order_id,omitempty"`
+}
+
+type PlanningSessionSurveyQuestion struct {
+	Prompt  string   `json:"prompt"`
+	Options []string `json:"options"`
+}
+
+type PlanningSessionSurvey struct {
+	Questions []PlanningSessionSurveyQuestion `json:"questions,omitempty"`
+}
+
+type PlanningWaitResult struct {
+	Kind         string `json:"kind,omitempty"`
+	Text         string `json:"text,omitempty"`
+	WorkOrderID  string `json:"work_order_id,omitempty"`
+	WorkOrderKey string `json:"work_order_key,omitempty"`
+}
+
+type FactoryPlanningSession struct {
+	ID                 uuid.UUID
+	OrganizationID     uuid.UUID
+	FactoryID          uuid.UUID
+	CreatedByUserID    *uuid.UUID
+	Repository         string
+	Kind               string
+	State              string
+	CanvasID           *uuid.UUID
+	CanvasRunID        *uuid.UUID
+	DraftTitle         string
+	DraftDescription   string
+	DraftWorkOrderID   *uuid.UUID
+	WaitState          string
+	WaitKind           string
+	WaitText           string
+	WaitWorkOrderID    *uuid.UUID
+	WaitWorkOrderKey   string
+	SurveyID           *uuid.UUID
+	Survey             datatypes.JSONType[PlanningSessionSurvey]
+	SelectableModelKey string
+	HeartbeatAt        time.Time
+	EndedAt            *time.Time
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	Messages           []PlanningSessionMessage `gorm:"-"`
+}
+
+func (FactoryPlanningSession) TableName() string {
+	return "factory_planning_sessions"
+}
+
+func (s *FactoryPlanningSession) Draft() PlanningSessionDraft {
+	draft := PlanningSessionDraft{
+		Title:       s.DraftTitle,
+		Description: s.DraftDescription,
+	}
+	if s.DraftWorkOrderID != nil {
+		draft.WorkOrderID = s.DraftWorkOrderID.String()
+	}
+	return draft
+}
+
+func (s *FactoryPlanningSession) Wait() PlanningWaitResult {
+	result := PlanningWaitResult{
+		Kind:         s.WaitKind,
+		Text:         s.WaitText,
+		WorkOrderKey: s.WaitWorkOrderKey,
+	}
+	if s.WaitWorkOrderID != nil {
+		result.WorkOrderID = s.WaitWorkOrderID.String()
+	}
+	return result
+}
+
+func (s *FactoryPlanningSession) CurrentSurvey() PlanningSessionSurvey {
+	if s.SurveyID == nil {
+		return PlanningSessionSurvey{}
+	}
+	return s.Survey.Data()
+}
+
+// ListAnalysisPlanningSessionsForWorkOrders loads the analysis session for
+// each work order. Work orders without a session are absent from the map.
+// Messages and activities stay unloaded.
+func ListAnalysisPlanningSessionsForWorkOrders(tx *gorm.DB, workOrderIDs []uuid.UUID) (map[uuid.UUID]*FactoryPlanningSession, error) {
+	sessionsByOrder := make(map[uuid.UUID]*FactoryPlanningSession)
+	if len(workOrderIDs) == 0 {
+		return sessionsByOrder, nil
+	}
+
+	var sessions []FactoryPlanningSession
+	err := tx.
+		Where("draft_work_order_id IN ?", workOrderIDs).
+		Where("kind = ?", PlanningSessionKindWorkOrderAnalysis).
+		Find(&sessions).Error
+	if err != nil {
+		return nil, err
+	}
+	for i := range sessions {
+		session := &sessions[i]
+		if session.DraftWorkOrderID == nil {
+			continue
+		}
+		sessionsByOrder[*session.DraftWorkOrderID] = session
+	}
+	return sessionsByOrder, nil
+}
+
+func (s *FactoryPlanningSession) AttachAgentRun(tx *gorm.DB, runID uuid.UUID, modelKey string) error {
+	if err := s.guardOpen(); err != nil {
+		return err
+	}
+	s.CanvasRunID = &runID
+	s.SelectableModelKey = strings.TrimSpace(modelKey)
+	s.clearWait()
+	s.clearSurvey()
+	s.UpdatedAt = time.Now()
+	return tx.Model(s).Updates(map[string]any{
+		"canvas_run_id":        s.CanvasRunID,
+		"selectable_model_key": s.SelectableModelKey,
+		"wait_state":           s.WaitState,
+		"wait_kind":            s.WaitKind,
+		"wait_text":            s.WaitText,
+		"wait_work_order_id":   s.WaitWorkOrderID,
+		"wait_work_order_key":  s.WaitWorkOrderKey,
+		"survey_id":            s.SurveyID,
+		"survey":               s.Survey,
+		"updated_at":           s.UpdatedAt,
+	}).Error
+}
+
+func (f *Factory) planningRefineWorkOrder(tx *gorm.DB, workOrderID uuid.UUID) (*FactoryWorkOrder, error) {
+	if workOrderID == uuid.Nil {
+		return nil, nil
+	}
+	order, err := f.FindWorkOrder(tx, workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order.State != FactoryWorkOrderStateDraft {
+		return nil, fmt.Errorf("%w: work order is not a draft", ErrFactoryPlanningSessionInvalid)
+	}
+	return order, nil
+}
+
+func FindPlanningSession(tx *gorm.DB, organizationID, factoryID, id uuid.UUID) (*FactoryPlanningSession, error) {
+	var session FactoryPlanningSession
+	err := tx.Where("organization_id = ? AND factory_id = ? AND id = ?", organizationID, factoryID, id).First(&session).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrFactoryPlanningSessionNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := session.reloadMessages(tx); err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func FindPlanningSessionByRun(tx *gorm.DB, canvasRunID uuid.UUID) (*FactoryPlanningSession, error) {
+	var session FactoryPlanningSession
+	err := tx.Where("canvas_run_id = ?", canvasRunID).First(&session).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrFactoryPlanningSessionNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+// EndPlanningSessionForFinishedRun closes the planning session when the canvas
+// run is finished. Follow-up keeps a healthy session's run in progress. A
+// finished run means the agent process is gone, including a passed greet that
+// never entered wait.
+func EndPlanningSessionForFinishedRun(tx *gorm.DB, canvasRunID uuid.UUID, _ string) error {
+	session, err := FindPlanningSessionByRun(tx, canvasRunID)
+	if errors.Is(err, ErrFactoryPlanningSessionNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return session.End(tx)
+}
+
+func ListStaleOpenPlanningSessions(tx *gorm.DB, now time.Time, limit int) ([]FactoryPlanningSession, error) {
+	if limit < 1 {
+		limit = 50
+	}
+	var sessions []FactoryPlanningSession
+	cutoff := now.Add(-PlanningSessionHeartbeatStale)
+	err := tx.
+		Where("state <> ? AND heartbeat_at < ?", PlanningSessionStateEnded, cutoff).
+		Where("kind = ?", PlanningSessionKindTaskCreation).
+		Order("heartbeat_at ASC").
+		Limit(limit).
+		Find(&sessions).Error
+	return sessions, err
+}
+
+func (s *FactoryPlanningSession) Heartbeat(tx *gorm.DB) error {
+	if s.State == PlanningSessionStateEnded {
+		return ErrFactoryPlanningSessionEnded
+	}
+	now := time.Now()
+	s.HeartbeatAt = now
+	s.UpdatedAt = now
+	return tx.Model(s).Select("HeartbeatAt", "UpdatedAt").Updates(s).Error
+}
+
+func (s *FactoryPlanningSession) End(tx *gorm.DB) error {
+	if s.State == PlanningSessionStateEnded {
+		return nil
+	}
+	now := time.Now()
+	s.State = PlanningSessionStateEnded
+	s.EndedAt = &now
+	s.UpdatedAt = now
+	if s.WaitState == PlanningWaitPending {
+		s.resolveWait(PlanningWaitResult{Kind: PlanningWaitKindEnded})
+	}
+	return s.saveEndedState(tx)
+}
+
+func (s *FactoryPlanningSession) Reopen(tx *gorm.DB) error {
+	if s.State != PlanningSessionStateEnded {
+		return nil
+	}
+	now := time.Now()
+	s.State = PlanningSessionStateRunning
+	s.EndedAt = nil
+	s.HeartbeatAt = now
+	s.UpdatedAt = now
+	s.clearWait()
+	s.clearSurvey()
+	return tx.Model(s).Select(
+		"State",
+		"EndedAt",
+		"HeartbeatAt",
+		"UpdatedAt",
+		"WaitState",
+		"WaitKind",
+		"WaitText",
+		"WaitWorkOrderID",
+		"WaitWorkOrderKey",
+		"SurveyID",
+		"Survey",
+	).Updates(s).Error
+}
+
+func (s *FactoryPlanningSession) IsAnalysisSession() bool {
+	return s.Kind == PlanningSessionKindWorkOrderAnalysis
+}
+
+func (s *FactoryPlanningSession) NeedsAnalysisRestart(tx *gorm.DB) bool {
+	if !s.IsAnalysisSession() {
+		return false
+	}
+	if s.State == PlanningSessionStateEnded {
+		return true
+	}
+	return !s.hasActiveAnalysisRun(tx)
+}
+
+func (s *FactoryPlanningSession) hasActiveAnalysisRun(tx *gorm.DB) bool {
+	if s.CanvasID == nil || s.CanvasRunID == nil {
+		return false
+	}
+	run, err := FindCanvasRunInTransaction(tx, *s.CanvasID, *s.CanvasRunID)
+	if err != nil {
+		return false
+	}
+	return run.State == CanvasRunStatePending || run.State == CanvasRunStateStarted
+}
+
+func (s *FactoryPlanningSession) DetachAgentRun(tx *gorm.DB) error {
+	s.CanvasRunID = nil
+	s.UpdatedAt = time.Now()
+	return tx.Model(s).Updates(map[string]any{
+		"canvas_run_id": nil,
+		"updated_at":    s.UpdatedAt,
+	}).Error
+}
+
+func (s *FactoryPlanningSession) EndIfStale(tx *gorm.DB, now time.Time) (bool, error) {
+	if s.State == PlanningSessionStateEnded {
+		return false, nil
+	}
+	if now.Sub(s.HeartbeatAt) < PlanningSessionHeartbeatStale {
+		return false, nil
+	}
+	return true, s.End(tx)
+}
+
+func (s *FactoryPlanningSession) reload(tx *gorm.DB) error {
+	return tx.Where("id = ?", s.ID).First(s).Error
+}
+
+func (s *FactoryPlanningSession) LockForUpdate(tx *gorm.DB) error {
+	return s.lockAndReload(tx)
+}
+
+func (s *FactoryPlanningSession) lockAndReload(tx *gorm.DB) error {
+	var locked FactoryPlanningSession
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", s.ID).First(&locked).Error
+	if err != nil {
+		return err
+	}
+	*s = locked
+	return s.reloadMessages(tx)
+}
+
+func (s *FactoryPlanningSession) withLockedSession(tx *gorm.DB, run func(*gorm.DB) error) error {
+	return tx.Transaction(func(inner *gorm.DB) error {
+		if err := s.lockAndReload(inner); err != nil {
+			return err
+		}
+		return run(inner)
+	})
+}
+
+func (s *FactoryPlanningSession) guardOpen() error {
+	if s.State == PlanningSessionStateEnded {
+		return ErrFactoryPlanningSessionEnded
+	}
+	return nil
+}
+
+func (s *FactoryPlanningSession) setDraft(draft PlanningSessionDraft) {
+	s.DraftTitle = strings.TrimSpace(draft.Title)
+	s.DraftDescription = strings.TrimSpace(draft.Description)
+	if id, err := uuid.Parse(strings.TrimSpace(draft.WorkOrderID)); err == nil {
+		s.DraftWorkOrderID = &id
+		return
+	}
+	s.DraftWorkOrderID = nil
+}
+
+func (s *FactoryPlanningSession) resolveWait(result PlanningWaitResult) {
+	s.WaitState = PlanningWaitResolved
+	s.WaitKind = result.Kind
+	s.WaitText = result.Text
+	s.WaitWorkOrderKey = result.WorkOrderKey
+	if id, err := uuid.Parse(strings.TrimSpace(result.WorkOrderID)); err == nil {
+		s.WaitWorkOrderID = &id
+		return
+	}
+	s.WaitWorkOrderID = nil
+}
+
+func (s *FactoryPlanningSession) clearWait() {
+	s.WaitState = PlanningWaitIdle
+	s.WaitKind = ""
+	s.WaitText = ""
+	s.WaitWorkOrderKey = ""
+	s.WaitWorkOrderID = nil
+}
+
+func (s *FactoryPlanningSession) clearSurvey() {
+	s.SurveyID = nil
+	s.Survey = datatypes.JSONType[PlanningSessionSurvey]{}
+}
+
+func (s *FactoryPlanningSession) saveEndedState(tx *gorm.DB) error {
+	return tx.Model(s).Updates(map[string]any{
+		"state":               s.State,
+		"ended_at":            s.EndedAt,
+		"updated_at":          s.UpdatedAt,
+		"wait_state":          s.WaitState,
+		"wait_kind":           s.WaitKind,
+		"wait_text":           s.WaitText,
+		"wait_work_order_id":  s.WaitWorkOrderID,
+		"wait_work_order_key": s.WaitWorkOrderKey,
+	}).Error
+}
+
+func (s *FactoryPlanningSession) saveSessionMutation(tx *gorm.DB) error {
+	s.UpdatedAt = time.Now()
+	return tx.Model(s).Updates(map[string]any{
+		"draft_title":         s.DraftTitle,
+		"draft_description":   s.DraftDescription,
+		"draft_work_order_id": s.DraftWorkOrderID,
+		"wait_state":          s.WaitState,
+		"wait_kind":           s.WaitKind,
+		"wait_text":           s.WaitText,
+		"wait_work_order_id":  s.WaitWorkOrderID,
+		"wait_work_order_key": s.WaitWorkOrderKey,
+		"survey_id":           s.SurveyID,
+		"survey":              s.Survey,
+		"updated_at":          s.UpdatedAt,
+	}).Error
+}
+
+func (s *FactoryPlanningSession) saveDraft(tx *gorm.DB) error {
+	s.UpdatedAt = time.Now()
+	return tx.Model(s).Updates(map[string]any{
+		"draft_title":         s.DraftTitle,
+		"draft_description":   s.DraftDescription,
+		"draft_work_order_id": s.DraftWorkOrderID,
+		"updated_at":          s.UpdatedAt,
+	}).Error
+}
+
+func (s *FactoryPlanningSession) saveWait(tx *gorm.DB) error {
+	s.UpdatedAt = time.Now()
+	return tx.Model(s).Updates(map[string]any{
+		"wait_state":          s.WaitState,
+		"wait_kind":           s.WaitKind,
+		"wait_text":           s.WaitText,
+		"wait_work_order_id":  s.WaitWorkOrderID,
+		"wait_work_order_key": s.WaitWorkOrderKey,
+		"updated_at":          s.UpdatedAt,
+	}).Error
+}
+
+func (s *FactoryPlanningSession) saveSurvey(tx *gorm.DB) error {
+	s.UpdatedAt = time.Now()
+	return tx.Model(s).Updates(map[string]any{
+		"survey_id":  s.SurveyID,
+		"survey":     s.Survey,
+		"updated_at": s.UpdatedAt,
+	}).Error
+}

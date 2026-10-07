@@ -20,7 +20,13 @@ func CreateFactory(ctx context.Context, organizationID string, req *pb.CreateFac
 		return nil, factoryErrorToStatus(invalidArgument("name is required"), "failed to create factory")
 	}
 
-	factory, err := models.CreateFactory(database.DB(ctx), orgID, name, req.GetDescription())
+	// An empty key means the caller did not choose one — older clients and
+	// the CLI take this path. CreateFactory then derives a key from the
+	// name and walks to a free variant, which a pre-derived key here would
+	// skip and turn into a spurious key-already-exists error.
+	key := models.NormalizeFactoryKey(req.GetKey())
+
+	factory, err := models.CreateFactory(database.DB(ctx), orgID, name, req.GetDescription(), key)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory")
 	}

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { buildComponentCtx, buildDetailsCtx, buildOutput } from "./common";
 import { createRuleGroupNamespaceMapper } from "./create_rule_group_namespace";

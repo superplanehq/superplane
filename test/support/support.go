@@ -11,8 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/git/inmemory"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
@@ -28,11 +26,14 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/graphql"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
 	_ "github.com/superplanehq/superplane/pkg/components/if"
+	_ "github.com/superplanehq/superplane/pkg/components/loop"
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
 	_ "github.com/superplanehq/superplane/pkg/components/runner"
 	_ "github.com/superplanehq/superplane/pkg/components/runner/claude"
+	_ "github.com/superplanehq/superplane/pkg/components/runner/codex"
+	_ "github.com/superplanehq/superplane/pkg/components/runner/openrouter"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
 	_ "github.com/superplanehq/superplane/pkg/components/upsertmemory"
@@ -54,7 +55,6 @@ type ResourceRegistry struct {
 	Encryptor    crypto.Encryptor
 	AuthService  *authorization.AuthService
 	Registry     *registry.Registry
-	GitProvider  git.Provider
 }
 
 func (r *ResourceRegistry) Close() {}
@@ -75,6 +75,7 @@ func Setup(t require.TestingT) *ResourceRegistry {
 
 func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
+	restoreSeedUsagePriceBooks(t)
 
 	encryptor := crypto.NewNoOpEncryptor()
 	registry, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
@@ -87,7 +88,6 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 		Encryptor:   encryptor,
 		Registry:    registry,
 		AuthService: AuthService(t),
-		GitProvider: inmemory.NewProvider(),
 	}
 
 	//
@@ -129,6 +129,24 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 	}
 
 	err = r.AuthService.SetupOrganization(tx, organization.ID.String(), user.ID.String())
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	err = models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID)
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	err = models.GrantWelcomeCredit(tx, organization.ID, account.ID)
+	if !assert.NoError(t, err) {
+		tx.Rollback()
+		t.FailNow()
+	}
+
+	organization, err = models.FindOrganizationByIDInTransaction(tx, organization.ID.String())
 	if !assert.NoError(t, err) {
 		tx.Rollback()
 		t.FailNow()
@@ -202,6 +220,19 @@ func CreateOrganization(t require.TestingT, r *ResourceRegistry, userID uuid.UUI
 		t.FailNow()
 	}
 
+	if r.Account != nil {
+		err = models.SetOrganizationCreatedByAccount(tx, organization.ID, r.Account.ID)
+		if !assert.NoError(t, err) {
+			tx.Rollback()
+			t.FailNow()
+		}
+		err = models.GrantWelcomeCredit(tx, organization.ID, r.Account.ID)
+		if !assert.NoError(t, err) {
+			tx.Rollback()
+			t.FailNow()
+		}
+	}
+
 	err = tx.Commit().Error
 	if !assert.NoError(t, err) {
 		t.FailNow()
@@ -216,7 +247,7 @@ func CreateUser(t *testing.T, r *ResourceRegistry, organizationID uuid.UUID) *mo
 	require.NoError(t, err)
 	user, err := models.CreateUser(organizationID, account.ID, account.Name, account.Email)
 	require.NoError(t, err)
-	err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgViewer, organizationID.String(), models.DomainTypeOrganization)
+	err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgOperator, organizationID.String(), models.DomainTypeOrganization)
 	require.NoError(t, err)
 	return user
 }
@@ -344,6 +375,161 @@ func CreateNextNodeExecution(
 	return &execution
 }
 
+// CreateFactoryLineDispatch creates a bare FactoryWorkOrderLineDispatch row
+// directly (bypassing FactoryLine.Dispatch/StartStep), for tests that build
+// a raw FactoryWorkOrderExecution and just need a valid parent to satisfy
+// the line_dispatch_id NOT NULL FK.
+func CreateFactoryLineDispatch(
+	t require.TestingT,
+	orgID, factoryID, workOrderID, lineID uuid.UUID,
+	lineName string,
+	steps []models.FactoryLineStep,
+) *models.FactoryWorkOrderLineDispatch {
+	now := time.Now()
+	dispatch := models.FactoryWorkOrderLineDispatch{
+		ID:             uuid.New(),
+		OrganizationID: orgID,
+		FactoryID:      factoryID,
+		WorkOrderID:    workOrderID,
+		LineID:         lineID,
+		LineName:       lineName,
+		Steps:          datatypes.NewJSONSlice(steps),
+		State:          models.FactoryWorkOrderLineDispatchStateActive,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+
+	require.NoError(t, database.Conn().Create(&dispatch).Error)
+	return &dispatch
+}
+
+// CompleteFactoryOnboarding marks a factory as past the setup wizard so
+// workspace pages render instead of redirecting to /setup.
+func CompleteFactoryOnboarding(t require.TestingT, factory *models.Factory) {
+	vcsID := uuid.New().String()
+	agentID := uuid.New().String()
+	appRepository := "acme/app"
+	backlogRepository := "acme/backlog"
+	issuesSource := models.FactoryOnboardingIssuesSourceVCS
+	agentHarness := models.FactoryOnboardingAgentHarnessClaudeCode
+	appID := uuid.New().String()
+	lineID := uuid.New().String()
+	require.NoError(t, factory.CompleteOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+		VCSIntegrationID:   &vcsID,
+		AgentIntegrationID: &agentID,
+		AppRepository:      &appRepository,
+		BacklogRepository:  &backlogRepository,
+		IssuesSource:       &issuesSource,
+		AgentHarness:       &agentHarness,
+		ProvisionedAppID:   &appID,
+		ProvisionedLineID:  &lineID,
+	}))
+}
+
+// CreateFactoryAppWithOnRunTrigger creates a factory-owned canvas with a
+// single onRun-triggered node, ready to be used as a factory line step's
+// entrypoint.
+func CreateFactoryAppWithOnRunTrigger(
+	t require.TestingT,
+	r *ResourceRegistry,
+	factoryID uuid.UUID,
+	name, entrypoint string,
+) (*models.Canvas, string) {
+	now := time.Now()
+	liveVersionID := uuid.New()
+	canvas := &models.Canvas{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		LiveVersionID:  &liveVersionID,
+		FactoryID:      &factoryID,
+		Name:           RandomName(name),
+		CreatedBy:      &r.User,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(canvas).Error; err != nil {
+			return err
+		}
+
+		node := models.CanvasNode{
+			WorkflowID: canvas.ID,
+			NodeID:     entrypoint,
+			Name:       name,
+			Type:       models.NodeTypeTrigger,
+			State:      models.CanvasNodeStateReady,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: "onRun"},
+			}),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+		if err := tx.Create(&node).Error; err != nil {
+			return err
+		}
+
+		version := models.CanvasVersion{
+			ID:         liveVersionID,
+			WorkflowID: canvas.ID,
+			OwnerID:    &r.User,
+			Nodes: datatypes.NewJSONSlice([]models.Node{
+				{
+					ID:   entrypoint,
+					Name: name,
+					Type: models.NodeTypeTrigger,
+					Ref: models.NodeRef{
+						Trigger: &models.TriggerRef{Name: "onRun"},
+					},
+				},
+			}),
+			Edges:     datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+		return tx.Create(&version).Error
+	}))
+
+	return canvas, entrypoint
+}
+
+// CreateFactoryCanvas creates a factory-owned canvas with an empty live
+// version. Use it when a test needs a factory app to point at and does not
+// care about the graph.
+func CreateFactoryCanvas(t require.TestingT, r *ResourceRegistry, factoryID uuid.UUID, name string) *models.Canvas {
+	now := time.Now()
+	liveVersionID := uuid.New()
+	canvas := &models.Canvas{
+		ID:             uuid.New(),
+		OrganizationID: r.Organization.ID,
+		LiveVersionID:  &liveVersionID,
+		FactoryID:      &factoryID,
+		Name:           RandomName(name),
+		CreatedBy:      &r.User,
+		CreatedAt:      &now,
+		UpdatedAt:      &now,
+	}
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(canvas).Error; err != nil {
+			return err
+		}
+
+		version := models.CanvasVersion{
+			ID:         liveVersionID,
+			WorkflowID: canvas.ID,
+			OwnerID:    &r.User,
+			Nodes:      datatypes.NewJSONSlice([]models.Node{}),
+			Edges:      datatypes.NewJSONSlice([]models.Edge{}),
+			CreatedAt:  &now,
+			UpdatedAt:  &now,
+		}
+		return tx.Create(&version).Error
+	}))
+
+	return canvas
+}
+
 func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
 	liveVersionID := uuid.New()
@@ -359,6 +545,7 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			Metadata:      node.Metadata.Data(),
 			Position:      node.Position.Data(),
 			IsCollapsed:   node.IsCollapsed,
+			Concurrency:   node.ConcurrencySpec(),
 		}
 	}
 
@@ -397,6 +584,7 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 				CreatedAt:     &now,
 				UpdatedAt:     &now,
 			}
+			canvasNode.SetConcurrencySpec(node.Concurrency)
 
 			if err := tx.Clauses(clause.Returning{}).Create(&canvasNode).Error; err != nil {
 				return err
@@ -499,39 +687,6 @@ func VerifyNodeRequestCount(t require.TestingT, workflowID uuid.UUID, expected i
 	require.Equal(t, expected, int(actual))
 }
 
-func CreateCanvasWithRepository(t *testing.T, r *ResourceRegistry, status string, register bool) (*models.Canvas, *models.Repository) {
-	t.Helper()
-
-	canvas, _ := CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-	repoID := r.GitProvider.GetRepositoryID(git.RepositoryOptions{
-		OrganizationID: canvas.OrganizationID,
-		CanvasID:       canvas.ID,
-	})
-
-	_, err := canvas.CreatePendingRepository(r.GitProvider.Name(), repoID)
-	require.NoError(t, err)
-
-	if register {
-		_, err := r.GitProvider.CreateRepository(t.Context(), repoID)
-		require.NoError(t, err)
-	}
-
-	repository, err := models.FindRepository(r.Organization.ID, canvas.ID)
-	require.NoError(t, err)
-
-	switch status {
-	case models.RepositoryStatusReady:
-		require.NoError(t, repository.MarkReady(database.Conn()))
-	case models.RepositoryStatusError:
-		require.NoError(t, repository.MarkError(database.Conn()))
-	}
-
-	repository, err = models.FindRepository(r.Organization.ID, canvas.ID)
-	require.NoError(t, err)
-
-	return canvas, repository
-}
-
 func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID string) {
 	var existingNode models.CanvasNode
 	err := database.Conn().
@@ -560,4 +715,14 @@ func ensureCanvasNodeExists(t require.TestingT, workflowID uuid.UUID, nodeID str
 	}
 
 	require.NoError(t, database.Conn().Create(&node).Error)
+}
+
+var seedUsagePriceBookVersions = []string{"2026-09-23.1"}
+
+func restoreSeedUsagePriceBooks(t require.TestingT) {
+	db := database.Conn()
+	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBookRate{}).Error)
+	require.NoError(t, db.Where("version NOT IN ?", seedUsagePriceBookVersions).Delete(&models.UsagePriceBook{}).Error)
+	require.NoError(t, models.ActivateUsagePriceBook(db, "2026-09-23.1"))
+	require.NoError(t, models.LoadCurrentPriceBook(db))
 }

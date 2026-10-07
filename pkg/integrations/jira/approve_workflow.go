@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -313,14 +312,15 @@ func approvalCreatedTime(approval Approval) (time.Time, bool) {
 		if !ok {
 			continue
 		}
-		if t, ok := parseJiraDateTime(raw); ok {
+		if t, ok := ParseJiraDateTime(raw); ok {
 			return t, true
 		}
 	}
 	return time.Time{}, false
 }
 
-func parseJiraDateTime(raw string) (time.Time, bool) {
+// ParseJiraDateTime parses timestamps returned by Jira APIs.
+func ParseJiraDateTime(raw string) (time.Time, bool) {
 	raw = strings.TrimSpace(raw)
 	layouts := []string{
 		time.RFC3339Nano,
@@ -338,10 +338,6 @@ func parseJiraDateTime(raw string) (time.Time, bool) {
 
 func (c *ApproveWorkflow) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *ApproveWorkflow) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *ApproveWorkflow) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

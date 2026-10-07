@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes } from "react-router";
+import { describe, expect, it, vi } from "bun:test";
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import type { CanvasRunsSidebarState } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import type { CanvasVersionsSidebarState } from "@/components/CanvasVersionsSidebar/useCanvasVersionsSidebarState";
@@ -54,8 +54,6 @@ const toolSidebarState = {
   handleToolSidebarToggle: vi.fn(),
   openToolSidebar: vi.fn(),
   closeToolSidebar: vi.fn(),
-  agentMode: "operator" as const,
-  switchAgentMode: vi.fn(),
 } satisfies CanvasToolSidebarState;
 
 const runsSidebarState = {
@@ -125,8 +123,8 @@ describe("Header", () => {
     renderHeader("version-live", { factoryId: "factory-123" });
 
     const link = screen.getByTestId("return-to-factory-link");
-    expect(link).toHaveTextContent("Return to factory");
-    expect(link).toHaveAttribute("href", "/org-1/factories/factory-123");
+    expect(link).toHaveTextContent("Return to workspace");
+    expect(link).toHaveAttribute("href", "/org-1/workspaces/factory-123/overview");
   });
 
   it("hides return to factory link when factoryId is absent", () => {

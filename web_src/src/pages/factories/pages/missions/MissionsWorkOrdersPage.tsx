@@ -1,0 +1,81 @@
+import { usePermissions } from "@/contexts/usePermissions";
+import { useFactoryWorkOrders } from "@/hooks/useFactoryData";
+import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
+import { cn } from "@/lib/utils";
+import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
+import { WorkspacePageHeader } from "../../layout/WorkspacePageHeader";
+import { WorkOrdersErrorState, WorkOrdersLoadingState } from "../../workOrders/WorkOrdersEmptyStates";
+import { WorkOrdersLoadedView } from "../../workOrders/WorkOrdersLoadedView";
+import { factoryContentBodyClassName, factorySectionHeaderClassName } from "../factoryPageLayoutStyles";
+import { useBrokenIntegrationsBanner } from "../../lib/useBrokenIntegrationsBanner";
+import { useHostedCreditChrome } from "../../lib/useHostedCreditEmptyBanner";
+import { pullRequestsFromWorkOrders } from "../../lib/workOrderPullRequest";
+import { useWorkOrderListState } from "../../lib/useWorkOrderListState";
+
+/** Storybook-only Tasks page with a Missions rail. */
+export function MissionsWorkOrdersPage() {
+  const { organizationId, factoryId, routeSegment, factory, openCreateWorkOrder } = useFactoriesLayout();
+  const { canAct, currentUserId, isLoading: permissionsLoading } = usePermissions();
+  const state = useWorkOrderListState(factoryId);
+
+  const {
+    data: workOrders = [],
+    isLoading: workOrdersLoading,
+    isFetching: workOrdersFetching,
+    error: workOrdersError,
+    refetch,
+  } = useFactoryWorkOrders(organizationId, factoryId);
+
+  const cardActions = useWorkOrderCardActions(organizationId, factoryId);
+  const pullRequests = pullRequestsFromWorkOrders(workOrders);
+
+  const canCreate = canAct("work_orders", "create");
+  const canDispatch = canAct("work_orders", "update");
+  const canAssign = canAct("work_orders", "update");
+  const { headerKicker: hostedCreditHeaderKicker } = useHostedCreditChrome(organizationId, routeSegment);
+  const brokenIntegrationsBanner = useBrokenIntegrationsBanner(organizationId, routeSegment);
+  const isOrdersLoading = workOrdersLoading || (workOrdersFetching && workOrders.length === 0);
+
+  if (workOrdersError) {
+    return (
+      <>
+        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Tasks" />
+        <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>
+          <WorkOrdersErrorState onRetry={() => void refetch()} />
+        </div>
+      </>
+    );
+  }
+
+  if (isOrdersLoading || !factory) {
+    return (
+      <>
+        <WorkspacePageHeader className={factorySectionHeaderClassName} title="Tasks" />
+        <div className={cn(factoryContentBodyClassName, "flex flex-col gap-4")}>
+          <WorkOrdersLoadingState />
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <WorkOrdersLoadedView
+      organizationId={organizationId}
+      factoryKey={routeSegment}
+      factory={factory}
+      factoryLines={factory.lines ?? []}
+      workOrders={workOrders}
+      pullRequests={pullRequests}
+      state={state}
+      currentUserId={currentUserId}
+      canCreate={canCreate}
+      onCreateWorkOrder={openCreateWorkOrder}
+      canDispatch={canDispatch}
+      canAssign={canAssign}
+      permissionsLoading={permissionsLoading}
+      hostedCreditHeaderKicker={hostedCreditHeaderKicker}
+      brokenIntegrationsBanner={brokenIntegrationsBanner}
+      {...cardActions}
+    />
+  );
+}

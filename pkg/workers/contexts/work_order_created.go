@@ -1,0 +1,236 @@
+package contexts
+
+import (
+	"context"
+	"strings"
+
+	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/components/factory"
+	"github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
+	"gorm.io/gorm"
+)
+
+// EmitWorkOrderCreated fans a new work order out to every On Work Order
+// trigger in the factory. When Planning is off, the Backlog canvas is
+// skipped so no planning or analysis run starts. Failures are logged:
+// the work order already exists, and a missed score can be retried by
+// creating the item again.
+func EmitWorkOrderCreated(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder) {
+	if factoryModel == nil || order == nil {
+		return
+	}
+
+	if err := emitWorkOrderCreated(tx, factoryModel, order, uuid.Nil, nil); err != nil {
+		log.WithError(err).Warnf("failed to emit onWorkOrder for work order %s", order.ID)
+	}
+}
+
+func EmitWorkOrderCreatedOnCanvas(tx *gorm.DB, factoryModel *models.Factory, order *models.FactoryWorkOrder, canvasID uuid.UUID) error {
+	if factoryModel == nil || order == nil || canvasID == uuid.Nil {
+		return nil
+	}
+	refinementEnabled := true
+	return emitWorkOrderCreated(tx, factoryModel, order, canvasID, &refinementEnabled)
+}
+
+func emitWorkOrderCreated(
+	tx *gorm.DB,
+	factoryModel *models.Factory,
+	order *models.FactoryWorkOrder,
+	onlyCanvas uuid.UUID,
+	refinementEnabledOverride *bool,
+) error {
+	canvases, err := factoryModel.ListCanvases(tx)
+	if err != nil {
+		return err
+	}
+
+	live := make([]models.Canvas, 0, len(canvases))
+	ids := make([]uuid.UUID, 0, len(canvases))
+	for i := range canvases {
+		if canvases[i].LiveVersionID == nil {
+			continue
+		}
+		live = append(live, canvases[i])
+		ids = append(ids, canvases[i].ID)
+	}
+	if len(live) == 0 {
+		return nil
+	}
+
+	specs, err := models.FindLiveCanvasSpecsByCanvasIDs(tx, ids)
+	if err != nil {
+		return err
+	}
+
+	refinementEnabled := refinementEnabledOverride != nil && *refinementEnabledOverride
+	if refinementEnabledOverride == nil {
+		refinementEnabled = workOrderRefinementEnabled(tx, order)
+	}
+	payload := workOrderCreatedPayloadWithRefinement(tx, order, &refinementEnabled)
+	emitted := []models.CanvasEvent{}
+
+	for i := range live {
+		if onlyCanvas != uuid.Nil && live[i].ID != onlyCanvas {
+			continue
+		}
+		spec, ok := specs[live[i].ID]
+		if !ok {
+			continue
+		}
+		if !refinementEnabled && models.IsBacklogFactoryApp(spec.Nodes, spec.Edges) {
+			continue
+		}
+		nodeID := onWorkOrderNodeID(spec)
+		if nodeID == "" {
+			continue
+		}
+
+		node, err := models.FindCanvasNode(tx, live[i].ID, nodeID)
+		if err != nil {
+			return err
+		}
+
+		events := NewEventContext(tx, node, nil, func(created []models.CanvasEvent) {
+			emitted = append(emitted, created...)
+		})
+		if err := events.Emit(factory.OnWorkOrderPayloadType, payload); err != nil {
+			return err
+		}
+	}
+
+	for i := range emitted {
+		if err := messages.PublishCanvasEventCreatedMessage(&emitted[i]); err != nil {
+			log.Warnf("failed to publish onWorkOrder event %s: %v", emitted[i].ID, err)
+		}
+	}
+
+	return nil
+}
+
+func workOrderCreatedPayload(tx *gorm.DB, order *models.FactoryWorkOrder) map[string]any {
+	return workOrderCreatedPayloadWithRefinement(tx, order, nil)
+}
+
+func workOrderCreatedPayloadWithRefinement(
+	tx *gorm.DB,
+	order *models.FactoryWorkOrder,
+	refinementEnabledOverride *bool,
+) map[string]any {
+	description := order.Description
+	filePayloads := []any{}
+	_, files, err := storedfiles.DescriptionForDispatch(
+		context.Background(),
+		tx,
+		blob.Current(),
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		order.Description,
+		blob.DispatchDownloadTTL(0),
+	)
+	if err != nil {
+		log.WithError(err).Warnf("failed to mint file URLs for work order %s", order.ID)
+	} else {
+		// Local runner containers cannot fetch localhost file URLs. A remote
+		// broker skips this rewrite; public hosts stay unchanged.
+		_, files = runner.RewriteLoopbackTaskFileURLs("", files)
+		for _, file := range files {
+			filePayloads = append(filePayloads, file.Map())
+		}
+	}
+
+	workOrder := map[string]any{
+		"id":          order.ID.String(),
+		"title":       order.Title,
+		"description": description,
+		"number":      order.Number,
+		"state":       order.State,
+		"files":       filePayloads,
+	}
+	if repository, repositoryURL, defaultBranch := workOrderCreatedRepository(tx, order); repository != "" {
+		workOrder["repository"] = repository
+		workOrder["repository_url"] = repositoryURL
+		workOrder["default_branch"] = defaultBranch
+	}
+	if order.OriginURL != nil && *order.OriginURL != "" {
+		origin := map[string]any{"url": *order.OriginURL}
+		if order.OriginLabel != nil && *order.OriginLabel != "" {
+			origin["label"] = *order.OriginLabel
+		}
+		workOrder["origin"] = origin
+	}
+
+	refinementEnabled := refinementEnabledOverride != nil && *refinementEnabledOverride
+	if refinementEnabledOverride == nil {
+		refinementEnabled = workOrderRefinementEnabled(tx, order)
+	}
+	return map[string]any{
+		"workOrder": workOrder,
+		models.WorkOrderCreatedRefinementEnabledDataKey: refinementEnabled,
+	}
+}
+
+func workOrderRefinementEnabled(tx *gorm.DB, order *models.FactoryWorkOrder) bool {
+	factoryModel, err := models.FindFactory(tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		log.WithError(err).Warnf("failed to snapshot Planning settings for work order %s", order.ID)
+		return false
+	}
+	return factoryModel.PlanningEnabled
+}
+
+func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (string, string, string) {
+	repository := strings.TrimSpace(stringValue(order.Repository))
+	defaultBranch := strings.TrimSpace(stringValue(order.DefaultBranch))
+	repositoryFromOrder := repository != ""
+	config := models.FactoryOnboardingConfig{}
+	if factoryModel, err := models.FindFactory(tx, order.OrganizationID, order.FactoryID); err == nil {
+		config = factoryModel.OnboardingConfigValue()
+	}
+	if repository == "" {
+		repository = strings.TrimSpace(config.AppRepository)
+	}
+	if defaultBranch == "" {
+		defaultBranch = strings.TrimSpace(config.DefaultBranch)
+	}
+	if repository == "" {
+		return "", "", ""
+	}
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+	provider := config.EffectiveVCSProvider()
+	if repositoryFromOrder {
+		provider = orderRepositoryProvider(order)
+	}
+	return repository, models.VCSRepositoryCloneURL(provider, repository), defaultBranch
+}
+
+// orderRepositoryProvider returns the Git host saved with the work order.
+// A row created before that host was stored stays on GitHub.
+func orderRepositoryProvider(order *models.FactoryWorkOrder) string {
+	if order != nil && order.VCSProvider != nil {
+		if provider := strings.TrimSpace(*order.VCSProvider); provider != "" {
+			return provider
+		}
+	}
+	return models.ProviderGitHub
+}
+
+func onWorkOrderNodeID(spec models.LiveCanvasSpec) string {
+	for i := range spec.Nodes {
+		if spec.Nodes[i].Type != models.NodeTypeTrigger {
+			continue
+		}
+		if spec.Nodes[i].ComponentName() == factory.OnWorkOrderTriggerName {
+			return spec.Nodes[i].ID
+		}
+	}
+	return ""
+}

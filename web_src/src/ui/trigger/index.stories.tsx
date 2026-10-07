@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { Trigger, type TriggerProps } from "./";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";

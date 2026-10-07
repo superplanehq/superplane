@@ -51,6 +51,10 @@ const preambleTemplate = "[SuperPlane session context — refreshed every turn; 
 	"and committing staging. It may also authorize other canvas-scoped write\n" +
 	"routes; use only the agent tools exposed in this session.\n" +
 	"\n" +
+	"The [Canvas Snapshot] is the graph the user is editing now. When\n" +
+	"snapshot_source is staging, those nodes are pending edits, not only the\n" +
+	"published live version.\n" +
+	"\n" +
 	"SuperPlane has no separate `events` permission. The canvases:read\n" +
 	"permission grants every read scoped to this app: describe the app,\n" +
 	"read Console panels and layout, and list app events, event\n" +

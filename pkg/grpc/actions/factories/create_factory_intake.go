@@ -1,0 +1,281 @@
+package factories
+
+import (
+	"context"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"github.com/superplanehq/superplane/pkg/registry"
+	"gorm.io/gorm"
+)
+
+// IntakeDependencies carries what creating an intake canvas needs. An intake
+// owns a canvas, so the intake actions have the same dependencies as the canvas
+// actions they delegate to.
+type IntakeDependencies struct {
+	Registry       *registry.Registry
+	Encryptor      crypto.Encryptor
+	AuthService    authorization.Authorization
+	WebhookBaseURL string
+	NewItemSource  IntakeItemSourceFactory
+}
+
+type IntakeItem struct {
+	ID        string
+	Key       string
+	Title     string
+	Body      string
+	URL       string
+	CreatedAt time.Time
+}
+
+type intakeItemSource interface {
+	Search(ctx context.Context, query string, limit int) ([]IntakeItem, error)
+	Get(ctx context.Context, id string) (*IntakeItem, error)
+}
+
+type IntakeItemSourceFactory func(
+	ctx context.Context,
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+) (intakeItemSource, error)
+
+func (d IntakeDependencies) itemSource(
+	ctx context.Context,
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+) (intakeItemSource, error) {
+	if d.NewItemSource != nil {
+		return d.NewItemSource(ctx, tx, intake)
+	}
+	return newLiveIntakeItemSource(ctx, d, tx, intake)
+}
+
+func CreateFactoryIntake(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID string,
+	req *pb.CreateFactoryIntakeRequest,
+) (*pb.CreateFactoryIntakeResponse, error) {
+	orgID, err := parseOrganizationID(organizationID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	source, err := parseFactoryIntakeSource(req.GetSource())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	db := database.DB(ctx)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+	factoryID := factory.ID
+
+	name := strings.TrimSpace(req.GetName())
+	if name == "" {
+		name = intakeDefaultName(source)
+	}
+	name, err = models.AvailableCanvasName(db, orgID, &factoryID, name)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	// Score new work orders on the Backlog canvas before the intake starts
+	// creating them, so a seeded batch is scored as soon as it lands.
+	if err := ensureBacklogCanvas(ctx, deps, db, factory); err != nil {
+		log.Warnf("factory %s: intake starts without a Backlog scorer: %v", factory.ID, err)
+	}
+
+	settings := defaultIntakeSettings()
+	switch source {
+	case models.FactoryIntakeSourceJiraIssues:
+		settings = defaultJiraIntakeSettings()
+	case models.FactoryIntakeSourceSentryExceptions:
+		settings = defaultSentryIntakeSettings()
+	case models.FactoryIntakeSourceProductiveTasks:
+		settings = defaultProductiveIntakeSettings()
+	case models.FactoryIntakeSourceDependabotAlerts:
+		settings = defaultDependabotIntakeSettings()
+	case models.FactoryIntakeSourceDatadog:
+		settings = defaultDatadogIntakeSettings()
+	case models.FactoryIntakeSourceLinearIssues:
+		settings = defaultLinearIntakeSettings()
+	}
+	settings = parseIntakeSettings(settings, req.GetSettings())
+	if req.GetSettings() != nil && req.GetSettings().GetConfidencePct() == 0 {
+		settings.ConfidencePct = DefaultIntakeConfidencePct
+	}
+	if source == models.FactoryIntakeSourceLinearIssues && len(settings.LinearProjectIDs) == 0 {
+		settings.LinearProjectIDs = linearProjectIDsFromResource(req.GetResourceId())
+	}
+	if source == models.FactoryIntakeSourceSentryExceptions && len(settings.SentryProjectIDs) == 0 {
+		settings.SentryProjectIDs = sentryProjectIDsFromResource(req.GetResourceId())
+	}
+
+	resourceID := req.GetResourceId()
+	if source == models.FactoryIntakeSourceLinearIssues && len(settings.LinearProjectIDs) > 0 {
+		resourceID = strings.Join(settings.LinearProjectIDs, ",")
+	}
+	if source == models.FactoryIntakeSourceSentryExceptions && len(settings.SentryProjectIDs) > 0 {
+		resourceID = strings.Join(settings.SentryProjectIDs, ",")
+	}
+
+	binding, err := resolveIntakeBinding(db, factory, source, req.GetIntegrationId(), resourceID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		binding = withLinearSeedLabels(binding, settings.LinearLabels)
+	}
+
+	canvasID, err := createIntakeCanvas(ctx, deps, intakeCanvasRequest{
+		OrganizationID: orgID,
+		FactoryID:      factoryID,
+		Source:         source,
+		Name:           name,
+		Binding:        binding,
+		Settings:       settings,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	intake, err := factory.CreateIntake(db, canvasID, source)
+	if err != nil {
+		// The canvas is live but nothing claims it as an intake, so it would
+		// linger as an unexplained factory app. Retire it.
+		discardIntakeCanvas(db, orgID, canvasID)
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	// An intake works without a first batch, so a source that cannot be read
+	// now costs the head start and nothing more. Persist the result so clients
+	// can distinguish an empty source from an import that did not run.
+	var seedResult intakeSeedResult
+	var seedErr error
+	if req.GetSkipInitialImport() {
+		seedResult = intakeSeedResult{skipped: true}
+	} else {
+		seedResult, seedErr = seedIntake(ctx, deps, db, canvasID, source, binding)
+	}
+	if err := recordInitialImport(db, intake, seedResult, seedErr); err != nil {
+		// The intake, canvas, and seed events already exist. Returning an error
+		// would invite a retry that creates a duplicate intake and emits the
+		// same events again.
+		log.Errorf("factory %s: intake %s initial import result was not recorded: %v", factory.ID, intake.ID, err)
+	}
+	if seedErr != nil {
+		log.Warnf("factory %s: intake %s starts without a first batch: %v", factory.ID, intake.ID, seedErr)
+	}
+
+	intake, err = factory.FindIntake(db, intake.ID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	spec, err := models.FindLiveCanvasSpecsByCanvasIDs(db, []uuid.UUID{canvasID})
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	states, err := intakeIntegrationStates(db, orgID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	return &pb.CreateFactoryIntakeResponse{
+		Intake: serializeFactoryIntake(db, intake, spec[canvasID], states),
+	}, nil
+}
+
+func recordInitialImport(
+	tx *gorm.DB,
+	intake *models.FactoryIntake,
+	seedResult intakeSeedResult,
+	seedErr error,
+) error {
+	if seedErr != nil {
+		return intake.FailInitialImport(tx)
+	}
+	if seedResult.skipped {
+		return intake.SkipInitialImport(tx)
+	}
+	return intake.CompleteInitialImport(tx, seedResult.itemCount)
+}
+
+// intakeCanvasRequest describes the graph to generate for a new intake.
+type intakeCanvasRequest struct {
+	OrganizationID uuid.UUID
+	FactoryID      uuid.UUID
+	Source         string
+	Name           string
+	Binding        *intakeBinding
+	Settings       intakeSettings
+}
+
+// createIntakeCanvas builds the intake graph and commits it as the canvas's
+// live version in one step. The graph has to be live from the start: a staged
+// graph never receives events.
+func createIntakeCanvas(
+	ctx context.Context,
+	deps IntakeDependencies,
+	request intakeCanvasRequest,
+) (uuid.UUID, error) {
+	orgID := request.OrganizationID
+	canvasDoc, err := buildIntakeCanvas(request)
+	if err != nil {
+		return uuid.Nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	nodes, edges, err := canvasDoc.Parse(deps.Registry, orgID.String())
+	if err != nil {
+		return uuid.Nil, factoryErrorToStatus(err, "failed to build intake automation")
+	}
+
+	response, err := canvases.CreateCanvas(
+		ctx,
+		deps.Registry,
+		deps.Encryptor,
+		deps.AuthService,
+		deps.WebhookBaseURL,
+		orgID,
+		canvasDoc.Metadata.Name,
+		canvasDoc.Metadata.Description,
+		&request.FactoryID,
+		nodes,
+		edges,
+	)
+	if err != nil {
+		return uuid.Nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	canvasID, err := uuid.Parse(response.GetCanvas().GetMetadata().GetId())
+	if err != nil {
+		return uuid.Nil, factoryErrorToStatus(err, "failed to create factory intake")
+	}
+
+	return canvasID, nil
+}
+
+func discardIntakeCanvas(db *gorm.DB, orgID, canvasID uuid.UUID) {
+	canvas, err := models.FindCanvasInTransaction(db, orgID, canvasID)
+	if err != nil {
+		log.Errorf("failed to load intake canvas %s for cleanup: %v", canvasID, err)
+		return
+	}
+
+	if err := canvas.SoftDeleteInTransaction(db); err != nil {
+		log.Errorf("failed to discard intake canvas %s: %v", canvasID, err)
+	}
+}

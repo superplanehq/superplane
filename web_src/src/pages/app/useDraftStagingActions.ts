@@ -7,6 +7,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 
 import { executeCommitStaging } from "./lib/commit-staging-flow";
 import { executeResetStaging } from "./lib/reset-staging-flow";
+import { stagingCommitSuccessToast, stagingResetSuccessToast } from "./lib/staging-action-copy";
 
 type CommitMutation = {
   mutateAsync: (commitMessage: string) => Promise<{ version?: CanvasesCanvasVersion }>;
@@ -47,51 +48,52 @@ type UseDraftStagingActionsOptions = {
   onCanvasDraftRestoredToCommitted?: (version: CanvasesCanvasVersion) => void;
   onCommittedVersionId?: (versionId: string) => void;
   registerIgnoredCanvasUpdatedEcho?: () => () => void;
+  factoryContext?: boolean;
 };
 
-export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
+function useCommitStagingAction(options: UseDraftStagingActionsOptions) {
   const {
     organizationId,
     canvasId,
     activeCanvasVersionId,
-    hasEditableVersion,
     ensureVersionActionDraftReady,
     commitCanvasStagingMutation,
-    discardCanvasStagingMutation,
     draftCanvasSpecsRef,
     setDraftCanvasSpec,
-    setActiveCanvasVersion,
     setStagingResetNonce,
     consoleMutationGenerationRef,
     setIsPreparingVersionAction,
     flushRepositoryFileStaging,
-    cancelPendingCanvasSaves,
-    onCanvasDraftRestoredToCommitted,
     onCommittedVersionId,
     registerIgnoredCanvasUpdatedEcho,
+    factoryContext = false,
   } = options;
   const queryClient = useQueryClient();
   const [commitStagingPending, setCommitStagingPending] = useState(false);
-  const [resetStagingPending, setResetStagingPending] = useState(false);
 
   const handleCommitStaging = useCallback(
-    async (commitMessage: string) => {
-      if (!hasEditableVersion || !activeCanvasVersionId) {
-        return;
+    async (commitMessage: string, options?: { versionId?: string }): Promise<boolean> => {
+      // Prefer explicit versionId (Factory Configure Save) — React state for
+      // activeCanvasVersionId can lag one frame behind the sync ref write.
+      const versionId = options?.versionId || activeCanvasVersionId;
+      if (!versionId) {
+        showErrorToast("Edit session is not ready to commit");
+        return false;
       }
 
       const trimmedMessage = commitMessage.trim();
       if (!trimmedMessage) {
         showErrorToast("Commit message is required");
-        return;
+        return false;
       }
 
       try {
+        let committed = false;
         await runStagingAction(setCommitStagingPending, setIsPreparingVersionAction, async () => {
-          const committed = await executeCommitStaging({
+          committed = await executeCommitStaging({
             organizationId,
             canvasId,
-            activeCanvasVersionId,
+            activeCanvasVersionId: versionId,
             commitMessage: trimmedMessage,
             queryClient,
             commitCanvasStagingMutation,
@@ -105,11 +107,13 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
             onCommittedVersionId,
           });
           if (committed) {
-            showSuccessToast("Changes committed");
+            showSuccessToast(stagingCommitSuccessToast(factoryContext));
           }
         });
+        return committed;
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "Failed to commit changes"));
+        return false;
       }
     },
     [
@@ -120,7 +124,6 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
       draftCanvasSpecsRef,
       ensureVersionActionDraftReady,
       flushRepositoryFileStaging,
-      hasEditableVersion,
       onCommittedVersionId,
       organizationId,
       queryClient,
@@ -128,8 +131,32 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
       setDraftCanvasSpec,
       setIsPreparingVersionAction,
       setStagingResetNonce,
+      factoryContext,
     ],
   );
+
+  return { handleCommitStaging, commitStagingPending };
+}
+
+function useResetStagingAction(options: UseDraftStagingActionsOptions) {
+  const {
+    organizationId,
+    canvasId,
+    activeCanvasVersionId,
+    hasEditableVersion,
+    discardCanvasStagingMutation,
+    draftCanvasSpecsRef,
+    setDraftCanvasSpec,
+    setActiveCanvasVersion,
+    setStagingResetNonce,
+    consoleMutationGenerationRef,
+    setIsPreparingVersionAction,
+    cancelPendingCanvasSaves,
+    onCanvasDraftRestoredToCommitted,
+    factoryContext = false,
+  } = options;
+  const queryClient = useQueryClient();
+  const [resetStagingPending, setResetStagingPending] = useState(false);
 
   const handleResetStaging = useCallback(async () => {
     if (!hasEditableVersion || !activeCanvasVersionId) {
@@ -152,7 +179,7 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
           cancelPendingCanvasSaves,
           onCanvasDraftRestoredToCommitted,
         });
-        showSuccessToast("Reverted to last commit");
+        showSuccessToast(stagingResetSuccessToast(factoryContext));
       });
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to reset staged changes"));
@@ -172,7 +199,14 @@ export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
     setDraftCanvasSpec,
     setIsPreparingVersionAction,
     setStagingResetNonce,
+    factoryContext,
   ]);
 
+  return { handleResetStaging, resetStagingPending };
+}
+
+export function useDraftStagingActions(options: UseDraftStagingActionsOptions) {
+  const { handleCommitStaging, commitStagingPending } = useCommitStagingAction(options);
+  const { handleResetStaging, resetStagingPending } = useResetStagingAction(options);
   return { handleCommitStaging, handleResetStaging, commitStagingPending, resetStagingPending };
 }

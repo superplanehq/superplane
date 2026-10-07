@@ -1,12 +1,12 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
-  "project": [
-    "src/**/*.{ts,tsx}",
-    ".storybook/**/*.{ts,tsx}",
-    "scripts/**/*.mjs"
-  ],
-  "ignoreDependencies": ["@storybook/react", "monaco-editor", "tippy.js"],
-  "ignore": [],
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "project": ["src/**/*.{ts,tsx}", ".storybook/**/*.{ts,tsx}", "scripts/**/*.mjs"],
+  "ignoreDependencies": ["tippy.js", "@happy-dom/global-registrator"],
+  "ignoreBinaries": ["bun"],
+  "ignore": ["src/test/bun-preload.ts", "src/test/bun-test.d.ts", "scripts/serve-monaco-worker-check.mjs"],
+  "paths": {
+    "@factory-templates/*": ["../pkg/grpc/actions/factories/templates/*"]
+  },
   "rules": {
     "nsTypes": "off"
   }

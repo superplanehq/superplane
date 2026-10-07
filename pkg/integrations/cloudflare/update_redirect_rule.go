@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -318,10 +317,6 @@ func (c *UpdateRedirectRule) Execute(ctx core.ExecutionContext) error {
 
 func (c *UpdateRedirectRule) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *UpdateRedirectRule) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *UpdateRedirectRule) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

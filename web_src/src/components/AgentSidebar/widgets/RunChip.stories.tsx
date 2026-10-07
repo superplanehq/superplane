@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import { RichMessage } from "./RichMessage";
 
 const meta: Meta<typeof RichMessage> = {

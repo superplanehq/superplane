@@ -3,8 +3,23 @@ import type { CanvasesCanvasVersion } from "@/api-client";
 import { hasDraftVersusLiveConsoleDiff } from "../draftConsoleDiff";
 import { hasDraftVersusLiveGraphDiff } from "../draftNodeDiff";
 import { consoleSpecFromYaml, fetchRepositorySpecFileContent } from "./repository-spec-files";
-import { dematerializeCanvasSpec } from "./workflow-spec-files";
+import { dematerializeCanvasMetadata, dematerializeCanvasSpec } from "./workflow-spec-files";
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./workflow-spec-paths";
+
+function canvasYamlMetadataMatches(committedYaml: string, nextYaml: string): boolean {
+  const committedMeta = dematerializeCanvasMetadata(committedYaml);
+  const nextMeta = dematerializeCanvasMetadata(nextYaml);
+  if (!committedMeta && !nextMeta) {
+    return true;
+  }
+  if (!committedMeta || !nextMeta) {
+    return false;
+  }
+  return (
+    (committedMeta.name ?? "").trim() === (nextMeta.name ?? "").trim() &&
+    (committedMeta.description ?? "").trim() === (nextMeta.description ?? "").trim()
+  );
+}
 
 export async function matchesCommittedCanvasYaml(
   canvasId: string,
@@ -13,6 +28,10 @@ export async function matchesCommittedCanvasYaml(
 ): Promise<boolean> {
   try {
     const committedYaml = await fetchRepositorySpecFileContent(canvasId, CANVAS_YAML_PATH, versionId, false);
+    if (!canvasYamlMetadataMatches(committedYaml, nextCanvasYaml)) {
+      return false;
+    }
+
     const committedSpec = dematerializeCanvasSpec(committedYaml);
     const nextSpec = dematerializeCanvasSpec(nextCanvasYaml);
     if (!committedSpec || !nextSpec) {

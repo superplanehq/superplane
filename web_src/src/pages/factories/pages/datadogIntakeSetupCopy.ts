@@ -1,0 +1,29 @@
+export const DATADOG_INTAKE_SETUP_COPY = {
+  pageTitle: "How should Datadog errors become tasks?",
+  wizardStepConnect: "Connect Datadog",
+  wizardStepConnectHelper:
+    "Enter the API key and an application key. The API key has no scopes. A restricted application key needs create_webhooks, manage_integrations, error_tracking_read, monitors_read, and monitors_write.",
+  wizardStepConnectExisting: "Choose the Datadog account that SuperPlane will monitor.",
+  wizardStepService: "Which Datadog service should create tasks?",
+  wizardStepServiceHelper:
+    "SuperPlane creates an Error Tracking monitor for this service. The list includes up to 10,000 services from the last 30 days.",
+  importExistingHelper: "SuperPlane adds the 10 newest open errors from this service.",
+  importExistingHelperOff: "SuperPlane does not import existing errors.",
+  wizardConnect: "Connect Datadog",
+  wizardContinue: "Continue",
+  wizardFinish: "Finish",
+  wizardFinishing: "Finishing...",
+  wizardConnectionsLoading: "Loading Datadog connections...",
+  wizardServicesLoading: "Loading Datadog services...",
+  wizardServicesError: "SuperPlane could not load Datadog services.",
+  wizardServicesEmpty: "No recent Error Tracking services. Enter a service name.",
+  serviceListIssueSearchFailed:
+    "The open-issue search failed. Services found only on open issues are missing. Type a name if it is missing.",
+  serviceListIssueSearchFailedNoNameField:
+    "The open-issue search failed. Services found only on open issues are missing. Select a service from the list.",
+  wizardNoMatchingServices: "No matching services.",
+  wizardServiceNameLabel: "Service name",
+  wizardServiceNamePlaceholder: "checkout",
+  wizardRetry: "Try again",
+  wizardCreateError: "SuperPlane could not create the Datadog intake.",
+} as const;

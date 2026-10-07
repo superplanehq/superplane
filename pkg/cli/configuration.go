@@ -21,7 +21,9 @@ type ConfigContext struct {
 	OrganizationID string  `json:"organizationId,omitempty" yaml:"organizationId,omitempty"`
 	APIToken       string  `json:"apiToken" yaml:"apiToken"`
 	App            *string `json:"app,omitempty" yaml:"app,omitempty"`
-	Canvas         *string `json:"canvas,omitempty" yaml:"canvas,omitempty"` // deprecated: use app
+	Canvas         *string `json:"canvas,omitempty" yaml:"canvas,omitempty"`   // deprecated: use app
+	Factory        *string `json:"factory,omitempty" yaml:"factory,omitempty"` // deprecated: use workspace
+	Workspace      *string `json:"workspace,omitempty" yaml:"workspace,omitempty"`
 }
 
 func activeAppID(context ConfigContext) string {
@@ -362,6 +364,29 @@ func (c *CurrentContext) SetActiveApp(appID string) error {
 	appID = strings.TrimSpace(appID)
 	c.context.App = &appID
 	c.context.Canvas = nil
+	_, err := UpsertContext(c.context)
+	return err
+}
+
+func (c *CurrentContext) GetActiveWorkspace() string {
+	if c.context.Workspace != nil {
+		if v := strings.TrimSpace(*c.context.Workspace); v != "" {
+			return v
+		}
+	}
+	if c.context.Factory != nil {
+		return strings.TrimSpace(*c.context.Factory)
+	}
+	return ""
+}
+
+func (c *CurrentContext) SetActiveWorkspace(workspaceID string) error {
+	if c.readOnly {
+		return fmt.Errorf("cannot set active workspace when using %s and %s; pass --workspace instead", EnvURL, EnvToken)
+	}
+
+	workspaceID = strings.TrimSpace(workspaceID)
+	c.context.Workspace = &workspaceID
 	_, err := UpsertContext(c.context)
 	return err
 }

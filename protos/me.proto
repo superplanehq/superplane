@@ -54,6 +54,165 @@ service Me {
       tags: "Me";
     };
   }
+
+  // Self-scoped personal API token management for the calling user.
+  // A user can hold several named tokens; each authenticates as that
+  // user. The plaintext secret is only ever returned once, at creation.
+  rpc ListTokens(ListTokensRequest) returns (ListTokensResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/me/tokens"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List personal API tokens";
+      description: "Returns the calling user's personal API tokens, without their secrets";
+      tags: "Me";
+    };
+  }
+
+  rpc CreateToken(CreateTokenRequest) returns (CreateTokenResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/me/tokens"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a personal API token";
+      description: "Creates a new named personal API token and returns its plaintext secret once";
+      tags: "Me";
+    };
+  }
+
+  rpc RevokeToken(RevokeTokenRequest) returns (RevokeTokenResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/me/tokens/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Revoke a personal API token";
+      description: "Revokes a personal API token without affecting the caller's other tokens";
+      tags: "Me";
+    };
+  }
+
+  // Self-scoped work order notification settings for the calling user.
+  rpc DescribeNotificationSettings(DescribeNotificationSettingsRequest) returns (DescribeNotificationSettingsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/me/notification-settings"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe notification settings";
+      description: "Returns the calling user's work order notification settings";
+      tags: "Me";
+    };
+  }
+
+  rpc UpdateNotificationSettings(UpdateNotificationSettingsRequest) returns (UpdateNotificationSettingsResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/me/notification-settings"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update notification settings";
+      description: "Updates the calling user's work order notification settings";
+      tags: "Me";
+    };
+  }
+
+  // Self-scoped "resume where you left off" location for the calling user.
+  // The UI saves the last meaningful screen it renders (e.g. a pending
+  // approval) so the user can return to it after closing the browser or
+  // opening a new session, even on a different device.
+  rpc DescribeLastLocation(DescribeLastLocationRequest) returns (DescribeLastLocationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/me/last-location"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe last location";
+      description: "Returns the last in-app screen the calling user visited, if any was saved";
+      tags: "Me";
+    };
+  }
+
+  rpc SaveLastLocation(SaveLastLocationRequest) returns (SaveLastLocationResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/me/last-location"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Save last location";
+      description: "Saves the last in-app screen the calling user visited";
+      tags: "Me";
+    };
+  }
+
+  rpc DescribeVCSProviderOnboarding(DescribeVCSProviderOnboardingRequest) returns (DescribeVCSProviderOnboardingResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/me/vcs/{provider}/onboarding"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe VCS provider onboarding";
+      description: "Returns linked identities, the active identity, accessible repositories, and pending installation requests for a VCS provider";
+      tags: "Me";
+    };
+  }
+
+  rpc SelectVCSProviderOnboardingIdentity(SelectVCSProviderOnboardingIdentityRequest) returns (SelectVCSProviderOnboardingIdentityResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/me/vcs/{provider}/identity"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Select a VCS provider identity";
+      description: "Selects the linked identity that supplies repositories during onboarding";
+      tags: "Me";
+    };
+  }
+
+  rpc StartVCSProviderInstallation(StartVCSProviderInstallationRequest) returns (StartVCSProviderInstallationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/me/vcs/{provider}/installations:start"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Start a VCS provider installation";
+      description: "Returns the installation URL for the selected VCS provider";
+      tags: "Me";
+    };
+  }
+
+  rpc ConfigureVCSProviderInstallation(ConfigureVCSProviderInstallationRequest) returns (ConfigureVCSProviderInstallationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/me/vcs/{provider}/installations/{installation_id}:configure"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Configure a VCS provider installation";
+      description: "Returns the settings URL for an existing VCS provider installation";
+      tags: "Me";
+    };
+  }
+
+  rpc RefreshVCSProviderOnboarding(RefreshVCSProviderOnboardingRequest) returns (RefreshVCSProviderOnboardingResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/me/vcs/{provider}/repositories:refresh"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Refresh VCS provider repositories";
+      description: "Queues catalog reconciliation and collaborator synchronization for the selected VCS provider";
+      tags: "Me";
+    };
+  }
+
+  rpc VerifyVCSProviderInstallations(VerifyVCSProviderInstallationsRequest) returns (VerifyVCSProviderInstallationsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/me/vcs/{provider}/installations:verify"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Verify VCS provider installations";
+      description: "Checks with the VCS provider that the installations the user can see still exist, and removes the installations that were uninstalled";
+      tags: "Me";
+    };
+  }
 }
 
 message MeRequest {
@@ -62,6 +221,83 @@ message MeRequest {
 
 message MeResponse {
   User user = 1;
+}
+
+message DescribeVCSProviderOnboardingRequest {
+  string provider = 1;
+}
+
+message VCSProviderIdentity {
+  int64 user_id = 1;
+  string login = 2;
+}
+
+message VCSProviderRepository {
+  int64 repository_id = 1;
+  int64 installation_id = 2;
+  string full_name = 3;
+  bool private = 4;
+  string default_branch = 5;
+  string account_login = 6;
+  string account_type = 7;
+}
+
+message VCSProviderInstallRequest {
+  int64 request_id = 1;
+  string account_login = 2;
+  string account_type = 3;
+  google.protobuf.Timestamp requested_at = 4;
+}
+
+message DescribeVCSProviderOnboardingResponse {
+  bool provider_configured = 1;
+  optional VCSProviderIdentity identity = 2;
+  repeated VCSProviderRepository repositories = 3;
+  repeated VCSProviderInstallRequest pending_requests = 4;
+  bool synchronizing = 5;
+  repeated VCSProviderIdentity identities = 6;
+}
+
+message SelectVCSProviderOnboardingIdentityRequest {
+  string provider = 1;
+  int64 user_id = 2;
+}
+
+message SelectVCSProviderOnboardingIdentityResponse {}
+
+message StartVCSProviderInstallationRequest {
+  string provider = 1;
+}
+
+message StartVCSProviderInstallationResponse {
+  string url = 1;
+}
+
+message ConfigureVCSProviderInstallationRequest {
+  string provider = 1;
+  int64 installation_id = 2;
+}
+
+message ConfigureVCSProviderInstallationResponse {
+  string url = 1;
+}
+
+message RefreshVCSProviderOnboardingRequest {
+  string provider = 1;
+  optional int64 repository_id = 2;
+}
+
+message RefreshVCSProviderOnboardingResponse {}
+
+message VerifyVCSProviderInstallationsRequest {
+  string provider = 1;
+}
+
+message VerifyVCSProviderInstallationsResponse {}
+
+message BrowserNotificationPreferences {
+  bool enabled = 1;
+  bool show_while_viewing = 2;
 }
 
 message User {
@@ -74,8 +310,119 @@ message User {
   repeated Authorization.Permission permissions = 7;
   repeated string roles = 8;
   repeated string groups = 9;
+  bool is_owner = 10;
+  BrowserNotificationPreferences browser_notification_preferences = 11;
 }
 
 message RegenerateTokenResponse {
   string token = 1;
+}
+
+message UserAPIToken {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp last_used_at = 4;
+}
+
+message ListTokensRequest {}
+
+message ListTokensResponse {
+  repeated UserAPIToken tokens = 1;
+}
+
+message CreateTokenRequest {
+  string name = 1;
+}
+
+message CreateTokenResponse {
+  UserAPIToken token = 1;
+  string plaintext = 2;
+}
+
+message RevokeTokenRequest {
+  string id = 1;
+}
+
+message RevokeTokenResponse {}
+
+// NotificationSettings is a user's organization-wide configuration for
+// work order notifications. A missing row defaults to email for all
+// workspace events and keeps the browser channel off.
+message NotificationSettings {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_WORK_ORDER_STATUS_OWNED = 1;
+    TYPE_WORK_ORDER_STATUS_NOTE_OWNED = 2;
+    TYPE_WORK_ORDER_AGENT_QUESTION = 3;
+    TYPE_WORK_ORDER_PLAN_READY = 4;
+  }
+
+  enum WorkspaceScope {
+    WORKSPACE_SCOPE_UNSPECIFIED = 0;
+    WORKSPACE_SCOPE_ALL = 1;
+    WORKSPACE_SCOPE_FILTERED = 2;
+    WORKSPACE_SCOPE_NONE = 3;
+  }
+
+  message WorkspaceFilter {
+    string workspace_id = 1;
+    string workspace_key = 2;
+    repeated Type event_types = 3;
+  }
+
+  message Workspaces {
+    WorkspaceScope scope = 1;
+    repeated WorkspaceFilter filters = 2;
+    // event_types applies when scope is ALL. An empty list means no types.
+    repeated Type event_types = 3;
+  }
+
+  message Browser {
+    WorkspaceScope scope = 1;
+    repeated WorkspaceFilter filters = 2;
+    // event_types applies when scope is ALL. An empty list means no types.
+    repeated Type event_types = 3;
+    bool show_while_viewing = 4;
+  }
+
+  Workspaces workspaces = 1;
+  Browser browser = 2;
+}
+
+message DescribeNotificationSettingsRequest {}
+
+message DescribeNotificationSettingsResponse {
+  NotificationSettings settings = 1;
+}
+
+message UpdateNotificationSettingsRequest {
+  NotificationSettings settings = 1;
+}
+
+message UpdateNotificationSettingsResponse {
+  NotificationSettings settings = 1;
+}
+
+// LastLocation is a saved in-app path (e.g. "/acme/apps/deploy?run=42") that
+// the UI can navigate back to. It is opaque to the backend beyond being a
+// safe, relative, same-origin path.
+message LastLocation {
+  string path = 1;
+  google.protobuf.Timestamp updated_at = 2;
+}
+
+message DescribeLastLocationRequest {}
+
+message DescribeLastLocationResponse {
+  // Unset when the calling user has no saved location yet.
+  LastLocation last_location = 1;
+}
+
+message SaveLastLocationRequest {
+  string path = 1;
+}
+
+message SaveLastLocationResponse {
+  LastLocation last_location = 1;
 }

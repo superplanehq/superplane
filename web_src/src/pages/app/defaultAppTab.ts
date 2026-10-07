@@ -4,25 +4,27 @@ import { type AppTabId, isAppTabId } from "@/lib/lastVisitedAppTab";
 export type UrlViewFlags = {
   isRunInspectionMode: boolean;
   isMemoryMode: boolean;
-  isFilesMode: boolean;
   isConsoleMode: boolean;
 };
 
 /**
  * Query params that pin the URL to a destination. A tab-selecting `view` and
  * `run` select a destination directly; `version` (version preview), `edit`
- * (edit-session entry), `sidebar`/`node` (node selection), and `file` (file
- * selection) deep-link into a specific spot. A default-tab redirect must not
- * pull the user away from any of them.
+ * (edit-session entry), and `sidebar`/`node` (node selection) deep-link into a
+ * specific spot. Leftover `file` pins from the retired Files tab stay pinned
+ * so a default-tab redirect does not move the user. A default-tab redirect
+ * must not pull the user away from any of them.
  */
 const DEEP_LINK_PARAMS = ["version", "edit", "sidebar", "node", "file"] as const;
 
 /**
- * `view` values that actually select a tab (`dashboard` is the legacy alias
- * for Console and is rewritten to it on mount). Legacy values that select no
- * tab (`runs`, `versions`) are deleted on mount by
- * useWorkflowViewSearchParams, so they must not pin navigation: the stored-tab
- * redirect and the Console fallback should still apply for that visit.
+ * `view` values that pin navigation. `dashboard` is the legacy Console alias
+ * and is rewritten to `console` on mount. Legacy `files` pins so the
+ * default-tab gate does not send the user to a stored Console or Memory tab
+ * before useWorkflowViewSearchParams migrates the URL to Canvas. Legacy
+ * values that select no tab (`runs`, `versions`) are deleted on mount, so
+ * they must not pin: the stored-tab redirect and the Console fallback still
+ * apply for that visit.
  */
 const TAB_SELECTING_VIEW_VALUES = ["console", "dashboard", "memory", "files"] as const;
 
@@ -40,7 +42,6 @@ export function urlViewFlagsToTab(flags: UrlViewFlags): AppTabId | null {
   if (flags.isRunInspectionMode) return null;
   if (flags.isConsoleMode) return "console";
   if (flags.isMemoryMode) return "memory";
-  if (flags.isFilesMode) return "files";
   return "canvas";
 }
 

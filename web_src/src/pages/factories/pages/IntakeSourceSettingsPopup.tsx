@@ -1,0 +1,464 @@
+import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
+import { cn } from "@/lib/utils";
+import { Bot, Settings, Workflow } from "lucide-react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+
+import { IntakeSourceSettingsFooter } from "./IntakeSourceSettingsFooter";
+import {
+  INTAKE_SETTINGS_COPY,
+  intakeSettingsTabs,
+  type IntakeSettingsTab,
+  type IntakeSourceSettings,
+} from "./intakeSourceSettingsModel";
+import { DependabotIntakeFilterFields } from "./DependabotIntakeFilterFields";
+import { DatadogIntakeFilterFields } from "./DatadogIntakeFilterFields";
+import { LinearIntakeFilterFields } from "./LinearIntakeFilterFields";
+import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
+import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
+import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
+import { SentryIntakeFilterFields } from "./SentryIntakeFilterFields";
+import { PlanningReviewEditor, type PlanningReviewAgentSlot } from "./PlanningReviewEditor";
+import {
+  SettingsAutomationCanvasEdit,
+  SettingsAutomationHeaderRow,
+  SettingsAutomationWorkspace,
+} from "./SettingsAutomationWorkspace";
+import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
+import { lineIntakeSourceById, type LineIntakeSourceId } from "./lineIntakeModel";
+import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
+
+interface IntakeSourceSettingsPopupProps {
+  settings: IntakeSourceSettings;
+  sourceId?: LineIntakeSourceId;
+  organizationId?: string;
+  integrationId?: string;
+  resourceId?: string;
+  labelOptions?: string[];
+  labelOptionsLoading?: boolean;
+  automationGraph?: IntakeAutomationGraph;
+  automationLoading?: boolean;
+  automationError?: boolean;
+  onRetryAutomation?: () => void;
+  onSave: (next: IntakeSourceSettings) => Promise<void> | void;
+  savePending?: boolean;
+  saveError?: string;
+  deletePending?: boolean;
+  deleteError?: string;
+  onDelete?: () => Promise<void> | void;
+  editAutomationHref?: string;
+  canvasId?: string;
+  runHrefFor?: RunsSidebarHrefForRun;
+  agent?: PlanningReviewAgentSlot;
+  onClose: () => void;
+  fixed?: boolean;
+  initialTab?: IntakeSettingsTab;
+}
+
+export function IntakeSourceSettingsPopup({
+  settings,
+  sourceId = "github-issues",
+  organizationId,
+  integrationId,
+  resourceId,
+  labelOptions,
+  labelOptionsLoading,
+  automationGraph,
+  automationLoading = false,
+  automationError = false,
+  onRetryAutomation,
+  onSave,
+  savePending = false,
+  saveError,
+  deletePending = false,
+  deleteError,
+  onDelete,
+  editAutomationHref,
+  canvasId,
+  runHrefFor,
+  agent,
+  onClose,
+  fixed = true,
+  initialTab = "general",
+}: IntakeSourceSettingsPopupProps) {
+  const tabs = intakeSettingsTabs(Boolean(agent));
+  const hasAgent = Boolean(agent);
+  const [draft, setDraft] = useState(settings);
+  const [tab, setTab] = useState<IntakeSettingsTab>(() => (tabs.includes(initialTab) ? initialTab : "general"));
+
+  useEffect(() => {
+    setDraft(settings);
+  }, [settings]);
+
+  useEffect(() => {
+    const next = intakeSettingsTabs(hasAgent);
+    if (!next.includes(tab)) {
+      setTab("general");
+    }
+  }, [tab, hasAgent]);
+
+  return (
+    <PopupShell testId="intake-source-settings" canvas fixed={fixed} onDismiss={onClose}>
+      <PopupHeader
+        title={`Intake ${settings.name}`}
+        onClose={onClose}
+        leading={<IntakeSourceTitleLogo sourceId={sourceId} />}
+      >
+        <SettingsAutomationHeaderRow
+          tabs={
+            <Tabs value={tab} onValueChange={(value) => setTab(value as IntakeSettingsTab)}>
+              <TabsList aria-label={INTAKE_SETTINGS_COPY.tabsLabel}>
+                <TabsTrigger value="general" data-testid="intake-settings-tab-general">
+                  <Settings />
+                  {INTAKE_SETTINGS_COPY.generalTab}
+                </TabsTrigger>
+                {tabs.includes("agent") ? (
+                  <TabsTrigger value="agent" data-testid="intake-settings-tab-agent">
+                    <Bot />
+                    {INTAKE_SETTINGS_COPY.agentTab}
+                  </TabsTrigger>
+                ) : null}
+                <TabsTrigger value="automation" data-testid="intake-settings-tab-automation">
+                  <Workflow />
+                  {INTAKE_SETTINGS_COPY.automationTab}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          }
+        />
+      </PopupHeader>
+      <IntakeSettingsTabPanel
+        tab={tab}
+        sourceId={sourceId}
+        organizationId={organizationId}
+        integrationId={integrationId}
+        resourceId={resourceId}
+        labelOptions={labelOptions}
+        labelOptionsLoading={labelOptionsLoading}
+        draft={draft}
+        agent={agent}
+        automationGraph={automationGraph}
+        automationLoading={automationLoading}
+        automationError={automationError}
+        onRetryAutomation={onRetryAutomation}
+        canvasId={canvasId}
+        runHrefFor={runHrefFor}
+        editAutomationHref={editAutomationHref}
+        savePending={savePending}
+        saveError={saveError}
+        deletePending={deletePending}
+        deleteError={deleteError}
+        onDelete={onDelete}
+        onDraftChange={setDraft}
+        onSave={onSave}
+        onClose={onClose}
+      />
+    </PopupShell>
+  );
+}
+
+function IntakeSourceTitleLogo({ sourceId }: { sourceId: LineIntakeSourceId }) {
+  const source = lineIntakeSourceById(sourceId);
+  if (!source?.iconSrc) {
+    return null;
+  }
+
+  return (
+    <img
+      src={source.iconSrc}
+      alt=""
+      data-testid="intake-source-settings-title-icon"
+      className={cn(
+        "size-5 shrink-0 object-contain",
+        source.iconAlt === "GitHub" && "dark:brightness-0 dark:invert",
+        logoDarkInvertClass(source.iconSrc),
+      )}
+    />
+  );
+}
+
+function IntakeSettingsTabPanel({
+  tab,
+  sourceId,
+  organizationId,
+  integrationId,
+  resourceId,
+  labelOptions,
+  labelOptionsLoading,
+  draft,
+  agent,
+  automationGraph,
+  automationLoading,
+  automationError,
+  onRetryAutomation,
+  canvasId,
+  runHrefFor,
+  editAutomationHref,
+  savePending,
+  saveError,
+  deletePending,
+  deleteError,
+  onDelete,
+  onDraftChange,
+  onSave,
+  onClose,
+}: {
+  tab: IntakeSettingsTab;
+  sourceId: LineIntakeSourceId;
+  organizationId?: string;
+  integrationId?: string;
+  resourceId?: string;
+  labelOptions?: string[];
+  labelOptionsLoading?: boolean;
+  draft: IntakeSourceSettings;
+  agent?: PlanningReviewAgentSlot;
+  automationGraph?: IntakeAutomationGraph;
+  automationLoading: boolean;
+  automationError: boolean;
+  onRetryAutomation?: () => void;
+  canvasId?: string;
+  runHrefFor?: RunsSidebarHrefForRun;
+  editAutomationHref?: string;
+  savePending?: boolean;
+  saveError?: string;
+  deletePending: boolean;
+  deleteError?: string;
+  onDelete?: () => Promise<void> | void;
+  onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
+  onSave: (next: IntakeSourceSettings) => Promise<void> | void;
+  onClose: () => void;
+}) {
+  if (tab === "automation") {
+    return (
+      <IntakeAutomationTab
+        graph={automationGraph}
+        canvasId={canvasId}
+        runHrefFor={runHrefFor}
+        editHref={editAutomationHref}
+        loading={automationLoading}
+        error={automationError}
+        onRetry={onRetryAutomation}
+      />
+    );
+  }
+  if (tab === "agent" && agent) {
+    return (
+      <PlanningReviewEditor
+        key={agent.draft?.components[0]?.id ?? "agent"}
+        initialDraft={agent.draft}
+        onSave={agent.onSave}
+        organizationId={agent.organizationId}
+        factoryId={agent.factoryId}
+        factoryKey={agent.factoryKey}
+        automationId={agent.automationId}
+        isLoading={agent.isLoading}
+        showAutomationNote={false}
+        showCancel={false}
+      />
+    );
+  }
+  return (
+    <IntakeGeneralTab
+      sourceId={sourceId}
+      organizationId={organizationId}
+      integrationId={integrationId}
+      resourceId={resourceId}
+      labelOptions={labelOptions}
+      labelOptionsLoading={labelOptionsLoading}
+      draft={draft}
+      savePending={savePending}
+      saveError={saveError}
+      deletePending={deletePending}
+      deleteError={deleteError}
+      onDelete={onDelete}
+      onDraftChange={onDraftChange}
+      onSave={onSave}
+      onClose={onClose}
+    />
+  );
+}
+
+function IntakeGeneralTab({
+  sourceId,
+  organizationId,
+  integrationId,
+  resourceId,
+  labelOptions,
+  labelOptionsLoading,
+  draft,
+  savePending,
+  saveError,
+  deletePending,
+  deleteError,
+  onDelete,
+  onDraftChange,
+  onSave,
+  onClose,
+}: {
+  sourceId: LineIntakeSourceId;
+  organizationId?: string;
+  integrationId?: string;
+  resourceId?: string;
+  labelOptions?: string[];
+  labelOptionsLoading?: boolean;
+  draft: IntakeSourceSettings;
+  savePending?: boolean;
+  saveError?: string;
+  deletePending: boolean;
+  deleteError?: string;
+  onDelete?: () => Promise<void> | void;
+  onDraftChange: Dispatch<SetStateAction<IntakeSourceSettings>>;
+  onSave: (next: IntakeSourceSettings) => Promise<void> | void;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+        <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
+          <GitHubIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            labelOptions={labelOptions}
+            labelOptionsLoading={labelOptionsLoading}
+          />
+          <JiraIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
+            projectId={resourceId}
+          />
+          <SentryIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
+          />
+          <DependabotIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
+          <ProductiveIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
+            projectId={resourceId}
+          />
+          <DatadogIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
+            resourceId={resourceId}
+          />
+          <LinearIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
+          />
+        </div>
+      </div>
+      <IntakeSourceSettingsFooter
+        sourceId={sourceId}
+        draft={draft}
+        savePending={savePending}
+        saveError={saveError}
+        deletePending={deletePending}
+        deleteError={deleteError}
+        onDelete={onDelete}
+        onSave={onSave}
+        onClose={onClose}
+      />
+    </>
+  );
+}
+
+function IntakeAutomationTab({
+  graph,
+  canvasId,
+  runHrefFor,
+  editHref,
+  loading,
+  error,
+  onRetry,
+}: {
+  graph?: IntakeAutomationGraph;
+  canvasId?: string;
+  runHrefFor?: RunsSidebarHrefForRun;
+  editHref?: string;
+  loading: boolean;
+  error: boolean;
+  onRetry?: () => void;
+}) {
+  if (!graph || graph.nodes.length === 0) {
+    return (
+      <IntakeAutomationEmpty
+        message={automationEmptyMessage(loading, error)}
+        onRetry={automationRetry(error, onRetry)}
+        editHref={editHref}
+      />
+    );
+  }
+
+  return (
+    <SettingsAutomationWorkspace
+      graph={graph}
+      testId="intake-source-automation"
+      canvasId={canvasId}
+      runHrefFor={runHrefFor}
+      workflowNodes={graph.specNodes}
+      editHref={editHref}
+      editLabel={INTAKE_SETTINGS_COPY.editAutomation}
+    />
+  );
+}
+
+function automationEmptyMessage(loading: boolean, error: boolean): string {
+  if (loading) {
+    return INTAKE_SETTINGS_COPY.automationLoading;
+  }
+  return error ? INTAKE_SETTINGS_COPY.automationError : INTAKE_SETTINGS_COPY.automationEmpty;
+}
+
+function automationRetry(error: boolean, onRetry: (() => void) | undefined): (() => void) | undefined {
+  return error ? onRetry : undefined;
+}
+
+function IntakeAutomationEmpty({
+  message,
+  onRetry,
+  editHref,
+}: {
+  message: string;
+  onRetry?: () => void;
+  editHref?: string;
+}) {
+  return (
+    <section
+      className="relative flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6"
+      aria-label="Automation"
+      data-testid="intake-source-automation"
+    >
+      <p className="workspace-body-text text-muted-foreground">{message}</p>
+      {onRetry ? (
+        <Button type="button" variant="outline" size="sm" onClick={onRetry}>
+          {INTAKE_SETTINGS_COPY.retryAutomation}
+        </Button>
+      ) : null}
+      {editHref ? (
+        <SettingsAutomationCanvasEdit
+          href={editHref}
+          label={INTAKE_SETTINGS_COPY.editAutomation}
+          testId="settings-automation-edit"
+        />
+      ) : null}
+    </section>
+  );
+}

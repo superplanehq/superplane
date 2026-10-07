@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { isRunQueryStillSearching, pickMemoryRows, resolveMemoryVariable } from "./useMarkdownVariables";
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";

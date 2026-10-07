@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import {
   agentsListAgentChatMessages,
   agentsResetCanvasAgentChat,
@@ -45,7 +45,6 @@ describe("useSendAgentChatMessage", () => {
     const sendPromise = result.current.mutateAsync({
       chatId: "chat-1",
       content: "Build this",
-      mode: "builder",
       autoLayoutOnUpdateEnabled: false,
     });
 
@@ -53,6 +52,7 @@ describe("useSendAgentChatMessage", () => {
       expect(agentsSendAgentChatMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           body: expect.objectContaining({
+            mode: "MODE_BUILDER",
             autoLayoutOnUpdateEnabled: false,
           }),
         }),

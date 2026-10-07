@@ -37,21 +37,8 @@ func TestAgentE2E(t *testing.T) {
 		steps.sendMessage("What is on this canvas?")
 		steps.assertUserMessage("What is on this canvas?")
 		steps.assertAssistantMessage("E2E assistant response for: What is on this canvas?")
-		steps.assertLastSendUsedMode("What is on this canvas?", "[Agent Mode: ASK]")
-	})
-
-	t.Run("switches to build mode before sending a message", func(t *testing.T) {
-		steps := newAgentSteps(t)
-		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
-			return agentAssistantTurn("Builder mode acknowledged"), nil
-		})
-
-		steps.start()
-		steps.openAgent()
-		steps.switchToBuildMode()
-		steps.sendMessage("Add a noop node")
-		steps.assertAssistantMessage("Builder mode acknowledged")
-		steps.assertLastSendUsedMode("Add a noop node", "[Agent Mode: BUILD]")
+		// Build is the only supported workflow now, so every send uses it.
+		steps.assertLastSendUsedMode("What is on this canvas?", "[Agent Mode: BUILD]")
 	})
 
 	t.Run("renders tool activity from provider events", func(t *testing.T) {
@@ -157,6 +144,20 @@ func newAgentSteps(t *testing.T) *agentSteps {
 	return &agentSteps{t: t}
 }
 
+const resetCanvasAgentBrowserStorageScript = `(() => {
+	window.localStorage.setItem("canvasAgentMode", "operator");
+	window.localStorage.setItem("canvasAgentSidebarOpen", "false");
+	window.sessionStorage.clear();
+})();`
+
+// Shared Playwright context keeps localStorage across tests. Init scripts
+// only run on the next full navigation, so register them before the canvas
+// visit. Use an IIFE: a bare `() => { ... }` expression never runs.
+func resetCanvasAgentBrowserStorage(t *testing.T, page pw.Page) {
+	t.Helper()
+	require.NoError(t, page.AddInitScript(pw.Script{Content: pw.String(resetCanvasAgentBrowserStorageScript)}))
+}
+
 func (s *agentSteps) withSendMessageHandler(
 	handler func(support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error),
 ) {
@@ -168,13 +169,7 @@ func (s *agentSteps) start() {
 	s.session.Start()
 	s.session.Login()
 	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureClaudeManagedAgents))
-	require.NoError(s.t, s.session.Page().AddInitScript(pw.Script{Content: pw.String(`
-		() => {
-			window.localStorage.setItem("canvasAgentMode", "operator");
-			window.localStorage.setItem("canvasAgentSidebarOpen", "false");
-			window.sessionStorage.clear();
-		}
-	`)}))
+	resetCanvasAgentBrowserStorage(s.t, s.session.Page())
 
 	s.canvas = shared.NewCanvasSteps("E2E Agent "+uuid.NewString(), s.t, s.session)
 	s.canvas.Create()
@@ -238,16 +233,6 @@ func (s *agentSteps) waitForToolSidebarOpen() {
 	}
 
 	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-}
-
-func (s *agentSteps) switchToBuildMode() {
-	s.session.Click(q.TestID("agent-mode-builder"))
-	s.assertEventuallyVisible(q.Locator(`[data-testid="agent-mode-builder"][aria-pressed="true"]`))
-}
-
-func (s *agentSteps) switchToAskMode() {
-	s.session.Click(q.TestID("agent-mode-operator"))
-	s.assertEventuallyVisible(q.Locator(`[data-testid="agent-mode-operator"][aria-pressed="true"]`))
 }
 
 func (s *agentSteps) sendMessage(message string) {

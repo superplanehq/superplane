@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -94,10 +93,6 @@ func decodeGetServiceConfiguration(configuration any) (GetServiceConfiguration, 
 func (c *GetService) Setup(ctx core.SetupContext) error {
 	_, err := decodeGetServiceConfiguration(ctx.Configuration)
 	return err
-}
-
-func (c *GetService) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetService) Execute(ctx core.ExecutionContext) error {

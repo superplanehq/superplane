@@ -1,0 +1,255 @@
+import type { FactoriesWorkOrder } from "@/api-client";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { LoadingButton } from "@/components/ui/loading-button";
+import { useWorkOrderFileUpload } from "@/hooks/useWorkOrderFileUpload";
+import { cn } from "@/lib/utils";
+import { ChevronRight, Factory as FactoryIcon, Maximize2, Minimize2, XIcon } from "lucide-react";
+import { useState, type ReactNode } from "react";
+
+import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
+import { CreateWorkOrderRequestDialog } from "./CreateWorkOrderRequestDialog";
+import { DictateButton } from "./DictateButton";
+import { useFactoriesLayout } from "./layout/factoriesLayoutContext";
+import { WorkOrderDescriptionEditor } from "./WorkOrderDescriptionEditor";
+import { useCreateWorkOrderComposer } from "./useCreateWorkOrderComposer";
+import { useWorkOrderFieldDictation } from "./useWorkOrderFieldDictation";
+import { factoryPlanningEnabled } from "./pages/planningSettingsModel";
+
+interface CreateWorkOrderDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
+}
+
+export function CreateWorkOrderDialog({ open, onClose, onCreated }: CreateWorkOrderDialogProps) {
+  const { factory } = useFactoriesLayout();
+
+  if (!open) {
+    return null;
+  }
+
+  if (factoryPlanningEnabled(factory)) {
+    return <CreateWorkOrderRequestSession onClose={onClose} onCreated={onCreated} />;
+  }
+
+  return <CreateWorkOrderDialogSession onClose={onClose} onCreated={onCreated} />;
+}
+
+function CreateWorkOrderRequestSession({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
+}) {
+  const { organizationId, factoryId } = useFactoriesLayout();
+  const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
+  const fileUpload = useWorkOrderFileUpload({ organizationId, factoryId });
+
+  return (
+    <CreateWorkOrderRequestDialog
+      open
+      description={composer.description}
+      maxLength={composer.maxDescriptionLength}
+      isCreating={composer.isCreating}
+      isUploading={fileUpload.isUploading}
+      organizationId={organizationId}
+      factoryId={factoryId}
+      onClose={() => {
+        if (!composer.isCreating && !fileUpload.isUploading) {
+          onClose();
+        }
+      }}
+      onDescriptionChange={composer.updateDescription}
+      onCreate={(draft) => {
+        void composer.handleCreate(draft);
+      }}
+      onUploadFiles={fileUpload.uploadFiles}
+    />
+  );
+}
+
+function CreateWorkOrderDialogSession({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (orderNumber: string, order?: FactoriesWorkOrder) => void;
+}) {
+  const { organizationId, factoryId, factory } = useFactoriesLayout();
+  const composer = useCreateWorkOrderComposer({ organizationId, factoryId, onClose, onCreated });
+  const fileUpload = useWorkOrderFileUpload({ organizationId, factoryId });
+  const [isExpanded, setIsExpanded] = useState(false);
+  const dictation = useWorkOrderFieldDictation({
+    title: composer.title,
+    description: composer.description,
+    maxTitleLength: composer.maxTitleLength,
+    maxDescriptionLength: composer.maxDescriptionLength,
+    onTitleChange: composer.updateTitle,
+    onDescriptionChange: composer.updateDescription,
+  });
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      handleClose();
+    }
+  };
+
+  const handleClose = () => {
+    dictation.stop();
+    if (composer.isCreating) {
+      return;
+    }
+    onClose();
+  };
+
+  return (
+    <Dialog open onOpenChange={handleOpenChange}>
+      <DialogContent
+        showCloseButton={false}
+        size="large"
+        className={cn(
+          "flex flex-col gap-0 overflow-hidden p-0 sm:rounded-xl",
+          isExpanded ? "h-[90vh] w-[90vw] max-w-none" : "h-[min(72vh,560px)] w-[calc(100%-2rem)] max-w-2xl",
+        )}
+        data-testid="create-work-order-dialog"
+      >
+        <CreateWorkOrderDialogHeader
+          workspaceName={factory?.name ?? "Workspace"}
+          isExpanded={isExpanded}
+          onToggleExpanded={() => setIsExpanded((current) => !current)}
+        >
+          <DialogTitle className="text-[13px] font-medium text-foreground">New task</DialogTitle>
+          <DialogDescription className="sr-only">Create a task for this workspace.</DialogDescription>
+        </CreateWorkOrderDialogHeader>
+
+        <div className="flex min-h-0 flex-1 flex-col px-5 py-4">
+          <Label htmlFor="work-order-title-input" className="sr-only">
+            Title
+          </Label>
+          <Input
+            id="work-order-title-input"
+            data-testid="work-order-title-input"
+            value={composer.title}
+            onChange={(event) => composer.updateTitle(event.target.value)}
+            onFocus={dictation.rememberTitle}
+            placeholder="Task title"
+            maxLength={composer.maxTitleLength}
+            autoFocus
+            className="h-auto border-0 bg-transparent p-0 text-[22px] font-semibold tracking-[-0.02em] shadow-none placeholder:font-semibold placeholder:text-muted-foreground/70 focus-visible:ring-0"
+          />
+          {composer.titleError ? <p className="mt-1 text-[12px] text-destructive">{composer.titleError}</p> : null}
+
+          <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+            <Label htmlFor="work-order-description-input" className="sr-only">
+              Description
+            </Label>
+            <WorkOrderDescriptionEditor
+              value={composer.description}
+              maxLength={composer.maxDescriptionLength}
+              disabled={composer.isCreating || fileUpload.isUploading}
+              organizationId={organizationId}
+              factoryId={factoryId}
+              onChange={composer.updateDescription}
+              onFocus={dictation.rememberDescription}
+              onUploadFiles={fileUpload.uploadFiles}
+              isUploading={fileUpload.isUploading}
+            />
+          </div>
+        </div>
+
+        <CreateWorkOrderDialogFooter
+          canCreate={composer.canCreate}
+          isCreating={composer.isCreating}
+          dictate={
+            <DictateButton dictation={dictation} copy={CREATE_WORK_ORDER_REQUEST_COPY} disabled={composer.isCreating} />
+          }
+          onCreate={() => {
+            dictation.stop();
+            void composer.handleCreate();
+          }}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CreateWorkOrderDialogHeader({
+  workspaceName,
+  isExpanded,
+  onToggleExpanded,
+  children,
+}: {
+  workspaceName: string;
+  isExpanded: boolean;
+  onToggleExpanded: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5"
+      data-testid="work-order-create-header"
+    >
+      <div className="flex min-w-0 items-center gap-2 text-[13px] text-muted-foreground">
+        <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-muted">
+          <FactoryIcon className="size-3" aria-hidden />
+        </span>
+        <span className="truncate text-foreground">{workspaceName}</span>
+        <ChevronRight className="size-3.5 shrink-0" aria-hidden />
+        {children}
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={isExpanded ? "Exit full screen" : "Open full screen"}
+          onClick={onToggleExpanded}
+          className="size-6 text-muted-foreground"
+          data-testid="work-order-create-fullscreen-button"
+        >
+          {isExpanded ? <Minimize2 className="size-3.5" aria-hidden /> : <Maximize2 className="size-3.5" aria-hidden />}
+        </Button>
+        <DialogClose
+          className="flex size-6 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:bg-slate-950/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:hover:bg-white/10"
+          data-testid="work-order-create-close-button"
+        >
+          <XIcon className="size-4" />
+          <span className="sr-only">Close</span>
+        </DialogClose>
+      </div>
+    </div>
+  );
+}
+
+function CreateWorkOrderDialogFooter({
+  canCreate,
+  isCreating,
+  dictate,
+  onCreate,
+}: {
+  canCreate: boolean;
+  isCreating: boolean;
+  dictate: ReactNode;
+  onCreate: () => void;
+}) {
+  return (
+    <div className="relative z-10 flex items-center justify-end gap-3 border-t border-border px-4 py-3">
+      {dictate}
+      <LoadingButton
+        type="button"
+        disabled={!canCreate}
+        loading={isCreating}
+        loadingText="Creating..."
+        onClick={onCreate}
+        className="h-8 rounded-full px-4"
+        data-testid="work-order-create-button"
+      >
+        Create
+      </LoadingButton>
+    </div>
+  );
+}

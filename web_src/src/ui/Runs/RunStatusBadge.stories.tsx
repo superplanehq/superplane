@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { RUN_STATUS_META, type RunStatusKey } from "./runPresentation";
 import { RunStatusBadge } from "./RunStatusBadge";

@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/ui/dialog";
 
 describe("ui dialog accessibility", () => {
@@ -72,5 +72,21 @@ describe("ui dialog accessibility", () => {
     expect(describedBy).toBeTruthy();
     const description = document.getElementById(describedBy ?? "");
     expect(description?.textContent).toBe("Helpful description");
+  });
+
+  it("uses theme surface tokens instead of a hardcoded dark gray fill", () => {
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Title</DialogTitle>
+          <div>Body</div>
+        </DialogContent>
+      </Dialog>,
+    );
+
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.className).toContain("bg-popover");
+    expect(dialog.className).toContain("border-border");
+    expect(dialog.className).not.toContain("dark:bg-gray-900");
   });
 });

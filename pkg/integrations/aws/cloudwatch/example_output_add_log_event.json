@@ -1,0 +1,10 @@
+{
+  "data": {
+    "logGroup": "/aws/lambda/my-function",
+    "logStream": "workflow-run-42",
+    "message": "Deployment approved by felix.gateru@example.com",
+    "timestamp": "2026-05-29T09:00:00Z"
+  },
+  "timestamp": "2026-05-29T09:00:00.657831534Z",
+  "type": "aws.cloudwatch.logEvent"
+}

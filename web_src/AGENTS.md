@@ -2,6 +2,12 @@
 
 This document captures the architecture principles, patterns, and workflow for developing components for SuperPlane.
 
+For user-facing labels, buttons, empty states, errors, confirmations, and other
+product wording, follow [../.agents/skills/ui-copy/SKILL.md](../.agents/skills/ui-copy/SKILL.md)
+and [../.agents/skills/simplified-technical-english/SKILL.md](../.agents/skills/simplified-technical-english/SKILL.md)
+— write real ASD-STE100-style copy as part of the design, not placeholder text
+after layout.
+
 ## Architecture Principles
 
 ### Component Design
@@ -34,7 +40,7 @@ This document captures the architecture principles, patterns, and workflow for d
 ### Setup
 
 1. **Storybook development**: Components are developed and tested in Storybook
-2. **TypeScript checking**: Run `npm run build && npm run test` regularly
+2. **TypeScript checking**: Run `npm run build && npm run test:run` regularly
 3. **Component stories**: Create comprehensive stories showing all component states
 4. **Formatting**: Run `npm run format` before committing file edits to keep Prettier formatting consistent
 
@@ -84,7 +90,7 @@ src/
 Always run before committing:
 
 ```bash
-npm run build && npm run test
+npm run build && npm run test:run
 npm run lint:budget
 ```
 

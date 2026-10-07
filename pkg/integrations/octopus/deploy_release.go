@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -197,10 +196,6 @@ func (c *DeployRelease) Setup(ctx core.SetupContext) error {
 			EventCategoryDeploymentFailed,
 		},
 	})
-}
-
-func (c *DeployRelease) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *DeployRelease) Execute(ctx core.ExecutionContext) error {

@@ -1,7 +1,9 @@
 package contexts
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -13,10 +15,14 @@ import (
 
 	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/blob"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/exprruntime"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/models/factory"
+	"github.com/superplanehq/superplane/pkg/storedfiles"
 	"gorm.io/gorm"
 )
 
@@ -85,16 +91,24 @@ func (b *NodeConfigurationBuilder) WithConfigurationFields(fields []configuratio
 }
 
 func (b *NodeConfigurationBuilder) Build(configuration map[string]any) (map[string]any, error) {
+	var (
+		resolved map[string]any
+		err      error
+	)
 	if len(b.configurationFields) > 0 {
-		return b.resolveWithSchema(configuration, b.configurationFields)
+		resolved, err = b.resolveWithSchema(configuration, b.configurationFields)
+	} else {
+		resolved, err = b.resolve(configuration)
 	}
-
-	resolved, err := b.resolve(configuration)
 	if err != nil {
 		return nil, err
 	}
 
-	return resolved, nil
+	resolved, err = b.applyLineDispatchOverrides(resolved)
+	if err != nil {
+		return nil, err
+	}
+	return b.replaceClaudeModelAlias(resolved)
 }
 
 func WithoutRunTitleConfiguration(configuration map[string]any) map[string]any {
@@ -505,6 +519,19 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expressio
 			}
 
 			return b.resolveAppPayload()
+		}),
+		expr.Function("order", noArgExpressionFunc("order", func() (any, error) {
+			return b.resolveOrderPayload(expression)
+		})),
+		expr.Function("task", noArgExpressionFunc("task", func() (any, error) {
+			return b.resolveOrderPayload(expression)
+		})),
+		expr.Function("workspace", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("workspace() takes no arguments")
+			}
+
+			return b.resolveWorkspacePayload()
 		}),
 	}
 
@@ -972,6 +999,33 @@ func (b *NodeConfigurationBuilder) resolveAppPayload() (any, error) {
 	}, nil
 }
 
+// resolveWorkspacePayload exposes the factory workspace that owns this app.
+// It is intentionally unavailable for organization apps so expressions cannot
+// infer a workspace outside their execution scope.
+func (b *NodeConfigurationBuilder) resolveWorkspacePayload() (any, error) {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return nil, fmt.Errorf("workspace() could not resolve the current app: %w", err)
+	}
+	if canvas.FactoryID == nil {
+		return nil, fmt.Errorf("workspace() is only available in factory apps")
+	}
+
+	factory, err := models.FindFactory(b.tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return nil, fmt.Errorf("workspace() could not resolve the current workspace: %w", err)
+	}
+	config := factory.OnboardingConfigValue()
+	return map[string]any{
+		"id":                 factory.ID.String(),
+		"key":                factory.Key,
+		"name":               factory.Name,
+		"repository":         config.AppRepository,
+		"backlog_repository": config.BacklogRepository,
+		"default_branch":     config.DefaultBranch,
+	}, nil
+}
+
 // resolveRunPayload exposes the current run to expressions via run().
 // It returns id, url, and started_at (a time.Time) for the run that the
 // current node belongs to, resolved from the builder's root event.
@@ -1000,6 +1054,381 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 	payload["url"] = url
 
 	return payload, nil
+}
+
+// resolveOrderPayload exposes the work order driving this run via order()
+// and its task() alias. Returns nil when the run is not attached to a
+// factory work-order execution. The url, key, artifacts, comments,
+// assignees, and spec are loaded only when the expression AST references
+// those fields on order() or task(). Origin is attached whenever the work
+// order has one.
+func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
+	if b.rootEventID == nil {
+		return nil, nil
+	}
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("order() could not resolve the current run: %w", err)
+	}
+
+	execution, err := models.FindWorkOrderExecutionByRunID(b.tx, run.ID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("order() could not resolve the work order execution: %w", err)
+	}
+
+	order, err := models.FindUnscopedWorkOrder(b.tx, execution.WorkOrderID)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
+	}
+	owningFactory, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not resolve the workspace: %w", err)
+	}
+	config := owningFactory.OnboardingConfigValue()
+	repository, defaultBranch, repositoryFromOrder := resolveOrderRepository(order, config)
+	provider := config.EffectiveVCSProvider()
+	if repositoryFromOrder {
+		provider = orderRepositoryProvider(order)
+	}
+	payload := map[string]any{
+		"id":             order.ID.String(),
+		"title":          order.Title,
+		"description":    order.Description,
+		"factory_id":     order.FactoryID.String(),
+		"state":          order.State,
+		"result":         order.Result,
+		"repository":     repository,
+		"repository_url": models.VCSRepositoryCloneURL(provider, repository),
+		"default_branch": defaultBranch,
+		// Keep this compatibility value until stored canvases no longer reference it.
+		"visual_evidence_enabled": false,
+	}
+
+	if err := attachOrderSource(b.tx, order, payload); err != nil {
+		return nil, err
+	}
+	attachOrderOrigin(order, payload)
+	if err := attachOrderFiles(b.tx, order, payload); err != nil {
+		return nil, err
+	}
+
+	usesURL, err := expressionvalidation.ExpressionUsesOrderURL(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	usesKey, err := expressionvalidation.ExpressionUsesOrderKey(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesURL {
+		payload["url"] = uiBaseURL() + order.URLPath(owningFactory.RouteSegment())
+	}
+	if usesKey {
+		payload["key"] = owningFactory.WorkOrderKey(order.Number)
+	}
+
+	usesArtifacts, err := expressionvalidation.ExpressionUsesOrderArtifacts(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesArtifacts {
+		artifacts, err := order.ListArtifacts(b.tx)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load artifacts: %w", err)
+		}
+
+		artifactPayloads := make([]any, 0, len(artifacts))
+		for i := range artifacts {
+			item, err := artifactExpressionPayload(&artifacts[i])
+			if err != nil {
+				return nil, err
+			}
+			artifactPayloads = append(artifactPayloads, item)
+		}
+		payload["artifacts"] = artifactPayloads
+	}
+
+	usesComments, err := expressionvalidation.ExpressionUsesOrderComments(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesComments {
+		comments, err := order.ListComments(b.tx)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load comments: %w", err)
+		}
+
+		commentPayloads := make([]any, 0, len(comments))
+		for i := range comments {
+			item, err := commentExpressionPayload(&comments[i])
+			if err != nil {
+				return nil, err
+			}
+			commentPayloads = append(commentPayloads, item)
+		}
+		payload["comments"] = commentPayloads
+	}
+
+	usesPullRequests, err := expressionvalidation.ExpressionUsesOrderPullRequests(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesPullRequests {
+		pullRequests, err := owningFactory.ListPullRequests(b.tx, models.FactoryPullRequestFilter{WorkOrderID: &order.ID})
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load pull requests: %w", err)
+		}
+
+		payloads := make([]any, 0, len(pullRequests))
+		for i := range pullRequests {
+			payloads = append(payloads, pullRequestExpressionPayload(&pullRequests[i]))
+		}
+		payload["pullRequests"] = payloads
+	}
+
+	usesAssignees, err := expressionvalidation.ExpressionUsesOrderAssignees(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesAssignees {
+		assignees, err := order.ListAssignees(b.tx)
+		if err != nil {
+			return nil, fmt.Errorf("order() could not load assignees: %w", err)
+		}
+
+		assigneePayloads := make([]any, 0, len(assignees))
+		for i := range assignees {
+			assigneePayloads = append(assigneePayloads, assigneeExpressionPayload(&assignees[i]))
+		}
+		payload["assignees"] = assigneePayloads
+	}
+
+	usesSpec, err := expressionvalidation.ExpressionUsesOrderSpec(expression)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not inspect expression: %w", err)
+	}
+	if usesSpec {
+		spec, err := b.resolveOrderSpec(order)
+		if err != nil {
+			return nil, err
+		}
+		payload["spec"] = spec
+	}
+
+	return payload, nil
+}
+
+func (b *NodeConfigurationBuilder) resolveOrderSpec(order *models.FactoryWorkOrder) (string, error) {
+	artifact, err := order.FindArtifactByKey(b.tx, models.PlanningSpecArtifactKey+":"+order.ID.String())
+	if errors.Is(err, models.ErrFactoryWorkOrderArtifactNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("order() could not load the refinement spec: %w", err)
+	}
+	return planningSpecArtifactBody(artifact), nil
+}
+
+func planningSpecArtifactBody(artifact *models.FactoryWorkOrderArtifact) string {
+	if artifact == nil || artifact.Type != models.FactoryWorkOrderArtifactTypeMarkdown {
+		return ""
+	}
+	var data map[string]any
+	if err := json.Unmarshal(artifact.Data, &data); err != nil {
+		return ""
+	}
+	body, _ := data["body"].(string)
+	return strings.TrimSpace(body)
+}
+
+func attachOrderFiles(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
+	_, files, err := storedfiles.DescriptionForDispatch(
+		context.Background(),
+		tx,
+		blob.Current(),
+		order.OrganizationID,
+		order.FactoryID,
+		order.ID,
+		order.Description,
+		blob.DispatchDownloadTTL(0),
+	)
+	if err != nil {
+		return fmt.Errorf("order() could not mint a file URL: %w", err)
+	}
+	// Local runner containers cannot fetch localhost file URLs. A remote
+	// broker skips this rewrite; public hosts stay unchanged.
+	_, files = runner.RewriteLoopbackTaskFileURLs("", files)
+
+	filePayloads := make([]any, 0, len(files))
+	for _, file := range files {
+		filePayloads = append(filePayloads, file.Map())
+	}
+	payload["files"] = filePayloads
+	return nil
+}
+
+// resolveOrderRepository keeps orders created before repository snapshots
+// compatible with workflow templates that use order().repository.
+func resolveOrderRepository(order *models.FactoryWorkOrder, config models.FactoryOnboardingConfig) (string, string, bool) {
+	repository := stringValue(order.Repository)
+	defaultBranch := stringValue(order.DefaultBranch)
+	if repository != "" && defaultBranch != "" {
+		return repository, defaultBranch, true
+	}
+
+	// Repository and branch are one snapshot. Do not combine a saved value
+	// with current workspace settings when a legacy row contains only one.
+	repository = config.AppRepository
+	defaultBranch = config.DefaultBranch
+	if defaultBranch == "" {
+		defaultBranch = "main"
+	}
+
+	return repository, defaultBranch, false
+}
+
+func attachOrderOrigin(order *models.FactoryWorkOrder, payload map[string]any) {
+	origin := order.Origin()
+	if origin == nil {
+		return
+	}
+
+	item := map[string]any{"url": origin.URL}
+	if origin.Label != "" {
+		item["label"] = origin.Label
+	}
+	payload["origin"] = item
+}
+
+func attachOrderSource(tx *gorm.DB, order *models.FactoryWorkOrder, payload map[string]any) error {
+	if order.SourceRunID == nil {
+		return nil
+	}
+
+	rootEvent, err := models.FindRootEventForRun(tx, *order.SourceRunID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return fmt.Errorf("order() could not resolve source: %w", err)
+	}
+	if rootEvent == nil {
+		return nil
+	}
+
+	if source := models.RootEventSourcePayload(rootEvent.Data.Data()); source != nil {
+		payload["source"] = normalizeExpressionValue(source)
+	}
+	return nil
+}
+
+func assigneeExpressionPayload(assignee *models.FactoryWorkOrderAssignee) map[string]any {
+	payload := map[string]any{
+		"id":    assignee.UserID.String(),
+		"name":  "",
+		"email": "",
+	}
+	if assignee.User != nil {
+		payload["name"] = assignee.User.Name
+		payload["email"] = assignee.User.GetEmail()
+	}
+	return payload
+}
+
+func artifactExpressionPayload(artifact *models.FactoryWorkOrderArtifact) (map[string]any, error) {
+	data := map[string]any{}
+	if len(artifact.Data) > 0 {
+		if err := json.Unmarshal(artifact.Data, &data); err != nil {
+			return nil, fmt.Errorf("order() could not decode artifact data: %w", err)
+		}
+	}
+
+	return map[string]any{
+		"id":   artifact.ID.String(),
+		"type": artifact.Type,
+		"data": normalizeExpressionValue(data),
+	}, nil
+}
+
+func pullRequestExpressionPayload(pullRequest *models.FactoryPullRequest) map[string]any {
+	payload := map[string]any{
+		"id":          pullRequest.ID.String(),
+		"workOrderId": pullRequest.WorkOrderID.String(),
+		"provider":    pullRequest.Provider,
+		"repository":  pullRequest.Repository,
+		"number":      pullRequest.Number,
+		"url":         pullRequest.URL,
+		"title":       pullRequest.Title,
+		"state":       pullRequest.State,
+	}
+	if pullRequest.ExternalID != nil {
+		payload["externalId"] = *pullRequest.ExternalID
+	}
+	return payload
+}
+
+func commentExpressionPayload(comment *models.FactoryWorkOrderComment) (map[string]any, error) {
+	author := comment.Author()
+	payload := map[string]any{
+		"id":         comment.ID.String(),
+		"body":       comment.Body,
+		"created_at": comment.CreatedAt,
+		"author":     commentAuthorExpressionPayload(&author),
+	}
+
+	if run := comment.RunRef(); run != nil {
+		payload["run"] = map[string]any{"id": run.ID.String()}
+	}
+
+	return normalizeExpressionValue(payload).(map[string]any), nil
+}
+
+func commentAuthorExpressionPayload(author *factory.WorkOrderCommentAuthor) map[string]any {
+	authorPayload := map[string]any{
+		"kind": author.Kind,
+	}
+
+	if author.UserID != nil {
+		authorPayload["user_id"] = *author.UserID
+	}
+
+	if automation := author.Automation; automation != nil {
+		automationPayload := map[string]any{}
+		if automation.NodeID != "" {
+			automationPayload["node_id"] = automation.NodeID
+		}
+		if automation.NodeName != "" {
+			automationPayload["node_name"] = automation.NodeName
+		}
+		if automation.AppID != uuid.Nil {
+			automationPayload["app_id"] = automation.AppID.String()
+		}
+		if automation.AppName != "" {
+			automationPayload["app_name"] = automation.AppName
+		}
+		if automation.LineID != uuid.Nil {
+			automationPayload["line_id"] = automation.LineID.String()
+		}
+		if automation.LineName != "" {
+			automationPayload["line_name"] = automation.LineName
+		}
+		if automation.StepIndex != nil {
+			automationPayload["step_index"] = *automation.StepIndex
+		}
+		if automation.StepName != "" {
+			automationPayload["step_name"] = automation.StepName
+		}
+		authorPayload["automation"] = automationPayload
+	}
+
+	return authorPayload
 }
 
 func (b *NodeConfigurationBuilder) buildRunURL(run *models.CanvasRun) (string, error) {
@@ -1145,19 +1574,38 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 }
 
 var reservedExpressionIdentifiers = map[string]struct{}{
-	"$":        {},
-	"memory":   {},
-	"config":   {},
-	"root":     {},
-	"previous": {},
-	"run":      {},
-	"app":      {},
-	"ctx":      {},
+	"$":         {},
+	"memory":    {},
+	"config":    {},
+	"root":      {},
+	"previous":  {},
+	"run":       {},
+	"app":       {},
+	"order":     {},
+	"task":      {},
+	"workspace": {},
+	"ctx":       {},
 }
 
 func isReservedExpressionIdentifier(name string) bool {
 	_, ok := reservedExpressionIdentifiers[name]
 	return ok
+}
+
+func noArgExpressionFunc(name string, resolve func() (any, error)) func(params ...any) (any, error) {
+	return func(params ...any) (any, error) {
+		if len(params) != 0 {
+			return nil, fmt.Errorf("%s() takes no arguments", name)
+		}
+		return resolve()
+	}
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func parseDepth(param any) (int, error) {
@@ -1816,4 +2264,242 @@ func (b *NodeConfigurationBuilder) listDirectUpstreamExecutions() ([]models.Canv
 	}
 
 	return executions, nil
+}
+
+func (b *NodeConfigurationBuilder) applyLineDispatchOverrides(resolved map[string]any) (map[string]any, error) {
+	dispatch, err := b.lineDispatch()
+	if err != nil || dispatch == nil {
+		return resolved, err
+	}
+	resolved, err = b.applyLineDispatchModel(resolved, dispatch)
+	if err != nil {
+		return resolved, err
+	}
+	return applyLineDispatchThinking(resolved, dispatch.ThinkingLevel), nil
+}
+
+func (b *NodeConfigurationBuilder) applyLineDispatchModel(
+	resolved map[string]any,
+	dispatch *models.FactoryWorkOrderLineDispatch,
+) (map[string]any, error) {
+	override := strings.TrimSpace(dispatch.Model)
+	if override == "" {
+		return resolved, nil
+	}
+
+	ok, err := b.nodeAcceptsDispatchModel(resolved, override)
+	if err != nil || !ok {
+		return resolved, err
+	}
+
+	resolved["model"] = override
+	return resolved, nil
+}
+
+func (b *NodeConfigurationBuilder) replaceClaudeModelAlias(resolved map[string]any) (map[string]any, error) {
+	model, _ := resolved["model"].(string)
+	if !models.IsClaudeFamilyAlias(model) {
+		return resolved, nil
+	}
+	candidates, err := b.claudeAliasCandidates(resolved)
+	if err != nil {
+		return nil, err
+	}
+	resolved["model"] = models.ConcreteClaudeModelID(model, candidates)
+	return resolved, nil
+}
+
+// claudeAliasCandidates lists models the executing node can run.
+// A Claude alias must not resolve to a model from another provider or funding source.
+func (b *NodeConfigurationBuilder) claudeAliasCandidates(resolved map[string]any) ([]string, error) {
+	if b.tx == nil || b.workflowID == uuid.Nil || b.nodeID == "" {
+		return nil, nil
+	}
+	node, err := models.FindCanvasNode(b.tx, b.workflowID, b.nodeID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	provider, ok := claudeRunnerProvider(node.ComponentName())
+	if !ok {
+		return nil, nil
+	}
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return models.ResolveSelectableLLMModels(
+		b.tx,
+		canvas.OrganizationID,
+		canvas.FactoryID,
+		provider,
+		llmFundingSource(resolved),
+	)
+}
+
+func claudeRunnerProvider(component string) (string, bool) {
+	switch component {
+	case "runnerClaudeCode":
+		return models.UsageProviderAnthropic, true
+	case "runnerOpenRouter":
+		return models.UsageProviderOpenRouter, true
+	default:
+		return "", false
+	}
+}
+
+func llmFundingSource(configuration map[string]any) string {
+	credentials, _ := configuration["credentials"].(map[string]any)
+	source, _ := credentials["source"].(string)
+	switch strings.TrimSpace(source) {
+	case "secret", "integration":
+		return models.UsageFundingSourceBYOK
+	default:
+		return models.UsageFundingSourceHosted
+	}
+}
+
+func applyLineDispatchThinking(resolved map[string]any, dispatchThinking string) map[string]any {
+	agent, _ := resolved["thinkingLevel"].(string)
+	thinking, ok := runner.OverlayThinkingLevel(agent, dispatchThinking)
+	if !ok {
+		return resolved
+	}
+	resolved["thinkingLevel"] = thinking
+	return resolved
+}
+
+func (b *NodeConfigurationBuilder) lineDispatch() (*models.FactoryWorkOrderLineDispatch, error) {
+	if b.rootEventID == nil || b.tx == nil {
+		return nil, nil
+	}
+
+	run, err := models.FindCanvasRunByRootEventInTransaction(b.tx, *b.rootEventID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	execution, err := models.FindWorkOrderExecutionByRunID(b.tx, run.ID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	dispatch, err := models.FindWorkOrderLineDispatch(b.tx, execution.LineDispatchID)
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderLineDispatchNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return dispatch, nil
+}
+
+func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
+	resolved map[string]any,
+	model string,
+) (bool, error) {
+	if b.nodeID == "" {
+		return false, nil
+	}
+
+	node, err := models.FindCanvasNode(b.tx, b.workflowID, b.nodeID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return false, err
+	}
+
+	if node.ComponentName() == models.SuperPlaneRunnerComponent {
+		return superPlaneAcceptsDispatchModel(b.tx, workflow.OrganizationID, workflow.FactoryID, model)
+	}
+
+	provider, ok := runnerProviderForComponent(node.ComponentName())
+	if !ok {
+		return false, nil
+	}
+
+	return models.ModelIsSelectable(
+		b.tx,
+		workflow.OrganizationID,
+		workflow.FactoryID,
+		provider,
+		runnerFundingSourceFromConfig(resolved),
+		model,
+	)
+}
+
+func superPlaneAcceptsDispatchModel(
+	tx *gorm.DB,
+	orgID uuid.UUID,
+	factoryID *uuid.UUID,
+	model string,
+) (bool, error) {
+	if parsed, err := models.ParseSelectableLLMModelKey(model); err == nil {
+		if parsed.Source.ID != models.UsageFundingSourceHosted {
+			return false, nil
+		}
+		return models.ModelIsSelectable(
+			tx,
+			orgID,
+			factoryID,
+			parsed.Provider.ID,
+			models.UsageFundingSourceHosted,
+			parsed.Model.ID,
+		)
+	}
+
+	hosted, err := models.ParseHostedLLMModelKey(model)
+	if err != nil || !hosted.IsSet() {
+		return false, nil
+	}
+	return models.ModelIsSelectable(
+		tx,
+		orgID,
+		factoryID,
+		hosted.Provider,
+		models.UsageFundingSourceHosted,
+		hosted.Model,
+	)
+}
+
+func runnerProviderForComponent(component string) (string, bool) {
+	switch component {
+	case "runnerClaudeCode":
+		return models.UsageProviderAnthropic, true
+	case "runnerCodex":
+		return models.UsageProviderOpenAI, true
+	case "runnerOpenRouter":
+		return models.UsageProviderOpenRouter, true
+	default:
+		return "", false
+	}
+}
+
+func runnerFundingSourceFromConfig(configuration map[string]any) string {
+	credentials, _ := configuration["credentials"].(map[string]any)
+	source, _ := credentials["source"].(string)
+	switch strings.TrimSpace(source) {
+	case "secret", "integration":
+		return models.UsageFundingSourceBYOK
+	default:
+		return models.UsageFundingSourceHosted
+	}
 }

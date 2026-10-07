@@ -1,20 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { buildBuildingBlockCategories } from "./buildingBlocks";
 
 const triggers = [
   { name: "onBroadcast", label: "On Broadcast" },
   { name: "onRun", label: "On Run" },
+  { name: "onWorkOrder", label: "On Task" },
 ];
 
 const components = [
   { name: "deploy", label: "Deploy" },
   { name: "broadcastMessage", label: "Broadcast Message" },
   { name: "runApp", label: "Run App" },
-  { name: "createWorkOrder", label: "Create Work Order" },
+  { name: "addRunError", label: "Add Run Error" },
+  { name: "createWorkOrder", label: "Create Task" },
+  { name: "addPullRequest", label: "Add Pull Request" },
   { name: "runnerJS", label: "Run JavaScript" },
   { name: "runnerBash", label: "Run Bash" },
   { name: "runnerPython", label: "Run Python" },
+  { name: "runnerSuperPlane", label: "Run SuperPlane Agent" },
   { name: "runnerClaudeCode", label: "Run Claude Code" },
+  { name: "runnerCodex", label: "Run Codex" },
+  { name: "runnerOpenRouter", label: "Run OpenRouter Agent" },
   { name: "runner", label: "Run Shell Commands" },
   { name: "display", label: "Display" },
   { name: "addmemory", label: "Add Memory" },
@@ -34,6 +40,7 @@ describe("buildBuildingBlockCategories", () => {
     expect(categories.find((category) => category.name === "SuperPlane")?.blocks.map((block) => block.name)).toEqual([
       "onBroadcast",
       "onRun",
+      "addRunError",
       "broadcastMessage",
       "runApp",
     ]);
@@ -42,7 +49,10 @@ describe("buildBuildingBlockCategories", () => {
       "runnerBash",
       "runnerJS",
       "runnerPython",
+      "runnerSuperPlane",
       "runnerClaudeCode",
+      "runnerCodex",
+      "runnerOpenRouter",
     ]);
     expect(categories.find((category) => category.name === "Core")?.blocks.map((block) => block.name)).toEqual([
       "deploy",
@@ -55,6 +65,9 @@ describe("buildBuildingBlockCategories", () => {
     expect(categories.find((category) => category.name === "SuperPlane")?.blocks.map((block) => block.name)).toEqual([
       "onBroadcast",
       "onRun",
+      "onWorkOrder",
+      "addPullRequest",
+      "addRunError",
       "broadcastMessage",
       "createWorkOrder",
       "runApp",

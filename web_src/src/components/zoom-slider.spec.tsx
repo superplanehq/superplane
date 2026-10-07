@@ -1,7 +1,7 @@
 import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 
 vi.mock("@xyflow/react", () => ({
   Panel: ({ children }: { children?: ReactNode }) => <div>{children}</div>,

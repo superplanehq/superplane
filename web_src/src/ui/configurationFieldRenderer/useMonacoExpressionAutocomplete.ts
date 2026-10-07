@@ -355,12 +355,13 @@ export const useMonacoExpressionAutocomplete = ({
         let shouldTriggerSuggest = false;
         for (const change of event.changes) {
           if (change.text !== "{" || change.rangeLength !== 0 || change.rangeOffset < 1) {
-            if (change.rangeLength === 0 && change.text) {
-              for (const char of change.text) {
-                if (char === "$" || char === "." || char === "[" || char === "'" || char === '"') {
-                  shouldTriggerSuggest = true;
-                  break;
-                }
+            if (change.rangeLength !== 0 || !change.text) {
+              continue;
+            }
+            for (const char of change.text) {
+              if (char === "$" || char === "." || char === "[" || char === "'" || char === '"') {
+                shouldTriggerSuggest = true;
+                break;
               }
             }
             if (shouldTriggerSuggest) {

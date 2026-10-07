@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -103,10 +102,6 @@ func (c *CreateAlert) Setup(ctx core.SetupContext) error {
 	return ctx.Metadata.Set(AlertRuleNodeMetadata{
 		Project: project,
 	})
-}
-
-func (c *CreateAlert) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateAlert) Execute(ctx core.ExecutionContext) error {

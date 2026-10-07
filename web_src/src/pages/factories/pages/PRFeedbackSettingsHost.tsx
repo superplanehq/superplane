@@ -1,0 +1,265 @@
+import { Button } from "@/components/ui/button";
+import {
+  useCreateFactoryPRFeedbackHandler,
+  useDeleteFactoryPRFeedbackHandler,
+  useFactoryPRFeedbackHandlers,
+  useUpdateFactoryPRFeedbackHandler,
+} from "@/hooks/useFactoryPRFeedbackData";
+import { useIntegrationResources } from "@/hooks/useIntegrations";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
+import { useState } from "react";
+import { useNavigate } from "react-router";
+
+import { PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS, supportsPRFeedbackVisualEvidence } from "../lib/columnCanvasAgent";
+import {
+  factoryAppConfigurePath,
+  factoryAppRunPath,
+  factoryPRFeedbackSetupPath,
+  prFeedbackSetupKindFromSourceId,
+} from "../lib/factoryPagePaths";
+import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
+import { PRFeedbackSettingsPopup } from "./PRFeedbackSettingsPopup";
+import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
+import {
+  PR_FEEDBACK_SETTINGS_COPY,
+  isPRFeedbackSetupAvailable,
+  takenPRFeedbackSourceIds,
+  prFeedbackDraftFromHandler,
+  prFeedbackSettingsToApi,
+  type PRFeedbackDraftSettings,
+  type PRFeedbackSettingsTab,
+  type PRFeedbackSource,
+} from "./prFeedbackSettingsModel";
+import { useIntakeAutomationCanvas } from "./useIntakeAutomationCanvas";
+import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
+
+interface PRFeedbackSettingsHostProps {
+  organizationId: string;
+  factoryId: string;
+  factoryKey: string;
+  githubIntegrationId?: string;
+  repository?: string;
+  lineId?: string;
+  canUpdate: boolean;
+  handlerId?: string | null;
+  initialTab?: PRFeedbackSettingsTab;
+  onCreated?: (handlerId: string) => void;
+  onClose: () => void;
+}
+
+export function PRFeedbackSettingsHost({
+  organizationId,
+  factoryId,
+  factoryKey,
+  githubIntegrationId = "",
+  repository = "",
+  lineId,
+  canUpdate,
+  handlerId,
+  initialTab = "general",
+  onClose,
+}: PRFeedbackSettingsHostProps) {
+  const navigate = useNavigate();
+  const handlersQuery = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
+  useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters, {
+    enabled: pickerOpen && Boolean(githubIntegrationId),
+  });
+  useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters, {
+    enabled: pickerOpen && Boolean(githubIntegrationId),
+  });
+  const handlers = handlersQuery.data ?? [];
+  const takenSourceIds = takenPRFeedbackSourceIds(handlers);
+  const handler = handlerId ? handlers.find((item) => item.id === handlerId) : handlers[0];
+
+  const createFromSource = (source: PRFeedbackSource) => {
+    if (!isPRFeedbackSetupAvailable(source.id) || takenSourceIds.includes(source.id) || !lineId) {
+      return;
+    }
+    setPickerOpen(false);
+    onClose();
+    navigate(
+      factoryPRFeedbackSetupPath(organizationId, factoryKey, lineId, prFeedbackSetupKindFromSourceId(source.id)),
+    );
+  };
+
+  if (handlersQuery.isPending) {
+    return (
+      <PopupShell testId="pr-feedback-settings" canvas fixed onDismiss={onClose}>
+        <PopupHeader title="PR feedback" onClose={onClose} />
+        <p className="workspace-body-text px-6 py-6 text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.loading}</p>
+      </PopupShell>
+    );
+  }
+
+  if (handlersQuery.isError) {
+    return (
+      <PopupShell testId="pr-feedback-settings" canvas fixed onDismiss={onClose}>
+        <PopupHeader title="PR feedback" onClose={onClose} />
+        <div className="flex items-center gap-3 px-6 py-6">
+          <p className="workspace-body-text text-destructive">{PR_FEEDBACK_SETTINGS_COPY.loadError}</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void handlersQuery.refetch()}>
+            {PR_FEEDBACK_SETTINGS_COPY.retry}
+          </Button>
+        </div>
+      </PopupShell>
+    );
+  }
+
+  if (!handler?.id) {
+    return (
+      <>
+        <PopupShell testId="pr-feedback-settings" canvas fixed onDismiss={onClose}>
+          <PopupHeader title="PR feedback" onClose={onClose} />
+          <div className="flex min-h-0 flex-1 flex-col items-start gap-3 px-6 py-6">
+            <p className="workspace-body-text text-muted-foreground">{PR_FEEDBACK_SETTINGS_COPY.emptyBody}</p>
+            {canUpdate ? (
+              <Button
+                type="button"
+                disabled={createHandler.isPending}
+                onClick={() => setPickerOpen(true)}
+                data-testid="pr-feedback-create"
+              >
+                {createHandler.isPending ? PR_FEEDBACK_SETTINGS_COPY.creating : PR_FEEDBACK_SETTINGS_COPY.create}
+              </Button>
+            ) : null}
+          </div>
+        </PopupShell>
+        <AddPRFeedbackPicker
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onSelect={createFromSource}
+          takenSourceIds={takenSourceIds}
+        />
+      </>
+    );
+  }
+
+  return (
+    <PRFeedbackSettingsLoaded
+      organizationId={organizationId}
+      factoryId={factoryId}
+      factoryKey={factoryKey}
+      githubIntegrationId={githubIntegrationId}
+      lineId={lineId}
+      canUpdate={canUpdate}
+      initialTab={initialTab}
+      handlerId={handler.id}
+      canvasId={handler.canvasId}
+      settings={prFeedbackDraftFromHandler(handler)}
+      healthy={Boolean(handler.healthy)}
+      onClose={onClose}
+    />
+  );
+}
+
+function PRFeedbackSettingsLoaded({
+  organizationId,
+  factoryId,
+  factoryKey,
+  githubIntegrationId,
+  lineId,
+  canUpdate,
+  initialTab,
+  handlerId,
+  canvasId,
+  settings,
+  healthy,
+  onClose,
+}: {
+  organizationId: string;
+  factoryId: string;
+  factoryKey: string;
+  githubIntegrationId: string;
+  lineId?: string;
+  canUpdate: boolean;
+  initialTab?: PRFeedbackSettingsTab;
+  handlerId: string;
+  canvasId?: string;
+  settings: PRFeedbackDraftSettings;
+  healthy: boolean;
+  onClose: () => void;
+}) {
+  const [saveError, setSaveError] = useState<string | undefined>();
+  const automation = useIntakeAutomationCanvas(organizationId, canvasId);
+  const isDiscussionHandler = settings.source === "discussion";
+  const supportsVisualEvidence =
+    isDiscussionHandler && supportsPRFeedbackVisualEvidence({ nodes: automation.graph.specNodes });
+  const agent = useColumnCanvasAgentEditor(organizationId, canvasId, {
+    showVisualEvidenceSetting: supportsVisualEvidence,
+    synchronizedAgentNodeIds: isDiscussionHandler ? PR_FEEDBACK_DISCUSSION_AGENT_NODE_IDS : undefined,
+  });
+  const updateHandler = useUpdateFactoryPRFeedbackHandler(organizationId, factoryId);
+  const deleteHandler = useDeleteFactoryPRFeedbackHandler(organizationId, factoryId);
+  const editAutomationHref = canvasId
+    ? factoryAppConfigurePath(organizationId, factoryKey, canvasId, { from: "lines", lineId })
+    : undefined;
+
+  return (
+    <PRFeedbackSettingsPopup
+      organizationId={organizationId}
+      githubIntegrationId={githubIntegrationId}
+      settings={settings}
+      healthy={healthy}
+      automationGraph={automation.graph}
+      automationLoading={automation.isLoading}
+      automationError={automation.isError}
+      onRetryAutomation={() => void automation.refetch()}
+      savePending={updateHandler.isPending}
+      deletePending={deleteHandler.isPending}
+      saveError={saveError}
+      onSave={async (next) => {
+        setSaveError(undefined);
+        try {
+          await updateHandler.mutateAsync({
+            handlerId,
+            name: next.name,
+            settings: prFeedbackSettingsToApi(next),
+          });
+        } catch (error) {
+          const message = getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.saveError);
+          setSaveError(message);
+          throw error;
+        }
+      }}
+      onDelete={
+        canUpdate
+          ? async () => {
+              try {
+                await deleteHandler.mutateAsync(handlerId);
+                onClose();
+              } catch (error) {
+                showErrorToast(getApiErrorMessage(error, PR_FEEDBACK_SETTINGS_COPY.saveError));
+              }
+            }
+          : undefined
+      }
+      editAutomationHref={editAutomationHref}
+      canvasId={canvasId}
+      runHrefFor={
+        canvasId
+          ? (runId) => factoryAppRunPath(organizationId, factoryKey, canvasId, runId, { from: "lines", lineId })
+          : undefined
+      }
+      agent={
+        agent.agentNode
+          ? {
+              draft: agent.draft ?? undefined,
+              isLoading: agent.isLoading || !agent.draft,
+              organizationId,
+              factoryId,
+              factoryKey,
+              automationId: canvasId,
+              onSave: agent.save,
+              showVisualEvidenceSetting: agent.showVisualEvidenceSetting,
+            }
+          : undefined
+      }
+      onClose={onClose}
+      initialTab={initialTab}
+    />
+  );
+}

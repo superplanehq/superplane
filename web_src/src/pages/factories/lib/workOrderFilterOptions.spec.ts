@@ -1,0 +1,232 @@
+import { describe, expect, it } from "bun:test";
+
+import type { FactoriesFactory, FactoriesFactoryIntake, FactoriesWorkOrder } from "@/api-client";
+
+import {
+  buildAssigneeFilterOptions,
+  buildLabelFilterOptions,
+  buildLineFilterOptions,
+  buildSourceFilterOptions,
+  buildStatusFilterOptions,
+  buildWorkOrderFilterChips,
+} from "./workOrderFilterOptions";
+import {
+  EMPTY_WORK_ORDER_FILTERS,
+  MANUAL_FILTER_VALUE,
+  UNASSIGNED_FILTER_VALUE,
+  applyWorkOrderFilters,
+  buildWorkOrderListEntries,
+} from "./workOrderListModel";
+
+const factory: FactoriesFactory = { id: "f", name: "Refunds", key: "RF" };
+
+function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder {
+  return {
+    id: "wo-1",
+    title: "Order title",
+    state: "STATE_OPEN",
+    createdAt: "2024-06-01T00:00:00Z",
+    updatedAt: "2024-06-02T00:00:00Z",
+    lineDispatches: [],
+    ...overrides,
+  };
+}
+
+describe("buildStatusFilterOptions", () => {
+  it("lists every display status with its dot class", () => {
+    const options = buildStatusFilterOptions();
+    expect(options.map((option) => option.value)).toEqual([
+      "draft",
+      "running",
+      "waiting",
+      "completed",
+      "failed",
+      "rejected",
+      "cancelled",
+    ]);
+    expect(options.every((option) => Boolean(option.dot))).toBe(true);
+    expect(options.find((option) => option.value === "waiting")?.label).toBe("Waiting");
+  });
+});
+
+describe("buildLabelFilterOptions", () => {
+  it("lists Review only when the merge pill is off", () => {
+    expect(buildLabelFilterOptions()).toEqual([{ value: "review", label: "Review" }]);
+  });
+
+  it("lists Review and Mergeable when the merge pill is on", () => {
+    expect(buildLabelFilterOptions(true)).toEqual([
+      { value: "review", label: "Review" },
+      { value: "mergeable", label: "Mergeable" },
+    ]);
+  });
+});
+
+describe("buildLineFilterOptions", () => {
+  it("skips lines with no id and names untitled lines", () => {
+    const options = buildLineFilterOptions([
+      { id: "line-a", name: "hotfix" },
+      { id: "line-b", name: "   " },
+      { name: "orphan" },
+    ]);
+
+    expect(options).toEqual([
+      { value: "line-a", label: "hotfix" },
+      { value: "line-b", label: "Untitled line" },
+    ]);
+  });
+});
+
+describe("buildSourceFilterOptions", () => {
+  it("lists configured tools once, plus sources on tasks, with Created manually last", () => {
+    const intakes: FactoriesFactoryIntake[] = [
+      { id: "github-1", source: "SOURCE_GITHUB_ISSUES" },
+      { id: "github-2", source: "SOURCE_GITHUB_ISSUES" },
+      { id: "jira-1", source: "SOURCE_JIRA_ISSUES" },
+    ];
+    const entries = buildWorkOrderListEntries(
+      [
+        order({ id: "wo-slack", origin: { url: "https://acme.slack.com/archives/C1/p1" } }),
+        order({ id: "wo-hand" }),
+        order({ id: "wo-mcp", mcpClient: { name: "Cursor" } }),
+      ],
+      factory,
+    );
+
+    expect(buildSourceFilterOptions(intakes, entries)).toEqual([
+      { value: "mcp:Cursor", label: "Cursor" },
+      { value: "github-issues", label: "GitHub issues" },
+      { value: "jira-issues", label: "Jira issues" },
+      { value: "slack", label: "Slack" },
+      { value: MANUAL_FILTER_VALUE, label: "Created manually" },
+    ]);
+  });
+
+  it("keeps a configured source with no tasks, and always includes Created manually", () => {
+    expect(buildSourceFilterOptions([{ id: "sentry-1", source: "SOURCE_SENTRY_EXCEPTIONS" }], [])).toEqual([
+      { value: "sentry-exceptions", label: "Sentry exceptions" },
+      { value: MANUAL_FILTER_VALUE, label: "Created manually" },
+    ]);
+  });
+
+  it("labels Dependabot alerts and matches only that source", () => {
+    const dependabotHref =
+      "https://github.com/acme/payments/security/dependabot?q=is:open+package:vitest+ecosystem:npm";
+    const entries = buildWorkOrderListEntries(
+      [
+        order({
+          id: "wo-dependabot",
+          title: "Fix Dependabot alerts for vitest (npm)",
+          origin: { url: dependabotHref, label: "Dependabot: vitest" },
+        }),
+        order({
+          id: "wo-issue",
+          title: "Fix Dependabot alerts for vitest (npm)",
+          origin: { url: "https://github.com/acme/payments/issues/12", label: "Dependabot: vitest" },
+        }),
+      ],
+      factory,
+    );
+
+    expect(buildSourceFilterOptions([{ id: "dep-1", source: "SOURCE_DEPENDABOT_ALERTS" }], entries)).toEqual([
+      { value: "dependabot-alerts", label: "Dependabot alerts" },
+      { value: "github-issues", label: "GitHub issues" },
+      { value: MANUAL_FILTER_VALUE, label: "Created manually" },
+    ]);
+
+    const chips = buildWorkOrderFilterChips(
+      { ...EMPTY_WORK_ORDER_FILTERS, sourceIds: ["dependabot-alerts"] },
+      { lines: [], sources: [], assignees: [] },
+    );
+    expect(chips.map((chip) => chip.label)).toEqual(["Source is Dependabot alerts"]);
+
+    expect(
+      applyWorkOrderFilters(entries, { ...EMPTY_WORK_ORDER_FILTERS, sourceIds: ["dependabot-alerts"] }).map(
+        (entry) => entry.id,
+      ),
+    ).toEqual(["wo-dependabot"]);
+    expect(
+      applyWorkOrderFilters(entries, { ...EMPTY_WORK_ORDER_FILTERS, sourceIds: ["github-issues"] }).map(
+        (entry) => entry.id,
+      ),
+    ).toEqual(["wo-issue"]);
+  });
+});
+
+describe("buildAssigneeFilterOptions", () => {
+  it("puts No Owner first, then people sorted by name", () => {
+    const entries = buildWorkOrderListEntries(
+      [
+        order({ id: "wo-1", assignees: [{ id: "u2", name: "Zoe" }] }),
+        order({ id: "wo-2", assignees: [{ id: "u1", name: "Alex" }] }),
+        order({ id: "wo-3" }),
+      ],
+      factory,
+    );
+
+    expect(buildAssigneeFilterOptions(entries)).toEqual([
+      { value: UNASSIGNED_FILTER_VALUE, label: "No Owner" },
+      { value: "u1", label: "Alex" },
+      { value: "u2", label: "Zoe" },
+    ]);
+  });
+
+  it("keeps organization members when the loaded page has no owners", () => {
+    expect(buildAssigneeFilterOptions([], [{ id: "u3", name: "Sam" }])).toEqual([
+      { value: UNASSIGNED_FILTER_VALUE, label: "No Owner" },
+      { value: "u3", label: "Sam" },
+    ]);
+  });
+});
+
+describe("buildWorkOrderFilterChips", () => {
+  const options = {
+    lines: [{ value: "line-a", label: "hotfix" }],
+    sources: [
+      { value: "github-issues", label: "GitHub issues" },
+      { value: MANUAL_FILTER_VALUE, label: "Created manually" },
+    ],
+    assignees: [
+      { value: UNASSIGNED_FILTER_VALUE, label: "No Owner" },
+      { value: "u1", label: "Alex" },
+    ],
+  };
+
+  it("labels one chip per applied filter", () => {
+    const chips = buildWorkOrderFilterChips(
+      {
+        statuses: ["running"],
+        labels: ["review", "mergeable"],
+        lineIds: ["line-a"],
+        sourceIds: ["github-issues", MANUAL_FILTER_VALUE],
+        assigneeIds: ["u1", UNASSIGNED_FILTER_VALUE],
+      },
+      { ...options, showPullRequestMerge: true },
+    );
+
+    expect(chips.map((chip) => chip.label)).toEqual([
+      "Status is Running",
+      "Label is Review",
+      "Label is Mergeable",
+      "Line is hotfix",
+      "Source is GitHub issues",
+      "Created manually",
+      "Owner is Alex",
+      "No Owner",
+    ]);
+  });
+
+  it("hides a stored Mergeable chip when the merge pill is off", () => {
+    const chips = buildWorkOrderFilterChips({ ...EMPTY_WORK_ORDER_FILTERS, labels: ["review", "mergeable"] }, options);
+    expect(chips.map((chip) => chip.label)).toEqual(["Label is Review"]);
+  });
+
+  it("returns nothing when no filter is applied", () => {
+    expect(buildWorkOrderFilterChips(EMPTY_WORK_ORDER_FILTERS, options)).toEqual([]);
+  });
+
+  it("falls back to a placeholder when an option disappeared", () => {
+    const chips = buildWorkOrderFilterChips({ ...EMPTY_WORK_ORDER_FILTERS, lineIds: ["deleted-line"] }, options);
+    expect(chips[0].label).toBe("Line is Unknown line");
+  });
+});

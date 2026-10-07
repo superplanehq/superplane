@@ -1,0 +1,236 @@
+package models_test
+
+import (
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/gorm"
+)
+
+func Test__FactoryIntake(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	t.Run("created intake takes its name from the canvas", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "GitHub issues")
+
+		intake, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		assert.Equal(t, canvas.ID, intake.CanvasID)
+		assert.Equal(t, models.FactoryIntakeSourceGitHubIssues, intake.Source)
+		assert.Equal(t, models.FactoryIntakeInitialImportStatusPending, intake.InitialImportStatus)
+		assert.Nil(t, intake.InitialImportItemCount)
+
+		found, err := factory.FindIntake(db, intake.ID)
+		require.NoError(t, err)
+		assert.Equal(t, canvas.Name, found.Name())
+	})
+
+	t.Run("records a completed initial import", func(t *testing.T) {
+		for _, itemCount := range []int{0, 3} {
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, support.RandomName("canvas"))
+			intake, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+			require.NoError(t, err)
+
+			require.NoError(t, intake.CompleteInitialImport(db, itemCount))
+
+			stored, err := factory.FindIntake(db, intake.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.FactoryIntakeInitialImportStatusCompleted, stored.InitialImportStatus)
+			require.NotNil(t, stored.InitialImportItemCount)
+			assert.Equal(t, itemCount, *stored.InitialImportItemCount)
+		}
+	})
+
+	t.Run("records failed and skipped initial imports without a count", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, support.RandomName("canvas"))
+		intake, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+
+		require.NoError(t, intake.FailInitialImport(db))
+		stored, err := factory.FindIntake(db, intake.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryIntakeInitialImportStatusFailed, stored.InitialImportStatus)
+		assert.Nil(t, stored.InitialImportItemCount)
+
+		require.NoError(t, intake.SkipInitialImport(db))
+		stored, err = factory.FindIntake(db, intake.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryIntakeInitialImportStatusSkipped, stored.InitialImportStatus)
+		assert.Nil(t, stored.InitialImportItemCount)
+	})
+
+	t.Run("every known source round-trips through create and find", func(t *testing.T) {
+		for _, source := range []string{
+			models.FactoryIntakeSourceGitHubIssues,
+			models.FactoryIntakeSourceSentryExceptions,
+			models.FactoryIntakeSourcePagerDutyIncidents,
+			models.FactoryIntakeSourceProductiveTasks,
+			models.FactoryIntakeSourceJiraIssues,
+			models.FactoryIntakeSourceDependabotAlerts,
+			models.FactoryIntakeSourceDatadog,
+			models.FactoryIntakeSourceLinearIssues,
+		} {
+			assert.True(t, models.ValidFactoryIntakeSource(source))
+
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, source)
+
+			intake, err := factory.CreateIntake(db, canvas.ID, source)
+			require.NoError(t, err)
+			assert.Equal(t, source, intake.Source)
+
+			found, err := factory.FindIntake(db, intake.ID)
+			require.NoError(t, err)
+			assert.Equal(t, source, found.Source)
+		}
+
+		assert.False(t, models.ValidFactoryIntakeSource("notion"))
+	})
+
+	t.Run("source must be one we know how to run", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Unknown source")
+
+		_, err = factory.CreateIntake(db, canvas.ID, "notion")
+		assert.ErrorIs(t, err, models.ErrFactoryIntakeSourceInvalid)
+	})
+
+	t.Run("a canvas implements at most one intake", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "GitHub issues")
+
+		_, err = factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+
+		_, err = factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceSentryExceptions)
+		assert.ErrorIs(t, err, models.ErrFactoryIntakeCanvasInUse)
+	})
+
+	t.Run("a factory lists several intakes from the same source", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		first := support.CreateFactoryCanvas(t, r, factory.ID, "GitHub issues")
+		second := support.CreateFactoryCanvas(t, r, factory.ID, "GitHub issues (2)")
+
+		_, err = factory.CreateIntake(db, first.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		_, err = factory.CreateIntake(db, second.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+
+		intakes, err := factory.ListIntakes(db)
+		require.NoError(t, err)
+		require.Len(t, intakes, 2)
+		assert.ElementsMatch(t, []string{first.Name, second.Name}, []string{intakes[0].Name(), intakes[1].Name()})
+	})
+
+	t.Run("intakes of other factories stay out of the list", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		other, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		canvas := support.CreateFactoryCanvas(t, r, other.ID, "GitHub issues")
+		_, err = other.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+
+		intakes, err := factory.ListIntakes(db)
+		require.NoError(t, err)
+		assert.Empty(t, intakes)
+	})
+
+	t.Run("a soft-deleted canvas hides its intake", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "GitHub issues")
+
+		intake, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+		require.NoError(t, canvas.SoftDeleteInTransaction(db))
+
+		intakes, err := factory.ListIntakes(db)
+		require.NoError(t, err)
+		assert.Empty(t, intakes)
+
+		_, err = factory.FindIntake(db, intake.ID)
+		assert.ErrorIs(t, err, models.ErrFactoryIntakeNotFound)
+	})
+
+	t.Run("deleting by canvas clears the row so the canvas can go away", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "GitHub issues")
+
+		_, err = factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+
+		require.NoError(t, models.DeleteFactoryIntakesByCanvas(db, canvas.ID))
+
+		var count int64
+		require.NoError(t, db.Model(&models.FactoryIntake{}).Where("canvas_id = ?", canvas.ID).Count(&count).Error)
+		assert.Zero(t, count)
+	})
+
+	t.Run("finds an intake by canvas", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "GitHub issues")
+		created, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceGitHubIssues)
+		require.NoError(t, err)
+
+		found, err := models.FindFactoryIntakeByCanvasID(db, canvas.ID)
+		require.NoError(t, err)
+		assert.Equal(t, created.ID, found.ID)
+		assert.Equal(t, models.FactoryIntakeSourceGitHubIssues, found.Source)
+	})
+
+	t.Run("missing intake reports not found", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+
+		_, err = factory.FindIntake(db, uuid.New())
+		assert.ErrorIs(t, err, models.ErrFactoryIntakeNotFound)
+		assert.NotErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("pause sets and clears paused_at", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Sentry exceptions")
+		intake, err := factory.CreateIntake(db, canvas.ID, models.FactoryIntakeSourceSentryExceptions)
+		require.NoError(t, err)
+		assert.False(t, intake.Paused())
+
+		require.NoError(t, intake.SetPaused(db, true))
+		assert.True(t, intake.Paused())
+		require.NotNil(t, intake.PausedAt)
+
+		stored, err := factory.FindIntake(db, intake.ID)
+		require.NoError(t, err)
+		assert.True(t, stored.Paused())
+		require.NotNil(t, stored.PausedAt)
+
+		require.NoError(t, intake.SetPaused(db, false))
+		assert.False(t, intake.Paused())
+		assert.Nil(t, intake.PausedAt)
+
+		stored, err = factory.FindIntake(db, intake.ID)
+		require.NoError(t, err)
+		assert.False(t, stored.Paused())
+		assert.Nil(t, stored.PausedAt)
+	})
+}

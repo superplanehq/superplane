@@ -3,7 +3,6 @@ package noop
 import (
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -66,10 +65,6 @@ func (c *NoOp) Execute(ctx core.ExecutionContext) error {
 		PayloadType,
 		[]any{map[string]any{}},
 	)
-}
-
-func (c *NoOp) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *NoOp) Setup(ctx core.SetupContext) error {

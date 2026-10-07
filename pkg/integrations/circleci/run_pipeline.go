@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -189,10 +188,6 @@ func (t *RunPipeline) Configuration() []configuration.Field {
 			},
 		},
 	}
-}
-
-func (t *RunPipeline) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (t *RunPipeline) Setup(ctx core.SetupContext) error {

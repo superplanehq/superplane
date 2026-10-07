@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { ComponentDefinition, ExecutionInfo, NodeInfo } from "../types";
 import { createHeartbeatMapper } from "./create_heartbeat";

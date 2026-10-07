@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -244,10 +243,6 @@ func (r *RunWorkflow) Configuration() []configuration.Field {
 			Description: "Send a signed JWT assertion so Semaphore can confirm this run was triggered by SuperPlane",
 		},
 	}
-}
-
-func (r *RunWorkflow) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (r *RunWorkflow) Setup(ctx core.SetupContext) error {

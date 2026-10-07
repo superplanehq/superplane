@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/structuredoutput"
@@ -224,7 +223,7 @@ func (c *CreateBatchMessage) Configuration() []configuration.Field {
 			Label:       "Model",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Default:     "claude-opus-4-6",
+			Default:     "claude-opus-5-5",
 			Placeholder: "Select a Claude model",
 			Description: "Model used for every request in the batch.",
 			TypeOptions: &configuration.TypeOptions{
@@ -330,10 +329,6 @@ func (c *CreateBatchMessage) Setup(ctx core.SetupContext) error {
 	}
 
 	return nil
-}
-
-func (c *CreateBatchMessage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateBatchMessage) Execute(ctx core.ExecutionContext) error {

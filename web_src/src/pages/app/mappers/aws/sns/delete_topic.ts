@@ -8,7 +8,7 @@ import type {
   NodeInfo,
 } from "../../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 import { buildSnsProps, buildSubtitle, extractArnResourceName } from "./common";
 
 interface DeleteTopicConfiguration {

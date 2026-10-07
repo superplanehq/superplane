@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { getRepositoryMapper } from "./get_repository";
 import { buildDetailsCtx, buildOutput, buildRepositoryData } from "./test_helpers";
 

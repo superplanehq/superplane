@@ -1,5 +1,5 @@
 import { renderHook, act } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { BUILDING_BLOCKS_SIDEBAR_SETTINGS_KEY, useSidebarSettings } from "./useSidebarSettings";
 
 describe("useSidebarSettings", () => {

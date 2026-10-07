@@ -209,6 +209,266 @@ func Test__OnPullRequest__HandleWebhook(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, eventContext.Count(), 0)
 	})
+
+	t.Run("ignoreDrafts filters draft pull requests", func(t *testing.T) {
+		ignoreDrafts := true
+		keepDrafts := false
+
+		cases := []struct {
+			name         string
+			body         string
+			actions      []string
+			ignoreDrafts *bool
+			wantEvents   int
+		}{
+			{
+				name:         "toggle on and opened draft does not emit",
+				body:         `{"action":"opened","pull_request":{"draft":true}}`,
+				actions:      []string{"opened"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   0,
+			},
+			{
+				name:         "toggle on and opened non-draft emits",
+				body:         `{"action":"opened","pull_request":{"draft":false}}`,
+				actions:      []string{"opened"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   1,
+			},
+			{
+				name:         "toggle on and ready_for_review emits",
+				body:         `{"action":"ready_for_review","pull_request":{"draft":false}}`,
+				actions:      []string{"ready_for_review"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   1,
+			},
+			{
+				name:         "toggle on and converted_to_draft does not emit",
+				body:         `{"action":"converted_to_draft","pull_request":{"draft":true}}`,
+				actions:      []string{"converted_to_draft"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   0,
+			},
+			{
+				name:         "toggle off and opened draft emits",
+				body:         `{"action":"opened","pull_request":{"draft":true}}`,
+				actions:      []string{"opened"},
+				ignoreDrafts: &keepDrafts,
+				wantEvents:   1,
+			},
+			{
+				name:       "omitted toggle and opened draft emits",
+				body:       `{"action":"opened","pull_request":{"draft":true}}`,
+				actions:    []string{"opened"},
+				wantEvents: 1,
+			},
+			{
+				name:         "toggle on and missing draft emits",
+				body:         `{"action":"opened","pull_request":{"title":"Ready"}}`,
+				actions:      []string{"opened"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   1,
+			},
+			{
+				name:         "toggle on and missing pull_request emits",
+				body:         `{"action":"opened"}`,
+				actions:      []string{"opened"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   1,
+			},
+			{
+				name:         "toggle on and non-boolean draft emits",
+				body:         `{"action":"opened","pull_request":{"draft":"true"}}`,
+				actions:      []string{"opened"},
+				ignoreDrafts: &ignoreDrafts,
+				wantEvents:   1,
+			},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				configuration := map[string]any{
+					"repository": "test",
+					"actions":    tc.actions,
+				}
+				if tc.ignoreDrafts != nil {
+					configuration["ignoreDrafts"] = *tc.ignoreDrafts
+				}
+
+				code, events, err := handleSignedPullRequestWebhook([]byte(tc.body), configuration)
+
+				assert.Equal(t, http.StatusOK, code)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.wantEvents, events.Count())
+			})
+		}
+	})
+}
+
+func Test__OnPullRequest__OnlyFactoryPullRequests(t *testing.T) {
+	body := []byte(`{
+		"action": "opened",
+		"number": 42,
+		"pull_request": {
+			"number": 42,
+			"html_url": "https://github.com/acme/app/pull/42",
+			"draft": false
+		},
+		"repository": {"full_name": "acme/app"}
+	}`)
+	configuration := map[string]any{
+		"repository":              "acme/app",
+		"actions":                 []string{"opened"},
+		"onlyFactoryPullRequests": true,
+	}
+	match := &core.PullRequestMatch{
+		PullRequest: &core.PullRequest{ID: "pr-1", Number: 42, Repository: "acme/app"},
+		WorkOrder:   &core.WorkOrder{ID: "wo-1", Number: 12, Title: "Show a clearer empty state"},
+	}
+
+	t.Run("includes the factory pull request and task", func(t *testing.T) {
+		factoryCtx := &recordingFactory{match: match}
+
+		code, events, err := handleSignedPullRequest(body, configuration, factoryCtx)
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Equal(t, 1, factoryCtx.calls)
+		assert.Equal(t, core.FindPullRequestParams{
+			Provider:   "github",
+			Repository: "acme/app",
+			Number:     42,
+			URL:        "https://github.com/acme/app/pull/42",
+		}, factoryCtx.params)
+		require.Equal(t, 1, events.Count())
+		payload := events.Payloads[0].Data.(map[string]any)
+		assert.Equal(t, "github.pullRequest", events.Payloads[0].Type)
+		assert.Equal(t, "opened", payload["action"])
+		assert.Equal(t, match.PullRequest, payload["pullRequest"])
+		assert.Equal(t, match.WorkOrder, payload["workOrder"])
+	})
+
+	t.Run("does not start a run when the pull request is not in this factory", func(t *testing.T) {
+		code, events, err := handleSignedPullRequest(body, configuration, &recordingFactory{err: core.ErrPullRequestNotFound})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 0, events.Count())
+	})
+
+	t.Run("leaves the event unchanged when the toggle is off", func(t *testing.T) {
+		factoryCtx := &recordingFactory{match: match}
+		off := map[string]any{
+			"repository": "acme/app",
+			"actions":    []string{"opened"},
+		}
+
+		code, events, err := handleSignedPullRequest(body, off, factoryCtx)
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		assert.Equal(t, 0, factoryCtx.calls)
+		require.Equal(t, 1, events.Count())
+		payload := events.Payloads[0].Data.(map[string]any)
+		assert.NotContains(t, payload, "workOrder")
+	})
+
+	t.Run("fails when the app is not owned by a factory", func(t *testing.T) {
+		code, events, err := handleSignedPullRequest(body, configuration, nil)
+
+		assert.Equal(t, http.StatusInternalServerError, code)
+		assert.ErrorContains(t, err, "not owned by a factory")
+		assert.Equal(t, 0, events.Count())
+	})
+}
+
+func handleSignedPullRequestWebhook(body []byte, configuration map[string]any) (int, *contexts.EventContext, error) {
+	return handleSignedPullRequest(body, configuration, nil)
+}
+
+func handleSignedPullRequest(body []byte, configuration map[string]any, factoryCtx core.FactoryContext) (int, *contexts.EventContext, error) {
+	secret := "test-secret"
+	h := hmac.New(sha256.New, []byte(secret))
+	h.Write(body)
+	signature := fmt.Sprintf("%x", h.Sum(nil))
+
+	headers := http.Header{}
+	headers.Set("X-Hub-Signature-256", "sha256="+signature)
+	headers.Set("X-GitHub-Event", "pull_request")
+
+	eventContext := &contexts.EventContext{}
+	code, _, err := (&OnPullRequest{}).HandleWebhook(core.WebhookRequestContext{
+		Body:          body,
+		Headers:       headers,
+		Logger:        logrus.NewEntry(logrus.New()),
+		Configuration: configuration,
+		Webhook:       &contexts.NodeWebhookContext{Secret: secret},
+		Events:        eventContext,
+		Factory:       factoryCtx,
+	})
+
+	return code, eventContext, err
+}
+
+type recordingFactory struct {
+	calls  int
+	params core.FindPullRequestParams
+	match  *core.PullRequestMatch
+	err    error
+}
+
+func (f *recordingFactory) FindPullRequest(params core.FindPullRequestParams) (*core.PullRequestMatch, error) {
+	f.calls++
+	f.params = params
+	return f.match, f.err
+}
+
+func (f *recordingFactory) CreateWorkOrder(core.WorkOrderParams) (*core.WorkOrder, bool, error) {
+	return nil, false, nil
+}
+
+func (f *recordingFactory) FindWorkOrder(core.FindWorkOrderParams) (*core.WorkOrder, error) {
+	return nil, nil
+}
+
+func (f *recordingFactory) UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
+	return nil, false, nil
+}
+
+func (f *recordingFactory) AddWorkOrderComment(core.AddWorkOrderCommentParams) error {
+	return nil
+}
+
+func (f *recordingFactory) AddWorkOrderArtifact(core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
+	return nil, nil
+}
+
+func (f *recordingFactory) ReportWorkOrderCheck(core.ReportWorkOrderCheckParams) (*core.WorkOrderCheck, error) {
+	return nil, nil
+}
+
+func (f *recordingFactory) SetWorkOrderStatusNote(core.SetWorkOrderStatusNoteParams) (*core.WorkOrderStatusNote, error) {
+	return nil, nil
+}
+
+func (f *recordingFactory) AddPullRequest(core.AddPullRequestParams) (*core.PullRequest, error) {
+	return nil, nil
+}
+
+func (f *recordingFactory) UpdatePullRequest(core.UpdatePullRequestParams) (*core.PullRequest, error) {
+	return nil, nil
+}
+
+func (f *recordingFactory) AddPullRequestActivity(core.AddPullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	return nil, nil
+}
+
+func (f *recordingFactory) UpdatePullRequestActivity(core.UpdatePullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	return nil, nil
+}
+
+func (f *recordingFactory) VCSProvider() (string, error) {
+	return "", nil
 }
 
 func Test__OnPullRequest__Setup(t *testing.T) {

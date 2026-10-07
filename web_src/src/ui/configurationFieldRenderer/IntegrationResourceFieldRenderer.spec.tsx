@@ -1,10 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { ConfigurationField } from "@/api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
+import { DATADOG_ISSUE_SEARCH_FAILED_NOTICE_ID, INTEGRATION_LIST_NOTICE_TYPE } from "@/lib/integrationListNotice";
+import { toTestId } from "@/lib/testID";
 
 import { IntegrationResourceFieldRenderer } from "./IntegrationResourceFieldRenderer";
 
@@ -158,5 +160,39 @@ describe("IntegrationResourceFieldRenderer", () => {
     await user.click(screen.getByTestId("remove-resource-1"));
 
     expect(onChange).toHaveBeenCalledWith(undefined);
+  });
+
+  it("reports a failed open-issue search without offering that notice as a service", async () => {
+    const user = userEvent.setup();
+    mockUseIntegrationResources.mockReturnValue({
+      data: [
+        { id: "checkout", name: "checkout", type: "service" },
+        {
+          id: DATADOG_ISSUE_SEARCH_FAILED_NOTICE_ID,
+          name: "The open-issue search failed. Services found only on open issues are missing.",
+          type: INTEGRATION_LIST_NOTICE_TYPE,
+        },
+      ],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useIntegrationResources>);
+
+    render(
+      <IntegrationResourceFieldRenderer
+        field={resourceField()}
+        value=""
+        onChange={vi.fn()}
+        organizationId="org-1"
+        integrationId="int-1"
+      />,
+    );
+
+    expect(
+      screen.getByText("The open-issue search failed. Services found only on open issues are missing."),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("combobox"));
+    expect(screen.getByText("checkout")).toBeInTheDocument();
+    expect(screen.queryByText(DATADOG_ISSUE_SEARCH_FAILED_NOTICE_ID)).not.toBeInTheDocument();
+    expect(screen.getByTestId(toTestId("app-installation-resource-field-channel"))).toBeInTheDocument();
   });
 });

@@ -1,0 +1,10 @@
+{{- if and .Values.posthog.enabled (eq .Values.posthog.secretName "") }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "secrets.posthog.name" . }}
+  namespace: {{ .Release.Namespace }}
+type: Opaque
+data:
+  POSTHOG_KEY: {{ .Values.posthog.key | required ".Values.posthog.key is required." | b64enc }}
+{{- end }}

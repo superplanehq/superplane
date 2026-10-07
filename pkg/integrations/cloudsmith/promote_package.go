@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -223,10 +222,6 @@ func (p *PromotePackage) Execute(ctx core.ExecutionContext) error {
 
 func (p *PromotePackage) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (p *PromotePackage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (p *PromotePackage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

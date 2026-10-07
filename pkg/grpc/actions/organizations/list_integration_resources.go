@@ -17,9 +17,9 @@ import (
 )
 
 func ListIntegrationResources(ctx context.Context, registry *registry.Registry, orgID string, integrationID string, parameters map[string]string) (*pb.ListIntegrationResourcesResponse, error) {
-	org, err := uuid.Parse(orgID)
+	org, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid organization ID")
+		return nil, err
 	}
 
 	ID, err := uuid.Parse(integrationID)
@@ -98,6 +98,7 @@ func serializeIntegrationResources(resources []core.IntegrationResource) []*pb.I
 			Type: resource.Type,
 			Name: resource.Name,
 			Id:   resource.ID,
+			Url:  resource.URL,
 		})
 	}
 	return out

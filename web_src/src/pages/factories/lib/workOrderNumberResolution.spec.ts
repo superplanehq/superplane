@@ -1,0 +1,251 @@
+import { describe, expect, it } from "bun:test";
+import type { FactoriesWorkOrder } from "@/api-client";
+import {
+  boardLineIdFromNavigationState,
+  canonicalWorkOrderNumber,
+  displayedBoardLineId,
+  findWorkOrderByRunId,
+  latestDispatchForLine,
+  peekOrderFromNavigationState,
+  resolvePeekWorkOrder,
+  resolveWorkOrderByNumber,
+  workOrderRouteNeedsCanonicalRedirect,
+} from "./workOrderNumberResolution";
+
+const ORDERS: FactoriesWorkOrder[] = [
+  { id: "order-1", number: "42", key: "SP-42", title: "Fix things" },
+  { id: "order-2", number: "7", key: "SP-7", title: "Ship things" },
+];
+
+describe("resolveWorkOrderByNumber", () => {
+  it("matches an exact number", () => {
+    const resolution = resolveWorkOrderByNumber(ORDERS, "42", false);
+    expect(resolution).toEqual({ status: "found", order: ORDERS[0], matchedBy: "number" });
+  });
+
+  it("tolerates leading zeros", () => {
+    const resolution = resolveWorkOrderByNumber(ORDERS, "007", false);
+    expect(resolution.status).toBe("found");
+    expect(resolution.order).toBe(ORDERS[1]);
+    expect(resolution.matchedBy).toBe("number");
+  });
+
+  it("falls back to a legacy id match when the segment isn't numeric", () => {
+    const resolution = resolveWorkOrderByNumber(ORDERS, "order-2", false);
+    expect(resolution).toEqual({ status: "found", order: ORDERS[1], matchedBy: "id" });
+  });
+
+  it("returns not-found once loaded and nothing matches", () => {
+    expect(resolveWorkOrderByNumber(ORDERS, "999", false)).toEqual({
+      status: "not-found",
+      order: null,
+      matchedBy: null,
+    });
+  });
+
+  it("returns loading instead of not-found while the list is still fetching", () => {
+    expect(resolveWorkOrderByNumber([], "42", true)).toEqual({ status: "loading", order: null, matchedBy: null });
+  });
+
+  it("rejects zero and negative numbers", () => {
+    expect(resolveWorkOrderByNumber(ORDERS, "0", false).status).toBe("not-found");
+    expect(resolveWorkOrderByNumber(ORDERS, "-1", false).status).toBe("not-found");
+  });
+});
+
+describe("workOrderRouteNeedsCanonicalRedirect", () => {
+  it("is false for an exact number match", () => {
+    const resolution = resolveWorkOrderByNumber(ORDERS, "42", false);
+    expect(workOrderRouteNeedsCanonicalRedirect(resolution, "42")).toBe(false);
+  });
+
+  it("is true for a leading-zero number", () => {
+    const resolution = resolveWorkOrderByNumber(ORDERS, "007", false);
+    expect(workOrderRouteNeedsCanonicalRedirect(resolution, "007")).toBe(true);
+  });
+
+  it("is true for a legacy id match", () => {
+    const resolution = resolveWorkOrderByNumber(ORDERS, "order-2", false);
+    expect(workOrderRouteNeedsCanonicalRedirect(resolution, "order-2")).toBe(true);
+  });
+});
+
+describe("canonicalWorkOrderNumber", () => {
+  it("returns the numeric string for a resolved order", () => {
+    expect(canonicalWorkOrderNumber(ORDERS[0])).toBe("42");
+  });
+
+  it("returns null when there is no order or number", () => {
+    expect(canonicalWorkOrderNumber(null)).toBeNull();
+    expect(canonicalWorkOrderNumber({ id: "x" })).toBeNull();
+  });
+});
+
+describe("findWorkOrderByRunId", () => {
+  it("returns the order whose dispatch ran this canvas run", () => {
+    const withRun: FactoriesWorkOrder = {
+      id: "order-run",
+      number: "9",
+      lineDispatches: [
+        {
+          id: "d-old",
+          stepExecutions: [{ id: "e-old", run: { id: "run-old" } }],
+        },
+        {
+          id: "d-new",
+          stepExecutions: [{ id: "e-new", run: { id: "run-new" } }],
+        },
+      ],
+    };
+
+    expect(findWorkOrderByRunId([ORDERS[0], withRun], "run-new")?.id).toBe("order-run");
+    expect(findWorkOrderByRunId([withRun], "missing")).toBeUndefined();
+    expect(findWorkOrderByRunId([withRun], "  ")).toBeUndefined();
+  });
+});
+
+describe("peekOrderFromNavigationState", () => {
+  it("reads a task from navigate state", () => {
+    expect(peekOrderFromNavigationState({ peekOrder: ORDERS[0] })).toBe(ORDERS[0]);
+  });
+
+  it("rejects empty or malformed state", () => {
+    expect(peekOrderFromNavigationState(undefined)).toBeUndefined();
+    expect(peekOrderFromNavigationState({ peekOrder: { title: "no id" } })).toBeUndefined();
+    expect(peekOrderFromNavigationState({ peekOrder: { id: "" } })).toBeUndefined();
+  });
+});
+
+describe("resolvePeekWorkOrder", () => {
+  const notFound = resolveWorkOrderByNumber([], "12", false);
+  const found = resolveWorkOrderByNumber(ORDERS, "42", false);
+  const imported: FactoriesWorkOrder = { id: "wo-imported-12", title: "Handle duplicate refunds" };
+  const numberedImport: FactoriesWorkOrder = { id: "wo-imported-12", number: "12", title: "Handle duplicate refunds" };
+
+  it("prefers the list match over a navigation hint", () => {
+    expect(resolvePeekWorkOrder(found, "42", numberedImport, imported)).toBe(ORDERS[0]);
+  });
+
+  it("uses the navigation hint when the list has not caught up", () => {
+    expect(resolvePeekWorkOrder(notFound, "12", numberedImport, null)).toBe(numberedImport);
+  });
+
+  it("uses the local hint when there is no permalink yet", () => {
+    expect(resolvePeekWorkOrder(notFound, undefined, undefined, imported)).toBe(imported);
+  });
+
+  it("ignores a local hint once a permalink is in the URL", () => {
+    expect(resolvePeekWorkOrder(notFound, "12", undefined, imported)).toBeUndefined();
+  });
+});
+
+describe("boardLineIdFromNavigationState", () => {
+  it("reads a line id from navigate state", () => {
+    expect(boardLineIdFromNavigationState({ lineId: "line-plan", peekOrder: ORDERS[0] })).toBe("line-plan");
+  });
+
+  it("rejects empty or malformed state", () => {
+    expect(boardLineIdFromNavigationState(undefined)).toBeUndefined();
+    expect(boardLineIdFromNavigationState({ peekOrder: ORDERS[0] })).toBeUndefined();
+    expect(boardLineIdFromNavigationState({ lineId: "  " })).toBeUndefined();
+    expect(boardLineIdFromNavigationState({ lineId: 12 })).toBeUndefined();
+  });
+});
+
+describe("displayedBoardLineId", () => {
+  const lines = [{ id: "line-plan" }, { id: "line-hotfix" }];
+  const order: FactoriesWorkOrder = {
+    id: "order-1",
+    lineDispatches: [{ id: "dispatch-hotfix", createdAt: "2026-09-28T00:00:00.000Z", line: { id: "line-hotfix" } }],
+  };
+
+  it("ignores a deleted task URL line and uses the dispatch line", () => {
+    expect(displayedBoardLineId({ queryLineId: "deleted-line", lines, order, fallbackLineId: "line-plan" })).toBe(
+      "line-hotfix",
+    );
+  });
+
+  it("keeps a task URL line that still exists", () => {
+    expect(displayedBoardLineId({ queryLineId: "line-plan", lines, order, fallbackLineId: "line-hotfix" })).toBe(
+      "line-plan",
+    );
+  });
+
+  it("prefers the route line over the task URL line", () => {
+    expect(
+      displayedBoardLineId({
+        routeLineId: "line-hotfix",
+        queryLineId: "line-plan",
+        lines,
+        order,
+        fallbackLineId: "line-plan",
+      }),
+    ).toBe("line-hotfix");
+  });
+
+  it("uses a navigation line when the task URL has no line", () => {
+    expect(displayedBoardLineId({ navigationLineId: "line-plan", lines, order, fallbackLineId: "line-hotfix" })).toBe(
+      "line-plan",
+    );
+  });
+
+  it("prefers a live query line over the navigation line", () => {
+    expect(
+      displayedBoardLineId({
+        queryLineId: "line-plan",
+        navigationLineId: "line-hotfix",
+        lines,
+        order,
+        fallbackLineId: "line-plan",
+      }),
+    ).toBe("line-plan");
+  });
+
+  it("ignores a deleted navigation line and uses the dispatch line", () => {
+    expect(displayedBoardLineId({ navigationLineId: "deleted-line", lines, order, fallbackLineId: "line-plan" })).toBe(
+      "line-hotfix",
+    );
+  });
+
+  it("uses the first line when the task has no dispatch", () => {
+    expect(
+      displayedBoardLineId({
+        queryLineId: "deleted-line",
+        lines,
+        order: { id: "order-2" },
+        fallbackLineId: "line-plan",
+      }),
+    ).toBe("line-plan");
+  });
+});
+
+describe("latestDispatchForLine", () => {
+  it("picks the newest dispatch on the viewed line", () => {
+    const order: FactoriesWorkOrder = {
+      id: "order-1",
+      lineDispatches: [
+        {
+          id: "d-other",
+          createdAt: "2026-08-21T10:00:00.000Z",
+          line: { id: "line-other" },
+          stepExecutions: [{ id: "e-other", run: { id: "run-other" } }],
+        },
+        {
+          id: "d-old",
+          createdAt: "2026-08-21T11:00:00.000Z",
+          line: { id: "line-1" },
+          stepExecutions: [{ id: "e-old", run: { id: "run-old" } }],
+        },
+        {
+          id: "d-new",
+          createdAt: "2026-08-21T12:00:00.000Z",
+          line: { id: "line-1" },
+          stepExecutions: [{ id: "e-new", run: { id: "run-new" } }],
+        },
+      ],
+    };
+
+    expect(latestDispatchForLine(order, "line-1")?.id).toBe("d-new");
+    expect(latestDispatchForLine(order)?.id).toBe("d-new");
+  });
+});

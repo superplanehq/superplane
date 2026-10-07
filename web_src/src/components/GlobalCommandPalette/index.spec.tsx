@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type * as ReactRouterDom from "react-router-dom";
-import { MemoryRouter } from "react-router-dom";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as ReactRouterDom from "react-router";
+import { MemoryRouter } from "react-router";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { unmockedPackage } from "@/test/unmockedModule";
+
 import { GlobalCommandPalette } from ".";
 import { registerCanvasNodeSearchProvider } from "./canvasNodeSearchStore";
 import { openGlobalCommandPalette } from "./controller";
@@ -16,6 +18,7 @@ const {
   inviteLinkQueryState,
   inviteLinkState,
   navigateMock,
+  paletteQueryState,
   permissionsState,
   writeTextMock,
 } = vi.hoisted(() => {
@@ -50,13 +53,20 @@ const {
     inviteLinkQueryState: { enabledValues: [] as boolean[] },
     inviteLinkState: { data: { token: "test-invite-token", enabled: true } },
     navigateMock: vi.fn(),
+    paletteQueryState: {
+      apiKeysCalls: 0,
+      canvasEnabledValues: [] as Array<boolean | undefined>,
+      integrationsCalls: 0,
+      loading: false,
+      organizationEnabledValues: [] as Array<boolean | undefined>,
+    },
     permissionsState: { permissions: defaultPermissions },
     writeTextMock: vi.fn(),
   };
 });
 
-vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof ReactRouterDom>("react-router-dom");
+vi.mock("react-router", () => {
+  const actual = unmockedPackage<typeof ReactRouterDom>("react-router/dist/development/index.js");
   return {
     ...actual,
     useNavigate: () => navigateMock,
@@ -68,6 +78,7 @@ vi.mock("@/contexts/useAccount", () => ({
     account: accountState.account,
     loading: accountState.loading,
     setupRequired: false,
+    refreshAccount: async () => undefined,
   }),
 }));
 
@@ -82,68 +93,86 @@ vi.mock("@/api-client", () => ({
 }));
 
 vi.mock("@/hooks/useCanvasData", () => ({
-  useCanvases: () => ({
-    data: [
-      {
-        id: "canvas-1",
-        name: "Deploy API",
-        description: "Production deployment flow",
-      },
-      {
-        id: "canvas-2",
-        name: "Database Backups",
-        description: "Nightly backup flow",
-      },
-    ],
-    isLoading: false,
-  }),
+  useCanvases: (_organizationId: string, options?: { enabled?: boolean }) => {
+    paletteQueryState.canvasEnabledValues.push(options?.enabled);
+    return {
+      data: [
+        {
+          id: "canvas-1",
+          name: "Deploy API",
+          description: "Production deployment flow",
+        },
+        {
+          id: "canvas-2",
+          name: "Database Backups",
+          description: "Nightly backup flow",
+        },
+      ],
+      isLoading: paletteQueryState.loading,
+    };
+  },
   useCreateCanvas: () => ({
     mutateAsync: createCanvasMock,
     isPending: false,
   }),
 }));
 
+vi.mock("@/hooks/useExperimentalFeature", () => ({
+  useExperimentalFeature: () => ({
+    has: () => false,
+    enabledExperimentalFeatures: [],
+    isLoading: false,
+  }),
+}));
+
 vi.mock("@/hooks/useOrganizationData", () => ({
-  useOrganization: () => ({
-    data: {
-      metadata: {
-        id: "org-1",
-        name: "Acme",
+  useOrganization: (_organizationId: string, enabled?: boolean) => {
+    paletteQueryState.organizationEnabledValues.push(enabled);
+    return {
+      data: {
+        metadata: {
+          id: "org-1",
+          name: "Acme",
+        },
       },
-    },
-  }),
-  useOrganizationUsage: () => ({
-    data: { enabled: true },
-    error: null,
-  }),
+    };
+  },
   useOrganizationInviteLink: (_organizationId: string, enabled: boolean) => {
     inviteLinkQueryState.enabledValues.push(enabled);
     return {
       data: enabled ? inviteLinkState.data : undefined,
-      isLoading: false,
+      isLoading: paletteQueryState.loading,
     };
   },
 }));
 
 vi.mock("@/hooks/useIntegrations", () => ({
-  useConnectedIntegrations: () => ({
-    data: [
-      {
-        metadata: { id: "int-1", name: "puppies-github", integrationName: "github" },
-        status: { state: "ready" },
-      },
-      {
-        metadata: { id: "int-2", name: "deploy-alerts", integrationName: "slack" },
-        status: { state: "ready" },
-      },
-    ],
-  }),
+  useConnectedIntegrations: () => {
+    paletteQueryState.integrationsCalls += 1;
+    return {
+      data: [
+        {
+          metadata: { id: "int-1", name: "puppies-github", integrationName: "github" },
+          status: { state: "ready" },
+        },
+        {
+          metadata: { id: "int-2", name: "deploy-alerts", integrationName: "slack" },
+          status: { state: "ready" },
+        },
+      ],
+      isLoading: paletteQueryState.loading,
+    };
+  },
 }));
 
 vi.mock("@/hooks/useApiKeys", () => ({
-  useAPIKeys: () => ({
-    data: [{ id: "api-key-1", name: "deploy-bot" }],
-  }),
+  useAPIKeys: () => {
+    paletteQueryState.apiKeysCalls += 1;
+    return {
+      data: [{ id: "api-key-1", name: "deploy-bot" }],
+      isLoading: false,
+    };
+  },
 }));
 
 vi.mock("@/lib/canvasNameGenerator", () => ({
@@ -152,6 +181,40 @@ vi.mock("@/lib/canvasNameGenerator", () => ({
 
 function openPalette() {
   openGlobalCommandPalette();
+}
+
+function declaredPointerEvents(element: Element) {
+  let current: Element | null = element;
+  while (current) {
+    const pointerEvents = window.getComputedStyle(current).pointerEvents;
+    if (pointerEvents && pointerEvents !== "inherit" && pointerEvents !== "unset") {
+      return pointerEvents;
+    }
+    current = current.parentElement;
+  }
+  return "auto";
+}
+
+async function waitUntilPointerEventsAllow(element: Element) {
+  await waitFor(() => {
+    expect(declaredPointerEvents(element)).not.toBe("none");
+  });
+}
+
+function setupUser() {
+  const user = userEvent.setup();
+  return {
+    async click(element: Element) {
+      if (!element.closest("[data-disabled='true']")) {
+        await waitUntilPointerEventsAllow(element);
+      }
+      await user.click(element);
+    },
+    async type(element: Element, text: string) {
+      await waitUntilPointerEventsAllow(element);
+      await user.type(element, text);
+    },
+  };
 }
 
 function renderPalette(path = "/org-1") {
@@ -188,6 +251,11 @@ describe("GlobalCommandPalette", () => {
     createCanvasMock.mockReset();
     createCanvasMock.mockResolvedValue({ data: { canvas: { metadata: { id: "canvas-new" } } } });
     navigateMock.mockReset();
+    paletteQueryState.apiKeysCalls = 0;
+    paletteQueryState.canvasEnabledValues = [];
+    paletteQueryState.integrationsCalls = 0;
+    paletteQueryState.loading = false;
+    paletteQueryState.organizationEnabledValues = [];
     inviteLinkQueryState.enabledValues = [];
     inviteLinkState.data = { token: "test-invite-token", enabled: true };
     permissionsState.permissions = [...defaultPermissions];
@@ -215,17 +283,57 @@ describe("GlobalCommandPalette", () => {
     expect(screen.getByText("Sign Out")).toBeInTheDocument();
   });
 
-  it("closes with CMD+K while the command input is focused", async () => {
+  it("keeps palette-only queries disabled until the palette opens", async () => {
     renderPalette();
+
+    expect(paletteQueryState.apiKeysCalls).toBe(0);
+    expect(paletteQueryState.integrationsCalls).toBe(0);
+    expect(inviteLinkQueryState.enabledValues).toEqual([]);
+    expect(paletteQueryState.canvasEnabledValues).not.toContain(true);
+    expect(paletteQueryState.organizationEnabledValues).not.toContain(true);
+
+    openPalette();
+
+    expect(await screen.findByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
+    expect(paletteQueryState.apiKeysCalls).toBeGreaterThan(0);
+    expect(paletteQueryState.integrationsCalls).toBeGreaterThan(0);
+    expect(inviteLinkQueryState.enabledValues).toContain(true);
+    expect(paletteQueryState.canvasEnabledValues).toContain(true);
+    expect(paletteQueryState.organizationEnabledValues).toContain(true);
+  });
+
+  it("shows a loading state while searchable data loads", async () => {
+    const user = setupUser();
+    paletteQueryState.loading = true;
+    renderPalette();
+
+    openPalette();
+    const input = await screen.findByPlaceholderText("Find apps, integrations, and commands...");
+    await user.type(input, "missing");
+
+    expect(await screen.findByText("Loading results…")).toBeInTheDocument();
+
+    paletteQueryState.loading = false;
+    await user.type(input, " result");
+
+    expect(await screen.findByText("No results found.")).toBeInTheDocument();
+  });
+
+  it("does not open or close with Cmd+K or Ctrl+K", async () => {
+    renderPalette();
+
+    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+
+    expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
 
     openPalette();
     const input = await screen.findByPlaceholderText("Find apps, integrations, and commands...");
     input.focus();
     fireEvent.keyDown(input, { key: "k", metaKey: true });
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
 
-    await waitFor(() => {
-      expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
-    });
+    expect(screen.getByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
   });
 
   it("does not open before the account is available", () => {
@@ -238,7 +346,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("expands app list when clicking Apps", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -249,7 +357,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("navigates to an app when selected from expanded list", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -260,7 +368,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("searches apps by name", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -270,7 +378,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("searches apps by description", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -280,7 +388,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("searches integrations by name", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -290,7 +398,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("searches integrations by provider name", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -300,7 +408,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("searches API keys by name", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -310,7 +418,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("does not match every result by shared category labels", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();
@@ -321,7 +429,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("searches canvas nodes from the canvas page", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const selectNode = vi.fn();
     unregisterCanvasNodeSearchProvider = registerCanvasNodeSearchProvider({
       searchNodes: (query) =>
@@ -366,7 +474,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("disables invite copy when the invite link is inactive", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     installClipboardWriteMock();
     inviteLinkState.data = { token: "test-invite-token", enabled: false };
     renderPalette();
@@ -380,7 +488,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("closes after copying the invite link successfully", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     installClipboardWriteMock();
     renderPalette();
 
@@ -400,7 +508,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("stays open when invite link copy fails", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     installClipboardWriteMock();
     writeTextMock.mockRejectedValue(new Error("Clipboard unavailable"));
     renderPalette();
@@ -434,7 +542,7 @@ describe("GlobalCommandPalette", () => {
   });
 
   it("collapses expanded section when back is clicked", async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     renderPalette();
 
     openPalette();

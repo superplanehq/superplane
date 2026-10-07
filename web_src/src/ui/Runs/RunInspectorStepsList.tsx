@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { Accordion } from "@/ui/accordion";
+import { RunErrorsCard } from "./RunErrorsCard";
 import { RunInspectorErrorSummaryCard } from "./RunInspectorErrorSummaryCard";
 import { RunInspectorNodeAccordion } from "./RunInspectorNodeAccordion";
 import { RunInspectorStepsHeader } from "./RunInspectorStepsHeader";
@@ -8,6 +9,7 @@ import type { RUN_STATUS_META } from "./runPresentation";
 import type { useRunInspectorActions } from "./useRunInspectorActions";
 
 export function RunInspectorStepsList({
+  runErrors,
   errorSummaries,
   status,
   sections,
@@ -26,6 +28,7 @@ export function RunInspectorStepsList({
   errorScrollRequest,
   onErrorScrolled,
 }: {
+  runErrors: string[];
   errorSummaries: RunInspectorErrorSummary[];
   status: keyof typeof RUN_STATUS_META;
   sections: RunInspectorNodeSection[];
@@ -46,8 +49,9 @@ export function RunInspectorStepsList({
 }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto" data-testid="run-panel-step-list">
-      {errorSummaries.length > 0 ? (
+      {runErrors.length > 0 || errorSummaries.length > 0 ? (
         <div className="space-y-2 px-4 py-3">
+          <RunErrorsCard errors={runErrors} />
           {errorSummaries.map((summary) => (
             <RunInspectorErrorSummaryCard
               key={summary.nodeId}
@@ -59,7 +63,11 @@ export function RunInspectorStepsList({
         </div>
       ) : null}
 
-      <RunInspectorStepsHeader status={status} errorCount={errorSummaries.length} stepCount={sections.length} />
+      <RunInspectorStepsHeader
+        status={status}
+        errorCount={errorSummaries.length + runErrors.length}
+        stepCount={sections.length}
+      />
 
       {isLoading ? (
         <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-slate-500 dark:text-gray-400">

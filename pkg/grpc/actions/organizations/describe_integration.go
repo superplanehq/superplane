@@ -12,9 +12,9 @@ import (
 )
 
 func DescribeIntegration(ctx context.Context, registry *registry.Registry, orgID, integrationID string) (*pb.DescribeIntegrationResponse, error) {
-	org, err := uuid.Parse(orgID)
+	org, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid organization ID")
+		return nil, err
 	}
 
 	integration, err := uuid.Parse(integrationID)

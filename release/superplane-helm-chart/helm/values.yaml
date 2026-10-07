@@ -32,6 +32,18 @@ api:
       cpu: 100m
       memory: 128Mi
 
+# WebSocket hubs run separately from the API. Ingress sends /ws here.
+websocket:
+  replicas: 1
+  dbPoolSize: 5
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
 domain:
   name: ""
   configMapName: "base-domain"
@@ -54,6 +66,20 @@ authentication:
 encryption:
   secretName: ""
   key: ""
+
+#
+# Optional Enterprise license from an existing Kubernetes secret. When set,
+# the mounted file is the only license source and administrators cannot
+# change the license in the UI. Leave empty to install the license in the UI.
+#
+license:
+  secretName: ""
+  secretKey: "license.jws"
+  # URL of the signed license key list. Use "none" without network access.
+  # Leave empty to use the SuperPlane issuer.
+  keysURL: ""
+  # Hide the license expiry banner. Self-hosted installations keep it visible.
+  hideExpiryBanner: false
 
 telemetry:
   secretName: ""
@@ -81,6 +107,33 @@ dash0Web:
   authToken: ""
   serviceName: "superplane-web"
   environment: ""
+
+posthog:
+  secretName: ""
+  enabled: false
+  key: ""
+
+polar:
+  secretName: ""
+  enabled: false
+  accessToken: ""
+  environment: "sandbox"
+  webhookSecret: ""
+  # Optional. Overrides the Polar API version that SuperPlane pins in code.
+  apiVersion: ""
+
+#
+# SuperPlane Linear OAuth application.
+# When enabled, Connect authorizes this public app.
+# On the Linear application, set the callback URL to
+# {BASE_URL}/api/v1/linear/oauth/callback.
+# Request the read, write, and admin scopes.
+#
+linear:
+  secretName: ""
+  enabled: false
+  clientId: ""
+  clientSecret: ""
 
 #
 # Secret used to sign JWT session tokens
@@ -206,30 +259,15 @@ rabbitmq:
     size: 2Gi
 
 #
-# SuperGit configuration
+# Platform blob storage. Self-host defaults to a local directory.
+# Hosted SuperPlane sets provider to gcs and a bucket name.
 #
-supergit:
-  host: "supergit"
-  port: 8080
-  apiPath: "/api"
-  defaultBranch: main
-  maxFileBytes: 10485760
-  maxCommitBytes: 26214400
-  image:
-    registry: ghcr.io/superplanehq
-    name: supergit
-    pullPolicy: IfNotPresent
-  local:
-    enabled: true
-    version: 0.1.1
-    size: 2Gi
-  resources:
-    limits:
-      cpu: 100m
-      memory: 128Mi
-    requests:
-      cpu: 100m
-      memory: 128Mi
+blobStorage:
+  provider: filesystem
+  bucket: ""
+  region: ""
+  localPath: /var/lib/superplane/blobs
+  credentialsFile: ""
 
 #
 # Email configuration
@@ -239,3 +277,21 @@ email:
   resendApiKey: ""
   fromName: ""
   fromAddress: ""
+
+#
+# In-app feedback delivery. The worker sends mail to support@superplane.com
+# and posts the same report to this Discord webhook when the URL is set.
+# Helm stores the webhook in a dedicated feedback secret, not the email secret.
+#
+feedback:
+  discordWebhookUrl: ""
+
+#
+# Kubernetes service account. create stays false.
+# Set name to use an existing account.
+# Set annotations to bind a cloud identity, for example GKE Workload Identity.
+#
+serviceAccount:
+  create: false
+  name: ""
+  annotations: {}

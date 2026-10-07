@@ -1,0 +1,164 @@
+package factories
+
+import (
+	"context"
+	"strings"
+
+	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/models/factory"
+	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
+)
+
+func AddWorkOrderComment(
+	ctx context.Context,
+	organizationID string,
+	req *pb.AddWorkOrderCommentRequest,
+) (*pb.AddWorkOrderCommentResponse, error) {
+	orgID, err := parseOrganizationID(organizationID)
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to add work order comment")
+	}
+
+	body := strings.TrimSpace(req.GetBody())
+	if body == "" {
+		return nil, factoryErrorToStatus(invalidArgument("body is required"), "failed to add work order comment")
+	}
+
+	userIDStr, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+	if _, err := uuid.Parse(userIDStr); err != nil {
+		return nil, factoryErrorToStatus(invalidArgument("invalid user id"), "failed to add work order comment")
+	}
+
+	// Interactive endpoint: author is always the caller. Automation
+	// comments arrive through the canvas component with its own kind.
+	author := factory.WorkOrderCommentAuthor{
+		Kind:   factory.CommentAuthorKindUser,
+		UserID: &userIDStr,
+	}
+
+	db := database.DB(ctx)
+	resolvedFactory, err := findFactory(db, orgID, req.GetFactoryId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to add work order comment")
+	}
+	factoryID := resolvedFactory.ID
+
+	resolvedOrder, err := findWorkOrder(db, resolvedFactory, req.GetOrderId())
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to add work order comment")
+	}
+	orderID := resolvedOrder.ID
+
+	var comment *models.FactoryWorkOrderComment
+	err = db.Transaction(func(tx *gorm.DB) error {
+		factoryModel, err := models.FindFactory(tx, orgID, factoryID)
+		if err != nil {
+			return err
+		}
+
+		order, err := factoryModel.FindWorkOrder(tx, orderID)
+		if err != nil {
+			return err
+		}
+
+		comment, err = order.RecordCommentAdded(tx, models.FactoryWorkOrderCommentParams{
+			Body:             body,
+			Author:           author,
+			MentionedUserIDs: parseMentionedUserIDs(req.GetMentionedUserIds()),
+		})
+		return err
+	})
+	if err != nil {
+		return nil, factoryErrorToStatus(err, "failed to add work order comment")
+	}
+
+	publishWorkOrderCommentUpdated(factoryID, orderID)
+
+	return &pb.AddWorkOrderCommentResponse{
+		Comment: serializeWorkOrderComment(comment),
+	}, nil
+}
+
+func publishWorkOrderCommentUpdated(factoryID, orderID uuid.UUID) {
+	if err := messages.PublishFactoryWorkOrderUpdated(
+		factoryID.String(),
+		orderID.String(),
+		factory.EventTypeOrderCommentAdded,
+	); err != nil {
+		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", orderID)
+	}
+}
+
+func serializeWorkOrderComment(comment *models.FactoryWorkOrderComment) *pb.WorkOrderComment {
+	return &pb.WorkOrderComment{
+		Id:               comment.ID.String(),
+		Body:             comment.Body,
+		Author:           serializeCommentAuthor(comment.Author()),
+		CreatedAt:        timestamppb.New(comment.CreatedAt),
+		MentionedUserIds: uuidStrings(comment.MentionedUserIDs),
+	}
+}
+
+func serializeCommentAuthor(author factory.WorkOrderCommentAuthor) *pb.WorkOrderCommentAuthor {
+	result := &pb.WorkOrderCommentAuthor{
+		Kind: commentAuthorKindToProto(author.Kind),
+	}
+	if author.UserID != nil {
+		result.UserId = *author.UserID
+	}
+	if author.Automation != nil {
+		result.Automation = &pb.AutomationRef{
+			NodeId:   author.Automation.NodeID,
+			NodeName: author.Automation.NodeName,
+			AppId:    author.Automation.AppID.String(),
+			AppName:  author.Automation.AppName,
+		}
+	}
+	return result
+}
+
+func commentAuthorKindToProto(kind string) pb.WorkOrderCommentAuthor_Kind {
+	switch kind {
+	case factory.CommentAuthorKindAutomation:
+		return pb.WorkOrderCommentAuthor_KIND_AUTOMATION
+	case factory.CommentAuthorKindUser:
+		return pb.WorkOrderCommentAuthor_KIND_USER
+	default:
+		return pb.WorkOrderCommentAuthor_KIND_UNSPECIFIED
+	}
+}
+
+func parseMentionedUserIDs(rawIDs []string) []uuid.UUID {
+	mentioned := make([]uuid.UUID, 0, len(rawIDs))
+	for _, rawID := range rawIDs {
+		userID, err := uuid.Parse(rawID)
+		if err != nil {
+			continue
+		}
+		mentioned = append(mentioned, userID)
+	}
+	return mentioned
+}
+
+func uuidStrings(ids []uuid.UUID) []string {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	result := make([]string, 0, len(ids))
+	for _, id := range ids {
+		result = append(result, id.String())
+	}
+	return result
+}

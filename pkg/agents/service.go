@@ -342,7 +342,7 @@ func (s *Service) defineOutcomeOnProvider(ctx context.Context, session *models.A
 		Description:     description,
 		Rubric:          rubric,
 		MaxIterations:   maxIterations,
-		ContextPreamble: s.buildPreamble(session, ModeBuilder, false),
+		ContextPreamble: s.buildPreamble(ctx, session, ModeBuilder, false),
 	})
 	return contextReplayed, err
 }
@@ -451,7 +451,7 @@ func (s *Service) sendMessageToProvider(ctx context.Context, session *models.Age
 	}
 
 	err = s.provider.SendMessage(ctx, session.ProviderSessionID, message, SendMessageOptions{
-		ContextPreamble: s.buildPreamble(session, NormalizeMode(options.Mode), options.AutoLayoutOnUpdateEnabled),
+		ContextPreamble: s.buildPreamble(ctx, session, NormalizeMode(options.Mode), options.AutoLayoutOnUpdateEnabled),
 		Images:          images,
 	})
 	return contextReplayed, err
@@ -659,7 +659,7 @@ func (s *Service) archiveProviderSession(ctx context.Context, providerSessionID 
 	}
 }
 
-func (s *Service) buildPreamble(session *models.AgentSession, mode Mode, autoLayoutOnUpdateEnabled bool) string {
+func (s *Service) buildPreamble(ctx context.Context, session *models.AgentSession, mode Mode, autoLayoutOnUpdateEnabled bool) string {
 	base := fmt.Sprintf(
 		preambleTemplate,
 		session.CanvasID.String(),
@@ -668,7 +668,7 @@ func (s *Service) buildPreamble(session *models.AgentSession, mode Mode, autoLay
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
-	canvasSnapshot := buildCanvasSnapshot(session)
+	canvasSnapshot := buildCanvasSnapshot(ctx, session)
 	return base + "\n\n" + canvasSnapshot + "\n\n" + modeInstructions(mode)
 }
 

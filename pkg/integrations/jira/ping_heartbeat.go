@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -168,10 +167,6 @@ func (c *PingHeartbeat) Execute(ctx core.ExecutionContext) error {
 
 func (c *PingHeartbeat) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *PingHeartbeat) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *PingHeartbeat) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

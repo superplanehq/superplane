@@ -1,7 +1,7 @@
 import { act, render as testingLibraryRender, screen } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 
 const { reactFlowPropsRef } = vi.hoisted(() => ({
@@ -24,6 +24,12 @@ vi.mock("@/sentry", () => ({
 }));
 
 vi.mock("@xyflow/react", () => ({
+  Position: {
+    Left: "left",
+    Right: "right",
+    Top: "top",
+    Bottom: "bottom",
+  },
   Background: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   Panel: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   ReactFlow: (props: { children?: ReactNode; nodes?: unknown }) => {
@@ -62,6 +68,10 @@ vi.mock("../componentSidebar", () => ({
 
 vi.mock("@/components/CanvasToolSidebar", () => ({
   CanvasToolSidebar: () => null,
+}));
+
+vi.mock("@/pages/factories/agent/FactoryCanvasToolSidebar", () => ({
+  FactoryCanvasToolSidebar: () => null,
 }));
 
 vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({

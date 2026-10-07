@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -380,10 +379,6 @@ func (c *SendTextMessage) Setup(ctx core.SetupContext) error {
 	}
 
 	return ctx.Metadata.Set(metadata)
-}
-
-func (c *SendTextMessage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *SendTextMessage) Execute(ctx core.ExecutionContext) error {

@@ -64,7 +64,12 @@ function getNonEmptyString(value: unknown): string | null {
   }
 
   const trimmed = value.trim();
-  if (!trimmed || looksLikeHtmlDocument(trimmed) || looksLikeBrowserNetworkError(trimmed)) {
+  if (
+    !trimmed ||
+    looksLikeHtmlDocument(trimmed) ||
+    looksLikeBrowserNetworkError(trimmed) ||
+    looksLikeSanitizedInternalError(trimmed)
+  ) {
     return null;
   }
 
@@ -79,6 +84,10 @@ function looksLikeHtmlDocument(value: string): boolean {
     normalized.startsWith("<html") ||
     (normalized.includes("<html") && normalized.includes("</html>"))
   );
+}
+
+function looksLikeSanitizedInternalError(value: string): boolean {
+  return value.trim().toLowerCase() === "internal error";
 }
 
 function looksLikeBrowserNetworkError(value: string): boolean {

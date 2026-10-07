@@ -22,7 +22,6 @@ type DummyAction struct {
 	name              string
 	hooks             []core.Hook
 	setupFunc         func(ctx core.SetupContext) error
-	processQueueFunc  func(ctx core.ProcessQueueContext) (*uuid.UUID, error)
 	executeFunc       func(ctx core.ExecutionContext) error
 	handleHookFunc    func(ctx core.ActionHookContext) error
 	handleWebhookFunc func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error)
@@ -30,22 +29,42 @@ type DummyAction struct {
 	cleanupFunc       func(ctx core.SetupContext) error
 }
 
-func NewDummyAction(options DummyActionOptions) *DummyAction {
+// dummyQueueProcessorAction is a DummyAction that also implements
+// core.QueueItemProcessor, so the engine treats it as a component that
+// manages its own queue item processing.
+type dummyQueueProcessorAction struct {
+	*DummyAction
+	processQueueFunc func(ctx core.ProcessQueueContext) (*uuid.UUID, error)
+}
+
+func (t *dummyQueueProcessorAction) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+	return t.processQueueFunc(ctx)
+}
+
+func NewDummyAction(options DummyActionOptions) core.Action {
 	name := options.Name
 	if name == "" {
 		name = "dummy"
 	}
 
-	return &DummyAction{
+	action := &DummyAction{
 		name:              name,
 		hooks:             options.Hooks,
 		setupFunc:         options.SetupFunc,
-		processQueueFunc:  options.ProcessQueueFunc,
 		executeFunc:       options.ExecuteFunc,
 		handleHookFunc:    options.HandleHookFunc,
 		handleWebhookFunc: options.HandleWebhookFunc,
 		cancelFunc:        options.CancelFunc,
 		cleanupFunc:       options.CleanupFunc,
+	}
+
+	if options.ProcessQueueFunc == nil {
+		return action
+	}
+
+	return &dummyQueueProcessorAction{
+		DummyAction:      action,
+		processQueueFunc: options.ProcessQueueFunc,
 	}
 }
 
@@ -90,13 +109,6 @@ func (t *DummyAction) Setup(ctx core.SetupContext) error {
 		return nil
 	}
 	return t.setupFunc(ctx)
-}
-
-func (t *DummyAction) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	if t.processQueueFunc == nil {
-		return nil, nil
-	}
-	return t.processQueueFunc(ctx)
 }
 
 func (t *DummyAction) Execute(ctx core.ExecutionContext) error {

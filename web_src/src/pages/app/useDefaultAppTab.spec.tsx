@@ -1,5 +1,5 @@
 import { renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { useDefaultAppTab } from "./useDefaultAppTab";
 import {
@@ -13,7 +13,6 @@ type UrlViewFlags = Parameters<typeof useDefaultAppTab>[0]["urlViewFlags"];
 const CANVAS_FLAGS: UrlViewFlags = {
   isRunInspectionMode: false,
   isMemoryMode: false,
-  isFilesMode: false,
   isConsoleMode: false,
 };
 

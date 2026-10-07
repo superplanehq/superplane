@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -209,10 +208,6 @@ func (u *UpdateWorkerRoute) Execute(ctx core.ExecutionContext) error {
 
 func (u *UpdateWorkerRoute) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (u *UpdateWorkerRoute) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (u *UpdateWorkerRoute) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

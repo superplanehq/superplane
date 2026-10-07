@@ -9,9 +9,10 @@ import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 import { type RunStatusKey } from "@/ui/Runs/runPresentation";
 import { RunStatusBadge } from "@/ui/Runs/RunStatusBadge";
 import { Link as LinkIcon } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 import { isNormalClick } from "@/lib/linkHelpers";
+import { useRunsSidebarRunHref } from "./useRunsSidebarRunHref";
 import { RUNS_SIDEBAR_RUN_ROW_CLASS } from "./runsSidebarRowLayout";
 
 interface RunRowProps {
@@ -40,7 +41,8 @@ export function RunRow({
   const iconSlug = triggerNode?.component ? componentIconMap[triggerNode.component] : undefined;
   const currentTime = useRunningRunClock(status);
   const durationText = useMemo(() => getRunDurationText(run, status, currentTime), [run, status, currentTime]);
-  const runHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?run=${run.id}`) : "#";
+  const routeHref = organizationId && appId && run.id ? appPath(organizationId, appId, `?run=${run.id}`) : "#";
+  const runHref = useRunsSidebarRunHref(run.id, routeHref);
   const selectRun = () => {
     if (run.id) onSelectRun(run.id);
   };

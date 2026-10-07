@@ -1,6 +1,7 @@
 import { Eye, Rocket, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { draftActionsConfirmCopy, type DraftActionsConfirmKind } from "./draftActionsConfirmCopy";
 
 export interface DraftActionsWidgetProps {
   versionId?: string;
@@ -8,6 +9,7 @@ export interface DraftActionsWidgetProps {
   canvasId: string;
   organizationId: string;
   isEditing: boolean;
+  confirmKind?: DraftActionsConfirmKind;
   onDismiss?: () => void;
   onViewStaging?: () => boolean | void | Promise<boolean> | Promise<void>;
   onCommitStaging?: (commitMessage: string) => Promise<boolean>;
@@ -18,11 +20,13 @@ export function DraftActionsWidget({
   canvasId,
   organizationId,
   isEditing,
+  confirmKind = "commit",
   onDismiss,
   onViewStaging,
   onCommitStaging,
 }: DraftActionsWidgetProps) {
   const [busy, setBusy] = useState<"commit" | "discard" | null>(null);
+  const confirmCopy = draftActionsConfirmCopy(confirmKind);
 
   const handleViewInEditor = () => {
     void onViewStaging?.();
@@ -113,7 +117,7 @@ export function DraftActionsWidget({
       </Button>
       <Button variant="default" size="sm" onClick={handleCommit} disabled={busy !== null} className="h-7 gap-1 text-xs">
         <Rocket size={12} />
-        {busy === "commit" ? "Committing..." : "Commit"}
+        {busy === "commit" ? confirmCopy.busy : confirmCopy.idle}
       </Button>
     </div>
   );

@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { persistAgentMode, readInitialAgentMode, type AgentMode } from "@/components/AgentSidebar/agentMode";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import type { CanvasPageHeaderMode } from "@/pages/app/viewState";
+import {
+  lastCanvasAgentSidebarRequest,
+  publishCanvasAgentSidebarChanged,
+  subscribeCanvasAgentSidebarState,
+} from "./canvasAgentSidebarOpenRequest";
 
 // Keep in sync with pkg/features/features.go.
 export const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
@@ -75,12 +79,11 @@ export function useCanvasToolSidebarState({
   forceEnable = false,
   onBeforeClose,
 }: UseCanvasToolSidebarStateOptions) {
-  const { has: hasFeature } = useExperimentalFeature(organizationId);
+  const { has: hasFeature, isLoading: featureLoading } = useExperimentalFeature(organizationId);
   const featureEnabled = hasFeature(FEATURE_CLAUDE_MANAGED_AGENTS);
   const agentEnabled = canUseAgents && featureEnabled;
 
   const [isToolSidebarOpen, setIsToolSidebarOpen] = useState(() => readInitialToolSidebarOpen(canvasId));
-  const [agentMode, setAgentMode] = useState<AgentMode>(readInitialAgentMode);
 
   // Tracks the canvas whose managed-agent provider failed to provision a
   // session (e.g. the instance has no agent credentials configured). Keyed by
@@ -102,6 +105,7 @@ export function useCanvasToolSidebarState({
     (open: boolean) => {
       if (typeof window === "undefined") return;
       window.localStorage.setItem(canvasAgentSidebarOpenStorageKey(canvasId), open ? "true" : "false");
+      if (canvasId) publishCanvasAgentSidebarChanged(canvasId, open);
     },
     [canvasId],
   );
@@ -116,6 +120,13 @@ export function useCanvasToolSidebarState({
     persistOpen(true);
   }, [persistOpen]);
 
+  useOpenCanvasAgentSidebarOnRequest({
+    canvasId,
+    enabled: Boolean(!hideCanvasToolSidebar && (agentEnabled || forceEnable)),
+    openToolSidebar,
+    closeToolSidebar,
+  });
+
   const handleToolSidebarToggle = useCallback(() => {
     if (isToolSidebarOpen) onBeforeClose?.();
 
@@ -123,11 +134,6 @@ export function useCanvasToolSidebarState({
     setIsToolSidebarOpen(next);
     persistOpen(next);
   }, [isToolSidebarOpen, onBeforeClose, persistOpen]);
-
-  const switchAgentMode = useCallback((mode: AgentMode) => {
-    setAgentMode(mode);
-    persistAgentMode(mode);
-  }, []);
 
   // Called by the agent panel when it cannot set up a chat because the agent
   // provider isn't configured on this instance. Hiding the toggle and closing
@@ -143,14 +149,75 @@ export function useCanvasToolSidebarState({
     setAgentUnavailableCanvasId((currentCanvasId) => (currentCanvasId === canvasId ? undefined : currentCanvasId));
   }, [agentUnavailable, canvasId]);
 
-  useEffect(() => {
-    if ((!agentEnabled && !forceEnable) || hideCanvasToolSidebar) {
-      setIsToolSidebarOpen(false);
-    }
-  }, [agentEnabled, forceEnable, hideCanvasToolSidebar]);
+  useSyncToolSidebarOpenWithAvailability({
+    featureLoading,
+    agentEnabled,
+    forceEnable,
+    hideCanvasToolSidebar,
+    canvasId,
+    setIsToolSidebarOpen,
+  });
 
   const showToolSidebarToggle = (agentEnabled || forceEnable) && !hideCanvasToolSidebar;
+  useCanvasToolSidebarShortcut({ showToolSidebarToggle, handleToolSidebarToggle });
 
+  return {
+    canvasId,
+    organizationId,
+    liveCanvasVersionId,
+    headerMode,
+    isRunInspectionMode,
+    isAutoLayoutOnUpdateEnabled,
+    onAgentStagingReady,
+    onAgentStagingCommit,
+    isEditing,
+    readOnly,
+    isToolSidebarOpen,
+    showToolSidebarToggle,
+    isAgentEnabled: agentEnabled,
+    agentUnavailable,
+    markAgentUnavailable,
+    markAgentAvailable,
+    handleToolSidebarToggle,
+    openToolSidebar,
+    closeToolSidebar,
+  };
+}
+
+export type CanvasToolSidebarState = ReturnType<typeof useCanvasToolSidebarState>;
+
+function useSyncToolSidebarOpenWithAvailability({
+  featureLoading,
+  agentEnabled,
+  forceEnable,
+  hideCanvasToolSidebar,
+  canvasId,
+  setIsToolSidebarOpen,
+}: {
+  featureLoading: boolean;
+  agentEnabled: boolean;
+  forceEnable: boolean;
+  hideCanvasToolSidebar?: boolean;
+  canvasId?: string;
+  setIsToolSidebarOpen: (open: boolean) => void;
+}) {
+  useEffect(() => {
+    if (featureLoading) return;
+    if ((!agentEnabled && !forceEnable) || hideCanvasToolSidebar) {
+      setIsToolSidebarOpen(false);
+      return;
+    }
+    setIsToolSidebarOpen(readInitialToolSidebarOpen(canvasId));
+  }, [agentEnabled, canvasId, featureLoading, forceEnable, hideCanvasToolSidebar, setIsToolSidebarOpen]);
+}
+
+function useCanvasToolSidebarShortcut({
+  showToolSidebarToggle,
+  handleToolSidebarToggle,
+}: {
+  showToolSidebarToggle: boolean;
+  handleToolSidebarToggle: () => void;
+}) {
   useEffect(() => {
     if (!showToolSidebarToggle) return;
 
@@ -178,30 +245,33 @@ export function useCanvasToolSidebarState({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showToolSidebarToggle, handleToolSidebarToggle]);
-
-  return {
-    canvasId,
-    organizationId,
-    liveCanvasVersionId,
-    headerMode,
-    isRunInspectionMode,
-    isAutoLayoutOnUpdateEnabled,
-    onAgentStagingReady,
-    onAgentStagingCommit,
-    isEditing,
-    readOnly,
-    isToolSidebarOpen,
-    showToolSidebarToggle,
-    isAgentEnabled: agentEnabled,
-    agentUnavailable,
-    markAgentUnavailable,
-    markAgentAvailable,
-    handleToolSidebarToggle,
-    openToolSidebar,
-    closeToolSidebar,
-    agentMode,
-    switchAgentMode,
-  };
 }
 
-export type CanvasToolSidebarState = ReturnType<typeof useCanvasToolSidebarState>;
+function useOpenCanvasAgentSidebarOnRequest({
+  canvasId,
+  enabled,
+  openToolSidebar,
+  closeToolSidebar,
+}: {
+  canvasId?: string;
+  enabled: boolean;
+  openToolSidebar: () => void;
+  closeToolSidebar: () => void;
+}) {
+  useEffect(() => {
+    if (!enabled) return;
+    if (canvasId) {
+      const pending = lastCanvasAgentSidebarRequest(canvasId);
+      if (pending === true) openToolSidebar();
+      if (pending === false) closeToolSidebar();
+    }
+    return subscribeCanvasAgentSidebarState((requestedCanvasId, open) => {
+      if (requestedCanvasId !== canvasId) return;
+      if (open) {
+        openToolSidebar();
+        return;
+      }
+      closeToolSidebar();
+    });
+  }, [canvasId, closeToolSidebar, enabled, openToolSidebar]);
+}

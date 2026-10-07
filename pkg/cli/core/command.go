@@ -31,6 +31,8 @@ type CommandContext struct {
 type ConfigContext interface {
 	GetActiveApp() string
 	SetActiveApp(appID string) error
+	GetActiveWorkspace() string
+	SetActiveWorkspace(workspaceID string) error
 	GetURL() string
 }
 

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -150,10 +149,6 @@ func (c *DeleteFeatureFlag) Execute(ctx core.ExecutionContext) error {
 		"launchdarkly.flag.deleted",
 		[]any{result},
 	)
-}
-
-func (c *DeleteFeatureFlag) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *DeleteFeatureFlag) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

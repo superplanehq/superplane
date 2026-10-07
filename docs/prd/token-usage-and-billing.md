@@ -1,0 +1,262 @@
+# Token usage tracking and billing
+
+> Status: Draft  
+> Audience: Product and engineering  
+> Slides: [PDF](token-usage-and-billing-slides.pdf) · [source](token-usage-and-billing-slides.md)
+
+This draft is the project playbook for SuperPlane workspace usage tracking
+(LLM tokens and SuperPlane runner-fleet VM time), hosted credits,
+bring-your-own-key (BYOK), and Polar prepaid billing. Phases 1–6 are shipped
+for model usage. Runner-fleet compute is recorded on the same ledger.
+
+## Locked decisions
+
+1. **Org wallet, workspace budgets.** The Polar customer and credit balance
+   live on the organization. Each workspace (factory) can receive a hosted
+   spend limit from that wallet. Reports roll up both ways from day one.
+2. **Charge hosted spend only.** Welcome credit and Polar prepaid packs pay
+   for SuperPlane-held provider keys. BYOK is tracked (tokens and estimated
+   dollars) and is not billed.
+3. **Providers: Anthropic, OpenAI, OpenRouter.** Cursor and Bedrock are out of
+   this program. Existing Cursor components stay as they are.
+
+## Goal
+
+New organizations receive a welcome credit. They pick models from an admin
+allowlist, connect a repository, and spend that credit on factory agents.
+
+When the credit is gone, owners add hosted credit and continue on SuperPlane-hosted
+models. They can also connect their own Anthropic, OpenAI, or OpenRouter keys.
+BYOK usage is reported. It does not debit SuperPlane credit.
+
+## What exists today
+
+Do not reinvent these pieces:
+
+- Factory UI already shows spend when `total_tokens` / `cost_cents` /
+  `duration_seconds` are non-zero. Serialization sums executions onto the
+  work order. `RecordUsage` and `RecordComputeUsage` write the ledger and
+  copy totals into the execution cache.
+- Org LLM integrations already store customer API keys. OpenAI, Anthropic,
+  and OpenRouter clients exist for factory agents.
+- Factory and organization settings **Spending** read
+  `workspace_usage_events`. That ledger is the spend source of truth.
+- The factory PRD defines tracked cost as model tokens plus execution compute.
+  It excludes third-party charges and human labor. Compute in this ledger is
+  SuperPlane runner-fleet time only (`e1-large-*`, `e1-tiny-*`). Not Daytona.
+  Not customer GCP VMs.
+
+## Product rules
+
+| Topic | Rule |
+| --- | --- |
+| Billing unit | Ledger stores tokens by type and USD cents. Money is the source of truth. |
+| Welcome grant | Once per organization, not per user. |
+| Hosted catalog | Admin picks one hosted provider and an allowlist of models. |
+| BYOK catalog | User connects keys. SuperPlane lists models. The list guides the picker. It does not gate a run. |
+| BYOK cost | Store estimated or provider-reported dollars. Mark `funding_source=byok`. |
+| Compute | Same ledger, `usage_kind=compute`. SuperPlane runner fleets only. Record seconds and machine type. Local/Compose fleet `local` always records and prices at 0. |
+| Self-hosted | Tracking ships. Welcome credit and Polar checkout are cloud-only. |
+| Prompts | Do not store prompt or completion text on usage rows. |
+| Failed runs | Record tokens already consumed. Pass or fail does not erase spend. |
+
+## Domain model
+
+```
+Organization (wallet, Polar customer, model allowlist, BYOK keys)
+  └── Workspace / Factory (optional hosted spend limit, reports)
+        └── Work order → line step execution
+              └── workspace_usage_events (append-only; model + compute)
+```
+
+- **Org** owns the Polar customer, credit balance, hosted provider config,
+  default model allowlist, and BYOK keys.
+- **Workspace** owns optional hosted spend limits and reports. Agents may further subset
+  the org allowlist.
+- Do not create a second Polar customer per workspace.
+
+**Usage event** — one append-only row per LLM call (or per terminal usage
+snapshot for long-running Anthropic managed agents), or per finished runner
+task for compute:
+
+- Scope: organization, factory, work order, line, dispatch, execution, canvas
+  run, node execution. Factory canvases only. Org canvases are skipped.
+- Model rows: `provider` (`anthropic` \| `openai` \| `openrouter`), `model`,
+  `usage_kind=model`, `funding_source` (`hosted` \| `byok`), token columns.
+- Compute rows: `provider=runner`, `model` = catalog machine type,
+  `usage_kind=compute`, `machine_type`, `fleet_id`, `duration_seconds`.
+  Token columns stay 0. SuperPlane runner fleets only.
+- Amounts: tokens as above, `duration_seconds`, `cost_micros`, currency,
+  `price_book_version`.
+- Safety: unique `idempotency_key`, `occurred_at`, no prompt payload.
+  Compute keys are `runner:compute:<task_id>`.
+
+Execution `total_tokens` / `cost_cents` / `duration_seconds` stay as
+**cached rollups** for the work-order API and UI. Reports that need “by model”
+or “by machine type” read the ledger. Line metrics wall minutes
+(`finished_at - created_at`) are not VM seconds. Billable VM time is broker
+`claimed_at` → `finished_at`.
+
+Hosted billed spend is `SUM(cost_micros) WHERE funding_source = hosted`.
+Compute and managed model usage both debit the `organization_llm_*` wallet.
+Compute uses published machine rates and does not apply markup.
+`PrepareHostedRun` and hosted runner starts hard-stop when remaining credit
+is empty or the organization is not on an open trial or active Business plan.
+
+## Phases
+
+### Phase 1 — Tracking and reporting (shipped)
+
+Ledger, price book, `RecordUsage`, execution rollups, org and workspace reports.
+Factory and organization settings **Spending**
+(`GET /organizations/{id}/workspace-usage`) are the ledger.
+
+### Phase 2 — Provider clients (shipped)
+
+Shared client surface for Anthropic, OpenAI, and OpenRouter. Out of scope:
+Cursor, Bedrock.
+
+### Phase 3 — Hosted catalog and welcome credit (shipped)
+
+Admin picks hosted providers and allowlists. Grant credit on org create.
+Hosted events debit the wallet. Soft warning at a threshold. Hard stop when
+hosted remaining credit is empty.
+
+### Phase 4 — BYOK model pools
+
+Reuse org integrations. The organization selects the BYOK model list per
+provider. Factory Settings → Models may subset the org BYOK list and the
+installation hosted allowlist. An empty factory list inherits the parent list.
+The agent picker uses the resolved list for hosted and BYOK credentials.
+`funding_source=byok` is tracked and does not debit the wallet.
+
+The BYOK list guides the picker only. It does not stop a run. A BYOK run
+spends the key of the organization, not SuperPlane credit, so the list gives
+SuperPlane no cost to protect. A gate there only stops the organization from
+using the key it connected. It also rejects an agent CLI alias such as `opus`,
+because the list holds full model ids. Only `PrepareHostedRun` keeps a
+selected-model gate, because hosted spend debits the wallet.
+
+Rates live in `usage_price_books` / `usage_price_book_rates`. The process loads
+the latest book at start. Compute rows for SuperPlane runner fleets write
+`cost_micros` from `micros_per_second`. Fleet `local` is always 0. Compute
+debits the hosted credit wallet at the published machine rate. Markup does
+not apply to compute.
+
+### Phase 5 — Polar prepaid checkout
+
+Polar is the payment bookkeeper. SuperPlane keeps the wallet, markup, and
+hosted run gate. Polar does not proxy inference and does not ingest usage in
+this phase.
+
+- One Polar customer per organization (`external_id` = org UUID).
+- Prepaid one-time credit packs ($25 / $100 / $500) discovered by product
+  metadata `superplane_credit_pack=true`.
+- `order.paid` inserts an `organization_llm_credit_grants` row of kind `topup`.
+  Wallet credit equals pack face value. Tax is extra on the Polar invoice.
+- Org Workspace usage shows **Add hosted credit** and **Manage invoices** when Polar
+  is configured. Hide those actions when Polar env is empty (self-hosted).
+- Polar usage meters and PAYG invoices are deferred. SuperPlane remaining
+  credit stays the source of truth.
+
+#### Polar API version
+
+Polar uses date-based API versions (`YYYY-MM`). See
+[Polar API versioning](https://polar.sh/docs/api-reference/current/versioning).
+Polar releases a new version in the first week of January, April, July, and
+October. Each version is supported for about nine months. After that, Polar
+rejects requests that use it with `404 Not Found`.
+
+- SuperPlane pins the version in `defaultAPIVersion` in
+  `pkg/billing/polar/client.go`. The client sends it in the `Polar-Version`
+  header on each request.
+- `POLAR_API_VERSION` overrides the pinned version. Use it only to test a new
+  version in sandbox.
+- A 404 without a `Polar-Version` response header means that Polar rejected
+  the version. The client returns `ErrUnsupportedAPIVersion`, not "not found".
+- The SuperPlane webhook endpoint in Polar has its own `api_version`. Set it to
+  the pinned version. The webhook handler logs a warning when a delivery uses
+  another version. Installation Admin > Polar Webhooks shows a warning when
+  the endpoint version is different from the pinned version.
+
+To upgrade the Polar API version before Polar removes the pinned version:
+
+1. Read the [Polar API changelog](https://polar.sh/docs/changelog/api) for the
+   new version.
+2. Set `POLAR_API_VERSION` to the new version in sandbox. Test checkout, the
+   billing portal, subscriptions, and webhook apply.
+3. Change `defaultAPIVersion` and update the tests for changed fields.
+4. Set the new `api_version` on the sandbox and production webhook endpoints
+   in Polar. This change applies only to new events.
+5. Deploy. Make sure that the logs do not show Polar API version warnings.
+
+### Phase 6 — Workspace budgets
+
+Per-factory hosted spend limit against the org wallet. Null means no factory
+cap. Zero means hosted runs cannot start in that factory. Remaining factory
+budget is cap minus hosted billed spend for that factory. Effective remaining
+is the minimum of factory remaining and org remaining. Soft warning uses the
+installation threshold. Hard stop in `PrepareHostedRun` when effective
+remaining is 0. BYOK ignores the cap. Concurrent hosted runs can overshoot
+remaining credit until a planned budget exists. Do not invent a second wallet.
+
+## Assumptions
+
+These are treated as true unless product changes them:
+
+- Credit is granted once per organization, not per user or per workspace.
+- USD cents are the billing source of truth. Token counts are attributes.
+- Factory execution cost columns are caches. The ledger is the source of
+  truth.
+- Record usage at the provider call site. Do not parse admin “Get Usage”
+  APIs or scrape node payloads as the ledger.
+- Current org integrations are BYOK until hosted keys exist.
+- Self-hosted deployments get tracking. They do not get welcome credit or
+  Polar checkout.
+- Polar v1 is prepaid top-up, not metered invoices. Polar usage meters and
+  PAYG invoices stay out of this program until prepaid checkout is proven.
+- Cursor and Bedrock stay out of the price book, catalog, and picker.
+
+## Open questions
+
+Decide these while Phase 1 is in progress or before Phase 3:
+
+1. **Welcome credit amount.** How much USD (or displayed tokens) does a new
+   org receive?
+2. **Display unit.** Does the UI say “tokens”, USD, or both for remaining
+   credit?
+3. **Default hosted provider.** OpenRouter is the fastest multi-model option.
+   Confirm Anthropic, OpenAI, or OpenRouter for the welcome pool.
+4. **Markup.** Pass through provider cost, or apply a SuperPlane markup?
+   If markup comes later, store provider cost and billed cost as separate
+   fields.
+5. **Hard stop timing.** Hosted calls stop when remaining credit is zero.
+   Polar checkout is how owners add credit.
+6. **Workspace model subset.** Factory Settings → Models can subset the org
+   BYOK list and the installation hosted allowlist in Phase 4.
+7. **Ledger retention.** How long do we keep usage events?
+8. **Compute in the same reports.** Closed. SuperPlane runner-fleet seconds
+   and machine type share `workspace_usage_events` (`usage_kind=compute`).
+9. **Tax and invoicing entity.** Polar is the merchant of record. Polar
+    invoices the customer and collects tax. SuperPlane is not the tax filer.
+
+## Non-goals (this program)
+
+- Cursor and Bedrock as hosted or BYOK providers
+- Billing BYOK spend
+- A Polar customer per workspace
+- Polar usage meters, Credits benefits, or PAYG invoices in v1
+- Storing prompts on usage rows
+- Attributing human labor or third-party SaaS charges
+
+## First implementation slice
+
+1. Keep this PRD as the source of truth.
+2. Phases 1–6 are shipped for model usage, hosted credit, BYOK, Polar, and
+   workspace budgets.
+3. Runner-fleet compute is on the same `workspace_usage_events` ledger.
+   Organization and workspace **Spending** show tokens and VM seconds.
+4. Defer Polar meters until prepaid checkout works. If meters are added later,
+   ingest billed cents, not tokens. Markup-on-VM, wallet debit for compute,
+   and a runner hard-stop when credit is empty stay out of the tracking
+   phase.

@@ -1,0 +1,61 @@
+import { describe, expect, it } from "bun:test";
+import type { CanvasesCanvas } from "@/api-client";
+
+import { hasFactoryAppDefaults, resolveFactoryAppTemplate } from "./factoryAppTemplate";
+
+function canvasWith(nodes: NonNullable<NonNullable<CanvasesCanvas["spec"]>["nodes"]>): CanvasesCanvas {
+  return { metadata: { id: "app-1" }, spec: { nodes, edges: [] } };
+}
+
+describe("resolveFactoryAppTemplate", () => {
+  it.each([
+    ["onrun-implement", "line-implementation"],
+    ["on-pr-closed", "pr-closure"],
+    ["on-pr-risk", "risk-score"],
+  ])("matches %s to %s", (nodeId, templateId) => {
+    expect(resolveFactoryAppTemplate(canvasWith([{ id: nodeId }]))?.id).toBe(templateId);
+  });
+
+  it("returns null for an unknown canvas", () => {
+    expect(resolveFactoryAppTemplate(canvasWith([{ id: "custom" }]))).toBeNull();
+  });
+});
+
+describe("hasFactoryAppDefaults", () => {
+  it("recognizes explicit backend template metadata", () => {
+    expect(
+      hasFactoryAppDefaults(
+        canvasWith([
+          {
+            id: "entrypoint",
+            metadata: { factoryTemplate: { id: "line-implementation", version: 1 } },
+          },
+        ]),
+      ),
+    ).toBe(true);
+  });
+
+  it("recognizes generated factory intakes", () => {
+    expect(hasFactoryAppDefaults(canvasWith([{ id: "trigger" }, { id: "create-work-order" }]))).toBe(true);
+  });
+
+  it("recognizes the generated Backlog scoring canvas", () => {
+    expect(hasFactoryAppDefaults(canvasWith([{ id: "trigger", component: "onWorkOrder" }]))).toBe(true);
+  });
+
+  it("recognizes legacy backlog automations", () => {
+    expect(hasFactoryAppDefaults(canvasWith([{ id: "on-issue-labeled" }, { id: "create-work-order" }]))).toBe(true);
+  });
+
+  it("recognizes generated PR feedback discussion canvases", () => {
+    expect(hasFactoryAppDefaults(canvasWith([{ id: "on-pr-comment" }, { id: "address-pr-feedback" }]))).toBe(true);
+  });
+
+  it("recognizes generated PR feedback checks canvases", () => {
+    expect(hasFactoryAppDefaults(canvasWith([{ id: "on-pull-request" }, { id: "wait-pr-checks" }]))).toBe(true);
+  });
+
+  it("rejects custom canvases", () => {
+    expect(hasFactoryAppDefaults(canvasWith([{ id: "custom" }]))).toBe(false);
+  });
+});

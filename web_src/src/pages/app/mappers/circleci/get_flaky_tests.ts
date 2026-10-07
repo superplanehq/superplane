@@ -10,7 +10,7 @@ import type {
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { stringOrDash } from "../utils";
+import { stringOrDash } from "../eventDisplay";
 import { baseProps } from "./base";
 
 interface GetFlakyTestsConfiguration {

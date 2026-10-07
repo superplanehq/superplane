@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { IntegrationStatusIndicator, type MissingIntegration } from "./";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useState } from "react";

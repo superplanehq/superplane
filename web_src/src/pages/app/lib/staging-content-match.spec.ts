@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { matchesCommittedCanvasYaml, matchesCommittedConsoleYaml } from "./staging-content-match";
 
@@ -52,6 +52,11 @@ describe("staging-content-match", () => {
 
   it("treats semantically identical canvas yaml as committed", async () => {
     await expect(matchesCommittedCanvasYaml("canvas-1", "version-1", reorderedCanvasYaml)).resolves.toBe(true);
+  });
+
+  it("treats a metadata name change as uncommitted", async () => {
+    const renamedYaml = sampleCanvasYaml.replace("name: demo", "name: renamed");
+    await expect(matchesCommittedCanvasYaml("canvas-1", "version-1", renamedYaml)).resolves.toBe(false);
   });
 
   it("treats semantically identical console yaml as committed", async () => {

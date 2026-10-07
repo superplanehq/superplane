@@ -1,0 +1,189 @@
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it } from "bun:test";
+
+import { CardReadinessMark, CardScoreBadges, ReadinessDot } from "./ReadinessMark";
+
+describe("ReadinessDot", () => {
+  it("is decorative and carries the tone colour", () => {
+    const { container } = render(<ReadinessDot tone="caution" />);
+
+    const dot = container.firstElementChild;
+    expect(dot).toHaveAttribute("aria-hidden", "true");
+    expect(dot?.className).toContain("status-waiting-dot");
+  });
+});
+
+describe("CardReadinessMark", () => {
+  it("shows one short verdict word and reads both scores to assistive tech", () => {
+    render(<CardReadinessMark clarity={4} confidence={2} testId="mark" />);
+
+    const mark = screen.getByTestId("mark");
+    expect(mark).toHaveAttribute("data-tone", "caution");
+    expect(mark).toHaveTextContent("Review");
+    expect(mark).not.toHaveTextContent("4");
+    expect(mark).toHaveAttribute(
+      "aria-label",
+      "Review before you start. Clarity score 4 of 5. Confidence score 2 of 5",
+    );
+  });
+
+  it("leads the tooltip with the headline, then both scores", async () => {
+    const user = userEvent.setup();
+    render(<CardReadinessMark clarity={4} confidence={2} testId="mark" />);
+
+    await user.hover(screen.getByTestId("mark"));
+
+    const tip = await screen.findByRole("tooltip");
+    expect(tip.textContent?.startsWith("Review before you start")).toBe(true);
+    expect(tip).toHaveTextContent("Clarity score");
+    expect(tip).toHaveTextContent("4/5");
+    expect(tip).toHaveTextContent("Confidence score");
+    expect(tip).toHaveTextContent("2/5");
+  });
+
+  it("says no score yet for a missing score", () => {
+    render(<CardReadinessMark clarity={3} testId="mark" />);
+
+    const mark = screen.getByTestId("mark");
+    expect(mark).toHaveAttribute("data-tone", "caution");
+    expect(mark).toHaveAttribute(
+      "aria-label",
+      "Review the plan before you start. Clarity score 3 of 5. Confidence score no score yet",
+    );
+  });
+
+  it("calls a low Clarity not ready and a pair of high scores ready", () => {
+    const { rerender } = render(<CardReadinessMark clarity={2} confidence={5} testId="mark" />);
+    expect(screen.getByTestId("mark")).toHaveAttribute("data-tone", "blocked");
+    expect(screen.getByTestId("mark")).toHaveTextContent("Not ready");
+
+    rerender(<CardReadinessMark clarity={5} confidence={4} testId="mark" />);
+    expect(screen.getByTestId("mark")).toHaveAttribute("data-tone", "ready");
+    expect(screen.getByTestId("mark")).toHaveTextContent("Ready");
+  });
+});
+
+describe("CardScoreBadges", () => {
+  it("shows a name and score out of 5 per badge, tinted by band", () => {
+    render(<CardScoreBadges clarity={5} confidence={2} testId="badges" />);
+
+    const clarity = screen.getByTestId("badges-clarity");
+    const confidence = screen.getByTestId("badges-confidence");
+    expect(clarity).toHaveTextContent("Clarity5/5");
+    expect(clarity).toHaveClass("text-emerald-700");
+    expect(confidence).toHaveTextContent("Confidence2");
+    expect(screen.getByTestId("badges-confidence-meter")).toBeInTheDocument();
+    expect(screen.getByTestId("badges")).toHaveAttribute("data-tone", "caution");
+    expect(screen.getByTestId("badges")).toHaveAttribute(
+      "aria-label",
+      "Review before you start. Clarity score 5 of 5. Confidence score 2 of 5",
+    );
+  });
+
+  it("mutes a badge without a score and shows a dash", () => {
+    render(<CardScoreBadges confidence={4} testId="badges" />);
+
+    const clarity = screen.getByTestId("badges-clarity");
+    expect(clarity).toHaveTextContent("Clarity–");
+    expect(clarity).toHaveClass("text-muted-foreground");
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence4");
+    expect(screen.getByTestId("badges-confidence-meter")).toBeInTheDocument();
+  });
+
+  it("hides a score when that Planning toggle is off", () => {
+    render(<CardScoreBadges clarity={5} confidence={2} showClarity={false} testId="badges" />);
+
+    expect(screen.queryByTestId("badges-clarity")).not.toBeInTheDocument();
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence2");
+  });
+
+  it("shows one Confidence meter when review metrics are present", async () => {
+    const user = userEvent.setup();
+    render(
+      <CardScoreBadges
+        clarity={3}
+        confidence={2}
+        reviewMetrics={[
+          { key: "clarity", name: "Clarity", score: 3 },
+          { key: "complexity", name: "Complexity", score: 2 },
+          { key: "verifiability", name: "Verifiability", score: 3 },
+        ]}
+        testId="badges"
+      />,
+    );
+
+    expect(screen.queryByTestId("badges-clarity")).not.toBeInTheDocument();
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence2");
+    expect(screen.getByTestId("badges-confidence-meter")).toBeInTheDocument();
+    expect(screen.getByTestId("badges")).toHaveAttribute("data-tone", "caution");
+
+    await user.hover(screen.getByTestId("badges"));
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("Clarity");
+    expect(tip).toHaveTextContent("Clear");
+    expect(tip).toHaveTextContent("Complexity");
+    expect(tip).toHaveTextContent("Moderate");
+    expect(tip).toHaveTextContent("Verifiability");
+    expect(tip).toHaveTextContent("Provable");
+    expect(screen.getByText("Clear")).toHaveClass("text-emerald-300");
+    expect(screen.getByText("Moderate")).toHaveClass("text-amber-300");
+    expect(screen.getByText("Provable")).toHaveClass("text-emerald-300");
+  });
+
+  it("uses Unclear Hard and Unproven for a score of 1", async () => {
+    const user = userEvent.setup();
+    render(
+      <CardScoreBadges
+        confidence={1}
+        reviewMetrics={[
+          { key: "clarity", name: "Clarity", score: 1 },
+          { key: "complexity", name: "Complexity", score: 1 },
+          { key: "verifiability", name: "Verifiability", score: 1 },
+        ]}
+        testId="badges"
+      />,
+    );
+
+    await user.hover(screen.getByTestId("badges"));
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("Unclear");
+    expect(tip).toHaveTextContent("Hard");
+    expect(tip).toHaveTextContent("Unproven");
+    expect(tip).not.toHaveTextContent("Partial");
+  });
+
+  it("skips the per-check breakdown when every review score is 3", async () => {
+    const user = userEvent.setup();
+    render(
+      <CardScoreBadges
+        confidence={3}
+        reviewMetrics={[
+          { key: "clarity", name: "Clarity", score: 3 },
+          { key: "complexity", name: "Complexity", score: 3 },
+          { key: "verifiability", name: "Verifiability", score: 3 },
+        ]}
+        testId="badges"
+      />,
+    );
+
+    expect(screen.getByTestId("badges")).toHaveAttribute("data-tone", "ready");
+    expect(screen.getByTestId("badges-confidence")).toHaveTextContent("Confidence3");
+
+    await user.hover(screen.getByTestId("badges"));
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("This task is ready to start");
+    expect(tip).not.toHaveTextContent("Clear");
+    expect(tip).not.toHaveTextContent("Provable");
+  });
+
+  it("keeps the verdict headline in the tooltip", async () => {
+    const user = userEvent.setup();
+    render(<CardScoreBadges clarity={2} confidence={5} testId="badges" />);
+
+    await user.hover(screen.getByTestId("badges"));
+
+    const tip = await screen.findByRole("tooltip");
+    expect(tip).toHaveTextContent("This task is not ready to start");
+  });
+});

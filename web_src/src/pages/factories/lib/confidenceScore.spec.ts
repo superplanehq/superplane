@@ -1,0 +1,132 @@
+import { describe, expect, it } from "bun:test";
+
+import {
+  boardCardLoadsConfidenceChecks,
+  clampConfidenceScore,
+  clarityScoreFromChecks,
+  confidenceBandForScore,
+  confidenceCheckLevel,
+  confidenceScoreFromChecks,
+  confidenceScoreFromPercent,
+  confidenceSuitabilityAnalysis,
+  confidenceSuitabilitySummary,
+  isScoreCheckName,
+  scoreFromChecks,
+} from "./confidenceScore";
+import { workOrderCheckStatus } from "./workOrderChecks";
+
+describe("confidenceScore", () => {
+  it("loads board confidence checks only for draft cards", () => {
+    expect(boardCardLoadsConfidenceChecks("draft")).toBe(true);
+    expect(boardCardLoadsConfidenceChecks("waiting")).toBe(false);
+    expect(boardCardLoadsConfidenceChecks("running")).toBe(false);
+    expect(boardCardLoadsConfidenceChecks("failed")).toBe(false);
+    expect(boardCardLoadsConfidenceChecks("completed")).toBe(false);
+  });
+
+  it("reads the Confidence score check and ignores other checks", () => {
+    expect(
+      confidenceScoreFromChecks([
+        { name: "Code quality", score: 82 },
+        { name: "Confidence score", score: 4.2 },
+      ]),
+    ).toBe(4);
+    expect(confidenceScoreFromChecks([{ name: "Code quality", score: 82 }])).toBeUndefined();
+    expect(confidenceScoreFromChecks([])).toBeUndefined();
+  });
+
+  it("reads Clarity and Confidence as separate checks", () => {
+    const checks = [
+      { name: "Clarity score", score: 5 },
+      { name: "Confidence score", score: 3 },
+    ];
+    expect(clarityScoreFromChecks(checks)).toBe(5);
+    expect(confidenceScoreFromChecks(checks)).toBe(3);
+    expect(scoreFromChecks(checks, "Clarity score")).toBe(5);
+    expect(clarityScoreFromChecks([{ name: "Confidence score", score: 3 }])).toBeUndefined();
+  });
+
+  it("names both score checks", () => {
+    expect(isScoreCheckName("Clarity score")).toBe(true);
+    expect(isScoreCheckName("Confidence score")).toBe(true);
+    expect(isScoreCheckName("Risk score")).toBe(false);
+    expect(isScoreCheckName(undefined)).toBe(false);
+  });
+
+  it("clamps scores to 0 through 5", () => {
+    expect(clampConfidenceScore(-1)).toBe(0);
+    expect(clampConfidenceScore(5.4)).toBe(5);
+    expect(clampConfidenceScore(3.6)).toBe(4);
+  });
+
+  it("turns an intake percentage into a 0 to 5 score", () => {
+    expect(confidenceScoreFromPercent(94)).toBe(5);
+    expect(confidenceScoreFromPercent(58)).toBe(3);
+    expect(confidenceScoreFromPercent(44)).toBe(2);
+    expect(confidenceScoreFromPercent(12)).toBe(1);
+    expect(confidenceScoreFromPercent(0)).toBe(0);
+  });
+
+  it("bands and levels a 0 to 5 score", () => {
+    expect(confidenceBandForScore(4)).toBe("High");
+    expect(confidenceBandForScore(3)).toBe("Medium");
+    expect(confidenceBandForScore(2)).toBe("Low");
+    expect(confidenceCheckLevel(4)).toBe("positive");
+    expect(confidenceCheckLevel(3)).toBe("neutral");
+    expect(confidenceCheckLevel(2)).toBe("caution");
+  });
+
+  it("bands and clamps a 1 to 3 review score on its own scale", () => {
+    expect(confidenceBandForScore(3, 3)).toBe("High");
+    expect(confidenceBandForScore(2, 3)).toBe("Medium");
+    expect(confidenceBandForScore(1, 3)).toBe("Low");
+    expect(clampConfidenceScore(5, 3)).toBe(3);
+  });
+
+  it("labels a confidence check High Medium or Low, not Healthy", () => {
+    expect(workOrderCheckStatus({ name: "Confidence score", score: 5, level: "positive" }).label).toBe("High");
+    expect(workOrderCheckStatus({ name: "Confidence score", score: 3, level: "neutral" }).label).toBe("Medium");
+    expect(workOrderCheckStatus({ name: "Clarity score", score: 2, level: "critical" }).label).toBe("Low");
+    expect(workOrderCheckStatus({ name: "Risk score", score: 65, level: "caution" }).label).toBe("Moderate");
+  });
+
+  it("labels planning review metrics with a result word", () => {
+    expect(workOrderCheckStatus({ name: "Clarity", key: "clarity", score: 5, level: "positive" }).label).toBe("Clear");
+    expect(workOrderCheckStatus({ name: "Complexity", key: "complexity", score: 3, level: "caution" }).label).toBe(
+      "Moderate",
+    );
+    expect(
+      workOrderCheckStatus({ name: "Verifiability", key: "verifiability", score: 2, level: "critical" }).label,
+    ).toBe("Unproven");
+  });
+
+  it("keeps the result word for a stored Risk check from an older report", () => {
+    expect(workOrderCheckStatus({ name: "Risk", key: "risk", score: 2, level: "critical" }).label).toBe("High");
+  });
+
+  it("keeps High Medium Low on the stored Clarity score name", () => {
+    expect(workOrderCheckStatus({ name: "Clarity score", key: "clarity", score: 5, level: "positive" }).label).toBe(
+      "High",
+    );
+  });
+
+  it("summarizes how suitable the issue is for an agent", () => {
+    expect(confidenceSuitabilitySummary("High")).toBe("This issue is a good fit for an agent on this factory line.");
+    expect(confidenceSuitabilitySummary("Medium")).toBe("This issue is a mixed fit for an agent on this factory line.");
+    expect(confidenceSuitabilitySummary("Low")).toBe("This issue is a poor fit for an agent on this factory line.");
+  });
+
+  it("explains that the automation scored the source issue for agent fit", () => {
+    expect(confidenceSuitabilityAnalysis({ source: "GitHub", reasons: ["The dispatcher is mapped."] })).toBe(
+      [
+        "The automation read this GitHub issue. It scored how suitable the work is for an agent on this factory line.",
+        "",
+        "### Why this score",
+        "- The dispatcher is mapped.",
+      ].join("\n"),
+    );
+    expect(confidenceSuitabilityAnalysis({ source: "Sentry" })).toBe(
+      "The automation read this Sentry issue. It scored how suitable the work is for an agent on this factory line.",
+    );
+  });
+});

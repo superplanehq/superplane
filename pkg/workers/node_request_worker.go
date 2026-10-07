@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 	"gorm.io/gorm"
@@ -14,7 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -29,19 +30,26 @@ type NodeRequestWorker struct {
 	encryptor      crypto.Encryptor
 	webhookBaseURL string
 	authService    authorization.Authorization
-	gitProvider    gitprovider.Provider
 	logger         *log.Entry
 }
 
-func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, gitProvider gitprovider.Provider, webhookBaseURL string, authService authorization.Authorization) *NodeRequestWorker {
+func NewNodeRequestWorker(encryptor crypto.Encryptor, registry *registry.Registry, webhookBaseURL string, authService authorization.Authorization) *NodeRequestWorker {
 	return &NodeRequestWorker{
 		encryptor:      encryptor,
 		registry:       registry,
-		gitProvider:    gitProvider,
 		webhookBaseURL: webhookBaseURL,
 		semaphore:      semaphore.NewWeighted(25),
 		authService:    authService,
 		logger:         log.WithFields(log.Fields{"worker": "NodeRequestWorker"}),
+	}
+}
+
+func (w *NodeRequestWorker) factoryIntakeDeps() factoryactions.IntakeDependencies {
+	return factoryactions.IntakeDependencies{
+		Registry:       w.registry,
+		Encryptor:      w.encryptor,
+		AuthService:    w.authService,
+		WebhookBaseURL: w.webhookBaseURL,
 	}
 }
 
@@ -99,12 +107,43 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 		newEvents = append(newEvents, events...)
 	}
 
+	type pendingFactoryWorkOrderUpdate struct {
+		factoryID string
+		orderID   string
+		reason    string
+	}
+	pendingFactoryWorkOrderUpdates := []pendingFactoryWorkOrderUpdate{}
+	onFactoryWorkOrderUpdated := func(factoryID, orderID, reason string) {
+		pendingFactoryWorkOrderUpdates = append(pendingFactoryWorkOrderUpdates, pendingFactoryWorkOrderUpdate{
+			factoryID: factoryID,
+			orderID:   orderID,
+			reason:    reason,
+		})
+	}
+	type pendingGitHubPullRequest struct {
+		organizationID uuid.UUID
+		factoryID      uuid.UUID
+		pullRequestID  uuid.UUID
+	}
+	pendingGitHubPullRequests := []pendingGitHubPullRequest{}
+	onGitHubPullRequestRecorded := func(organizationID, factoryID, pullRequestID uuid.UUID) {
+		pendingGitHubPullRequests = append(pendingGitHubPullRequests, pendingGitHubPullRequest{
+			organizationID: organizationID,
+			factoryID:      factoryID,
+			pullRequestID:  pullRequestID,
+		})
+	}
+	pendingFileBindCleanups := []contexts.FileBindCleanup{}
+	onFileBindCleanup := func(job contexts.FileBindCleanup) {
+		pendingFileBindCleanups = append(pendingFileBindCleanups, job)
+	}
+
 	runCancellations := &RunCancellationNotifier{}
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		r, err := models.LockNodeRequest(tx, request.ID)
 		if err == nil {
-			return w.processRequest(logger, tx, r, onNewEvents, runCancellations)
+			return w.processRequest(logger, tx, r, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup)
 		}
 
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -117,12 +156,31 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 	})
 
 	if err != nil {
+		contexts.ApplyFileBindCleanups(pendingFileBindCleanups, err)
 		logger.Errorf("Error locking and processing request: %v", err)
 		return err
 	}
 
+	contexts.ApplyFileBindCleanups(pendingFileBindCleanups, nil)
+
 	for _, event := range newEvents {
 		messages.PublishCanvasEventCreatedMessage(&event)
+	}
+
+	for _, update := range pendingFactoryWorkOrderUpdates {
+		if err := messages.PublishFactoryWorkOrderUpdated(update.factoryID, update.orderID, update.reason); err != nil {
+			logger.Errorf("failed to publish factory work order updated RabbitMQ message: %v", err)
+		}
+	}
+
+	for _, recorded := range pendingGitHubPullRequests {
+		factoryactions.ScheduleFactoryPullRequestMergeabilityRefresh(
+			context.Background(),
+			w.factoryIntakeDeps(),
+			recorded.organizationID,
+			recorded.factoryID,
+			recorded.pullRequestID,
+		)
 	}
 
 	runCancellations.Publish()
@@ -130,21 +188,39 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 	return nil
 }
 
-func (w *NodeRequestWorker) processRequest(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent), runCancellations *RunCancellationNotifier) error {
+func (w *NodeRequestWorker) processRequest(
+	logger *log.Entry,
+	tx *gorm.DB,
+	request *models.CanvasNodeRequest,
+	onNewEvents func([]models.CanvasEvent),
+	runCancellations *RunCancellationNotifier,
+	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
+	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
+	onFileBindCleanup func(contexts.FileBindCleanup),
+) error {
 	switch request.Type {
 	case models.NodeRequestTypeInvokeAction:
-		return w.invokeHook(logger, tx, request, onNewEvents, runCancellations)
+		return w.invokeHook(logger, tx, request, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup)
 	}
 
 	return fmt.Errorf("unsupported node execution request type %s", request.Type)
 }
 
-func (w *NodeRequestWorker) invokeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent), runCancellations *RunCancellationNotifier) error {
+func (w *NodeRequestWorker) invokeHook(
+	logger *log.Entry,
+	tx *gorm.DB,
+	request *models.CanvasNodeRequest,
+	onNewEvents func([]models.CanvasEvent),
+	runCancellations *RunCancellationNotifier,
+	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
+	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
+	onFileBindCleanup func(contexts.FileBindCleanup),
+) error {
 	if request.ExecutionID == nil {
 		return w.invokeNodeHook(logger, tx, request, onNewEvents)
 	}
 
-	return w.invokeComponentHook(logger, tx, request, onNewEvents, runCancellations)
+	return w.invokeComponentHook(logger, tx, request, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup)
 }
 
 func (w *NodeRequestWorker) invokeNodeHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent)) error {
@@ -252,7 +328,22 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(logger *log.Entry, tx *gorm.
 		return fmt.Errorf("spec is not specified")
 	}
 
-	hookProvider, _, err := w.registry.FindActionHook(nodeRef.Component.Name, spec.InvokeAction.ActionName)
+	componentName := nodeRef.Component.Name
+	configuration := node.Configuration.Data()
+	if request.ExecutionID != nil {
+		execution, err := models.FindNodeExecutionInTransaction(tx, request.WorkflowID, *request.ExecutionID)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if execution != nil {
+			if frozen := execution.FrozenComponentName(); frozen != "" {
+				componentName = frozen
+				configuration = execution.Configuration.Data()
+			}
+		}
+	}
+
+	hookProvider, _, err := w.registry.FindActionHook(componentName, spec.InvokeAction.ActionName)
 	if err != nil {
 		return fmt.Errorf("failed to find hook: %v", err)
 	}
@@ -260,7 +351,7 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(logger *log.Entry, tx *gorm.
 	logger = logging.WithNode(logger, *node)
 	hookCtx := core.ActionHookContext{
 		Name:          spec.InvokeAction.ActionName,
-		Configuration: node.Configuration.Data(),
+		Configuration: configuration,
 		Parameters:    spec.InvokeAction.Parameters,
 		Logger:        logger,
 		HTTP:          w.registry.HTTPContextInTransaction(tx),
@@ -300,7 +391,16 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(logger *log.Entry, tx *gorm.
 	return request.Complete(tx)
 }
 
-func (w *NodeRequestWorker) invokeComponentHook(logger *log.Entry, tx *gorm.DB, request *models.CanvasNodeRequest, onNewEvents func([]models.CanvasEvent), runCancellations *RunCancellationNotifier) error {
+func (w *NodeRequestWorker) invokeComponentHook(
+	logger *log.Entry,
+	tx *gorm.DB,
+	request *models.CanvasNodeRequest,
+	onNewEvents func([]models.CanvasEvent),
+	runCancellations *RunCancellationNotifier,
+	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
+	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
+	onFileBindCleanup func(contexts.FileBindCleanup),
+) error {
 	if request.ExecutionID == nil {
 		return fmt.Errorf("execution id is required for component hook")
 	}
@@ -315,7 +415,7 @@ func (w *NodeRequestWorker) invokeComponentHook(logger *log.Entry, tx *gorm.DB, 
 		return request.Complete(tx)
 	}
 
-	return w.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents, runCancellations)
+	return w.invokeExecutionComponentHook(logger, tx, request, execution, onNewEvents, runCancellations, onFactoryWorkOrderUpdated, onGitHubPullRequestRecorded, onFileBindCleanup)
 }
 
 func (w *NodeRequestWorker) invokeExecutionComponentHook(
@@ -325,6 +425,9 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 	execution *models.CanvasNodeExecution,
 	onNewEvents func([]models.CanvasEvent),
 	runCancellations *RunCancellationNotifier,
+	onFactoryWorkOrderUpdated func(factoryID, orderID, reason string),
+	onGitHubPullRequestRecorded func(organizationID, factoryID, pullRequestID uuid.UUID),
+	onFileBindCleanup func(contexts.FileBindCleanup),
 ) error {
 	node, err := models.FindUnscopedCanvasNode(tx, execution.WorkflowID, execution.NodeID)
 	if err != nil {
@@ -348,7 +451,14 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		return fmt.Errorf("spec is not specified")
 	}
 
-	hookProvider, _, err := w.registry.FindActionHook(node.Ref.Data().Component.Name, spec.InvokeAction.ActionName)
+	componentName := ""
+	if component := node.Ref.Data().Component; component != nil {
+		componentName = component.Name
+	}
+	if frozen := execution.FrozenComponentName(); frozen != "" {
+		componentName = frozen
+	}
+	hookProvider, _, err := w.registry.FindActionHook(componentName, spec.InvokeAction.ActionName)
 	if err != nil {
 		return fmt.Errorf("component not found: %w", err)
 	}
@@ -369,8 +479,19 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
 		Auth:           contexts.NewAuthReader(tx, workflow.OrganizationID, w.authService, nil),
 		Secrets:        contexts.NewSecretsContext(tx, w.registry, workflow.OrganizationID, w.encryptor),
-		Files:          contexts.NewRepositoryFilesContextInTransaction(w.gitProvider, execution.WorkflowID, tx),
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),
+		Factory: contexts.NewFactoryContext(tx, workflow, execution).
+			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
+			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
+			WithFileBindCleanup(onFileBindCleanup).
+			WithRemoteImageIngest(w.encryptor, w.registry),
+		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
+		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
+		RunnerTasks: contexts.NewRunnerTaskContext(
+			tx,
+			w.encryptor,
+			workflow.OrganizationID,
+		),
 	}
 
 	if node.AppInstallationID != nil {

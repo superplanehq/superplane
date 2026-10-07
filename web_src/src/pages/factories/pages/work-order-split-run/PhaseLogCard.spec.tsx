@@ -1,0 +1,536 @@
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
+
+import { PhaseLogCard } from "./PhaseLogCard";
+import { groupClaudeSteps } from "./phaseLogStream";
+import { idleLiveLogStream, line, LONG_NOTE, PHASE, PLANNING_STREAM } from "./PhaseLogCard.testHelpers";
+import type { SplitRunStreamLine } from "./splitRunMocks";
+
+const useLiveLogStreamMock = vi.fn();
+
+vi.mock("@monaco-editor/react", () => ({
+  default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
+}));
+
+vi.mock("@/contexts/useTheme", () => ({
+  useTheme: () => ({ preference: "light", resolvedTheme: "light", setPreference: () => undefined }),
+}));
+
+vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({
+  useLiveLogStream: (...args: unknown[]) => useLiveLogStreamMock(...args),
+}));
+
+beforeEach(() => {
+  useLiveLogStreamMock.mockReturnValue(idleLiveLogStream(vi.fn()));
+});
+
+// jsdom reports 0 for layout sizes, so overflow can only be exercised by
+// stubbing the read-only height getters. Returns a cleanup that removes them.
+function stubElementHeights({ scrollHeight, clientHeight }: { scrollHeight: number; clientHeight: number }) {
+  Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, value: scrollHeight });
+  Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, value: clientHeight });
+  return () => {
+    delete (HTMLElement.prototype as unknown as { scrollHeight?: number }).scrollHeight;
+    delete (HTMLElement.prototype as unknown as { clientHeight?: number }).clientHeight;
+  };
+}
+
+describe("groupClaudeSteps", () => {
+  it("keeps tools and agent notes in log order", () => {
+    const write = groupClaudeSteps(PLANNING_STREAM.filter((entry) => entry.note)).find(
+      (step) => step.line.id === "step-write",
+    );
+    expect(write?.events.map((event) => event.kind)).toEqual(["tools", "note", "tools"]);
+    expect(write?.events[0]).toMatchObject({
+      kind: "tools",
+      tools: [{ componentName: "cat /tmp/ORDER.md" }],
+    });
+    expect(write?.events[1]).toMatchObject({
+      kind: "note",
+      line: { componentName: LONG_NOTE },
+    });
+    expect(write?.events[2]).toMatchObject({
+      kind: "tools",
+      tools: [{ componentName: "LineListCard.tsx" }],
+    });
+  });
+
+  it("does not let blank notes split consecutive tools", () => {
+    const grouped = groupClaudeSteps([
+      line({ id: "step-write", note: true, componentType: "prompt", componentName: "Plan" }),
+      line({
+        id: "t1",
+        note: true,
+        noteParentId: "step-write",
+        componentType: "bash",
+        componentName: "echo a",
+      }),
+      line({
+        id: "blank",
+        note: true,
+        noteParentId: "step-write",
+        componentType: "note",
+        componentName: "  ",
+      }),
+      line({
+        id: "t2",
+        note: true,
+        noteParentId: "step-write",
+        componentType: "bash",
+        componentName: "echo b",
+      }),
+    ]);
+
+    expect(grouped[0]?.events).toHaveLength(1);
+    expect(grouped[0]?.events[0]).toMatchObject({
+      kind: "tools",
+      tools: [{ id: "t1" }, { id: "t2" }],
+    });
+  });
+});
+
+describe("PhaseLogCard collapsed stream", () => {
+  it("shows node steps without a caret and keeps them open", async () => {
+    const user = userEvent.setup();
+    render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
+
+    const node = screen.getByTestId("split-run-stream-line-planner-agent");
+    expect(node.querySelector(".lucide-chevron-right")).toBeNull();
+    expect(node.className).toMatch(/\bbg-muted\b/);
+    expect(node.className).not.toMatch(/\bbg-background\b/);
+    expect(node.className).not.toMatch(/border-b/);
+    expect(screen.getByText("Clone Repo")).toBeInTheDocument();
+    expect(screen.getByText("Write Implementation Plan")).toBeInTheDocument();
+    expect(screen.getByText("Use plan as output")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-line-step-clone")).getByText("✓")).toBeInTheDocument();
+    expect(within(screen.getByTestId("split-run-stream-line-step-fail")).getByText("✗")).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-stream-line-step-clone").querySelector(".lucide-chevron-right")).toBeNull();
+    expect(screen.getByTestId("split-run-stream-line-step-clone").className).toMatch(/\bbg-muted\b/);
+    expect(screen.getByTestId("split-run-stream-line-step-clone").className).not.toMatch(/\bbg-background\b/);
+    expect(screen.getByText("Cloning into 'superplane'...")).toBeInTheDocument();
+    expect(screen.getByText(LONG_NOTE)).toBeInTheDocument();
+    expect(screen.queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Agent - Plan for GH Issue"));
+    expect(screen.getByText("Clone Repo")).toBeInTheDocument();
+    await user.click(screen.getByText("Clone Repo"));
+    expect(screen.getByText("Cloning into 'superplane'...")).toBeInTheDocument();
+  });
+
+  it("wraps long bash and prompt titles", () => {
+    render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
+
+    const bash = screen.getByTestId("split-run-stream-line-step-clone");
+    const bashTitle = within(bash).getByText("Clone Repo");
+    expect(bash).not.toHaveClass("whitespace-nowrap");
+    expect(bashTitle).not.toHaveClass("truncate");
+    expect(bashTitle).toHaveClass("whitespace-pre-wrap", "break-words");
+
+    const prompt = screen.getByTestId("split-run-stream-line-step-write");
+    const promptTitle = within(prompt).getByText("Write Implementation Plan");
+    expect(prompt).not.toHaveClass("whitespace-nowrap");
+    expect(promptTitle).not.toHaveClass("truncate");
+    expect(promptTitle).toHaveClass("whitespace-pre-wrap", "break-words");
+
+    const output = within(screen.getByTestId("split-run-stream-line-step-clone").parentElement as HTMLElement)
+      .getByTestId("split-run-stream-output")
+      .querySelector("pre");
+    expect(output).toHaveClass("whitespace-pre-wrap", "break-words");
+    expect(output).not.toHaveClass("truncate");
+  });
+
+  it("preserves newlines in a multi-line step title", () => {
+    const multilineTitle = "set -e\necho line two";
+    const stream: SplitRunStreamLine[] = [
+      line({ id: "planner-agent", componentName: "Agent - Plan for GH Issue", componentType: "Run Claude Code" }),
+      line({
+        id: "step-multiline",
+        note: true,
+        componentName: multilineTitle,
+        componentType: "bash",
+        status: "passed",
+      }),
+    ];
+
+    render(<PhaseLogCard phase={PHASE} expanded stream={stream} />);
+
+    const title = screen.getByText(
+      (_, element) => element?.textContent === multilineTitle && element.classList.contains("whitespace-pre-wrap"),
+    );
+    expect(title).toHaveClass("whitespace-pre-wrap");
+    expect(title.textContent).toBe(multilineTitle);
+  });
+
+  it("clamps a long step title to two lines with a subtle expand toggle", async () => {
+    const restoreHeights = stubElementHeights({ scrollHeight: 120, clientHeight: 40 });
+    try {
+      const user = userEvent.setup();
+      const longTitle = "line one\nline two\nline three\nline four";
+      const stream: SplitRunStreamLine[] = [
+        line({ id: "planner-agent", componentName: "Agent - Plan for GH Issue", componentType: "Run Claude Code" }),
+        line({
+          id: "step-long",
+          note: true,
+          componentName: longTitle,
+          componentType: "bash",
+          status: "passed",
+        }),
+      ];
+
+      render(<PhaseLogCard phase={PHASE} expanded stream={stream} />);
+
+      const titleEl = () =>
+        screen.getByText(
+          (_, element) => element?.textContent === longTitle && element.classList.contains("whitespace-pre-wrap"),
+        );
+
+      expect(titleEl()).toHaveClass("line-clamp-2");
+      const toggle = screen.getByTestId("split-run-title-toggle");
+      expect(toggle).toHaveTextContent("Show more");
+      expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+      await user.click(toggle);
+
+      expect(titleEl()).not.toHaveClass("line-clamp-2");
+      expect(screen.getByTestId("split-run-title-toggle")).toHaveTextContent("Show less");
+      expect(screen.getByTestId("split-run-title-toggle")).toHaveAttribute("aria-expanded", "true");
+    } finally {
+      restoreHeights();
+    }
+  });
+
+  it("does not add an expand toggle when a short title fits in two lines", () => {
+    const restoreHeights = stubElementHeights({ scrollHeight: 40, clientHeight: 40 });
+    try {
+      const stream: SplitRunStreamLine[] = [
+        line({ id: "planner-agent", componentName: "Agent - Plan for GH Issue", componentType: "Run Claude Code" }),
+        line({ id: "step-short", note: true, componentName: "echo hi", componentType: "bash", status: "passed" }),
+      ];
+
+      render(<PhaseLogCard phase={PHASE} expanded stream={stream} />);
+
+      expect(screen.queryByTestId("split-run-title-toggle")).not.toBeInTheDocument();
+    } finally {
+      restoreHeights();
+    }
+  });
+
+  it("expands the selected node in the log", () => {
+    render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} selectedNodeId="planner-agent" />);
+
+    expect(screen.getByText("Clone Repo")).toBeInTheDocument();
+    expect(screen.getByText("Write Implementation Plan")).toBeInTheDocument();
+    expect(screen.getByText(LONG_NOTE)).toBeInTheDocument();
+  });
+
+  it("maps live log sections under an expanded runner node", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [
+        {
+          index: 0,
+          text: "Prepare Claude Code",
+          kind: "setup",
+          preview: "npm install",
+          lines: [],
+          events: [],
+          status: "passed",
+          duration_ms: 10,
+          started_at: 1,
+          collapsed: true,
+        },
+        {
+          index: 1,
+          text: "Set Up Git User",
+          kind: "bash",
+          preview: 'echo "Using superplaneagent@superplane.com"',
+          lines: ["Using superplaneagent@superplane.com"],
+          events: [],
+          status: "passed",
+          duration_ms: 20,
+          started_at: 1,
+          collapsed: true,
+        },
+        {
+          index: 5,
+          text: "Implementation",
+          kind: "prompt",
+          preview: "You are implementing a fix",
+          lines: [],
+          events: [
+            { kind: "note", text: "Gathering issue context first." },
+            {
+              kind: "tools",
+              id: "5-tools-0",
+              tools: [
+                {
+                  id: "5-tool-0",
+                  kind: "read",
+                  text: "pkg/foo.go",
+                  lines: ["package workers"],
+                  status: "passed",
+                  duration_ms: 80,
+                },
+              ],
+            },
+          ],
+          status: "passed",
+          duration_ms: 900,
+          started_at: 1,
+          collapsed: true,
+        },
+      ],
+      orphanLines: [],
+      error: null,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Run Claude Code",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText("Prepare Claude Code")).not.toBeInTheDocument();
+    expect(screen.getByText("bash")).toBeInTheDocument();
+    expect(screen.getByText("Set Up Git User")).toBeInTheDocument();
+    expect(screen.getByText('echo "Using superplaneagent@superplane.com"')).toBeInTheDocument();
+    expect(screen.getByText("prompt")).toBeInTheDocument();
+    expect(screen.getByText("Implementation")).toBeInTheDocument();
+    expect(screen.getByText("You are implementing a fix")).toBeInTheDocument();
+    expect(screen.getByText("Gathering issue context first.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Read 1 file" })).toBeInTheDocument();
+  });
+
+  it("collapses session setup and bash when compactSessionLog is on", () => {
+    useLiveLogStreamMock.mockReturnValue({
+      sections: [
+        {
+          index: 1,
+          text: "Clone Repo",
+          kind: "bash",
+          preview: "git clone repo",
+          lines: ["Cloning into 'repo'..."],
+          events: [],
+          status: "passed",
+          duration_ms: 20,
+          started_at: 1,
+          collapsed: true,
+        },
+        {
+          index: 5,
+          text: "Plan with the user",
+          kind: "prompt",
+          preview: "You are in a SuperPlane planning session",
+          lines: [],
+          events: [
+            { kind: "note", text: "Planning session tools enabled" },
+            { kind: "note", text: "permission mode: bypassPermissions" },
+            { kind: "note", text: "The repository is ready. What do you want to do?" },
+            { kind: "note", text: '{"message":"Hi! I am ready to help you plan work in this repository."}' },
+            {
+              kind: "tools",
+              id: "5-tools-0",
+              tools: [
+                {
+                  id: "5-tool-0",
+                  kind: "read",
+                  text: "README.md",
+                  lines: ["# Store"],
+                  status: "passed",
+                  duration_ms: 80,
+                },
+              ],
+            },
+          ],
+          status: "passed",
+          duration_ms: 900,
+          started_at: 1,
+          collapsed: true,
+        },
+      ],
+      orphanLines: [],
+      error: null,
+      isStreaming: false,
+      toggleSection: vi.fn(),
+      scrollRef: { current: null },
+    });
+
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Run Claude Code",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText("git clone repo")).not.toBeInTheDocument();
+    expect(screen.queryByText("Planning session tools enabled")).not.toBeInTheDocument();
+    expect(screen.queryByText("permission mode: bypassPermissions")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ran 1 command" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Setup" })).not.toBeInTheDocument();
+    expect(screen.queryByText("You are in a SuperPlane planning session")).not.toBeInTheDocument();
+    expect(screen.queryByText("prompt")).not.toBeInTheDocument();
+    expect(screen.queryByText(/"message":"Hi! I am ready/)).not.toBeInTheDocument();
+    expect(screen.getByText("The repository is ready. What do you want to do?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Read 1 file, used 1 tool" })).toBeInTheDocument();
+  });
+
+  it("hides the automation and node headers in the compact session log", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "agent-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "note",
+            componentName: "The repository is ready. What do you want to do?",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.queryByTestId("split-run-automation-header-plan")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-stream-line-runner-agent")).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+    expect(screen.getByText("The repository is ready. What do you want to do?")).toBeInTheDocument();
+  });
+
+  it("marks user replies in the compact session log", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "user-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "prompt",
+            componentName: "Add a Size field",
+          }),
+          line({
+            id: "agent-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "note",
+            componentName: "I can draft that.",
+          }),
+        ]}
+      />,
+    );
+
+    const userNote = screen.getByTestId("split-run-user-note");
+    expect(userNote).toHaveTextContent("You");
+    expect(userNote).toHaveTextContent("Add a Size field");
+    expect(screen.getByText("I can draft that.")).toBeInTheDocument();
+    expect(screen.getByText("I can draft that.").closest("[data-testid='split-run-user-note']")).toBeNull();
+  });
+
+  it("renders markdown in compact session log notes", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "agent-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "note",
+            componentName: "Changed color to **size** with a `medium` option.",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("size").tagName).toBe("STRONG");
+    expect(screen.getByText("medium").tagName).toBe("CODE");
+    expect(screen.queryByText("**size**")).not.toBeInTheDocument();
+  });
+
+  it("renders a fenced Go note as one code block", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        compactSessionLog
+        stream={[
+          line({
+            id: "runner-agent",
+            nodeId: "runner-agent",
+            componentName: "Agent",
+            componentType: "Run Claude Code",
+            component: "runnerClaudeCode",
+          }),
+          line({
+            id: "agent-1",
+            nodeId: "runner-agent",
+            note: true,
+            componentType: "note",
+            componentName: "```go\npackage main\n\nfunc main() {}\n```",
+          }),
+        ]}
+      />,
+    );
+
+    expect(screen.getAllByTestId("code-block-editor")).toHaveLength(1);
+    expect(screen.queryByText("undefined")).not.toBeInTheDocument();
+    expect(screen.getByTestId("monaco-stub")).toHaveTextContent("package main");
+  });
+});

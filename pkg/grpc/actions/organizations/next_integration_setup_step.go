@@ -31,9 +31,9 @@ func NextIntegrationSetupStep(
 	inputs *structpb.Struct,
 	capabilities []string,
 ) (*pb.NextIntegrationSetupStepResponse, error) {
-	org, err := uuid.Parse(orgID)
+	org, err := resolveOrganizationID(ctx, orgID)
 	if err != nil {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid organization ID")
+		return nil, err
 	}
 
 	integrationID, err := uuid.Parse(id)

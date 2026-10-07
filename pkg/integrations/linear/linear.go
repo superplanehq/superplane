@@ -55,13 +55,35 @@ type Metadata struct {
 	Organization         string  `json:"organization,omitempty" mapstructure:"organization,omitempty"`
 	URLKey               string  `json:"urlKey,omitempty" mapstructure:"urlKey,omitempty"`
 	AccessTokenExpiresAt string  `json:"accessTokenExpiresAt,omitempty" mapstructure:"accessTokenExpiresAt,omitempty"`
+	// HostedOAuth is true when this connection uses SuperPlane's Linear OAuth app.
+	HostedOAuth bool `json:"hostedOAuth,omitempty" mapstructure:"hostedOAuth,omitempty"`
+	// SetupReturnPath is a same-origin path to open after OAuth, such as the intake wizard.
+	SetupReturnPath string `json:"setupReturnPath,omitempty" mapstructure:"setupReturnPath,omitempty"`
 }
 
 const installationInstructions = `
-SuperPlane connects to Linear with OAuth.
+SuperPlane connects to Linear with OAuth. A workspace admin must authorize the connection, because the triggers register webhooks. That person must also be a member of each private team you want to listen to.
 
-1. Click the **Connect** button with client id and secret empty to start the setup wizard. 
+The connection requests the **read**, **write**, and **admin** scopes. Write covers creating and editing issues, comments, attachments, and reactions. Admin lets SuperPlane register webhooks.
 
+1. Open Linear, then **Settings**, then **Administration**, then **API**.
+2. Under **OAuth applications**, click **Create new**.
+3. Set the callback URL to the address SuperPlane shows, then create the application.
+4. Copy the **Client ID** into the **Client ID** field.
+5. Copy the **Client Secret** into the **Client Secret** field.
+6. Click **Save**. SuperPlane opens Linear so a workspace admin can authorize the connection.
+
+You can also leave both fields empty and click **Save**. SuperPlane opens Linear's application form with the callback URL filled in. Copy the **Client ID** and **Client Secret** from the credentials page into the fields above, then click **Save** again.
+
+Linear lets only a comment's own author edit it, so **Update Issue Comment** can only change comments that this same connection posted.
+`
+
+const hostedInstallationInstructions = `
+Click **Connect** to authorize SuperPlane in your Linear workspace. A workspace admin must approve the connection. That person must also be a member of each private team you want to listen to.
+
+The connection requests the **read**, **write**, and **admin** scopes. Write covers creating and editing issues. Admin lets SuperPlane register webhooks.
+
+To use your own OAuth application instead, open the manual setup and paste its **Client ID** and **Client Secret**.
 `
 
 func (l *Linear) Name() string {
@@ -81,6 +103,9 @@ func (l *Linear) Description() string {
 }
 
 func (l *Linear) Instructions() string {
+	if UseHostedOAuth() {
+		return hostedInstallationInstructions
+	}
 	return installationInstructions
 }
 
@@ -109,6 +134,11 @@ func (l *Linear) Actions() []core.Action {
 		&UpdateIssue{},
 		&AddIssueLabel{},
 		&AddIssueComment{},
+		&UpdateIssueComment{},
+		&CreateAttachment{},
+		&DeleteAttachment{},
+		&RemoveIssueLabel{},
+		&AddReaction{},
 	}
 }
 
@@ -117,26 +147,21 @@ func (l *Linear) Triggers() []core.Trigger {
 		&OnIssue{},
 		&OnIssueComment{},
 		&OnIssueLabel{},
+		&OnIssueAttachment{},
 	}
 }
 
 func (l *Linear) Sync(ctx core.SyncContext) error {
-	callbackURL := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
-
-	//
-	// Sensitive configuration values are stored encrypted, and only
-	// GetConfig decrypts them - never read the client secret from
-	// ctx.Configuration directly.
-	//
-	clientID, _ := ctx.Integration.GetConfig("clientId")
-	clientSecret, _ := ctx.Integration.GetConfig("clientSecret")
+	app := resolveOAuthApp(ctx.Integration)
+	callbackURL := oauthCallbackURL(ctx.BaseURL, ctx.Integration.ID(), app.Hosted)
 
 	//
 	// Without app credentials, guide the user through creating the OAuth app.
 	// Linear has no API for this, but its creation form accepts manifest query
-	// parameters, so the form opens fully pre-filled.
+	// parameters, so the form opens fully pre-filled. A hosted app skips this
+	// step and authorizes SuperPlane's application.
 	//
-	if len(clientID) == 0 || len(clientSecret) == 0 {
+	if !app.configured() {
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: appSetupDescription,
 			URL:         appCreateURL(ctx.BaseURL, callbackURL),
@@ -151,14 +176,14 @@ func (l *Linear) Sync(ctx core.SyncContext) error {
 	//
 	accessToken, _ := findSecret(ctx.Integration, OAuthAccessToken)
 	if accessToken == "" {
-		return l.requestAuthorization(ctx, string(clientID), callbackURL)
+		return l.requestAuthorization(ctx, app, callbackURL)
 	}
 
 	//
 	// Linear access tokens expire after 24 hours,
 	// so refresh on every scheduled resync.
 	//
-	if err := l.refreshToken(ctx, string(clientID), string(clientSecret)); err != nil {
+	if err := l.refreshToken(ctx, app.ClientID, app.ClientSecret); err != nil {
 		ctx.Logger.Errorf("Failed to refresh token: %v", err)
 		return err
 	}
@@ -186,11 +211,9 @@ func appCreateURL(baseURL, callbackURL string) string {
 	return fmt.Sprintf("%s?%s", AppsNewURL, params.Encode())
 }
 
-func (l *Linear) requestAuthorization(ctx core.SyncContext, clientID, callbackURL string) error {
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-		ctx.Logger.Errorf("Failed to decode metadata while setting state: %v", err)
-	}
+func (l *Linear) requestAuthorization(ctx core.SyncContext, app oauthApp, callbackURL string) error {
+	metadata := readMetadata(ctx.Integration)
+	rememberSetupReturnPath(ctx, &metadata)
 
 	if metadata.State == nil {
 		state, err := crypto.Base64String(32)
@@ -198,8 +221,11 @@ func (l *Linear) requestAuthorization(ctx core.SyncContext, clientID, callbackUR
 			return fmt.Errorf("failed to generate state: %v", err)
 		}
 		metadata.State = &state
-		ctx.Integration.SetMetadata(metadata)
 	}
+	metadata.HostedOAuth = app.Hosted
+	ctx.Integration.SetMetadata(metadata)
+
+	clientID := app.ClientID
 
 	authorizeURL := fmt.Sprintf(
 		"%s?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s&prompt=consent&actor=user",
@@ -348,12 +374,15 @@ func (l *Linear) updateMetadata(ctx core.SyncContext) error {
 	// The recorded token expiration carries over, since it drives when the next
 	// sync refreshes and is unrelated to the workspace data loaded here.
 	//
+	previous := readMetadata(ctx.Integration)
 	ctx.Integration.SetMetadata(Metadata{
 		User:                 viewer.User,
 		Teams:                teams,
 		Organization:         viewer.Organization.Name,
 		URLKey:               viewer.Organization.URLKey,
-		AccessTokenExpiresAt: readMetadata(ctx.Integration).AccessTokenExpiresAt,
+		AccessTokenExpiresAt: previous.AccessTokenExpiresAt,
+		HostedOAuth:          previous.HostedOAuth,
+		SetupReturnPath:      previous.SetupReturnPath,
 	})
 
 	return nil
@@ -365,20 +394,12 @@ func (l *Linear) HandleRequest(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	clientID, err := ctx.Integration.GetConfig("clientId")
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
+	metadata := readMetadata(ctx.Integration)
+	app := resolveOAuthApp(ctx.Integration)
+	if metadata.HostedOAuth {
+		app.Hosted = true
 	}
-
-	clientSecret, err := ctx.Integration.GetConfig("clientSecret")
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+	if !app.configured() {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -389,13 +410,14 @@ func (l *Linear) HandleRequest(ctx core.HTTPRequestContext) {
 	}
 
 	settingsURL := fmt.Sprintf("%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID())
-	redirectURI := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
+	redirectURL := callbackRedirectURL(ctx, settingsURL)
+	redirectURI := oauthCallbackURL(ctx.BaseURL, ctx.Integration.ID(), app.Hosted && metadata.HostedOAuth)
 
 	auth := NewAuth(ctx.HTTP)
-	tokenResponse, err := auth.HandleCallback(ctx.Request, string(clientID), string(clientSecret), expectedState, redirectURI)
+	tokenResponse, err := auth.HandleCallback(ctx.Request, app.ClientID, app.ClientSecret, expectedState, redirectURI)
 	if err != nil {
 		ctx.Logger.Errorf("Callback error: %v", err)
-		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 		return
 	}
 
@@ -421,14 +443,14 @@ func (l *Linear) HandleRequest(ctx core.HTTPRequestContext) {
 	}); err != nil {
 		ctx.Logger.Errorf("Callback error: failed to update metadata: %v", err)
 		ctx.Integration.Error(fmt.Sprintf("connected, but failed to load workspace data: %v", err))
-		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 		return
 	}
 
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
 
-	http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+	http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 }
 
 func findSecret(integration core.IntegrationContext, name string) (string, error) {

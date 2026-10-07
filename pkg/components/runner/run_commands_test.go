@@ -398,6 +398,7 @@ func TestValidateEnvironment(t *testing.T) {
 func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -450,7 +451,7 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &req))
 
 	assert.Equal(t, testRunnerMachineType, req.FleetID)
-	assert.Equal(t, []BrokerCommand{{Command: "echo hello"}}, req.Commands)
+	assert.Equal(t, []BrokerCommand{{Command: "echo hello", Kind: LiveLogKindBash, Preview: "echo hello"}}, req.Commands)
 	assert.Equal(t, config.MaxWebhookPayloadSize, req.WebhookPayloadSizeLimit)
 	assert.Equal(t, map[string]string{
 		"canvas_id":       "canvas-1",
@@ -463,6 +464,7 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -491,9 +493,10 @@ func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
 	assert.Equal(t, MachineTypeE1LargeARM64, req.FleetID)
 }
 
-func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
+func TestRunnerExecuteSendsOnlyPagerDefaultsWithoutConfiguredEnvironment(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -517,12 +520,16 @@ func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
 
 	body, err := io.ReadAll(httpContext.Requests[0].Body)
 	require.NoError(t, err)
-	assert.NotContains(t, string(body), "environment")
+
+	var req brokerCreateTaskRequest
+	require.NoError(t, json.Unmarshal(body, &req))
+	assert.Equal(t, pagerDefaults, req.Environment)
 }
 
 func TestRunnerExecuteFailsWhenSecretCannotBeResolved(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{}
 
@@ -606,11 +613,30 @@ func TestRunnerProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
 	}
 	require.NoError(t, (&Runner{}).processTaskStatus(state, task, ""))
 	require.Equal(t, FailedOutputChannel, state.Channel)
+	assert.False(t, state.Cancelled)
+}
+
+func TestRunnerProcessTaskStatusCanceledAnalysisCancelsExecution(t *testing.T) {
+	t.Parallel()
+
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	markAnalysisSession(state)
+	exit := 130
+	task := &Task{
+		Status:   "canceled",
+		ExitCode: &exit,
+	}
+	require.NoError(t, (&Runner{}).processTaskStatus(state, task, ""))
+	assert.True(t, state.Cancelled)
+	assert.True(t, state.Finished)
+	assert.False(t, state.Passed)
+	assert.Empty(t, state.Channel)
 }
 
 func TestBrokerCancelTaskSuccess(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -631,6 +657,7 @@ func TestBrokerCancelTaskSuccess(t *testing.T) {
 func TestBrokerCancelTask404Noop(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -647,6 +674,7 @@ func TestBrokerCancelTask404Noop(t *testing.T) {
 func TestBrokerCancelTask409RetriesThenSucceeds(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
@@ -666,10 +694,12 @@ func TestBrokerCancelTask409RetriesThenSucceeds(t *testing.T) {
 func TestRunnerCancelCallsBroker(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"up-1","state":"already_terminal","status":"succeeded"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"broker-42","status":"canceled"}`))},
 		},
 	}
 
@@ -679,13 +709,15 @@ func TestRunnerCancelCallsBroker(t *testing.T) {
 		ExecutionState: state,
 	})
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
+	require.Len(t, httpContext.Requests, 2)
 	assert.Equal(t, "/v1/tasks/broker-42/cancel", httpContext.Requests[0].URL.Path)
+	assert.Equal(t, "/v1/tasks/broker-42", httpContext.Requests[1].URL.Path)
 }
 
 func TestBrokerListActiveTasks(t *testing.T) {
 	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
 
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{

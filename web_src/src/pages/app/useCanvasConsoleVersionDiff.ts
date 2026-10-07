@@ -121,22 +121,23 @@ export function useCanvasConsoleVersionDiff({
       onShowConsoleDiff: consoleYamlDiffPayload ? onShowConsoleDiff : undefined,
     },
     draftConsoleDiffSummary,
-    consoleYamlDiffModal: consoleYamlDiffPayload
-      ? createElement(
-          Suspense,
-          { fallback: null },
-          createElement(CanvasYamlDiffModal, {
-            open: consoleDiffOpen,
-            onOpenChange: setConsoleDiffOpen,
-            liveYamlText: consoleYamlDiffPayload.liveYamlText,
-            draftYamlText: consoleYamlDiffPayload.draftYamlText,
-            filename: consoleYamlDiffPayload.filename,
-            title: "Console YAML diff",
-            dialogTitle: "Console YAML diff",
-            description: "Side-by-side YAML comparison between live and draft console versions.",
-          }),
-        )
-      : null,
+    consoleYamlDiffModal:
+      consoleYamlDiffPayload && consoleDiffOpen
+        ? createElement(
+            Suspense,
+            { fallback: null },
+            createElement(CanvasYamlDiffModal, {
+              open: consoleDiffOpen,
+              onOpenChange: setConsoleDiffOpen,
+              liveYamlText: consoleYamlDiffPayload.liveYamlText,
+              draftYamlText: consoleYamlDiffPayload.draftYamlText,
+              filename: consoleYamlDiffPayload.filename,
+              title: "Console YAML diff",
+              dialogTitle: "Console YAML diff",
+              description: "Side-by-side YAML comparison between live and draft console versions.",
+            }),
+          )
+        : null,
     draftChangeIndicators,
     hasDraftDiffVersusLive,
   };

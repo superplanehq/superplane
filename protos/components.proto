@@ -24,6 +24,22 @@ message Node {
   optional IntegrationRef integration = 9;
   optional string error_message = 10;
   optional string warning_message = 11;
+
+  // Inline concurrency configuration for this node. Absent means the
+  // node runs one execution at a time.
+  optional ConcurrencySpec concurrency = 12;
+}
+
+// ConcurrencySpec is a node's inline concurrency configuration.
+message ConcurrencySpec {
+  // Optional template expression that partitions the node's backlog:
+  // each resolved value is an independent queue. May contain {{ }}
+  // expressions resolved per queue item.
+  optional string key = 1;
+
+  // Maximum number of concurrent executions per key value. Absent
+  // means 1. Must be 1 or greater when set.
+  optional int32 max = 2;
 }
 
 message Position {

@@ -1,7 +1,6 @@
 package coolify
 
 import (
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -56,10 +55,6 @@ func (c *ListServices) Configuration() []configuration.Field {
 
 func (c *ListServices) Setup(ctx core.SetupContext) error {
 	return nil
-}
-
-func (c *ListServices) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *ListServices) Execute(ctx core.ExecutionContext) error {

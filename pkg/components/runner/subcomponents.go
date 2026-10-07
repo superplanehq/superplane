@@ -1,7 +1,7 @@
 package runner
 
 import (
-	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -13,14 +13,13 @@ const (
 	MaxExecutionTimeoutSecondsRequest = maxExecutionTimeoutSecondsRequest
 )
 
-func MachineTypeOptions() []configuration.FieldOption {
-	return machineTypeSelectOptions
-}
-
 func IntPtr(v int) *int { return intPtr(v) }
 
-func AfterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
-	return afterRunnerTaskCreated(ctx, taskID)
+func AfterRunnerTaskCreated(
+	ctx core.ExecutionContext,
+	taskID, backend string,
+) error {
+	return afterRunnerTaskCreated(ctx, taskID, backend)
 }
 
 func PollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error {
@@ -31,14 +30,14 @@ func HandleBrokerWebhook(ctx core.WebhookRequestContext, finishedEventType strin
 	return handleBrokerWebhook(ctx, finishedEventType)
 }
 
-func CancelBrokerTask(ctx core.ExecutionContext) error {
-	return cancelBrokerTask(ctx)
+func CancelBrokerTask(ctx core.ExecutionContext, finishedEventType string) error {
+	return cancelBrokerTask(ctx, finishedEventType)
+}
+
+func RevokeOpenRouterChildKey(httpCtx core.HTTPContext, state core.ExecutionStateContext, hosted core.HostedLLMContext, logger *logrus.Entry) {
+	_ = revokeOpenRouterChildKey(httpCtx, state, hosted, logger)
 }
 
 func ProcessBrokerTaskStatus(state core.ExecutionStateContext, task *Task, finishedEventType, organizationID string) error {
-	return processBrokerTaskStatus(state, task, finishedEventType, organizationID, nil)
-}
-
-func EnsureRunnerMinutesAvailable(ctx core.ExecutionContext) error {
-	return ensureRunnerMinutesAvailable(ctx)
+	return processBrokerTaskStatus(state, task, finishedEventType, organizationID, nil, nil, nil)
 }

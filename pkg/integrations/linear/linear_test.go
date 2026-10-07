@@ -474,16 +474,45 @@ func Test__Linear__Definition(t *testing.T) {
 	assert.Equal(t, "linear", integration.Icon())
 
 	actions := integration.Actions()
-	require.Len(t, actions, 5)
+	require.Len(t, actions, 10)
 	assert.Equal(t, "linear.createIssue", actions[0].Name())
 	assert.Equal(t, "linear.getIssue", actions[1].Name())
 	assert.Equal(t, "linear.updateIssue", actions[2].Name())
 	assert.Equal(t, "linear.addIssueLabel", actions[3].Name())
 	assert.Equal(t, "linear.addIssueComment", actions[4].Name())
+	assert.Equal(t, "linear.updateIssueComment", actions[5].Name())
+	assert.Equal(t, "linear.createAttachment", actions[6].Name())
+	assert.Equal(t, "linear.deleteAttachment", actions[7].Name())
+	assert.Equal(t, "linear.removeIssueLabel", actions[8].Name())
+	assert.Equal(t, "linear.addReaction", actions[9].Name())
 
 	triggers := integration.Triggers()
-	require.Len(t, triggers, 3)
+	require.Len(t, triggers, 4)
 	assert.Equal(t, "linear.onIssue", triggers[0].Name())
 	assert.Equal(t, "linear.onIssueComment", triggers[1].Name())
 	assert.Equal(t, "linear.onIssueLabel", triggers[2].Name())
+	assert.Equal(t, "linear.onIssueAttachment", triggers[3].Name())
+}
+
+func Test__Linear__Instructions(t *testing.T) {
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_ID", "")
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET", "")
+
+	text := (&Linear{}).Instructions()
+	assert.Contains(t, text, "Administration")
+	assert.Contains(t, text, "API")
+	assert.Contains(t, text, "admin")
+	assert.Contains(t, text, "Client ID")
+	assert.Contains(t, text, "read")
+	assert.Contains(t, text, "write")
+}
+
+func Test__Linear__Instructions__Hosted(t *testing.T) {
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_ID", "hosted-client")
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET", "hosted-secret")
+
+	text := (&Linear{}).Instructions()
+	assert.Contains(t, text, "Connect")
+	assert.Contains(t, text, "Client ID")
+	assert.Contains(t, text, "admin")
 }

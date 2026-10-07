@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { createHttpSyntheticCheckMapper } from "./create_http_synthetic_check";
 import { deleteHttpSyntheticCheckMapper } from "./delete_http_synthetic_check";

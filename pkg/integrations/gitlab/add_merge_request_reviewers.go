@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -174,10 +173,6 @@ func (c *AddMergeRequestReviewers) Execute(ctx core.ExecutionContext) error {
 		"gitlab.mergeRequest",
 		[]any{updated},
 	)
-}
-
-func (c *AddMergeRequestReviewers) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *AddMergeRequestReviewers) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

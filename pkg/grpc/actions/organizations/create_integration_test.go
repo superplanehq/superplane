@@ -11,13 +11,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
-	usagepb "github.com/superplanehq/superplane/pkg/protos/usage"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 )
@@ -26,6 +25,12 @@ func Test__CreateIntegration(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	baseURL := "http://localhost"
+	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+		OnSync: func(ctx core.SyncContext) error {
+			ctx.Integration.Ready()
+			return nil
+		},
+	})
 
 	t.Run("duplicate integration name -> error", func(t *testing.T) {
 		name := support.RandomName("integration")
@@ -35,7 +40,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Create first integration
 		//
-		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Integration)
@@ -44,7 +49,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Try to create second integration with the same name
 		//
-		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
 		require.Error(t, err)
 		code, msg, ok := grpcerrors.HandlerStatus(err)
 		assert.True(t, ok)
@@ -60,7 +65,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Create first integration
 		//
-		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		integrationID := response.Integration.Metadata.Id
@@ -97,7 +102,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Create a new installation with the same name
 		//
-		response2, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		response2, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response2)
 		assert.Equal(t, name, response2.Integration.Metadata.Name)
@@ -126,7 +131,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Create integration in first organization
 		//
-		response1, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		response1, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", name, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response1)
 		assert.Equal(t, name, response1.Integration.Metadata.Name)
@@ -134,7 +139,7 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// Create integration with same name in second organization
 		//
-		response2, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org2.ID.String(), "github", name, appConfig)
+		response2, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org2.ID.String(), "dummy", name, appConfig)
 		require.NoError(t, err)
 		require.NotNil(t, response2)
 		assert.Equal(t, name, response2.Integration.Metadata.Name)
@@ -254,43 +259,123 @@ func Test__CreateIntegration(t *testing.T) {
 		assert.Empty(t, response.Integration.Status.StateDescription)
 	})
 
-	t.Run("usage limit violation blocks integration creation", func(t *testing.T) {
+	t.Run("github uses legacy create when new setup flow feature is off", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_GITHUB_APP_ID", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "")
+
 		name := support.RandomName("integration")
 		appConfig, err := structpb.NewStruct(map[string]any{"organization": "test-org"})
 		require.NoError(t, err)
-		integrationCount, err := models.CountIntegrationsByOrganization(r.Organization.ID.String())
+
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "github", name, appConfig)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		assert.Nil(t, response.Integration.Status.SetupState)
+	})
+
+	t.Run("github uses setup provider when new setup flow feature is on", func(t *testing.T) {
+		t.Setenv("SUPERPLANE_GITHUB_APP_ID", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "")
+		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "")
+
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
+
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, nil)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		require.NotNil(t, response.Integration.Status.SetupState)
+		require.NotNil(t, response.Integration.Status.SetupState.CurrentStep)
+	})
+
+	t.Run("github requires repository selection when the public app is configured", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+
+		t.Setenv("SUPERPLANE_GITHUB_APP_ID", "99")
+		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
+		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
+
+		name := support.RandomName("integration")
+		_, err = CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, nil)
+		require.Error(t, err)
+		code, message, ok := grpcerrors.HandlerStatus(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.FailedPrecondition, code)
+		assert.Contains(t, message, "select a repository")
+		_, findErr := models.FindIntegrationByName(database.Conn(), org.ID, name)
+		assert.ErrorIs(t, findErr, gorm.ErrRecordNotFound)
+	})
+
+	t.Run("sentry uses hosted install when the public app env is set", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
+
+		t.Setenv("SUPERPLANE_SENTRY_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_ID", "cid")
+		t.Setenv("SUPERPLANE_SENTRY_APP_CLIENT_SECRET", "csecret")
+
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "sentry", name, nil)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		assert.Nil(t, response.Integration.Status.SetupState)
+		require.NotNil(t, response.Integration.Status.BrowserAction)
+		assert.Equal(t, "GET", response.Integration.Status.BrowserAction.Method)
+		assert.Contains(t, response.Integration.Status.BrowserAction.Url, "/api/v1/sentry/app/install?state=")
+	})
+
+	t.Run("github keeps legacy create when privateApp is set and setup flow feature is off", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+
+		t.Setenv("SUPERPLANE_GITHUB_APP_ID", "99")
+		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
+		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
+
+		appConfig, err := structpb.NewStruct(map[string]any{"privateApp": true})
 		require.NoError(t, err)
 
-		service := &fakeUsageService{
-			enabled: true,
-			checkOrganizationResp: &usagepb.CheckOrganizationLimitsResponse{
-				Allowed: false,
-				Violations: []*usagepb.LimitViolation{
-					{
-						Limit:           usagepb.LimitName_LIMIT_NAME_MAX_INTEGRATIONS,
-						ConfiguredLimit: 0,
-						CurrentValue:    1,
-					},
-				},
-			},
-		}
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, appConfig)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		assert.Nil(t, response.Integration.Status.SetupState)
+		require.NotNil(t, response.Integration.Status.BrowserAction)
+		assert.Equal(t, "POST", response.Integration.Status.BrowserAction.Method)
+	})
 
-		_, err = CreateIntegrationWithUsage(
-			ctx,
-			service,
-			r.Registry,
-			nil,
-			baseURL,
-			baseURL,
-			r.Organization.ID.String(),
-			"github",
-			name,
-			appConfig,
-		)
-		require.Error(t, err)
-		assert.Equal(t, codes.ResourceExhausted, grpcerrors.Code(err))
-		assert.Equal(t, "organization integration limit exceeded", status.Convert(err).Message())
-		require.Len(t, service.checkOrganizationCalls, 1)
-		assert.Equal(t, int32(integrationCount+1), service.checkOrganizationCalls[0].state.Integrations)
+	t.Run("github uses setup provider when privateApp is set even if hosted install is on", func(t *testing.T) {
+		org, err := models.CreateOrganization(support.RandomName("org"), "")
+		require.NoError(t, err)
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureNewIntegrationSetupFlow))
+		require.NoError(t, models.EnableExperimentalFeature(org.ID, features.FeatureFactories))
+
+		t.Setenv("SUPERPLANE_GITHUB_APP_ID", "99")
+		t.Setenv("SUPERPLANE_GITHUB_APP_SLUG", "superplane")
+		t.Setenv("SUPERPLANE_GITHUB_APP_PRIVATE_KEY", "test-pem")
+		t.Setenv("SUPERPLANE_GITHUB_APP_WEBHOOK_SECRET", "whsec")
+
+		appConfig, err := structpb.NewStruct(map[string]any{"privateApp": true})
+		require.NoError(t, err)
+
+		name := support.RandomName("integration")
+		response, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, org.ID.String(), "github", name, appConfig)
+		require.NoError(t, err)
+		require.NotNil(t, response.Integration)
+		require.NotNil(t, response.Integration.Status.SetupState)
+		require.NotNil(t, response.Integration.Status.SetupState.CurrentStep)
+		assert.Nil(t, response.Integration.Status.BrowserAction)
 	})
 }

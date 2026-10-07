@@ -153,7 +153,7 @@ func TestLoopStartLoop(t *testing.T) {
 	assert.Equal(t, 120*time.Second, scheduled.interval)
 }
 
-func TestLoopStartDeferredWhenAnotherSessionActive(t *testing.T) {
+func TestLoopStartDeferredWhenSessionsAtLimit(t *testing.T) {
 	component := &Loop{}
 	deferred := false
 
@@ -165,8 +165,9 @@ func TestLoopStartDeferredWhenAnotherSessionActive(t *testing.T) {
 		FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
 			return nil, nil
 		},
-		HasRunningExecutions: func() (bool, error) {
-			return true, nil
+		MaxConcurrency: 2,
+		CountRunningExecutions: func() (int64, error) {
+			return 2, nil
 		},
 		DeferQueueItem: func() error {
 			deferred = true
@@ -182,6 +183,45 @@ func TestLoopStartDeferredWhenAnotherSessionActive(t *testing.T) {
 	require.ErrorIs(t, err, core.ErrQueueItemDeferred)
 	assert.Nil(t, id)
 	assert.True(t, deferred)
+}
+
+func TestLoopStartsParallelSessionBelowLimit(t *testing.T) {
+	component := &Loop{}
+	execState := &contexts.ExecutionStateContext{}
+	execMetadata := &contexts.MetadataContext{}
+	scheduled := &scheduledRequestContext{}
+	executionID := uuid.New()
+
+	ctx := core.ProcessQueueContext{
+		RootEventID: uuid.New().String(),
+		Configuration: map[string]any{
+			"untilExpression": `$["Checker"].ready == true`,
+			"timeoutSeconds":  120,
+		},
+		FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+			return nil, nil
+		},
+		MaxConcurrency: 3,
+		CountRunningExecutions: func() (int64, error) {
+			return 2, nil
+		},
+		CreateExecution: func() (*core.ExecutionContext, error) {
+			return &core.ExecutionContext{
+				ID:             executionID,
+				Metadata:       execMetadata,
+				Requests:       scheduled,
+				ExecutionState: execState,
+			}, nil
+		},
+		DequeueItem:     func() error { return nil },
+		UpdateNodeState: func(state string) error { return nil },
+	}
+
+	id, err := component.ProcessQueueItem(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, id)
+	assert.Equal(t, executionID, *id)
+	assert.False(t, execState.Finished)
 }
 
 func TestReadMetadataFromPersistedJSON(t *testing.T) {

@@ -1,6 +1,6 @@
 import { render as testingLibraryRender, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import type { ChangeEvent } from "react";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
@@ -117,6 +117,6 @@ describe("PanelEditorDialog", () => {
 
     rerender(panelEditorElement({ open: false, onOpenChange }));
 
-    expect(screen.getByTestId("panel-yaml-diff-modal")).toHaveAttribute("data-open", "false");
+    expect(screen.queryByTestId("panel-yaml-diff-modal")).not.toBeInTheDocument();
   });
 });

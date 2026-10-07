@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { RunInspectorChrome } from "./RunInspectorChrome";
 
 vi.mock("sonner", () => ({
@@ -50,7 +50,25 @@ describe("RunInspectorChrome", () => {
     fireEvent.click(screen.getByRole("button", { name: "Copy run link" }));
 
     await waitFor(() => {
-      expect(writeText).toHaveBeenCalledWith("http://localhost:3000/org-1/apps/app-1?run=run-1");
+      expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/org-1/apps/app-1?run=run-1`);
     });
+  });
+
+  it("hides run navigation in factory context", () => {
+    render(
+      <RunInspectorChrome
+        runId="run-1"
+        newerRunId="run-newer"
+        olderRunId="run-older"
+        onNavigateRun={vi.fn()}
+        onClose={() => {}}
+        showRunNavigation={false}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Newer run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Older run" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy run link" })).not.toBeInTheDocument();
   });
 });

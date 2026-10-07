@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -343,10 +342,6 @@ func validateReadOnlySQL(sql string) error {
 		return fmt.Errorf("only read-only queries are allowed: INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE, CREATE, and GRANT are not permitted")
 	}
 	return nil
-}
-
-func (c *QueryLogfire) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *QueryLogfire) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

@@ -60,6 +60,7 @@ type PrepareComponentBaseNodeArgs = {
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
   canvasId: string;
   queryClient: QueryClient;
+  organizationId?: string;
   currentUser?: User;
   edges?: ComponentsEdge[];
   canvasMode?: "live" | "edit";
@@ -111,6 +112,9 @@ function buildPreparedTriggerCanvasNode(args: {
     actions: openModal ? buildTriggerActionContext(canvasId, node.id!, openModal) : undefined,
   });
 
+  const componentLabel = triggerMetadata?.label || node.component || undefined;
+  const nodeName = typeof node.name === "string" && node.name.trim() ? node.name.trim() : undefined;
+
   return {
     id: node.id!,
     position,
@@ -121,6 +125,8 @@ function buildPreparedTriggerCanvasNode(args: {
       outputChannels: ["default"],
       trigger: {
         ...triggerProps,
+        componentLabel,
+        nodeName,
         collapsed: node.isCollapsed,
         error: node.errorMessage,
         warning: node.warningMessage,
@@ -221,6 +227,7 @@ export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode
     nodeQueueItemsMap,
     canvasId,
     queryClient,
+    organizationId: args.organizationId,
     currentUser,
     edges,
     canvasMode: args.canvasMode,
@@ -228,7 +235,17 @@ export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode
 }
 
 export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): CanvasNode {
-  const { nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, canvasId, queryClient, currentUser } = args;
+  const {
+    nodes,
+    node,
+    components,
+    nodeExecutionsMap,
+    nodeQueueItemsMap,
+    canvasId,
+    queryClient,
+    organizationId,
+    currentUser,
+  } = args;
   const executions = nodeExecutionsMap[node.id!] || [];
   const metadata = components.find((c) => c.name === node.component);
   const displayLabel = node.name || metadata?.label || node.component || "Component";
@@ -249,6 +266,8 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
       currentUser: buildUserInfo(currentUser),
       actions: buildActionContext(queryClient, canvasId, node.id!),
       canvasMode: args.canvasMode,
+      organizationId,
+      canvasId,
     });
 
     if (!componentBaseProps.iconSrc) {
@@ -259,6 +278,8 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
     }
 
     const emptyStateProps = resolveComponentEmptyStateProps(componentBaseProps, node);
+    const componentLabel = metadata?.label || node.component || undefined;
+    const nodeName = typeof node.name === "string" && node.name.trim() ? node.name.trim() : undefined;
 
     return {
       id: node.id!,
@@ -271,6 +292,8 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
         component: {
           ...componentBaseProps,
           emptyStateProps,
+          componentLabel,
+          nodeName,
           error: node.errorMessage,
           warning: node.warningMessage,
         },

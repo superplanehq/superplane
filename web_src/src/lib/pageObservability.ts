@@ -9,7 +9,7 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
   const segments = pathname.split("/").filter(Boolean);
 
   if (segments.length === 0) {
-    return { pageKey: "organizationSelect", attributes: {} };
+    return { pageKey: "rootOrganizationRedirect", attributes: {} };
   }
 
   const [first, second, third, fourth] = segments;
@@ -18,16 +18,16 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
     return { pageKey: "login", attributes: {} };
   }
 
-  if (first === "create") {
-    return { pageKey: "organizationCreate", attributes: {} };
+  if (first === "onboarding") {
+    return { pageKey: "organizationOnboarding", attributes: {} };
   }
 
   if (first === "setup") {
     return { pageKey: "ownerSetup", attributes: {} };
   }
 
-  if (first === "install") {
-    return { pageKey: "install", attributes: {} };
+  if (first === "github" && second === "approved") {
+    return { pageKey: "githubInstallApproved", attributes: {} };
   }
 
   if (first === "invite" && second) {
@@ -41,6 +41,10 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
 
     if (second === "settings") {
       return { pageKey: "adminSettings", attributes: {} };
+    }
+
+    if (second === "price-books") {
+      return { pageKey: "adminPriceBooks", attributes: {} };
     }
 
     if (second === "runner-tasks") {
@@ -97,6 +101,10 @@ export function resolvePageObservability(pathname: string): PageObservabilityCon
 
   if (second === "settings") {
     return resolveSettingsPageObservability(organizationId, segments.slice(2));
+  }
+
+  if (second === "organization") {
+    return resolveOrganizationSettingsPageObservability(organizationId, segments.slice(2));
   }
 
   return null;
@@ -165,9 +173,57 @@ function resolveSettingsPageObservability(organizationId: string, segments: stri
       return { pageKey: "settingsAPIKeys", attributes: organizationAttributes };
     case "profile":
       return { pageKey: "settingsProfile", attributes: organizationAttributes };
+    case "notifications":
+      return { pageKey: "settingsNotifications", attributes: organizationAttributes };
     case "billing":
       return { pageKey: "settingsUsage", attributes: organizationAttributes };
     default:
       return { pageKey: "settingsUnknown", attributes: organizationAttributes };
   }
+}
+
+function resolveOrganizationSettingsPageObservability(
+  organizationId: string,
+  segments: string[],
+): PageObservabilityContext {
+  const organizationAttributes = { organization_id: organizationId };
+  const [section, ...rest] = segments;
+
+  if (!section || section === "general") {
+    return { pageKey: "organizationSettingsGeneral", attributes: organizationAttributes };
+  }
+
+  if (section === "workspaces") {
+    return { pageKey: "organizationSettingsWorkspaces", attributes: organizationAttributes };
+  }
+
+  if (section === "workspace-usage" || section === "llm-spend" || section === "spending") {
+    return { pageKey: "organizationSettingsWorkspaceUsage", attributes: organizationAttributes };
+  }
+
+  if (section === "billing") {
+    return { pageKey: "organizationSettingsBilling", attributes: organizationAttributes };
+  }
+
+  if (section === "usage") {
+    return { pageKey: "organizationSettingsUsage", attributes: organizationAttributes };
+  }
+
+  if (section === "integrations") {
+    if (!rest[0]) {
+      return { pageKey: "organizationSettingsIntegrations", attributes: organizationAttributes };
+    }
+    if (rest[1] === "setup") {
+      return {
+        pageKey: "organizationSettingsIntegrationSetup",
+        attributes: { ...organizationAttributes, integration_name: rest[0] },
+      };
+    }
+    return {
+      pageKey: "organizationSettingsIntegrationDetail",
+      attributes: { ...organizationAttributes, integration_id: rest[0] },
+    };
+  }
+
+  return { pageKey: "organizationSettingsUnknown", attributes: { ...organizationAttributes, section } };
 }

@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render as testingLibraryRender, waitFor } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
-import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 
 const { fitViewMock, getNodesMock, getViewportMock, reactFlowPropsRef, setViewportMock } = vi.hoisted(() => ({
@@ -30,6 +30,12 @@ vi.mock("@/sentry", () => ({
 }));
 
 vi.mock("@xyflow/react", () => ({
+  Position: {
+    Left: "left",
+    Right: "right",
+    Top: "top",
+    Bottom: "bottom",
+  },
   Background: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   Panel: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   ReactFlow: (props: { children?: ReactNode; nodes?: unknown }) => {
@@ -74,6 +80,10 @@ vi.mock("../componentSidebar", () => ({
 
 vi.mock("@/components/CanvasToolSidebar", () => ({
   CanvasToolSidebar: () => null,
+}));
+
+vi.mock("@/pages/factories/agent/FactoryCanvasToolSidebar", () => ({
+  FactoryCanvasToolSidebar: () => null,
 }));
 
 vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
@@ -177,6 +187,41 @@ describe("CanvasPage auto-focus toggle", () => {
 
     expect(fitViewMock).not.toHaveBeenCalled();
     expect(viewportRef.current).toEqual(initialViewport);
+  });
+
+  it("does not pan the viewport when a focus request sets fit to false", async () => {
+    const hasFitToViewRef = { current: true };
+    const node = {
+      id: "node-1",
+      position: { x: 0, y: 0 },
+      data: { label: "Trigger", state: "pending", type: "component" },
+    };
+    getNodesMock.mockReturnValue([node]);
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={[node]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          hasFitToViewRef={hasFitToViewRef}
+          focusRequest={{ nodeId: "node-1", requestId: 7, targetMode: "live", fit: false }}
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: setViewportMock });
+    });
+
+    await waitFor(() => {
+      expect(selectedRunNodes().some((entry) => entry.id === "node-1" && entry.selected)).toBe(true);
+    });
+    expect(fitViewMock).not.toHaveBeenCalled();
   });
 
   it("skips fitView for run participant fit requests when auto-focus is disabled and consumes the nonce", () => {

@@ -1,5 +1,7 @@
 import React from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { Switch } from "@/ui/switch";
 import type { FieldRendererProps, ValidationError } from "./types";
 import { BooleanFieldRenderer } from "./BooleanFieldRenderer";
@@ -23,6 +25,9 @@ interface ConfigurationFieldRendererProps extends FieldRendererProps {
   // New real-time validation props
   realtimeValidationErrors?: Array<{ field: string; message: string; type: string }>;
   enableRealtimeValidation?: boolean;
+  /** `checkbox` draws a check row. The canvas editor uses `switch`. */
+  booleanControl?: "switch" | "checkbox";
+  hideLabel?: boolean;
 }
 
 type ConfigurationField = FieldRendererProps["field"];
@@ -102,9 +107,11 @@ export const ConfigurationFieldRenderer = ({
   field,
   value,
   onChange,
+  onValuesChange,
   allValues = {},
   integrationId,
   organizationId,
+  factoryId,
   hasError = false,
   validationErrors,
   fieldPath,
@@ -116,6 +123,9 @@ export const ConfigurationFieldRenderer = ({
   expressionPreviewContext,
   expressionErrorMessage,
   expressionTemplateValue,
+  booleanControl = "switch",
+  hideLabel = false,
+  triggerClassName,
 }: ConfigurationFieldRendererProps) => {
   const isTogglable = field.togglable === true;
   const isEnabled = isTogglable ? value !== null && value !== undefined : true;
@@ -274,11 +284,13 @@ export const ConfigurationFieldRenderer = ({
     field,
     value,
     onChange,
+    onValuesChange,
     allValues,
     hasError: hasFieldError,
     autocompleteExampleObj: resolvedAutocompleteExampleObj,
     integrationId,
     organizationId,
+    factoryId,
     allowExpressions: fieldAllowsExpressions,
     readOnly,
     excludedSuggestions: runTitlePresentation ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
@@ -286,6 +298,7 @@ export const ConfigurationFieldRenderer = ({
     expressionPreviewContext,
     expressionErrorMessage,
     expressionTemplateValue,
+    triggerClassName,
   };
 
   if (readOnly && !shouldRenderFieldForReadOnly(field)) {
@@ -370,6 +383,59 @@ export const ConfigurationFieldRenderer = ({
     );
   }
 
+  if (field.type === "multi-select" && booleanControl === "checkbox") {
+    const options = field.typeOptions?.multiSelect?.options ?? [];
+    const selected = Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    return (
+      <div className="flex flex-col gap-2">
+        {options.map((option) => {
+          if (!option.value) {
+            return null;
+          }
+          const optionValue = option.value;
+          const checked = selected.includes(optionValue);
+          const label = option.label || optionValue;
+          return (
+            <label
+              key={optionValue}
+              className={cn(
+                "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+                checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15",
+              )}
+            >
+              <Checkbox
+                checked={checked}
+                onChange={(event) => {
+                  const next = event.target.checked
+                    ? [...selected, optionValue]
+                    : selected.filter((item) => item !== optionValue);
+                  onChange(next.length > 0 ? next : undefined);
+                }}
+                aria-label={label}
+              />
+              <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">{label}</span>
+            </label>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (field.type === "boolean" && !isTogglable && booleanControl === "checkbox") {
+    const checked = value === true;
+    return (
+      <label
+        className={cn(
+          "flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+          checked ? "border-foreground/20 bg-accent/50" : "border-border bg-card hover:border-foreground/15",
+        )}
+      >
+        <Checkbox checked={checked} onChange={(event) => onChange(event.target.checked)} aria-label={fieldLabel} />
+        <span className="min-w-0 text-[13px] font-medium tracking-[-0.01em] text-foreground">{fieldLabel}</span>
+      </label>
+    );
+  }
+
   // Non-togglable booleans render the switch inline with the label.
   if (field.type === "boolean") {
     return (
@@ -412,23 +478,25 @@ export const ConfigurationFieldRenderer = ({
 
   // For all other field types, render label above field
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-3">
-        {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
-        <Label className="block text-left flex-1 min-w-0">
-          {fieldLabel}
-          {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
-          {hasFieldError &&
-            ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
-              (!enableRealtimeValidation &&
-                validationErrors &&
-                isRequired &&
-                (value === undefined || value === null || value === ""))) && (
-              <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
-            )}
-        </Label>
-        <div ref={labelRightRef} className="ml-auto shrink-0" />
-      </div>
+    <div className={hideLabel ? undefined : "space-y-2"}>
+      {hideLabel ? null : (
+        <div className="flex items-center gap-3">
+          {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
+          <Label className="block text-left flex-1 min-w-0">
+            {fieldLabel}
+            {isRequired && <span className="text-gray-800 dark:text-gray-100 ml-1">*</span>}
+            {hasFieldError &&
+              ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
+                (!enableRealtimeValidation &&
+                  validationErrors &&
+                  isRequired &&
+                  (value === undefined || value === null || value === ""))) && (
+                <span className={REQUIRED_FIELD_BADGE_CLASS}>Required</span>
+              )}
+          </Label>
+          <div ref={labelRightRef} className="ml-auto shrink-0" />
+        </div>
+      )}
       {isEnabled && (
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0">{renderField()}</div>
@@ -470,6 +538,8 @@ function shouldRenderFieldForReadOnly(field: ConfigurationField): boolean {
     "integration",
     "secret",
     "run-parameters",
+    "hosted-model",
+    "runner-fleet",
   ];
 
   return (

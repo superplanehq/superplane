@@ -5,7 +5,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Link } from "@/components/Link/link";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
-import { useParams } from "react-router-dom";
+import { useParams } from "react-router";
 import { ChevronLeft } from "lucide-react";
 import { CanvasModeToggle, type CanvasMode } from "./components/CanvasModeToggle";
 import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
@@ -15,7 +15,7 @@ import type { AgentSuggestion } from "./components/AgentSuggestionsHoverCard";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
 
-export type HeaderMode = "default" | "version-live" | "console" | "memory" | "files";
+export type HeaderMode = "default" | "version-live" | "console" | "memory";
 
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). May be undefined while the canvas is still loading. */
@@ -32,6 +32,7 @@ export interface HeaderProps {
     diffCounts: { added: number; updated: number; removed: number };
     diffToggles: {
       showDeletedNodes: boolean;
+      showDeletedNodesControl?: boolean;
       toggleShowDeletedNodes: () => void;
       showEdgeDiff: boolean;
       toggleShowEdgeDiff: () => void;
@@ -74,10 +75,6 @@ export interface HeaderProps {
   onSelectConsole?: () => void;
   /** Provided when Memory is available as a first-class tab; opens the Memory view. */
   onSelectMemory?: () => void;
-  /** Provided when Files is available as a first-class tab; opens the Files view. */
-  onSelectFiles?: () => void;
-  /** DOM slot for Files mode actions owned by the files editor overlay. */
-  filesHeaderActionsSlotId?: string;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
   publishVersionLabel?: string;
   /** When true, shows the Discard control next to Publish in version edit mode (draft differs from live). */
@@ -86,14 +83,10 @@ export interface HeaderProps {
   hasUnpublishedCanvasDraftChanges?: boolean;
   /** Draft indicator for the Console tab when console changes exist. */
   hasUnpublishedConsoleDraftChanges?: boolean;
-  /** Draft indicator for the Files tab when a non-spec repository file is staged. */
-  hasFilesStagingChanges?: boolean;
   hasUncommittedCanvasDraftChanges?: boolean;
   hasUncommittedConsoleDraftChanges?: boolean;
-  hasUncommittedFilesDraftChanges?: boolean;
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
-  hasCommittedFilesDraftChanges?: boolean;
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
   /** Canvas rename requires `canvases:update`; hide rename when the user cannot update. */
@@ -236,12 +229,12 @@ function PageHeader({
 function FactoryReturnLink({ organizationId, factoryId }: { organizationId: string; factoryId: string }) {
   return (
     <Link
-      href={`/${organizationId}/factories/${factoryId}`}
+      href={`/${organizationId}/workspaces/${factoryId}/overview`}
       className="inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
       data-testid="return-to-factory-link"
     >
       <ChevronLeft className="h-4 w-4" aria-hidden />
-      Return to factory
+      Return to workspace
     </Link>
   );
 }
@@ -271,14 +264,11 @@ function SecondaryHeader(props: HeaderProps) {
               onSelectLive={props.onSelectCanvasView}
               onSelectConsole={props.onSelectConsole}
               onSelectMemory={props.onSelectMemory}
-              onSelectFiles={props.onSelectFiles}
               editing={editing}
               hasCanvasUncommitted={!!props.hasUncommittedCanvasDraftChanges}
               hasCanvasCommitted={!!props.hasCommittedCanvasDraftChanges}
               hasConsoleUncommitted={!!props.hasUncommittedConsoleDraftChanges}
               hasConsoleCommitted={!!props.hasCommittedConsoleDraftChanges}
-              hasFilesUncommitted={!!props.hasUncommittedFilesDraftChanges}
-              hasFilesCommitted={!!props.hasCommittedFilesDraftChanges}
             />
           ) : null}
         </div>
@@ -290,7 +280,7 @@ function SecondaryHeader(props: HeaderProps) {
 }
 
 function shouldShowCanvasViewModeToggle(props: HeaderProps): boolean {
-  if (!props.onSelectConsole && !props.onSelectMemory && !props.onSelectFiles) {
+  if (!props.onSelectConsole && !props.onSelectMemory) {
     return false;
   }
 
@@ -298,18 +288,11 @@ function shouldShowCanvasViewModeToggle(props: HeaderProps): boolean {
 }
 
 function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
-  return (
-    !mode ||
-    mode === "default" ||
-    mode === "version-live" ||
-    mode === "console" ||
-    mode === "memory" ||
-    mode === "files"
-  );
+  return !mode || mode === "default" || mode === "version-live" || mode === "console" || mode === "memory";
 }
 
 function getCanvasViewMode(mode: HeaderMode | undefined): CanvasMode {
-  if (mode === "console" || mode === "memory" || mode === "files") {
+  if (mode === "console" || mode === "memory") {
     return mode;
   }
 

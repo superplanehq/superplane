@@ -26,9 +26,6 @@ func init() {
 		Hooks: []core.Hook{
 			{Name: "probeHook", Type: core.HookTypeInternal},
 		},
-		ProcessQueueFunc: func(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-			return ctx.DefaultProcessing()
-		},
 		ExecuteFunc: func(ctx core.ExecutionContext) error {
 			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, "hook_probe.done", []any{map[string]any{}})
 		},
@@ -113,7 +110,7 @@ func Test_NodeRequestWorker_InternalHookUsesExecutionSnapshotConfiguration(t *te
 	}
 	require.NoError(t, database.Conn().Create(&req).Error)
 
-	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, r.GitProvider, "", r.AuthService)
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
 	err := worker.LockAndProcessRequest(req)
 	require.NoError(t, err)
 

@@ -148,6 +148,7 @@ type IntegrationResource struct {
 	Type string
 	Name string
 	ID   string
+	URL  string
 }
 
 type ListResourcesContext struct {
@@ -171,6 +172,7 @@ type SyncContext struct {
 	BaseURL         string
 	WebhooksBaseURL string
 	OrganizationID  string
+	ActorUserID     string
 	HTTP            HTTPContext
 	Integration     IntegrationContext
 	OIDC            oidc.Provider
@@ -245,6 +247,10 @@ type IntegrationContext interface {
 	 */
 	ListSubscriptions() ([]IntegrationSubscriptionContext, error)
 
+	// ListNodeConfigurations returns the configuration of each non-deleted
+	// node that uses this integration on an active canvas.
+	ListNodeConfigurations() ([]any, error)
+
 	/*
 	 * Find a subscription by a predicate function.
 	 * Returns the first subscription that matches the predicate, or nil if none found.
@@ -292,4 +298,7 @@ type WebhookContext interface {
 	GetMetadata() any
 	GetConfiguration() any
 	SetSecret([]byte) error
+	// CallbackHasActiveNodes reports whether webhookID still has live canvas
+	// consumers. Jira uses this before taking over a stale remote callback.
+	CallbackHasActiveNodes(webhookID string) (bool, error)
 }

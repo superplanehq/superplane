@@ -35,7 +35,9 @@ func (p *OnPRComment) Documentation() string {
 ## Configuration
 
 - **Repository**: Select the GitHub repository to monitor
-- **Content Filter**: Optional regex pattern to filter comments (e.g., ` + "`/solve`" + ` to only trigger on comments containing "/solve")
+- **Content Filter**: Optional filter on comments. Mentions that start with @ match as an exact GitHub username. Other values are regular expressions.
+- **Ignore Bots**: Skip comments written by GitHub Apps and bots
+- **Allowed Bots**: React to comments from these GitHub Apps or bots even when the comment does not match the content filter. Enter the bot login, for example coderabbitai.
 
 ## Event Data
 
@@ -120,10 +122,21 @@ func (p *OnPRComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 		return http.StatusOK, nil, nil
 	}
 
-	matched, code, err := applyPRCommentContentFilter(config.ContentFilter, eventType, data)
-	if err != nil {
-		ctx.Logger.Errorf("Failed to apply PR comment content filter: %v", err)
-		return code, nil, err
+	allowed := isAllowedBot(eventType, data, config.AllowedBots)
+	if config.IgnoreBots && isBotAuthor(eventType, data) && !allowed {
+		ctx.Logger.Info("Ignoring event - author is a bot")
+		return http.StatusOK, nil, nil
+	}
+
+	matched := allowed
+	if !allowed {
+		matched, code, err = applyPRCommentContentFilter(config.ContentFilter, eventType, data)
+		if err != nil {
+			ctx.Logger.Errorf("Failed to apply PR comment content filter: %v", err)
+			return code, nil, err
+		}
+	} else {
+		ctx.Logger.Info("Author is an allowed bot - bypassing content filter")
 	}
 
 	if !matched {

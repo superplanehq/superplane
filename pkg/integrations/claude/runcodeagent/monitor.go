@@ -141,7 +141,16 @@ func (a *RunCodeAgent) handleTerminalSession(ctx core.ActionHookContext, client 
 		return a.scheduleNextPoll(ctx, attempt+1, errs)
 	}
 
+	if sm != nil && sm.Err != nil {
+		ctx.Logger.Errorf("Session %s failed: %s", meta.Session.ID, sm.Err.Message)
+		mergeSessionIntoMetadata(meta, sess)
+		_ = ctx.Metadata.Set(*meta)
+		a.teardown(client, meta, false, persist, ctx.Logger.Warnf)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("code agent session failed: %s", sm.Err.Message))
+	}
+
 	out := buildOutput(sess.Status, meta.Session.ID, meta.Branch, sm, meta.PrURL)
+	runagent.RecordSessionUsage(ctx.Usage, ctx.Logger, sess)
 	// Past the poll budget the events may still be unavailable (sm == nil);
 	// emit what we have and only look for artifacts when events were read.
 	if sm != nil {

@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -41,10 +40,6 @@ func (c *testOutputChannelComponent) Hooks() []core.Hook { return nil }
 func (c *testOutputChannelComponent) HandleHook(core.ActionHookContext) error { return nil }
 
 func (c *testOutputChannelComponent) Setup(core.SetupContext) error { return nil }
-
-func (c *testOutputChannelComponent) ProcessQueueItem(core.ProcessQueueContext) (*uuid.UUID, error) {
-	return nil, nil
-}
 
 func (c *testOutputChannelComponent) Execute(core.ExecutionContext) error { return nil }
 

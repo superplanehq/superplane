@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -94,10 +93,6 @@ func decodePurgeCacheConfiguration(configuration any) (PurgeCacheConfiguration, 
 func (c *PurgeCache) Setup(ctx core.SetupContext) error {
 	_, err := decodePurgeCacheConfiguration(ctx.Configuration)
 	return err
-}
-
-func (c *PurgeCache) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *PurgeCache) Execute(ctx core.ExecutionContext) error {

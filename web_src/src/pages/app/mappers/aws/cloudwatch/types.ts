@@ -1,3 +1,46 @@
+export interface CloudWatchDimension {
+  name?: string;
+  value?: string;
+}
+
+/** Alarm payload emitted by the create and update alarm components. */
+export interface CloudWatchAlarm {
+  alarmName?: string;
+  alarmArn?: string;
+  alarmDescription?: string;
+  alarmConfigurationUpdatedTimestamp?: string;
+  actionsEnabled?: boolean;
+  namespace?: string;
+  metricName?: string;
+  dimensions?: CloudWatchDimension[];
+  statistic?: string;
+  extendedStatistic?: string;
+  unit?: string;
+  period?: number;
+  evaluationPeriods?: number;
+  datapointsToAlarm?: number;
+  threshold?: number;
+  thresholdMetricId?: string;
+  comparisonOperator?: string;
+  treatMissingData?: string;
+  evaluateLowSampleCountPercentile?: string;
+  stateValue?: string;
+  stateReason?: string;
+  stateReasonData?: string;
+  stateUpdatedTimestamp?: string;
+  stateTransitionedTimestamp?: string;
+  alarmActions?: string[];
+  okActions?: string[];
+  insufficientDataActions?: string[];
+  region?: string;
+  consoleUrl?: string;
+}
+
+/** Pre-delete snapshot emitted by the delete alarm component. It carries no console URL. */
+export interface CloudWatchDeletedAlarm extends CloudWatchAlarm {
+  deleted?: boolean;
+}
+
 export interface CloudWatchAlarmState {
   value?: string;
   reason?: string;

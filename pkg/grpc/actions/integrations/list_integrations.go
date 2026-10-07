@@ -3,9 +3,17 @@ package integrations
 import (
 	"context"
 
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/github"
+	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/linear"
+	"github.com/superplanehq/superplane/pkg/models"
 	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -14,22 +22,51 @@ import (
 )
 
 func ListIntegrations(ctx context.Context, registry *registry.Registry) (*pb.ListIntegrationsResponse, error) {
-	integrations := registry.ListIntegrations()
+	orgID, err := organizationIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pb.ListIntegrationsResponse{
-		Integrations: serializeIntegrations(registry, integrations),
+		Integrations:        serializeIntegrations(registry, orgID, registry.ListIntegrations()),
+		GithubAppConfigured: config.LoadGitHubHostedAppConfig().Enabled(),
 	}, nil
 }
 
-func serializeIntegrations(registry *registry.Registry, in []core.Integration) []*pb.IntegrationDefinition {
-	out := make([]*pb.IntegrationDefinition, len(in))
-	for i, integration := range in {
+func organizationIDFromContext(ctx context.Context) (uuid.UUID, error) {
+	raw, ok := authentication.GetOrganizationIdFromMetadata(ctx)
+	if !ok {
+		return uuid.Nil, grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return uuid.Nil, grpcerrors.InvalidArgument(err, "invalid organization ID")
+	}
+	return id, nil
+}
+
+func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []core.Integration) []*pb.IntegrationDefinition {
+	visible := make([]core.Integration, 0, len(in))
+	for _, integration := range in {
+		if integration.Name() == models.CustomLLMAppName {
+			continue
+		}
+		visible = append(visible, integration)
+	}
+	out := make([]*pb.IntegrationDefinition, len(visible))
+	for i, integration := range visible {
 		configFields := integration.Configuration()
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = actions.ConfigurationFieldToProto(field)
 		}
 
+		// Hosted GitHub install and the setup wizard are independent.
+		// Connect uses HostedAppInstall. The wizard needs new_integration_setup_flow.
+		useNewFlow := registry.UseNewSetupFlow(orgID, integration.Name())
+		hostedAppInstall := github.UseHostedInstall(orgID.String(), integration.Name()) ||
+			jira.UseHostedInstall(integration.Name()) ||
+			linear.UseHostedInstall(integration.Name())
 		out[i] = &pb.IntegrationDefinition{
 			Name:             integration.Name(),
 			Label:            integration.Label(),
@@ -39,7 +76,8 @@ func serializeIntegrations(registry *registry.Registry, in []core.Integration) [
 			Configuration:    configuration,
 			Capabilities:     serializeCapabilities(registry, integration),
 			CapabilityGroups: serializeCapabilityGroups(registry, integration),
-			LegacySetupOnly:  !registry.SupportsNewSetupFlow(integration.Name()),
+			LegacySetupOnly:  !useNewFlow,
+			HostedAppInstall: hostedAppInstall,
 		}
 	}
 	return out

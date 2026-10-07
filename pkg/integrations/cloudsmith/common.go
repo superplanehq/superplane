@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -113,10 +112,6 @@ func packageResult(spec PackageSpec, pkg *Package) PackageResult {
 		Package:    spec.Package,
 		Data:       pkg,
 	}
-}
-
-func defaultProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func defaultHandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

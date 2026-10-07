@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -174,10 +173,6 @@ func (c *ListAlertRules) Execute(ctx core.ExecutionContext) error {
 
 func (c *ListAlertRules) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *ListAlertRules) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *ListAlertRules) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

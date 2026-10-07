@@ -2,7 +2,6 @@ package core
 
 import (
 	"errors"
-	"io"
 	"net/http"
 	"time"
 
@@ -23,6 +22,7 @@ var (
  */
 type ExecutionContext struct {
 	ID             uuid.UUID
+	RunID          uuid.UUID
 	WorkflowID     string
 	OrganizationID string
 	CanvasName     string
@@ -42,13 +42,15 @@ type ExecutionContext struct {
 	Integration    IntegrationContext
 	Secrets        SecretsContext
 	CanvasMemory   CanvasMemoryContext
-	Files          RepositoryFilesContext
 	Webhook        NodeWebhookContext
 	Expressions    ExpressionContext
 	OIDC           oidc.Provider
 	Apps           AppExecutionContext
 	Runs           RunExecutionContext
 	Factory        FactoryContext
+	Usage          UsageRecorder
+	HostedLLM      HostedLLMContext
+	RunnerTasks    RunnerTaskContext
 }
 
 type AppExecutionContext interface {
@@ -84,7 +86,6 @@ type SetupContext struct {
 	Auth          AuthReader
 	Integration   IntegrationContext
 	Webhook       NodeWebhookContext
-	Files         RepositoryFilesContext
 	Apps          AppContext
 }
 
@@ -92,11 +93,6 @@ type CanvasMemoryContext interface {
 	Add(namespace string, values any) error
 	Find(namespace string, matches map[string]any) ([]any, error)
 	FindFirst(namespace string, matches map[string]any) (any, error)
-}
-
-type RepositoryFilesContext interface {
-	List() ([]string, error)
-	Read(path string) (io.ReadCloser, error)
 }
 
 type CanvasMemoryRecord struct {
@@ -109,6 +105,7 @@ type CanvasMemoryRecord struct {
  */
 type ExecutionStateContext interface {
 	IsFinished() bool
+	IsCancelling() bool
 	SetKV(key, value string) error
 	GetKV(key string) (string, error)
 
@@ -132,6 +129,12 @@ type ExecutionStateContext interface {
 	 * No payloads are emitted.
 	 */
 	Fail(reason, message string) error
+
+	/*
+	 * Cancels the execution.
+	 * No payloads are emitted.
+	 */
+	Cancel() error
 }
 
 /*
@@ -187,17 +190,20 @@ type ProcessQueueContext struct {
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
 
 	//
-	// HasRunningExecutions reports whether this node currently has any
-	// unfinished (running) executions.
+	// MaxConcurrency is the node's effective concurrency max.
+	// Self-managed components use it to gate how much concurrent work
+	// they start, since the queue worker does not capacity-gate their
+	// queue items.
 	//
-	HasRunningExecutions func() (bool, error)
+	MaxConcurrency int
 
 	//
-	// DefaultProcessing performs the default processing for the queue item.
-	// Convenience method to avoid boilerplate in components that just want default behavior,
-	// where an execution is created and the item is dequeued.
+	// CountRunningExecutions returns how many executions of this node
+	// currently occupy a concurrency slot: pending, started, or
+	// cancelling. Pending counts so that items processed in the same
+	// pass cannot all pass a limit check before any execution starts.
 	//
-	DefaultProcessing func() (*uuid.UUID, error)
+	CountRunningExecutions func() (int64, error)
 
 	//
 	// DistinctIncomingSources returns the distinct upstream
@@ -210,7 +216,7 @@ type ProcessQueueContext struct {
 type SecretsContext interface {
 	GetKey(secretName, keyName string) ([]byte, error)
 	GetSecretKeys(secretName string) (map[string][]byte, error)
-	GetIntegrationKeys(installationName string) (map[string][]byte, error)
+	GetIntegrationSecrets(installationName string) (IntegrationSecrets, error)
 }
 
 type User struct {

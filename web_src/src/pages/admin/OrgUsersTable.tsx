@@ -2,10 +2,13 @@ import { Text } from "@/components/Text/text";
 import { Heading } from "@/components/Heading/heading";
 import { Button } from "@/components/ui/button";
 import { useAccount } from "@/contexts/useAccount";
-import { Search, User as UserIcon } from "lucide-react";
+import { CopyButton } from "@/ui/CopyButton";
+import { Search, Trash2, User as UserIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import AdminPagination from "./AdminPagination";
-import { startImpersonation } from "./useAccountActions";
+import { ConfirmDeleteAccountDialog } from "./ConfirmDeleteAccountDialog";
+import { deleteAccount, startImpersonation } from "./useAccountActions";
 
 interface OrgUser {
   id: string;
@@ -20,21 +23,44 @@ interface PaginatedResponse<T> {
 
 const PAGE_SIZE = 50;
 
-function UserRow({ user }: { user: OrgUser }) {
+function CopyableId({ label, id }: { label: string; id: string }) {
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-xs text-gray-400 dark:text-gray-500 w-16 shrink-0">{label}</span>
+      <code className="font-mono text-xs text-gray-600 dark:text-gray-300">{id}</code>
+      <CopyButton text={id} ariaLabel={`Copy ${label.toLowerCase()}`} />
+    </div>
+  );
+}
+
+function UserRow({ user, onDelete }: { user: OrgUser; onDelete: (user: OrgUser) => void }) {
   const { account } = useAccount();
   const isSelf = user.account_id === account?.id;
+  const accountId = user.account_id;
 
   return (
     <tr className="border-b border-slate-50 last:border-0 dark:border-gray-800/70">
       <td className="px-4 py-2.5 text-gray-800 dark:text-gray-100">{user.name}</td>
       <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400">{user.email || "—"}</td>
+      <td className="px-4 py-2.5">
+        <CopyableId label="User ID" id={user.id} />
+        {accountId ? <CopyableId label="Account ID" id={accountId} /> : null}
+      </td>
       <td className="px-4 py-2.5 text-right">
         {isSelf ? (
           <Text className="text-xs text-gray-400 dark:text-gray-500">You</Text>
-        ) : user.account_id ? (
-          <Button variant="outline" size="sm" onClick={() => startImpersonation(user.account_id!)}>
-            Impersonate
-          </Button>
+        ) : accountId ? (
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => startImpersonation(accountId)}>
+              Impersonate
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onDelete(user)}>
+              <span className="flex items-center gap-1">
+                <Trash2 size={14} />
+                Delete
+              </span>
+            </Button>
+          </div>
         ) : null}
       </td>
     </tr>
@@ -42,10 +68,13 @@ function UserRow({ user }: { user: OrgUser }) {
 }
 
 export function OrgUsersTable({ orgId }: { orgId: string }) {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<OrgUser[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<OrgUser | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = useCallback(
     async (s: string, o: number) => {
@@ -69,8 +98,30 @@ export function OrgUsersTable({ orgId }: { orgId: string }) {
     return () => clearTimeout(t);
   }, [search, fetchUsers]);
 
+  const onConfirmDelete = async () => {
+    if (!deleteTarget?.account_id) return;
+    setDeleting(true);
+    const deletedOrganizationIds = await deleteAccount(deleteTarget.account_id, deleteTarget.name);
+    setDeleting(false);
+    if (!deletedOrganizationIds) return;
+    setDeleteTarget(null);
+    if (deletedOrganizationIds.includes(orgId)) {
+      navigate("/admin");
+      return;
+    }
+    fetchUsers(search, offset);
+  };
+
   return (
     <div className="mb-8">
+      <ConfirmDeleteAccountDialog
+        open={deleteTarget !== null}
+        onClose={() => !deleting && setDeleteTarget(null)}
+        onConfirm={onConfirmDelete}
+        accountName={deleteTarget?.name ?? ""}
+        accountEmail={deleteTarget?.email ?? ""}
+        deleting={deleting}
+      />
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <UserIcon size={16} className="text-gray-600 dark:text-gray-400" />
@@ -101,12 +152,13 @@ export function OrgUsersTable({ orgId }: { orgId: string }) {
                 <tr className="border-b border-slate-100 dark:border-gray-700/70">
                   <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Name</th>
                   <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Email</th>
+                  <th className="text-left px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">IDs</th>
                   <th className="text-right px-4 py-2.5 text-gray-500 font-medium dark:text-gray-400">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <UserRow key={u.id} user={u} />
+                  <UserRow key={u.id} user={u} onDelete={setDeleteTarget} />
                 ))}
               </tbody>
             </table>

@@ -1,6 +1,6 @@
 import type { EventSection } from "@/ui/componentBase";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { getState, getTriggerRenderer } from "..";
+import { getState, getTriggerRenderer } from "../mapperLookup";
 import type { ExecutionInfo, NodeInfo } from "../types";
 
 // parseInstancePath extracts the zone and name from a VM instance value of the

@@ -57,6 +57,16 @@ func (c *AddIssueComment) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddIssueCommentOnce, exampleOutputAddIssueCommentBytes, &exampleOutputAddIssueComment)
 }
 
+//go:embed example_output_update_issue_comment.json
+var exampleOutputUpdateIssueCommentBytes []byte
+
+var exampleOutputUpdateIssueCommentOnce sync.Once
+var exampleOutputUpdateIssueComment map[string]any
+
+func (c *UpdateIssueComment) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateIssueCommentOnce, exampleOutputUpdateIssueCommentBytes, &exampleOutputUpdateIssueComment)
+}
+
 //go:embed example_data_on_issue.json
 var exampleDataOnIssueBytes []byte
 
@@ -85,4 +95,54 @@ var exampleDataOnIssueComment map[string]any
 
 func (i *OnIssueComment) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueCommentOnce, exampleDataOnIssueCommentBytes, &exampleDataOnIssueComment)
+}
+
+//go:embed example_output_remove_issue_label.json
+var exampleOutputRemoveIssueLabelBytes []byte
+
+var exampleOutputRemoveIssueLabelOnce sync.Once
+var exampleOutputRemoveIssueLabel map[string]any
+
+func (c *RemoveIssueLabel) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputRemoveIssueLabelOnce, exampleOutputRemoveIssueLabelBytes, &exampleOutputRemoveIssueLabel)
+}
+
+//go:embed example_output_add_reaction.json
+var exampleOutputAddReactionBytes []byte
+
+var exampleOutputAddReactionOnce sync.Once
+var exampleOutputAddReaction map[string]any
+
+func (c *AddReaction) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddReactionOnce, exampleOutputAddReactionBytes, &exampleOutputAddReaction)
+}
+
+//go:embed example_output_create_attachment.json
+var exampleOutputCreateAttachmentBytes []byte
+
+var exampleOutputCreateAttachmentOnce sync.Once
+var exampleOutputCreateAttachment map[string]any
+
+func (c *CreateAttachment) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateAttachmentOnce, exampleOutputCreateAttachmentBytes, &exampleOutputCreateAttachment)
+}
+
+//go:embed example_output_delete_attachment.json
+var exampleOutputDeleteAttachmentBytes []byte
+
+var exampleOutputDeleteAttachmentOnce sync.Once
+var exampleOutputDeleteAttachment map[string]any
+
+func (c *DeleteAttachment) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteAttachmentOnce, exampleOutputDeleteAttachmentBytes, &exampleOutputDeleteAttachment)
+}
+
+//go:embed example_data_on_issue_attachment.json
+var exampleDataOnIssueAttachmentBytes []byte
+
+var exampleDataOnIssueAttachmentOnce sync.Once
+var exampleDataOnIssueAttachment map[string]any
+
+func (i *OnIssueAttachment) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueAttachmentOnce, exampleDataOnIssueAttachmentBytes, &exampleDataOnIssueAttachment)
 }

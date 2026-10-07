@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -430,6 +431,98 @@ func Test__HTTPContext__PolicyResolverInTransactionDoesNotUpdateSharedCache(t *t
 	require.ErrorContains(t, ctx.validateURLWithPolicy(policy, parsed), "access to example.com is not allowed")
 
 	require.NoError(t, ctx.validateURL(parsed))
+}
+
+func Test__HTTPContext__PolicyResolverInTransactionSerializesLookupsForSameTx(t *testing.T) {
+	var (
+		inFlight    atomic.Int32
+		maxInFlight atomic.Int32
+		calls       atomic.Int32
+	)
+
+	ctx, err := NewHTTPContext(HTTPOptions{
+		PolicyResolver: func() (HTTPPolicy, error) {
+			return HTTPPolicy{}, nil
+		},
+		PolicyResolverInTransaction: func(tx *gorm.DB) (HTTPPolicy, error) {
+			calls.Add(1)
+			current := inFlight.Add(1)
+			for {
+				max := maxInFlight.Load()
+				if current <= max || maxInFlight.CompareAndSwap(max, current) {
+					break
+				}
+			}
+			time.Sleep(50 * time.Millisecond)
+			inFlight.Add(-1)
+			return HTTPPolicy{}, nil
+		},
+	})
+	require.NoError(t, err)
+
+	tx := &gorm.DB{}
+	var wg sync.WaitGroup
+	errCh := make(chan error, 2)
+	wg.Add(2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			defer wg.Done()
+			_, lookupErr := ctx.activePolicy(tx)
+			errCh <- lookupErr
+		}()
+	}
+	wg.Wait()
+	close(errCh)
+
+	for lookupErr := range errCh {
+		require.NoError(t, lookupErr)
+	}
+	assert.Equal(t, int32(1), maxInFlight.Load())
+	assert.Equal(t, int32(1), calls.Load())
+}
+
+func Test__HTTPContext__PolicyResolverInTransactionDoesNotBlockOtherTransactions(t *testing.T) {
+	tx1 := &gorm.DB{}
+	tx2 := &gorm.DB{}
+	tx1Started := make(chan struct{})
+	tx1Release := make(chan struct{})
+	tx1Done := make(chan error, 1)
+	tx2Done := make(chan error, 1)
+
+	ctx, err := NewHTTPContext(HTTPOptions{
+		PolicyResolver: func() (HTTPPolicy, error) {
+			return HTTPPolicy{}, nil
+		},
+		PolicyResolverInTransaction: func(tx *gorm.DB) (HTTPPolicy, error) {
+			if tx == tx1 {
+				close(tx1Started)
+				<-tx1Release
+			}
+			return HTTPPolicy{}, nil
+		},
+	})
+	require.NoError(t, err)
+
+	go func() {
+		_, lookupErr := ctx.activePolicy(tx1)
+		tx1Done <- lookupErr
+	}()
+	<-tx1Started
+
+	go func() {
+		_, lookupErr := ctx.activePolicy(tx2)
+		tx2Done <- lookupErr
+	}()
+
+	select {
+	case lookupErr := <-tx2Done:
+		require.NoError(t, lookupErr)
+	case <-time.After(time.Second):
+		t.Fatal("lookup for a second transaction blocked on the first")
+	}
+
+	close(tx1Release)
+	require.NoError(t, <-tx1Done)
 }
 
 func Test__HTTPContextInTransaction__DoUsesTransactionPolicy(t *testing.T) {

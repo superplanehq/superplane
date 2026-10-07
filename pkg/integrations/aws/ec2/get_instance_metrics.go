@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -405,10 +404,6 @@ func (c *GetInstanceMetrics) Hooks() []core.Hook {
 
 func (c *GetInstanceMetrics) HandleHook(ctx core.ActionHookContext) error {
 	return nil
-}
-
-func (c *GetInstanceMetrics) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *GetInstanceMetrics) Cancel(ctx core.ExecutionContext) error {

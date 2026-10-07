@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -265,10 +264,6 @@ func (c *CreateSandbox) Execute(ctx core.ExecutionContext) error {
 
 func (c *CreateSandbox) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (c *CreateSandbox) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *CreateSandbox) Hooks() []core.Hook {

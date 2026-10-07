@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -150,10 +149,6 @@ func (c *PresignedURL) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("method must be GET or PUT")
 	}
 	return nil
-}
-
-func (c *PresignedURL) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *PresignedURL) Execute(ctx core.ExecutionContext) error {

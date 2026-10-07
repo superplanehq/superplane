@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -119,10 +118,6 @@ func (g *GetAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 
 func (g *GetAlertingPolicy) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (g *GetAlertingPolicy) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (g *GetAlertingPolicy) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -209,10 +208,6 @@ func (a *AddDataSource) Execute(ctx core.ExecutionContext) error {
 
 func (a *AddDataSource) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (a *AddDataSource) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (a *AddDataSource) Hooks() []core.Hook {

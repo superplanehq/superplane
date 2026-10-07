@@ -1,11 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import {
   NO_INCOMING_CONNECTIONS_WARNING,
   clearRunDetailNodeSearchParams,
   isValidRunId,
+  isNotFoundError,
   prepareCanvasLogNodes,
   shouldClearRunDetailNode,
   shouldClearStaleRunUrl,
+  shouldRequestInitialRunFit,
   withDerivedNodeWarnings,
 } from "./workflowPageHelpers";
 import { makeComponentsNode, makeEdge } from "@/test/factories";
@@ -13,6 +15,27 @@ import type { ActionsAction } from "@/api-client";
 import { mapCanvasNodesToLogEntries } from "./utils";
 
 const validRunId = "550e8400-e29b-41d4-a716-446655440000";
+
+describe("isNotFoundError", () => {
+  it.each([
+    "Not Found",
+    "NOT FOUND",
+    new Error("Not Found"),
+    { status: 404 },
+    { response: { status: 404 } },
+    { code: "NOT_FOUND" },
+    new Error("Request failed: 404"),
+  ])("recognizes missing resources: %p", (error) => {
+    expect(isNotFoundError(error)).toBe(true);
+  });
+
+  it.each([undefined, null, "Forbidden", new Error("Internal Server Error"), { status: 500 }])(
+    "does not classify other failures as missing resources: %p",
+    (error) => {
+      expect(isNotFoundError(error)).toBe(false);
+    },
+  );
+});
 
 describe("workflowPageHelpers run inspection", () => {
   it("clears stale run URLs after describe settles without a run", () => {
@@ -137,6 +160,58 @@ describe("workflowPageHelpers run inspection", () => {
 
     expect(unchanged.get("sidebar")).toBe("1");
     expect(unchanged.get("node")).toBe("node-b");
+  });
+});
+
+describe("shouldRequestInitialRunFit", () => {
+  it("requests a fit when entering run inspection with a run and no pending node focus", () => {
+    expect(
+      shouldRequestInitialRunFit({
+        isRunInspectionMode: true,
+        selectedRunId: validRunId,
+        searchParams: new URLSearchParams({ run: validRunId }),
+      }),
+    ).toBe(true);
+  });
+
+  it("does not request a fit outside of run inspection mode", () => {
+    expect(
+      shouldRequestInitialRunFit({
+        isRunInspectionMode: false,
+        selectedRunId: validRunId,
+        searchParams: new URLSearchParams({ run: validRunId }),
+      }),
+    ).toBe(false);
+  });
+
+  it("does not request a fit without a selected run", () => {
+    expect(
+      shouldRequestInitialRunFit({
+        isRunInspectionMode: true,
+        selectedRunId: null,
+        searchParams: new URLSearchParams(),
+      }),
+    ).toBe(false);
+  });
+
+  it("does not request a fit when a node is already pending focus via the sidebar", () => {
+    expect(
+      shouldRequestInitialRunFit({
+        isRunInspectionMode: true,
+        selectedRunId: validRunId,
+        searchParams: new URLSearchParams({ run: validRunId, sidebar: "1", node: "node-a" }),
+      }),
+    ).toBe(false);
+  });
+
+  it("still requests a fit when sidebar param is set without a node", () => {
+    expect(
+      shouldRequestInitialRunFit({
+        isRunInspectionMode: true,
+        selectedRunId: validRunId,
+        searchParams: new URLSearchParams({ run: validRunId, sidebar: "1" }),
+      }),
+    ).toBe(true);
   });
 });
 

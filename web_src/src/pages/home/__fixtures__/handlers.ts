@@ -1,4 +1,11 @@
+import {
+  STORYBOOK_ME_USER_AVATAR_URL,
+  STORYBOOK_ME_USER_EMAIL,
+  STORYBOOK_ME_USER_NAME,
+} from "@/pages/factories/__fixtures__/factoryPageResponses";
+import { storybookAccountProviders } from "./storybookAccountState";
 import { defaultHomePageFixture, type HomePageFixture } from "./homePageResponses";
+import { storybookHostedLlmModels, storybookSelectableLlmModels } from "./hostedLlmModels";
 
 export type { HomePageFixture };
 
@@ -6,11 +13,11 @@ export const homePageIds = {
   organizationId: defaultHomePageFixture.organizationId,
 };
 
-function buildMeUser(orgId: string) {
+export function buildStorybookMeUser(orgId: string) {
   return {
     id: "storybook-user",
-    name: "Storybook User",
-    email: "storybook@superplane.dev",
+    name: STORYBOOK_ME_USER_NAME,
+    email: STORYBOOK_ME_USER_EMAIL,
     organizationId: orgId,
     hasToken: true,
     roles: ["org_admin"],
@@ -19,17 +26,21 @@ function buildMeUser(orgId: string) {
       "canvases",
       "integrations",
       "secrets",
+      "api_keys",
       "groups",
       "users",
       "roles",
       "organization",
+      "org",
       "agents",
       "factories",
+      "work_orders",
+      "notifications",
     ].flatMap((resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action }))),
   };
 }
 
-export type FixtureResult = { json: unknown } | { text: string } | null;
+export type FixtureResult = { json: unknown; status?: number } | { text: string; status?: number } | null;
 
 const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 
@@ -40,7 +51,7 @@ interface Route {
 
 function buildRoutes(fixture: HomePageFixture): Route[] {
   const orgId = fixture.organizationId;
-  const meUser = buildMeUser(orgId);
+  const meUser = buildStorybookMeUser(orgId);
 
   return [
     { pattern: re("/api/v1/me"), resolve: () => ({ json: { user: meUser } }) },
@@ -86,37 +97,24 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
       },
     },
     {
-      pattern: re("/api/v1/canvas-folders"),
-      resolve: (_m, _url, method) => {
-        if (method === "POST") {
-          return {
-            json: {
-              folder: {
-                metadata: { id: "storybook-new-folder" },
-                spec: { title: "New Folder", backgroundColor: "blue", canvases: [] },
-              },
-            },
-          };
-        }
-        return { json: { folders: fixture.folders } };
-      },
+      pattern: re("/api/v1/organizations/[^/]+/workspace-usage"),
+      resolve: () => ({ json: { totalTokens: "0", totalCostCents: "0", periodDays: 30, byModel: [] } }),
     },
     {
-      pattern: re("/api/v1/canvas-folders/[^/]+/position"),
-      resolve: () => ({ json: {} }),
+      pattern: re("/api/v1/organizations/[^/]+/hosted-llm-models"),
+      resolve: (_m, url) => ({ json: storybookHostedLlmModels(url.searchParams.get("provider")) }),
     },
     {
-      pattern: re("/api/v1/canvas-folders/[^/]+"),
-      resolve: () => ({ json: {} }),
+      pattern: re("/api/v1/organizations/[^/]+/selectable-llm-models"),
+      resolve: () => ({ json: { models: storybookSelectableLlmModels() } }),
     },
-    { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
     { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+"),
       resolve: () => ({
         json: {
           organization: {
-            metadata: { id: orgId, name: fixture.organizationName },
+            metadata: { id: orgId, name: fixture.organizationName, slug: fixture.organizationSlug ?? "" },
             spec: {
               enabledExperimentalFeatures: fixture.enabledExperimentalFeatures ?? [],
             },
@@ -148,6 +146,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         json: {
           features: [
             {
+              id: "task_planning_review",
+              label: "Task Planning Review",
+              description: "Show the new plan card, focused questions, and implementation controls",
+            },
+            {
               id: "claude_managed_agents",
               label: "Managed agents",
               description: "Canvas agent chat",
@@ -156,10 +159,55 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
             {
               id: "factories",
               label: "Factories",
-              description: "Software factories for work orders",
+              description: "Software factories for tasks",
+            },
+            {
+              id: "workspace_models",
+              label: "Workspace Models",
+              description: "Show the in-progress workspace Models settings page",
+            },
+            {
+              id: "organization_byok",
+              label: "Organization BYOK",
+              description: "Show the organization LLM Models settings page",
+            },
+            {
+              id: "organization_byok_custom_provider",
+              label: "Organization BYOK Custom Provider",
+              description: "Add a custom model provider with a URL, token, and API type",
+            },
+            {
+              id: "workspace_mcp",
+              label: "Workspace MCP",
+              description: "Add MCP servers for workspace agents",
+            },
+            {
+              id: "workspace_skills",
+              label: "Workspace Skills",
+              description: "Add skills for workspace agents",
+            },
+            {
+              id: "superplane_mcp_server",
+              label: "MCP Server",
+              description: "Allow Cursor and other MCP clients to connect to workspaces in this organization",
+              released: true,
+            },
+            {
+              id: "mobile_factory_board",
+              label: "Mobile Factory Board",
+              description: "Phone layout for workspace boards",
             },
           ],
         },
+      }),
+    },
+    {
+      pattern: re("/organizations"),
+      resolve: () => ({
+        json: [
+          { id: orgId, slug: fixture.organizationSlug ?? "superplane", name: fixture.organizationName },
+          { id: "org-storybook-acme", slug: "acme", name: "Acme" },
+        ],
       }),
     },
     {
@@ -170,14 +218,10 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
           email: meUser.email,
           name: meUser.name,
           organization_id: orgId,
+          avatar_url: STORYBOOK_ME_USER_AVATAR_URL,
+          has_password: true,
+          providers: storybookAccountProviders(meUser.email),
         },
-      }),
-    },
-    // Catalog install from FreshOrgLanding starter setup
-    {
-      pattern: re("/apps/install"),
-      resolve: () => ({
-        json: { canvasId: "storybook-installed-canvas", organizationId: orgId },
       }),
     },
   ];
@@ -219,11 +263,12 @@ export function requestMethod(input: RequestInfo | URL, init?: RequestInit): str
 }
 
 export function fixtureResponse(resolved: NonNullable<FixtureResult>): Response {
+  const status = resolved.status ?? 200;
   if ("text" in resolved) {
-    return new Response(resolved.text, { status: 200, headers: { "content-type": "text/plain" } });
+    return new Response(resolved.text, { status, headers: { "content-type": "text/plain" } });
   }
   return new Response(JSON.stringify(resolved.json), {
-    status: 200,
+    status,
     headers: { "content-type": "application/json" },
   });
 }
@@ -259,33 +304,41 @@ const STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS = [
         togglable: false,
       },
     ],
-    // Dev compose sets APP_ENV=development → GitHub SetupProvider path is on.
+    // Org experimental feature new_integration_setup_flow → GitHub SetupProvider path.
     { legacySetupOnly: false },
   ),
   storybookIntegrationDefinition("claude", "Claude", "Use Claude models in workflows", [
-    {
-      name: "apiKey",
-      type: "string",
-      description: "Claude API key",
-      required: true,
-      label: "API Key",
-      visibilityConditions: [],
-      requiredConditions: [],
-      sensitive: true,
-      togglable: false,
-    },
+    storybookApiKeyField("Claude API key"),
     {
       name: "adminKey",
       type: "string",
-      description: "Admin API key, required for fetching usage and cost reports.",
+      description: "Use this key only to fetch usage and cost reports.",
       required: false,
       label: "Admin API Key",
       visibilityConditions: [],
       requiredConditions: [],
       sensitive: true,
-      togglable: false,
+      togglable: true,
     },
   ]),
+  storybookIntegrationDefinition("openai", "OpenAI", "Generate text responses with OpenAI models", [
+    storybookApiKeyField("OpenAI API key"),
+  ]),
+  storybookIntegrationDefinition("openrouter", "OpenRouter", "Use OpenRouter models in workflows", [
+    storybookApiKeyField("OpenRouter API key"),
+  ]),
+];
+
+const STORYBOOK_SENTRY_PROJECTS = [
+  { id: "payments", name: "payments", type: "project" },
+  { id: "checkout-web", name: "checkout-web", type: "project" },
+  { id: "refund-worker", name: "refund-worker", type: "project" },
+];
+
+const STORYBOOK_SENTRY_UNRESOLVED_ISSUES = [
+  { id: "1", name: "TimeoutError: refund gateway did not answer", type: "unresolved-issue" },
+  { id: "2", name: "TypeError: cannot read amount of undefined", type: "unresolved-issue" },
+  { id: "3", name: "ValidationError: refund amount is above the limit", type: "unresolved-issue" },
 ];
 
 const STORYBOOK_GITHUB_REPOSITORIES = [
@@ -296,6 +349,20 @@ const STORYBOOK_GITHUB_REPOSITORIES = [
 ];
 
 /** Storybook definitions aligned with real integration Configuration() fields. */
+function storybookApiKeyField(description: string): StorybookConfigField {
+  return {
+    name: "apiKey",
+    type: "string",
+    description,
+    required: true,
+    label: "API Key",
+    visibilityConditions: [],
+    requiredConditions: [],
+    sensitive: true,
+    togglable: false,
+  };
+}
+
 function storybookIntegrationDefinition(
   name: string,
   label: string,
@@ -310,15 +377,15 @@ function storybookIntegrationDefinition(
     description,
     configuration,
     instructions: "",
-    // Mirrors API LegacySetupOnly (!registry.SupportsNewSetupFlow).
-    // SupportsNewSetupFlow = SetupProvider registered AND APP_ENV == "development".
+    // Mirrors API LegacySetupOnly (!registry.UseNewSetupFlow).
+    // UseNewSetupFlow = SetupProvider registered AND org has new_integration_setup_flow.
     legacySetupOnly: options?.legacySetupOnly ?? true,
   };
 }
 
 export type StorybookOrgIntegration = {
   metadata: { id: string; name: string; integrationName: string };
-  status: { state: "ready" | "pending" | "error" };
+  status: { state: "ready" | "pending" | "error"; stateDescription?: string; metadata?: Record<string, unknown> };
   spec?: { configuration?: Record<string, unknown> };
 };
 
@@ -389,7 +456,7 @@ export async function matchFactorySetupFixture(
   orgIntegrations: StorybookOrgIntegration[],
 ): Promise<FixtureResult> {
   if (url.pathname === "/api/v1/integrations" && method === "GET") {
-    return { json: { integrations: STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS } };
+    return { json: { integrations: STORYBOOK_FACTORY_INTEGRATION_DEFINITIONS, githubAppConfigured: true } };
   }
 
   const orgIntegrationsMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations$/.exec(url.pathname);
@@ -405,6 +472,42 @@ export async function matchFactorySetupFixture(
 
   const resourcesMatch = /^\/api\/v1\/organizations\/([^/]+)\/integrations\/([^/]+)\/resources$/.exec(url.pathname);
   if (resourcesMatch && method === "GET") {
+    const resourceType = url.searchParams.get("type");
+    if (resourceType === "default_branch") {
+      return { json: { resources: [{ id: "main", name: "main", type: "default_branch" }] } };
+    }
+    if (resourceType === "status_check") {
+      return {
+        json: {
+          resources: [
+            { type: "status_check", id: "lint", name: "lint" },
+            { type: "status_check", id: "unit", name: "unit" },
+            {
+              type: "status_check",
+              id: "e2e",
+              name: "e2e",
+              url: "https://app.circleci.com/pipelines/github/acme/api/1",
+            },
+          ],
+        },
+      };
+    }
+    if (resourceType === "project") {
+      return { json: { resources: STORYBOOK_SENTRY_PROJECTS } };
+    }
+    if (resourceType === "unresolved-issue") {
+      return { json: { resources: STORYBOOK_SENTRY_UNRESOLVED_ISSUES } };
+    }
+    if (resourceType === "review_bot") {
+      return {
+        json: {
+          resources: [
+            { type: "review_bot", id: "coderabbitai", name: "coderabbitai[bot]" },
+            { type: "review_bot", id: "bugbot", name: "bugbot[bot]" },
+          ],
+        },
+      };
+    }
     return { json: { resources: STORYBOOK_GITHUB_REPOSITORIES } };
   }
 

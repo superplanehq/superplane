@@ -21,7 +21,7 @@ export interface NewRelicMetricPayload {
 
 export interface NewRelicNRQLResultPayload {
   query?: string;
-  results?: any[];
+  results?: unknown[];
 }
 
 export interface OnIssueConfiguration {
@@ -33,7 +33,7 @@ export interface ReportMetricConfiguration {
   metricName?: string;
   metricType?: string;
   value?: number;
-  attributes?: Record<string, any>;
+  attributes?: Record<string, unknown>;
   timestamp?: number;
 }
 

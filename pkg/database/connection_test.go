@@ -1,6 +1,11 @@
 package database
 
 import (
+	"context"
+	"crypto/rand"
+	"database/sql"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"os"
@@ -13,6 +18,90 @@ import (
 	postgresdrv "gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
+
+func TestReadSucceedsAfterIntegerColumnBecomesBigint(t *testing.T) {
+	if os.Getenv("DB_HOST") == "" {
+		t.Skip("DB_HOST not set (run with make test in Docker)")
+	}
+
+	t.Run("cache statement", func(t *testing.T) {
+		dsn := withQueryExecMode(t, postgresDSNFromEnv(), "cache_statement")
+		err := readAfterIntegerColumnBecomesBigint(t, dsn)
+		var pgErr *pgconn.PgError
+		require.ErrorAs(t, err, &pgErr)
+		require.Equal(t, "0A000", pgErr.Code)
+	})
+
+	t.Run("production dsn", func(t *testing.T) {
+		require.NoError(t, readAfterIntegerColumnBecomesBigint(t, postgresDSNFromEnv()))
+	})
+}
+
+func TestJSONBMapUpdateAndContainment(t *testing.T) {
+	if os.Getenv("DB_HOST") == "" {
+		t.Skip("DB_HOST not set (run with make test in Docker)")
+	}
+
+	db, err := openAppDB(postgresDSNFromEnv(), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
+	t.Cleanup(func() {
+		require.NoError(t, sqlDB.Close())
+	})
+
+	table, err := scratchTableName()
+	require.NoError(t, err)
+	require.NoError(t, db.Exec("CREATE TABLE "+table+" (id integer PRIMARY KEY, payload jsonb NOT NULL)").Error)
+	t.Cleanup(func() {
+		dropScratchTable(t, table)
+	})
+	require.NoError(t, db.Exec("INSERT INTO "+table+" (id, payload) VALUES (1, '{}')").Error)
+
+	metadata := map[string]any{
+		"groupKey":    "abc",
+		"sourceNodes": []any{map[string]any{"nodeId": "process-1"}},
+	}
+	require.NoError(t, db.Table(table).Where("id = ?", 1).Update("payload", metadata).Error)
+
+	matches, err := json.Marshal(map[string]string{"groupKey": "abc"})
+	require.NoError(t, err)
+	var count int64
+	require.NoError(t, db.Table(table).Where("payload @> ?::jsonb", matches).Count(&count).Error)
+	require.Equal(t, int64(1), count)
+}
+
+func readAfterIntegerColumnBecomesBigint(t *testing.T, dsn string) error {
+	t.Helper()
+	conn := openPinnedSQLConn(t, dsn)
+	ctx := context.Background()
+	table, err := scratchTableName()
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx, "CREATE TABLE "+table+" (id integer PRIMARY KEY, amount integer)")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		dropScratchTable(t, table)
+	})
+	_, err = conn.ExecContext(ctx, "INSERT INTO "+table+" (id, amount) VALUES (1, 7)")
+	require.NoError(t, err)
+
+	query := "SELECT amount FROM " + table + " WHERE id = $1"
+	var amount int64
+	require.NoError(t, conn.QueryRowContext(ctx, query, 1).Scan(&amount))
+	require.Equal(t, int64(7), amount)
+
+	_, err = conn.ExecContext(ctx, "ALTER TABLE "+table+" ALTER COLUMN amount TYPE bigint")
+	require.NoError(t, err)
+
+	err = conn.QueryRowContext(ctx, query, 1).Scan(&amount)
+	if err != nil {
+		return err
+	}
+	require.Equal(t, int64(7), amount)
+	return nil
+}
 
 func TestBuildPostgresDSN_sessionTimeouts(t *testing.T) {
 	dsn := buildPostgresDSN(DSNConfig{
@@ -35,6 +124,9 @@ func TestBuildPostgresDSN_sessionTimeouts(t *testing.T) {
 	}
 	if !strings.Contains(opts, "idle_in_transaction_session_timeout=30000") {
 		t.Fatalf("dsn options: %q", opts)
+	}
+	if q.Get("default_query_exec_mode") != "describe_exec" {
+		t.Fatalf("dsn default_query_exec_mode: %q", q.Get("default_query_exec_mode"))
 	}
 }
 
@@ -157,4 +249,149 @@ func TestPostgres_statementTimeoutEnforced(t *testing.T) {
 	require.Contains(t, strings.ToLower(err.Error()), "statement timeout")
 
 	require.NoError(t, db.Exec("SELECT 1").Error)
+}
+
+func TestParameterizedReadAfterColumnAdd(t *testing.T) {
+	if os.Getenv("DB_HOST") == "" {
+		t.Skip("DB_HOST not set (run with make test in Docker)")
+	}
+
+	productionDSN := postgresDSNFromEnv()
+
+	t.Run("cache statement", func(t *testing.T) {
+		dsn := withQueryExecMode(t, productionDSN, "cache_statement")
+		_, err := repeatParameterizedReadAfterColumnAdd(t, dsn)
+		var pgErr *pgconn.PgError
+		require.ErrorAs(t, err, &pgErr)
+		require.Equal(t, "0A000", pgErr.Code)
+	})
+
+	t.Run("production dsn", func(t *testing.T) {
+		columns, err := repeatParameterizedReadAfterColumnAdd(t, productionDSN)
+		require.NoError(t, err)
+		require.Equal(t, []string{"id", "extra"}, columns)
+	})
+}
+
+func postgresDSNFromEnv() string {
+	cfg := LoadConfig()
+	return buildPostgresDSN(dsnConfigFromEnv(), cfg.StatementTimeout, cfg.IdleInTransactionSessionTimeout)
+}
+
+func withQueryExecMode(t *testing.T, dsn, mode string) string {
+	t.Helper()
+	u, err := url.Parse(dsn)
+	require.NoError(t, err)
+	query := u.Query()
+	query.Set("default_query_exec_mode", mode)
+	u.RawQuery = query.Encode()
+	return u.String()
+}
+
+func repeatParameterizedReadAfterColumnAdd(t *testing.T, dsn string) ([]string, error) {
+	t.Helper()
+	conn := openPinnedSQLConn(t, dsn)
+	table := createScratchTable(t, conn)
+	ctx := context.Background()
+	query := "SELECT * FROM " + table + " WHERE id = $1"
+
+	columns, err := readScratchColumns(ctx, conn, query, 1)
+	require.NoError(t, err)
+	require.Equal(t, []string{"id"}, columns)
+
+	_, err = conn.ExecContext(ctx, "ALTER TABLE "+table+" ADD COLUMN extra text")
+	require.NoError(t, err)
+
+	return readScratchColumns(ctx, conn, query, 1)
+}
+
+func openPinnedSQLConn(t *testing.T, dsn string) *sql.Conn {
+	t.Helper()
+	db, err := gorm.Open(postgresdrv.Open(dsn), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
+	t.Cleanup(func() {
+		require.NoError(t, sqlDB.Close())
+	})
+
+	conn, err := sqlDB.Conn(context.Background())
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, conn.Close())
+	})
+	return conn
+}
+
+func createScratchTable(t *testing.T, conn *sql.Conn) string {
+	t.Helper()
+	name, err := scratchTableName()
+	require.NoError(t, err)
+	ctx := context.Background()
+	_, err = conn.ExecContext(ctx, "CREATE TABLE "+name+" (id integer PRIMARY KEY)")
+	require.NoError(t, err)
+	_, err = conn.ExecContext(ctx, "INSERT INTO "+name+" (id) VALUES (1)")
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		dropScratchTable(t, name)
+	})
+	return name
+}
+
+func scratchTableName() (string, error) {
+	var raw [8]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "", err
+	}
+	return "query_exec_mode_" + hex.EncodeToString(raw[:]), nil
+}
+
+func dropScratchTable(t *testing.T, name string) {
+	t.Helper()
+	db, err := gorm.Open(postgresdrv.Open(postgresDSNFromEnv()), &gorm.Config{})
+	if err != nil {
+		t.Errorf("open cleanup connection: %v", err)
+		return
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Errorf("cleanup sql.DB: %v", err)
+		return
+	}
+	defer sqlDB.Close()
+	if _, err := sqlDB.Exec("DROP TABLE IF EXISTS " + name); err != nil {
+		t.Errorf("drop scratch table %s: %v", name, err)
+	}
+}
+
+func readScratchColumns(ctx context.Context, conn *sql.Conn, query string, id int) ([]string, error) {
+	rows, err := conn.QueryContext(ctx, query, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		values := make([]any, len(columns))
+		dest := make([]any, len(columns))
+		for i := range values {
+			dest[i] = &values[i]
+		}
+		if err := rows.Scan(dest...); err != nil {
+			return nil, err
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	return columns, nil
 }

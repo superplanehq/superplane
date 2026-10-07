@@ -1,0 +1,73 @@
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "bun:test";
+
+import { FactoryNodeCard } from "./FactoryNodeCard";
+import { FactoryNodeStepList } from "./FactoryNodeStepList";
+
+describe("FactoryNodeCard", () => {
+  it("shows configured steps in a wider node body", () => {
+    render(
+      <FactoryNodeCard
+        title="Run Claude Code"
+        componentLabel="Run Claude Code"
+        nodeName="Draft Implementation Plan"
+        iconSlug="code"
+        canvasMode="edit"
+        body={<FactoryNodeStepList steps={["Clone repo", "Write implementation plan", "Use plan as output"]} />}
+      />,
+    );
+
+    const card = screen.getByTestId("factory-node-run-claude-code");
+    expect(card).toHaveStyle({ width: "320px" });
+    expect(screen.getByText("Clone repo")).toBeInTheDocument();
+    expect(screen.getByText("Write implementation plan")).toBeInTheDocument();
+    expect(screen.getByText("Use plan as output")).toBeInTheDocument();
+  });
+
+  it("keeps ordinary factory nodes at the default width", () => {
+    render(<FactoryNodeCard title="Run Bash" componentLabel="Run Bash" nodeName="Check files" />);
+
+    expect(screen.getByTestId("factory-node-run-bash")).toHaveStyle({ width: "280px" });
+  });
+
+  it("shows a compact header action at the top right without widening the card", () => {
+    render(
+      <FactoryNodeCard
+        title="Run Bash"
+        componentLabel="Run Bash"
+        nodeName="Build Storybook"
+        headerAction={<button type="button">See logs</button>}
+      />,
+    );
+
+    const card = screen.getByTestId("factory-node-run-bash");
+    const action = screen.getByTestId("factory-node-header-action");
+    expect(action).toContainElement(screen.getByRole("button", { name: "See logs" }));
+    expect(card).toContainElement(action);
+    expect(card).toHaveStyle({ width: "280px" });
+  });
+
+  it("keeps body custom fields out of the header", () => {
+    render(
+      <FactoryNodeCard
+        title="Prometheus"
+        componentLabel="Query Prometheus"
+        customField={<div>Paste the webhook URL in this panel.</div>}
+      />,
+    );
+
+    expect(screen.queryByTestId("factory-node-header-action")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factory-node-custom-field")).toHaveTextContent("Paste the webhook URL in this panel.");
+  });
+
+  it("uses the same blue selection ring as the run canvas", () => {
+    const { container } = render(
+      <FactoryNodeCard title="Create Pull Request" componentLabel="Create Pull Request" selected canvasMode="edit" />,
+    );
+
+    const frame = container.querySelector("[data-selected='true']");
+    expect(frame).not.toBeNull();
+    expect(frame?.className).toContain("ring-4");
+    expect(frame?.className).toContain("--status-running-dot");
+  });
+});

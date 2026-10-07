@@ -101,7 +101,7 @@ func Test__ListCanvases__ExcludesFactoryOwnedCanvases(t *testing.T) {
 		[]models.Edge{},
 	)
 
-	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, "Test Factory", "")
+	factory, err := models.CreateFactory(database.DB(t.Context()), r.Organization.ID, "Test Factory", "", "")
 	require.NoError(t, err)
 
 	factoryCanvas, _ := support.CreateCanvas(
@@ -325,7 +325,6 @@ func Test__ListCanvases__ReturnsSummaries(t *testing.T) {
 	assert.NotNil(t, listedCanvas.UpdatedAt)
 	assert.NotNil(t, listedCanvas.CreatedBy.Id)
 	assert.NotNil(t, listedCanvas.CreatedBy.Name)
-	assert.NotNil(t, listedCanvas.FolderId)
 }
 
 func findCanvasSummary(canvases []*pb.CanvasSummary, canvasID string) *pb.CanvasSummary {

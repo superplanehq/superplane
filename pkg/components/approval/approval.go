@@ -457,10 +457,6 @@ func (a *Approval) Setup(ctx core.SetupContext) error {
 	return ctx.Metadata.Set(metadata)
 }
 
-func (a *Approval) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
-
 func (a *Approval) Execute(ctx core.ExecutionContext) error {
 	config := Config{}
 	err := mapstructure.Decode(ctx.Configuration, &config)

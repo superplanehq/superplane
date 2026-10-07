@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { afterEach, describe, expect, it, vi } from "bun:test";
+import { MemoryRouter } from "react-router";
 
 import InstallationSettings from "./InstallationSettings";
 
@@ -29,15 +29,64 @@ const installationSettingsResponse = {
   smtp_password_configured: false,
 };
 
+const factoryTemplatesResponse = {
+  templates: [
+    { id: "backlog", name: "Backlog", description: "Plan new draft tasks.", count: 0 },
+    { id: "line-implementation", name: "Implement", description: "Create a branch.", count: 0 },
+    { id: "pr-closure", name: "PR Closure", description: "Close the task.", count: 0 },
+    { id: "intake", name: "Intake", description: "Import work.", count: 0 },
+  ],
+};
+
+const llmSettingsResponse = {
+  welcome_grant_cents: 5000,
+  markup_bps: 2000,
+  warning_threshold_bps: 2000,
+  default_hosted_provider: "",
+  default_hosted_model: "",
+  providers: [
+    {
+      provider: "anthropic",
+      enabled: false,
+      api_key_configured: false,
+      management_key_configured: false,
+      base_url: "",
+      allowed_models: [],
+    },
+    {
+      provider: "openai",
+      enabled: false,
+      api_key_configured: false,
+      management_key_configured: false,
+      base_url: "",
+      allowed_models: [],
+    },
+    {
+      provider: "openrouter",
+      enabled: false,
+      api_key_configured: false,
+      management_key_configured: false,
+      base_url: "",
+      allowed_models: [],
+    },
+  ],
+};
+
 const mockInstallationSettingsFetch = () => {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(installationSettingsResponse), {
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const body = url.includes("/llm-settings")
+        ? llmSettingsResponse
+        : url.includes("/factory-templates")
+          ? factoryTemplatesResponse
+          : installationSettingsResponse;
+      return new Response(JSON.stringify(body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
-      }),
-    ),
+      });
+    }),
   );
 };
 
@@ -61,6 +110,8 @@ describe("InstallationSettings", () => {
     renderInstallationSettings();
 
     expect(await screen.findByText("Network policy")).toBeInTheDocument();
+    expect(await screen.findByText("Onboarding templates")).toBeInTheDocument();
+    expect(await screen.findByText("SuperPlane-hosted models")).toBeInTheDocument();
     expect(screen.queryByText("Signup access")).not.toBeInTheDocument();
     expect(screen.queryByText("Public signups")).not.toBeInTheDocument();
     expect(screen.queryByTestId("installation-signups-switch")).not.toBeInTheDocument();

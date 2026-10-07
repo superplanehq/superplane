@@ -1,0 +1,166 @@
+package models
+
+import (
+	"fmt"
+	"maps"
+	"strings"
+
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+const (
+	FactoryAppTemplateMetadataKey = "factoryTemplate"
+	FactoryAppTemplateBacklogID   = "backlog"
+	FactoryAppBacklogTriggerID    = "trigger"
+)
+
+// FactoryAppTemplateMetadata returns the persisted marker for a generated
+// factory app. The marker survives canvas renames and user-facing copy changes.
+func FactoryAppTemplateMetadata(templateID string, version int) map[string]any {
+	return FactoryAppTemplateMetadataFor(templateID, version, "")
+}
+
+// FactoryAppTemplateMetadataFor records the template id and, when set, the Git host.
+// An empty provider leaves existing canvases readable as GitHub.
+func FactoryAppTemplateMetadataFor(templateID string, version int, provider string) map[string]any {
+	record := map[string]any{
+		"id":      templateID,
+		"version": version,
+	}
+	if strings.TrimSpace(provider) != "" {
+		record["provider"] = provider
+	}
+	return map[string]any{
+		FactoryAppTemplateMetadataKey: record,
+	}
+}
+
+func FactoryAppTemplateID(nodes []Node) string {
+	for _, node := range nodes {
+		metadata, ok := node.Metadata[FactoryAppTemplateMetadataKey].(map[string]any)
+		if !ok {
+			continue
+		}
+		if id, ok := metadata["id"].(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+func IsBacklogFactoryApp(nodes []Node, _ []Edge) bool {
+	if FactoryAppTemplateID(nodes) == FactoryAppTemplateBacklogID {
+		return true
+	}
+	return IsLegacyAnalyzeBacklog(nodes) || matchesBacklogIdentity(nodes, backlogVersionThreeNodeIDs)
+}
+
+// IsLegacyAnalyzeBacklog reports a generated version 1 or 2 Backlog graph.
+// Those graphs still have the Analyze / intent.md nodes. SuperPlane upgrades
+// them and no longer starts that path.
+func IsLegacyAnalyzeBacklog(nodes []Node) bool {
+	return matchesBacklogIdentity(nodes, backlogVersionOneNodeIDs) ||
+		matchesBacklogIdentity(nodes, backlogVersionTwoNodeIDs)
+}
+
+var (
+	backlogVersionOneNodeIDs = map[string]bool{
+		FactoryAppBacklogTriggerID: true,
+		"analyze":                  true,
+		"report-confidence":        true,
+		"attach-intent":            true,
+		"add-run-error":            true,
+	}
+	backlogVersionTwoNodeIDs = map[string]bool{
+		FactoryAppBacklogTriggerID: true,
+		"task-refinement-enabled":  true,
+		"analyze":                  true,
+		"refine-task":              true,
+		"report-confidence":        true,
+		"attach-intent":            true,
+		"add-run-error":            true,
+	}
+	backlogVersionThreeNodeIDs = map[string]bool{
+		FactoryAppBacklogTriggerID: true,
+		"task-refinement-enabled":  true,
+		"refine-task":              true,
+		"add-run-error":            true,
+	}
+)
+
+// StampFactoryAppTemplate records template identity in the live version and
+// its normalized trigger node. Canvas changesets keep component metadata
+// private, so generated templates stamp this server-owned key after publish.
+func (c *Canvas) StampFactoryAppTemplate(tx *gorm.DB, triggerNodeID, templateID string, version int) error {
+	return c.StampFactoryAppTemplateFor(tx, triggerNodeID, templateID, version, "")
+}
+
+// StampFactoryAppTemplateFor records template identity and the Git host.
+func (c *Canvas) StampFactoryAppTemplateFor(tx *gorm.DB, triggerNodeID, templateID string, version int, provider string) error {
+	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, c.ID)
+	if err != nil {
+		return err
+	}
+
+	metadata := FactoryAppTemplateMetadataFor(templateID, version, provider)
+	found := false
+	for i := range liveVersion.Nodes {
+		if liveVersion.Nodes[i].ID != triggerNodeID {
+			continue
+		}
+		found = true
+		liveVersion.Nodes[i].Metadata = maps.Clone(liveVersion.Nodes[i].Metadata)
+		if liveVersion.Nodes[i].Metadata == nil {
+			liveVersion.Nodes[i].Metadata = map[string]any{}
+		}
+		maps.Copy(liveVersion.Nodes[i].Metadata, metadata)
+		break
+	}
+	if !found {
+		return fmt.Errorf("template trigger node %s not found", triggerNodeID)
+	}
+
+	activeNode, err := FindCanvasNode(tx, c.ID, triggerNodeID)
+	if err != nil {
+		return err
+	}
+	activeMetadata := maps.Clone(activeNode.Metadata.Data())
+	if activeMetadata == nil {
+		activeMetadata = map[string]any{}
+	}
+	maps.Copy(activeMetadata, metadata)
+	if err := tx.Model(activeNode).Update("metadata", activeMetadata).Error; err != nil {
+		return err
+	}
+
+	return tx.Model(liveVersion).Update("nodes", datatypes.NewJSONSlice(liveVersion.Nodes)).Error
+}
+
+func matchesBacklogIdentity(nodes []Node, requiredNodeIDs map[string]bool) bool {
+	if len(nodes) != len(requiredNodeIDs) {
+		return false
+	}
+
+	analysisComponents := map[string]bool{
+		SuperPlaneRunnerComponent: true,
+		"runnerClaudeCode":        true,
+		"runnerCodex":             true,
+		"runnerOpenRouter":        true,
+	}
+	for _, node := range nodes {
+		if !requiredNodeIDs[node.ID] {
+			return false
+		}
+		if node.ID == "analyze" || node.ID == "refine-task" {
+			if !analysisComponents[node.ComponentName()] {
+				return false
+			}
+			continue
+		}
+		if node.ID == FactoryAppBacklogTriggerID && node.ComponentName() != "onWorkOrder" {
+			return false
+		}
+	}
+	return true
+}

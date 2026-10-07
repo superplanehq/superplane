@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useRef } from "react";
 
 export type MentionType = "node" | "run";
+export type ComposerTriggerKind = "mention" | "skill";
 
 export interface MentionItem {
   type: MentionType;
@@ -23,6 +24,7 @@ export interface InsertedMention {
 /**
  * Mentions are tracked as "@Label" substrings with position info.
  * On send, we replace each tracked mention with "[Label](node:id)" or "[Label](run:id)".
+ * Skill slash tags stay as `/command` in the sent text.
  */
 export interface UseMentionsReturn {
   /** The textarea value (plain text with @Label for mentions) */
@@ -31,9 +33,11 @@ export interface UseMentionsReturn {
   setValue: (v: string) => void;
   /** Whether the mention dropdown should be shown */
   showDropdown: boolean;
+  /** Whether the skill slash dropdown should be shown */
+  showSkillDropdown: boolean;
   /** Current filter text for the dropdown */
   filter: string;
-  /** Position (character index) where the @ trigger starts */
+  /** Position (character index) where the @ or / trigger starts */
   triggerStart: number;
   /** Current cursor position */
   cursorPos: number;
@@ -41,6 +45,8 @@ export interface UseMentionsReturn {
   setCursorPos: (pos: number) => void;
   /** Insert a mention at the current trigger position. Returns the new cursor position. */
   insertMention: (item: MentionItem) => number;
+  /** Insert a `/command` at the current slash trigger. Returns the new cursor position. */
+  insertSkill: (command: string) => number;
   /** Get the serialized markdown output for sending */
   getMarkdown: () => string;
   /** All tracked mentions */
@@ -58,30 +64,34 @@ export interface UseMentionsReturn {
 }
 
 /**
- * Detect if cursor is in a mention trigger position (after @).
- * Allows spaces in the filter so multi-word node names like "PR Opened" can be matched.
- * Terminates on newline or a second @ (start of another mention).
+ * Detect if cursor is in a mention or skill trigger position.
+ * Mention filters allow spaces so multi-word names can be matched.
+ * Skill filters end at whitespace so `/command ` is not an active query.
+ * Terminates on newline.
  */
-function detectTrigger(text: string, cursorPos: number): { active: boolean; filter: string; start: number } {
+function detectComposerTrigger(
+  text: string,
+  cursorPos: number,
+): { kind: ComposerTriggerKind | null; filter: string; start: number } {
   const before = text.slice(0, cursorPos);
 
-  // Find the last @ that's either at start or after whitespace
   for (let i = before.length - 1; i >= 0; i--) {
     const ch = before[i];
-    // Newline terminates — you can't mention across lines
     if (ch === "\n") {
-      return { active: false, filter: "", start: 0 };
+      return { kind: null, filter: "", start: 0 };
     }
-    if (ch === "@") {
-      // Check it's at start or after whitespace
+    if (ch === "@" || ch === "/") {
       if (i === 0 || /\s/.test(before[i - 1])) {
         const filter = before.slice(i + 1);
-        return { active: true, filter, start: i };
+        if (ch === "/" && /\s/.test(filter)) {
+          return { kind: null, filter: "", start: 0 };
+        }
+        return { kind: ch === "@" ? "mention" : "skill", filter, start: i };
       }
-      return { active: false, filter: "", start: 0 };
+      return { kind: null, filter: "", start: 0 };
     }
   }
-  return { active: false, filter: "", start: 0 };
+  return { kind: null, filter: "", start: 0 };
 }
 
 /** Prune mentions whose @Label text no longer exists at the tracked position */
@@ -99,23 +109,29 @@ export function useMentions(): UseMentionsReturn {
   const [dismissed, setDismissed] = useState(false);
   const snapshotRef = useRef<{ value: string; mentions: InsertedMention[] } | null>(null);
 
-  const trigger = useMemo(() => detectTrigger(value, cursorPos), [value, cursorPos]);
+  const trigger = useMemo(() => detectComposerTrigger(value, cursorPos), [value, cursorPos]);
 
   // Check if the trigger position is inside an already-inserted mention
   const triggerIsInsertedMention = useMemo(() => {
-    if (!trigger.active) return false;
+    if (trigger.kind !== "mention") return false;
     return mentions.some((m) => {
       const expected = `@${m.label}`;
       return m.startIndex === trigger.start && value.slice(m.startIndex, m.startIndex + expected.length) === expected;
     });
-  }, [trigger.active, trigger.start, mentions, value]);
+  }, [trigger.kind, trigger.start, mentions, value]);
 
   const showDropdown = useMemo(() => {
-    if (!trigger.active) return false;
+    if (trigger.kind !== "mention") return false;
     if (dismissed) return false;
     if (triggerIsInsertedMention) return false;
     return true;
-  }, [trigger.active, dismissed, triggerIsInsertedMention]);
+  }, [trigger.kind, dismissed, triggerIsInsertedMention]);
+
+  const showSkillDropdown = useMemo(() => {
+    if (trigger.kind !== "skill") return false;
+    if (dismissed) return false;
+    return true;
+  }, [trigger.kind, dismissed]);
 
   // setValue that also prunes stale mentions
   const setValue = useCallback((v: string) => {
@@ -163,6 +179,22 @@ export function useMentions(): UseMentionsReturn {
     [value, cursorPos, trigger.start],
   );
 
+  const insertSkill = useCallback(
+    (command: string): number => {
+      const displayText = `/${command}`;
+      const before = value.slice(0, trigger.start);
+      const after = value.slice(cursorPos);
+      const newValue = before + displayText + " " + after;
+      const newCursorPos = before.length + displayText.length + 1;
+
+      setRawValue(newValue);
+      setCursorPos(newCursorPos);
+      setDismissed(true);
+      return newCursorPos;
+    },
+    [value, cursorPos, trigger.start],
+  );
+
   const getMarkdown = useCallback(() => {
     const sorted = [...mentions].sort((a, b) => b.startIndex - a.startIndex);
     let result = value;
@@ -203,11 +235,13 @@ export function useMentions(): UseMentionsReturn {
     value,
     setValue,
     showDropdown,
+    showSkillDropdown,
     filter: trigger.filter,
     triggerStart: trigger.start,
     cursorPos,
     setCursorPos: setCursorPosWrapped,
     insertMention,
+    insertSkill,
     getMarkdown,
     mentions,
     isEmpty,

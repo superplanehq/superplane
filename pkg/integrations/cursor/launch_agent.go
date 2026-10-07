@@ -3,7 +3,6 @@ package cursor
 import (
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -115,10 +114,6 @@ func (c *LaunchAgent) Setup(ctx core.SetupContext) error {
 	// Set up webhook so it's associated with the node and saved
 	_, err := ctx.Webhook.Setup()
 	return err
-}
-
-func (c *LaunchAgent) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *LaunchAgent) Execute(ctx core.ExecutionContext) error {

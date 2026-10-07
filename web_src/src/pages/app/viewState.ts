@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 
-export type WorkflowHeaderMode = "version-live" | "console" | "memory" | "files";
+export type WorkflowHeaderMode = "version-live" | "console" | "memory";
 export type CanvasPageHeaderMode = WorkflowHeaderMode | "default";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version";
 
-const PANEL_HEADER_MODES = new Set<WorkflowHeaderMode>(["memory", "files"]);
+const PANEL_HEADER_MODES = new Set<WorkflowHeaderMode>(["memory"]);
 
 export function normalizeCanvasHeaderMode(headerMode: CanvasPageHeaderMode | undefined): WorkflowHeaderMode {
   if (!headerMode || headerMode === "default") {
@@ -37,7 +37,7 @@ export function isCanvasWorkflowTab(headerMode: CanvasPageHeaderMode | undefined
 /**
  * True when the runs sidebar (and its toggle icon) may be shown for the given
  * tab. The runs sidebar is available on the main workflow Canvas tab and on the
- * Console tab, but not on the Memory or Files surfaces. The Console overlay is
+ * Console tab, but not on the Memory surface. The Console overlay is
  * laid out beside the left sidebars, so an open runs sidebar coexists with it.
  */
 export function allowsRunsSidebar(headerMode: CanvasPageHeaderMode | undefined): boolean {
@@ -52,22 +52,40 @@ function isConsoleViewParam(view: string): boolean {
   return view === CONSOLE_VIEW || view === LEGACY_CONSOLE_VIEW;
 }
 
-/** True when the URL points at the main workflow canvas tab (not Console, Memory, Files, or Versions). */
+/** True when the URL points at the main workflow canvas tab (not Console, Memory, or Versions). */
 export function isWorkflowCanvasViewParam(view: string): boolean {
   return view === "" || view === LEGACY_RUNS_VIEW;
 }
 
+export type WorkflowUrlViewFlags = {
+  isRunInspectionMode: boolean;
+  isMemoryMode: boolean;
+  isConsoleMode: boolean;
+};
+
 /** View flags read directly from the URL (source of truth for first paint and header tab selection). */
-export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchParams) {
+export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchParams): WorkflowUrlViewFlags {
   const view = searchParams.get("view") ?? "";
   const run = searchParams.get("run") ?? "";
   const isRunInspectionMode = Boolean(run) && isWorkflowCanvasViewParam(view);
   return {
     isRunInspectionMode,
     isMemoryMode: view === "memory",
-    isFilesMode: view === "files",
     isConsoleMode: isConsoleViewParam(view),
   };
+}
+
+/** Factory apps are canvas-only — no Console / Memory surfaces. */
+export function clampWorkflowViewFlagsForFactoryApp(flags: WorkflowUrlViewFlags): WorkflowUrlViewFlags {
+  return {
+    ...flags,
+    isMemoryMode: false,
+    isConsoleMode: false,
+  };
+}
+
+export function isNonCanvasAppViewParam(view: string): boolean {
+  return isConsoleViewParam(view) || view === "memory";
 }
 
 export function useWorkflowUrlViewFlags(searchParams: URLSearchParams) {
@@ -97,11 +115,40 @@ export function clearComponentSidebarSearchParams(params: URLSearchParams): URLS
   return params;
 }
 
+export function componentSidebarFromSearchParams(params: URLSearchParams): {
+  isOpen: boolean;
+  nodeId: string | null;
+} {
+  return {
+    isOpen: params.get("sidebar") === "1",
+    nodeId: params.get("node") || null,
+  };
+}
+
+/**
+ * Run inspection uses `sidebar`/`node` for the run detail pane. Configure uses
+ * the same params for the component editor. Prefer the editor when Configure
+ * is active, including the brief window where `run` is still on the URL.
+ */
+export function resolveCanvasPageInitialSidebar(args: {
+  factoryConfigure: boolean;
+  runInspectionChromeActive: boolean;
+  searchParams: URLSearchParams;
+}): { isOpen: boolean; nodeId: string | null } {
+  if (args.runInspectionChromeActive && !args.factoryConfigure) {
+    return { isOpen: false, nodeId: null };
+  }
+  return componentSidebarFromSearchParams(args.searchParams);
+}
+
 export function clearRunInspectionSearchParams(params: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(params);
+  const keepComponentEditorSelection = next.get("configure") === "1" && Boolean(next.get("node"));
   next.delete("run");
-  next.delete("sidebar");
-  next.delete("node");
+  if (!keepComponentEditorSelection) {
+    next.delete("sidebar");
+    next.delete("node");
+  }
   return next;
 }
 
@@ -139,11 +186,9 @@ export function applyRunInspectionNavigationSearchParams(
 export function getWorkflowHeaderMode({
   isConsoleMode,
   isMemoryMode,
-  isFilesMode,
 }: {
   isConsoleMode: boolean;
   isMemoryMode: boolean;
-  isFilesMode: boolean;
 }): WorkflowHeaderMode {
   if (isConsoleMode) {
     return "console";
@@ -151,10 +196,6 @@ export function getWorkflowHeaderMode({
 
   if (isMemoryMode) {
     return "memory";
-  }
-
-  if (isFilesMode) {
-    return "files";
   }
 
   return "version-live";
@@ -182,28 +223,26 @@ export function getWorkflowViewPresentation({
   isConsoleMode,
   isRunInspectionMode,
   isMemoryMode,
-  isFilesMode,
   hasEditableVersion,
   isViewingCurrentLiveVersion,
 }: {
   isConsoleMode: boolean;
   isRunInspectionMode: boolean;
   isMemoryMode: boolean;
-  isFilesMode: boolean;
   hasEditableVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
 }) {
-  const hideNonCanvasChrome = isRunInspectionMode || isMemoryMode || isFilesMode;
+  const hideNonCanvasChrome = isRunInspectionMode || isMemoryMode;
 
   return {
-    headerMode: getWorkflowHeaderMode({ isConsoleMode, isMemoryMode, isFilesMode }),
+    headerMode: getWorkflowHeaderMode({ isConsoleMode, isMemoryMode }),
     canvasStateMode: getWorkflowCanvasStateMode({
       hasEditableVersion,
       isViewingCurrentLiveVersion,
     }),
     showBottomStatusControls: !hideNonCanvasChrome,
     hideAddControls: hideNonCanvasChrome,
-    readOnlyViewModes: isRunInspectionMode || isFilesMode,
+    readOnlyViewModes: isRunInspectionMode,
   };
 }
 

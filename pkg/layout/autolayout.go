@@ -7,6 +7,7 @@ import (
 
 const (
 	AlgorithmHorizontal     = "ALGORITHM_HORIZONTAL"
+	AlgorithmVertical       = "ALGORITHM_VERTICAL"
 	ScopeFullCanvas         = "SCOPE_FULL_CANVAS"
 	ScopeConnectedComponent = "SCOPE_CONNECTED_COMPONENT"
 )
@@ -27,6 +28,8 @@ func (a *AutoLayout) resolvedAlgorithm() (string, error) {
 	switch algorithm {
 	case "", AlgorithmHorizontal, "HORIZONTAL":
 		return AlgorithmHorizontal, nil
+	case AlgorithmVertical, "VERTICAL":
+		return AlgorithmVertical, nil
 	case "ALGORITHM_UNSPECIFIED", "UNSPECIFIED":
 		return "", fmt.Errorf("layout algorithm is required")
 	default:
@@ -49,8 +52,10 @@ func ParseAutoLayout(value string, scopeValue string, nodeIDs []string) (*AutoLa
 	switch normalizedValue {
 	case "", "horizontal":
 		autoLayout.Algorithm = AlgorithmHorizontal
+	case "vertical":
+		autoLayout.Algorithm = AlgorithmVertical
 	default:
-		return nil, fmt.Errorf("unsupported auto layout %q (supported: horizontal, disable)", value)
+		return nil, fmt.Errorf("unsupported auto layout %q (supported: horizontal, vertical, disable)", value)
 	}
 
 	normalizedNodeIDs := make([]string, 0, len(nodeIDs))

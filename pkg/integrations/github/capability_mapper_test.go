@@ -156,6 +156,23 @@ func Test__CapabilityMapper__NewPermissionSet(t *testing.T) {
 		assert.Equal(t, "read", got["checks"])
 	})
 
+	t.Run("dependabot alert trigger requests vulnerability alerts read", func(t *testing.T) {
+		t.Parallel()
+
+		ps := m.NewPermissionSet([]string{"github.onDependabotAlert"})
+		got := ps.ForAppManifest()
+		assert.Equal(t, "read", got["vulnerability_alerts"])
+	})
+
+	t.Run("wait for pull request checks requests checks and statuses read", func(t *testing.T) {
+		t.Parallel()
+
+		ps := m.NewPermissionSet([]string{"github.waitForPullRequestChecks"})
+		got := ps.ForAppManifest()
+		assert.Equal(t, "read", got["checks"])
+		assert.Equal(t, "read", got["statuses"])
+	})
+
 	t.Run("merge pull request action requests pull request write permission", func(t *testing.T) {
 		t.Parallel()
 

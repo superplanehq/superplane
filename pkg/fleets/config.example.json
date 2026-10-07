@@ -1,0 +1,39 @@
+{
+  "id": "production",
+  "superplaneUrl": "https://superplane.example",
+  "installationAdminToken": "replace-with-personal-api-token",
+  "runnerReleaseBaseUrl": "https://superplanehq-releases.s3.amazonaws.com/runner",
+  "reconcileIntervalSeconds": 15,
+  "requestTimeoutSeconds": 90,
+  "fleets": [
+    {
+      "id": "linux-amd64",
+      "warmCapacity": 1,
+      "maxCapacity": 10,
+      "aws": {
+        "region": "us-east-1",
+        "ami": "ami-00000000000000000",
+        "instanceType": "t3.micro",
+        "architecture": "amd64",
+        "subnetIds": [
+          "subnet-00000000000000000"
+        ],
+        "securityGroupIds": [
+          "sg-00000000000000000"
+        ],
+        "iamInstanceProfile": "superplane-runner-instance-profile",
+        "keyName": "",
+        "volumeSizeGb": 30,
+        "volumeIops": 0,
+        "volumeThroughputMbps": 0,
+        "resourceTags": {
+          "Environment": "production",
+          "ManagedBy": "fleet-manager"
+        },
+        "cloudWatch": {
+          "logGroupName": "/superplane/runners"
+        }
+      }
+    }
+  ]
+}

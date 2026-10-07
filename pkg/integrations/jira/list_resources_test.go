@@ -620,7 +620,7 @@ func Test__Jira__ListResources__issue_deskEmptyFallsBackToSearch(t *testing.T) {
 	assert.Equal(t, "HEL-9", resources[0].ID)
 	require.Len(t, httpContext.Requests, 3)
 	assert.Equal(t, http.MethodPost, httpContext.Requests[2].Method)
-	assert.True(t, strings.HasSuffix(httpContext.Requests[2].URL.Path, "/rest/api/3/search"))
+	assert.True(t, strings.HasSuffix(httpContext.Requests[2].URL.Path, "/rest/api/3/search/jql"))
 }
 
 func Test__Jira__ListResources__issue_noProject(t *testing.T) {
@@ -648,7 +648,7 @@ func Test__Jira__ListResources__issue_noProject(t *testing.T) {
 	assert.Equal(t, "X-1", resources[0].ID)
 	require.Len(t, httpContext.Requests, 1)
 	assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
-	assert.True(t, strings.HasSuffix(httpContext.Requests[0].URL.Path, "/rest/api/3/search"))
+	assert.True(t, strings.HasSuffix(httpContext.Requests[0].URL.Path, "/rest/api/3/search/jql"))
 }
 
 func Test__findRequestTypeFieldID(t *testing.T) {

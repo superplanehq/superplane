@@ -1,0 +1,24 @@
+{
+  "data": {
+    "id": "a7c41e88-1b2d-4f6a-9c3e-5d8f0a1b2c3d",
+    "title": "Deploy - staging",
+    "subtitle": "Succeeded in 4m 12s",
+    "url": "https://app.superplane.com/runs/8f21c4d0",
+    "createdAt": "2026-03-27T16:42:11.123Z",
+    "updatedAt": "2026-03-27T16:42:11.123Z",
+    "creator": {
+      "id": "5b2c1d0e-7a8f-4c9b-a1d2-3e4f5a6b7c8d",
+      "name": "Ada Lovelace",
+      "displayName": "ada",
+      "email": "ada@example.com"
+    },
+    "issue": {
+      "id": "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+      "identifier": "ENG-142",
+      "title": "Deploy pipeline fails on retry",
+      "url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails-on-retry"
+    }
+  },
+  "timestamp": "2026-03-27T16:42:11.123456789Z",
+  "type": "linear.attachment"
+}

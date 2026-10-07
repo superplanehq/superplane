@@ -1,0 +1,9 @@
+{
+  "data": {
+    "deleted": true,
+    "namespace": "example-alerts",
+    "workspaceId": "ws-11111111-1111-4111-8111-111111111111"
+  },
+  "timestamp": "2026-01-01T00:20:00.000000000Z",
+  "type": "aws.prometheus.ruleGroupNamespace.deleted"
+}

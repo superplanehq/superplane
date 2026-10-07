@@ -1,0 +1,85 @@
+import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
+import type { AccountOrganization } from "@/lib/accountOrganizations";
+import { organizationMatchesRoute, organizationRouteId, readyAccountOrganizations } from "@/lib/accountOrganizations";
+import { Building2, Check, Plus } from "lucide-react";
+import { useEffect } from "react";
+import { useNavigate } from "react-router";
+
+import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/ui/dropdownMenu";
+
+interface OrganizationSwitchMenuProps {
+  currentOrganizationRouteId: string;
+  onNavigate?: () => void;
+  testIdPrefix?: string;
+  /**
+   * Set from onboarding so choosing the current organization still leaves
+   * the wizard and opens that organization home.
+   */
+  navigateToCurrentOrganization?: boolean;
+}
+
+/** Shared organization choices for the Factories and legacy navigation menus. */
+export function OrganizationSwitchMenu({
+  currentOrganizationRouteId,
+  onNavigate,
+  testIdPrefix = "organization",
+  navigateToCurrentOrganization = false,
+}: OrganizationSwitchMenuProps) {
+  const navigate = useNavigate();
+  const organizationsQuery = useAccountOrganizations();
+  const listedOrganizations = organizationsQuery.data ?? [];
+  const organizations = readyAccountOrganizations(listedOrganizations);
+
+  // The menu mounts when it opens, and the cached list can miss an
+  // organization created or finished since the last fetch. Refetch on open;
+  // the cached list still shows while the fresh one loads.
+  const refetchOrganizations = organizationsQuery.refetch;
+  useEffect(() => {
+    void refetchOrganizations();
+  }, [refetchOrganizations]);
+
+  const goToOrganization = (organization: AccountOrganization) => {
+    const isCurrent = organizationMatchesRoute(organization, currentOrganizationRouteId);
+    if (!isCurrent || navigateToCurrentOrganization) {
+      navigate(`/${organizationRouteId(organization)}`);
+    }
+    onNavigate?.();
+  };
+
+  return (
+    <>
+      <DropdownMenuLabel>Switch organization</DropdownMenuLabel>
+      <div>
+        {organizationsQuery.isLoading ? (
+          <p className="px-2 py-1 text-sm text-muted-foreground">Loading organizations...</p>
+        ) : null}
+        {organizationsQuery.isError ? (
+          <p className="px-2 py-1 text-sm text-muted-foreground">Could not load organizations.</p>
+        ) : null}
+        {!organizationsQuery.isLoading && !organizationsQuery.isError && listedOrganizations.length === 0 ? (
+          <p className="px-2 py-1 text-sm text-muted-foreground">No organizations available.</p>
+        ) : null}
+        {organizations.map((organization) => {
+          const isCurrent = organizationMatchesRoute(organization, currentOrganizationRouteId);
+          return (
+            <DropdownMenuItem
+              key={organization.id}
+              onSelect={() => goToOrganization(organization)}
+              aria-checked={isCurrent}
+              data-testid={`${testIdPrefix}-organization-option-${organization.id}`}
+            >
+              <Building2 className="h-3.5 w-3.5" aria-hidden />
+              <span className="truncate">{organization.name}</span>
+              {isCurrent ? <Check className="ml-auto h-3.5 w-3.5" aria-hidden /> : null}
+            </DropdownMenuItem>
+          );
+        })}
+      </div>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onSelect={() => navigate("/onboarding")} data-testid={`${testIdPrefix}-organization-create`}>
+        <Plus className="h-3.5 w-3.5" aria-hidden />
+        Create new organization
+      </DropdownMenuItem>
+    </>
+  );
+}

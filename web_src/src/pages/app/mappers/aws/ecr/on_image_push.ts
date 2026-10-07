@@ -6,7 +6,7 @@ import awsEcrIcon from "@/assets/icons/integrations/aws.ecr.svg";
 import type { EcrImagePushEvent, EcrTriggerConfiguration, EcrTriggerMetadata } from "./types";
 import { buildRepositoryMetadataItems, getRepositoryLabel } from "./utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { stringOrDash } from "../../utils";
+import { stringOrDash } from "../../eventDisplay";
 
 /**
  * Renderer for the "aws.ecr.onImagePush" trigger

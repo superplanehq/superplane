@@ -1,6 +1,6 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter } from "react-router";
 import { CanvasCard } from "./canvas-card";
 import { mockCanvas, shortCanvas, noDescriptionCanvas } from "../../../test/__mocks__/canvas";
 

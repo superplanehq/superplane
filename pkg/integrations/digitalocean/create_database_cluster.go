@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -272,9 +271,6 @@ func (c *CreateDatabaseCluster) Execute(ctx core.ExecutionContext) error {
 }
 
 func (c *CreateDatabaseCluster) Cancel(ctx core.ExecutionContext) error { return nil }
-func (c *CreateDatabaseCluster) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
-}
 func (c *CreateDatabaseCluster) Hooks() []core.Hook {
 	return []core.Hook{
 		{

@@ -1,16 +1,21 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { ComponentStoryShell } from "./__fixtures__/ComponentStoryShell";
-import { FACTORIES_ORGANIZATION_ID, RUNNING_WORK_ORDER, CLOSED_WORK_ORDER } from "./__fixtures__/factoryPageResponses";
+import {
+  FACTORIES_ORGANIZATION_ID,
+  PRIMARY_FACTORY_KEY,
+  RUNNING_WORK_ORDER,
+  CLOSED_WORK_ORDER,
+} from "./__fixtures__/factoryPageResponses";
 import { WorkOrderExecutionsList } from "./WorkOrderExecutionsList";
 
 /**
  * List of line-run steps with status icons and run links. Three visual
- * variants: `default` (grouped card), `compact` (inline group used in
- * `WorkOrderCard`), and `inline` (single flat list).
+ * variants: `default` (grouped card), `compact` (inline group), and
+ * `inline` (single flat list).
  */
 const meta = {
-  title: "Factories/WorkOrderExecutionsList",
+  title: "Factories/Components/WorkOrderExecutionsList",
   component: WorkOrderExecutionsList,
   parameters: { layout: "padded" },
   decorators: [
@@ -30,16 +35,18 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
-    executions: RUNNING_WORK_ORDER.executions,
+    factoryKey: PRIMARY_FACTORY_KEY,
+    dispatches: RUNNING_WORK_ORDER.lineDispatches,
     variant: "default",
   },
 };
 
-/** Compact variant used in the work order card row. */
+/** Compact variant used in the task card row. */
 export const Compact: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
-    executions: CLOSED_WORK_ORDER.executions,
+    factoryKey: PRIMARY_FACTORY_KEY,
+    dispatches: CLOSED_WORK_ORDER.lineDispatches,
     variant: "compact",
   },
 };
@@ -48,7 +55,8 @@ export const Compact: Story = {
 export const Inline: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
-    executions: CLOSED_WORK_ORDER.executions,
+    factoryKey: PRIMARY_FACTORY_KEY,
+    dispatches: CLOSED_WORK_ORDER.lineDispatches,
     variant: "inline",
   },
 };
@@ -57,7 +65,8 @@ export const Inline: Story = {
 export const Empty: Story = {
   args: {
     organizationId: FACTORIES_ORGANIZATION_ID,
-    executions: [],
+    factoryKey: PRIMARY_FACTORY_KEY,
+    dispatches: [],
     variant: "default",
   },
 };

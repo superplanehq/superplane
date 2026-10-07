@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v84/github"
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -60,7 +59,9 @@ func (c *AddReaction) Documentation() string {
 
 ## Output
 
-Returns the created GitHub reaction object, including id, content, user, and timestamp.`
+If the component creates a reaction, it returns the GitHub reaction object, including id, content, user, and timestamp.
+
+If the resolved comment ID is blank, the component finishes with success and emits no reaction object. Downstream nodes that wait for that output do not run.`
 }
 
 func (c *AddReaction) Icon() string {
@@ -109,7 +110,7 @@ func (c *AddReaction) Configuration() []configuration.Field {
 			Label:       "Comment ID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "ID of the comment to react to",
+			Description: "ID of the comment to react to. If the resolved value is blank, the component does not add a reaction.",
 		},
 		{
 			Name:     "content",
@@ -179,6 +180,14 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("invalid target: %s", config.Target)
 	}
 
+	if strings.TrimSpace(config.CommentID) == "" {
+		return ctx.ExecutionState.Emit(
+			core.DefaultOutputChannel.Name,
+			"github.reaction",
+			[]any{},
+		)
+	}
+
 	commentID, err := parseCommentID(config.CommentID)
 	if err != nil {
 		return fmt.Errorf("comment ID is not a number: %v", err)
@@ -208,10 +217,6 @@ func (c *AddReaction) Execute(ctx core.ExecutionContext) error {
 		"github.reaction",
 		[]any{reaction},
 	)
-}
-
-func (c *AddReaction) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *AddReaction) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

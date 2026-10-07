@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/components/memorywrite"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -284,10 +283,6 @@ func buildFieldNames(spec Spec, values any) []string {
 	}
 
 	return fields
-}
-
-func (c *AddMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *AddMemory) Setup(ctx core.SetupContext) error {

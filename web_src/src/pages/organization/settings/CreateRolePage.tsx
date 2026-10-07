@@ -4,7 +4,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router";
 import { Description, Label } from "../../../components/Fieldset/fieldset";
 import { Input } from "../../../components/Input/input";
 import { Text } from "../../../components/Text/text";
@@ -215,6 +215,104 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
     ],
   },
   {
+    category: "Factories",
+    icon: "precision_manufacturing",
+    permissions: [
+      {
+        id: "factory.read",
+        name: "View Factories",
+        description: "View factories, lines, and factory apps",
+        category: "Factories",
+        resource: "factories",
+        action: "read",
+      },
+      {
+        id: "factory.create",
+        name: "Create Factories",
+        description: "Create new factories within the organization",
+        category: "Factories",
+        resource: "factories",
+        action: "create",
+      },
+      {
+        id: "factory.update",
+        name: "Manage Factories",
+        description: "Update factory settings and lines",
+        category: "Factories",
+        resource: "factories",
+        action: "update",
+      },
+      {
+        id: "factory.delete",
+        name: "Delete Factories",
+        description: "Delete factories from the organization",
+        category: "Factories",
+        resource: "factories",
+        action: "delete",
+      },
+      {
+        id: "factory.publish",
+        name: "Publish Factories",
+        description: "Make a factory board public or private",
+        category: "Factories",
+        resource: "factories",
+        action: "publish",
+      },
+    ],
+  },
+  {
+    category: "Tasks",
+    icon: "assignment",
+    permissions: [
+      {
+        id: "work_order.read",
+        name: "View Tasks",
+        description: "View tasks, events, and artifacts",
+        category: "Tasks",
+        resource: "work_orders",
+        action: "read",
+      },
+      {
+        id: "work_order.create",
+        name: "Create Tasks",
+        description: "Create new tasks",
+        category: "Tasks",
+        resource: "work_orders",
+        action: "create",
+      },
+      {
+        id: "work_order.update",
+        name: "Manage Tasks",
+        description: "Update task status, assignees, comments, and artifacts",
+        category: "Tasks",
+        resource: "work_orders",
+        action: "update",
+      },
+    ],
+  },
+  {
+    category: "Notifications",
+    icon: "notifications",
+    permissions: [
+      {
+        id: "notification.read",
+        name: "View Notification Settings",
+        description: "View your task notification settings",
+        category: "Notifications",
+        resource: "notifications",
+        action: "read",
+      },
+      {
+        id: "notification.update",
+        name: "Change Notification Settings",
+        description: "Change your task notification settings",
+        category: "Notifications",
+        resource: "notifications",
+        action: "update",
+      },
+    ],
+  },
+  {
     category: "Integrations",
     icon: "integration_instructions",
     permissions: [
@@ -297,7 +395,7 @@ const VISIBLE_ROLE_PERMISSION_KEYS = new Set(
   VISIBLE_ROLE_PERMISSIONS.map((permission) => permissionKey(permission.resource, permission.action)),
 );
 
-const DEFAULT_ROLE_NAMES = ["org_viewer", "org_admin", "org_owner"];
+const DEFAULT_ROLE_NAMES = ["org_admin", "org_maintainer", "org_operator"];
 
 const isDefaultRole = (roleName?: string | null) => {
   if (!roleName) return false;

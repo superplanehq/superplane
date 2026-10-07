@@ -1,28 +1,46 @@
+import { isHiddenAgentLiveLogText } from "@/lib/agentRunTelemetry";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "../../../lib/utils";
 import type { ExecutionInfo } from "../../../pages/app/mappers/types";
+import { LiveLogAgentActivity } from "./LiveLogAgentActivity";
+import { sectionTitle } from "./liveLogSections";
 import { isExecutionInFlight, type CommandSection } from "./types";
 import { terminalCommandStatusForExecution, terminalTimeMsForExecution, useLiveLogStream } from "./useLiveLogStream";
+import { LiveLogStateNotice } from "./LiveLogStateNotice";
 
-export function LiveLogStreamView({ execution }: { execution: ExecutionInfo }) {
+export function LiveLogStreamView({
+  execution,
+  session,
+}: {
+  execution: ExecutionInfo;
+  session?: { organizationId?: string; canvasId?: string };
+}) {
   const executionInFlight = isExecutionInFlight(execution);
-  const { sections, orphanLines, error, isStreaming, toggleSection, scrollRef } = useLiveLogStream(
+  const { sections, orphanLines, error, isLoading, retry, toggleSection, scrollRef } = useLiveLogStream(
     execution.id,
     executionInFlight,
     terminalCommandStatusForExecution(execution),
     terminalTimeMsForExecution(execution),
+    session,
   );
   const hasAnyLogs = orphanLines.length > 0 || sections.length > 0;
   const lastSectionIndex = sections.length - 1;
-  const waitingForLogs = !hasAnyLogs && !error && (executionInFlight || isStreaming);
-  const showError = Boolean(error) && !executionInFlight;
 
   return (
     <div ref={scrollRef} className="h-full min-h-0 overflow-y-auto bg-slate-50 dark:bg-gray-900">
-      {showError ? <ErrorMessage /> : null}
-      {waitingForLogs ? <WaitingForLogsMessage /> : null}
-      {!showError && !waitingForLogs && !hasAnyLogs ? <NoLogsMessage /> : null}
+      {error ? (
+        <LiveLogStateNotice
+          state="error"
+          error={error}
+          willRetry={executionInFlight}
+          onRetry={retry}
+          compact={hasAnyLogs}
+        />
+      ) : null}
+      {!error && !hasAnyLogs && isLoading ? <LiveLogStateNotice state="loading" /> : null}
+      {!error && !hasAnyLogs && !isLoading && executionInFlight ? <LiveLogStateNotice state="waiting" /> : null}
+      {!error && !hasAnyLogs && !isLoading && !executionInFlight ? <LiveLogStateNotice state="empty" /> : null}
 
       {sections.map((section, index) => (
         <CommandSectionView
@@ -32,22 +50,6 @@ export function LiveLogStreamView({ execution }: { execution: ExecutionInfo }) {
           isLast={index === lastSectionIndex}
         />
       ))}
-    </div>
-  );
-}
-
-function NoLogsMessage() {
-  return <div className="px-4 py-3 text-left text-muted-foreground">No log lines yet.</div>;
-}
-
-function WaitingForLogsMessage() {
-  return <div className="px-4 py-3 text-left text-muted-foreground">Waiting for logs…</div>;
-}
-
-function ErrorMessage() {
-  return (
-    <div className="px-4 py-3 text-left text-destructive">
-      Something went wrong while fetching logs. Please try again later.
     </div>
   );
 }
@@ -94,7 +96,12 @@ function CommandSectionHeader({
     >
       <div className="flex items-center gap-2">
         <span>{isCollapsed ? openChevron : closedChevron}</span>
-        <span className="font-medium text-gray-900 dark:text-gray-100">{section.text}</span>
+        {section.kind ? (
+          <span className="shrink-0 font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+            {section.kind}
+          </span>
+        ) : null}
+        <span className="font-medium text-gray-900 dark:text-gray-100">{sectionTitle(section)}</span>
       </div>
 
       <div className="flex items-center gap-2">
@@ -110,9 +117,50 @@ function CommandSectionContent({ section }: { section: CommandSection }) {
     return null;
   }
 
+  const activities = section.activities ?? [];
+  const hasActivities = activities.some((activity) => activity.items.length > 0);
+  const visibleLines = section.lines.filter((line) => line.trim() !== "" && !isHiddenAgentLiveLogText(line));
+
+  if (section.events.length > 0 || hasActivities) {
+    return (
+      <div className="border-t border-slate-200 bg-white px-4 py-2 font-mono text-xs leading-relaxed text-gray-800 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200">
+        {hasActivities ? <LiveLogAgentActivity activities={activities} /> : null}
+        {section.events.map((event, index) =>
+          event.kind === "note" ? (
+            isHiddenAgentLiveLogText(event.text) ? null : (
+              <p key={`note-${index}`} className="whitespace-pre-wrap">
+                {event.text}
+              </p>
+            )
+          ) : (
+            <ul key={event.id} className="mt-1 space-y-1">
+              {event.tools.map((tool) => (
+                <li key={tool.id}>
+                  <span className="font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {tool.kind}
+                  </span>{" "}
+                  <span>{tool.text}</span>
+                  {tool.lines.some((line) => line.trim()) ? (
+                    <pre className="mt-1 whitespace-pre-wrap text-gray-600 dark:text-gray-400">
+                      {tool.lines.filter((line) => line.trim()).join("\n")}
+                    </pre>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ),
+        )}
+      </div>
+    );
+  }
+
+  if (visibleLines.length === 0) {
+    return null;
+  }
+
   return (
     <pre className="px-4 py-2 text-left font-mono text-xs leading-relaxed whitespace-pre-wrap text-gray-800 bg-white border-t border-slate-200 dark:text-gray-200 dark:bg-gray-900 dark:border-gray-800">
-      {section.lines.filter((line) => line.trim() !== "").join("\n")}
+      {visibleLines.join("\n")}
     </pre>
   );
 }
@@ -151,7 +199,7 @@ function StatusBadge({ status }: { status: CommandSection["status"] }) {
     "bg-blue-500": status === "running",
   });
 
-  let label = "";
+  let label: string;
   switch (status) {
     case "passed":
       label = "Passed";

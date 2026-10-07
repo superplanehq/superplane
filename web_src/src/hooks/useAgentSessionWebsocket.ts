@@ -86,6 +86,8 @@ export type AgentStreamCallbacks = {
   onOutcomeEvent?: (event: "start" | "end", evaluation: OutcomeEvaluation) => void;
   /** A recoverable, non-terminal provider notice (session.error). */
   onNotice?: (message: string) => void;
+  /** Reconcile the REST snapshot after the socket opens or reconnects. */
+  onConnectionOpen?: () => void;
 };
 
 export function useAgentSessionWebsocket(
@@ -117,6 +119,7 @@ export function useAgentSessionWebsocket(
       heartbeat: false,
       share: false,
       onMessage,
+      onOpen: () => callbacksRef.current.onConnectionOpen?.(),
     },
     enabled && url !== null,
   );

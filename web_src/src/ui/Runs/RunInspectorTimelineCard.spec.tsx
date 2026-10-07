@@ -1,5 +1,5 @@
 import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { escapeJsonStringValue } from "./runInspectorJson";
 import { JsonPayload } from "./RunInspectorTimelineCard";
 

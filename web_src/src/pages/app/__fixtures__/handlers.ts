@@ -58,26 +58,18 @@ export interface CanvasAppFixture {
   executionsByEventId?: Record<string, { executions?: unknown[] }>;
   /** GET /api/v1/canvases/{canvasId}/memory (real API returns `{items: []}`) */
   memory?: { items?: unknown[] };
-  /** GET /api/v1/canvases/{canvasId}/repository/file?path=console.yaml */
+  /** GET /api/v1/canvases/{canvasId}/file?path=console.yaml */
   consoleYaml?: string;
   /**
-   * Extra repository file bodies keyed by path (e.g. `README.md`).
+   * Extra file bodies keyed by path (e.g. `README.md`).
    * `console.yaml` still prefers `consoleYaml` when both are set.
    */
   repositoryFileContents?: Record<string, string>;
-  /**
-   * Paths returned by GET .../repository/files. Defaults to the standard
-   * app-repo trio (`README.md`, `canvas.yaml`, `console.yaml`) plus any
-   * keys from `repositoryFileContents`.
-   */
-  repositoryFilePaths?: string[];
   /** GET /api/v1/agents/canvases/{canvasId}/chat */
   agentChat?: { chat?: Record<string, unknown> };
   /** GET /api/v1/agents/chats/{chatId}/messages */
   agentMessages?: { messages?: Array<Record<string, unknown>>; hasMore?: boolean };
 }
-
-const DEFAULT_REPOSITORY_FILE_PATHS = ["README.md", "canvas.yaml", "console.yaml"] as const;
 
 const capturedFixture = defaultRaw as CanvasAppFixture;
 
@@ -202,19 +194,64 @@ export const canvasAppIds = {
 function buildMeUser(orgId: string) {
   return {
     id: "storybook-user",
-    name: "Storybook User",
-    email: "storybook@superplane.dev",
+    name: "Leonardo DiCaprio",
+    email: "john.doe@superplane.dev",
     organizationId: orgId,
     hasToken: true,
     roles: ["org_admin"],
     groups: [],
-    permissions: ["canvases", "integrations", "secrets", "groups", "users", "roles", "organization", "agents"].flatMap(
-      (resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action })),
-    ),
+    permissions: [
+      "canvases",
+      "integrations",
+      "secrets",
+      "api_keys",
+      "groups",
+      "users",
+      "roles",
+      "organization",
+      "agents",
+      "factories",
+      "work_orders",
+      "members",
+      "notifications",
+    ].flatMap((resource) => ["read", "create", "update", "delete"].map((action) => ({ resource, action }))),
   };
 }
 
 type FixtureResult = { json: unknown } | { text: string } | null;
+
+/**
+ * Live version of a fixture canvas. The capture kept the version list but not
+ * `metadata.liveVersionId`, which every canvas has in the real API.
+ */
+function fixtureLiveVersionId(fixture: CanvasAppFixture): string | undefined {
+  const captured =
+    fixture.versionId ??
+    fixture.versionsLatest?.versions?.[0]?.metadata?.id ??
+    fixture.versions?.versions?.[0]?.metadata?.id;
+  return typeof captured === "string" ? captured : undefined;
+}
+
+/**
+ * GET /api/v1/canvases/{canvasId}. Adds `liveVersionId` when the capture has
+ * none: without it AppPage cannot resolve the live version, so edit sessions
+ * (including factory Configure) never start and the canvas stays read-only.
+ */
+function canvasDetailResponse(fixture: CanvasAppFixture) {
+  const canvas = fixture.canvas?.canvas;
+  if (!canvas) {
+    return { canvas: {} };
+  }
+  const metadata = (canvas.metadata ?? {}) as Record<string, unknown>;
+  if (metadata.liveVersionId) {
+    return { canvas };
+  }
+  const liveVersionId = fixtureLiveVersionId(fixture);
+  if (!liveVersionId) {
+    return { canvas };
+  }
+  return { canvas: { ...canvas, metadata: { ...metadata, liveVersionId } } };
+}
 
 const re = (pattern: string): RegExp => new RegExp(`^${pattern}$`);
 
@@ -234,7 +271,16 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     { pattern: re("/api/v1/triggers"), resolve: () => ({ json: fixture.triggers ?? { triggers: [] } }) },
     { pattern: re("/api/v1/actions"), resolve: () => ({ json: fixture.actions ?? { actions: [] } }) },
     { pattern: re("/api/v1/widgets"), resolve: () => ({ json: fixture.widgets ?? { widgets: [] } }) },
-    { pattern: re("/api/v1/integrations"), resolve: () => ({ json: fixture.integrations ?? { integrations: [] } }) },
+    {
+      pattern: re("/api/v1/integrations"),
+      resolve: () => {
+        const payload =
+          fixture.integrations && typeof fixture.integrations === "object"
+            ? fixture.integrations
+            : { integrations: [] };
+        return { json: { githubAppConfigured: true, ...payload } };
+      },
+    },
     { pattern: re("/api/v1/api-keys"), resolve: () => ({ json: { apiKeys: [] } }) },
 
     // Draft-version listing must stay empty (no open drafts); every other version
@@ -324,33 +370,11 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     // Real API shape is `{items: []}`; some legacy fixtures used `{memory: []}`
     // which no widget ever read successfully — normalize on `items` here.
     { pattern: re(`${CANVAS}/memory`), resolve: () => ({ json: fixture.memory ?? { items: [] } }) },
-    // Files tab needs a ready repository before it will render the tree.
-    // Without this, `useCanvasRepository` returns `undefined` and TanStack
-    // Query surfaces `["canvases","repository",…] data is undefined`.
     {
-      pattern: re(`${CANVAS}/repository/files`),
-      resolve: () => ({
-        json: {
-          files: resolveRepositoryFilePaths(fixture).map((path) => ({ path })),
-        },
-      }),
-    },
-    {
-      pattern: re(`${CANVAS}/repository/file`),
+      pattern: re(`${CANVAS}/file`),
       resolve: (_m, url) => ({ text: resolveRepositoryFileContent(fixture, url.searchParams.get("path")) }),
     },
-    {
-      pattern: re(`${CANVAS}/repository`),
-      resolve: () => ({
-        json: {
-          repository: {
-            metadata: { canvasId: fixture.canvasId },
-            status: { state: "STATE_READY", headSha: "storybook-fixture-head" },
-          },
-        },
-      }),
-    },
-    { pattern: re(CANVAS), resolve: () => ({ json: fixture.canvas ?? { canvas: {} } }) },
+    { pattern: re(CANVAS), resolve: () => ({ json: canvasDetailResponse(fixture) }) },
     { pattern: re("/api/v1/canvases"), resolve: () => ({ json: { canvases: [], totalCount: 0, hasNextPage: false } }) },
 
     {
@@ -396,7 +420,6 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
     },
 
     { pattern: re("/api/v1/organizations/[^/]+/integrations"), resolve: () => ({ json: { integrations: [] } }) },
-    { pattern: re("/api/v1/organizations/[^/]+/usage"), resolve: () => ({ json: {} }) },
     { pattern: re("/api/v1/organizations/[^/]+/invite-link"), resolve: () => ({ json: {} }) },
     {
       pattern: re("/api/v1/organizations/[^/]+"),
@@ -420,13 +443,19 @@ function buildRoutes(fixture: CanvasAppFixture): Route[] {
             {
               id: "factories",
               label: "Factories",
-              description: "Software factories for work orders",
+              description: "Software factories for tasks",
             },
           ],
         },
       }),
     },
-    { pattern: re("/account"), resolve: () => ({ json: { id: meUser.id, email: meUser.email, name: meUser.name } }) },
+    {
+      pattern: re("/account"),
+      // prettier-ignore
+      resolve: () => ({
+        json: { id: meUser.id, email: meUser.email, name: meUser.name, avatar_url: "/storybook/leonardo-dicaprio.jpg", has_password: true, providers: [{ provider: "github", username: "ada", email: meUser.email }] },
+      }),
+    },
   ];
 }
 
@@ -549,18 +578,6 @@ function filterRuns(runs: Array<Record<string, unknown>>, url: URL): Array<Recor
     }
     return true;
   });
-}
-
-function resolveRepositoryFilePaths(fixture: CanvasAppFixture): string[] {
-  if (fixture.repositoryFilePaths?.length) {
-    return [...fixture.repositoryFilePaths];
-  }
-
-  const paths = new Set<string>(DEFAULT_REPOSITORY_FILE_PATHS);
-  for (const path of Object.keys(fixture.repositoryFileContents ?? {})) {
-    paths.add(path);
-  }
-  return Array.from(paths).sort();
 }
 
 function resolveRepositoryFileContent(fixture: CanvasAppFixture, path: string | null): string {

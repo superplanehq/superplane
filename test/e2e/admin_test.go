@@ -19,7 +19,6 @@ func TestAdminDashboard(t *testing.T) {
 		steps.session.Login()
 		steps.session.Visit("/admin")
 		// The frontend AdminLayout checks installation_admin and redirects to /
-		steps.session.Sleep(1000)
 		steps.assertNotOnAdminPage()
 	})
 
@@ -94,9 +93,23 @@ func TestAdminDashboard(t *testing.T) {
 		steps.saveSMTPSettings()
 		steps.assertSMTPSettingsEnabled()
 	})
+
+	t.Run("admin user can view the installation license", func(t *testing.T) {
+		steps := &adminSteps{t: t}
+		steps.start()
+		steps.promoteToAdmin()
+		steps.session.Login()
+		steps.session.Visit("/admin/license")
+		steps.session.AssertText("SuperPlane Enterprise")
+		steps.session.AssertText("Managed license")
+		steps.session.AssertVisible(q.TestID("license-features"))
+	})
 }
 
 func TestAdminOwnerSetupPromotion(t *testing.T) {
+	t.Cleanup(func() {
+		middleware.MarkOwnerSetupCompleted()
+	})
 	t.Run("owner setup promotes first account to installation admin", func(t *testing.T) {
 		steps := &adminSetupSteps{t: t}
 		steps.start()
@@ -136,10 +149,7 @@ func (s *adminSteps) assertOnAdminPage() {
 }
 
 func (s *adminSteps) assertNotOnAdminPage() {
-	s.session.AssertURLContains("/")
-	// Should NOT be on /admin - the admin layout redirects non-admins
-	url := s.session.Page().URL()
-	assert.NotContains(s.t, url, "/admin")
+	s.session.WaitUntilURLDoesNotContain("/admin")
 }
 
 func (s *adminSteps) assertOrganizationVisible(name string) {
@@ -250,7 +260,7 @@ func (s *adminSetupSteps) fillInOwnerDetailsAndSubmit() {
 	s.session.FillIn(q.Locator(`input[placeholder="Last name"]`), "User")
 	s.session.FillIn(q.Locator(`input[placeholder="Password"]`), "Password1")
 	s.session.FillIn(q.Locator(`input[placeholder="Confirm password"]`), "Password1")
-	s.session.Click(q.Text("Finish setup"))
+	s.session.Click(q.Text("Continue"))
 	s.waitForSetupToComplete()
 }
 

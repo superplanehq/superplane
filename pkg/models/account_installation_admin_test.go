@@ -1,6 +1,8 @@
 package models
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -63,7 +65,7 @@ func TestListAllOrganizations(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	t.Run("returns empty list when no organizations exist", func(t *testing.T) {
-		orgs, total, err := ListAllOrganizations("", 50, 0, "", "")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "", "")
 		require.NoError(t, err)
 		assert.Empty(t, orgs)
 		assert.Equal(t, int64(0), total)
@@ -77,7 +79,7 @@ func TestListAllOrganizations(t *testing.T) {
 		_, err = CreateOrganization("Middle Org", "")
 		require.NoError(t, err)
 
-		orgs, total, err := ListAllOrganizations("", 50, 0, "name", "asc")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "name", "asc")
 		require.NoError(t, err)
 		require.Len(t, orgs, 3)
 		assert.Equal(t, int64(3), total)
@@ -103,13 +105,70 @@ func TestListAllOrganizations(t *testing.T) {
 		createTestCanvas(t, midCount.ID, "Mid Canvas 1")
 		createTestCanvas(t, midCount.ID, "Mid Canvas 2")
 
-		orgs, total, err := ListAllOrganizations("", 50, 0, "canvas_count", "desc")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "canvas_count", "desc")
 		require.NoError(t, err)
 		require.Len(t, orgs, 3)
 		assert.Equal(t, int64(3), total)
 		assert.Equal(t, "High Count", orgs[0].Name)
 		assert.Equal(t, "Mid Count", orgs[1].Name)
 		assert.Equal(t, "Low Count", orgs[2].Name)
+	})
+
+	t.Run("sorts organizations by task count", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		lowCount, err := CreateOrganization("Low Tasks", "")
+		require.NoError(t, err)
+		highCount, err := CreateOrganization("High Tasks", "")
+		require.NoError(t, err)
+		midCount, err := CreateOrganization("Mid Tasks", "")
+		require.NoError(t, err)
+
+		db := database.DB(t.Context())
+		createTestTasks(t, db, lowCount.ID, 1)
+		createTestTasks(t, db, highCount.ID, 3)
+		createTestTasks(t, db, midCount.ID, 2)
+
+		orgs, total, err := ListAllOrganizations(db, "", 50, 0, "task_count", "desc")
+		require.NoError(t, err)
+		require.Len(t, orgs, 3)
+		assert.Equal(t, int64(3), total)
+		assert.Equal(t, "High Tasks", orgs[0].Name)
+		assert.Equal(t, int64(3), orgs[0].TaskCount)
+		assert.Equal(t, "Mid Tasks", orgs[1].Name)
+		assert.Equal(t, int64(2), orgs[1].TaskCount)
+		assert.Equal(t, "Low Tasks", orgs[2].Name)
+		assert.Equal(t, int64(1), orgs[2].TaskCount)
+		assert.Equal(t, int64(0), orgs[0].DoneTaskCount)
+	})
+
+	t.Run("sorts organizations by done task count", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		noneDone, err := CreateOrganization("None Done", "")
+		require.NoError(t, err)
+		mostDone, err := CreateOrganization("Most Done", "")
+		require.NoError(t, err)
+		someDone, err := CreateOrganization("Some Done", "")
+		require.NoError(t, err)
+
+		db := database.DB(t.Context())
+		createTestTasks(t, db, noneDone.ID, 2)
+		createTestDoneTasks(t, db, mostDone.ID, 2, 1, 1)
+		createTestDoneTasks(t, db, someDone.ID, 1, 0, 1)
+
+		orgs, total, err := ListAllOrganizations(db, "", 50, 0, "done_task_count", "desc")
+		require.NoError(t, err)
+		require.Len(t, orgs, 3)
+		assert.Equal(t, int64(3), total)
+		assert.Equal(t, "Most Done", orgs[0].Name)
+		assert.Equal(t, int64(3), orgs[0].DoneTaskCount)
+		assert.Equal(t, int64(4), orgs[0].TaskCount)
+		assert.Equal(t, "Some Done", orgs[1].Name)
+		assert.Equal(t, int64(1), orgs[1].DoneTaskCount)
+		assert.Equal(t, int64(2), orgs[1].TaskCount)
+		assert.Equal(t, "None Done", orgs[2].Name)
+		assert.Equal(t, int64(0), orgs[2].DoneTaskCount)
 	})
 
 	t.Run("sorts organizations by member count", func(t *testing.T) {
@@ -129,7 +188,7 @@ func TestListAllOrganizations(t *testing.T) {
 		createTestUser(t, midCount.ID, "mid-1@example.com", "Mid 1")
 		createTestUser(t, midCount.ID, "mid-2@example.com", "Mid 2")
 
-		orgs, total, err := ListAllOrganizations("", 50, 0, "member_count", "desc")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "member_count", "desc")
 		require.NoError(t, err)
 		require.Len(t, orgs, 3)
 		assert.Equal(t, int64(3), total)
@@ -149,7 +208,7 @@ func TestListAllOrganizations(t *testing.T) {
 		err = SoftDeleteOrganization(toDelete.ID.String())
 		require.NoError(t, err)
 
-		orgs, total, err := ListAllOrganizations("", 50, 0, "", "")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 50, 0, "", "")
 		require.NoError(t, err)
 		require.Len(t, orgs, 1)
 		assert.Equal(t, int64(1), total)
@@ -164,11 +223,51 @@ func TestListAllOrganizations(t *testing.T) {
 		_, err = CreateOrganization("Beta Inc", "")
 		require.NoError(t, err)
 
-		orgs, total, err := ListAllOrganizations("alpha", 50, 0, "", "")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "alpha", 50, 0, "", "")
 		require.NoError(t, err)
 		require.Len(t, orgs, 1)
 		assert.Equal(t, int64(1), total)
 		assert.Equal(t, "Alpha Corp", orgs[0].Name)
+	})
+
+	t.Run("filters by organization id", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		target, err := CreateOrganization("Target Org", "")
+		require.NoError(t, err)
+		other, err := CreateOrganization("Other Org", "")
+		require.NoError(t, err)
+		deleted, err := CreateOrganization("Deleted Org", "")
+		require.NoError(t, err)
+		require.NoError(t, SoftDeleteOrganization(deleted.ID.String()))
+
+		id := target.ID.String()
+		cases := []struct {
+			name   string
+			search string
+			want   []uuid.UUID
+		}{
+			{name: "full id in lower case", search: id, want: []uuid.UUID{target.ID}},
+			{name: "full id in upper case", search: strings.ToUpper(id), want: []uuid.UUID{target.ID}},
+			{name: "first 8 characters", search: id[:8], want: []uuid.UUID{target.ID}},
+			{name: "surrounding spaces", search: "  " + id + "  ", want: []uuid.UUID{target.ID}},
+			{name: "name", search: "target", want: []uuid.UUID{target.ID}},
+			{name: "different organization id", search: other.ID.String(), want: []uuid.UUID{other.ID}},
+			{name: "deleted organization id", search: deleted.ID.String()},
+			{name: "id without hyphens", search: strings.ReplaceAll(id, "-", "")},
+		}
+
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				orgs, total, err := ListAllOrganizations(database.Conn(), tc.search, 50, 0, "", "")
+				require.NoError(t, err)
+				assert.Equal(t, int64(len(tc.want)), total)
+				require.Len(t, orgs, len(tc.want))
+				for i, org := range orgs {
+					assert.Equal(t, tc.want[i], org.ID)
+				}
+			})
+		}
 	})
 
 	t.Run("paginates results", func(t *testing.T) {
@@ -181,15 +280,113 @@ func TestListAllOrganizations(t *testing.T) {
 		_, err = CreateOrganization("Ccc", "")
 		require.NoError(t, err)
 
-		orgs, total, err := ListAllOrganizations("", 2, 0, "", "")
+		orgs, total, err := ListAllOrganizations(database.Conn(), "", 2, 0, "", "")
 		require.NoError(t, err)
 		assert.Len(t, orgs, 2)
 		assert.Equal(t, int64(3), total)
 
-		orgs2, _, err := ListAllOrganizations("", 2, 2, "", "")
+		orgs2, _, err := ListAllOrganizations(database.Conn(), "", 2, 2, "", "")
 		require.NoError(t, err)
 		assert.Len(t, orgs2, 1)
 	})
+}
+
+func TestFindOrganizationWithCounts(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	t.Run("returns organization with canvas and member counts", func(t *testing.T) {
+		org, err := CreateOrganization("Counted Org", "counted")
+		require.NoError(t, err)
+		createTestCanvas(t, org.ID, "Canvas 1")
+		createTestCanvas(t, org.ID, "Canvas 2")
+		createTestUser(t, org.ID, "member-1@example.com", "Member 1")
+
+		found, err := FindOrganizationWithCounts(database.Conn(), org.ID)
+		require.NoError(t, err)
+		assert.Equal(t, org.ID, found.ID)
+		assert.Equal(t, org.Name, found.Name)
+		assert.Equal(t, org.Slug, found.Slug)
+		assert.Equal(t, "counted", found.Description)
+		assert.Equal(t, int64(2), found.CanvasCount)
+		assert.Equal(t, int64(0), found.TaskCount)
+		assert.Equal(t, int64(0), found.DoneTaskCount)
+		assert.Equal(t, int64(1), found.MemberCount)
+	})
+
+	t.Run("excludes API keys from member count", func(t *testing.T) {
+		org, err := CreateOrganization("Human Members", "")
+		require.NoError(t, err)
+		createTestUser(t, org.ID, "human-member@example.com", "Human Member")
+		createTestAPIKeyUser(t, org.ID, "api-key@example.com", "API Key")
+
+		found, err := FindOrganizationWithCounts(database.Conn(), org.ID)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), found.MemberCount)
+	})
+
+	t.Run("excludes tasks from a deleted factory", func(t *testing.T) {
+		org, err := CreateOrganization("Deleted Factory Org", "")
+		require.NoError(t, err)
+		db := database.DB(t.Context())
+		factory, err := CreateFactory(db, org.ID, "Factory", "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateWorkOrder(db, "Task 1", "", nil, nil, nil)
+		require.NoError(t, err)
+		require.NoError(t, factory.SoftDelete(db))
+
+		found, err := FindOrganizationWithCounts(db, org.ID)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), found.TaskCount)
+		assert.Equal(t, int64(0), found.DoneTaskCount)
+	})
+
+	t.Run("returns not found for deleted organization", func(t *testing.T) {
+		org, err := CreateOrganization("Soon Deleted", "")
+		require.NoError(t, err)
+		require.NoError(t, SoftDeleteOrganization(org.ID.String()))
+
+		_, err = FindOrganizationWithCounts(database.Conn(), org.ID)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	})
+}
+
+func createTestTasks(t *testing.T, tx *gorm.DB, organizationID uuid.UUID, count int) {
+	t.Helper()
+
+	factory, err := CreateFactory(tx, organizationID, "Factory", "", "")
+	require.NoError(t, err)
+	for i := 0; i < count; i++ {
+		_, err := factory.CreateWorkOrder(tx, fmt.Sprintf("Task %d", i+1), "", nil, nil, nil)
+		require.NoError(t, err)
+	}
+}
+
+func createTestDoneTasks(t *testing.T, tx *gorm.DB, organizationID uuid.UUID, completed, failed, rejected int) {
+	t.Helper()
+
+	factory, err := CreateFactory(tx, organizationID, "Factory", "", "")
+	require.NoError(t, err)
+
+	createClosed := func(title, result string) {
+		t.Helper()
+		order, err := factory.CreateWorkOrder(tx, title, "", nil, nil, nil)
+		require.NoError(t, err)
+		require.NoError(t, tx.Model(order).Updates(map[string]any{
+			"state":  FactoryWorkOrderStateClosed,
+			"result": result,
+		}).Error)
+	}
+
+	for i := 0; i < completed; i++ {
+		createClosed(fmt.Sprintf("Completed %d", i+1), FactoryWorkOrderResultCompleted)
+	}
+	for i := 0; i < failed; i++ {
+		createClosed(fmt.Sprintf("Failed %d", i+1), FactoryWorkOrderResultFailed)
+	}
+	for i := 0; i < rejected; i++ {
+		createClosed(fmt.Sprintf("Rejected %d", i+1), FactoryWorkOrderResultRejected)
+	}
 }
 
 func createTestCanvas(t *testing.T, organizationID uuid.UUID, name string) {
@@ -230,6 +427,18 @@ func createTestUser(t *testing.T, organizationID uuid.UUID, email, name string) 
 
 	_, err = CreateUser(organizationID, account.ID, account.Email, account.Name)
 	require.NoError(t, err)
+}
+
+func createTestAPIKeyUser(t *testing.T, organizationID uuid.UUID, email, name string) {
+	t.Helper()
+
+	apiKey := &User{
+		OrganizationID: organizationID,
+		Email:          &email,
+		Name:           name,
+		Type:           UserTypeAPIKey,
+	}
+	require.NoError(t, database.Conn().Create(apiKey).Error)
 }
 
 func TestListActiveUsersByOrganization(t *testing.T) {

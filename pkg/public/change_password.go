@@ -109,7 +109,7 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !crypto.VerifyPassword(passwordAuth.PasswordHash, req.CurrentPassword) {
-		http.Error(w, "Current password is incorrect", http.StatusUnauthorized)
+		http.Error(w, "Current password is incorrect", http.StatusBadRequest)
 		return
 	}
 
@@ -130,7 +130,11 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		return models.ClearTokenHashesForAccountInTransaction(tx, account.ID)
+		if err := models.ClearTokenHashesForAccountInTransaction(tx, account.ID); err != nil {
+			return err
+		}
+
+		return models.DeleteUserAPITokensForAccount(tx, account.ID)
 	})
 
 	if err != nil {

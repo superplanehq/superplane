@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -208,10 +207,6 @@ func (q *QuarantinePackage) Execute(ctx core.ExecutionContext) error {
 
 func (q *QuarantinePackage) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (q *QuarantinePackage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (q *QuarantinePackage) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

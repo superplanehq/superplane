@@ -1,0 +1,211 @@
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
+
+const { filesCreateFactoryFile, filesCreateWorkOrderFile, showErrorToast } = vi.hoisted(() => ({
+  filesCreateFactoryFile: vi.fn(),
+  filesCreateWorkOrderFile: vi.fn(),
+  showErrorToast: vi.fn(),
+}));
+
+vi.mock("@/api-client", () => ({
+  filesCreateFactoryFile,
+  filesCreateWorkOrderFile,
+}));
+
+vi.mock("@/lib/toast", () => ({
+  showErrorToast,
+}));
+
+import { MAX_WORK_ORDER_FILE_BYTES } from "@/lib/workOrderFiles";
+
+import { useWorkOrderFileUpload } from "./useWorkOrderFileUpload";
+
+describe("useWorkOrderFileUpload", () => {
+  beforeEach(() => {
+    filesCreateFactoryFile.mockReset();
+    filesCreateWorkOrderFile.mockReset();
+    showErrorToast.mockReset();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+      }),
+    );
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:preview");
+  });
+
+  it("uploads a workspace file and returns an sp-file ref", async () => {
+    const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const uploadUrl = `https://files.example/api/v1/files/${id}/content`;
+    filesCreateFactoryFile.mockResolvedValue({ data: { file: { id, uploadUrl } } });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([new File(["png"], "bug.png", { type: "image/png" })]);
+    });
+
+    expect(filesCreateFactoryFile).toHaveBeenCalled();
+    expect(filesCreateWorkOrderFile).not.toHaveBeenCalled();
+    expect(uploaded).toEqual([
+      expect.objectContaining({
+        id,
+        ref: `sp-file://${id}`,
+        isImage: true,
+      }),
+    ]);
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(uploadUrl, expect.any(Object)));
+  });
+
+  it("does not upload content when the API omits the minted upload URL", async () => {
+    filesCreateFactoryFile.mockResolvedValue({
+      data: { file: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" } },
+    });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([new File(["png"], "bug.png", { type: "image/png" })]);
+    });
+
+    expect(uploaded).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(showErrorToast).toHaveBeenCalledWith("The file could not be stored.");
+  });
+
+  it("uploads a video file and returns an sp-file ref", async () => {
+    const id = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const uploadUrl = `https://files.example/api/v1/files/${id}/content`;
+    filesCreateFactoryFile.mockResolvedValue({ data: { file: { id, uploadUrl } } });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([new File(["x"], "clip.mp4", { type: "video/mp4" })]);
+    });
+
+    expect(uploaded).toEqual([
+      expect.objectContaining({
+        id,
+        ref: `sp-file://${id}`,
+        isImage: false,
+        isVideo: true,
+      }),
+    ]);
+  });
+
+  it("uploads an audio file and returns an sp-file ref", async () => {
+    const id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const uploadUrl = `https://files.example/api/v1/files/${id}/content`;
+    filesCreateFactoryFile.mockResolvedValue({ data: { file: { id, uploadUrl } } });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([new File(["x"], "note.mp3", { type: "audio/mpeg" })]);
+    });
+
+    expect(uploaded).toEqual([
+      expect.objectContaining({
+        id,
+        ref: `sp-file://${id}`,
+        isImage: false,
+        isVideo: false,
+        isAudio: true,
+      }),
+    ]);
+  });
+
+  it("explains an opaque not-found create as a permission failure", async () => {
+    filesCreateFactoryFile.mockResolvedValue({
+      error: { message: "Not found" },
+      response: new Response("Not found", { status: 404 }),
+    });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    await act(async () => {
+      await result.current.uploadFiles([new File(["a,b"], "rows.csv", { type: "text/csv" })]);
+    });
+
+    expect(showErrorToast).toHaveBeenCalledWith("You do not have permission to attach files here.");
+  });
+
+  it("explains a forbidden create as a permission failure", async () => {
+    filesCreateFactoryFile.mockResolvedValue({
+      error: { message: "permission denied" },
+      response: new Response("permission denied", { status: 403 }),
+    });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    await act(async () => {
+      await result.current.uploadFiles([new File(["a,b"], "rows.csv", { type: "text/csv" })]);
+    });
+
+    expect(showErrorToast).toHaveBeenCalledWith("You do not have permission to attach files here.");
+  });
+
+  it("explains when the workspace or task no longer exists", async () => {
+    filesCreateWorkOrderFile.mockResolvedValue({
+      error: { message: "resource not found" },
+      response: new Response("resource not found", { status: 404 }),
+    });
+    const { result } = renderHook(() =>
+      useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1", orderId: "order-1" }),
+    );
+
+    await act(async () => {
+      await result.current.uploadFiles([new File(["a,b"], "rows.csv", { type: "text/csv" })]);
+    });
+
+    expect(showErrorToast).toHaveBeenCalledWith(
+      "This workspace or task no longer exists. Refresh the page and try again.",
+    );
+    expect(filesCreateFactoryFile).not.toHaveBeenCalled();
+  });
+
+  it("uploads a file at the attachment limit", async () => {
+    const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const uploadUrl = `https://files.example/api/v1/files/${id}/content`;
+    filesCreateFactoryFile.mockResolvedValue({ data: { file: { id, uploadUrl } } });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+    const file = new File([new Uint8Array(MAX_WORK_ORDER_FILE_BYTES)], "limit.png", { type: "image/png" });
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([file]);
+    });
+
+    expect(file.size).toBe(MAX_WORK_ORDER_FILE_BYTES);
+    expect(uploaded).toEqual([expect.objectContaining({ id, ref: `sp-file://${id}` })]);
+    expect(showErrorToast).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith(uploadUrl, expect.objectContaining({ method: "PUT", body: file }));
+  });
+
+  it("rejects a file larger than the attachment limit", async () => {
+    const file = new File(["x"], "large.png", { type: "image/png" });
+    Object.defineProperty(file, "size", { value: MAX_WORK_ORDER_FILE_BYTES + 1 });
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([file]);
+    });
+
+    expect(uploaded).toEqual([]);
+    expect(showErrorToast).toHaveBeenCalledWith("Each file must be 70 MB or smaller.");
+    expect(filesCreateFactoryFile).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file type that SuperPlane does not store", async () => {
+    const { result } = renderHook(() => useWorkOrderFileUpload({ organizationId: "org-1", factoryId: "factory-1" }));
+
+    let uploaded: Awaited<ReturnType<typeof result.current.uploadFiles>> = [];
+    await act(async () => {
+      uploaded = await result.current.uploadFiles([new File(["x"], "payload.zip", { type: "application/zip" })]);
+    });
+
+    expect(uploaded).toEqual([]);
+    expect(showErrorToast).toHaveBeenCalledWith("This file type is not allowed.");
+    expect(filesCreateFactoryFile).not.toHaveBeenCalled();
+  });
+});

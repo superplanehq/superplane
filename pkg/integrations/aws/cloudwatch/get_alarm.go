@@ -1,0 +1,159 @@
+package cloudwatch
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/aws/common"
+)
+
+type GetAlarm struct{}
+
+type GetAlarmConfiguration struct {
+	Region    string `json:"region" mapstructure:"region"`
+	AlarmName string `json:"alarm" mapstructure:"alarm"`
+}
+
+type GetAlarmNodeMetadata struct {
+	Region    string `json:"region" mapstructure:"region"`
+	AlarmName string `json:"alarmName" mapstructure:"alarmName"`
+}
+
+func (c *GetAlarm) Name() string {
+	return "aws.cloudwatch.getAlarm"
+}
+
+func (c *GetAlarm) Label() string {
+	return "CloudWatch • Get Alarm"
+}
+
+func (c *GetAlarm) Description() string {
+	return "Read the configuration and current state of a CloudWatch metric alarm"
+}
+
+func (c *GetAlarm) Documentation() string {
+	return `The Get Alarm component describes a CloudWatch metric alarm and emits its current details.
+
+## Use Cases
+
+- **State inspection**: Check whether an alarm is in ALARM, OK or INSUFFICIENT_DATA before taking action
+- **Conditional workflows**: Branch on the alarm threshold, statistic or missing-data handling
+- **Audit**: Record the alarm configuration at a point in time, before or after a change
+
+## Configuration
+
+- **Region**: AWS region where the alarm lives
+- **Alarm**: CloudWatch alarm to describe (` + "`cloudwatch.alarm`" + ` resource picker)
+
+## Output
+
+Emits the alarm on the default output channel, with the same fields as Create Alarm:
+- ` + "`alarmName`" + `, ` + "`alarmArn`" + `, ` + "`alarmDescription`" + `, ` + "`namespace`" + `, ` + "`metricName`" + `, ` + "`dimensions`" + `
+- ` + "`statistic`" + `, ` + "`extendedStatistic`" + `, ` + "`unit`" + `, ` + "`period`" + `, ` + "`evaluationPeriods`" + `, ` + "`datapointsToAlarm`" + `
+- ` + "`threshold`" + `, ` + "`comparisonOperator`" + `, ` + "`treatMissingData`" + `, ` + "`actionsEnabled`" + `
+- ` + "`stateValue`" + `, ` + "`stateReason`" + `, ` + "`stateUpdatedTimestamp`" + `, ` + "`stateTransitionedTimestamp`" + `
+- ` + "`alarmActions`" + `, ` + "`okActions`" + `, ` + "`insufficientDataActions`" + `, ` + "`region`" + `, ` + "`consoleUrl`" + `
+
+This component reads metric alarms; composite alarms are not returned. An alarm driven by metric
+math, anomaly detection or a Metrics Insights query is returned, but its metric definition is not:
+` + "`namespace`" + `, ` + "`metricName`" + `, ` + "`statistic`" + ` and ` + "`period`" + ` come back empty.
+`
+}
+
+func (c *GetAlarm) Icon() string {
+	return "aws"
+}
+
+func (c *GetAlarm) Color() string {
+	return "gray"
+}
+
+func (c *GetAlarm) OutputChannels(_ any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
+}
+
+func (c *GetAlarm) Configuration() []configuration.Field {
+	return []configuration.Field{
+		regionField(),
+		alarmField("CloudWatch alarm to describe"),
+	}
+}
+
+func (c *GetAlarm) Setup(ctx core.SetupContext) error {
+	config := GetAlarmConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	region, err := requireRegion(config.Region)
+	if err != nil {
+		return err
+	}
+
+	alarmName, err := requireAlarmName(config.AlarmName)
+	if err != nil {
+		return err
+	}
+
+	return ctx.Metadata.Set(GetAlarmNodeMetadata{
+		Region:    region,
+		AlarmName: alarmName,
+	})
+}
+
+func (c *GetAlarm) Execute(ctx core.ExecutionContext) error {
+	config := GetAlarmConfiguration{}
+	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	region, err := requireRegion(config.Region)
+	if err != nil {
+		return err
+	}
+
+	alarmName, err := requireAlarmName(config.AlarmName)
+	if err != nil {
+		return err
+	}
+
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to get AWS credentials: %w", err)
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	alarm, err := client.DescribeAlarm(alarmName)
+	if err != nil {
+		return fmt.Errorf("failed to describe alarm: %w", err)
+	}
+
+	return ctx.ExecutionState.Emit(
+		core.DefaultOutputChannel.Name,
+		GetAlarmPayloadType,
+		[]any{alarmToMap(alarm)},
+	)
+}
+
+func (c *GetAlarm) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *GetAlarm) HandleHook(_ core.ActionHookContext) error {
+	return nil
+}
+
+func (c *GetAlarm) Cancel(_ core.ExecutionContext) error {
+	return nil
+}
+
+func (c *GetAlarm) Cleanup(_ core.SetupContext) error {
+	return nil
+}
+
+func (c *GetAlarm) HandleWebhook(_ core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
+}

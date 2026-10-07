@@ -37,8 +37,9 @@ func CreateAPIKey(ctx context.Context, req *pb.CreateAPIKeyRequest, authService 
 	}
 
 	validRoles := map[string]bool{
-		models.RoleOrgAdmin:  true,
-		models.RoleOrgViewer: true,
+		models.RoleOrgAdmin:      true,
+		models.RoleOrgMaintainer: true,
+		models.RoleOrgOperator:   true,
 	}
 
 	if req.Role == "" {
@@ -46,7 +47,7 @@ func CreateAPIKey(ctx context.Context, req *pb.CreateAPIKeyRequest, authService 
 	}
 
 	if !validRoles[req.Role] {
-		return nil, grpcerrors.InvalidArgument(nil, "invalid role for API key; must be org_admin or org_viewer")
+		return nil, grpcerrors.InvalidArgument(nil, "invalid role for API key; must be org_admin, org_maintainer, or org_operator")
 	}
 
 	orgUUID, err := uuid.Parse(orgID)
@@ -104,7 +105,7 @@ func CreateAPIKey(ctx context.Context, req *pb.CreateAPIKeyRequest, authService 
 	})
 
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to create API key")
+		return nil, mapAPIKeyWriteError(err, "failed to create API key")
 	}
 
 	creator, err := creatorUserForAPIKey(db, orgID, apiKey)

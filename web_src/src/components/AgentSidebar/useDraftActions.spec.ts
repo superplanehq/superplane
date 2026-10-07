@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
 import { useDraftActions } from "./useDraftActions";
 import type { AgentMessage } from "@/components/CanvasToolSidebar/types";
 

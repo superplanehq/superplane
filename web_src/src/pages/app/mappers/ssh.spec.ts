@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import type {
@@ -112,11 +112,10 @@ function buildComponentCtx(node: NodeInfo): ComponentBaseContext {
 }
 
 describe("sshMapper metadata preview", () => {
-  it("shows joined commands for inline mode", () => {
+  it("shows joined commands", () => {
     const node = buildNode({
       host: "example.com",
       username: "root",
-      commandSource: "inline",
       commands: "echo hi\nls -la",
     });
 
@@ -125,74 +124,19 @@ describe("sshMapper metadata preview", () => {
     expect(props.metadata).toContainEqual({ icon: "terminal", label: "echo hi && ls -la" });
   });
 
-  it("shows the file path for file mode", () => {
+  it("shows commands for leftover file-mode configs that still have them", () => {
     const node = buildNode({
       host: "example.com",
       username: "root",
       commandSource: "file",
       commandFile: "scripts/deploy.sh",
-      commands: "stale inline value that should be hidden",
+      commands: "echo leftover",
     });
 
     const props = sshMapper.props(buildComponentCtx(node));
 
-    expect(props.metadata).toContainEqual({ icon: "file-code", label: "scripts/deploy.sh" });
-    expect(props.metadata).not.toContainEqual({ icon: "terminal", label: "stale inline value that should be hidden" });
-  });
-
-  it("uses exact matching so a padded commandSource is not treated as file mode (matches UI conditions + backend)", () => {
-    const node = buildNode({
-      host: "example.com",
-      username: "root",
-      commandSource: "\tfile\n",
-      commandFile: "scripts/deploy.sh",
-      commands: "echo inline fallback",
-    });
-
-    const props = sshMapper.props(buildComponentCtx(node));
-
+    expect(props.metadata).toContainEqual({ icon: "terminal", label: "echo leftover" });
     expect(props.metadata).not.toContainEqual({ icon: "file-code", label: "scripts/deploy.sh" });
-    expect(props.metadata).toContainEqual({ icon: "terminal", label: "echo inline fallback" });
-  });
-
-  it("hides the stale inline preview in file mode when commandFile is empty", () => {
-    const node = buildNode({
-      host: "example.com",
-      username: "root",
-      commandSource: "file",
-      commandFile: "",
-      commands: "stale inline value that should be hidden",
-    });
-
-    const props = sshMapper.props(buildComponentCtx(node));
-
-    expect(props.metadata).not.toContainEqual({ icon: "terminal", label: "stale inline value that should be hidden" });
-    expect(props.metadata).not.toContainEqual({ icon: "file-code", label: "" });
-  });
-
-  it("hides the stale inline preview in file mode when commandFile is missing", () => {
-    const node = buildNode({
-      host: "example.com",
-      username: "root",
-      commandSource: "file",
-      commands: "stale inline value that should be hidden",
-    });
-
-    const props = sshMapper.props(buildComponentCtx(node));
-
-    expect(props.metadata).not.toContainEqual({ icon: "terminal", label: "stale inline value that should be hidden" });
-  });
-
-  it("falls back to inline preview when commandSource is missing (legacy nodes)", () => {
-    const node = buildNode({
-      host: "example.com",
-      username: "root",
-      commands: "echo legacy",
-    });
-
-    const props = sshMapper.props(buildComponentCtx(node));
-
-    expect(props.metadata).toContainEqual({ icon: "terminal", label: "echo legacy" });
   });
 });
 

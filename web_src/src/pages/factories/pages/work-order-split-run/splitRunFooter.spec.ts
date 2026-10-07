@@ -1,0 +1,413 @@
+import { describe, expect, it } from "bun:test";
+
+import {
+  availableSplitRunStopChoices,
+  buildSplitRunFooter,
+  classicSplitRunFooter,
+  creditBillingHrefForNote,
+  DEFAULT_SPLIT_RUN_STOP_CHOICE,
+  defaultSplitRunStopChoice,
+  doneFooterForStatus,
+  rerunStartStepIndex,
+  splitRunCloseNeedsConfirm,
+  splitRunDecisionTone,
+  showsArchive,
+  SPLIT_RUN_STOP_CHOICES,
+} from "./splitRunFooter";
+
+const PR_NOTE = {
+  key: "pr",
+  headline: "Review the pull request",
+  text: "Merge #6812 to continue Verify.",
+  cta: { label: "Review PR #6812", href: "https://github.com/acme/payments/pull/6812" },
+  source: { name: "PR Closure" },
+};
+
+const FAILED_NOTE = {
+  key: "implement-failed",
+  headline: "Implement did not pass",
+  text: "Backend tests failed on the reconciliation worker.",
+  cta: { label: "Debug", icon: "bug" as const },
+  source: { name: "Implementation" },
+};
+
+const DRAFT_NOTE = {
+  key: "draft-plan-ready",
+  headline: "Review the plan, then start",
+  text: "From GitHub issue PAY-842. Confidence 5/5.",
+};
+
+const REJECT = { id: "reject", kind: "reject", label: "Reject", emphasis: "quiet" };
+const ARCHIVE = { id: "archive", kind: "archive", label: "Archive", emphasis: "quiet" };
+const APPROVE = { id: "approve", kind: "approve", label: "Approve", emphasis: "primary" };
+const RERUN = { id: "rerun", kind: "rerun", label: "Rerun", emphasis: "primary" };
+const START = { id: "start", kind: "start", label: "Start", emphasis: "primary" };
+const REOPEN = { id: "reopen", kind: "reopen", label: "Reopen", emphasis: "primary" };
+
+describe("buildSplitRunFooter", () => {
+  it("keeps a draft note with Archive and Start", () => {
+    expect(buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE })).toEqual({
+      kind: "draft",
+      sentence: "This task is a draft.",
+      note: { headline: "Review the plan, then start", text: "From GitHub issue PAY-842. Confidence 5/5." },
+      attentionCard: true,
+      actions: [ARCHIVE, START],
+    });
+  });
+
+  it("tells a draft is under analysis and keeps Archive", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", note: DRAFT_NOTE, isAnalyzing: true });
+
+    expect(footer).toEqual({
+      kind: "draft",
+      sentence: "SuperPlane is analyzing this task.",
+      note: {
+        headline: "SuperPlane is currently analyzing this task",
+        text: "Wait for the analysis to finish. Or click Start to send this task to the line now.",
+      },
+      attentionCard: true,
+      actions: [ARCHIVE, START],
+    });
+  });
+
+  it("keeps Start available when Clarity is 2 or lower", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 1, confidenceScore: 5 });
+
+    expect(footer.note?.headline).toBe("This task is not ready to start");
+    expect(footer.note?.text).toBe("The task is not clear enough. Tell the agent more in the chat.");
+    expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+    expect(footer.actions.find((action) => action.kind === "start")).toEqual(START);
+    expect(footer.clarityScore).toBe(1);
+    expect(footer.confidenceScore).toBe(5);
+    expect(splitRunDecisionTone(footer)).toBe("draft-blocked");
+  });
+
+  it("warns about agent fit when Confidence is 2 or lower", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 5, confidenceScore: 2 });
+
+    expect(footer.note?.headline).toBe("Review before you start");
+    expect(footer.note?.text).toBe("An agent may need steering. Start if you accept the risk, or split the work.");
+    expect(splitRunDecisionTone(footer)).toBe("draft-caution");
+  });
+
+  it("warns before Start when either score is 3", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 3, confidenceScore: 5 });
+
+    expect(footer.note?.headline).toBe("Review the plan before you start");
+    expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+    expect(splitRunDecisionTone(footer)).toBe("draft-caution");
+  });
+
+  it("invites Start when both scores are 4 or 5", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 4, confidenceScore: 5 });
+
+    expect(footer.note?.headline).toBe("This task is ready to start");
+    expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+    expect(splitRunDecisionTone(footer)).toBe("draft-ready");
+  });
+
+  it("scores an intake draft on Confidence alone", () => {
+    expect(buildSplitRunFooter({ kind: "draft", confidenceScore: 5 }).note?.headline).toBe(
+      "This task is ready to start",
+    );
+    expect(buildSplitRunFooter({ kind: "draft", confidenceScore: 1 }).note?.headline).toBe("Review before you start");
+  });
+
+  it("keeps Archive after analysis writes a score", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", isAnalyzing: true, clarityScore: 4, confidenceScore: 4 });
+
+    expect(footer.actions.map((action) => action.kind)).toEqual(["archive", "start"]);
+    expect(footer.note?.headline).toBe("This task is ready to start");
+  });
+
+  it("keeps no close actions on a running order", () => {
+    const footer = buildSplitRunFooter({
+      kind: "running",
+      note: { key: "running-step", headline: "Implement is running", text: "The log shows live progress." },
+    });
+
+    expect(footer.sentence).toBe("This task is running.");
+    expect(footer.note?.headline).toBe("Implement is running");
+    expect(footer.run).toBeUndefined();
+    expect(footer.actions).toEqual([]);
+    expect(splitRunCloseNeedsConfirm("running")).toBe(true);
+    expect(DEFAULT_SPLIT_RUN_STOP_CHOICE).toBe("canceled");
+    expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.label)).toEqual([
+      "Stop and Close",
+      "Stop and Complete",
+      "Rerun this step",
+      "Rerun from the start",
+    ]);
+    expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.actionLabel)).toEqual([
+      "Stop and Close",
+      "Stop and Complete",
+      "Rerun step",
+      "Rerun from start",
+    ]);
+    expect(SPLIT_RUN_STOP_CHOICES.map((choice) => choice.description)).toEqual([
+      "Marks this task as Rejected",
+      "Marks this task as Completed",
+      "Starts this step again",
+      "Starts this task from the first step",
+    ]);
+  });
+
+  it("keeps a waiting note on the decision strip with Reject and Approve", () => {
+    const footer = buildSplitRunFooter({ kind: "waiting", note: PR_NOTE });
+
+    expect(footer.attentionCard).toBe(true);
+    expect(footer.note).toEqual({
+      headline: "Review the pull request",
+      text: "Merge #6812 to continue Verify.",
+      sourceName: "PR Closure",
+      cta: PR_NOTE.cta,
+    });
+    expect(footer.sentence).toBe("This task is waiting.");
+    expect(footer.actions).toEqual([REJECT, APPROVE]);
+    expect(splitRunCloseNeedsConfirm("waiting")).toBe(false);
+  });
+
+  it("omits the decision strip when a waiting order has no run note", () => {
+    expect(buildSplitRunFooter({ kind: "waiting" })).toEqual({
+      kind: "waiting",
+      sentence: "This task is waiting.",
+      actions: [],
+    });
+  });
+
+  it("hides the decision strip while a waiting order is still running a follow-up", () => {
+    expect(buildSplitRunFooter({ kind: "waiting", decision: false })).toEqual({
+      kind: "waiting",
+      sentence: "This task is waiting.",
+      actions: [],
+    });
+  });
+
+  it("treats a stopped open implement as Reject and Rerun", () => {
+    const footer = buildSplitRunFooter({ kind: "stopped" });
+
+    expect(footer.attentionCard).toBe(true);
+    expect(footer.note?.headline).toBe("A person stopped this automation");
+    expect(footer.note?.text).toBe("This automation did not finish. This task still needs a decision.");
+    expect(footer.note?.cta).toBeUndefined();
+    expect(footer.note?.actor).toBeUndefined();
+    expect(footer.sentence).toBe("This task stopped.");
+    expect(footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
+    expect(footer.actions.map((action) => action.kind)).toEqual(["reject", "rerun"]);
+    expect(splitRunCloseNeedsConfirm("stopped")).toBe(false);
+  });
+
+  it("keeps the stopped verb phrase when the person who stopped it is known", () => {
+    const actor = { id: "user-1", name: "Alex", initials: "A" };
+    const footer = buildSplitRunFooter({ kind: "stopped", actor });
+
+    expect(footer.note?.headline).toBe("stopped this automation");
+    expect(footer.note?.actor).toEqual(actor);
+  });
+
+  it("treats a failed open implement as a decision strip with Reject and Rerun", () => {
+    const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE });
+
+    expect(footer.attentionCard).toBe(true);
+    expect(footer.note?.headline).toBe("Implement did not pass");
+    expect(footer.note?.cta?.label).toBe("Debug");
+    expect(footer.sentence).toBe("This task failed.");
+    expect(footer.actions).toEqual([REJECT, RERUN]);
+    expect(splitRunCloseNeedsConfirm("failed")).toBe(false);
+  });
+
+  it("offers Send to backlog and Reopen on failed and rejected footers", () => {
+    expect(doneFooterForStatus("completed")).toEqual({
+      kind: "done",
+      sentence: "Task completed successfully.",
+      note: {
+        headline: "This task succeeded",
+        text: "The work is done. The result met the goal.",
+      },
+      attentionCard: true,
+      actions: [],
+      status: "completed",
+    });
+    expect(doneFooterForStatus("rejected")).toMatchObject({
+      sentence: "A person rejected this task.",
+      note: {
+        headline: "This task did not succeed",
+        text: "The work is done. The result did not meet the goal.",
+      },
+      attentionCard: true,
+      actions: [
+        { id: "send-to-backlog", kind: "send-to-backlog", label: "Send to backlog", emphasis: "quiet" },
+        REOPEN,
+      ],
+    });
+    expect(doneFooterForStatus("failed")).toMatchObject({
+      sentence: "Closed as failed. Line execution did not pass.",
+      note: {
+        headline: "This task is closed as failed",
+        text: "Reopen this task to start the line again.",
+      },
+      actions: [
+        { id: "send-to-backlog", kind: "send-to-backlog", label: "Send to backlog", emphasis: "quiet" },
+        REOPEN,
+      ],
+    });
+  });
+
+  it("names the person or automation that scored a completed or rejected task", () => {
+    const actor = { id: "user-1", name: "Alex", initials: "A" };
+    expect(doneFooterForStatus("completed", { actor }).note).toMatchObject({
+      headline: "marked this task as successful",
+      text: "The work is done. The result met the goal.",
+      actor,
+    });
+    expect(doneFooterForStatus("rejected", { automationName: "PR Closure" }).note).toMatchObject({
+      headline: "PR Closure marked this task as unsuccessful",
+      text: "The work is done. The result did not meet the goal.",
+    });
+  });
+
+  it("offers Send to backlog and Reopen on a closed failed footer", () => {
+    const footer = buildSplitRunFooter({ kind: "failed", note: FAILED_NOTE, status: "failed" });
+
+    expect(footer.actions).toEqual([
+      { id: "send-to-backlog", kind: "send-to-backlog", label: "Send to backlog", emphasis: "quiet" },
+      REOPEN,
+    ]);
+    expect(footer.attentionCard).toBe(true);
+    expect(footer.note).toEqual({
+      headline: "This task is closed as failed",
+      text: "Reopen this task to start the line again.",
+    });
+  });
+
+  it("points a credit failure action at billing and drops it without a path", () => {
+    const note = {
+      headline: "Implement did not pass",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" as const },
+    };
+
+    expect(creditBillingHrefForNote(note, "/org/workspaces/acme/settings/organization/billing").cta).toEqual({
+      label: "Add credits",
+      href: "/org/workspaces/acme/settings/organization/billing",
+    });
+    expect(creditBillingHrefForNote(note, undefined).cta).toBeUndefined();
+    expect(creditBillingHrefForNote({ ...note, cta: { label: "Debug", icon: "bug" } }, undefined).cta).toEqual({
+      label: "Debug",
+      icon: "bug",
+    });
+  });
+
+  it("keeps a credit failure note when the draft uses the classic footer", () => {
+    const footer = buildSplitRunFooter({
+      kind: "draft",
+      note: {
+        key: "draft-credit",
+        headline: "Analysis did not pass",
+        text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+        cta: { label: "Add credits", destination: "billing" },
+      },
+    });
+
+    expect(classicSplitRunFooter(footer).note?.headline).toBe("Analysis did not pass");
+  });
+
+  it("keeps a credit failure note when the draft already has scores", () => {
+    const footer = buildSplitRunFooter({
+      kind: "draft",
+      note: {
+        key: "draft-credit",
+        headline: "Analysis did not pass",
+        text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+        cta: { label: "Add credits", destination: "billing" },
+      },
+      clarityScore: 4,
+      confidenceScore: 5,
+    });
+
+    expect(footer.note).toEqual({
+      headline: "Analysis did not pass",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" },
+    });
+    expect(footer.note?.headline).not.toBe("This task is ready to start");
+    expect(splitRunDecisionTone(footer)).toBe("failed");
+  });
+
+  it("keeps the credit note when a failed task is closed", () => {
+    const footer = buildSplitRunFooter({
+      kind: "failed",
+      status: "failed",
+      note: {
+        key: "step-failed",
+        headline: "Implement did not pass",
+        text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+        cta: { label: "Add credits", destination: "billing" },
+      },
+    });
+
+    expect(footer.note).toEqual({
+      headline: "Implement did not pass",
+      text: "This agent run is blocked. The organization has no SuperPlane hosted credit.",
+      cta: { label: "Add credits", destination: "billing" },
+    });
+    expect(footer.actions.map((action) => action.kind)).toEqual(["send-to-backlog", "reopen"]);
+    expect(footer.note?.headline).not.toBe("This task is closed as failed");
+  });
+});
+
+describe("availableSplitRunStopChoices", () => {
+  it("keeps every Stop outcome while the task is still open", () => {
+    expect(availableSplitRunStopChoices("running").map((choice) => choice.id)).toEqual([
+      "canceled",
+      "completed",
+      "rerun-step",
+      "rerun-start",
+    ]);
+    expect(availableSplitRunStopChoices("waiting").map((choice) => choice.id)).toEqual([
+      "canceled",
+      "completed",
+      "rerun-step",
+      "rerun-start",
+    ]);
+    expect(defaultSplitRunStopChoice("running")).toBe("canceled");
+    expect(defaultSplitRunStopChoice("waiting")).toBe("canceled");
+    expect(defaultSplitRunStopChoice("waiting", "failed")).toBe("rerun-step");
+  });
+
+  it("drops the outcome that already matches the task", () => {
+    expect(availableSplitRunStopChoices("draft").map((choice) => choice.id)).toEqual(["canceled", "completed"]);
+  });
+
+  it("offers Reopen when the task is already closed", () => {
+    expect(availableSplitRunStopChoices("completed").map((choice) => choice.id)).toEqual(["reopen"]);
+    expect(availableSplitRunStopChoices("rejected").map((choice) => choice.id)).toEqual(["reopen"]);
+    expect(availableSplitRunStopChoices("failed").map((choice) => choice.id)).toEqual(["reopen"]);
+    expect(availableSplitRunStopChoices("cancelled").map((choice) => choice.id)).toEqual(["reopen"]);
+    expect(defaultSplitRunStopChoice("completed")).toBe("reopen");
+  });
+});
+
+describe("rerunStartStepIndex", () => {
+  it("uses the first step for Rerun from the start", () => {
+    expect(rerunStartStepIndex("rerun-start", 2)).toBe(0);
+  });
+
+  it("keeps the current step for Rerun this step", () => {
+    expect(rerunStartStepIndex("rerun-step", 2)).toBe(2);
+  });
+});
+
+describe("showsArchive", () => {
+  it("keeps Archive on a draft and on a started open task", () => {
+    expect(showsArchive({ kind: "draft" })).toBe(true);
+    expect(showsArchive({ kind: "waiting", status: "waiting" })).toBe(true);
+  });
+
+  it("hides Archive while the task is running or closed", () => {
+    expect(showsArchive({ kind: "running", status: "running" })).toBe(false);
+    expect(showsArchive({ kind: "waiting", status: "running" })).toBe(false);
+    expect(showsArchive({ kind: "done", status: "completed" })).toBe(false);
+    expect(showsArchive({ kind: "done", status: "rejected" })).toBe(false);
+  });
+});

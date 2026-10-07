@@ -32,6 +32,6 @@ func DescribeCanvasVersion(ctx context.Context, db *gorm.DB, canvas *models.Canv
 	}
 
 	return &pb.DescribeCanvasVersionResponse{
-		Version: SerializeCanvasVersion(version, canvas.OrganizationID.String(), nil),
+		Version: serializeCanvasVersionWithReadiness(db, canvas, version, canvas.OrganizationID.String(), nil),
 	}, nil
 }

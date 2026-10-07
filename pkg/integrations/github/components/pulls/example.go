@@ -19,6 +19,9 @@ var exampleDataOnPRCommentBytes []byte
 //go:embed payloads/on_pr_review_comment.json
 var exampleDataOnPRReviewCommentBytes []byte
 
+//go:embed payloads/on_pr_review.json
+var exampleDataOnPRReviewBytes []byte
+
 //go:embed payloads/add_reaction.json
 var exampleOutputAddReactionBytes []byte
 
@@ -58,6 +61,9 @@ var exampleOutputMarkPullRequestReadyForReview map[string]any
 var exampleOutputUpdatePullRequestOnce sync.Once
 var exampleOutputUpdatePullRequest map[string]any
 
+var exampleOutputFindPullRequestOnce sync.Once
+var exampleOutputFindPullRequest map[string]any
+
 var exampleDataOnPullRequestOnce sync.Once
 var exampleDataOnPullRequest map[string]any
 
@@ -66,6 +72,9 @@ var exampleDataOnPRComment map[string]any
 
 var exampleDataOnPRReviewCommentOnce sync.Once
 var exampleDataOnPRReviewComment map[string]any
+
+var exampleDataOnPRReviewOnce sync.Once
+var exampleDataOnPRReview map[string]any
 
 func (c *AddReaction) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputAddReactionOnce, exampleOutputAddReactionBytes, &exampleOutputAddReaction)
@@ -88,6 +97,14 @@ func (t *OnPRReviewComment) ExampleData() map[string]any {
 		&exampleDataOnPRReviewCommentOnce,
 		exampleDataOnPRReviewCommentBytes,
 		&exampleDataOnPRReviewComment,
+	)
+}
+
+func (t *OnPRReview) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleDataOnPRReviewOnce,
+		exampleDataOnPRReviewBytes,
+		&exampleDataOnPRReview,
 	)
 }
 
@@ -136,5 +153,13 @@ func (c *UpdatePullRequest) ExampleOutput() map[string]any {
 		&exampleOutputUpdatePullRequestOnce,
 		exampleOutputUpdatePullRequestBytes,
 		&exampleOutputUpdatePullRequest,
+	)
+}
+
+func (c *FindPullRequest) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputFindPullRequestOnce,
+		exampleOutputCreatePullRequestBytes,
+		&exampleOutputFindPullRequest,
 	)
 }

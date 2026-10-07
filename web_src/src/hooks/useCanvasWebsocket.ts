@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useWebSocket } from "@/lib/reactUseWebsocket";
-import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
 import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasEvent,
@@ -10,6 +10,7 @@ import type {
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import {
   parseRunsFiltersFromQueryKey,
+  upsertExecutionIntoDescribeRunData,
   upsertExecutionIntoInfiniteRunsData,
   upsertRunIntoDescribeRunData,
   upsertRunIntoInfiniteData,
@@ -19,6 +20,36 @@ import { canvasKeys, invalidateStagedCanvasCaches } from "./useCanvasData";
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/`;
 
+function isDescribeRunQueryKey(queryKey: readonly unknown[], canvasId: string): boolean {
+  const sample = canvasKeys.run(canvasId, "_");
+  return queryKey.length === sample.length && sample.slice(0, -1).every((part, index) => queryKey[index] === part);
+}
+
+function patchDescribeRunQueries(
+  queryClient: QueryClient,
+  canvasId: string,
+  execution: CanvasesCanvasNodeExecution,
+): boolean {
+  let patched = false;
+  const queries = queryClient.getQueriesData<{ run?: CanvasesCanvasRun }>({
+    queryKey: [...canvasKeys.runs(), canvasId],
+  });
+
+  for (const [queryKey, current] of queries) {
+    if (!isDescribeRunQueryKey(queryKey, canvasId)) {
+      continue;
+    }
+
+    const next = upsertExecutionIntoDescribeRunData(current, execution);
+    if (next && next !== current) {
+      patched = true;
+      queryClient.setQueryData(queryKey, next);
+    }
+  }
+
+  return patched;
+}
+
 type CanvasWebsocketPayload = {
   canvasId: string;
   userId?: string;
@@ -27,6 +58,8 @@ type CanvasWebsocketPayload = {
 type CanvasLifecycleEventName = "canvas_updated" | "canvas_deleted";
 
 type CanvasStagingEventName = "staging_updated";
+
+type CanvasRunEventName = "run_pending" | "run_started" | "run_cancelling" | "run_finished";
 
 type WebsocketPayload =
   | CanvasesCanvasNodeExecution
@@ -43,18 +76,35 @@ interface QueuedMessage {
   timestamp: number;
 }
 
-export function useCanvasWebsocket(
-  canvasId: string,
-  organizationId: string,
-  onNodeEvent?: (nodeId: string, event: string) => void,
-  onWorkflowEvent?: (event: CanvasesCanvasEvent, eventName: string) => void,
-  onExecutionEvent?: (execution: CanvasesCanvasNodeExecution, eventName: string) => void,
-  onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => boolean | void,
-  shouldApplyCanvasUpdate?: () => boolean,
+type UseCanvasWebsocketOptions = {
+  canvasId: string;
+  organizationId: string;
+  onNodeEvent?: (nodeId: string, event: string) => void;
+  onWorkflowEvent?: (event: CanvasesCanvasEvent, eventName: string) => void;
+  onExecutionEvent?: (execution: CanvasesCanvasNodeExecution, eventName: string) => void;
+  onRunEvent?: (run: CanvasesCanvasRun, eventName: CanvasRunEventName) => void;
+  onConnectionOpen?: () => void;
+  onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => boolean | void;
+  shouldApplyCanvasUpdate?: () => boolean;
+  processRuntimeEvents?: boolean;
+  enabled?: boolean;
+  onCanvasStagingEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasStagingEventName) => boolean | void;
+};
+
+export function useCanvasWebsocket({
+  canvasId,
+  organizationId,
+  onNodeEvent,
+  onWorkflowEvent,
+  onExecutionEvent,
+  onRunEvent,
+  onConnectionOpen,
+  onCanvasLifecycleEvent,
+  shouldApplyCanvasUpdate,
   processRuntimeEvents = true,
   enabled = true,
-  onCanvasStagingEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasStagingEventName) => boolean | void,
-): void {
+  onCanvasStagingEvent,
+}: UseCanvasWebsocketOptions): void {
   const updateNodeEvent = useNodeExecutionStore((state) => state.updateNodeEvent);
   const updateNodeExecution = useNodeExecutionStore((state) => state.updateNodeExecution);
   const addNodeQueueItem = useNodeExecutionStore((state) => state.addNodeQueueItem);
@@ -92,8 +142,6 @@ export function useCanvasWebsocket(
     },
     [canvasId, organizationId, queryClient, onCanvasLifecycleEvent, shouldApplyCanvasUpdate],
   );
-
-  const hasConnectedOnce = useRef(false);
 
   const patchRunInCache = useCallback(
     (run: CanvasesCanvasRun) => {
@@ -141,6 +189,18 @@ export function useCanvasWebsocket(
         }
       }
 
+      if (execution.runId) {
+        const describeKey = canvasKeys.run(canvasId, execution.runId);
+        const current = queryClient.getQueryData<{ run?: CanvasesCanvasRun }>(describeKey);
+        const next = upsertExecutionIntoDescribeRunData(current, execution);
+        if (next && next !== current) {
+          patched = true;
+          queryClient.setQueryData(describeKey, next);
+        }
+      } else if (patchDescribeRunQueries(queryClient, canvasId, execution)) {
+        patched = true;
+      }
+
       return patched;
     },
     [queryClient, canvasId],
@@ -174,7 +234,20 @@ export function useCanvasWebsocket(
       // Memory updates can happen from manual mutations regardless of the live
       // view, so they bypass the runtime-event gate as well.
       const isMemoryUpdatedEvent = data.event === "memory_updated";
-      if (!isCanvasLifecycleEvent && !isCanvasStagingEvent && !isMemoryUpdatedEvent && !processRuntimeEvents) {
+      // Run state is shared query data. Keep it current even when the canvas is
+      // showing a historical version and live execution rendering is disabled.
+      const isRunStateEvent =
+        data.event === "run_pending" ||
+        data.event === "run_started" ||
+        data.event === "run_cancelling" ||
+        data.event === "run_finished";
+      if (
+        !isCanvasLifecycleEvent &&
+        !isCanvasStagingEvent &&
+        !isMemoryUpdatedEvent &&
+        !isRunStateEvent &&
+        !processRuntimeEvents
+      ) {
         return;
       }
 
@@ -233,6 +306,7 @@ export function useCanvasWebsocket(
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
           break;
+        case "run_pending":
         case "run_started":
         case "run_cancelling":
         case "run_finished": {
@@ -242,6 +316,7 @@ export function useCanvasWebsocket(
           }
 
           patchRunInCache(run);
+          onRunEvent?.(run, data.event as CanvasRunEventName);
           break;
         }
         case "canvas_updated":
@@ -285,6 +360,7 @@ export function useCanvasWebsocket(
       onNodeEvent,
       onWorkflowEvent,
       onExecutionEvent,
+      onRunEvent,
       onCanvasStagingEvent,
       processRuntimeEvents,
       handleCanvasLifecycleEvent,
@@ -373,16 +449,15 @@ export function useCanvasWebsocket(
   );
 
   const handleWebSocketOpen = useCallback(() => {
-    if (!hasConnectedOnce.current) {
-      hasConnectedOnce.current = true;
-      return;
-    }
-
+    // The initial REST snapshot can complete before the subscription opens.
+    // Resync after every successful connection to close that gap and to recover
+    // messages missed during later disconnects.
     invalidateRuns();
     // Refresh memory in case mutations happened while we were disconnected; we
     // no longer poll, so the websocket is the only push channel.
     invalidateMemoryEntries();
-  }, [invalidateRuns, invalidateMemoryEntries]);
+    onConnectionOpen?.();
+  }, [invalidateRuns, invalidateMemoryEntries, onConnectionOpen]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -404,9 +479,13 @@ export function useCanvasWebsocket(
       onOpen: handleWebSocketOpen,
       onError: () => {},
       onClose: () => {},
-      share: false,
+      share: true,
       onMessage: onMessage,
     },
     enabled,
   );
+}
+
+export function useCanvasRuntimeWebsocket(canvasId: string, organizationId: string, enabled = true): void {
+  useCanvasWebsocket({ canvasId, organizationId, processRuntimeEvents: true, enabled });
 }

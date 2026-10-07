@@ -37,7 +37,6 @@ func TestAgentStagingEditTransition(t *testing.T) {
 		steps.start()
 		steps.warmLiveViewStagingCaches()
 		steps.openAgent()
-		steps.switchToBuildMode()
 		steps.sendMessage("Add a noop node to the canvas")
 		steps.assertAssistantMessage("Added agent noop node")
 		steps.assertAutoEnteredEditModeWithoutManualEdit()
@@ -84,13 +83,7 @@ func (s *agentStagingEditSteps) start() {
 	s.session.Start()
 	s.session.Login()
 	require.NoError(s.t, models.EnableExperimentalFeature(s.session.OrgID, features.FeatureClaudeManagedAgents))
-	require.NoError(s.t, s.session.Page().AddInitScript(pw.Script{Content: pw.String(`
-		() => {
-			window.localStorage.setItem("canvasAgentMode", "operator");
-			window.localStorage.setItem("canvasAgentSidebarOpen", "false");
-			window.sessionStorage.clear();
-		}
-	`)}))
+	resetCanvasAgentBrowserStorage(s.t, s.session.Page())
 
 	s.canvas = shared.NewCanvasSteps("E2E Agent Staging Edit "+uuid.NewString(), s.t, s.session)
 	s.canvas.Create()
@@ -146,11 +139,6 @@ func (s *agentStagingEditSteps) waitForAgentInput() {
 		visible, err := input.IsVisible()
 		return err == nil && visible
 	}, agentWaitTimeout, agentPollInterval)
-}
-
-func (s *agentStagingEditSteps) switchToBuildMode() {
-	s.session.Click(q.TestID("agent-mode-builder"))
-	s.assertEventuallyVisible(q.Locator(`[data-testid="agent-mode-builder"][aria-pressed="true"]`))
 }
 
 func (s *agentStagingEditSteps) sendMessage(message string) {

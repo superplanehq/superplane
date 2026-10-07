@@ -1,0 +1,141 @@
+import type { FactoriesFactoryLine } from "@/api-client";
+import { PermissionTooltip } from "@/components/PermissionGate";
+import { Button } from "@/components/ui/button";
+import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
+import { Forward } from "lucide-react";
+import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
+import { OrgUserReference } from "../OrgUserReference";
+import type { WorkOrderListEntry } from "../lib/workOrderListModel";
+
+/** Actions callable from list and table rows. Cards do not change the owner. */
+export interface WorkOrderRowCallbacks {
+  onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
+  onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
+}
+
+interface CardOwnerMarkProps {
+  entry: WorkOrderListEntry;
+  organizationId: string;
+}
+
+/** Visible given name on a card. The full name stays on the title. */
+function ownerGivenName(fullName: string): string {
+  const givenName = fullName.trim().split(/\s+/)[0];
+  return givenName || fullName;
+}
+
+/**
+ * Display-only owner given name and avatar for cards. The name sits left
+ * of the avatar. The owner cannot be changed here.
+ */
+export function CardOwnerMark({ entry, organizationId }: CardOwnerMarkProps) {
+  const { resolveUser } = useOrgUserLookup(organizationId);
+  const owner = entry.order.assignees?.[0] as { id?: string; name?: string; avatarUrl?: string } | undefined;
+  if (!owner) {
+    return null;
+  }
+
+  const display = resolveUser(owner.id, owner.name);
+  const ownerName = display?.name ?? owner.name;
+  if (!ownerName || !display) {
+    return null;
+  }
+  const shown = owner.avatarUrl && !display.avatarUrl ? { ...display, avatarUrl: owner.avatarUrl } : display;
+
+  return (
+    <span
+      className="inline-flex min-w-0 items-center gap-1.5"
+      data-testid={`work-order-row-assignees-${entry.id}`}
+      title={ownerName}
+    >
+      <span className="truncate text-[11px] leading-4 text-muted-foreground">{ownerGivenName(ownerName)}</span>
+      <span className="inline-flex size-5 shrink-0 items-center justify-center">
+        <OrgUserReference display={shown} size="xs" showName={false} className="rounded-full leading-none" />
+      </span>
+    </span>
+  );
+}
+
+interface AssigneeGroupProps {
+  entry: WorkOrderListEntry;
+  organizationId: string;
+  canAssign: boolean;
+  isAssigneesSaving: boolean;
+  onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
+  size?: "sm" | "md";
+}
+
+/**
+ * Single owner avatar. The owner cannot be changed here.
+ */
+export function AssigneeGroup({ entry, organizationId, size = "sm" }: AssigneeGroupProps) {
+  const { resolveUser } = useOrgUserLookup(organizationId);
+  const owner = entry.order.assignees?.[0];
+  if (!owner) {
+    return null;
+  }
+
+  return (
+    <span
+      className="pointer-events-none inline-flex items-center"
+      data-testid={`work-order-row-assignees-${entry.id}`}
+      title={owner.name}
+    >
+      <OrgUserReference
+        display={resolveUser(owner.id, owner.name)}
+        size={size}
+        showName={false}
+        className="rounded-full ring-2 ring-background"
+      />
+    </span>
+  );
+}
+
+interface DispatchButtonProps {
+  entry: WorkOrderListEntry;
+  lines: FactoriesFactoryLine[];
+  canDispatch: boolean;
+  isDispatching: boolean;
+  onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
+  /** Only draft/open tasks show the button. */
+  visible: boolean;
+  variant?: "ghost" | "outline";
+}
+
+export function InlineDispatchButton({
+  entry,
+  lines,
+  canDispatch,
+  isDispatching,
+  onDispatch,
+  visible,
+  variant = "ghost",
+}: DispatchButtonProps) {
+  if (!visible) {
+    return null;
+  }
+  return (
+    <div className="pointer-events-auto" onClick={(event) => event.stopPropagation()}>
+      <PermissionTooltip allowed={canDispatch} message="You don't have permission to dispatch tasks.">
+        <DispatchWorkOrderPopover
+          lines={lines}
+          isSaving={isDispatching}
+          canDispatch={canDispatch}
+          onDispatch={(input) => onDispatch(entry.id, input)}
+        >
+          <Button
+            type="button"
+            variant={variant}
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+            disabled={!canDispatch || lines.length === 0}
+            aria-label="Dispatch to line"
+            data-testid={`work-order-row-dispatch-${entry.id}`}
+          >
+            <Forward className="size-3.5" aria-hidden />
+          </Button>
+        </DispatchWorkOrderPopover>
+      </PermissionTooltip>
+    </div>
+  );
+}

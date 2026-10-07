@@ -3237,11 +3237,23 @@ The Update Issue component modifies an existing GitLab issue: its title, descrip
 - **Title** (toggle): New title for the issue
 - **Description** (toggle): New description for the issue
 - **State** (toggle): Close or reopen the issue
-- **Labels** (toggle): Labels to add to the issue, keeping any existing labels
+- **Labels to Add** (toggle): Labels to add to the issue, keeping any existing labels
 - **Assignees** (toggle): Users to assign the issue to, replacing any existing assignees
 - **Milestone** (toggle): Milestone to associate with the issue
 
-Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Labels are added to the issue's existing labels rather than replacing them, so enabling Labels with nothing selected makes no change. Enabling Assignees with nothing selected removes all assignees, and enabling Milestone with nothing selected unassigns the milestone. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
+Each field besides Project and Issue IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Title is the exception: GitLab does not allow blank titles, so it must have a value when enabled.
+
+#### List and reference fields: append vs. replace
+
+These fields behave differently, because GitLab's API exposes them differently:
+
+| Field | Behaviour | Enabled with nothing selected |
+| --- | --- | --- |
+| **Labels to Add** | **Appends** — sent as `add_labels`, so labels already on the issue are kept | No change |
+| **Assignees** | **Replaces** — sent as `assignee_ids`, which overwrites the whole list | Clears all assignees |
+| **Milestone** | **Replaces** — a single `milestone_id` | Unassigns the milestone |
+
+Because labels only ever append, this component cannot remove a label. Use GitLab's own label controls when you need to take one off.
 
 ### Output
 
@@ -3388,10 +3400,21 @@ The Update Merge Request component modifies an existing GitLab merge request: it
 - **Description** (toggle): New description for the merge request
 - **Target Branch** (toggle): Retarget the merge request onto a different branch
 - **State** (toggle): Close or reopen the merge request
-- **Labels** (toggle): Labels to add, keeping any existing labels
+- **Labels to Add** (toggle): Labels to add, keeping any existing labels
 - **Assignees** (toggle): Users to assign, replacing any existing assignees
 
-Each field besides Project and Merge Request IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Labels are added to the merge request's existing labels rather than replacing them, so enabling Labels with nothing selected makes no change. Enabling Assignees with nothing selected clears them. Title and Target Branch are the exception: GitLab rejects a blank title, and an empty target branch cannot resolve to a real branch, so both must have a value when enabled.
+Each field besides Project and Merge Request IID is toggled on individually, so only the fields you enable are sent in the update. At least one must be enabled. Title and Target Branch are the exception: GitLab rejects a blank title, and an empty target branch cannot resolve to a real branch, so both must have a value when enabled.
+
+#### List fields: append vs. replace
+
+The two list fields behave differently, because GitLab's API exposes them differently:
+
+| Field | Behaviour | Enabled with nothing selected |
+| --- | --- | --- |
+| **Labels to Add** | **Appends** — sent as `add_labels`, so labels already on the merge request are kept | No change |
+| **Assignees** | **Replaces** — sent as `assignee_ids`, which overwrites the whole list | Clears all assignees |
+
+Because labels only ever append, this component cannot remove a label. Use GitLab's own label controls, or a dedicated label action, when you need to take one off.
 
 ### Permissions
 

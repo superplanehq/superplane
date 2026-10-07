@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Heading } from "../Heading/heading";
 import { Text } from "../Text/text";
 import { Avatar } from "../Avatar/avatar";

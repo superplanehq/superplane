@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -71,10 +70,6 @@ func (c *DeleteSnapshot) Configuration() []configuration.Field {
 			Description: "Snapshot image to delete",
 		},
 	}
-}
-
-func (c *DeleteSnapshot) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *DeleteSnapshot) Setup(ctx core.SetupContext) error {

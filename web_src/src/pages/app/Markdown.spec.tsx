@@ -1,6 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "bun:test";
+
+import { clearWorkOrderFileDownloadCache } from "@/lib/workOrderFiles";
+import { clearWorkspaceMarkdownImageLoadCache } from "@/lib/workspaceMarkdownImages";
+
 import { MarkdownContent } from "./Markdown";
 
 vi.mock("@/components/AgentSidebar/widgets/MermaidWidget", () => ({
@@ -50,6 +54,13 @@ describe("MarkdownContent", () => {
     expect(screen.queryByTestId("markdown-code")).not.toBeInTheDocument();
   });
 
+  it("does not render undefined for an empty mermaid fence", () => {
+    render(<MarkdownContent content={"```mermaid\n```"} />);
+
+    expect(screen.getByTestId("mermaid-diagram")).toHaveTextContent("");
+    expect(screen.queryByText("undefined")).not.toBeInTheDocument();
+  });
+
   it("renders node links as chips when canvas context is available", () => {
     render(
       <MarkdownContent
@@ -77,6 +88,17 @@ describe("MarkdownContent", () => {
     expect(screen.getByRole("link", { name: "docs" })).not.toHaveAttribute("target");
   });
 
+  it("can style links and open them in a new tab", () => {
+    render(
+      <MarkdownContent content="Open [docs](https://example.com)." openLinksInNewTab linkClassName="visible-link" />,
+    );
+
+    const link = screen.getByRole("link", { name: "docs" });
+    expect(link).toHaveAttribute("target", "_blank");
+    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(link).toHaveClass("visible-link");
+  });
+
   it("applies shared console link and inline-code styles", () => {
     const { container } = render(<MarkdownContent content={"See [docs](https://example.com) and `sha`."} />);
 
@@ -99,6 +121,26 @@ describe("MarkdownContent", () => {
 
     expect(screen.getByTestId("markdown-code")).toHaveTextContent("raw output");
     expect(screen.getByTestId("markdown-code").closest("pre")).toBeInTheDocument();
+  });
+
+  it("renders underline HTML in workspace markdown", () => {
+    render(<MarkdownContent content={"Hello <u>world</u>"} variant="workspace" />);
+
+    expect(screen.getByText("world").tagName).toBe("U");
+  });
+
+  it("renders underline next to punctuation and nested marks", () => {
+    render(<MarkdownContent content={"See **<u>word</u>**."} variant="workspace" />);
+
+    expect(screen.getByText("word").tagName).toBe("U");
+    expect(screen.getByText("word").closest("strong")).toBeInTheDocument();
+  });
+
+  it("does not treat ++ as workspace underline", () => {
+    const { container } = render(<MarkdownContent content={"i++ then j++ and C++ … ++more++"} variant="workspace" />);
+
+    expect(container.querySelector("u")).toBeNull();
+    expect(container).toHaveTextContent("i++ then j++ and C++ … ++more++");
   });
 
   it("renders bold markdown with semibold weight", () => {
@@ -257,5 +299,276 @@ describe("MarkdownContent", () => {
 
     expect(screen.queryByTestId("markdown-section")).not.toBeInTheDocument();
     expect(document.querySelector("blockquote")).toBeTruthy();
+  });
+});
+
+describe("MarkdownContent mentions", () => {
+  it("highlights complete @Name mentions when mention people are provided", () => {
+    render(
+      <MarkdownContent
+        content="@test test dasdasd"
+        variant="workspace"
+        mentionPeople={[{ id: "u1", name: "test test", email: "test@test.com" }]}
+      />,
+    );
+
+    expect(screen.getByTestId("work-order-mention")).toHaveTextContent("@test test");
+    expect(screen.getByTestId("work-order-mention")).not.toHaveTextContent("dasdasd");
+  });
+
+  it("shows the member name and email on mention hover", async () => {
+    const user = userEvent.setup();
+    render(
+      <MarkdownContent
+        content="@test test dasdasd"
+        variant="workspace"
+        mentionPeople={[{ id: "u1", name: "test test", email: "test@test.com" }]}
+      />,
+    );
+
+    await user.hover(screen.getByTestId("work-order-mention"));
+    const card = await screen.findByTestId("work-order-mention-tooltip");
+    expect(card).toHaveTextContent("test test");
+    expect(card).toHaveTextContent("test@test.com");
+  });
+});
+
+describe("MarkdownContent work order files", () => {
+  const fileId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+
+  afterEach(() => {
+    clearWorkOrderFileDownloadCache();
+  });
+
+  it("uses the download URL as the image source when files are present", () => {
+    render(
+      <MarkdownContent
+        content={`See ![bug](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/bug.png" }]}
+      />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", "https://cdn.example/bug.png");
+  });
+
+  it("does not render an empty image source without files", () => {
+    render(<MarkdownContent content={`See ![bug](sp-file://${fileId})`} />);
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByText("bug")).toBeInTheDocument();
+  });
+
+  it("does not change the image source when the download URL is reminted", () => {
+    const first = "https://files.example/bug.png?expires=9999999999&sig=one";
+    const reminted = "https://files.example/bug.png?expires=9999999999&sig=two";
+    const { rerender } = render(
+      <MarkdownContent content={`See ![bug](sp-file://${fileId})`} files={[{ id: fileId, downloadUrl: first }]} />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", first);
+
+    rerender(
+      <MarkdownContent content={`See ![bug](sp-file://${fileId})`} files={[{ id: fileId, downloadUrl: reminted }]} />,
+    );
+
+    expect(screen.getByRole("img", { name: "bug" })).toHaveAttribute("src", first);
+  });
+
+  it("renders a video player for video task files", () => {
+    render(
+      <MarkdownContent
+        content={`See ![clip](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/clip.mp4", contentType: "video/mp4" }]}
+      />,
+    );
+
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", "https://cdn.example/clip.mp4");
+  });
+
+  it("keeps the video element mounted when the chat rerenders", () => {
+    const content = `See ![clip](sp-file://${fileId})`;
+    const files = [{ id: fileId, downloadUrl: "https://cdn.example/clip.mp4", contentType: "video/mp4" }];
+    const { rerender } = render(<MarkdownContent content={content} files={files} />);
+    const video = document.querySelector("video");
+
+    rerender(<MarkdownContent content={content} files={[{ ...files[0] }]} />);
+
+    expect(document.querySelector("video")).toBe(video);
+  });
+
+  it("shows a download fallback for videos the browser cannot play", () => {
+    render(
+      <MarkdownContent
+        content={`See ![clip](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/clip.mov", contentType: "video/quicktime" }]}
+      />,
+    );
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByText("clip")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Download video" })).toHaveAttribute(
+      "href",
+      "https://cdn.example/clip.mov",
+    );
+    expect(screen.getByText("This browser cannot play this video.")).toBeInTheDocument();
+  });
+
+  it("retries a video after a new download URL when playback failed", () => {
+    const { rerender } = render(
+      <MarkdownContent
+        content={`See ![clip](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/clip.mp4", contentType: "video/mp4" }]}
+      />,
+    );
+
+    fireEvent.error(document.querySelector("video")!);
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: "Download video" })).toBeInTheDocument();
+
+    rerender(
+      <MarkdownContent
+        content={`See ![clip](sp-file://${fileId})`}
+        files={[{ id: fileId, downloadUrl: "https://cdn.example/clip-2.mp4", contentType: "video/mp4" }]}
+      />,
+    );
+
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", "https://cdn.example/clip-2.mp4");
+  });
+});
+
+describe("MarkdownContent images", () => {
+  afterEach(() => {
+    clearWorkspaceMarkdownImageLoadCache();
+  });
+
+  it("hides a workspace image until it loads", () => {
+    const { container } = render(
+      <MarkdownContent content="![Architecture](https://files.example/architecture.png)" variant="workspace" />,
+    );
+    const image = container.querySelector("img");
+
+    expect(image).not.toBeNull();
+    expect(image).toHaveClass("opacity-0");
+
+    fireEvent.load(image!);
+
+    expect(image).not.toHaveClass("opacity-0");
+  });
+
+  it("keeps a failed workspace image hidden and accessible", () => {
+    const { container } = render(
+      <MarkdownContent content="![Architecture](https://files.example/architecture.png)" variant="workspace" />,
+    );
+    const image = container.querySelector("img");
+
+    fireEvent.error(image!);
+
+    expect(image).toHaveClass("opacity-0");
+    expect(image).toHaveAttribute("alt", "Architecture");
+  });
+
+  it("hides a workspace image again only when its source changes", () => {
+    const first = "![Architecture](https://files.example/architecture.png)";
+    const { container, rerender } = render(<MarkdownContent content={first} variant="workspace" />);
+    const image = container.querySelector("img");
+
+    fireEvent.load(image!);
+    rerender(<MarkdownContent content={first} variant="workspace" />);
+
+    expect(container.querySelector("img")).not.toHaveClass("opacity-0");
+
+    rerender(<MarkdownContent content="![Architecture](https://files.example/updated.png)" variant="workspace" />);
+
+    expect(container.querySelector("img")).toHaveClass("opacity-0");
+  });
+
+  it("keeps a loaded workspace image visible after the markdown remounts", () => {
+    const content = "![Architecture](https://files.example/architecture.png)";
+    const { container, rerender } = render(<MarkdownContent key="first" content={content} variant="workspace" />);
+
+    fireEvent.load(container.querySelector("img")!);
+    rerender(<MarkdownContent key="second" content={content} variant="workspace" />);
+
+    expect(container.querySelector("img")).not.toHaveClass("opacity-0");
+  });
+
+  it("keeps default Markdown image behavior", () => {
+    const { container } = render(<MarkdownContent content="![Architecture](https://files.example/architecture.png)" />);
+
+    expect(container.querySelector("img")).not.toHaveClass("opacity-0");
+  });
+});
+
+describe("MarkdownContent GitHub attachments", () => {
+  const attachment = "https://github.com/user-attachments/assets/31436ab5-d9ce-405a-89fc-fba12e03a40f";
+
+  it("plays a GitHub user-attachments autolink as video", () => {
+    render(<MarkdownContent content={attachment} />);
+
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", attachment);
+    expect(screen.queryByRole("link", { name: attachment })).not.toBeInTheDocument();
+  });
+
+  it("plays a GitHub attachment image as video when the type is unknown", () => {
+    render(<MarkdownContent content={`![clip](${attachment})`} />);
+
+    const video = document.querySelector("video");
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute("src", attachment);
+    expect(video).toHaveAttribute("aria-label", "clip");
+  });
+
+  it("shows an image when the GitHub attachment is not a video", () => {
+    render(<MarkdownContent content={attachment} />);
+
+    fireEvent.error(document.querySelector("video")!);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("img", { name: attachment })).toHaveAttribute("src", attachment);
+  });
+
+  it("keeps a labeled GitHub attachment as a link", () => {
+    render(<MarkdownContent content={`See [Watch clip](${attachment}).`} />);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: "Watch clip" })).toHaveAttribute("href", attachment);
+  });
+
+  it("keeps a formatted GitHub attachment label as a link", () => {
+    render(<MarkdownContent content={`See [**Watch clip**](${attachment}).`} />);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: "Watch clip" })).toHaveAttribute("href", attachment);
+  });
+
+  it("keeps a repository file under assets as a link", () => {
+    const file = "https://github.com/superplanehq/superplane/blob/main/docs/assets/diagram.png";
+    render(<MarkdownContent content={`See ${file}`} />);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: file })).toHaveAttribute("href", file);
+  });
+
+  it("plays a repository attachment autolink as video", () => {
+    const repoAttachment = "https://github.com/acme/app/assets/1/2";
+    render(<MarkdownContent content={repoAttachment} />);
+
+    expect(document.querySelector("video")).toHaveAttribute("src", repoAttachment);
+  });
+
+  it("keeps regular GitHub issue links as links", () => {
+    render(<MarkdownContent content="See https://github.com/superplanehq/superplane/issues/8004" />);
+
+    expect(document.querySelector("video")).toBeNull();
+    expect(screen.getByRole("link", { name: /issues\/8004/ })).toHaveAttribute(
+      "href",
+      "https://github.com/superplanehq/superplane/issues/8004",
+    );
   });
 });

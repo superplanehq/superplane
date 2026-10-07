@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -130,10 +129,6 @@ func (c *DeregisterImage) Setup(ctx core.SetupContext) error {
 	}
 
 	return nil
-}
-
-func (c *DeregisterImage) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *DeregisterImage) Execute(ctx core.ExecutionContext) error {

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { posthog } from "@/posthog";
-import { consumePendingSignupAnalyticsPreference } from "@/lib/signupAnalytics";
+import { consumePendingSignupAnalyticsPreference, hasConfirmedSignupAnalyticsPreference } from "@/lib/signupAnalytics";
+import { trackGoogleSignup } from "@/lib/googleTagManager";
 
 import { AccountContext, type AccountContextType } from "./accountContextState";
 
@@ -13,66 +14,90 @@ export function AccountProvider({ children }: AccountProviderProps) {
   const [loading, setLoading] = useState(true);
   const [setupRequired, setSetupRequired] = useState(false);
 
-  useEffect(() => {
-    const fetchAccount = async () => {
-      try {
-        const response = await fetch("/account", {
-          method: "GET",
-          credentials: "include",
-          redirect: "manual", // Don't follow redirects, check status code instead
-        });
+  const loadAccount = useCallback(async (identify: boolean, keepAccountOnError = false) => {
+    const response = await fetch("/account", {
+      method: "GET",
+      credentials: "include",
+      redirect: "manual",
+    });
 
-        if (response.status === 409 && response.headers.get("X-Owner-Setup-Required") === "true") {
-          setSetupRequired(true);
-          return;
-        }
+    if (response.status === 409 && response.headers.get("X-Owner-Setup-Required") === "true") {
+      setSetupRequired(true);
+      setAccount(null);
+      return;
+    }
 
-        if (response.status === 200) {
-          const accountData = await response.json();
-          setAccount(accountData);
-
-          if (!accountData.impersonation?.active) {
-            const signupPreference = consumePendingSignupAnalyticsPreference({
-              accountEmail: accountData.email,
-              currentPath: window.location.pathname,
-              signupResult: getSignupAnalyticsResult(window.location.search),
-            });
-
-            const accountProperties = {
-              email: accountData.email,
-              name: accountData.name,
-              installation_admin: accountData.installation_admin,
-              ...(signupPreference
-                ? {
-                    product_updates_opt_in: signupPreference.productUpdatesOptIn,
-                  }
-                : {}),
-            };
-
-            posthog.identify(accountData.id, accountProperties);
-
-            if (signupPreference) {
-              posthog.capture("auth:signup", {
-                product_updates_opt_in: signupPreference.productUpdatesOptIn,
-                $set: {
-                  product_updates_opt_in: signupPreference.productUpdatesOptIn,
-                },
-              });
-            }
-          }
-        }
-        // If response is not 200 (e.g., 307 redirect, 401, etc.), user is not authenticated
-      } catch {
-        // Network errors or other unexpected errors
-      } finally {
-        setLoading(false);
+    if (response.status !== 200) {
+      if (!keepAccountOnError || response.status === 401) {
+        setAccount(null);
       }
+      return;
+    }
+
+    const accountData = await response.json();
+    setAccount(accountData);
+
+    if (!identify || accountData.impersonation?.active) {
+      return;
+    }
+
+    const signupResult = getSignupAnalyticsResult(window.location.search);
+    if (
+      signupResult === "created" ||
+      (signupResult !== "existing" && hasConfirmedSignupAnalyticsPreference(accountData.email))
+    ) {
+      trackGoogleSignup(accountData.id);
+    }
+    const signupPreference = consumePendingSignupAnalyticsPreference({
+      accountEmail: accountData.email,
+      currentPath: window.location.pathname,
+      signupResult,
+    });
+
+    const accountProperties = {
+      email: accountData.email,
+      name: accountData.name,
+      installation_admin: accountData.installation_admin,
+      ...(signupPreference
+        ? {
+            product_updates_opt_in: signupPreference.productUpdatesOptIn,
+          }
+        : {}),
     };
 
-    fetchAccount();
+    posthog.identify(accountData.id, accountProperties);
+
+    if (signupPreference) {
+      posthog.capture("auth:signup", {
+        product_updates_opt_in: signupPreference.productUpdatesOptIn,
+        $set: {
+          product_updates_opt_in: signupPreference.productUpdatesOptIn,
+        },
+      });
+    } else if (signupResult === "created") {
+      posthog.capture("auth:signup");
+    }
+
+    if (signupResult) {
+      removeSignupAnalyticsResult();
+    }
   }, []);
 
-  return <AccountContext.Provider value={{ account, loading, setupRequired }}>{children}</AccountContext.Provider>;
+  useEffect(() => {
+    loadAccount(true)
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
+  }, [loadAccount]);
+
+  const refreshAccount = useCallback(async () => {
+    await loadAccount(false, true);
+  }, [loadAccount]);
+
+  return (
+    <AccountContext.Provider value={{ account, loading, setupRequired, refreshAccount }}>
+      {children}
+    </AccountContext.Provider>
+  );
 }
 
 function getSignupAnalyticsResult(search: string) {
@@ -82,4 +107,13 @@ function getSignupAnalyticsResult(search: string) {
   }
 
   return null;
+}
+
+function removeSignupAnalyticsResult() {
+  const params = new URLSearchParams(window.location.search);
+  params.delete("auth_signup_result");
+
+  const search = params.toString();
+  const nextURL = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
+  window.history.replaceState(window.history.state, "", nextURL);
 }

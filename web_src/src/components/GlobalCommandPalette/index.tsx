@@ -6,7 +6,7 @@ import { useCommandPalettePageProps } from "./usePageProps";
 
 export function GlobalCommandPalette() {
   const model = useCommandPaletteModel();
-  if (!model) return null;
+  if (!model?.open) return null;
   return <CommandPaletteDialog model={model} />;
 }
 
@@ -29,7 +29,7 @@ function CommandPaletteDialog({ model }: { model: CommandPaletteModel }) {
         className="h-16 text-lg"
       />
       <CommandList className="max-h-[min(600px,calc(80vh-4rem))] scroll-py-2 px-3 py-3">
-        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandEmpty>{pageProps.searchLoading ? "Loading results…" : "No results found."}</CommandEmpty>
         <CommandPalettePage {...pageProps} />
       </CommandList>
     </CommandDialog>

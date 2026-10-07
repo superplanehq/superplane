@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 
 import type { CanvasesCanvas } from "@/api-client";
 
@@ -139,6 +139,39 @@ spec:
       spec: { nodes: spec?.nodes ?? [], edges: spec?.edges ?? [] },
     });
     expect(rebuilt).not.toContain("is_collapsed:");
+  });
+
+  it("round-trips node concurrency", () => {
+    const workflow: CanvasesCanvas = {
+      ...sampleWorkflow,
+      spec: {
+        nodes: [
+          {
+            id: "deploy-1",
+            name: "Deploy",
+            type: "TYPE_ACTION",
+            component: "deploy",
+            concurrency: { key: "ci-{{ root().data.branch }}", max: 3 },
+          },
+          {
+            id: "test-1",
+            name: "Test",
+            type: "TYPE_ACTION",
+            component: "test",
+          },
+        ],
+        edges: [{ sourceId: "deploy-1", targetId: "test-1" }],
+      },
+    };
+
+    const yamlText = buildCanvasYamlFromWorkflow(workflow);
+
+    const spec = parseCanvasYamlToSpec(yamlText);
+    expect(spec?.nodes?.[0]?.concurrency).toEqual({
+      key: "ci-{{ root().data.branch }}",
+      max: 3,
+    });
+    expect(spec?.nodes?.[1]?.concurrency).toBeUndefined();
   });
 
   it("does not accept snake_case edge field aliases", () => {

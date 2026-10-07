@@ -54,12 +54,10 @@ function validate(form: FormState): string | null {
 
 function errorFromResponseStatus(status: number, message: string): string {
   switch (status) {
-    case 401:
+    case 400:
       return message || "Current password is incorrect.";
     case 403:
       return message || "Password change is unavailable for this account.";
-    case 400:
-      return message || "Invalid request.";
     default:
       return message || "Failed to update password.";
   }

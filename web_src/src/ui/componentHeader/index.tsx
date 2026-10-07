@@ -1,3 +1,4 @@
+import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn, resolveIcon } from "@/lib/utils";
 import { resolveNodeIconColorClass } from "@/lib/colors";
 import React from "react";
@@ -43,7 +44,11 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
               <img
                 src={iconSrc}
                 alt={title}
-                className={cn("h-4 w-4 shrink-0 object-contain", mergeWithMutedBodyBelow && "opacity-70")}
+                className={cn(
+                  "h-4 w-4 shrink-0 object-contain",
+                  mergeWithMutedBodyBelow && "opacity-70",
+                  logoDarkInvertClass(iconSrc),
+                )}
               />
             ) : (
               <Icon

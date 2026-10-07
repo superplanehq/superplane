@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation } from "react-router";
 import { sendPageObservabilityReady, type PageReadyAttributes } from "@/lib/dash0Observability";
 import { resolvePageObservability } from "@/lib/pageObservability";
 

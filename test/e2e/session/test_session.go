@@ -15,8 +15,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	spjwt "github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/test/e2e/queries"
 )
 
@@ -29,6 +31,7 @@ type TestSession struct {
 
 	BaseURL string
 	OrgID   uuid.UUID
+	OrgSlug string
 	Account *models.Account
 }
 
@@ -54,6 +57,7 @@ func NewTestSession(t *testing.T, context pw.BrowserContext, page pw.Page, timeo
 func (s *TestSession) Start() {
 	s.resetDatabase()
 	s.setupUserAndOrganization()
+	middleware.MarkOwnerSetupCompleted()
 }
 
 // StartWithoutUser resets the database but does not seed any user or
@@ -134,13 +138,19 @@ func (s *TestSession) resetDatabase() {
             SELECT tablename
             FROM pg_tables
             WHERE schemaname = 'public'
-              AND tablename NOT IN ('schema_migrations')
+              AND tablename NOT IN ('schema_migrations', 'usage_price_books', 'usage_price_book_rates')
         ) LOOP
             EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
         END LOOP;
     END$$;`
 
-	if err := database.Conn().Exec(sql).Error; err != nil {
+	err := database.RetryOnDeadlock(5, func() error {
+		return database.Conn().Exec(sql).Error
+	}, func(attempt int) {
+		s.t.Logf("reset database deadlock, retry %d", attempt)
+		time.Sleep(time.Duration(attempt) * 200 * time.Millisecond)
+	})
+	if err != nil {
 		s.t.Fatalf("reset database: %v", err)
 	}
 }
@@ -183,6 +193,12 @@ func (s *TestSession) setupUserAndOrganization() {
 		}
 	}
 
+	// New orgs enable factories by default. Classic canvas and Apps home
+	// tests must stay on /:org/apps/:id. Factory tests turn the flag on.
+	if err := models.DisableExperimentalFeature(organization.ID, features.FeatureFactories); err != nil {
+		s.t.Fatalf("disable factories: %v", err)
+	}
+
 	user, err := models.FindMaybeDeletedUserByEmail(organization.ID.String(), email)
 	if err != nil {
 		user, err = models.CreateUser(organization.ID, account.ID, email, name)
@@ -210,6 +226,7 @@ func (s *TestSession) setupUserAndOrganization() {
 	}
 
 	s.OrgID = organization.ID
+	s.OrgSlug = organization.Slug
 	s.Account = account
 }
 
@@ -381,6 +398,32 @@ func (s *TestSession) HoverOver(q queries.Query) {
 	if err := q.Run(s).Hover(pw.LocatorHoverOptions{Timeout: pw.Float(s.timeoutMs)}); err != nil {
 		s.t.Fatalf("hover over %q: %v", q.Describe(), err)
 	}
+}
+
+func (s *TestSession) WaitUntilURLDoesNotContain(part string) {
+	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if !strings.Contains(s.page.URL(), part) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for URL to drop %q, last URL was %q", part, s.page.URL())
+}
+
+// WaitUntilURLContains polls until the current URL contains part. Use this
+// for redirects that a single-page app resolves after several async requests
+// (for example, the post-login redirect into an organization), where a fixed
+// sleep is not enough.
+func (s *TestSession) WaitUntilURLContains(part string) {
+	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if strings.Contains(s.page.URL(), part) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	s.t.Fatalf("timed out waiting for URL to contain %q, last URL was %q", part, s.page.URL())
 }
 
 func (s *TestSession) AssertURLContains(part string) {

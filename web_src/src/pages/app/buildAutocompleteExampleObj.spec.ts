@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { SuperplaneComponentsNode, TriggersTrigger } from "@/api-client";
 import { evaluateExpr } from "@/lib/exprEvaluator";
 import { buildAutocompleteExampleObj, type AutocompleteExampleContext } from "./buildAutocompleteExampleObj";
@@ -63,6 +63,18 @@ describe("buildAutocompleteExampleObj", () => {
         url: expect.stringContaining("?run=f47ac10b-58cc-4372-a567-0e02b2c3d479"),
         started_at: expect.any(String),
       }),
+      __order: expect.objectContaining({
+        id: expect.any(String),
+        title: "Ship feature",
+        artifacts: expect.any(Array),
+        comments: expect.any(Array),
+      }),
+      __workspace: expect.objectContaining({
+        id: expect.any(String),
+        name: "Example workspace",
+        repository: "acme/service",
+        default_branch: "main",
+      }),
     });
     expect(
       evaluateExpr(
@@ -115,8 +127,22 @@ describe("buildAutocompleteExampleObj", () => {
         url: expect.stringContaining("?run=f47ac10b-58cc-4372-a567-0e02b2c3d479"),
         started_at: expect.any(String),
       }),
+      __order: expect.objectContaining({
+        id: expect.any(String),
+        title: "Ship feature",
+        artifacts: expect.any(Array),
+        comments: expect.any(Array),
+      }),
+      __workspace: expect.objectContaining({
+        id: expect.any(String),
+        name: "Example workspace",
+        repository: "acme/service",
+        default_branch: "main",
+      }),
     });
     expect(evaluateExpr("root().data.check_run.name", autocompleteContext!)).toBe("Unit tests");
     expect(evaluateExpr("app().name", autocompleteContext!)).toBe("Deploy");
+    expect(evaluateExpr("order().title", autocompleteContext!)).toBe("Ship feature");
+    expect(evaluateExpr("task().title", autocompleteContext!)).toBe("Ship feature");
   });
 });

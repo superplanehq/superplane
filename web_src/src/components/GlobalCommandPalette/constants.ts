@@ -1,7 +1,7 @@
 import {
+  BookOpen,
   Building2,
   CircleUser,
-  Gauge,
   Key,
   KeyRound,
   Network,
@@ -17,18 +17,6 @@ import type { PermissionCheck } from "./types";
 
 export const COMMAND_SHORTCUT = "/";
 export const DOCS_URL = "https://docs.superplane.com";
-
-export const PUBLIC_TOP_LEVEL_SEGMENTS = new Set([
-  "",
-  "admin",
-  "create",
-  "invite",
-  "install",
-  "login",
-  "setup",
-  "signup",
-  "welcome",
-]);
 
 export const ORGANIZATION_SETTINGS_LINKS: Array<{
   id: string;
@@ -87,14 +75,6 @@ export const ORGANIZATION_SETTINGS_LINKS: Array<{
     permission: { resource: "integrations", action: "read" },
   },
   {
-    id: "usage",
-    label: "Usage",
-    description: "Limits and tracked usage",
-    path: "settings/billing",
-    icon: Gauge,
-    permission: { resource: "org", action: "read" },
-  },
-  {
     id: "secrets",
     label: "Secrets",
     description: "Encrypted values for workflows",
@@ -140,9 +120,16 @@ export const ADMIN_LINKS: Array<{
     icon: Network,
   },
   {
+    id: "price-books",
+    label: "Price Books",
+    description: "Review model and VM rates for this installation",
+    href: "/admin/price-books",
+    icon: BookOpen,
+  },
+  {
     id: "runner-tasks",
-    label: "Runner Tasks",
-    description: "Inspect runner task activity",
+    label: "Fleets",
+    description: "Inspect installation fleets, runners, and tasks",
     href: "/admin/runner-tasks",
     icon: Terminal,
   },

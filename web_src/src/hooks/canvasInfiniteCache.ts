@@ -139,7 +139,7 @@ function getRunSortTimestamp(run: CanvasesCanvasRun): number {
   return parseTimestamp(run.createdAt) || parseTimestamp(run.updatedAt);
 }
 
-function mergeRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun): CanvasesCanvasRun {
+function mergeCanvasRunFields(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun): CanvasesCanvasRun {
   return {
     id: incoming.id ?? existing.id,
     canvasId: incoming.canvasId ?? existing.canvasId,
@@ -153,7 +153,39 @@ function mergeRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun
     finishedAt: incoming.finishedAt ?? existing.finishedAt,
     versionId: incoming.versionId ?? existing.versionId,
     parent: incoming.parent ?? existing.parent,
+    totalTokens: keepRecordedMetric(existing.totalTokens, incoming.totalTokens),
+    costCents: keepRecordedMetric(existing.costCents, incoming.costCents),
+    models: keepRecordedModels(existing.models, incoming.models),
   };
+}
+
+function keepRecordedMetric(existing: string | undefined, incoming: string | undefined): string | undefined {
+  if (isPositiveMetric(incoming)) {
+    return incoming;
+  }
+  if (isPositiveMetric(existing)) {
+    return existing;
+  }
+  return incoming ?? existing;
+}
+
+function isPositiveMetric(value: string | undefined): value is string {
+  if (!value) {
+    return false;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0;
+}
+
+function keepRecordedModels(existing: string[] | undefined, incoming: string[] | undefined): string[] | undefined {
+  if (incoming?.some((model) => model.trim() !== "")) {
+    return incoming;
+  }
+  return existing ?? incoming;
+}
+
+export function mergeCanvasRunUpdate(existing: CanvasesCanvasRun, incoming: CanvasesCanvasRun): CanvasesCanvasRun {
+  return shouldAcceptRunUpdate(existing, incoming) ? mergeCanvasRunFields(existing, incoming) : existing;
 }
 
 function bumpTotalCountOnAllPages<T extends { totalCount?: number }>(pages: T[], delta: number): void {
@@ -200,11 +232,11 @@ export function upsertRunIntoInfiniteData(
 
   if (location) {
     const existing = pages[location.pageIndex].runs![location.runIndex];
-    if (!shouldAcceptRunUpdate(existing, run)) {
+    const nextRun = mergeCanvasRunUpdate(existing, run);
+    if (nextRun === existing) {
       return old;
     }
 
-    const nextRun = mergeRunUpdate(existing, run);
     if (runMatchesFilters(nextRun, filters)) {
       pages[location.pageIndex].runs![location.runIndex] = nextRun;
       return { ...old, pages };
@@ -356,9 +388,38 @@ export function upsertRunIntoDescribeRunData(
     return { run: incoming };
   }
 
-  if (!shouldAcceptRunUpdate(current.run, incoming)) {
+  const run = mergeCanvasRunUpdate(current.run, incoming);
+  if (run === current.run) {
     return current;
   }
 
-  return { ...current, run: mergeRunUpdate(current.run, incoming) };
+  return { ...current, run };
+}
+
+export function upsertExecutionIntoDescribeRunData(
+  current: { run?: CanvasesCanvasRun } | undefined,
+  execution: CanvasesCanvasNodeExecution,
+): { run?: CanvasesCanvasRun } | undefined {
+  const run = current?.run;
+  if (!run) {
+    return current;
+  }
+
+  if (execution.runId) {
+    if (run.id && execution.runId !== run.id) {
+      return current;
+    }
+  } else {
+    const rootEventId = execution.rootEvent?.id;
+    if (!rootEventId || run.rootEvent?.id !== rootEventId) {
+      return current;
+    }
+  }
+
+  const executions = upsertExecutionRef(run.executions ?? [], executionToRef(execution));
+  if (executions === run.executions) {
+    return current;
+  }
+
+  return { ...current, run: { ...run, executions } };
 }

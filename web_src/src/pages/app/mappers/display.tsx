@@ -1,7 +1,7 @@
 import { renderTimeAgo } from "@/components/TimeAgo";
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
-import { getStateMap } from ".";
+import { getStateMap } from "./mapperLookup";
 
 import { Message } from "./display/Message";
 import type { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "./types";

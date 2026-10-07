@@ -130,9 +130,6 @@ func serializeCanvasSummaries(
 			})
 		}
 
-		if canvas.CanvasFolderID != nil {
-			protoCanvases[i].FolderId = canvas.CanvasFolderID.String()
-		}
 	}
 
 	return protoCanvases, nil

@@ -1,19 +1,23 @@
 package grpc
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/enterprise"
+	adminRunnerActions "github.com/superplanehq/superplane/pkg/grpc/actions/admin/runners"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
+	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
-	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbFactories "github.com/superplanehq/superplane/pkg/protos/factories"
+	pbFiles "github.com/superplanehq/superplane/pkg/protos/files"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbMe "github.com/superplanehq/superplane/pkg/protos/me"
@@ -24,7 +28,6 @@ import (
 	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	pbWidgets "github.com/superplanehq/superplane/pkg/protos/widgets"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/usage"
 )
 
 type Services struct {
@@ -39,40 +42,64 @@ type Services struct {
 	Triggers      pbTriggers.TriggersServer
 	Widgets       pbWidgets.WidgetsServer
 	Canvases      pbCanvases.CanvasesServer
-	CanvasFolders pbCanvasFolders.CanvasFoldersServer
 	Factories     pbFactories.FactoriesServer
+	Files         pbFiles.FilesServer
 	APIKeys       pbAPIKeys.ApiKeysServer
 	Agents        pbAgents.AgentsServer
+	AdminRunners  pbAdminRunners.RunnersServer
 }
 
 type ServicesConfig struct {
-	BaseURL         string
-	WebhooksBaseURL string
-	Encryptor       crypto.Encryptor
-	AuthService     authorization.Authorization
-	Registry        *registry.Registry
-	OIDCProvider    oidc.Provider
-	GitProvider     git.Provider
-	AgentService    agentsActions.AgentsService
-	UsageService    usage.Service
+	BaseURL          string
+	WebhooksBaseURL  string
+	RunnerAPIBaseURL string
+	Encryptor        crypto.Encryptor
+	AuthService      authorization.Authorization
+	Registry         *registry.Registry
+	OIDCProvider     oidc.Provider
+	AgentService     agentsActions.AgentsService
+	JWTSigner        *jwt.Signer
+
+	// Entitlements defaults to Community mode. Enterprise defaults to a
+	// registry whose Community implementations refuse every operation.
+	Entitlements licensing.Entitlements
+	Enterprise   *enterprise.Registry
 }
 
 func NewServices(cfg ServicesConfig) (*Services, error) {
-	if cfg.UsageService == nil {
-		return nil, fmt.Errorf("usage service is required")
+	if cfg.JWTSigner == nil {
+		return nil, errors.New("JWT signer is required")
+	}
+
+	entitlements := cfg.Entitlements
+	if entitlements == nil {
+		entitlements = licensing.Community
+	}
+
+	featureRegistry := cfg.Enterprise
+	if featureRegistry == nil {
+		featureRegistry = enterprise.NewRegistry()
+	}
+
+	groups, err := NewGroupsService(cfg.AuthService, featureRegistry)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := NewRoleService(cfg.AuthService, entitlements, featureRegistry)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Services{
 		Users:  NewUsersService(cfg.AuthService),
-		Groups: NewGroupsService(cfg.AuthService),
-		Roles:  NewRoleService(cfg.AuthService),
+		Groups: groups,
+		Roles:  roles,
 		Organizations: NewOrganizationService(
 			cfg.AuthService,
 			cfg.Registry,
 			cfg.OIDCProvider,
 			cfg.BaseURL,
 			cfg.WebhooksBaseURL,
-			cfg.UsageService,
 		),
 		Integrations: NewIntegrationService(cfg.Encryptor, cfg.Registry),
 		Secrets:      NewSecretService(cfg.Encryptor, cfg.AuthService),
@@ -84,13 +111,22 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 			cfg.AuthService,
 			cfg.Registry,
 			cfg.Encryptor,
-			cfg.GitProvider,
 			cfg.WebhooksBaseURL,
-			cfg.UsageService,
 		),
-		CanvasFolders: NewCanvasFolderService(),
-		Factories:     NewFactoryService(),
-		APIKeys:       NewAPIKeysService(cfg.AuthService),
-		Agents:        NewAgentsService(cfg.AgentService),
+		Factories: NewFactoryService(
+			cfg.Registry,
+			cfg.Encryptor,
+			cfg.AuthService,
+			cfg.WebhooksBaseURL,
+		),
+		Files:   NewFilesService(cfg.AuthService),
+		APIKeys: NewAPIKeysService(cfg.AuthService),
+		Agents:  NewAgentsService(cfg.AgentService),
+		AdminRunners: NewAdminRunnersService(
+			adminRunnerActions.NewService(
+				cfg.JWTSigner,
+				cfg.RunnerAPIBaseURL,
+			),
+		),
 	}, nil
 }

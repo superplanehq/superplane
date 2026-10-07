@@ -3,6 +3,12 @@ ARG GO_VERSION=1.26.2
 ARG PLAYWRIGHT_GO_VERSION=v0.6100.0
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 
+# Optional CI module caches. `make image.build` replaces these with
+# --build-context when tmp/go and tmp/go-build exist. Release builds keep
+# the empty stages and download modules as before.
+FROM scratch AS ci-go-mod
+FROM scratch AS ci-go-build
+
 # ----------------------------------------------------------------------------------------------------------------------
 # Development stage with tools installed.
 # Used for local development and testing.
@@ -25,7 +31,7 @@ ENV GOPROXY="https://proxy.golang.org|direct"
 ENV PLAYWRIGHT_BROWSERS_PATH="/ms-playwright"
 
 RUN apt-get update && \
-  apt-get install -y --no-install-recommends bash ca-certificates make unzip && \
+  apt-get install -y --no-install-recommends bash ca-certificates git make unzip && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
@@ -52,6 +58,9 @@ RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
 RUN playwright install chromium-headless-shell --with-deps
 RUN rm -rf /opt/install /opt/install-scripts /tmp/*
 
+COPY scripts/docker/install-bun.sh /tmp/install-bun.sh
+RUN bash /tmp/install-bun.sh && rm /tmp/install-bun.sh
+
 CMD [ "/bin/bash",  "-c", "sleep infinity" ]
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -67,6 +76,8 @@ ARG FRONTEND_PREBUILT=0
 
 WORKDIR /app
 COPY pkg /app/pkg
+COPY ee /app/ee
+COPY LICENSE NOTICE /app/
 COPY cmd /app/cmd
 COPY go.mod /app/go.mod
 COPY go.sum /app/go.sum
@@ -78,7 +89,18 @@ COPY protos /app/protos
 COPY api/swagger /app/api/swagger
 COPY rbac /app/rbac
 COPY templates /app/templates
-RUN rm -rf build && go build -o build/superplane cmd/server/main.go
+ENV GOMODCACHE=/go/pkg/mod
+ENV GOCACHE=/go/go-build-cache
+RUN --mount=from=ci-go-mod,target=/mnt/ci-go-mod \
+    --mount=from=ci-go-build,target=/mnt/ci-go-build \
+    mkdir -p "${GOMODCACHE}" "${GOCACHE}" && \
+    if [ -n "$(ls -A /mnt/ci-go-mod 2>/dev/null)" ]; then \
+      cp -a /mnt/ci-go-mod/. "${GOMODCACHE}/"; \
+    fi && \
+    if [ -n "$(ls -A /mnt/ci-go-build 2>/dev/null)" ]; then \
+      cp -a /mnt/ci-go-build/. "${GOCACHE}/"; \
+    fi && \
+    rm -rf build && go build -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
 RUN if [ "$FRONTEND_PREBUILT" = "1" ]; then \
@@ -139,10 +161,8 @@ COPY --from=builder /app/pkg/web/assets/dist /app/pkg/web/assets/dist
 COPY --from=builder /app/api/swagger /app/api/swagger
 COPY --from=builder /app/rbac /app/rbac
 COPY --from=builder /app/templates /app/templates
-
-# SuperGit binary is downloaded by release/superplane-demo-image/download-supergit.sh before build.
-COPY build/superplane-demo-supergit/supergit /app/supergit
-RUN chmod +x /app/supergit
+COPY --from=builder /app/LICENSE /app/NOTICE /app/
+COPY --from=builder /app/ee/LICENSE /app/ee/LICENSE
 
 # Trial entrypoint that runs embedded Postgres and RabbitMQ and then SuperPlane.
 COPY release/superplane-demo-image/entrypoint.sh /app/entrypoint.sh
@@ -170,7 +190,6 @@ LABEL org.opencontainers.image.title="superplane" \
 
 # postgresql-client needs to be installed here too,
 # otherwise the createdb command won't work.
-# Install PostgreSQL 17.5 client tools
 COPY scripts/docker/install-postgresql-client.sh install-postgresql-client.sh
 RUN bash install-postgresql-client.sh
 
@@ -192,6 +211,8 @@ COPY --from=builder --chown=nobody:root /app/pkg/web/assets/dist /app/pkg/web/as
 COPY --from=builder --chown=nobody:root /app/api/swagger /app/api/swagger
 COPY --from=builder --chown=nobody:root /app/rbac /app/rbac
 COPY --from=builder --chown=nobody:root /app/templates /app/templates
+COPY --from=builder --chown=nobody:root /app/LICENSE /app/NOTICE /app/
+COPY --from=builder --chown=nobody:root /app/ee/LICENSE /app/ee/LICENSE
 
 USER nobody
 

@@ -1,29 +1,93 @@
-import { OrgWorkspaceHarness } from "@/pages/__fixtures__/OrgWorkspaceHarness";
-import type { HomePageFixture } from "@/pages/home/__fixtures__/handlers";
+import type { CanvasAppFixture } from "@/pages/app/__fixtures__/handlers";
+import { OrgWorkspaceHarness, type OrgWorkspacePageOverrides } from "@/pages/__fixtures__/OrgWorkspaceHarness";
+import type { HomePageFixture, StorybookOrgIntegration } from "@/pages/home/__fixtures__/handlers";
 import { defaultHomePageFixture } from "@/pages/home/__fixtures__/homePageResponses";
+import { FEATURE_CLAUDE_MANAGED_AGENTS, FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 
+import { FactoryPreviewFlagsContext, type FactoryPreviewFlags } from "../pages/factoryPreviewFlagsContext";
+import { OnboardingStorybookProvider } from "../pages/onboarding/OnboardingStorybookContext";
+import { OnboardingPage } from "../pages/onboarding/OnboardingPage";
+import type { OnboardingStorybookSeed } from "../pages/onboarding/onboardingMocks";
+import { StorybookOverviewPage } from "../pages/onboarding/StorybookOverviewPage";
+import { WikiWireframe } from "../pages/wiki/WikiWireframe";
+import { WIKI_DOCUMENTS_DEFAULT, WIKI_DOCUMENTS_REFRESHED } from "../pages/wiki/wikiMocks";
+import { defaultBacklogIntakeItemCatalog } from "./backlogIntakeItemFixtures";
 import { defaultFactoriesFixture, FACTORIES_ORGANIZATION_ID, type FactoriesFixture } from "./factoryPageResponses";
+import { refundLineCanvasFixture } from "./factoryOwnedCanvasFixture";
+import { MissionAssignmentProvider } from "../pages/missions/MissionAssignmentContext";
+import { MissionsWorkOrdersPage } from "../pages/missions/MissionsWorkOrdersPage";
+import { WorkOrderMissionOverviewRow } from "../pages/missions/WorkOrderMissionOverviewRow";
+import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOverviewSlots";
+import { BacklogIntakeItemsProvider } from "../pages/BacklogIntakeItemsContext";
 
 interface FactoriesHarnessProps {
-  /** Path under the org. Defaults to `factories` (list page). */
+  /** Path under the org. Defaults to `workspaces` (list page). */
   pathSuffix?: string;
-  /** Fixture backing the factories API. Defaults to the populated Refunds Factory dataset. */
+  /** Fixture backing the factories API. Defaults to the populated Semaphore dataset. */
   factoriesFixture?: FactoriesFixture;
+  /** Canvas fixture for factory-embedded AppPage routes. Defaults to a factory-owned canvas so in-story clicks do not redirect to Overview. */
+  appFixture?: CanvasAppFixture;
+  /**
+   * Storybook-only: replace selected factory page elements.
+   * Wiki defaults to the wireframe so sidebar navigation shows it; pass
+   * `pageOverrides={{ wiki: WikiPage }}` to keep Coming Soon.
+   * Tasks defaults to the missions page so the sidebar keeps missions.
+   * Setup + Get started overview are enabled by default.
+   */
+  pageOverrides?: OrgWorkspacePageOverrides;
+  /** Seed pending providers/repos/tips for setup stories. */
+  onboardingSeed?: OnboardingStorybookSeed;
+  /** When false, skip setup provider/routes (app-like create → overview). */
+  enableOnboarding?: boolean;
+  /** Open the canvas agent sidebar on mount (factory canvas agent story). */
+  openAgentSidebar?: boolean;
+  /** Organization connections the story starts with. Defaults to none. */
+  orgIntegrations?: StorybookOrgIntegration[];
+  /** Extra organization experimental features to enable on top of the defaults (factories, managed agents). */
+  experimentalFeatures?: string[];
+  /** Override Storybook preview flags. Defaults turn the design-review surfaces on. */
+  previewFlags?: Partial<FactoryPreviewFlags>;
 }
+
+function DefaultWikiWireframe() {
+  return <WikiWireframe initialDocuments={WIKI_DOCUMENTS_DEFAULT} refreshedDocuments={WIKI_DOCUMENTS_REFRESHED} />;
+}
+
+const defaultFactoryAppFixture = refundLineCanvasFixture();
+
+/** Stories keep hidden-in-app surfaces visible for design review. */
+const PREVIEW_FLAGS: FactoryPreviewFlags = {
+  addIntakeControl: true,
+  columnAutomations: true,
+  columnAutomationRows: true,
+};
 
 /**
  * Mounts the org home routes with the factories feature enabled and a fixture
  * backend for factory list/detail/orders/lines/apps endpoints. Shares the same
- * `OrgWorkspaceHarness` shell so links between Home → Factories → App work.
+ * `OrgWorkspaceHarness` shell so links between Home → Workspaces → App work.
  */
 export function FactoriesHarness({
-  pathSuffix = "factories",
+  pathSuffix = "workspaces",
   factoriesFixture = defaultFactoriesFixture,
+  appFixture = defaultFactoryAppFixture,
+  pageOverrides,
+  onboardingSeed,
+  enableOnboarding = true,
+  openAgentSidebar = false,
+  orgIntegrations,
+  experimentalFeatures = [],
+  previewFlags,
 }: FactoriesHarnessProps) {
   const homeFixture: HomePageFixture = {
     ...defaultHomePageFixture,
     organizationId: factoriesFixture.organizationId ?? FACTORIES_ORGANIZATION_ID,
-    enabledExperimentalFeatures: [...(defaultHomePageFixture.enabledExperimentalFeatures ?? []), "factories"],
+    enabledExperimentalFeatures: [
+      ...(defaultHomePageFixture.enabledExperimentalFeatures ?? []),
+      FEATURE_FACTORIES,
+      FEATURE_CLAUDE_MANAGED_AGENTS,
+      ...experimentalFeatures,
+    ],
     factories: factoriesFixture.factories.map((factory) => ({
       id: factory.id ?? "",
       name: factory.name ?? "",
@@ -31,12 +95,48 @@ export function FactoriesHarness({
     })),
   };
 
-  return (
+  const harness = (
     <OrgWorkspaceHarness
       startAt="home"
       pathSuffix={pathSuffix}
       homeFixture={homeFixture}
       factoriesFixture={factoriesFixture}
+      appFixture={appFixture}
+      openAgentSidebar={openAgentSidebar}
+      orgIntegrations={orgIntegrations}
+      pageOverrides={
+        enableOnboarding
+          ? {
+              wiki: DefaultWikiWireframe,
+              overview: StorybookOverviewPage,
+              onboarding: OnboardingPage,
+              workOrders: MissionsWorkOrdersPage,
+              ...pageOverrides,
+            }
+          : { wiki: DefaultWikiWireframe, workOrders: MissionsWorkOrdersPage, ...pageOverrides }
+      }
     />
   );
+
+  const withMissions = (
+    <FactoryPreviewFlagsContext.Provider value={{ ...PREVIEW_FLAGS, ...previewFlags }}>
+      <MissionAssignmentProvider>
+        <WorkOrderOverviewMissionSlotContext.Provider value={WorkOrderMissionOverviewRow}>
+          {harness}
+        </WorkOrderOverviewMissionSlotContext.Provider>
+      </MissionAssignmentProvider>
+    </FactoryPreviewFlagsContext.Provider>
+  );
+
+  const withIntakeItems = (
+    <BacklogIntakeItemsProvider catalog={factoriesFixture.intakeItemCatalog ?? defaultBacklogIntakeItemCatalog}>
+      {withMissions}
+    </BacklogIntakeItemsProvider>
+  );
+
+  if (!enableOnboarding) {
+    return withIntakeItems;
+  }
+
+  return <OnboardingStorybookProvider initial={onboardingSeed}>{withIntakeItems}</OnboardingStorybookProvider>;
 }

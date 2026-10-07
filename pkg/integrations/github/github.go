@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v84/github"
@@ -17,16 +19,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/actions"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/admin"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/checks"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/contents"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/deployments"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/issues"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/metadata"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/statuses"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -49,20 +54,6 @@ To complete the GitHub app setup:
 `
 )
 
-var defaultGitHubAppEvents = []string{
-	"create",
-	"issue_comment",
-	"issues",
-	"pull_request",
-	"pull_request_review",
-	"pull_request_review_comment",
-	"push",
-	"release",
-	"status",
-	"check_run",
-	"workflow_run",
-}
-
 func init() {
 	registry.RegisterIntegrationWithOptions("github", &GitHub{}, registry.IntegrationRegistrationOptions{
 		WebhookHandler: &GitHubWebhookHandler{},
@@ -74,7 +65,9 @@ type GitHub struct {
 }
 
 type Configuration struct {
-	Organization string `mapstructure:"organization" json:"organization"`
+	Organization    string `mapstructure:"organization" json:"organization"`
+	PrivateApp      bool   `mapstructure:"privateApp" json:"privateApp"`
+	SetupReturnPath string `mapstructure:"setupReturnPath" json:"setupReturnPath"`
 }
 
 func (g *GitHub) Name() string {
@@ -112,6 +105,7 @@ func (g *GitHub) Actions() []core.Action {
 	return []core.Action{
 		&admin.GetWorkflowUsage{},
 		&checks.ListCheckRunsForRef{},
+		&checks.WaitForPullRequestChecks{},
 		&actions.RunWorkflow{},
 		&contents.CreateRelease{},
 		&contents.GetRelease{},
@@ -133,6 +127,7 @@ func (g *GitHub) Actions() []core.Action {
 		&pulls.MarkPullRequestReadyForReview{},
 		&pulls.AddPullRequestReviewers{},
 		&pulls.UpdatePullRequest{},
+		&pulls.FindPullRequest{},
 		&pulls.AddReaction{},
 		&statuses.GetCombinedCommitStatus{},
 		&statuses.PublishCommitStatus{},
@@ -150,8 +145,10 @@ func (g *GitHub) Triggers() []core.Trigger {
 		&contents.OnBranchCreated{},
 		&issues.OnIssue{},
 		&issues.OnIssueComment{},
+		&dependabot.OnAlert{},
 		&pulls.OnPullRequest{},
 		&pulls.OnPRComment{},
+		&pulls.OnPRReview{},
 		&pulls.OnPRReviewComment{},
 		&checks.OnCheckRun{},
 		&statuses.OnCommitStatus{},
@@ -175,11 +172,22 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("Failed to decode metadata: %v", err)
 	}
 
+	if metadata.HostedApp {
+		if _, err := models.FindVCSProviderIntegrationBinding(database.Conn(), ctx.Integration.ID()); err != nil {
+			return fmt.Errorf("failed to resolve hosted GitHub App binding: %w", err)
+		}
+		return nil
+	}
+
 	//
 	// App is already installed - do not do anything.
 	//
 	if metadata.InstallationID != "" {
 		return nil
+	}
+
+	if UseHostedApp(ctx.OrganizationID) && !config.PrivateApp {
+		return fmt.Errorf("select a repository from the global GitHub App catalog")
 	}
 
 	state, err := crypto.Base64String(32)
@@ -198,14 +206,29 @@ func (g *GitHub) Sync(ctx core.SyncContext) error {
 	})
 
 	ctx.Integration.SetMetadata(common.Metadata{
-		Owner: config.Organization,
-		State: state,
+		Owner:           config.Organization,
+		State:           state,
+		SetupReturnPath: config.SetupReturnPath,
 	})
 
 	return nil
 }
 
+func hostedGitHubApp(integration core.IntegrationContext) bool {
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
+		return false
+	}
+
+	return metadata.HostedApp
+}
+
 func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
+	if hostedGitHubApp(ctx.Integration) {
+		ctx.Response.WriteHeader(http.StatusNotFound)
+		return
+	}
+
 	if strings.HasSuffix(ctx.Request.URL.Path, "/redirect") {
 		g.afterAppCreation(ctx)
 		return
@@ -227,6 +250,14 @@ func (g *GitHub) HandleRequest(ctx core.HTTPRequestContext) {
 
 func (g *GitHub) findWebhookSecret(ctx core.HTTPRequestContext) (string, error) {
 	if ctx.Integration.LegacySetup() {
+		var metadata common.Metadata
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err == nil && metadata.HostedApp {
+			app, ok := common.HostedAppFromEnv()
+			if !ok {
+				return "", fmt.Errorf("hosted GitHub App is not configured")
+			}
+			return app.WebhookSecret, nil
+		}
 		return common.FindSecret(ctx.Integration, GitHubAppWebhookSecret)
 	}
 
@@ -265,7 +296,7 @@ func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext) {
 	// When we receive an installation_repositories event, we always reload the list of repositories using the API.
 	//
 	case *github.InstallationRepositoriesEvent:
-		g.handleInstallationRepositoriesEvent(ctx)
+		g.handleInstallationRepositoriesEvent(ctx, event)
 
 	default:
 		ctx.Logger.Warnf("ignoring eventType %s", eventType)
@@ -273,8 +304,19 @@ func (g *GitHub) handleWebhook(ctx core.HTTPRequestContext) {
 }
 
 func (g *GitHub) findInstallationID(ctx core.HTTPRequestContext) (string, error) {
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err == nil && metadata.HostedApp {
+		binding, err := models.FindVCSProviderIntegrationBinding(database.DB(ctx.Request.Context()), ctx.Integration.ID())
+		if err != nil {
+			return "", fmt.Errorf("failed to find hosted GitHub App binding: %w", err)
+		}
+		if binding.Provider != models.ProviderGitHub {
+			return "", fmt.Errorf("hosted GitHub integration has provider %q", binding.Provider)
+		}
+		return strconv.FormatInt(binding.InstallationID, 10), nil
+	}
+
 	if ctx.Integration.LegacySetup() {
-		metadata := common.Metadata{}
 		err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 		if err != nil {
 			return "", fmt.Errorf("failed to decode metadata: %v", err)
@@ -287,22 +329,40 @@ func (g *GitHub) findInstallationID(ctx core.HTTPRequestContext) (string, error)
 }
 
 func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, event *github.InstallationEvent) {
+	receivedInstallationID := ""
+	if event.GetInstallation().GetID() > 0 {
+		receivedInstallationID = strconv.FormatInt(event.GetInstallation().GetID(), 10)
+	}
+
+	action := event.GetAction()
+	switch action {
+	//
+	// This is handled by the setup_url, so no need to do anything here.
+	//
+	case "created":
+		ctx.Logger.Infof("installation %s created", receivedInstallationID)
+		return
+	}
+
 	installationID, err := g.findInstallationID(ctx)
 	if err != nil {
 		ctx.Logger.Errorf("failed to find installation ID: %v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
-
-	switch *event.Action {
-
-	//
-	// This is handled by the setup_url, so no need to do anything here.
-	//
-	case "created":
-		ctx.Logger.Infof("installation %s created", installationID)
+	if installationID == "" {
+		ctx.Logger.Warn("ignoring installation event for an integration with no bound installation")
 		return
+	}
+	if receivedInstallationID != "" && receivedInstallationID != installationID {
+		ctx.Logger.
+			WithField("bound_installation_id", installationID).
+			WithField("event_installation_id", receivedInstallationID).
+			Warn("ignoring installation event for another installation")
+		return
+	}
 
+	switch action {
 	case "suspend":
 		ctx.Logger.Infof("installation %s suspended", installationID)
 		ctx.Integration.Error("app installation was suspended")
@@ -328,6 +388,12 @@ func (g *GitHub) handleInstallationEvent(ctx core.HTTPRequestContext, event *git
 
 func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, installationID string) {
 	ctx.Logger.Infof("installation %s deleted", installationID)
+	ctx.Integration.Error("App was uninstalled")
+
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err == nil && metadata.HostedApp {
+		return
+	}
 
 	state, err := crypto.Base64String(32)
 	if err != nil {
@@ -337,16 +403,10 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 	}
 
 	//
-	// Move the integration to error state
-	//
-	ctx.Integration.Error("App was uninstalled")
-
-	//
 	// If we are dealing with a legacy integration,
 	// we need to update metadata and browser action.
 	//
 	if ctx.Integration.LegacySetup() {
-		metadata := common.Metadata{}
 		err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 		if err != nil {
 			return
@@ -355,11 +415,10 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 		metadata.InstallationID = ""
 		metadata.Repositories = []common.Repository{}
 		metadata.State = state
-
 		ctx.Integration.SetMetadata(metadata)
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: appInstallationDescription,
-			URL:         fmt.Sprintf("https://github.com/apps/%s/installations/new?state=%s", metadata.GitHubApp.Slug, state),
+			URL:         common.HostedAppInstallURL(metadata.GitHubApp.Slug, state),
 			Method:      "GET",
 		})
 
@@ -441,20 +500,22 @@ func (g *GitHub) handleInstallationDeletion(ctx core.HTTPRequestContext, install
 	}
 }
 
-func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext) {
+func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext, event *github.InstallationRepositoriesEvent) {
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		ctx.Logger.Errorf("failed to decode metadata: %v", err)
+		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
+		return
+	}
+	if metadata.HostedApp {
+		return
+	}
+
 	//
 	// Integrations from new setup flow do not store repositories in metadata,
 	// so this is a no-op for them.
 	//
 	if !ctx.Integration.LegacySetup() {
-		return
-	}
-
-	metadata := common.Metadata{}
-	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
-	if err != nil {
-		ctx.Logger.Errorf("failed to decode metadata: %v", err)
-		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -473,6 +534,17 @@ func (g *GitHub) handleInstallationRepositoriesEvent(ctx core.HTTPRequestContext
 	}
 
 	ctx.Logger.Infof("Updated repositories: %v", repos)
+
+	if metadata.Owner == "" {
+		metadata.Owner = ownerFromInstallationAccount(event.GetInstallation())
+	}
+	if metadata.Owner == "" {
+		appClient, err := newClientForApp(ctx.Integration, metadata.GitHubApp.ID)
+		if err != nil {
+			ctx.Logger.Errorf("failed to create app client: %v", err)
+		}
+		metadata.Owner = resolveInstallationOwner(context.Background(), appClient, metadata.InstallationID, repos)
+	}
 
 	metadata.Repositories = repos
 	ctx.Integration.SetMetadata(metadata)
@@ -690,6 +762,16 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	installationID = ctx.Request.URL.Query().Get("installation_id")
 	setupAction := ctx.Request.URL.Query().Get("setup_action")
 	requestState := ctx.Request.URL.Query().Get("state")
+	if isInstallationRequestSetupAction(setupAction) {
+		if requestState != state {
+			ctx.Logger.Errorf("invalid installation ID or state")
+			http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
+			return
+		}
+		persistInstallRequested(ctx)
+		redirectToIntegrationSettingsRequested(ctx)
+		return
+	}
 	if installationID == "" || requestState != state {
 		ctx.Logger.Errorf("invalid installation ID or state")
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
@@ -699,8 +781,9 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	//
 	// Installation updates are handled through the webhook events.
 	//
-	if setupAction != "install" {
+	if !isPendingInstallationSetupAction(setupAction) {
 		ctx.Logger.Infof("Ignoring setup action %s for GitHub App installation %s", setupAction, installationID)
+		redirectToIntegrationSettings(ctx)
 		return
 	}
 
@@ -770,6 +853,7 @@ func (g *GitHub) afterAppInstallation(ctx core.HTTPRequestContext) {
 	}
 
 	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
+	clearInstallRequested(ctx)
 	ctx.Integration.Ready()
 
 	ctx.Logger.Infof("Successfully installed GitHub App - installation=%s", installationID)
@@ -792,9 +876,15 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		return
 	}
 
+	installationID := ctx.Request.URL.Query().Get("installation_id")
+	setupAction := ctx.Request.URL.Query().Get("setup_action")
+	state := ctx.Request.URL.Query().Get("state")
+
 	//
-	// App installation has already been set up.
-	// Just redirect to the SuperPlane app installation page.
+	// App installation has already been set up. A hosted connection with a
+	// valid state accepts an install on another account (the onboarding
+	// picker offers it); every other callback redirects to the SuperPlane
+	// app installation page.
 	//
 	if metadata.InstallationID != "" {
 		ctx.Logger.Infof("app installation %s already set up", metadata.InstallationID)
@@ -808,10 +898,16 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 		)
 		return
 	}
-
-	installationID := ctx.Request.URL.Query().Get("installation_id")
-	setupAction := ctx.Request.URL.Query().Get("setup_action")
-	state := ctx.Request.URL.Query().Get("state")
+	if isInstallationRequestSetupAction(setupAction) {
+		if state != metadata.State {
+			ctx.Logger.Errorf("invalid installation ID or state")
+			http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
+			return
+		}
+		persistInstallRequested(ctx)
+		redirectToIntegrationSettingsRequested(ctx)
+		return
+	}
 	if installationID == "" || state != metadata.State {
 		ctx.Logger.Errorf("invalid installation ID or state")
 		http.Error(ctx.Response, "invalid installation ID or state", http.StatusBadRequest)
@@ -821,55 +917,19 @@ func (g *GitHub) afterAppInstallationLegacy(ctx core.HTTPRequestContext) {
 	//
 	// Installation updates are handled through the webhook events.
 	//
-	if setupAction != "install" {
+	if !isPendingInstallationSetupAction(setupAction) {
 		ctx.Logger.Infof("Ignoring setup action %s for GitHub App installation %s", setupAction, installationID)
+		redirectToIntegrationSettings(ctx)
 		return
 	}
 
-	metadata.InstallationID = installationID
-	client, err := newClientForAppInstallation(ctx.Integration, metadata.GitHubApp.ID, installationID)
-	if err != nil {
-		ctx.Logger.Errorf("failed to create client: %v", err)
+	if err := g.bindLegacyInstallation(ctx, metadata, installationID); err != nil {
+		ctx.Logger.Errorf("%v", err)
 		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	if metadata.Owner == "" {
-		ghApp, _, err := client.Apps.Get(context.Background(), metadata.GitHubApp.Slug)
-		if err != nil {
-			ctx.Logger.Errorf("failed to get app: %v", err)
-			http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		metadata.Owner = ghApp.Owner.GetLogin()
-	}
-
-	repos, err := listInstallationRepositories(context.Background(), client)
-	if err != nil {
-		ctx.Logger.Errorf("failed to list repos: %v", err)
-		http.Error(ctx.Response, "internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	metadata.Repositories = repos
-	metadata.State = ""
-
-	ctx.Integration.SetMetadata(metadata)
-	ctx.Integration.RemoveBrowserAction()
-	ctx.Integration.Ready()
-
-	ctx.Logger.Infof("Successfully installed GitHub App %s - installation=%s", metadata.GitHubApp.Slug, metadata.InstallationID)
-	ctx.Logger.Infof("Repositories: %v", metadata.Repositories)
-
-	http.Redirect(
-		ctx.Response,
-		ctx.Request,
-		fmt.Sprintf(
-			"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
-		),
-		http.StatusSeeOther,
-	)
+	redirectToIntegrationSettings(ctx)
 }
 
 func (g *GitHub) browserActionURL(organization string) string {
@@ -882,10 +942,9 @@ func (g *GitHub) browserActionURL(organization string) string {
 
 func (g *GitHub) appManifest(ctx core.SyncContext) string {
 	manifest := map[string]any{
-		"name":           `SuperPlane GH integration`,
-		"public":         false,
-		"url":            "https://superplane.com",
-		"default_events": defaultGitHubAppEvents,
+		"name":   `SuperPlane GH integration`,
+		"public": false,
+		"url":    "https://superplane.com",
 		"default_permissions": map[string]string{
 			"issues":                      "write",
 			"actions":                     "write",
@@ -896,6 +955,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"statuses":                    "write",
 			"deployments":                 "write",
 			"organization_administration": "read",
+			"vulnerability_alerts":        "read",
 		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),
 		"redirect_url": fmt.Sprintf(`%s/api/v1/integrations/%s/redirect`, ctx.BaseURL, ctx.Integration.ID().String()),
@@ -954,6 +1014,270 @@ func (g *GitHub) createAppFromManifest(httpCtx core.HTTPContext, code string) (*
 	return &appData, nil
 }
 
+func isPendingInstallationSetupAction(setupAction string) bool {
+	return setupAction == "install" || setupAction == "update"
+}
+
+func isInstallationRequestSetupAction(setupAction string) bool {
+	return setupAction == "request"
+}
+
+func persistInstallRequested(ctx core.HTTPRequestContext) {
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	requests := metadata.CurrentInstallRequests()
+	requests = append(requests, common.InstallRequest{
+		AccountLogin: requestedInstallAccount(ctx),
+		CreatedAt:    time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	metadata.SetInstallRequests(requests)
+	ctx.Integration.SetMetadata(metadata)
+}
+
+func clearInstallRequested(ctx core.HTTPRequestContext) {
+	metadata := common.Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return
+	}
+	if !metadata.HasInstallRequests() && metadata.InstallRequestedAccount == "" {
+		return
+	}
+	metadata.SetInstallRequests(nil)
+	ctx.Integration.SetMetadata(metadata)
+}
+
+func requestedInstallAccount(ctx core.HTTPRequestContext) string {
+	for _, key := range []string{"account", "org", "organization", "githubOrg"} {
+		if value := strings.TrimSpace(ctx.Request.URL.Query().Get(key)); value != "" {
+			return value
+		}
+	}
+
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	if metadata.InstallRequestedAccount != "" {
+		return metadata.InstallRequestedAccount
+	}
+	return ""
+}
+
+func redirectToIntegrationSettings(ctx core.HTTPRequestContext) {
+	redirectToIntegrationSettingsURL(ctx, "")
+}
+
+func redirectToIntegrationSettingsRequested(ctx core.HTTPRequestContext) {
+	query := "githubSetup=request&githubIntegrationId=" + url.QueryEscape(ctx.Integration.ID().String())
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	if metadata.InstallRequestedAccount != "" {
+		query += "&githubOrg=" + url.QueryEscape(metadata.InstallRequestedAccount)
+	}
+	redirectToIntegrationSettingsURL(ctx, query)
+}
+
+const integrationSetupReturnCookie = "sp_integration_setup_return"
+
+type persistentIntegration interface {
+	Persist() error
+}
+
+func persistIntegrationBeforeRedirect(ctx core.HTTPRequestContext) {
+	persister, ok := ctx.Integration.(persistentIntegration)
+	if !ok {
+		return
+	}
+
+	if err := persister.Persist(); err != nil {
+		ctx.Logger.Errorf("failed to persist GitHub integration before redirect: %v", err)
+	}
+}
+
+func redirectToIntegrationSettingsURL(ctx core.HTTPRequestContext, rawQuery string) {
+	persistIntegrationBeforeRedirect(ctx)
+	location := integrationCallbackLocation(ctx, rawQuery)
+	if integrationCallbackReturnPath(ctx) != "" {
+		clearIntegrationSetupReturnCookie(ctx.Response)
+	}
+	http.Redirect(ctx.Response, ctx.Request, location, http.StatusSeeOther)
+}
+
+func integrationCallbackLocation(ctx core.HTTPRequestContext, rawQuery string) string {
+	settings := fmt.Sprintf(
+		"%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID().String(),
+	)
+	returnPath := integrationCallbackReturnPath(ctx)
+	if returnPath == "" {
+		if rawQuery != "" {
+			return settings + "?" + rawQuery
+		}
+		return settings
+	}
+
+	return strings.TrimRight(ctx.BaseURL, "/") + mergeSetupReturnQuery(returnPath, rawQuery)
+}
+
+func integrationCallbackReturnPath(ctx core.HTTPRequestContext) string {
+	if path := setupReturnPathFromMetadata(ctx); path != "" {
+		return path
+	}
+	if path := integrationSetupReturnPath(ctx.Request); path != "" {
+		return path
+	}
+	if factoriesEnabled(ctx.OrganizationID) {
+		return "/onboarding"
+	}
+
+	return ""
+}
+
+func setupReturnPathFromMetadata(ctx core.HTTPRequestContext) string {
+	if ctx.Integration == nil {
+		return ""
+	}
+
+	metadata := common.Metadata{}
+	_ = mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
+	return firstSafeSetupReturnPath(metadata.SetupReturnPath)
+}
+
+func firstSafeSetupReturnPath(paths ...string) string {
+	for _, path := range paths {
+		if isSafeIntegrationSetupReturnPath(path) {
+			return path
+		}
+	}
+
+	return ""
+}
+
+func integrationSetupReturnPath(request *http.Request) string {
+	if request == nil {
+		return ""
+	}
+
+	cookie, err := request.Cookie(integrationSetupReturnCookie)
+	if err != nil || cookie == nil {
+		return ""
+	}
+
+	path, err := url.QueryUnescape(strings.TrimSpace(cookie.Value))
+	if err != nil || !isSafeIntegrationSetupReturnPath(path) {
+		return ""
+	}
+
+	return path
+}
+
+func isSafeIntegrationSetupReturnPath(path string) bool {
+	if path == "" || strings.Contains(path, "://") || strings.ContainsAny(path, "\\\t\r\n ") {
+		return false
+	}
+
+	pathname, _, _ := strings.Cut(path, "?")
+	if pathname == "/onboarding" {
+		return true
+	}
+	if !strings.HasPrefix(pathname, "/") || strings.HasPrefix(pathname, "//") {
+		return false
+	}
+
+	rest := strings.TrimPrefix(pathname, "/")
+	organization, after, ok := strings.Cut(rest, "/")
+	return ok && organization != "" && after != ""
+}
+
+func mergeSetupReturnQuery(path, rawQuery string) string {
+	if rawQuery == "" {
+		return path
+	}
+
+	pathname, existing, _ := strings.Cut(path, "?")
+	params, err := url.ParseQuery(existing)
+	if err != nil {
+		params = url.Values{}
+	}
+	extra, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return path
+	}
+	for key, values := range extra {
+		if len(values) == 0 {
+			continue
+		}
+		params.Set(key, values[len(values)-1])
+	}
+	encoded := params.Encode()
+	if encoded == "" {
+		return pathname
+	}
+	return pathname + "?" + encoded
+}
+
+func clearIntegrationSetupReturnCookie(response http.ResponseWriter) {
+	if response == nil {
+		return
+	}
+
+	http.SetCookie(response, &http.Cookie{
+		Name:   integrationSetupReturnCookie,
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
+}
+
+func ownerFromRepositories(repos []common.Repository) string {
+	for _, repo := range repos {
+		path := strings.TrimPrefix(repo.URL, "https://github.com/")
+		owner, _, ok := strings.Cut(path, "/")
+		if ok && owner != "" {
+			return owner
+		}
+	}
+	return ""
+}
+
+func ownerFromInstallationAccount(installation *github.Installation) string {
+	if installation == nil || installation.GetAccount() == nil {
+		return ""
+	}
+
+	return installation.GetAccount().GetLogin()
+}
+
+func ownerFromAppInstallation(ctx context.Context, client *github.Client, installationID string) (string, error) {
+	id, err := strconv.ParseInt(installationID, 10, 64)
+	if err != nil {
+		return "", fmt.Errorf("invalid installation ID: %w", err)
+	}
+
+	installation, _, err := client.Apps.GetInstallation(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	if installation == nil || installation.GetAccount() == nil {
+		return "", nil
+	}
+
+	return installation.GetAccount().GetLogin(), nil
+}
+
+func resolveInstallationOwner(ctx context.Context, appClient *github.Client, installationID string, repos []common.Repository) string {
+	if owner := ownerFromRepositories(repos); owner != "" {
+		return owner
+	}
+	if appClient == nil {
+		return ""
+	}
+
+	owner, err := ownerFromAppInstallation(ctx, appClient, installationID)
+	if err != nil {
+		return ""
+	}
+
+	return owner
+}
+
 func listInstallationRepositories(ctx context.Context, client *github.Client) ([]common.Repository, error) {
 	var allRepos []*github.Repository
 	opts := &github.ListOptions{
@@ -997,6 +1321,20 @@ func (g *GitHub) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }
 
+func newClientForApp(ctx core.IntegrationContext, appID int64) (*github.Client, error) {
+	pem, err := findAppPrivateKey(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find PEM: %v", err)
+	}
+
+	itr, err := ghinstallation.NewAppsTransport(http.DefaultTransport, appID, []byte(pem))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create apps transport: %v", err)
+	}
+
+	return github.NewClient(&http.Client{Transport: itr}), nil
+}
+
 func newClientForAppInstallation(ctx core.IntegrationContext, appID int64, installationID string) (*github.Client, error) {
 	installationNumber, err := strconv.ParseInt(installationID, 10, 64)
 	if err != nil {
@@ -1024,19 +1362,28 @@ func newClientForAppInstallation(ctx core.IntegrationContext, appID int64, insta
 
 func findAppPrivateKey(ctx core.IntegrationContext) (string, error) {
 	if ctx.LegacySetup() {
-		return common.FindSecret(ctx, common.GitHubAppPEM)
+		var metadata common.Metadata
+		if err := mapstructure.Decode(ctx.GetMetadata(), &metadata); err != nil {
+			return "", fmt.Errorf("failed to decode metadata: %v", err)
+		}
+		return common.LegacyAppPrivateKey(ctx, metadata)
 	}
 
 	return ctx.Secrets().Get(common.SecretAppPEM)
 }
 
-func (g *GitHub) ResolveSecrets(ctx core.IntegrationSecretContext) (map[string][]byte, error) {
+func (g *GitHub) ResolveSecrets(ctx core.IntegrationSecretContext) (core.IntegrationSecrets, error) {
 	token, err := resolveAccessToken(ctx.HTTP, ctx.Integration)
 	if err != nil {
-		return nil, err
+		return core.IntegrationSecrets{}, err
 	}
 
-	return map[string][]byte{
-		integrationSecretGitHubToken: []byte(token),
+	return core.IntegrationSecrets{
+		Values: map[string][]byte{
+			integrationSecretGitHubToken: []byte(token),
+		},
+		Usage:     githubSecretUsage,
+		Setup:     githubSetupScript,
+		SetupName: githubSetupName,
 	}, nil
 }

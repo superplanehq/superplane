@@ -59,6 +59,91 @@ func Test__AppContext__Get(t *testing.T) {
 	})
 }
 
+func Test__AppContext__Get__factoryOwnedApps(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	factoryID := factory.ID
+
+	factoryListenerCanvas, factoryListenerNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "run-app",
+				Name:   "Run App",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runApp"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"app": "",
+				}),
+			},
+		},
+		nil,
+	)
+	require.NoError(t, database.Conn().Model(factoryListenerCanvas).Update("factory_id", factoryID).Error)
+	factoryListenerCanvas.FactoryID = &factoryID
+
+	factorySourceCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	require.NoError(t, database.Conn().Model(factorySourceCanvas).Update("factory_id", factoryID).Error)
+
+	orgCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	ctx := NewAppContext(database.Conn(), factoryListenerCanvas, &factoryListenerNodes[0])
+
+	t.Run("allows another app owned by the same factory", func(t *testing.T) {
+		app, err := ctx.Get(factorySourceCanvas.ID.String())
+		require.NoError(t, err)
+		assert.Equal(t, factorySourceCanvas.ID.String(), app.ID)
+	})
+
+	t.Run("rejects org apps outside the factory", func(t *testing.T) {
+		app, err := ctx.Get(orgCanvas.ID.String())
+		require.ErrorContains(t, err, "not owned by this factory")
+		assert.Nil(t, app)
+	})
+}
+
+func Test__AppContext__Get__rejectsFactoryAppsFromOrgApps(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	factoryID := factory.ID
+
+	orgListenerCanvas, orgListenerNodes := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "run-app",
+				Name:   "Run App",
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "runApp"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"app": "",
+				}),
+			},
+		},
+		nil,
+	)
+
+	factorySourceCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	require.NoError(t, database.Conn().Model(factorySourceCanvas).Update("factory_id", factoryID).Error)
+
+	ctx := NewAppContext(database.Conn(), orgListenerCanvas, &orgListenerNodes[0])
+
+	t.Run("rejects factory-owned apps", func(t *testing.T) {
+		app, err := ctx.Get(factorySourceCanvas.ID.String())
+		require.ErrorContains(t, err, "owned by a factory")
+		assert.Nil(t, app)
+	})
+}
+
 func Test__AppContext__Subscribe(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

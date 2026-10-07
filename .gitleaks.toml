@@ -1,0 +1,30 @@
+# Allow documented fixtures and local dummy values.
+# Scan still fails on new secrets in application source.
+
+title = "SuperPlane"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Example payloads, docs, VCR cassettes, local dummy keys, and the public license key list"
+paths = [
+  # Root-signed public key list shipped in the binary. Compact JWS of public JWKs, not a credential.
+  '''pkg/licensing/trustedkeys/license-keys\.jws$''',
+  '''(^|/)docs/''',
+  '''(^|/)fixtures/''',
+  '''(^|/)test/fixtures/''',
+  '''(^|/)test/e2e/vcr/''',
+  '''example_data_''',
+  '''example_output_''',
+  '''docker-compose(\.[^/]+)?\.yml$''',
+  '''\.env\.example$''',
+  '''oidc-keys/''',
+  '''testdata''',
+  '''_test\.go$''',
+  '''__fixtures__/''',
+  '''scripts/generate_integrations_docs\.go$''',
+  '''release/.*/templates/database\.yaml$''',
+  '''web_src/storybook-static/''',
+  '''test/e2e/test_context\.go$''',
+]

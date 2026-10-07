@@ -15,21 +15,17 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
 
-	factoryID, err := parseFactoryID(req.GetFactoryId())
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to update factory line")
-	}
-
 	lineID, err := parseLineID(req.GetLineId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
 
 	db := database.DB(ctx)
-	factory, err := models.FindFactory(db, orgID, factoryID)
+	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
+	factoryID := factory.ID
 
 	line, err := factory.FindLine(db, lineID)
 	if err != nil {
@@ -53,11 +49,19 @@ func UpdateFactoryLine(ctx context.Context, organizationID string, req *pb.Updat
 		}
 	}
 
-	if name == nil && steps == nil {
-		return nil, factoryErrorToStatus(invalidArgument("name or steps must be provided"), "failed to update factory line")
+	var columnColors map[string]string
+	if req.ColumnColors != nil {
+		columnColors, err = parseLineColumnColors(req.GetColumnColors())
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory line")
+		}
 	}
 
-	if err := line.Update(db, name, steps); err != nil {
+	if name == nil && steps == nil && columnColors == nil {
+		return nil, factoryErrorToStatus(invalidArgument("name, steps, or column colors must be provided"), "failed to update factory line")
+	}
+
+	if err := line.Update(db, name, steps, columnColors); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory line")
 	}
 

@@ -11,6 +11,7 @@ type indexTemplateData struct {
 	SentryDSN                     string
 	SentryEnvironment             string
 	PostHogKey                    string
+	GTMContainerID                string
 	Dash0WebOTLPEndpoint          string
 	Dash0WebAuthToken             string
 	Dash0WebServiceName           string
@@ -45,6 +46,7 @@ func newIndexTemplateDataFromEnv() indexTemplateData {
 		SentryDSN:                     os.Getenv("SENTRY_DSN"),
 		SentryEnvironment:             os.Getenv("SENTRY_ENVIRONMENT"),
 		PostHogKey:                    os.Getenv("POSTHOG_KEY"),
+		GTMContainerID:                strings.TrimSpace(os.Getenv("GTM_CONTAINER_ID")),
 		Dash0WebOTLPEndpoint:          os.Getenv("DASH0_WEB_OTLP_ENDPOINT"),
 		Dash0WebAuthToken:             os.Getenv("DASH0_WEB_AUTH_TOKEN"),
 		Dash0WebServiceName:           dash0WebServiceName(),

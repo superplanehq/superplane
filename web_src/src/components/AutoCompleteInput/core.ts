@@ -110,6 +110,25 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
     description: "Returns the current run, exposing its id, url, and started_at.",
     example: "run().url",
   },
+  {
+    name: "task",
+    snippet: "task().",
+    description:
+      "Returns the task for this run when dispatched from a factory, exposing id, title, description, factory_id, state, result, source, url, artifacts, and comments (the last three loaded when accessed).",
+    example: 'none(task().artifacts, {#.type == "pr"})',
+  },
+  {
+    name: "order",
+    snippet: "order().",
+    description: "Same as task(). Returns the task for this run when dispatched from a factory.",
+    example: 'none(order().artifacts, {#.type == "pr"})',
+  },
+  {
+    name: "workspace",
+    snippet: "workspace().",
+    description: "Returns the factory workspace, including its repository and default branch.",
+    example: "workspace().repository",
+  },
   // String
   {
     name: "trim",
@@ -1470,6 +1489,16 @@ function normalizeSpecialFunctionExpr(expr: string): string | null {
   const appMatch = expr.match(/^app\(\)/);
   if (appMatch) {
     return `__app${expr.slice(appMatch[0].length)}`;
+  }
+
+  const orderMatch = expr.match(/^(?:order|task)\(\)/);
+  if (orderMatch) {
+    return `__order${expr.slice(orderMatch[0].length)}`;
+  }
+
+  const workspaceMatch = expr.match(/^workspace\(\)/);
+  if (workspaceMatch) {
+    return `__workspace${expr.slice(workspaceMatch[0].length)}`;
   }
 
   return expr;

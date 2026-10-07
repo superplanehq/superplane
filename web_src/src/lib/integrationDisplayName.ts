@@ -6,10 +6,12 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   github: "GitHub",
   gitlab: "GitLab",
   openai: "OpenAI",
+  openrouter: "OpenRouter",
   claude: "Claude",
   logfire: "Logfire",
   cursor: "Cursor",
   pagerduty: "PagerDuty",
+  productive: "Productive",
   slack: "Slack",
   digitalocean: "DigitalOcean",
   discord: "Discord",
@@ -31,7 +33,19 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   dockerhub: "DockerHub",
   harness: "Harness",
   launchdarkly: "LaunchDarkly",
+  perplexity: "Perplexity",
+  sentry: "Sentry",
+  coolify: "Coolify",
+  telegram: "Telegram",
+  teams: "Teams",
+  hetzner: "Hetzner",
+  servicenow: "ServiceNow",
 };
+
+/** Provider ids and labels for settings search (Find settings → Integrations). */
+export function knownIntegrationTypeEntries(): Array<{ name: string; label: string }> {
+  return Object.entries(INTEGRATION_TYPE_DISPLAY_NAMES).map(([name, label]) => ({ name, label }));
+}
 
 /**
  * Returns the display name for an integration type.

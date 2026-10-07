@@ -1,34 +1,55 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { init } = vi.hoisted(() => ({
+const { init, addSignalAttribute, removeSignalAttribute, sendEvent } = vi.hoisted(() => ({
   init: vi.fn(),
+  addSignalAttribute: vi.fn(),
+  removeSignalAttribute: vi.fn(),
+  sendEvent: vi.fn(),
 }));
 
 vi.mock("@dash0/sdk-web", () => ({
   init,
+  addSignalAttribute,
+  removeSignalAttribute,
+  sendEvent,
 }));
+
+import { initDash0 } from "@/dash0";
+
+type Dash0TestWindow = Window & {
+  SUPERPLANE_DASH0_OTLP_ENDPOINT?: string;
+  SUPERPLANE_DASH0_AUTH_TOKEN?: string;
+  SUPERPLANE_DASH0_SERVICE_NAME?: string;
+  SUPERPLANE_DASH0_ENVIRONMENT?: string;
+};
+
+function dash0Window(): Dash0TestWindow {
+  return window as Dash0TestWindow;
+}
+
+function setDash0Window(values: { endpoint?: string; authToken?: string; serviceName?: string; environment?: string }) {
+  const win = dash0Window();
+  win.SUPERPLANE_DASH0_OTLP_ENDPOINT = values.endpoint;
+  win.SUPERPLANE_DASH0_AUTH_TOKEN = values.authToken;
+  win.SUPERPLANE_DASH0_SERVICE_NAME = values.serviceName;
+  win.SUPERPLANE_DASH0_ENVIRONMENT = values.environment;
+}
 
 describe("dash0 init", () => {
   beforeEach(() => {
     init.mockClear();
-    vi.resetModules();
-    delete (window as Window & { SUPERPLANE_DASH0_OTLP_ENDPOINT?: string }).SUPERPLANE_DASH0_OTLP_ENDPOINT;
-    delete (window as Window & { SUPERPLANE_DASH0_AUTH_TOKEN?: string }).SUPERPLANE_DASH0_AUTH_TOKEN;
-    delete (window as Window & { SUPERPLANE_DASH0_SERVICE_NAME?: string }).SUPERPLANE_DASH0_SERVICE_NAME;
-    delete (window as Window & { SUPERPLANE_DASH0_ENVIRONMENT?: string }).SUPERPLANE_DASH0_ENVIRONMENT;
+    setDash0Window({});
   });
 
-  it("calls init when endpoint and auth token are set", async () => {
-    (window as Window & { SUPERPLANE_DASH0_OTLP_ENDPOINT?: string }).SUPERPLANE_DASH0_OTLP_ENDPOINT =
-      "https://ingress.us-west-2.aws.dash0.com:4318";
-    (window as Window & { SUPERPLANE_DASH0_AUTH_TOKEN?: string }).SUPERPLANE_DASH0_AUTH_TOKEN = "test-token";
-    (window as Window & { SUPERPLANE_DASH0_SERVICE_NAME?: string }).SUPERPLANE_DASH0_SERVICE_NAME =
-      "superplane-staging";
-    (window as Window & { SUPERPLANE_DASH0_ENVIRONMENT?: string }).SUPERPLANE_DASH0_ENVIRONMENT = "staging";
+  it("calls init when endpoint and auth token are set", () => {
+    setDash0Window({
+      endpoint: "https://ingress.us-west-2.aws.dash0.com:4318",
+      authToken: "test-token",
+      serviceName: "superplane-staging",
+      environment: "staging",
+    });
 
-    const dash0 = await import("@/dash0");
-
-    expect(dash0.isDash0Enabled).toBe(true);
+    expect(initDash0()).toBe(true);
     expect(init).toHaveBeenCalledWith(
       expect.objectContaining({
         serviceName: "superplane-staging",
@@ -45,13 +66,13 @@ describe("dash0 init", () => {
     );
   });
 
-  it("uses default service name when not configured", async () => {
-    (window as Window & { SUPERPLANE_DASH0_OTLP_ENDPOINT?: string }).SUPERPLANE_DASH0_OTLP_ENDPOINT =
-      "https://ingress.us-west-2.aws.dash0.com:4318";
-    (window as Window & { SUPERPLANE_DASH0_AUTH_TOKEN?: string }).SUPERPLANE_DASH0_AUTH_TOKEN = "test-token";
+  it("uses default service name when not configured", () => {
+    setDash0Window({
+      endpoint: "https://ingress.us-west-2.aws.dash0.com:4318",
+      authToken: "test-token",
+    });
 
-    await import("@/dash0");
-
+    expect(initDash0()).toBe(true);
     expect(init).toHaveBeenCalledWith(
       expect.objectContaining({
         serviceName: "superplane-web",
@@ -59,33 +80,28 @@ describe("dash0 init", () => {
     );
   });
 
-  it("ignores PostHog analytics traffic", async () => {
-    (window as Window & { SUPERPLANE_DASH0_OTLP_ENDPOINT?: string }).SUPERPLANE_DASH0_OTLP_ENDPOINT =
-      "https://ingress.us-west-2.aws.dash0.com:4318";
-    (window as Window & { SUPERPLANE_DASH0_AUTH_TOKEN?: string }).SUPERPLANE_DASH0_AUTH_TOKEN = "test-token";
+  it("ignores PostHog analytics traffic", () => {
+    setDash0Window({
+      endpoint: "https://ingress.us-west-2.aws.dash0.com:4318",
+      authToken: "test-token",
+    });
 
-    await import("@/dash0");
-
+    expect(initDash0()).toBe(true);
     const ignoreUrls = init.mock.calls[0]?.[0]?.ignoreUrls as RegExp[];
     expect(ignoreUrls.some((pattern) => pattern.test("https://us.i.posthog.com/e/"))).toBe(true);
   });
 
-  it("does not call init when endpoint is missing", async () => {
-    (window as Window & { SUPERPLANE_DASH0_AUTH_TOKEN?: string }).SUPERPLANE_DASH0_AUTH_TOKEN = "test-token";
+  it("does not call init when endpoint is missing", () => {
+    setDash0Window({ authToken: "test-token" });
 
-    const dash0 = await import("@/dash0");
-
-    expect(dash0.isDash0Enabled).toBe(false);
+    expect(initDash0()).toBe(false);
     expect(init).not.toHaveBeenCalled();
   });
 
-  it("does not call init when auth token is missing", async () => {
-    (window as Window & { SUPERPLANE_DASH0_OTLP_ENDPOINT?: string }).SUPERPLANE_DASH0_OTLP_ENDPOINT =
-      "https://ingress.us-west-2.aws.dash0.com:4318";
+  it("does not call init when auth token is missing", () => {
+    setDash0Window({ endpoint: "https://ingress.us-west-2.aws.dash0.com:4318" });
 
-    const dash0 = await import("@/dash0");
-
-    expect(dash0.isDash0Enabled).toBe(false);
+    expect(initDash0()).toBe(false);
     expect(init).not.toHaveBeenCalled();
   });
 });

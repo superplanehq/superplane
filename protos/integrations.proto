@@ -45,6 +45,9 @@ message ListIntegrationsRequest {
 
 message ListIntegrationsResponse {
   repeated IntegrationDefinition integrations = 1;
+  // True when this process holds complete public GitHub App credentials.
+  // Independent of per-organization hosted install (factories feature).
+  bool github_app_configured = 2;
 }
 
 message IntegrationDefinition {
@@ -61,6 +64,10 @@ message IntegrationDefinition {
   //
   repeated Configuration.Field configuration = 8;
   string instructions = 9;
+
+  // When true, new GitHub connections install SuperPlane's public GitHub App.
+  // The client skips the organization dialog and the SetupProvider wizard.
+  bool hosted_app_install = 10;
 }
 
 message CapabilityDefinition {

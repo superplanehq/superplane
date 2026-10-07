@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -258,10 +257,6 @@ func (c *DeleteLoadBalancer) emitDeleted(ctx core.ActionHookContext, lbARN strin
 			"state":           LoadBalancerStateDeleted,
 		},
 	})
-}
-
-func (c *DeleteLoadBalancer) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (c *DeleteLoadBalancer) Cancel(ctx core.ExecutionContext) error {

@@ -49,6 +49,18 @@ function mergeRequestEventSubtitle(eventData?: OnMergeRequestEventData, createdA
   return buildGitlabSubtitle(eventData?.object_attributes?.action || "", createdAt);
 }
 
+function mergeRequestRootEventValues(eventData?: OnMergeRequestEventData, createdAt?: string): Record<string, string> {
+  const mr = eventData?.object_attributes;
+  return {
+    "Received At": formatReceivedAt(createdAt),
+    Title: mr?.title || "-",
+    URL: mr?.url || "-",
+    Action: mr?.action || "-",
+    State: mr?.state || "-",
+    Author: eventData?.user?.username || "-",
+  };
+}
+
 function buildMetadataItems(metadata?: GitLabNodeMetadata, configuration?: OnMergeRequestConfiguration) {
   const metadataItems = [];
 
@@ -80,17 +92,7 @@ export const onMergeRequestTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as OnMergeRequestEventData;
-    const mr = eventData?.object_attributes;
-
-    return {
-      "Received At": formatReceivedAt(context.event?.createdAt),
-      Title: mr?.title || "-",
-      URL: mr?.url || "-",
-      Action: mr?.action || "-",
-      State: mr?.state || "-",
-      Author: eventData?.user?.username || "-",
-    };
+    return mergeRequestRootEventValues(context.event?.data as OnMergeRequestEventData, context.event?.createdAt);
   },
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {

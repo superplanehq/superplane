@@ -11,7 +11,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatDuration } from "@/lib/duration";
-import { stringOrDash } from "../utils";
+import { stringOrDash } from "../eventDisplay";
 import { baseProps } from "./base";
 
 interface GetRecentWorkflowRunsConfiguration {

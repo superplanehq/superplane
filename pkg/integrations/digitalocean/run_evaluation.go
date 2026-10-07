@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -396,10 +395,6 @@ func buildEvalOutput(meta evalRunMetadata, run *EvaluationRun, prompts []Evaluat
 
 func (r *RunEvaluation) Cancel(ctx core.ExecutionContext) error {
 	return nil
-}
-
-func (r *RunEvaluation) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
-	return ctx.DefaultProcessing()
 }
 
 func (r *RunEvaluation) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

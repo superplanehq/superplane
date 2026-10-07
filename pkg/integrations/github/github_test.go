@@ -10,149 +10,172 @@ import (
 	"testing"
 
 	gh "github.com/google/go-github/v84/github"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 type githubManifest struct {
-	DefaultEvents      []string          `json:"default_events"`
 	DefaultPermissions map[string]string `json:"default_permissions"`
 }
 
-func Test__GitHub__Sync(t *testing.T) {
-	g := &GitHub{}
+func TestGitHubSyncKeepsPrivateAppManifestFlow(t *testing.T) {
+	integration := &contexts.IntegrationContext{}
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{
+		Configuration: Configuration{Organization: "testhq", PrivateApp: true},
+		Integration:   integration,
+	}))
 
-	t.Run("personal scope", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
-		require.NoError(t, g.Sync(core.SyncContext{Integration: integrationCtx}))
-
-		//
-		// Browser action is created
-		//
-		require.NotNil(t, integrationCtx.BrowserAction)
-		assert.Equal(t, integrationCtx.BrowserAction.Method, "POST")
-		assert.NotEmpty(t, integrationCtx.BrowserAction.Description)
-		assert.Equal(t, integrationCtx.BrowserAction.URL, "https://github.com/settings/apps/new")
-		assertManifestContainsDefaultEvents(t, integrationCtx.BrowserAction.FormFields["manifest"])
-
-		//
-		// Metadata is set
-		//
-		require.NotNil(t, integrationCtx.Metadata)
-		metadata := integrationCtx.Metadata.(common.Metadata)
-		assert.Empty(t, metadata.Owner)
-		assert.NotEmpty(t, metadata.State)
-	})
-
-	t.Run("organization scope", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{}
-		require.NoError(t, g.Sync(core.SyncContext{
-			Configuration: Configuration{Organization: "testhq"},
-			Integration:   integrationCtx,
-		}))
-
-		//
-		// Browser action is created
-		//
-		require.NotNil(t, integrationCtx.BrowserAction)
-		assert.Equal(t, integrationCtx.BrowserAction.Method, "POST")
-		assert.NotEmpty(t, integrationCtx.BrowserAction.Description)
-		assert.Equal(t, integrationCtx.BrowserAction.URL, "https://github.com/organizations/testhq/settings/apps/new")
-		assertManifestContainsDefaultEvents(t, integrationCtx.BrowserAction.FormFields["manifest"])
-
-		//
-		// Metadata is set
-		//
-		require.NotNil(t, integrationCtx.Metadata)
-		metadata := integrationCtx.Metadata.(common.Metadata)
-		assert.Equal(t, metadata.Owner, "testhq")
-		assert.NotEmpty(t, metadata.State)
-	})
+	require.NotNil(t, integration.BrowserAction)
+	assert.Equal(t, "POST", integration.BrowserAction.Method)
+	assert.Equal(t, "https://github.com/organizations/testhq/settings/apps/new", integration.BrowserAction.URL)
+	assertManifestContainsChecksPermission(t, integration.BrowserAction.FormFields["manifest"])
 }
 
-func Test__listInstallationRepositories__paginates_all_pages(t *testing.T) {
-	t.Parallel()
+func TestGitHubSyncDoesNotInstallTheHostedApp(t *testing.T) {
+	setHostedAppEnv(t)
+	restore := withFactoriesEnabledForTest(func(string) bool { return true })
+	t.Cleanup(restore)
 
-	type reposResponse struct {
-		TotalCount   int `json:"total_count"`
-		Repositories []struct {
-			ID      int64  `json:"id"`
-			Name    string `json:"name"`
-			HTMLURL string `json:"html_url"`
-		} `json:"repositories"`
-	}
+	err := (&GitHub{}).Sync(core.SyncContext{
+		OrganizationID: "11111111-1111-1111-1111-111111111111",
+		Integration:    &contexts.IntegrationContext{},
+	})
+	require.EqualError(t, err, "select a repository from the global GitHub App catalog")
+}
 
-	var srv *httptest.Server
-	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		require.Equal(t, "/installation/repositories", r.URL.Path)
-
-		page := r.URL.Query().Get("page")
-		if page == "" {
-			page = "1"
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-
-		switch page {
-		case "1":
-			// Provide Link header to instruct the client there is a next page.
-			next := fmt.Sprintf(`<%s/installation/repositories?page=2&per_page=100>; rel="next", <%s/installation/repositories?page=2&per_page=100>; rel="last"`, srv.URL, srv.URL)
-			w.Header().Set("Link", next)
-
-			_ = json.NewEncoder(w).Encode(reposResponse{
-				TotalCount: 2,
-				Repositories: []struct {
-					ID      int64  `json:"id"`
-					Name    string `json:"name"`
-					HTMLURL string `json:"html_url"`
-				}{
-					{ID: 1, Name: "repo1", HTMLURL: "https://github.com/test/repo1"},
-				},
-			})
-		case "2":
-			_ = json.NewEncoder(w).Encode(reposResponse{
-				TotalCount: 2,
-				Repositories: []struct {
-					ID      int64  `json:"id"`
-					Name    string `json:"name"`
-					HTMLURL string `json:"html_url"`
-				}{
-					{ID: 2, Name: "repo2", HTMLURL: "https://github.com/test/repo2"},
-				},
-			})
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
+func TestGitHubSyncKeepsHostedBindingReady(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	organization, err := models.CreateOrganization("Hosted sync", "")
+	require.NoError(t, err)
+	require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 501,
+		AccountLogin:   "acme",
 	}))
-	t.Cleanup(srv.Close)
+	integration, err := models.FindOrCreateVCSProviderBinding(
+		database.Conn(),
+		organization.ID,
+		models.ProviderGitHub,
+		501,
+		"acme",
+	)
+	require.NoError(t, err)
 
-	client := gh.NewClient(srv.Client())
-	baseURL, err := url.Parse(srv.URL + "/")
+	ctx := &contexts.IntegrationContext{
+		IntegrationID: integration.ID.String(),
+		Metadata:      common.Metadata{HostedApp: true},
+	}
+	require.NoError(t, (&GitHub{}).Sync(core.SyncContext{Integration: ctx}))
+	assert.Nil(t, ctx.BrowserAction)
+}
+
+func TestGitHubInstallationEventIgnoresAnotherPrivateAppInstallation(t *testing.T) {
+	integration := &contexts.IntegrationContext{
+		Metadata: common.Metadata{InstallationID: "42"},
+		State:    "ready",
+	}
+	request := httptest.NewRequest(http.MethodPost, "/webhook", nil)
+	response := httptest.NewRecorder()
+
+	(&GitHub{}).handleInstallationEvent(core.HTTPRequestContext{
+		Request:     request,
+		Response:    response,
+		Integration: integration,
+		Logger:      log.New().WithField("test", t.Name()),
+	}, &gh.InstallationEvent{
+		Action:       gh.Ptr("deleted"),
+		Installation: &gh.Installation{ID: gh.Ptr(int64(99))},
+	})
+
+	assert.Equal(t, "ready", integration.State)
+	assert.Empty(t, integration.StateDescription)
+}
+
+func TestGitHubHandleRequestRejectsHostedIntegrationCallbacks(t *testing.T) {
+	for _, path := range []string{"/redirect", "/setup", "/webhook"} {
+		t.Run(path, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodPost, path, nil)
+			response := httptest.NewRecorder()
+
+			(&GitHub{}).HandleRequest(core.HTTPRequestContext{
+				Request:  request,
+				Response: response,
+				Integration: &contexts.IntegrationContext{
+					Metadata: common.Metadata{HostedApp: true},
+				},
+			})
+
+			assert.Equal(t, http.StatusNotFound, response.Code)
+		})
+	}
+}
+
+func TestOwnerFromRepositories(t *testing.T) {
+	assert.Equal(t, "acme", ownerFromRepositories([]common.Repository{{URL: "https://github.com/acme/payments"}}))
+	assert.Empty(t, ownerFromRepositories(nil))
+}
+
+func TestOwnerFromAppInstallation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "/app/installations/42", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":42,"account":{"login":"acme","type":"Organization"}}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := gh.NewClient(server.Client())
+	baseURL, err := url.Parse(server.URL + "/")
 	require.NoError(t, err)
 	client.BaseURL = baseURL
-	client.UploadURL = baseURL
 
-	repos, err := listInstallationRepositories(context.Background(), client)
+	owner, err := ownerFromAppInstallation(context.Background(), client, "42")
 	require.NoError(t, err)
-	require.Len(t, repos, 2)
-	require.Equal(t, int64(1), repos[0].ID)
-	require.Equal(t, "repo1", repos[0].Name)
-	require.Equal(t, "https://github.com/test/repo1", repos[0].URL)
-	require.Equal(t, int64(2), repos[1].ID)
-	require.Equal(t, "repo2", repos[1].Name)
-	require.Equal(t, "https://github.com/test/repo2", repos[1].URL)
+	assert.Equal(t, "acme", owner)
 }
 
-func assertManifestContainsDefaultEvents(t *testing.T, manifestJSON string) {
+func TestListInstallationRepositoriesPaginatesAllPages(t *testing.T) {
+	type repository struct {
+		ID      int64  `json:"id"`
+		Name    string `json:"name"`
+		HTMLURL string `json:"html_url"`
+	}
+	type response struct {
+		Repositories []repository `json:"repositories"`
+	}
+
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("page") == "" {
+			w.Header().Set("Link", fmt.Sprintf(`<%s/installation/repositories?page=2&per_page=100>; rel="next"`, server.URL))
+			_ = json.NewEncoder(w).Encode(response{Repositories: []repository{{ID: 1, Name: "one"}}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(response{Repositories: []repository{{ID: 2, Name: "two"}}})
+	}))
+	t.Cleanup(server.Close)
+
+	client := gh.NewClient(server.Client())
+	baseURL, err := url.Parse(server.URL + "/")
+	require.NoError(t, err)
+	client.BaseURL = baseURL
+
+	repositories, err := listInstallationRepositories(context.Background(), client)
+	require.NoError(t, err)
+	require.Len(t, repositories, 2)
+	assert.Equal(t, int64(1), repositories[0].ID)
+	assert.Equal(t, int64(2), repositories[1].ID)
+}
+
+func assertManifestContainsChecksPermission(t *testing.T, manifest string) {
 	t.Helper()
-
-	require.NotEmpty(t, manifestJSON)
-
-	var manifest githubManifest
-	require.NoError(t, json.Unmarshal([]byte(manifestJSON), &manifest))
-	require.Equal(t, defaultGitHubAppEvents, manifest.DefaultEvents)
-	require.Equal(t, "read", manifest.DefaultPermissions["checks"])
+	var parsed githubManifest
+	require.NoError(t, json.Unmarshal([]byte(manifest), &parsed))
+	assert.Equal(t, "read", parsed.DefaultPermissions["checks"])
+	assert.Equal(t, "read", parsed.DefaultPermissions["vulnerability_alerts"])
 }

@@ -1,0 +1,146 @@
+import { AppPage } from "@/pages/app";
+import { usePageTitle } from "@/hooks/usePageTitle";
+import {
+  DEFAULT_SUPERPLANE_BASE_URL,
+  buildAgentCliInstallCommands,
+  buildAgentCliInstallInstructions,
+  buildAgentEditPrompt,
+} from "../lib/agentEditPrompt";
+import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { factoryAppRunPath, parseFactoryAppNavFrom } from "../lib/factoryPagePaths";
+import { AgentSetupPromptDialog } from "./AgentSetupPromptDialog";
+import { FactoryAppCanvasHeader } from "./FactoryAppCanvasHeader";
+import { FactoryAppCanvasRedirect } from "./factoryAppCanvasGuards";
+import { FactoryAppResetConfirmDialog } from "./FactoryAppResetConfirmDialog";
+import { FactoryCanvasYamlModal } from "./FactoryCanvasYamlModal";
+import { FactoryAutomationRunsSidebar } from "./factoryAutomationRunsSidebar/FactoryAutomationRunsSidebar";
+import { useFactoryAppCanvasPageModel } from "./useFactoryAppCanvasPageModel";
+
+type FactoryAppCanvasPageModel = ReturnType<typeof useFactoryAppCanvasPageModel>;
+
+/**
+ * Factory-shell embed for a factory-owned app/canvas. Configure (`?configure=1`)
+ * opens the edit workspace without the runs sidebar. Viewing a run (`?run=`
+ * without configure) stays here so the factory Run inspector can open on node
+ * click.
+ */
+export function FactoryAppCanvasPage() {
+  const { factory } = useFactoriesLayout();
+  const model = useFactoryAppCanvasPageModel();
+  const agentInstallInstructions = buildAgentCliInstallInstructions({
+    baseUrl: DEFAULT_SUPERPLANE_BASE_URL,
+  });
+  const agentInstallCommands = buildAgentCliInstallCommands();
+  const agentPrompt = buildAgentEditPrompt({
+    appName: model.title,
+    appId: model.appId,
+    runId: model.runId,
+    lineId: model.lineId,
+  });
+
+  // `model.title` is already computed for the visible header (falls back to
+  // "Untitled automation" while the canvas name loads); reuse it here so the
+  // tab title and on-page heading always agree.
+  usePageTitle([model.title, factory?.name ?? "Workspace"]);
+
+  if (model.shouldRedirect) {
+    return <FactoryAppCanvasRedirect organizationId={model.organizationId} factoryKey={model.factoryKey} />;
+  }
+
+  return (
+    <div
+      className="absolute inset-0 flex flex-col bg-background"
+      data-testid="factory-app-canvas-page"
+      data-configure={model.isConfigure ? "true" : undefined}
+    >
+      <FactoryAppCanvasHeader
+        backHref={model.back.href}
+        backLabel={model.back.label}
+        title={model.title}
+        subtitle={model.subtitle}
+        isConfigure={model.isConfigure}
+        configureBusy={model.configureBusy}
+        canRename={model.canRename}
+        onDraftTitleChange={model.isConfigure ? model.handleDraftTitleChange : undefined}
+        onDiscard={model.handleConfigureDiscard}
+        onSave={model.handleConfigureSave}
+        onOpenVisualEditor={model.canUpdateCanvas ? model.handleOpenVisualEditor : undefined}
+        workspace={
+          model.isConfigure
+            ? {
+                agentOpen: model.agentOpen,
+                componentsOpen: model.componentsOpen,
+                onAgentOpenChange: model.handleAgentOpenChange,
+                onComponentsOpenChange: model.handleComponentsOpenChange,
+                onViewYaml: model.handleViewYaml,
+                onEditWithLocalAgent: model.handleEditWithLocalAgent,
+                onResetToFactoryDefaults: model.resetAvailable ? model.handleOpenResetConfirm : undefined,
+              }
+            : undefined
+        }
+      />
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <FactoryAppCanvasWorkspace model={model} />
+      </div>
+      <FactoryCanvasYamlModal
+        open={model.yamlViewOpen}
+        onOpenChange={model.handleYamlViewOpenChange}
+        canvas={model.canvas}
+      />
+      <AgentSetupPromptDialog
+        open={model.agentPromptOpen}
+        onOpenChange={model.handleAgentPromptOpenChange}
+        installInstructions={agentInstallInstructions}
+        installCommands={agentInstallCommands}
+        prompt={agentPrompt}
+      />
+      <FactoryAppResetConfirmDialog
+        open={model.resetConfirmOpen}
+        onOpenChange={model.handleResetConfirmOpenChange}
+        onConfirm={model.handleResetToFactoryDefaults}
+      />
+    </div>
+  );
+}
+
+function FactoryAppCanvasWorkspace({ model }: { model: FactoryAppCanvasPageModel }) {
+  if (model.canvasLoading && !model.canvas) {
+    return <p className="p-5 text-[13px] text-muted-foreground">Loading…</p>;
+  }
+
+  const showRunsSidebar = Boolean(model.appId) && !model.isConfigure;
+
+  return (
+    <div className="flex h-full min-h-0 min-w-0">
+      {showRunsSidebar ? (
+        <FactoryAutomationRunsSidebar
+          canvasId={model.appId}
+          organizationId={model.organizationId}
+          factoryId={model.factoryId}
+          factoryKey={model.factoryKey}
+          selectedRunId={model.runId}
+          onSelectRun={model.handleSelectRun}
+          runHrefFor={(runId) =>
+            factoryAppRunPath(model.organizationId, model.factoryKey, model.appId, runId, {
+              from: parseFactoryAppNavFrom(model.from),
+              lineId: model.lineId ?? undefined,
+              orderNumber: model.orderNumber ?? undefined,
+            })
+          }
+        />
+      ) : null}
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+        <AppPage
+          factoryEmbed
+          factoryConfigure={model.isConfigure}
+          factoryAgentEnabled={model.isConfigure}
+          factoryEditWorkspace={model.isConfigure}
+          factoryConfigureActionsRef={model.configureActionsRef}
+          onFactoryConfigureBusyChange={model.handleConfigureBusyChange}
+          onFactoryConfigureDone={model.handleConfigureDone}
+          onFactoryConfigureSaved={model.handleConfigureSaved}
+        />
+      </div>
+    </div>
+  );
+}
