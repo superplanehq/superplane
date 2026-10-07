@@ -215,6 +215,31 @@ func TestWorkOrderReadyForAutoStartReviewRequiresAllThreeThrees(t *testing.T) {
 	require.NoError(t, err)
 	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
 	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{
+		Scores: reviewScores(3, 3, 3),
+		Spec:   "# Retry refunds\n\nStop double charges.\n",
+	}))
+
+	ready, err := WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.True(t, ready)
+
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 2)}))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+}
+
+func TestWorkOrderReadyForAutoStartReviewBlocksLaterMaximumAfterLowFirstScore(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-review-low-first")
+	db := database.DB(t.Context())
+	require.NoError(t, EnableExperimentalFeatureInTransaction(db, org.ID, features.FeatureTaskPlanningReview))
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Clarity: false, Confidence: false}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	line, err := factoryModel.CreateLine(db, "ship", nil)
+	require.NoError(t, err)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, &line.ID)
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{
 		Scores: reviewScores(3, 3, 2),
 		Spec:   "# Retry refunds\n\nStop double charges.\n",
 	}))
@@ -226,7 +251,21 @@ func TestWorkOrderReadyForAutoStartReviewRequiresAllThreeThrees(t *testing.T) {
 	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
-	assert.True(t, ready)
+	assert.False(t, ready)
+
+	require.NoError(t, session.SendUserMessage(db, "The refund path changed.", userID))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	nextRun, err := CreateCanvasRunInTransaction(db, canvas.ID, "start", CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, session.AttachAgentRun(db, nextRun.ID, ""))
+	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
 }
 
 func reviewScores(clarity, complexity, verifiability float64) *PlanningReviewScores {
