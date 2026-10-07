@@ -13,6 +13,7 @@ import { FirstRunSetup } from "./FirstRunSetup";
 import type { OnboardingAgentCredentialChoice } from "./onboardingAgentReadiness";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
+import { intakeCatalogAvailability, seededIntakeCatalog } from "@/test/intakeCatalog";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
@@ -38,6 +39,10 @@ vi.mock("@/hooks/useMe", () => ({
   useMe: () => ({ data: { id: "user-1" } }),
 }));
 
+vi.mock("@/hooks/useIntakeCatalogAvailability", () => ({
+  useIntakeCatalogAvailability: () => intakeCatalogAvailability(seededIntakeCatalog(["jira-issues"])),
+}));
+
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({ has: () => true, enabledExperimentalFeatures: [], isLoading: false }),
 }));
@@ -46,7 +51,7 @@ vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
 vi.mock("./useBitbucketOnboarding", () => ({
   useBitbucketOnboarding: () => ({
-    data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },
+    data: { providerConfigured: false, identity: undefined, repositories: [] },
     isPending: false,
     error: null,
     startInstallation: { mutateAsync: vi.fn() },

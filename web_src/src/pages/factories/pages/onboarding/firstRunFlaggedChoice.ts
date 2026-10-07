@@ -1,6 +1,6 @@
 import type { IssuesChoiceId } from "./onboardingFixtures";
 
-type FlaggedIssuesChoice = "jira" | "linear";
+type FlaggedIssuesChoice = "vcs" | "jira" | "linear";
 
 function shouldClearSavedFlaggedChoice(args: {
   issuesChoice: IssuesChoiceId | null;
@@ -24,6 +24,21 @@ export function shouldClearSavedJiraChoice(args: {
     source: "jira",
     featureLoading: args.featureLoading,
     available: args.jiraAvailable,
+    organizationReady: args.organizationReady,
+  });
+}
+
+export function shouldClearSavedVcsChoice(args: {
+  issuesChoice: IssuesChoiceId | null;
+  featureLoading: boolean;
+  vcsAvailable: boolean;
+  organizationReady: boolean;
+}): boolean {
+  return shouldClearSavedFlaggedChoice({
+    issuesChoice: args.issuesChoice,
+    source: "vcs",
+    featureLoading: args.featureLoading,
+    available: args.vcsAvailable,
     organizationReady: args.organizationReady,
   });
 }
@@ -70,6 +85,22 @@ export function savedJiraChoiceBlock(args: {
     source: "jira",
     featureLoading: args.featureLoading,
     available: args.jiraAvailable,
+    organizationReady: args.organizationReady,
+  });
+}
+
+/** A saved VCS choice cannot continue until the intake catalog confirms it. */
+export function savedVcsChoiceBlock(args: {
+  issuesChoice: IssuesChoiceId | null;
+  featureLoading: boolean;
+  vcsAvailable: boolean;
+  organizationReady: boolean;
+}): SavedFlaggedChoiceBlock | null {
+  return savedFlaggedChoiceBlock({
+    issuesChoice: args.issuesChoice,
+    source: "vcs",
+    featureLoading: args.featureLoading,
+    available: args.vcsAvailable,
     organizationReady: args.organizationReady,
   });
 }

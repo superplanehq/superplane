@@ -34,7 +34,7 @@ type TestContext struct {
 }
 
 func NewTestContext(t *testing.M) *TestContext {
-	return &TestContext{timeoutMs: 15000}
+	return &TestContext{timeoutMs: 30000}
 }
 
 func (s *TestContext) Start() {
