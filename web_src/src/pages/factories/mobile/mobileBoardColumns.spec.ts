@@ -43,10 +43,9 @@ describe("buildMobileBoardColumns", () => {
     }
   });
 
-  it("assigns totalCount to backlog and done columns and verify when no stages exist", () => {
+  it("assigns the server total to Backlog and Done", () => {
     const columns = buildMobileBoardColumns(PLAN_LINE, [BACKLOG_DRAFT, DONE_ORDER], REFUND_FACTORY_APPS, {
       backlog: 40,
-      open: 30,
       done: 80,
     });
 

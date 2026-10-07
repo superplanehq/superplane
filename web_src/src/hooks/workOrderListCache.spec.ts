@@ -142,7 +142,7 @@ describe("patchCachedWorkOrderPages", () => {
     expect(next?.pages[1]?.orders).toEqual([]);
   });
 
-  it("increments totalCount when a row joins this list", () => {
+  it("increments totalCount when a row joins a fully loaded list", () => {
     const next = patchCachedWorkOrderPages(
       {
         pageParams: [undefined],
@@ -154,6 +154,20 @@ describe("patchCachedWorkOrderPages", () => {
     );
     expect(next?.pages[0]?.orders.map((order) => order.id)).toEqual(["wo-1", "wo-2"]);
     expect(next?.pages[0]?.totalCount).toBe(9);
+  });
+
+  it("does not increment totalCount when the task may already be on a later page", () => {
+    const next = patchCachedWorkOrderPages(
+      {
+        pageParams: [undefined],
+        pages: [{ orders: [{ id: "wo-2", title: "Other", state: "STATE_DRAFT" }], hasNextPage: true, totalCount: 80 }],
+      },
+      "wo-1",
+      { id: "wo-1", title: "Edited", state: "STATE_DRAFT", checks: [] },
+      ["STATE_DRAFT"],
+    );
+    expect(next?.pages[0]?.orders.map((order) => order.id)).toEqual(["wo-1", "wo-2"]);
+    expect(next?.pages[0]?.totalCount).toBe(80);
   });
 
   it("keeps totalCount when a loaded row stays on this list", () => {

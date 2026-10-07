@@ -95,6 +95,27 @@ export function workOrdersPageStatesFromKey(queryKey: readonly unknown[]): Facto
   return joined.split(",") as FactoriesWorkOrderState[];
 }
 
+function orderIsOnLoadedPages(pages: readonly WorkOrdersPage[], orderId: string): boolean {
+  return pages.some((page) => page.orders.some((order) => order.id === orderId));
+}
+
+function loadedWorkOrderPagesAreComplete(pages: readonly WorkOrdersPage[]): boolean {
+  const last = pages.at(-1);
+  return last !== undefined && !last.hasNextPage;
+}
+
+function describedOrderBelongsOnPage(
+  described: FactoriesWorkOrder,
+  states: readonly FactoriesWorkOrderState[],
+  query: WorkOrdersPageQuery,
+): boolean {
+  return (
+    pageIncludesState(states, described.state) &&
+    pageIncludesResults(query.results, described.result) &&
+    workOrderMatchesPageQuery(described, query)
+  );
+}
+
 function shiftPageTotalCount(page: WorkOrdersPage, delta: number): WorkOrdersPage {
   if (page.totalCount === undefined || delta === 0) {
     return page;
@@ -120,11 +141,8 @@ export function patchCachedWorkOrderPages(
     return data;
   }
 
-  const belongs =
-    pageIncludesState(states, described.state) &&
-    pageIncludesResults(query.results, described.result) &&
-    workOrderMatchesPageQuery(described, query);
-  const exists = data.pages.some((page) => page.orders.some((order) => order.id === orderId));
+  const belongs = describedOrderBelongsOnPage(described, states, query);
+  const exists = orderIsOnLoadedPages(data.pages, orderId);
 
   if (!belongs) {
     if (!exists) {
@@ -160,6 +178,7 @@ export function patchCachedWorkOrderPages(
     };
   }
 
+  const totalDelta = loadedWorkOrderPagesAreComplete(data.pages) ? 1 : 0;
   return {
     ...data,
     pages: shiftPagesTotalCount(
@@ -170,9 +189,41 @@ export function patchCachedWorkOrderPages(
         },
         ...rest,
       ],
-      1,
+      totalDelta,
     ),
   };
+}
+
+export function pageKeysWithUnknownWorkOrderMembership(
+  queryClient: QueryClient,
+  organizationId: string,
+  factoryId: string,
+  orderId: string,
+  described: FactoriesWorkOrder,
+): ReadonlyArray<readonly unknown[]> {
+  const keys: Array<readonly unknown[]> = [];
+  for (const query of queryClient.getQueryCache().findAll({
+    queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId),
+  })) {
+    const data = queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(query.queryKey);
+    if (!data || data.pages.length === 0) {
+      continue;
+    }
+    if (loadedWorkOrderPagesAreComplete(data.pages) || orderIsOnLoadedPages(data.pages, orderId)) {
+      continue;
+    }
+    if (
+      !describedOrderBelongsOnPage(
+        described,
+        workOrdersPageStatesFromKey(query.queryKey),
+        workOrdersPageQueryFromKey(query.queryKey),
+      )
+    ) {
+      continue;
+    }
+    keys.push(query.queryKey);
+  }
+  return keys;
 }
 
 export function applyWorkOrderToListCaches(

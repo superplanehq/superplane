@@ -11,6 +11,7 @@ import { factoryQueryKeys } from "./useFactoryData";
 import {
   applyWorkOrderToListCaches,
   cachedWorkOrderIdsFromLists,
+  pageKeysWithUnknownWorkOrderMembership,
   removeWorkOrderFromListCaches,
 } from "./workOrderListCache";
 
@@ -179,8 +180,18 @@ async function refreshUpdatedWorkOrder(
   if (!isCurrent()) {
     return;
   }
+  const unknownMembershipKeys = pageKeysWithUnknownWorkOrderMembership(
+    queryClient,
+    organizationId,
+    factoryId,
+    orderId,
+    order,
+  );
   queryClient.setQueryData(factoryQueryKeys.workOrderDetail(organizationId, factoryId, orderId), order);
   applyWorkOrderToListCaches(queryClient, organizationId, factoryId, orderId, order);
+  for (const queryKey of unknownMembershipKeys) {
+    void queryClient.invalidateQueries({ queryKey });
+  }
 }
 
 function invalidateFactoryWorkOrdersOnReconnect(
