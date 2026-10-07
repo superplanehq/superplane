@@ -109,6 +109,15 @@ func TestRunnerPlanningSessionUpdateWritesScoresSpecAndSurvey(t *testing.T) {
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
 
+	require.NoError(t, factoryModel.SoftDelete(db))
+
+	published := []messages.FactoryWorkOrderNotificationMessage{}
+	restore := messages.SetWorkOrderNotificationPublisherForTest(func(message messages.FactoryWorkOrderNotificationMessage) error {
+		published = append(published, message)
+		return nil
+	})
+	defer restore()
+
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/updates", bytes.NewReader([]byte(`{
 		"scores": {
 			"clarity": {"score": 3, "summary": "Outcome, scope, and done are defined."},
@@ -133,6 +142,9 @@ func TestRunnerPlanningSessionUpdateWritesScoresSpecAndSurvey(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, artifacts)
 	assert.Contains(t, string(artifacts[0].Data), "Stop double charges.")
+	require.Len(t, published, 1)
+	assert.Equal(t, factoryevents.EventTypeOrderPlanReady, published[0].EventType)
+	assert.Equal(t, order.ID.String(), published[0].OrderID)
 }
 
 func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
@@ -212,6 +224,20 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			session: session,
 			status:  http.StatusConflict,
 			body:    "planning session has ended\n",
+		},
+		{
+			name:    "hidden workspace is not found",
+			err:     models.ErrFactoryNotFound,
+			session: session,
+			status:  http.StatusNotFound,
+			body:    models.ErrFactoryNotFound.Error() + "\n",
+		},
+		{
+			name:    "missing task is not found",
+			err:     models.ErrFactoryWorkOrderNotFound,
+			session: session,
+			status:  http.StatusNotFound,
+			body:    models.ErrFactoryWorkOrderNotFound.Error() + "\n",
 		},
 		{
 			name:        "no draft stays 500",
