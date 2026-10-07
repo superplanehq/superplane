@@ -28,6 +28,7 @@ export function ConsoleAutomationCard({
   actionBusy,
   onStopRun,
   onRerunStep,
+  onRerunAutomation,
 }: {
   automation: ConsoleAutomation;
   phase?: SplitRunPhase;
@@ -41,6 +42,7 @@ export function ConsoleAutomationCard({
   actionBusy: boolean;
   onStopRun?: (run: { appId: string; runId: string }) => void;
   onRerunStep?: (phase: SplitRunPhase) => void;
+  onRerunAutomation?: (phase: SplitRunPhase) => void;
 }) {
   const { latest } = automation;
   const stopping = useStopRequested(latest.status, actionBusy);
@@ -74,10 +76,13 @@ export function ConsoleAutomationCard({
           onStopRun({ appId: shownPhase.appId ?? "", runId: shownPhase.runId ?? "" });
         }
       : undefined;
-  const rerunStep =
-    canStopRun && onRerunStep && shownStatus === "failed" && shownPhase?.stepIndex != null
-      ? () => onRerunStep(shownPhase)
-      : undefined;
+  const retry = consoleAutomationRetry({
+    canUpdate: canStopRun,
+    status: shownStatus,
+    phase: shownPhase,
+    onRerunStep,
+    onRerunAutomation,
+  });
   return (
     <Frame
       variant="default"
@@ -117,7 +122,7 @@ export function ConsoleAutomationCard({
               factoryKey={factoryKey}
               orderNumber={orderNumber}
               onStop={stopRun}
-              onRetry={rerunStep}
+              onRetry={retry}
               actionBusy={actionBusy}
             />
           </FramePanel>
@@ -125,6 +130,28 @@ export function ConsoleAutomationCard({
       </Collapsible>
     </Frame>
   );
+}
+
+function consoleAutomationRetry({
+  canUpdate,
+  status,
+  phase,
+  onRerunStep,
+  onRerunAutomation,
+}: {
+  canUpdate: boolean;
+  status: SplitRunPhaseStatus;
+  phase?: SplitRunPhase;
+  onRerunStep?: (phase: SplitRunPhase) => void;
+  onRerunAutomation?: (phase: SplitRunPhase) => void;
+}): (() => void) | undefined {
+  if (!canUpdate || status !== "failed" || !phase?.appId || !phase.runId) {
+    return undefined;
+  }
+  if (phase.stepIndex != null) {
+    return onRerunStep ? () => onRerunStep(phase) : undefined;
+  }
+  return onRerunAutomation ? () => onRerunAutomation(phase) : undefined;
 }
 
 function useStopRequested(status: SplitRunPhaseStatus, actionBusy: boolean) {
