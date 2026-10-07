@@ -1,3 +1,4 @@
+import { useIntakeCatalogAvailability, type IntakeCatalogAvailability } from "@/hooks/useIntakeCatalogAvailability";
 import { cn } from "@/lib/utils";
 import type { IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 import { Check } from "lucide-react";
@@ -138,12 +139,14 @@ function WizardStepBody({
   onCreateVcsConnection: () => void;
   onEditVcsConnection: () => void;
 }) {
+  const intakes = useIntakeCatalogAvailability(organizationId);
   switch (step) {
     case "vcs":
       return (
         <VcsStep
           github={githubConnections}
           selectedConnectionId={selectedVcsConnectionId}
+          otherProviders={intakes.loaded ? otherRepositoryProviders(intakes) : undefined}
           onSelectConnection={onSelectVcsConnection}
           onCreateConnection={onCreateVcsConnection}
         />
@@ -158,12 +161,27 @@ function WizardStepBody({
         />
       );
     case "issues":
-      return <IssuesStep setup={setup} onRequestConnect={requestConnect} autoDiscover repos={repos} />;
+      return (
+        <IssuesStep
+          setup={setup}
+          onRequestConnect={requestConnect}
+          autoDiscover
+          repos={repos}
+          intakeState={intakes.stateOf}
+        />
+      );
     case "agent":
       return <AgentStep organizationId={organizationId} setup={setup} onRequestConnect={requestConnect} />;
     case "name":
       return <NameStep setup={setup} />;
   }
+}
+
+function otherRepositoryProviders(intakes: IntakeCatalogAvailability) {
+  return intakes
+    .entriesFor("onboardingRepository")
+    .filter((entry) => entry.key !== "github")
+    .map((entry) => ({ key: entry.key, name: entry.name, iconSrc: entry.iconSrc }));
 }
 
 async function continueToStep(
