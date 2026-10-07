@@ -385,28 +385,11 @@ func planningScoreLevel(score, maxScore float64) string {
 	return FactoryWorkOrderCheckLevelCritical
 }
 
-func planningScoreCallSentence(tx *gorm.DB, session *FactoryPlanningSession) string {
+func planningScoreCallSentence() string {
 	const updateCue = "End an answer, and the first plan, with how to update the plan or the scores. "
-	const startCue = "When every required score is 5, publish each required score on that plan turn. "
-	const reviewStartCue = "When every required score is 3, publish each required score on that plan turn. "
+	const startCue = "When every required score is 3, publish each required score on that plan turn. "
 	const missingCue = "If no score is published yet, this turn is a plan turn. Publish the required scores before you ask or stop. "
-	if organizationHasPlanningReview(tx, session.OrganizationID) {
-		return missingCue + "Call propose_update with scores, spec, and survey in one call. Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + reviewStartCue + updateCue
-	}
-	factoryModel, err := FindFactory(tx, session.OrganizationID, session.FactoryID)
-	if err != nil {
-		return missingCue + "Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
-	}
-	switch {
-	case factoryModel.PlanningClarity && factoryModel.PlanningConfidence:
-		return missingCue + "Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
-	case factoryModel.PlanningClarity:
-		return missingCue + "Publish the specification only when this turn updates the plan. Publish the Clarity score when the plan changes, the score would change, or the user asks to update that score. " + startCue + updateCue
-	case factoryModel.PlanningConfidence:
-		return missingCue + "Publish the specification only when this turn updates the plan. Publish the Confidence score when the plan changes, the score would change, or the user asks to update that score. " + startCue + updateCue
-	default:
-		return "Publish the specification only when this turn updates the plan. " + updateCue
-	}
+	return missingCue + "Call propose_update with scores, spec, and survey in one call. Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
 }
 
 func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (string, error) {
@@ -431,13 +414,9 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 	window := analysisConversationWindow(messages, analysisRewindMessageCharacterLimit)
 
 	var b strings.Builder
-	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Follow the task prompt for tone, Clarity and Confidence rules, and specification shape. ")
-	b.WriteString(planningScoreCallSentence(tx, session))
-	if organizationHasPlanningReview(tx, session.OrganizationID) {
-		b.WriteString("If you write or update a specification this turn, include spec on propose_update before you stop. Do not leave a written plan unpublished. Include survey on propose_update only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
-	} else {
-		b.WriteString("If you write or update a specification this turn, call propose_spec before you stop. Do not leave a written plan unpublished. Call survey only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
-	}
+	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Follow the task prompt for tone, planning score rules, and specification shape. ")
+	b.WriteString(planningScoreCallSentence())
+	b.WriteString("If you write or update a specification this turn, include spec on propose_update before you stop. Do not leave a written plan unpublished. Include survey on propose_update only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
 	if artifacts.spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
 		b.WriteString(artifacts.spec)
@@ -625,11 +604,6 @@ func WorkOrderReadyForAutoStart(
 	if !factoryModel.PlanningEnabled {
 		return false, nil
 	}
-	// Review scoring is not optional, so the Confidence setting only gates
-	// auto-start on the legacy flow.
-	if !factoryModel.PlanningConfidence && !organizationHasPlanningReview(tx, factoryModel.OrganizationID) {
-		return false, nil
-	}
 	if len(session.CurrentSurvey().Questions) > 0 {
 		return false, nil
 	}
@@ -641,17 +615,8 @@ func WorkOrderReadyForAutoStart(
 	if err != nil {
 		return false, err
 	}
-	if organizationHasPlanningReview(tx, factoryModel.OrganizationID) {
-		if !turn.reportedReviewScores(checks) {
-			return false, nil
-		}
-	} else {
-		if !turn.reportedScore(checks, PlanningConfidenceCheckKey, PlanningScoreMax) {
-			return false, nil
-		}
-		if factoryModel.PlanningClarity && !turn.reportedScore(checks, PlanningClarityCheckKey, PlanningScoreMax) {
-			return false, nil
-		}
+	if !turn.reportedReviewScores(checks) {
+		return false, nil
 	}
 	spec, err := planningSpecBody(tx, order)
 	if err != nil {

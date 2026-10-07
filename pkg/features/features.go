@@ -90,16 +90,12 @@ const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
 // task view on phone-width screens. Desktop screens keep the standard shell.
 const FeatureMobileFactoryBoard = "mobile_factory_board"
 
-// FeatureTaskPlanningReview enables the new task planning UI per organization.
-const FeatureTaskPlanningReview = "task_planning_review"
-
 func released() *bool {
 	v := true
 	return &v
 }
 
 var registry = []Feature{
-	{ID: FeatureTaskPlanningReview, Label: "Task Planning Review", Description: "Show the new plan card, focused questions, and implementation controls"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},

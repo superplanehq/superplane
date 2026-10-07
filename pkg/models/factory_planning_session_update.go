@@ -5,8 +5,6 @@ import (
 	"math"
 	"strings"
 
-	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/features"
 	"gorm.io/gorm"
 )
 
@@ -150,12 +148,4 @@ func hasPlanningReviewScores(checks []FactoryWorkOrderCheck) bool {
 		}
 	}
 	return found == len(planningReviewScoreKinds)
-}
-
-func organizationHasPlanningReview(tx *gorm.DB, organizationID uuid.UUID) bool {
-	org, err := FindOrganizationByIDInTransaction(tx, organizationID.String())
-	if err != nil {
-		return false
-	}
-	return org.HasExperimentalFeature(features.FeatureTaskPlanningReview)
 }
