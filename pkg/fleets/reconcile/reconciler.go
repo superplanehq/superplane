@@ -17,7 +17,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/fleets/provider"
 )
 
-const listLimit = 1000
+const (
+	listLimit      = 1000
+	maxPollTimeout = 30 * time.Second
+)
 
 type AdminClient interface {
 	DescribeFleet(context.Context, string) (adminclient.Fleet, error)
@@ -37,12 +40,17 @@ type ArtifactResolver interface {
 }
 
 type Config struct {
-	FleetID             string
-	WarmCapacity        int
-	MaxCapacity         int
-	OperatingSystem     string
-	Architecture        string
-	CapacityWaitSeconds int
+	FleetID         string
+	WarmCapacity    int
+	MaxCapacity     int
+	OperatingSystem string
+	Architecture    string
+	PollTimeout     time.Duration
+}
+
+type RunConfig struct {
+	Interval           time.Duration
+	ErrorRetryInterval time.Duration
 }
 
 type Reconciler struct {
@@ -84,8 +92,14 @@ func New(
 	case config.Architecture == "":
 		return nil, fmt.Errorf("architecture is required")
 	}
-	if config.CapacityWaitSeconds < 0 || config.CapacityWaitSeconds > 30 {
-		return nil, fmt.Errorf("capacity wait must be between 0 and 30 seconds")
+	if config.PollTimeout < 0 || config.PollTimeout > maxPollTimeout {
+		return nil, fmt.Errorf(
+			"poll timeout must be between 0 and %s",
+			maxPollTimeout,
+		)
+	}
+	if config.PollTimeout%time.Second != 0 {
+		return nil, fmt.Errorf("poll timeout must use whole seconds")
 	}
 	if log == nil {
 		log = slog.Default()
@@ -440,30 +454,33 @@ func (r *Reconciler) capacityWaitSeconds() int {
 	if r.generation == "" {
 		return 0
 	}
-	return r.config.CapacityWaitSeconds
+	return int(r.config.PollTimeout / time.Second)
 }
 
 func Run(
 	ctx context.Context,
 	log *slog.Logger,
-	errorRetryInterval time.Duration,
+	config RunConfig,
 	reconcilers []*Reconciler,
 ) {
 	if log == nil {
 		log = slog.Default()
 	}
-	if errorRetryInterval <= 0 {
-		errorRetryInterval = 15 * time.Second
+	if config.Interval <= 0 {
+		config.Interval = 15 * time.Second
+	}
+	if config.ErrorRetryInterval <= 0 {
+		config.ErrorRetryInterval = 15 * time.Second
 	}
 	for _, current := range reconcilers {
-		go runOne(ctx, log, errorRetryInterval, current)
+		go runOne(ctx, log, config, current)
 	}
 }
 
 func runOne(
 	ctx context.Context,
 	log *slog.Logger,
-	errorRetryInterval time.Duration,
+	config RunConfig,
 	reconciler *Reconciler,
 ) {
 	for {
@@ -472,8 +489,8 @@ func runOne(
 			return
 		}
 		if err == nil {
-			if reconciler.config.CapacityWaitSeconds == 0 || reconciler.generation == "" {
-				if !waitForRetry(ctx, errorRetryInterval) {
+			if reconciler.config.PollTimeout == 0 || reconciler.generation == "" {
+				if !waitForNextReconciliation(ctx, config.Interval) {
 					return
 				}
 			}
@@ -484,13 +501,13 @@ func runOne(
 			slog.String("fleet_id", reconciler.FleetID()),
 			slog.Any("error", err),
 		)
-		if !waitForRetry(ctx, errorRetryInterval) {
+		if !waitForNextReconciliation(ctx, config.ErrorRetryInterval) {
 			return
 		}
 	}
 }
 
-func waitForRetry(ctx context.Context, interval time.Duration) bool {
+func waitForNextReconciliation(ctx context.Context, interval time.Duration) bool {
 	timer := time.NewTimer(interval)
 	defer timer.Stop()
 	select {
