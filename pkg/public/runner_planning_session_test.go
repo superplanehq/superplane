@@ -135,6 +135,58 @@ func TestRunnerPlanningSessionUpdateWritesScoresSpecAndSurvey(t *testing.T) {
 	assert.Contains(t, string(artifacts[0].Data), "Stop double charges.")
 }
 
+func TestRunnerPlanningSessionUpdateAfterWorkspaceDeleteReturnsEnded(t *testing.T) {
+	r := support.Setup(t)
+	transport := bindTestSentryHub(t)
+	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NotNil(t, session.DraftWorkOrderID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+	require.NoError(t, factoryModel.SoftDelete(db))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/updates", bytes.NewReader([]byte(`{
+		"scores": {
+			"clarity": {"score": 3, "summary": "Outcome, scope, and done are defined."},
+			"complexity": {"score": 2, "summary": "One agent can finish this in one run."},
+			"verifiability": {"score": 3, "summary": "Existing tests cover the change."}
+		},
+		"spec": "# Retry refunds\n\nStop double charges.\n"
+	}`)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusConflict, rec.Code, rec.Body.String())
+	assert.Equal(t, "planning session has ended\n", rec.Body.String())
+	assert.Empty(t, transport.Events())
+
+	artifacts, err := order.ListArtifacts(db)
+	require.NoError(t, err)
+	assert.Empty(t, artifacts)
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	assert.Empty(t, checks)
+}
+
+func TestRunnerPlanningWaitAfterWorkspaceDeleteReturnsEnded(t *testing.T) {
+	r := support.Setup(t)
+	transport := bindTestSentryHub(t)
+	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NoError(t, session.BeginWait(db))
+	require.NoError(t, factoryModel.SoftDelete(db))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runner/planning-sessions/wait?hold_seconds=1", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	assert.Equal(t, "ended", body["status"])
+	assert.Empty(t, transport.Events())
+}
+
 func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
@@ -365,6 +417,33 @@ func TestWriteRunnerPlanningError(t *testing.T) {
 			assert.Contains(t, capturedExceptionText(event), tt.wantMessage)
 		})
 	}
+}
+
+func TestWriteRunnerPlanningErrorMissingFactoryEndsSession(t *testing.T) {
+	r := support.Setup(t)
+	_, session, _, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	require.NoError(t, session.BeginWait(db))
+	hook := logtest.NewGlobal()
+	t.Cleanup(func() { hook.Reset() })
+	transport := bindTestSentryHub(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/updates", nil)
+	req.Pattern = "/api/v1/runner/planning-sessions/updates"
+	rec := httptest.NewRecorder()
+
+	writeRunnerPlanningError(rec, req, session, fmt.Errorf("load workspace: %w", models.ErrFactoryNotFound))
+
+	require.Equal(t, http.StatusConflict, rec.Code)
+	assert.Equal(t, "planning session has ended\n", rec.Body.String())
+	assert.Empty(t, transport.Events())
+	for _, entry := range hook.AllEntries() {
+		assert.NotEqual(t, log.ErrorLevel, entry.Level)
+	}
+
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateEnded, reloaded.State)
+	assert.Equal(t, models.PlanningWaitKindEnded, reloaded.WaitKind)
 }
 
 func TestWritePlanningWaitError(t *testing.T) {

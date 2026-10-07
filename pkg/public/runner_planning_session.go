@@ -645,6 +645,14 @@ func writeRunnerPlanningError(w http.ResponseWriter, r *http.Request, session *m
 		http.Error(w, "planning session not found", http.StatusNotFound)
 	case errors.Is(err, models.ErrFactoryPlanningSessionEnded):
 		http.Error(w, "planning session has ended", http.StatusConflict)
+	case errors.Is(err, models.ErrFactoryNotFound):
+		if endErr := endPlanningSessionForMissingFactory(r, session); endErr != nil {
+			log.WithError(endErr).Error("runner planning session failed")
+			captureRunnerPlanningErrorToSentry(r, session, endErr)
+			http.Error(w, "Lookup failed", http.StatusInternalServerError)
+			return
+		}
+		http.Error(w, "planning session has ended", http.StatusConflict)
 	case isPlanningRequestCanceled(r, err):
 		log.WithError(err).WithField("route", resolveCriticalHTTPRoute(r)).Info("runner planning session client disconnected")
 		w.WriteHeader(statusClientClosedRequest)
@@ -653,6 +661,13 @@ func writeRunnerPlanningError(w http.ResponseWriter, r *http.Request, session *m
 		captureRunnerPlanningErrorToSentry(r, session, err)
 		http.Error(w, "Lookup failed", http.StatusInternalServerError)
 	}
+}
+
+func endPlanningSessionForMissingFactory(r *http.Request, session *models.FactoryPlanningSession) error {
+	if r == nil || session == nil || session.ID == uuid.Nil {
+		return nil
+	}
+	return session.End(database.DB(r.Context()))
 }
 
 func captureRunnerPlanningErrorToSentry(r *http.Request, session *models.FactoryPlanningSession, err error) {
