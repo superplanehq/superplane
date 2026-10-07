@@ -198,7 +198,7 @@ const MERGE_CHECK_SCALE_REPLACEMENTS: ReadonlyArray<readonly [string, string]> =
 function withCurrentMergeCheckScale(prompt: string): string {
   let next = prompt;
   for (const [from, to] of MERGE_CHECK_SCALE_REPLACEMENTS) {
-    next = next.replaceAll(from, to);
+    next = next.split(from).join(to);
   }
   if (LEGACY_MERGE_CHECK_SCORE.test(next)) {
     return prompt;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import type { PlanningReviewDraft } from "./planningReviewMockup";
+import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 import {
   defaultRiskScoreCategories,
   draftWithRiskScoreCategories,
@@ -128,7 +128,8 @@ describe("draftWithRiskScoreCategories", () => {
         "Documentation only = 1 (very_low). Secrets and credentials = 5 (critical).",
       ].join("\n"),
     );
-    draft.components[0].configuration.steps.push({
+    const draftSteps = draft.components[0].configuration.steps as PlanningReviewStep[];
+    draftSteps.push({
       name: "Performance",
       type: "prompt",
       prompt: [
@@ -147,7 +148,9 @@ describe("draftWithRiskScoreCategories", () => {
 
     expect(steps[1].prompt).toContain("score is an integer from 1 to 3.");
     expect(steps[1].prompt).toContain("choose a score from 1 to 3.");
-    expect(steps[1].prompt).toContain("Use Higher risk for critical. Use Moderate risk for caution. Use Lower risk for healthy.");
+    expect(steps[1].prompt).toContain(
+      "Use Higher risk for critical. Use Moderate risk for caution. Use Lower risk for healthy.",
+    );
     expect(steps[1].prompt).not.toContain("1 to 5");
     expect(steps[2].prompt).toContain("If no performance practice applies, report 3.");
     expect(steps[2].prompt).not.toContain("report the check with 5");
@@ -156,9 +159,11 @@ describe("draftWithRiskScoreCategories", () => {
 
   it("leaves a custom 5-point rubric on its original scale", () => {
     const draft = draftWithPrompt(
-      ["score is an integer from 1 to 5.", "5 means the owner asked for a manual score.", "Cache changes = 4 (high)."].join(
-        "\n",
-      ),
+      [
+        "score is an integer from 1 to 5.",
+        "5 means the owner asked for a manual score.",
+        "Cache changes = 4 (high).",
+      ].join("\n"),
     );
 
     const next = draftWithRiskScoreCategories(draft, [{ id: "custom-1", name: "Cache changes", score: 2 }]);
