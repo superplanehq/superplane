@@ -50,17 +50,19 @@ type FactoryOnboardingConfig struct {
 	InitialOnboardingAttemptID string `json:"initial_onboarding_attempt_id,omitempty"`
 	VCSIntegrationID           string `json:"vcs_integration_id,omitempty"`
 	// VCSProvider is the Git host. Empty means GitHub. Existing rows stay empty.
-	VCSProvider         string `json:"vcs_provider,omitempty"`
-	AgentIntegrationID  string `json:"agent_integration_id,omitempty"`
-	AppRepository       string `json:"app_repository,omitempty"`
-	AppRepositoryID     int64  `json:"app_repository_id,omitempty"`
-	BacklogRepository   string `json:"backlog_repository,omitempty"`
-	BacklogRepositoryID int64  `json:"backlog_repository_id,omitempty"`
-	DefaultBranch       string `json:"default_branch,omitempty"`
-	IssuesSource        string `json:"issues_source,omitempty"`
-	AgentHarness        string `json:"agent_harness,omitempty"`
-	ProvisionedAppID    string `json:"provisioned_app_id,omitempty"`
-	ProvisionedLineID   string `json:"provisioned_line_id,omitempty"`
+	VCSProvider        string `json:"vcs_provider,omitempty"`
+	AgentIntegrationID string `json:"agent_integration_id,omitempty"`
+	AppRepository      string `json:"app_repository,omitempty"`
+	AppRepositoryID    int64  `json:"app_repository_id,omitempty"`
+	// AppRepositoryExternalID is the Bitbucket repository UUID. GitHub leaves it empty.
+	AppRepositoryExternalID string `json:"app_repository_external_id,omitempty"`
+	BacklogRepository       string `json:"backlog_repository,omitempty"`
+	BacklogRepositoryID     int64  `json:"backlog_repository_id,omitempty"`
+	DefaultBranch           string `json:"default_branch,omitempty"`
+	IssuesSource            string `json:"issues_source,omitempty"`
+	AgentHarness            string `json:"agent_harness,omitempty"`
+	ProvisionedAppID        string `json:"provisioned_app_id,omitempty"`
+	ProvisionedLineID       string `json:"provisioned_line_id,omitempty"`
 }
 
 // FactoryOnboardingPatch carries optional field updates for a partial merge.
@@ -68,18 +70,19 @@ type FactoryOnboardingConfig struct {
 // (including clearing when the pointed string is empty, or when an enum is
 // cleared to the empty string).
 type FactoryOnboardingPatch struct {
-	VCSIntegrationID    *string
-	VCSProvider         *string
-	AgentIntegrationID  *string
-	AppRepository       *string
-	AppRepositoryID     *int64
-	BacklogRepository   *string
-	BacklogRepositoryID *int64
-	DefaultBranch       *string
-	IssuesSource        *string
-	AgentHarness        *string
-	ProvisionedAppID    *string
-	ProvisionedLineID   *string
+	VCSIntegrationID        *string
+	VCSProvider             *string
+	AgentIntegrationID      *string
+	AppRepository           *string
+	AppRepositoryID         *int64
+	AppRepositoryExternalID *string
+	BacklogRepository       *string
+	BacklogRepositoryID     *int64
+	DefaultBranch           *string
+	IssuesSource            *string
+	AgentHarness            *string
+	ProvisionedAppID        *string
+	ProvisionedLineID       *string
 }
 
 func ValidateFactoryOnboardingIssuesSource(source string) error {
@@ -303,6 +306,9 @@ func mergeFactoryOnboardingConfig(current FactoryOnboardingConfig, patch Factory
 	}
 	if patch.AppRepositoryID != nil {
 		next.AppRepositoryID = *patch.AppRepositoryID
+	}
+	if patch.AppRepositoryExternalID != nil {
+		next.AppRepositoryExternalID = strings.TrimSpace(*patch.AppRepositoryExternalID)
 	}
 	if patch.BacklogRepository != nil {
 		value := strings.TrimSpace(*patch.BacklogRepository)
