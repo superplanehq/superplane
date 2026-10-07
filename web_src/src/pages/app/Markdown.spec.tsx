@@ -572,3 +572,31 @@ describe("MarkdownContent GitHub attachments", () => {
     );
   });
 });
+
+describe("MarkdownContent hosted videos", () => {
+  it("renders a provider embed from the video id", () => {
+    render(<MarkdownContent content="![Demo](https://www.youtube.com/watch?v=dQw4w9WgXcQ)" />);
+
+    const frame = document.querySelector("iframe");
+    expect(frame).toHaveAttribute("src", "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ");
+    expect(frame).not.toHaveAttribute("src", "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  });
+
+  it("renders a CleanShot card instead of an embed", () => {
+    render(<MarkdownContent content="![Demo](https://cln.sh/abcd1234)" />);
+
+    expect(document.querySelector("iframe")).toBeNull();
+    expect(screen.getByText("CleanShot")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open video" })).toHaveAttribute("href", "https://cln.sh/abcd1234");
+  });
+
+  it("keeps a plain video link as a link", () => {
+    render(<MarkdownContent content="[Demo](https://www.youtube.com/watch?v=dQw4w9WgXcQ)" />);
+
+    expect(document.querySelector("iframe")).toBeNull();
+    expect(screen.getByRole("link", { name: "Demo" })).toHaveAttribute(
+      "href",
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    );
+  });
+});

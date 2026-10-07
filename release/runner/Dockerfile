@@ -57,6 +57,9 @@ RUN apt-get update \
   && chmod -R a+rX /ms-playwright \
   && rm -rf /var/lib/apt/lists/*
 
+COPY release/runner/packer/aws/scripts/install-yt-dlp.sh /tmp/install-yt-dlp.sh
+RUN bash /tmp/install-yt-dlp.sh && rm /tmp/install-yt-dlp.sh
+
 COPY --from=build /runner /usr/local/bin/runner
 
 ENV HOME=/home/node
