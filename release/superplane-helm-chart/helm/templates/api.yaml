@@ -46,6 +46,10 @@ spec:
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
       {{- end }}
+      {{- if .Values.runnerAPI.enabled }}
+      securityContext:
+        fsGroup: {{ .Values.runnerLogs.fsGroup }}
+      {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

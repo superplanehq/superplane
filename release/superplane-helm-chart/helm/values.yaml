@@ -287,6 +287,8 @@ runnerAPI:
 runnerLogs:
   path: /var/lib/superplane/runner-active-logs
   existingClaim: ""
+  # Group that owns the log volume. The SuperPlane image runs as nobody (65534).
+  fsGroup: 65534
 
 #
 # Integrated Fleet Manager. Off by default.
