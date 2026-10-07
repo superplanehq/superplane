@@ -236,41 +236,57 @@ function parseDefaultValue(fieldType: string | undefined, defaultValue: unknown)
     return defaultValue;
   }
 
+  return parseTypedDefaultValue(fieldType, defaultValue);
+}
+
+function parseTypedDefaultValue(fieldType: string | undefined, defaultValue: string): unknown {
   switch (fieldType) {
-    case "number": {
-      const num = Number(defaultValue);
-      return isNaN(num) ? defaultValue : num;
-    }
+    case "number":
+      return parseNumericDefault(defaultValue);
     case "boolean":
       return defaultValue === "true";
     case "multi-select":
     case "days-of-week":
     case "list":
-    case "any-predicate-list": {
-      try {
-        return JSON.parse(defaultValue);
-      } catch {
-        if (fieldType === "multi-select") {
-          return [defaultValue];
-        }
-        return defaultValue;
-      }
-    }
-    case "object": {
-      try {
-        return JSON.parse(defaultValue);
-      } catch {
-        return {};
-      }
-    }
-    case "timezone": {
-      if (defaultValue === "current") {
-        const offset = -new Date().getTimezoneOffset() / 60;
-        return offset.toString();
-      }
-      return defaultValue;
-    }
+    case "any-predicate-list":
+      return parseListDefault(fieldType, defaultValue);
+    case "object":
+      return parseObjectDefault(defaultValue);
+    case "timezone":
+      return parseTimezoneDefault(defaultValue);
     default:
       return defaultValue;
   }
+}
+
+function parseNumericDefault(defaultValue: string): unknown {
+  const num = Number(defaultValue);
+  return isNaN(num) ? defaultValue : num;
+}
+
+function parseListDefault(fieldType: string, defaultValue: string): unknown {
+  try {
+    return JSON.parse(defaultValue);
+  } catch {
+    if (fieldType === "multi-select") {
+      return [defaultValue];
+    }
+    return defaultValue;
+  }
+}
+
+function parseObjectDefault(defaultValue: string): unknown {
+  try {
+    return JSON.parse(defaultValue);
+  } catch {
+    return {};
+  }
+}
+
+function parseTimezoneDefault(defaultValue: string): string {
+  if (defaultValue === "current") {
+    const offset = -new Date().getTimezoneOffset() / 60;
+    return offset.toString();
+  }
+  return defaultValue;
 }
