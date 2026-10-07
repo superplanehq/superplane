@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FEATURE_FACTORY_BITBUCKET } from "@/lib/experimentalFeatures";
+import { intakeCatalogAvailability, seededIntakeCatalog } from "@/test/intakeCatalog";
 
 import { FirstRunSetup } from "./FirstRunSetup";
 import type { IntegrationId } from "./onboardingFixtures";
@@ -67,6 +68,10 @@ vi.mock("@/contexts/useAccount", () => ({
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
   useAccountOrganizations: () => ({ data: [{ id: "org-1", name: "Acme" }] }),
+}));
+
+vi.mock("@/hooks/useIntakeCatalogAvailability", () => ({
+  useIntakeCatalogAvailability: () => intakeCatalogAvailability(seededIntakeCatalog([])),
 }));
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({

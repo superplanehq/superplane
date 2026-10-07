@@ -19,6 +19,7 @@ import (
 
 func TestResolveJiraCloseTarget(t *testing.T) {
 	r := support.Setup(t)
+	grantIntakeCatalogAccess(t, r.Organization.ID)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 	deps := IntakeDependencies{
@@ -97,6 +98,7 @@ func TestResolveJiraCloseTarget(t *testing.T) {
 
 func TestResolveJiraCloseTargetPrefersSourceRun(t *testing.T) {
 	r := support.Setup(t)
+	grantIntakeCatalogAccess(t, r.Organization.ID)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 	deps := IntakeDependencies{
