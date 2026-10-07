@@ -165,8 +165,8 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.NotContains(t, agent.Configuration, "model")
 	prompt := agentPrompt(t, agent)
 	assert.Contains(t, prompt, "Merge check: risk.")
-	assert.Contains(t, prompt, "Additive database changes = 3 (medium).")
-	assert.Contains(t, prompt, "Authorization changes = 4 (high).")
+	assert.Contains(t, prompt, "Additive database changes = 2 (caution).")
+	assert.Contains(t, prompt, "Authorization changes = 3 (critical).")
 	assert.Contains(t, prompt, "report_merge_check")
 	assert.Contains(t, prompt, "check is risk.")
 	for _, name := range []string{"Checkout Pull Request", "Blast radius", "Performance", "Security", "Drift from Specification", "Reversibility"} {

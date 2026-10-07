@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,6 +25,12 @@ const (
 	// environment. The work order id travels in the signed token instead.
 	EnvSuperplaneMergeConfidenceOrderID = "SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID"
 	EnvSuperplaneMergeConfidenceToken   = "SUPERPLANE_MERGE_CONFIDENCE_TOKEN"
+	// EnvSuperplaneMergeConfidenceMaxScore tells the report tool which range
+	// the check prompts use. 5 means at least one prompt still asks for 1 to 5.
+	EnvSuperplaneMergeConfidenceMaxScore = "SUPERPLANE_MERGE_CONFIDENCE_MAX_SCORE"
+
+	mergeConfidenceCurrentMaxScore = 3
+	mergeConfidenceLegacyMaxScore  = 5
 )
 
 // MergeConfidenceScope is the runner token for one merge confidence agent run.
@@ -39,11 +46,16 @@ type MergeConfidenceScope struct {
 	// CheckLabels maps a check id to the step name. Built-in checks use their
 	// own names when this map has no entry.
 	CheckLabels map[string]string
+	// CheckMaxScores maps a check id to 3 or 5. A nil map is a token minted
+	// before score scales existed. Those runs still use 1 through 5.
+	CheckMaxScores map[string]int
 }
 
 var (
-	mergeConfidenceChecksLine = regexp.MustCompile(`(?m)^Enabled checks: (none|(?:risk|performance|security|drift|reversibility)(?:, (?:risk|performance|security|drift|reversibility))*)\.$`)
-	mergeCheckIDLine          = regexp.MustCompile(`(?m)^Merge check: ([a-z][a-z0-9-]{0,40})\.$`)
+	mergeConfidenceChecksLine   = regexp.MustCompile(`(?m)^Enabled checks: (none|(?:risk|performance|security|drift|reversibility)(?:, (?:risk|performance|security|drift|reversibility))*)\.$`)
+	mergeCheckIDLine            = regexp.MustCompile(`(?m)^Merge check: ([a-z][a-z0-9-]{0,40})\.$`)
+	mergeConfidenceLegacyScore  = regexp.MustCompile(`(?m)(?:\b1 to 5\b|\b1 through 5\b|\breport(?: the check)? with 5\b|^\s*[45] means\b| = [45] \()`)
+	mergeConfidenceCurrentScore = regexp.MustCompile(`\b1 to 3\b|\b1 through 3\b`)
 )
 
 // MergeCheckID reads the check id from a step prompt. An empty string means the step is not a check.
@@ -101,6 +113,131 @@ func MergeConfidenceChecksFromSteps(steps []AgentStep) ([]string, map[string]str
 	return ParseMergeConfidenceChecks(agentStepPrompts(steps)), nil
 }
 
+// MergeConfidenceCheckScales reads the score range from each check prompt.
+// It uses the scoring instructions, not the task title or task description.
+// A prompt that still asks for 1 to 5 stays on that scale. A prompt that asks
+// for 1 to 3 uses the new scale. A prompt that names neither stays on 1 to 5.
+func MergeConfidenceCheckScales(steps []AgentStep) map[string]int {
+	scales := map[string]int{}
+	sawCheck := false
+	for _, step := range steps {
+		if step.Prompt == nil {
+			continue
+		}
+		id := MergeCheckID(*step.Prompt)
+		if id == "" {
+			continue
+		}
+		sawCheck = true
+		scales[id] = mergeConfidencePromptScale(*step.Prompt)
+	}
+	if sawCheck {
+		return scales
+	}
+	scale := mergeConfidenceLegacyMaxScore
+	prompts := agentStepPrompts(steps)
+	if promptScale(prompts) == mergeConfidenceCurrentMaxScore {
+		scale = mergeConfidenceCurrentMaxScore
+	}
+	for _, id := range ParseMergeConfidenceChecks(prompts) {
+		scales[id] = scale
+	}
+	return scales
+}
+
+func promptScale(prompts []string) int {
+	if len(prompts) == 0 {
+		return mergeConfidenceLegacyMaxScore
+	}
+	scale := mergeConfidenceLegacyMaxScore
+	for _, prompt := range prompts {
+		instructions := mergeConfidenceScoringText(prompt)
+		next := mergeConfidencePromptScale(instructions)
+		if next == mergeConfidenceLegacyMaxScore && mergeConfidenceLegacyScore.MatchString(instructions) {
+			return mergeConfidenceLegacyMaxScore
+		}
+		if next == mergeConfidenceCurrentMaxScore {
+			scale = mergeConfidenceCurrentMaxScore
+		}
+	}
+	return scale
+}
+
+func mergeConfidencePromptScale(prompt string) int {
+	instructions := mergeConfidenceScoringText(prompt)
+	if mergeConfidenceLegacyScore.MatchString(instructions) {
+		return mergeConfidenceLegacyMaxScore
+	}
+	if mergeConfidenceCurrentScore.MatchString(instructions) {
+		return mergeConfidenceCurrentMaxScore
+	}
+	return mergeConfidenceLegacyMaxScore
+}
+
+func mergeConfidenceScoringText(prompt string) string {
+	taskStart := mergeConfidenceTaskStart(prompt)
+	if taskStart < 0 {
+		return prompt
+	}
+	instructionAt := mergeConfidenceInstructionStart(prompt, taskStart)
+	if instructionAt < 0 {
+		return prompt
+	}
+	return prompt[:taskStart] + prompt[instructionAt:]
+}
+
+func mergeConfidenceTaskStart(prompt string) int {
+	titleAt := strings.Index(prompt, "Task title:")
+	descriptionAt := strings.Index(prompt, "Task description:")
+	switch {
+	case titleAt >= 0 && (descriptionAt < 0 || titleAt <= descriptionAt):
+		return titleAt
+	case descriptionAt >= 0:
+		return descriptionAt
+	default:
+		return -1
+	}
+}
+
+func mergeConfidenceInstructionStart(prompt string, taskStart int) int {
+	markers := []string{
+		"Report this check with the report_merge_check tool.",
+		"Report each enabled check with the report_merge_check tool.",
+	}
+	start := -1
+	for _, marker := range markers {
+		at := strings.LastIndex(prompt, marker)
+		if at < taskStart {
+			continue
+		}
+		if start < 0 || at < start {
+			start = at
+		}
+	}
+	return start
+}
+
+// CheckScoreScale is the range for one reported check. A token with no scale
+// claim still uses 1 through 5.
+func (scope MergeConfidenceScope) CheckScoreScale(check string) float64 {
+	if scope.CheckMaxScores == nil {
+		return mergeConfidenceLegacyMaxScore
+	}
+	if scope.CheckMaxScores[strings.ToLower(strings.TrimSpace(check))] == mergeConfidenceLegacyMaxScore {
+		return mergeConfidenceLegacyMaxScore
+	}
+	return mergeConfidenceCurrentMaxScore
+}
+
+func mergeConfidenceRunMaxScore(scales map[string]int) int {
+	for _, scale := range scales {
+		if scale == mergeConfidenceLegacyMaxScore {
+			return mergeConfidenceLegacyMaxScore
+		}
+	}
+	return mergeConfidenceCurrentMaxScore
+}
+
 func uniqueMergeConfidenceChecks(names []string) []string {
 	seen := make(map[string]struct{}, len(names))
 	enabled := make([]string, 0, len(names))
@@ -139,6 +276,13 @@ func MintMergeConfidenceToken(signer *jwt.Signer, scope MergeConfidenceScope, tt
 			return "", fmt.Errorf("merge confidence check names: %w", err)
 		}
 		claims["check_labels"] = string(encoded)
+	}
+	if scope.CheckMaxScores != nil {
+		encoded, err := json.Marshal(scope.CheckMaxScores)
+		if err != nil {
+			return "", fmt.Errorf("merge confidence score scale: %w", err)
+		}
+		claims["check_max_scores"] = string(encoded)
 	}
 	return signer.GenerateWithClaims(ttl, claims)
 }
@@ -180,6 +324,13 @@ func ParseMergeConfidenceToken(signer *jwt.Signer, token string) (*MergeConfiden
 	scope.EnabledChecks = parseMergeConfidenceChecksClaim(raw)
 	labels, _ := claims["check_labels"].(string)
 	scope.CheckLabels = parseMergeConfidenceCheckLabels(labels)
+	if rawScale, ok := claims["check_max_scores"].(string); ok {
+		scales, err := parseMergeConfidenceCheckScales(rawScale)
+		if err != nil {
+			return nil, err
+		}
+		scope.CheckMaxScores = scales
+	}
 	return &scope, nil
 }
 
@@ -193,6 +344,21 @@ func parseMergeConfidenceCheckLabels(raw string) map[string]string {
 		return nil
 	}
 	return labels
+}
+
+func parseMergeConfidenceCheckScales(raw string) (map[string]int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return map[string]int{}, nil
+	}
+	var scales map[string]int
+	if err := json.Unmarshal([]byte(raw), &scales); err != nil {
+		return nil, fmt.Errorf("merge confidence score scale is invalid")
+	}
+	if scales == nil {
+		return map[string]int{}, nil
+	}
+	return scales, nil
 }
 
 func parseMergeConfidenceChecksClaim(raw string) []string {
@@ -261,6 +427,7 @@ func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []BrokerEnv
 	}
 
 	enabled, labels := MergeConfidenceChecksFromSteps(steps)
+	scales := MergeConfidenceCheckScales(steps)
 	token, err := MintMergeConfidenceToken(jwt.NewSigner(secret), MergeConfidenceScope{
 		OrganizationID:  orgID,
 		FactoryID:       *canvas.FactoryID,
@@ -269,6 +436,7 @@ func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []BrokerEnv
 		NodeExecutionID: ctx.ID,
 		EnabledChecks:   enabled,
 		CheckLabels:     labels,
+		CheckMaxScores:  scales,
 	}, time.Duration(timeoutSeconds)*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("mint merge confidence token: %w", err)
@@ -280,10 +448,17 @@ func AttachMergeConfidenceEnv(ctx core.ExecutionContext, environment []BrokerEnv
 			Value: baseURL,
 		})
 	}
-	return append(environment, BrokerEnvironmentVariable{
-		Name:  EnvSuperplaneMergeConfidenceToken,
-		Value: token,
-	}), nil
+	environment = withoutEnvironmentName(environment, EnvSuperplaneMergeConfidenceMaxScore)
+	return append(environment,
+		BrokerEnvironmentVariable{
+			Name:  EnvSuperplaneMergeConfidenceToken,
+			Value: token,
+		},
+		BrokerEnvironmentVariable{
+			Name:  EnvSuperplaneMergeConfidenceMaxScore,
+			Value: strconv.Itoa(mergeConfidenceRunMaxScore(scales)),
+		},
+	), nil
 }
 
 func agentStepPrompts(steps []AgentStep) []string {

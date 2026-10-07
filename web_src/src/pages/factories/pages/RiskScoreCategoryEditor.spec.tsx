@@ -17,7 +17,7 @@ describe("RiskScoreCategoryEditor", () => {
 
     expect(screen.getByTestId("risk-score-category-database-additive")).toHaveTextContent("Moderate Risk");
     expect(screen.getByTestId("risk-score-category-database-additive")).toHaveStyle({ color: "#b45309" });
-    expect(screen.getByTestId("risk-score-category-authorization")).toHaveTextContent("High Risk");
+    expect(screen.getByTestId("risk-score-category-authorization")).toHaveTextContent("Higher Risk");
     expect(screen.getByTestId("risk-score-category-authorization")).toHaveStyle({ color: "#b91c1c" });
     expect(screen.getByTestId("risk-score-category-documentation")).toHaveStyle({ color: "#047857" });
   });

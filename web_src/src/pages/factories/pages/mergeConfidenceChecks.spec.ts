@@ -72,12 +72,12 @@ describe("draftWithMergeConfidence", () => {
 
     const next = draftWithMergeConfidence(draft, {
       checks: ["security", "drift"],
-      categories: [{ id: "authorization", name: "Authorization changes", score: 5 }],
+      categories: [{ id: "authorization", name: "Authorization changes", score: 3 }],
     });
 
     expect(mergeConfidenceFromDraft(next ?? undefined)).toEqual({
       checks: ["security", "drift"],
-      categories: [{ id: "authorization", name: "Authorization changes", score: 5 }],
+      categories: [{ id: "authorization", name: "Authorization changes", score: 3 }],
     });
     const prompt = (next?.components[0].configuration.steps as Array<{ prompt: string }>)[0].prompt;
     expect(prompt).toContain("Review the pull request diff.");
