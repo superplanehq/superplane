@@ -76,10 +76,6 @@ const FeatureNewRunners = "new_runners"
 // available.
 const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 
-// FeatureFactoryRiskScore gates the merge confidence automation on the Verify
-// column until the flow is generally available.
-const FeatureFactoryRiskScore = "factory_risk_score"
-
 // FeatureSuperPlaneMCPServer is released. Every organization can authorize
 // Cursor and other MCP clients against one workspace. The factories flag
 // still applies.
@@ -112,7 +108,6 @@ var registry = []Feature{
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureNewRunners, Label: "New Runners", Description: "Run tasks with the integrated SuperPlane runner architecture"},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
-	{ID: FeatureFactoryRiskScore, Label: "Factory Merge Confidence", Description: "Add a merge confidence automation to the Verify column"},
 	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
 	{ID: FeatureMobileFactoryBoard, Label: "Mobile Board", Description: "Show the mobile workspace shell on phone-width screens"},
 }

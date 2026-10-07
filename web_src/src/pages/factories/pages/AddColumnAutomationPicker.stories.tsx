@@ -56,7 +56,7 @@ export const VerifyCatalog: Story = {
   name: "Verify catalog",
   render: () => (
     <OpenPicker
-      catalog={catalogForColumn("verify", { allowCustom: true, allowRiskScore: true })}
+      catalog={catalogForColumn("verify", { allowCustom: true })}
       takenIds={["discussion"]}
     />
   ),
