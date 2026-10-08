@@ -609,6 +609,39 @@ func ClaimHostedLinearOAuthState(tx *gorm.DB, state string) (*Integration, error
 	return &integration, nil
 }
 
+// ListLinearIntegrationsForAppWebhook finds ready Linear connections for one
+// workspace. organizationID is Linear's organization id. urlKey is the
+// workspace key in issue URLs. Either value can be empty. A connection matches
+// when one of the stored values equals the event.
+func ListLinearIntegrationsForAppWebhook(tx *gorm.DB, organizationID, urlKey string) ([]Integration, error) {
+	organizationID = strings.TrimSpace(organizationID)
+	urlKey = strings.TrimSpace(urlKey)
+	if organizationID == "" && urlKey == "" {
+		return nil, nil
+	}
+
+	query := tx.Where("app_name = ? AND state = ?", "linear", IntegrationStateReady)
+	switch {
+	case organizationID != "" && urlKey != "":
+		query = query.Where(
+			"metadata->>'organizationId' = ? OR metadata->>'urlKey' = ?",
+			organizationID,
+			urlKey,
+		)
+	case organizationID != "":
+		query = query.Where("metadata->>'organizationId' = ?", organizationID)
+	default:
+		query = query.Where("metadata->>'urlKey' = ?", urlKey)
+	}
+
+	var integrations []Integration
+	err := query.Find(&integrations).Error
+	if err != nil {
+		return nil, err
+	}
+	return integrations, nil
+}
+
 // ListGitHubIntegrationsByInstallationID finds GitHub connections bound to a
 // GitHub App installation. One installation can belong to more than one
 // SuperPlane organization.

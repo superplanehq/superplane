@@ -781,6 +781,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc(s.BasePath+"/sentry/app/webhook", s.HandleSentryAppWebhook).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/jira/oauth/callback", s.HandleJiraOAuthCallback).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/linear/oauth/callback", s.HandleLinearOAuthCallback).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/linear/webhook", s.HandleLinearAppWebhook).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/mcp-oauth/callback", s.HandleMCPOAuthCallback).Methods("GET")
 
 	// Account-based endpoints (use account session, not organization context)

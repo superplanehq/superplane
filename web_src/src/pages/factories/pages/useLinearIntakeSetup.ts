@@ -99,6 +99,7 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
   };
 
   return {
+    organizationId,
     step,
     setStep,
     integrationId,
