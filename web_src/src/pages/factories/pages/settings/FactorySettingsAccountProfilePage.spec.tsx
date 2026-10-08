@@ -61,7 +61,12 @@ describe("FactorySettingsAccountProfilePage associated accounts", () => {
   it("shows Associated accounts for GitHub PR credit", () => {
     renderPage();
 
-    expect(screen.getByTestId("account-redesign-associated-accounts")).toBeInTheDocument();
+    const associatedAccounts = screen.getByTestId("account-redesign-associated-accounts");
+    expect(associatedAccounts).toBeInTheDocument();
+    expect(associatedAccounts).toHaveTextContent("GitHub accounts credit pull requests in Velocity.");
+    expect(associatedAccounts).toHaveTextContent("Bitbucket accounts find repositories you can open.");
+    expect(associatedAccounts).toHaveTextContent("These accounts do not change how you sign in.");
+    expect(screen.queryByText("SuperPlane uses these accounts to credit your work.")).not.toBeInTheDocument();
     expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent(
       "Velocity uses this GitHub account to credit your pull requests.",
     );

@@ -38,7 +38,8 @@ export function AccountProfileAssociatedAccountsCard({
     <>
       <FactorySettingsCard title="Associated accounts" data-testid="account-redesign-associated-accounts">
         <p className="text-[12px] text-muted-foreground">
-          SuperPlane uses these accounts to credit your work. This does not change how you sign in.
+          GitHub accounts credit pull requests in Velocity. Bitbucket accounts find repositories you can open. These
+          accounts do not change how you sign in.
         </p>
         <ul className="mt-4 space-y-4">
           {githubAccounts.map((account, index) => (
