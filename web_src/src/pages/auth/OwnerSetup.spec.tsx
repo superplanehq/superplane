@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import OwnerSetup from "./OwnerSetup";
@@ -50,7 +51,11 @@ describe("OwnerSetup", () => {
       }),
     );
 
-    render(<OwnerSetup />);
+    render(
+      <MemoryRouter>
+        <OwnerSetup />
+      </MemoryRouter>,
+    );
 
     fireEvent.change(screen.getByPlaceholderText("First name"), { target: { value: "Ada" } });
     fireEvent.change(screen.getByPlaceholderText("Last name"), { target: { value: "Lovelace" } });
