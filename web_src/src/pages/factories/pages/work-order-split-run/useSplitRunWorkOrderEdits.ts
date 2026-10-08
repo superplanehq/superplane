@@ -172,7 +172,6 @@ export function useSplitRunWorkOrderEdits(args: {
         } else {
           setOwner(previousOwner);
         }
-        showSuccessToast("Owner updated.");
       } catch (error) {
         setAssigneeIds(previousIds);
         setOwner(previousOwner);
