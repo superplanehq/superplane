@@ -277,8 +277,8 @@ func loadMissingWorkOrderCreators(db *gorm.DB, orders []*models.FactoryWorkOrder
 		return nil
 	}
 
-	var users []models.User
-	if err := db.Unscoped().Where("id IN ?", ids).Find(&users).Error; err != nil {
+	users, err := models.FindUnscopedUsersByIDs(db, ids)
+	if err != nil {
 		return err
 	}
 	byID := make(map[uuid.UUID]*models.User, len(users))
