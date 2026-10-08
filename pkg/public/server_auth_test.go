@@ -141,6 +141,18 @@ func Test__GetAccount(t *testing.T) {
 		server.Router.ServeHTTP(response, req)
 		assert.Equal(t, http.StatusOK, response.Code)
 	})
+
+	t.Run("canceled request -> client closed", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		req, _ := http.NewRequest(http.MethodGet, "/account", nil)
+		req = req.WithContext(ctx)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, req)
+		assert.Equal(t, statusClientClosedRequest, response.Code)
+		assert.Empty(t, response.Body.String())
+	})
 }
 
 func Test__ListAccountOrganizations(t *testing.T) {
