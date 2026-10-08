@@ -47,7 +47,7 @@ describe("useColumnCanvasAgentEditor", () => {
     expect(result.current.draft?.title).toBe("Refine Task");
   });
 
-  it("shows the visual evidence setting only for line implementation", () => {
+  it("does not show the visual evidence setting for Implement", () => {
     hookState.canvas.current = agentCanvas;
 
     const { result, rerender } = renderHook(({ appId }) => useColumnCanvasAgentEditor("organization-1", appId), {
@@ -55,7 +55,7 @@ describe("useColumnCanvasAgentEditor", () => {
       wrapper: createWrapper(),
     });
 
-    expect(result.current.showVisualEvidenceSetting).toBe(true);
+    expect(result.current.showVisualEvidenceSetting).toBe(false);
     hookState.canvas.current = backlogCanvas;
     rerender({ appId: "backlog" });
     expect(result.current.showVisualEvidenceSetting).toBe(false);
