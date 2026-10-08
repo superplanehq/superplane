@@ -39,6 +39,8 @@ type AnalysisHeaderEdits = {
   saveTitle: (next: string) => void;
   owner: WorkOrderSplitRunPopupProps["fixture"]["owner"];
   assigneeIds: string[];
+  ownerBusy: boolean;
+  saveOwner: (assigneeIds: string[]) => Promise<void>;
 };
 
 export function AnalysisPopupHeader({

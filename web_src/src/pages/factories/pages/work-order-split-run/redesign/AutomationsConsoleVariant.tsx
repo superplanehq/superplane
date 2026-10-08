@@ -9,7 +9,6 @@ import {
 } from "@/components/reui/timeline";
 import { Badge } from "@/components/reui/badge";
 import { cn } from "@/lib/utils";
-import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { Check, Circle, Clock, LoaderCircle, X } from "lucide-react";
 import { type ReactNode } from "react";
 
@@ -57,6 +56,11 @@ type AutomationsConsoleVariantProps = {
   canEditDescription?: boolean;
   descriptionBusy?: boolean;
   onDescriptionSave?: (next: string) => void | Promise<void>;
+  owner?: SplitRunFixture["owner"];
+  assigneeIds?: string[];
+  canEditOwner?: boolean;
+  ownerBusy?: boolean;
+  onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
   source?: SplitRunSource;
   files?: FilesFile[];
   /** Pull requests tracked on this task, for the summary panel. */
@@ -71,11 +75,6 @@ type AutomationsConsoleVariantProps = {
   onStopRun?: (run: { appId: string; runId: string }) => void;
   /** Reruns a failed line step. The card footer Retry uses this. */
   onRerunStep?: (phase: SplitRunPhase) => void;
-  assigneeIds?: string[];
-  owner?: OrgUserDisplay;
-  canEditOwner?: boolean;
-  ownerBusy?: boolean;
-  onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
 };
 
 export function AutomationsConsoleVariant({
@@ -89,6 +88,11 @@ export function AutomationsConsoleVariant({
   canEditDescription = false,
   descriptionBusy = false,
   onDescriptionSave,
+  owner,
+  assigneeIds,
+  canEditOwner = false,
+  ownerBusy = false,
+  onOwnerSave,
   source,
   files,
   pullRequests,
@@ -98,11 +102,6 @@ export function AutomationsConsoleVariant({
   actionBusy = false,
   onStopRun,
   onRerunStep,
-  assigneeIds,
-  owner,
-  canEditOwner = false,
-  ownerBusy = false,
-  onOwnerSave,
 }: AutomationsConsoleVariantProps) {
   const outcome = outcomeSummary(fixture);
   const groups = stagesFromFixture(fixture);

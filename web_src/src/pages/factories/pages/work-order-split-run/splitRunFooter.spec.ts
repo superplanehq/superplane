@@ -147,11 +147,11 @@ describe("buildSplitRunFooter", () => {
   it("keeps no close actions on a running order", () => {
     const footer = buildSplitRunFooter({
       kind: "running",
-      note: { key: "running-step", headline: "Implement is running", text: "The log shows live progress." },
+      note: { key: "running-step", headline: "Implementation in progress", text: "The log shows live progress." },
     });
 
     expect(footer.sentence).toBe("This task is running.");
-    expect(footer.note?.headline).toBe("Implement is running");
+    expect(footer.note?.headline).toBe("Implementation in progress");
     expect(footer.run).toBeUndefined();
     expect(footer.actions).toEqual([]);
     expect(splitRunCloseNeedsConfirm("running")).toBe(true);

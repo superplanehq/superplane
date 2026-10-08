@@ -137,7 +137,7 @@ export function ConsoleSummaryPanel({
           </FramePanel>
         ) : null}
         <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-context">
-          <SummaryRow label="Owner">
+          <SummaryRow label="Owner" truncate={false}>
             <OwnerSummaryValue
               organizationId={organizationId}
               assigneeIds={shownAssigneeIds}
@@ -147,7 +147,7 @@ export function ConsoleSummaryPanel({
               onOwnerSave={onOwnerSave}
             />
           </SummaryRow>
-          <PanelSource source={source} owner={shownOwner.id} />
+          <PanelSource source={source} ownerId={displayedOwnerId(shownOwner, shownAssigneeIds)} />
           <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
           {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
           <SummaryRow label="Spend">
@@ -277,8 +277,8 @@ function ConsoleLiveNote({
   const note = footer.kind === "running" ? footer.note : undefined;
   // The automation name, as on the card. A stage name can be an activity title.
   const stageName = stage ? stage.componentName.trim() || stage.name : undefined;
-  const headline = note?.headline ?? (stageName ? `${stageName} is running` : "An automation is running");
-  const text = note?.text ?? "The log shows live progress.";
+  const headline = note?.headline ?? (stageName ? `${stageName} in progress` : "Automation in progress");
+  const text = note?.text ?? "View the log for live progress.";
   return (
     <FramePanel
       className="border-[color:var(--status-running-border)] bg-[color:var(--status-running-bg)] py-3"
@@ -335,15 +335,22 @@ function isBranchArtifact(artifact: FactoriesWorkOrderArtifact): boolean {
   return (artifact.type ?? "").replace(/^TYPE_/i, "").toLowerCase() === "branch";
 }
 
+function displayedOwnerId(owner: SplitRunFixture["owner"], assigneeIds?: string[]): string | undefined {
+  if (assigneeIds !== undefined && assigneeIds.length === 0) {
+    return undefined;
+  }
+  return owner.id || undefined;
+}
+
 /**
  * The source of the task. A task the owner created by hand keeps one
  * "Created manually" row instead of repeating the owner's name.
  */
-function PanelSource({ source, owner }: { source?: SplitRunSource; owner: string }) {
+function PanelSource({ source, ownerId }: { source?: SplitRunSource; ownerId?: string }) {
   if (!source) {
     return null;
   }
-  if (source.kind === "manual" && source.person.id === owner) {
+  if (source.kind === "manual" && ownerId && source.person.id === ownerId) {
     return <SummaryRow label="Source">{source.detail}</SummaryRow>;
   }
   return (
@@ -425,11 +432,18 @@ function OwnerSummaryValue({
   );
 }
 
-function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
+function SummaryRow({ label, children, truncate = true }: { label: string; children: ReactNode; truncate?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-[13px]">
       <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate text-right text-foreground tabular-nums">{children}</span>
+      <span
+        className={cn(
+          "min-w-0 max-w-full text-right text-foreground",
+          truncate ? "truncate tabular-nums" : "flex justify-end overflow-x-hidden",
+        )}
+      >
+        {children}
+      </span>
     </div>
   );
 }

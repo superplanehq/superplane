@@ -175,6 +175,11 @@ export function SplitRunPopupTabs({
           canEditDescription={edits.canEditDescription}
           descriptionBusy={edits.descriptionBusy}
           onDescriptionSave={edits.saveDescription}
+          owner={edits.owner}
+          assigneeIds={edits.assigneeIds}
+          canEditOwner={edits.canEdit}
+          ownerBusy={edits.ownerBusy}
+          onOwnerSave={edits.saveOwner}
           source={fixture.source}
           files={files}
           pullRequests={popupData.pullRequests}
