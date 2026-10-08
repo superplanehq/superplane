@@ -247,7 +247,7 @@ func loadWorkOrderAssigneeUsers(db *gorm.DB, orders ...*models.FactoryWorkOrder)
 	}
 
 	var assignees []models.FactoryWorkOrderAssignee
-	if err := db.Preload("User").Where("work_order_id IN ?", ids).Find(&assignees).Error; err != nil {
+	if err := db.Preload("User", models.PreloadRemovedMember).Where("work_order_id IN ?", ids).Find(&assignees).Error; err != nil {
 		return err
 	}
 	for i := range assignees {
@@ -256,6 +256,40 @@ func loadWorkOrderAssigneeUsers(db *gorm.DB, orders ...*models.FactoryWorkOrder)
 			continue
 		}
 		order.Assignees = append(order.Assignees, assignees[i])
+	}
+	return loadMissingWorkOrderCreators(db, orders)
+}
+
+func loadMissingWorkOrderCreators(db *gorm.DB, orders []*models.FactoryWorkOrder) error {
+	ids := make([]uuid.UUID, 0)
+	seen := make(map[uuid.UUID]struct{})
+	for _, order := range orders {
+		if order == nil || order.CreatedBy != nil || order.CreatedByID == nil {
+			continue
+		}
+		if _, ok := seen[*order.CreatedByID]; ok {
+			continue
+		}
+		seen[*order.CreatedByID] = struct{}{}
+		ids = append(ids, *order.CreatedByID)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	users, err := models.FindUnscopedUsersByIDs(db, ids)
+	if err != nil {
+		return err
+	}
+	byID := make(map[uuid.UUID]*models.User, len(users))
+	for i := range users {
+		byID[users[i].ID] = &users[i]
+	}
+	for _, order := range orders {
+		if order == nil || order.CreatedBy != nil || order.CreatedByID == nil {
+			continue
+		}
+		order.CreatedBy = byID[*order.CreatedByID]
 	}
 	return nil
 }
