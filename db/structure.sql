@@ -690,6 +690,8 @@ CREATE TABLE public.factory_velocity_repository_merges (
     merged_at timestamp with time zone NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    provider text DEFAULT 'github'::text NOT NULL,
+    author_uuid text DEFAULT ''::text NOT NULL,
     CONSTRAINT factory_velocity_repository_merges_number_positive CHECK ((number > 0)),
     CONSTRAINT factory_velocity_repository_merges_source_valid CHECK ((source = ANY (ARRAY['people'::text, 'agent'::text])))
 );
@@ -3516,17 +3518,17 @@ CREATE INDEX idx_factory_pull_requests_work_order ON public.factory_pull_request
 
 
 --
+-- Name: idx_factory_velocity_merges_factory_provider_repo_num; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_velocity_merges_factory_provider_repo_num ON public.factory_velocity_repository_merges USING btree (factory_id, provider, repository, number);
+
+
+--
 -- Name: idx_factory_velocity_repository_merges_factory_merged_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_factory_velocity_repository_merges_factory_merged_at ON public.factory_velocity_repository_merges USING btree (factory_id, merged_at DESC);
-
-
---
--- Name: idx_factory_velocity_repository_merges_factory_repo_number; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_factory_velocity_repository_merges_factory_repo_number ON public.factory_velocity_repository_merges USING btree (factory_id, repository, number);
 
 
 --
@@ -5627,7 +5629,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261008140950	f
+20261008223314	f
 \.
 
 
