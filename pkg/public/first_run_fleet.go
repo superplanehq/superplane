@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -39,6 +40,24 @@ func (s *Server) adminPrepareFleetManager(w http.ResponseWriter, r *http.Request
 		http.Error(w, "failed to load owner organization", http.StatusInternalServerError)
 		return
 	}
+
+	baseURL := strings.TrimRight(strings.TrimSpace(s.BaseURL), "/")
+	if baseURL == "" {
+		baseURL = strings.TrimRight(strings.TrimSpace(r.Header.Get("X-Forwarded-Host")), "/")
+	}
+	if baseURL == "" {
+		baseURL = "http://localhost:8000"
+	}
+
+	if strings.TrimSpace(os.Getenv("APP_ENV")) == "development" {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(firstRunFleetManagerResponse{
+			FleetID: fleet.Slug,
+			YAML:    fleets.FirstRunManagerYAML(baseURL, ""),
+		})
+		return
+	}
+
 	user, err := models.FindActiveHumanUserByAccountAndOrganization(db, organizations[0].ID, account.ID)
 	if err != nil {
 		http.Error(w, "failed to load owner user", http.StatusInternalServerError)
@@ -54,14 +73,6 @@ func (s *Server) adminPrepareFleetManager(w http.ResponseWriter, r *http.Request
 	if err := models.CreateUserAPIToken(db, token); err != nil {
 		http.Error(w, "failed to create Fleet Manager token", http.StatusInternalServerError)
 		return
-	}
-
-	baseURL := strings.TrimRight(strings.TrimSpace(s.BaseURL), "/")
-	if baseURL == "" {
-		baseURL = strings.TrimRight(strings.TrimSpace(r.Header.Get("X-Forwarded-Host")), "/")
-	}
-	if baseURL == "" {
-		baseURL = "http://localhost:8000"
 	}
 
 	w.Header().Set("Content-Type", "application/json")

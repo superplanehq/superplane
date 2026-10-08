@@ -2,6 +2,7 @@ package fleets
 
 import (
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -11,11 +12,19 @@ func FirstRunFleetID() string {
 	return firstRunFleetID
 }
 
+func developmentAppEnv() bool {
+	return strings.TrimSpace(os.Getenv("APP_ENV")) == "development"
+}
+
 // FirstRunManagerYAML is the Fleet Manager configuration an operator pastes
-// after owner setup. Azure and Packer values stay placeholders until that
-// stack supplies a ConfigMap.
+// after owner setup. Development omits the self-host AWS placeholders because
+// local Compose already runs Docker Fleet Manager with its own token.
 func FirstRunManagerYAML(superplaneURL, token string) string {
 	superplaneURL = strings.TrimRight(strings.TrimSpace(superplaneURL), "/")
+	if developmentAppEnv() {
+		return firstRunDevManagerYAML(superplaneURL)
+	}
+
 	token = strings.TrimSpace(token)
 	return fmt.Sprintf(`id: self-host
 superplaneUrl: %s
@@ -38,4 +47,18 @@ fleets:
       keyName: ""
       volumeSizeGb: 30
 `, superplaneURL, token, firstRunFleetID)
+}
+
+func firstRunDevManagerYAML(superplaneURL string) string {
+	return fmt.Sprintf(`id: local
+superplaneUrl: %s
+fleets:
+  - id: %s
+    provider: docker
+    maxCapacity: 10
+    docker:
+      image: superplane-runner-local:dev
+      architecture: amd64
+      runnerApiUrl: %s
+`, superplaneURL, firstRunFleetID, superplaneURL)
 }

@@ -13,6 +13,7 @@ import (
 )
 
 func TestAdminPrepareFleetManager(t *testing.T) {
+	t.Setenv("APP_ENV", "")
 	server, r, token := setupAdminTestServer(t)
 	server.BaseURL = "https://superplane.example"
 
@@ -37,4 +38,24 @@ func TestAdminPrepareFleetManager(t *testing.T) {
 	tokens, err := models.ListUserAPITokens(database.DB(t.Context()), r.User)
 	require.NoError(t, err)
 	require.NotEmpty(t, tokens)
+}
+
+func TestAdminPrepareFleetManagerOmitsTokenInDevelopment(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	server, _, token := setupAdminTestServer(t)
+	server.BaseURL = "http://app:8000"
+
+	response := execRequest(server, requestParams{
+		method:     http.MethodPost,
+		path:       "/admin/api/installation/first-run/fleet-manager",
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, response.Code)
+
+	var body firstRunFleetManagerResponse
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	assert.Equal(t, fleets.FirstRunFleetID(), body.FleetID)
+	assert.Empty(t, body.Token)
+	assert.Contains(t, body.YAML, "provider: docker")
+	assert.NotContains(t, body.YAML, "installationAdminToken")
 }
