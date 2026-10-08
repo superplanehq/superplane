@@ -30,7 +30,6 @@ const bitbucketOnboarding = vi.hoisted(() => ({
   identity: undefined as { login?: string; providerUserId?: string } | undefined,
   repositories: [] as Array<{ fullName?: string }>,
   installedWorkspaces: [] as Array<{ slug?: string }>,
-  installUrl: "",
   isPending: false,
   error: null as unknown,
 }));
@@ -60,7 +59,6 @@ vi.mock("./useBitbucketOnboarding", () => ({
           identity: bitbucketOnboarding.identity,
           repositories: bitbucketOnboarding.repositories,
           installedWorkspaces: bitbucketOnboarding.installedWorkspaces,
-          installUrl: bitbucketOnboarding.installUrl,
         }
       : undefined,
     isPending: bitbucketOnboarding.isPending,
@@ -199,7 +197,6 @@ describe("FirstRunSetup Bitbucket", () => {
     bitbucketOnboarding.identity = undefined;
     bitbucketOnboarding.repositories = [];
     bitbucketOnboarding.installedWorkspaces = [];
-    bitbucketOnboarding.installUrl = "";
     bitbucketOnboarding.isPending = false;
     bitbucketOnboarding.error = null;
     experimental.enabled = new Set([FEATURE_FACTORY_BITBUCKET]);
@@ -215,7 +212,6 @@ describe("FirstRunSetup Bitbucket", () => {
         <FirstRunBitbucketForgeScreen
           phase="choose"
           connectHref=""
-          installUrl=""
           repositories={["acme-team/api", "other-team/web"]}
           installedWorkspaces={["empty-team"]}
           selectedRepository={repository}
@@ -251,7 +247,6 @@ describe("FirstRunSetup Bitbucket", () => {
       <FirstRunBitbucketForgeScreen
         phase="choose"
         connectHref=""
-        installUrl=""
         repositories={["acme-team/api"]}
         selectedRepository="acme-team/api"
         onGrantAccess={onGrantAccess}
@@ -264,6 +259,27 @@ describe("FirstRunSetup Bitbucket", () => {
 
     expect(onGrantAccess).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("option", { name: /acme-team\/api/ })).toBeInTheDocument();
+    expect(screen.getByText("You need write access to a repository to see it here.")).toBeInTheDocument();
+    expect(screen.getByText("Do not see your repository?")).toBeInTheDocument();
+  });
+
+  it("shows the workspace hint with a subtle install link before a workspace is chosen", async () => {
+    render(
+      <FirstRunBitbucketForgeScreen
+        phase="choose"
+        connectHref=""
+        repositories={["acme-team/api"]}
+        installedWorkspaces={["acme-team"]}
+        selectedRepository={null}
+        onGrantAccess={vi.fn()}
+        onSelectRepository={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("You need write access to at least one repository in a workspace.")).toBeInTheDocument();
+    expect(screen.getByText("Do not see your Bitbucket workspace?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Install on another workspace" })).toHaveClass("underline");
   });
 
   it("keeps Bitbucket unavailable until the organization enables it", async () => {
@@ -344,14 +360,9 @@ describe("FirstRunSetup Bitbucket", () => {
     await chooseBitbucket(user);
 
     expect(screen.getByRole("status")).toHaveTextContent("SuperPlane checks automatically for installed workspaces.");
-    expect(
-      screen.getByText("Already installed? Open Apps → SuperPlane in the workspace, then return here."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Confirm the installation in Bitbucket")).toBeInTheDocument();
-    expect(screen.getByText("Open Apps → SuperPlane in that workspace.")).toBeInTheDocument();
-    expect(
-      screen.queryByText("A workspace admin must install SuperPlane on the Bitbucket workspace."),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Choose a Bitbucket workspace" })).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-github-stepper")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-bitbucket-waiting")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-bitbucket-install")).toBeEnabled();
 
@@ -376,7 +387,6 @@ describe("FirstRunSetup Bitbucket", () => {
       <FirstRunBitbucketForgeScreen
         phase="grant"
         connectHref=""
-        installUrl="https://bitbucket.org/install"
         repositories={[]}
         installedWorkspaces={[]}
         selectedRepository={null}
@@ -394,12 +404,33 @@ describe("FirstRunSetup Bitbucket", () => {
     expect(onRetryLookup).toHaveBeenCalledTimes(1);
   });
 
+  it("makes the Bitbucket wait obvious once the installation starts", async () => {
+    render(
+      <FirstRunBitbucketForgeScreen
+        phase="grant"
+        connectHref=""
+        repositories={[]}
+        installedWorkspaces={[]}
+        selectedRepository={null}
+        attemptActive
+        chrome={{ stepIndex: 2, onBack: vi.fn() }}
+        onGrantAccess={vi.fn()}
+        onSelectRepository={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("first-run-bitbucket-waiting")).toHaveTextContent("Checking for the new workspace…");
+    expect(screen.getByTestId("first-run-bitbucket-waiting")).toHaveTextContent(
+      "This page updates automatically when Bitbucket confirms the installation.",
+    );
+  });
+
   it("shows the checking status while a second installation is in flight", async () => {
     render(
       <FirstRunBitbucketForgeScreen
         phase="choose"
         connectHref=""
-        installUrl=""
         repositories={["acme-team/api"]}
         selectedRepository="acme-team/api"
         attemptActive
