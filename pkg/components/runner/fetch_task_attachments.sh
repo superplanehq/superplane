@@ -57,6 +57,8 @@ for item in manifest.get("files") or []:
     if not url or not dest_name or "/" in dest_name or dest_name in (".", ".."):
         print(f"invalid attachment dest {dest_name!r}", file=sys.stderr)
         sys.exit(1)
+    if (item.get("kind") or "").strip() == "hosted_video":
+        continue
     dest = os.path.join(attachments, dest_name)
     expected_size = int(item.get("size_bytes") or 0)
     expected_checksum = (item.get("checksum") or "").strip().lower()

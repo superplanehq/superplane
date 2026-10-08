@@ -628,6 +628,9 @@ function maybePrepareAttachments(files, helpers) {
 }
 
 function attachmentKind(file) {
+  if (file && file.kind === "hosted_video") {
+    return "hosted_video";
+  }
   const type = String((file && file.content_type) || "").split(";")[0].trim().toLowerCase();
   if (type.startsWith("audio/")) {
     return "audio";
@@ -700,7 +703,7 @@ function mergeManifestFiles(taskDir, incoming) {
     files.some(
       (file) =>
         file.status === "pending" ||
-        ((file.kind === "video" || file.kind === "audio") &&
+        ((file.kind === "video" || file.kind === "audio" || file.kind === "hosted_video") &&
           (file.status === "downloaded" || file.status === "partial")),
     );
   return { manifest, needsPreparation };

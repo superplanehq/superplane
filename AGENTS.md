@@ -115,7 +115,7 @@ runner API and Docker Fleet Manager. Set `TASK_BROKER_*` in `.env` only while
 testing legacy or remote broker routing (see `.env.example`).
 
 The local worker image includes Claude Code, Codex, OpenCode, git, `gh`,
-`jq`, ffmpeg, ffprobe, whisper-cli, and the Whisper tiny model. Factory
+`jq`, ffmpeg, ffprobe, whisper-cli, yt-dlp, and the Whisper tiny model. Factory
 line apps run on that worker. Do not install those CLIs on the host.
 Connect GitHub and Claude integrations in the organization before you
 dispatch a factory line. Factory nodes use those integrations, not `.env`
@@ -123,7 +123,7 @@ dispatch a factory line. Factory nodes use those integrations, not `.env`
 dev.server`. OpenCode must be on the runner `PATH` for Run OpenRouter Agent.
 SuperPlane does not download OpenCode in the prompt prepare step.
 Video and audio task files need ffmpeg, ffprobe, whisper-cli, and the baked
-Whisper model. Missing media tools fail the setup step. Do not download
+Whisper model. Hosted video links also need the pinned yt-dlp. Missing media tools fail the setup step. Do not download
 models during a task.
 
 Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`
