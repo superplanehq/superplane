@@ -1,3 +1,6 @@
+{{- if and (or .Values.runner.api.enabled (eq (include "runner.workers.enabled" .) "true")) (eq .Values.blobStorage.provider "filesystem") }}
+{{- fail "runner.api and runner.workers need blobStorage.provider set to a shared store such as gcs or s3. filesystem is a pod-local directory, so runner pods cannot read the same blobs as the API." }}
+{{- end }}
 {{- if .Values.runner.api.enabled }}
 apiVersion: v1
 kind: Service
@@ -49,6 +52,10 @@ spec:
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.database.local.enabled }}
+      initContainers:
+        {{- include "superplane.migrateWaitContainer" . | nindent 8 }}
       {{- end }}
       containers:
         - name: {{ .Release.Name }}-runner-api

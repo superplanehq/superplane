@@ -100,10 +100,11 @@ metadata:
   name: http-redirect-proxy
   namespace: {{ .Release.Namespace }}
 spec:
-  # HTTP-01 (Let's Encrypt) needs port 80. A 308 here makes the
-  # ACME challenge return 404 after redirect and the cert never issues.
+  # cert-manager HTTP-01 uses port 80. FrontendConfig cannot exclude
+  # one path, so that type keeps the load balancer redirect off and the
+  # API redirects other HTTP requests. Other certificate types redirect here.
   redirectToHttps:
-    enabled: false
+    enabled: {{ ne $ssl.type "cert-manager" }}
 {{- end }}
 {{- if and .Values.ingress.enabled (eq .Values.ingress.className "gce") }}
 ---

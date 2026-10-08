@@ -47,6 +47,10 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.database.local.enabled }}
+      initContainers:
+        {{- include "superplane.migrateWaitContainer" . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Release.Name }}-api
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -128,6 +132,10 @@ spec:
 {{- end }}
             - name: ENABLE_PASSWORD_LOGIN
               value: {{ ternary "yes" "no" .Values.authentication.enablePasswordLogin | quote }}
+            {{- if and .Values.ingress.ssl.enabled (eq .Values.ingress.className "gce") (eq .Values.ingress.ssl.type "cert-manager") }}
+            - name: REDIRECT_HTTP_REQUESTS
+              value: "yes"
+            {{- end }}
             - name: OWNER_SETUP_ENABLED
 {{- if .Values.api.ownerSetupEnabled }}
               value: "yes"

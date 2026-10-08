@@ -1723,13 +1723,18 @@ func (s *Server) Serve(host string, port int) error {
 	log.Info("Starting WebSocket hub")
 	s.wsHub.Run()
 
+	handler := http.Handler(s.Router)
+	if os.Getenv("REDIRECT_HTTP_REQUESTS") == "yes" {
+		handler = middleware.RedirectInsecureForwardedHTTP(handler)
+	}
+
 	s.httpServer = &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       15 * time.Minute,
 		WriteTimeout:      15 * time.Minute,
 		IdleTimeout:       60 * time.Second,
-		Handler:           s.Router,
+		Handler:           handler,
 	}
 
 	return s.httpServer.ListenAndServe()

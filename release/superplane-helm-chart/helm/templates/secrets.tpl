@@ -189,3 +189,52 @@
 {{- define "secrets.feedback.name" }}
 {{- printf "%s-feedback" .Release.Name }}
 {{- end }}
+
+{{- define "superplane.migrateWaitContainer" -}}
+- name: wait-for-migrate
+  image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+  imagePullPolicy: {{ .Values.image.pullPolicy }}
+  command: ["bash", "-c"]
+  args:
+    - |
+      set -euo pipefail
+      if [ "${POSTGRES_DB_SSL:-}" = "true" ]; then
+        export PGSSLMODE=require
+      else
+        export PGSSLMODE=disable
+      fi
+      latest_schema=$(ls /app/db/migrations/*.up.sql | sed 's#.*/##' | cut -d_ -f1 | sort -n | tail -1)
+      latest_data=""
+      if ls /app/db/data_migrations/*.up.sql >/dev/null 2>&1; then
+        latest_data=$(ls /app/db/data_migrations/*.up.sql | sed 's#.*/##' | cut -d_ -f1 | sort -n | tail -1)
+      fi
+      echo "Waiting for schema ${latest_schema}"
+      for _ in $(seq 1 90); do
+        schema=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME" -d "$DB_NAME" -tAc "SELECT version FROM schema_migrations WHERE dirty = false ORDER BY version DESC LIMIT 1" 2>/dev/null || true)
+        schema=$(printf '%s' "$schema" | tr -d '[:space:]')
+        if [ "$schema" != "$latest_schema" ]; then
+          sleep 5
+          continue
+        fi
+        if [ -z "$latest_data" ]; then
+          exit 0
+        fi
+        data=$(PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME" -d "$DB_NAME" -tAc "SELECT version FROM data_migrations WHERE dirty = false ORDER BY version DESC LIMIT 1" 2>/dev/null || true)
+        data=$(printf '%s' "$data" | tr -d '[:space:]')
+        if [ "$data" = "$latest_data" ]; then
+          exit 0
+        fi
+        sleep 5
+      done
+      echo "Timed out waiting for migrations"
+      exit 1
+  envFrom:
+    - secretRef:
+        name: {{ include "secrets.database.name" . }}
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    capabilities:
+      drop: ["ALL"]
+{{- end }}
