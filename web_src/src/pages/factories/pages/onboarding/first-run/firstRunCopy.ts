@@ -61,6 +61,10 @@ export const FIRST_RUN_COPY = {
     signedInAs: (login: string) => `You are signed in to GitHub as ${login}.`,
     connectGitHub: "Connect GitHub",
     connectAction: "Connect GitHub",
+    createAppAction: "Create GitHub App",
+    createAppBody:
+      "This installation has no GitHub App yet. Create a public GitHub App, then connect your GitHub account.",
+    creatingGitHubApp: "Opening GitHub…",
     stepOrganization: "Choose organization",
     stepOrganizationDone: (organization: string) => `Organization: ${organization}`,
     stepRepository: "Choose repository",

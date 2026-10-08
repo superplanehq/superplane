@@ -1,11 +1,7 @@
 import { useConsumeIntegrationSetupReturnOnArrival } from "@/hooks/useConsumeIntegrationSetupReturnOnArrival";
-import { Loader2 } from "lucide-react";
 
 import { useFactoriesLayout, type ResolvedFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { FirstRunSetup } from "./FirstRunSetup";
-import { FirstRunShell } from "./first-run/FirstRunShell";
-import { GithubAppRequiredNotice } from "./GithubAppRequiredNotice";
-import { useGithubAppAvailability } from "./useGithubAppAvailability";
 import { useOnboardingEntryPath } from "./useOnboardingEntryPath";
 import { useOnboardingPageModel } from "./useOnboardingPageModel";
 import { useOnboardingWorkspaceResolution } from "./useOnboardingWorkspaceResolution";
@@ -19,28 +15,12 @@ function WorkspaceOnboardingPage({ layout }: { layout: ResolvedFactoriesLayout }
   const onboardingEntryPath = useOnboardingEntryPath();
   const reresolveWorkspace = useOnboardingWorkspaceResolution();
   useConsumeIntegrationSetupReturnOnArrival(layout.organizationId);
-  const githubApp = useGithubAppAvailability(layout.organizationId);
   const model = useOnboardingPageModel({
     ...layout,
     factoryKey: layout.routeSegment,
     onboardingEntryPath,
     reresolveWorkspace,
   });
-
-  if (!githubApp.resolved) {
-    return (
-      <FirstRunShell testId="workspace-setup-loading" busy visual="preview">
-        <p className="inline-flex items-center gap-2 text-[13px] text-muted-foreground" role="status">
-          <Loader2 className="size-4 animate-spin" aria-hidden />
-          Checking GitHub setup…
-        </p>
-      </FirstRunShell>
-    );
-  }
-
-  if (githubApp.resolved && !githubApp.failed && !githubApp.available) {
-    return <GithubAppRequiredNotice />;
-  }
 
   if (!model.canConfigureWorkspace) {
     return (
