@@ -44,7 +44,7 @@ export function FirstRunBitbucketForgeScreen(props: FirstRunBitbucketForgeScreen
 
 function BitbucketLoadingScreen({ chrome, sphere }: FirstRunBitbucketForgeScreenProps) {
   return (
-    <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere}>
+    <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere} visual="preview">
       <p className="text-[13px] text-muted-foreground" role="status">
         {copy.loading}
       </p>
@@ -59,7 +59,7 @@ function BitbucketLookupFailedScreen({
   onRetryLookup = () => undefined,
 }: FirstRunBitbucketForgeScreenProps) {
   return (
-    <FirstRunShell testId="first-run-bitbucket-lookup-failed" chrome={chrome} sphere={sphere}>
+    <FirstRunShell testId="first-run-bitbucket-lookup-failed" chrome={chrome} sphere={sphere} visual="preview">
       <FirstRunHeading headline={copy.connectHeadline}>
         <p className="text-[13px] text-destructive">{copy.lookupFailed}</p>
       </FirstRunHeading>
@@ -80,7 +80,7 @@ function BitbucketLookupFailedScreen({
 
 function BitbucketConnectScreen({ connectHref, chrome, sphere }: FirstRunBitbucketForgeScreenProps) {
   return (
-    <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere}>
+    <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere} visual="preview">
       <FirstRunHeading headline={copy.connectHeadline}>
         <p className="text-[15px] leading-6 text-muted-foreground">{copy.connectAccountBody}</p>
       </FirstRunHeading>
@@ -106,7 +106,7 @@ function BitbucketGrantScreen({
   retrying = false,
 }: FirstRunBitbucketForgeScreenProps) {
   return (
-    <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={granting}>
+    <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={granting} visual="preview">
       <FirstRunHeading headline={copy.connectHeadline}>
         <p className="text-[15px] leading-6 text-muted-foreground">{copy.grantBody}</p>
       </FirstRunHeading>
@@ -158,6 +158,7 @@ function BitbucketChooseRepositoryScreen({
       busy={saving}
       contentSpacing="compact"
       sphere={sphere}
+      visual="preview"
     >
       <FirstRunHeading headline={chooseCopy.headline}>
         <p className="text-[13px] text-muted-foreground">{copy.repositoryHelper}</p>

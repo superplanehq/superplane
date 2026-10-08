@@ -285,6 +285,36 @@ describe("FirstRunSetup Bitbucket", () => {
     expect(bitbucketOnboarding.refetch).toHaveBeenCalled();
   });
 
+  it.each(["loading", "lookup failed", "connect", "grant", "choose"])(
+    "keeps the %s controls separate from the Bitbucket animation",
+    async (state) => {
+      bitbucketOnboarding.providerConfigured = true;
+      if (state === "loading") {
+        bitbucketOnboarding.loaded = false;
+        bitbucketOnboarding.isPending = true;
+      }
+      if (state === "lookup failed") {
+        bitbucketOnboarding.loaded = false;
+        bitbucketOnboarding.error = new Error("network error");
+      }
+      if (state === "grant" || state === "choose") {
+        bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+      }
+      if (state === "choose") {
+        bitbucketOnboarding.repositories = [{ fullName: "acme-team/api" }];
+      }
+      const user = userEvent.setup();
+      renderSetup(new Set());
+
+      await chooseBitbucket(user);
+
+      const artStage = screen.getByTestId("first-run-art-stage");
+      expect(artStage).toContainElement(screen.getByTestId("first-run-art-pane"));
+      expect(artStage).not.toContainElement(screen.getByTestId("first-run-content"));
+      expect(screen.getByTestId("first-run-back")).toBeEnabled();
+    },
+  );
+
   it("offers a retry instead of the access token setup when the Bitbucket lookup fails", async () => {
     bitbucketOnboarding.loaded = false;
     bitbucketOnboarding.error = new Error("network error");
