@@ -26,8 +26,8 @@ func Test__FactoryVelocityRepositoryMerge__ReplaceIsIdempotent(t *testing.T) {
 	merge := models.NewFactoryVelocityRepositoryMerge(r.Organization.ID, factory.ID, "Example/Repo", 7, models.FactoryVelocityMergeSourcePeople, now.Add(-time.Hour))
 	merge.AuthorLogin = "octocat"
 
-	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factory.ID, from, to, []models.FactoryVelocityRepositoryMerge{merge}))
-	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factory.ID, from, to, []models.FactoryVelocityRepositoryMerge{merge}))
+	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factory.ID, models.ProviderGitHub, from, to, []models.FactoryVelocityRepositoryMerge{merge}))
+	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factory.ID, models.ProviderGitHub, from, to, []models.FactoryVelocityRepositoryMerge{merge}))
 
 	stored, err := models.ListFactoryVelocityRepositoryMerges(db, factory.ID, from, to)
 	require.NoError(t, err)
@@ -48,14 +48,14 @@ func Test__FactoryVelocityRepositoryMerge__ReplaceOnlyTouchesItsWindow(t *testin
 	old := models.NewFactoryVelocityRepositoryMerge(r.Organization.ID, factory.ID, "example/repo", 1, models.FactoryVelocityMergeSourcePeople, now.Add(-30*24*time.Hour))
 	old.AuthorLogin = "octocat"
 	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(
-		db, factory.ID, now.Add(-60*24*time.Hour), now, []models.FactoryVelocityRepositoryMerge{old},
+		db, factory.ID, models.ProviderGitHub, now.Add(-60*24*time.Hour), now, []models.FactoryVelocityRepositoryMerge{old},
 	))
 
 	// A later sync recomputes only the last two days, and must leave history alone.
 	recent := models.NewFactoryVelocityRepositoryMerge(r.Organization.ID, factory.ID, "example/repo", 2, models.FactoryVelocityMergeSourcePeople, now.Add(-time.Hour))
 	recent.AuthorLogin = "hubber"
 	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(
-		db, factory.ID, now.Add(-48*time.Hour), now.Add(time.Hour), []models.FactoryVelocityRepositoryMerge{recent},
+		db, factory.ID, models.ProviderGitHub, now.Add(-48*time.Hour), now.Add(time.Hour), []models.FactoryVelocityRepositoryMerge{recent},
 	))
 
 	stored, err := models.ListFactoryVelocityRepositoryMerges(db, factory.ID, now.Add(-60*24*time.Hour), now.Add(time.Hour))
@@ -78,10 +78,10 @@ func Test__FactoryVelocityRepositoryMerge__ReplaceDropsMergesThatBecameSuperPlan
 
 	merge := models.NewFactoryVelocityRepositoryMerge(r.Organization.ID, factory.ID, "example/repo", 9, models.FactoryVelocityMergeSourcePeople, now.Add(-time.Hour))
 	merge.AuthorLogin = "octocat"
-	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factory.ID, from, to, []models.FactoryVelocityRepositoryMerge{merge}))
+	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factory.ID, models.ProviderGitHub, from, to, []models.FactoryVelocityRepositoryMerge{merge}))
 
 	// The next sync recognizes the pull request as SuperPlane's and omits it.
-	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factory.ID, from, to, nil))
+	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factory.ID, models.ProviderGitHub, from, to, nil))
 
 	stored, err := models.ListFactoryVelocityRepositoryMerges(db, factory.ID, from, to)
 	require.NoError(t, err)
@@ -136,8 +136,8 @@ func Test__ListFactoryVelocityRepositoryMerges__ScopesToFactory(t *testing.T) {
 	theirs := models.NewFactoryVelocityRepositoryMerge(r.Organization.ID, second.ID, "example/repo", 1, models.FactoryVelocityMergeSourcePeople, now.Add(-time.Hour))
 	theirs.AuthorLogin = "hubber"
 
-	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, first.ID, from, to, []models.FactoryVelocityRepositoryMerge{mine}))
-	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, second.ID, from, to, []models.FactoryVelocityRepositoryMerge{theirs}))
+	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, first.ID, models.ProviderGitHub, from, to, []models.FactoryVelocityRepositoryMerge{mine}))
+	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, second.ID, models.ProviderGitHub, from, to, []models.FactoryVelocityRepositoryMerge{theirs}))
 
 	stored, err := models.ListFactoryVelocityRepositoryMerges(db, first.ID, from, to)
 	require.NoError(t, err)
@@ -156,7 +156,7 @@ func Test__DeleteFactoryVelocityRepositoryMerges(t *testing.T) {
 	merge := models.NewFactoryVelocityRepositoryMerge(r.Organization.ID, factory.ID, "example/repo", 1, models.FactoryVelocityMergeSourcePeople, now.Add(-time.Hour))
 	merge.AuthorLogin = "octocat"
 	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(
-		db, factory.ID, now.Add(-48*time.Hour), now.Add(time.Hour), []models.FactoryVelocityRepositoryMerge{merge},
+		db, factory.ID, models.ProviderGitHub, now.Add(-48*time.Hour), now.Add(time.Hour), []models.FactoryVelocityRepositoryMerge{merge},
 	))
 
 	require.NoError(t, models.DeleteFactoryVelocityRepositoryMerges(db, factory.ID))
