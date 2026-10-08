@@ -416,6 +416,76 @@ func TestLoadDockerProviderDoesNotRequireAWSConfiguration(t *testing.T) {
 	}
 }
 
+func TestLoadAppliesAzureDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
+	body := `{
+		"id":"fleet-manager",
+		"superplaneUrl":"https://superplane.example",
+		"installationAdminToken":"personal-token",
+		"runnerReleaseBaseUrl":"https://downloads.example/runner/",
+		"fleets":[{
+			"id":"linux-amd64",
+			"provider":"azure",
+			"azure":{
+				"subscriptionId":"00000000-0000-0000-0000-000000000000",
+				"resourceGroup":"superplane-runners",
+				"location":"eastus",
+				"imageId":"/galleries/runners/images/superplane-runner-amd64/versions/1.0.0",
+				"architecture":"amd64",
+				"subnetId":"/subnets/runners",
+				"networkSecurityGroupId":"/nsgs/runners",
+				"identityId":"/identities/runner",
+				"zones":["1","2"]
+			}
+		}]
+	}`
+	config, err := Load(writeConfig(t, body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Fleets[0].Azure.VMSize != defaultAzureVMSize ||
+		config.Fleets[0].Azure.DiskSizeGB != defaultVolumeSizeGB {
+		t.Fatalf("defaults were not applied: %#v", config.Fleets[0].Azure)
+	}
+	if config.Fleets[0].Provider != ProviderAzure {
+		t.Fatalf("provider = %q", config.Fleets[0].Provider)
+	}
+	mutable := strings.Replace(
+		body,
+		"https://downloads.example/runner/",
+		"https://downloads.example/runner/latest/",
+		1,
+	)
+	if _, err := Load(writeConfig(t, mutable)); err == nil {
+		t.Fatal("expected mutable artifact URL to fail")
+	}
+}
+
+func TestLoadRejectsAzureFleetWithoutZones(t *testing.T) {
+	_, err := Load(writeConfig(t, `{
+		"id":"fleet-manager",
+		"superplaneUrl":"https://superplane.example",
+		"installationAdminToken":"personal-token",
+		"runnerReleaseBaseUrl":"https://downloads.example/runner",
+		"fleets":[{
+			"id":"linux-amd64",
+			"provider":"azure",
+			"azure":{
+				"subscriptionId":"00000000-0000-0000-0000-000000000000",
+				"resourceGroup":"superplane-runners",
+				"location":"eastus",
+				"imageId":"/galleries/runners/images/runner/versions/1.0.0",
+				"architecture":"amd64",
+				"subnetId":"/subnets/runners",
+				"networkSecurityGroupId":"/nsgs/runners",
+				"identityId":"/identities/runner"
+			}
+		}]
+	}`))
+	if err == nil || !strings.Contains(err.Error(), "azure.zones must not be empty") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func validDockerConfig(extra string) string {
 	return `{
 		"id":"fleet-manager",

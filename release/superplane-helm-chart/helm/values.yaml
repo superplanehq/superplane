@@ -272,19 +272,27 @@ rabbitmq:
 #
 # Platform blob storage. Self-host defaults to a local directory.
 # Hosted SuperPlane sets provider to gcs and a bucket name.
+# Azure self-host sets provider to azure and account to the storage account name.
 #
 blobStorage:
   provider: filesystem
+  account: ""
   bucket: ""
   region: ""
   localPath: /var/lib/superplane/blobs
   credentialsFile: ""
 
 #
+# Extra labels for pods that use a workload identity.
+# AKS requires azure.workload.identity/use: "true".
+#
+podLabels: {}
+
+#
 # Runner API and runner workers. Off by default.
 # The runner API serves /runner/v1. Runner workers compact finished task
 # logs into blob storage and remove stale runners.
-# Set blobStorage.provider to gcs or s3 before you enable the runner.
+# Set blobStorage.provider to gcs, s3, or azure before you enable the runner.
 # filesystem is local to one pod, so the runner cannot share those blobs.
 # Omit runner.workers.enabled to follow runner.api.enabled.
 # Active logs are a shared filesystem. Leave existingClaim empty to create
@@ -311,7 +319,8 @@ runner:
 # Put the Fleet Manager configuration in an existing secret, under the key
 # fleet-manager.yaml. See pkg/fleets/README.md for the format.
 # Set serviceAccount.annotations to bind a cloud identity, for example
-# iam.gke.io/gcp-service-account for GKE Workload Identity.
+# iam.gke.io/gcp-service-account for GKE Workload Identity or
+# azure.workload.identity/client-id for AKS.
 #
 fleetManager:
   enabled: false
@@ -328,6 +337,7 @@ fleetManager:
   # Fleet Manager reads its configuration once at start. Change an annotation,
   # for example a checksum of the configuration, to restart it.
   podAnnotations: {}
+  podLabels: {}
   resources:
     limits:
       cpu: 100m

@@ -39,6 +39,9 @@ spec:
       labels:
         app: superplane
         service: {{ .Release.Name }}-api
+        {{- with .Values.podLabels }}
+        {{- include "superplane.podLabels" . | nindent 8 }}
+        {{- end }}
     spec:
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
@@ -150,6 +153,8 @@ spec:
               value: {{ .Values.installation.type | quote }}
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
+            - name: BLOB_STORAGE_ACCOUNT
+              value: {{ .Values.blobStorage.account | quote }}
             - name: BLOB_STORAGE_BUCKET
               value: {{ .Values.blobStorage.bucket | quote }}
             - name: BLOB_STORAGE_REGION
