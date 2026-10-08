@@ -27,6 +27,7 @@ func TestReconcileFactoryRepositoryPublishesManagedRunnerCredentials(t *testing.
 	}{
 		{"line-implementation", models.ProviderBitbucket, implementationAgentNodeID, orderRepositoryExpression},
 		{"risk-score", models.ProviderGitHub, "assess-risk", "new-workspace/api"},
+		{"visual-evidence", models.ProviderGitHub, "capture-visual-evidence", "new-workspace/api"},
 	} {
 		t.Run(testCase.templateID, func(t *testing.T) {
 			r := support.Setup(t)
