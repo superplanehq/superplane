@@ -127,11 +127,13 @@ export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
 }
 
 /**
- * Draft tasks. A draft that already ran on a line still belongs
- * here. Newest updated drafts come first.
+ * Draft tasks. A draft that already ran on a line still belongs here.
+ * Order follows the caller's list (the backlog ListWorkOrders page).
+ * Do not re-sort by updated_at here — assignee saves bump updated_at and
+ * would jump cards on every render.
  */
 export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
-  return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
+  return workOrders.filter(isLineBacklogOrder);
 }
 
 /**
