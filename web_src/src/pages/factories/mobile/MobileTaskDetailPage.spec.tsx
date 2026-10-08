@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
@@ -434,17 +434,14 @@ describe("MobileTaskDetailPage owner", () => {
     renderRunning();
 
     await user.click(screen.getByTestId("popup-edit-owner"));
-    const reviewer = screen.getAllByRole("listitem").find((item) => item.textContent?.includes("Casey Reviewer"));
-    if (!reviewer) {
-      throw new Error("Could not find Casey Reviewer");
-    }
-    await user.click(within(reviewer).getByRole("checkbox"));
-    await user.click(screen.getByTestId("work-order-save-assignees"));
+    await user.click(screen.getByRole("option", { name: "Casey Reviewer" }));
 
-    expect(updateAssignees).toHaveBeenCalledWith({
-      orderId: RUNNING_WORK_ORDER.id,
-      assigneeIds: ["user-1"],
-    });
+    await waitFor(() =>
+      expect(updateAssignees).toHaveBeenCalledWith({
+        orderId: RUNNING_WORK_ORDER.id,
+        assigneeIds: ["user-1"],
+      }),
+    );
     expect(screen.getByRole("button", { name: "Owner: Casey Reviewer" })).toBeInTheDocument();
   });
 
