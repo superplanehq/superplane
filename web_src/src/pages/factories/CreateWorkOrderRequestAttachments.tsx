@@ -2,6 +2,7 @@ import { Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { Button } from "@/components/ui/button";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { HostedVideoEmbed } from "@/pages/app/HostedVideoEmbed";
 
@@ -105,28 +106,31 @@ function AttachmentTile({
 
   return (
     <div className="group relative size-14 shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-50 dark:border-gray-700 dark:bg-gray-900">
-      <button
+      <Button
         type="button"
-        className="block size-full cursor-pointer border-0 bg-transparent p-0"
+        variant="ghost"
+        className="relative block size-full h-auto cursor-pointer rounded-none border-0 bg-transparent p-0 shadow-none hover:bg-transparent dark:hover:bg-transparent"
         aria-label={`${CREATE_WORK_ORDER_REQUEST_COPY.openImage}: ${label}`}
         data-testid={`create-work-order-request-attachment-${image.id}`}
         onClick={onOpen}
       >
         <AttachmentTileMedia image={image} />
-      </button>
+      </Button>
       {onRemove ? (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           aria-label={`Remove ${label}`}
           data-testid={`create-work-order-request-tile-remove-${image.id}`}
-          className="absolute top-0.5 right-0.5 flex size-4 items-center justify-center rounded-full bg-slate-900/70 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+          className="absolute top-0.5 right-0.5 z-10 size-4 rounded-full bg-slate-900/70 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-slate-900/70 hover:text-white focus-visible:opacity-100 dark:bg-slate-900/70 dark:text-white dark:hover:bg-slate-900/70 dark:hover:text-white"
           onClick={(event) => {
             event.stopPropagation();
             onRemove(image.id);
           }}
         >
           <X className="size-3" aria-hidden />
-        </button>
+        </Button>
       ) : null}
     </div>
   );
@@ -137,9 +141,30 @@ function AttachmentTileMedia({ image }: { image: CreateWorkOrderRequestImage }) 
     return <AttachmentTypeLabel label={attachmentTypeLabel(image)} />;
   }
   if (image.isVideo) {
-    return <video src={image.src} muted playsInline className="pointer-events-none size-full object-cover" />;
+    return <VideoAttachmentPreview src={image.src} />;
   }
   return <img src={image.src} alt="" className="pointer-events-none size-full object-cover" />;
+}
+
+function VideoAttachmentPreview({ src }: { src: string }) {
+  const [frameReady, setFrameReady] = useState(false);
+
+  return (
+    <>
+      <video
+        src={src}
+        muted
+        playsInline
+        preload="auto"
+        className={
+          frameReady ? "pointer-events-none size-full object-cover" : "pointer-events-none absolute size-0 opacity-0"
+        }
+        onLoadedData={() => setFrameReady(true)}
+        onError={() => setFrameReady(false)}
+      />
+      {frameReady ? null : <AttachmentTypeLabel label="Video" />}
+    </>
+  );
 }
 
 function attachmentTypeLabel(image: CreateWorkOrderRequestImage): string {

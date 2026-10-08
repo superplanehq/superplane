@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
@@ -125,5 +125,25 @@ describe("CreateWorkOrderRequestAttachments", () => {
       "src",
       "https://cdn.example.com/demo.mp4",
     );
+  });
+
+  it("keeps a Video label until a frame loads and after a load error", () => {
+    renderAttachments([
+      { id: "mov", alt: "Screen recording", src: "https://cdn.example.com/clip.mov", isVideo: true },
+      { id: "mp4", alt: "Demo", src: "https://cdn.example.com/demo.mp4", isVideo: true },
+    ]);
+
+    const mov = screen.getByTestId("create-work-order-request-attachment-mov");
+    const mp4 = screen.getByTestId("create-work-order-request-attachment-mp4");
+    expect(mov).toHaveTextContent("Video");
+    expect(mp4).toHaveTextContent("Video");
+
+    fireEvent.error(mov.querySelector("video")!);
+    fireEvent.loadedData(mp4.querySelector("video")!);
+
+    expect(mov).toHaveTextContent("Video");
+    expect(mp4).not.toHaveTextContent("Video");
+    expect(mov.querySelector("video")).toHaveAttribute("src", "https://cdn.example.com/clip.mov");
+    expect(mp4.querySelector("video")).toHaveAttribute("src", "https://cdn.example.com/demo.mp4");
   });
 });
