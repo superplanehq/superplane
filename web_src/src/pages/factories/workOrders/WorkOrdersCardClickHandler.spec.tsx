@@ -154,14 +154,25 @@ describe("WorkOrdersBoardView layout", () => {
     expect(within(row).getByText(formatRelative(new Date(entry.updatedAtMs)))).toBeInTheDocument();
     const owner = within(row).getByTestId(`work-order-row-assignees-${entry.id}`);
     expect(owner).toBeInTheDocument();
-    expect(within(owner).getByText("Ada")).toBeInTheDocument();
-    expect(within(row).queryByRole("button", { name: "Change owner" })).not.toBeInTheDocument();
-    expect(effectivePointerEvents(owner)).toBe("none");
+    expect(within(row).queryByText("Ada")).not.toBeInTheDocument();
+    expect(within(row).getByTestId(`work-order-card-title-trailing-${entry.id}`)).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Owner: Ada Lovelace" })).toBeInTheDocument();
+    expect(effectivePointerEvents(owner)).toBe("auto");
     expect(within(row).queryByText(entry.displayKey)).not.toBeInTheDocument();
     expect(within(row).queryByText(/verify/i)).not.toBeInTheDocument();
   });
 
-  it("puts the update time on the left and the first name with the avatar on the right", () => {
+  it("opens the people list from the owner without opening the task", async () => {
+    const user = userEvent.setup();
+    const { router, row } = renderView(WorkOrdersBoardView);
+
+    await user.click(within(row).getByRole("button", { name: "Owner: Ada Lovelace" }));
+
+    expect(router.state.location.pathname).toBe("/");
+    expect(screen.getByPlaceholderText("Search people")).toBeInTheDocument();
+  });
+
+  it("puts the update time on the left and the owner avatar in the top-right corner", () => {
     const createdAt = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
     const updatedAt = new Date(Date.now() - 60 * 60 * 1000);
     const createdLabel = formatRelative(createdAt);
@@ -191,14 +202,13 @@ describe("WorkOrdersBoardView layout", () => {
 
     const { row } = renderView(WorkOrdersBoardView, [recent]);
     const time = within(row).getByText(updatedLabel);
-    const owner = within(row).getByTestId(`work-order-row-assignees-${recent.id}`);
+    const titleTrailing = within(row).getByTestId(`work-order-card-title-trailing-${recent.id}`);
 
     expect(within(row).queryByText(createdLabel)).not.toBeInTheDocument();
     expect(time).toHaveAttribute("title", `Updated ${updatedAt.toLocaleString()}`);
-    expect(within(owner).getByText("Ada")).toBeInTheDocument();
-    expect(time.compareDocumentPosition(owner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(row).queryByText("Ada")).not.toBeInTheDocument();
+    expect(titleTrailing.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(time.parentElement?.className).not.toMatch(/ml-auto/);
-    expect(owner.parentElement?.className).toMatch(/ml-auto/);
   });
 
   it("shows an em dash when the task has no update time", () => {
@@ -266,7 +276,8 @@ describe("WorkOrdersBoardView layout", () => {
     expect(title.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(chip.compareDocumentPosition(time) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(time.parentElement).not.toContainElement(chip);
-    expect(within(owner).getByText("Arnold")).toBeInTheDocument();
+    expect(within(row).queryByText("Arnold")).not.toBeInTheDocument();
+    expect(within(row).getByTestId(`work-order-card-title-trailing-${waiting.id}`)).toBeInTheDocument();
   });
 
   it("does not render a Start button on a draft backlog card", () => {
@@ -290,7 +301,59 @@ describe("WorkOrdersBoardView layout", () => {
 
     expect(within(row).queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
     expect(within(row).queryByTestId("work-order-card-start-wo-draft")).not.toBeInTheDocument();
-    expect(within(row).queryByTestId("work-order-row-assignees-wo-draft")).not.toBeInTheDocument();
+    expect(within(row).getByTestId("empty-owner-mark")).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Assign owner" })).toBeInTheDocument();
+  });
+
+  it("shows the owner avatar on a draft that already has an owner", () => {
+    const draft = buildWorkOrderListEntry(
+      {
+        id: "wo-draft-owned",
+        number: "7",
+        title: "Draft with owner",
+        state: "STATE_DRAFT",
+        createdAt: "2024-06-01T00:00:00Z",
+        updatedAt: "2024-06-02T00:00:00Z",
+        lineDispatches: [],
+        assignees: [{ id: "user-1", name: "Ada Lovelace" }],
+      },
+      factory,
+    );
+
+    const { row } = renderView(WorkOrdersBoardView, [draft]);
+
+    expect(within(row).getByTestId(`work-order-card-title-trailing-${draft.id}`)).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Owner: Ada Lovelace" })).toBeInTheDocument();
+    expect(within(row).queryByTestId("empty-owner-mark")).not.toBeInTheDocument();
+  });
+
+  it("shows a dashed owner icon when the task has no owner", () => {
+    const unassigned = buildWorkOrderListEntry(
+      {
+        id: "wo-unassigned",
+        number: "12",
+        title: "Refund batch with no owner",
+        state: "STATE_OPEN",
+        createdAt: "2024-06-01T00:00:00Z",
+        updatedAt: "2024-06-02T00:00:00Z",
+        lineDispatches: [
+          {
+            id: "dispatch-1",
+            line: { id: "line-a", name: "hotfix" },
+            state: "STATE_ACTIVE",
+            stepExecutions: [{ id: "e1", step: "verify", state: "STATE_STARTED" }],
+          },
+        ],
+        assignees: [],
+      },
+      factory,
+    );
+
+    const { row } = renderView(WorkOrdersBoardView, [unassigned]);
+    const owner = within(row).getByTestId("work-order-row-assignees-wo-unassigned");
+
+    expect(within(owner).getByTestId("empty-owner-mark")).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Assign owner" })).toBeInTheDocument();
   });
 });
 
@@ -317,12 +380,17 @@ describe.each(views)("$name click handling", ({ Component }) => {
 });
 
 describe.each(viewsWithAssignee)("$name assignee control", ({ Component }) => {
-  it("shows the owner without a change control", () => {
-    const { row } = renderView(Component);
+  it("opens the people list from the owner without opening the task", async () => {
+    const user = userEvent.setup();
+    const { router, row } = renderView(Component);
 
-    expect(within(row).getByTestId(`work-order-row-assignees-${entry.id}`)).toBeInTheDocument();
-    expect(within(row).queryByRole("button", { name: "Change owner" })).not.toBeInTheDocument();
-    expect(effectivePointerEvents(within(row).getByTestId(`work-order-row-assignees-${entry.id}`))).toBe("none");
+    const owner = within(row).getByTestId(`work-order-row-assignees-${entry.id}`);
+    expect(effectivePointerEvents(owner)).toBe("auto");
+
+    await user.click(within(row).getByRole("button", { name: "Owner: Ada Lovelace" }));
+
+    expect(router.state.location.pathname).toBe("/");
+    expect(screen.getByPlaceholderText("Search people")).toBeInTheDocument();
   });
 });
 

@@ -9,6 +9,7 @@ import {
 } from "@/components/reui/timeline";
 import { Badge } from "@/components/reui/badge";
 import { cn } from "@/lib/utils";
+import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { Check, Circle, Clock, LoaderCircle, X } from "lucide-react";
 import { type ReactNode } from "react";
 
@@ -70,6 +71,11 @@ type AutomationsConsoleVariantProps = {
   onStopRun?: (run: { appId: string; runId: string }) => void;
   /** Reruns a failed line step. The card footer Retry uses this. */
   onRerunStep?: (phase: SplitRunPhase) => void;
+  assigneeIds?: string[];
+  owner?: OrgUserDisplay;
+  canEditOwner?: boolean;
+  ownerBusy?: boolean;
+  onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
 };
 
 export function AutomationsConsoleVariant({
@@ -92,6 +98,11 @@ export function AutomationsConsoleVariant({
   actionBusy = false,
   onStopRun,
   onRerunStep,
+  assigneeIds,
+  owner,
+  canEditOwner = false,
+  ownerBusy = false,
+  onOwnerSave,
 }: AutomationsConsoleVariantProps) {
   const outcome = outcomeSummary(fixture);
   const groups = stagesFromFixture(fixture);
@@ -102,7 +113,7 @@ export function AutomationsConsoleVariant({
   const anyLive = hasLiveAutomation(columns);
   const expandIdleCards = !anyLive && (fixture.lineStatus === "pending" || fixture.footerTone === "draft");
   const liveRun = liveRunTarget(fixture);
-  const stopLiveRun = canStopRun && onStopRun && liveRun ? () => onStopRun(liveRun) : undefined;
+  const stopLiveRun = liveRunStop(canStopRun, onStopRun, liveRun);
   const showIntake = Boolean(source) || Boolean(taskDescription?.trim()) || canEditDescription;
 
   return (
@@ -140,6 +151,12 @@ export function AutomationsConsoleVariant({
         source={source}
         actionBusy={actionBusy}
         onStopLiveRun={stopLiveRun}
+        organizationId={organizationId}
+        assigneeIds={assigneeIds}
+        owner={owner}
+        canEditOwner={canEditOwner}
+        ownerBusy={ownerBusy}
+        onOwnerSave={onOwnerSave}
       />
     </div>
   );
@@ -156,6 +173,17 @@ interface ConsoleColumn {
   id: ConsoleColumnId;
   title: string;
   automations: ConsoleAutomation[];
+}
+
+function liveRunStop(
+  canStopRun: boolean,
+  onStopRun: AutomationsConsoleVariantProps["onStopRun"],
+  liveRun: { appId: string; runId: string } | undefined,
+) {
+  if (!canStopRun || !onStopRun || !liveRun) {
+    return undefined;
+  }
+  return () => onStopRun(liveRun);
 }
 
 /**

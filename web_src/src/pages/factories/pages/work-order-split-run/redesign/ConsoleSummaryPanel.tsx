@@ -2,6 +2,7 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/r
 import { Frame, FrameDescription, FrameHeader, FramePanel, FrameTitle } from "@/components/reui/frame";
 import { Button } from "@/components/ui/button";
 import { overlayHeaderSpend } from "@/lib/overlayHeaderSpend";
+import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { safeExternalUrl } from "@/lib/safeExternalUrl";
 import { cn } from "@/lib/utils";
 import { type ReactNode } from "react";
@@ -16,7 +17,8 @@ import { splitRunDecisionTone } from "../splitRunFooter";
 import { attentionToneClassName } from "../splitRunNoteActionStyle";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
 import { pullRequestLabel } from "../../../lib/workOrderPullRequest";
-import { OrgUserReference } from "../../../OrgUserReference";
+import { OrgUserReference, EmptyOwnerMark } from "../../../OrgUserReference";
+import { OwnerAssignTrigger } from "../../../WorkOrderAssigneesPopover";
 import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
 import { WorkOrderMergeableChip, WorkOrderPullRequestChip } from "../../../workOrders/WorkOrderPullRequestChip";
 import { OwnerSpendValue } from "../../work-order-popup-redesign/popupShared";
@@ -36,17 +38,7 @@ import { StaticStatusGlyph } from "./redesignShared";
  * The strip under the status never goes blank: a decision when there is
  * one, the live run while an automation works, a waiting note otherwise.
  */
-export function ConsoleSummaryPanel({
-  fixture,
-  outcome,
-  stages,
-  pullRequests,
-  artifacts,
-  panelReview,
-  source,
-  actionBusy = false,
-  onStopLiveRun,
-}: {
+type ConsoleSummaryPanelProps = {
   fixture: SplitRunFixture;
   outcome: ReturnType<typeof outcomeSummary>;
   stages: AutomationStage[];
@@ -58,10 +50,36 @@ export function ConsoleSummaryPanel({
   actionBusy?: boolean;
   /** Cancels the live run. The live note shows Stop only when set. */
   onStopLiveRun?: () => void;
-}) {
+  organizationId?: string;
+  assigneeIds?: string[];
+  owner?: OrgUserDisplay;
+  canEditOwner?: boolean;
+  ownerBusy?: boolean;
+  onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
+};
+
+export function ConsoleSummaryPanel({
+  fixture,
+  outcome,
+  stages,
+  pullRequests,
+  artifacts,
+  panelReview,
+  source,
+  actionBusy = false,
+  onStopLiveRun,
+  organizationId,
+  assigneeIds,
+  owner,
+  canEditOwner = false,
+  ownerBusy = false,
+  onOwnerSave,
+}: ConsoleSummaryPanelProps) {
   const liveSpend = useLiveHeaderSpendOverlay();
   const spend = overlayHeaderSpend(outcome.spend, outcome.tokens, liveSpend);
   const panel = consolePanelFacts({ fixture, outcome, stages, pullRequests, artifacts, source, panelReview });
+  const shownOwner = owner ?? outcome.owner;
+  const shownAssigneeIds = assigneeIds ?? fixture.assigneeIds;
   return (
     <aside className="lg:sticky lg:top-0 lg:self-start" data-testid="redesign-console-summary">
       <Frame variant="default" spacing="sm" stacked className="[--frame-radius:var(--radius-lg)]">
@@ -120,9 +138,16 @@ export function ConsoleSummaryPanel({
         ) : null}
         <FramePanel className="flex flex-col gap-2 py-3" data-testid="redesign-console-context">
           <SummaryRow label="Owner">
-            <OrgUserReference display={outcome.owner} size="xs" nameClassName="text-[13px]" />
+            <OwnerSummaryValue
+              organizationId={organizationId}
+              assigneeIds={shownAssigneeIds}
+              owner={shownOwner}
+              canEditOwner={canEditOwner}
+              ownerBusy={ownerBusy}
+              onOwnerSave={onOwnerSave}
+            />
           </SummaryRow>
-          <PanelSource source={source} owner={outcome.owner.id} />
+          <PanelSource source={source} owner={shownOwner.id} />
           <SummaryRow label="Started">{outcome.startedLabel.replace(/^Started\s+/i, "")}</SummaryRow>
           {panel.duration ? <SummaryRow label="Duration">{panel.duration}</SummaryRow> : null}
           <SummaryRow label="Spend">
@@ -355,6 +380,48 @@ function PanelPullRequest({ pullRequest }: { pullRequest: FactoriesFactoryPullRe
         {workOrderCardPullRequestIsMergeable(pullRequest) ? <WorkOrderMergeableChip /> : null}
       </div>
     </div>
+  );
+}
+
+function OwnerSummaryValue({
+  organizationId,
+  assigneeIds,
+  owner,
+  canEditOwner,
+  ownerBusy,
+  onOwnerSave,
+}: {
+  organizationId?: string;
+  assigneeIds: string[] | undefined;
+  owner: OrgUserDisplay;
+  canEditOwner: boolean;
+  ownerBusy: boolean;
+  onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
+}) {
+  const mark =
+    assigneeIds === undefined || assigneeIds.length > 0 ? (
+      <OrgUserReference display={owner} size="xs" nameClassName="text-[13px]" />
+    ) : (
+      <EmptyOwnerMark />
+    );
+
+  if (!canEditOwner || !organizationId || !onOwnerSave) {
+    return mark;
+  }
+
+  return (
+    <OwnerAssignTrigger
+      organizationId={organizationId}
+      selectedIds={assigneeIds ?? []}
+      canAssign
+      isSaving={ownerBusy}
+      onSave={onOwnerSave}
+      align="end"
+      label={assigneeIds && assigneeIds.length > 0 ? `Owner: ${owner.name}` : "Assign owner"}
+      testId="task-edit-owner"
+    >
+      {mark}
+    </OwnerAssignTrigger>
   );
 }
 

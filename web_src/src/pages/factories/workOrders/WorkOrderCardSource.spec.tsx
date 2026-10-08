@@ -62,10 +62,8 @@ describe("WorkOrderCard source icon", () => {
     expect(icon).toHaveAttribute("target", "_blank");
     expect(icon).toHaveAttribute("rel", "noopener noreferrer");
     expect(icon).toHaveAttribute("aria-label", "GitHub issues acme/payments#12");
-    expect(icon).toHaveAttribute("data-slot", "button");
-    expect(icon).toHaveAttribute("data-size", "icon-xs");
-    expect(icon.className).toContain("size-6");
-    expect(icon.querySelector("img")?.className).toContain("size-3.5");
+    expect(icon.className).toContain("size-3.5");
+    expect(icon.querySelector("img")?.className).toContain("size-3");
   });
 
   it("shows the Jira icon for a Jira origin URL", () => {
@@ -168,7 +166,7 @@ describe("WorkOrderCard source icon", () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
-  it("places the source icon in the title row", () => {
+  it("places the source icon in the footer leading cluster", () => {
     renderCard({
       ...baseOrder,
       id: "wo-draft",
@@ -177,9 +175,11 @@ describe("WorkOrderCard source icon", () => {
     });
 
     const source = screen.getByTestId("work-order-card-source-wo-draft");
+    const footerLeading = screen.getByTestId("work-order-card-footer-leading-wo-draft");
     const title = screen.getByText("Ship refund retries");
     const titleRow = title.parentElement;
-    expect(titleRow).not.toBeNull();
-    expect(titleRow?.contains(source)).toBe(true);
+
+    expect(footerLeading.contains(source)).toBe(true);
+    expect(titleRow?.contains(source)).toBe(false);
   });
 });
