@@ -56,6 +56,11 @@ output "runner_active_logs_efs_access_point_id" {
   value       = aws_efs_access_point.runner_active_logs.id
 }
 
+output "blob_storage_bucket" {
+  description = "S3 bucket used for shared SuperPlane blobs"
+  value       = aws_s3_bucket.blobs.id
+}
+
 # -----------------------------------------------------------------------------
 # SuperPlane Outputs
 # -----------------------------------------------------------------------------
