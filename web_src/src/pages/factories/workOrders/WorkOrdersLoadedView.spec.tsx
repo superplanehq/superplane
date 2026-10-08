@@ -65,7 +65,7 @@ function listState(overrides: Partial<WorkOrderListState> = {}): WorkOrderListSt
   };
 }
 
-function renderView(state: WorkOrderListState) {
+function renderView(state: WorkOrderListState, workOrders: FactoriesWorkOrder[] = [closedOrder]) {
   render(
     <MemoryRouter>
       <WorkOrdersLoadedView
@@ -73,7 +73,7 @@ function renderView(state: WorkOrderListState) {
         factoryKey="RF"
         factory={factory}
         factoryLines={[]}
-        workOrders={[closedOrder]}
+        workOrders={workOrders}
         state={state}
         canCreate
         onCreateWorkOrder={vi.fn()}
@@ -104,5 +104,20 @@ describe("WorkOrdersLoadedView", () => {
 
     expect(screen.getByTestId("work-orders-filtered-empty-state")).toBeInTheDocument();
     expect(screen.queryByTestId("work-orders-scope-empty-state")).not.toBeInTheDocument();
+  });
+
+  it("names unassigned work when that scope has no tasks", () => {
+    experimentalFeatureHas.current = () => false;
+    renderView(
+      listState({
+        scope: "unassigned",
+        filters: EMPTY_WORK_ORDER_FILTERS,
+        filterCount: 0,
+        hasActiveFilters: false,
+      }),
+      [{ ...closedOrder, assignees: [{ id: "alex", name: "Alex" }] }],
+    );
+
+    expect(screen.getByText("Nothing in unassigned work")).toBeInTheDocument();
   });
 });
