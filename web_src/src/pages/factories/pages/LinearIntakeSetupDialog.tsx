@@ -46,26 +46,14 @@ export function LinearIntakeSetupDialog(props: LinearIntakeSetupDialogProps) {
         resourceStepCaption="Awaiting projects"
         stepAction={
           showConnectAction ? (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                disabled={setup.connecting}
-                onClick={() => void setup.connectLinear()}
-                data-testid="linear-setup-connect"
-              >
-                {setup.connecting ? LINEAR_INTAKE_SETUP_COPY.wizardConnecting : LINEAR_INTAKE_SETUP_COPY.wizardConnect}
-              </Button>
-              {setup.hosted ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setup.setConnectOpen(true)}
-                  data-testid="linear-setup-own-app"
-                >
-                  {LINEAR_INTAKE_SETUP_COPY.wizardOwnApp}
-                </Button>
-              ) : null}
-            </div>
+            <Button
+              type="button"
+              disabled={setup.connecting}
+              onClick={() => void setup.connectLinear()}
+              data-testid="linear-setup-connect"
+            >
+              {setup.connecting ? LINEAR_INTAKE_SETUP_COPY.wizardConnecting : LINEAR_INTAKE_SETUP_COPY.wizardConnect}
+            </Button>
           ) : undefined
         }
         footer={<SetupFooter setup={setup} onCreated={props.onCreated} />}
