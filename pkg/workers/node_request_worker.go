@@ -98,6 +98,10 @@ func (w *NodeRequestWorker) Start(ctx context.Context) {
 }
 
 func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeRequest) error {
+	if request.Type == models.NodeRequestTypeVisualEvidenceCapture {
+		return w.processVisualEvidenceCapture(request)
+	}
+
 	logger := w.logger.WithFields(log.Fields{"request": request.ID})
 
 	logger.Infof("Locking and processing request")
@@ -181,10 +185,34 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 			recorded.factoryID,
 			recorded.pullRequestID,
 		)
+		factoryactions.StartVisualEvidenceCapture(
+			context.Background(),
+			w.factoryIntakeDeps(),
+			recorded.organizationID,
+			recorded.factoryID,
+			recorded.pullRequestID,
+		)
 	}
 
 	runCancellations.Publish()
 
+	return nil
+}
+
+func (w *NodeRequestWorker) processVisualEvidenceCapture(request models.CanvasNodeRequest) error {
+	events, err := factoryactions.ProcessVisualEvidenceCaptureRequest(
+		context.Background(),
+		w.factoryIntakeDeps(),
+		request.ID,
+	)
+	if err != nil {
+		return err
+	}
+	for i := range events {
+		if err := messages.PublishCanvasEventCreatedMessage(&events[i]); err != nil {
+			w.logger.WithError(err).Warnf("visual evidence: failed to publish event %s", events[i].ID)
+		}
+	}
 	return nil
 }
 

@@ -318,6 +318,9 @@ func reconcileFactoryRepository(
 			case "risk-score":
 				managedRunnerNodeIDs["assess-risk"] = true
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
+			case "visual-evidence":
+				managedRunnerNodeIDs["capture-visual-evidence"] = true
+				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
 			}
 		}
 		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
@@ -392,6 +395,8 @@ func factoryTemplateVCSNodeIDs(templateID string) []string {
 		return []string{"on-issue-labeled", "on-issue-assigned"}
 	case "risk-score":
 		return []string{"on-pr-risk"}
+	case "visual-evidence":
+		return []string{"on-pr-visual-evidence", "comment-visual-evidence"}
 	default:
 		return nil
 	}

@@ -125,8 +125,12 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "risk-score"]);
-    for (const factoryId of ["pr-closure", "risk-score"]) {
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual([
+      "pr-closure",
+      "risk-score",
+      "visual-evidence",
+    ]);
+    for (const factoryId of ["pr-closure", "risk-score", "visual-evidence"]) {
       expect(installFactory).toHaveBeenCalledWith(
         expect.objectContaining({
           factoryId,
@@ -152,7 +156,7 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["risk-score"]);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["risk-score", "visual-evidence"]);
   });
 
   it("does not install pull request closure when it was renamed to PR Closure (2)", async () => {
@@ -167,7 +171,7 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["risk-score"]);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["risk-score", "visual-evidence"]);
   });
 
   it("does not install merge confidence when one is named Merge confidence", async () => {
@@ -182,7 +186,7 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure"]);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "visual-evidence"]);
   });
 
   it("does not install merge confidence when one is named Merge confidence (2)", async () => {
@@ -197,10 +201,40 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure"]);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "visual-evidence"]);
   });
 
-  it("installs both event apps next to an app with an unrelated name", async () => {
+  it("does not install visual evidence when one is named Visual Evidence", async () => {
+    const installFactory = installFactoryMock();
+    const listApps = vi.fn().mockResolvedValue([{ id: "app-1", name: "Visual Evidence" }]);
+
+    await provisionEventApps({
+      factoryId: "factory-1",
+      selections: {},
+      ...installParams,
+      installFactory,
+      listApps,
+    });
+
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "risk-score"]);
+  });
+
+  it("does not install visual evidence when one is named Visual Evidence (2)", async () => {
+    const installFactory = installFactoryMock();
+    const listApps = vi.fn().mockResolvedValue([{ id: "app-1", name: "Visual Evidence (2)" }]);
+
+    await provisionEventApps({
+      factoryId: "factory-1",
+      selections: {},
+      ...installParams,
+      installFactory,
+      listApps,
+    });
+
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "risk-score"]);
+  });
+
+  it("installs event apps next to an app with an unrelated name", async () => {
     const installFactory = installFactoryMock();
     const listApps = vi.fn().mockResolvedValue([{ id: "app-1", name: "Backlog" }]);
 
@@ -212,7 +246,11 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "risk-score"]);
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual([
+      "pr-closure",
+      "risk-score",
+      "visual-evidence",
+    ]);
   });
 
   it("installs neither event app for a Bitbucket workspace", async () => {
