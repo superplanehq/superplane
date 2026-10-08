@@ -2,6 +2,9 @@
   "name": "superplane-bitbucket",
   "private": true,
   "dependencies": {
-    "@forge/api": "^6.0.0"
+    "@forge/api": "^6.0.0",
+    "@forge/bridge": "^4.0.0",
+    "@forge/react": "^11.0.0",
+    "react": "^18.0.0"
   }
 }

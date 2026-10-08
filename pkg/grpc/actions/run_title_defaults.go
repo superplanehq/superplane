@@ -31,6 +31,8 @@ var defaultRunTitleExpressions = map[string]string{
 	"azure.onVirtualMachineRestarted":   "{{ root().data.subject }}",
 	"azure.onVirtualMachineStarted":     "{{ root().data.subject }}",
 	"azure.onVirtualMachineStopped":     "{{ root().data.subject }}",
+	"bitbucket.onPullRequest":           "#{{ root().data.pullrequest.id }} - {{ root().data.pullrequest.title }}",
+	"bitbucket.onPullRequestComment":    "#{{ root().data.pullrequest.id }} - {{ root().data.pullrequest.title }}",
 	"bitbucket.onPush":                  "{{ root().data.push.changes[0].new.name }}",
 	"circleci.onWorkflowCompleted":      "{{ root().data.workflow.name }}",
 

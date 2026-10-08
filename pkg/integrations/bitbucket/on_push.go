@@ -4,12 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/crypto"
 )
 
 type OnPush struct{}
@@ -141,30 +139,15 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 	//
 	// Verify the webhook signature.
 	//
-	signature := ctx.Headers.Get("X-Hub-Signature")
-	if signature == "" {
-		return http.StatusForbidden, nil, fmt.Errorf("missing X-Hub-Signature header")
-	}
-
-	signature = strings.TrimPrefix(signature, "sha256=")
-	if signature == "" {
-		return http.StatusForbidden, nil, fmt.Errorf("invalid signature format")
-	}
-
-	secret, err := ctx.Webhook.GetSecret()
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("error getting webhook secret")
-	}
-
-	if err := crypto.VerifySignature(secret, ctx.Body, signature); err != nil {
-		return http.StatusForbidden, nil, fmt.Errorf("invalid signature")
+	if code, err := verifyBitbucketSignature(ctx); err != nil {
+		return code, nil, err
 	}
 
 	//
 	// Parse the webhook payload.
 	//
 	data := map[string]any{}
-	err = json.Unmarshal(ctx.Body, &data)
+	err := json.Unmarshal(ctx.Body, &data)
 	if err != nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
@@ -176,6 +159,10 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 	err = mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if !payloadRepositoryMatchesTrigger(ctx, config.Repository) {
+		return http.StatusOK, nil, nil
 	}
 
 	ref := extractRef(data)
