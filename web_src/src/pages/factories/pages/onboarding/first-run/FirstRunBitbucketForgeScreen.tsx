@@ -102,8 +102,6 @@ function BitbucketGrantScreen({
   chrome,
   sphere,
   onGrantAccess,
-  onRetryLookup,
-  retrying = false,
 }: FirstRunBitbucketForgeScreenProps) {
   return (
     <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={granting} visual="preview">
@@ -115,9 +113,6 @@ function BitbucketGrantScreen({
           {copy.synchronizing}
         </p>
         <p className="text-[13px] text-muted-foreground">{copy.waitingForInstallation}</p>
-        <LoadingButton type="button" onClick={onRetryLookup} loading={retrying} loadingText={copy.retrying}>
-          {copy.checkAgain}
-        </LoadingButton>
         <p className="text-[13px] text-muted-foreground">{copy.installIfNeeded}</p>
         <LoadingButton
           type="button"

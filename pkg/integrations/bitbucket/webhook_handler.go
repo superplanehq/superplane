@@ -49,7 +49,34 @@ func (h *BitbucketWebhookHandler) CompareConfig(a, b any) (bool, error) {
 }
 
 func (h *BitbucketWebhookHandler) Merge(current, requested any) (any, bool, error) {
-	return current, false, nil
+	currentConfig := WebhookConfiguration{}
+	if err := mapstructure.Decode(current, &currentConfig); err != nil {
+		return nil, false, err
+	}
+	requestedConfig := WebhookConfiguration{}
+	if err := mapstructure.Decode(requested, &requestedConfig); err != nil {
+		return nil, false, err
+	}
+
+	// Webhooks are per repository. A different repository never merges.
+	if currentConfig.RepositorySlug != requestedConfig.RepositorySlug {
+		return current, false, nil
+	}
+
+	// ponytail: union event types so one repository webhook serves every
+	// trigger; re-provision replaces the Bitbucket webhook with the union
+	merged := WebhookConfiguration{
+		EventTypes:     slices.Clone(currentConfig.EventTypes),
+		RepositorySlug: currentConfig.RepositorySlug,
+	}
+	changed := false
+	for _, event := range requestedConfig.EventTypes {
+		if !slices.Contains(merged.EventTypes, event) {
+			merged.EventTypes = append(merged.EventTypes, event)
+			changed = true
+		}
+	}
+	return merged, changed, nil
 }
 
 func (h *BitbucketWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {

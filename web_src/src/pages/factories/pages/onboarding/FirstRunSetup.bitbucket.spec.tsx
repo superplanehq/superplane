@@ -168,7 +168,7 @@ function StatefulSetup({
 }
 
 function renderSetup(connected: Set<IntegrationId>, overrides: Partial<OnboardingPageModel> = {}) {
-  render(
+  return render(
     <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
       <StatefulSetup connected={connected} overrides={overrides} />
     </MemoryRouter>,
@@ -270,7 +270,7 @@ describe("FirstRunSetup Bitbucket", () => {
     bitbucketOnboarding.providerConfigured = true;
     bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
     const user = userEvent.setup();
-    renderSetup(new Set());
+    const { rerender } = renderSetup(new Set());
 
     await chooseBitbucket(user);
 
@@ -281,8 +281,19 @@ describe("FirstRunSetup Bitbucket", () => {
     expect(
       screen.queryByText("A workspace admin must install SuperPlane on the Bitbucket workspace."),
     ).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Check again" }));
-    expect(bitbucketOnboarding.refetch).toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-bitbucket-install")).toBeEnabled();
+
+    bitbucketOnboarding.installedWorkspaces = [{ slug: "acme-team" }];
+    bitbucketOnboarding.repositories = [{ fullName: "acme-team/api" }];
+    rerender(
+      <MemoryRouter initialEntries={["/org-1/workspaces/PAY/setup"]}>
+        <StatefulSetup connected={new Set()} overrides={{}} />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("option", { name: /acme-team\/api/ })).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-bitbucket-grant")).not.toBeInTheDocument();
   });
 
   it.each(["loading", "lookup failed", "connect", "grant", "choose"])(

@@ -32,6 +32,7 @@ type Repository struct {
 	FullName   string         `json:"full_name" mapstructure:"full_name"`
 	Slug       string         `json:"slug" mapstructure:"slug"`
 	Mainbranch *Branch        `json:"mainbranch,omitempty" mapstructure:"mainbranch,omitempty"`
+	Workspace  *Workspace     `json:"workspace,omitempty" mapstructure:"workspace,omitempty"`
 	Links      RepositoryLink `json:"links" mapstructure:"links"`
 }
 
@@ -72,6 +73,17 @@ func NewClient(authType string, httpContext core.HTTPContext, integration core.I
 		}
 		return &Client{
 			AuthType: AuthTypeWorkspaceAccessToken,
+			Token:    string(token),
+			HTTP:     httpContext,
+		}, nil
+
+	case AuthTypeRepositoryAccessToken:
+		token, err := integration.GetConfig("token")
+		if err != nil {
+			return nil, fmt.Errorf("error getting token config: %w", err)
+		}
+		return &Client{
+			AuthType: AuthTypeRepositoryAccessToken,
 			Token:    string(token),
 			HTTP:     httpContext,
 		}, nil
@@ -142,6 +154,20 @@ func (c *Client) GetWorkspace(workspaceSlug string) (*Workspace, error) {
 	}
 
 	return &workspace, nil
+}
+
+func (c *Client) GetRepository(repository string) (*Repository, error) {
+	path, err := repositoryPath(repository)
+	if err != nil {
+		return nil, err
+	}
+
+	var repo Repository
+	endpoint := fmt.Sprintf("%s/repositories/%s", baseURL, path)
+	if err := c.doJSON(http.MethodGet, endpoint, nil, http.StatusOK, &repo); err != nil {
+		return nil, err
+	}
+	return &repo, nil
 }
 
 func (c *Client) ListRepositories(workspace string) ([]Repository, error) {

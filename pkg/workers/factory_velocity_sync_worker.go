@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
@@ -19,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	bitbucketintegration "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -296,11 +298,20 @@ func (w *FactoryVelocitySyncWorker) listTargetMerges(
 	target models.FactoryVelocitySyncTarget,
 	from, to time.Time,
 ) ([]repositoryMerge, error) {
-	provider := vcs.Select(target.VCSProvider, &githubVelocity{
-		worker:         w,
-		organizationID: target.OrganizationID,
-		integrationID:  target.IntegrationID,
-	})
+	var provider vcs.Provider
+	if effectiveVelocityProvider(target) == models.ProviderBitbucket {
+		provider = &bitbucketVelocity{
+			worker:         w,
+			organizationID: target.OrganizationID,
+			integrationID:  target.IntegrationID,
+		}
+	} else {
+		provider = vcs.Select(target.VCSProvider, &githubVelocity{
+			worker:         w,
+			organizationID: target.OrganizationID,
+			integrationID:  target.IntegrationID,
+		})
+	}
 	merged, err := provider.ListMergedPullRequests(ctx, target.Repository, from, to)
 	if err != nil {
 		return nil, err
@@ -316,6 +327,7 @@ func repositoryMergesFromProvider(merged []vcs.MergedPullRequest) []repositoryMe
 			number:          merge.Number,
 			source:          merge.Source,
 			authorLogin:     merge.AuthorLogin,
+			authorUUID:      merge.AuthorUUID,
 			authorName:      merge.AuthorName,
 			authorAvatarURL: merge.AuthorAvatarURL,
 			mergedAt:        merge.MergedAt,
@@ -362,7 +374,7 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 		}
 
 		rows := repositoryMergeRows(target, merged, superplane)
-		return models.ReplaceFactoryVelocityRepositoryMerges(tx, target.FactoryID, from, windowEnd, rows)
+		return models.ReplaceFactoryVelocityRepositoryMerges(tx, target.FactoryID, effectiveVelocityProvider(target), from, windowEnd, rows)
 	})
 	if err != nil {
 		return fmt.Errorf("store repository merges: %w", err)
@@ -370,6 +382,14 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 
 	backfilledFrom := earliestBackfill(target, from, repositoryChanged)
 	return sync.RecordSuccess(database.Conn(), target.Repository, now, backfilledFrom)
+}
+
+// effectiveVelocityProvider normalizes the sync target host. Empty means GitHub.
+func effectiveVelocityProvider(target models.FactoryVelocitySyncTarget) string {
+	if strings.TrimSpace(target.VCSProvider) == "" {
+		return models.ProviderGitHub
+	}
+	return target.VCSProvider
 }
 
 // repositoryMergeRows keeps the merges SuperPlane did not open. Subtracting here
@@ -398,7 +418,9 @@ func repositoryMergeRows(
 			merge.source,
 			merge.mergedAt,
 		)
+		row.Provider = effectiveVelocityProvider(target)
 		row.AuthorLogin = merge.authorLogin
+		row.AuthorUUID = merge.authorUUID
 		row.AuthorName = merge.authorName
 		row.AuthorAvatarURL = merge.authorAvatarURL
 		rows = append(rows, row)
@@ -434,6 +456,43 @@ func (w *FactoryVelocitySyncWorker) githubClient(orgID, integrationID uuid.UUID)
 	client, err := common.NewClient(integrationCtx, w.registry.HTTPContext())
 	if err != nil {
 		return nil, fmt.Errorf("build GitHub client: %w", err)
+	}
+	return client, nil
+}
+
+func (w *FactoryVelocitySyncWorker) bitbucketClient(orgID, integrationID uuid.UUID) (*bitbucketintegration.Client, error) {
+	if w.registry == nil {
+		return nil, errors.New("integration registry is unavailable")
+	}
+
+	instance, err := models.FindIntegration(orgID, integrationID)
+	if err != nil {
+		return nil, fmt.Errorf("load integration: %w", err)
+	}
+	if instance.AppName != models.ProviderBitbucket {
+		return nil, fmt.Errorf("integration %s is not a Bitbucket integration", integrationID)
+	}
+	if instance.State != models.IntegrationStateReady {
+		return nil, fmt.Errorf("integration %s is not ready", integrationID)
+	}
+
+	metadata := bitbucketintegration.Metadata{}
+	if err := mapstructure.Decode(instance.Metadata.Data(), &metadata); err != nil {
+		return nil, fmt.Errorf("decode Bitbucket integration: %w", err)
+	}
+
+	integrationCtx := contexts.NewIntegrationContext(
+		database.Conn(),
+		nil,
+		instance,
+		w.encryptor,
+		w.registry,
+		nil,
+	)
+
+	client, err := bitbucketintegration.NewClient(metadata.AuthType, w.registry.HTTPContext(), integrationCtx)
+	if err != nil {
+		return nil, fmt.Errorf("build Bitbucket client: %w", err)
 	}
 	return client, nil
 }
@@ -489,6 +548,7 @@ type repositoryMerge struct {
 	number          int64
 	source          string
 	authorLogin     string
+	authorUUID      string
 	authorName      string
 	authorAvatarURL string
 	mergedAt        time.Time

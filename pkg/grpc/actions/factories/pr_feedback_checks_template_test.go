@@ -1,11 +1,13 @@
 package factories
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/expr-lang/expr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	goyaml "gopkg.in/yaml.v3"
 )
 
 func TestPrFeedbackChecksWaitingTitleExpression(t *testing.T) {
@@ -40,6 +42,75 @@ func TestPrFeedbackChecksRepairTitleExpression(t *testing.T) {
 		"Fixing failed checks on [3fc0c4c](https://github.com/acme/app/commit/3fc0c4c0123456789abcdef)",
 		evalRootDataExpression(t, templateExpressionSource(t, prFeedbackChecksRepairTitleExpression()), checksTitleData()),
 	)
+}
+
+func bitbucketChecksTitleData() map[string]any {
+	return map[string]any{
+		"repository": map[string]any{
+			"full_name": "acme/widgets",
+			"links": map[string]any{
+				"html": map[string]any{"href": "https://bitbucket.org/acme/widgets"},
+			},
+		},
+		"pull_request": map[string]any{
+			"head": map[string]any{
+				"sha": "3fc0c4c0123456789abcdef",
+			},
+		},
+	}
+}
+
+func TestPrFeedbackBitbucketTitleExpressions(t *testing.T) {
+	assert.Equal(
+		t,
+		"Waiting for builds on [3fc0c4c](https://bitbucket.org/acme/widgets/commits/3fc0c4c0123456789abcdef)",
+		evalRootDataExpression(t, templateExpressionSource(t, prFeedbackChecksWaitingTitleExpressionFor("bitbucket")), bitbucketChecksTitleData()),
+	)
+	assert.Equal(
+		t,
+		"Builds passed on [3fc0c4c](https://bitbucket.org/acme/widgets/commits/3fc0c4c0123456789abcdef)",
+		evalRootDataExpression(t, templateExpressionSource(t, prFeedbackChecksPassedTitleExpressionFor("bitbucket")), bitbucketChecksTitleData()),
+	)
+
+	fallback := bitbucketChecksTitleData()
+	delete(fallback["repository"].(map[string]any), "links")
+	assert.Equal(
+		t,
+		"Fixing failed builds on [3fc0c4c](https://bitbucket.org/acme/widgets/commits/3fc0c4c0123456789abcdef)",
+		evalRootDataExpression(t, templateExpressionSource(t, prFeedbackChecksRepairTitleExpressionFor("bitbucket")), fallback),
+	)
+}
+
+func TestBuildChecksPRFeedbackCanvasBitbucket(t *testing.T) {
+	canvas := buildChecksPRFeedbackCanvas(prFeedbackBuildRequest{
+		Repository:  "acme/widgets",
+		CheckNames:  []string{"build-a"},
+		VCSProvider: "bitbucket",
+		Agent: &intakeAgent{
+			Component: "runnerOpenRouter",
+			Model:     "anthropic/claude-sonnet-4-6",
+		},
+	})
+
+	trigger := findSpecNode(t, canvas, prFeedbackPullRequestTriggerNodeID)
+	assert.Equal(t, "bitbucket.onPullRequest", trigger.Component)
+	assert.Equal(t, []any{"created", "updated"}, trigger.Configuration["actions"])
+
+	wait := findSpecNode(t, canvas, prFeedbackWaitChecksNodeID)
+	assert.Equal(t, "bitbucket.waitForBuilds", wait.Component)
+	assert.Equal(t, []any{"build-a"}, wait.Configuration["buildKeys"])
+	_, hasCheckNames := wait.Configuration["checkNames"]
+	assert.False(t, hasCheckNames)
+
+	for _, node := range canvas.Spec.Nodes {
+		assert.NotContains(t, strings.ToLower(node.Component), "github")
+	}
+	encoded, err := goyaml.Marshal(canvas)
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), "GITHUB_TOKEN")
+	assert.NotContains(t, string(encoded), "github.com")
+	assert.Contains(t, string(encoded), "BITBUCKET_TOKEN")
+	assert.Contains(t, string(encoded), "api.bitbucket.org")
 }
 
 func TestPrFeedbackChecksPassedDescriptionExpression(t *testing.T) {

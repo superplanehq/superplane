@@ -9,6 +9,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Triggers
 
 <CardGrid>
+  <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to Bitbucket pull request events" />
+  <LinkCard title="On Pull Request Comment" href="#on-pull-request-comment" description="Listen to Bitbucket pull request comments" />
   <LinkCard title="On Push" href="#on-push" description="Listen to Bitbucket push events" />
 </CardGrid>
 
@@ -19,6 +21,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Pull Request Comment" href="#create-pull-request-comment" description="Add a comment to a Bitbucket pull request" />
   <LinkCard title="Find Pull Request" href="#find-pull-request" description="Find a pull request in a Bitbucket repository by branch" />
   <LinkCard title="Update Pull Request" href="#update-pull-request" description="Update the title or description of a Bitbucket pull request" />
+  <LinkCard title="Wait for Builds" href="#wait-for-builds" description="Wait for Bitbucket builds to finish on a commit" />
 </CardGrid>
 
 ## Instructions
@@ -28,13 +31,224 @@ To configure Bitbucket with SuperPlane:
 - **API Token mode**:
 	- Go to **Atlassian Settings → Security → Create API token**.
 	- Select **Bitbucket** App.
-	- Create a token with admin:workspace:bitbucket scope.
+	- Create a token with repository read/write and pull request read/write scopes, plus workspace read for repository listing.
 
 - **Workspace Access Token mode**:
    - Go to **Bitbucket Workspace Settings → Security → Access tokens**.
-   - Create a workspace access token.
+   - Create a workspace access token with repository read/write, pull request read/write, and webhook read/write scopes.
+
+- **Repository Access Token mode (single repository)**:
+   - Go to **Repository Settings → Security → Access tokens**.
+   - Create a repository access token with repository read/write, pull request read/write, and webhook read/write scopes.
+   - This token works only for the configured repository and cannot list the workspace.
 
 - **Copy the token** and your workspace slug (for example: `my-workspace`) below.
+For repository tokens, also copy the repository in workspace/repository format.
+
+<a id="on-pull-request"></a>
+
+## On Pull Request
+
+**Trigger key:** `bitbucket.onPullRequest`
+
+The On Pull Request trigger starts a workflow execution when pull request events occur in a Bitbucket repository.
+
+### Use Cases
+
+- **PR automation**: Automate actions when PRs are opened, updated, approved, merged, or declined
+- **Code review workflows**: Trigger review processes or notifications
+
+### Configuration
+
+- **Repository**: Select the Bitbucket repository to monitor
+- **Actions**: Select which pull request actions to listen for (created, updated, approved, unapproved, merged, declined)
+
+### Event Data
+
+Each PR event includes:
+- **action**: The normalized action (created, updated, approved, unapproved, merged, declined)
+- **pullrequest**: Complete PR information including title, state, source and destination branches
+- **repository**: Repository information
+- **actor**: User who triggered the event
+
+### Webhook Setup
+
+This trigger automatically sets up a Bitbucket webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed. One repository webhook is shared between triggers.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "created",
+    "actor": {
+      "display_name": "Ada Lovelace",
+      "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
+    },
+    "pull_request": {
+      "base": {
+        "ref": "main"
+      },
+      "description": "Adds retry handling to the worker.",
+      "head": {
+        "ref": "feat/retry-handling",
+        "sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+      },
+      "html_url": "https://bitbucket.org/acme/widgets/pull-requests/42",
+      "merged": false,
+      "number": 42,
+      "state": "open",
+      "title": "feat: Add retry handling"
+    },
+    "pullrequest": {
+      "author": {
+        "display_name": "Ada Lovelace",
+        "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
+      },
+      "created_on": "2026-04-22T10:00:00.000000+00:00",
+      "description": "Adds retry handling to the worker.",
+      "destination": {
+        "branch": {
+          "name": "main"
+        },
+        "commit": {
+          "hash": "f6e5d4c3b2a1f6e5d4c3b2a1f6e5d4c3b2a1f6e5"
+        },
+        "repository": {
+          "full_name": "acme/widgets"
+        }
+      },
+      "draft": false,
+      "id": 42,
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/acme/widgets/pull-requests/42"
+        }
+      },
+      "source": {
+        "branch": {
+          "name": "feat/retry-handling"
+        },
+        "commit": {
+          "hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+        },
+        "repository": {
+          "full_name": "acme/widgets"
+        }
+      },
+      "state": "OPEN",
+      "title": "feat: Add retry handling",
+      "updated_on": "2026-04-22T10:01:00.000000+00:00"
+    },
+    "repository": {
+      "full_name": "acme/widgets",
+      "name": "widgets",
+      "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
+    }
+  },
+  "timestamp": "2026-04-22T10:01:00Z",
+  "type": "bitbucket.pullRequest"
+}
+```
+
+<a id="on-pull-request-comment"></a>
+
+## On Pull Request Comment
+
+**Trigger key:** `bitbucket.onPullRequestComment`
+
+The On Pull Request Comment trigger starts a workflow execution when comments are added on a pull request.
+
+### Use Cases
+
+- **PR feedback**: React to reviewer comments on a pull request
+- **Bot interactions**: Respond to mentions in pull request comments
+- **Notification systems**: Notify teams when pull requests receive comments
+
+### Configuration
+
+- **Repository**: Select the Bitbucket repository to monitor
+- **Content Filter**: Optional filter on comment content. Mentions that start with @ match as an exact Bitbucket nickname. Other values are regular expressions.
+- **Only pull requests in this factory**: Start a run only when the comment belongs to a pull request in this factory.
+
+### Event Data
+
+Each comment event includes:
+- **comment**: Comment information including body, author, timestamps, parent thread, and inline file/line context
+- **pullrequest**: The pull request the comment belongs to
+- **repository**: Repository information
+- **actor**: User who added the comment
+
+Bitbucket payloads carry no bot marker, so this trigger has no bot filter. Feedback automations exclude their own replies through the replying integration instead.
+
+### Webhook Setup
+
+This trigger automatically sets up a Bitbucket webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed. One repository webhook is shared between triggers.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "actor": {
+      "display_name": "Grace Hopper",
+      "nickname": "grace",
+      "uuid": "{e401aafa-d676-4ee0-a3f1-8b94c681feaa}"
+    },
+    "comment": {
+      "author": {
+        "display_name": "Grace Hopper",
+        "html_url": "https://bitbucket.org/grace/",
+        "login": "grace",
+        "nickname": "grace",
+        "uuid": "{e401aafa-d676-4ee0-a3f1-8b94c681feaa}"
+      },
+      "body": "@ada please check the retry backoff on line 42",
+      "content": {
+        "markup": "markdown",
+        "raw": "@ada please check the retry backoff on line 42"
+      },
+      "created_on": "2026-04-22T10:05:00.000000+00:00",
+      "html_url": "https://bitbucket.org/acme/widgets/pull-requests/42#comment-7001",
+      "id": 7001,
+      "inline": {
+        "from": 40,
+        "path": "pkg/workers/retry.go",
+        "to": 44
+      },
+      "nickname": "grace",
+      "path": "pkg/workers/retry.go",
+      "updated_on": "2026-04-22T10:05:00.000000+00:00",
+      "url": "https://bitbucket.org/acme/widgets/pull-requests/42#comment-7001"
+    },
+    "pullrequest": {
+      "id": 42,
+      "links": {
+        "html": {
+          "href": "https://bitbucket.org/acme/widgets/pull-requests/42"
+        }
+      },
+      "source": {
+        "branch": {
+          "name": "feat/retry-handling"
+        },
+        "commit": {
+          "hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+        }
+      },
+      "state": "OPEN",
+      "title": "feat: Add retry handling"
+    },
+    "repository": {
+      "full_name": "acme/widgets",
+      "name": "widgets",
+      "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
+    }
+  },
+  "timestamp": "2026-04-22T10:05:00Z",
+  "type": "bitbucket.pullRequestComment"
+}
+```
 
 <a id="on-push"></a>
 
@@ -254,6 +468,7 @@ The Create Pull Request Comment component adds a comment to a pull request in a 
 - **Repository**: The Bitbucket repository, in workspace/repository format
 - **Pull Request ID**: The pull request number. Supports expressions.
 - **Body**: The comment text. Supports Markdown and expressions.
+- **Parent Comment ID**: Optional. Reply inside the thread of another comment. Supports expressions.
 
 ### Output
 
@@ -428,6 +643,70 @@ Emits the updated pull request that Bitbucket returns.
   },
   "timestamp": "2026-04-22T10:00:00.000000000Z",
   "type": "bitbucket.pullRequest"
+}
+```
+
+<a id="wait-for-builds"></a>
+
+## Wait for Builds
+
+**Component key:** `bitbucket.waitForBuilds`
+
+The Wait for Builds action waits until required Bitbucket builds finish on a commit.
+
+### Use Cases
+
+- **Required builds**: Block a workflow until selected builds pass
+- **CI gating**: Continue only when external CI reports success
+
+### Configuration
+
+- **Repository**: Select the Bitbucket repository to monitor
+- **Ref**: Full commit SHA to watch. Use the pull request head SHA.
+- **Build Keys**: Exact build keys to require. A key is the commit status key from Bitbucket.
+- **Timeout Seconds**: Maximum seconds to wait for builds.
+
+### Output Channels
+
+- **Passed**: No selected build failed
+- **Failed**: A selected build failed or stopped
+- **Timed Out**: The timeout expired, or a selected build never appeared
+
+Each output includes the repository, SHA, all observed builds, selected builds, failed builds, and timestamps.
+
+### Notes
+
+- The action listens for commit status webhooks
+- A five-minute poll runs only when a webhook does not arrive
+- Missing builds stay pending until the timeout
+
+### Example Output
+
+```json
+{
+  "data": {
+    "builds": [
+      {
+        "conclusion": "success",
+        "key": "build-a",
+        "name": "Build A",
+        "status": "completed"
+      }
+    ],
+    "failedBuilds": [],
+    "repository": "acme/widgets",
+    "selectedBuilds": [
+      {
+        "conclusion": "success",
+        "key": "build-a",
+        "name": "Build A",
+        "status": "completed"
+      }
+    ],
+    "sha": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+  },
+  "timestamp": "2026-04-22T10:05:00Z",
+  "type": "bitbucket.builds"
 }
 ```
 
