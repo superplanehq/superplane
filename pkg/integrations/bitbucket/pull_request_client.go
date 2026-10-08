@@ -165,7 +165,11 @@ func (c *Client) CreatePullRequestCommentWithParent(repository string, id int64,
 	}
 
 	body := map[string]any{"content": map[string]any{"raw": content}}
-	if parent, ok := parseCommentID(parentID); ok {
+	if strings.TrimSpace(parentID) != "" {
+		parent, ok := parseCommentID(parentID)
+		if !ok {
+			return nil, fmt.Errorf("invalid parentCommentId %q: must be a positive integer", parentID)
+		}
 		body["parent"] = map[string]any{"id": parent}
 	}
 

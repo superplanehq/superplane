@@ -5,8 +5,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	bitbucketintegration "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -143,26 +145,26 @@ func validateBitbucketTokenRepository(integration *models.Integration, repositor
 	if !ok || strings.TrimSpace(workspace) == "" || slug == "" || strings.Contains(slug, "/") {
 		return invalidArgument("repository must be in workspace/repository format")
 	}
-	metadata := integration.Metadata.Data()
-	if metadata != nil {
-		if repo, ok := metadata["repository"].(map[string]any); ok && repo != nil {
-			if fullName, _ := repo["full_name"].(string); strings.TrimSpace(fullName) != "" {
-				configured := strings.TrimSuffix(strings.TrimSpace(fullName), ".git")
-				if !strings.EqualFold(configured, strings.TrimSuffix(repository, ".git")) {
-					return invalidArgument("VCS repository is not accessible")
-				}
-				return nil
-			}
-		}
-		if ws, ok := metadata["workspace"].(map[string]any); ok && ws != nil {
-			if configured, _ := ws["slug"].(string); strings.TrimSpace(configured) != "" {
-				if !strings.EqualFold(strings.TrimSpace(configured), strings.TrimSpace(workspace)) {
-					return invalidArgument("VCS repository is not accessible")
-				}
-				return nil
-			}
-		}
+	var typed bitbucketintegration.Metadata
+	if err := mapstructure.Decode(integration.Metadata.Data(), &typed); err != nil {
+		return invalidArgument("VCS repository is not accessible")
 	}
-	// ponytail: metadata-scope check only; live revalidation happens at sync/selection
-	return invalidArgument("VCS repository is not accessible")
+	if typed.AuthType == bitbucketintegration.AuthTypeRepositoryAccessToken {
+		if typed.Repository == nil || strings.TrimSpace(typed.Repository.FullName) == "" {
+			return invalidArgument("VCS repository is not accessible")
+		}
+		configured := strings.TrimSuffix(strings.TrimSpace(typed.Repository.FullName), ".git")
+		if !strings.EqualFold(configured, strings.TrimSuffix(repository, ".git")) {
+			return invalidArgument("VCS repository is not accessible")
+		}
+		return nil
+	}
+	configured := ""
+	if typed.Workspace != nil {
+		configured = strings.TrimSpace(typed.Workspace.Slug)
+	}
+	if configured == "" || !strings.EqualFold(configured, strings.TrimSpace(workspace)) {
+		return invalidArgument("VCS repository is not accessible")
+	}
+	return nil
 }

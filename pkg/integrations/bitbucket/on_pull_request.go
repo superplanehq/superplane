@@ -124,8 +124,12 @@ func (p *OnPullRequest) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
+	keys, err := pullRequestEventKeysForActions(config.Actions)
+	if err != nil {
+		return err
+	}
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		EventTypes:     pullRequestEventKeysForActions(config.Actions),
+		EventTypes:     keys,
 		RepositorySlug: repo.Slug,
 	})
 }

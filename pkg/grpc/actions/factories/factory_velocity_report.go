@@ -295,7 +295,7 @@ func (b *velocityPeopleBuilder) memberRow(member *models.FactoryVelocityMember) 
 // never on nicknames. Authors outside the organization still get a row,
 // because they are part of what the repository shipped.
 func (b *velocityPeopleBuilder) addAuthoredMerge(merge *models.FactoryVelocityRepositoryMerge) {
-	if merge.Provider == models.ProviderBitbucket {
+	if strings.EqualFold(strings.TrimSpace(merge.Provider), models.ProviderBitbucket) {
 		b.addBitbucketAuthoredMerge(merge)
 		return
 	}

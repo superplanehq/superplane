@@ -152,7 +152,8 @@ type FactoryVCSCapabilities struct {
 // An empty provider uses the GitHub set. Bitbucket gains capabilities one
 // step at a time; only issue intake stays off.
 func FactoryVCSCapabilitiesFor(provider string) FactoryVCSCapabilities {
-	if strings.TrimSpace(provider) == "" || provider == ProviderGitHub {
+	provider = strings.TrimSpace(provider)
+	if provider == "" || strings.EqualFold(provider, ProviderGitHub) {
 		return FactoryVCSCapabilities{
 			PRClosure:       true,
 			PRFeedback:      true,
@@ -164,15 +165,18 @@ func FactoryVCSCapabilitiesFor(provider string) FactoryVCSCapabilities {
 			VCSIssueIntake:  true,
 		}
 	}
-	return FactoryVCSCapabilities{
-		PRClosure:       true,
-		PRFeedback:      true,
-		PRChecks:        true,
-		MergeConfidence: true,
-		Velocity:        true,
-		BoardClose:      true,
-		BoardMerge:      true,
+	if strings.EqualFold(provider, ProviderBitbucket) {
+		return FactoryVCSCapabilities{
+			PRClosure:       true,
+			PRFeedback:      true,
+			PRChecks:        true,
+			MergeConfidence: true,
+			Velocity:        true,
+			BoardClose:      true,
+			BoardMerge:      true,
+		}
 	}
+	return FactoryVCSCapabilities{}
 }
 
 func ValidateFactoryOnboardingAgentHarness(harness string) error {

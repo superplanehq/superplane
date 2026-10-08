@@ -386,10 +386,17 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 
 // effectiveVelocityProvider normalizes the sync target host. Empty means GitHub.
 func effectiveVelocityProvider(target models.FactoryVelocitySyncTarget) string {
-	if strings.TrimSpace(target.VCSProvider) == "" {
+	provider := strings.TrimSpace(target.VCSProvider)
+	if provider == "" {
 		return models.ProviderGitHub
 	}
-	return target.VCSProvider
+	if strings.EqualFold(provider, models.ProviderBitbucket) {
+		return models.ProviderBitbucket
+	}
+	if strings.EqualFold(provider, models.ProviderGitHub) {
+		return models.ProviderGitHub
+	}
+	return provider
 }
 
 // repositoryMergeRows keeps the merges SuperPlane did not open. Subtracting here

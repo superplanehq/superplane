@@ -248,7 +248,14 @@ function useBitbucketWorkspaceChoice(
   selectedRepository: string | null,
   onClearRepository?: () => void,
 ) {
-  const workspaces = [...new Set([...repositoryOrganizations(repositories), ...(installedWorkspaces ?? [])])].sort();
+  const workspaces = [
+    ...new Map(
+      [...repositoryOrganizations(repositories), ...(installedWorkspaces ?? [])].map((name) => [
+        name.toLowerCase(),
+        name,
+      ]),
+    ).values(),
+  ].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   const [chosen, setChosen] = useState<string | null>(() => ownerOfRepository(selectedRepository));
   const workspace = findOrganization(workspaces, chosen);
   return {

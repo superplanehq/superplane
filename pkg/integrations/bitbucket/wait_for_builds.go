@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -674,7 +675,7 @@ func waitBuildsRefFromPayload(payload map[string]any) (string, string) {
 }
 
 func waitBuildsRefValue(repository, sha string) string {
-	return strings.TrimSpace(repository) + "@" + strings.TrimSpace(sha)
+	return strings.ToLower(strings.TrimSpace(repository)) + "@" + strings.ToLower(strings.TrimSpace(sha))
 }
 
 func decodeWaitBuildsConfig(raw any) (WaitForBuildsConfiguration, error) {
@@ -723,9 +724,13 @@ func normalizeWaitBuildKeys(keys []string) []string {
 
 func decodeWaitBuildsMetadata(raw any) (WaitForBuildsMetadata, error) {
 	var metadata WaitForBuildsMetadata
+	if raw == nil {
+		return metadata, fmt.Errorf("metadata is empty")
+	}
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
 		Result:           &metadata,
 		WeaklyTypedInput: true,
+		DecodeHook:       decodeWaitBuildsTimeHook,
 	})
 	if err != nil {
 		return metadata, err
@@ -741,4 +746,31 @@ func (c WaitForBuildsConfiguration) timeout() time.Duration {
 		return time.Duration(*c.TimeoutSeconds) * time.Second
 	}
 	return waitBuildsDefaultTimeoutSeconds * time.Second
+}
+
+func decodeWaitBuildsTimeHook(from, to reflect.Type, data any) (any, error) {
+	if from == nil || to == nil {
+		return data, nil
+	}
+	if from.Kind() != reflect.String {
+		return data, nil
+	}
+	if to != reflect.TypeOf(time.Time{}) && to != reflect.TypeOf((*time.Time)(nil)) {
+		return data, nil
+	}
+	text, ok := data.(string)
+	if !ok || text == "" {
+		return data, nil
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, text)
+	if err != nil {
+		parsed, err = time.Parse(time.RFC3339, text)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if to == reflect.TypeOf((*time.Time)(nil)) {
+		return &parsed, nil
+	}
+	return parsed, nil
 }

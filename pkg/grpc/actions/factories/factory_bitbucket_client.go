@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -74,7 +75,19 @@ func (b *bitbucketProvider) ReadMergeability(ctx context.Context, pullRequest *m
 		}, nil
 	}
 
-	statuses, err := b.client.ListCommitStatuses(pullRequest.Repository, strings.TrimSpace(current.SourceHash))
+	headSHA := strings.TrimSpace(current.SourceHash)
+	// ponytail: strategies default open client-side; live verification can restrict
+	allowed := []string{"SQUASH", "MERGE", "REBASE"}
+	if headSHA == "" {
+		return vcs.Mergeability{
+			CanMerge:       false,
+			BlockedReason:  mergeabilityBlockedReasonName(pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECKS_UNFINISHED),
+			Message:        mergeBlockedChecksUnfinished,
+			HeadSHA:        "",
+			AllowedMethods: allowed,
+		}, nil
+	}
+	statuses, err := b.client.ListCommitStatuses(pullRequest.Repository, headSHA)
 	if err != nil {
 		return vcs.Mergeability{}, err
 	}
@@ -88,9 +101,6 @@ func (b *bitbucketProvider) ReadMergeability(ctx context.Context, pullRequest *m
 			failed = true
 		}
 	}
-	headSHA := strings.TrimSpace(current.SourceHash)
-	// ponytail: strategies default open client-side; live verification can restrict
-	allowed := []string{"SQUASH", "MERGE", "REBASE"}
 	switch {
 	case failed:
 		return vcs.Mergeability{
@@ -140,7 +150,7 @@ func (b *bitbucketProvider) MergePullRequest(ctx context.Context, repository str
 		// ponytail: Bitbucket reports unmergeable heads as 409; the board
 		// re-syncs and asks for review. Live verification refines this.
 		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusConflict {
-			return errFactoryPullRequestHeadMoved
+			return fmt.Errorf("%w: %w", errFactoryPullRequestHeadMoved, err)
 		}
 		return err
 	}
@@ -184,7 +194,7 @@ func buildFactoryBitbucketAPI(db *gorm.DB, deps IntakeDependencies, factory *mod
 
 	integration, err := findReadyOnboardingIntegration(db, factory.OrganizationID, integrationID)
 	if err != nil {
-		return nil, errFactoryBitbucketNotConnected
+		return nil, fmt.Errorf("%w: %w", errFactoryBitbucketNotConnected, err)
 	}
 	if integration.AppName != models.ProviderBitbucket {
 		return nil, errFactoryBitbucketNotConnected
@@ -192,7 +202,7 @@ func buildFactoryBitbucketAPI(db *gorm.DB, deps IntakeDependencies, factory *mod
 
 	metadata := bitbucketintegration.Metadata{}
 	if err := mapstructure.Decode(integration.Metadata.Data(), &metadata); err != nil {
-		return nil, errFactoryBitbucketNotConnected
+		return nil, fmt.Errorf("%w: %w", errFactoryBitbucketNotConnected, err)
 	}
 
 	client, err := bitbucketintegration.NewClient(
@@ -201,7 +211,7 @@ func buildFactoryBitbucketAPI(db *gorm.DB, deps IntakeDependencies, factory *mod
 		contexts.NewIntegrationContext(db, nil, integration, deps.Encryptor, deps.Registry, nil),
 	)
 	if err != nil {
-		return nil, errFactoryBitbucketNotConnected
+		return nil, fmt.Errorf("%w: %w", errFactoryBitbucketNotConnected, err)
 	}
 	return client, nil
 }

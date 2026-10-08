@@ -190,7 +190,7 @@ FROM users u
 LEFT JOIN accounts a ON a.id = u.account_id
 LEFT JOIN account_linked_accounts l ON l.account_id = a.id AND l.provider = ?
 LEFT JOIN account_providers p ON p.account_id = a.id AND p.provider = ?
-LEFT JOIN account_linked_accounts b ON b.account_id = a.id AND b.provider = ?
+LEFT JOIN account_linked_accounts b ON b.account_id = a.id AND b.provider = ? AND b.active = TRUE
 WHERE u.organization_id = ?
 	AND u.type = ?
 	AND u.deleted_at IS NULL

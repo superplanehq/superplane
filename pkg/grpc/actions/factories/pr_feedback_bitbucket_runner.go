@@ -25,7 +25,42 @@ func bitbucketPullRequestSourceLines() []string {
 		`  echo "Could not resolve the pull request source repository." >&2`,
 		`  exit 1`,
 		`fi`,
+		`if ! printf '%s' "${SOURCE_REPO}" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then`,
+		`  echo "Invalid pull request source repository." >&2`,
+		`  exit 1`,
+		`fi`,
+		`if ! git check-ref-format --branch "${SOURCE_BRANCH}" >/dev/null 2>&1; then`,
+		`  echo "Invalid pull request source branch." >&2`,
+		`  exit 1`,
+		`fi`,
+		`if ! printf '%s' "${SOURCE_HASH}" | grep -Eq '^[0-9a-fA-F]{7,64}$'; then`,
+		`  echo "Invalid pull request source commit." >&2`,
+		`  exit 1`,
+		`fi`,
 	)
+}
+
+// bitbucketValidateStoredSourceLines re-validates the source values after
+// they are re-read from .superplane files in the push path.
+func bitbucketValidateStoredSourceLines() []string {
+	return []string{
+		`if ! printf '%s' "${SOURCE_REPO}" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then`,
+		`  echo "Invalid pull request source repository." >&2`,
+		`  exit 1`,
+		`fi`,
+		`if ! git check-ref-format --branch "${SOURCE_BRANCH}" >/dev/null 2>&1; then`,
+		`  echo "Invalid pull request source branch." >&2`,
+		`  exit 1`,
+		`fi`,
+		`if ! printf '%s' "${SOURCE_HASH}" | grep -Eq '^[0-9a-fA-F]{7,64}$'; then`,
+		`  echo "Invalid pull request source commit." >&2`,
+		`  exit 1`,
+		`fi`,
+		`if ! printf '%s' "${CHECKED_OUT}" | grep -Eq '^[0-9a-fA-F]{7,64}$'; then`,
+		`  echo "Invalid local source commit." >&2`,
+		`  exit 1`,
+		`fi`,
+	}
 }
 
 // bitbucketCheckoutCommand clones the pull request source repository and
@@ -45,13 +80,13 @@ func bitbucketCheckoutCommand() string {
 		`printf '%s' "${SOURCE_HASH}" > .superplane/source-hash`,
 		`git clone "https://bitbucket.org/${SOURCE_REPO}.git" repo`,
 		`cd repo`,
-		`git fetch origin "${SOURCE_BRANCH}"`,
+		`git fetch origin -- "${SOURCE_BRANCH}"`,
 		`FETCHED=$(git rev-parse FETCH_HEAD)`,
 		`if [ "${FETCHED}" != "${SOURCE_HASH}" ]; then`,
 		`  echo "Source branch tip does not match the pull request commit. Stop without changing it." >&2`,
 		`  exit 1`,
 		`fi`,
-		`git checkout -B "${SOURCE_BRANCH}" "${SOURCE_HASH}"`,
+		`git checkout -B -- "${SOURCE_BRANCH}" "${SOURCE_HASH}"`,
 		`if [ "$(git rev-parse HEAD)" != "${SOURCE_HASH}" ]; then`,
 		`  echo "Local checkout does not match the pull request source commit." >&2`,
 		`  exit 1`,
@@ -69,6 +104,9 @@ func bitbucketCommitPushCommand(message string) string {
 		`CHECKED_OUT=$(cat ../.superplane/source-hash)`,
 		`SOURCE_REPO=$(cat ../.superplane/source-repo)`,
 		`SOURCE_BRANCH=$(cat ../.superplane/source-branch)`,
+	)
+	lines = append(lines, bitbucketValidateStoredSourceLines()...)
+	lines = append(lines,
 		`if [ "${SOURCE_HASH}" != "${CHECKED_OUT}" ]; then`,
 		`  echo "Remote pull request head changed. Stop without pushing."`,
 		`  exit 0`,
@@ -84,7 +122,7 @@ func bitbucketCommitPushCommand(message string) string {
 		`git add -A`,
 		`if ! git diff --cached --quiet; then`,
 		`  git commit -s -m "`+message+`"`,
-		`  git push "https://bitbucket.org/${SOURCE_REPO}.git" "HEAD:${SOURCE_BRANCH}"`,
+		`  git push -- "https://bitbucket.org/${SOURCE_REPO}.git" "HEAD:${SOURCE_BRANCH}"`,
 		`fi`,
 	)
 	return strings.Join(lines, "\n")

@@ -190,7 +190,7 @@ func rejectVCSProviderChange(factory *models.Factory, patch models.FactoryOnboar
 	if strings.TrimSpace(current.VCSIntegrationID) == "" && strings.TrimSpace(current.VCSProvider) == "" {
 		return nil
 	}
-	if next != current.EffectiveVCSProvider() {
+	if !strings.EqualFold(next, current.EffectiveVCSProvider()) {
 		return invalidArgument("version control provider cannot be changed")
 	}
 	return nil

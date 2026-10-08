@@ -236,7 +236,7 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 		ActivityID:   prFeedbackActivityNodeID,
 		ActivityName: "Add Comment Activity",
 		RunnerID:     prFeedbackRunnerNodeID,
-		Title:        prFeedbackCommentActivityTitleExpression(),
+		Title:        prFeedbackBitbucketCommentActivityTitleExpression(),
 		Description:  prFeedbackCommentActivityDescriptionExpression(),
 		Y:            prFeedbackCommentFlowY,
 	}, request)
@@ -460,6 +460,11 @@ func prFeedbackReviewActivityDescriptionExpression() string {
 
 func prFeedbackCommentActivityTitleExpression() string {
 	return `{{ "[@" + root().data.comment.user.login + "](" + root().data.comment.user.html_url` +
+		` + ") left a [comment](" + root().data.comment.html_url + ")" }}`
+}
+
+func prFeedbackBitbucketCommentActivityTitleExpression() string {
+	return `{{ "[@" + (root().data.comment.author.login ?? root().data.comment.author.nickname) + "](" + root().data.comment.author.html_url` +
 		` + ") left a [comment](" + root().data.comment.html_url + ")" }}`
 }
 

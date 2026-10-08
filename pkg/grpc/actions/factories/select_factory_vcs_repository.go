@@ -170,7 +170,7 @@ func syncFactoryVCSProviderBindings(
 // rejectFactoryProviderSwitch locks the provider at the first saved VCS
 // binding. Clearing and rebinding across hosts is rejected.
 func rejectFactoryProviderSwitch(factory *models.Factory, provider string) error {
-	provider = strings.ToLower(strings.TrimSpace(provider))
+	provider = strings.TrimSpace(provider)
 	if provider == "" {
 		return grpcerrors.InvalidArgument(nil, "VCS provider is not supported")
 	}
@@ -178,7 +178,7 @@ func rejectFactoryProviderSwitch(factory *models.Factory, provider string) error
 	if strings.TrimSpace(current.VCSIntegrationID) == "" && strings.TrimSpace(current.VCSProvider) == "" {
 		return nil
 	}
-	if provider != current.EffectiveVCSProvider() {
+	if !strings.EqualFold(provider, current.EffectiveVCSProvider()) {
 		return grpcerrors.InvalidArgument(nil, "version control provider cannot be changed")
 	}
 	return nil

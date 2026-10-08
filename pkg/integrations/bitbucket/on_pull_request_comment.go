@@ -296,13 +296,8 @@ func inlineCommentContext(inline map[string]any) map[string]any {
 // commentURL best-effort links back to the comment. Bitbucket anchors PR
 // comments with #comment-<id>.
 func commentURL(payload, comment map[string]any) string {
-	id, _ := comment["id"].(float64)
-	if id == 0 {
-		if asInt, ok := comment["id"].(int); ok {
-			id = float64(asInt)
-		}
-	}
-	if id == 0 {
+	id, ok := int64FromJSON(comment["id"])
+	if !ok || id <= 0 {
 		return ""
 	}
 	pr, _ := payload["pullrequest"].(map[string]any)

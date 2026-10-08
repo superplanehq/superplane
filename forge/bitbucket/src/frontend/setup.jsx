@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import ForgeReconciler, { Button, Heading, SectionMessage, Text } from "@forge/react";
 import { invokeRemote } from "@forge/bridge";
 
+const BOOTSTRAP_PATH = "/api/v1/bitbucket/forge/bootstrap";
+
 // Setup page under Apps → SuperPlane. Opening this page confirms the
 // installation: the call below travels through Forge with the system token
 // enabled, so SuperPlane receives the same verified delivery as the
@@ -13,11 +15,11 @@ function Setup() {
     setStatus("confirming");
     try {
       await invokeRemote({
-        path: "/api/v1/bitbucket/forge/bootstrap",
+        path: BOOTSTRAP_PATH,
         method: "POST",
       });
       setStatus("confirmed");
-    } catch (error) {
+    } catch {
       setStatus("failed");
     }
   }, []);
@@ -26,21 +28,35 @@ function Setup() {
     void confirm();
   }, [confirm]);
 
-  return (
-    <>
-      <Heading as="h1">SuperPlane</Heading>
-      {status === "confirmed" ? (
+  if (status === "confirmed") {
+    return (
+      <>
+        <Heading as="h1">SuperPlane</Heading>
         <SectionMessage title="Installation confirmed" appearance="confirmation">
           <Text>SuperPlane received this workspace. Return to the SuperPlane tab to continue setup.</Text>
         </SectionMessage>
-      ) : status === "failed" ? (
+      </>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <>
+        <Heading as="h1">SuperPlane</Heading>
         <SectionMessage title="Confirmation failed" appearance="error">
           <Text>SuperPlane did not receive this workspace. Try again.</Text>
         </SectionMessage>
-      ) : (
-        <Text>Confirming this workspace with SuperPlane…</Text>
-      )}
-      {status === "failed" ? <Button appearance="primary" onClick={() => void confirm()}>Try again</Button> : null}
+        <Button appearance="primary" onClick={() => void confirm()}>
+          Try again
+        </Button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Heading as="h1">SuperPlane</Heading>
+      <Text>Confirming this workspace with SuperPlane…</Text>
     </>
   );
 }

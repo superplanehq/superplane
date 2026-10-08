@@ -71,9 +71,10 @@ export function useFirstRunBitbucket(args: {
   const grantAccess = () =>
     args.blocking.run("opening-bitbucket", async () => {
       const popup = openGitHubWindow();
+      const known = installedSlugs(onboarding.data);
       try {
         const url = await onboarding.startInstallation.mutateAsync();
-        startAttempt(installedSlugs(onboarding.data));
+        startAttempt(known);
         navigateGitHubWindow(popup, url);
       } catch (error) {
         popup?.close();

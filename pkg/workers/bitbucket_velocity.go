@@ -28,11 +28,14 @@ func (b *bitbucketVelocity) ListMergedPullRequests(
 	repository string,
 	from, to time.Time,
 ) ([]vcs.MergedPullRequest, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	client, err := b.worker.bitbucketClient(b.organizationID, b.integrationID)
 	if err != nil {
 		return nil, err
 	}
-	return listBitbucketMerges(client, repository, from, to)
+	return listBitbucketMerges(ctx, client, repository, from, to)
 }
 
 // listBitbucketMerges returns the pull requests that merged in [from, to).
@@ -40,6 +43,7 @@ func (b *bitbucketVelocity) ListMergedPullRequests(
 // itself; updated_on is only the fallback. Agent output is recognized by the
 // co-author trailer on the merge commit, matching the GitHub classification.
 func listBitbucketMerges(
+	ctx context.Context,
 	client *bitbucketintegration.Client,
 	repository string,
 	from, to time.Time,
@@ -54,6 +58,9 @@ func listBitbucketMerges(
 
 	merged := make([]vcs.MergedPullRequest, 0, len(prs))
 	for i := range prs {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		merge, ok, err := toBitbucketRepositoryMerge(client, repository, &prs[i], from, to)
 		if err != nil {
 			return nil, err

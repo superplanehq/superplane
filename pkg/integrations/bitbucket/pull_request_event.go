@@ -35,18 +35,23 @@ var pullRequestActionByEventKey = map[string]string{
 
 // pullRequestEventKeysForActions returns the webhook event keys a trigger
 // configuration subscribes to.
-func pullRequestEventKeysForActions(actions []string) []string {
+func pullRequestEventKeysForActions(actions []string) ([]string, error) {
 	byAction := map[string]string{}
 	for key, action := range pullRequestActionByEventKey {
 		byAction[action] = key
 	}
 	keys := []string{}
 	for _, action := range actions {
-		if key, ok := byAction[strings.ToLower(strings.TrimSpace(action))]; ok {
-			keys = append(keys, key)
+		key, ok := byAction[strings.ToLower(strings.TrimSpace(action))]
+		if !ok {
+			return nil, fmt.Errorf("unknown pull request action %q", action)
 		}
+		keys = append(keys, key)
 	}
-	return keys
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("at least one action is required")
+	}
+	return keys, nil
 }
 
 // normalizeBitbucketPullRequestEvent builds the shared Bitbucket event
@@ -199,5 +204,5 @@ func repositoryNameMatchesPayload(configured string, payload map[string]any) boo
 	if fullName != "" && configured != "" {
 		return strings.EqualFold(strings.TrimSpace(fullName), strings.TrimSpace(configured))
 	}
-	return true
+	return false
 }

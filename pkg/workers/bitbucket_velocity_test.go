@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -120,7 +121,7 @@ func TestListBitbucketMergesKeepsAShortPageWalkIncomplete(t *testing.T) {
 	}
 	client, _ := stubBitbucketVelocityClient(responses...)
 
-	_, err := listBitbucketMerges(client, "acme/widgets", time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+	_, err := listBitbucketMerges(context.Background(), client, "acme/widgets", time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "exceeded")
 }
