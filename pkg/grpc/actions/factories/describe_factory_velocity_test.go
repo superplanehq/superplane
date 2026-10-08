@@ -415,7 +415,7 @@ func seedSyncedRepositoryMerges(
 
 	from := time.Now().AddDate(0, 0, -90)
 	to := time.Now().Add(time.Hour)
-	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factoryID, from, to, merges))
+	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factoryID, models.ProviderGitHub, from, to, merges))
 
 	sync, err := models.ClaimFactoryVelocitySync(db, factoryID, time.Now())
 	require.NoError(t, err)
