@@ -104,8 +104,8 @@ Run these three steps once, in order:
    foreground logs.
 
 Factory workspace onboarding needs a public SuperPlane GitHub App on a
-stable tunnel. Without `SUPERPLANE_GITHUB_APP_*` in `.env`, local factory
-onboarding is blocked. Factory Sentry intake uses a public SuperPlane
+stable tunnel. Cloud holds `SUPERPLANE_GITHUB_APP_*`. Self-host and local
+development can create that public app from workspace Connect. Factory Sentry intake uses a public SuperPlane
 Sentry app. Without `SUPERPLANE_SENTRY_APP_*` in `.env`, SuperPlane asks
 for a personal token. See
 [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).

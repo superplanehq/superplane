@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -69,7 +71,7 @@ func ResolveHostedAppBinding(ctx core.IntegrationContext) (*HostedAppBinding, er
 	for _, repository := range repositories {
 		repositoryIDs = append(repositoryIDs, repository.RepositoryID)
 	}
-	app, ok := HostedAppFromEnv()
+	app, ok := HostedApp(context.Background())
 	if !ok {
 		return nil, fmt.Errorf("hosted GitHub App is not configured")
 	}
@@ -94,24 +96,36 @@ func RestrictHostedAppTransport(transport *ghinstallation.Transport, repositoryI
 	return nil
 }
 
-// HostedAppFromEnv returns the public GitHub App when Cloud holds complete
-// credentials. Self-hosted leaves them empty.
+// HostedAppFromEnv returns the public GitHub App from process environment.
 func HostedAppFromEnv() (HostedApp, bool) {
-	cfg := config.LoadGitHubHostedAppConfig()
+	return hostedAppFromConfig(config.LoadGitHubHostedAppConfig())
+}
+
+// HostedApp returns the public GitHub App for this request. Environment wins.
+// Self-host falls back to the installation row after first-run create.
+func HostedApp(ctx context.Context) (HostedApp, bool) {
+	cfg, err := githubapp.ResolveProcess(ctx)
+	if err != nil {
+		return HostedApp{}, false
+	}
+	return hostedAppFromConfig(cfg)
+}
+
+func HostedAppConfigured() bool {
+	_, ok := HostedApp(context.Background())
+	return ok
+}
+
+func hostedAppFromConfig(cfg config.GitHubHostedAppConfig) (HostedApp, bool) {
 	if !cfg.Enabled() {
 		return HostedApp{}, false
 	}
-
 	return HostedApp{
 		ID:            cfg.ID,
 		Slug:          cfg.Slug,
 		PrivateKey:    cfg.PrivateKey,
 		WebhookSecret: cfg.WebhookSecret,
 	}, true
-}
-
-func HostedAppConfigured() bool {
-	return config.LoadGitHubHostedAppConfig().Enabled()
 }
 
 func HostedAppInstallURL(slug, state string) string {
@@ -169,7 +183,7 @@ func VerifyHostedAppInstallState(secret, state string) (uuid.UUID, error) {
 // integration secret.
 func LegacyAppPrivateKey(ctx core.IntegrationContext, metadata Metadata) (string, error) {
 	if metadata.HostedApp {
-		app, ok := HostedAppFromEnv()
+		app, ok := HostedApp(context.Background())
 		if !ok {
 			return "", fmt.Errorf("hosted GitHub App is not configured")
 		}

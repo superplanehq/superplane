@@ -350,12 +350,13 @@ function VcsScreen({
   if (screen === "connect") {
     return (
       <FirstRunConnectScreen
-        loading={flow.repositoriesLoading}
+        loading={flow.repositoriesLoading && flow.appConfigured}
         connecting={flow.blockingAction === "opening-github"}
+        createApp={!flow.appConfigured}
         connectError={flow.connectError}
         chrome={chrome}
         sphere={sphereFor("connect", setup.selectedRepo)}
-        onConnectGitHub={() => void flow.connectGitHub()}
+        onConnectGitHub={() => void (flow.appConfigured ? flow.connectGitHub() : flow.createGitHubApp())}
       />
     );
   }

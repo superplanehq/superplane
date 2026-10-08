@@ -1,6 +1,7 @@
 import type { MeVcsProviderRepository } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
+import { startPublicGitHubAppCreate } from "@/lib/githubAppManifest";
 import {
   FEATURE_FACTORY_BITBUCKET,
   FEATURE_FACTORY_JIRA_INTAKE,
@@ -304,6 +305,10 @@ function useFirstRunCommands(args: {
       window.location.assign(linkedAccountConnectHref("github", returnPath));
       return true;
     });
+  const createGitHubApp = () =>
+    blocking.runUntilNavigation("opening-github", async () => {
+      return startPublicGitHubAppCreate(onboardingStepPath(`${location.pathname}${location.search}`, "vcs"));
+    });
   const selectGitHubIdentity = (userId: string) =>
     blocking.run("switching-github-account", async () => {
       await connection.onboarding.selectIdentity.mutateAsync(userId);
@@ -346,6 +351,7 @@ function useFirstRunCommands(args: {
     chooseVcsHost,
     connectBitbucket,
     connectGitHub,
+    createGitHubApp,
     connectJira: () => connectIssueTracker("jira"),
     connectLinear: () => connectIssueTracker("linear"),
     continueFromRepository,

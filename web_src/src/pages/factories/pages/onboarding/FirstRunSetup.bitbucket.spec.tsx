@@ -68,7 +68,13 @@ vi.mock("./useBitbucketOnboarding", () => ({
 
 vi.mock("./useGitHubOnboarding", () => ({
   useGitHubOnboarding: () => ({
-    data: { appConfigured: true, identity: undefined, repositories: [], pendingRequests: [], synchronizing: false },
+    data: {
+      providerConfigured: true,
+      identity: undefined,
+      repositories: [],
+      pendingRequests: [],
+      synchronizing: false,
+    },
     isPending: false,
     error: null,
     startInstallation: { mutateAsync: vi.fn() },
