@@ -14,7 +14,6 @@ import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLan
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
 } from "@/lib/experimentalFeatures";
@@ -114,7 +113,7 @@ const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
-const useFactoryBoardWorkOrders = vi.fn(() => ({
+const useFactoryBoardWorkOrders = vi.fn((_organizationId?: string, _factoryId?: string, _options?: unknown) => ({
   workOrders: useFactoryWorkOrders().data ?? [],
   isLoading: false,
   isPlaceholderData: false,
@@ -180,7 +179,8 @@ vi.mock("@/hooks/useFactoryData", () => ({
   }),
   useUpdateFactory: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
+  useFactoryBoardWorkOrders: (organizationId: string, factoryId: string, options?: unknown) =>
+    useFactoryBoardWorkOrders(organizationId, factoryId, options),
   useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
   useUpdateFactoryLine: () => ({
@@ -1202,7 +1202,8 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-dependabot-alerts")).not.toHaveTextContent(
       ADD_INTAKE_COPY.comingSoon,
     );
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).not.toHaveTextContent(
       ADD_INTAKE_COPY.comingSoon,
@@ -1212,7 +1213,6 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
-    await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
     await user.click(screen.getByTestId("add-intake-template-datadog"));
     await user.click(screen.getByTestId("add-intake-template-linear-issues"));
@@ -1273,7 +1273,8 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
@@ -1325,7 +1326,6 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Jira setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1355,7 +1355,8 @@ describe("LinesPage board extras", () => {
 
     const productive = screen.getByTestId("add-intake-template-productive-tasks");
     expect(productive).toBeEnabled();
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(productive);
 
@@ -1747,7 +1748,12 @@ describe("LinesPage board editing", () => {
     const search = within(actions).getByTestId("work-orders-search-trigger");
     expect(within(actions).queryByTestId("work-orders-scope-active")).not.toBeInTheDocument();
     expect(scopeAll).toHaveTextContent("All");
-    expect(within(actions).getByTestId("work-orders-scope-my")).toHaveTextContent("My");
+    const scopeMy = within(actions).getByTestId("work-orders-scope-my");
+    const scopeUnassigned = within(actions).getByTestId("work-orders-scope-unassigned");
+    expect(scopeMy).toHaveTextContent("My");
+    expect(scopeUnassigned).toHaveTextContent("Unassigned");
+    expect(scopeAll.compareDocumentPosition(scopeMy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(scopeMy.compareDocumentPosition(scopeUnassigned) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(scopeAll.className).toMatch(/rounded-full/);
     expect(filter).toHaveAccessibleName("Filter");
     expect(filter).not.toHaveTextContent("Filter");
@@ -1800,6 +1806,53 @@ describe("LinesPage board editing", () => {
     expect(screen.getByText("Draft: rework refund telemetry")).toBeInTheDocument();
     expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
     expect(window.localStorage.getItem(`sp:work-orders:scope:${PRIMARY_FACTORY_ID}`)).toBe("active");
+  });
+
+  it("keeps Unassigned pressed and requests only tasks with no owner", async () => {
+    const user = userEvent.setup();
+    const closedUnassigned: FactoriesWorkOrder = {
+      id: "wo-closed-unassigned",
+      title: "Close stale refund draft",
+      state: "STATE_CLOSED",
+      result: "RESULT_COMPLETED",
+      assignees: [],
+      lineDispatches: [{ id: "dispatch-closed", line: { id: REFUND_LINE_PLAN_ID } }],
+    };
+    useFactoryWorkOrders.mockReturnValue({
+      data: [DRAFT_WORK_ORDER, BOARD_IMPLEMENT_NOTIFY_ORDER, closedUnassigned],
+    });
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-scope-unassigned"));
+
+    const actions = within(screen.getByTestId("lines-detail-header")).getByTestId("workspace-page-header-actions");
+    expect(within(actions).getByTestId("work-orders-scope-unassigned")).toHaveAttribute("aria-pressed", "true");
+    expect(within(actions).getByTestId("work-orders-scope-all")).toHaveAttribute("aria-pressed", "false");
+    expect(within(actions).getByTestId("work-orders-scope-my")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Draft: rework refund telemetry")).toBeInTheDocument();
+    expect(screen.getByText("Close stale refund draft")).toBeInTheDocument();
+    expect(screen.queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
+
+    const options = useFactoryBoardWorkOrders.mock.calls.at(-1)?.[2] as { userId?: string; unassigned?: boolean };
+    expect(options.unassigned).toBe(true);
+    expect(options.userId).toBeUndefined();
+  });
+
+  it("restores a saved Unassigned choice and does not add a selected owner to the request", () => {
+    window.localStorage.setItem(`sp:work-orders:scope:${PRIMARY_FACTORY_ID}`, "unassigned");
+    window.localStorage.setItem(
+      `sp:work-orders:filters:${PRIMARY_FACTORY_ID}`,
+      JSON.stringify({ assigneeIds: ["storybook-user"] }),
+    );
+    renderLinesBoard();
+
+    const actions = within(screen.getByTestId("lines-detail-header")).getByTestId("workspace-page-header-actions");
+    expect(within(actions).getByTestId("work-orders-scope-unassigned")).toHaveAttribute("aria-pressed", "true");
+    expect(within(actions).getByTestId("work-orders-scope-all")).toHaveAttribute("aria-pressed", "false");
+
+    const options = useFactoryBoardWorkOrders.mock.calls.at(-1)?.[2] as { userId?: string; unassigned?: boolean };
+    expect(options.unassigned).toBe(true);
+    expect(options.userId).toBeUndefined();
   });
 
   it("lists Source in the filter menu from configured intakes", async () => {

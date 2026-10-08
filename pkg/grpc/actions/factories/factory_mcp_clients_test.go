@@ -60,6 +60,45 @@ func Test__ListFactoryMCPClientsUsesRegisteredClientName(t *testing.T) {
 	assert.Equal(t, "Cursor Desktop", response.GetClients()[0].GetClientName())
 }
 
+func Test__ListFactoryMCPClientsNamesCodexMetadataClient(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureSuperPlaneMCPServer))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	const (
+		codexID       = "https://chatgpt.com/oauth/codex/example/client.json"
+		namedCodexID  = "https://chatgpt.com/oauth/codex/named/client.json"
+		storedCodexID = "https://chatgpt.com/oauth/codex/stored/client.json"
+		otherID       = "https://example.com/oauth/client.json"
+	)
+	_, err = models.CreateMCPOAuthClient(db, namedCodexID, "Cursor Desktop", []string{"cursor://callback"})
+	require.NoError(t, err)
+	_, err = models.CreateMCPOAuthClient(db, storedCodexID, storedCodexID, []string{"cursor://callback"})
+	require.NoError(t, err)
+
+	now := time.Now()
+	codex := insertFactoryMCPRefreshToken(t, r, factory.ID, codexID, now.Add(time.Hour), now)
+	named := insertFactoryMCPRefreshToken(t, r, factory.ID, namedCodexID, now.Add(time.Hour), now.Add(time.Second))
+	stored := insertFactoryMCPRefreshToken(t, r, factory.ID, storedCodexID, now.Add(time.Hour), now.Add(2*time.Second))
+	other := insertFactoryMCPRefreshToken(t, r, factory.ID, otherID, now.Add(time.Hour), now.Add(3*time.Second))
+
+	response, err := ListFactoryMCPClients(t.Context(), r.Organization.ID.String(), &pb.ListFactoryMCPClientsRequest{
+		FactoryId: factory.ID.String(),
+	})
+	require.NoError(t, err)
+
+	names := map[string]string{}
+	for _, client := range response.GetClients() {
+		names[client.GetId()] = client.GetClientName()
+	}
+	assert.Equal(t, "Codex", names[codex.ID.String()])
+	assert.Equal(t, "Cursor Desktop", names[named.ID.String()])
+	assert.Equal(t, "Codex", names[stored.ID.String()])
+	assert.Equal(t, otherID, names[other.ID.String()])
+}
+
 func Test__ListFactoryMCPClientsDoesNotRequireMCPServerFlag(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

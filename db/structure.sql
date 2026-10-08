@@ -1066,7 +1066,8 @@ CREATE TABLE public.linear_webhook_receipts (
     http_status integer NOT NULL,
     outcome text NOT NULL,
     subscription_count integer DEFAULT 0 NOT NULL,
-    task_ids text DEFAULT ''::text NOT NULL
+    task_ids text DEFAULT ''::text NOT NULL,
+    delivery_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -3732,6 +3733,13 @@ CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (gro
 
 
 --
+-- Name: idx_linear_webhook_receipts_delivery; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_linear_webhook_receipts_delivery ON public.linear_webhook_receipts USING btree (webhook_id, delivery_key) WHERE ((delivery_key <> ''::text) AND (outcome = 'accepted'::text));
+
+
+--
 -- Name: idx_linear_webhook_receipts_received_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5619,6 +5627,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
+20261007152426	f
 20261008002107	f
 \.
 

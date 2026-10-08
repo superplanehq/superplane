@@ -1,6 +1,6 @@
 import type { IssuesChoiceId } from "./onboardingFixtures";
 
-type FlaggedIssuesChoice = "jira" | "linear";
+type FlaggedIssuesChoice = "linear";
 
 function shouldClearSavedFlaggedChoice(args: {
   issuesChoice: IssuesChoiceId | null;
@@ -11,21 +11,6 @@ function shouldClearSavedFlaggedChoice(args: {
 }): boolean {
   if (args.featureLoading || args.available || args.issuesChoice !== args.source) return false;
   return args.organizationReady;
-}
-
-export function shouldClearSavedJiraChoice(args: {
-  issuesChoice: IssuesChoiceId | null;
-  featureLoading: boolean;
-  jiraAvailable: boolean;
-  organizationReady: boolean;
-}): boolean {
-  return shouldClearSavedFlaggedChoice({
-    issuesChoice: args.issuesChoice,
-    source: "jira",
-    featureLoading: args.featureLoading,
-    available: args.jiraAvailable,
-    organizationReady: args.organizationReady,
-  });
 }
 
 export function shouldClearSavedLinearChoice(args: {
@@ -56,22 +41,6 @@ function savedFlaggedChoiceBlock(args: {
   if (args.featureLoading) return "loading";
   if (!args.organizationReady) return "lookup-failed";
   return null;
-}
-
-/** A saved Jira choice cannot continue until the feature lookup confirms Jira. */
-export function savedJiraChoiceBlock(args: {
-  issuesChoice: IssuesChoiceId | null;
-  featureLoading: boolean;
-  jiraAvailable: boolean;
-  organizationReady: boolean;
-}): SavedFlaggedChoiceBlock | null {
-  return savedFlaggedChoiceBlock({
-    issuesChoice: args.issuesChoice,
-    source: "jira",
-    featureLoading: args.featureLoading,
-    available: args.jiraAvailable,
-    organizationReady: args.organizationReady,
-  });
 }
 
 /** A saved Linear choice cannot continue until the feature lookup confirms Linear. */
