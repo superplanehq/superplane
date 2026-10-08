@@ -36,6 +36,9 @@ func accountLookupDisconnected(r *http.Request, err error) bool {
 	if r == nil || err == nil {
 		return false
 	}
+	if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
 	return errors.Is(r.Context().Err(), context.Canceled)
 }
 

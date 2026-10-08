@@ -31,6 +31,12 @@ func Test__AccountLookupError(t *testing.T) {
 			wantStatus:     http.StatusUnauthorized,
 		},
 		{
+			name:          "canceled lookup after disconnect is client closed",
+			err:           context.Canceled,
+			cancelRequest: true,
+			wantStatus:    statusClientClosedRequest,
+		},
+		{
 			name:          "deadline after disconnect is client closed",
 			err:           context.DeadlineExceeded,
 			cancelRequest: true,
@@ -41,6 +47,13 @@ func Test__AccountLookupError(t *testing.T) {
 			err:          lookupErr,
 			wantStatus:   http.StatusInternalServerError,
 			wantRecorded: true,
+		},
+		{
+			name:          "database error after disconnect is recorded",
+			err:           lookupErr,
+			cancelRequest: true,
+			wantStatus:    http.StatusInternalServerError,
+			wantRecorded:  true,
 		},
 		{
 			name:         "deadline on a live request is recorded",
