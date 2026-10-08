@@ -99,6 +99,9 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 		case models.ProviderGitHub:
 			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL, "user:email"))
 			log.Infof("GitHub OAuth provider initialized")
+		case models.ProviderBitbucket:
+			gothProviders = append(gothProviders, newBitbucketProvider(config.Key, config.Secret, config.CallbackURL))
+			log.Infof("Bitbucket OAuth provider initialized")
 		case models.ProviderGoogle:
 			gothProviders = append(gothProviders, google.New(config.Key, config.Secret, config.CallbackURL, "email", "profile"))
 			log.Infof("Google OAuth provider initialized")
@@ -144,6 +147,9 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 }
 
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
+	if rejectBitbucketSignIn(w, r) {
+		return
+	}
 	if !isConnectIntent(r) {
 		gothUser, err := gothic.CompleteUserAuth(w, r)
 		if err == nil {
@@ -204,7 +210,11 @@ func withGitHubAccountPicker(authURL string) string {
 }
 
 func useRealProviderAuthInDevelopment(r *http.Request) bool {
-	return mux.Vars(r)["provider"] == models.ProviderGitHub && isConnectIntent(r)
+	if !isConnectIntent(r) {
+		return false
+	}
+	provider := mux.Vars(r)["provider"]
+	return provider == models.ProviderGitHub || provider == models.ProviderBitbucket
 }
 
 func (a *Handler) handleDevelopmentAuth(w http.ResponseWriter, r *http.Request) {
@@ -269,6 +279,14 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 	a.completeProviderAuth(w, r, mockUser)
 }
 
+func rejectBitbucketSignIn(w http.ResponseWriter, r *http.Request) bool {
+	if mux.Vars(r)["provider"] != models.ProviderBitbucket || isConnectIntent(r) {
+		return false
+	}
+	http.Error(w, "Bitbucket does not support sign-in", http.StatusBadRequest)
+	return true
+}
+
 func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
 	if isConnectIntent(r) {
 		a.finishAccountConnection(w, r, gothUser)
@@ -302,6 +320,11 @@ func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, got
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err != nil {
+		log.WithError(err).Warn("provider authentication failed")
+		if a.isDev {
+			http.Error(w, "Authentication failed: "+err.Error(), http.StatusUnauthorized)
+			return
+		}
 		http.Error(w, "Authentication failed", http.StatusUnauthorized)
 		return
 	}
@@ -328,6 +351,11 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 			return
 		}
 		a.completeProviderLink(w, r, gothUser, state)
+		return
+	}
+
+	if strings.EqualFold(gothUser.Provider, models.ProviderBitbucket) {
+		http.Error(w, "Bitbucket does not support sign-in", http.StatusBadRequest)
 		return
 	}
 

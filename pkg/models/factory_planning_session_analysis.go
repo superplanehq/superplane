@@ -248,51 +248,19 @@ var (
 	planningConfidenceScore = planningScoreKind{key: PlanningConfidenceCheckKey, name: PlanningConfidenceCheckName, max: PlanningScoreMax}
 )
 
-// ProposeClarity publishes how well the task is defined.
+// ProposeClarity is not part of the review scoring contract.
 func (s *FactoryPlanningSession) ProposeClarity(tx *gorm.DB, score float64, summary string) error {
-	if err := s.guardPlanningScoreEnabled(tx, "clarity"); err != nil {
-		return err
-	}
-	return s.proposePlanningScore(tx, planningClarityScore, score, summary)
+	return rejectLegacyPlanningScore("clarity")
 }
 
-// ProposeConfidence publishes how likely a coding agent completes the task in
-// one run without steering.
+// ProposeConfidence is not part of the review scoring contract. A new
+// session accepts only Clarity, Complexity, and Verifiability.
 func (s *FactoryPlanningSession) ProposeConfidence(tx *gorm.DB, score float64, summary string) error {
-	if err := s.guardPlanningScoreEnabled(tx, "confidence"); err != nil {
-		return err
-	}
-	return s.proposePlanningScore(tx, planningConfidenceScore, score, summary)
+	return rejectLegacyPlanningScore("confidence")
 }
 
-func (s *FactoryPlanningSession) guardPlanningScoreEnabled(tx *gorm.DB, score string) error {
-	factoryModel, err := FindFactory(tx, s.OrganizationID, s.FactoryID)
-	if err != nil {
-		return err
-	}
-	if score == "clarity" && !factoryModel.PlanningClarity {
-		return fmt.Errorf("%w: clarity is disabled", ErrFactoryPlanningSessionInvalid)
-	}
-	if score == "confidence" && !factoryModel.PlanningConfidence {
-		return fmt.Errorf("%w: confidence is disabled", ErrFactoryPlanningSessionInvalid)
-	}
-	return nil
-}
-
-func (s *FactoryPlanningSession) proposePlanningScore(tx *gorm.DB, kind planningScoreKind, score float64, summary string) error {
-	if err := validatePlanningScore(kind, score); err != nil {
-		return err
-	}
-	return s.withLockedSession(tx, func(inner *gorm.DB) error {
-		if err := s.guardOpen(); err != nil {
-			return err
-		}
-		order, err := s.analysisWorkOrder(inner)
-		if err != nil {
-			return err
-		}
-		return reportPlanningScore(inner, s, order, kind, score, summary)
-	})
+func rejectLegacyPlanningScore(score string) error {
+	return fmt.Errorf("%w: a lone %s score is not accepted; publish clarity, complexity, and verifiability from 1 through 3", ErrFactoryPlanningSessionInvalid, score)
 }
 
 func validatePlanningScore(kind planningScoreKind, score float64) error {
@@ -385,28 +353,11 @@ func planningScoreLevel(score, maxScore float64) string {
 	return FactoryWorkOrderCheckLevelCritical
 }
 
-func planningScoreCallSentence(tx *gorm.DB, session *FactoryPlanningSession) string {
+func planningScoreCallSentence() string {
 	const updateCue = "End an answer, and the first plan, with how to update the plan or the scores. "
-	const startCue = "When every required score is 5, publish each required score on that plan turn. "
 	const reviewStartCue = "When every required score is 3, publish each required score on that plan turn. "
 	const missingCue = "If no score is published yet, this turn is a plan turn. Publish the required scores before you ask or stop. "
-	if organizationHasPlanningReview(tx, session.OrganizationID) {
-		return missingCue + "Call propose_update with scores, spec, and survey in one call. Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + reviewStartCue + updateCue
-	}
-	factoryModel, err := FindFactory(tx, session.OrganizationID, session.FactoryID)
-	if err != nil {
-		return missingCue + "Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
-	}
-	switch {
-	case factoryModel.PlanningClarity && factoryModel.PlanningConfidence:
-		return missingCue + "Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + startCue + updateCue
-	case factoryModel.PlanningClarity:
-		return missingCue + "Publish the specification only when this turn updates the plan. Publish the Clarity score when the plan changes, the score would change, or the user asks to update that score. " + startCue + updateCue
-	case factoryModel.PlanningConfidence:
-		return missingCue + "Publish the specification only when this turn updates the plan. Publish the Confidence score when the plan changes, the score would change, or the user asks to update that score. " + startCue + updateCue
-	default:
-		return "Publish the specification only when this turn updates the plan. " + updateCue
-	}
+	return missingCue + "Call propose_update with scores, spec, and survey in one call. Publish the specification only when this turn updates the plan. Publish the scores when the plan changes, a score would change, or the user asks to update a score. " + reviewStartCue + updateCue
 }
 
 func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (string, error) {
@@ -432,12 +383,8 @@ func AnalysisContinuationText(tx *gorm.DB, session *FactoryPlanningSession) (str
 
 	var b strings.Builder
 	b.WriteString("Continue this SuperPlane analysis session. Do not greet as if the session is new. Follow the task prompt for tone, Clarity and Confidence rules, and specification shape. ")
-	b.WriteString(planningScoreCallSentence(tx, session))
-	if organizationHasPlanningReview(tx, session.OrganizationID) {
-		b.WriteString("If you write or update a specification this turn, include spec on propose_update before you stop. Do not leave a written plan unpublished. Include survey on propose_update only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
-	} else {
-		b.WriteString("If you write or update a specification this turn, call propose_spec before you stop. Do not leave a written plan unpublished. Call survey only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
-	}
+	b.WriteString(planningScoreCallSentence())
+	b.WriteString("If you write or update a specification this turn, include spec on propose_update before you stop. Do not leave a written plan unpublished. Include survey on propose_update only when the task prompt says to ask. You may update a score without rewriting the specification. Apply the latest user message.\n")
 	if artifacts.spec != "" {
 		b.WriteString("\nCurrent specification:\n\n")
 		b.WriteString(artifacts.spec)
@@ -625,11 +572,6 @@ func WorkOrderReadyForAutoStart(
 	if !factoryModel.PlanningEnabled {
 		return false, nil
 	}
-	// Review scoring is not optional, so the Confidence setting only gates
-	// auto-start on the legacy flow.
-	if !factoryModel.PlanningConfidence && !organizationHasPlanningReview(tx, factoryModel.OrganizationID) {
-		return false, nil
-	}
 	if len(session.CurrentSurvey().Questions) > 0 {
 		return false, nil
 	}
@@ -641,23 +583,80 @@ func WorkOrderReadyForAutoStart(
 	if err != nil {
 		return false, err
 	}
-	if organizationHasPlanningReview(tx, factoryModel.OrganizationID) {
-		if !turn.reportedReviewScores(checks) {
-			return false, nil
-		}
-	} else {
-		if !turn.reportedScore(checks, PlanningConfidenceCheckKey, PlanningScoreMax) {
-			return false, nil
-		}
-		if factoryModel.PlanningClarity && !turn.reportedScore(checks, PlanningClarityCheckKey, PlanningScoreMax) {
-			return false, nil
-		}
+	if !turn.reportedReviewScores(checks) {
+		return false, nil
+	}
+	firstReady, err := firstCheckReportsAtMaximum(tx, order.ID, planningReviewScoreKinds)
+	if err != nil {
+		return false, err
+	}
+	if !firstReady {
+		return false, nil
 	}
 	spec, err := planningSpecBody(tx, order)
 	if err != nil {
 		return false, err
 	}
 	return strings.TrimSpace(spec) != "", nil
+}
+
+func firstCheckReportsAtMaximum(tx *gorm.DB, workOrderID uuid.UUID, kinds []planningScoreKind) (bool, error) {
+	scores, err := firstReportedCheckScores(tx, workOrderID, kinds)
+	if err != nil {
+		return false, err
+	}
+	for _, kind := range kinds {
+		score, ok := scores[kind.key]
+		if !ok || score != kind.max {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func firstReportedCheckScores(tx *gorm.DB, workOrderID uuid.UUID, kinds []planningScoreKind) (map[string]float64, error) {
+	scores := make(map[string]float64, len(kinds))
+	for _, kind := range kinds {
+		score, found, err := earliestCheckScore(tx, workOrderID, kind)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			scores[kind.key] = score
+		}
+	}
+	return scores, nil
+}
+
+func earliestCheckScore(tx *gorm.DB, workOrderID uuid.UUID, kind planningScoreKind) (float64, bool, error) {
+	maxScore, err := json.Marshal(kind.max)
+	if err != nil {
+		return 0, false, err
+	}
+	var events []FactoryWorkOrderEvent
+	err = tx.
+		Where("work_order_id = ?", workOrderID).
+		Where("type = ?", factory.EventTypeOrderCheckReported).
+		Where("data->'check'->>'key' = ?", kind.key).
+		Where("data->'check'->>'maxScore' = ?", string(maxScore)).
+		Order("created_at ASC").
+		Order("id ASC").
+		Limit(1).
+		Find(&events).Error
+	if err != nil {
+		return 0, false, err
+	}
+	if len(events) == 0 {
+		return 0, false, nil
+	}
+	var payload factory.WorkOrderCheckReported
+	if err := json.Unmarshal(events[0].Data, &payload); err != nil {
+		return 0, false, err
+	}
+	if payload.Check == nil || payload.Check.Key != kind.key || payload.Check.MaxScore != kind.max {
+		return 0, false, nil
+	}
+	return payload.Check.Score, true, nil
 }
 
 type planningTurn struct {

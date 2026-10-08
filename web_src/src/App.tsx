@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
-import { FEATURE_FACTORIES, FEATURE_FACTORY_RISK_SCORE } from "./lib/experimentalFeatures";
+import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
@@ -176,14 +176,7 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
-              <Route
-                path=":lineId/setup/risk-score"
-                element={
-                  <RequireExperimentalFeature featureId={FEATURE_FACTORY_RISK_SCORE}>
-                    <RiskScoreSetupPage />
-                  </RequireExperimentalFeature>
-                }
-              />
+              <Route path=":lineId/setup/risk-score" element={<RiskScoreSetupPage />} />
               <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
               <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
               <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />

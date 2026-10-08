@@ -29,6 +29,7 @@ import {
 } from "./githubInstallReturn";
 import { githubConnectReturnPath } from "./onboardingGitHubConnect";
 import { useFirstRunBlockingAction, type FirstRunBlocking } from "./useFirstRunBlockingAction";
+import { useFirstRunBitbucket } from "./useFirstRunBitbucket";
 import {
   githubOnboardingMessage,
   navigateGitHubWindow,
@@ -218,6 +219,24 @@ function selectedIssuesChoice(model: OnboardingPageModel, linearAvailable: boole
   return issuesChoice;
 }
 
+function saveSelectedRepository(args: {
+  model: OnboardingPageModel;
+  connection: GitHubConnectionState;
+  forgeConfigured: boolean;
+}): Promise<boolean> {
+  const selectedRepo = args.model.setup.selectedRepo;
+  if (!selectedRepo) return Promise.resolve(false);
+  if (args.model.setup.vcsHost === "bitbucket") {
+    args.model.setup.commitRepoStep();
+    if (args.forgeConfigured) return args.model.selectBitbucketForgeRepository(selectedRepo);
+    return args.model.selectBitbucketRepository(selectedRepo);
+  }
+  const repository = args.connection.repositories.find((candidate) => candidate.fullName === selectedRepo);
+  if (!repository) return Promise.resolve(false);
+  args.model.setup.commitRepoStep();
+  return args.model.selectCatalogRepository(repository);
+}
+
 function useFirstRunCommands(args: {
   model: OnboardingPageModel;
   agentGate: OnboardingAgentGate;
@@ -226,23 +245,22 @@ function useFirstRunCommands(args: {
   blocking: FirstRunBlocking;
   linearAvailable: boolean;
   bitbucketAvailable: boolean;
+  forgeConfigured: boolean;
   installScope: GitHubInstallScope;
 }) {
-  const { model, agentGate, connection, navigation, blocking, linearAvailable, bitbucketAvailable, installScope } =
-    args;
+  const {
+    model,
+    agentGate,
+    connection,
+    navigation,
+    blocking,
+    linearAvailable,
+    bitbucketAvailable,
+    forgeConfigured,
+    installScope,
+  } = args;
   const location = useLocation();
-  const saveRepository = async (): Promise<boolean> => {
-    const selectedRepo = model.setup.selectedRepo;
-    if (!selectedRepo) return false;
-    if (model.setup.vcsHost === "bitbucket") {
-      model.setup.commitRepoStep();
-      return model.selectBitbucketRepository(selectedRepo);
-    }
-    const repository = connection.repositories.find((candidate) => candidate.fullName === selectedRepo);
-    if (!repository) return false;
-    model.setup.commitRepoStep();
-    return model.selectCatalogRepository(repository);
-  };
+  const saveRepository = () => saveSelectedRepository({ model, connection, forgeConfigured });
   const continueFromRepository = () =>
     blocking.run("saving-repository", async () => {
       if (await saveRepository()) {
@@ -327,64 +345,10 @@ function useFirstRunCommands(args: {
   };
 }
 
-type FlaggedIssuesChoice = "linear";
+import { savedLinearChoiceBlock, shouldClearSavedLinearChoice } from "./firstRunFlaggedChoice";
 
-function shouldClearSavedFlaggedChoice(args: {
-  issuesChoice: IssuesChoiceId | null;
-  source: FlaggedIssuesChoice;
-  featureLoading: boolean;
-  available: boolean;
-  organizationReady: boolean;
-}): boolean {
-  if (args.featureLoading || args.available || args.issuesChoice !== args.source) return false;
-  return args.organizationReady;
-}
-
-export function shouldClearSavedLinearChoice(args: {
-  issuesChoice: IssuesChoiceId | null;
-  featureLoading: boolean;
-  linearAvailable: boolean;
-  organizationReady: boolean;
-}): boolean {
-  return shouldClearSavedFlaggedChoice({
-    issuesChoice: args.issuesChoice,
-    source: "linear",
-    featureLoading: args.featureLoading,
-    available: args.linearAvailable,
-    organizationReady: args.organizationReady,
-  });
-}
-
-export type SavedFlaggedChoiceBlock = "loading" | "lookup-failed";
-
-function savedFlaggedChoiceBlock(args: {
-  issuesChoice: IssuesChoiceId | null;
-  source: FlaggedIssuesChoice;
-  featureLoading: boolean;
-  available: boolean;
-  organizationReady: boolean;
-}): SavedFlaggedChoiceBlock | null {
-  if (args.available || args.issuesChoice !== args.source) return null;
-  if (args.featureLoading) return "loading";
-  if (!args.organizationReady) return "lookup-failed";
-  return null;
-}
-
-/** A saved Linear choice cannot continue until the feature lookup confirms Linear. */
-export function savedLinearChoiceBlock(args: {
-  issuesChoice: IssuesChoiceId | null;
-  featureLoading: boolean;
-  linearAvailable: boolean;
-  organizationReady: boolean;
-}): SavedFlaggedChoiceBlock | null {
-  return savedFlaggedChoiceBlock({
-    issuesChoice: args.issuesChoice,
-    source: "linear",
-    featureLoading: args.featureLoading,
-    available: args.linearAvailable,
-    organizationReady: args.organizationReady,
-  });
-}
+export { savedLinearChoiceBlock, shouldClearSavedLinearChoice };
+export type { SavedFlaggedChoiceBlock } from "./firstRunFlaggedChoice";
 
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId, factoryId } = useFactoriesLayout();
@@ -396,6 +360,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     setupFinished,
     connectedBefore: Boolean(model.setup.selectedRepo),
   });
+  const bitbucketConnect = useFirstRunBitbucket({ organizationId, setupFinished, blocking });
   const intakeFeatures = useExperimentalFeature(organizationId);
   const intakeFeatureLoading = intakeFeatures.isLoading;
   const linearAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_LINEAR_INTAKE);
@@ -416,6 +381,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     blocking,
     linearAvailable,
     bitbucketAvailable,
+    forgeConfigured: bitbucketConnect.configured,
     installScope,
   });
   // A saved Linear choice is not valid when the organization does not have the
@@ -443,6 +409,17 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     vcsHost: model.setup.vcsHost,
     bitbucketAvailable,
     bitbucketFeatureLoading: intakeFeatureLoading,
+    bitbucketForgeConfigured: bitbucketConnect.configured,
+    bitbucketOnboardingPending: bitbucketConnect.pending,
+    bitbucketInstallUrl: bitbucketConnect.installUrl,
+    bitbucketRepositories: bitbucketConnect.repositories,
+    bitbucketIdentityLinked: bitbucketConnect.identityLinked,
+    bitbucketLoadError: bitbucketConnect.loadError,
+    bitbucketLookupFailed: bitbucketConnect.lookupFailed,
+    bitbucketLookupRetrying: bitbucketConnect.lookupRetrying,
+    retryBitbucketLookup: bitbucketConnect.retryLookup,
+    bitbucketConnectHref: bitbucketConnect.connectHref,
+    grantBitbucketAccess: bitbucketConnect.grantAccess,
     // The ticket screen is the last screen, so it finishes setup.
     ticketsFinishSetup: agentGate === "skip" || agentGate === "first",
     skipAgentScreen: agentGate === "skip",

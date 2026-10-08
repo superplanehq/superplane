@@ -33,7 +33,6 @@ export type { IntentAnalysisChat } from "./intentAnalysisChat";
  * source context. The summary stays on the right.
  */
 type WorkOrderIntentDocumentProps = {
-  planningReviewEnabled?: boolean;
   title: string;
   description: string;
   artifacts: FactoriesWorkOrderArtifact[];
@@ -52,7 +51,6 @@ type WorkOrderIntentDocumentProps = {
 };
 
 export function WorkOrderIntentDocument({
-  planningReviewEnabled = false,
   title,
   description,
   artifacts,
@@ -113,7 +111,7 @@ export function WorkOrderIntentDocument({
           files={files}
           source={source}
           contextSidebar={contextSidebar}
-          analysis={withClosedDecision(analysisChat, showClosedDecision, resultFooter, planningReviewEnabled)}
+          analysis={withClosedDecision(analysisChat, showClosedDecision, resultFooter)}
         />
         {mountPlanPane ? (
           <IntentSpecColumn
@@ -135,7 +133,7 @@ export function WorkOrderIntentDocument({
             contextSidebar={contextSidebar}
             isResizing={split.isResizing}
             onResize={split.startResize}
-            onClosePlan={planningReviewEnabled ? analysisChat?.onTogglePlan : undefined}
+            onClosePlan={analysisChat?.onTogglePlan}
           />
         ) : null}
       </div>
@@ -148,24 +146,12 @@ function withClosedDecision(
   analysisChat: IntentAnalysisChat | undefined,
   showClosedDecision: boolean,
   resultFooter: ReactNode,
-  planningReviewEnabled: boolean,
 ): IntentAnalysisChat | undefined {
   if (!analysisChat) {
     return undefined;
   }
-  analysisChat = { ...analysisChat, planningReviewEnabled };
   if (!showClosedDecision) {
     return { ...analysisChat, closedDecision: undefined, modelSelect: undefined };
-  }
-  if (!analysisChat.planningReviewEnabled) {
-    const startTone = analysisChat.creditVerdict
-      ? "blocked"
-      : liveDraftReadiness({
-          clarity: analysisChat.clarity?.score,
-          confidence: analysisChat.confidence?.score,
-          isAnalyzing: analysisChat.isAnalyzing,
-        }).tone;
-    return { ...analysisChat, closedDecision: <ClosedPlanActions resultFooter={resultFooter} startTone={startTone} /> };
   }
   const startTone = planningStartTone(analysisChat);
   return {
@@ -193,12 +179,7 @@ function planningStartTone(analysis: IntentAnalysisChat): DraftReadinessTone {
   }).tone;
 }
 
-function requestPaneClassName(
-  refineOpen: boolean,
-  showPlanPane: boolean,
-  isResizing: boolean,
-  planningReviewEnabled = false,
-) {
+function requestPaneClassName(refineOpen: boolean, showPlanPane: boolean, isResizing: boolean) {
   if (!refineOpen) {
     return showPlanPane ? REQUEST_PANE_SPLIT_CLASS : REQUEST_PANE_BASE_CLASS;
   }
@@ -206,7 +187,7 @@ function requestPaneClassName(
     REQUEST_PANE_BASE_CLASS,
     "border-b border-border lg:w-[var(--intent-left)] lg:flex-none lg:border-r lg:border-b-0",
     showPlanPane && "lg:min-w-[14rem]",
-    showPlanPane && planningReviewEnabled && "max-lg:hidden",
+    showPlanPane && "max-lg:hidden",
     !isResizing && `lg:transition-[width] ${REFINE_SPLIT_EASE}`,
   );
 }
@@ -238,7 +219,7 @@ function IntentRequestPane({
 }) {
   return (
     <div
-      className={requestPaneClassName(refineOpen, showPlanPane, isResizing, analysis?.planningReviewEnabled)}
+      className={requestPaneClassName(refineOpen, showPlanPane, isResizing)}
       style={{
         ["--intent-left" as string]: refineOpen ? chatWidth : showPlanPane ? `${percent}%` : undefined,
       }}

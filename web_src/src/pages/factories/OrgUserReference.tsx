@@ -33,15 +33,15 @@ export function OrgUserReference({
   };
 
   return (
-    <span className={cn("inline-flex min-w-0 items-center gap-1.5", className)}>
+    <span className={cn("inline-flex min-w-0 max-w-full items-center gap-1.5", className)}>
       <Avatar
         src={resolvedDisplay.avatarUrl}
         initials={resolvedDisplay.initials}
         alt={resolvedDisplay.name}
-        className={avatarSizeClass[size]}
+        className={cn("shrink-0", avatarSizeClass[size])}
       />
       {showName ? (
-        <span className={cn("truncate text-foreground", emphasizeName && "font-semibold", nameClassName)}>
+        <span className={cn("min-w-0 truncate text-foreground", emphasizeName && "font-semibold", nameClassName)}>
           {resolvedDisplay.name}
         </span>
       ) : null}

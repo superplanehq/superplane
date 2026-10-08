@@ -25,6 +25,10 @@ func DescribeVCSProviderOnboarding(ctx context.Context, provider string) (*pb.De
 		return nil, err
 	}
 
+	if provider == models.ProviderBitbucket {
+		return describeBitbucketOnboarding(ctx)
+	}
+
 	response := &pb.DescribeVCSProviderOnboardingResponse{ProviderConfigured: vcsProviderConfigured(provider)}
 	identities, err := vcsProviderIdentities(ctx, provider)
 	if err != nil {
@@ -126,6 +130,9 @@ func StartVCSProviderInstallation(ctx context.Context, provider string) (*pb.Sta
 	if err != nil {
 		return nil, err
 	}
+	if provider == models.ProviderBitbucket {
+		return startBitbucketInstallation(ctx)
+	}
 	cfg := config.LoadGitHubHostedAppConfig()
 	if !cfg.Enabled() {
 		return nil, grpcerrors.FailedPrecondition(nil, "public GitHub App is not configured")
@@ -200,6 +207,9 @@ func RefreshVCSProviderOnboarding(
 	if err != nil {
 		return nil, err
 	}
+	if provider == models.ProviderBitbucket {
+		return &pb.RefreshVCSProviderOnboardingResponse{}, nil
+	}
 	identity, err := currentVCSProviderIdentity(ctx, provider)
 	if err != nil {
 		return nil, vcsProviderIdentityError(err)
@@ -236,9 +246,10 @@ func RefreshVCSProviderOnboarding(
 }
 
 type vcsProviderIdentity struct {
-	userID int64
-	login  string
-	active bool
+	userID         int64
+	providerUserID string
+	login          string
+	active         bool
 }
 
 func currentAccountID(ctx context.Context) (uuid.UUID, error) {
@@ -271,6 +282,18 @@ func vcsProviderIdentities(ctx context.Context, provider string) ([]vcsProviderI
 		if linked.Provider != provider {
 			continue
 		}
+		if provider == models.ProviderBitbucket {
+			bitbucketAccountID, parseErr := normalizeBitbucketAccountID(linked.ProviderID)
+			if parseErr != nil {
+				return nil, grpcerrors.FailedPrecondition(parseErr, "linked Bitbucket account has an invalid user id")
+			}
+			identities = append(identities, vcsProviderIdentity{
+				providerUserID: bitbucketAccountID,
+				login:          linked.Username,
+				active:         linked.Active,
+			})
+			continue
+		}
 		numericID, err := strconv.ParseInt(linked.ProviderID, 10, 64)
 		if err != nil || numericID <= 0 {
 			return nil, grpcerrors.FailedPrecondition(err, "linked provider account has an invalid user id")
@@ -298,19 +321,32 @@ func currentVCSProviderIdentity(ctx context.Context, provider string) (*vcsProvi
 }
 
 func serializeVCSProviderIdentity(identity *vcsProviderIdentity) *pb.VCSProviderIdentity {
-	return &pb.VCSProviderIdentity{UserId: identity.userID, Login: identity.login}
+	return &pb.VCSProviderIdentity{
+		UserId:         identity.userID,
+		Login:          identity.login,
+		ProviderUserId: identity.providerUserID,
+	}
 }
 
 func supportedVCSProvider(provider string) (string, error) {
 	provider = strings.ToLower(strings.TrimSpace(provider))
-	if provider != models.ProviderGitHub {
+	switch provider {
+	case models.ProviderGitHub, models.ProviderBitbucket:
+		return provider, nil
+	default:
 		return "", grpcerrors.InvalidArgument(nil, "VCS provider is not supported")
 	}
-	return provider, nil
 }
 
 func vcsProviderConfigured(provider string) bool {
-	return provider == models.ProviderGitHub && config.LoadGitHubHostedAppConfig().Enabled()
+	switch provider {
+	case models.ProviderGitHub:
+		return config.LoadGitHubHostedAppConfig().Enabled()
+	case models.ProviderBitbucket:
+		return config.LoadBitbucketForgeAppConfig().Enabled()
+	default:
+		return false
+	}
 }
 
 func vcsProviderIdentityError(err error) error {

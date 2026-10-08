@@ -8,9 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
 import type { UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
 import { useSpokenPhraseDictation, type SpokenPhraseField } from "@/hooks/useSpokenPhraseDictation";
+import { hostedVideoFromClipboard } from "@/lib/hostedVideo";
 import { cn } from "@/lib/utils";
 import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { CreateWorkOrderRequestAttachButton } from "../../CreateWorkOrderRequestAttachButton";
+import { HostedVideoLinkField } from "../../HostedVideoLinkField";
 import { CreateWorkOrderRequestAttachments } from "../../CreateWorkOrderRequestAttachments";
 import { DictateButton } from "../../DictateButton";
 import { PendingWorkOrderFileChips } from "../../PendingWorkOrderFileChips";
@@ -24,7 +26,11 @@ import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import type { IntentAnalysisChat } from "./intentAnalysisChat";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { composerChipsWorking } from "./planChipStatus";
-import { mergeAnalysisTranscriptFiles, useAnalysisComposerImages } from "./useAnalysisComposerImages";
+import {
+  addAnalysisHostedVideo,
+  mergeAnalysisTranscriptFiles,
+  useAnalysisComposerImages,
+} from "./useAnalysisComposerImages";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import {
@@ -76,9 +82,7 @@ function analysisRequestChatState(analysis: IntentAnalysisChat) {
   return {
     followKey: analysis.view.executionId || analysis.view.canvasId || "analysis",
     active,
-    showSurvey: analysis.planningReviewEnabled
-      ? hasPendingPlanningQuestions(analysis.view)
-      : Boolean(analysis.view.survey && analysis.canSend && !active && analysis.view.messages.at(-1)?.role === "agent"),
+    showSurvey: hasPendingPlanningQuestions(analysis.view),
     placeholder:
       !analysis.canSend && stopped ? ANALYSIS_PLANNING_COPY.stopped : ANALYSIS_PLANNING_COPY.composerPlaceholder,
   };
@@ -106,6 +110,7 @@ function AnalysisRequestChat({
   const images = useAnalysisComposerImages({
     disabled: !analysis.canSend,
     onUploadFiles: analysis.onUploadFiles,
+    markdown: analysis.composer ?? "",
   });
   const transcriptFiles = mergeAnalysisTranscriptFiles(files, images.transcriptFiles);
   const composer = usePlanningComposer(analysis, images.pending.length, state.showSurvey);
@@ -142,7 +147,6 @@ function AnalysisRequestChat({
               <WorkOrderIntentSurvey
                 survey={analysis.view.survey}
                 onSubmit={analysis.onSubmitSurvey}
-                planningReviewEnabled={analysis.planningReviewEnabled}
                 disabled={!analysis.canSend}
               />
             ) : null}
@@ -164,7 +168,7 @@ function AnalysisRequestChat({
           chatColumnClass={chatColumnClass}
         />
       ) : null}
-      {analysis.planningReviewEnabled && analysis.composerError ? (
+      {analysis.composerError ? (
         <p
           role="alert"
           className={cn(chatColumnClass, "sp-error-shake pb-2 text-[12px] text-destructive")}
@@ -173,16 +177,14 @@ function AnalysisRequestChat({
           {analysis.composerError}
         </p>
       ) : null}
-      {analysis.planningReviewEnabled ? (
-        <PlanningImplementationControls
-          startDiscouraged={analysis.startDiscouraged}
-          modelSelect={analysis.modelSelect}
-          actions={analysis.closedDecision}
-          canSend={analysis.canSend}
-          showSuggestChanges={composer.collapsed}
-          onSuggestChanges={composer.expand}
-        />
-      ) : null}
+      <PlanningImplementationControls
+        startDiscouraged={analysis.startDiscouraged}
+        modelSelect={analysis.modelSelect}
+        actions={analysis.closedDecision}
+        canSend={analysis.canSend}
+        showSuggestChanges={composer.collapsed}
+        onSuggestChanges={composer.expand}
+      />
     </div>
   );
 }
@@ -190,8 +192,7 @@ function AnalysisRequestChat({
 function usePlanningComposer(analysis: IntentAnalysisChat, pendingFiles: number, showSurvey: boolean) {
   const [expanded, setExpanded] = useState(false);
   const collapsed = Boolean(
-    analysis.planningReviewEnabled &&
-      analysis.prioritizeImplementation &&
+    analysis.prioritizeImplementation &&
       !expanded &&
       !analysis.composer &&
       !analysis.composerError &&
@@ -202,9 +203,9 @@ function usePlanningComposer(analysis: IntentAnalysisChat, pendingFiles: number,
   return {
     collapsed,
     expand,
-    visible: !analysis.planningReviewEnabled || (!showSurvey && !collapsed),
-    focusOnMount: Boolean(analysis.planningReviewEnabled && expanded),
-    onFocus: analysis.planningReviewEnabled ? expand : undefined,
+    visible: !showSurvey && !collapsed,
+    focusOnMount: expanded,
+    onFocus: expand,
   };
 }
 
@@ -291,11 +292,6 @@ function AnalysisComposer({
             onSend={() => void send()}
           />
         </div>
-        {!analysis.planningReviewEnabled && analysis.composerError ? (
-          <p className="sp-error-shake mt-2 text-[12px] text-destructive" data-testid="split-run-intent-chat-error">
-            {analysis.composerError}
-          </p>
-        ) : null}
       </form>
     </div>
   );
@@ -367,7 +363,15 @@ function AnalysisComposerField({
             setCursor(event.target.selectionStart);
           }}
           onSelect={(event) => setCursor(event.currentTarget.selectionStart)}
-          onPaste={images.handlePaste}
+          onPaste={(event) => {
+            const hosted = hostedVideoFromClipboard(event.clipboardData.getData("text/plain"));
+            if (hosted) {
+              event.preventDefault();
+              addAnalysisHostedVideo(analysis, images.pending, hosted);
+              return;
+            }
+            images.handlePaste(event);
+          }}
           onKeyDown={(event) => {
             if (skillKeyboardRef.current?.(event)) {
               return;
@@ -422,6 +426,10 @@ function AnalysisComposerAddons({
           onAttach={(files) => void images.attach(files)}
         />
       ) : null}
+      <HostedVideoLinkField
+        disabled={!analysis.canSend}
+        onAdd={(video) => addAnalysisHostedVideo(analysis, images.pending, video)}
+      />
       <DictateButton dictation={dictation} copy={ANALYSIS_PLANNING_COPY} disabled={!analysis.canSend} />
       {images.previewImages.length > 0 ? (
         <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />

@@ -170,7 +170,7 @@ export function useSplitRunWorkOrderEdits(args: {
             initials: getUserInitials(name) || previousOwner.initials,
           });
         } else {
-          setOwner(previousOwner);
+          setOwner({ id: "", name: "", initials: "" });
         }
         showSuccessToast("Owner updated.");
       } catch (error) {

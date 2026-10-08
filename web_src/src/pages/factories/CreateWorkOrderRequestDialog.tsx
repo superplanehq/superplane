@@ -1,7 +1,9 @@
 import { ArrowUp, Loader2, Maximize2, Minimize2, XIcon } from "lucide-react";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 
+import { MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import { Button } from "@/components/ui/button";
+import type { HostedVideo } from "@/lib/hostedVideo";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Kbd } from "@/components/ui/kbd";
@@ -11,14 +13,20 @@ import { useShortcutLabel } from "@/hooks/useShortcutLabel";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { isSkillSlashMenuTarget } from "@/lib/skillSlashMenu";
+import { showErrorToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 import { CreateWorkOrderRequestAttachButton } from "./CreateWorkOrderRequestAttachButton";
+import { HostedVideoLinkField } from "./HostedVideoLinkField";
 import { CreateWorkOrderRequestAttachments } from "./CreateWorkOrderRequestAttachments";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import { DictateButton } from "./DictateButton";
 import { PendingWorkOrderFileChips } from "./PendingWorkOrderFileChips";
-import { createWorkOrderRequestImages, mergeCreateWorkOrderRequestImages } from "./lib/createWorkOrderRequestImages";
+import {
+  createWorkOrderRequestImages,
+  insertHostedVideoMarkdown,
+  mergeCreateWorkOrderRequestImages,
+} from "./lib/createWorkOrderRequestImages";
 import { MAX_DERIVED_WORK_ORDER_TITLE_LENGTH } from "./lib/derivedWorkOrderTitle";
 import { useCreateWorkOrderRequestForm } from "./useCreateWorkOrderRequestForm";
 import { useWorkOrderFieldDictation } from "./useWorkOrderFieldDictation";
@@ -228,6 +236,7 @@ function RequestDialogForm({
         showAttach={showAttach}
         dictate={<DictateButton dictation={dictation} copy={CREATE_WORK_ORDER_REQUEST_COPY} disabled={form.busy} />}
         onAttach={(files) => void form.handleAttach(files)}
+        onAddHostedVideo={(video) => addHostedVideo(description, form.attachedFiles, video, onDescriptionChange)}
         onRemoveAttachment={form.handleRemoveAttachment}
       />
     </form>
@@ -312,6 +321,7 @@ function RequestDialogFooter({
   showAttach,
   dictate,
   onAttach,
+  onAddHostedVideo,
   onRemoveAttachment,
 }: {
   attachedImages: ReturnType<typeof mergeCreateWorkOrderRequestImages>;
@@ -322,6 +332,7 @@ function RequestDialogFooter({
   showAttach: boolean;
   dictate: ReactNode;
   onAttach: (files: FileList | File[]) => void;
+  onAddHostedVideo: (video: HostedVideo) => boolean;
   onRemoveAttachment: (id: string) => void;
 }) {
   const sendShortcut = useShortcutLabel("Enter");
@@ -337,6 +348,7 @@ function RequestDialogFooter({
               onAttach={onAttach}
             />
           ) : null}
+          <HostedVideoLinkField disabled={isCreating} onAdd={onAddHostedVideo} />
           {dictate}
           {attachedImages.length > 0 ? (
             <CreateWorkOrderRequestAttachments images={attachedImages} onRemove={onRemoveAttachment} />
@@ -368,4 +380,21 @@ function RequestDialogFooter({
       </InputGroupAddon>
     </InputGroup>
   );
+}
+
+function addHostedVideo(
+  description: string,
+  attached: UploadedWorkOrderFile[],
+  video: HostedVideo,
+  onDescriptionChange: (next: string) => void,
+): boolean {
+  const next = insertHostedVideoMarkdown(description, video, attached);
+  if (next == null) {
+    showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images, videos, or audio files.`);
+    return false;
+  }
+  if (next !== description) {
+    onDescriptionChange(next);
+  }
+  return true;
 }
