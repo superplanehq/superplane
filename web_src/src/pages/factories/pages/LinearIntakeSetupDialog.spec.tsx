@@ -78,16 +78,20 @@ describe("LinearIntakeSetupDialog", () => {
     expect(screen.getByTestId("linear-setup-finish")).toBeDisabled();
   });
 
-  it("creates the intake for the selected projects and labels", async () => {
+  it("creates the intake for the selected projects and every label", async () => {
     const user = userEvent.setup();
     const onCreated = vi.fn();
     renderDialog(onCreated);
 
-    await user.click(await screen.findByTestId("linear-project-project-1"));
+    expect(
+      await screen.findByRole("heading", { name: LINEAR_INTAKE_SETUP_COPY.wizardStepProject }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(LINEAR_INTAKE_SETUP_COPY.labelsLabel)).not.toBeInTheDocument();
+    expect(screen.queryByText(LINEAR_INTAKE_SETUP_COPY.labelsHelper)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.labelNew })).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("linear-project-project-1"));
     await user.click(screen.getByTestId("linear-project-project-2"));
-    await user.click(screen.getByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.labelNew }));
-    await user.type(screen.getByTestId("linear-intake-label-input"), "bug");
-    await user.click(screen.getByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.labelAdd }));
     await user.click(screen.getByTestId("linear-setup-finish"));
 
     await waitFor(() => {
@@ -96,7 +100,7 @@ describe("LinearIntakeSetupDialog", () => {
         integrationId: "integration-1",
         settings: {
           linearProjectIds: ["project-1", "project-2"],
-          linearLabels: ["bug"],
+          linearLabels: [],
         },
       });
     });
