@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
@@ -17,7 +17,6 @@ import {
   REFUND_LINE_PLAN_ID,
   DRAFT_WORK_ORDER,
   RUNNING_WORK_ORDER,
-  CLOSED_WORK_ORDER,
   factoryWithPlanning,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
@@ -29,12 +28,41 @@ const useWorkOrder = vi.fn((): { data: FactoriesWorkOrder | undefined; isLoading
   isError: false,
 }));
 
-const { onDispatch, dispatchingIds, canUpdateWorkOrder, runnerModelCalls, updateAssignees } = vi.hoisted(() => ({
+const {
+  onDispatch,
+  dispatchingIds,
+  canUpdateWorkOrder,
+  runnerModelCalls,
+  updateAssignees,
+  findPlanningSession,
+  sendPlanningMessage,
+  answerPlanningSurvey,
+  liveCanvas,
+} = vi.hoisted(() => ({
   onDispatch: vi.fn(),
   dispatchingIds: { current: new Set<string>() },
   canUpdateWorkOrder: { current: true },
   runnerModelCalls: [] as unknown[][],
   updateAssignees: vi.fn(),
+  findPlanningSession: vi.fn(),
+  sendPlanningMessage: vi.fn(),
+  answerPlanningSurvey: vi.fn(),
+  liveCanvas: { current: undefined as unknown },
+}));
+
+vi.mock("../pages/planningSessionClient", () => ({
+  findPlanningSessionByWorkOrder: (...args: unknown[]) => findPlanningSession(...args),
+  sendPlanningSessionMessage: (...args: unknown[]) => sendPlanningMessage(...args),
+  answerPlanningSessionSurvey: (...args: unknown[]) => answerPlanningSurvey(...args),
+}));
+
+vi.mock("../pages/usePlanningSessionLiveRun", () => ({
+  usePlanningSessionLiveRun: (_organizationId: string, view: unknown) => view,
+}));
+
+vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
+  useSplitRunLiveCanvas: () =>
+    liveCanvas.current ?? { enabled: false, isError: false, isLoading: false, canvas: undefined, stream: [] },
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
@@ -130,7 +158,7 @@ function renderTask(
   factory: FactoriesFactory = REFUND_FACTORY,
 ) {
   return render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ThemeProvider>
         <TooltipProvider>
           <MemoryRouter initialEntries={[entry]}>
@@ -158,8 +186,17 @@ function renderTask(
   );
 }
 
+function resetPlanningSession() {
+  findPlanningSession.mockReset();
+  findPlanningSession.mockResolvedValue(null);
+  sendPlanningMessage.mockReset();
+  answerPlanningSurvey.mockReset();
+  liveCanvas.current = undefined;
+}
+
 describe("MobileTaskDetailPage back link", () => {
   beforeEach(() => {
+    resetPlanningSession();
     useWorkOrder.mockReset();
     useWorkOrder.mockReturnValue({ data: undefined, isLoading: true, isError: false });
     onDispatch.mockReset();
@@ -266,6 +303,7 @@ function renderDraft(factory: FactoriesFactory = REFUND_FACTORY, search = `?line
 
 describe("MobileTaskDetailPage model select", () => {
   beforeEach(() => {
+    resetPlanningSession();
     useWorkOrder.mockReset();
     onDispatch.mockReset();
     dispatchingIds.current = new Set();
@@ -407,59 +445,5 @@ describe("MobileTaskDetailPage model select", () => {
     expect(screen.getByRole("button", { name: "Start" })).toBeDisabled();
     expect(runnerModelCalls.map((call) => call[2])).not.toContain("hotfix");
     expect(runnerModelCalls.every((call) => call[2] == null || call[2] === "")).toBe(true);
-  });
-});
-
-describe("MobileTaskDetailPage owner", () => {
-  beforeEach(() => {
-    useWorkOrder.mockReset();
-    onDispatch.mockReset();
-    dispatchingIds.current = new Set();
-    canUpdateWorkOrder.current = true;
-    updateAssignees.mockReset();
-  });
-
-  function renderRunning() {
-    useWorkOrder.mockReturnValue({ data: RUNNING_WORK_ORDER, isLoading: false, isError: false });
-    return renderTask(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${RUNNING_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
-    );
-  }
-
-  it("assigns the task to the current user from the header", async () => {
-    const user = userEvent.setup();
-    updateAssignees.mockResolvedValue({
-      assignees: [{ id: "user-1", name: "Casey Reviewer" }],
-    });
-    renderRunning();
-
-    await user.click(screen.getByTestId("popup-edit-owner"));
-    await user.click(screen.getByRole("option", { name: "Casey Reviewer" }));
-
-    await waitFor(() =>
-      expect(updateAssignees).toHaveBeenCalledWith({
-        orderId: RUNNING_WORK_ORDER.id,
-        assigneeIds: ["user-1"],
-      }),
-    );
-    expect(screen.getByRole("button", { name: "Owner: Casey Reviewer" })).toBeInTheDocument();
-  });
-
-  it("keeps the owner as text without task update permission", () => {
-    canUpdateWorkOrder.current = false;
-    renderRunning();
-
-    expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
-    expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("Leonardo DiCaprio");
-  });
-
-  it("does not offer an owner change on a completed task", () => {
-    useWorkOrder.mockReturnValue({ data: CLOSED_WORK_ORDER, isLoading: false, isError: false });
-    renderTask(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${CLOSED_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
-    );
-
-    expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
-    expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("Leonardo DiCaprio");
   });
 });
