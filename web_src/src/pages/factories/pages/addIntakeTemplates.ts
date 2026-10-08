@@ -8,7 +8,6 @@ import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import {
   FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
 } from "@/lib/experimentalFeatures";
@@ -54,7 +53,6 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     name: "Jira issues",
     description: "Creates tasks from Jira issues.",
     iconSrc: jiraIcon,
-    featureId: FEATURE_FACTORY_JIRA_INTAKE,
   },
   {
     id: "sentry-exceptions",
