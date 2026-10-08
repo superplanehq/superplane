@@ -5,8 +5,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	bitbucketintegration "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -64,8 +66,13 @@ func updateBitbucketFactoryRepository(
 		selectedRepository = match.FullName
 		selectedDefaultBranch = match.DefaultBranch
 		selectedExternalID = match.UUID
-	} else if selectedDefaultBranch == "" {
-		return nil, factoryErrorToStatus(invalidArgument("default branch is required"), "failed to update factory repository")
+	} else {
+		if err := validateBitbucketTokenRepository(integration, repositoryName); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory repository")
+		}
+		if selectedDefaultBranch == "" {
+			return nil, factoryErrorToStatus(invalidArgument("default branch is required"), "failed to update factory repository")
+		}
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -126,4 +133,38 @@ func updateBitbucketFactoryRepository(
 		return nil, factoryErrorToStatus(err, "failed to update factory repository")
 	}
 	return &pb.UpdateFactoryRepositoryResponse{Factory: serialized}, nil
+}
+
+// validateBitbucketTokenRepository confines token-mode repository changes to
+// the integration scope: exact repository for repository tokens, workspace
+// prefix otherwise. Forge installs revalidate through the visible list above.
+func validateBitbucketTokenRepository(integration *models.Integration, repository string) error {
+	repository = strings.TrimSpace(repository)
+	workspace, slug, ok := strings.Cut(repository, "/")
+	slug = strings.TrimSuffix(strings.TrimSpace(slug), ".git")
+	if !ok || strings.TrimSpace(workspace) == "" || slug == "" || strings.Contains(slug, "/") {
+		return invalidArgument("repository must be in workspace/repository format")
+	}
+	var typed bitbucketintegration.Metadata
+	if err := mapstructure.Decode(integration.Metadata.Data(), &typed); err != nil {
+		return invalidArgument("VCS repository is not accessible")
+	}
+	if typed.AuthType == bitbucketintegration.AuthTypeRepositoryAccessToken {
+		if typed.Repository == nil || strings.TrimSpace(typed.Repository.FullName) == "" {
+			return invalidArgument("VCS repository is not accessible")
+		}
+		configured := strings.TrimSuffix(strings.TrimSpace(typed.Repository.FullName), ".git")
+		if !strings.EqualFold(configured, strings.TrimSuffix(repository, ".git")) {
+			return invalidArgument("VCS repository is not accessible")
+		}
+		return nil
+	}
+	configured := ""
+	if typed.Workspace != nil {
+		configured = strings.TrimSpace(typed.Workspace.Slug)
+	}
+	if configured == "" || !strings.EqualFold(configured, strings.TrimSpace(workspace)) {
+		return invalidArgument("VCS repository is not accessible")
+	}
+	return nil
 }

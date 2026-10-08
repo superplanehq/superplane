@@ -11,7 +11,10 @@ import { bitbucketOnboardingPollInterval } from "./bitbucketOnboardingPoll";
 const bitbucketOnboardingKey = (organizationId: string) => ["me", organizationId, "bitbucket-onboarding"] as const;
 const bitbucketProvider = "bitbucket";
 
-export function useBitbucketOnboarding(organizationId: string, options: { poll?: boolean } = {}) {
+export function useBitbucketOnboarding(
+  organizationId: string,
+  options: { poll?: boolean; attemptActive?: boolean } = {},
+) {
   const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: bitbucketOnboardingKey(organizationId),
@@ -23,7 +26,8 @@ export function useBitbucketOnboarding(organizationId: string, options: { poll?:
     },
     enabled: Boolean(organizationId),
     staleTime: 0,
-    refetchInterval: (current) => bitbucketOnboardingPollInterval(options.poll !== false, current.state),
+    refetchInterval: (current) =>
+      bitbucketOnboardingPollInterval(options.poll !== false, current.state, options.attemptActive === true),
   });
 
   const startInstallation = useMutation({
