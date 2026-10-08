@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -19,7 +20,11 @@ import (
 const maxRegistrationRequestBytes = 64 * 1024
 
 type registerRunnerRequest struct {
-	Version string `json:"version"`
+	Version  string            `json:"version"`
+	OS       string            `json:"os"`
+	Arch     string            `json:"arch"`
+	Hostname string            `json:"hostname"`
+	Tags     map[string]string `json:"tags,omitempty"`
 }
 
 type registerRunnerResponse struct {
@@ -52,6 +57,21 @@ func (s *Server) registerRunner(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "runner version is required")
 		return
 	}
+	request.OS = strings.TrimSpace(request.OS)
+	request.Arch = strings.TrimSpace(request.Arch)
+	request.Hostname = strings.TrimSpace(request.Hostname)
+	if len(request.OS) > 128 || len(request.Arch) > 128 || len(request.Hostname) > 255 {
+		writeError(w, http.StatusBadRequest, "runner host information is invalid")
+		return
+	}
+	if !validRunnerTags(request.Tags) {
+		writeError(w, http.StatusBadRequest, "runner tags are invalid")
+		return
+	}
+	if request.Tags == nil {
+		request.Tags = map[string]string{}
+	}
+	ip := registrationIP(r)
 
 	claims, err := ValidateRegistrationToken(s.signer, registrationToken)
 	if err != nil {
@@ -84,6 +104,13 @@ func (s *Server) registerRunner(w http.ResponseWriter, r *http.Request) {
 			claims.FleetID,
 			taskID,
 			request.Version,
+			models.RunnerHost{
+				OS:       request.OS,
+				Arch:     request.Arch,
+				Hostname: request.Hostname,
+				IP:       ip,
+				Tags:     request.Tags,
+			},
 			crypto.HashToken(accessToken),
 			time.Now(),
 		)
@@ -140,6 +167,34 @@ func registrationClaimIDs(claims *RegistrationClaims) (uuid.UUID, uuid.UUID, *uu
 		return uuid.Nil, uuid.Nil, nil, err
 	}
 	return runnerID, jti, &taskID, nil
+}
+
+func validRunnerTags(tags map[string]string) bool {
+	if len(tags) > 32 {
+		return false
+	}
+	for key, value := range tags {
+		if key == "" || key == "os" || key == "arch" || key == "hostname" || key == "ip" ||
+			len(key) > 128 || len(value) > 512 {
+			return false
+		}
+	}
+	return true
+}
+
+func registrationIP(r *http.Request) string {
+	forwarded := strings.Split(r.Header.Get("X-Forwarded-For"), ",")
+	if ip := net.ParseIP(strings.TrimSpace(forwarded[len(forwarded)-1])); ip != nil {
+		return ip.String()
+	}
+	address, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		address = r.RemoteAddr
+	}
+	if ip := net.ParseIP(address); ip != nil {
+		return ip.String()
+	}
+	return ""
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

@@ -23,12 +23,18 @@ func TestRegisterExchangesOpaqueRegistrationToken(t *testing.T) {
 				if got := r.Header.Get("Authorization"); got != "Bearer "+test.token {
 					t.Fatalf("authorization = %q", got)
 				}
-				var request registerRequest
+				var request RegistrationDetails
 				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 					t.Fatalf("decode request: %v", err)
 				}
 				if request.Version != "0.1.0" {
 					t.Fatalf("version = %q", request.Version)
+				}
+				if request.Tags["ec2_instance_id"] != "i-123" {
+					t.Fatalf("tags = %#v", request.Tags)
+				}
+				if request.OS != "linux" || request.Arch != "amd64" || request.Hostname != "worker-a" {
+					t.Fatalf("host information = %#v", request)
 				}
 				writeJSON(t, w, http.StatusOK, Registration{
 					RunnerID:    "runner-1",
@@ -44,7 +50,10 @@ func TestRegisterExchangesOpaqueRegistrationToken(t *testing.T) {
 				server.Client(),
 				server.URL,
 				test.token,
-				"0.1.0",
+				RegistrationDetails{
+					Version: "0.1.0", OS: "linux", Arch: "amd64", Hostname: "worker-a",
+					Tags: map[string]string{"ec2_instance_id": "i-123"},
+				},
 			)
 			if err != nil {
 				t.Fatalf("Register: %v", err)
@@ -65,7 +74,7 @@ func TestRegisterIncludesResponseBodyInStatusError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := Register(t.Context(), server.Client(), server.URL, "token", "wrong")
+	_, err := Register(t.Context(), server.Client(), server.URL, "token", RegistrationDetails{Version: "wrong"})
 	if err == nil {
 		t.Fatal("expected registration error")
 	}

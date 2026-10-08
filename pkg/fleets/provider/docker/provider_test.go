@@ -66,6 +66,7 @@ func TestProviderLifecycle(t *testing.T) {
 	encoded, err := p.BuildBootstrap(provider.RunnerBootstrap{
 		RunnerAPIURL:      "https://public.example",
 		RegistrationToken: "one-time-token",
+		Tags:              map[string]string{"fleet_manager_id": "manager-a"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -88,6 +89,7 @@ func TestProviderLifecycle(t *testing.T) {
 		"runner:dev",
 		"--url http://app:8000",
 		"--registration-token one-time-token",
+		"--tag fleet_manager_id=manager-a",
 	} {
 		if !strings.Contains(createArgs, expected) {
 			t.Fatalf("create args %q do not contain %q", createArgs, expected)

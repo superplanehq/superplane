@@ -26,6 +26,10 @@ type FleetFixture = {
   idle?: string;
   busy?: string;
   runners?: Array<{ id: string; state?: string }>;
+  runnerDetails?: Record<
+    string,
+    { id: string; state: string; os: string; arch: string; hostname: string; ip: string; tags: Record<string, string> }
+  >;
   tasks?: Array<{ id: string; state?: string }>;
   runnerTotal?: string;
   taskTotal?: string;
@@ -96,6 +100,10 @@ const fleetRecordBody = (url: URL, fleets: FleetFixture[]) => {
   }
   if (url.pathname.endsWith("/runners")) {
     return runnersBody(fleet);
+  }
+  const runnerId = url.pathname.split("/runners/")[1];
+  if (runnerId && fleet.runnerDetails?.[runnerId]) {
+    return json({ runner: fleet.runnerDetails[runnerId] });
   }
   if (url.pathname.endsWith("/tasks")) {
     return tasksBody(fleet);
@@ -226,6 +234,35 @@ describe("RunnerTasks", () => {
       expect(url.searchParams.has("offset")).toBe(false);
       expect(url.searchParams.get("limit")).toBe("50");
     });
+  });
+
+  it("finds a terminated runner by ID and shows its instance ID", async () => {
+    const { calls } = installFetch([
+      {
+        id: "e1-large-amd64",
+        runnerDetails: {
+          "runner-terminated": {
+            id: "runner-terminated",
+            state: "terminated",
+            os: "linux",
+            arch: "amd64",
+            hostname: "worker-a",
+            ip: "198.51.100.4",
+            tags: { ec2_instance_id: "i-123" },
+          },
+        },
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(await screen.findByLabelText("Runner ID"), "runner-terminated");
+    await user.click(screen.getByRole("button", { name: "Find runner" }));
+
+    expect(await screen.findByText("i-123")).toBeInTheDocument();
+    expect(screen.getByText("worker-a")).toBeInTheDocument();
+    expect(screen.getByText("198.51.100.4")).toBeInTheDocument();
+    expect(calls).toContain("/admin/api/installation/fleets/e1-large-amd64/runners/runner-terminated");
   });
 
   it("keeps the task broker not-configured state", async () => {

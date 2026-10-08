@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -60,6 +61,11 @@ type Runner struct {
 	FleetID                uuid.UUID
 	State                  string
 	RunnerVersion          string
+	OS                     string
+	Arch                   string
+	Hostname               string
+	IP                     string
+	Tags                   datatypes.JSONType[map[string]string]
 	Ephemeral              bool
 	RegisteredAt           *time.Time
 	LastSeenAt             *time.Time
@@ -70,6 +76,14 @@ type Runner struct {
 	TerminatedAt           *time.Time
 	CreationIdempotencyKey *string
 	CreationRequestHash    *string
+}
+
+type RunnerHost struct {
+	OS       string
+	Arch     string
+	Hostname string
+	IP       string
+	Tags     map[string]string
 }
 
 /*
@@ -217,6 +231,7 @@ func (r *Runner) Register(
 	fleetSlug string,
 	taskID *uuid.UUID,
 	version string,
+	host RunnerHost,
 	accessTokenHash string,
 	now time.Time,
 ) error {
@@ -301,6 +316,11 @@ func (r *Runner) Register(
 		Where("state = ?", RunnerStatePending).
 		Updates(map[string]any{
 			"state":         RunnerStateIdle,
+			"os":            host.OS,
+			"arch":          host.Arch,
+			"hostname":      host.Hostname,
+			"ip":            host.IP,
+			"tags":          datatypes.NewJSONType(host.Tags),
 			"registered_at": now,
 			"last_seen_at":  now,
 			"updated_at":    now,
@@ -313,6 +333,11 @@ func (r *Runner) Register(
 	}
 
 	r.State = RunnerStateIdle
+	r.OS = host.OS
+	r.Arch = host.Arch
+	r.Hostname = host.Hostname
+	r.IP = host.IP
+	r.Tags = datatypes.NewJSONType(host.Tags)
 	r.RegisteredAt = &now
 	r.LastSeenAt = &now
 	r.UpdatedAt = now

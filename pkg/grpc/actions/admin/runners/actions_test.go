@@ -346,6 +346,11 @@ func TestListRunnersOnlyReturnsRunnersForFleet(t *testing.T) {
 		FleetID:       installationFleet.ID,
 		State:         models.RunnerStatePending,
 		RunnerVersion: "0.1.0",
+		OS:            "linux",
+		Arch:          "amd64",
+		Hostname:      "worker-a",
+		IP:            "198.51.100.4",
+		Tags:          datatypes.NewJSONType(map[string]string{"ec2_instance_id": "i-123"}),
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -367,6 +372,11 @@ func TestListRunnersOnlyReturnsRunnersForFleet(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, response.Runners, 1)
 	assert.Equal(t, installationRunner.ID.String(), response.Runners[0].Id)
+	assert.Equal(t, "i-123", response.Runners[0].Tags["ec2_instance_id"])
+	assert.Equal(t, "linux", response.Runners[0].Os)
+	assert.Equal(t, "amd64", response.Runners[0].Arch)
+	assert.Equal(t, "worker-a", response.Runners[0].Hostname)
+	assert.Equal(t, "198.51.100.4", response.Runners[0].Ip)
 	assert.Equal(t, int64(1), response.TotalCount)
 	assert.False(t, response.HasNextPage)
 }

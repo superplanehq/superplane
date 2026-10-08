@@ -1,6 +1,9 @@
 import { Text } from "@/components/Text/text";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
-import { type FleetRunner, type FleetTask, nextCursor, previousCursor } from "./fleetAdmin";
+import { type FleetRunner, type FleetTask, fetchRunner, nextCursor, previousCursor } from "./fleetAdmin";
 import { PageControls, RelativeTimestamp, StateBadge, headerCellClass, rowClass, tableClass } from "./fleetTable";
 
 export const RunnerRows = ({ rows }: { rows: FleetRunner[] }) => (
@@ -11,6 +14,11 @@ export const RunnerRows = ({ rows }: { rows: FleetRunner[] }) => (
           <th className={headerCellClass}>ID</th>
           <th className={headerCellClass}>State</th>
           <th className={headerCellClass}>Runner version</th>
+          <th className={headerCellClass}>OS</th>
+          <th className={headerCellClass}>Architecture</th>
+          <th className={headerCellClass}>Hostname</th>
+          <th className={headerCellClass}>IP address</th>
+          <th className={headerCellClass}>Tags</th>
           <th className={headerCellClass}>Ephemeral</th>
           <th className={headerCellClass}>Created</th>
           <th className={headerCellClass}>Last seen</th>
@@ -25,6 +33,26 @@ export const RunnerRows = ({ rows }: { rows: FleetRunner[] }) => (
             </td>
             <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300">
               {runner.runnerVersion?.trim() || "—"}
+            </td>
+            <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300">{runner.os || "—"}</td>
+            <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300">{runner.arch || "—"}</td>
+            <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300">{runner.hostname || "—"}</td>
+            <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300">{runner.ip || "—"}</td>
+            <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300">
+              {Object.entries(runner.tags ?? {}).length === 0 ? (
+                "—"
+              ) : (
+                <dl className="space-y-1">
+                  {Object.entries(runner.tags ?? {})
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([key, value]) => (
+                      <div key={key} className="flex gap-1">
+                        <dt className="font-medium">{key}:</dt>
+                        <dd className="font-mono break-all">{value}</dd>
+                      </div>
+                    ))}
+                </dl>
+              )}
             </td>
             <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">{runner.ephemeral ? "Yes" : "No"}</td>
             <td className="px-4 py-2.5">
@@ -90,20 +118,70 @@ const EmptyRecords = ({ message }: { message: string }) => (
 );
 
 export const RunnerList = ({
+  fleetId,
   runners,
   cursors,
   setCursors,
 }: {
+  fleetId: string;
   runners: { rows: FleetRunner[]; totalCount: number; hasNextPage: boolean } | null;
   cursors: string[];
   setCursors: (update: (current: string[]) => string[]) => void;
 }) => {
+  const [runnerId, setRunnerId] = useState("");
+  const [foundRunner, setFoundRunner] = useState<FleetRunner | null>(null);
+  const [lookupError, setLookupError] = useState("");
+  const lookupAbort = useRef<AbortController | null>(null);
+
+  useEffect(() => () => lookupAbort.current?.abort(), []);
+
+  const findRunner = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    lookupAbort.current?.abort();
+    setFoundRunner(null);
+    setLookupError("");
+    const id = runnerId.trim();
+    if (!id) {
+      return;
+    }
+    const abort = new AbortController();
+    lookupAbort.current = abort;
+    try {
+      setFoundRunner(await fetchRunner(fleetId, id, abort.signal));
+    } catch (error) {
+      if (!abort.signal.aborted) {
+        setLookupError(error instanceof Error ? error.message : "Failed to load runner.");
+      }
+    }
+  };
+
   if (!runners) {
     return <Text className="text-sm text-gray-500 dark:text-gray-400">Loading runners...</Text>;
   }
 
   return (
     <>
+      <form onSubmit={findRunner} className="mb-3 flex items-end gap-2">
+        <div className="w-full max-w-md">
+          <label htmlFor="runner-id-lookup" className="mb-1 block text-sm text-gray-700 dark:text-gray-300">
+            Runner ID
+          </label>
+          <Input
+            id="runner-id-lookup"
+            value={runnerId}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => setRunnerId(event.target.value)}
+          />
+        </div>
+        <Button type="submit" disabled={!runnerId.trim()}>
+          Find runner
+        </Button>
+      </form>
+      {lookupError && <Text className="mb-3 text-sm text-red-600 dark:text-red-400">{lookupError}</Text>}
+      {foundRunner && (
+        <div className="mb-3">
+          <RunnerRows rows={[foundRunner]} />
+        </div>
+      )}
       {runners.rows.length === 0 ? (
         <EmptyRecords message="No idle or busy runners." />
       ) : (

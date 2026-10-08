@@ -39,7 +39,13 @@ const FleetBody = ({ page }: { page: ReturnType<typeof useAdminFleets> }) => {
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
         </TabsList>
         <TabsContent value="runners" className="mt-3">
-          <RunnerList runners={page.runners} cursors={page.runnerCursors} setCursors={page.setRunnerCursors} />
+          <RunnerList
+            key={page.selectedFleetId}
+            fleetId={page.selectedFleetId ?? ""}
+            runners={page.runners}
+            cursors={page.runnerCursors}
+            setCursors={page.setRunnerCursors}
+          />
         </TabsContent>
         <TabsContent value="tasks" className="mt-3">
           <TaskList tasks={page.tasks} cursors={page.taskCursors} setCursors={page.setTaskCursors} />

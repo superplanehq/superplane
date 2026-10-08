@@ -80,6 +80,17 @@ Docker fleets use a configured runner image instead of a release artifact.
 The local development configuration uses the tool-rich
 `superplane-runner-local:dev` image.
 
+The runner sends OS, architecture, and hostname as registration fields. The
+server records the registration request's IP in the runner's `ip` field when available.
+It uses the rightmost `X-Forwarded-For` address from the ingress proxy, or the
+connection peer address for direct requests. Fleet Manager adds the
+`fleet_manager_id` tag. Use `--tag key=value` more than once, or set `--tags`
+or `RUNNER_TAGS` to comma-separated `key=value` pairs. Quote a pair as a CSV
+field if its value contains a comma. Use `--tags-from-ec2-metadata` or
+`--tags-from-gcp-metadata` to add cloud instance tags. AWS Fleet Manager enables
+EC2 tags for its runners. The admin runner list and describe API return the
+host fields and tags.
+
 Fleet Manager creates unbound ephemeral runners. An idle runner can reserve the
 next queued task. The target capacity is the number of queued tasks plus
 `warmCapacity`. Set `warmCapacity` to the number of idle runners that the

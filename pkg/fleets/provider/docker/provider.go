@@ -119,8 +119,9 @@ func (p *Provider) List(
 }
 
 type bootstrap struct {
-	RunnerAPIURL      string `json:"runner_api_url"`
-	RegistrationToken string `json:"registration_token"`
+	RunnerAPIURL      string            `json:"runner_api_url"`
+	RegistrationToken string            `json:"registration_token"`
+	Tags              map[string]string `json:"tags,omitempty"`
 }
 
 func (p *Provider) BuildBootstrap(
@@ -133,6 +134,7 @@ func (p *Provider) BuildBootstrap(
 	return json.Marshal(bootstrap{
 		RunnerAPIURL:      runnerAPIURL,
 		RegistrationToken: request.RegistrationToken,
+		Tags:              request.Tags,
 	})
 }
 
@@ -178,6 +180,9 @@ func (p *Provider) Create(
 		"--url", boot.RunnerAPIURL,
 		"--registration-token", boot.RegistrationToken,
 	)
+	for key, value := range boot.Tags {
+		args = append(args, "--tag", key+"="+value)
+	}
 	output, err := p.docker.Run(ctx, args...)
 	if err != nil {
 		return provider.Resource{}, dockerError(

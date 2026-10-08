@@ -13,8 +13,12 @@ import (
 
 const maxErrorResponseBytes = 4 * 1024
 
-type registerRequest struct {
-	Version string `json:"version"`
+type RegistrationDetails struct {
+	Version  string            `json:"version"`
+	OS       string            `json:"os"`
+	Arch     string            `json:"arch"`
+	Hostname string            `json:"hostname"`
+	Tags     map[string]string `json:"tags,omitempty"`
 }
 
 // Registration is the identity and revocable credential returned after the
@@ -31,24 +35,24 @@ func Register(
 	client *http.Client,
 	baseURL string,
 	registrationToken string,
-	version string,
+	details RegistrationDetails,
 ) (Registration, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	registrationToken = strings.TrimSpace(registrationToken)
-	version = strings.TrimSpace(version)
+	details.Version = strings.TrimSpace(details.Version)
 	switch {
 	case baseURL == "":
 		return Registration{}, errors.New("runner API URL is required")
 	case registrationToken == "":
 		return Registration{}, errors.New("runner registration token is required")
-	case version == "":
+	case details.Version == "":
 		return Registration{}, errors.New("runner version is required")
 	}
 
-	body, err := json.Marshal(registerRequest{Version: version})
+	body, err := json.Marshal(details)
 	if err != nil {
 		return Registration{}, fmt.Errorf("encode runner registration: %w", err)
 	}

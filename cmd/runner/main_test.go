@@ -4,11 +4,30 @@ import (
 	"bytes"
 	"log/slog"
 	"os"
+	"reflect"
 	"strings"
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/spf13/pflag"
 )
+
+func TestRunnerTagsAcceptListAndSingleTag(t *testing.T) {
+	t.Setenv("RUNNER_TAGS", `fleet_manager_id=manager-a,"note=hello, world"`)
+	flags := pflag.NewFlagSet("runner", pflag.ContinueOnError)
+	var tags map[string]string
+	if err := registerRunnerTagFlags(flags, &tags); err != nil {
+		t.Fatal(err)
+	}
+	if err := flags.Parse([]string{"--tag", "role=worker", "--tags", "role=builder,zone=us-east-1"}); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"fleet_manager_id": "manager-a", "note": "hello, world", "role": "builder", "zone": "us-east-1"}
+	if !reflect.DeepEqual(tags, want) {
+		t.Fatalf("tags = %#v, want %#v", tags, want)
+	}
+}
 
 func TestForwardShutdownSignalsLogsSignal(t *testing.T) {
 	var logs bytes.Buffer

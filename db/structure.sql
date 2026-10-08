@@ -1368,6 +1368,11 @@ CREATE TABLE public.runners (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     terminated_at timestamp with time zone,
+    tags jsonb DEFAULT '{}'::jsonb NOT NULL,
+    os text DEFAULT ''::text NOT NULL,
+    arch text DEFAULT ''::text NOT NULL,
+    hostname text DEFAULT ''::text NOT NULL,
+    ip text DEFAULT ''::text NOT NULL,
     CONSTRAINT runners_creation_idempotency_check CHECK ((((creation_idempotency_key IS NULL) AND (creation_request_hash IS NULL)) OR ((creation_idempotency_key IS NOT NULL) AND (creation_request_hash IS NOT NULL)))),
     CONSTRAINT runners_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'idle'::character varying, 'busy'::character varying, 'terminated'::character varying])::text[]))),
     CONSTRAINT runners_termination_check CHECK (((((state)::text = 'terminated'::text) AND (terminated_at IS NOT NULL)) OR (((state)::text <> 'terminated'::text) AND (terminated_at IS NULL))))
@@ -5595,7 +5600,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261006160433	f
+20261007202030	f
 \.
 
 

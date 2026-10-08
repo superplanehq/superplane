@@ -43,6 +43,7 @@ type ArtifactResolver interface {
 
 type Config struct {
 	FleetID         string
+	FleetManagerID  string
 	WarmCapacity    int
 	MaxCapacity     int
 	OperatingSystem string
@@ -418,6 +419,7 @@ func (r *Reconciler) provision(
 		RunnerAPIURL:      runnerBaseURL(created.RunnerAPIURL),
 		RegistrationToken: created.RegistrationToken,
 		Artifact:          resolved,
+		Tags:              map[string]string{"fleet_manager_id": r.config.FleetManagerID},
 	})
 	if err != nil {
 		return r.rollbackProvision(ctx, created.Runner.ID, fmt.Errorf("build runner bootstrap: %w", err))
