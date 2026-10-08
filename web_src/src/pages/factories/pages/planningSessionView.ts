@@ -148,14 +148,13 @@ function planningSessionMessageTime(message: PlanningSessionMessagePayload): num
 
 export function createWithAgentViewFromSession(
   session: PlanningSessionPayload,
-  extras: Pick<CreateWithAgentView, "composer" | "right" | "endConfirmOpen"> & {
-    analysisDelivered?: boolean;
-  },
+  extras: Pick<CreateWithAgentView, "composer" | "right" | "endConfirmOpen">,
 ): CreateWithAgentView {
   const activities = (session.activities ?? []).flatMap(agentActivityFromPayload);
   return {
     repository: session.repository ?? "",
-    machineStatus: createWithAgentMachineStatus(session, extras.analysisDelivered),
+    machineStatus: createWithAgentMachineStatus(session),
+    turnEnded: session.state === "ended",
     canvasId: session.canvasId ?? "",
     canvasRunId: session.canvasRunId ?? "",
     executionId: session.executionId ?? "",
@@ -266,19 +265,21 @@ export function isFailedPlanningCanvasRun(run: { result?: string } | null | unde
   return run?.result === "RESULT_FAILED" || run?.result === "RESULT_CANCELLED";
 }
 
+/**
+ * The canvas run decides how a finished analysis turn looks. A passed run
+ * means the agent ended its turn after the idle wait, so the chat waits for
+ * the next user message. A failed or cancelled run means the analysis stopped.
+ */
 export function applyPlanningSessionLiveRun(
   view: CreateWithAgentView,
   run: { result?: string } | null | undefined,
   analysisDelivered = false,
 ): CreateWithAgentView {
-  if (view.machineStatus === "failed" || view.machineStatus === "passed") {
-    return view;
-  }
   if (isFailedPlanningCanvasRun(run)) {
     return { ...view, machineStatus: analysisStopStatus(analysisDelivered) };
   }
-  if (run?.result === "RESULT_PASSED" && view.machineStatus !== "waiting") {
-    return { ...view, machineStatus: analysisStopStatus(analysisDelivered) };
+  if (run?.result === "RESULT_PASSED") {
+    return { ...view, machineStatus: "waiting", turnEnded: true };
   }
   return view;
 }
@@ -289,12 +290,13 @@ function analysisStopStatus(analysisDelivered: boolean): CreateWithAgentView["ma
 
 export type PlanningSessionMachineInput = Pick<PlanningSessionPayload, "state" | "waitState" | "executionId">;
 
-function createWithAgentMachineStatus(
-  session: PlanningSessionMachineInput,
-  analysisDelivered?: boolean,
-): CreateWithAgentView["machineStatus"] {
+/**
+ * An ended session is a closed turn: the next user message starts a new run
+ * with the rewind. The live run marks a failed or cancelled turn as stopped.
+ */
+function createWithAgentMachineStatus(session: PlanningSessionMachineInput): CreateWithAgentView["machineStatus"] {
   if (session.state === "ended") {
-    return analysisStopStatus(Boolean(analysisDelivered));
+    return "waiting";
   }
   if (!session.executionId) {
     return "starting";
