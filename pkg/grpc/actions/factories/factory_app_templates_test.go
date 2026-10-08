@@ -266,6 +266,7 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
 	assert.Equal(t, true, entrypoint.Configuration["ignoreDrafts"])
 	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
+	assert.Equal(t, []any{"synchronize", "reopened", "ready_for_review"}, entrypoint.Configuration["actions"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, entrypoint.Integration)
 
 	agent := findYAMLNode(t, canvas, "capture-visual-evidence")
@@ -276,6 +277,12 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-claude"},
 	}, agent.Configuration["credentials"])
+	checkout, ok := implementationStep(t, agent, "Checkout Pull Request")["command"].(string)
+	require.True(t, ok)
+	assert.Contains(t, checkout, `git fetch --depth 1 origin "${PR_REVISION}:refs/remotes/origin/pr-revision"`)
+	assert.Contains(t, checkout, `git checkout --detach "${PR_REVISION}"`)
+	assert.Contains(t, checkout, `Checked out ${revision}. Expected ${PR_REVISION}.`)
+	assert.NotContains(t, checkout, "FETCH_HEAD")
 	prompt, ok := implementationStep(t, agent, "Capture Visual Evidence")["prompt"].(string)
 	require.True(t, ok)
 	assert.Contains(t, prompt, "Do not implement the task.")
@@ -307,6 +314,7 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 	assert.Contains(t, body, `fromBase64($["Capture Visual Evidence"].data.result.visualEvidence.markdown)`)
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "has-visual-evidence", TargetID: "comment-visual-evidence", Channel: "true"})
 	assert.Contains(t, result.consoleYAML, "This app is not a factory line step.")
+	assert.Contains(t, result.consoleYAML, "The first capture starts when")
 	assert.Contains(t, result.consoleYAML, "posts one comment")
 	assert.NotContains(t, result.consoleYAML, "closed pull")
 

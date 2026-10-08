@@ -388,7 +388,7 @@ func reconcileFactoryRepository(
 func factoryTemplateVCSNodeIDs(templateID string) []string {
 	switch templateID {
 	case "line-implementation":
-		return []string{"find-pr", "create-pr", "update-pr"}
+		return []string{"find-pr", "create-pr", "update-pr", "comment-visual-evidence", "comment-visual-evidence-updated"}
 	case "pr-closure":
 		return []string{"on-pr-closed", "comment-source-issue", "close-source-issue"}
 	case "issue-intake":

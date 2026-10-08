@@ -178,6 +178,69 @@ func TestUpdateFactoryRepositorySynchronizesHostedBindingAccess(t *testing.T) {
 	assert.Equal(t, int64(202), granted[0].RepositoryID)
 }
 
+func TestReconcileFactoryRepositoryUpdatesLegacyEvidenceComments(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	previousID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+	selectedID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderGitHub)
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	provider, repository, branch := models.ProviderGitHub, "new-workspace/api", "main"
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSProvider: &provider, VCSIntegrationID: &selectedID,
+		AppRepository: &repository, BacklogRepository: &repository, DefaultBranch: &branch,
+	}))
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Implement")
+	comment := func(id string) models.Node {
+		return models.Node{
+			ID: id, Name: "Comment Visual Evidence", Type: models.NodeTypeComponent,
+			Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssueComment"}},
+			IntegrationID: &previousID,
+			Configuration: map[string]any{
+				"repository":  "{{ task().repository }}",
+				"issueNumber": "1",
+				"body":        "evidence",
+			},
+			Metadata: models.FactoryAppTemplateMetadataFor("line-implementation", 1, models.ProviderGitHub),
+		}
+	}
+	customID := previousID
+	nodes := []models.Node{
+		comment("comment-visual-evidence"),
+		comment("comment-visual-evidence-updated"),
+		{
+			ID: "custom-comment", Name: "Custom comment", Type: models.NodeTypeComponent,
+			Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssueComment"}},
+			IntegrationID: &customID,
+			Configuration: map[string]any{
+				"repository":  "{{ task().repository }}",
+				"issueNumber": "1",
+				"body":        "custom",
+			},
+		},
+	}
+	deps := IntakeDependencies{Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000"}
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return canvases.PublishGeneratedCanvasNodes(t.Context(), tx, canvas, r.User, "Install implementation", nodes, nil,
+			changesets.CanvasPublisherOptions{
+				Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor,
+				AuthService: r.AuthService, WebhookBaseURL: deps.WebhookBaseURL,
+			})
+	}))
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		return reconcileFactoryRepository(t.Context(), tx, deps, factory, r.User,
+			previousID, selectedID, "old-workspace/api", "old-workspace/api", branch, repository)
+	}))
+
+	reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+	require.NoError(t, err)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, reloaded)
+	require.NoError(t, err)
+	assert.Equal(t, selectedID, *findIntakeNode(version.Nodes, "comment-visual-evidence").IntegrationID)
+	assert.Equal(t, selectedID, *findIntakeNode(version.Nodes, "comment-visual-evidence-updated").IntegrationID)
+	assert.Equal(t, previousID, *findIntakeNode(version.Nodes, "custom-comment").IntegrationID)
+}
+
 func TestReplaceConfigurationValues(t *testing.T) {
 	configuration := map[string]any{
 		"repository": "acme/old",

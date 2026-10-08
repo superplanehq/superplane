@@ -181,6 +181,13 @@ func (w *NodeRequestWorker) LockAndProcessRequest(request models.CanvasNodeReque
 			recorded.factoryID,
 			recorded.pullRequestID,
 		)
+		factoryactions.StartVisualEvidenceCapture(
+			context.Background(),
+			w.factoryIntakeDeps(),
+			recorded.organizationID,
+			recorded.factoryID,
+			recorded.pullRequestID,
+		)
 	}
 
 	runCancellations.Publish()

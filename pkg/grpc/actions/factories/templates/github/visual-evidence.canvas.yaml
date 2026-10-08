@@ -21,7 +21,6 @@ spec:
       component: github.onPullRequest
       configuration:
         actions:
-          - opened
           - synchronize
           - reopened
           - ready_for_review
@@ -67,16 +66,23 @@ spec:
             type: bash
             command: |-
               set -euo pipefail
+              if [ -z "${PR_REVISION:-}" ]; then
+                echo "The pull request revision is missing." >&2
+                exit 1
+              fi
               gh auth setup-git --hostname github.com --force
               git clone --depth 1 --branch "${BASE}" "https://github.com/${REPO}.git" repo
               cd repo
-              git fetch --depth 1 origin "pull/${PR_NUMBER}/head"
-              if [ -n "${PR_REVISION:-}" ]; then
-                git checkout --detach "${PR_REVISION}" || git checkout --detach FETCH_HEAD
-              else
-                git checkout --detach FETCH_HEAD
+              if ! git fetch --depth 1 origin "${PR_REVISION}:refs/remotes/origin/pr-revision"; then
+                echo "Could not fetch pull request revision ${PR_REVISION}." >&2
+                exit 1
               fi
+              git checkout --detach "${PR_REVISION}"
               revision="$(git rev-parse HEAD)"
+              if [ "${revision}" != "${PR_REVISION}" ]; then
+                echo "Checked out ${revision}. Expected ${PR_REVISION}." >&2
+                exit 1
+              fi
               base_ref="$(printf '%s' "${BASE}" | sed 's#/#%2F#g')"
               gh api -H "Accept: application/vnd.github.v3.diff" "/repos/${REPO}/compare/${base_ref}...${revision}" > /tmp/pr.diff
           - name: Capture Visual Evidence

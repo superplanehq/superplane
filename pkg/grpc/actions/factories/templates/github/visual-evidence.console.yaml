@@ -12,8 +12,9 @@ spec:
         body: |
           > [!SECTION:setup] Visual evidence
           >
-          > This app is not a factory line step. It listens for pull request
-          > open and update events.
+          > This app is not a factory line step. The first capture starts when
+          > a pull request is attached to the task. Later updates start from
+          > pull request events.
           >
           > When the change has visual evidence, it posts one comment.
   layout:
