@@ -108,6 +108,7 @@ func (d Directory) RepositoriesVisibleTo(ctx context.Context, accountUUID string
 
 // CatalogVisibleTo checks workspace access independently from repository access.
 // Token and API failures are returned when no installation could be checked.
+// A confirmed workspace stays in the catalog when its repository list fails.
 func (d Directory) CatalogVisibleTo(
 	ctx context.Context,
 	accountUUID string,
@@ -134,9 +135,10 @@ func (d Directory) CatalogVisibleTo(
 		visible, err := d.visibleWorkspace(ctx, token, workspaceRef, accountUUID)
 		if err != nil {
 			readErr = err
-			continue
 		}
-		sawRead = true
+		if err == nil || len(visible.Workspaces) > 0 {
+			sawRead = true
+		}
 		for _, workspace := range visible.Workspaces {
 			workspace.ID = installation.ID
 			workspace.WorkspaceUUID = installation.WorkspaceUUID
@@ -192,7 +194,7 @@ func (d Directory) visibleWorkspace(ctx context.Context, token, workspaceRef, ac
 	}
 	records, err := d.listRepositories(ctx, token, slug)
 	if err != nil {
-		return VisibleCatalog{}, err
+		return catalog, err
 	}
 	repositories := make([]VisibleRepository, 0, len(records))
 	for _, record := range records {

@@ -74,6 +74,39 @@ func TestDirectoryDetectsInstalledWorkspacesWithoutWritableRepositories(t *testi
 	}
 }
 
+func TestDirectoryKeepsAConfirmedWorkspaceWhenRepositoryListingFails(t *testing.T) {
+	checkedOther := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/workspaces/acme/permissions":
+			_, _ = w.Write([]byte(`{"values":[{"permission":"owner","workspace":{"slug":"acme"}}]}`))
+		case "/workspaces/acme/permissions/repositories":
+			_, _ = w.Write([]byte(`{"values":[]}`))
+		case "/repositories/acme":
+			http.Error(w, "unavailable", http.StatusInternalServerError)
+		case "/workspaces/other/permissions", "/workspaces/other/permissions/repositories":
+			checkedOther = true
+			http.NotFound(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	directory := Directory{BaseURL: server.URL, HTTP: server.Client()}
+	catalog, err := directory.CatalogVisibleTo(context.Background(), testAccountID, []InstallationRef{
+		{ID: "install-confirmed", WorkspaceUUID: "workspace-1", WorkspaceSlug: "acme"},
+		{ID: "install-hidden", WorkspaceSlug: "other"},
+	}, func(string) (string, error) { return "system-token", nil })
+	require.NoError(t, err)
+	require.True(t, checkedOther)
+	require.Len(t, catalog.Workspaces, 1)
+	assert.Equal(t, "install-confirmed", catalog.Workspaces[0].ID)
+	assert.Equal(t, "acme", catalog.Workspaces[0].WorkspaceSlug)
+	assert.Empty(t, catalog.Repositories)
+}
+
 func TestDirectoryReportsUnavailableTokensInsteadOfMissingInstallations(t *testing.T) {
 	tokenErr := errors.New("expired token")
 	_, err := (Directory{}).CatalogVisibleTo(context.Background(), testAccountID,
