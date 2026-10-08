@@ -16,6 +16,9 @@ import (
 )
 
 func Test__Linear__Sync(t *testing.T) {
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_ID", "")
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET", "")
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET", "")
 	integration := &Linear{}
 
 	t.Run("no client credentials - setup wizard with pre-filled app form", func(t *testing.T) {
@@ -540,6 +543,7 @@ func Test__Linear__Instructions(t *testing.T) {
 }
 
 func Test__Linear__Instructions__Hosted(t *testing.T) {
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET", "")
 	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_ID", "hosted-client")
 	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET", "hosted-secret")
 
