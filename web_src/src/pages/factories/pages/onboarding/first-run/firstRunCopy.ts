@@ -35,7 +35,6 @@ export const FIRST_RUN_COPY = {
     synchronizing: "SuperPlane checks automatically for installed workspaces.",
     waitingForInstallation: "Already installed? Keep this page open. Your workspace appears after synchronization.",
     installIfNeeded: "If SuperPlane is not installed, ask a workspace admin to install it.",
-    checkAgain: "Check again",
     grantAction: "Install SuperPlane on Bitbucket",
     openingBitbucket: "Opening Bitbucket…",
     grantLinkLabel: "Installation link",

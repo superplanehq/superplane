@@ -232,16 +232,18 @@ func (r *velocityPersonRow) totalMerged() int {
 // author of a merged pull request, and the SuperPlane member credited for a
 // work order. A member with a connected GitHub account is one row.
 type velocityPeopleBuilder struct {
-	rows        map[string]*velocityPersonRow
-	byUserID    map[uuid.UUID]*models.FactoryVelocityMember
-	byGitHubKey map[string]*models.FactoryVelocityMember
+	rows            map[string]*velocityPersonRow
+	byUserID        map[uuid.UUID]*models.FactoryVelocityMember
+	byGitHubKey     map[string]*models.FactoryVelocityMember
+	byBitbucketUUID map[string]*models.FactoryVelocityMember
 }
 
 func newVelocityPeopleBuilder(members []models.FactoryVelocityMember) *velocityPeopleBuilder {
 	builder := &velocityPeopleBuilder{
-		rows:        make(map[string]*velocityPersonRow),
-		byUserID:    make(map[uuid.UUID]*models.FactoryVelocityMember, len(members)),
-		byGitHubKey: make(map[string]*models.FactoryVelocityMember, len(members)),
+		rows:            make(map[string]*velocityPersonRow),
+		byUserID:        make(map[uuid.UUID]*models.FactoryVelocityMember, len(members)),
+		byGitHubKey:     make(map[string]*models.FactoryVelocityMember, len(members)),
+		byBitbucketUUID: make(map[string]*models.FactoryVelocityMember, len(members)),
 	}
 
 	for i := range members {
@@ -250,12 +252,25 @@ func newVelocityPeopleBuilder(members []models.FactoryVelocityMember) *velocityP
 		if login := normalizeGitHubLogin(member.GitHubLogin); login != "" {
 			builder.byGitHubKey[login] = member
 		}
+		if uuid := normalizeBitbucketUUID(member.BitbucketUUID); uuid != "" {
+			builder.byBitbucketUUID[uuid] = member
+		}
 	}
 	return builder
 }
 
 func normalizeGitHubLogin(login string) string {
 	return strings.ToLower(strings.TrimSpace(login))
+}
+
+// normalizeBitbucketUUID normalizes a "{uuid}" account identifier for
+// identity matching. Nicknames are never identity.
+func normalizeBitbucketUUID(value string) string {
+	value = strings.Trim(strings.TrimSpace(value), "{}")
+	if _, err := uuid.Parse(value); err != nil {
+		return ""
+	}
+	return strings.ToLower(value)
 }
 
 func (b *velocityPeopleBuilder) memberRow(member *models.FactoryVelocityMember) *velocityPersonRow {
@@ -275,10 +290,15 @@ func (b *velocityPeopleBuilder) memberRow(member *models.FactoryVelocityMember) 
 	return row
 }
 
-// addAuthoredMerge credits a merged pull request to its GitHub author. Authors
-// outside the organization still get a row, because they are part of what the
-// repository shipped.
+// addAuthoredMerge credits a merged pull request to its author. GitHub authors
+// match on login; Bitbucket authors match on the linked account UUID only,
+// never on nicknames. Authors outside the organization still get a row,
+// because they are part of what the repository shipped.
 func (b *velocityPeopleBuilder) addAuthoredMerge(merge *models.FactoryVelocityRepositoryMerge) {
+	if merge.Provider == models.ProviderBitbucket {
+		b.addBitbucketAuthoredMerge(merge)
+		return
+	}
 	login := normalizeGitHubLogin(merge.AuthorLogin)
 	if login == "" {
 		return
@@ -299,6 +319,39 @@ func (b *velocityPeopleBuilder) addAuthoredMerge(merge *models.FactoryVelocityRe
 		name := strings.TrimSpace(merge.AuthorName)
 		if name == "" {
 			name = merge.AuthorLogin
+		}
+		row = &velocityPersonRow{id: id, name: name, avatarURL: merge.AuthorAvatarURL}
+		b.rows[id] = row
+	}
+	row.authoredMerged++
+}
+
+// addBitbucketAuthoredMerge credits a merge to its linked Bitbucket identity.
+// Unmatched authors bucket by UUID so renames never split or merge people.
+func (b *velocityPeopleBuilder) addBitbucketAuthoredMerge(merge *models.FactoryVelocityRepositoryMerge) {
+	uuid := normalizeBitbucketUUID(merge.AuthorUUID)
+	if uuid == "" {
+		return
+	}
+
+	if member, ok := b.byBitbucketUUID[uuid]; ok {
+		row := b.memberRow(member)
+		if row.avatarURL == "" {
+			row.avatarURL = merge.AuthorAvatarURL
+		}
+		row.authoredMerged++
+		return
+	}
+
+	id := "bitbucket:" + uuid
+	row, ok := b.rows[id]
+	if !ok {
+		name := strings.TrimSpace(merge.AuthorName)
+		if name == "" {
+			name = strings.TrimSpace(merge.AuthorLogin)
+		}
+		if name == "" {
+			name = uuid
 		}
 		row = &velocityPersonRow{id: id, name: name, avatarURL: merge.AuthorAvatarURL}
 		b.rows[id] = row
