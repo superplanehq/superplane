@@ -4,9 +4,65 @@ import type { ReactNode } from "react";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { OutputList } from "../pages/work-order-popup-redesign/popupShared";
+import { SplitRunReview } from "../pages/work-order-split-run/SplitRunReview";
+import type { SplitRunStopChoice } from "../pages/work-order-split-run/splitRunFooter";
 import type { SplitRunFixture, SplitRunPhase } from "../pages/work-order-split-run/splitRunMocks";
 import { MOBILE_TASK_COPY } from "./mobileCopy";
 import { MobileTaskActivity } from "./MobileTaskActivity";
+
+export function PhoneTaskReview({
+  model,
+  draftStart,
+  scope,
+  withModelSelect,
+}: {
+  model: {
+    fixture: SplitRunFixture;
+    pullRequests: FactoriesFactoryPullRequest[];
+    canUpdate: boolean;
+    lineName?: string;
+    onArchive?: () => void | Promise<void>;
+    onReject?: () => void | Promise<void>;
+    onStop?: (choice: SplitRunStopChoice) => void | Promise<void>;
+    startBusy: boolean;
+    actionBusy: boolean;
+  };
+  draftStart: {
+    onStart?: () => void | Promise<void>;
+    modelSelect?: ReactNode;
+  };
+  scope: {
+    organizationId?: string;
+    factoryId?: string;
+    factoryKey?: string;
+    orderId: string;
+    orderNumber?: string;
+  };
+  withModelSelect: boolean;
+}) {
+  const { fixture, pullRequests, canUpdate, lineName } = model;
+  return (
+    <SplitRunReview
+      footer={fixture.footer}
+      organizationId={scope.organizationId}
+      factoryId={scope.factoryId}
+      factoryKey={scope.factoryKey}
+      orderId={scope.orderId}
+      orderNumber={scope.orderNumber}
+      pullRequests={pullRequests}
+      canAct={canUpdate}
+      onStart={draftStart.onStart}
+      modelSelect={withModelSelect ? draftStart.modelSelect : undefined}
+      onArchive={model.onArchive}
+      onReject={model.onReject}
+      onStop={model.onStop}
+      startBusy={model.startBusy}
+      actionBusy={model.actionBusy}
+      startDisabled={!canUpdate || !lineName}
+      compact="stacked"
+    />
+  );
+}
 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (

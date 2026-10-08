@@ -20,7 +20,6 @@ import { boardLineIdFromNavigationState, displayedBoardLineId } from "../lib/wor
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { formatWorkOrderIdentifier } from "../lib/workspaceKey";
 import { OwnerTimeCostRow } from "../pages/work-order-popup-redesign/popupShared";
-import { SplitRunReview } from "../pages/work-order-split-run/SplitRunReview";
 import { SPLIT_RUN_ANALYZING_NOTE } from "../pages/work-order-split-run/splitRunFooter";
 import { ANALYSIS_PLANNING_COPY } from "../pages/work-order-split-run/useAnalysisPlanningSession";
 import type { IntentAnalysisChat } from "../pages/work-order-split-run/intentAnalysisChat";
@@ -40,7 +39,7 @@ import { useColumnAppCheckRuns } from "../pages/work-order-split-run/useColumnAp
 import { useWorkOrderPRFeedbackLog } from "../pages/useWorkOrderPRFeedbackRunHref";
 import { MOBILE_TASK_COPY } from "./mobileCopy";
 import { MobileDraftStartModelSelect } from "./MobileDraftStartModelSelect";
-import { MobileTaskSections, Section } from "./MobileTaskSections";
+import { MobileTaskSections, PhoneTaskReview, Section } from "./MobileTaskSections";
 import { useMobileRefineChat } from "./useMobileRefineChat";
 
 function taskBackLineId(
@@ -244,24 +243,11 @@ function LoadedMobileTask({
     modelSelect: draftStart.modelSelect,
   });
   const review = (withModelSelect: boolean) => (
-    <SplitRunReview
-      footer={fixture.footer}
-      organizationId={organizationId}
-      factoryId={factoryId}
-      factoryKey={routeSegment}
-      orderId={orderId}
-      orderNumber={order.number}
-      pullRequests={pullRequests}
-      canAct={model.canUpdate}
-      onStart={draftStart.onStart}
-      modelSelect={withModelSelect ? draftStart.modelSelect : undefined}
-      onArchive={model.onArchive}
-      onReject={model.onReject}
-      onStop={model.onStop}
-      startBusy={model.startBusy}
-      actionBusy={model.actionBusy}
-      startDisabled={!model.canUpdate || !model.lineName}
-      compact="stacked"
+    <PhoneTaskReview
+      model={model}
+      draftStart={draftStart}
+      scope={{ organizationId, factoryId, factoryKey: routeSegment, orderId, orderNumber: order.number }}
+      withModelSelect={withModelSelect}
     />
   );
   const canStopRun = Boolean(model.canUpdate && organizationId && factoryId && orderId);
