@@ -133,7 +133,12 @@ function SetupStepBody({ setup }: { setup: LinearIntakeSetupModel }) {
         <p className="text-[13px] font-medium">{LINEAR_INTAKE_SETUP_COPY.labelsLabel}</p>
         <p className="workspace-body-text mt-1 text-muted-foreground">{LINEAR_INTAKE_SETUP_COPY.labelsHelper}</p>
         <div className="mt-2">
-          <LinearLabelField labels={setup.labels} onChange={setup.setLabels} />
+          <LinearLabelField
+            labels={setup.labels}
+            onChange={setup.setLabels}
+            organizationId={setup.organizationId}
+            integrationId={setup.integrationId}
+          />
         </div>
       </div>
     </div>

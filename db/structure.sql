@@ -251,6 +251,26 @@ CREATE TABLE public.app_messages (
 
 
 --
+-- Name: bitbucket_forge_installations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bitbucket_forge_installations (
+    installation_id text NOT NULL,
+    workspace_uuid text DEFAULT ''::text NOT NULL,
+    workspace_slug text DEFAULT ''::text NOT NULL,
+    installer_account_id text DEFAULT ''::text NOT NULL,
+    api_base_url text DEFAULT ''::text NOT NULL,
+    system_token bytea,
+    token_expires_at timestamp without time zone,
+    last_delivery_at timestamp without time zone,
+    installed_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uninstalled_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: canvas_memories; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1030,7 +1050,8 @@ CREATE TABLE public.linear_webhook_receipts (
     http_status integer NOT NULL,
     outcome text NOT NULL,
     subscription_count integer DEFAULT 0 NOT NULL,
-    task_ids text DEFAULT ''::text NOT NULL
+    task_ids text DEFAULT ''::text NOT NULL,
+    delivery_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -2106,6 +2127,14 @@ ALTER TABLE ONLY public.app_messages
 
 
 --
+-- Name: bitbucket_forge_installations bitbucket_forge_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bitbucket_forge_installations
+    ADD CONSTRAINT bitbucket_forge_installations_pkey PRIMARY KEY (installation_id);
+
+
+--
 -- Name: canvas_memories canvas_memories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3022,6 +3051,13 @@ CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USIN
 
 
 --
+-- Name: bitbucket_forge_installations_workspace_uuid_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX bitbucket_forge_installations_workspace_uuid_idx ON public.bitbucket_forge_installations USING btree (workspace_uuid);
+
+
+--
 -- Name: factories_organization_id_key_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3670,6 +3706,13 @@ CREATE INDEX idx_files_work_order_id ON public.files USING btree (work_order_id)
 --
 
 CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (group_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_linear_webhook_receipts_delivery; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_linear_webhook_receipts_delivery ON public.linear_webhook_receipts USING btree (webhook_id, delivery_key) WHERE ((delivery_key <> ''::text) AND (outcome = 'accepted'::text));
 
 
 --
@@ -5560,7 +5603,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261006115204	f
+20261007152426	f
 \.
 
 

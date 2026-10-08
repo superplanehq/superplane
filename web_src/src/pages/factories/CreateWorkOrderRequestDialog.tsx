@@ -1,7 +1,9 @@
 import { ArrowUp, Loader2, Maximize2, Minimize2, XIcon } from "lucide-react";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 
+import { MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import { Button } from "@/components/ui/button";
+import type { HostedVideo } from "@/lib/hostedVideo";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { InputGroup, InputGroupAddon } from "@/components/ui/input-group";
 import { Kbd } from "@/components/ui/kbd";
@@ -11,14 +13,19 @@ import { useShortcutLabel } from "@/hooks/useShortcutLabel";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { isSkillSlashMenuTarget } from "@/lib/skillSlashMenu";
+import { showErrorToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 import { CreateWorkOrderRequestAttachButton } from "./CreateWorkOrderRequestAttachButton";
-import { CreateWorkOrderRequestAttachments } from "./CreateWorkOrderRequestAttachments";
+import { HostedVideoLinkField } from "./HostedVideoLinkField";
+import { CreateWorkOrderRequestPreviewRow } from "./CreateWorkOrderRequestAttachments";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import { DictateButton } from "./DictateButton";
-import { PendingWorkOrderFileChips } from "./PendingWorkOrderFileChips";
-import { createWorkOrderRequestImages, mergeCreateWorkOrderRequestImages } from "./lib/createWorkOrderRequestImages";
+import {
+  createWorkOrderRequestImages,
+  insertHostedVideoMarkdown,
+  mergeCreateWorkOrderRequestImages,
+} from "./lib/createWorkOrderRequestImages";
 import { MAX_DERIVED_WORK_ORDER_TITLE_LENGTH } from "./lib/derivedWorkOrderTitle";
 import { useCreateWorkOrderRequestForm } from "./useCreateWorkOrderRequestForm";
 import { useWorkOrderFieldDictation } from "./useWorkOrderFieldDictation";
@@ -228,6 +235,7 @@ function RequestDialogForm({
         showAttach={showAttach}
         dictate={<DictateButton dictation={dictation} copy={CREATE_WORK_ORDER_REQUEST_COPY} disabled={form.busy} />}
         onAttach={(files) => void form.handleAttach(files)}
+        onAddHostedVideo={(video) => addHostedVideo(description, form.attachedFiles, video, onDescriptionChange)}
         onRemoveAttachment={form.handleRemoveAttachment}
       />
     </form>
@@ -312,6 +320,7 @@ function RequestDialogFooter({
   showAttach,
   dictate,
   onAttach,
+  onAddHostedVideo,
   onRemoveAttachment,
 }: {
   attachedImages: ReturnType<typeof mergeCreateWorkOrderRequestImages>;
@@ -322,50 +331,69 @@ function RequestDialogFooter({
   showAttach: boolean;
   dictate: ReactNode;
   onAttach: (files: FileList | File[]) => void;
+  onAddHostedVideo: (video: HostedVideo) => boolean;
   onRemoveAttachment: (id: string) => void;
 }) {
   const sendShortcut = useShortcutLabel("Enter");
 
   return (
     <InputGroup className="h-auto shrink-0 overflow-visible border-0 bg-transparent shadow-none dark:bg-transparent">
-      <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible px-3 pt-1 pb-3">
-        <div className="flex min-w-0 items-end gap-2 overflow-visible">
-          {showAttach ? (
-            <CreateWorkOrderRequestAttachButton
-              accept={WORK_ORDER_FILE_ACCEPT}
-              disabled={!canAttach}
-              onAttach={onAttach}
-            />
-          ) : null}
-          {dictate}
-          {attachedImages.length > 0 ? (
-            <CreateWorkOrderRequestAttachments images={attachedImages} onRemove={onRemoveAttachment} />
-          ) : null}
-          {pendingFiles.length > 0 ? (
-            <PendingWorkOrderFileChips files={pendingFiles} onRemove={onRemoveAttachment} />
-          ) : null}
-        </div>
-        <div className="ms-auto flex items-center gap-1.5">
-          <Kbd className="hidden sm:inline-flex" data-testid="create-work-order-request-create-kbd">
-            {sendShortcut}
-          </Kbd>
-          <Button
-            type="submit"
-            size="icon"
-            className="size-8 rounded-full"
-            disabled={!canCreate}
-            aria-label={isCreating ? CREATE_WORK_ORDER_REQUEST_COPY.creating : CREATE_WORK_ORDER_REQUEST_COPY.create}
-            aria-keyshortcuts="Meta+Enter Control+Enter"
-            data-testid="create-work-order-request-create"
-          >
-            {isCreating ? (
-              <Loader2 className="size-3.5 animate-spin" aria-hidden />
-            ) : (
-              <ArrowUp className="size-3.5" aria-hidden />
-            )}
-          </Button>
+      <InputGroupAddon
+        align="block-end"
+        className="flex-col items-stretch justify-start gap-2 overflow-visible px-3 pt-1 pb-3"
+      >
+        <CreateWorkOrderRequestPreviewRow images={attachedImages} files={pendingFiles} onRemove={onRemoveAttachment} />
+        <div className="flex w-full items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            {showAttach ? (
+              <CreateWorkOrderRequestAttachButton
+                accept={WORK_ORDER_FILE_ACCEPT}
+                disabled={!canAttach}
+                onAttach={onAttach}
+              />
+            ) : null}
+            <HostedVideoLinkField disabled={isCreating} onAdd={onAddHostedVideo} />
+            {dictate}
+          </div>
+          <div className="ms-auto flex items-center gap-1.5">
+            <Kbd className="hidden sm:inline-flex" data-testid="create-work-order-request-create-kbd">
+              {sendShortcut}
+            </Kbd>
+            <Button
+              type="submit"
+              size="icon"
+              className="size-8 rounded-full"
+              disabled={!canCreate}
+              aria-label={isCreating ? CREATE_WORK_ORDER_REQUEST_COPY.creating : CREATE_WORK_ORDER_REQUEST_COPY.create}
+              aria-keyshortcuts="Meta+Enter Control+Enter"
+              data-testid="create-work-order-request-create"
+            >
+              {isCreating ? (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              ) : (
+                <ArrowUp className="size-3.5" aria-hidden />
+              )}
+            </Button>
+          </div>
         </div>
       </InputGroupAddon>
     </InputGroup>
   );
+}
+
+function addHostedVideo(
+  description: string,
+  attached: UploadedWorkOrderFile[],
+  video: HostedVideo,
+  onDescriptionChange: (next: string) => void,
+): boolean {
+  const next = insertHostedVideoMarkdown(description, video, attached);
+  if (next == null) {
+    showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images, videos, or audio files.`);
+    return false;
+  }
+  if (next !== description) {
+    onDescriptionChange(next);
+  }
+  return true;
 }

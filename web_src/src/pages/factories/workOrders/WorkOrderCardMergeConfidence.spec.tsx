@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
 
 import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
-import { formatRelative } from "@/lib/datetime";
 
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard } from "./WorkOrderCard";
@@ -53,7 +52,7 @@ function renderCard(order: FactoriesWorkOrder, mergeConfidence: { score: number;
 }
 
 describe("WorkOrderCard merge confidence", () => {
-  it("shows Merge beside the owner and keeps planning scores hidden", async () => {
+  it("shows Merge in the footer and keeps planning scores hidden", async () => {
     const user = userEvent.setup();
     const order = verifyOrder("wo-verify");
     renderCard(order, { score: 4, maxScore: 5 });
@@ -69,9 +68,11 @@ describe("WorkOrderCard merge confidence", () => {
     expect(chip.querySelector(".tabular-nums")).toHaveClass("text-success");
     expect(screen.queryByText("Confidence")).not.toBeInTheDocument();
     expect(screen.queryByText("Clarity")).not.toBeInTheDocument();
-    const footer = screen.getByText(formatRelative(new Date(order.updatedAt ?? ""))).parentElement;
+    const footer = screen.getByTestId("work-order-card-footer-leading-wo-verify").parentElement;
     expect(footer).toContainElement(chip);
-    expect(footer).toContainElement(screen.getByTestId("work-order-row-assignees-wo-verify"));
+    expect(screen.getByTestId("work-order-card-title-trailing-wo-verify")).toContainElement(
+      screen.getByTestId("work-order-row-assignees-wo-verify"),
+    );
 
     await user.hover(chip);
     expect(await screen.findByRole("tooltip")).toHaveTextContent("Merge confidence");

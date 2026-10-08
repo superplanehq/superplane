@@ -316,7 +316,7 @@ export const DraftScoredIntakeOnly: Story = {
   },
 };
 
-/** Verify wrote merge confidence. The meter sits beside the owner. */
+/** Verify wrote merge confidence. The meter sits on the right of the footer. */
 export const MergeConfidence: Story = {
   name: "Merge confidence",
   args: {
@@ -372,7 +372,7 @@ export const OpenOwned: Story = {
 };
 
 /**
- * GitHub origin on the card. The source icon sits in the title row
+ * GitHub origin on the card. The source icon sits in the footer
  * and opens the issue in a new tab.
  */
 export const GitHubOrigin: Story = {
@@ -391,7 +391,7 @@ export const GitHubOrigin: Story = {
 };
 
 /**
- * Manual origin on the card. The product logo sits in the title row
+ * Manual origin on the card. The product logo sits in the footer
  * and is not a link.
  */
 export const ManualOrigin: Story = {

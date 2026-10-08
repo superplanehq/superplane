@@ -49,8 +49,9 @@ import {
   applyWorkOrderFilters,
   applyWorkOrderScope,
   applyWorkOrderSearch,
+  boardWorkOrderScopeQuery,
   buildWorkOrderListEntries,
-  UNASSIGNED_FILTER_VALUE,
+  type WorkOrderScope,
 } from "../lib/workOrderListModel";
 import { canonicalWorkOrderNumber } from "../lib/workOrderNumberResolution";
 import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
@@ -65,17 +66,21 @@ import { MobileBoardHeader } from "./MobileBoardHeader";
 import { MobileBoardSettings } from "./MobileBoardSettings";
 import { activeColumnIndex, buildMobileBoardColumns, type MobileBoardColumn } from "./mobileBoardColumns";
 
+function phoneBoardScope(scope: WorkOrderScope): WorkOrderScope {
+  if (scope === "my" || scope === "unassigned") {
+    return scope;
+  }
+  return "all";
+}
+
 function boardQueryOptions(
   state: WorkOrderListState,
   lineId: string,
   currentUserId?: string,
 ): FactoryBoardWorkOrdersOptions {
-  const ownerIds = state.filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
-  const mine = state.scope === "my";
+  const scope = phoneBoardScope(state.scope);
   return {
-    userId: ownerIds.length === 1 ? ownerIds[0] : mine ? currentUserId : undefined,
-    unassigned: state.filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE),
-    requireUser: mine && ownerIds.length !== 1,
+    ...boardWorkOrderScopeQuery(scope, state.filters.assigneeIds, currentUserId),
     done: { lineId, results: boardDoneResultsForStatuses(state.filters.statuses) },
   };
 }
@@ -182,7 +187,7 @@ function useMobileBoardModel({
     const visibleIds = new Set(
       applyWorkOrderSearch(
         applyWorkOrderFilters(
-          applyWorkOrderScope(entries, listState.scope === "my" ? "my" : "all", currentUserId),
+          applyWorkOrderScope(entries, phoneBoardScope(listState.scope), currentUserId),
           { ...listState.filters, lineIds: [] },
           { showPullRequestMerge },
         ),

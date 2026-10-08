@@ -149,6 +149,23 @@ SuperPlane requests exactly the `user:email` scope. It stores the GitHub user
 ID and login, but it does not use the OAuth token for repositories,
 collaborators, or automation.
 
+### Bitbucket OAuth consumer
+
+Bitbucket connect links an account. It does not add a sign-in method.
+
+1. Open Bitbucket and create an OAuth consumer.
+2. Set the callback URL to `{BASE_URL}/auth/bitbucket/callback`.
+3. Set the scope to `account`.
+4. Copy the key and secret into `.env` as `BITBUCKET_CLIENT_ID` and `BITBUCKET_CLIENT_SECRET`.
+
+SuperPlane stores the Bitbucket account id and username. It does not use this
+OAuth token to open pull requests.
+
+The Forge app is optional. Its source is in `forge/bitbucket/`. Set
+`SUPERPLANE_BITBUCKET_FORGE_APP_ID` and `SUPERPLANE_BITBUCKET_FORGE_INSTALL_URL`
+when you install that app. When those values are empty, workspace setup keeps
+the Bitbucket token screen.
+
 ### 4. Set the SuperPlane environment
 
 Add these values to `.env`. Do not commit real secrets.
@@ -261,11 +278,10 @@ SuperPlane after you change this value.
 2. Under **OAuth applications**, click **Create new**.
 3. Set the application to public.
 4. Set the callback URL to `{BASE_URL}/api/v1/linear/oauth/callback`.
-5. Request the **read**, **write**, and **admin** scopes. Admin lets
-   SuperPlane register webhooks. A workspace admin must authorize the
-   connection, and that person must be a member of each private team.
-6. Create the application.
-7. Copy the **Client ID** and **Client Secret**.
+5. Set the webhook URL to `{BASE_URL}/api/v1/linear/webhook`.
+6. Select **Issues**, **Comments**, and **Issue attachments**.
+7. Create the application.
+8. Copy the **Client ID**, the **Client Secret**, and the **Webhook signing secret**.
 
 ### 3. Set the SuperPlane environment
 
@@ -274,7 +290,10 @@ Add these values to `.env`. Do not commit real secrets.
 ```env
 SUPERPLANE_LINEAR_OAUTH_CLIENT_ID=
 SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET=
+SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET=
 ```
+
+`SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET` is the webhook signing secret from the Linear application. When it is set, Connect requests the **read** and **write** scopes. Linear sends issue, comment, and attachment events to the webhook URL. When it is empty, Connect also requests the **admin** scope and SuperPlane creates a webhook for each trigger.
 
 Restart the server after you save `.env`.
 
@@ -282,8 +301,8 @@ Restart the server after you save `.env`.
 
 1. Open a factory line board.
 2. Add a **Linear issues** intake.
-3. When both variables are set, Connect opens Linear's authorize page.
-4. When either variable is empty, Connect asks for a Client ID and a
+3. When the client ID and the client secret are set, Connect opens Linear's authorize page.
+4. When either of those values is empty, Connect asks for a Client ID and a
    Client Secret.
 
 ## Local hosted OpenRouter

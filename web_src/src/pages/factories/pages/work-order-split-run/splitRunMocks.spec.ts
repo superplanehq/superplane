@@ -138,7 +138,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     );
     expect(fixture.waitingNotes).toEqual([]);
     expect(fixture.footerTone).toBe("running");
-    expect(fixture.footer.note?.headline).toBe("Implement is running");
+    expect(fixture.footer.note?.headline).toBe("Implementation in progress");
     expect(fixture.footer.run).toEqual({
       appId: "app-refund-implementer",
       runId: RUNNING_WORK_ORDER.lineDispatches?.[0]?.stepExecutions?.[0]?.run?.id,

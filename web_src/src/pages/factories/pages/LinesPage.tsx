@@ -110,9 +110,9 @@ import {
   applyWorkOrderFilters,
   applyWorkOrderScope,
   applyWorkOrderSearch,
+  boardWorkOrderScopeQuery,
   buildWorkOrderListEntries,
   countWorkOrderFilters,
-  UNASSIGNED_FILTER_VALUE,
   visibleWorkOrderFilters,
   WORK_ORDER_SCOPES,
   type WorkOrderScope,
@@ -225,14 +225,18 @@ import {
   type LineBoardColumnColorId,
 } from "./lineBoardColumnColors";
 
-type LineBoardScope = Extract<WorkOrderScope, "all" | "my">;
+type LineBoardScope = Extract<WorkOrderScope, "all" | "my" | "unassigned">;
 
 const LINE_BOARD_SCOPES: ReadonlyArray<ScopePillOption<LineBoardScope>> = WORK_ORDER_SCOPES.filter(
-  (scope): scope is ScopePillOption<LineBoardScope> => scope.id === "all" || scope.id === "my",
+  (scope): scope is ScopePillOption<LineBoardScope> =>
+    scope.id === "all" || scope.id === "my" || scope.id === "unassigned",
 );
 
 function lineBoardWorkOrderScope(scope: WorkOrderScope): LineBoardScope {
-  return scope === "my" ? "my" : "all";
+  if (scope === "my" || scope === "unassigned") {
+    return scope;
+  }
+  return "all";
 }
 
 function boardWorkOrdersPageOptions(
@@ -240,12 +244,8 @@ function boardWorkOrdersPageOptions(
   lineId: string | undefined,
   currentUserId?: string,
 ): FactoryBoardWorkOrdersOptions {
-  const ownerIds = state.filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
-  const scope = lineBoardWorkOrderScope(state.scope);
   return {
-    userId: ownerIds.length === 1 ? ownerIds[0] : scope === "my" ? currentUserId : undefined,
-    unassigned: state.filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE),
-    requireUser: scope === "my" && ownerIds.length !== 1,
+    ...boardWorkOrderScopeQuery(lineBoardWorkOrderScope(state.scope), state.filters.assigneeIds, currentUserId),
     done: {
       lineId,
       results: boardDoneResultsForStatuses(state.filters.statuses),

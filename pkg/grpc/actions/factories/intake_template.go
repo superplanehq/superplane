@@ -508,7 +508,7 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	return defaultIntakeSettings()
 }
 
-func intakeRefinementConfiguration(agent *intakeAgent, vcsName string, planningReview bool) map[string]any {
+func intakeRefinementConfiguration(agent *intakeAgent, vcsName string) map[string]any {
 	configuration := intakeRunnerConfiguration(agent, vcsName)
 	configuration["steps"] = []any{
 		map[string]any{
@@ -520,7 +520,7 @@ func intakeRefinementConfiguration(agent *intakeAgent, vcsName string, planningR
 			"name":             "Refine Task",
 			"type":             "prompt",
 			"workingDirectory": "repo",
-			"prompt":           intakeRefinementPrompt(planningReview),
+			"prompt":           intakeRefinementPrompt(),
 		},
 	}
 	return configuration
@@ -567,15 +567,11 @@ func intakeRunnerConfiguration(agent *intakeAgent, vcsName string) map[string]an
 	return configuration
 }
 
-// intakeRefinementPrompt returns the Refine Task node prompt. Organizations
-// on the task planning review flow get the 1 through 3 prompt pack; the
-// hardcoded analysis protocol stays the safety net either way.
-func intakeRefinementPrompt(planningReview bool) string {
-	pack := runner.PlanningSessionUserPromptMarkdown()
-	if planningReview {
-		pack = runner.PlanningSessionUserPromptReviewMarkdown()
-	}
-	return pack + "\n\nTask:\n{{ root().data.workOrder }}"
+// intakeRefinementPrompt returns the Refine Task node prompt. New and reset
+// Backlog templates use the 1 through 3 review pack. A saved canvas prompt
+// is left unchanged.
+func intakeRefinementPrompt() string {
+	return runner.PlanningSessionUserPromptMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
 }
 
 func intakeAnalysisCloneCommand() string {
