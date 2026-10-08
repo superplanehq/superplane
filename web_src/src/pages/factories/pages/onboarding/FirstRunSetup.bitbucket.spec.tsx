@@ -1,11 +1,13 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FEATURE_FACTORY_BITBUCKET } from "@/lib/experimentalFeatures";
 
 import { FirstRunSetup } from "./FirstRunSetup";
+import { FirstRunBitbucketForgeScreen } from "./first-run/FirstRunBitbucketForgeScreen";
 import type { IntegrationId } from "./onboardingFixtures";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
@@ -178,6 +180,8 @@ function renderSetup(connected: Set<IntegrationId>, overrides: Partial<Onboardin
 async function chooseBitbucket(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByTestId("first-run-get-started"));
   await user.click(within(screen.getByTestId("first-run-host-bitbucket")).getByRole("button"));
+  const workspace = screen.queryByRole("button", { name: "Use acme-team" });
+  if (workspace) await user.click(workspace);
 }
 
 describe("FirstRunSetup Bitbucket", () => {
@@ -195,6 +199,65 @@ describe("FirstRunSetup Bitbucket", () => {
     experimental.enabled = new Set([FEATURE_FACTORY_BITBUCKET]);
     experimental.loading = false;
     localStorage.clear();
+  });
+
+  it("chooses a workspace before a repository and clears the selection when switching workspaces", async () => {
+    const user = userEvent.setup();
+    function WorkspaceChoice() {
+      const [repository, setRepository] = useState<string | null>(null);
+      return (
+        <FirstRunBitbucketForgeScreen
+          phase="choose"
+          connectHref=""
+          installUrl=""
+          repositories={["acme-team/api", "other-team/web"]}
+          installedWorkspaces={["empty-team"]}
+          selectedRepository={repository}
+          chrome={{ stepIndex: 2, onBack: vi.fn() }}
+          onGrantAccess={vi.fn()}
+          onSelectRepository={setRepository}
+          onClearRepository={() => setRepository(null)}
+          onContinue={vi.fn()}
+        />
+      );
+    }
+    render(<WorkspaceChoice />);
+
+    expect(screen.getByRole("heading", { name: "Choose a Bitbucket workspace" })).toBeInTheDocument();
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Use empty-team" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Use acme-team" }));
+    expect(screen.queryByRole("option", { name: /other-team\/web/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: /acme-team\/api/ }));
+    expect(screen.getByTestId("first-run-continue-to-tickets")).toBeEnabled();
+
+    await user.click(screen.getByTestId("first-run-back"));
+    await user.click(screen.getByRole("button", { name: "Use other-team" }));
+    expect(screen.queryByRole("option", { name: /acme-team\/api/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /other-team\/web/ })).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-continue-to-tickets")).toBeDisabled();
+  });
+
+  it("offers installation on another workspace when repositories are already available", async () => {
+    const user = userEvent.setup();
+    const onGrantAccess = vi.fn();
+    render(
+      <FirstRunBitbucketForgeScreen
+        phase="choose"
+        connectHref=""
+        installUrl=""
+        repositories={["acme-team/api"]}
+        selectedRepository="acme-team/api"
+        onGrantAccess={onGrantAccess}
+        onSelectRepository={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Install on another workspace" }));
+
+    expect(onGrantAccess).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("option", { name: /acme-team\/api/ })).toBeInTheDocument();
   });
 
   it("keeps Bitbucket unavailable until the organization enables it", async () => {
@@ -259,7 +322,7 @@ describe("FirstRunSetup Bitbucket", () => {
     await chooseBitbucket(user);
 
     expect(screen.getByText("SuperPlane is installed on your Bitbucket workspace.")).toBeInTheDocument();
-    expect(screen.getByText("acme-team")).toBeInTheDocument();
+    expect(screen.getByText("Workspace: acme-team")).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-bitbucket-install")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-continue-to-tickets")).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Check repositories" }));
@@ -291,6 +354,8 @@ describe("FirstRunSetup Bitbucket", () => {
         <StatefulSetup connected={new Set()} overrides={{}} />
       </MemoryRouter>,
     );
+
+    await user.click(await screen.findByRole("button", { name: "Use acme-team" }));
 
     expect(await screen.findByRole("option", { name: /acme-team\/api/ })).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-bitbucket-grant")).not.toBeInTheDocument();
