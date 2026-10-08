@@ -3518,17 +3518,17 @@ CREATE INDEX idx_factory_pull_requests_work_order ON public.factory_pull_request
 
 
 --
--- Name: idx_factory_velocity_repository_merges_factory_merged_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_factory_velocity_repository_merges_factory_merged_at ON public.factory_velocity_repository_merges USING btree (factory_id, merged_at DESC);
-
-
---
 -- Name: idx_factory_velocity_merges_factory_provider_repo_num; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX idx_factory_velocity_merges_factory_provider_repo_num ON public.factory_velocity_repository_merges USING btree (factory_id, provider, repository, number);
+
+
+--
+-- Name: idx_factory_velocity_repository_merges_factory_merged_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_velocity_repository_merges_factory_merged_at ON public.factory_velocity_repository_merges USING btree (factory_id, merged_at DESC);
 
 
 --
