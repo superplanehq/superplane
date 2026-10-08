@@ -38,6 +38,51 @@ resource "kubernetes_storage_class" "gp3_default" {
   ]
 }
 
+# Bind the chart's runner API and workers to the same EFS access point.
+resource "kubernetes_persistent_volume_v1" "runner_active_logs" {
+  metadata {
+    name = "${var.cluster_name}-runner-active-logs"
+  }
+
+  spec {
+    capacity = {
+      storage = var.runner_active_log_volume_capacity
+    }
+    access_modes                     = ["ReadWriteMany"]
+    persistent_volume_reclaim_policy = "Retain"
+    storage_class_name               = ""
+    mount_options                    = ["tls"]
+
+    persistent_volume_source {
+      csi {
+        driver        = "efs.csi.aws.com"
+        volume_handle = "${aws_efs_file_system.runner_active_logs.id}::${aws_efs_access_point.runner_active_logs.id}"
+      }
+    }
+  }
+
+  depends_on = [aws_eks_addon.efs_csi, aws_efs_mount_target.runner_active_logs]
+}
+
+resource "kubernetes_persistent_volume_claim_v1" "runner_active_logs" {
+  metadata {
+    name      = "superplane-runner-active-logs"
+    namespace = kubernetes_namespace.superplane.metadata[0].name
+  }
+
+  spec {
+    access_modes       = ["ReadWriteMany"]
+    storage_class_name = ""
+    volume_name        = kubernetes_persistent_volume_v1.runner_active_logs.metadata[0].name
+
+    resources {
+      requests = {
+        storage = var.runner_active_log_volume_capacity
+      }
+    }
+  }
+}
+
 # -----------------------------------------------------------------------------
 # Database Credentials Secret
 # -----------------------------------------------------------------------------

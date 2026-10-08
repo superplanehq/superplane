@@ -967,6 +967,22 @@ CREATE TABLE public.hosted_llm_providers (
 
 
 --
+-- Name: installation_github_apps; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_github_apps (
+    id integer NOT NULL,
+    github_app_id bigint NOT NULL,
+    slug character varying(255) NOT NULL,
+    encrypted_private_key bytea NOT NULL,
+    encrypted_webhook_secret bytea NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT installation_github_apps_singleton CHECK ((id = 1))
+);
+
+
+--
 -- Name: installation_license_keys; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1050,7 +1066,8 @@ CREATE TABLE public.linear_webhook_receipts (
     http_status integer NOT NULL,
     outcome text NOT NULL,
     subscription_count integer DEFAULT 0 NOT NULL,
-    task_ids text DEFAULT ''::text NOT NULL
+    task_ids text DEFAULT ''::text NOT NULL,
+    delivery_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -2486,6 +2503,14 @@ ALTER TABLE ONLY public.factory_pull_request_runs
 
 
 --
+-- Name: installation_github_apps installation_github_apps_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_github_apps
+    ADD CONSTRAINT installation_github_apps_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: installation_license_keys installation_license_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3705,6 +3730,13 @@ CREATE INDEX idx_files_work_order_id ON public.files USING btree (work_order_id)
 --
 
 CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (group_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_linear_webhook_receipts_delivery; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_linear_webhook_receipts_delivery ON public.linear_webhook_receipts USING btree (webhook_id, delivery_key) WHERE ((delivery_key <> ''::text) AND (outcome = 'accepted'::text));
 
 
 --
@@ -5595,7 +5627,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261006160433	f
+20261008140950	f
 \.
 
 

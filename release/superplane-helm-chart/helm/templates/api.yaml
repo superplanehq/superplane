@@ -1,6 +1,3 @@
-{{- if and .Values.runnerAPI.enabled (not .Values.runnerLogs.existingClaim) (gt (int .Values.api.replicas) 1) }}
-{{- fail "Set runnerLogs.existingClaim when api.replicas is greater than 1." }}
-{{- end }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -53,10 +50,15 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.database.local.enabled }}
+      initContainers:
+        {{- include "superplane.migrateWaitContainer" . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Release.Name }}-api
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/build/superplane"]
           envFrom:
             - configMapRef:
                 name: {{ .Values.domain.configMapName }}
@@ -93,12 +95,6 @@ spec:
           env:
             - name: START_PUBLIC_API
               value: "yes"
-            - name: START_RUNNER_API
-{{- if .Values.runnerAPI.enabled }}
-              value: "yes"
-{{- else }}
-              value: "no"
-{{- end }}
             - name: START_EVENT_DISTRIBUTER
               value: "no"
             - name: START_WEBSOCKET_SERVER
@@ -139,6 +135,10 @@ spec:
 {{- end }}
             - name: ENABLE_PASSWORD_LOGIN
               value: {{ ternary "yes" "no" .Values.authentication.enablePasswordLogin | quote }}
+            {{- if and .Values.ingress.ssl.enabled (eq .Values.ingress.className "gce") (eq .Values.ingress.ssl.type "cert-manager") }}
+            - name: REDIRECT_HTTP_REQUESTS
+              value: "yes"
+            {{- end }}
             - name: OWNER_SETUP_ENABLED
 {{- if .Values.api.ownerSetupEnabled }}
               value: "yes"
@@ -163,14 +163,6 @@ spec:
               value: {{ .Values.blobStorage.localPath | quote }}
             - name: BLOB_STORAGE_CREDENTIALS_FILE
               value: {{ .Values.blobStorage.credentialsFile | quote }}
-{{- if .Values.runnerAPI.enabled }}
-            - name: RUNNER_ACTIVE_LOG_FS_PATH
-              value: {{ .Values.runnerLogs.path | quote }}
-{{- if not .Values.runnerLogs.existingClaim }}
-            - name: START_RUNNER_LOG_COMPACTOR
-              value: "yes"
-{{- end }}
-{{- end }}
             - name: START_FILE_CLEANUP_WORKER
               value: "yes"
 {{- if .Values.license.secretName }}
@@ -197,10 +189,6 @@ spec:
             - name: blob-data
               mountPath: {{ .Values.blobStorage.localPath }}
 {{- end }}
-{{- if .Values.runnerAPI.enabled }}
-            - name: runner-logs
-              mountPath: {{ .Values.runnerLogs.path }}
-{{- end }}
 
           ports:
             - name: http
@@ -208,21 +196,21 @@ spec:
               protocol: TCP
           startupProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
-            periodSeconds: 5
+            periodSeconds: 10
             timeoutSeconds: 2
-            failureThreshold: 60
+            failureThreshold: 30
           livenessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 5
           readinessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
             periodSeconds: 10
             timeoutSeconds: 2
@@ -253,13 +241,4 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
         - name: blob-data
           emptyDir: {}
-{{- end }}
-{{- if .Values.runnerAPI.enabled }}
-        - name: runner-logs
-{{- if .Values.runnerLogs.existingClaim }}
-          persistentVolumeClaim:
-            claimName: {{ .Values.runnerLogs.existingClaim }}
-{{- else }}
-          emptyDir: {}
-{{- end }}
 {{- end }}

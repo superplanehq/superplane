@@ -8,12 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Kbd } from "@/components/ui/kbd";
 import type { UseSpeechDictationResult } from "@/hooks/useSpeechDictation";
 import { useSpokenPhraseDictation, type SpokenPhraseField } from "@/hooks/useSpokenPhraseDictation";
+import { hostedVideoFromClipboard } from "@/lib/hostedVideo";
 import { cn } from "@/lib/utils";
 import { WORK_ORDER_FILE_ACCEPT } from "@/lib/workOrderFiles";
 import { CreateWorkOrderRequestAttachButton } from "../../CreateWorkOrderRequestAttachButton";
-import { CreateWorkOrderRequestAttachments } from "../../CreateWorkOrderRequestAttachments";
+import { HostedVideoLinkField } from "../../HostedVideoLinkField";
+import { CreateWorkOrderRequestPreviewRow } from "../../CreateWorkOrderRequestAttachments";
 import { DictateButton } from "../../DictateButton";
-import { PendingWorkOrderFileChips } from "../../PendingWorkOrderFileChips";
+
 import { appendUploadedWorkOrderImages } from "../../lib/createWorkOrderRequestImages";
 import { WorkOrderDescription } from "../../WorkOrderDescription";
 import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOverflow";
@@ -24,7 +26,11 @@ import { AnalysisLiveWork } from "./IntentAnalysisLiveWork";
 import type { IntentAnalysisChat } from "./intentAnalysisChat";
 import { JumpToLatestPill } from "./JumpToLatestPill";
 import { composerChipsWorking } from "./planChipStatus";
-import { mergeAnalysisTranscriptFiles, useAnalysisComposerImages } from "./useAnalysisComposerImages";
+import {
+  addAnalysisHostedVideo,
+  mergeAnalysisTranscriptFiles,
+  useAnalysisComposerImages,
+} from "./useAnalysisComposerImages";
 import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useFollowLogScroll } from "./useFollowLogScroll";
 import {
@@ -104,6 +110,7 @@ function AnalysisRequestChat({
   const images = useAnalysisComposerImages({
     disabled: !analysis.canSend,
     onUploadFiles: analysis.onUploadFiles,
+    markdown: analysis.composer ?? "",
   });
   const transcriptFiles = mergeAnalysisTranscriptFiles(files, images.transcriptFiles);
   const composer = usePlanningComposer(analysis, images.pending.length, state.showSurvey);
@@ -356,7 +363,15 @@ function AnalysisComposerField({
             setCursor(event.target.selectionStart);
           }}
           onSelect={(event) => setCursor(event.currentTarget.selectionStart)}
-          onPaste={images.handlePaste}
+          onPaste={(event) => {
+            const hosted = hostedVideoFromClipboard(event.clipboardData.getData("text/plain"));
+            if (hosted) {
+              event.preventDefault();
+              addAnalysisHostedVideo(analysis, images.pending, hosted);
+              return;
+            }
+            images.handlePaste(event);
+          }}
           onKeyDown={(event) => {
             if (skillKeyboardRef.current?.(event)) {
               return;
@@ -369,23 +384,33 @@ function AnalysisComposerField({
           className="min-h-[4.2rem] py-2 text-[13px]"
           rows={2}
         />
-        <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible pb-1.5">
-          <AnalysisComposerAddons analysis={analysis} images={images} dictation={dictation} />
-          <div className="flex items-center gap-1.5">
-            <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
-              {ANALYSIS_PLANNING_COPY.sendShortcut}
-            </Kbd>
-            <InputGroupButton
-              type="submit"
-              variant="default"
-              size="icon-sm"
-              className="rounded-full"
-              disabled={!canSubmit}
-              aria-label={ANALYSIS_PLANNING_COPY.send}
-              data-testid="split-run-intent-composer-send"
-            >
-              <ArrowUp className="size-4" aria-hidden />
-            </InputGroupButton>
+        <InputGroupAddon
+          align="block-end"
+          className="flex-col items-stretch justify-start gap-2 overflow-visible pb-1.5"
+        >
+          <CreateWorkOrderRequestPreviewRow
+            images={images.previewImages}
+            files={images.pendingFiles}
+            onRemove={images.remove}
+          />
+          <div className="flex w-full items-center justify-between gap-3">
+            <AnalysisComposerAddons analysis={analysis} images={images} dictation={dictation} />
+            <div className="flex items-center gap-1.5">
+              <Kbd className="hidden sm:inline-flex" data-testid="split-run-intent-composer-kbd">
+                {ANALYSIS_PLANNING_COPY.sendShortcut}
+              </Kbd>
+              <InputGroupButton
+                type="submit"
+                variant="default"
+                size="icon-sm"
+                className="rounded-full"
+                disabled={!canSubmit}
+                aria-label={ANALYSIS_PLANNING_COPY.send}
+                data-testid="split-run-intent-composer-send"
+              >
+                <ArrowUp className="size-4" aria-hidden />
+              </InputGroupButton>
+            </div>
           </div>
         </InputGroupAddon>
       </InputGroup>
@@ -403,7 +428,7 @@ function AnalysisComposerAddons({
   dictation: UseSpeechDictationResult;
 }) {
   return (
-    <div className="create-work-order-request-attachments flex min-w-0 items-end gap-2 overflow-visible">
+    <div className="flex min-w-0 items-center gap-2">
       {analysis.onUploadFiles ? (
         <CreateWorkOrderRequestAttachButton
           accept={WORK_ORDER_FILE_ACCEPT}
@@ -411,13 +436,11 @@ function AnalysisComposerAddons({
           onAttach={(files) => void images.attach(files)}
         />
       ) : null}
+      <HostedVideoLinkField
+        disabled={!analysis.canSend}
+        onAdd={(video) => addAnalysisHostedVideo(analysis, images.pending, video)}
+      />
       <DictateButton dictation={dictation} copy={ANALYSIS_PLANNING_COPY} disabled={!analysis.canSend} />
-      {images.previewImages.length > 0 ? (
-        <CreateWorkOrderRequestAttachments images={images.previewImages} onRemove={images.remove} />
-      ) : null}
-      {images.pendingFiles.length > 0 ? (
-        <PendingWorkOrderFileChips files={images.pendingFiles} onRemove={images.remove} />
-      ) : null}
     </div>
   );
 }

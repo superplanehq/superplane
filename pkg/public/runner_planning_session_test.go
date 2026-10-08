@@ -1047,6 +1047,21 @@ func TestRunnerPlanningWaitFailedWriteRestoresUserMessage(t *testing.T) {
 	assert.Equal(t, "hello", delivered["text"])
 }
 
+func TestMintPlanningWaitReturnsHostedVideoWithoutUploadedFiles(t *testing.T) {
+	text := "See ![Demo](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n\n[notes](https://vimeo.com/123456789)"
+	got, files, err := mintPlanningWait(t.Context(), &models.FactoryPlanningSession{}, models.PlanningWaitResult{
+		Kind: models.PlanningWaitKindMessage,
+		Text: text,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, text, got)
+	require.Len(t, files, 1)
+	assert.Equal(t, "hosted_video", files[0]["kind"])
+	assert.Equal(t, "https://www.youtube.com/watch?v=dQw4w9WgXcQ", files[0]["url"])
+	_, hasID := files[0]["id"]
+	assert.False(t, hasID)
+}
+
 func TestRunnerPlanningWaitMintsFileRefsInDeliveredText(t *testing.T) {
 	r := support.Setup(t)
 	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")

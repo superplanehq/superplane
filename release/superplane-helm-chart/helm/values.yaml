@@ -5,6 +5,12 @@
 image:
   registry: ghcr.io/superplanehq
   name: superplane
+  # Self-hosted installs must use <git-sha>-selfhosted. The plain <git-sha>
+  # and stable images load JS and CSS from assets.superplane.com. That host
+  # allows only app.superplane.com, so the UI fails on a customer domain.
+  # Empty uses Chart.AppVersion, which published charts set to
+  # <git-sha>-selfhosted.
+  tag: ""
   pullPolicy: IfNotPresent
   pullSecrets: []
 
@@ -127,13 +133,18 @@ polar:
 # When enabled, Connect authorizes this public app.
 # On the Linear application, set the callback URL to
 # {BASE_URL}/api/v1/linear/oauth/callback.
-# Request the read, write, and admin scopes.
+# Set the webhook URL to {BASE_URL}/api/v1/linear/webhook
+# and select Issues, Comments, and Issue attachments.
+# webhookSecret is that application's webhook signing secret.
+# When it is set, Connect requests the read and write scopes.
+# When it is empty, Connect also requests the admin scope.
 #
 linear:
   secretName: ""
   enabled: false
   clientId: ""
   clientSecret: ""
+  webhookSecret: ""
 
 #
 # Secret used to sign JWT session tokens
@@ -261,6 +272,7 @@ rabbitmq:
 #
 # Platform blob storage. Self-host defaults to a local directory.
 # Hosted SuperPlane sets provider to gcs and a bucket name.
+# Azure self-host sets provider to azure and account to the storage account name.
 #
 blobStorage:
   provider: filesystem
@@ -271,44 +283,60 @@ blobStorage:
   credentialsFile: ""
 
 #
-# Extra labels for API, worker, and WebSocket pods.
-# AKS workload identity requires azure.workload.identity/use: "true".
+# Extra labels for pods that use a workload identity.
+# AKS requires azure.workload.identity/use: "true".
 #
 podLabels: {}
 
 #
-# Runner API is off by default. GKE and EKS Terraform leave it off.
-# Azure Terraform turns it on so integrated runners can register.
+# Runner API and runner workers. Off by default.
+# The runner API serves /runner/v1. Runner workers compact finished task
+# logs into blob storage and remove stale runners.
+# Set blobStorage.provider to gcs, s3, or azure before you enable the runner.
+# filesystem is local to one pod, so the runner cannot share those blobs.
+# Omit runner.workers.enabled to follow runner.api.enabled.
+# Active logs are a shared filesystem. Leave existingClaim empty to create
+# a ReadWriteOnce claim. The worker pod then schedules on the runner API
+# node. Set existingClaim to a ReadWriteMany claim when replicas are
+# greater than 1 across nodes.
 #
-runnerAPI:
-  enabled: false
-
-#
-# Active runner logs. Used when runnerAPI.enabled is true.
-# With no existingClaim, one API replica stores and archives logs on emptyDir.
-# More than one API replica needs existingClaim. The claim must support
-# advisory locks, atomic rename, and durable sync.
-#
-runnerLogs:
-  path: /var/lib/superplane/active-runner-logs
-  existingClaim: ""
+runner:
+  api:
+    enabled: false
+    replicas: 1
+  workers:
+    replicas: 1
+  activeLogs:
+    path: /var/lib/superplane/runner-active-logs
+    existingClaim: ""
+    size: 10Gi
+    # Group that owns the log volume. The SuperPlane image runs as nobody (65534).
+    fsGroup: 65534
 
 #
 # Integrated Fleet Manager. Off by default.
-# Supply an existing secret with key fleet-manager.yaml.
+# Fleet Manager creates and deletes runner machines for the configured fleets.
+# Put the Fleet Manager configuration in an existing secret, under the key
+# fleet-manager.yaml. See pkg/fleets/README.md for the format.
+# Set serviceAccount.annotations to bind a cloud identity, for example
+# iam.gke.io/gcp-service-account for GKE Workload Identity or
+# azure.workload.identity/client-id for AKS.
 #
 fleetManager:
   enabled: false
   existingSecret: ""
   image:
     registry: ghcr.io/superplanehq
-    name: superplane-fleet-manager
+    name: fleet-manager
     tag: ""
     pullPolicy: IfNotPresent
   serviceAccount:
     create: false
     name: ""
     annotations: {}
+  # Fleet Manager reads its configuration once at start. Change an annotation,
+  # for example a checksum of the configuration, to restart it.
+  podAnnotations: {}
   podLabels: {}
   resources:
     limits:
@@ -336,8 +364,8 @@ feedback:
   discordWebhookUrl: ""
 
 #
-# Kubernetes service account. create stays false.
-# Set name to use an existing account.
+# Kubernetes service account for the API, worker, and WebSocket pods.
+# Set create to true to create it, or set name to use an existing account.
 # Set annotations to bind a cloud identity, for example GKE Workload Identity.
 #
 serviceAccount:

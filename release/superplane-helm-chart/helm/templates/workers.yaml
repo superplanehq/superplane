@@ -29,10 +29,15 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.database.local.enabled }}
+      initContainers:
+        {{- include "superplane.migrateWaitContainer" . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Release.Name }}-workers
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/build/superplane"]
           envFrom:
             - configMapRef:
                 name: {{ .Values.domain.configMapName }}
@@ -113,8 +118,6 @@ spec:
               value: /app/rbac/rbac_canvas_policy.csv
             - name: APPLICATION_NAME
               value: superplane
-            - name: RUN_DB_MIGRATIONS
-              value: "no"
             - name: DB_POOL_SIZE
               value: "{{ .Values.workers.dbPoolSize }}"
             - name: DB_STATEMENT_TIMEOUT
@@ -143,16 +146,6 @@ spec:
               value: {{ .Values.blobStorage.localPath | quote }}
             - name: BLOB_STORAGE_CREDENTIALS_FILE
               value: {{ .Values.blobStorage.credentialsFile | quote }}
-            - name: START_RUNNER_LOG_COMPACTOR
-{{- if and .Values.runnerAPI.enabled .Values.runnerLogs.existingClaim }}
-              value: "yes"
-{{- else }}
-              value: "no"
-{{- end }}
-{{- if and .Values.runnerAPI.enabled .Values.runnerLogs.existingClaim }}
-            - name: RUNNER_ACTIVE_LOG_FS_PATH
-              value: {{ .Values.runnerLogs.path | quote }}
-{{- end }}
             - name: START_FILE_CLEANUP_WORKER
               value: "yes"
 
@@ -163,10 +156,6 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
             - name: blob-data
               mountPath: {{ .Values.blobStorage.localPath }}
-{{- end }}
-{{- if and .Values.runnerAPI.enabled .Values.runnerLogs.existingClaim }}
-            - name: runner-logs
-              mountPath: {{ .Values.runnerLogs.path }}
 {{- end }}
 
           securityContext:
@@ -187,9 +176,4 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
         - name: blob-data
           emptyDir: {}
-{{- end }}
-{{- if and .Values.runnerAPI.enabled .Values.runnerLogs.existingClaim }}
-        - name: runner-logs
-          persistentVolumeClaim:
-            claimName: {{ .Values.runnerLogs.existingClaim }}
 {{- end }}

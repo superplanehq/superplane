@@ -1,4 +1,7 @@
 {{- if .Values.fleetManager.enabled }}
+{{- if not .Values.runner.api.enabled }}
+{{- fail "runner.api.enabled must be true when fleetManager.enabled is true" }}
+{{- end }}
 {{- if .Values.fleetManager.serviceAccount.create }}
 apiVersion: v1
 kind: ServiceAccount
@@ -20,7 +23,10 @@ metadata:
     app: superplane
     service: {{ .Release.Name }}-fleet-manager
 spec:
+  # Two replicas would both create runners for the same fleets.
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: superplane
@@ -34,6 +40,10 @@ spec:
         {{- with .Values.fleetManager.podLabels }}
         {{- include "superplane.podLabels" . | nindent 8 }}
         {{- end }}
+      {{- with .Values.fleetManager.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
     spec:
       {{- if or .Values.fleetManager.serviceAccount.create .Values.fleetManager.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.fleetManager.serviceAccountName" . }}
@@ -42,9 +52,15 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: fleet-manager
-          image: "{{ .Values.fleetManager.image.registry }}/{{ .Values.fleetManager.image.name }}:{{ .Values.fleetManager.image.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.fleetManager.image.registry }}/{{ .Values.fleetManager.image.name }}:{{ required "fleetManager.image.tag is required when fleetManager.enabled is true" .Values.fleetManager.image.tag }}"
           imagePullPolicy: {{ .Values.fleetManager.image.pullPolicy }}
           env:
             - name: FLEET_MANAGER_CONFIG_FILE
@@ -55,6 +71,7 @@ spec:
               readOnly: true
           securityContext:
             privileged: false
+            allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]

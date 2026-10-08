@@ -99,6 +99,7 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
   };
 
   return {
+    organizationId,
     step,
     setStep,
     integrationId,
@@ -114,7 +115,6 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
     connectOpen,
     setConnectOpen,
     connecting,
-    hosted: usesHostedLinearOAuth(linearDefinition),
     error,
     connectedQuery,
     createIntegration,

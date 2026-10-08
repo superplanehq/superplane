@@ -295,8 +295,8 @@ kubectl logs -n superplane deploy/superplane-api --tail=80
 API, workers, and websocket used to run migrations together. A killed
 `CREATE INDEX CONCURRENTLY` leaves `schema_migrations.dirty = true`.
 
-The API now has a startup probe. Workers and websocket set
-`RUN_DB_MIGRATIONS=no` after you rebuild the image.
+Helm runs migrations in one hook Job. API, workers, and websocket start
+the server and do not migrate.
 
 To repair a dirty database:
 

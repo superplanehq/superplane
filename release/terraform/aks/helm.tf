@@ -223,7 +223,7 @@ resource "helm_release" "superplane" {
   }
 
   set {
-    name  = "runnerAPI.enabled"
+    name  = "runner.api.enabled"
     value = "true"
   }
 

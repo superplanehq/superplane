@@ -57,10 +57,15 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.database.local.enabled }}
+      initContainers:
+        {{- include "superplane.migrateWaitContainer" . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Release.Name }}-websocket
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/build/superplane"]
           envFrom:
             - configMapRef:
                 name: {{ .Values.domain.configMapName }}
@@ -121,8 +126,6 @@ spec:
               value: /app/rbac/rbac_canvas_policy.csv
             - name: APPLICATION_NAME
               value: superplane
-            - name: RUN_DB_MIGRATIONS
-              value: "no"
             - name: DB_POOL_SIZE
               value: "{{ .Values.websocket.dbPoolSize }}"
             - name: DB_STATEMENT_TIMEOUT
