@@ -90,8 +90,8 @@ export function AutomationsConsoleVariant({
   onDescriptionSave,
   owner,
   assigneeIds,
-  canEditOwner,
-  ownerBusy,
+  canEditOwner = false,
+  ownerBusy = false,
   onOwnerSave,
   source,
   files,
@@ -112,7 +112,7 @@ export function AutomationsConsoleVariant({
   const anyLive = hasLiveAutomation(columns);
   const expandIdleCards = !anyLive && (fixture.lineStatus === "pending" || fixture.footerTone === "draft");
   const liveRun = liveRunTarget(fixture);
-  const stopLiveRun = canStopRun && onStopRun && liveRun ? () => onStopRun(liveRun) : undefined;
+  const stopLiveRun = liveRunStop(canStopRun, onStopRun, liveRun);
   const showIntake = Boolean(source) || Boolean(taskDescription?.trim()) || canEditDescription;
 
   return (
@@ -151,8 +151,8 @@ export function AutomationsConsoleVariant({
         actionBusy={actionBusy}
         onStopLiveRun={stopLiveRun}
         organizationId={organizationId}
-        owner={owner}
         assigneeIds={assigneeIds}
+        owner={owner}
         canEditOwner={canEditOwner}
         ownerBusy={ownerBusy}
         onOwnerSave={onOwnerSave}
@@ -172,6 +172,17 @@ interface ConsoleColumn {
   id: ConsoleColumnId;
   title: string;
   automations: ConsoleAutomation[];
+}
+
+function liveRunStop(
+  canStopRun: boolean,
+  onStopRun: AutomationsConsoleVariantProps["onStopRun"],
+  liveRun: { appId: string; runId: string } | undefined,
+) {
+  if (!canStopRun || !onStopRun || !liveRun) {
+    return undefined;
+  }
+  return () => onStopRun(liveRun);
 }
 
 /**
