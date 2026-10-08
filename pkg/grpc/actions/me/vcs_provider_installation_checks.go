@@ -97,7 +97,7 @@ func VerifyVCSProviderInstallations(
 	if provider == models.ProviderBitbucket {
 		return &pb.VerifyVCSProviderInstallationsResponse{}, nil
 	}
-	if !vcsProviderConfigured(provider) {
+	if !vcsProviderConfigured(ctx, provider) {
 		return nil, grpcerrors.FailedPrecondition(nil, "public GitHub App is not configured")
 	}
 	identity, err := currentVCSProviderIdentity(ctx, provider)

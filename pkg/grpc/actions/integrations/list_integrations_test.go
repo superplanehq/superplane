@@ -9,7 +9,9 @@ import (
 	appconfig "github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	ghub "github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -279,6 +281,24 @@ func TestListIntegrationsHostedGitHubAppInstall(t *testing.T) {
 		require.False(t, resp.GithubAppConfigured)
 		require.False(t, resp.Integrations[0].HostedAppInstall)
 		require.False(t, resp.Integrations[0].LegacySetupOnly)
+	})
+
+	t.Run("true when the installation stores the app", func(t *testing.T) {
+		t.Setenv(appconfig.EnvGitHubAppID, "")
+		t.Setenv(appconfig.EnvGitHubAppSlug, "")
+		t.Setenv(appconfig.EnvGitHubAppPrivateKey, "")
+		t.Setenv(appconfig.EnvGitHubAppWebhookSecret, "")
+		require.NoError(t, githubapp.Save(t.Context(), database.DB(t.Context()), setup.Encryptor, appconfig.GitHubHostedAppConfig{
+			ID:            11,
+			Slug:          "from-db",
+			PrivateKey:    "db-pem",
+			WebhookSecret: "db-secret",
+		}))
+
+		resp, err := ListIntegrations(ctx, reg)
+		require.NoError(t, err)
+		require.True(t, resp.GithubAppConfigured)
+		require.True(t, resp.Integrations[0].HostedAppInstall)
 	})
 
 	t.Run("true when factories and env are set", func(t *testing.T) {

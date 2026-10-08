@@ -969,6 +969,22 @@ CREATE TABLE public.hosted_llm_providers (
 
 
 --
+-- Name: installation_github_apps; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_github_apps (
+    id integer NOT NULL,
+    github_app_id bigint NOT NULL,
+    slug character varying(255) NOT NULL,
+    encrypted_private_key bytea NOT NULL,
+    encrypted_webhook_secret bytea NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT installation_github_apps_singleton CHECK ((id = 1))
+);
+
+
+--
 -- Name: installation_license_keys; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2486,6 +2502,14 @@ ALTER TABLE ONLY public.hosted_llm_providers
 
 ALTER TABLE ONLY public.factory_pull_request_runs
     ADD CONSTRAINT idx_factory_pull_request_runs_run_unique UNIQUE (run_id);
+
+
+--
+-- Name: installation_github_apps installation_github_apps_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_github_apps
+    ADD CONSTRAINT installation_github_apps_pkey PRIMARY KEY (id);
 
 
 --

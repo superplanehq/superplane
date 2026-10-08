@@ -121,9 +121,15 @@ variable "superplane_namespace" {
 }
 
 variable "superplane_image_tag" {
-  description = "SuperPlane image tag (e.g., stable, beta, v0.4)"
+  description = "Self-hosted SuperPlane image tag. Empty uses the chart's matching self-hosted image."
   type        = string
-  default     = "stable"
+  default     = ""
+}
+
+variable "runner_active_log_volume_capacity" {
+  description = "Nominal Kubernetes PV/PVC capacity for runner active logs. EFS grows elastically and does not reserve this capacity."
+  type        = string
+  default     = "1Gi"
 }
 
 # -----------------------------------------------------------------------------
