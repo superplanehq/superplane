@@ -178,6 +178,17 @@ func ListActiveBitbucketForgeInstallations(tx *gorm.DB) ([]BitbucketForgeInstall
 	return rows, nil
 }
 
+// CountUnhealthyBitbucketForgeInstallations monitors delivery health without
+// deleting installation records or invalidating otherwise usable tokens.
+func CountUnhealthyBitbucketForgeInstallations(tx *gorm.DB, now, deliveryCutoff time.Time) (int64, error) {
+	var count int64
+	err := tx.Model(&BitbucketForgeInstallation{}).
+		Where("uninstalled_at IS NULL").
+		Where("last_delivery_at IS NULL OR last_delivery_at < ? OR token_expires_at IS NULL OR token_expires_at <= ? OR system_token IS NULL OR octet_length(system_token) = 0", deliveryCutoff, now).
+		Count(&count).Error
+	return count, err
+}
+
 func saveBitbucketForgeDelivery(tx *gorm.DB, delivery BitbucketForgeDelivery) (*BitbucketForgeInstallation, error) {
 	installationID := delivery.InstallationID
 	now := delivery.DeliveredAt

@@ -146,7 +146,7 @@ dev.setup:
 	$(MAKE) dev.setup.go
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
-	@$(COMPOSE) exec app ./scripts/db_seed_local_runner_fleet.sh superplane_dev
+	@$(MAKE) dev.setup.runner.fleet
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
@@ -156,6 +156,11 @@ dev.setup.npm:
 dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
 	@$(COMPOSE) exec app go build cmd/server/main.go
+
+.PHONY: dev.setup.runner.fleet
+dev.setup.runner.fleet:
+	@$(MAKE) dev.test.is.running
+	@$(COMPOSE) exec -T app ./scripts/db_seed_local_runner_fleet.sh superplane_dev
 
 dev.clean.go.cache:
 	@$(MAKE) dev.test.is.running
@@ -184,6 +189,7 @@ endif
 	$(COMPOSE) exec app bash /app/docker-entrypoint.dev.sh
 
 dev.runners:
+	@$(MAKE) dev.setup.runner.fleet
 	$(COMPOSE_RUNNER) up -d --no-build --no-deps fleet-manager
 	@echo "Fleet Manager is running with ephemeral Docker runners."
 
