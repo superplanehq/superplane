@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 )
 
 const forgeDeliveryBodyLimit = 1 << 20
@@ -36,6 +37,8 @@ func (s *Server) HandleBitbucketForgeUninstall(w http.ResponseWriter, r *http.Re
 }
 
 func (s *Server) handleBitbucketForgeDelivery(w http.ResponseWriter, r *http.Request, uninstallRoute bool) {
+	outcome := "rejected"
+	defer func() { telemetry.RecordBitbucketForgeDelivery(r.Context(), outcome) }()
 	cfg := config.LoadBitbucketForgeAppConfig()
 	if !cfg.Enabled() {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -58,6 +61,7 @@ func (s *Server) handleBitbucketForgeDelivery(w http.ResponseWriter, r *http.Req
 
 	body, err := readForgeDeliveryBody(r)
 	if err != nil {
+		log.WithError(err).WithField("installation_id", invocation.InstallationID).Warn("invalid Bitbucket Forge delivery body")
 		http.Error(w, "invalid forge delivery", http.StatusBadRequest)
 		return
 	}
@@ -69,6 +73,7 @@ func (s *Server) handleBitbucketForgeDelivery(w http.ResponseWriter, r *http.Req
 	if !uninstall {
 		ciphertext, err = s.encryptor.Encrypt(r.Context(), []byte(invocation.SystemToken), []byte(invocation.InstallationID))
 		if err != nil {
+			outcome = "failed"
 			log.WithError(err).WithField("installation_id", invocation.InstallationID).Error("failed to encrypt Bitbucket Forge token")
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
@@ -86,6 +91,7 @@ func (s *Server) handleBitbucketForgeDelivery(w http.ResponseWriter, r *http.Req
 		Uninstall:          uninstall,
 	})
 	if err != nil {
+		outcome = "failed"
 		log.WithError(err).WithField("installation_id", invocation.InstallationID).Error("failed to store Bitbucket Forge delivery")
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
@@ -99,6 +105,7 @@ func (s *Server) handleBitbucketForgeDelivery(w http.ResponseWriter, r *http.Req
 		"token_expires_at":     invocation.SystemTokenExpires.UTC().Format(time.RFC3339),
 		"token_valid_for":      time.Until(invocation.SystemTokenExpires).Truncate(time.Second).String(),
 	}).Info("received Bitbucket Forge delivery")
+	outcome = "accepted"
 	w.WriteHeader(http.StatusNoContent)
 }
 

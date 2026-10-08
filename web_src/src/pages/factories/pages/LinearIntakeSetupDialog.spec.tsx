@@ -44,7 +44,8 @@ vi.mock("@/hooks/useIntegrations", () => ({
 }));
 
 vi.mock("@/ui/IntegrationCreateDialog", () => ({
-  IntegrationCreateDialog: () => null,
+  IntegrationCreateDialog: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="linear-credential-dialog" /> : null,
 }));
 
 function renderDialog(onCreated = vi.fn()) {
@@ -100,6 +101,26 @@ describe("LinearIntakeSetupDialog", () => {
       });
     });
     expect(onCreated).toHaveBeenCalled();
+  });
+
+  it("shows only Connect Linear when the hosted application is available and no connection exists", async () => {
+    mocks.linearDefinition.hostedAppInstall = true;
+    mocks.connected.splice(0, mocks.connected.length);
+    renderDialog();
+
+    expect(await screen.findByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.wizardConnect })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use your own Linear app" })).not.toBeInTheDocument();
+  });
+
+  it("opens the credential dialog when the hosted Linear application is not configured", async () => {
+    mocks.linearDefinition.hostedAppInstall = false;
+    mocks.connected.splice(0, mocks.connected.length);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.wizardConnect }));
+
+    expect(await screen.findByTestId("linear-credential-dialog")).toBeInTheDocument();
   });
 
   it("skips the initial import when the checkbox is off", async () => {

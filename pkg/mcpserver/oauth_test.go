@@ -265,6 +265,27 @@ func TestRegisterClientAllowsCursorRedirects(t *testing.T) {
 	require.Contains(t, client.RedirectURIs, "cursor://anysphere.cursor-mcp/oauth/callback")
 }
 
+func TestClientDisplayNameUsesCodexForMetadataClientID(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	const codexID = "https://chatgpt.com/oauth/codex/example/client.json"
+	db := database.Conn()
+	require.Equal(t, "Codex", ClientDisplayName(db, codexID))
+	require.Equal(t, models.DefaultMCPClientName, ClientDisplayName(db, "https://example.com/oauth/client.json"))
+	require.Equal(t, LocalClientName, ClientDisplayName(db, LocalClientID))
+	require.Equal(t, models.DefaultMCPClientName, ClientDisplayName(db, ""))
+
+	_, err := models.CreateMCPOAuthClient(db, codexID, "Cursor Desktop", []string{"cursor://callback"})
+	require.NoError(t, err)
+	require.Equal(t, "Cursor Desktop", ClientDisplayName(db, codexID))
+
+	storedURL := "https://www.chatgpt.com/oauth/codex/stored/client.json"
+	_, err = models.CreateMCPOAuthClient(db, storedURL, storedURL, []string{"cursor://callback"})
+	require.NoError(t, err)
+	require.Equal(t, "Codex", ClientDisplayName(db, storedURL))
+}
+
 func TestParseAuthorizeRequestRequiresPKCE(t *testing.T) {
 	_, err := ParseAuthorizeRequest(url.Values{
 		"client_id":     {LocalClientID},
