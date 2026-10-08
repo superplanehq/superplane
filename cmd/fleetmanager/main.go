@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/fleets/provider"
 	awsprovider "github.com/superplanehq/superplane/pkg/fleets/provider/aws"
 	dockerprovider "github.com/superplanehq/superplane/pkg/fleets/provider/docker"
+	gcpprovider "github.com/superplanehq/superplane/pkg/fleets/provider/gcp"
 	"github.com/superplanehq/superplane/pkg/fleets/reconcile"
 )
 
@@ -51,10 +52,9 @@ func main() {
 		log.Error("create installation admin API client", slog.Any("error", err))
 		os.Exit(1)
 	}
-	var awsArtifactResolver reconcile.ArtifactResolver
-	var awsSDKConfig aws.Config
-	if usesAWS(config) {
-		awsArtifactResolver, err = artifact.NewResolver(
+	var releaseArtifactResolver reconcile.ArtifactResolver
+	if usesReleaseArtifacts(config) {
+		releaseArtifactResolver, err = artifact.NewResolver(
 			config.RunnerReleaseBaseURL,
 			httpClient,
 		)
@@ -62,12 +62,23 @@ func main() {
 			log.Error("create runner artifact resolver", slog.Any("error", err))
 			os.Exit(1)
 		}
+	}
+	var awsSDKConfig aws.Config
+	if usesAWS(config) {
 		loadedAWSConfig, configErr := awsconfig.LoadDefaultConfig(ctx)
 		if configErr != nil {
 			log.Error("load AWS config", slog.Any("error", configErr))
 			os.Exit(1)
 		}
 		awsSDKConfig = loadedAWSConfig
+	}
+	var gcpClient gcpprovider.ComputeAPI
+	if usesGCP(config) {
+		gcpClient, err = gcpprovider.NewSDK(ctx)
+		if err != nil {
+			log.Error("create Compute Engine client", slog.Any("error", err))
+			os.Exit(1)
+		}
 	}
 
 	reconcilers := make([]*reconcile.Reconciler, 0, len(config.Fleets))
@@ -80,7 +91,8 @@ func main() {
 			config.ID,
 			fleet,
 			ec2Client,
-			awsArtifactResolver,
+			gcpClient,
+			releaseArtifactResolver,
 			log,
 		)
 		if err != nil {
@@ -134,8 +146,20 @@ func newEC2Client(config aws.Config, region string) *ec2.Client {
 }
 
 func usesAWS(config *fleetconfig.Config) bool {
+	return hasProvider(config, fleetconfig.ProviderAWS)
+}
+
+func usesGCP(config *fleetconfig.Config) bool {
+	return hasProvider(config, fleetconfig.ProviderGCP)
+}
+
+func usesReleaseArtifacts(config *fleetconfig.Config) bool {
+	return usesAWS(config) || usesGCP(config)
+}
+
+func hasProvider(config *fleetconfig.Config, providerName string) bool {
 	for _, fleet := range config.Fleets {
-		if fleet.Provider == fleetconfig.ProviderAWS {
+		if fleet.Provider == providerName {
 			return true
 		}
 	}
@@ -146,7 +170,8 @@ func buildProvider(
 	fleetManagerID string,
 	fleet fleetconfig.Fleet,
 	ec2Client *ec2.Client,
-	awsArtifactResolver reconcile.ArtifactResolver,
+	gcpClient gcpprovider.ComputeAPI,
+	releaseArtifactResolver reconcile.ArtifactResolver,
 	log *slog.Logger,
 ) (provider.Provider, reconcile.ArtifactResolver, string, error) {
 	switch fleet.Provider {
@@ -167,7 +192,23 @@ func buildProvider(
 			CloudWatchRegion:     fleet.AWS.Region,
 			CloudWatchLogGroup:   fleet.AWS.CloudWatch.LogGroupName,
 		}, log)
-		return resourceProvider, awsArtifactResolver, fleet.AWS.Architecture, err
+		return resourceProvider, releaseArtifactResolver, fleet.AWS.Architecture, err
+	case fleetconfig.ProviderGCP:
+		resourceProvider, err := gcpprovider.New(gcpClient, gcpprovider.Config{
+			FleetManagerID:      fleetManagerID,
+			ProjectID:           fleet.GCP.ProjectID,
+			Zones:               fleet.GCP.Zones,
+			MachineType:         fleet.GCP.MachineType,
+			Image:               fleet.GCP.Image,
+			Architecture:        fleet.GCP.Architecture,
+			Subnetwork:          fleet.GCP.Subnetwork,
+			ServiceAccountEmail: fleet.GCP.ServiceAccountEmail,
+			NetworkTags:         fleet.GCP.NetworkTags,
+			DiskSizeGB:          fleet.GCP.DiskSizeGB,
+			DiskType:            fleet.GCP.DiskType,
+			Labels:              fleet.GCP.Labels,
+		}, log)
+		return resourceProvider, releaseArtifactResolver, fleet.GCP.Architecture, err
 	case fleetconfig.ProviderDocker:
 		resourceProvider, err := dockerprovider.New(dockerprovider.Config{
 			Image:        fleet.Docker.Image,
