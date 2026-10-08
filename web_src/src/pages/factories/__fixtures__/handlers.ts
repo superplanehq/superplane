@@ -38,6 +38,7 @@ import { defaultNotificationSettings } from "@/lib/notificationSettings";
 import { buildStorybookMeUser, fixtureResponse, type FixtureResult } from "@/pages/home/__fixtures__/handlers";
 import { storybookHostedLlmModels, storybookSelectableLlmModels } from "@/pages/home/__fixtures__/hostedLlmModels";
 import { automationNameForLineStep } from "../lib/factoryLineFormShared";
+import { storybookIntakeCatalogEntries } from "./intakeCatalogFixtures";
 import {
   formatUsageCsvDollarsFromMicros,
   usageSpendMicros,
@@ -180,6 +181,18 @@ function factoriesCollectionRoute(fixture: FactoriesFixture): FactoriesRoute {
       fixture.workOrdersByFactoryId[created.id] = [];
       fixture.appsByFactoryId[created.id] = [];
       return { json: { factory: created } };
+    },
+  };
+}
+
+function factoryIntakeCatalogRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factory-intake-catalog"),
+    resolve: (_match, method) => {
+      if (method !== "GET") {
+        return null;
+      }
+      return { json: { entries: storybookIntakeCatalogEntries(fixture.intakeCatalogGrantedKeys ?? []) } };
     },
   };
 }
@@ -1523,6 +1536,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     factoryVCSProviderRepositoryRoute(fixture),
     factoryOnboardingRoute(fixture),
     factoryRepositoryRoute(fixture),
+    factoryIntakeCatalogRoute(fixture),
     ...organizationSecretsRoutes(),
     ...factoryLinesRoutes(fixture),
     ...workOrderRoutes(fixture),

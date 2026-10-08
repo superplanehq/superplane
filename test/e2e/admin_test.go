@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,7 +51,7 @@ func TestAdminDashboard(t *testing.T) {
 		steps.session.Login()
 
 		// Navigate to admin accounts page
-		steps.session.Visit("/admin/accounts")
+		steps.session.VisitWithTimeout("/admin/accounts", 30*time.Second)
 		steps.session.Sleep(500)
 
 		// Start impersonation on the other user

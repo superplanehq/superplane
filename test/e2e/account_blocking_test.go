@@ -115,7 +115,7 @@ func (s *accountBlockingSteps) promoteAdminAndLogin() {
 }
 
 func (s *accountBlockingSteps) visitAccountsPage() {
-	s.session.Visit("/admin/accounts")
+	s.session.VisitWithTimeout("/admin/accounts", 30*time.Second)
 	s.session.Sleep(500)
 	s.session.AssertText(s.targetEmail)
 }

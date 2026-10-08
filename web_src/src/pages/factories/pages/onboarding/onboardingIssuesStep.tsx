@@ -1,3 +1,4 @@
+import type { IntakeSurfaceState } from "@/lib/intakeCatalog";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -12,11 +13,13 @@ export function IssuesStep({
   onRequestConnect,
   autoDiscover,
   repos,
+  intakeState,
 }: {
   setup: OnboardingSetupApi;
   onRequestConnect: (id: IntegrationId) => void;
   autoDiscover?: boolean;
   repos?: string[];
+  intakeState?: (key: string) => IntakeSurfaceState | undefined;
 }) {
   const {
     selectedRepo,
@@ -107,6 +110,7 @@ export function IssuesStep({
               setup={setup}
               backlogRepo={backlogRepo}
               host={host}
+              intakeState={intakeState}
               onRequestConnect={onRequestConnect}
             />
           </div>

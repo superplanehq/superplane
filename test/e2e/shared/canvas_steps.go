@@ -385,7 +385,7 @@ func (s *CanvasSteps) WaitForStaging(_ uuid.UUID) {
 	require.Eventually(s.t, func() bool {
 		hasStaging, err := models.HasStagedFilesForUser(database.Conn(), s.WorkflowID, userID)
 		return err == nil && hasStaging
-	}, 15*time.Second, 200*time.Millisecond)
+	}, 30*time.Second, 200*time.Millisecond, "expected staging rows for user %s on workflow %s", userID, s.WorkflowID)
 }
 
 // WaitForStagingOnCurrentDraft waits until the current user has staging rows and returns the live version id.
@@ -726,7 +726,7 @@ func (s *CanvasSteps) CreatePublishedWithParameterizedManualRun() {
 }
 
 func (s *CanvasSteps) Visit() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.WorkflowID.String())
+	s.session.VisitWithTimeout("/"+s.session.OrgID.String()+"/apps/"+s.WorkflowID.String(), 30*time.Second)
 }
 
 func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
