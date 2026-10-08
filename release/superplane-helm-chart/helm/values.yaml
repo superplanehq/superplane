@@ -5,6 +5,12 @@
 image:
   registry: ghcr.io/superplanehq
   name: superplane
+  # Self-hosted installs must use <git-sha>-selfhosted. The plain <git-sha>
+  # and stable images load JS and CSS from assets.superplane.com. That host
+  # allows only app.superplane.com, so the UI fails on a customer domain.
+  # Empty uses Chart.AppVersion, which published charts set to
+  # <git-sha>-selfhosted.
+  tag: ""
   pullPolicy: IfNotPresent
   pullSecrets: []
 
@@ -275,6 +281,62 @@ blobStorage:
   credentialsFile: ""
 
 #
+# Runner API and runner workers. Off by default.
+# The runner API serves /runner/v1. Runner workers compact finished task
+# logs into blob storage and remove stale runners.
+# Set blobStorage.provider to gcs or s3 before you enable the runner.
+# filesystem is local to one pod, so the runner cannot share those blobs.
+# Omit runner.workers.enabled to follow runner.api.enabled.
+# Active logs are a shared filesystem. Leave existingClaim empty to create
+# a ReadWriteOnce claim. The worker pod then schedules on the runner API
+# node. Set existingClaim to a ReadWriteMany claim when replicas are
+# greater than 1 across nodes.
+#
+runner:
+  api:
+    enabled: false
+    replicas: 1
+  workers:
+    replicas: 1
+  activeLogs:
+    path: /var/lib/superplane/runner-active-logs
+    existingClaim: ""
+    size: 10Gi
+    # Group that owns the log volume. The SuperPlane image runs as nobody (65534).
+    fsGroup: 65534
+
+#
+# Integrated Fleet Manager. Off by default.
+# Fleet Manager creates and deletes runner machines for the configured fleets.
+# Put the Fleet Manager configuration in an existing secret, under the key
+# fleet-manager.yaml. See pkg/fleets/README.md for the format.
+# Set serviceAccount.annotations to bind a cloud identity, for example
+# iam.gke.io/gcp-service-account for GKE Workload Identity.
+#
+fleetManager:
+  enabled: false
+  existingSecret: ""
+  image:
+    registry: ghcr.io/superplanehq
+    name: fleet-manager
+    tag: ""
+    pullPolicy: IfNotPresent
+  serviceAccount:
+    create: false
+    name: ""
+    annotations: {}
+  # Fleet Manager reads its configuration once at start. Change an annotation,
+  # for example a checksum of the configuration, to restart it.
+  podAnnotations: {}
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+#
 # Email configuration
 #
 email:
@@ -292,8 +354,8 @@ feedback:
   discordWebhookUrl: ""
 
 #
-# Kubernetes service account. create stays false.
-# Set name to use an existing account.
+# Kubernetes service account for the API, worker, and WebSocket pods.
+# Set create to true to create it, or set name to use an existing account.
 # Set annotations to bind a cloud identity, for example GKE Workload Identity.
 #
 serviceAccount:

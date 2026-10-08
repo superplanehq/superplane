@@ -1,18 +1,22 @@
+{{- if and (or .Values.runner.api.enabled (eq (include "runner.workers.enabled" .) "true")) (eq .Values.blobStorage.provider "filesystem") }}
+{{- fail "runner.api and runner.workers need blobStorage.provider set to a shared store such as gcs or s3. filesystem is a pod-local directory, so runner pods cannot read the same blobs as the API." }}
+{{- end }}
+{{- if .Values.runner.api.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Release.Name }}-websocket
+  name: {{ .Release.Name }}-runner-api
   namespace: {{ .Release.Namespace }}
 {{- if eq .Values.ingress.className "gce" }}
   annotations:
-    cloud.google.com/backend-config: '{"default": "ingress-websocket-backend-config"}'
+    cloud.google.com/backend-config: '{"default": "ingress-runner-api-backend-config"}'
     cloud.google.com/neg: '{"ingress": true}'
 {{- end }}
 spec:
   type: NodePort
   selector:
     app: superplane
-    service: {{ .Release.Name }}-websocket
+    service: {{ .Release.Name }}-runner-api
   ports:
     - name: http
       port: 8000
@@ -22,34 +26,29 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-websocket
+  name: {{ .Release.Name }}-runner-api
   namespace: {{ .Release.Namespace }}
   labels:
     app: superplane
-    service: {{ .Release.Name }}-websocket
+    service: {{ .Release.Name }}-runner-api
 spec:
-  replicas: {{ .Values.websocket.replicas }}
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxUnavailable: 0
-      maxSurge: 1
-  minReadySeconds: 10
+  replicas: {{ .Values.runner.api.replicas }}
   selector:
     matchLabels:
       app: superplane
-      service: {{ .Release.Name }}-websocket
+      service: {{ .Release.Name }}-runner-api
   template:
     metadata:
-      name: {{ .Release.Name }}-websocket
+      name: {{ .Release.Name }}-runner-api
       labels:
         app: superplane
-        service: {{ .Release.Name }}-websocket
+        service: {{ .Release.Name }}-runner-api
     spec:
-      terminationGracePeriodSeconds: 75
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
       {{- end }}
+      securityContext:
+        fsGroup: {{ .Values.runner.activeLogs.fsGroup }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -59,7 +58,7 @@ spec:
         {{- include "superplane.migrateWaitContainer" . | nindent 8 }}
       {{- end }}
       containers:
-        - name: {{ .Release.Name }}-websocket
+        - name: {{ .Release.Name }}-runner-api
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/app/build/superplane"]
@@ -97,24 +96,9 @@ spec:
                 name: {{ include "secrets.linear.name" . }}
             {{- end }}
           env:
-            - name: START_PUBLIC_API
-              value: "yes"
-            - name: START_GRPC_GATEWAY
-              value: "no"
-            - name: START_EVENT_DISTRIBUTER
-              value: "yes"
-            - name: START_WEB_SERVER
-              value: "no"
-            - name: START_WEBSOCKET_SERVER
-              value: "yes"
-            - name: START_RBAC_POLICY_RELOAD_CONSUMER
-              value: "yes"
+            {{- include "runner.processEnv" (dict "enabled" (list "START_RUNNER_API")) | nindent 12 }}
             - name: PUBLIC_API_BASE_PATH
               value: "/api/v1"
-            - name: WEB_BASE_PATH
-              value: ""
-            - name: SWAGGER_BASE_PATH
-              value: "/app/api/swagger"
             - name: RBAC_MODEL_PATH
               value: /app/rbac/rbac_model.conf
             - name: RBAC_ORG_POLICY_PATH
@@ -124,7 +108,7 @@ spec:
             - name: APPLICATION_NAME
               value: superplane
             - name: DB_POOL_SIZE
-              value: "{{ .Values.websocket.dbPoolSize }}"
+              value: "{{ .Values.api.dbPoolSize }}"
             - name: DB_STATEMENT_TIMEOUT
               value: "{{ .Values.database.statementTimeout }}"
             - name: DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT
@@ -133,28 +117,6 @@ spec:
               value: /app/templates
             - name: OIDC_KEYS_PATH
               value: /app/oidc-keys
-            - name: BLOCK_SIGNUP
-{{- if .Values.api.blockSignup }}
-              value: "yes"
-{{- else }}
-              value: "no"
-{{- end }}
-            - name: ENABLE_PASSWORD_LOGIN
-              value: {{ ternary "yes" "no" .Values.authentication.enablePasswordLogin | quote }}
-            - name: OWNER_SETUP_ENABLED
-{{- if .Values.api.ownerSetupEnabled }}
-              value: "yes"
-{{- else }}
-              value: "no"
-{{- end }}
-            - name: OTEL_ENABLED
-              value: "yes"
-            - name: SUPERPLANE_BEACON_ENABLED
-              value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
-            - name: SUPERPLANE_INSTALLATION_TYPE
-              value: {{ .Values.installation.type | quote }}
-            - name: SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER
-              value: {{ ternary "yes" "no" .Values.license.hideExpiryBanner | quote }}
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
             - name: BLOB_STORAGE_BUCKET
@@ -165,16 +127,14 @@ spec:
               value: {{ .Values.blobStorage.localPath | quote }}
             - name: BLOB_STORAGE_CREDENTIALS_FILE
               value: {{ .Values.blobStorage.credentialsFile | quote }}
-
+            - name: RUNNER_ACTIVE_LOG_FS_PATH
+              value: {{ .Values.runner.activeLogs.path | quote }}
           volumeMounts:
             - name: oidc-keys
               mountPath: /app/oidc-keys
               readOnly: true
-{{- if eq .Values.blobStorage.provider "filesystem" }}
-            - name: blob-data
-              mountPath: {{ .Values.blobStorage.localPath }}
-{{- end }}
-
+            - name: runner-active-logs
+              mountPath: {{ .Values.runner.activeLogs.path }}
           ports:
             - name: http
               containerPort: 8000
@@ -183,7 +143,7 @@ spec:
             httpGet:
               path: /health
               port: http
-            periodSeconds: 5
+            periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 30
           livenessProbe:
@@ -197,25 +157,23 @@ spec:
             httpGet:
               path: /health
               port: http
-            periodSeconds: 5
+            periodSeconds: 10
             timeoutSeconds: 2
-            failureThreshold: 6
+            failureThreshold: 5
           securityContext:
             privileged: false
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
-
-          {{- with .Values.websocket.resources }}
+          {{- with .Values.api.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-
       volumes:
         - name: oidc-keys
           secret:
             secretName: {{ include "secrets.oidc.name" . }}
-{{- if eq .Values.blobStorage.provider "filesystem" }}
-        - name: blob-data
-          emptyDir: {}
+        - name: runner-active-logs
+          persistentVolumeClaim:
+            claimName: {{ include "runner.activeLogs.claimName" . }}
 {{- end }}

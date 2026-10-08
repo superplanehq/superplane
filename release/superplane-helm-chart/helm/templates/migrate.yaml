@@ -1,0 +1,102 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  {{- if .Values.database.local.enabled }}
+  name: {{ .Release.Name }}-migrate-{{ .Release.Revision }}
+  {{- else }}
+  name: {{ .Release.Name }}-migrate
+  {{- end }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: superplane
+    service: {{ .Release.Name }}-migrate
+  {{- if not .Values.database.local.enabled }}
+  annotations:
+    # External database. The secret already exists, or this Job reads
+    # the password from values because the chart Secret is created later.
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+  {{- end }}
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      name: {{ .Release.Name }}-migrate
+      labels:
+        app: superplane
+        service: {{ .Release.Name }}-migrate
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.database.local.enabled }}
+          # The bundled Postgres StatefulSet starts with this Job.
+          # Wait until it accepts connections, then migrate.
+          command: ["bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              for _ in $(seq 1 90); do
+                if pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USERNAME"; then
+                  exec bash /app/docker-entrypoint.sh
+                fi
+                sleep 5
+              done
+              echo "database did not become ready"
+              exit 1
+          {{- end }}
+          {{- if or .Values.database.local.enabled (ne .Values.database.secretName "") }}
+          envFrom:
+            - secretRef:
+                name: {{ include "secrets.database.name" . }}
+          {{- end }}
+          env:
+            - name: APPLICATION_NAME
+              value: superplane
+            - name: RUN_MIGRATIONS
+              value: "yes"
+            - name: MIGRATE_ONLY
+              value: "yes"
+            {{- if and (not .Values.database.local.enabled) (eq .Values.database.secretName "") }}
+            - name: DB_NAME
+              value: superplane
+            - name: DB_HOST
+              value: {{ .Values.database.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.database.port | toString | quote }}
+            - name: DB_USERNAME
+              value: {{ .Values.database.username | quote }}
+            - name: DB_PASSWORD
+              value: {{ .Values.database.password | quote }}
+            - name: POSTGRES_DB_SSL
+              value: {{ .Values.database.ssl | toString | quote }}
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
