@@ -130,7 +130,7 @@ export function analysisWorkOrderRefreshKey(session: PlanningSessionPayload | nu
   });
 }
 
-function analysisView(session: PlanningSessionPayload | null, composer: string, analysisDelivered: boolean) {
+function analysisView(session: PlanningSessionPayload | null, composer: string) {
   if (!session) {
     return emptyCreateWithAgentView();
   }
@@ -138,7 +138,6 @@ function analysisView(session: PlanningSessionPayload | null, composer: string, 
     composer,
     right: emptyCreateWithAgentView().right,
     endConfirmOpen: false,
-    analysisDelivered,
   });
 }
 
@@ -208,11 +207,7 @@ export function useAnalysisPlanningSession(args: AnalysisPlanningSessionArgs) {
     onError: onMutationError,
   });
 
-  const view = usePlanningSessionLiveRun(
-    organizationId,
-    analysisView(session, composer, analysisDelivered),
-    analysisDelivered,
-  );
+  const view = usePlanningSessionLiveRun(organizationId, analysisView(session, composer), analysisDelivered);
   const { isLive, canSend } = analysisSendState(
     session,
     view.machineStatus,
