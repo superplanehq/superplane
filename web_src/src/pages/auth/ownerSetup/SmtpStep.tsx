@@ -1,9 +1,9 @@
-import { Input, InputGroup } from "@/components/Input/input";
 import { Button } from "@/components/ui/button";
+import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { FirstRunHeading } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { ErrorBanner } from "./ErrorBanner";
 import { OWNER_SETUP_COPY } from "./ownerSetupCopy";
@@ -66,11 +66,15 @@ function SmtpField({
   testId?: string;
   className?: string;
 }) {
+  const fieldId = useId();
   return (
     <div>
-      <Label className={fieldLabelClass}>{label}</Label>
+      <Label htmlFor={fieldId} className={fieldLabelClass}>
+        {label}
+      </Label>
       <InputGroup>
-        <Input
+        <InputGroupInput
+          id={fieldId}
           type={type}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -92,6 +96,7 @@ function SmtpFormFields({
   error: string | null;
   onChange: (field: keyof SMTPForm, value: boolean | string) => void;
 }) {
+  const tlsId = useId();
   return (
     <>
       <ErrorBanner message={error} />
@@ -136,10 +141,12 @@ function SmtpFormFields({
       </div>
       <div className="flex items-center justify-between gap-4 pt-2">
         <div>
-          <p className="text-[13px] font-medium">{copy.useTls}</p>
+          <Label htmlFor={tlsId} className="text-[13px] font-medium">
+            {copy.useTls}
+          </Label>
           <p className="mt-1 text-[12px] text-muted-foreground">{copy.useTlsHelp}</p>
         </div>
-        <Switch checked={form.useTLS} onCheckedChange={(checked) => onChange("useTLS", checked)} />
+        <Switch id={tlsId} checked={form.useTLS} onCheckedChange={(checked) => onChange("useTLS", checked)} />
       </div>
     </>
   );
