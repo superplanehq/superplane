@@ -96,34 +96,11 @@ export PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 playwright install --with-deps chromium
 chmod -R a+rX "${PLAYWRIGHT_BROWSERS_PATH}"
 
-# Playwright and the global npm installs leave large caches. Remove them before
-# the AWS CLI archive is unpacked to keep the image bake below its disk limit.
+# Playwright and the global npm installs leave large caches. Remove them
+# so the image bake stays below its disk limit.
 npm cache clean --force
 apt-get clean
 rm -rf /var/lib/apt/lists/*
-
-aws_architecture="x86_64"
-if [ "${architecture}" = "arm64" ]; then
-  aws_architecture="aarch64"
-fi
-curl --fail --location --silent --show-error \
-  "https://awscli.amazonaws.com/awscli-exe-linux-${aws_architecture}.zip" \
-  --output /tmp/awscliv2.zip
-unzip -q /tmp/awscliv2.zip -d /tmp
-/tmp/aws/install
-
-curl --fail --location --silent --show-error \
-  "https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/${architecture}/latest/amazon-cloudwatch-agent.deb" \
-  --output /tmp/amazon-cloudwatch-agent.deb
-dpkg -i /tmp/amazon-cloudwatch-agent.deb
-
-if ! snap list amazon-ssm-agent >/dev/null 2>&1; then
-  snap install amazon-ssm-agent --classic
-fi
-snap start --enable amazon-ssm-agent
-systemctl is-enabled --quiet snap.amazon-ssm-agent.amazon-ssm-agent.service
-systemctl is-active --quiet snap.amazon-ssm-agent.amazon-ssm-agent.service
-/snap/amazon-ssm-agent/current/amazon-ssm-agent -version
 
 git --version
 gh --version
@@ -140,7 +117,6 @@ claude --version
 opencode --version
 codex --version
 playwright --version
-aws --version
 
 ffmpeg -version >/dev/null
 ffprobe -version >/dev/null
@@ -149,16 +125,13 @@ PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright \
 test -s /tmp/playwright-smoke.png
 
 install -d -m 0755 /etc/systemd/system/superplane-runner.service.d
-cat > /etc/systemd/system/superplane-runner.service.d/10-runner-ami.conf <<'EOF'
+cat > /etc/systemd/system/superplane-runner.service.d/10-runner-image.conf <<'EOF'
 [Service]
 Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 EOF
 
 apt-get clean
 rm -rf \
-  /tmp/amazon-cloudwatch-agent.deb \
-  /tmp/aws \
-  /tmp/awscliv2.zip \
   /tmp/nodesource-setup.sh \
   /tmp/playwright-smoke.png \
   /var/lib/apt/lists/*

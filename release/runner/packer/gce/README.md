@@ -10,8 +10,11 @@ as `user-data` metadata. cloud-init runs the script once at first boot. The
 script downloads the configured runner release, verifies its checksum, and
 runs the release `install.sh`.
 
-The template uses the shared scripts in `../aws/scripts`. Keep the tool
-version defaults the same as `../aws/runner.pkr.hcl`.
+`scripts/install.sh` installs the task tools for this image. It does
+not install the AWS CLI, the CloudWatch Agent, or the SSM Agent. The
+media tools script stays in `../aws/scripts` because it is not specific
+to one cloud. Keep the tool version defaults the same as
+`../aws/runner.pkr.hcl`.
 
 ## Build
 

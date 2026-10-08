@@ -146,13 +146,12 @@ build {
   }
 
   provisioner "shell" {
-    script = "${path.root}/../aws/scripts/install.sh"
+    script = "${path.root}/scripts/install.sh"
     environment_vars = [
       "CLAUDE_CODE_VERSION=${var.claude_code_version}",
       "OPENCODE_VERSION=${var.opencode_version}",
       "CODEX_VERSION=${var.codex_version}",
       "PLAYWRIGHT_VERSION=${var.playwright_version}",
-      "INSTALL_AWS_AGENTS=no",
     ]
     execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
   }
