@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/pkg/database"
 )
 
 func Test__HostedAppFromEnv(t *testing.T) {
@@ -18,7 +18,7 @@ func Test__HostedAppFromEnv(t *testing.T) {
 	t.Setenv(EnvGitHubAppWebhookSecret, "")
 
 	t.Run("empty env is not configured", func(t *testing.T) {
-		support.Setup(t)
+		require.NoError(t, database.TruncateTables())
 		_, ok := HostedAppFromEnv()
 		assert.False(t, ok)
 		assert.False(t, HostedAppConfigured())

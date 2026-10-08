@@ -71,7 +71,7 @@ func ResolveHostedAppBinding(ctx core.IntegrationContext) (*HostedAppBinding, er
 	for _, repository := range repositories {
 		repositoryIDs = append(repositoryIDs, repository.RepositoryID)
 	}
-	app, ok := HostedApp(context.Background())
+	app, ok := ResolveHostedApp(context.Background())
 	if !ok {
 		return nil, fmt.Errorf("hosted GitHub App is not configured")
 	}
@@ -101,9 +101,9 @@ func HostedAppFromEnv() (HostedApp, bool) {
 	return hostedAppFromConfig(config.LoadGitHubHostedAppConfig())
 }
 
-// HostedApp returns the public GitHub App for this request. Environment wins.
-// Self-host falls back to the installation row after first-run create.
-func HostedApp(ctx context.Context) (HostedApp, bool) {
+// ResolveHostedApp returns the public GitHub App for this request. Environment
+// wins. Self-host falls back to the installation row after first-run create.
+func ResolveHostedApp(ctx context.Context) (HostedApp, bool) {
 	cfg, err := githubapp.ResolveProcess(ctx)
 	if err != nil {
 		return HostedApp{}, false
@@ -112,7 +112,7 @@ func HostedApp(ctx context.Context) (HostedApp, bool) {
 }
 
 func HostedAppConfigured() bool {
-	_, ok := HostedApp(context.Background())
+	_, ok := ResolveHostedApp(context.Background())
 	return ok
 }
 
@@ -183,7 +183,7 @@ func VerifyHostedAppInstallState(secret, state string) (uuid.UUID, error) {
 // integration secret.
 func LegacyAppPrivateKey(ctx core.IntegrationContext, metadata Metadata) (string, error) {
 	if metadata.HostedApp {
-		app, ok := HostedApp(context.Background())
+		app, ok := ResolveHostedApp(context.Background())
 		if !ok {
 			return "", fmt.Errorf("hosted GitHub App is not configured")
 		}

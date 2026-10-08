@@ -25,7 +25,7 @@ func TestHandleGitHubAppManifest(t *testing.T) {
 	t.Run("returns the public app create form", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     http.MethodGet,
-			path:       "/api/v1/github/app/manifest?return_to=/org/workspaces/new/setup",
+			path:       "/github/app/manifest?return_to=/org/workspaces/new/setup",
 			authCookie: token,
 		})
 		require.Equal(t, http.StatusOK, response.Code)
@@ -48,7 +48,7 @@ func TestHandleGitHubAppManifest(t *testing.T) {
 		t.Setenv(config.EnvGitHubAppWebhookSecret, "whsec")
 		response := execRequest(server, requestParams{
 			method:     http.MethodGet,
-			path:       "/api/v1/github/app/manifest",
+			path:       "/github/app/manifest",
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusConflict, response.Code)
@@ -61,7 +61,7 @@ func TestHandleGitHubAppCreatedRejectsInvalidState(t *testing.T) {
 
 	response := execRequest(server, requestParams{
 		method: http.MethodGet,
-		path:   "/api/v1/github/app/created?code=abc&state=bad",
+		path:   "/github/app/created?code=abc&state=bad",
 	})
 	assert.Equal(t, http.StatusBadRequest, response.Code)
 }

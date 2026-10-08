@@ -146,7 +146,7 @@ func githubAppSetupOrganizationIDAt(ctx context.Context, state string) uuid.UUID
 // that WebhookProvisioner registers for each webhook, so this endpoint does
 // not deliver them.
 func (s *Server) HandleGitHubAppWebhook(w http.ResponseWriter, r *http.Request) {
-	app, ok := common.HostedApp(r.Context())
+	app, ok := common.ResolveHostedApp(r.Context())
 	if !ok {
 		http.Error(w, "not found", http.StatusNotFound)
 		return

@@ -7,15 +7,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/test/support"
 )
 
+func testEncryptor() crypto.Encryptor {
+	return crypto.NewAESGCMEncryptor([]byte("0123456789abcdef0123456789abcdef"))
+}
+
 func TestResolvePrefersEnvironment(t *testing.T) {
-	r := support.Setup(t)
+	require.NoError(t, database.TruncateTables())
+	encryptor := testEncryptor()
 	clearGitHubAppEnv(t)
-	require.NoError(t, Save(t.Context(), database.DB(t.Context()), r.Encryptor, config.GitHubHostedAppConfig{
+	require.NoError(t, Save(t.Context(), database.DB(t.Context()), encryptor, config.GitHubHostedAppConfig{
 		ID:            11,
 		Slug:          "from-db",
 		PrivateKey:    "db-pem",
@@ -26,7 +31,7 @@ func TestResolvePrefersEnvironment(t *testing.T) {
 	t.Setenv(config.EnvGitHubAppPrivateKey, "env-pem")
 	t.Setenv(config.EnvGitHubAppWebhookSecret, "env-secret")
 
-	cfg, err := Resolve(t.Context(), database.DB(t.Context()), r.Encryptor)
+	cfg, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
 	require.NoError(t, err)
 	assert.Equal(t, int64(22), cfg.ID)
 	assert.Equal(t, "from-env", cfg.Slug)
@@ -35,16 +40,17 @@ func TestResolvePrefersEnvironment(t *testing.T) {
 }
 
 func TestResolveReadsInstallationRow(t *testing.T) {
-	r := support.Setup(t)
+	require.NoError(t, database.TruncateTables())
+	encryptor := testEncryptor()
 	clearGitHubAppEnv(t)
-	require.NoError(t, Save(t.Context(), database.DB(t.Context()), r.Encryptor, config.GitHubHostedAppConfig{
+	require.NoError(t, Save(t.Context(), database.DB(t.Context()), encryptor, config.GitHubHostedAppConfig{
 		ID:            11,
 		Slug:          "from-db",
 		PrivateKey:    "db-pem",
 		WebhookSecret: "db-secret",
 	}))
 
-	cfg, err := Resolve(t.Context(), database.DB(t.Context()), r.Encryptor)
+	cfg, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
 	require.NoError(t, err)
 	assert.True(t, cfg.Enabled())
 	assert.Equal(t, int64(11), cfg.ID)
@@ -59,10 +65,10 @@ func TestResolveReadsInstallationRow(t *testing.T) {
 }
 
 func TestResolveEmptyWhenMissing(t *testing.T) {
-	r := support.Setup(t)
+	require.NoError(t, database.TruncateTables())
 	clearGitHubAppEnv(t)
 
-	cfg, err := Resolve(t.Context(), database.DB(t.Context()), r.Encryptor)
+	cfg, err := Resolve(t.Context(), database.DB(t.Context()), testEncryptor())
 	require.NoError(t, err)
 	assert.False(t, cfg.Enabled())
 }

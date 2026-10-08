@@ -13,8 +13,8 @@ const installationGitHubAppID = 1
 // self-hosted installation. There is at most one row. Cloud keeps the same
 // credentials in process environment instead of this table.
 type InstallationGitHubApp struct {
-	ID                     int `gorm:"primary_key"`
-	GitHubAppID            int64
+	ID                     int   `gorm:"primary_key"`
+	GitHubAppID            int64 `gorm:"column:github_app_id"`
 	Slug                   string
 	EncryptedPrivateKey    []byte
 	EncryptedWebhookSecret []byte
