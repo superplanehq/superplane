@@ -64,8 +64,13 @@ func updateBitbucketFactoryRepository(
 		selectedRepository = match.FullName
 		selectedDefaultBranch = match.DefaultBranch
 		selectedExternalID = match.UUID
-	} else if selectedDefaultBranch == "" {
-		return nil, factoryErrorToStatus(invalidArgument("default branch is required"), "failed to update factory repository")
+	} else {
+		if err := validateBitbucketTokenRepository(integration, repositoryName); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to update factory repository")
+		}
+		if selectedDefaultBranch == "" {
+			return nil, factoryErrorToStatus(invalidArgument("default branch is required"), "failed to update factory repository")
+		}
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -126,4 +131,38 @@ func updateBitbucketFactoryRepository(
 		return nil, factoryErrorToStatus(err, "failed to update factory repository")
 	}
 	return &pb.UpdateFactoryRepositoryResponse{Factory: serialized}, nil
+}
+
+// validateBitbucketTokenRepository confines token-mode repository changes to
+// the integration scope: exact repository for repository tokens, workspace
+// prefix otherwise. Forge installs revalidate through the visible list above.
+func validateBitbucketTokenRepository(integration *models.Integration, repository string) error {
+	repository = strings.TrimSpace(repository)
+	workspace, slug, ok := strings.Cut(repository, "/")
+	slug = strings.TrimSuffix(strings.TrimSpace(slug), ".git")
+	if !ok || strings.TrimSpace(workspace) == "" || slug == "" || strings.Contains(slug, "/") {
+		return invalidArgument("repository must be in workspace/repository format")
+	}
+	metadata := integration.Metadata.Data()
+	if metadata != nil {
+		if repo, ok := metadata["repository"].(map[string]any); ok && repo != nil {
+			if fullName, _ := repo["full_name"].(string); strings.TrimSpace(fullName) != "" {
+				configured := strings.TrimSuffix(strings.TrimSpace(fullName), ".git")
+				if !strings.EqualFold(configured, strings.TrimSuffix(repository, ".git")) {
+					return invalidArgument("VCS repository is not accessible")
+				}
+				return nil
+			}
+		}
+		if ws, ok := metadata["workspace"].(map[string]any); ok && ws != nil {
+			if configured, _ := ws["slug"].(string); strings.TrimSpace(configured) != "" {
+				if !strings.EqualFold(strings.TrimSpace(configured), strings.TrimSpace(workspace)) {
+					return invalidArgument("VCS repository is not accessible")
+				}
+				return nil
+			}
+		}
+	}
+	// ponytail: metadata-scope check only; live revalidation happens at sync/selection
+	return invalidArgument("VCS repository is not accessible")
 }
