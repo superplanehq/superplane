@@ -4,7 +4,11 @@ import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesWorkOrder, FactoriesWorkOrderSummary } from "@/api-client";
-import { BOARD_BACKLOG_STATES, factoryWorkOrdersPageKey, flattenWorkOrdersPages } from "@/pages/factories/lib/workOrderListPagination";
+import {
+  BOARD_BACKLOG_STATES,
+  factoryWorkOrdersPageKey,
+  flattenWorkOrdersPages,
+} from "@/pages/factories/lib/workOrderListPagination";
 
 const { factoriesUpdateWorkOrderAssignees } = vi.hoisted(() => ({
   factoriesUpdateWorkOrderAssignees: vi.fn(),
@@ -19,7 +23,11 @@ import { factoryQueryKeys, useUpdateWorkOrderAssignees } from "./useFactoryData"
 const ORGANIZATION_ID = "org-1";
 const FACTORY_ID = "factory-1";
 
-function summary(id: string, updatedAt: string, assignees: FactoriesWorkOrderSummary["assignees"] = []): FactoriesWorkOrderSummary {
+function summary(
+  id: string,
+  updatedAt: string,
+  assignees: FactoriesWorkOrderSummary["assignees"] = [],
+): FactoriesWorkOrderSummary {
   return {
     id,
     title: id,
@@ -83,13 +91,17 @@ describe("useUpdateWorkOrderAssignees list cache", () => {
     const ids = flattenWorkOrdersPages(queryClient.getQueryData(pageKey)?.pages).map((order) => order.id);
     expect(ids).toEqual(["wo-a", "wo-b", "wo-c"]);
 
-    const patched = flattenWorkOrdersPages(queryClient.getQueryData(pageKey)?.pages).find((order) => order.id === "wo-b");
+    const patched = flattenWorkOrdersPages(queryClient.getQueryData(pageKey)?.pages).find(
+      (order) => order.id === "wo-b",
+    );
     expect(patched?.assignees).toEqual([{ id: "user-2", name: "Bob" }]);
     expect(patched?.updatedAt).toBe("2026-02-01T00:00:00.000Z");
 
-    expect(invalidateSpy.mock.calls.some(([options]) => JSON.stringify(options?.queryKey).includes("work-orders-page"))).toBe(
-      false,
+    expect(
+      invalidateSpy.mock.calls.some(([options]) => JSON.stringify(options?.queryKey).includes("work-orders-page")),
+    ).toBe(false);
+    expect(invalidateSpy.mock.calls.some(([options]) => JSON.stringify(options?.queryKey).includes("events"))).toBe(
+      true,
     );
-    expect(invalidateSpy.mock.calls.some(([options]) => JSON.stringify(options?.queryKey).includes("events"))).toBe(true);
   });
 });

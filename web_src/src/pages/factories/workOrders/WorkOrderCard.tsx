@@ -250,10 +250,7 @@ function WorkOrderCardTitleRow({
       <WorkOrderStatusIcon status={displayStatus} title={statusLabel} aria-label={statusLabel} />
       <h3 className="min-w-0 flex-1 truncate text-[13px] font-medium leading-5 text-foreground">{title}</h3>
       {showOwnerCorner ? (
-        <div
-          className="flex shrink-0 items-center gap-0.5"
-          data-testid={`work-order-card-title-trailing-${entryId}`}
-        >
+        <div className="flex shrink-0 items-center gap-0.5" data-testid={`work-order-card-title-trailing-${entryId}`}>
           <CardOwnerMark
             entry={entry}
             organizationId={organizationId}
@@ -389,10 +386,7 @@ function WorkOrderCardMetaRow({
 
   return (
     <div className="mt-2 flex items-center justify-between gap-2">
-      <div
-        className="flex min-w-0 flex-1 items-center gap-2"
-        data-testid={`work-order-card-footer-leading-${entryId}`}
-      >
+      <div className="flex min-w-0 flex-1 items-center gap-2" data-testid={`work-order-card-footer-leading-${entryId}`}>
         {source ? <WorkOrderSourceIcon entryId={entryId} source={source} /> : null}
         <span
           className="truncate text-[11px] font-medium leading-[0.875rem] text-muted-foreground"
