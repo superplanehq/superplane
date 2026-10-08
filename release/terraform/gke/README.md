@@ -167,7 +167,7 @@ commit and tags it with the commit SHA. Use versions that are compatible:
 | Artifact | Variable or field | Requirement |
 | --- | --- | --- |
 | SuperPlane image | `superplane_image_tag` | Must contain the integrated runner API. Use `<commit-sha>-selfhosted`. The plain `<commit-sha>` image loads the UI from the hosted CDN and fails CORS on your domain. |
-| Helm chart | `superplane_chart_version` | Must contain the `runnerAPI` and `fleetManager` values. Chart `0.26.0` does not. Use `0.0.0-<commit-sha>`. |
+| Helm chart | `superplane_chart_version` | Must contain the `runner.api` and `fleetManager` values. Chart `0.26.0` does not. Use `0.0.0-<commit-sha>`. |
 | Fleet Manager image | `fleet_manager_image_tag` | Must contain the GCP provider. Use `<commit-sha>`. |
 | Runner release | `runnerVersion` of the fleet | A published release ID, `v<version>` or `sha:<commit-sha>`. |
 
@@ -252,7 +252,7 @@ This apply creates:
 - A firewall rule that blocks all inbound traffic to runner VMs.
 - The Fleet Manager service account, with `roles/compute.instanceAdmin.v1` on
   the project.
-- The runner API on the SuperPlane API pods. Runners connect to
+- A runner API Deployment. Runners connect to
   `https://superplane.example.com/runner/v1`.
 
 If `172.20.0.0/24` overlaps a range in your network, set `runner_subnet_cidr`.

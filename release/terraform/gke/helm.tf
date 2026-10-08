@@ -70,8 +70,13 @@ locals {
   }) : ""
 
   runner_api_values = local.runners_enabled ? yamlencode({
-    runnerAPI = {
-      enabled = true
+    runner = {
+      api = {
+        enabled = true
+      }
+      workers = {
+        enabled = true
+      }
     }
   }) : ""
 
