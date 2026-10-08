@@ -33,6 +33,12 @@ type VisibleRepository struct {
 	Private        bool
 }
 
+// VisibleCatalog separates installed workspaces from writable repositories.
+type VisibleCatalog struct {
+	Workspaces   []InstallationRef
+	Repositories []VisibleRepository
+}
+
 type httpDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -94,16 +100,21 @@ type repositoryRecord struct {
 	Mainbranch *Branch `json:"mainbranch"`
 }
 
-// RepositoriesVisibleTo lists repositories from each installation where the
-// Bitbucket account can push. A stale token is skipped. An API error is
-// returned only when no installation could be read.
-func (d Directory) RepositoriesVisibleTo(
+// RepositoriesVisibleTo lists repositories the account can push to.
+func (d Directory) RepositoriesVisibleTo(ctx context.Context, accountUUID string, installations []InstallationRef, tokenFor func(string) (string, error)) ([]VisibleRepository, error) {
+	catalog, err := d.CatalogVisibleTo(ctx, accountUUID, installations, tokenFor)
+	return catalog.Repositories, err
+}
+
+// CatalogVisibleTo checks workspace access independently from repository access.
+// Token and API failures are returned when no installation could be checked.
+func (d Directory) CatalogVisibleTo(
 	ctx context.Context,
 	accountUUID string,
 	installations []InstallationRef,
 	tokenFor func(installationID string) (string, error),
-) ([]VisibleRepository, error) {
-	var repositories []VisibleRepository
+) (VisibleCatalog, error) {
+	var catalog VisibleCatalog
 	seen := map[string]struct{}{}
 	sawRead := false
 	var readErr error
@@ -117,15 +128,21 @@ func (d Directory) RepositoriesVisibleTo(
 		}
 		token, err := tokenFor(installation.ID)
 		if err != nil {
+			readErr = err
 			continue
 		}
-		visible, err := d.VisibleRepositories(ctx, token, workspaceRef, accountUUID)
+		visible, err := d.visibleWorkspace(ctx, token, workspaceRef, accountUUID)
 		if err != nil {
 			readErr = err
 			continue
 		}
 		sawRead = true
-		for _, repository := range visible {
+		for _, workspace := range visible.Workspaces {
+			workspace.ID = installation.ID
+			workspace.WorkspaceUUID = installation.WorkspaceUUID
+			catalog.Workspaces = append(catalog.Workspaces, workspace)
+		}
+		for _, repository := range visible.Repositories {
 			repository.InstallationID = installation.ID
 			if repository.WorkspaceSlug == "" {
 				repository.WorkspaceSlug = workspaceRef
@@ -138,40 +155,44 @@ func (d Directory) RepositoriesVisibleTo(
 				continue
 			}
 			seen[key] = struct{}{}
-			repositories = append(repositories, repository)
+			catalog.Repositories = append(catalog.Repositories, repository)
 		}
 	}
 	if !sawRead && readErr != nil {
-		return nil, readErr
+		return VisibleCatalog{}, readErr
 	}
-	return repositories, nil
+	return catalog, nil
 }
 
-// VisibleRepositories returns repositories the account can push to.
+// visibleWorkspace returns an accessible installation and its writable repositories.
 // Explicit repository permissions do not include access a workspace owner
 // inherits, so an owner sees every repository in the workspace. A member
 // without a push permission, or a workspace Bitbucket does not know, yields
 // an empty list.
-func (d Directory) VisibleRepositories(ctx context.Context, token, workspaceRef, accountUUID string) ([]VisibleRepository, error) {
+func (d Directory) visibleWorkspace(ctx context.Context, token, workspaceRef, accountUUID string) (VisibleCatalog, error) {
 	grants, err := d.listPushGrants(ctx, token, workspaceRef, accountUUID)
 	if err != nil {
-		return nil, err
+		return VisibleCatalog{}, err
 	}
 	role, roleSlug, err := d.workspaceRole(ctx, token, workspaceRef, accountUUID)
 	if err != nil {
-		return nil, err
+		return VisibleCatalog{}, err
 	}
 	owner := strings.EqualFold(role, "owner") || strings.EqualFold(role, "admin")
-	if len(grants) == 0 && !owner {
-		return nil, nil
-	}
 	slug := roleSlug
 	if slug == "" {
 		slug = workspaceSlugFromGrants(grants, workspaceRef)
 	}
+	var catalog VisibleCatalog
+	if role != "" || len(grants) > 0 {
+		catalog.Workspaces = []InstallationRef{{WorkspaceSlug: slug}}
+	}
+	if len(grants) == 0 && !owner {
+		return catalog, nil
+	}
 	records, err := d.listRepositories(ctx, token, slug)
 	if err != nil {
-		return nil, err
+		return VisibleCatalog{}, err
 	}
 	repositories := make([]VisibleRepository, 0, len(records))
 	for _, record := range records {
@@ -194,7 +215,8 @@ func (d Directory) VisibleRepositories(ctx context.Context, token, workspaceRef,
 			Private:       record.IsPrivate,
 		})
 	}
-	return repositories, nil
+	catalog.Repositories = repositories
+	return catalog, nil
 }
 
 type workspaceMembership struct {
