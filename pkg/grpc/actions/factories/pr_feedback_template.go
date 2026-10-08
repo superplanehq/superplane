@@ -479,10 +479,14 @@ func prFeedbackReviewActivityTitleExpression() string {
 		` + ") left a [review](" + root().data.review.html_url + ")" }}`
 }
 
-func prFeedbackDiscussionActivityExpressions(nodeID string) (string, string, bool) {
+func prFeedbackDiscussionActivityExpressions(nodeID, provider string) (string, string, bool) {
 	switch nodeID {
 	case prFeedbackActivityNodeID:
-		return prFeedbackCommentActivityTitleExpression(), prFeedbackCommentActivityDescriptionExpression(), true
+		title := prFeedbackCommentActivityTitleExpression()
+		if provider == models.ProviderBitbucket {
+			title = prFeedbackBitbucketCommentActivityTitleExpression()
+		}
+		return title, prFeedbackCommentActivityDescriptionExpression(), true
 	case prFeedbackReviewActivityNodeID:
 		return prFeedbackReviewActivityTitleExpression(), prFeedbackReviewActivityDescriptionExpression(), true
 	case prFeedbackReplyActivityNodeID:

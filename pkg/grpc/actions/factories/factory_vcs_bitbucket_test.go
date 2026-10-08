@@ -260,6 +260,64 @@ func TestCreateBitbucketDiscussionHandlerListensForComments(t *testing.T) {
 	}
 }
 
+func TestUpdateBitbucketDiscussionHandlerKeepsAuthorTitle(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	deps := IntakeDependencies{
+		Registry:       r.Registry,
+		Encryptor:      r.Encryptor,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "http://localhost:8000",
+	}
+
+	factory := bitbucketFactory(t, r)
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
+	appRepo := "acme/widgets"
+	provider := models.ProviderBitbucket
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSProvider:      &provider,
+		VCSIntegrationID: &integrationID,
+		AppRepository:    &appRepo,
+	}))
+
+	created, err := CreateFactoryPRFeedbackHandler(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryPRFeedbackHandlerRequest{
+		FactoryId: factory.ID.String(),
+		Source:    pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_DISCUSSION,
+	})
+	require.NoError(t, err)
+
+	_, err = UpdateFactoryPRFeedbackHandler(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryPRFeedbackHandlerRequest{
+		FactoryId: factory.ID.String(),
+		HandlerId: created.GetHandler().GetId(),
+		Settings: &pb.FactoryPRFeedbackHandler_Settings{
+			Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
+				Repository: appRepo,
+			},
+			Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
+				Mention:    "@superplaneagent",
+				IgnoreBots: true,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(created.GetHandler().GetCanvasId()))
+	require.NoError(t, err)
+	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+
+	var title string
+	for _, node := range liveVersion.Nodes {
+		if node.ID != prFeedbackActivityNodeID {
+			continue
+		}
+		title, _ = node.Configuration["title"].(string)
+	}
+	assert.Equal(t, prFeedbackBitbucketCommentActivityTitleExpression(), title)
+	assert.NotContains(t, title, "comment.user.login")
+}
+
 func TestMergeFactoryPullRequest_BitbucketHeadMoved(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -498,12 +556,13 @@ func TestBitbucketProviderReadMergeability(t *testing.T) {
 		assert.Equal(t, "CHECKS_UNFINISHED", result.BlockedReason)
 	})
 
-	t.Run("empty builds do not block", func(t *testing.T) {
+	t.Run("empty builds cannot lock the revision", func(t *testing.T) {
 		result := read(t,
 			okBitbucketResponse(`{"id": 42, "state": "OPEN", "draft": false, "source": {"commit": {"hash": "abc123"}}}`),
 			okBitbucketResponse(`{"values": []}`),
 		)
-		assert.True(t, result.CanMerge)
+		assert.False(t, result.CanMerge)
+		assert.Equal(t, bitbucketMergeNotRevisionSafe, result.Message)
 		assert.Equal(t, "abc123", result.HeadSHA)
 		assert.Equal(t, []string{"SQUASH", "MERGE", "REBASE"}, result.AllowedMethods)
 	})

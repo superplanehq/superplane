@@ -60,9 +60,12 @@ func Test__EvaluateBuildStatuses(t *testing.T) {
 		assert.Equal(t, waitBuildsOutcomePending, evaluation.Outcome)
 	})
 
-	t.Run("matches display names as well as keys", func(t *testing.T) {
-		evaluation := evaluateBuildStatuses(builds(passing), []string{"Build A"}, false)
-		assert.Equal(t, waitBuildsOutcomePassed, evaluation.Outcome)
+	t.Run("a display name does not satisfy a required key", func(t *testing.T) {
+		evaluation := evaluateBuildStatuses(builds(
+			CommitStatus{Key: "other", Name: "build-a", State: "SUCCESSFUL"},
+		), []string{"build-a"}, false)
+		assert.Equal(t, waitBuildsOutcomePending, evaluation.Outcome)
+		assert.Equal(t, []string{"build-a"}, evaluation.MissingSelected)
 	})
 }
 

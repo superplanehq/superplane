@@ -554,8 +554,7 @@ func selectedBuilds(builds []BuildStatus, selectedKeys []string) []BuildStatus {
 
 	selected := make([]BuildStatus, 0, len(builds))
 	for _, build := range builds {
-		// ponytail: match key or display name; Pipelines posts UUID keys
-		if wanted[strings.ToLower(build.Key)] || (build.Name != "" && wanted[strings.ToLower(build.Name)]) {
+		if wanted[strings.ToLower(build.Key)] {
 			selected = append(selected, build)
 		}
 	}
@@ -570,9 +569,6 @@ func missingSelectedBuilds(builds []BuildStatus, selectedKeys []string) []string
 	seen := map[string]bool{}
 	for _, build := range builds {
 		seen[strings.ToLower(build.Key)] = true
-		if build.Name != "" {
-			seen[strings.ToLower(build.Name)] = true
-		}
 	}
 
 	var missing []string

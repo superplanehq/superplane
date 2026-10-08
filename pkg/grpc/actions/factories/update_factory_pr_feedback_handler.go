@@ -141,6 +141,10 @@ func applyPRFeedbackSettings(
 			updated.RunnerIntegrationNames,
 		)
 		independentDiscussionFlows := graph.hasIndependentDiscussionFlows(spec)
+		provider := ""
+		if factory != nil {
+			provider = factory.OnboardingConfigValue().EffectiveVCSProvider()
+		}
 
 		nodes := slices.Clone(liveVersion.Nodes)
 		for i := range nodes {
@@ -191,10 +195,6 @@ func applyPRFeedbackSettings(
 				continue
 			}
 			if graph.isChecks() {
-				provider := ""
-				if factory != nil {
-					provider = factory.OnboardingConfigValue().EffectiveVCSProvider()
-				}
 				if title, description, ok := prFeedbackChecksActivityExpressionsFor(nodes[i].ID, provider); ok {
 					configuration := maps.Clone(nodes[i].Configuration)
 					if configuration == nil {
@@ -218,7 +218,7 @@ func applyPRFeedbackSettings(
 				configuration = map[string]any{}
 			}
 			if !graph.isChecks() && independentDiscussionFlows {
-				title, description, ok := prFeedbackDiscussionActivityExpressions(nodes[i].ID)
+				title, description, ok := prFeedbackDiscussionActivityExpressions(nodes[i].ID, provider)
 				if !ok {
 					nodes[i].Configuration = configuration
 					continue
