@@ -208,6 +208,51 @@ resource "aws_eks_addon" "ebs_csi" {
 }
 
 # -----------------------------------------------------------------------------
+# EFS CSI Driver IAM Role (IRSA)
+# -----------------------------------------------------------------------------
+
+resource "aws_iam_role" "efs_csi" {
+  name = "${var.cluster_name}-efs-csi-controller"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Effect = "Allow"
+      Principal = {
+        Federated = aws_iam_openid_connect_provider.eks.arn
+      }
+      Condition = {
+        StringEquals = {
+          "${replace(aws_eks_cluster.superplane.identity[0].oidc[0].issuer, "https://", "")}:aud" = "sts.amazonaws.com"
+          "${replace(aws_eks_cluster.superplane.identity[0].oidc[0].issuer, "https://", "")}:sub" = "system:serviceaccount:kube-system:efs-csi-controller-sa"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "efs_csi" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEFSCSIDriverPolicy"
+  role       = aws_iam_role.efs_csi.name
+}
+
+# -----------------------------------------------------------------------------
+# EFS CSI Driver Add-on
+# -----------------------------------------------------------------------------
+
+resource "aws_eks_addon" "efs_csi" {
+  cluster_name             = aws_eks_cluster.superplane.name
+  addon_name               = "aws-efs-csi-driver"
+  service_account_role_arn = aws_iam_role.efs_csi.arn
+
+  depends_on = [
+    aws_eks_node_group.superplane,
+    aws_iam_role_policy_attachment.efs_csi
+  ]
+}
+
+# -----------------------------------------------------------------------------
 # OIDC Provider for IRSA
 # -----------------------------------------------------------------------------
 
