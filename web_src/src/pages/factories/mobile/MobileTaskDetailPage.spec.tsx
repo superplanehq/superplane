@@ -17,6 +17,7 @@ import {
   REFUND_LINE_PLAN_ID,
   DRAFT_WORK_ORDER,
   RUNNING_WORK_ORDER,
+  CLOSED_WORK_ORDER,
   factoryWithPlanning,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
@@ -34,6 +35,7 @@ const {
   dispatchingIds,
   canUpdateWorkOrder,
   runnerModelCalls,
+  updateAssignees,
   findPlanningSession,
   sendPlanningMessage,
   answerPlanningSurvey,
@@ -43,6 +45,7 @@ const {
   dispatchingIds: { current: new Set<string>() },
   canUpdateWorkOrder: { current: true },
   runnerModelCalls: [] as unknown[][],
+  updateAssignees: vi.fn(),
   findPlanningSession: vi.fn(),
   sendPlanningMessage: vi.fn(),
   answerPlanningSurvey: vi.fn(),
@@ -72,6 +75,8 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateWorkOrderAssignees: () => ({ mutateAsync: updateAssignees, isPending: false }),
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
@@ -104,8 +109,21 @@ vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
   },
 }));
 
+vi.mock("@/lib/toast", () => ({
+  showSuccessToast: vi.fn(),
+  showErrorToast: vi.fn(),
+}));
+
 vi.mock("@/hooks/useOrganizationData", () => ({
-  useOrganizationUsers: () => ({ data: [], isLoading: false }),
+  useOrganizationUsers: () => ({
+    data: [
+      {
+        metadata: { id: "user-1", email: "casey@example.com" },
+        spec: { displayName: "Casey Reviewer" },
+      },
+    ],
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -187,6 +205,8 @@ describe("MobileTaskDetailPage back link", () => {
     dispatchingIds.current = new Set();
     canUpdateWorkOrder.current = true;
     runnerModelCalls.length = 0;
+    updateAssignees.mockReset();
+    updateAssignees.mockResolvedValue({ assignees: [] });
   });
 
   it("returns to the clicked line when the task URL has no line id", async () => {
@@ -291,6 +311,8 @@ describe("MobileTaskDetailPage model select", () => {
     dispatchingIds.current = new Set();
     canUpdateWorkOrder.current = true;
     runnerModelCalls.length = 0;
+    updateAssignees.mockReset();
+    updateAssignees.mockResolvedValue({ assignees: [] });
   });
 
   it("shows a model control next to Start on a draft when planning is on", () => {
@@ -564,5 +586,59 @@ describe("MobileTaskDetailPage phase log", () => {
     expect(screen.getByText("1 agent run")).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-composer")).not.toBeInTheDocument();
     expect(findPlanningSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("MobileTaskDetailPage owner", () => {
+  beforeEach(() => {
+    useWorkOrder.mockReset();
+    onDispatch.mockReset();
+    dispatchingIds.current = new Set();
+    canUpdateWorkOrder.current = true;
+    updateAssignees.mockReset();
+  });
+
+  function renderRunning() {
+    useWorkOrder.mockReturnValue({ data: RUNNING_WORK_ORDER, isLoading: false, isError: false });
+    return renderTask(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${RUNNING_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
+    );
+  }
+
+  it("assigns the task to the current user from the header", async () => {
+    const user = userEvent.setup();
+    updateAssignees.mockResolvedValue({
+      assignees: [{ id: "user-1", name: "Casey Reviewer" }],
+    });
+    renderRunning();
+
+    await user.click(screen.getByTestId("popup-edit-owner"));
+    await user.click(screen.getByRole("option", { name: "Casey Reviewer" }));
+
+    await waitFor(() =>
+      expect(updateAssignees).toHaveBeenCalledWith({
+        orderId: RUNNING_WORK_ORDER.id,
+        assigneeIds: ["user-1"],
+      }),
+    );
+    expect(screen.getByRole("button", { name: "Owner: Casey Reviewer" })).toBeInTheDocument();
+  });
+
+  it("keeps the owner as text without task update permission", () => {
+    canUpdateWorkOrder.current = false;
+    renderRunning();
+
+    expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
+    expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("Leonardo DiCaprio");
+  });
+
+  it("does not offer an owner change on a completed task", () => {
+    useWorkOrder.mockReturnValue({ data: CLOSED_WORK_ORDER, isLoading: false, isError: false });
+    renderTask(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${CLOSED_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
+    );
+
+    expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
+    expect(screen.getByTestId("popup-owner-time-cost")).toHaveTextContent("Leonardo DiCaprio");
   });
 });

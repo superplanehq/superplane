@@ -21,6 +21,18 @@ const experimental = vi.hoisted(() => ({
   loading: false,
 }));
 
+const bitbucketOnboarding = vi.hoisted(() => ({
+  loaded: true,
+  refetch: (() => undefined) as () => unknown,
+  providerConfigured: false,
+  identity: undefined as { login?: string; providerUserId?: string } | undefined,
+  repositories: [] as Array<{ fullName?: string }>,
+  installedWorkspaces: [] as Array<{ slug?: string }>,
+  installUrl: "",
+  isPending: false,
+  error: null as unknown,
+}));
+
 vi.mock("@/hooks/useIntegrations", () => ({
   useIntegrationResources: (
     _organizationId: string,
@@ -38,9 +50,33 @@ vi.mock("@/hooks/useIntegrations", () => ({
   },
 }));
 
+vi.mock("./useBitbucketOnboarding", () => ({
+  useBitbucketOnboarding: () => ({
+    data: bitbucketOnboarding.loaded
+      ? {
+          providerConfigured: bitbucketOnboarding.providerConfigured,
+          identity: bitbucketOnboarding.identity,
+          repositories: bitbucketOnboarding.repositories,
+          installedWorkspaces: bitbucketOnboarding.installedWorkspaces,
+          installUrl: bitbucketOnboarding.installUrl,
+        }
+      : undefined,
+    isPending: bitbucketOnboarding.isPending,
+    error: bitbucketOnboarding.error,
+    refetch: bitbucketOnboarding.refetch,
+    startInstallation: { mutateAsync: vi.fn() },
+  }),
+}));
+
 vi.mock("./useGitHubOnboarding", () => ({
   useGitHubOnboarding: () => ({
-    data: { appConfigured: true, identity: undefined, repositories: [], pendingRequests: [], synchronizing: false },
+    data: {
+      providerConfigured: true,
+      identity: undefined,
+      repositories: [],
+      pendingRequests: [],
+      synchronizing: false,
+    },
     isPending: false,
     error: null,
     startInstallation: { mutateAsync: vi.fn() },
@@ -97,6 +133,7 @@ function pageModel(setup: OnboardingSetupApi, overrides: Partial<OnboardingPageM
     requestConnect: vi.fn(),
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
     bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
@@ -152,6 +189,15 @@ async function chooseBitbucket(user: ReturnType<typeof userEvent.setup>) {
 describe("FirstRunSetup Bitbucket", () => {
   beforeEach(() => {
     resources.calls = [];
+    bitbucketOnboarding.loaded = true;
+    bitbucketOnboarding.refetch = vi.fn();
+    bitbucketOnboarding.providerConfigured = false;
+    bitbucketOnboarding.identity = undefined;
+    bitbucketOnboarding.repositories = [];
+    bitbucketOnboarding.installedWorkspaces = [];
+    bitbucketOnboarding.installUrl = "";
+    bitbucketOnboarding.isPending = false;
+    bitbucketOnboarding.error = null;
     experimental.enabled = new Set([FEATURE_FACTORY_BITBUCKET]);
     experimental.loading = false;
     localStorage.clear();
@@ -191,6 +237,104 @@ describe("FirstRunSetup Bitbucket", () => {
 
     expect(requestConnect).toHaveBeenCalledWith("bitbucket");
     expect(screen.queryByTestId("first-run-connect")).not.toBeInTheDocument();
+  });
+
+  it("connects a Bitbucket account with OAuth when Forge is configured", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    const user = userEvent.setup();
+    const requestConnect = vi.fn();
+    renderSetup(new Set(), { requestConnect });
+
+    await chooseBitbucket(user);
+    const link = screen.getByTestId("first-run-bitbucket-oauth");
+
+    expect(link).toHaveAttribute("href", expect.stringContaining("/auth/bitbucket?intent=connect"));
+    expect(requestConnect).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Connect your Bitbucket account. SuperPlane uses it to find repositories you can open."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows an existing installation without asking to install again when no repositories are available", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+    bitbucketOnboarding.installedWorkspaces = [{ slug: "acme-team" }];
+    const user = userEvent.setup();
+    renderSetup(new Set());
+
+    await chooseBitbucket(user);
+
+    expect(screen.getByText("SuperPlane is installed on your Bitbucket workspace.")).toBeInTheDocument();
+    expect(screen.getByText("acme-team")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-bitbucket-install")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-continue-to-tickets")).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Check repositories" }));
+    expect(bitbucketOnboarding.refetch).toHaveBeenCalled();
+  });
+
+  it("keeps checking when an installation is not yet detected", async () => {
+    bitbucketOnboarding.providerConfigured = true;
+    bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+    const user = userEvent.setup();
+    renderSetup(new Set());
+
+    await chooseBitbucket(user);
+
+    expect(screen.getByRole("status")).toHaveTextContent("SuperPlane checks automatically for installed workspaces.");
+    expect(
+      screen.getByText("Already installed? Keep this page open. Your workspace appears after synchronization."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("A workspace admin must install SuperPlane on the Bitbucket workspace."),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Check again" }));
+    expect(bitbucketOnboarding.refetch).toHaveBeenCalled();
+  });
+
+  it.each(["loading", "lookup failed", "connect", "grant", "choose"])(
+    "keeps the %s controls separate from the Bitbucket animation",
+    async (state) => {
+      bitbucketOnboarding.providerConfigured = true;
+      if (state === "loading") {
+        bitbucketOnboarding.loaded = false;
+        bitbucketOnboarding.isPending = true;
+      }
+      if (state === "lookup failed") {
+        bitbucketOnboarding.loaded = false;
+        bitbucketOnboarding.error = new Error("network error");
+      }
+      if (state === "grant" || state === "choose") {
+        bitbucketOnboarding.identity = { login: "ada", providerUserId: "bitbucket-user-1" };
+      }
+      if (state === "choose") {
+        bitbucketOnboarding.repositories = [{ fullName: "acme-team/api" }];
+      }
+      const user = userEvent.setup();
+      renderSetup(new Set());
+
+      await chooseBitbucket(user);
+
+      const artStage = screen.getByTestId("first-run-art-stage");
+      expect(artStage).toContainElement(screen.getByTestId("first-run-art-pane"));
+      expect(artStage).not.toContainElement(screen.getByTestId("first-run-content"));
+      expect(screen.getByTestId("first-run-back")).toBeEnabled();
+    },
+  );
+
+  it("offers a retry instead of the access token setup when the Bitbucket lookup fails", async () => {
+    bitbucketOnboarding.loaded = false;
+    bitbucketOnboarding.error = new Error("network error");
+    const user = userEvent.setup();
+    const requestConnect = vi.fn();
+    renderSetup(new Set(), { requestConnect });
+
+    await chooseBitbucket(user);
+
+    expect(screen.queryByTestId("first-run-connect-bitbucket")).not.toBeInTheDocument();
+    expect(screen.getByText("SuperPlane could not check the Bitbucket setup. Try again.")).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-bitbucket-retry"));
+    expect(bitbucketOnboarding.refetch).toHaveBeenCalled();
+    expect(requestConnect).not.toHaveBeenCalled();
   });
 
   it("saves the chosen Bitbucket repository and opens the ticket screen", async () => {

@@ -55,7 +55,6 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
-	mustEnableClarityCheck(t, db, factoryModel)
 	require.NotNil(t, session.DraftWorkOrderID)
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
@@ -68,21 +67,8 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 	server.Router.ServeHTTP(specRec, spec)
 	require.Equal(t, http.StatusOK, specRec.Code, specRec.Body.String())
 
-	clarity := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", bytes.NewReader([]byte(
-		`{"score":5,"summary":"The plan is ready."}`,
-	)))
-	clarity.Header.Set("Authorization", "Bearer "+token)
-	clarityRec := httptest.NewRecorder()
-	server.Router.ServeHTTP(clarityRec, clarity)
-	require.Equal(t, http.StatusOK, clarityRec.Code, clarityRec.Body.String())
-
-	confidence := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/confidence", bytes.NewReader([]byte(
-		`{"score":4,"summary":"This issue is a good fit for an agent."}`,
-	)))
-	confidence.Header.Set("Authorization", "Bearer "+token)
-	confidenceRec := httptest.NewRecorder()
-	server.Router.ServeHTTP(confidenceRec, confidence)
-	require.Equal(t, http.StatusOK, confidenceRec.Code, confidenceRec.Body.String())
+	assertLegacyPlanningScoreRejected(t, server, token, "/api/v1/runner/planning-sessions/clarity", "clarity")
+	assertLegacyPlanningScoreRejected(t, server, token, "/api/v1/runner/planning-sessions/confidence", "confidence")
 
 	artifacts, err := order.ListArtifacts(db)
 	require.NoError(t, err)
@@ -92,13 +78,7 @@ func TestRunnerPlanningSessionSpecAndConfidence(t *testing.T) {
 
 	checks, err := order.ListChecks(db)
 	require.NoError(t, err)
-	require.Len(t, checks, 2)
-	scores := map[string]float64{}
-	for _, check := range checks {
-		scores[check.Key] = check.Score
-	}
-	assert.Equal(t, 5.0, scores[models.PlanningClarityCheckKey])
-	assert.Equal(t, 4.0, scores[models.PlanningConfidenceCheckKey])
+	assert.Empty(t, checks)
 }
 
 func TestRunnerPlanningSessionUpdateWritesScoresSpecAndSurvey(t *testing.T) {
@@ -139,18 +119,11 @@ func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
 	r := support.Setup(t)
 	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
-	mustEnableClarityCheck(t, db, factoryModel)
 	require.NotNil(t, session.DraftWorkOrderID)
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", bytes.NewReader([]byte(
-		`{"score":2,"summary":"The request is still missing the failing path."}`,
-	)))
-	req.Header.Set("Authorization", "Bearer "+token)
-	rec := httptest.NewRecorder()
-	server.Router.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	assertLegacyPlanningScoreRejected(t, server, token, "/api/v1/runner/planning-sessions/clarity", "clarity")
 
 	artifacts, err := order.ListArtifacts(db)
 	require.NoError(t, err)
@@ -158,10 +131,7 @@ func TestRunnerPlanningSessionClarityWithoutSpec(t *testing.T) {
 
 	checks, err := order.ListChecks(db)
 	require.NoError(t, err)
-	require.Len(t, checks, 1)
-	assert.Equal(t, models.PlanningClarityCheckKey, checks[0].Key)
-	assert.Equal(t, 2.0, checks[0].Score)
-	assert.Equal(t, "The request is still missing the failing path.", checks[0].Summary)
+	assert.Empty(t, checks)
 }
 
 func TestWriteRunnerPlanningError(t *testing.T) {
@@ -572,20 +542,19 @@ func TestWriteRunnerPlanningErrorOmitsUnboundedPath(t *testing.T) {
 	assert.False(t, present)
 }
 
-func TestRunnerPlanningSessionClarityWithoutDraftReturnsLookupFailed(t *testing.T) {
+func TestRunnerPlanningSessionSpecWithoutDraftReturnsLookupFailed(t *testing.T) {
 	r := support.Setup(t)
 	transport := bindTestSentryHub(t)
-	server, session, factoryModel, token := mustPlanningRunnerSession(t, r)
+	server, session, _, token := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
-	mustEnableClarityCheck(t, db, factoryModel)
 	session.DraftWorkOrderID = nil
 	require.NoError(t, db.Model(session).Updates(map[string]any{
 		"draft_work_order_id": nil,
 		"wait_work_order_id":  nil,
 	}).Error)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/clarity", bytes.NewReader([]byte(
-		`{"score":5,"summary":"The plan is ready."}`,
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/runner/planning-sessions/specs", bytes.NewReader([]byte(
+		`{"body":"# Retry refunds\n\nStop double charges.\n"}`,
 	)))
 	req.Header.Set("Authorization", "Bearer "+token)
 	rec := httptest.NewRecorder()
@@ -594,11 +563,23 @@ func TestRunnerPlanningSessionClarityWithoutDraftReturnsLookupFailed(t *testing.
 	assert.Equal(t, "Lookup failed\n", rec.Body.String())
 
 	event := requireCapturedException(t, transport.Events())
-	assert.Equal(t, "/api/v1/runner/planning-sessions/clarity", event.Tags["route"])
+	assert.Equal(t, "/api/v1/runner/planning-sessions/specs", event.Tags["route"])
 	assert.Equal(t, session.ID.String(), event.Tags["planning_session_id"])
 	_, hasDraft := event.Tags["draft_work_order_id"]
 	assert.False(t, hasDraft)
 	assert.Contains(t, capturedExceptionText(event), models.ErrFactoryPlanningSessionNoDraft.Error())
+}
+
+func assertLegacyPlanningScoreRejected(t *testing.T, server *Server, token string, path string, score string) {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader([]byte(
+		`{"score":5,"summary":"The plan is ready."}`,
+	)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	server.Router.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), "a lone "+score+" score is not accepted")
 }
 
 func TestRunnerPlanningSessionSurvey(t *testing.T) {
@@ -1066,6 +1047,21 @@ func TestRunnerPlanningWaitFailedWriteRestoresUserMessage(t *testing.T) {
 	assert.Equal(t, "hello", delivered["text"])
 }
 
+func TestMintPlanningWaitReturnsHostedVideoWithoutUploadedFiles(t *testing.T) {
+	text := "See ![Demo](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n\n[notes](https://vimeo.com/123456789)"
+	got, files, err := mintPlanningWait(t.Context(), &models.FactoryPlanningSession{}, models.PlanningWaitResult{
+		Kind: models.PlanningWaitKindMessage,
+		Text: text,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, text, got)
+	require.Len(t, files, 1)
+	assert.Equal(t, "hosted_video", files[0]["kind"])
+	assert.Equal(t, "https://www.youtube.com/watch?v=dQw4w9WgXcQ", files[0]["url"])
+	_, hasID := files[0]["id"]
+	assert.False(t, hasID)
+}
+
 func TestRunnerPlanningWaitMintsFileRefsInDeliveredText(t *testing.T) {
 	r := support.Setup(t)
 	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "test-signing-key")
@@ -1151,15 +1147,6 @@ func mustPlanningRunnerSession(t *testing.T, r *support.ResourceRegistry) (*Serv
 	})
 	require.NoError(t, err)
 	return server, session, factoryModel, mustPlanningRunnerToken(t, signer, session)
-}
-
-// mustEnableClarityCheck turns the opt-in Clarity check on so the clarity
-// route accepts the request. New factories start with Clarity off.
-func mustEnableClarityCheck(t *testing.T, db *gorm.DB, factoryModel *models.Factory) {
-	t.Helper()
-	planning := factoryModel.Planning()
-	planning.Clarity = true
-	require.NoError(t, factoryModel.UpdatePlanning(db, planning))
 }
 
 func mustPlanningRunnerToken(t *testing.T, signer *jwt.Signer, session *models.FactoryPlanningSession) string {
@@ -1258,8 +1245,14 @@ func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
 	mustEnableAutoStart(t, db, factoryModel, line.ID)
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, models.PlanningSessionUpdate{
+		Scores: &models.PlanningReviewScores{
+			Clarity:       models.PlanningScoreValue{Score: 3, Summary: "Outcome, scope, and done are defined."},
+			Complexity:    models.PlanningScoreValue{Score: 3, Summary: "One agent can finish this in one run."},
+			Verifiability: models.PlanningScoreValue{Score: 3, Summary: "Existing tests cover the change."},
+		},
+		Spec: "# Retry refunds\n\nStop double charges.\n",
+	}))
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 
@@ -1288,8 +1281,14 @@ func TestBeginPlanningWaitAndNotify_SkipsAutoStartWithoutLine(t *testing.T) {
 	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
 	db := database.DB(t.Context())
 	require.NotNil(t, session.DraftWorkOrderID)
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, models.PlanningSessionUpdate{
+		Scores: &models.PlanningReviewScores{
+			Clarity:       models.PlanningScoreValue{Score: 3, Summary: "Outcome, scope, and done are defined."},
+			Complexity:    models.PlanningScoreValue{Score: 3, Summary: "One agent can finish this in one run."},
+			Verifiability: models.PlanningScoreValue{Score: 3, Summary: "Existing tests cover the change."},
+		},
+		Spec: "# Retry refunds\n\nStop double charges.\n",
+	}))
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 
@@ -1312,8 +1311,14 @@ func TestBeginPlanningWaitAndNotify_FailedAutoStartDoesNotRetry(t *testing.T) {
 	require.NotNil(t, session.DraftWorkOrderID)
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	require.NoError(t, err)
-	require.NoError(t, session.ProposeSpec(db, "# Retry refunds\n\nStop double charges.\n"))
-	require.NoError(t, session.ProposeConfidence(db, 5, "The plan is ready."))
+	require.NoError(t, session.ProposeUpdate(db, models.PlanningSessionUpdate{
+		Scores: &models.PlanningReviewScores{
+			Clarity:       models.PlanningScoreValue{Score: 3, Summary: "Outcome, scope, and done are defined."},
+			Complexity:    models.PlanningScoreValue{Score: 3, Summary: "One agent can finish this in one run."},
+			Verifiability: models.PlanningScoreValue{Score: 3, Summary: "Existing tests cover the change."},
+		},
+		Spec: "# Retry refunds\n\nStop double charges.\n",
+	}))
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 

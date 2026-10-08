@@ -2,9 +2,11 @@ package bitbucket
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/core"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -46,6 +48,27 @@ func Test__Bitbucket__ResolveSecrets(t *testing.T) {
 			"BITBUCKET_GIT_USERNAME": []byte("x-bitbucket-api-token-auth"),
 			"BITBUCKET_EMAIL":        []byte("dev@example.com"),
 		}, secrets.Values)
+	})
+
+	t.Run("forge app exports the system token as x-token-auth", func(t *testing.T) {
+		bitbucketapp.SetSystemTokenSource(func(installationID string) (string, time.Time, error) {
+			require.Equal(t, "install-1", installationID)
+			return "system-token", time.Now().Add(time.Hour), nil
+		})
+		t.Cleanup(func() { bitbucketapp.SetSystemTokenSource(nil) })
+
+		secrets, err := b.ResolveSecrets(core.IntegrationSecretContext{
+			HTTP: &contexts.HTTPContext{},
+			Integration: &contexts.IntegrationContext{
+				Metadata: Metadata{AuthType: AuthTypeForgeApp, ForgeInstallationID: "install-1"},
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string][]byte{
+			"BITBUCKET_TOKEN":        []byte("system-token"),
+			"BITBUCKET_GIT_USERNAME": []byte("x-token-auth"),
+		}, secrets.Values)
+		assert.NotContains(t, secrets.Setup, "system-token")
 	})
 
 	t.Run("missing token returns an error", func(t *testing.T) {

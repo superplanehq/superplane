@@ -3,18 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_LINEAR_INTAKE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_LINEAR_INTAKE } from "@/lib/experimentalFeatures";
 
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunSetup } from "./FirstRunSetup";
-import { shouldClearSavedJiraChoice, savedJiraChoiceBlock } from "./useFirstRunSetupFlow";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
 import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
 const feature = vi.hoisted(() => ({
-  jiraIntake: true,
   linearIntake: false,
   organizationReady: true,
   isLoading: false,
@@ -22,11 +20,7 @@ const feature = vi.hoisted(() => ({
 
 vi.mock("@/hooks/useExperimentalFeature", () => ({
   useExperimentalFeature: () => ({
-    has: (id: string) => {
-      if (id === FEATURE_FACTORY_JIRA_INTAKE) return feature.jiraIntake;
-      if (id === FEATURE_FACTORY_LINEAR_INTAKE) return feature.linearIntake;
-      return false;
-    },
+    has: (id: string) => id === FEATURE_FACTORY_LINEAR_INTAKE && feature.linearIntake,
     isLoading: feature.isLoading,
     organizationReady: feature.organizationReady,
   }),
@@ -67,10 +61,19 @@ vi.mock("@/hooks/useIntegrations", () => ({
   }),
 }));
 
+vi.mock("./useBitbucketOnboarding", () => ({
+  useBitbucketOnboarding: () => ({
+    data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },
+    isPending: false,
+    error: null,
+    startInstallation: { mutateAsync: vi.fn() },
+  }),
+}));
+
 vi.mock("./useGitHubOnboarding", () => ({
   useGitHubOnboarding: () => ({
     data: {
-      appConfigured: true,
+      providerConfigured: true,
       identity: { userId: "42", login: "octocat" },
       repositories: [{ repositoryId: "201", installationId: "101", fullName: "acme/api", defaultBranch: "main" }],
       pendingRequests: [],
@@ -130,6 +133,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     requestConnect: vi.fn(),
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
     bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
@@ -168,16 +172,14 @@ function renderLiveSetup(model: OnboardingPageModel, setupOptions: SetupOptions)
   return { ...view, setupRef };
 }
 
-describe("FirstRunSetup Jira intake feature", () => {
+describe("FirstRunSetup Jira intake", () => {
   beforeEach(() => {
-    feature.jiraIntake = true;
     feature.linearIntake = false;
     feature.organizationReady = true;
     feature.isLoading = false;
   });
 
-  it("hides Jira and does not provision a Jira intake when the feature is off", async () => {
-    feature.jiraIntake = false;
+  it("lets the user keep a saved Jira choice without an experimental feature", async () => {
     const user = userEvent.setup();
     const model = pageModel({
       hostedAgentReady: true,
@@ -193,24 +195,21 @@ describe("FirstRunSetup Jira intake feature", () => {
       initial: { issuesChoice: "jira" },
     });
 
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).toBeInTheDocument();
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraHelper)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Coming soon")).toHaveLength(2);
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-jira-choice-notice")).not.toBeInTheDocument();
-    await waitFor(() => expect(setupRef.current?.issuesChoice).toBeNull());
+    expect(screen.getByTestId("first-run-jira-projects")).toBeInTheDocument();
+    expect(setupRef.current?.issuesChoice).toBe("jira");
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
 
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
-    expect(model.saveIssues).toHaveBeenCalledTimes(1);
-    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
-    expect(model.finish).toHaveBeenCalledWith("vcs");
+    expect(model.saveIssues).toHaveBeenCalledWith("jira");
+    expect(model.finish).toHaveBeenCalledWith("jira");
   });
 
   it("keeps a saved Jira choice when the organization lookup fails", async () => {
-    feature.jiraIntake = false;
     feature.organizationReady = false;
     const user = userEvent.setup();
     const model = pageModel({
@@ -227,36 +226,28 @@ describe("FirstRunSetup Jira intake feature", () => {
       initial: { issuesChoice: "jira" },
     });
 
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
-    expect(screen.getByTestId("first-run-jira-choice-notice")).toHaveTextContent(
-      FIRST_RUN_COPY.tickets.jiraLookupFailed,
-    );
-    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira).closest('[data-soon="true"]')).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-jira-choice-notice")).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
     expect(setupRef.current?.issuesChoice).toBe("jira");
-
-    await user.click(screen.getByRole("button", { name: /GitHub Issues/ }));
-    expect(setupRef.current?.issuesChoice).toBe("vcs");
 
     await user.click(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze }));
 
     await waitFor(() => expect(model.finish).toHaveBeenCalledTimes(1));
-    expect(model.saveIssues).toHaveBeenCalledWith("vcs");
-    expect(model.finish).toHaveBeenCalledWith("vcs");
+    expect(model.saveIssues).toHaveBeenCalledWith("jira");
+    expect(model.finish).toHaveBeenCalledWith("jira");
   });
 
-  it("does not mark Jira as coming soon while the feature lookup is loading", () => {
+  it("does not wait on a Jira feature lookup while Linear is still loading", () => {
     feature.isLoading = true;
-    feature.jiraIntake = true;
 
     renderLiveSetup(pageModel(), { simulateDiscovery: false });
 
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.jira)).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraLookupLoading)).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect Jira" })).toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.tickets.linearLookupLoading)).toBeInTheDocument();
-    expect(screen.queryByText(FIRST_RUN_COPY.tickets.jiraSoonHelper)).not.toBeInTheDocument();
     expect(screen.queryByText(FIRST_RUN_COPY.tickets.linearSoonHelper)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Connect Jira" })).not.toBeInTheDocument();
     expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
   });
 
@@ -284,64 +275,5 @@ describe("FirstRunSetup Jira intake feature", () => {
 
     await user.click(screen.getByTestId("linear-project-project-1"));
     expect(model.toggleLinearProject).toHaveBeenCalledWith("project-1");
-  });
-});
-
-describe("shouldClearSavedJiraChoice", () => {
-  it("clears a saved Jira choice only after the organization lookup confirms the feature is off", () => {
-    expect(
-      shouldClearSavedJiraChoice({
-        issuesChoice: "jira",
-        featureLoading: false,
-        jiraAvailable: false,
-        organizationReady: true,
-      }),
-    ).toBe(true);
-  });
-
-  it("does not clear a saved Jira choice when the organization lookup has not succeeded", () => {
-    expect(
-      shouldClearSavedJiraChoice({
-        issuesChoice: "jira",
-        featureLoading: false,
-        jiraAvailable: false,
-        organizationReady: false,
-      }),
-    ).toBe(false);
-  });
-});
-
-describe("savedJiraChoiceBlock", () => {
-  it("blocks a saved Jira choice when the organization lookup fails", () => {
-    expect(
-      savedJiraChoiceBlock({
-        issuesChoice: "jira",
-        featureLoading: false,
-        jiraAvailable: false,
-        organizationReady: false,
-      }),
-    ).toBe("lookup-failed");
-  });
-
-  it("blocks a saved Jira choice while the feature lookup is loading", () => {
-    expect(
-      savedJiraChoiceBlock({
-        issuesChoice: "jira",
-        featureLoading: true,
-        jiraAvailable: false,
-        organizationReady: false,
-      }),
-    ).toBe("loading");
-  });
-
-  it("does not block Jira after the lookup confirms the feature is off", () => {
-    expect(
-      savedJiraChoiceBlock({
-        issuesChoice: "jira",
-        featureLoading: false,
-        jiraAvailable: false,
-        organizationReady: true,
-      }),
-    ).toBeNull();
   });
 });

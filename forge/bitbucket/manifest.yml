@@ -1,0 +1,83 @@
+# SuperPlane Bitbucket Forge app.
+#
+# Replace app.id after `forge register`.
+# Replace remotes.baseUrl with the public tunnel for this environment.
+# Each environment (production, staging, a developer tunnel) needs its own
+# Forge environment and remote URL.
+#
+# The scheduled trigger calls the remote directly so the system token is
+# valid for at least two hours. Do not route that trigger through a function.
+modules:
+  trigger:
+    - key: lifecycle-trigger
+      endpoint: lifecycle
+      events:
+        - avi:forge:installed:app
+        - avi:forge:upgraded:app
+  preUninstall:
+    - key: uninstall-hook
+      endpoint: uninstall
+  scheduledTrigger:
+    - key: token-refresh-trigger
+      endpoint: token-refresh
+      interval: fiveMinute
+  webtrigger:
+    - key: bootstrap-trigger
+      function: bootstrap
+  function:
+    - key: bootstrap
+      handler: index.bootstrap
+  endpoint:
+    - key: lifecycle
+      remote: superplane
+      route:
+        path: /api/v1/bitbucket/forge/lifecycle
+      auth:
+        appSystemToken:
+          enabled: true
+    - key: token-refresh
+      remote: superplane
+      route:
+        path: /api/v1/bitbucket/forge/scheduled
+      auth:
+        appSystemToken:
+          enabled: true
+    - key: uninstall
+      remote: superplane
+      route:
+        path: /api/v1/bitbucket/forge/uninstall
+      auth:
+        appSystemToken:
+          enabled: true
+    - key: bootstrap-remote
+      remote: superplane
+      route:
+        path: /api/v1/bitbucket/forge/bootstrap
+      auth:
+        appSystemToken:
+          enabled: true
+
+remotes:
+  - key: superplane
+    baseUrl: https://sp-mbp.tunnel.mytmlt.site
+    operations:
+      - compute
+    auth:
+      appSystemToken:
+        enabled: true
+
+permissions:
+  scopes:
+    - read:app-system-token
+    - read:repository:bitbucket
+    - write:repository:bitbucket
+    - read:pullrequest:bitbucket
+    - write:pullrequest:bitbucket
+    - read:workspace:bitbucket
+
+app:
+  id: ari:cloud:ecosystem::app/670a54a2-2536-4fa3-aae8-09379ab0623c
+  runtime:
+    name: nodejs22.x
+  licensing:
+    enabled: false

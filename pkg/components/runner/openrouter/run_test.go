@@ -163,7 +163,7 @@ func TestBuildOpenCodeConfigWritesAnalysisInstructions(t *testing.T) {
 }
 
 func TestBuildOpenCodeConfigKeepsProtocolAtInstructionPriority(t *testing.T) {
-	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol_review.md"))
 	require.NoError(t, err)
 	config := jsBuildConfigWithPrompt(t, "/task", map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",

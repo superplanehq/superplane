@@ -7,11 +7,12 @@ import { useEffect, useRef } from "react";
 
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 import { resolveWorkOrderFileSrc, revokeWorkOrderFilePreviewUrl, parseWorkOrderFileId } from "@/lib/workOrderFiles";
+import { hostedVideoFromClipboard } from "@/lib/hostedVideo";
 import { cn } from "@/lib/utils";
 
 import { WorkOrderImage } from "./lib/workOrderDescriptionImage";
 import { WorkOrderRequestImage } from "./lib/workOrderRequestImage";
-import { insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
+import { insertHostedVideo, insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
 import { pasteMarkdownFromClipboard } from "./lib/workOrderDescriptionMarkdown";
 import { WorkspaceUnderline } from "./lib/workspaceUnderline";
 import { WorkOrderDescriptionFormatToolbar } from "./WorkOrderDescriptionFormatToolbar";
@@ -124,6 +125,13 @@ export function WorkOrderDescriptionEditor({
           return true;
         }
         const text = event.clipboardData?.getData("text/plain") ?? "";
+        const hosted = hostedVideoFromClipboard(text);
+        const current = editorRef.current;
+        if (hosted && current) {
+          event.preventDefault();
+          insertHostedVideo(current, hosted);
+          return true;
+        }
         if (!text) {
           return false;
         }
@@ -131,7 +139,6 @@ export function WorkOrderDescriptionEditor({
         queueMicrotask(() => {
           pasteInFlightRef.current = false;
         });
-        const current = editorRef.current;
         if (!current) {
           pasteInFlightRef.current = false;
           return false;

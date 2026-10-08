@@ -931,6 +931,24 @@ function displayedPhaseSpend(phase: SplitRunPhase, agents: PhaseAgentUsageEntry[
   };
 }
 
+function phaseMetricParts(cents: number, tokens: number, model: string, clock: string) {
+  const spendParts: string[] = [];
+  if (cents > 0) {
+    spendParts.push(formatUsdCents(cents));
+  }
+  if (tokens > 0) {
+    spendParts.push(formatCompactTokenValue(tokens));
+  }
+  const restParts: string[] = [];
+  if (model) {
+    restParts.push(model);
+  }
+  if (clock) {
+    restParts.push(clock);
+  }
+  return { spendParts, restParts };
+}
+
 function PhaseMetrics({
   phase,
   onUsageOpenChange,
@@ -948,20 +966,7 @@ function PhaseMetrics({
   useReportLiveHeaderSpend(phase.id, tokens, cents);
   const modelIds = useSpecificModelIds();
   const model = modelNameWithThinking(displayRunnerModel(phase.model ?? "", modelIds), phase.thinkingLevel);
-  const spendParts: string[] = [];
-  if (cents > 0) {
-    spendParts.push(formatUsdCents(cents));
-  }
-  if (tokens > 0) {
-    spendParts.push(formatCompactTokenValue(tokens));
-  }
-  const restParts: string[] = [];
-  if (model) {
-    restParts.push(model);
-  }
-  if (clock) {
-    restParts.push(clock);
-  }
+  const { spendParts, restParts } = phaseMetricParts(cents, tokens, model, clock);
   if (spendParts.length === 0 && restParts.length === 0) {
     return null;
   }

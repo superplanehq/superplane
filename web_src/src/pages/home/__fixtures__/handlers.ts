@@ -146,11 +146,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
         json: {
           features: [
             {
-              id: "task_planning_review",
-              label: "Task Planning Review",
-              description: "Show the new plan card, focused questions, and implementation controls",
-            },
-            {
               id: "claude_managed_agents",
               label: "Managed agents",
               description: "Canvas agent chat",

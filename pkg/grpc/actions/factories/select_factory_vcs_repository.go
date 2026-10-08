@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -26,13 +26,19 @@ func SelectFactoryVCSProviderRepository(
 		return nil, factoryErrorToStatus(err, "failed to select VCS repository")
 	}
 	provider := strings.ToLower(strings.TrimSpace(req.GetProvider()))
+	if provider == models.ProviderBitbucket {
+		return selectBitbucketFactoryRepository(ctx, orgID, organizationID, req)
+	}
 	if provider != models.ProviderGitHub {
 		return nil, grpcerrors.InvalidArgument(nil, "VCS provider is not supported")
 	}
 	if req.GetRepositoryId() <= 0 {
 		return nil, grpcerrors.InvalidArgument(nil, "repository id is required")
 	}
-	app := config.LoadGitHubHostedAppConfig()
+	app, err := githubapp.ResolveProcess(ctx)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load public GitHub App")
+	}
 	if !app.Enabled() {
 		return nil, grpcerrors.FailedPrecondition(nil, "public GitHub App is not configured")
 	}

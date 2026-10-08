@@ -13,7 +13,7 @@ type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
 const github = vi.hoisted(() => ({
   data: {
-    appConfigured: true,
+    providerConfigured: true,
     identity: undefined as { userId: string; login: string } | undefined,
     repositories: [] as Array<{
       repositoryId: string;
@@ -24,12 +24,14 @@ const github = vi.hoisted(() => ({
     pendingRequests: [] as Array<{ requestId: string; accountLogin: string }>,
     synchronizing: false,
   },
+  isPending: false,
   error: null as unknown,
   calls: [] as Array<{ organizationId: string; options?: { poll?: boolean } }>,
   installationChecks: [] as boolean[],
 }));
 
 const showErrorToast = vi.hoisted(() => vi.fn());
+const startPublicGitHubAppCreate = vi.hoisted(() => vi.fn().mockResolvedValue(true));
 const startInstallation = vi.fn().mockResolvedValue("https://github.com/apps/superplane/installations/new");
 const configureInstallation = vi.fn().mockResolvedValue("https://github.com/settings/installations/101");
 
@@ -37,12 +39,25 @@ vi.mock("@/lib/toast", () => ({
   showErrorToast,
 }));
 
+vi.mock("@/lib/githubAppManifest", () => ({
+  startPublicGitHubAppCreate: (...args: unknown[]) => startPublicGitHubAppCreate(...args),
+}));
+
+vi.mock("./useBitbucketOnboarding", () => ({
+  useBitbucketOnboarding: () => ({
+    data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },
+    isPending: false,
+    error: null,
+    startInstallation: { mutateAsync: vi.fn() },
+  }),
+}));
+
 vi.mock("./useGitHubOnboarding", () => ({
   useGitHubOnboarding: (organizationId: string, options?: { poll?: boolean }) => {
     github.calls.push({ organizationId, options });
     return {
       data: github.data,
-      isPending: false,
+      isPending: github.isPending,
       error: github.error,
       startInstallation: { mutateAsync: startInstallation },
       configureInstallation: { mutateAsync: configureInstallation },
@@ -106,6 +121,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     requestConnect: vi.fn(),
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
     bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
@@ -150,14 +166,18 @@ const runningDestination = {
 
 describe("FirstRunSetup GitHub catalog", () => {
   beforeEach(() => {
+    github.data.providerConfigured = true;
     github.data.identity = undefined;
     github.data.repositories = [];
     github.data.pendingRequests = [];
     github.data.synchronizing = false;
+    github.isPending = false;
     github.error = null;
     github.calls = [];
     github.installationChecks = [];
     showErrorToast.mockReset();
+    startPublicGitHubAppCreate.mockReset();
+    startPublicGitHubAppCreate.mockResolvedValue(true);
     localStorage.clear();
   });
 
@@ -165,6 +185,27 @@ describe("FirstRunSetup GitHub catalog", () => {
     renderSetup(pageModel());
 
     expect(screen.getByTestId("first-run-connect-github")).toHaveTextContent("Connect GitHub");
+  });
+
+  it("keeps Connect loading until GitHub access is known", () => {
+    github.isPending = true;
+    github.data.providerConfigured = false;
+    renderSetup(pageModel());
+
+    expect(screen.getByRole("status")).toHaveTextContent(FIRST_RUN_COPY.connect.loadingAccounts);
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+    expect(startPublicGitHubAppCreate).not.toHaveBeenCalled();
+  });
+
+  it("asks to create the GitHub App when the process has none", async () => {
+    const user = userEvent.setup();
+    github.data.providerConfigured = false;
+    renderSetup(pageModel());
+
+    expect(screen.getByTestId("first-run-connect-github")).toHaveTextContent(FIRST_RUN_COPY.connect.createAppAction);
+    expect(screen.getByText(FIRST_RUN_COPY.connect.createAppBody)).toBeInTheDocument();
+    await user.click(screen.getByTestId("first-run-connect-github"));
+    expect(startPublicGitHubAppCreate).toHaveBeenCalledWith("/org-1/workspaces/PAY/setup?step=vcs");
   });
 
   it("returns from GitHub connection at repository selection", async () => {

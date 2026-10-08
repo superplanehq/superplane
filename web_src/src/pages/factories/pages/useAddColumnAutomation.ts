@@ -1,7 +1,7 @@
 import { organizationsDescribeIntegration } from "@/api-client";
 import { useCreateFactoryAutomation } from "@/hooks/useFactoryData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_RISK_SCORE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
@@ -41,8 +41,7 @@ export function useAddColumnAutomation(args: {
   const { installFactory, isInstalling } = useInstallFactory({ organizationId: args.organizationId });
   const experimentalFeatures = useExperimentalFeature(args.organizationId);
   const allowCustom = experimentalFeatures.has(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-  const allowRiskScore = experimentalFeatures.has(FEATURE_FACTORY_RISK_SCORE);
-  const catalogOptions = { allowCustom, allowRiskScore };
+  const catalogOptions = { allowCustom };
 
   const catalog = column ? catalogForColumn(column, catalogOptions) : [];
   const takenIds = column ? takenCatalogIds(args.automationsFor(column), catalog) : [];

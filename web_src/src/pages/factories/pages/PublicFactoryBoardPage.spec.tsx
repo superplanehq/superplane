@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "bun:test";
 
@@ -134,7 +134,8 @@ describe("PublicFactoryBoardPage", () => {
     expect(closure.closest("button")).toBeNull();
     expect(intake.closest("a")).toBeNull();
     expect(screen.getByRole("heading", { name: "refine agents.md" })).toBeInTheDocument();
-    expect(screen.getByText("Ada")).toBeInTheDocument();
+    const card = screen.getByTestId("work-order-card-backlog-0");
+    expect(within(card).getByTestId("work-order-row-assignees-backlog-0")).toHaveAttribute("title", "Ada Lovelace");
     expect(screen.getByTestId("work-order-card-source-backlog-0")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open refine agents.md" })).not.toBeInTheDocument();
   });

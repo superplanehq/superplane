@@ -9,7 +9,6 @@ import type { PlanChipStatus } from "./planChipStatus";
 import type { ComposerCreditVerdict } from "./splitRunFooter";
 
 export type IntentAnalysisChat = {
-  planningReviewEnabled?: boolean;
   organizationId: string;
   factoryId?: string;
   view: CreateWithAgentView;

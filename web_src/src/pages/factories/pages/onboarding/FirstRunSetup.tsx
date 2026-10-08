@@ -10,6 +10,7 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep } from "./AgentStep";
 import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
 import { FirstRunBitbucketChooseScreen } from "./first-run/FirstRunBitbucketChooseScreen";
+import { FirstRunBitbucketForgeScreen } from "./first-run/FirstRunBitbucketForgeScreen";
 import { FirstRunHostScreen } from "./first-run/FirstRunHostScreen";
 import { FirstRunModelSourceChoice } from "./first-run/FirstRunModelSourceChoice";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
@@ -223,9 +224,6 @@ function TicketsScreenHost({
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
-      jiraAvailable={flow.jiraAvailable}
-      jiraFeatureLoading={flow.jiraFeatureLoading}
-      jiraChoiceBlock={flow.jiraChoiceBlock}
       linearAvailable={flow.linearAvailable}
       linearFeatureLoading={flow.linearFeatureLoading}
       linearChoiceBlock={flow.linearChoiceBlock}
@@ -255,6 +253,16 @@ function TicketsScreenHost({
   );
 }
 
+function bitbucketForgePhase(
+  identityLinked: boolean,
+  repositoryCount: number,
+  installedWorkspaceCount: number,
+): "connect" | "grant" | "choose" {
+  if (!identityLinked) return "connect";
+  if (repositoryCount === 0 && installedWorkspaceCount === 0) return "grant";
+  return "choose";
+}
+
 function BitbucketChooseHost({
   organizationId,
   flow,
@@ -268,10 +276,38 @@ function BitbucketChooseHost({
 }) {
   const connected = model.setup.connected.has("bitbucket");
   const resources = useIntegrationResources(organizationId, model.bitbucketIntegrationId, "repository", undefined, {
-    enabled: connected,
+    enabled: connected && !flow.bitbucketForgeConfigured,
   });
   const repositories = (resources.data ?? []).map((resource) => resource.name ?? "").filter(Boolean);
   const sphere = connected ? repositorySphereFor(model.setup.selectedRepo) : sphereFor("connect", null);
+  if (flow.bitbucketOnboardingPending || flow.bitbucketForgeConfigured || flow.bitbucketLookupFailed) {
+    return (
+      <FirstRunBitbucketForgeScreen
+        phase={bitbucketForgePhase(
+          flow.bitbucketIdentityLinked,
+          flow.bitbucketRepositories.length,
+          flow.bitbucketInstalledWorkspaces.length,
+        )}
+        connectHref={flow.bitbucketConnectHref}
+        installUrl={flow.bitbucketInstallUrl}
+        repositories={flow.bitbucketRepositories}
+        installedWorkspaces={flow.bitbucketInstalledWorkspaces}
+        selectedRepository={model.setup.selectedRepo}
+        granting={flow.blockingAction === "opening-bitbucket"}
+        saving={flow.blockingAction === "saving-repository"}
+        loading={flow.bitbucketOnboardingPending}
+        loadError={flow.bitbucketLoadError}
+        lookupFailed={flow.bitbucketLookupFailed}
+        retrying={flow.bitbucketLookupRetrying}
+        chrome={chrome}
+        sphere={sphere}
+        onRetryLookup={flow.retryBitbucketLookup}
+        onGrantAccess={() => void flow.grantBitbucketAccess()}
+        onSelectRepository={model.setup.selectRepo}
+        onContinue={() => void flow.continueFromRepository()}
+      />
+    );
+  }
   return (
     <FirstRunBitbucketChooseScreen
       connected={connected}
@@ -322,10 +358,11 @@ function VcsScreen({
       <FirstRunConnectScreen
         loading={flow.repositoriesLoading}
         connecting={flow.blockingAction === "opening-github"}
+        createApp={!flow.appConfigured}
         connectError={flow.connectError}
         chrome={chrome}
         sphere={sphereFor("connect", setup.selectedRepo)}
-        onConnectGitHub={() => void flow.connectGitHub()}
+        onConnectGitHub={() => void (flow.appConfigured ? flow.connectGitHub() : flow.createGitHubApp())}
       />
     );
   }
