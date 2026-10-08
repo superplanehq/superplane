@@ -502,9 +502,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("popup-owner-time-cost")).not.toBeInTheDocument();
     expect(screen.queryByRole("tablist", { name: "Task views" })).not.toBeInTheDocument();
     const panel = screen.getByTestId("redesign-console-summary");
-    expect(within(panel).getByTestId("task-edit-owner")).toHaveAccessibleName(
-      `Owner: ${SPLIT_RUN_RUNNING.owner.name}`,
-    );
+    expect(within(panel).getByTestId("task-edit-owner")).toHaveAccessibleName(`Owner: ${SPLIT_RUN_RUNNING.owner.name}`);
     expect(panel).toHaveTextContent("$0.73");
     expect(panel).toHaveTextContent("2.7k tokens");
     expect(within(panel).getByTestId("split-run-source")).toHaveTextContent("GitHub issues");
