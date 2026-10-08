@@ -86,7 +86,7 @@ func bitbucketCheckoutCommand() string {
 		`  echo "Source branch tip does not match the pull request commit. Stop without changing it." >&2`,
 		`  exit 1`,
 		`fi`,
-		`git checkout -B -- "${SOURCE_BRANCH}" "${SOURCE_HASH}"`,
+		`git checkout -B "${SOURCE_BRANCH}" "${SOURCE_HASH}"`,
 		`if [ "$(git rev-parse HEAD)" != "${SOURCE_HASH}" ]; then`,
 		`  echo "Local checkout does not match the pull request source commit." >&2`,
 		`  exit 1`,
