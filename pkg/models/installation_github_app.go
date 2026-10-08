@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -8,6 +9,8 @@ import (
 )
 
 const installationGitHubAppID = 1
+
+var ErrInstallationGitHubAppExists = errors.New("installation GitHub App already exists")
 
 // InstallationGitHubApp stores the public SuperPlane GitHub App for a
 // self-hosted installation. There is at most one row. Cloud keeps the same
@@ -53,14 +56,15 @@ func SaveInstallationGitHubApp(
 		UpdatedAt:              now,
 	}
 
-	return tx.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"github_app_id",
-			"slug",
-			"encrypted_private_key",
-			"encrypted_webhook_secret",
-			"updated_at",
-		}),
-	}).Create(&app).Error
+	result := tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoNothing: true,
+	}).Create(&app)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrInstallationGitHubAppExists
+	}
+	return nil
 }

@@ -73,6 +73,32 @@ func TestResolveEmptyWhenMissing(t *testing.T) {
 	assert.False(t, cfg.Enabled())
 }
 
+func TestSaveKeepsFirstApp(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	encryptor := testEncryptor()
+	clearGitHubAppEnv(t)
+	require.NoError(t, Save(t.Context(), database.DB(t.Context()), encryptor, config.GitHubHostedAppConfig{
+		ID:            11,
+		Slug:          "first",
+		PrivateKey:    "first-pem",
+		WebhookSecret: "first-secret",
+	}))
+
+	err := Save(t.Context(), database.DB(t.Context()), encryptor, config.GitHubHostedAppConfig{
+		ID:            22,
+		Slug:          "second",
+		PrivateKey:    "second-pem",
+		WebhookSecret: "second-secret",
+	})
+	require.ErrorIs(t, err, ErrAlreadyConfigured)
+
+	cfg, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
+	require.NoError(t, err)
+	assert.Equal(t, int64(11), cfg.ID)
+	assert.Equal(t, "first", cfg.Slug)
+	assert.Equal(t, "first-pem", cfg.PrivateKey)
+}
+
 func clearGitHubAppEnv(t *testing.T) {
 	t.Helper()
 	t.Setenv(config.EnvGitHubAppID, "")

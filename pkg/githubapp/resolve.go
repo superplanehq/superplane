@@ -17,6 +17,8 @@ const (
 	webhookSecretAssociatedData = "installation_github_app_webhook_secret"
 )
 
+var ErrAlreadyConfigured = errors.New("GitHub App is already configured")
+
 // Resolve returns the public GitHub App for this request. Process environment
 // wins so Cloud keeps env-only credentials. Self-host stores the app on the
 // installation after the first-run create step.
@@ -98,5 +100,9 @@ func Save(
 	if err != nil {
 		return fmt.Errorf("encrypt GitHub App webhook secret: %w", err)
 	}
-	return models.SaveInstallationGitHubApp(tx, cfg.ID, cfg.Slug, privateKey, webhookSecret)
+	err = models.SaveInstallationGitHubApp(tx, cfg.ID, cfg.Slug, privateKey, webhookSecret)
+	if errors.Is(err, models.ErrInstallationGitHubAppExists) {
+		return ErrAlreadyConfigured
+	}
+	return err
 }

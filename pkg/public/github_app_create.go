@@ -2,6 +2,7 @@ package public
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/githubapp"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
 
@@ -19,8 +21,13 @@ type githubAppManifestResponse struct {
 }
 
 func (s *Server) HandleGitHubAppManifest(w http.ResponseWriter, r *http.Request) {
-	if _, ok := middleware.GetAccountFromContext(r.Context()); !ok {
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !account.IsInstallationAdmin() {
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 	if config.LoadGitHubHostedAppConfig().Enabled() {
@@ -42,7 +49,7 @@ func (s *Server) HandleGitHubAppManifest(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "GitHub App setup is not available", http.StatusInternalServerError)
 		return
 	}
-	state, err := githubapp.SignCreateState(s.jwt.Secret, r.URL.Query().Get("return_to"))
+	state, err := githubapp.SignCreateState(s.jwt.Secret, r.URL.Query().Get("return_to"), account.ID)
 	if err != nil {
 		http.Error(w, "failed to start GitHub App setup", http.StatusInternalServerError)
 		return
@@ -60,9 +67,14 @@ func (s *Server) HandleGitHubAppManifest(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) HandleGitHubAppCreated(w http.ResponseWriter, r *http.Request) {
-	returnPath, err := githubapp.VerifyCreateState(s.jwt.Secret, r.URL.Query().Get("state"))
+	returnPath, accountID, err := githubapp.VerifyCreateState(s.jwt.Secret, r.URL.Query().Get("state"))
 	if err != nil {
 		http.Error(w, "invalid GitHub App setup state", http.StatusBadRequest)
+		return
+	}
+	account, err := models.FindAccountByID(accountID.String())
+	if err != nil || !account.IsInstallationAdmin() {
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 	if config.LoadGitHubHostedAppConfig().Enabled() || githubapp.Enabled(r.Context(), database.DB(r.Context()), s.encryptor) {
@@ -77,6 +89,10 @@ func (s *Server) HandleGitHubAppCreated(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if err := githubapp.Save(r.Context(), database.DB(r.Context()), s.encryptor, cfg); err != nil {
+		if errors.Is(err, githubapp.ErrAlreadyConfigured) {
+			http.Redirect(w, r, returnPath, http.StatusFound)
+			return
+		}
 		log.WithError(err).Error("failed to store GitHub App credentials")
 		http.Error(w, "failed to save GitHub App", http.StatusInternalServerError)
 		return
