@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -29,7 +30,7 @@ func DescribeVCSProviderOnboarding(ctx context.Context, provider string) (*pb.De
 		return describeBitbucketOnboarding(ctx)
 	}
 
-	response := &pb.DescribeVCSProviderOnboardingResponse{ProviderConfigured: vcsProviderConfigured(provider)}
+	response := &pb.DescribeVCSProviderOnboardingResponse{ProviderConfigured: vcsProviderConfigured(ctx, provider)}
 	identities, err := vcsProviderIdentities(ctx, provider)
 	if err != nil {
 		return nil, err
@@ -133,7 +134,10 @@ func StartVCSProviderInstallation(ctx context.Context, provider string) (*pb.Sta
 	if provider == models.ProviderBitbucket {
 		return startBitbucketInstallation(ctx)
 	}
-	cfg := config.LoadGitHubHostedAppConfig()
+	cfg, err := githubapp.ResolveProcess(ctx)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load public GitHub App")
+	}
 	if !cfg.Enabled() {
 		return nil, grpcerrors.FailedPrecondition(nil, "public GitHub App is not configured")
 	}
@@ -338,10 +342,10 @@ func supportedVCSProvider(provider string) (string, error) {
 	}
 }
 
-func vcsProviderConfigured(provider string) bool {
+func vcsProviderConfigured(ctx context.Context, provider string) bool {
 	switch provider {
 	case models.ProviderGitHub:
-		return config.LoadGitHubHostedAppConfig().Enabled()
+		return githubapp.ProcessEnabled(ctx)
 	case models.ProviderBitbucket:
 		return config.LoadBitbucketForgeAppConfig().Enabled()
 	default:
