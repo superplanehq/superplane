@@ -119,8 +119,12 @@ func (b *bitbucketProvider) ReadMergeability(ctx context.Context, pullRequest *m
 			AllowedMethods: allowed,
 		}, nil
 	default:
+		// Bitbucket merge has no source-commit precondition. A matching
+		// read does not stop a later push from becoming the merged head.
 		return vcs.Mergeability{
-			CanMerge:       true,
+			CanMerge:       false,
+			BlockedReason:  mergeabilityBlockedReasonName(pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNSPECIFIED),
+			Message:        bitbucketMergeNotRevisionSafe,
 			HeadSHA:        headSHA,
 			AllowedMethods: allowed,
 		}, nil
@@ -138,11 +142,16 @@ func (b *bitbucketProvider) MergePullRequest(ctx context.Context, repository str
 	if !strings.EqualFold(strings.TrimSpace(current.State), bitbucketintegration.PullRequestStateOpen) {
 		return errors.New("the pull request is no longer open")
 	}
-	// ponytail: read-then-merge head check; Bitbucket has no merge precondition
-	if expectedSHA = strings.TrimSpace(expectedSHA); expectedSHA != "" &&
+	expectedSHA = strings.TrimSpace(expectedSHA)
+	if expectedSHA != "" &&
 		strings.TrimSpace(current.SourceHash) != "" &&
 		!strings.EqualFold(strings.TrimSpace(current.SourceHash), expectedSHA) {
 		return errFactoryPullRequestHeadMoved
+	}
+	// The merge request cannot carry the approved hash. Do not merge a
+	// revision the caller asked to lock.
+	if expectedSHA != "" {
+		return errFactoryBitbucketMergeNotRevisionSafe
 	}
 	_, err = b.client.MergePullRequest(repository, int64(number), method)
 	if err != nil {

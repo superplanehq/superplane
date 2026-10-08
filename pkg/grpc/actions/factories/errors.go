@@ -151,6 +151,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "The repository does not allow this merge method.")
 	case errors.Is(err, errFactoryPullRequestHeadMoved):
 		return grpcerrors.FailedPrecondition(err, "The pull request head changed. Review the pull request and try again.")
+	case errors.Is(err, errFactoryBitbucketMergeNotRevisionSafe):
+		return grpcerrors.FailedPrecondition(err, bitbucketMergeNotRevisionSafe)
 	case errors.Is(err, models.ErrFactoryPlanningSessionNotFound):
 		return grpcerrors.NotFound(err, "planning session not found")
 	case errors.Is(err, models.ErrFactoryPlanningSessionInvalid):

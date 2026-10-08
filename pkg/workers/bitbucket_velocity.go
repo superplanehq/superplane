@@ -39,9 +39,9 @@ func (b *bitbucketVelocity) ListMergedPullRequests(
 }
 
 // listBitbucketMerges returns the pull requests that merged in [from, to).
-// The merge instant comes from the merge commit, which dates the merge
-// itself; updated_on is only the fallback. Agent output is recognized by the
-// co-author trailer on the merge commit, matching the GitHub classification.
+// The merge instant is the pull request updated_on. The merge commit is read
+// only for the agent co-author trailer. A fast-forward merge reuses an older
+// commit, so that commit date is not the merge date.
 func listBitbucketMerges(
 	ctx context.Context,
 	client *bitbucketintegration.Client,
@@ -82,7 +82,9 @@ func toBitbucketRepositoryMerge(
 		return vcs.MergedPullRequest{}, false, nil
 	}
 
-	// One commit read dates the merge and classifies agent output.
+	// The commit message classifies agent output. Its date is not the merge
+	// instant: a fast-forward merge reuses a commit that can predate the pull
+	// request.
 	mergedAt := pr.UpdatedOn
 	agent := false
 	if pr.MergeHash != "" {
@@ -92,9 +94,6 @@ func toBitbucketRepositoryMerge(
 				return vcs.MergedPullRequest{}, false, fmt.Errorf("read merge commit %s: %w", pr.MergeHash, err)
 			}
 		} else if commit != nil {
-			if !commit.Date.IsZero() {
-				mergedAt = commit.Date
-			}
 			agent = hasAgentCoAuthor(commit.Message)
 		}
 	}

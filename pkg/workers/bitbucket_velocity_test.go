@@ -48,9 +48,9 @@ func TestToBitbucketRepositoryMerge(t *testing.T) {
 
 	mergeDate := now.Add(-time.Hour).Format(time.RFC3339)
 
-	t.Run("dates the merge from the merge commit", func(t *testing.T) {
+	t.Run("dates the merge from the pull request, not the commit", func(t *testing.T) {
 		client, _ := stubBitbucketVelocityClient(okJSONResponse(`{
-			"hash": "m42", "date": "` + mergeDate + `", "message": "Merged in feat/x"
+			"hash": "m42", "date": "2020-01-01T10:00:00+00:00", "message": "Merged in feat/x"
 		}`))
 
 		merge, ok, err := toBitbucketRepositoryMerge(client, "acme/widgets", bitbucketVelocityPR(), from, to)
@@ -60,7 +60,7 @@ func TestToBitbucketRepositoryMerge(t *testing.T) {
 		assert.Equal(t, models.FactoryVelocityMergeSourcePeople, merge.Source)
 		assert.Equal(t, "11111111-1111-1111-1111-111111111111", merge.AuthorUUID)
 		assert.Equal(t, "ada", merge.AuthorLogin)
-		assert.WithinDuration(t, now.Add(-time.Hour), merge.MergedAt, time.Minute)
+		assert.WithinDuration(t, now, merge.MergedAt, time.Minute)
 	})
 
 	t.Run("classifies agent merges by the co-author trailer", func(t *testing.T) {
@@ -101,12 +101,30 @@ func TestToBitbucketRepositoryMerge(t *testing.T) {
 		assert.Contains(t, err.Error(), "Rate limit exceeded")
 	})
 
+	t.Run("keeps a fast-forward merge when the commit predates the window", func(t *testing.T) {
+		client, _ := stubBitbucketVelocityClient(okJSONResponse(`{
+			"hash": "m42", "date": "2020-01-01T10:00:00+00:00",
+			"message": "Fast-forward\n\nCo-authored-by: SuperPlane Agent <superplaneagent@superplane.com>"
+		}`))
+		pr := bitbucketVelocityPR()
+		pr.SourceHash = "m42"
+		pr.UpdatedOn = now.Add(-time.Hour)
+
+		merge, ok, err := toBitbucketRepositoryMerge(client, "acme/widgets", pr, from, to)
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.Equal(t, models.FactoryVelocityMergeSourceAgent, merge.Source)
+		assert.WithinDuration(t, now.Add(-time.Hour), merge.MergedAt, time.Minute)
+	})
+
 	t.Run("excludes merges outside the window", func(t *testing.T) {
 		client, _ := stubBitbucketVelocityClient(okJSONResponse(`{
-			"hash": "m42", "date": "2020-01-01T10:00:00+00:00", "message": "Merged in feat/x"
+			"hash": "m42", "date": "` + mergeDate + `", "message": "Merged in feat/x"
 		}`))
+		pr := bitbucketVelocityPR()
+		pr.UpdatedOn = from.Add(-time.Hour)
 
-		_, ok, err := toBitbucketRepositoryMerge(client, "acme/widgets", bitbucketVelocityPR(), from, to)
+		_, ok, err := toBitbucketRepositoryMerge(client, "acme/widgets", pr, from, to)
 		require.NoError(t, err)
 		assert.False(t, ok)
 	})

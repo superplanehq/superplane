@@ -87,8 +87,9 @@ func TestDescribeFactoryPullRequestMergeability_BitbucketPR(t *testing.T) {
 		PrId:      pullRequest.ID.String(),
 	})
 	require.NoError(t, err)
-	require.True(t, response.GetMergeability().GetCanMerge())
+	require.False(t, response.GetMergeability().GetCanMerge())
 	assert.Equal(t, "abc123", response.GetMergeability().GetHeadSha())
+	assert.Equal(t, bitbucketMergeNotRevisionSafe, response.GetMergeability().GetMessage())
 }
 
 func TestMergeFactoryPullRequest_BitbucketFactory(t *testing.T) {
@@ -117,8 +118,6 @@ func TestMergeFactoryPullRequest_BitbucketFactory(t *testing.T) {
 		Responses: []*http.Response{
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(openPR))},
 			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"values": [{"key": "build-a", "state": "SUCCESSFUL"}]}`))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(openPR))},
-			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id": 42, "state": "MERGED"}`))},
 		},
 	}
 	stubClient, err := bitbucketintegration.NewClient(
@@ -133,28 +132,28 @@ func TestMergeFactoryPullRequest_BitbucketFactory(t *testing.T) {
 	}
 	t.Cleanup(func() { newFactoryBitbucketAPI = restore })
 
-	response, err := MergeFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.MergeFactoryPullRequestRequest{
+	_, err = MergeFactoryPullRequest(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.MergeFactoryPullRequestRequest{
 		FactoryId:       factory.ID.String(),
 		PrId:            pullRequest.ID.String(),
 		MergeMethod:     pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH,
 		ExpectedHeadSha: "abc123",
 	})
-	require.NoError(t, err)
-	require.NotNil(t, response.GetPullRequest())
-
-	require.Len(t, httpCtx.Requests, 4)
-	mergeRequest := httpCtx.Requests[3]
-	assert.Equal(t, http.MethodPost, mergeRequest.Method)
-	assert.Equal(t, "/2.0/repositories/acme/widgets/pullrequests/42/merge", mergeRequest.URL.Path)
+	code, message, ok := grpcerrors.HandlerStatus(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, code)
+	assert.Equal(t, bitbucketMergeNotRevisionSafe, message)
+	require.Len(t, httpCtx.Requests, 2, "no merge attempt without a revision lock")
+	for _, request := range httpCtx.Requests {
+		assert.NotContains(t, request.URL.Path, "/merge")
+	}
 
 	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
 	require.NoError(t, err)
-	assert.Equal(t, models.FactoryPullRequestStateMerged, stored.State)
+	assert.Equal(t, models.FactoryPullRequestStateOpen, stored.State)
 
 	reloaded, err := factory.FindWorkOrder(db, order.ID)
 	require.NoError(t, err)
-	assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
-	assert.Equal(t, models.FactoryWorkOrderResultCompleted, reloaded.Result)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
 }
 
 func TestCreateBitbucketChecksHandlerWaitsForBuilds(t *testing.T) {
@@ -311,8 +310,11 @@ func TestMergeFactoryPullRequest_BitbucketHeadMoved(t *testing.T) {
 	code, message, ok := grpcerrors.HandlerStatus(err)
 	require.True(t, ok)
 	assert.Equal(t, codes.FailedPrecondition, code)
-	assert.Contains(t, message, "head changed")
+	assert.Equal(t, bitbucketMergeNotRevisionSafe, message)
 	require.Len(t, httpCtx.Requests, 2, "no merge attempt after the head moved")
+	for _, request := range httpCtx.Requests {
+		assert.NotContains(t, request.URL.Path, "/merge")
+	}
 
 	stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
 	require.NoError(t, err)
