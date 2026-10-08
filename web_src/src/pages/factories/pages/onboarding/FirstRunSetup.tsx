@@ -289,7 +289,6 @@ function BitbucketChooseHost({
           flow.bitbucketInstalledWorkspaces.length,
         )}
         connectHref={flow.bitbucketConnectHref}
-        installUrl={flow.bitbucketInstallUrl}
         repositories={flow.bitbucketRepositories}
         installedWorkspaces={flow.bitbucketInstalledWorkspaces}
         selectedRepository={model.setup.selectedRepo}

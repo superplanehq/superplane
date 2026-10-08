@@ -84,7 +84,6 @@ export function useFirstRunBitbucket(args: {
   return {
     configured: Boolean(onboarding.data?.providerConfigured),
     pending: onboarding.isPending && !onboarding.data,
-    installUrl: onboarding.data?.installUrl ?? "",
     repositories: (onboarding.data?.repositories ?? []).map((repository) => repository.fullName ?? "").filter(Boolean),
     installedWorkspaces: slugs,
     installationAttemptActive: attemptActive,
