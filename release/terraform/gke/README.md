@@ -216,6 +216,7 @@ network blocks inbound SSH, enable runners in step 3.3 first. Then build
 with Identity-Aware Proxy:
 
 ```bash
+cd ../../..   # repository root
 packer build \
   -var project_id="$PROJECT_ID" \
   -var architecture=amd64 \
@@ -223,6 +224,7 @@ packer build \
   -var use_iap=true \
   -var subnetwork=superplane-runners \
   release/runner/packer/gce/runner.pkr.hcl
+cd release/terraform/gke
 ```
 
 Allow inbound TCP 22 from `35.235.240.0/20` for IAP.
@@ -466,7 +468,9 @@ and apply. This removes Fleet Manager. Then delete the runner VMs that remain:
 unset TF_VAR_installation_admin_token
 terraform apply
 
-gcloud compute instances list --filter="labels.superplane_fleet_manager_id=superplane" \
+# Fleet Manager labels runner VMs with cluster_name. The default is superplane.
+CLUSTER_NAME=superplane
+gcloud compute instances list --filter="labels.superplane_fleet_manager_id=${CLUSTER_NAME}" \
   --format="value(name,zone.basename())" |
   while read -r name zone; do gcloud compute instances delete "$name" --zone="$zone" --quiet; done
 ```
