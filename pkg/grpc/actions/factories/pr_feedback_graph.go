@@ -49,17 +49,28 @@ func (g prFeedbackGraph) Healthy(spec models.LiveCanvasSpec) bool {
 }
 
 func (g prFeedbackGraph) healthyDiscussion(spec models.LiveCanvasSpec) bool {
-	if g.CommentTriggerNodeID == "" || g.ReviewTriggerNodeID == "" || g.ReplyTriggerNodeID == "" {
+	if g.CommentTriggerNodeID == "" {
 		return false
 	}
+	// ponytail: comment-only graphs (Bitbucket has no review triggers yet)
+	// are healthy; a half-removed review/reply pair is not
+	review := g.ReviewTriggerNodeID != ""
+	reply := g.ReplyTriggerNodeID != ""
+	if review != reply {
+		return false
+	}
+	triggerIDs := []string{g.CommentTriggerNodeID}
+	if review {
+		triggerIDs = append(triggerIDs, g.ReviewTriggerNodeID, g.ReplyTriggerNodeID)
+	}
 
-	for _, triggerID := range g.triggerNodeIDs() {
+	for _, triggerID := range triggerIDs {
 		if _, ok := resolvePRFeedbackDiscussionFlow(spec, triggerID); !ok {
 			return false
 		}
 	}
 
-	for _, triggerID := range g.triggerNodeIDs() {
+	for _, triggerID := range triggerIDs {
 		if strings.TrimSpace(prFeedbackNodeString(findIntakeNode(spec.Nodes, triggerID), "repository")) == "" {
 			return false
 		}
@@ -173,7 +184,7 @@ func (g prFeedbackGraph) healthyChecks(spec models.LiveCanvasSpec) bool {
 	}
 
 	wait := findIntakeNode(spec.Nodes, g.WaitChecksNodeID)
-	if wait == nil || wait.ComponentName() != prFeedbackWaitChecksComponent {
+	if wait == nil || !isPrFeedbackWaitComponent(wait.ComponentName()) {
 		return false
 	}
 	runner := findIntakeNode(spec.Nodes, g.RunnerNodeID)
@@ -200,7 +211,7 @@ func resolvePRFeedbackGraph(spec models.LiveCanvasSpec) prFeedbackGraph {
 			return node.ComponentName() == "github.onPRReviewComment"
 		}),
 		PullRequestTriggerNodeID: resolveIntakeNode(nodes, prFeedbackPullRequestTriggerNodeID, func(node *models.Node) bool {
-			return node.ComponentName() == "github.onPullRequest"
+			return node.ComponentName() == "github.onPullRequest" || node.ComponentName() == "bitbucket.onPullRequest"
 		}),
 		FindNodeID: resolveIntakeNode(nodes, prFeedbackFindNodeID, func(node *models.Node) bool {
 			return node.ComponentName() == prFeedbackFindComponent
@@ -209,7 +220,7 @@ func resolvePRFeedbackGraph(spec models.LiveCanvasSpec) prFeedbackGraph {
 			return node.ComponentName() == prFeedbackActivityComponent
 		}),
 		WaitChecksNodeID: resolveIntakeNode(nodes, prFeedbackWaitChecksNodeID, func(node *models.Node) bool {
-			return node.ComponentName() == prFeedbackWaitChecksComponent
+			return isPrFeedbackWaitComponent(node.ComponentName())
 		}),
 		MarkPassedNodeID: resolveIntakeNode(nodes, prFeedbackMarkPassedNodeID, func(node *models.Node) bool {
 			return node.ComponentName() == prFeedbackUpdateActivityComponent

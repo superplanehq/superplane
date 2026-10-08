@@ -304,6 +304,7 @@ function BitbucketChooseHost({
         onRetryLookup={flow.retryBitbucketLookup}
         onGrantAccess={() => void flow.grantBitbucketAccess()}
         onSelectRepository={model.setup.selectRepo}
+        onClearRepository={model.setup.clearRepository}
         onContinue={() => void flow.continueFromRepository()}
       />
     );

@@ -55,7 +55,7 @@ const (
 	// every pull request. Waiting for checks or addressing comments on one
 	// PR would then block the others. The key partitions the queue by PR
 	// number; max stays at the default of 1 so one PR still serializes.
-	prFeedbackPRNumberSource = `root().data.pull_request?.number ?? root().data.issue?.number`
+	prFeedbackPRNumberSource = `root().data.pull_request?.number ?? root().data.issue?.number ?? root().data.pullrequest?.id`
 	prFeedbackConcurrencyKey = "pr-{{ " + prFeedbackPRNumberSource + " }}"
 )
 
@@ -77,6 +77,17 @@ type prFeedbackBuildRequest struct {
 	RunnerIntegrationNames []string
 	Binding                *intakeBinding
 	Agent                  *intakeAgent
+	// VCSProvider selects the Git host. Empty means GitHub.
+	VCSProvider string
+}
+
+// prFeedbackVCSProvider normalizes the request host. Bitbucket canvases use
+// Bitbucket triggers, waits, and checkout; everything else stays GitHub.
+func prFeedbackVCSProvider(request prFeedbackBuildRequest) string {
+	if strings.EqualFold(strings.TrimSpace(request.VCSProvider), models.ProviderBitbucket) {
+		return models.ProviderBitbucket
+	}
+	return models.ProviderGitHub
 }
 
 func buildPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
@@ -92,6 +103,9 @@ func prFeedbackCanvasName(request prFeedbackBuildRequest, fallback string) strin
 }
 
 func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
+	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
+		return buildBitbucketDiscussionPRFeedbackCanvas(request)
+	}
 	name := prFeedbackCanvasName(request, prFeedbackDefaultName)
 	mention := strings.TrimSpace(request.Mention)
 
@@ -191,6 +205,66 @@ func buildDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canva
 		Spec: &yaml.CanvasSpec{
 			Edges: append(append(commentFlow.edges, reviewFlow.edges...), replyFlow.edges...),
 			Nodes: append(append(commentFlow.nodes, reviewFlow.nodes...), replyFlow.nodes...),
+		},
+	})
+}
+
+// buildBitbucketDiscussionPRFeedbackCanvas listens for pull request
+// comments only. Bitbucket exposes no review-submission triggers, so the
+// review and reply flows stay GitHub-only until their own step.
+func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
+	name := prFeedbackCanvasName(request, prFeedbackDefaultName)
+	mention := strings.TrimSpace(request.Mention)
+
+	triggerConfig := map[string]any{
+		"contentFilter": mention,
+	}
+	if strings.TrimSpace(request.Repository) != "" {
+		triggerConfig["repository"] = request.Repository
+	}
+	commentFlow := prFeedbackDiscussionFlowNodes(prFeedbackDiscussionFlowRequest{
+		Trigger: yaml.Node{
+			ID:            prFeedbackCommentTriggerNodeID,
+			Name:          "On PR Comment",
+			Type:          yaml.NodeTypeTrigger,
+			Component:     "bitbucket.onPullRequestComment",
+			Configuration: triggerConfig,
+			Integration:   request.Binding.integrationRef(),
+		},
+		FindID:       prFeedbackFindNodeID,
+		FindName:     "Find Pull Request",
+		ActivityID:   prFeedbackActivityNodeID,
+		ActivityName: "Add Comment Activity",
+		RunnerID:     prFeedbackRunnerNodeID,
+		Title:        prFeedbackCommentActivityTitleExpression(),
+		Description:  prFeedbackCommentActivityDescriptionExpression(),
+		Y:            prFeedbackCommentFlowY,
+	}, request)
+	commentFlow = commentFlow.withAcknowledge(yaml.Node{
+		ID:        prFeedbackAcknowledgeCommentNodeID,
+		Name:      "Acknowledge PR Comment",
+		Type:      yaml.NodeTypeAction,
+		Component: "bitbucket.createPullRequestComment",
+		Configuration: map[string]any{
+			"repository":      "{{ root().data.repository.full_name }}",
+			"pullNumber":      "{{ root().data.pullrequest.id }}",
+			"parentCommentId": "{{ root().data.comment.id }}",
+			"body":            "SuperPlane is looking into this.",
+		},
+		Integration: request.Binding.integrationRef(),
+		Position:    prFeedbackAcknowledgePosition(prFeedbackCommentFlowY),
+	})
+
+	return withPRFeedbackConcurrency(&yaml.Canvas{
+		APIVersion: yaml.APIVersion,
+		Kind:       yaml.KindCanvas,
+		Metadata: &yaml.CanvasMetadata{
+			Name:        name,
+			Description: prFeedbackDefaultDescription,
+		},
+		Spec: &yaml.CanvasSpec{
+			Edges: commentFlow.edges,
+			Nodes: commentFlow.nodes,
 		},
 	})
 }
@@ -305,7 +379,7 @@ func prFeedbackDiscussionFlowNodes(
 				Type:      yaml.NodeTypeAction,
 				Component: prFeedbackFindComponent,
 				Configuration: map[string]any{
-					"provider":   "github",
+					"provider":   prFeedbackVCSProvider(request),
 					"repository": "{{ root().data.repository.full_name }}",
 					"number":     prFeedbackPRNumberExpression(),
 					"url":        prFeedbackPRURLExpression(),
@@ -414,7 +488,7 @@ func prFeedbackDiscussionActivityExpressions(nodeID string) (string, string, boo
 }
 
 func prFeedbackPRURLExpression() string {
-	return "{{ root().data.pull_request?.html_url ?? root().data.issue?.pull_request?.html_url }}"
+	return "{{ root().data.pull_request?.html_url ?? root().data.issue?.pull_request?.html_url ?? root().data.pullrequest?.links?.html?.href }}"
 }
 
 func prFeedbackPRNumberExpression() string {
@@ -422,7 +496,7 @@ func prFeedbackPRNumberExpression() string {
 }
 
 func prFeedbackPRHeadExpression() string {
-	return "{{ root().data.pull_request?.head?.ref ?? \"\" }}"
+	return "{{ root().data.pull_request?.head?.ref ?? root().data.pullrequest?.source?.branch?.name ?? \"\" }}"
 }
 
 func prFeedbackCoauthorsExpression() string {
@@ -434,7 +508,7 @@ func prFeedbackRunnerConfiguration(request prFeedbackBuildRequest) map[string]an
 		"machineType":             prFeedbackMachineType,
 		"executionTimeoutSeconds": prFeedbackTimeoutSeconds,
 		"includeVisualEvidence":   request.IncludeVisualEvidence,
-		"steps":                   prFeedbackRunnerSteps(),
+		"steps":                   prFeedbackRunnerStepsFor(request),
 		"environmentFrom":         prFeedbackEnvironmentFrom(request.Binding, request.RunnerIntegrationNames),
 		"environment": []any{
 			map[string]any{
@@ -507,6 +581,13 @@ func prFeedbackEnvironmentFrom(binding *intakeBinding, extraIntegrationNames []s
 }
 
 func prFeedbackRunnerSteps() []any {
+	return prFeedbackRunnerStepsFor(prFeedbackBuildRequest{})
+}
+
+func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
+	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
+		return prFeedbackBitbucketRunnerSteps(request)
+	}
 	return []any{
 		map[string]any{
 			"name": "Set Up Git User",
@@ -563,7 +644,79 @@ func prFeedbackRunnerSteps() []any {
 	}
 }
 
+// prFeedbackBitbucketRunnerSteps checks out the pull request source
+// repository. A same-named branch on the destination is not a push target.
+func prFeedbackBitbucketRunnerSteps(request prFeedbackBuildRequest) []any {
+	return []any{
+		map[string]any{
+			"name": "Set Up Git User",
+			"type": "bash",
+			"command": strings.Join([]string{
+				"git config --global user.email \"" + runner.FactoryAgentEmail + "\"",
+				"git config --global user.name \"" + runner.FactoryAgentName + "\"",
+			}, "\n"),
+		},
+		map[string]any{
+			"name":    "Checkout Pull Request",
+			"type":    "bash",
+			"command": bitbucketCheckoutCommand(),
+		},
+		map[string]any{
+			"name":             "Set Up DCO Signing",
+			"type":             "bash",
+			"workingDirectory": "repo",
+			"command":          runner.FactoryRepoCommitSetup(),
+		},
+		map[string]any{
+			"name":             "Address PR feedback",
+			"type":             "prompt",
+			"workingDirectory": "repo",
+			"prompt":           prFeedbackPromptFor(request),
+		},
+		map[string]any{
+			"name":             "Commit and Push",
+			"type":             "bash",
+			"workingDirectory": "repo",
+			"command":          bitbucketCommitPushCommand("fix: address PR #${PR_NUMBER} feedback"),
+		},
+	}
+}
+
 func prFeedbackPrompt() string {
+	return prFeedbackPromptFor(prFeedbackBuildRequest{})
+}
+
+func prFeedbackPromptFor(request prFeedbackBuildRequest) string {
+	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
+		return strings.Join([]string{
+			"You address current pull request feedback for a SuperPlane work order.",
+			"The repository is already checked out in the current working directory.",
+			"Stay on this branch. Push commits to this branch. Do not create a new branch.",
+			"",
+			"Repository: {{ root().data.repository.full_name }}",
+			"Pull request: #{{ root().data.pull_request?.number ?? root().data.issue?.number ?? root().data.pullrequest?.id }}",
+			"",
+			"Use the Bitbucket token in BITBUCKET_TOKEN.",
+			"When BITBUCKET_EMAIL is set, send HTTP basic authentication with that email and BITBUCKET_TOKEN.",
+			"Read pull request comments that mention the workspace agent.",
+			"Use inline file and line context on code-anchored comments.",
+			"Ignore replies that SuperPlane Agent already wrote.",
+			"",
+			"For each request:",
+			"- Check that the change is valid and safe.",
+			"- Apply valid requests.",
+			"- Explain disagreements in the completion comment. Do not make unsafe changes.",
+			"",
+			"Do not report a work-order check or add a work-order comment.",
+			"Post one pull request comment after you address all feedback.",
+			"Summarize the changes in this comment.",
+			"If you upload visual evidence, include it in the same comment.",
+			"Do not post a separate visual evidence comment.",
+			"Stop after current feedback is addressed.",
+			"Keep the change focused. Add tests where they are needed.",
+			runner.FactoryCommitIdentityPrompt,
+		}, "\n")
+	}
 	return strings.Join([]string{
 		"You address current pull request feedback for a SuperPlane work order.",
 		"The repository is already checked out in the current working directory.",

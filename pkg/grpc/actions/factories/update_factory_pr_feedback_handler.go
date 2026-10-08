@@ -164,7 +164,10 @@ func applyPRFeedbackSettings(
 					configuration = map[string]any{}
 				}
 				configuration["repository"] = updated.Repository
-				configuration["checkNames"] = checkNamesNodeValue(updated.CheckNames)
+				// ponytail: wait nodes name required builds per provider
+				delete(configuration, "checkNames")
+				delete(configuration, "buildKeys")
+				configuration[prFeedbackWaitNamesKey(factory)] = checkNamesNodeValue(updated.CheckNames)
 				nodes[i].Configuration = configuration
 				continue
 			}
@@ -188,7 +191,11 @@ func applyPRFeedbackSettings(
 				continue
 			}
 			if graph.isChecks() {
-				if title, description, ok := prFeedbackChecksActivityExpressions(nodes[i].ID); ok {
+				provider := ""
+				if factory != nil {
+					provider = factory.OnboardingConfigValue().EffectiveVCSProvider()
+				}
+				if title, description, ok := prFeedbackChecksActivityExpressionsFor(nodes[i].ID, provider); ok {
 					configuration := maps.Clone(nodes[i].Configuration)
 					if configuration == nil {
 						configuration = map[string]any{}

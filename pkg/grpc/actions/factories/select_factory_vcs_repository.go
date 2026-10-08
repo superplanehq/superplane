@@ -52,6 +52,9 @@ func SelectFactoryVCSProviderRepository(
 		if err != nil {
 			return err
 		}
+		if err := rejectFactoryProviderSwitch(factory, provider); err != nil {
+			return err
+		}
 
 		repository, findErr := models.FindAccessibleVCSProviderRepository(tx, provider, providerUserID, req.GetRepositoryId())
 		if errors.Is(findErr, gorm.ErrRecordNotFound) {
@@ -160,6 +163,23 @@ func syncFactoryVCSProviderBindings(
 		if err := models.SyncVCSProviderBindingRepositories(tx, integrationID, provider); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// rejectFactoryProviderSwitch locks the provider at the first saved VCS
+// binding. Clearing and rebinding across hosts is rejected.
+func rejectFactoryProviderSwitch(factory *models.Factory, provider string) error {
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	if provider == "" {
+		return grpcerrors.InvalidArgument(nil, "VCS provider is not supported")
+	}
+	current := factory.OnboardingConfigValue()
+	if strings.TrimSpace(current.VCSIntegrationID) == "" && strings.TrimSpace(current.VCSProvider) == "" {
+		return nil
+	}
+	if provider != current.EffectiveVCSProvider() {
+		return grpcerrors.InvalidArgument(nil, "version control provider cannot be changed")
 	}
 	return nil
 }
