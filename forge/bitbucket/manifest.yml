@@ -20,7 +20,7 @@ modules:
   scheduledTrigger:
     - key: token-refresh-trigger
       endpoint: token-refresh
-      interval: hour
+      interval: fiveMinute
   webtrigger:
     - key: bootstrap-trigger
       function: bootstrap

@@ -2,6 +2,7 @@ package bitbucket
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -28,10 +29,57 @@ func TestDirectorySkipsAWorkspaceTheAccountIsNotIn(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	directory := Directory{BaseURL: server.URL, HTTP: server.Client()}
-	repositories, err := directory.VisibleRepositories(context.Background(), "system-token", "acme", testAccountID)
+	catalog, err := directory.CatalogVisibleTo(context.Background(), testAccountID, []InstallationRef{{ID: "install-1", WorkspaceSlug: "acme"}}, func(string) (string, error) { return "system-token", nil })
 	require.NoError(t, err)
+	repositories := catalog.Repositories
 	assert.Empty(t, repositories)
+	assert.Empty(t, catalog.Workspaces)
 	assert.False(t, listed)
+}
+
+func TestDirectoryDetectsInstalledWorkspacesWithoutWritableRepositories(t *testing.T) {
+	for _, role := range []string{"owner", "member", ""} {
+		t.Run(role, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/workspaces/acme/permissions":
+					assert.Equal(t, testPermissionQuery, r.URL.Query().Get("q"))
+					if role != "" {
+						_, _ = w.Write([]byte(`{"values":[{"permission":"` + role + `","workspace":{"slug":"acme"}}]}`))
+						return
+					}
+					_, _ = w.Write([]byte(`{"values":[]}`))
+				case testPermissionsPath, "/repositories/acme":
+					_, _ = w.Write([]byte(`{"values":[]}`))
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			t.Cleanup(server.Close)
+			directory := Directory{BaseURL: server.URL, HTTP: server.Client()}
+			catalog, err := directory.CatalogVisibleTo(context.Background(), testAccountID,
+				[]InstallationRef{{ID: "installation-1", WorkspaceUUID: "workspace-1", WorkspaceSlug: "acme"}},
+				func(string) (string, error) { return "system-token", nil })
+			require.NoError(t, err)
+			assert.Empty(t, catalog.Repositories)
+			if role == "" {
+				assert.Empty(t, catalog.Workspaces)
+				return
+			}
+			require.Len(t, catalog.Workspaces, 1)
+			assert.Equal(t, "acme", catalog.Workspaces[0].WorkspaceSlug)
+			assert.Equal(t, "installation-1", catalog.Workspaces[0].ID)
+		})
+	}
+}
+
+func TestDirectoryReportsUnavailableTokensInsteadOfMissingInstallations(t *testing.T) {
+	tokenErr := errors.New("expired token")
+	_, err := (Directory{}).CatalogVisibleTo(context.Background(), testAccountID,
+		[]InstallationRef{{ID: "installation-1", WorkspaceSlug: "acme"}},
+		func(string) (string, error) { return "", tokenErr })
+	require.ErrorIs(t, err, tokenErr)
 }
 
 func TestDirectoryHidesRepositoriesWithoutAPushPermission(t *testing.T) {
@@ -59,8 +107,9 @@ func TestDirectoryHidesRepositoriesWithoutAPushPermission(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	directory := Directory{BaseURL: server.URL, HTTP: server.Client()}
-	repositories, err := directory.VisibleRepositories(context.Background(), "system-token", "acme", testAccountID)
+	catalog, err := directory.CatalogVisibleTo(context.Background(), testAccountID, []InstallationRef{{ID: "install-1", WorkspaceSlug: "acme"}}, func(string) (string, error) { return "system-token", nil })
 	require.NoError(t, err)
+	repositories := catalog.Repositories
 	require.Len(t, repositories, 1)
 	assert.Equal(t, "acme/api", repositories[0].FullName)
 	assert.Equal(t, "22222222-2222-2222-2222-222222222222", repositories[0].UUID)
@@ -86,8 +135,9 @@ func TestDirectoryDoesNotListRepositoriesForAMemberWithoutGrants(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	directory := Directory{BaseURL: server.URL, HTTP: server.Client()}
-	repositories, err := directory.VisibleRepositories(context.Background(), "system-token", "acme", testAccountID)
+	catalog, err := directory.CatalogVisibleTo(context.Background(), testAccountID, []InstallationRef{{ID: "install-1", WorkspaceSlug: "acme"}}, func(string) (string, error) { return "system-token", nil })
 	require.NoError(t, err)
+	repositories := catalog.Repositories
 	assert.Empty(t, repositories)
 	assert.False(t, listed)
 }
@@ -116,8 +166,9 @@ func TestDirectoryListsEveryRepositoryForAWorkspaceOwner(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	directory := Directory{BaseURL: server.URL, HTTP: server.Client()}
-	repositories, err := directory.VisibleRepositories(context.Background(), "system-token", "acme", testAccountID)
+	catalog, err := directory.CatalogVisibleTo(context.Background(), testAccountID, []InstallationRef{{ID: "install-1", WorkspaceSlug: "acme"}}, func(string) (string, error) { return "system-token", nil })
 	require.NoError(t, err)
+	repositories := catalog.Repositories
 	require.Len(t, repositories, 2)
 	assert.Equal(t, "acme/api", repositories[0].FullName)
 	assert.Equal(t, "acme/web", repositories[1].FullName)
@@ -148,8 +199,9 @@ func TestDirectoryFollowsPermissionPagesAndFallsBackToMain(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	directory := Directory{BaseURL: server.URL, HTTP: server.Client()}
-	repositories, err := directory.VisibleRepositories(context.Background(), "system-token", "acme", testAccountID)
+	catalog, err := directory.CatalogVisibleTo(context.Background(), testAccountID, []InstallationRef{{ID: "install-1", WorkspaceSlug: "acme"}}, func(string) (string, error) { return "system-token", nil })
 	require.NoError(t, err)
+	repositories := catalog.Repositories
 	require.Len(t, repositories, 2)
 	assert.Equal(t, "acme/api", repositories[0].FullName)
 	assert.Equal(t, "develop", repositories[0].DefaultBranch)
@@ -178,8 +230,9 @@ func TestDirectoryResolvesTheWorkspaceSlugFromAGrant(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	directory := Directory{BaseURL: server.URL, HTTP: server.Client()}
-	repositories, err := directory.VisibleRepositories(context.Background(), "system-token", workspaceUUID, testAccountID)
+	catalog, err := directory.CatalogVisibleTo(context.Background(), testAccountID, []InstallationRef{{ID: "install-1", WorkspaceSlug: workspaceUUID}}, func(string) (string, error) { return "system-token", nil })
 	require.NoError(t, err)
+	repositories := catalog.Repositories
 	require.Len(t, repositories, 1)
 	assert.Equal(t, "acme", repositories[0].WorkspaceSlug)
 }

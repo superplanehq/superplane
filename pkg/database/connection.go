@@ -201,6 +201,7 @@ func TruncateTables() error {
 
 	return Conn().Exec(`
 		truncate table
+			bitbucket_forge_installations,
 			runner_task_log_lifecycles,
 			runner_registrations,
 			runner_credentials,

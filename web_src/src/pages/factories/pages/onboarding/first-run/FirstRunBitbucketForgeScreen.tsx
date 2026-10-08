@@ -18,6 +18,7 @@ type FirstRunBitbucketForgeScreenProps = {
   connectHref: string;
   installUrl: string;
   repositories: string[];
+  installedWorkspaces?: string[];
   selectedRepository: string | null;
   granting?: boolean;
   saving?: boolean;
@@ -101,6 +102,8 @@ function BitbucketGrantScreen({
   chrome,
   sphere,
   onGrantAccess,
+  onRetryLookup,
+  retrying = false,
 }: FirstRunBitbucketForgeScreenProps) {
   return (
     <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={granting}>
@@ -108,8 +111,17 @@ function BitbucketGrantScreen({
         <p className="text-[15px] leading-6 text-muted-foreground">{copy.grantBody}</p>
       </FirstRunHeading>
       <div className="mt-8 space-y-4">
+        <p className="text-[13px] text-muted-foreground" role="status">
+          {copy.synchronizing}
+        </p>
+        <p className="text-[13px] text-muted-foreground">{copy.waitingForInstallation}</p>
+        <LoadingButton type="button" onClick={onRetryLookup} loading={retrying} loadingText={copy.retrying}>
+          {copy.checkAgain}
+        </LoadingButton>
+        <p className="text-[13px] text-muted-foreground">{copy.installIfNeeded}</p>
         <LoadingButton
           type="button"
+          variant="outline"
           onClick={onGrantAccess}
           loading={granting}
           loadingText={copy.openingBitbucket}
@@ -126,6 +138,7 @@ function BitbucketGrantScreen({
 
 function BitbucketChooseRepositoryScreen({
   repositories,
+  installedWorkspaces = [],
   selectedRepository,
   saving = false,
   loadError = false,
@@ -133,6 +146,10 @@ function BitbucketChooseRepositoryScreen({
   sphere,
   onSelectRepository,
   onContinue,
+  onRetryLookup,
+  onGrantAccess,
+  retrying = false,
+  granting = false,
 }: FirstRunBitbucketForgeScreenProps) {
   return (
     <FirstRunShell
@@ -148,7 +165,27 @@ function BitbucketChooseRepositoryScreen({
       <div className="mt-8 space-y-4">
         {loadError ? <p className="text-[13px] text-destructive">{copy.loadError}</p> : null}
         {repositories.length === 0 ? (
-          <p className="text-[13px] text-muted-foreground">{copy.empty}</p>
+          <div className="space-y-3">
+            <p className="text-[13px]">{copy.installed}</p>
+            <ul className="text-[13px] text-muted-foreground">
+              {installedWorkspaces.map((workspace) => (
+                <li key={workspace}>{workspace}</li>
+              ))}
+            </ul>
+            <p className="text-[13px] text-muted-foreground">{copy.installedEmpty}</p>
+            <LoadingButton type="button" onClick={onRetryLookup} loading={retrying} loadingText={copy.retrying}>
+              {copy.checkRepositories}
+            </LoadingButton>
+            <LoadingButton
+              type="button"
+              variant="outline"
+              onClick={onGrantAccess}
+              loading={granting}
+              loadingText={copy.openingBitbucket}
+            >
+              {copy.installAnother}
+            </LoadingButton>
+          </div>
         ) : (
           <RepositoryPicker
             host="bitbucket"
