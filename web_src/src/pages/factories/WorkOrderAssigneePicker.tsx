@@ -1,9 +1,12 @@
-import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar } from "@/components/Avatar/avatar";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { buildOrgUserDisplayMap, getUserInitials, resolveOrgUserDisplay } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
+import { Check } from "lucide-react";
 import { useMemo } from "react";
+
+import { EmptyOwnerMark } from "./OrgUserReference";
 
 interface WorkOrderAssigneePickerProps {
   organizationId: string;
@@ -12,7 +15,6 @@ interface WorkOrderAssigneePickerProps {
   pinnedIds?: string[];
   onChange: (assigneeIds: string[]) => void;
   disabled?: boolean;
-  variant?: "default" | "popover";
 }
 
 export function WorkOrderAssigneePicker({
@@ -21,10 +23,10 @@ export function WorkOrderAssigneePicker({
   pinnedIds,
   onChange,
   disabled = false,
-  variant = "default",
 }: WorkOrderAssigneePickerProps) {
   const { data: users = [], isLoading } = useOrganizationUsers(organizationId);
   const pinned = pinnedIds ?? selectedIds;
+  const selectedId = selectedIds[0];
 
   const userOptions = useMemo(() => {
     const usersById = buildOrgUserDisplayMap(users);
@@ -57,59 +59,54 @@ export function WorkOrderAssigneePicker({
       });
   }, [users, pinned]);
 
-  const toggleUser = (userId: string, checked: boolean) => {
+  const selectUser = (userId: string) => {
     if (disabled) {
       return;
     }
-
-    // A task has one owner. Checking a person replaces the current owner.
-    onChange(checked ? [userId] : selectedIds.filter((id) => id !== userId));
+    onChange([userId]);
   };
 
-  if (isLoading) {
-    return <p className="text-sm text-gray-500 dark:text-gray-400">Loading members…</p>;
-  }
-
-  if (userOptions.length === 0) {
-    return <p className="text-sm text-gray-500 dark:text-gray-400">No organization members found.</p>;
-  }
+  const clearOwner = () => {
+    if (disabled) {
+      return;
+    }
+    onChange([]);
+  };
 
   return (
-    <ul
-      className={cn(
-        "overflow-y-auto",
-        variant === "popover"
-          ? "max-h-60 space-y-0.5"
-          : "max-h-72 space-y-1 rounded-lg border border-gray-200 p-2 dark:border-gray-700/70",
-      )}
-    >
-      {userOptions.map((user) => {
-        const checked = selectedIds.includes(user.id);
-        return (
-          <li key={user.id}>
-            <label
-              className={cn(
-                "flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-gray-50 dark:hover:bg-gray-800/60",
-                checked && "bg-gray-50 dark:bg-gray-800/40",
-                disabled && "cursor-not-allowed opacity-60",
-              )}
-            >
-              <Checkbox
-                checked={checked}
-                disabled={disabled}
-                onChange={(event) => toggleUser(user.id, event.target.checked)}
-              />
-              <Avatar
-                src={user.display.avatarUrl}
-                initials={user.display.initials}
-                alt={user.display.name}
-                className="size-6"
-              />
-              <span className="text-sm text-gray-900 dark:text-gray-100">{user.label}</span>
-            </label>
-          </li>
-        );
-      })}
-    </ul>
+    <Command>
+      <CommandInput placeholder="Search people" autoFocus disabled={disabled} />
+      <CommandList>
+        {isLoading ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">Loading members…</p>
+        ) : (
+          <>
+            <CommandEmpty>No people found.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem value="No owner" onSelect={clearOwner} disabled={disabled}>
+                <EmptyOwnerMark />
+                <span className="min-w-0 flex-1 truncate">No owner</span>
+                {selectedIds.length === 0 ? <Check className="size-4" aria-hidden /> : null}
+              </CommandItem>
+              {userOptions.map((user) => {
+                const selected = user.id === selectedId;
+                return (
+                  <CommandItem
+                    key={user.id}
+                    value={`${user.label} ${user.id}`}
+                    onSelect={() => selectUser(user.id)}
+                    disabled={disabled}
+                  >
+                    <Avatar src={user.display.avatarUrl} initials={user.display.initials} alt="" className="size-6" />
+                    <span className="min-w-0 flex-1 truncate">{user.label}</span>
+                    <Check className={cn("size-4", selected ? "opacity-100" : "opacity-0")} aria-hidden />
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+          </>
+        )}
+      </CommandList>
+    </Command>
   );
 }

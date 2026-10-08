@@ -4,7 +4,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { overlayHeaderSpend, type LiveHeaderSpend } from "@/lib/overlayHeaderSpend";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { FileText, Maximize2, Minimize2, UserPlus, XIcon } from "lucide-react";
+import { FileText, Maximize2, Minimize2, XIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { FACTORIES_ORGANIZATION_ID, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
@@ -15,9 +15,9 @@ import {
   type WorkOrderUsageByMachineType,
   type WorkOrderUsageByModel,
 } from "../../lib/workOrderUsage";
-import { OrgUserReference } from "../../OrgUserReference";
+import { OrgUserReference, EmptyOwnerMark } from "../../OrgUserReference";
 import { WorkOrderArtifactInline } from "../../WorkOrderArtifactInline";
-import { WorkOrderAssigneesPopover } from "../../WorkOrderAssigneesPopover";
+import { OwnerAssignTrigger } from "../../WorkOrderAssigneesPopover";
 import { WorkOrderStatusNote } from "../../WorkOrderStatusNote";
 import { RunOverlayBoardBackdrop, RunOverlayFrame } from "../work-order-run-overlay/runOverlayShared";
 import type { PopupFixture, PopupLogEntry, PopupLogState } from "./workOrderPopupMocks";
@@ -177,7 +177,7 @@ export function OwnerTimeCostRow({
   children,
   organizationId,
   canEditOwner = false,
-  assigneeIds = [],
+  assigneeIds,
   ownerBusy = false,
   onOwnerSave,
   usageByModel,
@@ -197,15 +197,13 @@ export function OwnerTimeCostRow({
   liveSpend?: LiveHeaderSpend;
 }) {
   const spend = overlayHeaderSpend(fixture.costUsd, fixture.tokensLabel, liveSpend);
+  const hasOwner = assigneeIds === undefined || assigneeIds.length > 0;
   const ownerMark = (
     <span className="inline-flex min-w-0 items-center gap-1.5">
-      {assigneeIds.length > 0 || !canEditOwner ? (
+      {hasOwner ? (
         <OrgUserReference display={fixture.owner} size="xs" nameClassName="truncate text-[13px]" />
       ) : (
-        <span className="inline-flex items-center gap-1 text-muted-foreground">
-          <UserPlus className="size-3.5 shrink-0" aria-hidden />
-          Assign
-        </span>
+        <EmptyOwnerMark />
       )}
     </span>
   );
@@ -216,24 +214,18 @@ export function OwnerTimeCostRow({
       data-testid="popup-owner-time-cost"
     >
       {canEditOwner && organizationId && onOwnerSave ? (
-        <WorkOrderAssigneesPopover
+        <OwnerAssignTrigger
           organizationId={organizationId}
-          selectedIds={assigneeIds}
-          canEdit={canEditOwner}
+          selectedIds={assigneeIds ?? []}
+          canAssign={canEditOwner}
           isSaving={ownerBusy}
           onSave={onOwnerSave}
           align="start"
+          label={hasOwner ? `Owner: ${fixture.owner.name}` : "Assign owner"}
+          testId="popup-edit-owner"
         >
-          <button
-            type="button"
-            className="inline-flex min-w-0 items-center gap-1.5 rounded-sm hover:bg-muted/60"
-            aria-label={assigneeIds.length > 0 ? `Owner: ${fixture.owner.name}` : "Assign owner"}
-            data-testid="popup-edit-owner"
-            disabled={ownerBusy}
-          >
-            {ownerMark}
-          </button>
-        </WorkOrderAssigneesPopover>
+          {ownerMark}
+        </OwnerAssignTrigger>
       ) : (
         ownerMark
       )}
