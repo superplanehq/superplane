@@ -1,19 +1,68 @@
 package me
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 )
+
+func TestDescribeBitbucketOnboardingIncludesInstalledWorkspacesWithoutRepositories(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv(config.EnvBitbucketForgeAppID, "ari:cloud:ecosystem::app/example")
+	t.Setenv(config.EnvBitbucketForgeInstallURL, "https://developer.atlassian.com/console/install/example")
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	const accountID = "11111111-1111-1111-1111-111111111111"
+	db := database.DB(ctx)
+	require.NoError(t, models.SaveAccountLinkedAccount(db,
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderBitbucket, accountID, "ada-bb", "", "")))
+	now := time.Now()
+	_, err := models.SaveBitbucketForgeDelivery(db, models.BitbucketForgeDelivery{
+		InstallationID: "installation-1", WorkspaceUUID: "22222222-2222-2222-2222-222222222222",
+		WorkspaceSlug: "acme", InstallerAccountID: "another-admin", SystemToken: []byte("encrypted-token"),
+		TokenExpiresAt: now.Add(time.Hour), DeliveredAt: now,
+	})
+	require.NoError(t, err)
+	bitbucketapp.SetSystemTokenSource(func(string) (string, time.Time, error) { return "system-token", now.Add(time.Hour), nil })
+	t.Cleanup(func() { bitbucketapp.SetSystemTokenSource(nil) })
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		assert.Equal(t, "Bearer system-token", request.Header.Get("Authorization"))
+		assert.Equal(t, `user.uuid="{`+accountID+`}"`, request.URL.Query().Get("q"))
+		w.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/workspaces/acme/permissions":
+			_, _ = w.Write([]byte(`{"values":[{"permission":"member","workspace":{"slug":"acme"}}]}`))
+		case "/workspaces/acme/permissions/repositories":
+			_, _ = w.Write([]byte(`{"values":[]}`))
+		default:
+			t.Errorf("unexpected Bitbucket request: %s", request.URL.Path)
+			http.NotFound(w, request)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Cleanup(bitbucket.UseDirectory(bitbucket.Directory{BaseURL: server.URL, HTTP: server.Client()}))
+
+	response, err := DescribeVCSProviderOnboarding(ctx, models.ProviderBitbucket)
+	require.NoError(t, err)
+	assert.Empty(t, response.Repositories)
+	require.Len(t, response.InstalledWorkspaces, 1)
+	assert.Equal(t, "acme", response.InstalledWorkspaces[0].Slug)
+	assert.Equal(t, "installation-1", response.InstalledWorkspaces[0].InstallationId)
+	assert.Equal(t, "22222222-2222-2222-2222-222222222222", response.InstalledWorkspaces[0].ExternalId)
+}
 
 func TestDescribeVCSProviderOnboardingListsLinkedIdentities(t *testing.T) {
 	r := support.Setup(t)
