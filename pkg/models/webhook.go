@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -77,6 +78,43 @@ func (w *Webhook) MarkFailed(tx *gorm.DB) error {
 
 func (w *Webhook) HasExceededRetries() bool {
 	return w.RetryCount >= w.MaxRetries
+}
+
+// UpdateConfiguration stores a new configuration and leaves the state unchanged.
+func (w *Webhook) UpdateConfiguration(tx *gorm.DB, configuration any) error {
+	if w == nil || w.ID == uuid.Nil {
+		return fmt.Errorf("missing webhook id")
+	}
+
+	w.Configuration = datatypes.NewJSONType[any](configuration)
+	return tx.Model(w).Updates(map[string]any{
+		"configuration": w.Configuration,
+		"updated_at":    time.Now(),
+	}).Error
+}
+
+// Reprovision marks a ready or failed webhook pending so Setup runs again.
+// A webhook that is already pending or provisioning is left unchanged, so a
+// second sync cannot start another remote webhook while the first is in progress.
+// The bool is true when this call changed the row.
+func (w *Webhook) Reprovision(tx *gorm.DB, configuration any) (bool, error) {
+	if w == nil || w.ID == uuid.Nil {
+		return false, fmt.Errorf("missing webhook id")
+	}
+
+	result := tx.Model(&Webhook{}).
+		Where("id = ?", w.ID).
+		Where("state IN ?", []string{WebhookStateReady, WebhookStateFailed}).
+		Updates(map[string]any{
+			"state":         WebhookStatePending,
+			"retry_count":   0,
+			"configuration": datatypes.NewJSONType[any](configuration),
+			"updated_at":    time.Now(),
+		})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
 }
 
 func FindWebhook(id uuid.UUID) (*Webhook, error) {

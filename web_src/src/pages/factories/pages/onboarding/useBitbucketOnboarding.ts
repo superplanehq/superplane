@@ -6,9 +6,10 @@ import {
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { bitbucketOnboardingPollInterval } from "./bitbucketOnboardingPoll";
+
 const bitbucketOnboardingKey = (organizationId: string) => ["me", organizationId, "bitbucket-onboarding"] as const;
 const bitbucketProvider = "bitbucket";
-const bitbucketOnboardingPollIntervalMs = 3_000;
 
 export function useBitbucketOnboarding(organizationId: string, options: { poll?: boolean } = {}) {
   const queryClient = useQueryClient();
@@ -22,13 +23,7 @@ export function useBitbucketOnboarding(organizationId: string, options: { poll?:
     },
     enabled: Boolean(organizationId),
     staleTime: 0,
-    refetchInterval: (current) => {
-      if (options.poll === false) return false;
-      const data = current.state.data;
-      if (!data?.providerConfigured || !data.identity) return false;
-      if ((data.repositories ?? []).length > 0) return false;
-      return bitbucketOnboardingPollIntervalMs;
-    },
+    refetchInterval: (current) => bitbucketOnboardingPollInterval(options.poll !== false, current.state),
   });
 
   const startInstallation = useMutation({

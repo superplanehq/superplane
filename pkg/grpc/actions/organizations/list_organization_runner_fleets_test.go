@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -25,20 +24,7 @@ func Test__ListOrganizationRunnerFleets(t *testing.T) {
 		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
 	})
 
-	t.Run("returns legacy machine types when the integrated backend is disabled", func(t *testing.T) {
-		response, err := ListOrganizationRunnerFleets(t.Context(), r.Organization.ID.String())
-		require.NoError(t, err)
-		require.Len(t, response.Fleets, 4)
-
-		assert.Equal(t, models.RunnerFleetE1LargeAMD64, response.Fleets[0].Id)
-		assert.Equal(t, models.RunnerFleetE1LargeARM64, response.Fleets[1].Id)
-		assert.Equal(t, models.RunnerFleetE1TinyAMD64, response.Fleets[2].Id)
-		assert.Equal(t, models.RunnerFleetE1TinyARM64, response.Fleets[3].Id)
-	})
-
-	t.Run("returns enabled installation and organization fleets for the integrated backend", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureNewRunners))
-
+	t.Run("returns enabled installation and organization fleets without explicit enablement", func(t *testing.T) {
 		installationFleet := newOrganizationListTestFleet("aws-large-amd64", models.RunnerFleetScopeInstallation, nil)
 		require.NoError(t, installationFleet.Create(db))
 

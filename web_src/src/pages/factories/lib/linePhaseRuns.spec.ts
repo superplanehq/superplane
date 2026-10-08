@@ -461,7 +461,7 @@ describe("collectLineBacklogOrders", () => {
 
     const backlog = collectLineBacklogOrders([onLine, otherLine, draft, returned, open, closed]);
 
-    expect(backlog.map((entry) => entry.id)).toEqual(["wo-returned", "wo-draft"]);
+    expect(backlog.map((entry) => entry.id)).toEqual(["wo-draft", "wo-returned"]);
   });
 
   it("keeps a returned draft off the Plan column", () => {

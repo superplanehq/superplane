@@ -12,8 +12,11 @@ letsencrypt_email = "admin@example.com"
 # SuperPlane
 # -----------------------------------------------------------------------------
 
-# superplane_image_tag = "stable"  # Options: stable, beta, or specific version like v0.4
+# superplane_image_tag = "<git-sha>-selfhosted"  # Empty uses the chart's matching image.
 # superplane_namespace = "superplane"
+
+# Nominal PV/PVC capacity. EFS grows elastically and does not reserve this size.
+# runner_active_log_volume_capacity = "1Gi"
 
 # -----------------------------------------------------------------------------
 # Optional Variables - AWS Region

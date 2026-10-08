@@ -63,7 +63,7 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to start authorization", http.StatusInternalServerError)
 			return
 		}
-		s.writeConsentPage(w, r, account, client.Name, consent, "", http.StatusOK)
+		s.writeConsentPage(w, r, account, consentClientName(client), consent, "", http.StatusOK)
 		return
 	}
 
@@ -88,7 +88,7 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to start authorization", http.StatusInternalServerError)
 			return
 		}
-		s.writeConsentPage(w, r, account, client.Name, token, "Choose a workspace this account can use.", http.StatusBadRequest)
+		s.writeConsentPage(w, r, account, consentClientName(client), token, "Choose a workspace this account can use.", http.StatusBadRequest)
 		return
 	}
 
@@ -111,6 +111,13 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, redirect, http.StatusFound)
+}
+
+func consentClientName(client *mcpserver.Client) string {
+	if client == nil {
+		return ""
+	}
+	return mcp.ClientDisplayName(client.Name, client.ID, "")
 }
 
 func (s *Server) writeConsentPage(

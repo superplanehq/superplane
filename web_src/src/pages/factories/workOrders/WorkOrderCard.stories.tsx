@@ -355,7 +355,7 @@ export const OpenOwned: Story = {
 };
 
 /**
- * GitHub origin on the card. The source icon sits in the title row
+ * GitHub origin on the card. The source icon sits in the footer
  * and opens the issue in a new tab.
  */
 export const GitHubOrigin: Story = {
@@ -374,7 +374,7 @@ export const GitHubOrigin: Story = {
 };
 
 /**
- * Manual origin on the card. The product logo sits in the title row
+ * Manual origin on the card. The product logo sits in the footer
  * and is not a link.
  */
 export const ManualOrigin: Story = {

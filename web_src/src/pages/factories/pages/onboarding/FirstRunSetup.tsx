@@ -224,9 +224,6 @@ function TicketsScreenHost({
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
-      jiraAvailable={flow.jiraAvailable}
-      jiraFeatureLoading={flow.jiraFeatureLoading}
-      jiraChoiceBlock={flow.jiraChoiceBlock}
       linearAvailable={flow.linearAvailable}
       linearFeatureLoading={flow.linearFeatureLoading}
       linearChoiceBlock={flow.linearChoiceBlock}
@@ -256,9 +253,13 @@ function TicketsScreenHost({
   );
 }
 
-function bitbucketForgePhase(identityLinked: boolean, repositoryCount: number): "connect" | "grant" | "choose" {
+function bitbucketForgePhase(
+  identityLinked: boolean,
+  repositoryCount: number,
+  installedWorkspaceCount: number,
+): "connect" | "grant" | "choose" {
   if (!identityLinked) return "connect";
-  if (repositoryCount === 0) return "grant";
+  if (repositoryCount === 0 && installedWorkspaceCount === 0) return "grant";
   return "choose";
 }
 
@@ -282,10 +283,15 @@ function BitbucketChooseHost({
   if (flow.bitbucketOnboardingPending || flow.bitbucketForgeConfigured || flow.bitbucketLookupFailed) {
     return (
       <FirstRunBitbucketForgeScreen
-        phase={bitbucketForgePhase(flow.bitbucketIdentityLinked, flow.bitbucketRepositories.length)}
+        phase={bitbucketForgePhase(
+          flow.bitbucketIdentityLinked,
+          flow.bitbucketRepositories.length,
+          flow.bitbucketInstalledWorkspaces.length,
+        )}
         connectHref={flow.bitbucketConnectHref}
         installUrl={flow.bitbucketInstallUrl}
         repositories={flow.bitbucketRepositories}
+        installedWorkspaces={flow.bitbucketInstalledWorkspaces}
         selectedRepository={model.setup.selectedRepo}
         granting={flow.blockingAction === "opening-bitbucket"}
         saving={flow.blockingAction === "saving-repository"}
@@ -352,10 +358,11 @@ function VcsScreen({
       <FirstRunConnectScreen
         loading={flow.repositoriesLoading}
         connecting={flow.blockingAction === "opening-github"}
+        createApp={!flow.appConfigured}
         connectError={flow.connectError}
         chrome={chrome}
         sphere={sphereFor("connect", setup.selectedRepo)}
-        onConnectGitHub={() => void flow.connectGitHub()}
+        onConnectGitHub={() => void (flow.appConfigured ? flow.connectGitHub() : flow.createGitHubApp())}
       />
     );
   }

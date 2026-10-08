@@ -767,7 +767,11 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	r.PathPrefix(s.BasePath+"/integrations/{integrationID}").HandlerFunc(s.HandleIntegrationRequest).
 		Methods("GET", "POST")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/github/app/created", s.HandleGitHubAppCreated).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/webhook", s.HandleGitHubAppWebhook).Methods("POST")
+	githubAppUserRoute := r.NewRoute().Subrouter()
+	githubAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/manifest", s.HandleGitHubAppManifest).Methods("GET")
 	// Forge calls these routes. The Forge Invocation Token authenticates them.
 	// They stay off the gateway authorizer, the same way the GitHub App webhook does.
 	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/lifecycle", s.HandleBitbucketForgeDelivery).Methods("POST")
@@ -781,6 +785,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc(s.BasePath+"/sentry/app/webhook", s.HandleSentryAppWebhook).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/jira/oauth/callback", s.HandleJiraOAuthCallback).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/linear/oauth/callback", s.HandleLinearOAuthCallback).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/linear/webhook", s.HandleLinearAppWebhook).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/mcp-oauth/callback", s.HandleMCPOAuthCallback).Methods("GET")
 
 	// Account-based endpoints (use account session, not organization context)
@@ -816,6 +821,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/installation/factory-templates/{templateId}/reset", s.adminResetFactoryTemplate).Methods("POST")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminUpdateInstallationNetworkSettings).Methods("PATCH")
+	adminRoute.HandleFunc("/installation/first-run/fleet-manager", s.adminPrepareFleetManager).Methods("POST")
 	adminRoute.HandleFunc("/installation/license", s.adminGetInstallationLicense).Methods("GET")
 	adminRoute.HandleFunc("/installation/license", s.adminInstallInstallationLicense).Methods("PUT")
 	adminRoute.HandleFunc("/installation/license", s.adminRemoveInstallationLicense).Methods("DELETE")
@@ -1177,20 +1183,6 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
-		return
-	}
-
-	// Workspace setup cannot connect GitHub without the SuperPlane GitHub
-	// App, so onboarding stops here on installations that do not hold the
-	// app credentials (for example, local development without a tunnel).
-	if !config.LoadGitHubHostedAppConfig().Enabled() {
-		http.Error(
-			w,
-			"This installation has no GitHub App configured, so workspace setup is not available. "+
-				"Set the SUPERPLANE_GITHUB_APP_* environment variables and restart the server. "+
-				"See docs/contributing/connecting-to-3rdparty-services-from-development.md.",
-			http.StatusServiceUnavailable,
-		)
 		return
 	}
 
@@ -1723,13 +1715,18 @@ func (s *Server) Serve(host string, port int) error {
 	log.Info("Starting WebSocket hub")
 	s.wsHub.Run()
 
+	handler := http.Handler(s.Router)
+	if os.Getenv("REDIRECT_HTTP_REQUESTS") == "yes" {
+		handler = middleware.RedirectInsecureForwardedHTTP(handler)
+	}
+
 	s.httpServer = &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       15 * time.Minute,
 		WriteTimeout:      15 * time.Minute,
 		IdleTimeout:       60 * time.Second,
-		Handler:           s.Router,
+		Handler:           handler,
 	}
 
 	return s.httpServer.ListenAndServe()

@@ -26,10 +26,15 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.database.local.enabled }}
+      initContainers:
+        {{- include "superplane.migrateWaitContainer" . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Release.Name }}-workers
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/build/superplane"]
           envFrom:
             - configMapRef:
                 name: {{ .Values.domain.configMapName }}

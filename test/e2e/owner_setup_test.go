@@ -3,6 +3,7 @@ package e2e
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -12,11 +13,43 @@ import (
 	"github.com/superplanehq/superplane/test/e2e/session"
 )
 
+// skipRemainingOwnerSetupSteps clicks License, SMTP, and Fleet skip controls
+// after the owner account exists. License can continue on its own when keys
+// fail or a managed license is already set, so this waits for whichever skip
+// control is visible until workspace setup opens.
+func skipRemainingOwnerSetupSteps(t *testing.T, sess *session.TestSession) {
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(sess.Page().URL(), "/workspaces/new") {
+			return
+		}
+
+		clicked := false
+		for _, id := range []string{
+			"owner-setup-license-skip",
+			"owner-setup-smtp-skip",
+			"owner-setup-fleet-skip",
+		} {
+			visible, err := sess.Page().GetByTestId(id).IsVisible()
+			if err != nil || !visible {
+				continue
+			}
+			sess.Click(q.TestID(id))
+			clicked = true
+			break
+		}
+		if !clicked {
+			sess.Sleep(200)
+		}
+	}
+	t.Fatalf("timed out skipping owner setup steps, last URL was %q", sess.Page().URL())
+}
+
 func TestOwnerSetupFlow(t *testing.T) {
 	t.Cleanup(func() {
 		middleware.MarkOwnerSetupCompleted()
 	})
-	t.Run("completing owner setup via UI creates owner and redirects to home", func(t *testing.T) {
+	t.Run("completing owner setup via UI creates owner and opens workspace setup", func(t *testing.T) {
 		steps := &ownerSetupSteps{t: t}
 		steps.start()
 		steps.visitRootPage()
@@ -24,7 +57,7 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.visitSetupPage()
 		steps.fillInOwnerDetailsAndSubmit("owner@example.com", "Owner", "User", "Password1")
 		steps.assertOwnerAndOrganizationCreated()
-		steps.assertRedirectedToOrganization()
+		steps.assertRedirectedToWorkspaceSetup()
 		steps.assertOwnerSetupIsNoLongerRequired()
 	})
 
@@ -83,8 +116,8 @@ func (s *ownerSetupSteps) assertRedirectedToSetup() {
 func (s *ownerSetupSteps) fillInOwnerDetailsAndSubmit(email, firstName, lastName, password string) {
 	s.fillInOwnerDetails(email, firstName, lastName, password)
 	s.session.Click(q.Text("Continue"))
-	// Poll for setup to complete - wait for organization to be created in database
 	s.waitForSetupToComplete()
+	skipRemainingOwnerSetupSteps(s.t, s.session)
 }
 
 func (s *ownerSetupSteps) fillInOwnerDetails(email, firstName, lastName, password string) {
@@ -132,6 +165,10 @@ func (s *ownerSetupSteps) assertOwnerAndOrganizationCreated() {
 	assert.NoError(s.t, err, "find organization Demo")
 
 	s.orgSlug = org.Slug
+}
+
+func (s *ownerSetupSteps) assertRedirectedToWorkspaceSetup() {
+	s.session.WaitUntilURLContains("/" + s.orgSlug + "/workspaces/new")
 }
 
 func (s *ownerSetupSteps) assertRedirectedToOrganization() {

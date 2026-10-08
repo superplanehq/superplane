@@ -652,11 +652,12 @@ export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: s
       }
       return response.data.order;
     },
-    onSuccess: (_data, variables) => {
-      invalidateWorkOrderLists(queryClient, organizationId, factoryId);
-      void queryClient.invalidateQueries({
-        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
-      });
+    onSuccess: (order, variables) => {
+      // Assignee saves bump updated_at on the server, so a ListWorkOrders
+      // refetch would resort the backlog and jump the card. Patch in place
+      // instead and keep the column order the user was looking at.
+      applyWorkOrderToListCaches(queryClient, organizationId, factoryId, variables.orderId, order);
+      queryClient.setQueryData(workOrderDetailKey(organizationId, factoryId, variables.orderId), order);
       void queryClient.invalidateQueries({
         queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
       });

@@ -253,6 +253,12 @@ message VCSProviderInstallRequest {
   google.protobuf.Timestamp requested_at = 4;
 }
 
+message VCSProviderInstalledWorkspace {
+ string installation_id = 1;
+ string external_id = 2;
+ string slug = 3;
+}
+
 message DescribeVCSProviderOnboardingResponse {
   bool provider_configured = 1;
   optional VCSProviderIdentity identity = 2;
@@ -262,6 +268,8 @@ message DescribeVCSProviderOnboardingResponse {
   repeated VCSProviderIdentity identities = 6;
   // Forge distribution link for Bitbucket. Empty for GitHub.
   string install_url = 7;
+  // Bitbucket installations accessible to the linked account, even without repositories.
+  repeated VCSProviderInstalledWorkspace installed_workspaces = 8;
 }
 
 message SelectVCSProviderOnboardingIdentityRequest {
