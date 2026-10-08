@@ -109,7 +109,7 @@ function AttachmentTile({
       <Button
         type="button"
         variant="ghost"
-        className="relative block size-full h-auto cursor-pointer rounded-none border-0 bg-transparent p-0 shadow-none hover:bg-transparent dark:hover:bg-transparent"
+        className="relative block size-full cursor-pointer rounded-none border-0 bg-transparent p-0 shadow-none hover:bg-transparent dark:hover:bg-transparent"
         aria-label={`${CREATE_WORK_ORDER_REQUEST_COPY.openImage}: ${label}`}
         data-testid={`create-work-order-request-attachment-${image.id}`}
         onClick={onOpen}
