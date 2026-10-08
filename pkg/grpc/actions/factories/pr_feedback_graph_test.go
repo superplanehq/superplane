@@ -89,6 +89,29 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 
 		graph := resolvePRFeedbackGraph(spec)
 		assert.True(t, graph.Healthy(spec))
+
+		t.Run("a bitbucket comment-only graph is healthy", func(t *testing.T) {
+			canvas := buildDiscussionPRFeedbackCanvas(prFeedbackBuildRequest{
+				Repository:  "acme/widgets",
+				Mention:     "@ada",
+				VCSProvider: models.ProviderBitbucket,
+			})
+			spec := models.LiveCanvasSpec{Nodes: canvas.Nodes(), Edges: canvas.Edges()}
+
+			graph := resolvePRFeedbackGraph(spec)
+			assert.Equal(t, prFeedbackCommentTriggerNodeID, graph.CommentTriggerNodeID)
+			assert.Empty(t, graph.ReviewTriggerNodeID)
+			assert.Empty(t, graph.ReplyTriggerNodeID)
+			assert.True(t, graph.Healthy(spec))
+			assert.Equal(t, []resolvedPRFeedbackDiscussionFlow{
+				{
+					TriggerNodeID:  prFeedbackCommentTriggerNodeID,
+					FindNodeID:     prFeedbackFindNodeID,
+					ActivityNodeID: prFeedbackActivityNodeID,
+					RunnerNodeID:   prFeedbackRunnerNodeID,
+				},
+			}, graph.discussionFlows(spec))
+		})
 		assert.Equal(t, []resolvedPRFeedbackDiscussionFlow{
 			{
 				TriggerNodeID:  prFeedbackCommentTriggerNodeID,

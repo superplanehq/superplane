@@ -299,11 +299,14 @@ function BitbucketChooseHost({
         loadError={flow.bitbucketLoadError}
         lookupFailed={flow.bitbucketLookupFailed}
         retrying={flow.bitbucketLookupRetrying}
+        attemptActive={flow.bitbucketInstallationAttemptActive}
+        attemptTimedOut={flow.bitbucketInstallationAttemptTimedOut}
         chrome={chrome}
         sphere={sphere}
         onRetryLookup={flow.retryBitbucketLookup}
         onGrantAccess={() => void flow.grantBitbucketAccess()}
         onSelectRepository={model.setup.selectRepo}
+        onClearRepository={model.setup.clearRepository}
         onContinue={() => void flow.continueFromRepository()}
       />
     );

@@ -81,4 +81,19 @@ func Test__Bitbucket__ResolveSecrets(t *testing.T) {
 		})
 		require.ErrorContains(t, err, "token is required")
 	})
+
+	t.Run("repository access token uses x-token-auth without email", func(t *testing.T) {
+		secrets, err := b.ResolveSecrets(core.IntegrationSecretContext{
+			HTTP: &contexts.HTTPContext{},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"token": "repo-token"},
+				Metadata:      Metadata{AuthType: AuthTypeRepositoryAccessToken},
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []byte("repo-token"), secrets.Values["BITBUCKET_TOKEN"])
+		assert.Equal(t, []byte("x-token-auth"), secrets.Values["BITBUCKET_GIT_USERNAME"])
+		_, hasEmail := secrets.Values["BITBUCKET_EMAIL"]
+		assert.False(t, hasEmail)
+	})
 }

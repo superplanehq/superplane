@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	AuthTypeAPIToken             = "apiToken"
-	AuthTypeWorkspaceAccessToken = "workspaceAccessToken"
-	AuthTypeForgeApp             = "forgeApp"
+	AuthTypeAPIToken              = "apiToken"
+	AuthTypeWorkspaceAccessToken  = "workspaceAccessToken"
+	AuthTypeRepositoryAccessToken = "repositoryAccessToken"
+	AuthTypeForgeApp              = "forgeApp"
 
 	installationInstructions = `
 To configure Bitbucket with SuperPlane:
@@ -22,13 +23,19 @@ To configure Bitbucket with SuperPlane:
 - **API Token mode**:
 	- Go to **Atlassian Settings → Security → Create API token**.
 	- Select **Bitbucket** App.
-	- Create a token with admin:workspace:bitbucket scope.
+	- Create a token with repository read/write and pull request read/write scopes, plus workspace read for repository listing.
 
 - **Workspace Access Token mode**:
    - Go to **Bitbucket Workspace Settings → Security → Access tokens**.
-   - Create a workspace access token.
+   - Create a workspace access token with repository read/write, pull request read/write, and webhook read/write scopes.
+
+- **Repository Access Token mode (single repository)**:
+   - Go to **Repository Settings → Security → Access tokens**.
+   - Create a repository access token with repository read/write, pull request read/write, and webhook read/write scopes.
+   - This token works only for the configured repository and cannot list the workspace.
 
 - **Copy the token** and your workspace slug (for example: ` + "`my-workspace`" + `) below.
+For repository tokens, also copy the repository in workspace/repository format.
 `
 )
 
@@ -39,17 +46,19 @@ func init() {
 type Bitbucket struct{}
 
 type Configuration struct {
-	Workspace string  `json:"workspace"`
-	AuthType  string  `json:"authType"`
-	Token     *string `json:"token"`
-	Email     *string `json:"email"`
+	Workspace  string  `json:"workspace"`
+	Repository string  `json:"repository"`
+	AuthType   string  `json:"authType"`
+	Token      *string `json:"token"`
+	Email      *string `json:"email"`
 }
 
 type Metadata struct {
-	AuthType            string             `json:"authType" mapstructure:"authType"`
-	Workspace           *WorkspaceMetadata `json:"workspace,omitempty" mapstructure:"workspace,omitempty"`
-	HostedApp           bool               `json:"hostedApp,omitempty" mapstructure:"hostedApp,omitempty"`
-	ForgeInstallationID string             `json:"forgeInstallationId,omitempty" mapstructure:"forgeInstallationId,omitempty"`
+	AuthType            string              `json:"authType" mapstructure:"authType"`
+	Workspace           *WorkspaceMetadata  `json:"workspace,omitempty" mapstructure:"workspace,omitempty"`
+	Repository          *RepositoryMetadata `json:"repository,omitempty" mapstructure:"repository,omitempty"`
+	HostedApp           bool                `json:"hostedApp,omitempty" mapstructure:"hostedApp,omitempty"`
+	ForgeInstallationID string              `json:"forgeInstallationId,omitempty" mapstructure:"forgeInstallationId,omitempty"`
 }
 
 type WorkspaceMetadata struct {
@@ -86,7 +95,18 @@ func (b *Bitbucket) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Description: "Bitbucket workspace slug",
 			Placeholder: "e.g. my-workspace",
-			Required:    true,
+			Required:    false,
+		},
+		{
+			Name:        "repository",
+			Label:       "Repository",
+			Type:        configuration.FieldTypeString,
+			Description: "Bitbucket repository in workspace/repository format (repository access tokens only)",
+			Placeholder: "e.g. my-workspace/my-repo",
+			Required:    false,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "authType", Values: []string{AuthTypeRepositoryAccessToken}},
+			},
 		},
 		{
 			Name:        "authType",
@@ -99,6 +119,7 @@ func (b *Bitbucket) Configuration() []configuration.Field {
 					Options: []configuration.FieldOption{
 						{Label: "API Token", Value: AuthTypeAPIToken},
 						{Label: "Workspace Access Token", Value: AuthTypeWorkspaceAccessToken},
+						{Label: "Repository Access Token", Value: AuthTypeRepositoryAccessToken},
 					},
 				},
 			},
@@ -130,12 +151,15 @@ func (b *Bitbucket) Actions() []core.Action {
 		&CreatePullRequest{},
 		&UpdatePullRequest{},
 		&CreatePullRequestComment{},
+		&WaitForBuilds{},
 	}
 }
 
 func (b *Bitbucket) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnPush{},
+		&OnPullRequest{},
+		&OnPullRequestComment{},
 	}
 }
 
@@ -149,10 +173,6 @@ func (b *Bitbucket) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.Workspace == "" {
-		return fmt.Errorf("workspace is required")
-	}
-
 	if config.AuthType == "" {
 		return fmt.Errorf("authType is required")
 	}
@@ -161,8 +181,16 @@ func (b *Bitbucket) Sync(ctx core.SyncContext) error {
 		return syncForgeApp(ctx)
 	}
 
-	if config.AuthType != AuthTypeAPIToken && config.AuthType != AuthTypeWorkspaceAccessToken {
+	if config.AuthType != AuthTypeAPIToken && config.AuthType != AuthTypeWorkspaceAccessToken && config.AuthType != AuthTypeRepositoryAccessToken {
 		return fmt.Errorf("authType %s is not supported", config.AuthType)
+	}
+
+	if config.AuthType == AuthTypeRepositoryAccessToken {
+		return syncRepositoryAccessToken(ctx, config)
+	}
+
+	if strings.TrimSpace(config.Workspace) == "" {
+		return fmt.Errorf("workspace is required")
 	}
 
 	client, err := NewClient(config.AuthType, ctx.HTTP, ctx.Integration)
@@ -181,6 +209,59 @@ func (b *Bitbucket) Sync(ctx core.SyncContext) error {
 			UUID: workspace.UUID,
 			Name: workspace.Name,
 			Slug: workspace.Slug,
+		},
+	})
+
+	ctx.Integration.Ready()
+
+	return nil
+}
+
+func syncRepositoryAccessToken(ctx core.SyncContext, config Configuration) error {
+	repository := strings.TrimSpace(config.Repository)
+	if repository == "" {
+		return fmt.Errorf("repository is required")
+	}
+	workspaceSlug, _, ok := strings.Cut(repository, "/")
+	if !ok || strings.TrimSpace(workspaceSlug) == "" {
+		return fmt.Errorf("repository must be in workspace/repository format: %q", repository)
+	}
+
+	client, err := NewClient(config.AuthType, ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("error creating client: %w", err)
+	}
+
+	repo, err := client.GetRepository(repository)
+	if err != nil {
+		return fmt.Errorf("error getting repository: %w", err)
+	}
+
+	workspaceSlug = strings.TrimSpace(workspaceSlug)
+	if repo.FullName != "" {
+		if ws, _, ok := strings.Cut(strings.TrimSpace(repo.FullName), "/"); ok && strings.TrimSpace(ws) != "" {
+			workspaceSlug = strings.TrimSpace(ws)
+		}
+	}
+	workspaceName := workspaceSlug
+	if repo.Workspace != nil && strings.TrimSpace(repo.Workspace.Slug) != "" {
+		workspaceSlug = strings.TrimSpace(repo.Workspace.Slug)
+		if strings.TrimSpace(repo.Workspace.Name) != "" {
+			workspaceName = strings.TrimSpace(repo.Workspace.Name)
+		}
+	}
+
+	ctx.Integration.SetMetadata(Metadata{
+		AuthType: config.AuthType,
+		Workspace: &WorkspaceMetadata{
+			Slug: workspaceSlug,
+			Name: workspaceName,
+		},
+		Repository: &RepositoryMetadata{
+			UUID:     repo.UUID,
+			Name:     repo.Name,
+			FullName: repo.FullName,
+			Slug:     repo.Slug,
 		},
 	})
 
