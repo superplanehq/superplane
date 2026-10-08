@@ -1,6 +1,6 @@
 {{- if .Values.fleetManager.enabled }}
-{{- if not .Values.runnerAPI.enabled }}
-{{- fail "runnerAPI.enabled must be true when fleetManager.enabled is true" }}
+{{- if not .Values.runner.api.enabled }}
+{{- fail "runner.api.enabled must be true when fleetManager.enabled is true" }}
 {{- end }}
 {{- if .Values.fleetManager.serviceAccount.create }}
 apiVersion: v1

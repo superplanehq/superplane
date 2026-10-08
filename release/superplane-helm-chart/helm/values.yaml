@@ -276,25 +276,27 @@ blobStorage:
   credentialsFile: ""
 
 #
-# Integrated runner API. Off by default.
-# When enabled, the API pod also serves the /runner/v1 routes, moves
-# finished runner task logs to blob storage, and removes stale runners.
-# Use a cloud blob storage provider: filesystem blobs stay inside one pod.
+# Runner API and runner workers. Off by default.
+# The runner API serves /runner/v1. Runner workers compact finished task
+# logs into blob storage and remove stale runners.
+# Omit runner.workers.enabled to follow runner.api.enabled.
+# Active logs are a shared filesystem. Leave existingClaim empty to create
+# a ReadWriteOnce claim. The worker pod then schedules on the runner API
+# node. Set existingClaim to a ReadWriteMany claim when replicas are
+# greater than 1 across nodes.
 #
-runnerAPI:
-  enabled: false
-
-#
-# Active runner task logs. Used when runnerAPI.enabled is true.
-# Leave existingClaim empty to use an emptyDir volume. An emptyDir volume
-# supports one API replica and loses active logs when the pod restarts.
-# More than one API replica needs a ReadWriteMany claim, such as Filestore.
-#
-runnerLogs:
-  path: /var/lib/superplane/runner-active-logs
-  existingClaim: ""
-  # Group that owns the log volume. The SuperPlane image runs as nobody (65534).
-  fsGroup: 65534
+runner:
+  api:
+    enabled: false
+    replicas: 1
+  workers:
+    replicas: 1
+  activeLogs:
+    path: /var/lib/superplane/runner-active-logs
+    existingClaim: ""
+    size: 10Gi
+    # Group that owns the log volume. The SuperPlane image runs as nobody (65534).
+    fsGroup: 65534
 
 #
 # Integrated Fleet Manager. Off by default.

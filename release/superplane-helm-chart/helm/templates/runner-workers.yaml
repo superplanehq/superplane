@@ -1,33 +1,46 @@
+{{- if eq (include "runner.workers.enabled" .) "true" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Release.Name }}-workers
+  name: {{ .Release.Name }}-runner-workers
   namespace: {{ .Release.Namespace }}
   labels:
     app: superplane
-    service: {{ .Release.Name }}-workers
+    service: {{ .Release.Name }}-runner-workers
 spec:
-  replicas: {{ .Values.workers.replicas }}
+  replicas: {{ .Values.runner.workers.replicas }}
   selector:
     matchLabels:
       app: superplane
-      service: {{ .Release.Name }}-workers
+      service: {{ .Release.Name }}-runner-workers
   template:
     metadata:
-      name: {{ .Release.Name }}-workers
+      name: {{ .Release.Name }}-runner-workers
       labels:
         app: superplane
-        service: {{ .Release.Name }}-workers
+        service: {{ .Release.Name }}-runner-workers
     spec:
+      {{- if and .Values.runner.api.enabled (not .Values.runner.activeLogs.existingClaim) }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: superplane
+                  service: {{ .Release.Name }}-runner-api
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
       {{- end }}
+      securityContext:
+        fsGroup: {{ .Values.runner.activeLogs.fsGroup }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
-        - name: {{ .Release.Name }}-workers
+        - name: {{ .Release.Name }}-runner-workers
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/app/build/superplane"]
@@ -41,70 +54,17 @@ spec:
             - secretRef:
                 name: {{ include "secrets.telemetry.name" . }}
             - secretRef:
-                name: {{ include "secrets.authentication.name" . }}
-            - secretRef:
                 name: {{ include "secrets.encryption.name" . }}
             - secretRef:
                 name: {{ include "secrets.jwt.name" . }}
             - secretRef:
-                name: {{ include "secrets.email.name" . }}
-            - secretRef:
-                name: {{ include "secrets.feedback.name" . }}
-            - secretRef:
                 name: {{ include "secrets.sentry.name" . }}
-            {{- if .Values.polar.enabled }}
-            - secretRef:
-                name: {{ include "secrets.polar.name" . }}
-            {{- end }}
-            {{- if .Values.linear.enabled }}
-            - secretRef:
-                name: {{ include "secrets.linear.name" . }}
-            {{- end }}
           env:
-            - name: START_CONSUMERS
-              value: "yes"
-            - name: START_EVENT_ROUTER
-              value: "yes"
-            - name: START_RUN_FINALIZER
-              value: "yes"
-            - name: START_RUN_INITIALIZER
-              value: "yes"
-            - name: START_NODE_EXECUTOR
-              value: "yes"
-            - name: START_EXECUTION_TERMINATOR
-              value: "yes"
-            - name: START_NODE_QUEUE_WORKER
-              value: "yes"
-            - name: START_NODE_REQUEST_WORKER
-              value: "yes"
-            - name: START_APP_MESSAGE_WORKER
-              value: "yes"
-            - name: START_INTEGRATION_REQUEST_WORKER
-              value: "yes"
-            - name: START_WEBHOOK_PROVISIONER
-              value: "yes"
-            - name: START_WEBHOOK_CLEANUP_WORKER
-              value: "yes"
-            - name: START_INTEGRATION_CLEANUP_WORKER
-              value: "yes"
-            - name: START_CANVAS_CLEANUP_WORKER
-              value: "yes"
-            - name: START_FACTORY_CLEANUP_WORKER
-              value: "yes"
-            - name: START_FACTORY_VELOCITY_SYNC_WORKER
-              value: "yes"
-            - name: START_PRICE_BOOK_SYNC_WORKER
-              value: "yes"
-            - name: START_PLANNING_SESSION_CLEANUP_WORKER
-              value: "yes"
-            - name: START_EVENT_RETENTION_WORKER
-              value: "yes"
-            - name: START_NODE_REQUEST_CLEANUP_WORKER
-              value: "yes"
-            - name: RBAC_MODEL_PATH
-              value: /app/rbac/rbac_model.conf
+            {{- include "runner.processEnv" (dict "enabled" (list "START_RUNNER_LOG_COMPACTOR" "START_RUNNER_CLEANUP_WORKER")) | nindent 12 }}
             - name: PUBLIC_API_BASE_PATH
               value: "/api/v1"
+            - name: RBAC_MODEL_PATH
+              value: /app/rbac/rbac_model.conf
             - name: RBAC_ORG_POLICY_PATH
               value: /app/rbac/rbac_org_policy.csv
             - name: RBAC_CANVAS_POLICY_PATH
@@ -117,16 +77,10 @@ spec:
               value: "{{ .Values.database.statementTimeout }}"
             - name: DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT
               value: "{{ .Values.database.idleInTransactionSessionTimeout }}"
-            - name: EMAIL_FROM_NAME
-              value: "{{ .Values.email.fromName }}"
-            - name: EMAIL_FROM_ADDRESS
-              value: "{{ .Values.email.fromAddress }}"
             - name: TEMPLATE_DIR
               value: /app/templates
             - name: OIDC_KEYS_PATH
               value: /app/oidc-keys
-            - name: OTEL_ENABLED
-              value: "yes"
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
             - name: BLOB_STORAGE_BUCKET
@@ -137,34 +91,28 @@ spec:
               value: {{ .Values.blobStorage.localPath | quote }}
             - name: BLOB_STORAGE_CREDENTIALS_FILE
               value: {{ .Values.blobStorage.credentialsFile | quote }}
-            - name: START_FILE_CLEANUP_WORKER
-              value: "yes"
-
+            - name: RUNNER_ACTIVE_LOG_FS_PATH
+              value: {{ .Values.runner.activeLogs.path | quote }}
           volumeMounts:
             - name: oidc-keys
               mountPath: /app/oidc-keys
               readOnly: true
-{{- if eq .Values.blobStorage.provider "filesystem" }}
-            - name: blob-data
-              mountPath: {{ .Values.blobStorage.localPath }}
-{{- end }}
-
+            - name: runner-active-logs
+              mountPath: {{ .Values.runner.activeLogs.path }}
           securityContext:
             privileged: false
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
-
           {{- with .Values.workers.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-
       volumes:
         - name: oidc-keys
           secret:
             secretName: {{ include "secrets.oidc.name" . }}
-{{- if eq .Values.blobStorage.provider "filesystem" }}
-        - name: blob-data
-          emptyDir: {}
+        - name: runner-active-logs
+          persistentVolumeClaim:
+            claimName: {{ include "runner.activeLogs.claimName" . }}
 {{- end }}

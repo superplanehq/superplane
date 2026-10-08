@@ -19,9 +19,6 @@ spec:
       targetPort: 8000
       protocol: TCP
 ---
-{{- if and .Values.runnerAPI.enabled (gt (int .Values.api.replicas) 1) (not .Values.runnerLogs.existingClaim) }}
-{{- fail "runnerLogs.existingClaim is required when runnerAPI.enabled is true and api.replicas is more than 1" }}
-{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -32,11 +29,6 @@ metadata:
     service: {{ .Release.Name }}-api
 spec:
   replicas: {{ .Values.api.replicas }}
-  {{- if and .Values.runnerAPI.enabled (not .Values.runnerLogs.existingClaim) }}
-  strategy:
-    type: Recreate
-    rollingUpdate: null
-  {{- end }}
   selector:
     matchLabels:
       app: superplane
@@ -51,10 +43,6 @@ spec:
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
       {{- end }}
-      {{- if .Values.runnerAPI.enabled }}
-      securityContext:
-        fsGroup: {{ .Values.runnerLogs.fsGroup }}
-      {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -63,6 +51,7 @@ spec:
         - name: {{ .Release.Name }}-api
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/build/superplane"]
           envFrom:
             - configMapRef:
                 name: {{ .Values.domain.configMapName }}
@@ -121,8 +110,6 @@ spec:
               value: /app/rbac/rbac_canvas_policy.csv
             - name: APPLICATION_NAME
               value: superplane
-            - name: RUN_MIGRATIONS
-              value: "yes"
             - name: DB_POOL_SIZE
               value: "{{ .Values.api.dbPoolSize }}"
             - name: DB_STATEMENT_TIMEOUT
@@ -165,16 +152,6 @@ spec:
               value: {{ .Values.blobStorage.credentialsFile | quote }}
             - name: START_FILE_CLEANUP_WORKER
               value: "yes"
-{{- if .Values.runnerAPI.enabled }}
-            - name: START_RUNNER_API
-              value: "yes"
-            - name: START_RUNNER_LOG_COMPACTOR
-              value: "yes"
-            - name: START_RUNNER_CLEANUP_WORKER
-              value: "yes"
-            - name: RUNNER_ACTIVE_LOG_FS_PATH
-              value: {{ .Values.runnerLogs.path | quote }}
-{{- end }}
 {{- if .Values.license.secretName }}
             - name: SUPERPLANE_LICENSE_PATH
               value: /app/license/license.jws
@@ -199,10 +176,6 @@ spec:
             - name: blob-data
               mountPath: {{ .Values.blobStorage.localPath }}
 {{- end }}
-{{- if .Values.runnerAPI.enabled }}
-            - name: runner-logs
-              mountPath: {{ .Values.runnerLogs.path }}
-{{- end }}
 
           ports:
             - name: http
@@ -210,21 +183,21 @@ spec:
               protocol: TCP
           startupProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
             periodSeconds: 10
             timeoutSeconds: 2
-            failureThreshold: 90
+            failureThreshold: 30
           livenessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 5
           readinessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
             periodSeconds: 10
             timeoutSeconds: 2
@@ -255,13 +228,4 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
         - name: blob-data
           emptyDir: {}
-{{- end }}
-{{- if .Values.runnerAPI.enabled }}
-        - name: runner-logs
-{{- if .Values.runnerLogs.existingClaim }}
-          persistentVolumeClaim:
-            claimName: {{ .Values.runnerLogs.existingClaim }}
-{{- else }}
-          emptyDir: {}
-{{- end }}
 {{- end }}
