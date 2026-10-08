@@ -14,6 +14,13 @@ import (
 )
 
 func openFactoryVCS(db *gorm.DB, deps IntakeDependencies, factory *models.Factory) vcs.Provider {
+	if factory.OnboardingConfigValue().EffectiveVCSProvider() == models.ProviderBitbucket {
+		return &bitbucketProvider{
+			db:      db,
+			deps:    deps,
+			factory: factory,
+		}
+	}
 	return vcs.Select(factory.OnboardingConfigValue().VCSProvider, &githubProvider{
 		db:      db,
 		deps:    deps,

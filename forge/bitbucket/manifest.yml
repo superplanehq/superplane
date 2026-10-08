@@ -1,7 +1,7 @@
 # SuperPlane Bitbucket Forge app.
 #
 # Replace app.id after `forge register`.
-# Replace remotes.baseUrl with the public tunnel for this environment.
+# Use the Cloud URL for production and a public tunnel for development.
 # Each environment (production, staging, a developer tunnel) needs its own
 # Forge environment and remote URL.
 #
@@ -24,6 +24,13 @@ modules:
   webtrigger:
     - key: bootstrap-trigger
       function: bootstrap
+  bitbucket:workspaceGlobalPage:
+    - key: superplane-setup
+      resource: setup
+      resolver:
+        endpoint: setup-remote
+      render: native
+      title: SuperPlane
   function:
     - key: bootstrap
       handler: index.bootstrap
@@ -56,10 +63,15 @@ modules:
       auth:
         appSystemToken:
           enabled: true
+    - key: setup-remote
+      remote: superplane
+      auth:
+        appSystemToken:
+          enabled: true
 
 remotes:
   - key: superplane
-    baseUrl: https://sp-mbp.tunnel.mytmlt.site
+    baseUrl: https://app.superplane.com
     operations:
       - compute
     auth:
@@ -81,3 +93,7 @@ app:
     name: nodejs22.x
   licensing:
     enabled: false
+
+resources:
+  - key: setup
+    path: src/frontend/setup.jsx
