@@ -52,7 +52,8 @@ func TestToBitbucketRepositoryMerge(t *testing.T) {
 			"hash": "m42", "date": "` + mergeDate + `", "message": "Merged in feat/x"
 		}`))
 
-		merge, ok := toBitbucketRepositoryMerge(client, "acme/widgets", bitbucketVelocityPR(), from, to)
+		merge, ok, err := toBitbucketRepositoryMerge(client, "acme/widgets", bitbucketVelocityPR(), from, to)
+		require.NoError(t, err)
 		require.True(t, ok)
 		assert.Equal(t, int64(42), merge.Number)
 		assert.Equal(t, models.FactoryVelocityMergeSourcePeople, merge.Source)
@@ -67,7 +68,8 @@ func TestToBitbucketRepositoryMerge(t *testing.T) {
 			"message": "Squashed commit\n\nCo-authored-by: SuperPlane Agent <superplaneagent@superplane.com>"
 		}`))
 
-		merge, ok := toBitbucketRepositoryMerge(client, "acme/widgets", bitbucketVelocityPR(), from, to)
+		merge, ok, err := toBitbucketRepositoryMerge(client, "acme/widgets", bitbucketVelocityPR(), from, to)
+		require.NoError(t, err)
 		require.True(t, ok)
 		assert.Equal(t, models.FactoryVelocityMergeSourceAgent, merge.Source)
 	})
@@ -80,9 +82,22 @@ func TestToBitbucketRepositoryMerge(t *testing.T) {
 		pr := bitbucketVelocityPR()
 		pr.UpdatedOn = now.Add(-time.Hour)
 
-		merge, ok := toBitbucketRepositoryMerge(client, "acme/widgets", pr, from, to)
+		merge, ok, err := toBitbucketRepositoryMerge(client, "acme/widgets", pr, from, to)
+		require.NoError(t, err)
 		require.True(t, ok)
 		assert.Equal(t, models.FactoryVelocityMergeSourcePeople, merge.Source)
+	})
+
+	t.Run("returns temporary commit read errors", func(t *testing.T) {
+		client, _ := stubBitbucketVelocityClient(&http.Response{
+			StatusCode: http.StatusTooManyRequests,
+			Body:       io.NopCloser(strings.NewReader(`{"error":{"message":"Rate limit exceeded"}}`)),
+		})
+
+		_, ok, err := toBitbucketRepositoryMerge(client, "acme/widgets", bitbucketVelocityPR(), from, to)
+		require.Error(t, err)
+		assert.False(t, ok)
+		assert.Contains(t, err.Error(), "Rate limit exceeded")
 	})
 
 	t.Run("excludes merges outside the window", func(t *testing.T) {
@@ -90,9 +105,24 @@ func TestToBitbucketRepositoryMerge(t *testing.T) {
 			"hash": "m42", "date": "2020-01-01T10:00:00+00:00", "message": "Merged in feat/x"
 		}`))
 
-		_, ok := toBitbucketRepositoryMerge(client, "acme/widgets", bitbucketVelocityPR(), from, to)
+		_, ok, err := toBitbucketRepositoryMerge(client, "acme/widgets", bitbucketVelocityPR(), from, to)
+		require.NoError(t, err)
 		assert.False(t, ok)
 	})
+}
+
+func TestListBitbucketMergesKeepsAShortPageWalkIncomplete(t *testing.T) {
+	now := time.Now().Format(time.RFC3339)
+	body := `{"values":[{"id":1,"state":"MERGED","updated_on":"` + now + `","author":{},"source":{},"merge_commit":{"hash":"m1"}}],"next":"https://api.bitbucket.org/2.0/next"}`
+	responses := make([]*http.Response, velocitySyncMaxPages)
+	for i := range responses {
+		responses[i] = okJSONResponse(body)
+	}
+	client, _ := stubBitbucketVelocityClient(responses...)
+
+	_, err := listBitbucketMerges(client, "acme/widgets", time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeded")
 }
 
 func okJSONResponse(body string) *http.Response {

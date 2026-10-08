@@ -1,6 +1,7 @@
 package bitbucket
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -64,7 +65,7 @@ func (h *BitbucketWebhookHandler) Merge(current, requested any) (any, bool, erro
 	}
 
 	// ponytail: union event types so one repository webhook serves every
-	// trigger; re-provision replaces the Bitbucket webhook with the union
+	// trigger; re-provision updates that remote hook with the union
 	merged := WebhookConfiguration{
 		EventTypes:     slices.Clone(currentConfig.EventTypes),
 		RepositorySlug: currentConfig.RepositorySlug,
@@ -104,6 +105,32 @@ func (h *BitbucketWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, er
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return nil, fmt.Errorf("error getting webhook secret: %w", err)
+	}
+
+	existing := BitbucketWebhook{}
+	if raw := ctx.Webhook.GetMetadata(); raw != nil {
+		if err := mapstructure.Decode(raw, &existing); err != nil {
+			return nil, fmt.Errorf("failed to decode webhook metadata: %w", err)
+		}
+	}
+	if existing.UUID != "" {
+		hook, err := client.UpdateWebhook(
+			metadata.Workspace.Slug,
+			config.RepositorySlug,
+			existing.UUID,
+			ctx.Webhook.GetURL(),
+			string(secret),
+			config.EventTypes,
+		)
+		if err == nil {
+			if hook.UUID == "" {
+				hook.UUID = existing.UUID
+			}
+			return &BitbucketWebhook{UUID: hook.UUID}, nil
+		}
+		if !errors.Is(err, errBitbucketWebhookNotFound) {
+			return nil, fmt.Errorf("error updating webhook: %w", err)
+		}
 	}
 
 	hook, err := client.CreateWebhook(

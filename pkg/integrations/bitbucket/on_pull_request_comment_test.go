@@ -154,7 +154,7 @@ func Test__OnPullRequestComment__HandleWebhook(t *testing.T) {
 		assert.Zero(t, eventContext.Count())
 	})
 
-	t.Run("mention filter matches nicknames", func(t *testing.T) {
+	t.Run("mention filter matches the comment body", func(t *testing.T) {
 		body := pullRequestCommentFixture(t)
 		headers, eventContext := signed(t, "pullrequest:comment_created", body)
 
@@ -164,7 +164,7 @@ func Test__OnPullRequestComment__HandleWebhook(t *testing.T) {
 			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Configuration: map[string]any{
 				"repository":    "acme/widgets",
-				"contentFilter": "@grace",
+				"contentFilter": "@ada",
 			},
 			Events: eventContext,
 		})
@@ -174,14 +174,13 @@ func Test__OnPullRequestComment__HandleWebhook(t *testing.T) {
 		assert.Equal(t, 1, eventContext.Count())
 
 		missHeaders, missEvents := signed(t, "pullrequest:comment_created", body)
-		_ = missHeaders
 		code, _, err = trigger.HandleWebhook(core.WebhookRequestContext{
 			Body:    body,
 			Headers: missHeaders,
 			Webhook: &contexts.NodeWebhookContext{Secret: "test-secret"},
 			Configuration: map[string]any{
 				"repository":    "acme/widgets",
-				"contentFilter": "@ada",
+				"contentFilter": "@grace",
 			},
 			Events: missEvents,
 		})
@@ -223,12 +222,17 @@ func Test__OnPullRequestComment__HandleWebhook(t *testing.T) {
 }
 
 func Test__MatchBitbucketContentFilter(t *testing.T) {
-	event := map[string]any{"comment": map[string]any{"body": "looks good, /solve it", "nickname": "grace"}}
+	event := map[string]any{"comment": map[string]any{
+		"body":     "looks good, /solve it @Ada",
+		"nickname": "grace",
+	}}
 
 	assert.True(t, matchBitbucketContentFilter("", event))
-	assert.True(t, matchBitbucketContentFilter("@grace", event))
-	assert.True(t, matchBitbucketContentFilter("@GRACE", event))
-	assert.False(t, matchBitbucketContentFilter("@ada", event))
+	assert.True(t, matchBitbucketContentFilter("@ada", event))
+	assert.True(t, matchBitbucketContentFilter("@Ada", event))
+	assert.False(t, matchBitbucketContentFilter("@grace", event))
+	assert.False(t, matchBitbucketContentFilter("@ad", event))
+	assert.False(t, matchBitbucketContentFilter("@adalovelace", event))
 	assert.True(t, matchBitbucketContentFilter("/solve", event))
 	assert.False(t, matchBitbucketContentFilter("/deploy", event))
 }

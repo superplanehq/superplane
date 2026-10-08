@@ -3,6 +3,7 @@ package bitbucket
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -272,6 +273,66 @@ func (c *Client) CreateWebhook(workspace, repoSlug, webhookURL, secret string, e
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 
+	return &hookResp, nil
+}
+
+var errBitbucketWebhookNotFound = errors.New("bitbucket webhook not found")
+
+// UpdateWebhook replaces the events on an existing repository webhook.
+func (c *Client) UpdateWebhook(workspace, repoSlug, webhookUID, webhookURL, secret string, events []string) (*BitbucketHookResponse, error) {
+	endpoint := fmt.Sprintf("%s/repositories/%s/%s/hooks/%s", baseURL, workspace, repoSlug, webhookUID)
+	hook, status, err := c.saveWebhook(http.MethodPut, endpoint, BitbucketHookRequest{
+		Description: "SuperPlane",
+		URL:         webhookURL,
+		Active:      true,
+		Secret:      secret,
+		Events:      events,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if status == http.StatusNotFound {
+		return nil, errBitbucketWebhookNotFound
+	}
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %d: %s", status, hook)
+	}
+	return decodeHookResponse(hook)
+}
+
+func (c *Client) saveWebhook(method, endpoint string, hookReq BitbucketHookRequest) ([]byte, int, error) {
+	body, err := json.Marshal(hookReq)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error marshaling webhook request: %w", err)
+	}
+
+	req, err := http.NewRequest(method, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, 0, fmt.Errorf("error creating request: %w", err)
+	}
+
+	c.setAuthHeaders(req)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("error reading response body: %w", err)
+	}
+	return respBody, resp.StatusCode, nil
+}
+
+func decodeHookResponse(body []byte) (*BitbucketHookResponse, error) {
+	var hookResp BitbucketHookResponse
+	if err := json.Unmarshal(body, &hookResp); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
 	return &hookResp, nil
 }
 

@@ -110,7 +110,11 @@ func TestBuildChecksPRFeedbackCanvasBitbucket(t *testing.T) {
 	assert.NotContains(t, string(encoded), "GITHUB_TOKEN")
 	assert.NotContains(t, string(encoded), "github.com")
 	assert.Contains(t, string(encoded), "BITBUCKET_TOKEN")
-	assert.Contains(t, string(encoded), "api.bitbucket.org")
+	assert.Contains(t, string(encoded), "BITBUCKET_EMAIL")
+	assert.Contains(t, string(encoded), "source.repository.full_name")
+	assert.Contains(t, string(encoded), "failedBuilds")
+	assert.NotContains(t, string(encoded), "git push origin HEAD")
+	assert.NotContains(t, string(encoded), "failedChecks")
 }
 
 func TestPrFeedbackChecksPassedDescriptionExpression(t *testing.T) {
@@ -161,6 +165,21 @@ func TestPrFeedbackChecksRepairDescriptionExpression(t *testing.T) {
 			"· [ci/semaphoreci/push: CI](https://example.com/ci): The build failed on Semaphore 2.0.",
 		got,
 	)
+}
+
+func TestPrFeedbackBitbucketBuildListExpressions(t *testing.T) {
+	got := evalWaitChecksExpression(t, prFeedbackChecksRepairDescriptionExpressionFor("bitbucket"), map[string]any{
+		"failedBuilds": []any{
+			map[string]any{
+				"name":       "pipeline",
+				"conclusion": "failure",
+				"detailsUrl": "https://example.com/pipeline",
+			},
+		},
+	})
+	assert.Equal(t, "Failed builds\n· [pipeline](https://example.com/pipeline)", got)
+	assert.Contains(t, prFeedbackFailedChecksExpressionFor("bitbucket"), "failedBuilds")
+	assert.Contains(t, prFeedbackFailedChecksExpression(), "failedChecks")
 }
 
 func checksTitleData() map[string]any {

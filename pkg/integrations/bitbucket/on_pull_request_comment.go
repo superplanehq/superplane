@@ -52,7 +52,7 @@ func (p *OnPullRequestComment) Documentation() string {
 ## Configuration
 
 - **Repository**: Select the Bitbucket repository to monitor
-- **Content Filter**: Optional filter on comment content. Mentions that start with @ match as an exact Bitbucket nickname. Other values are regular expressions.
+- **Content Filter**: Optional filter on comment content. Mentions that start with @ match that mention in the comment body. Other values are regular expressions.
 - **Only pull requests in this factory**: Start a run only when the comment belongs to a pull request in this factory.
 
 ## Event Data
@@ -98,7 +98,7 @@ func (p *OnPullRequestComment) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Placeholder: "e.g., /solve or @ada",
-			Description: "Optional filter on comment content. Mentions that start with @ match as an exact Bitbucket nickname. Other values are regular expressions.",
+			Description: "Optional filter on comment content. Mentions that start with @ match that mention in the comment body. Other values are regular expressions.",
 		},
 		{
 			Name:        "onlyFactoryPullRequests",
@@ -318,8 +318,8 @@ func commentURL(payload, comment map[string]any) string {
 	return fmt.Sprintf("%s#comment-%d", strings.TrimRight(href, "/"), int64(id))
 }
 
-// matchBitbucketContentFilter matches @nicknames exactly and everything
-// else as a regular expression against the comment body.
+// matchBitbucketContentFilter matches @mentions in the comment body and
+// everything else as a regular expression against that body.
 func matchBitbucketContentFilter(filter string, event map[string]any) bool {
 	filter = strings.TrimSpace(filter)
 	if filter == "" {
@@ -328,17 +328,40 @@ func matchBitbucketContentFilter(filter string, event map[string]any) bool {
 	comment, _ := event["comment"].(map[string]any)
 	body, _ := comment["body"].(string)
 	if strings.HasPrefix(filter, "@") {
-		nickname, _ := comment["nickname"].(string)
-		if nickname == "" {
-			if author, ok := comment["author"].(map[string]any); ok {
-				nickname, _ = author["nickname"].(string)
-			}
-		}
-		return strings.EqualFold(strings.TrimSpace(nickname), strings.TrimPrefix(filter, "@"))
+		return bitbucketMentionMatches(filter, body)
 	}
 	matched, err := regexp.MatchString(filter, body)
 	if err != nil {
 		return strings.Contains(body, filter)
 	}
 	return matched
+}
+
+// bitbucketMentionMatches reports whether body contains mention as a whole
+// nickname. A longer nickname that only starts with the filter does not match.
+func bitbucketMentionMatches(mention, body string) bool {
+	mention = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(mention), "@"))
+	if mention == "" {
+		return false
+	}
+
+	lower := strings.ToLower(body)
+	needle := "@" + mention
+	start := 0
+	for {
+		index := strings.Index(lower[start:], needle)
+		if index < 0 {
+			return false
+		}
+		index += start
+		after := index + len(needle)
+		if after == len(lower) || !isBitbucketNicknameChar(lower[after]) {
+			return true
+		}
+		start = after
+	}
+}
+
+func isBitbucketNicknameChar(char byte) bool {
+	return (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '-' || char == '_'
 }

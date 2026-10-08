@@ -2,6 +2,9 @@ package workers
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,14 +44,20 @@ func listBitbucketMerges(
 	repository string,
 	from, to time.Time,
 ) ([]vcs.MergedPullRequest, error) {
-	prs, _, err := client.ListMergedPullRequests(repository, from, velocitySyncMaxPages)
+	prs, truncated, err := client.ListMergedPullRequests(repository, from, velocitySyncMaxPages)
 	if err != nil {
 		return nil, err
+	}
+	if truncated {
+		return nil, fmt.Errorf("bitbucket merge list exceeded %d pages before the window start", velocitySyncMaxPages)
 	}
 
 	merged := make([]vcs.MergedPullRequest, 0, len(prs))
 	for i := range prs {
-		merge, ok := toBitbucketRepositoryMerge(client, repository, &prs[i], from, to)
+		merge, ok, err := toBitbucketRepositoryMerge(client, repository, &prs[i], from, to)
+		if err != nil {
+			return nil, err
+		}
 		if ok {
 			merged = append(merged, merge)
 		}
@@ -61,22 +70,29 @@ func toBitbucketRepositoryMerge(
 	repository string,
 	pr *bitbucketintegration.MergedBitbucketPullRequest,
 	from, to time.Time,
-) (vcs.MergedPullRequest, bool) {
+) (vcs.MergedPullRequest, bool, error) {
 	if pr == nil || pr.ID <= 0 {
-		return vcs.MergedPullRequest{}, false
+		return vcs.MergedPullRequest{}, false, nil
 	}
 
 	// One commit read dates the merge and classifies agent output.
 	mergedAt := pr.UpdatedOn
 	agent := false
-	if commit, err := client.GetMergeCommit(repository, pr.MergeHash); err == nil && commit != nil {
-		if !commit.Date.IsZero() {
-			mergedAt = commit.Date
+	if pr.MergeHash != "" {
+		commit, err := client.GetMergeCommit(repository, pr.MergeHash)
+		if err != nil {
+			if !bitbucketCommitMissing(err) {
+				return vcs.MergedPullRequest{}, false, fmt.Errorf("read merge commit %s: %w", pr.MergeHash, err)
+			}
+		} else if commit != nil {
+			if !commit.Date.IsZero() {
+				mergedAt = commit.Date
+			}
+			agent = hasAgentCoAuthor(commit.Message)
 		}
-		agent = hasAgentCoAuthor(commit.Message)
 	}
 	if mergedAt.IsZero() || mergedAt.Before(from) || !mergedAt.Before(to) {
-		return vcs.MergedPullRequest{}, false
+		return vcs.MergedPullRequest{}, false, nil
 	}
 
 	merge := vcs.MergedPullRequest{
@@ -93,5 +109,13 @@ func toBitbucketRepositoryMerge(
 	if agent {
 		merge.Source = models.FactoryVelocityMergeSourceAgent
 	}
-	return merge, true
+	return merge, true, nil
+}
+
+// bitbucketCommitMissing reports a permanent missing commit. Temporary API
+// and transport failures must fail the sync so a later retry keeps the
+// stored rows.
+func bitbucketCommitMissing(err error) bool {
+	var apiErr *bitbucketintegration.APIError
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
 }

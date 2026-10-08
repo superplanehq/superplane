@@ -91,7 +91,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Component: prFeedbackUpdateActivityComponent,
 					Configuration: map[string]any{
 						"title":       prFeedbackChecksPassedTitleExpressionFor(prFeedbackVCSProvider(request)),
-						"description": prFeedbackChecksPassedDescriptionExpression(),
+						"description": prFeedbackChecksPassedDescriptionExpressionFor(provider),
 					},
 					Position: yaml.Position{X: 820, Y: 80},
 				},
@@ -103,7 +103,7 @@ func buildChecksPRFeedbackCanvas(request prFeedbackBuildRequest) *yaml.Canvas {
 					Configuration: map[string]any{
 						"access":      "exclusive",
 						"title":       prFeedbackChecksRepairTitleExpressionFor(prFeedbackVCSProvider(request)),
-						"description": prFeedbackChecksRepairDescriptionExpression(),
+						"description": prFeedbackChecksRepairDescriptionExpressionFor(provider),
 					},
 					Position: yaml.Position{X: 820, Y: 260},
 				},
@@ -220,7 +220,7 @@ func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[str
 			},
 			map[string]any{
 				"name":        "FAILED_CHECKS",
-				"value":       prFeedbackFailedChecksExpression(),
+				"value":       prFeedbackFailedChecksExpressionFor(prFeedbackVCSProvider(request)),
 				"valueSource": "literal",
 			},
 			map[string]any{
@@ -256,22 +256,9 @@ func prFeedbackChecksRunnerSteps(request prFeedbackBuildRequest) []any {
 	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
 		return append(steps,
 			map[string]any{
-				"name": "Checkout Pull Request",
-				"type": "bash",
-				"command": strings.Join([]string{
-					"set -euo pipefail",
-					`git clone "https://bitbucket.org/${REPO}.git" repo`,
-					"cd repo",
-					`if [ -z "${PR_HEAD:-}" ]; then`,
-					`  PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${BITBUCKET_TOKEN}" "https://api.bitbucket.org/2.0/repositories/${REPO}/pullrequests/${PR_NUMBER}" | jq -r .source.branch.name)`,
-					"fi",
-					`if [ -z "${PR_HEAD}" ] || [ "${PR_HEAD}" = "null" ]; then`,
-					`  echo "Could not resolve the pull request head branch." >&2`,
-					"  exit 1",
-					"fi",
-					`git fetch origin "${PR_HEAD}:${PR_HEAD}"`,
-					`git checkout "${PR_HEAD}"`,
-				}, "\n"),
+				"name":    "Checkout Pull Request",
+				"type":    "bash",
+				"command": bitbucketCheckoutCommand(),
 			},
 			map[string]any{
 				"name":             "Set Up DCO Signing",
@@ -354,23 +341,7 @@ func prFeedbackBitbucketCommitPushStep() map[string]any {
 		"name":             "Commit and Push",
 		"type":             "bash",
 		"workingDirectory": "repo",
-		"command": strings.Join([]string{
-			"set -euo pipefail",
-			`REMOTE_HEAD=$(curl -fsSL -H "Authorization: Bearer ${BITBUCKET_TOKEN}" "https://api.bitbucket.org/2.0/repositories/${REPO}/pullrequests/${PR_NUMBER}" | jq -r .source.commit.hash)`,
-			`if [ -z "${REMOTE_HEAD}" ] || [ "${REMOTE_HEAD}" = "null" ]; then`,
-			`  echo "Could not read the remote pull request head." >&2`,
-			"  exit 1",
-			"fi",
-			`if [ "${REMOTE_HEAD}" != "${PR_REVISION}" ]; then`,
-			`  echo "Remote pull request head changed. Stop without pushing."`,
-			"  exit 0",
-			"fi",
-			"git add -A",
-			"if ! git diff --cached --quiet; then",
-			`  git commit -s -m "fix: repair failing builds on PR #${PR_NUMBER}"`,
-			"  git push origin HEAD",
-			"fi",
-		}, "\n"),
+		"command":          bitbucketCommitPushCommand("fix: repair failing builds on PR #${PR_NUMBER}"),
 	}
 }
 
@@ -389,6 +360,7 @@ func prFeedbackChecksPrompt(request prFeedbackBuildRequest) string {
 			"Address every failed build in that list in this run.",
 			"Read logs from Bitbucket Pipelines or from the build URL in FAILED_CHECKS.",
 			"Use the Bitbucket token in BITBUCKET_TOKEN.",
+			"When BITBUCKET_EMAIL is set, send HTTP basic authentication with that email and BITBUCKET_TOKEN.",
 			"",
 			"Verify the remote pull request head before you push.",
 			"Stop without pushing when the remote head differs from this revision.",
@@ -479,19 +451,53 @@ func prFeedbackCommitURLSourceFor(provider string) string {
 }
 
 func prFeedbackChecksPassedDescriptionExpression() string {
-	return `{{ ` + prFeedbackChecksMarkdownListSource(prFeedbackWaitChecksSelectedSource()) + ` }}`
+	return prFeedbackChecksPassedDescriptionExpressionFor("")
+}
+
+func prFeedbackChecksPassedDescriptionExpressionFor(provider string) string {
+	return `{{ ` + prFeedbackChecksMarkdownListSource(prFeedbackWaitChecksSelectedSourceFor(provider)) + ` }}`
 }
 
 func prFeedbackChecksRepairDescriptionExpression() string {
-	return `{{ "Failed checks\n" + ` + prFeedbackChecksMarkdownListSource(prFeedbackWaitChecksFailedSource()) + ` }}`
+	return prFeedbackChecksRepairDescriptionExpressionFor("")
+}
+
+func prFeedbackChecksRepairDescriptionExpressionFor(provider string) string {
+	label := "Failed checks"
+	if provider == models.ProviderBitbucket {
+		label = "Failed builds"
+	}
+	return `{{ "` + label + `\n" + ` + prFeedbackChecksMarkdownListSource(prFeedbackWaitChecksFailedSourceFor(provider)) + ` }}`
 }
 
 func prFeedbackWaitChecksSelectedSource() string {
-	return `$["` + prFeedbackWaitChecksNodeName + `"].data.selectedChecks ?? []`
+	return prFeedbackWaitChecksSelectedSourceFor("")
+}
+
+func prFeedbackWaitChecksSelectedSourceFor(provider string) string {
+	return `$["` + prFeedbackWaitChecksNodeName + `"].data.` + prFeedbackWaitSelectedField(provider) + ` ?? []`
 }
 
 func prFeedbackWaitChecksFailedSource() string {
-	return `$["` + prFeedbackWaitChecksNodeName + `"].data.failedChecks ?? []`
+	return prFeedbackWaitChecksFailedSourceFor("")
+}
+
+func prFeedbackWaitChecksFailedSourceFor(provider string) string {
+	return `$["` + prFeedbackWaitChecksNodeName + `"].data.` + prFeedbackWaitFailedField(provider) + ` ?? []`
+}
+
+func prFeedbackWaitSelectedField(provider string) string {
+	if provider == models.ProviderBitbucket {
+		return "selectedBuilds"
+	}
+	return "selectedChecks"
+}
+
+func prFeedbackWaitFailedField(provider string) string {
+	if provider == models.ProviderBitbucket {
+		return "failedBuilds"
+	}
+	return "failedChecks"
 }
 
 func prFeedbackChecksMarkdownListSource(checksExpr string) string {
@@ -513,9 +519,9 @@ func prFeedbackChecksActivityExpressionsFor(nodeID, provider string) (string, st
 	case prFeedbackActivityNodeID:
 		return prFeedbackChecksWaitingTitleExpressionFor(provider), "", true
 	case prFeedbackMarkPassedNodeID:
-		return prFeedbackChecksPassedTitleExpressionFor(provider), prFeedbackChecksPassedDescriptionExpression(), true
+		return prFeedbackChecksPassedTitleExpressionFor(provider), prFeedbackChecksPassedDescriptionExpressionFor(provider), true
 	case prFeedbackStartRepairNodeID:
-		return prFeedbackChecksRepairTitleExpressionFor(provider), prFeedbackChecksRepairDescriptionExpression(), true
+		return prFeedbackChecksRepairTitleExpressionFor(provider), prFeedbackChecksRepairDescriptionExpressionFor(provider), true
 	default:
 		return "", "", false
 	}
@@ -540,7 +546,11 @@ func attemptCountLabel(count int) string {
 }
 
 func prFeedbackFailedChecksExpression() string {
-	return `{{ join(map($["Wait For Pull Request Checks"].data.failedChecks ?? [], .name + " " + .conclusion + " " + (.detailsUrl ?? "")), "\n") }}`
+	return prFeedbackFailedChecksExpressionFor("")
+}
+
+func prFeedbackFailedChecksExpressionFor(provider string) string {
+	return `{{ join(map($["Wait For Pull Request Checks"].data.` + prFeedbackWaitFailedField(provider) + ` ?? [], .name + " " + .conclusion + " " + (.detailsUrl ?? "")), "\n") }}`
 }
 
 func checkNamesNodeValue(names []string) []any {

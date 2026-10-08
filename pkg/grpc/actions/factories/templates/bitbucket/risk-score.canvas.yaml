@@ -56,6 +56,9 @@ spec:
           - name: PR_SOURCE
             value: "{{ root().data.pullrequest.source.branch.name }}"
             valueSource: literal
+          - name: SOURCE_REPO
+            value: "{{ root().data.pullrequest?.source?.repository?.full_name ?? root().data.repository.full_name }}"
+            valueSource: literal
           - name: SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID
             value: '{{ root().data.workOrder.id }}'
             valueSource: literal
@@ -64,14 +67,23 @@ spec:
             type: bash
             command: |-
               set -euo pipefail
+              if [ -z "${SOURCE_REPO:-}" ] || [ -z "${PR_SOURCE:-}" ] || [ -z "${PR_REVISION:-}" ]; then
+                echo "Could not resolve the pull request source repository." >&2
+                exit 1
+              fi
               git clone --no-checkout "https://bitbucket.org/${REPO}.git" repo
               cd repo
               git fetch origin "${BASE}:${BASE}"
-              git fetch origin "${PR_SOURCE}:${PR_SOURCE}"
-              if [ -n "${PR_REVISION:-}" ]; then
-                git checkout --detach "${PR_REVISION}" || git checkout --detach FETCH_HEAD
+              if [ "${SOURCE_REPO}" != "${REPO}" ]; then
+                git fetch "https://bitbucket.org/${SOURCE_REPO}.git" "${PR_SOURCE}"
               else
-                git checkout --detach FETCH_HEAD
+                git fetch origin "${PR_SOURCE}"
+              fi
+              git cat-file -e "${PR_REVISION}^{commit}"
+              git checkout --detach "${PR_REVISION}"
+              if [ "$(git rev-parse HEAD)" != "${PR_REVISION}" ]; then
+                echo "Checked out the wrong revision." >&2
+                exit 1
               fi
               revision="$(git rev-parse HEAD)"
               git diff "$(git merge-base "${BASE}" "${revision}")" "${revision}" > /tmp/pr.diff

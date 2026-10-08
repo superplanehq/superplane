@@ -467,7 +467,7 @@ func (c *Client) ListMergedPullRequests(repository string, from time.Time, maxPa
 				continue
 			}
 			if updated.Before(from) {
-				return merged, true, nil
+				return merged, false, nil
 			}
 			merged = append(merged, MergedBitbucketPullRequest{
 				ID:           pr.ID,

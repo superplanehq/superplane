@@ -94,9 +94,20 @@ func Test__ListMergedPullRequests(t *testing.T) {
 		assert.Equal(t, "11111111-1111-1111-1111-111111111111", prs[0].AuthorUUID)
 		assert.Equal(t, "ada", prs[0].AuthorNick)
 		assert.Equal(t, "m9", prs[0].MergeHash)
-		assert.True(t, truncated)
+		assert.False(t, truncated)
 		require.Len(t, httpCtx.Requests, 1)
 		assert.Contains(t, httpCtx.Requests[0].URL.RawQuery, "state=MERGED")
+	})
+
+	t.Run("page cap reports a short walk", func(t *testing.T) {
+		client, _ := stubBitbucketClient(okResponse(`{"values": [
+			{"id": 9, "state": "MERGED", "updated_on": "` + now.Format(time.RFC3339) + `", "author": {}, "source": {}, "merge_commit": {}}
+		], "next": "https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests?page=2"}`))
+
+		prs, truncated, err := client.ListMergedPullRequests("acme/widgets", from, 1)
+		require.NoError(t, err)
+		require.Len(t, prs, 1)
+		assert.True(t, truncated)
 	})
 
 	t.Run("unparseable timestamps are skipped", func(t *testing.T) {

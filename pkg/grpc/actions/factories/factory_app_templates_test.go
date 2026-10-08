@@ -233,7 +233,9 @@ func TestMaterializeRiskScoreTemplateBitbucket(t *testing.T) {
 	assert.Contains(t, prompt, "Description: {{ root().data.pull_request.description }}")
 	assert.Contains(t, result.canvasYAML, "git clone --no-checkout")
 	assert.Contains(t, result.canvasYAML, "git merge-base")
-	assert.Contains(t, result.canvasYAML, "PR_SOURCE")
+	assert.Contains(t, result.canvasYAML, "SOURCE_REPO")
+	assert.Contains(t, result.canvasYAML, "source?.repository?.full_name")
+	assert.NotContains(t, result.canvasYAML, "git checkout --detach FETCH_HEAD")
 	assert.Contains(t, result.canvasYAML, "SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID")
 	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
 
@@ -633,7 +635,9 @@ func TestBuildDiscussionPRFeedbackCanvasBitbucket(t *testing.T) {
 	assert.NotContains(t, string(encoded), "GITHUB_TOKEN")
 	assert.NotContains(t, string(encoded), "github.com")
 	assert.Contains(t, string(encoded), "BITBUCKET_TOKEN")
-	assert.Contains(t, string(encoded), "api.bitbucket.org")
+	assert.Contains(t, string(encoded), "BITBUCKET_EMAIL")
+	assert.Contains(t, string(encoded), "source.repository.full_name")
+	assert.NotContains(t, string(encoded), "git push origin HEAD")
 }
 
 func TestMaterializeFactoryTemplateRejectsRetiredPlan(t *testing.T) {

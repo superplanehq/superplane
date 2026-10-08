@@ -644,9 +644,8 @@ func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
 	}
 }
 
-// prFeedbackBitbucketRunnerSteps checks out a Bitbucket pull request by
-// branch. Bitbucket exposes no pull-ref namespace, so same-repo branches
-// are fetched by name.
+// prFeedbackBitbucketRunnerSteps checks out the pull request source
+// repository. A same-named branch on the destination is not a push target.
 func prFeedbackBitbucketRunnerSteps(request prFeedbackBuildRequest) []any {
 	return []any{
 		map[string]any{
@@ -658,22 +657,9 @@ func prFeedbackBitbucketRunnerSteps(request prFeedbackBuildRequest) []any {
 			}, "\n"),
 		},
 		map[string]any{
-			"name": "Checkout Pull Request",
-			"type": "bash",
-			"command": strings.Join([]string{
-				"set -euo pipefail",
-				`git clone "https://bitbucket.org/${REPO}.git" repo`,
-				"cd repo",
-				`if [ -z "${PR_HEAD:-}" ]; then`,
-				`  PR_HEAD=$(curl -fsSL -H "Authorization: Bearer ${BITBUCKET_TOKEN}" "https://api.bitbucket.org/2.0/repositories/${REPO}/pullrequests/${PR_NUMBER}" | jq -r .source.branch.name)`,
-				"fi",
-				`if [ -z "${PR_HEAD}" ] || [ "${PR_HEAD}" = "null" ]; then`,
-				`  echo "Could not resolve the pull request head branch." >&2`,
-				"  exit 1",
-				"fi",
-				`git fetch origin "${PR_HEAD}:${PR_HEAD}"`,
-				`git checkout "${PR_HEAD}"`,
-			}, "\n"),
+			"name":    "Checkout Pull Request",
+			"type":    "bash",
+			"command": bitbucketCheckoutCommand(),
 		},
 		map[string]any{
 			"name":             "Set Up DCO Signing",
@@ -691,14 +677,7 @@ func prFeedbackBitbucketRunnerSteps(request prFeedbackBuildRequest) []any {
 			"name":             "Commit and Push",
 			"type":             "bash",
 			"workingDirectory": "repo",
-			"command": strings.Join([]string{
-				"set -euo pipefail",
-				"git add -A",
-				"if ! git diff --cached --quiet; then",
-				`  git commit -s -m "fix: address PR #${PR_NUMBER} feedback"`,
-				"  git push origin HEAD",
-				"fi",
-			}, "\n"),
+			"command":          bitbucketCommitPushCommand("fix: address PR #${PR_NUMBER} feedback"),
 		},
 	}
 }
@@ -718,6 +697,7 @@ func prFeedbackPromptFor(request prFeedbackBuildRequest) string {
 			"Pull request: #{{ root().data.pull_request?.number ?? root().data.issue?.number ?? root().data.pullrequest?.id }}",
 			"",
 			"Use the Bitbucket token in BITBUCKET_TOKEN.",
+			"When BITBUCKET_EMAIL is set, send HTTP basic authentication with that email and BITBUCKET_TOKEN.",
 			"Read pull request comments that mention the workspace agent.",
 			"Use inline file and line context on code-anchored comments.",
 			"Ignore replies that SuperPlane Agent already wrote.",
