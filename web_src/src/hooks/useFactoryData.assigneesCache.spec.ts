@@ -93,9 +93,7 @@ describe("useUpdateWorkOrderAssignees list cache", () => {
     const ids = flattenWorkOrdersPages(pageData?.pages).map((order) => order.id);
     expect(ids).toEqual(["wo-a", "wo-b", "wo-c"]);
 
-    const patched = flattenWorkOrdersPages(pageData?.pages).find(
-      (order) => order.id === "wo-b",
-    );
+    const patched = flattenWorkOrdersPages(pageData?.pages).find((order) => order.id === "wo-b");
     expect(patched?.assignees).toEqual([{ id: "user-2", name: "Bob" }]);
     expect(patched?.updatedAt).toBe("2026-02-01T00:00:00.000Z");
 
