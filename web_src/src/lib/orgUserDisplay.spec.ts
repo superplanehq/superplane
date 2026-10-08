@@ -48,4 +48,15 @@ describe("orgUserDisplay", () => {
       initials: "JO",
     });
   });
+
+  it("treats a fallback that equals the member id as a missing name", () => {
+    const usersById = buildOrgUserDisplayMap([]);
+    const userId = "51c57d3c-7cc8-45a1-92cf-ed7385924e29";
+
+    expect(resolveOrgUserDisplay(usersById, userId, userId)).toEqual({
+      id: userId,
+      name: "Unknown member",
+      initials: "UM",
+    });
+  });
 });

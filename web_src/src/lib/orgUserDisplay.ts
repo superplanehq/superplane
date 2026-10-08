@@ -60,7 +60,8 @@ export function resolveOrgUserDisplay(
     return fromMap;
   }
 
-  const name = fallbackName?.trim() || UNKNOWN_ORG_USER_NAME;
+  const trimmedName = fallbackName?.trim() ?? "";
+  const name = trimmedName && trimmedName.toLowerCase() !== userId.toLowerCase() ? trimmedName : UNKNOWN_ORG_USER_NAME;
 
   return {
     id: userId,

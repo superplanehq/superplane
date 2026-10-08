@@ -65,7 +65,7 @@ func CreateWorkOrderArtifact(
 		return nil, factoryErrorToStatus(err, "failed to create work order artifact")
 	}
 
-	if err := db.Preload("CreatedBy").First(artifact, "id = ?", artifact.ID).Error; err != nil {
+	if err := db.Preload("CreatedBy", models.PreloadRemovedMember).First(artifact, "id = ?", artifact.ID).Error; err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create work order artifact")
 	}
 

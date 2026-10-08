@@ -99,6 +99,10 @@ func (u *User) RestoreInTransaction(tx *gorm.DB) error {
 		Error
 }
 
+func PreloadRemovedMember(db *gorm.DB) *gorm.DB {
+	return db.Unscoped()
+}
+
 func (u *User) UpdateTokenHash(tokenHash string) error {
 	u.UpdatedAt = time.Now()
 	u.TokenHash = tokenHash
