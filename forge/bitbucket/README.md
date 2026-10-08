@@ -1,8 +1,17 @@
 # Bitbucket Forge synchronization
 
-SuperPlane records installations from authenticated Forge lifecycle and
-scheduled deliveries. Onboarding checks each recorded installation for the
-connected Bitbucket account's workspace and repository access.
+SuperPlane records installations from authenticated Forge lifecycle,
+scheduled, and setup-page deliveries. Onboarding checks each recorded
+installation for the connected Bitbucket account's workspace and
+repository access.
+
+Confirm an installation from the workspace itself: install the app, open
+**Apps → SuperPlane** in that Bitbucket workspace, then return to the
+SuperPlane tab. Opening that page calls
+`/api/v1/bitbucket/forge/bootstrap` through Forge with the system token
+enabled. The page shows confirmation only after SuperPlane accepts the
+delivery, and offers a retry action on failure. This removes dependence
+on the delayed lifecycle event.
 
 The scheduled remote trigger runs every five minutes. It supplies a fresh
 system token and recreates a missing installation record after a successful

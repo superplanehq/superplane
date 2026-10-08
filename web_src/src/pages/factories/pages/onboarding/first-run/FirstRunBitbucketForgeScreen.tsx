@@ -34,6 +34,8 @@ type FirstRunBitbucketForgeScreenProps = {
   loadError?: boolean;
   lookupFailed?: boolean;
   retrying?: boolean;
+  attemptActive?: boolean;
+  attemptTimedOut?: boolean;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   onRetryLookup?: () => void;
@@ -108,18 +110,28 @@ function BitbucketGrantScreen({
   installUrl,
   granting = false,
   loadError = false,
+  retrying = false,
+  attemptActive = false,
+  attemptTimedOut = false,
   chrome,
   sphere,
   onGrantAccess,
-}: FirstRunBitbucketForgeScreenProps) {
+  onRetryLookup,
+}: FirstRunBitbucketForgeScreenProps & { onRetryLookup?: () => void }) {
   return (
     <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={granting} visual="preview">
       <FirstRunHeading headline={copy.connectHeadline}>
         <p className="text-[15px] leading-6 text-muted-foreground">{copy.grantBody}</p>
       </FirstRunHeading>
       <div className="mt-8 space-y-4">
+        <p className="text-[13px] font-medium">{copy.confirmStepsTitle}</p>
+        <ol className="list-decimal space-y-1 pl-5 text-[13px] text-muted-foreground">
+          <li>{copy.confirmStep1}</li>
+          <li>{copy.confirmStep2}</li>
+          <li>{copy.confirmStep3}</li>
+        </ol>
         <p className="text-[13px] text-muted-foreground" role="status">
-          {copy.synchronizing}
+          {attemptActive ? copy.checkingNewWorkspace : copy.synchronizing}
         </p>
         <p className="text-[13px] text-muted-foreground">{copy.waitingForInstallation}</p>
         <p className="text-[13px] text-muted-foreground">{copy.installIfNeeded}</p>
@@ -134,6 +146,21 @@ function BitbucketGrantScreen({
           {copy.grantAction}
         </LoadingButton>
         {installUrl ? <InstallationLink url={installUrl} /> : null}
+        {attemptTimedOut && onRetryLookup ? (
+          <div className="space-y-2">
+            <p className="text-[13px] text-muted-foreground">{copy.attemptTimedOut}</p>
+            <LoadingButton
+              type="button"
+              variant="outline"
+              onClick={onRetryLookup}
+              loading={retrying}
+              loadingText={copy.retrying}
+              data-testid="first-run-bitbucket-check-again"
+            >
+              {copy.checkAgain}
+            </LoadingButton>
+          </div>
+        ) : null}
         {loadError ? <p className="text-[13px] text-destructive">{copy.loadError}</p> : null}
       </div>
     </FirstRunShell>
@@ -146,6 +173,7 @@ function BitbucketChooseRepositoryScreen({
   selectedRepository,
   saving = false,
   loadError,
+  attemptActive = false,
   chrome,
   sphere,
   onSelectRepository,
@@ -200,22 +228,14 @@ function BitbucketChooseRepositoryScreen({
           >
             {copy.installAnother}
           </LoadingButton>
-          {workspace ? (
-            <div className="space-y-2">
-              <LoadingButton
-                type="button"
-                className="w-full"
-                disabled={!repositorySelected || busy}
-                loading={saving}
-                loadingText={chooseCopy.saving}
-                onClick={onContinue}
-                data-testid="first-run-continue-to-tickets"
-              >
-                {repositorySelected ? chooseCopy.continueReady : chooseCopy.continue}
-              </LoadingButton>
-              <p className="text-[12px] text-muted-foreground">{chooseCopy.moreLater}</p>
-            </div>
-          ) : null}
+          <NewWorkspaceCheck active={attemptActive} />
+          <BitbucketContinue
+            workspace={workspace}
+            repositorySelected={repositorySelected}
+            busy={busy}
+            saving={saving}
+            onContinue={onContinue}
+          />
         </FirstRunGithubStepper>
       </div>
     </FirstRunShell>
@@ -285,6 +305,47 @@ function BitbucketWorkspaceRepositories({
       listClassName="max-h-48"
       onSelect={onSelectRepository}
     />
+  );
+}
+
+function BitbucketContinue({
+  workspace,
+  repositorySelected,
+  busy,
+  saving,
+  onContinue,
+}: {
+  workspace: string | null;
+  repositorySelected: boolean;
+  busy: boolean;
+  saving: boolean;
+  onContinue: () => void;
+}) {
+  if (!workspace) return null;
+  return (
+    <div className="space-y-2">
+      <LoadingButton
+        type="button"
+        className="w-full"
+        disabled={!repositorySelected || busy}
+        loading={saving}
+        loadingText={chooseCopy.saving}
+        onClick={onContinue}
+        data-testid="first-run-continue-to-tickets"
+      >
+        {repositorySelected ? chooseCopy.continueReady : chooseCopy.continue}
+      </LoadingButton>
+      <p className="text-[12px] text-muted-foreground">{chooseCopy.moreLater}</p>
+    </div>
+  );
+}
+
+function NewWorkspaceCheck({ active }: { active: boolean }) {
+  if (!active) return null;
+  return (
+    <p className="text-[13px] text-muted-foreground" role="status">
+      {copy.checkingNewWorkspace}
+    </p>
   );
 }
 

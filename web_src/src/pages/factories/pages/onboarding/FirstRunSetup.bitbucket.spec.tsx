@@ -339,8 +339,10 @@ describe("FirstRunSetup Bitbucket", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("SuperPlane checks automatically for installed workspaces.");
     expect(
-      screen.getByText("Already installed? Keep this page open. Your workspace appears after synchronization."),
+      screen.getByText("Already installed? Open Apps → SuperPlane in the workspace, then return here."),
     ).toBeInTheDocument();
+    expect(screen.getByText("Confirm the installation in Bitbucket")).toBeInTheDocument();
+    expect(screen.getByText("Open Apps → SuperPlane in that workspace.")).toBeInTheDocument();
     expect(
       screen.queryByText("A workspace admin must install SuperPlane on the Bitbucket workspace."),
     ).not.toBeInTheDocument();
@@ -359,6 +361,50 @@ describe("FirstRunSetup Bitbucket", () => {
 
     expect(await screen.findByRole("option", { name: /acme-team\/api/ })).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-bitbucket-grant")).not.toBeInTheDocument();
+  });
+
+  it("offers Check again after the installation attempt times out", async () => {
+    const user = userEvent.setup();
+    const onRetryLookup = vi.fn();
+    render(
+      <FirstRunBitbucketForgeScreen
+        phase="grant"
+        connectHref=""
+        installUrl="https://bitbucket.org/install"
+        repositories={[]}
+        installedWorkspaces={[]}
+        selectedRepository={null}
+        attemptTimedOut
+        chrome={{ stepIndex: 2, onBack: vi.fn() }}
+        onGrantAccess={vi.fn()}
+        onRetryLookup={onRetryLookup}
+        onSelectRepository={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/SuperPlane did not detect a new workspace/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Check again" }));
+    expect(onRetryLookup).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the checking status while a second installation is in flight", async () => {
+    render(
+      <FirstRunBitbucketForgeScreen
+        phase="choose"
+        connectHref=""
+        installUrl=""
+        repositories={["acme-team/api"]}
+        selectedRepository="acme-team/api"
+        attemptActive
+        onGrantAccess={vi.fn()}
+        onSelectRepository={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("Checking for the new workspace…");
+    expect(screen.getByRole("option", { name: /acme-team\/api/ })).toBeInTheDocument();
   });
 
   it.each(["loading", "lookup failed", "connect", "grant", "choose"])(
