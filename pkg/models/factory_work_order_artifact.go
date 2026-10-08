@@ -271,7 +271,7 @@ func (o *FactoryWorkOrder) UpdateArtifactData(
 func (o *FactoryWorkOrder) ListArtifacts(tx *gorm.DB) ([]FactoryWorkOrderArtifact, error) {
 	var artifacts []FactoryWorkOrderArtifact
 	err := tx.
-		Preload("CreatedBy").
+		Preload("CreatedBy", PreloadRemovedMember).
 		Where("work_order_id = ?", o.ID).
 		Order("created_at DESC").
 		Order("id DESC").
