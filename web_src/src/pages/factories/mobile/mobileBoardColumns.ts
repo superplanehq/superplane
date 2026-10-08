@@ -45,7 +45,7 @@ export function buildMobileBoardColumns(
   apps: Array<{ id?: string; name?: string; columnKey?: string }>,
 ): MobileBoardColumn[] {
   const fullBoard = buildLinePhaseBoard(line, workOrders, apps);
-  const verifyOrders = collectLineVerifyOrders(fullBoard);
+  const verifyOrders = collectLineVerifyOrders(fullBoard, workOrders);
   const stageColumns = visibleLineStageColumns(fullBoard, verifyOrders);
   const backlogOrders = collectLineBacklogOrders(workOrders);
   const doneOrders = collectLineDoneOrders(workOrders, line, fullBoard);
