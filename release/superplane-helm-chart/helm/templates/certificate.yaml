@@ -1,6 +1,8 @@
 {{- if and .Values.ingress.ssl.enabled (eq .Values.ingress.ssl.type "cert-manager") }}
 {{- $domainName := .Values.domain.name | required ".Values.domain.name is required." -}}
 {{- $certManager := .Values.ingress.ssl.certManager -}}
+# Single Certificate for the Ingress TLS secret. Do not add a second
+# Certificate or a cert-manager.io/cluster-issuer Ingress annotation.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:

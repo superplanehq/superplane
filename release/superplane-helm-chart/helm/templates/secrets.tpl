@@ -81,6 +81,71 @@
 {{- end }}
 {{- end }}
 
+{{- define "runner.workers.enabled" -}}
+{{- if kindIs "bool" .Values.runner.workers.enabled -}}
+{{- .Values.runner.workers.enabled -}}
+{{- else -}}
+{{- .Values.runner.api.enabled -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "runner.activeLogs.claimName" -}}
+{{- if .Values.runner.activeLogs.existingClaim -}}
+{{- .Values.runner.activeLogs.existingClaim -}}
+{{- else -}}
+{{- printf "%s-runner-active-logs" .Release.Name -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "runner.processEnv" -}}
+{{- $enabled := .enabled -}}
+{{- range $flag := list
+  "START_PUBLIC_API"
+  "START_GRPC_GATEWAY"
+  "START_EVENT_DISTRIBUTER"
+  "START_WEBSOCKET_SERVER"
+  "START_WEB_SERVER"
+  "START_RBAC_POLICY_RELOAD_CONSUMER"
+  "START_FILE_CLEANUP_WORKER"
+  "START_RUNNER_API"
+  "START_RUNNER_LOG_COMPACTOR"
+  "START_RUNNER_CLEANUP_WORKER"
+  "START_CONSUMERS"
+  "START_EVENT_ROUTER"
+  "START_RUN_FINALIZER"
+  "START_RUN_INITIALIZER"
+  "START_NODE_EXECUTOR"
+  "START_EXECUTION_TERMINATOR"
+  "START_NODE_QUEUE_WORKER"
+  "START_NODE_REQUEST_WORKER"
+  "START_APP_MESSAGE_WORKER"
+  "START_INTEGRATION_REQUEST_WORKER"
+  "START_WEBHOOK_PROVISIONER"
+  "START_WEBHOOK_CLEANUP_WORKER"
+  "START_INTEGRATION_CLEANUP_WORKER"
+  "START_CANVAS_CLEANUP_WORKER"
+  "START_FACTORY_CLEANUP_WORKER"
+  "START_FACTORY_VELOCITY_SYNC_WORKER"
+  "START_PRICE_BOOK_SYNC_WORKER"
+  "START_PLANNING_SESSION_CLEANUP_WORKER"
+  "START_EVENT_RETENTION_WORKER"
+  "START_NODE_REQUEST_CLEANUP_WORKER"
+}}
+- name: {{ $flag }}
+  value: {{ ternary "yes" "no" (has $flag $enabled) | quote }}
+{{- end }}
+{{- end -}}
+
+{{- define "superplane.fleetManager.serviceAccountName" -}}
+{{- if .Values.fleetManager.serviceAccount.name }}
+{{- .Values.fleetManager.serviceAccount.name }}
+{{- else if .Values.fleetManager.serviceAccount.create }}
+{{- printf "%s-fleet-manager" .Release.Name }}
+{{- else }}
+{{- "default" }}
+{{- end }}
+{{- end }}
+
 {{- define "secrets.encryption.name" }}
 {{- if eq .Values.encryption.secretName "" }}
 {{- printf "%s-encryption" .Release.Name }}
