@@ -149,9 +149,11 @@ type FactoryVCSCapabilities struct {
 }
 
 // FactoryVCSCapabilitiesFor returns the automations a provider can run.
-// An empty provider uses the GitHub set. Bitbucket stays off until its own step.
+// An empty provider uses the GitHub set. Bitbucket gains capabilities one
+// step at a time; only issue intake stays off.
 func FactoryVCSCapabilitiesFor(provider string) FactoryVCSCapabilities {
-	if strings.TrimSpace(provider) == "" || provider == ProviderGitHub {
+	provider = strings.TrimSpace(provider)
+	if provider == "" || strings.EqualFold(provider, ProviderGitHub) {
 		return FactoryVCSCapabilities{
 			PRClosure:       true,
 			PRFeedback:      true,
@@ -161,6 +163,17 @@ func FactoryVCSCapabilitiesFor(provider string) FactoryVCSCapabilities {
 			BoardMerge:      true,
 			BoardClose:      true,
 			VCSIssueIntake:  true,
+		}
+	}
+	if strings.EqualFold(provider, ProviderBitbucket) {
+		return FactoryVCSCapabilities{
+			PRClosure:       true,
+			PRFeedback:      true,
+			PRChecks:        true,
+			MergeConfidence: true,
+			Velocity:        true,
+			BoardClose:      true,
+			BoardMerge:      true,
 		}
 	}
 	return FactoryVCSCapabilities{}

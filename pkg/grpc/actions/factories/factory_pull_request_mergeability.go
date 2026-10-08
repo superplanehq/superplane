@@ -70,7 +70,7 @@ func loadFactoryPullRequestForMerge(
 	if err != nil {
 		return nil, nil, err
 	}
-	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
+	if !strings.EqualFold(pullRequest.Provider, factory.OnboardingConfigValue().EffectiveVCSProvider()) {
 		return nil, nil, errFactoryPullRequestNotGitHub
 	}
 	if pullRequest.State != models.FactoryPullRequestStateOpen {

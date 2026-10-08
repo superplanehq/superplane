@@ -82,6 +82,11 @@ func CreateFactoryIntake(
 	}
 	factoryID := factory.ID
 
+	if factory.OnboardingConfigValue().EffectiveVCSProvider() == models.ProviderBitbucket &&
+		(source == models.FactoryIntakeSourceGitHubIssues || source == models.FactoryIntakeSourceDependabotAlerts) {
+		return nil, factoryErrorToStatus(invalidArgument("this intake source is not supported for Bitbucket workspaces"), "failed to create factory intake")
+	}
+
 	name := strings.TrimSpace(req.GetName())
 	if name == "" {
 		name = intakeDefaultName(source)

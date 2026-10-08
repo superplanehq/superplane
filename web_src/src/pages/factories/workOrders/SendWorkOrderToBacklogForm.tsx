@@ -10,6 +10,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 import {
   SEND_WORK_ORDER_TO_BACKLOG_COPY,
+  closePullRequestsLabel,
   workOrderHasClearableArtifacts,
   workOrderHasCloseablePullRequests,
 } from "../lib/sendWorkOrderToBacklog";
@@ -75,7 +76,7 @@ export function SendWorkOrderToBacklogForm({
             data-testid="send-to-backlog-close-prs"
           />
           <Label htmlFor={closePullRequestsId} className="font-normal">
-            {SEND_WORK_ORDER_TO_BACKLOG_COPY.closePullRequests}
+            {closePullRequestsLabel(pullRequests)}
           </Label>
         </div>
       ) : null}
