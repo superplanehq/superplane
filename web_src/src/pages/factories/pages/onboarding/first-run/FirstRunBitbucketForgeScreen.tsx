@@ -18,6 +18,7 @@ type FirstRunBitbucketForgeScreenProps = {
   connectHref: string;
   installUrl: string;
   repositories: string[];
+  installedWorkspaces?: string[];
   selectedRepository: string | null;
   granting?: boolean;
   saving?: boolean;
@@ -43,7 +44,7 @@ export function FirstRunBitbucketForgeScreen(props: FirstRunBitbucketForgeScreen
 
 function BitbucketLoadingScreen({ chrome, sphere }: FirstRunBitbucketForgeScreenProps) {
   return (
-    <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere}>
+    <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere} visual="preview">
       <p className="text-[13px] text-muted-foreground" role="status">
         {copy.loading}
       </p>
@@ -58,7 +59,7 @@ function BitbucketLookupFailedScreen({
   onRetryLookup = () => undefined,
 }: FirstRunBitbucketForgeScreenProps) {
   return (
-    <FirstRunShell testId="first-run-bitbucket-lookup-failed" chrome={chrome} sphere={sphere}>
+    <FirstRunShell testId="first-run-bitbucket-lookup-failed" chrome={chrome} sphere={sphere} visual="preview">
       <FirstRunHeading headline={copy.connectHeadline}>
         <p className="text-[13px] text-destructive">{copy.lookupFailed}</p>
       </FirstRunHeading>
@@ -79,7 +80,7 @@ function BitbucketLookupFailedScreen({
 
 function BitbucketConnectScreen({ connectHref, chrome, sphere }: FirstRunBitbucketForgeScreenProps) {
   return (
-    <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere}>
+    <FirstRunShell testId="first-run-bitbucket-connect" chrome={chrome} sphere={sphere} visual="preview">
       <FirstRunHeading headline={copy.connectHeadline}>
         <p className="text-[15px] leading-6 text-muted-foreground">{copy.connectAccountBody}</p>
       </FirstRunHeading>
@@ -101,15 +102,26 @@ function BitbucketGrantScreen({
   chrome,
   sphere,
   onGrantAccess,
+  onRetryLookup,
+  retrying = false,
 }: FirstRunBitbucketForgeScreenProps) {
   return (
-    <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={granting}>
+    <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={granting} visual="preview">
       <FirstRunHeading headline={copy.connectHeadline}>
         <p className="text-[15px] leading-6 text-muted-foreground">{copy.grantBody}</p>
       </FirstRunHeading>
       <div className="mt-8 space-y-4">
+        <p className="text-[13px] text-muted-foreground" role="status">
+          {copy.synchronizing}
+        </p>
+        <p className="text-[13px] text-muted-foreground">{copy.waitingForInstallation}</p>
+        <LoadingButton type="button" onClick={onRetryLookup} loading={retrying} loadingText={copy.retrying}>
+          {copy.checkAgain}
+        </LoadingButton>
+        <p className="text-[13px] text-muted-foreground">{copy.installIfNeeded}</p>
         <LoadingButton
           type="button"
+          variant="outline"
           onClick={onGrantAccess}
           loading={granting}
           loadingText={copy.openingBitbucket}
@@ -126,6 +138,7 @@ function BitbucketGrantScreen({
 
 function BitbucketChooseRepositoryScreen({
   repositories,
+  installedWorkspaces = [],
   selectedRepository,
   saving = false,
   loadError = false,
@@ -133,6 +146,10 @@ function BitbucketChooseRepositoryScreen({
   sphere,
   onSelectRepository,
   onContinue,
+  onRetryLookup,
+  onGrantAccess,
+  retrying = false,
+  granting = false,
 }: FirstRunBitbucketForgeScreenProps) {
   return (
     <FirstRunShell
@@ -141,6 +158,7 @@ function BitbucketChooseRepositoryScreen({
       busy={saving}
       contentSpacing="compact"
       sphere={sphere}
+      visual="preview"
     >
       <FirstRunHeading headline={chooseCopy.headline}>
         <p className="text-[13px] text-muted-foreground">{copy.repositoryHelper}</p>
@@ -148,7 +166,27 @@ function BitbucketChooseRepositoryScreen({
       <div className="mt-8 space-y-4">
         {loadError ? <p className="text-[13px] text-destructive">{copy.loadError}</p> : null}
         {repositories.length === 0 ? (
-          <p className="text-[13px] text-muted-foreground">{copy.empty}</p>
+          <div className="space-y-3">
+            <p className="text-[13px]">{copy.installed}</p>
+            <ul className="text-[13px] text-muted-foreground">
+              {installedWorkspaces.map((workspace) => (
+                <li key={workspace}>{workspace}</li>
+              ))}
+            </ul>
+            <p className="text-[13px] text-muted-foreground">{copy.installedEmpty}</p>
+            <LoadingButton type="button" onClick={onRetryLookup} loading={retrying} loadingText={copy.retrying}>
+              {copy.checkRepositories}
+            </LoadingButton>
+            <LoadingButton
+              type="button"
+              variant="outline"
+              onClick={onGrantAccess}
+              loading={granting}
+              loadingText={copy.openingBitbucket}
+            >
+              {copy.installAnother}
+            </LoadingButton>
+          </div>
         ) : (
           <RepositoryPicker
             host="bitbucket"

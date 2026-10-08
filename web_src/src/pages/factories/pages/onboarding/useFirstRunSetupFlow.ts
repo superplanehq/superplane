@@ -419,6 +419,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bitbucketOnboardingPending: bitbucketConnect.pending,
     bitbucketInstallUrl: bitbucketConnect.installUrl,
     bitbucketRepositories: bitbucketConnect.repositories,
+    bitbucketInstalledWorkspaces: bitbucketConnect.installedWorkspaces,
     bitbucketIdentityLinked: bitbucketConnect.identityLinked,
     bitbucketLoadError: bitbucketConnect.loadError,
     bitbucketLookupFailed: bitbucketConnect.lookupFailed,

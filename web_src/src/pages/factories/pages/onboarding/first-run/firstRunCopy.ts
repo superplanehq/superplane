@@ -31,7 +31,11 @@ export const FIRST_RUN_COPY = {
     connectBody:
       "Connect a Bitbucket workspace with an access token. SuperPlane uses it to read your code and open pull requests.",
     connectAccountBody: "Connect your Bitbucket account. SuperPlane uses it to find repositories you can open.",
-    grantBody: "A workspace admin must install SuperPlane on the Bitbucket workspace.",
+    grantBody: "SuperPlane has not detected an installed workspace yet.",
+    synchronizing: "SuperPlane checks automatically for installed workspaces.",
+    waitingForInstallation: "Already installed? Keep this page open. Your workspace appears after synchronization.",
+    installIfNeeded: "If SuperPlane is not installed, ask a workspace admin to install it.",
+    checkAgain: "Check again",
     grantAction: "Install SuperPlane on Bitbucket",
     openingBitbucket: "Opening Bitbucket…",
     grantLinkLabel: "Installation link",
@@ -45,6 +49,11 @@ export const FIRST_RUN_COPY = {
     retry: "Try again",
     retrying: "Checking…",
     empty: "SuperPlane cannot see repositories in this Bitbucket workspace.",
+    installed: "SuperPlane is installed on your Bitbucket workspace.",
+    installedEmpty:
+      "No repositories are available. Ask a workspace admin for write access to a repository, then check again.",
+    checkRepositories: "Check repositories",
+    installAnother: "Install on another workspace",
   },
   connect: {
     headline: "Connect SuperPlane to GitHub",

@@ -464,6 +464,43 @@ resource "helm_release" "superplane" {
     value = "IfNotPresent"
   }
 
+  # Share blobs across the API, workers, and runner pods.
+  set {
+    name  = "blobStorage.provider"
+    value = "s3"
+  }
+
+  set {
+    name  = "blobStorage.bucket"
+    value = aws_s3_bucket.blobs.id
+  }
+
+  set {
+    name  = "blobStorage.region"
+    value = var.region
+  }
+
+  set {
+    name  = "serviceAccount.create"
+    value = "true"
+  }
+
+  set {
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = aws_iam_role.blob_storage.arn
+  }
+
+  # Integrated Runner API and workers share active logs through EFS.
+  set {
+    name  = "runner.api.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "runner.activeLogs.existingClaim"
+    value = kubernetes_persistent_volume_claim_v1.runner_active_logs.metadata[0].name
+  }
+
   # Domain configuration
   set {
     name  = "domain.name"
@@ -609,6 +646,9 @@ resource "helm_release" "superplane" {
     kubernetes_secret.oidc,
     helm_release.cert_manager,
     helm_release.nginx_ingress,
+    aws_iam_role_policy.blob_storage,
+    aws_s3_bucket_public_access_block.blobs,
+    aws_s3_bucket_server_side_encryption_configuration.blobs,
     aws_db_instance.superplane
   ]
 }
