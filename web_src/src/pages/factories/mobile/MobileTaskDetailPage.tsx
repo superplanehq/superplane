@@ -125,6 +125,7 @@ type MobileTaskModel = {
   startBusy: boolean;
   actionBusy: boolean;
   columnAppRunQueries: ReturnType<typeof useColumnAppCheckRuns>["queries"];
+  footerActions: ReturnType<typeof useSplitRunFooterActions>;
 };
 
 /** Loads everything the task screen shows and wires the footer actions. */
@@ -191,6 +192,7 @@ function useMobileTaskModel(
     startBusy: cardActions.dispatchingOrderIds.has(orderId),
     actionBusy: footerActions.busy,
     columnAppRunQueries: columnAppCheckRuns.queries,
+    footerActions,
   };
 }
 
@@ -245,6 +247,14 @@ function LoadedMobileTask({
       compact="stacked"
     />
   );
+  const canStopRun = Boolean(model.canUpdate && organizationId && factoryId && orderId);
+  const onStopRun = (run: { appId: string; runId: string }) => void model.footerActions.handleStopAutomation(run);
+  const onRerunStep = (phase: { stepIndex?: number | null }) =>
+    void model.footerActions.handleStop("rerun-step", {
+      kind: "failed",
+      lineName: fixture.lineName,
+      stepIndex: phase.stepIndex ?? undefined,
+    });
   if (refine.chat) {
     return (
       <MobileTaskFrame onBack={onBack} backDisabled={backDisabled} scroll={false}>
@@ -290,6 +300,12 @@ function LoadedMobileTask({
           fixture={fixture}
           artifacts={artifacts}
           pullRequests={pullRequests}
+          factoryKey={routeSegment}
+          orderNumber={order.number ? String(order.number) : undefined}
+          canStopRun={canStopRun}
+          actionBusy={model.actionBusy}
+          onStopRun={onStopRun}
+          onRerunStep={onRerunStep}
         />
       </article>
     </MobileTaskFrame>

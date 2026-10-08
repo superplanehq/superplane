@@ -1,186 +1,270 @@
-import type { FilesFile } from "@/api-client";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { ChevronDown } from "lucide-react";
-import { useMemo, useState } from "react";
-
-import type { PhaseGlyphKind } from "../lib/linePhaseRuns";
-import { PhaseGlyph } from "../pages/linePhaseGlyph";
-import { attachArtifactsToStream, type StreamArtifactIndex } from "../pages/work-order-split-run/attachStreamArtifacts";
-import { canvasNodesForRunnerModel, phaseWithRunnerModel } from "../pages/work-order-split-run/draftStartModel";
-import { PhaseLogCard } from "../pages/work-order-split-run/PhaseLogCard";
-import { SpecificModelIdsProvider } from "../pages/work-order-split-run/specificModelIds";
 import {
-  splitRunStatusLabel,
-  type SplitRunPhase,
-  type SplitRunPhaseStatus,
-  type SplitRunStreamLine,
-} from "../pages/work-order-split-run/splitRunMocks";
-import { SplitRunCheckPills } from "../pages/work-order-split-run/SplitRunReview";
-import { useSplitRunLiveCanvas } from "../pages/work-order-split-run/useSplitRunLiveCanvas";
+  Timeline,
+  TimelineContent,
+  TimelineHeader,
+  TimelineIndicator,
+  TimelineItem,
+  TimelineSeparator,
+  TimelineTitle,
+} from "@/components/reui/timeline";
+import { Badge } from "@/components/reui/badge";
+import { cn } from "@/lib/utils";
+import { formatCompactDuration } from "@/lib/duration";
+import { Check, Circle, Clock, LoaderCircle, X } from "lucide-react";
+import { useMemo } from "react";
+
+import { formatWorkOrderDateTime } from "../lib/workOrderDateTime";
+import { LiveHeaderSpendProvider } from "../pages/work-order-split-run/liveHeaderSpendContext";
+import { phasesWithRunArtifacts } from "../pages/work-order-split-run/attachStreamArtifacts";
+import { ConsoleAutomationCard } from "../pages/work-order-split-run/redesign/consoleAutomationCard";
+import {
+  timingsForConsoleColumns,
+  type ColumnTiming,
+  type ColumnTimingId,
+} from "../pages/work-order-split-run/redesign/columnTiming";
+import {
+  automationsFromStages,
+  isConsoleCreationStage,
+  stagesByConsoleColumn,
+  stagesFromFixture,
+  type ConsoleAutomation,
+  type ConsoleColumnId,
+} from "../pages/work-order-split-run/redesign/automationsViewModel";
+import { META_TEXT_CLASSNAME } from "../pages/work-order-split-run/redesign/redesignFormat";
 import { useSplitRunStreamArtifacts } from "../pages/work-order-split-run/useSplitRunStreamArtifacts";
+import { SpecificModelIdsProvider } from "../pages/work-order-split-run/specificModelIds";
+import type { SplitRunFixture, SplitRunPhase, SplitRunPhaseStatus } from "../pages/work-order-split-run/splitRunMocks";
 import { MOBILE_TASK_COPY } from "./mobileCopy";
 
-const PHASE_GLYPH: Record<SplitRunPhaseStatus, PhaseGlyphKind> = {
-  passed: "passed",
-  running: "running",
-  pending: "pending",
-  waiting: "waiting",
-  failed: "failed",
-  cancelled: "cancelled",
+const CONSOLE_COLUMNS = [
+  { id: "backlog", title: "Backlog" },
+  { id: "implement", title: "Implement" },
+  { id: "verify", title: "Verify" },
+  { id: "done", title: "Done" },
+] as const;
+
+type MobileConsoleColumn = {
+  id: ConsoleColumnId;
+  title: string;
+  automations: ConsoleAutomation[];
 };
 
 type MobileTaskActivityProps = {
   organizationId: string;
   factoryId: string;
   orderId: string;
-  phases: SplitRunPhase[];
-  /** Phase that opens on load. Undefined keeps every phase closed. */
-  expandedPhaseId?: string;
-  files?: FilesFile[];
+  fixture: SplitRunFixture;
+  factoryKey?: string;
+  orderNumber?: string;
+  canStopRun?: boolean;
+  actionBusy?: boolean;
+  onStopRun?: (run: { appId: string; runId: string }) => void;
+  onRerunStep?: (phase: SplitRunPhase) => void;
 };
 
 /**
- * Automation phases on the task. Each row opens the same phase log as the
- * desktop task popup, so the phone does not need the full run page.
+ * Automation runs on the task, with the same cards as the desktop task
+ * popup. The timeline stacks in one column for a narrow screen: only
+ * columns that ran show up, and each card opens the same collapsible
+ * agent steps (Clone Repo, Implementation, Commit and Push, Generate PR
+ * title and description) with the same run footer and Stop control.
  */
 export function MobileTaskActivity({
   organizationId,
   factoryId,
   orderId,
-  phases,
-  expandedPhaseId,
-  files,
+  fixture,
+  factoryKey,
+  orderNumber,
+  canStopRun = false,
+  actionBusy = false,
+  onStopRun,
+  onRerunStep,
 }: MobileTaskActivityProps) {
   const artifactIndex = useSplitRunStreamArtifacts(organizationId, factoryId, orderId);
+  const consoleFixture = useMemo(() => {
+    const phases = phasesWithRunArtifacts(fixture.phases, artifactIndex);
+    return phases === fixture.phases ? fixture : { ...fixture, phases };
+  }, [artifactIndex, fixture]);
+  const columns = useMemo(() => mobileConsoleColumns(consoleFixture), [consoleFixture]);
+  const timings = useMemo(() => timingsForConsoleColumns(consoleFixture), [consoleFixture]);
+  const currentColumn = reachedColumns(columns);
+  const markers = columns.map((column, index) => columnMarker(column, index, currentColumn));
+  const anyLive = hasLiveAutomation(columns);
+  const expandIdleCards = !anyLive && (fixture.lineStatus === "pending" || fixture.footerTone === "draft");
 
-  if (phases.length === 0) {
+  if (columns.length === 0) {
     return <p className="text-[13px] text-muted-foreground">{MOBILE_TASK_COPY.noActivity}</p>;
   }
   return (
     <SpecificModelIdsProvider organizationId={organizationId}>
-      <ol className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card">
-        {phases.map((phase) => (
-          <li key={phase.id} className="min-w-0">
-            <ActivityRow
-              phase={phase}
-              expandedByDefault={phase.id === expandedPhaseId}
-              organizationId={organizationId}
-              artifactIndex={artifactIndex}
-              files={files}
-            />
-          </li>
-        ))}
-      </ol>
+      <LiveHeaderSpendProvider>
+        <section aria-label={MOBILE_TASK_COPY.activity} data-testid="mobile-task-activity">
+          <Timeline value={columns.length} className="pl-1">
+            {columns.map((column, index) => (
+              <TimelineItem
+                key={column.id}
+                step={index + 1}
+                className="group/column"
+                data-testid={`mobile-task-column-${column.id}`}
+              >
+                <TimelineHeader className="flex w-full items-center gap-2">
+                  <TimelineSeparator />
+                  <ColumnStatusIndicator marker={markers[index] ?? "pending"} columnId={column.id} />
+                  <TimelineTitle className="font-semibold">{column.title}</TimelineTitle>
+                  {column.automations.length > 0 ? (
+                    <Badge variant="secondary" className="h-5 min-w-5 px-1.5">
+                      {column.automations.length}
+                    </Badge>
+                  ) : null}
+                  <MobileColumnTiming columnId={column.id} timing={timings[column.id] as ColumnTiming | undefined} />
+                </TimelineHeader>
+                <TimelineContent className="mt-2 flex min-w-0 flex-col gap-3 text-foreground">
+                  {column.automations.map((automation) => (
+                    <ConsoleAutomationCard
+                      key={automation.id}
+                      automation={automation}
+                      phase={consoleFixture.phases.find((entry) => entry.id === automation.latest.id)}
+                      phases={consoleFixture.phases}
+                      organizationId={organizationId}
+                      factoryKey={factoryKey}
+                      orderNumber={orderNumber}
+                      expandIdle={expandIdleCards && index + 1 === currentColumn}
+                      canStopRun={canStopRun}
+                      actionBusy={actionBusy}
+                      onStopRun={onStopRun}
+                      onRerunStep={onRerunStep}
+                    />
+                  ))}
+                </TimelineContent>
+              </TimelineItem>
+            ))}
+          </Timeline>
+        </section>
+      </LiveHeaderSpendProvider>
     </SpecificModelIdsProvider>
   );
 }
 
-/** A phase has a log when it already carries lines or points at a run. */
-function phaseHasLog(phase: SplitRunPhase): boolean {
-  return phase.stream.length > 0 || Boolean(phase.appId && phase.runId);
+/**
+ * Task stages sit in the column named after them, like the desktop
+ * console. The phone skips empty columns and the synthetic create-task
+ * stage so the run log starts at the first automation that acted.
+ */
+function mobileConsoleColumns(fixture: SplitRunFixture): MobileConsoleColumn[] {
+  const groups = stagesFromFixture(fixture);
+  const byColumn = stagesByConsoleColumn(groups, fixture.footer.run?.appId);
+  return CONSOLE_COLUMNS.flatMap((column) => {
+    const automations = automationsFromStages(byColumn[column.id].filter((stage) => !isConsoleCreationStage(stage)));
+    if (automations.length === 0) {
+      return [];
+    }
+    return [{ id: column.id, title: column.title, automations }];
+  });
 }
 
-/** One automation on the line. Tap to read its log. */
-function ActivityRow({
-  phase,
-  expandedByDefault,
-  organizationId,
-  artifactIndex,
-  files,
-}: {
-  phase: SplitRunPhase;
-  expandedByDefault: boolean;
-  organizationId: string;
-  artifactIndex: StreamArtifactIndex;
-  files?: FilesFile[];
-}) {
-  const canExpand = phaseHasLog(phase);
-  const [expanded, setExpanded] = useState(expandedByDefault && canExpand);
+/** Timeline steps to fill: through the last column that has a run. */
+function reachedColumns(columns: MobileConsoleColumn[]): number {
+  return columns.length;
+}
 
+function hasLiveAutomation(columns: MobileConsoleColumn[]): boolean {
+  return columns.some((column) =>
+    column.automations.some((automation) => {
+      const status = automation.latest.status;
+      return status === "running" || status === "waiting";
+    }),
+  );
+}
+
+type ColumnMarker = "completed" | "running" | "waiting" | "failed" | "cancelled" | "pending";
+
+/**
+ * Rail marker for one console column. Composition matches ReUI
+ * solution-agents-3: size-5 disk, size-3 icon, indicator in the header.
+ */
+function columnMarker(column: MobileConsoleColumn, index: number, currentColumn: number): ColumnMarker {
+  if (column.automations.length === 0) {
+    return index + 1 < currentColumn ? "completed" : "pending";
+  }
+  const statuses = column.automations.map((automation) => automation.latest.status);
+  if (statuses.some((status) => status === "running")) return "running";
+  if (statuses.some((status) => status === "waiting")) return "waiting";
+  if (statuses.some((status) => status === "failed")) return "failed";
+  if (statuses.some((status) => status === "cancelled")) return "cancelled";
+  if (statuses.every((status) => status === "pending")) return "pending";
+  return "completed";
+}
+
+const COLUMN_MARKER_LABEL: Record<ColumnMarker, string> = {
+  completed: "Completed",
+  running: "Running",
+  waiting: "Waiting",
+  failed: "Failed",
+  cancelled: "Canceled",
+  pending: "Not started",
+};
+
+function ColumnStatusIndicator({ marker, columnId }: { marker: ColumnMarker; columnId: string }) {
   return (
-    <div className="flex min-w-0 flex-col" data-testid={`mobile-task-phase-${phase.id}`}>
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={() => canExpand && setExpanded((current) => !current)}
-        aria-expanded={canExpand ? expanded : undefined}
-        aria-label={canExpand ? (expanded ? MOBILE_TASK_COPY.hideLog : MOBILE_TASK_COPY.showLog) : undefined}
-        className="h-auto w-full min-w-0 items-start justify-start gap-3 whitespace-normal rounded-none px-3 py-2.5 text-left font-normal shadow-none hover:bg-transparent dark:text-foreground dark:hover:bg-transparent dark:hover:text-foreground"
-      >
-        <PhaseGlyph kind={PHASE_GLYPH[phase.status]} className="mt-1" />
-        <span className="min-w-0 flex-1">
-          <span className="block text-[14px] font-medium text-foreground break-words">{phase.name}</span>
-          <span className="block text-[12px] text-muted-foreground">
-            {splitRunStatusLabel(phase.status)}
-            {phase.componentName ? ` · ${phase.componentName}` : ""}
-            {phase.duration ? ` · ${phase.duration}` : ""}
-          </span>
-          {phase.checks && phase.checks.length > 0 ? (
-            <span className="mt-1.5 block">
-              <SplitRunCheckPills checks={phase.checks} testId={`mobile-task-phase-checks-${phase.id}`} />
-            </span>
-          ) : null}
-        </span>
-        {canExpand ? (
-          <ChevronDown
-            className={cn("mt-1 size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")}
-            aria-hidden
-          />
-        ) : null}
-      </Button>
-      {expanded && canExpand ? (
-        <div className="min-w-0 border-t border-border px-2 py-2" data-testid={`mobile-task-phase-log-${phase.id}`}>
-          <PhaseLog phase={phase} organizationId={organizationId} artifactIndex={artifactIndex} files={files} />
-        </div>
-      ) : null}
-    </div>
+    <TimelineIndicator
+      aria-hidden={false}
+      className={cn(
+        "flex size-5 items-center justify-center border-none",
+        marker === "pending"
+          ? "bg-muted text-muted-foreground"
+          : "bg-foreground text-background group-data-completed/timeline-item:bg-foreground group-data-completed/timeline-item:text-background",
+      )}
+      data-testid={`mobile-task-column-marker-${columnId}`}
+      data-status={marker}
+    >
+      <span className="sr-only">{COLUMN_MARKER_LABEL[marker]}</span>
+      {marker === "completed" ? <Check className="size-3" aria-hidden /> : null}
+      {marker === "running" ? <LoaderCircle className="size-3 animate-spin" aria-hidden /> : null}
+      {marker === "waiting" ? <Clock className="size-3" aria-hidden /> : null}
+      {marker === "failed" || marker === "cancelled" ? <X className="size-3" aria-hidden /> : null}
+      {marker === "pending" ? <Circle className="size-3" aria-hidden /> : null}
+    </TimelineIndicator>
   );
 }
 
 /**
- * Live phase log. The row above already names the phase, so the card hides
- * its own header. Example canvas steps are not a log: use the live run when
- * it has lines, and keep the stored phase summary otherwise.
+ * Arrival and dwell for one column. Desktop shows this on hover; a phone
+ * has no hover, so it stays visible in a compact badge row that wraps
+ * under the column title on narrow screens.
  */
-function PhaseLog({
-  phase,
-  organizationId,
-  artifactIndex,
-  files,
-}: {
-  phase: SplitRunPhase;
-  organizationId: string;
-  artifactIndex: StreamArtifactIndex;
-  files?: FilesFile[];
-}) {
-  const live = useSplitRunLiveCanvas(organizationId, phase);
-  const stream = useMemo(
-    () => attachArtifactsToStream(phonePhaseLogStream(phase, live), artifactIndex, phase.runId),
-    [artifactIndex, live, phase],
-  );
-
-  return (
-    <PhaseLogCard
-      phase={phaseWithRunnerModel(phase, canvasNodesForRunnerModel(live.canvas?.nodes, live.canvas?.statuses))}
-      expanded
-      collapsible={false}
-      showHeader={false}
-      stream={stream ?? phase.stream}
-      streamLoading={live.isLoading}
-      organizationId={organizationId}
-      canvasId={phase.appId}
-      files={files}
-    />
-  );
-}
-
-function phonePhaseLogStream(
-  phase: SplitRunPhase,
-  live: { isError?: boolean; stream: SplitRunStreamLine[] },
-): SplitRunStreamLine[] {
-  if (live.isError || live.stream.length === 0) {
-    return phase.stream;
+function MobileColumnTiming({ columnId, timing }: { columnId: ColumnTimingId; timing?: ColumnTiming }) {
+  if (!timing) {
+    return null;
   }
-  return live.stream;
+  const arrived = formatWorkOrderDateTime(new Date(timing.enteredAt));
+  const spent = timing.durationMs != null ? formatCompactDuration(timing.durationMs) : "";
+  if (!arrived && !spent) {
+    return null;
+  }
+  return (
+    <span
+      className="ml-auto inline-flex max-w-full flex-wrap items-center justify-end gap-1"
+      data-testid={`mobile-task-column-timing-${columnId}`}
+    >
+      {arrived ? (
+        <Badge variant="secondary" size="sm" radius="full" className="font-normal tabular-nums">
+          <span className="sr-only">Arrived </span>
+          {arrived}
+        </Badge>
+      ) : null}
+      {spent ? (
+        <Badge variant="secondary" size="sm" radius="full" className="font-normal tabular-nums">
+          <span className="sr-only">Spent </span>
+          {spent}
+        </Badge>
+      ) : null}
+    </span>
+  );
 }
+
+export function MobileActivityEmptyHint() {
+  return <p className={META_TEXT_CLASSNAME}>{MOBILE_TASK_COPY.noActivity}</p>;
+}
+
+export type { SplitRunPhaseStatus };

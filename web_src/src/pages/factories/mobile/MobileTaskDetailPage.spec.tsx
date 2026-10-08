@@ -545,43 +545,23 @@ describe("MobileTaskDetailPage phase log", () => {
     resetPlanningSession();
   });
 
-  it("shows notes and command output in the open phase of a task that is not a draft", async () => {
+  it("shows the desktop console card for a task that is not a draft", async () => {
     liveCanvas.current = {
       enabled: true,
       isError: false,
       isLoading: false,
       canvas: { key: "live", title: "Implementation", nodes: [], edges: [], statuses: {} },
-      stream: [
-        { id: "node-1", nodeId: "node-1", at: "", componentName: "Run tests", status: "failed", kind: "action" },
-        {
-          id: "step-1",
-          nodeId: "node-1",
-          at: "",
-          note: true,
-          componentType: "bash",
-          componentName: "npm test",
-          detail: "FAIL refund.spec.ts",
-          status: "failed",
-        },
-        {
-          id: "note-1",
-          nodeId: "node-1",
-          at: "",
-          note: true,
-          noteParentId: "step-1",
-          componentType: "note",
-          componentName: "The refund case still fails.",
-          status: "passed",
-        },
-      ],
+      stream: [],
     };
     useWorkOrder.mockReturnValue({ data: RUNNING_WORK_ORDER, isLoading: false, isError: false });
     renderTask(
       `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${RUNNING_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
     );
 
-    expect(await screen.findByText("The refund case still fails.")).toBeInTheDocument();
-    expect(screen.getByText("FAIL refund.spec.ts")).toBeInTheDocument();
+    expect(await screen.findByTestId("mobile-task-activity")).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-task-column-implement")).toHaveTextContent("Implement");
+    expect(screen.getByTestId("mobile-task-column-implement")).toHaveTextContent("Implementation");
+    expect(screen.getByText("1 agent run")).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-composer")).not.toBeInTheDocument();
     expect(findPlanningSession).not.toHaveBeenCalled();
   });

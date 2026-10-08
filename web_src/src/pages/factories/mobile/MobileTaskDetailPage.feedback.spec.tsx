@@ -157,8 +157,8 @@ describe("MobileTaskDetailPage stored phase log", () => {
     liveCanvas.current = canvas;
     renderRunningTask();
 
-    const log = await screen.findByTestId("mobile-task-phase-log-implement-0");
-    expect(within(log).getByText("Implementation")).toBeInTheDocument();
+    const activity = await screen.findByTestId("mobile-task-activity");
+    expect(within(activity).getByText("Implementation")).toBeInTheDocument();
     expect(screen.queryByText("Implement From Task Description")).not.toBeInTheDocument();
   });
 });

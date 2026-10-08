@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { OutputList } from "../pages/work-order-popup-redesign/popupShared";
-import type { SplitRunFixture } from "../pages/work-order-split-run/splitRunMocks";
+import type { SplitRunFixture, SplitRunPhase } from "../pages/work-order-split-run/splitRunMocks";
 import { MOBILE_TASK_COPY } from "./mobileCopy";
 import { MobileTaskActivity } from "./MobileTaskActivity";
 
@@ -20,8 +20,9 @@ export function Section({ title, children }: { title: string; children: ReactNod
 /**
  * Activity, pull requests, and files. The phone page shows them under the
  * description. The refine chat does not show them; it follows the desktop
- * popup and shows the agent's live work instead. The current phase opens
- * on load.
+ * popup and shows the agent's live work instead. Activity uses the same
+ * console automation cards as the desktop popup, stacked for a narrow
+ * screen, so collapsible agent steps match desktop.
  */
 export function MobileTaskSections({
   order,
@@ -29,12 +30,24 @@ export function MobileTaskSections({
   fixture,
   artifacts,
   pullRequests,
+  factoryKey,
+  orderNumber,
+  canStopRun = false,
+  actionBusy = false,
+  onStopRun,
+  onRerunStep,
 }: {
   order: FactoriesWorkOrder;
   orderId: string;
   fixture: SplitRunFixture;
   artifacts: FactoriesWorkOrderArtifact[];
   pullRequests: FactoriesFactoryPullRequest[];
+  factoryKey?: string;
+  orderNumber?: string;
+  canStopRun?: boolean;
+  actionBusy?: boolean;
+  onStopRun?: (run: { appId: string; runId: string }) => void;
+  onRerunStep?: (phase: SplitRunPhase) => void;
 }) {
   const { organizationId, factoryId } = useFactoriesLayout();
   return (
@@ -44,9 +57,13 @@ export function MobileTaskSections({
           organizationId={organizationId}
           factoryId={factoryId}
           orderId={orderId}
-          phases={fixture.phases.filter((phase) => !phase.historyRun)}
-          expandedPhaseId={fixture.currentPhaseId}
-          files={order.files}
+          fixture={fixture}
+          factoryKey={factoryKey}
+          orderNumber={orderNumber ?? (order.number ? String(order.number) : undefined)}
+          canStopRun={canStopRun}
+          actionBusy={actionBusy}
+          onStopRun={onStopRun}
+          onRerunStep={onRerunStep}
         />
       </Section>
 
