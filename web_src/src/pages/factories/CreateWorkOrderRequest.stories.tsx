@@ -10,16 +10,16 @@ import { withFactoriesTheme } from "./__fixtures__/factoriesStoryTheme";
 
 const STORY_IMAGE_ID = "story-checkout";
 const STORY_IMAGE_URL = "https://placehold.co/320x160/png?text=Checkout";
-const STORY_STACK_IMAGES = [
+const STORY_ATTACHED_IMAGES = [
   { id: "story-checkout", url: "https://placehold.co/320x240/f97316/ffffff/png?text=Checkout", alt: "Checkout error" },
   { id: "story-receipt", url: "https://placehold.co/320x240/2563eb/ffffff/png?text=Receipt", alt: "Receipt" },
   { id: "story-retry", url: "https://placehold.co/320x240/059669/ffffff/png?text=Retry", alt: "Retry screen" },
   { id: "story-invoice", url: "https://placehold.co/320x240/7c3aed/ffffff/png?text=Invoice", alt: "Invoice" },
   { id: "story-label", url: "https://placehold.co/320x240/db2777/ffffff/png?text=Label", alt: "Label" },
 ] as const;
-const STORY_STACK_MARKDOWN = `Refunds fail when the customer retries checkout.
+const STORY_ATTACHED_MARKDOWN = `Refunds fail when the customer retries checkout.
 
-${STORY_STACK_IMAGES.map((image) => `![${image.alt}](${workOrderFileRef(image.id)})`).join("\n\n")}`;
+${STORY_ATTACHED_IMAGES.map((image) => `![${image.alt}](${workOrderFileRef(image.id)})`).join("\n\n")}`;
 
 const STORY_LONG_MARKDOWN = `Refunds fail when the customer retries checkout.
 
@@ -46,9 +46,11 @@ async function mockUploadFiles(files: FileList | File[]): Promise<UploadedWorkOr
 function RequestDialogPlayground({
   initialDescription = "",
   fileUrls,
+  initialAttachedFiles = [],
 }: {
   initialDescription?: string;
   fileUrls?: Record<string, string>;
+  initialAttachedFiles?: UploadedWorkOrderFile[];
 }) {
   const [description, setDescription] = useState(initialDescription);
 
@@ -66,6 +68,7 @@ function RequestDialogPlayground({
         console.log("create", draft);
       }}
       onUploadFiles={mockUploadFiles}
+      initialAttachedFiles={initialAttachedFiles}
     />
   );
 }
@@ -99,12 +102,22 @@ export const Empty: Story = {
   render: () => <RequestDialogPlayground />,
 };
 
-export const WithImageStack: Story = {
+export const AttachedImages: Story = {
   name: "Attached images",
   render: () => (
     <RequestDialogPlayground
-      initialDescription={STORY_STACK_MARKDOWN}
-      fileUrls={Object.fromEntries(STORY_STACK_IMAGES.map((image) => [image.id, image.url]))}
+      initialDescription={STORY_ATTACHED_MARKDOWN}
+      fileUrls={Object.fromEntries(STORY_ATTACHED_IMAGES.map((image) => [image.id, image.url]))}
+      initialAttachedFiles={[
+        {
+          id: "story-notes",
+          filename: "refund-notes.txt",
+          contentType: "text/plain",
+          ref: workOrderFileRef("story-notes"),
+          previewUrl: "https://example.com/refund-notes.txt",
+          isImage: false,
+        },
+      ]}
     />
   ),
 };
