@@ -73,11 +73,12 @@ The AWS integration uses OpenID Connect. When running locally, AWS IAM needs an 
 
 ## Factory GitHub App (local workspace setup)
 
-Factory workspace setup installs SuperPlane's public GitHub App. Cloud holds
-the app in `SUPERPLANE_GITHUB_APP_*`. Self-host and local development can
-create that public app from the workspace Connect screen. SuperPlane stores
-the credentials on the installation. You do not need Helm or `.env` values
-for the process app.
+Factory workspace setup installs a GitHub App. Cloud holds the public
+SuperPlane app in `SUPERPLANE_GITHUB_APP_*`. Self-host and local development
+can create a GitHub App from the workspace Connect screen. That app stays
+private to the GitHub account that creates it. SuperPlane stores the
+credentials on the installation. You do not need Helm or `.env` values for
+the process app.
 
 A stable public tunnel is still required. GitHub must reach setup and
 webhook URLs on this SuperPlane instance.
@@ -97,13 +98,14 @@ WEBHOOKS_BASE_URL=https://<stable-tunnel-url>
 Restart SuperPlane after you change these values. See the tunnel steps
 above if you still need to expose `localhost:8000`.
 
-### 2. Create a public GitHub App from workspace setup
+### 2. Create a GitHub App from workspace setup
 
 1. Open `/onboarding` or create a workspace.
 2. SuperPlane opens the workspace wizard. The Connect screen shows
    **Create GitHub App** when this installation has no process app.
-3. Create the public GitHub App. GitHub returns to Connect. Then install
-   the app on a GitHub organization and choose the repository.
+3. Create the GitHub App. The app stays private. GitHub returns to
+   Connect. Then install the app on a GitHub organization and choose the
+   repository.
 
 If Cloud or a previous run already configured the app, Connect stays
 **Connect GitHub**. SuperPlane does not show a second repository picker.
@@ -112,7 +114,7 @@ To reuse an existing app instead of the wizard, follow the manual steps
 below and set `SUPERPLANE_GITHUB_APP_*`. Environment values win over the
 installation row.
 
-### 3. Create a public GitHub App by hand (optional)
+### 3. Create a GitHub App by hand (optional)
 
 1. Open GitHub, then **Settings**, then **Developer settings**, then **GitHub Apps**.
 2. Click **New GitHub App**.
@@ -125,7 +127,7 @@ installation row.
    - Webhook secret: a random string. Copy it for `.env`.
 
    Disable **Request user authorization (OAuth) during installation**. The
-   public GitHub App does not authorize users.
+   GitHub App does not authorize users.
 
 5. Grant repository permissions that match the private-app manifest:
    - Issues: Read and write
@@ -145,12 +147,13 @@ installation row.
    repositories in SuperPlane.
 
    Subscribe the app to the **Member** event. SuperPlane uses this event to
-   refresh cached push access after repository membership changes.
+   refresh cached push access after repository membership changes. Do not
+   subscribe to installation or installation_repositories events.
 
 6. Create the app.
-7. Make the app **public**. GitHub creates it as private. Open the app
-   settings and change the visibility. Factory onboarding cannot install a
-   private app on other accounts.
+7. Leave the app **private**. Self-host and local development install the
+   app only on GitHub accounts that the owner controls. Cloud keeps the
+   public SuperPlane app in `SUPERPLANE_GITHUB_APP_*`.
 8. Generate a private key and download the PEM file.
 9. Copy the App ID and slug from the app page.
 
@@ -209,7 +212,7 @@ value is set and that the App ID is a positive integer. Then restart
 2. SuperPlane must show the workspace wizard. If the process has no app,
    Connect shows **Create GitHub App**.
 3. After the app exists, Connect GitHub. The browser must open your
-   public app install page.
+   GitHub App install page.
 
 If Connect cannot create the app, confirm `BASE_URL` and
 `WEBHOOKS_BASE_URL` point at a stable tunnel. Then try again.

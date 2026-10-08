@@ -18,7 +18,7 @@ func TestPublicManifestJSON(t *testing.T) {
 
 	var manifest map[string]any
 	require.NoError(t, json.Unmarshal([]byte(raw), &manifest))
-	assert.Equal(t, true, manifest["public"])
+	assert.Equal(t, false, manifest["public"])
 	assert.Equal(t, "SuperPlane", manifest["name"])
 	assert.Equal(t, "https://app.example/api/v1/github/app/setup", manifest["setup_url"])
 	assert.Equal(t, "https://app.example/api/v1/github/app/created", manifest["redirect_url"])
@@ -27,7 +27,7 @@ func TestPublicManifestJSON(t *testing.T) {
 	assert.Equal(t, "https://hooks.example/api/v1/github/app/webhook", hooks["url"])
 	events, ok := manifest["default_events"].([]any)
 	require.True(t, ok)
-	assert.Contains(t, events, "member")
+	assert.Equal(t, []any{"member"}, events)
 	permissions, ok := manifest["default_permissions"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "write", permissions["contents"])

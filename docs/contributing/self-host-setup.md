@@ -2,7 +2,7 @@
 
 This runbook is for a new SuperPlane installation. Cloud already holds the
 public GitHub App. Do not set `SUPERPLANE_GITHUB_APP_*` in Helm for
-self-host. Workspace Connect creates that public app once.
+self-host. Workspace Connect creates a private GitHub App once.
 
 ## 1. Create the owner account
 
@@ -31,8 +31,8 @@ Owner setup then opens workspace setup.
 1. Create the workspace. SuperPlane does not block this step when the
    GitHub App is missing.
 2. On Connect, choose **Create GitHub App** if this installation has no
-   public app.
-3. GitHub creates a public app and returns to Connect.
+   GitHub App.
+3. GitHub creates a private app and returns to Connect.
 4. Choose **Connect GitHub**. Install the app on a GitHub organization.
 5. Choose the source repository. SuperPlane does not ask for a second
    repository on an installation wizard.

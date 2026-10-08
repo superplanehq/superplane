@@ -53,8 +53,7 @@ export const FIRST_RUN_COPY = {
     connectGitHub: "Connect GitHub",
     connectAction: "Connect GitHub",
     createAppAction: "Create GitHub App",
-    createAppBody:
-      "This installation has no GitHub App yet. Create a public GitHub App, then connect your GitHub account.",
+    createAppBody: "This installation has no GitHub App yet. Create a GitHub App, then connect your GitHub account.",
     creatingGitHubApp: "Opening GitHub…",
     stepOrganization: "Choose organization",
     stepOrganizationDone: (organization: string) => `Organization: ${organization}`,

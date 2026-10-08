@@ -34,7 +34,7 @@ func TestHandleGitHubAppManifest(t *testing.T) {
 
 	require.NoError(t, models.PromoteToInstallationAdmin(account.ID.String()))
 
-	t.Run("returns the public app create form", func(t *testing.T) {
+	t.Run("returns the GitHub App create form", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     http.MethodGet,
 			path:       "/github/app/manifest?return_to=/org/workspaces/new/setup",
@@ -46,7 +46,7 @@ func TestHandleGitHubAppManifest(t *testing.T) {
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
 		assert.Equal(t, "https://github.com/settings/apps/new", body.URL)
 		assert.Equal(t, http.MethodPost, body.Method)
-		assert.Contains(t, body.Form["manifest"], `"public":true`)
+		assert.Contains(t, body.Form["manifest"], `"public":false`)
 		assert.Contains(t, body.Form["manifest"], "https://hooks.example/api/v1/github/app/webhook")
 		returnPath, accountID, err := githubapp.VerifyCreateState("test-client-secret", body.Form["state"])
 		require.NoError(t, err)

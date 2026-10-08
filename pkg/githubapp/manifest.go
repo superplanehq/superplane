@@ -52,7 +52,7 @@ func PublicManifestJSON(baseURL, webhooksBaseURL string) (string, error) {
 
 	manifest := map[string]any{
 		"name":   "SuperPlane",
-		"public": true,
+		"public": false,
 		"url":    publicAppHomepageURL,
 		"default_permissions": map[string]string{
 			"issues":                      "write",
@@ -66,7 +66,7 @@ func PublicManifestJSON(baseURL, webhooksBaseURL string) (string, error) {
 			"organization_administration": "read",
 			"members":                     "read",
 		},
-		"default_events": []string{"installation", "installation_repositories", "member"},
+		"default_events": []string{"member"},
 		"setup_url":      baseURL + setupPath,
 		"redirect_url":   baseURL + createdPath,
 		"hook_attributes": map[string]any{
