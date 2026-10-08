@@ -195,11 +195,6 @@ export function SplitRunPopupTabs({
               stepIndex: phase.stepIndex,
             })
           }
-          assigneeIds={edits.assigneeIds}
-          owner={edits.owner}
-          canEditOwner={edits.canEdit}
-          ownerBusy={edits.ownerBusy}
-          onOwnerSave={edits.saveOwner}
         />
       </div>
     </>

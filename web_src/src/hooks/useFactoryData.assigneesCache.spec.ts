@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { type InfiniteData, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
@@ -8,6 +8,7 @@ import {
   BOARD_BACKLOG_STATES,
   factoryWorkOrdersPageKey,
   flattenWorkOrdersPages,
+  type WorkOrdersPage,
 } from "@/pages/factories/lib/workOrderListPagination";
 
 const { factoriesUpdateWorkOrderAssignees } = vi.hoisted(() => ({
@@ -88,10 +89,11 @@ describe("useUpdateWorkOrderAssignees list cache", () => {
     });
 
     const pageKey = factoryWorkOrdersPageKey(ORGANIZATION_ID, FACTORY_ID, BOARD_BACKLOG_STATES);
-    const ids = flattenWorkOrdersPages(queryClient.getQueryData(pageKey)?.pages).map((order) => order.id);
+    const pageData = queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(pageKey);
+    const ids = flattenWorkOrdersPages(pageData?.pages).map((order) => order.id);
     expect(ids).toEqual(["wo-a", "wo-b", "wo-c"]);
 
-    const patched = flattenWorkOrdersPages(queryClient.getQueryData(pageKey)?.pages).find(
+    const patched = flattenWorkOrdersPages(pageData?.pages).find(
       (order) => order.id === "wo-b",
     );
     expect(patched?.assignees).toEqual([{ id: "user-2", name: "Bob" }]);
