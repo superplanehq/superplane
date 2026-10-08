@@ -5,9 +5,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
@@ -29,7 +29,7 @@ func ListIntegrations(ctx context.Context, registry *registry.Registry) (*pb.Lis
 
 	return &pb.ListIntegrationsResponse{
 		Integrations:        serializeIntegrations(registry, orgID, registry.ListIntegrations()),
-		GithubAppConfigured: config.LoadGitHubHostedAppConfig().Enabled(),
+		GithubAppConfigured: githubapp.ProcessEnabled(ctx),
 	}, nil
 }
 

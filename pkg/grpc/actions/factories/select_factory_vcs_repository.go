@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -35,7 +35,10 @@ func SelectFactoryVCSProviderRepository(
 	if req.GetRepositoryId() <= 0 {
 		return nil, grpcerrors.InvalidArgument(nil, "repository id is required")
 	}
-	app := config.LoadGitHubHostedAppConfig()
+	app, err := githubapp.ResolveProcess(ctx)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load public GitHub App")
+	}
 	if !app.Enabled() {
 		return nil, grpcerrors.FailedPrecondition(nil, "public GitHub App is not configured")
 	}
