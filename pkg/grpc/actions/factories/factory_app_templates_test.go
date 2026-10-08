@@ -52,7 +52,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, agent.Configuration["credentials"])
-	assert.Equal(t, false, agent.Configuration["includeVisualEvidence"])
+	assert.NotContains(t, agent.Configuration, "includeVisualEvidence")
 	assert.Contains(t, result.canvasYAML, "{{ task().description }}")
 	assert.Contains(t, result.canvasYAML, `task().spec != "" ? "\n\nSpec:\n" + task().spec : ""`)
 	assert.NotContains(t, result.canvasYAML, `title == "PLAN.md"`)
@@ -88,27 +88,15 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Contains(t, body, "[{{ task().key }}]({{ task().url }})")
 	assert.Less(t, strings.Index(body, "Closes"), strings.Index(body, "task().key"), "body: %s", body)
 	assert.NotContains(t, body, "[Task](")
+	assert.NotContains(t, result.canvasYAML, "visualEvidence")
+	assert.NotContains(t, result.canvasYAML, "has-visual-evidence")
+	assert.NotContains(t, result.canvasYAML, "comment-visual-evidence")
+	assert.NotContains(t, result.canvasYAML, "github.createIssueComment")
 
-	commentEvidence := findYAMLNode(t, canvas, "comment-visual-evidence")
-	assert.Equal(t, "github.createIssueComment", commentEvidence.Component)
-	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, commentEvidence.Integration)
-	assert.Contains(t, commentEvidence.Configuration["body"], `$["Create Pull Request"].data.head.sha[:7]`)
-	assert.Contains(t, commentEvidence.Configuration["body"], "## Visual evidence")
-	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "attach-pr-artifact", TargetID: "has-visual-evidence", Channel: "default"})
-	hasEvidence := findYAMLNode(t, canvas, "has-visual-evidence")
-	assert.Equal(
-		t,
-		`($["Implement From Task Description"].data.result.visualEvidence.status == "captured" || $["Implement From Task Description"].data.result.visualEvidence.status == "partial") && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
-		hasEvidence.Configuration["expression"],
-	)
-	hasUpdatedEvidence := findYAMLNode(t, canvas, "has-visual-evidence-updated")
-	assert.Equal(
-		t,
-		`($["Implement From Task Description"].data.result.visualEvidence.status == "captured" || $["Implement From Task Description"].data.result.visualEvidence.status == "partial") && len($["Implement From Task Description"].data.result.visualEvidence.artifacts) > 0`,
-		hasUpdatedEvidence.Configuration["expression"],
-	)
-	updatedCommentEvidence := findYAMLNode(t, canvas, "comment-visual-evidence-updated")
-	assert.Contains(t, updatedCommentEvidence.Configuration["body"], `$["Update Pull Request"].data.head.sha[:7]`)
+	attach := findYAMLNode(t, canvas, "attach-pr-artifact")
+	assert.Equal(t, "addPullRequest", attach.Component)
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "create-pr", TargetID: "attach-pr-artifact", Channel: "default"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "update-pr", TargetID: "attach-pr-artifact-updated", Channel: "default"})
 
 	updatePR := findYAMLNode(t, canvas, "update-pr")
 	updateBody, ok := updatePR.Configuration["body"].(string)
@@ -226,36 +214,111 @@ func TestMaterializeRiskScoreOmitsDisabledChecks(t *testing.T) {
 	}
 }
 
-func TestMaterializeLineImplementationKeepsVisualEvidence(t *testing.T) {
-	for _, enabled := range []bool{true, false} {
-		t.Run(visualEvidenceCaseName(enabled), func(t *testing.T) {
-			seed, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
-				appID:   "app-1",
-				appName: "Implement",
-			})
-			require.NoError(t, err)
-			live, err := yaml.CanvasFromYAML([]byte(seed.canvasYAML))
-			require.NoError(t, err)
-			findYAMLNode(t, live, "implementation-agent-no-issue").Configuration["includeVisualEvidence"] = enabled
+func TestMaterializeLineImplementationDoesNotRestoreVisualEvidence(t *testing.T) {
+	enabled := true
+	result, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
+		appID:                 "app-1",
+		appName:               "Implement",
+		includeVisualEvidence: &enabled,
+	})
+	require.NoError(t, err)
+	defaults, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	agent := findYAMLNode(t, defaults, "implementation-agent-no-issue")
+	assert.NotContains(t, agent.Configuration, "includeVisualEvidence")
+	assert.NotContains(t, result.canvasYAML, "visualEvidence")
+	assert.NotContains(t, result.canvasYAML, "has-visual-evidence")
+	assert.NotContains(t, result.canvasYAML, "comment-visual-evidence")
+}
 
-			includeVisualEvidence := canvasAgentIncludesVisualEvidence(live.Nodes())
-			assert.Equal(t, enabled, includeVisualEvidence)
+func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
+	disabled := false
+	result, err := materializeFactoryTemplate("visual-evidence", "", factoryTemplateInput{
+		appID:   "app-evidence",
+		appName: "Visual Evidence",
+		installParams: map[string]string{
+			"appRepository": "acme/app",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"github": {id: "github-1", name: "acme-github"},
+		},
+		agent: &factoryTemplateAgent{
+			component:                 "runnerClaudeCode",
+			model:                     "claude-sonnet-4-6",
+			credentialSource:          "integration",
+			credentialIntegrationName: "acme-claude",
+		},
+		includeVisualEvidence: &disabled,
+	})
+	require.NoError(t, err)
 
-			result, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
-				appID:                 "app-1",
-				appName:               "Implement",
-				includeVisualEvidence: &includeVisualEvidence,
-			})
-			require.NoError(t, err)
-			defaults, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
-			require.NoError(t, err)
-			assert.Equal(
-				t,
-				enabled,
-				findYAMLNode(t, defaults, "implementation-agent-no-issue").Configuration["includeVisualEvidence"],
-			)
-		})
-	}
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	assert.Equal(t, "Visual Evidence", canvas.Metadata.Name)
+
+	entrypoint := findYAMLNode(t, canvas, "on-pr-visual-evidence")
+	assert.Equal(t, map[string]any{
+		"id":       "visual-evidence",
+		"version":  float64(factoryTemplateVersion),
+		"provider": models.ProviderGitHub,
+	}, entrypoint.Metadata[factoryTemplateMetadataKey])
+	assert.Equal(t, "github.onPullRequest", entrypoint.Component)
+	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
+	assert.Equal(t, true, entrypoint.Configuration["ignoreDrafts"])
+	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
+	assert.Equal(t, []any{"synchronize", "reopened", "ready_for_review"}, entrypoint.Configuration["actions"])
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, entrypoint.Integration)
+
+	agent := findYAMLNode(t, canvas, "capture-visual-evidence")
+	assert.Equal(t, "Capture Visual Evidence", agent.Name)
+	assert.Equal(t, true, agent.Configuration["includeVisualEvidence"])
+	assert.Equal(t, float64(1800), agent.Configuration["executionTimeoutSeconds"])
+	assert.Equal(t, map[string]any{
+		"source":      "integration",
+		"integration": map[string]any{"name": "acme-claude"},
+	}, agent.Configuration["credentials"])
+	checkout, ok := implementationStep(t, agent, "Checkout Pull Request")["command"].(string)
+	require.True(t, ok)
+	assert.Contains(t, checkout, `git fetch --depth 1 origin "${PR_REVISION}:refs/remotes/origin/pr-revision"`)
+	assert.Contains(t, checkout, `git checkout --detach "${PR_REVISION}"`)
+	assert.Contains(t, checkout, `Checked out ${revision}. Expected ${PR_REVISION}.`)
+	assert.NotContains(t, checkout, "FETCH_HEAD")
+	prompt, ok := implementationStep(t, agent, "Capture Visual Evidence")["prompt"].(string)
+	require.True(t, ok)
+	assert.Contains(t, prompt, "Do not implement the task.")
+	assert.Contains(t, prompt, "Do not change files. Do not commit. Do not push.")
+	assert.Contains(t, prompt, "Capture visual evidence only for user interface changes")
+	assert.NotContains(t, prompt, "task()")
+	emit, ok := implementationStep(t, agent, "Emit Visual Evidence")["command"].(string)
+	require.True(t, ok)
+	assert.Contains(t, emit, "visualEvidence")
+	assert.NotContains(t, emit, "branch:")
+
+	hasEvidence := findYAMLNode(t, canvas, "has-visual-evidence")
+	assert.Equal(
+		t,
+		`($["Capture Visual Evidence"].data.result.visualEvidence.status == "captured" || $["Capture Visual Evidence"].data.result.visualEvidence.status == "partial") && len($["Capture Visual Evidence"].data.result.visualEvidence.artifacts) > 0`,
+		hasEvidence.Configuration["expression"],
+	)
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "capture-visual-evidence", TargetID: "has-visual-evidence", Channel: "passed"})
+
+	comment := findYAMLNode(t, canvas, "comment-visual-evidence")
+	assert.Equal(t, "github.createIssueComment", comment.Component)
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, comment.Integration)
+	assert.Equal(t, "{{ root().data.repository.full_name }}", comment.Configuration["repository"])
+	assert.Equal(t, "{{ root().data.pull_request.number }}", comment.Configuration["issueNumber"])
+	body, ok := comment.Configuration["body"].(string)
+	require.True(t, ok)
+	assert.Contains(t, body, "## Visual evidence")
+	assert.Contains(t, body, "root().data.pull_request.head.sha[:7]")
+	assert.Contains(t, body, `fromBase64($["Capture Visual Evidence"].data.result.visualEvidence.markdown)`)
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "has-visual-evidence", TargetID: "comment-visual-evidence", Channel: "true"})
+	assert.Contains(t, result.consoleYAML, "This app is not a factory line step.")
+	assert.Contains(t, result.consoleYAML, "The first capture starts when")
+	assert.Contains(t, result.consoleYAML, "posts one comment")
+	assert.NotContains(t, result.consoleYAML, "closed pull")
+
+	requireValidCanvasExpressions(t, canvas)
 }
 
 func TestDeriveFactoryTemplateInputCarriesVisualEvidence(t *testing.T) {
@@ -508,11 +571,9 @@ func TestMaterializeFactoryTemplateBitbucketImplement(t *testing.T) {
 
 	bitbucket := &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}
 	for nodeID, component := range map[string]string{
-		"find-pr":                         "bitbucket.findPullRequest",
-		"create-pr":                       "bitbucket.createPullRequest",
-		"update-pr":                       "bitbucket.updatePullRequest",
-		"comment-visual-evidence":         "bitbucket.createPullRequestComment",
-		"comment-visual-evidence-updated": "bitbucket.createPullRequestComment",
+		"find-pr":   "bitbucket.findPullRequest",
+		"create-pr": "bitbucket.createPullRequest",
+		"update-pr": "bitbucket.updatePullRequest",
 	} {
 		node := findYAMLNode(t, canvas, nodeID)
 		assert.Equal(t, component, node.Component, nodeID)
@@ -522,6 +583,9 @@ func TestMaterializeFactoryTemplateBitbucketImplement(t *testing.T) {
 	attach := findYAMLNode(t, canvas, "attach-pr-artifact")
 	assert.Equal(t, "bitbucket", attach.Configuration["provider"])
 	assert.Equal(t, `{{ $["Create Pull Request"].data.links.html.href }}`, attach.Configuration["url"])
+	assert.NotContains(t, agent.Configuration, "includeVisualEvidence")
+	assert.NotContains(t, result.canvasYAML, "visualEvidence")
+	assert.NotContains(t, result.canvasYAML, "bitbucket.createPullRequestComment")
 	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
 }
 

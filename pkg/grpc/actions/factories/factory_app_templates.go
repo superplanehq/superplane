@@ -67,10 +67,9 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		canvasFile:       "templates/github/line-implementation.canvas.yaml",
 		consoleFile:      "templates/github/line-app.console.yaml",
 		componentIntegrations: map[string]string{
-			"github.createIssueComment": "github",
-			"github.createPullRequest":  "github",
-			"github.findPullRequest":    "github",
-			"github.updatePullRequest":  "github",
+			"github.createPullRequest": "github",
+			"github.findPullRequest":   "github",
+			"github.updatePullRequest": "github",
 		},
 	}),
 	{id: "line-implementation", provider: models.ProviderBitbucket}: bitbucketFactoryTemplate(factoryAppTemplate{
@@ -79,10 +78,9 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		canvasFile:       "templates/bitbucket/line-implementation.canvas.yaml",
 		consoleFile:      "templates/bitbucket/line-app.console.yaml",
 		componentIntegrations: map[string]string{
-			"bitbucket.createPullRequest":        "bitbucket",
-			"bitbucket.createPullRequestComment": "bitbucket",
-			"bitbucket.findPullRequest":          "bitbucket",
-			"bitbucket.updatePullRequest":        "bitbucket",
+			"bitbucket.createPullRequest": "bitbucket",
+			"bitbucket.findPullRequest":   "bitbucket",
+			"bitbucket.updatePullRequest": "bitbucket",
 		},
 	}),
 	{id: "pr-closure", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
@@ -113,6 +111,17 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		columnKey:        models.CanvasColumnKeyVerify,
 		componentIntegrations: map[string]string{
 			"github.onPullRequest": "github",
+		},
+	}),
+	{id: "visual-evidence", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
+		id:               "visual-evidence",
+		entrypointNodeID: "on-pr-visual-evidence",
+		canvasFile:       "templates/github/visual-evidence.canvas.yaml",
+		consoleFile:      "templates/github/visual-evidence.console.yaml",
+		columnKey:        models.CanvasColumnKeyVerify,
+		componentIntegrations: map[string]string{
+			"github.createIssueComment": "github",
+			"github.onPullRequest":      "github",
 		},
 	}),
 }
@@ -323,7 +332,9 @@ func wireFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate, input
 		}
 		rewriteFactoryIntegrationNames(node.Configuration, input.integrations)
 		rewriteFactoryAgent(node, input.agent)
-		applyFactoryVisualEvidence(node, input.includeVisualEvidence)
+		if template.id == "line-implementation" {
+			applyFactoryVisualEvidence(node, input.includeVisualEvidence)
+		}
 		if node.Component == "runApp" && configString(node.Configuration, "app") == input.appID {
 			node.Metadata = maps.Clone(node.Metadata)
 			if node.Metadata == nil {

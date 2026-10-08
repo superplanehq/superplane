@@ -236,6 +236,8 @@ func TestAssemblePublicBoardListsColumnAutomations(t *testing.T) {
 		{ID: appID, Name: "Implement"},
 		{Name: "PR Closure"},
 		{Name: "Risk score", ColumnKey: &verifyKey},
+		{ID: uuid.New(), Name: "Visual Evidence", ColumnKey: &verifyKey},
+		{ID: uuid.New(), Name: "Visual Evidence payments", ColumnKey: &verifyKey},
 	}
 	board := assemblePublicBoard(
 		factory,
@@ -260,6 +262,8 @@ func TestAssemblePublicBoardListsColumnAutomations(t *testing.T) {
 	assert.Equal(t, []publicAutomation{
 		{ID: "feedback-0", Kind: "pr-discussion", Name: "Pull request comments", CatalogID: "pr-discussion", Icon: "github", Health: "healthy"},
 		{ID: "risk-score-1", Kind: "risk-score", Name: "Risk score", CatalogID: "risk-score", Health: "healthy"},
+		{ID: "visual-evidence-2", Kind: "visual-evidence", Name: "Visual Evidence", CatalogID: "visual-evidence", Icon: "github", Health: "healthy"},
+		{ID: "verify-0", Kind: "custom", Name: "Visual Evidence payments", CatalogID: "custom", Health: "healthy"},
 	}, automationsNamed(board, "verify"))
 	assert.Equal(t, []publicAutomation{
 		{ID: "closure", Kind: "pr-closure", Name: "PR Closure", CatalogID: "pr-closure", Icon: "github", Health: "healthy"},

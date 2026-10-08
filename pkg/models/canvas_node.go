@@ -333,6 +333,34 @@ func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]
 	return nodes, nil
 }
 
+func ListFactoryAppTemplateNodes(tx *gorm.DB, organizationID, factoryID uuid.UUID, templateID string) ([]CanvasNode, error) {
+	var nodes []CanvasNode
+	err := tx.
+		Joins("JOIN workflows ON workflows.id = workflow_nodes.workflow_id AND workflows.deleted_at IS NULL").
+		Where("workflows.organization_id = ? AND workflows.factory_id = ?", organizationID, factoryID).
+		Where("workflow_nodes.metadata -> 'factoryTemplate' ->> 'id' = ?", templateID).
+		Where("workflow_nodes.state <> ?", CanvasNodeStateError).
+		Find(&nodes).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return nodes, nil
+}
+
+func CanvasHasFactoryAppTemplate(tx *gorm.DB, canvasID uuid.UUID, templateID string) (bool, error) {
+	var count int64
+	err := tx.Model(&CanvasNode{}).
+		Where("workflow_id = ?", canvasID).
+		Where("metadata -> 'factoryTemplate' ->> 'id' = ?", templateID).
+		Count(&count).
+		Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // ListCanvasNodesReady returns the component nodes with at least one
 // actionable pending queue item, i.e. the nodes a dispatch pass can make
 // progress on. A pending item is actionable when any of these holds:
