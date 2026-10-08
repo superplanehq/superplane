@@ -1,0 +1,168 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Visual Evidence
+  description: Capture screenshots or a short video when a pull request changes the user interface.
+spec:
+  edges:
+    - channel: default
+      sourceId: on-pr-visual-evidence
+      targetId: capture-visual-evidence
+    - channel: passed
+      sourceId: capture-visual-evidence
+      targetId: has-visual-evidence
+    - channel: "true"
+      sourceId: has-visual-evidence
+      targetId: comment-visual-evidence
+  nodes:
+    - id: on-pr-visual-evidence
+      name: On Pull Request
+      type: TYPE_TRIGGER
+      component: github.onPullRequest
+      configuration:
+        actions:
+          - opened
+          - synchronize
+          - reopened
+          - ready_for_review
+        ignoreDrafts: true
+        onlyFactoryPullRequests: true
+        repository: '{{ install_params.appRepository }}'
+      position:
+        x: 80
+        "y": 80
+      isCollapsed: true
+    - id: capture-visual-evidence
+      name: Capture Visual Evidence
+      type: TYPE_ACTION
+      component: runnerClaudeCode
+      configuration:
+        executionTimeoutSeconds: 1800
+        includeVisualEvidence: true
+        machineType: e1-large-amd64
+        model: sonnet
+        credentials:
+          source: integration
+          integration:
+            name: claude
+        environmentFrom:
+          - source: integration
+            integration:
+              name: github
+        environment:
+          - name: REPO
+            value: "{{ root().data.repository.full_name }}"
+            valueSource: literal
+          - name: PR_NUMBER
+            value: "{{ root().data.pull_request.number }}"
+            valueSource: literal
+          - name: PR_REVISION
+            value: "{{ root().data.pull_request.head.sha }}"
+            valueSource: literal
+          - name: BASE
+            value: "{{ root().data.pull_request.base.ref }}"
+            valueSource: literal
+        steps:
+          - name: Checkout Pull Request
+            type: bash
+            command: |-
+              set -euo pipefail
+              gh auth setup-git --hostname github.com --force
+              git clone --depth 1 --branch "${BASE}" "https://github.com/${REPO}.git" repo
+              cd repo
+              git fetch --depth 1 origin "pull/${PR_NUMBER}/head"
+              if [ -n "${PR_REVISION:-}" ]; then
+                git checkout --detach "${PR_REVISION}" || git checkout --detach FETCH_HEAD
+              else
+                git checkout --detach FETCH_HEAD
+              fi
+              revision="$(git rev-parse HEAD)"
+              base_ref="$(printf '%s' "${BASE}" | sed 's#/#%2F#g')"
+              gh api -H "Accept: application/vnd.github.v3.diff" "/repos/${REPO}/compare/${base_ref}...${revision}" > /tmp/pr.diff
+          - name: Capture Visual Evidence
+            type: prompt
+            workingDirectory: repo
+            prompt: |-
+              Review the pull request diff. Do not change files. Do not commit. Do not push.
+              Do not implement the task.
+
+              The repository is checked out at the pull request head.
+              The pull request diff is in /tmp/pr.diff. Review that file.
+              It is the difference between the base branch and the head.
+
+              Repository: {{ root().data.repository.full_name }}
+              Pull request: #{{ root().data.pull_request.number }}
+              Title: {{ root().data.pull_request.title }}
+              Base branch: {{ root().data.pull_request.base.ref }}
+              Head SHA: {{ root().data.pull_request.head.sha }}
+
+              Capture visual evidence only for user interface changes that are already in this pull request.
+              Do not implement the task. Do not add product changes.
+              The protocol below tells an implementation agent to implement before capture.
+              Ignore that instruction. This run captures evidence only.
+              Do not commit. Do not push.
+          - name: Emit Visual Evidence
+            type: bash
+            command: |-
+              set -euo pipefail
+
+              EVIDENCE_FILE="$SUPERPLANE_TASK_DIR/visual-evidence.json"
+              if [ ! -s "$EVIDENCE_FILE" ]; then
+                EVIDENCE_TMP="${EVIDENCE_FILE}.$$"
+                printf '%s\n' '{"status":"not_applicable","reason":"","artifacts":[]}' > "$EVIDENCE_TMP"
+                mv "$EVIDENCE_TMP" "$EVIDENCE_FILE"
+              fi
+
+              EVIDENCE_MARKDOWN="$(jq -r '
+                if (.status == "captured" or .status == "partial") and (.artifacts | length) > 0 then
+                  ([.artifacts[].markdown] +
+                    (if (.reason // "") != "" then ["**Evidence note:** " + .reason] else [] end)) |
+                  join("\n\n")
+                else
+                  ""
+                end
+              ' "$EVIDENCE_FILE")"
+              jq -n \
+                --slurpfile evidence "$EVIDENCE_FILE" \
+                --arg evidenceMarkdown "$EVIDENCE_MARKDOWN" \
+                '{
+                  visualEvidence: {
+                    status: $evidence[0].status,
+                    reason: ($evidence[0].reason // ""),
+                    attempts: ($evidence[0].attempts // []),
+                    artifacts: $evidence[0].artifacts,
+                    markdown: ($evidenceMarkdown | @base64)
+                  }
+                }' \
+                > "$SUPERPLANE_RESULT_FILE"
+      position:
+        x: 640
+        "y": 80
+      isCollapsed: true
+    - id: has-visual-evidence
+      name: Has Visual Evidence?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: ($["Capture Visual Evidence"].data.result.visualEvidence.status == "captured" || $["Capture Visual Evidence"].data.result.visualEvidence.status == "partial") && len($["Capture Visual Evidence"].data.result.visualEvidence.artifacts) > 0
+      position:
+        x: 1200
+        "y": 80
+      isCollapsed: true
+    - id: comment-visual-evidence
+      name: Comment Visual Evidence
+      type: TYPE_ACTION
+      component: github.createIssueComment
+      configuration:
+        repository: '{{ root().data.repository.full_name }}'
+        issueNumber: '{{ root().data.pull_request.number }}'
+        body: |-
+          ## Visual evidence
+
+          Captured for commit `{{ root().data.pull_request.head.sha[:7] }}`.
+
+          {{ fromBase64($["Capture Visual Evidence"].data.result.visualEvidence.markdown) }}
+      position:
+        x: 1760
+        "y": 80
+      isCollapsed: true

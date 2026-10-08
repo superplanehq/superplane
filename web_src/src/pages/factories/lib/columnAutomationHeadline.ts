@@ -30,6 +30,7 @@ const FIXED_HEADLINES: Record<
   "pr-checks": "Fixes failing status checks",
   "pr-closure": "Closes tasks when pull requests merge",
   "risk-score": "Scores merge confidence",
+  "visual-evidence": "Publishes visual evidence",
 };
 
 /**

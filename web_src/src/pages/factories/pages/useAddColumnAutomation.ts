@@ -73,6 +73,13 @@ export function useAddColumnAutomation(args: {
       });
       return;
     }
+    if (entry.kind === "visual-evidence") {
+      await installBundledCanvas(args, installFactory, navigate, closePicker, {
+        factoryId: "visual-evidence",
+        missingGitHubMessage: "Connect GitHub in workspace setup before you add visual evidence.",
+      });
+      return;
+    }
     if (entry.kind === "risk-score") {
       closePicker();
       if (args.lineId) {
