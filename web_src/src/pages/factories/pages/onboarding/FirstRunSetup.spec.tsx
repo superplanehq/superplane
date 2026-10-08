@@ -24,6 +24,7 @@ const github = vi.hoisted(() => ({
     pendingRequests: [] as Array<{ requestId: string; accountLogin: string }>,
     synchronizing: false,
   },
+  isPending: false,
   error: null as unknown,
   calls: [] as Array<{ organizationId: string; options?: { poll?: boolean } }>,
   installationChecks: [] as boolean[],
@@ -56,7 +57,7 @@ vi.mock("./useGitHubOnboarding", () => ({
     github.calls.push({ organizationId, options });
     return {
       data: github.data,
-      isPending: false,
+      isPending: github.isPending,
       error: github.error,
       startInstallation: { mutateAsync: startInstallation },
       configureInstallation: { mutateAsync: configureInstallation },
@@ -170,6 +171,7 @@ describe("FirstRunSetup GitHub catalog", () => {
     github.data.repositories = [];
     github.data.pendingRequests = [];
     github.data.synchronizing = false;
+    github.isPending = false;
     github.error = null;
     github.calls = [];
     github.installationChecks = [];
@@ -183,6 +185,16 @@ describe("FirstRunSetup GitHub catalog", () => {
     renderSetup(pageModel());
 
     expect(screen.getByTestId("first-run-connect-github")).toHaveTextContent("Connect GitHub");
+  });
+
+  it("keeps Connect loading until GitHub access is known", () => {
+    github.isPending = true;
+    github.data.providerConfigured = false;
+    renderSetup(pageModel());
+
+    expect(screen.getByRole("status")).toHaveTextContent(FIRST_RUN_COPY.connect.loadingAccounts);
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+    expect(startPublicGitHubAppCreate).not.toHaveBeenCalled();
   });
 
   it("asks to create the GitHub App when the process has none", async () => {

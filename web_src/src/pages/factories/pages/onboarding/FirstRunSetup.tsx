@@ -347,7 +347,7 @@ function VcsScreen({
   if (screen === "connect") {
     return (
       <FirstRunConnectScreen
-        loading={flow.repositoriesLoading && flow.appConfigured}
+        loading={flow.repositoriesLoading}
         connecting={flow.blockingAction === "opening-github"}
         createApp={!flow.appConfigured}
         connectError={flow.connectError}
