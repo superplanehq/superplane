@@ -9,6 +9,7 @@ const os = require("node:os");
 const path = require("node:path");
 const {
   FOLLOW_UP_CMD_INDEX_BASE,
+  IDLE_TIMEOUT_MS,
   MAX_ATTACHMENT_BYTES,
   interpretWaitResponse,
   isAllowedSignedDownloadURL,
@@ -266,6 +267,72 @@ test("runLoop runs the user prompt then exits on ended", async () => {
   });
   assert.equal(code, 0);
   assert.deepEqual(prompts, ["Add color"]);
+});
+
+function fakeClock(start = 0) {
+  let current = start;
+  return {
+    now: () => current,
+    advance: (ms) => {
+      current += ms;
+    },
+  };
+}
+
+test("runLoop exits after five minutes with no user message", async () => {
+  const clock = fakeClock();
+  const logs = [];
+  let waits = 0;
+  const code = await runLoop({
+    waitOnce: async () => {
+      waits += 1;
+      clock.advance(45_000);
+      return { status: "pending" };
+    },
+    runPrompt: async () => {
+      throw new Error("no prompt expected");
+    },
+    sleep: async (ms) => clock.advance(ms),
+    log: (msg) => logs.push(msg),
+    now: clock.now,
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(code, 0);
+  // Each wait holds 45s plus a 1s retry; the seventh hold passes 300s.
+  assert.equal(waits, 7);
+  assert.ok(clock.now() < IDLE_TIMEOUT_MS + 46_000);
+  assert.match(logs[0], /no user message for 300 seconds/);
+});
+
+test("runLoop runs a message before the deadline on the same task and resets the clock", async () => {
+  const clock = fakeClock();
+  const prompts = [];
+  let waits = 0;
+  const code = await runLoop({
+    waitOnce: async () => {
+      waits += 1;
+      if (waits === 1) {
+        clock.advance(IDLE_TIMEOUT_MS - 1_000);
+        return { status: "message", text: "Add color" };
+      }
+      clock.advance(60_000);
+      return { status: "pending" };
+    },
+    runPrompt: async (text) => {
+      prompts.push(text);
+      // Agent work time does not count toward the idle wait.
+      clock.advance(20 * 60 * 1000);
+      return 0;
+    },
+    sleep: async () => {},
+    log: () => {},
+    now: clock.now,
+    writeLiveLogRecord: () => {},
+  });
+  assert.equal(code, 0);
+  assert.deepEqual(prompts, ["Add color"]);
+  // After the prompt, five pending minutes pass before the loop exits.
+  assert.equal(waits, 1 + 5);
 });
 
 test("runLoop retries attachment preparation before running the prompt", async () => {
@@ -616,7 +683,8 @@ test("runLoop stays alive when waitOnce returns pending after a fetch throw", as
 
 test("runLoop emits cmd_start then cmd_end for each follow-up prompt", async () => {
   const records = [];
-  const nowValues = [5_000, 5_250, 6_000, 6_400];
+  // Loop start, then cmd start, cmd end, and idle clock reset per prompt.
+  const nowValues = [4_000, 5_000, 5_250, 5_250, 6_000, 6_400, 6_400];
   const results = [
     { status: "message", text: "Add color" },
     { status: "message", text: "Use the existing form" },
