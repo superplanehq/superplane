@@ -20,6 +20,7 @@ import {
   factoryWithPlanning,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
+import { MOBILE_TASK_COPY } from "./mobileCopy";
 import { MobileTaskDetailPage } from "./MobileTaskDetailPage";
 
 const useWorkOrder = vi.fn((): { data: FactoriesWorkOrder | undefined; isLoading: boolean; isError: boolean } => ({
@@ -459,6 +460,15 @@ describe("MobileTaskDetailPage refine chat", () => {
     expect(screen.getAllByRole("button", { name: "Start" })).toHaveLength(1);
     expect(screen.getAllByTestId("split-run-draft-model")).toHaveLength(1);
     expect(screen.getByTestId("mobile-task-detail")).toBeInTheDocument();
+  });
+
+  it("does not show the activity list or a phase log in the refine chat, like the desktop popup", async () => {
+    findPlanningSession.mockResolvedValue(WAITING_SESSION);
+    renderDraft();
+
+    expect(await screen.findByTestId("split-run-intent-transcript")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: MOBILE_TASK_COPY.activity })).not.toBeInTheDocument();
+    expect(screen.queryByTestId(/^mobile-task-phase-/)).not.toBeInTheDocument();
   });
 
   it("sends a text reply through the planning session message path", async () => {

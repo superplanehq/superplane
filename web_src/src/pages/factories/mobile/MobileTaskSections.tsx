@@ -17,21 +17,24 @@ export function Section({ title, children }: { title: string; children: ReactNod
   );
 }
 
-/** Activity, pull requests, and files. The phone page shows them with and without the refine chat. */
+/**
+ * Activity, pull requests, and files. The phone page shows them under the
+ * description. The refine chat does not show them; it follows the desktop
+ * popup and shows the agent's live work instead. The current phase opens
+ * on load.
+ */
 export function MobileTaskSections({
   order,
   orderId,
   fixture,
   artifacts,
   pullRequests,
-  expandCurrentPhase,
 }: {
   order: FactoriesWorkOrder;
   orderId: string;
   fixture: SplitRunFixture;
   artifacts: FactoriesWorkOrderArtifact[];
   pullRequests: FactoriesFactoryPullRequest[];
-  expandCurrentPhase: boolean;
 }) {
   const { organizationId, factoryId } = useFactoriesLayout();
   return (
@@ -42,7 +45,7 @@ export function MobileTaskSections({
           factoryId={factoryId}
           orderId={orderId}
           phases={fixture.phases.filter((phase) => !phase.historyRun)}
-          expandedPhaseId={expandCurrentPhase ? fixture.currentPhaseId : undefined}
+          expandedPhaseId={fixture.currentPhaseId}
           files={order.files}
         />
       </Section>

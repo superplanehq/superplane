@@ -245,17 +245,6 @@ function LoadedMobileTask({
       compact="stacked"
     />
   );
-  const sections = (
-    <MobileTaskSections
-      order={order}
-      orderId={orderId}
-      fixture={fixture}
-      artifacts={artifacts}
-      pullRequests={pullRequests}
-      expandCurrentPhase={!refine.chat}
-    />
-  );
-
   if (refine.chat) {
     return (
       <MobileTaskFrame onBack={onBack} backDisabled={backDisabled} scroll={false}>
@@ -268,9 +257,8 @@ function LoadedMobileTask({
           loadFailed={refine.loadFailed}
           review={review(false)}
           summary={
-            <div className="mb-5 flex flex-col gap-5" data-testid="mobile-task-detail">
+            <div className="mb-5" data-testid="mobile-task-detail">
               <MobileTaskHeader order={order} fixture={fixture} />
-              {sections}
             </div>
           }
         />
@@ -296,7 +284,13 @@ function LoadedMobileTask({
             <p className="text-[13px] text-muted-foreground">{MOBILE_TASK_COPY.noDescription}</p>
           )}
         </Section>
-        {sections}
+        <MobileTaskSections
+          order={order}
+          orderId={orderId}
+          fixture={fixture}
+          artifacts={artifacts}
+          pullRequests={pullRequests}
+        />
       </article>
     </MobileTaskFrame>
   );
@@ -340,9 +334,11 @@ function useMobileDraftStart(model: MobileTaskModel, startLineKey: string) {
 }
 
 /**
- * Refine chat for a Planning draft. The task header and activity scroll
- * above the request in the chat log. The composer, the question form, and
- * Start stay at the bottom of the frame, above the bottom bar.
+ * Refine chat for a Planning draft. The task header scrolls above the
+ * request in the chat log. Like the desktop popup, the chat shows the
+ * agent's live work, not the automation phase list or its log. The
+ * composer, the question form, and Start stay at the bottom of the frame,
+ * above the bottom bar.
  */
 function MobileRefineBody({
   order,
