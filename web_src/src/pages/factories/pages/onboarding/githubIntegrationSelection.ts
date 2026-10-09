@@ -29,25 +29,25 @@ export function selectionsWithGitHubInstallation(
 }
 
 /**
- * A saved VCS integration was verified when its repository was selected.
- * Restore its readiness once the workspace loads, so an OAuth redirect for
- * another integration (Jira, Linear) does not block finishing setup with
- * "Connect GitHub, then select both repositories." The installation name is
- * resolved again at finish time.
+ * Canvas secret lookup matches app_installations.installation_name.
+ * The integration id is not that name. Do not mark the selection ready until
+ * the installation name is known, for GitHub and Bitbucket.
  */
-export function selectionsWithSavedVcsReady(
+export function selectionsWithSavedVcsInstallation(
   onboarding: FactoriesFactory["onboarding"],
   selections: IntegrationSelections,
+  installationName: string,
 ): IntegrationSelections {
   const host = onboardingVcsHost(onboarding);
-  const id = onboarding?.vcsIntegrationId;
-  if (!host || !id) return selections;
+  const id = onboarding?.vcsIntegrationId?.trim() ?? "";
+  const name = installationName.trim();
+  if (!host || !id || !name || name === id) return selections;
   const current = selections[host];
-  if (current?.id === id && current.ready) return selections;
-  return { ...selections, [host]: { id, name: current?.name || id, ready: true } };
+  if (current?.id === id && current.name === name && current.ready) return selections;
+  return { ...selections, [host]: { id, name, ready: true } };
 }
 
-export async function describeGitHubInstallationName(organizationId: string, integrationId: string): Promise<string> {
+export async function describeInstallationName(organizationId: string, integrationId: string): Promise<string> {
   const response = await organizationsDescribeIntegration(
     withOrganizationHeader({
       organizationId,

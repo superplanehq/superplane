@@ -17,7 +17,7 @@ import { completeInitialOrganizationIdentity } from "./initialOnboardingOrganiza
 import { factoryHomePath } from "../../lib/factoryPagePaths";
 import { jiraCompletionSettingsToApi } from "../intakeSourceSettingsModel";
 import type { JiraCompletionColumnValue } from "../jiraCompletionColumn";
-import { describeGitHubInstallationName, selectionsWithGitHubInstallation } from "./githubIntegrationSelection";
+import { describeInstallationName, selectionsWithSavedVcsInstallation } from "./githubIntegrationSelection";
 import { markWorkspaceGettingStarted } from "./gettingStartedState";
 import { firstWorkOrderAgentError, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import { vcsLabel, type IssuesChoiceId, type VcsHostId } from "./onboardingFixtures";
@@ -240,17 +240,25 @@ function workspaceVcsHost(host: VcsHostId | null): VcsHostId {
   return host === "bitbucket" ? "bitbucket" : "github";
 }
 
-// A Bitbucket selection already carries the integration name. A GitHub
-// selection names the installation, which templates need.
+// Templates copy this name into secret references. The worker loads
+// credentials by that name, so GitHub and Bitbucket both need the
+// installation name, not the integration id.
 async function selectionsWithVcsInstallation(
   organizationId: string,
   selections: IntegrationSelections,
   vcsHost: VcsHostId,
   integrationId: string,
 ): Promise<IntegrationSelections> {
-  if (vcsHost !== "github") return selections;
-  const installationName = await describeGitHubInstallationName(organizationId, integrationId);
-  return selectionsWithGitHubInstallation(selections, installationName);
+  const installationName = await describeInstallationName(organizationId, integrationId);
+  const name = installationName.trim();
+  if (!name || name === integrationId.trim()) {
+    throw new Error(`${vcsHost === "bitbucket" ? "Bitbucket" : "GitHub"} integration name is missing`);
+  }
+  return selectionsWithSavedVcsInstallation(
+    { vcsIntegrationId: integrationId, vcsProvider: vcsHost },
+    selections,
+    name,
+  );
 }
 
 function agentIntegrationIdForPlan(plan: OnboardingAgentPlan, selections: IntegrationSelections): string | undefined {
