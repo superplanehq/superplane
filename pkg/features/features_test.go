@@ -114,13 +114,10 @@ func Test__Get(t *testing.T) {
 		assert.True(t, IsReleased(FeatureSuperPlaneMCPServer))
 	})
 
-	t.Run("known id returns mobile board feature", func(t *testing.T) {
-		f, ok := Get(FeatureMobileFactoryBoard)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureMobileFactoryBoard, f.ID)
-		assert.Equal(t, "Mobile Board", f.Label)
-		assert.Equal(t, "Show the mobile workspace shell on phone-width screens", f.Description)
-		assert.Nil(t, f.Released)
+	t.Run("retired mobile board flag is absent", func(t *testing.T) {
+		feature, ok := Get("mobile_factory_board")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
 	})
 
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
@@ -179,7 +176,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
 	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
-	assert.True(t, Exists(FeatureMobileFactoryBoard))
+	assert.False(t, Exists("mobile_factory_board"))
 	assert.False(t, Exists("factory_risk_score"))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("factory_task_console"))
