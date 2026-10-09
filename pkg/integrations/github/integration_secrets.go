@@ -117,7 +117,7 @@ func legacyAccessToken(httpCtx core.HTTPContext, integrationCtx core.Integration
 
 	token, err := itr.Token(context.Background())
 	if err != nil {
-		return "", fmt.Errorf("failed to create installation access token: %v", err)
+		return "", fmt.Errorf("failed to create installation access token: %w", common.ExplainError(err))
 	}
 
 	return token, nil
@@ -165,7 +165,7 @@ func appInstallationAccessToken(
 
 	token, err := itr.Token(context.Background())
 	if err != nil {
-		return "", fmt.Errorf("failed to create installation access token: %v", err)
+		return "", fmt.Errorf("failed to create installation access token: %w", common.ExplainError(err))
 	}
 
 	return token, nil
