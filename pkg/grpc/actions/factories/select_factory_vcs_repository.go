@@ -44,11 +44,6 @@ func SelectFactoryVCSProviderRepository(
 	}
 
 	db := database.DB(ctx)
-	providerUserID, err := factoryVCSProviderUserID(ctx, db, organizationID, provider)
-	if err != nil {
-		return nil, err
-	}
-
 	var factory *models.Factory
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err = findFactory(tx, orgID, req.GetId())
@@ -59,7 +54,7 @@ func SelectFactoryVCSProviderRepository(
 			return err
 		}
 
-		repository, findErr := models.FindAccessibleVCSProviderRepository(tx, provider, providerUserID, req.GetRepositoryId())
+		repository, findErr := findGitHubCatalogRepository(ctx, tx, organizationID, req.GetRepositoryId())
 		if errors.Is(findErr, gorm.ErrRecordNotFound) {
 			return grpcerrors.PermissionDenied(findErr, "VCS repository is not accessible")
 		}
@@ -111,6 +106,38 @@ func SelectFactoryVCSProviderRepository(
 		return nil, factoryErrorToStatus(err, "failed to select VCS repository")
 	}
 	return &pb.SelectFactoryVCSProviderRepositoryResponse{Factory: serialized}, nil
+}
+
+func findGitHubCatalogRepository(
+	ctx context.Context,
+	tx *gorm.DB,
+	organizationID string,
+	repositoryID int64,
+) (*models.AccessibleVCSProviderRepository, error) {
+	if !githubapp.UserConnectReady(ctx) {
+		return models.FindInstalledVCSProviderRepository(tx, models.ProviderGitHub, repositoryID)
+	}
+	providerUserID, err := factoryVCSProviderUserID(ctx, tx, organizationID, models.ProviderGitHub)
+	if err != nil {
+		return nil, err
+	}
+	return models.FindAccessibleVCSProviderRepository(tx, models.ProviderGitHub, providerUserID, repositoryID)
+}
+
+func findGitHubCatalogRepositoryByName(
+	ctx context.Context,
+	tx *gorm.DB,
+	organizationID string,
+	fullName string,
+) (*models.AccessibleVCSProviderRepository, error) {
+	if !githubapp.UserConnectReady(ctx) {
+		return models.FindInstalledVCSProviderRepositoryByName(tx, models.ProviderGitHub, fullName)
+	}
+	providerUserID, err := factoryVCSProviderUserID(ctx, tx, organizationID, models.ProviderGitHub)
+	if err != nil {
+		return nil, err
+	}
+	return models.FindAccessibleVCSProviderRepositoryByName(tx, models.ProviderGitHub, providerUserID, fullName)
 }
 
 func factoryVCSProviderUserID(ctx context.Context, db *gorm.DB, organizationID, provider string) (int64, error) {
