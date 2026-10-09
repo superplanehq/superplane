@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { useState } from "react";
-import { MemoryRouter, Route, Routes, useParams } from "react-router";
+import { Route, Routes, useParams } from "react-router";
 
 import { Button } from "@/components/ui/button";
 
@@ -22,6 +22,8 @@ const forkedOrder = {
 const forkHandler = http.post("*/api/v1/factories/:factoryId/orders/:orderId/fork", () =>
   HttpResponse.json({ order: forkedOrder }),
 );
+
+const storyPath = "/org-1/workspaces/sp";
 
 const baseTarget: ForkTaskTarget = {
   organizationId: "org-1",
@@ -43,7 +45,10 @@ const meta = {
     withFactoriesTheme,
     (Story) => (
       <QueryClientProvider client={queryClient}>
-        <ComponentStoryShell className="flex min-h-[520px] items-center justify-center bg-background p-6">
+        <ComponentStoryShell
+          initialPath={storyPath}
+          className="flex min-h-[520px] items-center justify-center bg-background p-6"
+        >
           <Story />
         </ComponentStoryShell>
       </QueryClientProvider>
@@ -57,12 +62,10 @@ type Story = StoryObj<typeof meta>;
 
 function OpenDialog({ target, isPending = false }: { target: ForkTaskTarget; isPending?: boolean }) {
   return (
-    <MemoryRouter initialEntries={["/org-1/workspaces/sp"]}>
-      <Routes>
-        <Route path="/org-1/workspaces/sp" element={<DialogControls target={target} isPending={isPending} />} />
-        <Route path="/org-1/workspaces/sp/task/:number" element={<ForkedTaskNote />} />
-      </Routes>
-    </MemoryRouter>
+    <Routes>
+      <Route path={storyPath} element={<DialogControls target={target} isPending={isPending} />} />
+      <Route path={`${storyPath}/task/:number`} element={<ForkedTaskNote />} />
+    </Routes>
   );
 }
 
