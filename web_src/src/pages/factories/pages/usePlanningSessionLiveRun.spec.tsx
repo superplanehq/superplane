@@ -27,13 +27,14 @@ describe("usePlanningSessionLiveRun", () => {
     expect(result.current.machineStatus).toBe("failed");
   });
 
-  it("marks the machine failed when the live run passed", () => {
+  it("waits for the next user message when the live run passed after the idle wait", () => {
     useDescribeRun.mockReturnValue({ data: { run: { result: "RESULT_PASSED" } } });
     const view = runningCreateWithAgentView();
 
     const { result } = renderHook(() => usePlanningSessionLiveRun("org-1", view));
 
-    expect(result.current.machineStatus).toBe("failed");
+    expect(result.current.machineStatus).toBe("waiting");
+    expect(result.current.turnEnded).toBe(true);
   });
 
   it("stays off until the session has a canvas run", () => {

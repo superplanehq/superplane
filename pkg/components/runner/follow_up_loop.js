@@ -4,6 +4,9 @@
 /**
  * Planning-session only. After the hello prompt, wait on SuperPlane and
  * run each user message as the next Claude Code prompt (--continue).
+ * After IDLE_TIMEOUT_MS with no user message, exit so the runner task
+ * finishes and SuperPlane closes the session. A later message starts a
+ * new runner task with the analysis rewind.
  * Line automations never ship this script.
  */
 
@@ -13,6 +16,7 @@ const { spawn, spawnSync } = require("child_process");
 const { MAX_ATTACHMENT_BYTES } = require("./attachment_limit");
 
 const HOLD_SECONDS = 45;
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 const WAIT_RETRY_SECONDS = 1;
 const FOLLOW_UP_CMD_INDEX_BASE = 1000;
 const MAX_UNREACHABLE_WAITS = 8;
@@ -738,13 +742,22 @@ function isUnreachableWait(result) {
   return Boolean(result && result.unreachable);
 }
 
+function idleTimeoutReached(idleSince, now, idleTimeoutMs) {
+  return now() - idleSince >= idleTimeoutMs;
+}
+
 async function runLoop(helpers) {
   const wait = helpers.waitOnce;
   const sleep = helpers.sleep || defaultSleep;
   const log = helpers.log || ((msg) => process.stderr.write(msg));
+  const now = helpers.now || Date.now;
   const maxUnreachable = helpers.maxUnreachableWaits || MAX_UNREACHABLE_WAITS;
+  const idleTimeoutMs = helpers.idleTimeoutMs || IDLE_TIMEOUT_MS;
   let followUpIndex = 0;
   let unreachableStreak = 0;
+  // The idle clock counts only time spent waiting for the user. Agent work
+  // on a follow-up prompt does not count.
+  let idleSince = now();
   while (true) {
     const result = await wait();
     if (isUnreachableWait(result)) {
@@ -761,12 +774,17 @@ async function runLoop(helpers) {
       return action.code;
     }
     if (action.type === "wait") {
+      if (idleTimeoutReached(idleSince, now, idleTimeoutMs)) {
+        log(`no user message for ${Math.round(idleTimeoutMs / 1000)} seconds; ending this turn\n`);
+        return 0;
+      }
       await sleep(WAIT_RETRY_SECONDS * 1000);
       continue;
     }
     persistAnalysisContinuation(helpers.taskDir, result);
     const code = await runFollowUpPrompt(action, helpers, followUpIndex);
     followUpIndex += 1;
+    idleSince = now();
     if (code !== 0) {
       log(`follow-up prompt failed with exit ${code}; waiting for the next message\n`);
     }
@@ -788,6 +806,7 @@ async function main() {
 
 module.exports = {
   FOLLOW_UP_CMD_INDEX_BASE,
+  IDLE_TIMEOUT_MS,
   MAX_ATTACHMENT_BYTES,
   MAX_UNREACHABLE_WAITS,
   interpretWaitResponse,

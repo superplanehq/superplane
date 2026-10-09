@@ -222,9 +222,11 @@ func FindPlanningSessionByRun(tx *gorm.DB, canvasRunID uuid.UUID) (*FactoryPlann
 }
 
 // EndPlanningSessionForFinishedRun closes the planning session when the canvas
-// run is finished. Follow-up keeps a healthy session's run in progress. A
-// finished run means the agent process is gone, including a passed greet that
-// never entered wait.
+// run is finished. The follow-up loop keeps the run in progress while it
+// waits up to five minutes for the next user message. A finished run means the
+// agent process is gone: the idle wait ended, the agent failed, or a passed
+// greet never entered wait. The next user message reopens the session and
+// starts a new run with the analysis rewind.
 func EndPlanningSessionForFinishedRun(tx *gorm.DB, canvasRunID uuid.UUID, _ string) error {
 	session, err := FindPlanningSessionByRun(tx, canvasRunID)
 	if errors.Is(err, ErrFactoryPlanningSessionNotFound) {

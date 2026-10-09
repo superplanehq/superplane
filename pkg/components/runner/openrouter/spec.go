@@ -125,8 +125,10 @@ func attachPlanningSessionFiles(task OpenRouterBrokerTask, environment []runner.
 }
 
 // applyPlanningFollowUp keeps the machine on after canvas steps when this run
-// is a planning session. Line apps never attach a planning token, so they
-// keep the default step list and finish.
+// is a planning session. The follow-up loop waits up to five minutes for the
+// next user message, then exits so the run finishes and the session closes.
+// Line apps never attach a planning token, so they keep the default step list
+// and finish.
 func applyPlanningFollowUp(task OpenRouterBrokerTask, environment []runner.BrokerEnvironmentVariable, spec RunOpenRouterSpec) OpenRouterBrokerTask {
 	if !runner.HasPlanningSessionToken(environment) {
 		return task
