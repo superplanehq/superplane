@@ -14,6 +14,7 @@ type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 const github = vi.hoisted(() => ({
   data: {
     providerConfigured: true,
+    accountConnectionRequired: true,
     identity: undefined as { userId: string; login: string } | undefined,
     repositories: [] as Array<{
       repositoryId: string;
@@ -32,8 +33,6 @@ const github = vi.hoisted(() => ({
 
 const showErrorToast = vi.hoisted(() => vi.fn());
 const startPublicGitHubAppCreate = vi.hoisted(() => vi.fn().mockResolvedValue(true));
-const fetchGitHubLoginClient = vi.hoisted(() => vi.fn().mockResolvedValue({ state: "missing", canUpdate: false }));
-const saveGitHubLoginClient = vi.hoisted(() => vi.fn());
 const startInstallation = vi.fn().mockResolvedValue("https://github.com/apps/superplane/installations/new");
 const configureInstallation = vi.fn().mockResolvedValue("https://github.com/settings/installations/101");
 
@@ -43,8 +42,6 @@ vi.mock("@/lib/toast", () => ({
 
 vi.mock("@/lib/githubAppManifest", () => ({
   startPublicGitHubAppCreate: (...args: unknown[]) => startPublicGitHubAppCreate(...args),
-  fetchGitHubLoginClient: (...args: unknown[]) => fetchGitHubLoginClient(...args),
-  saveGitHubLoginClient: (...args: unknown[]) => saveGitHubLoginClient(...args),
 }));
 
 vi.mock("./useBitbucketOnboarding", () => ({
@@ -171,6 +168,7 @@ const runningDestination = {
 describe("FirstRunSetup GitHub catalog", () => {
   beforeEach(() => {
     github.data.providerConfigured = true;
+    github.data.accountConnectionRequired = true;
     github.data.identity = undefined;
     github.data.repositories = [];
     github.data.pendingRequests = [];
@@ -182,10 +180,6 @@ describe("FirstRunSetup GitHub catalog", () => {
     showErrorToast.mockReset();
     startPublicGitHubAppCreate.mockReset();
     startPublicGitHubAppCreate.mockResolvedValue(true);
-    fetchGitHubLoginClient.mockReset();
-    fetchGitHubLoginClient.mockResolvedValue({ state: "missing", canUpdate: false });
-    saveGitHubLoginClient.mockReset();
-    saveGitHubLoginClient.mockResolvedValue(undefined);
     localStorage.clear();
   });
 
@@ -205,6 +199,23 @@ describe("FirstRunSetup GitHub catalog", () => {
     expect(startPublicGitHubAppCreate).not.toHaveBeenCalled();
   });
 
+  it("opens organization selection after the GitHub App exists without sign-in", () => {
+    github.data.providerConfigured = true;
+    github.data.accountConnectionRequired = false;
+    github.data.repositories = [
+      {
+        repositoryId: "201",
+        installationId: "101",
+        fullName: "acme/api",
+        defaultBranch: "main",
+      },
+    ];
+    renderSetup(pageModel());
+
+    expect(screen.getByText(FIRST_RUN_COPY.choose.organizationHeadline)).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
+  });
+
   it("asks to create the GitHub App when the process has none", async () => {
     const user = userEvent.setup();
     github.data.providerConfigured = false;
@@ -214,68 +225,6 @@ describe("FirstRunSetup GitHub catalog", () => {
     expect(screen.getByText(FIRST_RUN_COPY.connect.createAppBody)).toBeInTheDocument();
     await user.click(screen.getByTestId("first-run-connect-github"));
     expect(startPublicGitHubAppCreate).toHaveBeenCalledWith("/org-1/workspaces/PAY/setup?step=vcs");
-  });
-
-  it("asks for the existing GitHub App login instead of creating another app", async () => {
-    fetchGitHubLoginClient.mockResolvedValue({ state: "needs_client", canUpdate: false });
-    github.data.providerConfigured = false;
-    renderSetup(pageModel());
-
-    expect(await screen.findByTestId("first-run-github-client-id")).toBeInTheDocument();
-    expect(screen.getByText(FIRST_RUN_COPY.connect.addLoginBody)).toBeInTheDocument();
-    expect(screen.queryByText(FIRST_RUN_COPY.connect.createAppAction)).not.toBeInTheDocument();
-    expect(startPublicGitHubAppCreate).not.toHaveBeenCalled();
-  });
-
-  it("shows an error when GitHub login cannot be saved", async () => {
-    const user = userEvent.setup();
-    const previousAssign = window.location.assign.bind(window.location);
-    const assign = vi.fn();
-    window.location.assign = assign;
-    fetchGitHubLoginClient.mockResolvedValue({ state: "needs_client", canUpdate: false });
-    saveGitHubLoginClient.mockRejectedValue(new Error("rejected"));
-    github.data.providerConfigured = false;
-
-    try {
-      renderSetup(pageModel());
-      await user.type(await screen.findByLabelText(FIRST_RUN_COPY.connect.clientIdLabel), "Iv1.client");
-      await user.type(screen.getByLabelText(FIRST_RUN_COPY.connect.clientSecretLabel), "secret");
-      await user.click(screen.getByTestId("first-run-save-github-login"));
-
-      expect(await screen.findByText(FIRST_RUN_COPY.connect.loginSaveError)).toBeInTheDocument();
-      expect(assign).not.toHaveBeenCalled();
-      expect(screen.getByTestId("first-run-save-github-login")).toHaveTextContent(
-        FIRST_RUN_COPY.connect.saveLoginAction,
-      );
-    } finally {
-      window.location.assign = previousAssign;
-    }
-  });
-
-  it("replaces a saved GitHub login client without creating another app", async () => {
-    const user = userEvent.setup();
-    const previousAssign = window.location.assign.bind(window.location);
-    const assign = vi.fn();
-    window.location.assign = assign;
-    fetchGitHubLoginClient.mockResolvedValue({ state: "ready", canUpdate: true });
-
-    try {
-      renderSetup(pageModel());
-      await user.click(await screen.findByTestId("first-run-change-github-login"));
-      await user.type(screen.getByLabelText(FIRST_RUN_COPY.connect.clientIdLabel), "Iv1.other");
-      await user.type(screen.getByLabelText(FIRST_RUN_COPY.connect.clientSecretLabel), "corrected");
-      await user.click(screen.getByTestId("first-run-save-github-login"));
-
-      expect(saveGitHubLoginClient).toHaveBeenCalledWith("Iv1.other", "corrected");
-      await waitFor(() => {
-        expect(assign).toHaveBeenCalledWith(
-          "/auth/github?intent=connect&redirect=%2Forg-1%2Fworkspaces%2FPAY%2Fsetup%3Fstep%3Drepo%26githubConnected%3D1",
-        );
-      });
-      expect(startPublicGitHubAppCreate).not.toHaveBeenCalled();
-    } finally {
-      window.location.assign = previousAssign;
-    }
   });
 
   it("returns from GitHub connection at repository selection", async () => {
