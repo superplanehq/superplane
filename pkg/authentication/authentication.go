@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -177,6 +179,12 @@ func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) beginProviderAuth(w http.ResponseWriter, r *http.Request) {
+	if mux.Vars(r)["provider"] == models.ProviderGitHub {
+		if err := a.ensureGitHubOAuth(r.Context()); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	if !requestsGitHubAccountPicker(r) {
 		gothic.BeginAuthHandler(w, r)
 		return
@@ -189,6 +197,42 @@ func (a *Handler) beginProviderAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, withGitHubAccountPicker(authURL), http.StatusTemporaryRedirect)
+}
+
+// Cloud registers GitHub at startup from GITHUB_CLIENT_ID. A self-hosted
+// installation stores the login client with the GitHub App, so each request
+// loads that client before Goth starts the redirect.
+func (a *Handler) ensureGitHubOAuth(ctx context.Context) error {
+	if strings.TrimSpace(os.Getenv("GITHUB_CLIENT_ID")) != "" && strings.TrimSpace(os.Getenv("GITHUB_CLIENT_SECRET")) != "" {
+		return nil
+	}
+	if a.encryptor == nil {
+		return errors.New("sign-in with GitHub is not configured: create the GitHub App again")
+	}
+	cfg, err := githubapp.Resolve(ctx, database.DB(ctx), a.encryptor)
+	if err != nil {
+		return err
+	}
+	if cfg.ClientID == "" || cfg.ClientSecret == "" {
+		if _, err := goth.GetProvider(models.ProviderGitHub); err == nil {
+			return nil
+		}
+		return errors.New("sign-in with GitHub is not configured: create the GitHub App again")
+	}
+	goth.UseProviders(github.New(cfg.ClientID, cfg.ClientSecret, githubOAuthCallbackURL(), "user:email"))
+	return nil
+}
+
+func githubOAuthCallbackURL() string {
+	baseURL := strings.TrimSpace(os.Getenv("BASE_URL"))
+	if baseURL == "" {
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8000"
+		}
+		baseURL = "http://localhost:" + port
+	}
+	return githubapp.OAuthCallbackURL(baseURL)
 }
 
 // GitHub otherwise authorizes the active browser account, so a user with
@@ -318,6 +362,15 @@ func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, got
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
+	// Login starts on one pod and the callback can land on another. Load the
+	// saved GitHub client before gothic reads it, the same way login does.
+	if mux.Vars(r)["provider"] == models.ProviderGitHub {
+		if err := a.ensureGitHubOAuth(r.Context()); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err != nil {
 		log.WithError(err).Warn("provider authentication failed")

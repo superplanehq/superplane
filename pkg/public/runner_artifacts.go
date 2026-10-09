@@ -401,7 +401,9 @@ func servePublicArtifact(w http.ResponseWriter, r *http.Request, provider blob.P
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	if provider.Name() == blob.ProviderGCS || provider.Name() == blob.ProviderS3 {
+	if provider.Name() == blob.ProviderGCS ||
+		provider.Name() == blob.ProviderS3 ||
+		provider.Name() == blob.ProviderAzure {
 		signedURL, signErr := provider.SignedGetURL(r.Context(), file.StorageKey, artifactRedirectTTL)
 		if signErr != nil {
 			log.WithError(signErr).Error("failed to sign public artifact URL")
