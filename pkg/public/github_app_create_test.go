@@ -204,6 +204,34 @@ func TestHandleGitHubAppLoginSavesClientOnExistingApp(t *testing.T) {
 		assert.Equal(t, "Iv1.client", cfg.ClientID)
 		assert.Equal(t, "secret", cfg.ClientSecret)
 	})
+
+	t.Run("replaces a wrong login client without replacing the app", func(t *testing.T) {
+		read := execRequest(server, requestParams{
+			method:     http.MethodGet,
+			path:       "/github/app/login",
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, read.Code)
+		var body githubAppLoginResponse
+		require.NoError(t, json.Unmarshal(read.Body.Bytes(), &body))
+		assert.Equal(t, githubapp.LoginClientReady, body.State)
+		assert.True(t, body.CanUpdate)
+
+		response := execRequest(server, requestParams{
+			method:     http.MethodPost,
+			path:       "/github/app/login",
+			body:       []byte(`{"clientId":"Iv1.other","clientSecret":"corrected"}`),
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusNoContent, response.Code)
+		cfg, err := githubapp.Resolve(t.Context(), database.DB(t.Context()), r.Encryptor)
+		require.NoError(t, err)
+		assert.Equal(t, int64(44), cfg.ID)
+		assert.Equal(t, "pem", cfg.PrivateKey)
+		assert.Equal(t, "whsec", cfg.WebhookSecret)
+		assert.Equal(t, "Iv1.other", cfg.ClientID)
+		assert.Equal(t, "corrected", cfg.ClientSecret)
+	})
 }
 
 func TestHandleGitHubAppCreatedRejectsInvalidState(t *testing.T) {

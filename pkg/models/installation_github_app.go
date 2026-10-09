@@ -100,3 +100,28 @@ func ReplaceInstallationGitHubAppOAuth(
 	}
 	return nil
 }
+
+// UpdateInstallationGitHubAppLoginClient replaces the login client on the
+// saved GitHub App. It does not change the app id, private key, or webhook
+// secret, so an administrator can correct a client id or secret.
+func UpdateInstallationGitHubAppLoginClient(
+	tx *gorm.DB,
+	githubAppID int64,
+	clientID string,
+	encryptedClientSecret []byte,
+) error {
+	result := tx.Model(&InstallationGitHubApp{}).
+		Where("id = ? AND github_app_id = ?", installationGitHubAppID, githubAppID).
+		Updates(map[string]any{
+			"client_id":               clientID,
+			"encrypted_client_secret": encryptedClientSecret,
+			"updated_at":              time.Now(),
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrInstallationGitHubAppExists
+	}
+	return nil
+}

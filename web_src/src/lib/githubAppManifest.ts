@@ -9,14 +9,20 @@ type GitHubAppManifestResponse = {
 
 export type GitHubLoginClientState = "missing" | "needs_client" | "ready";
 
-export async function fetchGitHubLoginClient(): Promise<GitHubLoginClientState> {
+export type GitHubLoginClient = {
+  state: GitHubLoginClientState;
+  canUpdate: boolean;
+};
+
+export async function fetchGitHubLoginClient(): Promise<GitHubLoginClient> {
   const response = await fetch("/api/v1/github/app/login", { credentials: "include" });
   if (!response.ok) {
     throw new Error(await getResponseErrorMessage(response, "SuperPlane could not read the GitHub App"));
   }
-  const body = (await response.json()) as { state?: string };
-  if (body.state === "needs_client" || body.state === "ready") return body.state;
-  return "missing";
+  const body = (await response.json()) as { state?: string; canUpdate?: boolean };
+  const state: GitHubLoginClientState =
+    body.state === "needs_client" || body.state === "ready" ? body.state : "missing";
+  return { state, canUpdate: body.canUpdate === true };
 }
 
 export async function saveGitHubLoginClient(clientId: string, clientSecret: string): Promise<void> {

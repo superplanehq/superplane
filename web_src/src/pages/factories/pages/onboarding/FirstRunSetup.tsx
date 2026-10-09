@@ -360,10 +360,13 @@ function VcsScreen({
         createApp={!flow.appConfigured && !flow.loginClientNeeded}
         addLogin={flow.loginClientNeeded}
         savingLogin={flow.blockingAction === "opening-github" && flow.loginClientNeeded}
+        canChangeLogin={flow.canChangeLogin}
+        loginError={flow.loginError}
         connectError={flow.connectError}
         chrome={chrome}
         sphere={sphereFor("connect", setup.selectedRepo)}
         onConnectGitHub={() => void (flow.appConfigured ? flow.connectGitHub() : flow.createGitHubApp())}
+        onChangeLogin={flow.startGitHubLoginEdit}
         onSaveLogin={(clientId, clientSecret) => void flow.saveGitHubLogin(clientId, clientSecret)}
       />
     );

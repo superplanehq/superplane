@@ -118,8 +118,9 @@ func (s *Server) redirectExistingGitHubApp(w http.ResponseWriter, r *http.Reques
 }
 
 type githubAppLoginResponse struct {
-	State string `json:"state"`
-	Slug  string `json:"slug,omitempty"`
+	State     string `json:"state"`
+	Slug      string `json:"slug,omitempty"`
+	CanUpdate bool   `json:"canUpdate,omitempty"`
 }
 
 type githubAppLoginRequest struct {
@@ -140,14 +141,18 @@ func (s *Server) HandleGitHubAppLogin(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		state, slug, err := githubapp.LoginClientStatus(database.DB(r.Context()))
+		status, err := githubapp.LoginClientStatus(database.DB(r.Context()))
 		if err != nil {
 			log.WithError(err).Error("failed to read GitHub login client")
 			http.Error(w, "failed to read GitHub login", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(githubAppLoginResponse{State: state, Slug: slug})
+		_ = json.NewEncoder(w).Encode(githubAppLoginResponse{
+			State:     status.State,
+			Slug:      status.Slug,
+			CanUpdate: status.CanUpdate,
+		})
 	case http.MethodPost:
 		var body githubAppLoginRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

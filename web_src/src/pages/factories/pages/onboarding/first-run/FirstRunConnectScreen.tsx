@@ -1,3 +1,6 @@
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { useState, type FormEvent } from "react";
 
@@ -21,11 +24,13 @@ export function FirstRunConnectScreen({
   createApp = false,
   addLogin = false,
   savingLogin = false,
+  canChangeLogin = false,
   loginError,
   connectError,
   chrome,
   sphere,
   onConnectGitHub,
+  onChangeLogin,
   onSaveLogin,
 }: {
   loading?: boolean;
@@ -33,11 +38,13 @@ export function FirstRunConnectScreen({
   createApp?: boolean;
   addLogin?: boolean;
   savingLogin?: boolean;
+  canChangeLogin?: boolean;
   loginError?: string;
   connectError?: string;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   onConnectGitHub: () => void;
+  onChangeLogin?: () => void;
   onSaveLogin?: (clientId: string, clientSecret: string) => void;
 }) {
   const [clientId, setClientId] = useState("");
@@ -98,31 +105,50 @@ export function FirstRunConnectScreen({
           >
             {addLogin ? (
               <form id="first-run-github-login" className="w-full space-y-3" onSubmit={saveLogin}>
-                <label className="block space-y-1.5 text-[13px] text-muted-foreground">
-                  {copy.clientIdLabel}
-                  <input
-                    className="h-9 w-full rounded-md border border-[#34322b] bg-[#201f1a] px-3 text-[14px] text-foreground"
+                <div className="space-y-1.5">
+                  <Label htmlFor="first-run-github-client-id" className="text-[13px] font-normal text-muted-foreground">
+                    {copy.clientIdLabel}
+                  </Label>
+                  <Input
+                    id="first-run-github-client-id"
                     autoComplete="off"
                     value={clientId}
                     onChange={(event) => setClientId(event.target.value)}
                     data-testid="first-run-github-client-id"
                   />
-                </label>
-                <label className="block space-y-1.5 text-[13px] text-muted-foreground">
-                  {copy.clientSecretLabel}
-                  <input
-                    className="h-9 w-full rounded-md border border-[#34322b] bg-[#201f1a] px-3 text-[14px] text-foreground"
+                </div>
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="first-run-github-client-secret"
+                    className="text-[13px] font-normal text-muted-foreground"
+                  >
+                    {copy.clientSecretLabel}
+                  </Label>
+                  <Input
+                    id="first-run-github-client-secret"
                     type="password"
                     autoComplete="off"
                     value={clientSecret}
                     onChange={(event) => setClientSecret(event.target.value)}
                     data-testid="first-run-github-client-secret"
                   />
-                </label>
+                </div>
               </form>
             ) : null}
           </FirstRunGithubStepper>
         )}
+        {!loading && canChangeLogin ? (
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-[13px] font-normal text-muted-foreground hover:text-foreground"
+            onClick={onChangeLogin}
+            data-testid="first-run-change-github-login"
+          >
+            {copy.changeLoginAction}
+          </Button>
+        ) : null}
         {loginError ? <p className="text-[13px] text-destructive">{loginError}</p> : null}
         {connectError ? <p className="text-[13px] text-destructive">{connectError}</p> : null}
       </div>

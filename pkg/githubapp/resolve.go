@@ -143,34 +143,44 @@ func Save(
 	return err
 }
 
+// LoginClient is the sign-in client stored for this installation.
+// CanUpdate is true when an administrator can replace that client
+// without replacing the GitHub App.
+type LoginClient struct {
+	State     string
+	Slug      string
+	CanUpdate bool
+}
+
 // LoginClientStatus reports whether sign-in can start, or the saved app still
 // needs its login client. Creating another GitHub App does not add that client.
-func LoginClientStatus(tx *gorm.DB) (string, string, error) {
+func LoginClientStatus(tx *gorm.DB) (LoginClient, error) {
 	if strings.TrimSpace(os.Getenv("GITHUB_CLIENT_ID")) != "" && strings.TrimSpace(os.Getenv("GITHUB_CLIENT_SECRET")) != "" {
-		return LoginClientReady, "", nil
+		return LoginClient{State: LoginClientReady}, nil
 	}
 	if env := config.LoadGitHubHostedAppConfig(); env.Enabled() {
-		return LoginClientReady, env.Slug, nil
+		return LoginClient{State: LoginClientReady, Slug: env.Slug}, nil
 	}
 	if tx == nil {
-		return LoginClientMissing, "", nil
+		return LoginClient{State: LoginClientMissing}, nil
 	}
 
 	record, err := models.FindInstallationGitHubApp(tx)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return LoginClientMissing, "", nil
+		return LoginClient{State: LoginClientMissing}, nil
 	}
 	if err != nil {
-		return "", "", fmt.Errorf("load installation GitHub App: %w", err)
+		return LoginClient{}, fmt.Errorf("load installation GitHub App: %w", err)
 	}
 	if record.ClientID != "" && len(record.EncryptedClientSecret) > 0 {
-		return LoginClientReady, record.Slug, nil
+		return LoginClient{State: LoginClientReady, Slug: record.Slug, CanUpdate: true}, nil
 	}
-	return LoginClientNeeded, record.Slug, nil
+	return LoginClient{State: LoginClientNeeded, Slug: record.Slug}, nil
 }
 
 // SaveLoginClient stores the login client on the GitHub App that already
-// exists. It does not replace that app.
+// exists. A later save corrects the client id and secret. It does not
+// replace the app.
 func SaveLoginClient(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor, clientID, clientSecret string) error {
 	clientID = strings.TrimSpace(clientID)
 	clientSecret = strings.TrimSpace(clientSecret)
@@ -188,15 +198,16 @@ func SaveLoginClient(ctx context.Context, tx *gorm.DB, encryptor crypto.Encrypto
 	if err != nil {
 		return fmt.Errorf("load installation GitHub App: %w", err)
 	}
-	if record.ClientID != "" {
-		return ErrAlreadyConfigured
-	}
 
 	encryptedClientSecret, err := encryptor.Encrypt(ctx, []byte(clientSecret), []byte(clientSecretAssociatedData))
 	if err != nil {
 		return fmt.Errorf("encrypt GitHub App client secret: %w", err)
 	}
-	return models.ReplaceInstallationGitHubAppOAuth(tx, record.GitHubAppID, clientID, encryptedClientSecret)
+	err = models.UpdateInstallationGitHubAppLoginClient(tx, record.GitHubAppID, clientID, encryptedClientSecret)
+	if errors.Is(err, models.ErrInstallationGitHubAppExists) {
+		return ErrAlreadyConfigured
+	}
+	return err
 }
 
 // UserConnectReady reports whether GitHub account connection can start.

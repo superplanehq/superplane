@@ -189,10 +189,11 @@ func TestSaveLoginClientKeepsExistingApp(t *testing.T) {
 		PrivateKey:    "db-pem",
 		WebhookSecret: "db-secret",
 	}))
-	state, slug, err := LoginClientStatus(database.DB(t.Context()))
+	status, err := LoginClientStatus(database.DB(t.Context()))
 	require.NoError(t, err)
-	assert.Equal(t, LoginClientNeeded, state)
-	assert.Equal(t, "from-db", slug)
+	assert.Equal(t, LoginClientNeeded, status.State)
+	assert.Equal(t, "from-db", status.Slug)
+	assert.False(t, status.CanUpdate)
 
 	require.NoError(t, SaveLoginClient(t.Context(), database.DB(t.Context()), encryptor, "Iv1.client", "client-secret"))
 	cfg, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
@@ -205,12 +206,19 @@ func TestSaveLoginClientKeepsExistingApp(t *testing.T) {
 	assert.Equal(t, "client-secret", cfg.ClientSecret)
 	assert.True(t, UserConnectReady(t.Context()))
 
-	err = SaveLoginClient(t.Context(), database.DB(t.Context()), encryptor, "Iv1.other", "other-secret")
-	require.ErrorIs(t, err, ErrAlreadyConfigured)
+	require.NoError(t, SaveLoginClient(t.Context(), database.DB(t.Context()), encryptor, "Iv1.other", "other-secret"))
 	kept, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
 	require.NoError(t, err)
+	assert.Equal(t, int64(11), kept.ID)
+	assert.Equal(t, "from-db", kept.Slug)
 	assert.Equal(t, "db-pem", kept.PrivateKey)
-	assert.Equal(t, "Iv1.client", kept.ClientID)
+	assert.Equal(t, "db-secret", kept.WebhookSecret)
+	assert.Equal(t, "Iv1.other", kept.ClientID)
+	assert.Equal(t, "other-secret", kept.ClientSecret)
+	status, err = LoginClientStatus(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.Equal(t, LoginClientReady, status.State)
+	assert.True(t, status.CanUpdate)
 }
 
 func clearGitHubAppEnv(t *testing.T) {

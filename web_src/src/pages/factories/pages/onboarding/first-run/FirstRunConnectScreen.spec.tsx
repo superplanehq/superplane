@@ -37,9 +37,15 @@ describe("FirstRunConnectScreen", () => {
     expect(screen.getByText(FIRST_RUN_COPY.connect.addLoginBody)).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
     expect(screen.getByTestId("first-run-save-github-login")).toBeDisabled();
+    expect(screen.getByLabelText(FIRST_RUN_COPY.connect.clientIdLabel)).toBe(
+      screen.getByTestId("first-run-github-client-id"),
+    );
+    expect(screen.getByLabelText(FIRST_RUN_COPY.connect.clientSecretLabel)).toBe(
+      screen.getByTestId("first-run-github-client-secret"),
+    );
 
-    await user.type(screen.getByTestId("first-run-github-client-id"), "Iv1.client");
-    await user.type(screen.getByTestId("first-run-github-client-secret"), "secret");
+    await user.type(screen.getByLabelText(FIRST_RUN_COPY.connect.clientIdLabel), "Iv1.client");
+    await user.type(screen.getByLabelText(FIRST_RUN_COPY.connect.clientSecretLabel), "secret");
     await user.click(screen.getByTestId("first-run-save-github-login"));
 
     expect(save).toHaveBeenCalledWith("Iv1.client", "secret");

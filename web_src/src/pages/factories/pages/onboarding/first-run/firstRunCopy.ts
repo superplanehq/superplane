@@ -76,6 +76,9 @@ export const FIRST_RUN_COPY = {
     clientSecretLabel: "Client secret",
     saveLoginAction: "Save GitHub login",
     savingLogin: "Saving GitHub login…",
+    changeLoginAction: "Change client ID",
+    loginSaveError:
+      "SuperPlane could not save the GitHub login. Check the client ID and client secret, then try again.",
     stepOrganization: "Choose organization",
     stepOrganizationDone: (organization: string) => `Organization: ${organization}`,
     stepRepository: "Choose repository",
