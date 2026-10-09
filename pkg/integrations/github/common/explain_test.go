@@ -160,6 +160,13 @@ type closeTracker struct {
 	closed bool
 }
 
+func (c *closeTracker) Read(p []byte) (int, error) {
+	if c.closed {
+		return 0, errors.New("http: read on closed response body")
+	}
+	return c.Reader.Read(p)
+}
+
 func (c *closeTracker) Close() error {
 	c.closed = true
 	return nil
@@ -205,7 +212,6 @@ func testAppPrivateKey(t *testing.T) []byte {
 
 type logCapture struct {
 	mu      sync.Mutex
-	active  bool
 	entries []*log.Entry
 }
 
@@ -216,21 +222,23 @@ func (l *logCapture) Levels() []log.Level {
 func (l *logCapture) Fire(entry *log.Entry) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if !l.active {
-		return nil
-	}
 	l.entries = append(l.entries, entry)
 	return nil
 }
 
 func captureErrorLogs(t *testing.T) *logCapture {
 	t.Helper()
-	hook := &logCapture{active: true}
-	log.AddHook(hook)
+	hook := &logCapture{}
+	logger := log.StandardLogger()
+	previous := logger.ReplaceHooks(make(log.LevelHooks))
+	for _, hooks := range previous {
+		for _, existing := range hooks {
+			logger.AddHook(existing)
+		}
+	}
+	logger.AddHook(hook)
 	t.Cleanup(func() {
-		hook.mu.Lock()
-		hook.active = false
-		hook.mu.Unlock()
+		logger.ReplaceHooks(previous)
 	})
 	return hook
 }
