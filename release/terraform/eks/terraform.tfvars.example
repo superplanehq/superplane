@@ -12,7 +12,8 @@ letsencrypt_email = "admin@example.com"
 # SuperPlane
 # -----------------------------------------------------------------------------
 
-# superplane_image_tag = "<git-sha>-selfhosted"  # Empty uses the chart's matching image.
+# superplane_chart_version = "0.0.0-782e528cea1fd707313bcfa4a2e8f57e9148f5c5"
+# superplane_image_tag    = "<git-sha>-selfhosted"  # Empty uses the chart's matching image.
 # superplane_namespace = "superplane"
 
 # Nominal PV/PVC capacity. EFS grows elastically and does not reserve this size.
@@ -32,7 +33,7 @@ letsencrypt_email = "admin@example.com"
 # -----------------------------------------------------------------------------
 
 # cluster_name    = "superplane"
-# cluster_version = "1.36"
+# cluster_version = "1.37"
 # node_count      = 2
 # instance_type   = "t3.medium"
 

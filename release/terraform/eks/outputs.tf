@@ -90,7 +90,7 @@ output "kubectl_config_command" {
 
 output "load_balancer_hostname_command" {
   description = "Command to get the NLB hostname for DNS configuration"
-  value       = "kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
+  value       = "kubectl get svc -n traefik traefik -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
 }
 
 # -----------------------------------------------------------------------------
@@ -109,7 +109,7 @@ output "next_steps" {
        ${local.kubectl_command}
 
     2. Get the Load Balancer hostname:
-       kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+       kubectl get svc -n traefik traefik -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 
     3. Create a CNAME record in your DNS provider:
        - Type: CNAME
