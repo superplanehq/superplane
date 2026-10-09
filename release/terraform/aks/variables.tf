@@ -125,9 +125,14 @@ variable "superplane_namespace" {
 }
 
 variable "superplane_image_tag" {
-  description = "SuperPlane image tag (e.g., stable, beta, v0.4)"
+  description = "SuperPlane image tag. Empty uses the chart's <git-sha>-selfhosted image. The plain <git-sha> and stable images load UI files from the hosted CDN and fail CORS on a customer domain. A local build can use a local- tag."
   type        = string
-  default     = "stable"
+  default     = ""
+
+  validation {
+    condition     = var.superplane_image_tag == "" || strcontains(var.superplane_image_tag, "selfhosted") || startswith(var.superplane_image_tag, "local-")
+    error_message = "Set superplane_image_tag to a tag that contains selfhosted, for example <git-sha>-selfhosted, or leave it empty. A local image can use a local- tag."
+  }
 }
 
 variable "image_registry" {
@@ -155,7 +160,7 @@ variable "fleet_manager_image_name" {
 }
 
 variable "fleet_manager_image_tag" {
-  description = "Fleet Manager image tag. Empty uses superplane_image_tag."
+  description = "Fleet Manager image tag. Empty uses superplane_image_tag. Set a tag when Fleet Manager is enabled and superplane_image_tag is empty."
   type        = string
   default     = ""
 }

@@ -294,6 +294,13 @@ resource "helm_release" "superplane" {
     type  = "string"
   }
 
+  # The config stays sensitive. Only the checksum is safe to publish.
+  # A changed checksum restarts Fleet Manager so it loads the new file.
+  set {
+    name  = "fleetManager.podAnnotations.checksum/config"
+    value = nonsensitive(sha256(var.fleet_manager_config))
+  }
+
   set {
     name  = "podSecurityContext.runAsNonRoot"
     value = "true"
