@@ -73,6 +73,80 @@ func TestResolveEmptyWhenMissing(t *testing.T) {
 	assert.False(t, cfg.Enabled())
 }
 
+func TestResolveKeepsOAuthClient(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	encryptor := testEncryptor()
+	clearGitHubAppEnv(t)
+	t.Setenv("NO_ENCRYPTION", "")
+	t.Setenv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	require.NoError(t, Save(t.Context(), database.DB(t.Context()), encryptor, config.GitHubHostedAppConfig{
+		ID:            11,
+		Slug:          "from-db",
+		PrivateKey:    "db-pem",
+		WebhookSecret: "db-secret",
+		ClientID:      "Iv1.client",
+		ClientSecret:  "client-secret",
+	}))
+
+	cfg, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
+	require.NoError(t, err)
+	assert.Equal(t, "Iv1.client", cfg.ClientID)
+	assert.Equal(t, "client-secret", cfg.ClientSecret)
+	assert.True(t, UserConnectReady(t.Context()))
+}
+
+func TestSaveAddsOAuthClientToExistingApp(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	encryptor := testEncryptor()
+	clearGitHubAppEnv(t)
+	t.Setenv("NO_ENCRYPTION", "")
+	t.Setenv("ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	require.NoError(t, Save(t.Context(), database.DB(t.Context()), encryptor, config.GitHubHostedAppConfig{
+		ID:            11,
+		Slug:          "from-db",
+		PrivateKey:    "db-pem",
+		WebhookSecret: "db-secret",
+	}))
+	assert.False(t, UserConnectReady(t.Context()))
+
+	require.NoError(t, Save(t.Context(), database.DB(t.Context()), encryptor, config.GitHubHostedAppConfig{
+		ID:            11,
+		Slug:          "ignored",
+		PrivateKey:    "new-pem",
+		WebhookSecret: "new-secret",
+		ClientID:      "Iv1.client",
+		ClientSecret:  "client-secret",
+	}))
+
+	cfg, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
+	require.NoError(t, err)
+	assert.Equal(t, int64(11), cfg.ID)
+	assert.Equal(t, "from-db", cfg.Slug)
+	assert.Equal(t, "db-pem", cfg.PrivateKey)
+	assert.Equal(t, "db-secret", cfg.WebhookSecret)
+	assert.Equal(t, "Iv1.client", cfg.ClientID)
+	assert.Equal(t, "client-secret", cfg.ClientSecret)
+
+	err = Save(t.Context(), database.DB(t.Context()), encryptor, config.GitHubHostedAppConfig{
+		ID:            22,
+		Slug:          "replaced",
+		PrivateKey:    "other-pem",
+		WebhookSecret: "other-secret",
+		ClientID:      "Iv1.other",
+		ClientSecret:  "other-secret",
+	})
+	require.ErrorIs(t, err, ErrAlreadyConfigured)
+	kept, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
+	require.NoError(t, err)
+	assert.Equal(t, int64(11), kept.ID)
+	assert.Equal(t, "db-pem", kept.PrivateKey)
+	assert.Equal(t, "Iv1.client", kept.ClientID)
+}
+
 func TestSaveKeepsFirstApp(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	encryptor := testEncryptor()

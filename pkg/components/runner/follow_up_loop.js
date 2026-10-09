@@ -150,6 +150,9 @@ function isObjectStorageHost(host) {
   if (value === "storage.googleapis.com" || value.endsWith(".storage.googleapis.com")) {
     return true;
   }
+  if (value.endsWith(".blob.core.windows.net")) {
+    return true;
+  }
   if (value === "s3.amazonaws.com" || value.endsWith(".s3.amazonaws.com")) {
     return true;
   }

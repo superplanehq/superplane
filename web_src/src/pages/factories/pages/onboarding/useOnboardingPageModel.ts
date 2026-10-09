@@ -34,6 +34,8 @@ import {
   initialWizardStep,
   isWizardStepId,
   localIssuesSource,
+  ONBOARDING_CONNECTION_NAMES,
+  ONBOARDING_MANUAL_CONNECTION_NAMES,
   onboardingVcsHost,
 } from "./onboardingStatus";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
@@ -48,12 +50,6 @@ import {
   type InitialOnboardingSetupState,
   type OnboardingSetupApi,
 } from "./useOnboardingSetupState";
-
-const ONBOARDING_INTEGRATIONS = ["bitbucket", "jira", "linear", ...AGENT_PROVIDER_IDS];
-
-// Agent keys stay unselected so a new workspace can use the canonical
-// SuperPlane template when hosted credit is available.
-const ONBOARDING_MANUAL_SELECTIONS = [...AGENT_PROVIDER_IDS] as const;
 
 /**
  * Setup only needs the keys that make an agent run. The Anthropic admin key
@@ -267,6 +263,8 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
       const integrationId = factory.onboarding?.vcsIntegrationId;
       if (!integrationId) throw new Error("GitHub repository selection returned no integration");
       const installationName = await describeGitHubInstallationName(args.organizationId, integrationId);
+      args.connect.rememberPreferredInstance("github", integrationId);
+      await args.connect.refetchConnections();
       args.integrations.setSelections((current) => ({
         ...current,
         github: githubIntegrationSelection(integrationId, installationName),
@@ -284,6 +282,8 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
       const integrationId = factory.onboarding?.vcsIntegrationId;
       if (!integrationId) throw new Error("Bitbucket repository selection returned no integration");
       const installationName = await describeGitHubInstallationName(args.organizationId, integrationId);
+      args.connect.rememberPreferredInstance("bitbucket", integrationId);
+      await args.connect.refetchConnections();
       args.integrations.setSelections((current) => ({
         ...current,
         bitbucket: { id: integrationId, name: installationName || "bitbucket", ready: true },
@@ -372,11 +372,11 @@ export function useOnboardingPageModel(args: {
       args.onboardingEntryPath ?? factorySetupPath(args.organizationId, args.factoryKey),
       openSection,
     ),
-    integrationNames: ONBOARDING_INTEGRATIONS,
+    integrationNames: [...ONBOARDING_CONNECTION_NAMES],
     selections: integrations.selections,
     onSelectionsChange: integrations.setSelections,
     hiddenConfigurationFields: ONBOARDING_HIDDEN_CONFIGURATION_FIELDS,
-    manualSelectionNames: ONBOARDING_MANUAL_SELECTIONS,
+    manualSelectionNames: ONBOARDING_MANUAL_CONNECTION_NAMES,
   });
   const [saving, setSaving] = useState(false);
   const [provisionedDestination, setProvisionedDestination] = useState<OnboardingDestination | null>(null);
