@@ -89,7 +89,7 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		triggerName:          "On Issue",
 		triggerConfiguration: map[string]any{"actions": intakeTriggerActionsFor(defaultIntakeSettings())},
 		createTitle:          "{{ root().data.issue.title }}",
-		createDescription:    "{{ root().data.issue.body }}",
+		createDescription:    "{{ root().data.issue.body ?? \"\" }}",
 	},
 	models.FactoryIntakeSourceSentryExceptions: {
 		name:                 "Sentry exceptions",
