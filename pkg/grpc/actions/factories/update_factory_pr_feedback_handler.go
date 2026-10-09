@@ -141,6 +141,10 @@ func applyPRFeedbackSettings(
 			updated.RunnerIntegrationNames,
 		)
 		independentDiscussionFlows := graph.hasIndependentDiscussionFlows(spec)
+		provider := ""
+		if factory != nil {
+			provider = factory.OnboardingConfigValue().EffectiveVCSProvider()
+		}
 
 		nodes := slices.Clone(liveVersion.Nodes)
 		for i := range nodes {
@@ -164,7 +168,10 @@ func applyPRFeedbackSettings(
 					configuration = map[string]any{}
 				}
 				configuration["repository"] = updated.Repository
-				configuration["checkNames"] = checkNamesNodeValue(updated.CheckNames)
+				// ponytail: wait nodes name required builds per provider
+				delete(configuration, "checkNames")
+				delete(configuration, "buildKeys")
+				configuration[prFeedbackWaitNamesKey(factory)] = checkNamesNodeValue(updated.CheckNames)
 				nodes[i].Configuration = configuration
 				continue
 			}
@@ -188,7 +195,7 @@ func applyPRFeedbackSettings(
 				continue
 			}
 			if graph.isChecks() {
-				if title, description, ok := prFeedbackChecksActivityExpressions(nodes[i].ID); ok {
+				if title, description, ok := prFeedbackChecksActivityExpressionsFor(nodes[i].ID, provider); ok {
 					configuration := maps.Clone(nodes[i].Configuration)
 					if configuration == nil {
 						configuration = map[string]any{}
@@ -211,7 +218,7 @@ func applyPRFeedbackSettings(
 				configuration = map[string]any{}
 			}
 			if !graph.isChecks() && independentDiscussionFlows {
-				title, description, ok := prFeedbackDiscussionActivityExpressions(nodes[i].ID)
+				title, description, ok := prFeedbackDiscussionActivityExpressions(nodes[i].ID, provider)
 				if !ok {
 					nodes[i].Configuration = configuration
 					continue

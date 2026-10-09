@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -14,13 +15,16 @@ import (
 )
 
 const (
-	defaultPollTimeout        = 30 * time.Second
-	defaultErrorRetryInterval = 15 * time.Second
-	defaultRequestTimeout     = 90 * time.Second
-	maxPollTimeout            = 30 * time.Second
-	defaultInstanceType       = "t3.micro"
-	defaultAzureVMSize        = "Standard_D2ds_v4"
-	defaultVolumeSizeGB       = 30
+	defaultPollTimeout         = 30 * time.Second
+	defaultErrorRetryInterval  = 15 * time.Second
+	defaultRequestTimeout      = 90 * time.Second
+	maxPollTimeout             = 30 * time.Second
+	defaultInstanceType        = "t3.micro"
+	defaultAzureVMSize         = "Standard_D2ds_v4"
+	defaultVolumeSizeGB        = 30
+	defaultGCPAMD64MachineType = "e2-standard-4"
+	defaultGCPARM64MachineType = "t2a-standard-4"
+	defaultGCPDiskType         = "pd-balanced"
 
 	fleetManagerConfigEnvironment = "FLEET_MANAGER_CONFIG"
 	installationTokenEnvironment  = "INSTALLATION_ADMIN_TOKEN"
@@ -28,7 +32,11 @@ const (
 	ProviderAWS    = "aws"
 	ProviderAzure  = "azure"
 	ProviderDocker = "docker"
+	ProviderGCP    = "gcp"
 )
+
+// GCP stores the Fleet Manager and fleet IDs as instance labels.
+var gcpLabelValuePattern = regexp.MustCompile(`^[a-z0-9_-]{1,63}$`)
 
 type Config struct {
 	ID                     string               `json:"id"`
@@ -80,6 +88,7 @@ type Fleet struct {
 	Provider     string `json:"provider"`
 	AWS          AWS    `json:"aws"`
 	Azure        Azure  `json:"azure"`
+	GCP          GCP    `json:"gcp"`
 	Docker       Docker `json:"docker"`
 }
 
@@ -117,6 +126,20 @@ type Azure struct {
 	DiskSizeGB             int32             `json:"diskSizeGb"`
 	EphemeralOSDisk        bool              `json:"ephemeralOSDisk"`
 	ResourceTags           map[string]string `json:"resourceTags"`
+}
+
+type GCP struct {
+	ProjectID           string            `json:"projectId"`
+	Zones               []string          `json:"zones"`
+	MachineType         string            `json:"machineType"`
+	Image               string            `json:"image"`
+	Architecture        string            `json:"architecture"`
+	Subnetwork          string            `json:"subnetwork"`
+	ServiceAccountEmail string            `json:"serviceAccountEmail"`
+	NetworkTags         []string          `json:"networkTags"`
+	DiskSizeGB          int64             `json:"diskSizeGb"`
+	DiskType            string            `json:"diskType"`
+	Labels              map[string]string `json:"labels"`
 }
 
 type Docker struct {
@@ -256,6 +279,7 @@ func (c *Config) applyDefaults() {
 		)
 		fleet.Azure.IdentityID = strings.TrimSpace(fleet.Azure.IdentityID)
 		fleet.Azure.Zones = nonEmpty(fleet.Azure.Zones)
+		fleet.GCP.applyDefaults()
 		fleet.Docker.Image = strings.TrimSpace(fleet.Docker.Image)
 		fleet.Docker.Architecture = strings.ToLower(
 			strings.TrimSpace(fleet.Docker.Architecture),
@@ -306,7 +330,13 @@ func (c *Config) validate() error {
 	case len(c.Fleets) == 0:
 		return fmt.Errorf("fleets must contain at least one fleet")
 	}
-	if c.hasProvider(ProviderAWS) || c.hasProvider(ProviderAzure) {
+	if c.hasProvider(ProviderGCP) && !gcpLabelValuePattern.MatchString(c.ID) {
+		return fmt.Errorf(
+			"id must be a valid GCP label value when a GCP fleet is configured: " +
+				"use 1-63 lowercase letters, digits, underscores, or dashes",
+		)
+	}
+	if c.hasProvider(ProviderAWS) || c.hasProvider(ProviderAzure) || c.hasProvider(ProviderGCP) {
 		switch {
 		case c.RunnerReleaseBaseURL == "":
 			return fmt.Errorf("runnerReleaseBaseUrl is required")
@@ -335,8 +365,13 @@ func (c *Config) validate() error {
 			)
 		case fleet.Provider != ProviderAWS &&
 			fleet.Provider != ProviderAzure &&
+			fleet.Provider != ProviderGCP &&
 			fleet.Provider != ProviderDocker:
 			return fmt.Errorf("%s.provider is invalid", prefix)
+		case fleet.Provider == ProviderGCP:
+			if err := fleet.validateGCP(prefix); err != nil {
+				return err
+			}
 		case fleet.Provider == ProviderDocker &&
 			fleet.Docker.Image == "":
 			return fmt.Errorf("%s.docker.image is required", prefix)
@@ -409,6 +444,54 @@ func (c *Config) validate() error {
 			return fmt.Errorf("fleet ID %q is duplicated", fleet.ID)
 		}
 		seen[fleet.ID] = struct{}{}
+	}
+	return nil
+}
+
+func (g *GCP) applyDefaults() {
+	g.ProjectID = strings.TrimSpace(g.ProjectID)
+	g.Zones = nonEmpty(g.Zones)
+	g.Image = strings.TrimSpace(g.Image)
+	g.Architecture = strings.ToLower(strings.TrimSpace(g.Architecture))
+	g.Subnetwork = strings.TrimSpace(g.Subnetwork)
+	g.ServiceAccountEmail = strings.TrimSpace(g.ServiceAccountEmail)
+	g.NetworkTags = nonEmpty(g.NetworkTags)
+	g.MachineType = strings.TrimSpace(g.MachineType)
+	if g.MachineType == "" && g.Architecture == "arm64" {
+		g.MachineType = defaultGCPARM64MachineType
+	}
+	if g.MachineType == "" {
+		g.MachineType = defaultGCPAMD64MachineType
+	}
+	g.DiskType = strings.TrimSpace(g.DiskType)
+	if g.DiskType == "" {
+		g.DiskType = defaultGCPDiskType
+	}
+	if g.DiskSizeGB == 0 {
+		g.DiskSizeGB = defaultVolumeSizeGB
+	}
+}
+
+func (f *Fleet) validateGCP(prefix string) error {
+	switch {
+	case !gcpLabelValuePattern.MatchString(f.ID):
+		return fmt.Errorf(
+			"%s.id must be a valid GCP label value: "+
+				"use 1-63 lowercase letters, digits, underscores, or dashes",
+			prefix,
+		)
+	case f.GCP.ProjectID == "":
+		return fmt.Errorf("%s.gcp.projectId is required", prefix)
+	case len(f.GCP.Zones) == 0:
+		return fmt.Errorf("%s.gcp.zones must not be empty", prefix)
+	case f.GCP.Image == "":
+		return fmt.Errorf("%s.gcp.image is required", prefix)
+	case f.GCP.Architecture != "amd64" && f.GCP.Architecture != "arm64":
+		return fmt.Errorf("%s.gcp.architecture must be amd64 or arm64", prefix)
+	case f.GCP.Subnetwork == "":
+		return fmt.Errorf("%s.gcp.subnetwork is required", prefix)
+	case f.GCP.DiskSizeGB < 1:
+		return fmt.Errorf("%s.gcp.diskSizeGb must be positive", prefix)
 	}
 	return nil
 }

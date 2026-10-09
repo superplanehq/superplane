@@ -31,6 +31,8 @@ var defaultRunTitleExpressions = map[string]string{
 	"azure.onVirtualMachineRestarted":   "{{ root().data.subject }}",
 	"azure.onVirtualMachineStarted":     "{{ root().data.subject }}",
 	"azure.onVirtualMachineStopped":     "{{ root().data.subject }}",
+	"bitbucket.onPullRequest":           "#{{ root().data.pullrequest.id }} - {{ root().data.pullrequest.title }}",
+	"bitbucket.onPullRequestComment":    "#{{ root().data.pullrequest.id }} - {{ root().data.pullrequest.title }}",
 	"bitbucket.onPush":                  "{{ root().data.push.changes[0].new.name }}",
 	"circleci.onWorkflowCompleted":      "{{ root().data.workflow.name }}",
 
@@ -88,8 +90,6 @@ var defaultRunTitleExpressions = map[string]string{
 	"honeycomb.onAlertFired":              "{{ root().data.name }}",
 	"incident.onIncident":                 "{{ root().data.incident.name }}",
 	"jfrogArtifactory.onArtifactUploaded": "{{ root().data.name }} in {{ root().data.repo }}",
-	"jira.onAlert":                        "{{ root().data.alert.tinyId }} - {{ root().data.alert.message }}",
-	"jira.onIncident":                     "{{ root().data.issue.key }} - {{ root().data.issue.fields.summary }}",
 	"jira.onIssue":                        "{{ root().data.issue.key }} - {{ root().data.issue.fields.summary }}",
 	"jira.onIssueComment":                 "{{ root().data.issue.key }} - {{ root().data.issue.fields.summary }}",
 	"launchdarkly.onFeatureFlagChange":    "{{ root().data.name }}",

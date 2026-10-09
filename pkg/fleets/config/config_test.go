@@ -486,6 +486,148 @@ func TestLoadRejectsAzureFleetWithoutZones(t *testing.T) {
 	}
 }
 
+func TestExampleConfigsLoad(t *testing.T) {
+	for _, name := range []string{"config.example.json", "config.gcp.example.json"} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Load(filepath.Join("..", name)); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestLoadAppliesGCPDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
+	body := `{
+		"id":"gke",
+		"superplaneUrl":"https://superplane.example",
+		"installationAdminToken":"personal-token",
+		"runnerReleaseBaseUrl":"https://downloads.example/runner/",
+		"fleets":[
+			{
+				"id":"e1-large-amd64",
+				"provider":"gcp",
+				"gcp":{
+					"projectId":"my-project",
+					"zones":[" us-central1-a ",""],
+					"image":"projects/my-project/global/images/family/superplane-runner-amd64",
+					"architecture":"AMD64",
+					"subnetwork":"projects/my-project/regions/us-central1/subnetworks/superplane-runners"
+				}
+			},
+			{
+				"id":"e1-large-arm64",
+				"provider":"gcp",
+				"gcp":{
+					"projectId":"my-project",
+					"zones":["us-central1-a"],
+					"image":"projects/my-project/global/images/family/superplane-runner-arm64",
+					"architecture":"arm64",
+					"subnetwork":"projects/my-project/regions/us-central1/subnetworks/superplane-runners"
+				}
+			}
+		]
+	}`
+	config, err := Load(writeConfig(t, body))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	amd64 := config.Fleets[0].GCP
+	if amd64.MachineType != "e2-standard-4" ||
+		amd64.DiskSizeGB != defaultVolumeSizeGB ||
+		amd64.DiskType != "pd-balanced" ||
+		amd64.Architecture != "amd64" {
+		t.Fatalf("amd64 defaults were not applied: %#v", amd64)
+	}
+	if len(amd64.Zones) != 1 || amd64.Zones[0] != "us-central1-a" {
+		t.Fatalf("zones = %#v", amd64.Zones)
+	}
+	if config.Fleets[1].GCP.MachineType != "t2a-standard-4" {
+		t.Fatalf("arm64 machine type = %q", config.Fleets[1].GCP.MachineType)
+	}
+
+	mutable := strings.Replace(
+		body,
+		"https://downloads.example/runner/",
+		"https://downloads.example/runner/latest/",
+		1,
+	)
+	if _, err := Load(writeConfig(t, mutable)); err == nil {
+		t.Fatal("expected mutable artifact URL to fail")
+	}
+}
+
+func TestLoadRejectsInvalidGCPFleets(t *testing.T) {
+	tests := map[string]struct {
+		fleetManagerID string
+		fleetID        string
+		gcp            string
+		expected       string
+	}{
+		"missing project": {
+			fleetManagerID: "gke",
+			fleetID:        "e1-large-amd64",
+			gcp:            `"zones":["us-central1-a"],"image":"img","architecture":"amd64","subnetwork":"subnet"`,
+			expected:       "fleets[0].gcp.projectId is required",
+		},
+		"missing zones": {
+			fleetManagerID: "gke",
+			fleetID:        "e1-large-amd64",
+			gcp:            `"projectId":"p","image":"img","architecture":"amd64","subnetwork":"subnet"`,
+			expected:       "fleets[0].gcp.zones must not be empty",
+		},
+		"missing image": {
+			fleetManagerID: "gke",
+			fleetID:        "e1-large-amd64",
+			gcp:            `"projectId":"p","zones":["us-central1-a"],"architecture":"amd64","subnetwork":"subnet"`,
+			expected:       "fleets[0].gcp.image is required",
+		},
+		"invalid architecture": {
+			fleetManagerID: "gke",
+			fleetID:        "e1-large-amd64",
+			gcp:            `"projectId":"p","zones":["us-central1-a"],"image":"img","architecture":"x86","subnetwork":"subnet"`,
+			expected:       "fleets[0].gcp.architecture must be amd64 or arm64",
+		},
+		"missing subnetwork": {
+			fleetManagerID: "gke",
+			fleetID:        "e1-large-amd64",
+			gcp:            `"projectId":"p","zones":["us-central1-a"],"image":"img","architecture":"amd64"`,
+			expected:       "fleets[0].gcp.subnetwork is required",
+		},
+		"fleet ID is not a label value": {
+			fleetManagerID: "gke",
+			fleetID:        "E1.Large",
+			gcp:            `"projectId":"p","zones":["us-central1-a"],"image":"img","architecture":"amd64","subnetwork":"subnet"`,
+			expected:       "fleets[0].id must be a valid GCP label value",
+		},
+		"fleet manager ID is not a label value": {
+			fleetManagerID: "GKE Production",
+			fleetID:        "e1-large-amd64",
+			gcp:            `"projectId":"p","zones":["us-central1-a"],"image":"img","architecture":"amd64","subnetwork":"subnet"`,
+			expected:       "id must be a valid GCP label value when a GCP fleet is configured",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := Load(writeConfig(t, `{
+				"id":"`+test.fleetManagerID+`",
+				"superplaneUrl":"https://superplane.example",
+				"installationAdminToken":"personal-token",
+				"runnerReleaseBaseUrl":"https://downloads.example/runner",
+				"fleets":[{
+					"id":"`+test.fleetID+`",
+					"provider":"gcp",
+					"gcp":{`+test.gcp+`}
+				}]
+			}`))
+			if err == nil || !strings.Contains(err.Error(), test.expected) {
+				t.Fatalf("error = %v, expected %q", err, test.expected)
+			}
+		})
+	}
+}
+
 func validDockerConfig(extra string) string {
 	return `{
 		"id":"fleet-manager",

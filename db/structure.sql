@@ -690,6 +690,8 @@ CREATE TABLE public.factory_velocity_repository_merges (
     merged_at timestamp with time zone NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    provider text DEFAULT 'github'::text NOT NULL,
+    author_uuid text DEFAULT ''::text NOT NULL,
     CONSTRAINT factory_velocity_repository_merges_number_positive CHECK ((number > 0)),
     CONSTRAINT factory_velocity_repository_merges_source_valid CHECK ((source = ANY (ARRAY['people'::text, 'agent'::text])))
 );
@@ -3518,17 +3520,17 @@ CREATE INDEX idx_factory_pull_requests_work_order ON public.factory_pull_request
 
 
 --
+-- Name: idx_factory_velocity_merges_factory_provider_repo_num; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_velocity_merges_factory_provider_repo_num ON public.factory_velocity_repository_merges USING btree (factory_id, provider, repository, number);
+
+
+--
 -- Name: idx_factory_velocity_repository_merges_factory_merged_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_factory_velocity_repository_merges_factory_merged_at ON public.factory_velocity_repository_merges USING btree (factory_id, merged_at DESC);
-
-
---
--- Name: idx_factory_velocity_repository_merges_factory_repo_number; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_factory_velocity_repository_merges_factory_repo_number ON public.factory_velocity_repository_merges USING btree (factory_id, repository, number);
 
 
 --
@@ -3991,6 +3993,13 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 --
 
 CREATE INDEX idx_workflow_runs_cancelling ON public.workflow_runs USING btree (cancelled_at) WHERE ((state)::text = 'cancelling'::text);
+
+
+--
+-- Name: idx_workflow_runs_parent_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_parent_run_id ON public.workflow_runs USING btree (parent_run_id) INCLUDE (id) WHERE (parent_run_id IS NOT NULL);
 
 
 --
@@ -5629,7 +5638,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261008234016	f
+20261009123849	f
 \.
 
 

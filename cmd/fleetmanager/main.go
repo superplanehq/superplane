@@ -20,6 +20,7 @@ import (
 	awsprovider "github.com/superplanehq/superplane/pkg/fleets/provider/aws"
 	azureprovider "github.com/superplanehq/superplane/pkg/fleets/provider/azure"
 	dockerprovider "github.com/superplanehq/superplane/pkg/fleets/provider/docker"
+	gcpprovider "github.com/superplanehq/superplane/pkg/fleets/provider/gcp"
 	"github.com/superplanehq/superplane/pkg/fleets/reconcile"
 )
 
@@ -99,6 +100,14 @@ func main() {
 			azureClients[fleet.Azure.SubscriptionID] = client
 		}
 	}
+	var gcpClient gcpprovider.ComputeAPI
+	if usesGCP(config) {
+		gcpClient, err = gcpprovider.NewSDK(ctx)
+		if err != nil {
+			log.Error("create Compute Engine client", slog.Any("error", err))
+			os.Exit(1)
+		}
+	}
 
 	reconcilers := make([]*reconcile.Reconciler, 0, len(config.Fleets))
 	for _, fleet := range config.Fleets {
@@ -111,6 +120,7 @@ func main() {
 			fleet,
 			ec2Client,
 			azureClients[fleet.Azure.SubscriptionID],
+			gcpClient,
 			releaseArtifactResolver,
 			log,
 		)
@@ -172,8 +182,12 @@ func usesAzure(config *fleetconfig.Config) bool {
 	return hasProvider(config, fleetconfig.ProviderAzure)
 }
 
+func usesGCP(config *fleetconfig.Config) bool {
+	return hasProvider(config, fleetconfig.ProviderGCP)
+}
+
 func usesReleaseArtifacts(config *fleetconfig.Config) bool {
-	return usesAWS(config) || usesAzure(config)
+	return usesAWS(config) || usesAzure(config) || usesGCP(config)
 }
 
 func hasProvider(config *fleetconfig.Config, providerName string) bool {
@@ -190,6 +204,7 @@ func buildProvider(
 	fleet fleetconfig.Fleet,
 	ec2Client *ec2.Client,
 	azureClient azureprovider.ComputeAPI,
+	gcpClient gcpprovider.ComputeAPI,
 	releaseArtifactResolver reconcile.ArtifactResolver,
 	log *slog.Logger,
 ) (provider.Provider, reconcile.ArtifactResolver, string, error) {
@@ -230,6 +245,22 @@ func buildProvider(
 			ResourceTags:           fleet.Azure.ResourceTags,
 		}, log)
 		return resourceProvider, releaseArtifactResolver, fleet.Azure.Architecture, err
+	case fleetconfig.ProviderGCP:
+		resourceProvider, err := gcpprovider.New(gcpClient, gcpprovider.Config{
+			FleetManagerID:      fleetManagerID,
+			ProjectID:           fleet.GCP.ProjectID,
+			Zones:               fleet.GCP.Zones,
+			MachineType:         fleet.GCP.MachineType,
+			Image:               fleet.GCP.Image,
+			Architecture:        fleet.GCP.Architecture,
+			Subnetwork:          fleet.GCP.Subnetwork,
+			ServiceAccountEmail: fleet.GCP.ServiceAccountEmail,
+			NetworkTags:         fleet.GCP.NetworkTags,
+			DiskSizeGB:          fleet.GCP.DiskSizeGB,
+			DiskType:            fleet.GCP.DiskType,
+			Labels:              fleet.GCP.Labels,
+		}, log)
+		return resourceProvider, releaseArtifactResolver, fleet.GCP.Architecture, err
 	case fleetconfig.ProviderDocker:
 		resourceProvider, err := dockerprovider.New(dockerprovider.Config{
 			Image:        fleet.Docker.Image,

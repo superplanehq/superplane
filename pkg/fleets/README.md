@@ -1,7 +1,7 @@
 # Fleet Manager
 
 This process reconciles SuperPlane runner demand with configured infrastructure
-providers. A fleet can use AWS, Azure, or Docker. Fleet Manager only uses the
+providers. A fleet can use AWS, Azure, GCP, or Docker. Fleet Manager only uses the
 installation admin HTTP API.
 
 Set `FLEET_MANAGER_CONFIG` to the JSON or YAML configuration body, or set
@@ -16,7 +16,8 @@ configuration source.
 Set the top-level `id` to a stable identifier for the Fleet Manager
 deployment. AWS and Azure providers apply it as the
 `superplane_fleet_manager_id` resource tag and use it with the fleet ID to
-find owned runners.
+find owned runners. GCP providers apply it as the
+`superplane_fleet_manager_id` instance label.
 
 Each AWS fleet can define additional `resourceTags`. Fleet Manager applies
 them to runner instances and root volumes. Additional tags cannot override the
@@ -89,6 +90,33 @@ the fleet may use. Fleet Manager retries the next zone when Azure reports
 insufficient capacity.
 
 See `config.azure.example.json` for a complete Azure fleet.
+
+GCP fleets also require `runnerReleaseBaseUrl`. Bootstrap uses the same
+archive layout and `install.sh` flow as AWS. Fleet Manager uses Application
+Default Credentials, for example GKE Workload Identity. The credential needs
+`roles/compute.instanceAdmin.v1` in `gcp.projectId`.
+
+Fleet Manager creates one Compute Engine instance per runner. It sends the
+bootstrap script as `user-data` metadata, and cloud-init runs it once at
+first boot. Set `gcp.image` to an image or image family from
+`release/runner/packer/gce`. Set `gcp.subnetwork` to a subnetwork with Cloud
+NAT. Instances get no external IP address. Set `gcp.zones` to the zones that
+the fleet may use. Fleet Manager tries the next zone when a zone has no
+capacity.
+
+`gcp.machineType` defaults to `e2-standard-4` for amd64 and `t2a-standard-4`
+for arm64. `gcp.diskType` defaults to `pd-balanced`. Leave
+`gcp.serviceAccountEmail` empty to start instances without a service
+account. Runner tasks then cannot get Google Cloud credentials from the
+metadata server. Use `gcp.networkTags` to apply firewall rules.
+
+GCP labels allow only lowercase letters, digits, underscores, and dashes. The
+top-level `id` and each GCP fleet `id` must follow that rule. Fleet Manager
+reserves the `superplane_fleet_manager_id`, `superplane_fleet_id`, and
+`superplane_runner_arch` labels. It stores the runner ID and runner version in
+instance metadata.
+
+See `config.gcp.example.json` for a complete GCP fleet.
 
 Docker fleets use a configured runner image instead of a release artifact.
 The local development configuration uses the tool-rich

@@ -22,6 +22,16 @@ describe("bitbucketOnboardingPollInterval", () => {
     expect(bitbucketOnboardingPollInterval(true, { status: "success", data: linked })).toBe(3_000);
   });
 
+  it("polls during an installation attempt even when repositories already exist", () => {
+    expect(
+      bitbucketOnboardingPollInterval(
+        true,
+        { status: "success", data: { ...linked, repositories: [{ fullName: "acme/api" }] } },
+        true,
+      ),
+    ).toBe(3_000);
+  });
+
   it("stops polling before an account is linked or after repositories appear", () => {
     expect(bitbucketOnboardingPollInterval(true, { status: "success" })).toBe(false);
     expect(

@@ -108,9 +108,9 @@ RUN if [ "$FRONTEND_PREBUILT" = "1" ]; then \
     else \
       npm install && \
       if [ -n "$VITE_ASSET_BASE_URL" ]; then \
-        VITE_BASE_URL=$BASE_URL VITE_ASSET_BASE_URL=$VITE_ASSET_BASE_URL npm run build; \
+        NODE_OPTIONS=--max-old-space-size=4096 VITE_BASE_URL=$BASE_URL VITE_ASSET_BASE_URL=$VITE_ASSET_BASE_URL npm run build; \
       else \
-        VITE_BASE_URL=$BASE_URL npm run build; \
+        NODE_OPTIONS=--max-old-space-size=4096 VITE_BASE_URL=$BASE_URL npm run build; \
       fi; \
     fi
 

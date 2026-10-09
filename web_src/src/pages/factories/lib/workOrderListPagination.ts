@@ -40,6 +40,7 @@ export type WorkOrdersPageCursor = {
 export type WorkOrdersPage = {
   orders: FactoriesWorkOrderSummary[];
   hasNextPage: boolean;
+  totalCount?: number;
 };
 
 export function uniqueWorkOrdersById<T extends { id?: string }>(orders: T[]): T[] {
@@ -79,6 +80,7 @@ export function workOrdersPageFromResponse(response: FactoriesListWorkOrdersResp
   return {
     orders: response?.orders ?? [],
     hasNextPage: Boolean(response?.hasNextPage),
+    totalCount: response?.totalCount,
   };
 }
 
