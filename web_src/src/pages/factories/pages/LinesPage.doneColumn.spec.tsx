@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactory, FactoriesWorkOrder, FactoriesWorkOrderSummary } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { WORKSPACE_LOADING_TEST_ID } from "@/lib/workspaceLoadingCopy";
@@ -32,12 +32,12 @@ import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { LinesPage } from "./LinesPage";
 
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
-const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrder[] }));
+const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
 const useWorkOrder = vi.fn((..._args: unknown[]) => ({
   data: undefined as FactoriesWorkOrder | undefined,
   isLoading: false,
 }));
-function boardPageResult(isLoading = false, workOrders: FactoriesWorkOrder[] = []) {
+function boardPageResult(isLoading = false, workOrders: FactoriesWorkOrderSummary[] = []) {
   return {
     workOrders,
     isLoading,
@@ -198,6 +198,26 @@ describe("LinesPage Done column", () => {
     expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
   });
 
+  it("hides merge confidence on a completed Done card", () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-completed",
+          title: "Publish refund SLA dashboard",
+          state: "STATE_CLOSED",
+          result: "RESULT_COMPLETED",
+          lineDispatches: [{ id: "dispatch-1", line: { id: REFUND_LINE_PLAN_ID } }],
+          checkScores: [{ key: "security-review", name: "Security", score: 4, maxScore: 5 }],
+        },
+      ],
+    });
+    renderBoard();
+
+    const done = screen.getByTestId("lines-done-column");
+    expect(within(done).getByText("Publish refund SLA dashboard")).toBeInTheDocument();
+    expect(within(done).queryByRole("img", { name: /Merge confidence/ })).not.toBeInTheDocument();
+  });
+
   it("puts a completed task in Done instead of the last stage", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [
@@ -246,7 +266,7 @@ describe("LinesPage Done column", () => {
           result: "RESULT_COMPLETED",
           lineDispatches: [{ id: "dispatch-1", line: { id: REFUND_LINE_PLAN_ID } }],
         },
-      ] as FactoriesWorkOrder[],
+      ] as FactoriesWorkOrderSummary[],
     });
     renderBoard();
 
@@ -306,7 +326,7 @@ describe("LinesPage Done column", () => {
           result: "RESULT_FAILED",
           lineDispatches: [{ id: "dispatch-failed", line: { id: REFUND_LINE_PLAN_ID } }],
         },
-      ] as FactoriesWorkOrder[],
+      ] as FactoriesWorkOrderSummary[],
     });
     renderBoard();
 
@@ -325,7 +345,7 @@ describe("LinesPage Done column", () => {
           result: "RESULT_REJECTED",
           lineDispatches: [],
         },
-      ] as FactoriesWorkOrder[],
+      ] as FactoriesWorkOrderSummary[],
     });
     renderBoard();
 
