@@ -3,6 +3,7 @@ import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { type DraftReadinessTone } from "../lib/draftReadiness";
 import { OutputList } from "../pages/work-order-popup-redesign/popupShared";
 import { SplitRunReview } from "../pages/work-order-split-run/SplitRunReview";
 import type { SplitRunStopChoice } from "../pages/work-order-split-run/splitRunFooter";
@@ -15,6 +16,8 @@ export function PhoneTaskReview({
   draftStart,
   scope,
   withModelSelect,
+  actionsOnly = false,
+  startTone,
 }: {
   model: {
     fixture: SplitRunFixture;
@@ -39,6 +42,8 @@ export function PhoneTaskReview({
     orderNumber?: string;
   };
   withModelSelect: boolean;
+  actionsOnly?: boolean;
+  startTone?: DraftReadinessTone;
 }) {
   const { fixture, pullRequests, canUpdate, lineName } = model;
   return (
@@ -60,6 +65,8 @@ export function PhoneTaskReview({
       actionBusy={model.actionBusy}
       startDisabled={!canUpdate || !lineName}
       compact="stacked"
+      actionsOnly={actionsOnly}
+      startTone={startTone}
     />
   );
 }

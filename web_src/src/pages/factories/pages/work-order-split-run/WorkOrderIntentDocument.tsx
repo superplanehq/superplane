@@ -142,6 +142,16 @@ export function WorkOrderIntentDocument({
 }
 
 /** Start stays available, but questions and plan updates take priority. */
+function planningReadiness(analysis: IntentAnalysisChat) {
+  return liveDraftReadiness({
+    clarity: analysis.showClarity !== false ? analysis.clarity?.score : undefined,
+    confidence: analysis.showConfidence !== false ? analysis.confidence?.score : undefined,
+    scoreMax: analysis.confidence?.maxScore,
+    isAnalyzing:
+      analysis.isAnalyzing || analysis.view.machineStatus === "starting" || analysis.view.machineStatus === "running",
+  });
+}
+
 function withClosedDecision(
   analysisChat: IntentAnalysisChat | undefined,
   showClosedDecision: boolean,
@@ -151,32 +161,22 @@ function withClosedDecision(
     return undefined;
   }
   if (!showClosedDecision) {
-    return { ...analysisChat, closedDecision: undefined, modelSelect: undefined };
+    return { ...analysisChat, closedDecision: undefined, modelSelect: undefined, readinessNote: undefined };
   }
-  const startTone = planningStartTone(analysisChat);
+  const readiness = planningReadiness(analysisChat);
+  const startTone = analysisChat.creditVerdict ? "blocked" : readiness.tone;
+  const startDiscouraged = !analysisChat.creditVerdict && (startTone === "caution" || startTone === "blocked");
   return {
     ...analysisChat,
-    startDiscouraged: !analysisChat.creditVerdict && (startTone === "caution" || startTone === "blocked"),
+    startDiscouraged,
+    readinessNote: startDiscouraged ? { headline: readiness.headline, text: readiness.text } : undefined,
     prioritizeImplementation:
       Boolean(analysisChat.canTogglePlan) &&
-      startTone === "ready" &&
+      readiness.tone === "ready" &&
       analysisChat.view.machineStatus === "waiting" &&
       !hasPendingPlanningQuestions(analysisChat.view),
     closedDecision: <ClosedPlanActions resultFooter={resultFooter} startTone={startTone} />,
   };
-}
-
-function planningStartTone(analysis: IntentAnalysisChat): DraftReadinessTone {
-  if (analysis.creditVerdict) {
-    return "blocked";
-  }
-  return liveDraftReadiness({
-    clarity: analysis.showClarity !== false ? analysis.clarity?.score : undefined,
-    confidence: analysis.showConfidence !== false ? analysis.confidence?.score : undefined,
-    scoreMax: analysis.confidence?.maxScore,
-    isAnalyzing:
-      analysis.isAnalyzing || analysis.view.machineStatus === "starting" || analysis.view.machineStatus === "running",
-  }).tone;
 }
 
 function requestPaneClassName(refineOpen: boolean, showPlanPane: boolean, isResizing: boolean) {
