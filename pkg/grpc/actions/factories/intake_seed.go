@@ -1042,6 +1042,10 @@ func gitHubIssueEvent(issue *github.Issue, repository string) (map[string]any, e
 		}
 	}
 
+	if body, ok := payload["body"]; !ok || body == nil {
+		payload["body"] = ""
+	}
+
 	return map[string]any{
 		"action":     "opened",
 		"issue":      payload,

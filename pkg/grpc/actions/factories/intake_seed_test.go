@@ -196,6 +196,21 @@ func Test__GitHubIssueEvents(t *testing.T) {
 		assert.Equal(t, []any{}, payload["labels"])
 		assert.Equal(t, []any{}, payload["assignees"])
 	})
+
+	t.Run("a nil body is emitted as an empty description", func(t *testing.T) {
+		issue := &github.Issue{
+			Number: github.Ptr(7),
+			Title:  github.Ptr("Issue with no description"),
+		}
+
+		events, err := gitHubIssueEvents([]*github.Issue{issue}, "acme/backlog")
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		payload, ok := events[0]["issue"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "", payload["body"])
+	})
 }
 
 func Test__JiraIssueEvents(t *testing.T) {

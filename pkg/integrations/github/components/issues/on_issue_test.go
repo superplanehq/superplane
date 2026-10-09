@@ -165,12 +165,51 @@ func Test__OnIssue__HandleWebhook(t *testing.T) {
 		assert.Equal(t, map[string]any{
 			"action": "opened",
 			"issue": map[string]any{
+				"body": "",
 				"labels": []any{
 					map[string]any{"name": "bug"},
 					map[string]any{"name": "docs"},
 				},
 			},
 		}, events.Payloads[0].Data)
+	})
+
+	t.Run("a null issue description is emitted as an empty body", func(t *testing.T) {
+		body := []byte(`{"action":"opened","issue":{"body":null}}`)
+		events := &contexts.EventContext{}
+
+		code, _, err := trigger.HandleWebhook(signedIssueContext(body, map[string]any{
+			"repository": "acme/widgets",
+			"actions":    []string{"opened"},
+		}, events, nil))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+		assert.Equal(t, "github.issue", events.Payloads[0].Type)
+		assert.Equal(t, map[string]any{
+			"action": "opened",
+			"issue":  map[string]any{"body": ""},
+		}, events.Payloads[0].Data)
+	})
+
+	t.Run("a real issue description is emitted unchanged", func(t *testing.T) {
+		body := []byte(`{"action":"opened","issue":{"body":"Steps to reproduce"}}`)
+		events := &contexts.EventContext{}
+
+		code, _, err := trigger.HandleWebhook(signedIssueContext(body, map[string]any{
+			"repository": "acme/widgets",
+			"actions":    []string{"opened"},
+		}, events, nil))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+		payload, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		issue, ok := payload["issue"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "Steps to reproduce", issue["body"])
 	})
 
 	t.Run("label filter trims spaces around a configured label", func(t *testing.T) {

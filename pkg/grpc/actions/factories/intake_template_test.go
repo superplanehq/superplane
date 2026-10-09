@@ -60,6 +60,22 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 		assert.Contains(t, filter.Configuration["expression"], `"bug"`)
 	})
 
+	t.Run("a GitHub issue with no description creates a task with an empty description", func(t *testing.T) {
+		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues})
+		require.NoError(t, err)
+
+		create := findSpecNode(t, canvas, intakeCreateNodeID)
+		assert.Equal(t, `{{ root().data.issue.body ?? "" }}`, create.Configuration["description"])
+
+		source := templateExpressionSource(t, create.Configuration["description"].(string))
+		assert.Equal(t, "", evalRootDataExpression(t, source, map[string]any{
+			"issue": map[string]any{"body": nil},
+		}))
+		assert.Equal(t, "Steps to reproduce", evalRootDataExpression(t, source, map[string]any{
+			"issue": map[string]any{"body": "Steps to reproduce"},
+		}))
+	})
+
 	t.Run("a GitHub issue flows from the trigger through the filter to the work order", func(t *testing.T) {
 		canvas, err := buildIntakeCanvas(intakeCanvasRequest{Source: models.FactoryIntakeSourceGitHubIssues})
 		require.NoError(t, err)
