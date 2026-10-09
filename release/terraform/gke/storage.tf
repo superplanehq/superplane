@@ -25,6 +25,15 @@ resource "google_storage_bucket" "blobs" {
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
   force_destroy               = var.blob_bucket_force_destroy
+
+  # The browser downloads archived logs from a signed URL on this bucket.
+  # Without CORS that download fails and the UI shows a log fetch error.
+  cors {
+    origin          = ["https://${var.domain_name}"]
+    method          = ["GET", "HEAD"]
+    response_header = ["Accept", "Content-Type", "Content-Encoding", "Content-Length"]
+    max_age_seconds = 3600
+  }
 }
 
 resource "google_service_account" "app" {
