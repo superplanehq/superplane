@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { http, HttpResponse } from "msw";
 import { useState } from "react";
+import { MemoryRouter, Route, Routes, useParams } from "react-router";
 
 import { Button } from "@/components/ui/button";
 
@@ -9,6 +11,17 @@ import { withFactoriesTheme } from "./__fixtures__/factoriesStoryTheme";
 import { ForkTaskDialog, type ForkTaskTarget } from "./ForkTaskDialog";
 
 const queryClient = new QueryClient();
+
+const forkedOrder = {
+  id: "order-forked",
+  number: "42",
+  title: "Forked task",
+  state: "STATE_DRAFT",
+};
+
+const forkHandler = http.post("*/api/v1/factories/:factoryId/orders/:orderId/fork", () =>
+  HttpResponse.json({ order: forkedOrder }),
+);
 
 const baseTarget: ForkTaskTarget = {
   organizationId: "org-1",
@@ -22,7 +35,10 @@ const baseTarget: ForkTaskTarget = {
 const meta = {
   title: "Factories/Components/ForkTaskDialog",
   component: ForkTaskDialog,
-  parameters: { layout: "centered" },
+  parameters: {
+    layout: "centered",
+    msw: { handlers: [forkHandler] },
+  },
   decorators: [
     withFactoriesTheme,
     (Story) => (
@@ -40,6 +56,17 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 function OpenDialog({ target, isPending = false }: { target: ForkTaskTarget; isPending?: boolean }) {
+  return (
+    <MemoryRouter initialEntries={["/org-1/workspaces/sp"]}>
+      <Routes>
+        <Route path="/org-1/workspaces/sp" element={<DialogControls target={target} isPending={isPending} />} />
+        <Route path="/org-1/workspaces/sp/task/:number" element={<ForkedTaskNote />} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
+function DialogControls({ target, isPending = false }: { target: ForkTaskTarget; isPending?: boolean }) {
   const [open, setOpen] = useState(true);
   return (
     <>
@@ -49,6 +76,11 @@ function OpenDialog({ target, isPending = false }: { target: ForkTaskTarget; isP
       <ForkTaskDialog open={open} onOpenChange={setOpen} target={target} isPending={isPending} />
     </>
   );
+}
+
+function ForkedTaskNote() {
+  const { number } = useParams();
+  return <p data-testid="forked-task">Forked task {number}</p>;
 }
 
 /** Both choices are available. Copy request is selected. */
