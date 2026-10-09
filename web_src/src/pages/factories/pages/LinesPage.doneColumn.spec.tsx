@@ -198,6 +198,26 @@ describe("LinesPage Done column", () => {
     expect(screen.queryByTestId("lines-column-title-phase-2")).not.toBeInTheDocument();
   });
 
+  it("hides merge confidence on a completed Done card", () => {
+    useFactoryWorkOrders.mockReturnValue({
+      data: [
+        {
+          id: "wo-completed",
+          title: "Publish refund SLA dashboard",
+          state: "STATE_CLOSED",
+          result: "RESULT_COMPLETED",
+          lineDispatches: [{ id: "dispatch-1", line: { id: REFUND_LINE_PLAN_ID } }],
+          checkScores: [{ key: "security-review", name: "Security", score: 4, maxScore: 5 }],
+        },
+      ],
+    });
+    renderBoard();
+
+    const done = screen.getByTestId("lines-done-column");
+    expect(within(done).getByText("Publish refund SLA dashboard")).toBeInTheDocument();
+    expect(within(done).queryByRole("img", { name: /Merge confidence/ })).not.toBeInTheDocument();
+  });
+
   it("puts a completed task in Done instead of the last stage", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [

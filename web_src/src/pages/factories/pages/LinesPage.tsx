@@ -1867,6 +1867,7 @@ function DoneColumn({
               order={order}
               workOrderCardContext={workOrderCardContext}
               onOpenWorkOrder={onOpenWorkOrder}
+              showMergeConfidence={false}
             />
           </li>
         ))}
