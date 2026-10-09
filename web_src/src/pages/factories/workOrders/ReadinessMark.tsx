@@ -13,10 +13,7 @@ import {
 } from "../lib/confidenceScore";
 import { DRAFT_READINESS_SHORT_LABEL, draftReadiness, type DraftReadinessTone } from "../lib/draftReadiness";
 import { PLANNING_REVIEW_SCORE_MAX, planningReviewAtMax, planningReviewLevel } from "../lib/planningReviewScore";
-import {
-  mergeConfidenceCheckLevel,
-  type MergeConfidenceCardCheck,
-} from "../lib/mergeConfidenceScore";
+import { mergeConfidenceCheckLevel, type MergeConfidenceCardCheck } from "../lib/mergeConfidenceScore";
 import { workOrderCheckDisplayName, workOrderCheckStatus, type WorkOrderCheckLevel } from "../lib/workOrderChecks";
 import { ConfidenceMeter } from "./ConfidenceMeter";
 
