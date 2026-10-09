@@ -150,6 +150,18 @@ describe("syncSelectionsWithInstances", () => {
     });
   });
 
+  it("replaces a placeholder installation name on a ready selection", () => {
+    const saved = {
+      metadata: { id: "int-9", name: "bitbucket-acme", integrationName: "bitbucket" },
+      status: { state: "ready" },
+    } as OrganizationsIntegration;
+    const data = [{ name: "bitbucket", allInstances: [saved], readyInstances: [saved] }];
+
+    expect(syncSelectionsWithInstances(data, { bitbucket: { id: "int-9", name: "int-9", ready: true } })).toEqual({
+      bitbucket: { id: "int-9", name: "bitbucket-acme", ready: true },
+    });
+  });
+
   it("applies a preferred instance for a manual-selection integration", () => {
     const data = [
       {
