@@ -26,7 +26,7 @@ import {
   githubIntegrationSelection,
   selectionsWithSavedVcsInstallation,
 } from "./githubIntegrationSelection";
-import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
+import { isHostedAgentReady } from "./onboardingAgentReadiness";
 import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
