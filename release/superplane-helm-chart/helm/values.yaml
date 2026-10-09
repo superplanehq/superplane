@@ -287,11 +287,11 @@ blobStorage:
 # Set blobStorage.provider to gcs or s3 before you enable the runner.
 # filesystem is local to one pod, so the runner cannot share those blobs.
 # Omit runner.workers.enabled to follow runner.api.enabled.
-# Active logs are a shared filesystem. The API, runner API, and runner
-# workers mount this volume. The API reads it to serve live logs.
-# Leave existingClaim empty to create a ReadWriteOnce claim. Those pods
-# then schedule on the runner API node. Set existingClaim to a
-# ReadWriteMany claim when those pods must run on more than one node.
+# Active logs stay on the runner API volume. The API reads them from
+# the runner API service. Leave existingClaim empty to create a
+# ReadWriteOnce claim. The runner worker then schedules on the runner
+# API node. Set existingClaim to a ReadWriteMany claim when replicas
+# must run on more than one node.
 #
 runner:
   api:

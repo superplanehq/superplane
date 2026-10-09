@@ -116,7 +116,7 @@ func (s *Server) serveRunnerTaskLogs(
 		}
 	}
 
-	store := runnerlogs.Current()
+	store := s.activeRunnerLogStore()
 	if store == nil || store.Name() != lifecycle.ActiveStore {
 		http.Error(w, "Active log storage is unavailable", http.StatusServiceUnavailable)
 		return
