@@ -1,7 +1,7 @@
 import type { MeVcsProviderRepository } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
-import { FEATURE_FACTORY_BITBUCKET, FEATURE_FACTORY_LINEAR_INTAKE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_BITBUCKET } from "@/lib/experimentalFeatures";
 import { startPublicGitHubAppCreate } from "@/lib/githubAppManifest";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
@@ -200,10 +200,9 @@ function waitForBrowserPaint(): Promise<void> {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
-function selectedIssuesChoice(model: OnboardingPageModel, linearAvailable: boolean): IssuesChoiceId | null {
+function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null {
   const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice);
   const issuesChoice = issuesChoiceForTicketSource(ticketSource);
-  if (issuesChoice === "linear" && !linearAvailable) return null;
   if (issuesChoice === "linear" && (model.linearProjectsLoading || model.linearProjectsError)) return null;
   if (
     !issuesChoice ||
@@ -244,22 +243,12 @@ function useFirstRunCommands(args: {
   connection: GitHubConnectionState;
   navigation: ReturnType<typeof useFirstRunNavigation>;
   blocking: FirstRunBlocking;
-  linearAvailable: boolean;
   bitbucketAvailable: boolean;
   forgeConfigured: boolean;
   installScope: GitHubInstallScope;
 }) {
-  const {
-    model,
-    agentGate,
-    connection,
-    navigation,
-    blocking,
-    linearAvailable,
-    bitbucketAvailable,
-    forgeConfigured,
-    installScope,
-  } = args;
+  const { model, agentGate, connection, navigation, blocking, bitbucketAvailable, forgeConfigured, installScope } =
+    args;
   const location = useLocation();
   const saveRepository = () => saveSelectedRepository({ model, connection, forgeConfigured });
   const continueFromRepository = () =>
@@ -278,7 +267,7 @@ function useFirstRunCommands(args: {
   };
   const continueFromTickets = () =>
     blocking.run("saving-ticket-source", async () => {
-      const issuesChoice = selectedIssuesChoice(model, linearAvailable);
+      const issuesChoice = selectedIssuesChoice(model);
       if (!issuesChoice) return;
       model.setup.setIssuesChoice(issuesChoice);
       model.setup.commitIssuesStep();
@@ -318,7 +307,6 @@ function useFirstRunCommands(args: {
     });
   const connectIssueTracker = (source: "jira" | "linear") =>
     blocking.runUntilNavigation(source === "jira" ? "connecting-jira" : "connecting-linear", async () => {
-      if (source === "linear" && !linearAvailable) return false;
       model.setup.setIssuesChoice(source);
       if (!(await model.saveIssues(source))) return false;
       await waitForBrowserPaint();
@@ -331,7 +319,6 @@ function useFirstRunCommands(args: {
     });
   };
   const selectTicketSource = (source: FirstRunTicketSource) => {
-    if (source === "linear" && !linearAvailable) return;
     const issuesChoice = issuesChoiceForTicketSource(source);
     if (issuesChoice) model.setup.setIssuesChoice(issuesChoice);
   };
@@ -351,11 +338,6 @@ function useFirstRunCommands(args: {
   };
 }
 
-import { savedLinearChoiceBlock, shouldClearSavedLinearChoice } from "./firstRunFlaggedChoice";
-
-export { savedLinearChoiceBlock, shouldClearSavedLinearChoice };
-export type { SavedFlaggedChoiceBlock } from "./firstRunFlaggedChoice";
-
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId, factoryId } = useFactoriesLayout();
   const setupFinished = model.provisionedDestination != null;
@@ -369,7 +351,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const bitbucketConnect = useFirstRunBitbucket({ organizationId, setupFinished, blocking });
   const intakeFeatures = useExperimentalFeature(organizationId);
   const intakeFeatureLoading = intakeFeatures.isLoading;
-  const linearAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_LINEAR_INTAKE);
   const bitbucketAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_BITBUCKET);
   const bitbucket = { available: bitbucketAvailable, loading: intakeFeatureLoading };
   const agentGate = onboardingAgentGate({
@@ -385,30 +366,10 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     connection,
     navigation,
     blocking,
-    linearAvailable,
     bitbucketAvailable,
     forgeConfigured: bitbucketConnect.configured,
     installScope,
   });
-  // A saved Linear choice is not valid when the organization does not have the
-  // Linear intake feature. Clear it only after the organization lookup confirms
-  // the feature is off. A failed lookup has no organization data and must not
-  // replace the saved choice with the GitHub Issues default.
-  const issuesChoice = model.setup.issuesChoice;
-  const setIssuesChoice = model.setup.setIssuesChoice;
-  const organizationReady = intakeFeatures.organizationReady;
-  const linearChoiceArgs = {
-    issuesChoice,
-    featureLoading: intakeFeatureLoading,
-    linearAvailable,
-    organizationReady,
-  };
-  const clearSavedLinearChoice = shouldClearSavedLinearChoice(linearChoiceArgs);
-  const linearChoiceBlock = savedLinearChoiceBlock(linearChoiceArgs);
-  useEffect(() => {
-    if (!clearSavedLinearChoice) return;
-    setIssuesChoice(null);
-  }, [clearSavedLinearChoice, setIssuesChoice]);
   return {
     ...navigation,
     ...commands,
@@ -436,9 +397,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     selectCredentialChoice: model.setAgentCredentialChoice,
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
-    linearAvailable,
-    linearFeatureLoading: intakeFeatureLoading,
-    linearChoiceBlock,
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
     repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
     repositoriesLoading: connection.onboarding.isPending,
