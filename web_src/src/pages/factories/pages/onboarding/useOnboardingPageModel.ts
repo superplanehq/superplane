@@ -21,7 +21,11 @@ import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { OnboardingConnectDialogs } from "./CustomProviderConnectDialog";
-import { describeGitHubInstallationName, githubIntegrationSelection } from "./githubIntegrationSelection";
+import {
+  describeGitHubInstallationName,
+  githubIntegrationSelection,
+  selectionsWithSavedVcsReady,
+} from "./githubIntegrationSelection";
 import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
@@ -65,6 +69,9 @@ const ONBOARDING_HIDDEN_CONFIGURATION_FIELDS: Record<string, string[]> = {
 
 function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
   const [selections, setSelections] = useState<IntegrationSelections>(() => initialOnboardingSelections(onboarding));
+  useEffect(() => {
+    setSelections((current) => selectionsWithSavedVcsReady(onboarding, current));
+  }, [onboarding]);
   const connected = useMemo(() => {
     const ready = new Set<IntegrationId>();
     if (selections.github?.ready) ready.add("github");
