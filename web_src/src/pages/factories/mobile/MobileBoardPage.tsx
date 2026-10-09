@@ -340,6 +340,7 @@ function MobileLineBoard(props: {
             onOpen={() => onOpenWorkOrder(order)}
             isAnalyzing={column.key === "backlog" && Boolean(order.id && model.analyzingOrderIds.has(order.id))}
             creditLabel={order.id ? model.creditFailureLabels.get(order.id) : undefined}
+            showMergeConfidence={column.key !== "done"}
           />
         )}
       />
