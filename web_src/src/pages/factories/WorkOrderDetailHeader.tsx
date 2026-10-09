@@ -2,8 +2,11 @@ import type { FactoriesWorkOrderResult, FactoriesWorkOrderState } from "@/api-cl
 import { Button } from "@/components/ui/button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Ellipsis } from "lucide-react";
+import { useState } from "react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { CopyLinkButton } from "./CopyLinkButton";
+import { ForkTaskDialog, type ForkTaskTarget } from "./ForkTaskDialog";
+import { FORK_TASK_COPY } from "./lib/forkTask";
 import { WorkspacePageHeader } from "./layout/WorkspacePageHeader";
 import {
   applyWorkOrderStatusAction,
@@ -33,6 +36,7 @@ interface WorkOrderDetailHeaderProps {
   onClose: (result: FactoriesWorkOrderResult) => void;
   onStatusChange: (state: FactoriesWorkOrderState, result?: FactoriesWorkOrderResult) => Promise<void>;
   onSendToBacklog?: () => void;
+  fork?: ForkTaskTarget;
   className?: string;
 }
 
@@ -69,45 +73,58 @@ const HEADER_ACTION_TEST_ID: Record<WorkOrderStatusActionKind, string> = {
 
 function HeaderOverflowMenu(props: WorkOrderDetailHeaderProps) {
   const actions = buildWorkOrderStatusActions(props);
-  if (actions.length === 0) {
+  const [forkOpen, setForkOpen] = useState(false);
+  if (actions.length === 0 && !props.fork) {
     return null;
   }
 
   const disabled = props.isClosing || props.isUpdatingStatus || props.isCompleting || props.isRejecting;
 
   return (
-    <DropdownMenu>
-      <PermissionTooltip
-        allowed={props.canClose || props.canManage}
-        message="You don't have permission to manage this task."
-      >
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            className="text-muted-foreground hover:bg-accent hover:text-foreground"
-            disabled={disabled}
-            aria-label="More actions"
-            data-testid="work-order-actions-button"
-          >
-            <Ellipsis className="size-3.5" aria-hidden />
-          </Button>
-        </DropdownMenuTrigger>
-      </PermissionTooltip>
+    <>
+      <DropdownMenu>
+        <PermissionTooltip
+          allowed={props.canClose || props.canManage || Boolean(props.fork?.canFork)}
+          message={
+            props.canClose || props.canManage
+              ? "You don't have permission to manage this task."
+              : FORK_TASK_COPY.permission
+          }
+        >
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              className="text-muted-foreground hover:bg-accent hover:text-foreground"
+              disabled={disabled}
+              aria-label="More actions"
+              data-testid="work-order-actions-button"
+            >
+              <Ellipsis className="size-3.5" aria-hidden />
+            </Button>
+          </DropdownMenuTrigger>
+        </PermissionTooltip>
 
-      <DropdownMenuContent align="end" className="w-48">
-        {actions.map((action) => (
-          <DropdownMenuItem
-            key={action.kind}
-            disabled={action.disabled}
-            onSelect={() => applyWorkOrderStatusAction(action.kind, props)}
-            data-testid={HEADER_ACTION_TEST_ID[action.kind]}
-          >
-            {action.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+        <DropdownMenuContent align="end" className="w-48">
+          {props.fork ? (
+            <DropdownMenuItem onSelect={() => setForkOpen(true)} data-testid="fork-task-menu-item">
+              {FORK_TASK_COPY.menu}
+            </DropdownMenuItem>
+          ) : null}
+          {actions.map((action) => (
+            <DropdownMenuItem
+              key={action.kind}
+              disabled={action.disabled}
+              onSelect={() => applyWorkOrderStatusAction(action.kind, props)}
+              data-testid={HEADER_ACTION_TEST_ID[action.kind]}
+            >
+              {action.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {props.fork ? <ForkTaskDialog open={forkOpen} onOpenChange={setForkOpen} target={props.fork} /> : null}
+    </>
   );
 }

@@ -221,6 +221,11 @@ func (s *FactoryService) CreateWorkOrder(ctx context.Context, req *pb.CreateWork
 	return actions.CreateWorkOrder(ctx, organizationID, req)
 }
 
+func (s *FactoryService) ForkWorkOrder(ctx context.Context, req *pb.ForkWorkOrderRequest) (*pb.ForkWorkOrderResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.ForkWorkOrder(ctx, organizationID, req)
+}
+
 func (s *FactoryService) DescribeWorkOrder(ctx context.Context, req *pb.DescribeWorkOrderRequest) (*pb.DescribeWorkOrderResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DescribeWorkOrder(ctx, organizationID, req)
