@@ -8,6 +8,7 @@ import {
   type IssuesChoiceId,
   type VcsHostId,
 } from "./onboardingFixtures";
+import { clearOnboardingRepoChoice, readOnboardingRepoChoice, writeOnboardingRepoChoice } from "./onboardingRepoChoice";
 import { readOnboardingVcsHostChoice, writeOnboardingVcsHostChoice } from "./onboardingVcsHostChoice";
 import { isPlaceholderWorkspaceName, workspaceNameFromRepository } from "./workspaceNames";
 
@@ -27,6 +28,31 @@ export type OnboardingSetupState = {
 export type InitialOnboardingSetupState = Partial<
   Pick<OnboardingSetupState, "vcsHost" | "selectedRepo" | "issuesRepo" | "issuesChoice" | "agent">
 >;
+
+function rememberRepository(persistRepoKey: string | undefined, repo: string | null) {
+  if (!persistRepoKey) return;
+  if (!repo?.trim()) {
+    clearOnboardingRepoChoice(persistRepoKey);
+    return;
+  }
+  writeOnboardingRepoChoice(persistRepoKey, repo);
+}
+
+/**
+ * A saved repository is the source of truth. The stored choice only fills the
+ * gap left by an OAuth redirect that returns before that save is visible.
+ */
+function restoreSelectedRepository(
+  saved: string | null | undefined,
+  persistRepoKey: string | undefined,
+): string | null {
+  if (saved) {
+    if (persistRepoKey) clearOnboardingRepoChoice(persistRepoKey);
+    return saved;
+  }
+  if (!persistRepoKey) return null;
+  return readOnboardingRepoChoice(persistRepoKey);
+}
 
 function isIssuesReady(issuesChoice: IssuesChoiceId | null, connected: Set<IntegrationId>): boolean {
   if (issuesChoice === "skip" || issuesChoice === "vcs") {
@@ -73,6 +99,8 @@ export function useOnboardingSetupState(
     initial?: InitialOnboardingSetupState;
     /** Keeps the host choice when the page reloads before a repository is saved. */
     persistVcsHostKey?: string;
+    /** Keeps the repository choice when the page reloads before that choice is saved. */
+    persistRepoKey?: string;
   },
 ) {
   const [workspaceName, setWorkspaceName] = useState(() => initialName.trim());
@@ -87,7 +115,9 @@ export function useOnboardingSetupState(
     if (options?.persistVcsHostKey) return readOnboardingVcsHostChoice(options.persistVcsHostKey);
     return null;
   });
-  const [selectedRepo, setSelectedRepo] = useState<string | null>(() => options?.initial?.selectedRepo ?? null);
+  const [selectedRepo, setSelectedRepo] = useState<string | null>(() =>
+    restoreSelectedRepository(options?.initial?.selectedRepo, options?.persistRepoKey),
+  );
   /** True after Continue to issues — starts repository analysis. */
   const [repoCommitted, setRepoCommitted] = useState(false);
   /** Backlog repository for GitHub/GitLab Issues (may differ from the app repo). */
@@ -144,29 +174,32 @@ export function useOnboardingSetupState(
       // Re-clicking the active host must not clear repo / issues selections.
       if (host === vcsHost) return;
       if (options?.persistVcsHostKey) writeOnboardingVcsHostChoice(options.persistVcsHostKey, host);
+      rememberRepository(options?.persistRepoKey, null);
       setVcsHost(host);
       setSelectedRepo(null);
       setRepoCommitted(false);
       resetIssuesState();
     },
-    [options?.persistVcsHostKey, vcsHost, resetIssuesState],
+    [options?.persistVcsHostKey, options?.persistRepoKey, vcsHost, resetIssuesState],
   );
 
   const selectRepo = useCallback(
     (repo: string) => {
+      rememberRepository(options?.persistRepoKey, repo);
       setSelectedRepo(repo);
       setRepoCommitted(false);
       resetIssuesState();
       suggestWorkspaceName(workspaceNameFromRepository(repo));
     },
-    [resetIssuesState, suggestWorkspaceName],
+    [options?.persistRepoKey, resetIssuesState, suggestWorkspaceName],
   );
 
   const clearRepository = useCallback(() => {
+    rememberRepository(options?.persistRepoKey, null);
     setSelectedRepo(null);
     setRepoCommitted(false);
     resetIssuesState();
-  }, [resetIssuesState]);
+  }, [options?.persistRepoKey, resetIssuesState]);
 
   const commitRepoStep = useCallback(() => {
     setRepoCommitted(true);
