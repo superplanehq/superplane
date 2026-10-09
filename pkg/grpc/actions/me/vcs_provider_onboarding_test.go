@@ -270,6 +270,17 @@ func TestDescribeGitHubOnboardingSkipsAccountConnection(t *testing.T) {
 	assert.Equal(t, "acme", response.GetRepositories()[0].GetAccountLogin())
 }
 
+func TestDescribeInstalledGitHubOnboardingRequiresWorkspaceMember(t *testing.T) {
+	r := support.Setup(t)
+	saveInstallationGitHubApp(t)
+	ctx := notificationSettingsContext("00000000-0000-0000-0000-000000000099", r.Organization.ID.String())
+
+	_, err := DescribeVCSProviderOnboarding(ctx, models.ProviderGitHub)
+	code, _, ok := grpcerrors.HandlerStatus(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, code)
+}
+
 func TestStartGitHubInstallationWithoutAccountConnection(t *testing.T) {
 	r := support.Setup(t)
 	saveInstallationGitHubApp(t)

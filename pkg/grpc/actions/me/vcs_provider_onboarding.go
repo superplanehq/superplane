@@ -236,6 +236,9 @@ func RefreshVCSProviderOnboarding(
 		}
 		repositories, err = models.ListAccessibleVCSProviderRepositories(database.DB(ctx), provider, identity.userID)
 	} else {
+		if memberErr := requireWorkspaceMember(ctx); memberErr != nil {
+			return nil, memberErr
+		}
 		repositories, err = models.ListInstalledVCSProviderRepositories(database.DB(ctx), provider)
 	}
 	if err != nil {
@@ -365,6 +368,9 @@ func describeInstalledGitHubOnboarding(
 	ctx context.Context,
 	response *pb.DescribeVCSProviderOnboardingResponse,
 ) (*pb.DescribeVCSProviderOnboardingResponse, error) {
+	if err := requireWorkspaceMember(ctx); err != nil {
+		return nil, err
+	}
 	repositories, err := models.ListInstalledVCSProviderRepositories(database.DB(ctx), models.ProviderGitHub)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list accessible repositories")
@@ -401,6 +407,22 @@ func describeInstalledGitHubOnboarding(
 		return nil, grpcerrors.Internal(err, "failed to inspect repository synchronization")
 	}
 	return response, nil
+}
+
+func requireWorkspaceMember(ctx context.Context) error {
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+	organizationID, ok := authentication.GetOrganizationIdFromMetadata(ctx)
+	if !ok {
+		return grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+	_, err := models.FindActiveUserByID(organizationID, userID)
+	if err != nil {
+		return grpcerrors.PermissionDenied(err, "workspace membership is required")
+	}
+	return nil
 }
 
 func vcsProviderConfigured(ctx context.Context, provider string) bool {

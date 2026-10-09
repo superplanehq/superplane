@@ -109,6 +109,9 @@ func VerifyVCSProviderInstallations(
 		}
 		repositories, err = models.ListAccessibleVCSProviderRepositories(database.DB(ctx), provider, identity.userID)
 	} else {
+		if memberErr := requireWorkspaceMember(ctx); memberErr != nil {
+			return nil, memberErr
+		}
 		repositories, err = models.ListInstalledVCSProviderRepositories(database.DB(ctx), provider)
 	}
 	if err != nil {
