@@ -45,8 +45,8 @@ func (i *OnIssue) Documentation() string {
 
 ## Configuration
 
-- **Team**: Linear team to monitor. Required when no projects are selected.
-- **Projects** (optional): Only issues in these projects. When set, the team can stay empty and SuperPlane listens on every team those projects belong to, including private teams.
+- **Team**: Linear team to monitor. Leave empty to listen to the whole workspace.
+- **Projects** (optional): Only issues in these projects. When set, the team can stay empty and SuperPlane listens on every team those projects belong to, including private teams. Leave empty to listen to every project.
 - **Actions** (required): Which issue actions to listen for (created, updated, deleted). Default: created.
 - **Labels** (optional): Only trigger for issues carrying specific labels
 
@@ -73,8 +73,8 @@ func (i *OnIssue) Configuration() []configuration.Field {
 			Label:       "Team",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "The Linear team to monitor. Required when no projects are selected.",
-			Placeholder: "Select a team",
+			Description: "The Linear team to monitor. Leave empty to listen to the whole workspace.",
+			Placeholder: "All teams",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypeTeam,
@@ -86,7 +86,7 @@ func (i *OnIssue) Configuration() []configuration.Field {
 			Label:       "Projects",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Only issues in these projects. Leave empty to listen to the whole team.",
+			Description: "Only issues in these projects. Leave empty to listen to every project.",
 			Placeholder: "All projects",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -151,21 +151,32 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 		return i.setupProjectWebhooks(ctx, projects)
 	}
 
-	if config.Team == "" {
-		return fmt.Errorf("team is required")
+	if config.Team != "" {
+		team, err := requireTeam(ctx.Integration, config.Team)
+		if err != nil {
+			return err
+		}
+
+		if err := ctx.Metadata.Set(NodeMetadata{Team: team}); err != nil {
+			return err
+		}
+
+		return ctx.Integration.RequestWebhook(WebhookConfiguration{
+			TeamID:       config.Team,
+			ResourceType: IssueResourceType,
+		}.withDeliveryMode(ctx.Integration))
 	}
 
-	team, err := requireTeam(ctx.Integration, config.Team)
-	if err != nil {
-		return err
-	}
-
-	if err := ctx.Metadata.Set(NodeMetadata{Team: team}); err != nil {
+	//
+	// No projects and no team listens to the whole workspace. An empty team
+	// resolves to every team: the application webhook receives everything, and
+	// a per-team webhook is created with allPublicTeams.
+	//
+	if err := ctx.Metadata.Set(NodeMetadata{}); err != nil {
 		return err
 	}
 
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
-		TeamID:       config.Team,
 		ResourceType: IssueResourceType,
 	}.withDeliveryMode(ctx.Integration))
 }

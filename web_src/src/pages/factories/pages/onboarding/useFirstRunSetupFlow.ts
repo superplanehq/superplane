@@ -126,11 +126,9 @@ function screenWithoutIncompleteBacklog(
   agentGate: OnboardingAgentGate,
   issuesChoice: IssuesChoiceId | null,
   jiraProjectId: string,
-  linearProjectIds: string[],
 ): FirstRunScreen {
   if (screen !== "agent" || agentGate !== "show") return screen;
   if (issuesChoice === "jira" && !jiraProjectId) return "tickets";
-  if (issuesChoice === "linear" && linearProjectIds.length === 0) return "tickets";
   return screen;
 }
 
@@ -190,7 +188,6 @@ function useFirstRunNavigation(
       agentGate,
       model.setup.issuesChoice,
       model.jiraProjectId,
-      model.linearProjectIds,
     ),
     goToScreen,
   };
@@ -203,7 +200,6 @@ function waitForBrowserPaint(): Promise<void> {
 function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null {
   const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice);
   const issuesChoice = issuesChoiceForTicketSource(ticketSource);
-  if (issuesChoice === "linear" && (model.linearProjectsLoading || model.linearProjectsError)) return null;
   if (
     !issuesChoice ||
     !canAnalyzeTicketSource({

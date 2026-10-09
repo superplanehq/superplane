@@ -211,7 +211,8 @@ function FirstRunLinearProjectFields({
 
   return (
     <div className="mt-4 border-t border-border pt-4" data-testid="first-run-linear-projects">
-      <p className="mb-3 text-[13px] font-medium">{copy.linearProjectHeading}</p>
+      <p className="mb-1 text-[13px] font-medium">{copy.linearProjectHeading}</p>
+      <p className="mb-3 text-[13px] text-muted-foreground">Leave empty to include every project.</p>
       <fieldset disabled={saving} className="contents">
         <LinearProjectPicker
           projects={linearProjects}

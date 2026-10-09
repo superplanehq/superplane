@@ -73,7 +73,7 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
   {
     id: "linear-issues",
     name: "Linear issues",
-    description: "Create a task when a Linear issue is added to a selected project.",
+    description: "Create a task when a Linear issue is created.",
     iconSrc: linearIcon,
   },
   {

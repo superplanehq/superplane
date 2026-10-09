@@ -55,11 +55,13 @@ func seedLinearIssues(
 }
 
 func newestLinearSeedIssues(client *linear.Client, projectIDs, labels []string) ([]linear.Issue, error) {
+	var issues []linear.Issue
+	var err error
 	if len(projectIDs) == 0 {
-		return nil, fmt.Errorf("linear intake has no projects")
+		issues, err = client.ListOpenWorkspaceIssues(intakeLinearSeedFetchSize)
+	} else {
+		issues, err = client.ListOpenProjectIssues(projectIDs, intakeLinearSeedFetchSize)
 	}
-
-	issues, err := client.ListOpenProjectIssues(projectIDs, intakeLinearSeedFetchSize)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list Linear issues: %w", err)
 	}

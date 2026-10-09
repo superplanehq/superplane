@@ -57,10 +57,14 @@ export interface IntakeSourceSettings {
   datadogEnvironments: string[];
   /** Datadog service the trigger watches. Saved as the intake resource, not in settings. */
   datadogService: string;
-  /** Linear projects that still create a task. At least one is required. */
+  /** Linear projects that still create a task. Empty means every project. */
   linearProjectIds: string[];
   /** Linear labels that still create a task. Empty means every label. */
   linearLabels: string[];
+  /** Move the originating Linear issue when SuperPlane completes the task. */
+  linearMoveOnComplete: boolean;
+  /** Linear workflow state name to move the issue to. Empty means the issue team's Done state. */
+  linearCompletionState: string;
 }
 
 export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
@@ -90,6 +94,8 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   datadogService: "",
   linearProjectIds: [],
   linearLabels: [],
+  linearMoveOnComplete: true,
+  linearCompletionState: "",
 };
 
 export const SENTRY_INTAKE_LEVELS = ["fatal", "error", "warning", "info", "debug"] as const;
@@ -206,6 +212,7 @@ export function normalizeIntakeSourceSettings(
   const datadogService = draft.datadogService.trim();
   const linearProjectIds = normalizeLinearValues(draft.linearProjectIds);
   const linearLabels = normalizeLinearValues(draft.linearLabels);
+  const linearCompletionState = draft.linearCompletionState.trim();
   const sentryProjectIds = normalizeLinearValues(draft.sentryProjectIds);
   if (!draft.filterByLabel) {
     return {
@@ -221,6 +228,7 @@ export function normalizeIntakeSourceSettings(
       datadogService,
       linearProjectIds,
       linearLabels,
+      linearCompletionState,
       sentryProjectIds,
     };
   }
@@ -235,6 +243,7 @@ export function normalizeIntakeSourceSettings(
     datadogService,
     linearProjectIds,
     linearLabels,
+    linearCompletionState,
     sentryProjectIds,
   };
 }
@@ -362,6 +371,8 @@ export function intakeSettingsFromApi(
     datadogService: "",
     linearProjectIds: normalizeLinearValues(settings?.linearProjectIds ?? []),
     linearLabels: normalizeLinearValues(settings?.linearLabels ?? []),
+    linearMoveOnComplete: settings?.linearMoveOnComplete ?? DEFAULT_GITHUB_INTAKE_SETTINGS.linearMoveOnComplete,
+    linearCompletionState: settings?.linearCompletionState?.trim() ?? "",
     ...productiveFiltersFromApi(settings),
   };
 }
@@ -406,6 +417,8 @@ export function intakeSettingsToApi(settings: IntakeSourceSettings): FactoriesFa
     datadogEnvironments: normalizeDatadogEnvironments(settings.datadogEnvironments),
     linearProjectIds: normalizeLinearValues(settings.linearProjectIds),
     linearLabels: normalizeLinearValues(settings.linearLabels),
+    linearMoveOnComplete: settings.linearMoveOnComplete,
+    linearCompletionState: settings.linearMoveOnComplete ? settings.linearCompletionState.trim() : "",
   };
 }
 

@@ -176,10 +176,89 @@ query SearchProjectIssues($ids: [ID!]!, $query: String!, $first: Int!) {
   }
 }`
 
+const openWorkspaceIssuesQuery = `
+query OpenWorkspaceIssues($first: Int!) {
+  issues(
+    first: $first
+    orderBy: updatedAt
+    filter: {
+      state: { type: { nin: ["completed", "canceled"] } }
+    }
+  ) {
+    nodes {` + issueFields + `
+    }
+  }
+}`
+
+const searchWorkspaceIssuesQuery = `
+query SearchWorkspaceIssues($query: String!, $first: Int!) {
+  issues(
+    first: $first
+    orderBy: updatedAt
+    filter: {
+      state: { type: { nin: ["completed", "canceled"] } }
+      or: [
+        { title: { containsIgnoreCase: $query } }
+        { description: { containsIgnoreCase: $query } }
+      ]
+    }
+  ) {
+    nodes {` + issueFields + `
+    }
+  }
+}`
+
 // ListOpenProjectIssues returns the newest open issues in the given projects.
 // Completed and canceled issues are left out. limit is capped at one page.
 func (c *Client) ListOpenProjectIssues(projectIDs []string, limit int) ([]Issue, error) {
 	return c.SearchOpenProjectIssues(projectIDs, "", limit)
+}
+
+// ListOpenWorkspaceIssues returns the newest open issues in the whole
+// workspace. An empty project filter listens to every project, so the seed
+// and the item search need this path.
+func (c *Client) ListOpenWorkspaceIssues(limit int) ([]Issue, error) {
+	return c.SearchOpenWorkspaceIssues("", limit)
+}
+
+// SearchOpenWorkspaceIssues returns open issues whose title or description
+// contains query. An empty query lists the newest open issues. An identifier
+// such as ENG-142 is included when that issue is open.
+func (c *Client) SearchOpenWorkspaceIssues(query string, limit int) ([]Issue, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > pageSize {
+		limit = pageSize
+	}
+
+	query = strings.TrimSpace(query)
+	document := openWorkspaceIssuesQuery
+	variables := map[string]any{"first": limit}
+	if query != "" {
+		document = searchWorkspaceIssuesQuery
+		variables["query"] = query
+	}
+
+	response := struct {
+		Issues connection[Issue] `json:"issues"`
+	}{}
+	if err := c.execute(document, variables, &response); err != nil {
+		return nil, err
+	}
+	issues := response.Issues.Nodes
+	if query == "" || !looksLikeIssueIdentifier(query) {
+		return issues, nil
+	}
+
+	issue, err := c.GetIssue(query)
+	if err != nil || issue == nil || issueIsClosed(*issue) {
+		return issues, nil
+	}
+	if slices.ContainsFunc(issues, func(existing Issue) bool { return existing.ID == issue.ID }) {
+		return issues, nil
+	}
+	return append([]Issue{*issue}, issues...), nil
 }
 
 // SearchOpenProjectIssues returns open issues in the given projects whose

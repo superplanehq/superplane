@@ -32,18 +32,26 @@ func Test__intakeFilterExpressionFor_Linear__Empty(t *testing.T) {
 	assert.Equal(t, "true", intakeLinearFilterExpression(intakeSettings{}))
 }
 
-func Test__applyIntakeSettingsToGraph__LinearRequiresAProject(t *testing.T) {
-	_, _, err := applyIntakeSettingsToGraph(
+func Test__applyIntakeSettingsToGraph__LinearAllowsEmptyProjects(t *testing.T) {
+	nodes, _, err := applyIntakeSettingsToGraph(
 		models.FactoryIntakeSourceLinearIssues,
-		intakeGraph{TriggerNodeID: intakeTriggerNodeID},
-		models.LiveCanvasSpec{},
+		intakeGraph{TriggerNodeID: intakeTriggerNodeID, FilterNodeID: intakeFilterNodeID},
+		models.LiveCanvasSpec{Nodes: []models.Node{{
+			ID:            intakeTriggerNodeID,
+			Configuration: map[string]any{"projects": []any{"project-1"}},
+		}}},
 		&pb.FactoryIntake_Settings{},
-		nil,
+		[]models.Node{{
+			ID:            intakeTriggerNodeID,
+			Configuration: map[string]any{"projects": []any{"project-1"}},
+		}},
 		nil,
 	)
-	require.ErrorContains(t, err, "at least one Linear project is required")
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	assert.Empty(t, configurationStrings(nodes[0].Configuration["projects"]))
 
-	nodes, _, err := applyIntakeSettingsToGraph(
+	nodes, _, err = applyIntakeSettingsToGraph(
 		models.FactoryIntakeSourceLinearIssues,
 		intakeGraph{TriggerNodeID: intakeTriggerNodeID, FilterNodeID: intakeFilterNodeID},
 		models.LiveCanvasSpec{Nodes: []models.Node{{

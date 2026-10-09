@@ -75,7 +75,7 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
     setStep("connection");
   };
   const createBoundIntake = async () => {
-    if (!integrationId || projectIds.length === 0) {
+    if (!integrationId) {
       return false;
     }
     setError(undefined);

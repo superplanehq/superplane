@@ -58,8 +58,8 @@ export function finishOnboardingError(args: {
   if (args.issuesChoice === "jira" && (!args.jiraReady || !args.jiraProjectId)) {
     return "Connect Jira, then choose a project.";
   }
-  if (args.issuesChoice === "linear" && (!args.linearReady || !args.linearProjectIds?.length)) {
-    return "Connect Linear, then choose a project.";
+  if (args.issuesChoice === "linear" && !args.linearReady) {
+    return "Connect Linear to continue.";
   }
   const agentError = firstWorkOrderAgentError({
     remainingCreditCents: args.remainingCreditCents,
@@ -218,8 +218,8 @@ function linearIntakeBinding(
   linearId: string | undefined,
   projectIds: string[] | undefined,
 ): { integrationId: string; projectIds: string[] } | undefined {
-  if (issuesChoice !== "linear" || !linearId || !projectIds?.length) return undefined;
-  return { integrationId: linearId, projectIds };
+  if (issuesChoice !== "linear" || !linearId) return undefined;
+  return { integrationId: linearId, projectIds: projectIds ?? [] };
 }
 
 function jiraIntakeBinding(
