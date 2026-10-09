@@ -29,6 +29,16 @@ metadata:
     service: {{ .Release.Name }}-api
 spec:
   replicas: {{ .Values.api.replicas }}
+  {{- if and .Values.runner.api.enabled (not .Values.runner.activeLogs.existingClaim) }}
+  # The active log volume is ReadWriteOnce and stays on the runner API node.
+  # Start the replacement only after the current pod stops, so the node has
+  # CPU for it.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  {{- end }}
   selector:
     matchLabels:
       app: superplane
@@ -42,6 +52,20 @@ spec:
     spec:
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
+      {{- end }}
+      {{- if .Values.runner.api.enabled }}
+      securityContext:
+        fsGroup: {{ .Values.runner.activeLogs.fsGroup }}
+      {{- if not .Values.runner.activeLogs.existingClaim }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: superplane
+                  service: {{ .Release.Name }}-runner-api
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
@@ -158,6 +182,10 @@ spec:
               value: {{ .Values.blobStorage.localPath | quote }}
             - name: BLOB_STORAGE_CREDENTIALS_FILE
               value: {{ .Values.blobStorage.credentialsFile | quote }}
+            {{- if .Values.runner.api.enabled }}
+            - name: RUNNER_ACTIVE_LOG_FS_PATH
+              value: {{ .Values.runner.activeLogs.path | quote }}
+            {{- end }}
             - name: START_FILE_CLEANUP_WORKER
               value: "yes"
 {{- if .Values.license.secretName }}
@@ -183,6 +211,10 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
             - name: blob-data
               mountPath: {{ .Values.blobStorage.localPath }}
+{{- end }}
+{{- if .Values.runner.api.enabled }}
+            - name: runner-active-logs
+              mountPath: {{ .Values.runner.activeLogs.path }}
 {{- end }}
 
           ports:
@@ -236,4 +268,9 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
         - name: blob-data
           emptyDir: {}
+{{- end }}
+{{- if .Values.runner.api.enabled }}
+        - name: runner-active-logs
+          persistentVolumeClaim:
+            claimName: {{ include "runner.activeLogs.claimName" . }}
 {{- end }}
