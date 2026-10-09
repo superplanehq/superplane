@@ -21,6 +21,7 @@ func ListCanvases(
 	registry *registry.Registry,
 	organizationID string,
 	userID string,
+	includeGraph bool,
 ) (*pb.ListCanvasesResponse, error) {
 	organizationUUID, err := uuid.Parse(organizationID)
 	if err != nil {
@@ -38,7 +39,7 @@ func ListCanvases(
 		return nil, grpcerrors.Internal(err, "failed to list canvases")
 	}
 
-	protoCanvases, err := serializeCanvasSummaries(database.DB(ctx), organizationUUID, userUUID, canvases)
+	protoCanvases, err := serializeCanvasSummaries(database.DB(ctx), organizationUUID, userUUID, canvases, includeGraph)
 	if err != nil {
 		log.Errorf("failed to serialize canvases for organization %s: %v", organizationID, err)
 		return nil, grpcerrors.Internal(err, "failed to serialize canvases")
@@ -54,6 +55,7 @@ func serializeCanvasSummaries(
 	organizationID uuid.UUID,
 	userID uuid.UUID,
 	canvases []models.Canvas,
+	includeGraph bool,
 ) ([]*pb.CanvasSummary, error) {
 	//
 	// Get all users with a single query, to avoid N+1 queries.
@@ -80,9 +82,12 @@ func serializeCanvasSummaries(
 		canvasIDs[i] = canvas.ID
 	}
 
-	liveSpecs, err := models.FindLiveCanvasSpecsByCanvasIDs(db, canvasIDs)
-	if err != nil {
-		return nil, err
+	liveSpecs := map[uuid.UUID]models.LiveCanvasSpec{}
+	if includeGraph {
+		liveSpecs, err = models.FindLiveCanvasSpecsByCanvasIDs(db, canvasIDs)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	preferencesByCanvasID, err := models.FindUserCanvasPreferencesForCanvases(db, organizationID, userID, canvasIDs)
