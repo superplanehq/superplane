@@ -529,9 +529,10 @@
 .theme-factories .settings-graph {
   background-color: #f4f1ea;
   background-image:
-    linear-gradient(to right, #e4dccf 1px, transparent 1px),
-    linear-gradient(to bottom, #e4dccf 1px, transparent 1px);
-  background-size: 14px 14px, 14px 14px;
+    linear-gradient(to right, #e4dccf 1px, transparent 1px), linear-gradient(to bottom, #e4dccf 1px, transparent 1px);
+  background-size:
+    14px 14px,
+    14px 14px;
 }
 
 .theme-factories .settings-graph .react-flow,
@@ -619,9 +620,10 @@
 .dark .theme-factories .settings-graph {
   background-color: #17150f;
   background-image:
-    linear-gradient(to right, #2e2b24 1px, transparent 1px),
-    linear-gradient(to bottom, #2e2b24 1px, transparent 1px);
-  background-size: 14px 14px, 14px 14px;
+    linear-gradient(to right, #2e2b24 1px, transparent 1px), linear-gradient(to bottom, #2e2b24 1px, transparent 1px);
+  background-size:
+    14px 14px,
+    14px 14px;
 }
 
 /*
@@ -1440,152 +1442,40 @@
   }
 }
 
-@keyframes workspace-loading-stroke-left {
-  0% {
-    stroke-dashoffset: 1;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  12.5% {
-    stroke-dashoffset: 0;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  25%,
-  100% {
-    stroke-dashoffset: -1;
-  }
-}
-
-@keyframes workspace-loading-stroke-mid-left {
-  0%,
-  25% {
-    stroke-dashoffset: 1;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  37.5% {
-    stroke-dashoffset: 0;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  50%,
-  100% {
-    stroke-dashoffset: -1;
-  }
-}
-
-@keyframes workspace-loading-stroke-mid-right {
-  0%,
-  50% {
-    stroke-dashoffset: 1;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  62.5% {
-    stroke-dashoffset: 0;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  75%,
-  100% {
-    stroke-dashoffset: -1;
-  }
-}
-
-@keyframes workspace-loading-stroke-right {
-  0%,
-  75% {
-    stroke-dashoffset: 1;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  87.5% {
-    stroke-dashoffset: 0;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  100% {
-    stroke-dashoffset: -1;
-  }
-}
-
-@keyframes workspace-loading-pen {
-  0%,
-  25%,
-  50%,
-  75% {
-    left: 50%;
-    top: 8%;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  12.5% {
-    left: 15.5%;
-    top: 73.8%;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  37.5% {
-    left: 36.1%;
-    top: 85.7%;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  62.5% {
-    left: 63.9%;
-    top: 85.7%;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  87.5% {
-    left: 84.5%;
-    top: 73.8%;
-    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  100% {
-    left: 50%;
-    top: 8%;
-  }
-}
-
 @keyframes workspace-loading-overlay-exit {
   to {
     opacity: 0;
   }
 }
 
+/* Isolate blending so the reference animation uses the app's exact background. */
 .workspace-loading-mark {
-  --workspace-loading-cycle: 1.5s;
-  position: relative;
-  width: 5.5rem;
-  aspect-ratio: 33 / 25;
+  display: grid;
+  place-items: center;
+  width: 12rem;
+  aspect-ratio: 1;
+  isolation: isolate;
+  background: var(--background);
 }
 
-.workspace-loading-trace-svg {
+.workspace-loading-animation {
   display: block;
   width: 100%;
   height: 100%;
-  overflow: visible;
+  /* Remove the GIF's near-black backdrop, then use black ink on light surfaces. */
+  filter: grayscale(1) contrast(1.2) brightness(1.1) invert(1);
+  mix-blend-mode: multiply;
 }
 
-.workspace-loading-trace {
-  stroke-dasharray: 1 1;
-  stroke-dashoffset: 1;
+.dark .workspace-loading-animation {
+  filter: grayscale(1) contrast(1.2) brightness(1.1);
+  mix-blend-mode: screen;
 }
 
-.workspace-loading-trace--left {
-  animation: workspace-loading-stroke-left var(--workspace-loading-cycle) infinite;
-}
-
-.workspace-loading-trace--mid-left {
-  animation: workspace-loading-stroke-mid-left var(--workspace-loading-cycle) infinite;
-}
-
-.workspace-loading-trace--mid-right {
-  animation: workspace-loading-stroke-mid-right var(--workspace-loading-cycle) infinite;
-}
-
-.workspace-loading-trace--right {
-  animation: workspace-loading-stroke-right var(--workspace-loading-cycle) infinite;
-}
-
-.workspace-loading-pen {
-  position: absolute;
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 999px;
-  background: currentColor;
-  translate: -50% -50%;
-  animation: workspace-loading-pen var(--workspace-loading-cycle) infinite;
+.workspace-loading-static {
+  display: none;
+  width: 8.4rem;
+  height: auto;
 }
 
 .workspace-loading-overlay--exit {
@@ -1594,6 +1484,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .workspace-loading-animation {
+    display: none;
+  }
+
+  .workspace-loading-static {
+    display: block;
+  }
+
   .workspace-next-steps-progress,
   .workspace-next-steps-title,
   .workspace-next-steps-banner {
@@ -1601,12 +1499,6 @@
   }
 
   .workspace-next-steps-reveal,
-  .workspace-loading-trace,
-  .workspace-loading-trace--left,
-  .workspace-loading-trace--mid-left,
-  .workspace-loading-trace--mid-right,
-  .workspace-loading-trace--right,
-  .workspace-loading-pen,
   .workspace-loading-overlay--exit,
   .sp-text-reveal,
   .sp-stream-text,
@@ -1640,14 +1532,5 @@
   .sp-confidence-drawer,
   .sp-confidence-drawer .sp-review-metric {
     animation: none;
-  }
-
-  .workspace-loading-trace {
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
-
-  .workspace-loading-pen {
-    display: none;
   }
 }
