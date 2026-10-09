@@ -61,7 +61,7 @@ export function buildMobileBoardColumns(
   totalCounts?: MobileBoardColumnTotalCounts,
 ): MobileBoardColumn[] {
   const fullBoard = buildLinePhaseBoard(line, workOrders, apps);
-  const verifyOrders = collectLineVerifyOrders(fullBoard);
+  const verifyOrders = collectLineVerifyOrders(fullBoard, workOrders);
   const stageColumns = visibleLineStageColumns(fullBoard, verifyOrders);
   const backlogOrders = collectLineBacklogOrders(workOrders);
   const doneCards = cardsForOrders(collectLineDoneOrders(workOrders, line, fullBoard));

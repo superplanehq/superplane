@@ -62,7 +62,7 @@ describe("collectLineVerifyOrders", () => {
     ]);
 
     const board = buildLinePhaseBoard(LINE, [waiting], APPS);
-    const verify = collectLineVerifyOrders(board);
+    const verify = collectLineVerifyOrders(board, [waiting]);
 
     expect(verify.map((entry) => entry.id)).toEqual(["wo-wait"]);
     expect(visibleLineStageColumns(board, verify).flatMap((column) => column.runs)).toEqual([]);
@@ -83,7 +83,7 @@ describe("collectLineVerifyOrders", () => {
     ]);
 
     const board = buildLinePhaseBoard(LINE, [failed], APPS);
-    const verify = collectLineVerifyOrders(board);
+    const verify = collectLineVerifyOrders(board, [failed]);
 
     expect(verify).toEqual([]);
     expect(lineStageColumns(board)[2]?.runs.map((run) => run.workOrderId)).toEqual(["wo-failed"]);
@@ -107,6 +107,42 @@ describe("collectLineVerifyOrders", () => {
     };
 
     const board = buildLinePhaseBoard(LINE, [closed], APPS);
-    expect(collectLineVerifyOrders(board)).toEqual([]);
+    expect(collectLineVerifyOrders(board, [closed])).toEqual([]);
+  });
+
+  it("keeps a task in its source-list place when updated_at changes", () => {
+    const first = order("wo-first", "First review", [
+      {
+        id: "e-first",
+        line: { id: "line-1", name: "poc" },
+        step: "demo",
+        stepIndex: 2,
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        createdAt: "2026-08-11T12:00:00.000Z",
+        updatedAt: "2026-08-11T12:00:00.000Z",
+      },
+    ]);
+    const second = order("wo-second", "Second review", [
+      {
+        id: "e-second",
+        line: { id: "line-1", name: "poc" },
+        step: "demo",
+        stepIndex: 2,
+        state: "STATE_FINISHED",
+        result: "RESULT_PASSED",
+        createdAt: "2026-08-11T12:00:00.000Z",
+        updatedAt: "2026-08-11T12:00:00.000Z",
+      },
+    ]);
+    first.updatedAt = "2026-01-01T00:00:00.000Z";
+    second.updatedAt = "2026-02-01T00:00:00.000Z";
+    const bumpedSecond = { ...second, updatedAt: "2026-03-01T00:00:00.000Z" };
+    const board = buildLinePhaseBoard(LINE, [first, bumpedSecond], APPS);
+
+    expect(collectLineVerifyOrders(board, [first, bumpedSecond]).map((entry) => entry.id)).toEqual([
+      "wo-first",
+      "wo-second",
+    ]);
   });
 });
