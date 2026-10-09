@@ -73,6 +73,48 @@ describe("fork task menu", () => {
     expect(forkMutate).toHaveBeenCalledWith({ orderId: "order-1", mode: "MODE_PLAN" });
   });
 
+  it("moves between choices with arrow keys and keeps one tab stop", async () => {
+    const user = userEvent.setup();
+    renderHeader(true);
+
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Fork task" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Fork task" });
+    const request = within(dialog).getByRole("radio", { name: "Copy request" });
+    const plan = within(dialog).getByRole("radio", { name: "Copy plan" });
+    expect(request).toHaveAttribute("tabindex", "0");
+    expect(plan).toHaveAttribute("tabindex", "-1");
+
+    request.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(plan).toHaveFocus();
+    expect(plan).toHaveAttribute("aria-checked", "true");
+    expect(plan).toHaveAttribute("tabindex", "0");
+    expect(request).toHaveAttribute("tabindex", "-1");
+
+    await user.tab();
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+
+    await user.click(within(dialog).getByRole("button", { name: "Fork task" }));
+    expect(forkMutate).toHaveBeenCalledWith({ orderId: "order-1", mode: "MODE_PLAN" });
+  });
+
+  it("does not move to a disabled plan choice", async () => {
+    const user = userEvent.setup();
+    renderHeader(false);
+
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Fork task" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Fork task" });
+    const request = within(dialog).getByRole("radio", { name: "Copy request" });
+    request.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(request).toHaveFocus();
+    expect(request).toHaveAttribute("aria-checked", "true");
+  });
+
   it("disables plan copy when the task has no plan", async () => {
     const user = userEvent.setup();
     renderHeader(false);

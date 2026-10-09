@@ -5,15 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { clearBacklogAnalysisPending, pendingBacklogAnalysisIds } from "@/pages/factories/lib/backlogAnalysis";
 
-const { factoriesCreateWorkOrder } = vi.hoisted(() => ({
+const { factoriesCreateWorkOrder, factoriesForkWorkOrder } = vi.hoisted(() => ({
   factoriesCreateWorkOrder: vi.fn(),
+  factoriesForkWorkOrder: vi.fn(),
 }));
 
 vi.mock("@/api-client", () => ({
   factoriesCreateWorkOrder,
+  factoriesForkWorkOrder,
 }));
 
-import { mergeFactoryBoardWorkOrders, useCreateWorkOrder } from "./useFactoryData";
+import { mergeFactoryBoardWorkOrders, useCreateWorkOrder, useForkWorkOrder } from "./useFactoryData";
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -56,5 +58,69 @@ describe("useCreateWorkOrder", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ["backlog-analysis-runs", "org-1"],
     });
+  });
+});
+
+describe("useForkWorkOrder", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    clearBacklogAnalysisPending("wo-forked-1");
+  });
+
+  it("marks a request fork pending only when planning is on", async () => {
+    factoriesForkWorkOrder.mockResolvedValue({ data: { order: { id: "wo-forked-1" } } });
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(["factories", "org-1", "factory-1"], {
+      id: "factory-1",
+      planning: { enabled: true },
+    });
+
+    const { result } = renderHook(() => useForkWorkOrder("org-1", "factory-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ orderId: "wo-source", mode: "MODE_INTAKE" });
+    });
+
+    await waitFor(() => expect(pendingBacklogAnalysisIds().has("wo-forked-1")).toBe(true));
+  });
+
+  it("does not mark a request fork pending when planning is off", async () => {
+    factoriesForkWorkOrder.mockResolvedValue({ data: { order: { id: "wo-forked-1" } } });
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(["factories", "org-1"], [{ id: "factory-1", planning: { enabled: false } }]);
+
+    const { result } = renderHook(() => useForkWorkOrder("org-1", "factory-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ orderId: "wo-source", mode: "MODE_INTAKE" });
+    });
+
+    expect(pendingBacklogAnalysisIds().has("wo-forked-1")).toBe(false);
+  });
+
+  it("does not mark a plan fork pending", async () => {
+    factoriesForkWorkOrder.mockResolvedValue({ data: { order: { id: "wo-forked-1" } } });
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(["factories", "org-1", "factory-1"], {
+      id: "factory-1",
+      planning: { enabled: true },
+    });
+
+    const { result } = renderHook(() => useForkWorkOrder("org-1", "factory-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ orderId: "wo-source", mode: "MODE_PLAN" });
+    });
+
+    expect(pendingBacklogAnalysisIds().has("wo-forked-1")).toBe(false);
   });
 });

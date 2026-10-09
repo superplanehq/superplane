@@ -39,6 +39,7 @@ import type {
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
+import { factoryPlanningEnabled } from "@/pages/factories/pages/planningSettingsModel";
 import { buildOptimisticDispatchedOrder } from "@/pages/factories/lib/dispatchOptimistic";
 import {
   getWorkOrderEventsNextPageParam,
@@ -64,7 +65,14 @@ import {
   type WorkOrdersPageQuery,
 } from "@/pages/factories/lib/workOrderListPagination";
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
 
 export const factoryQueryKeys = {
   list: (organizationId: string) => ["factories", organizationId] as const,
@@ -603,6 +611,17 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
   });
 }
 
+function intakePlanningEnabled(queryClient: QueryClient, organizationId: string, factoryId: string): boolean {
+  const detail = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
+  if (detail) {
+    return factoryPlanningEnabled(detail);
+  }
+  const listed = queryClient
+    .getQueryData<FactoriesFactory[]>(factoryListKey(organizationId))
+    ?.find((factory) => factory.id === factoryId);
+  return factoryPlanningEnabled(listed);
+}
+
 export function useForkWorkOrder(organizationId: string, factoryId: string) {
   const queryClient = useQueryClient();
 
@@ -625,7 +644,7 @@ export function useForkWorkOrder(organizationId: string, factoryId: string) {
       if (order.id) {
         queryClient.setQueryData(workOrderDetailKey(organizationId, factoryId, order.id), order);
       }
-      if (input.mode !== "MODE_INTAKE" || !order.id) {
+      if (input.mode !== "MODE_INTAKE" || !order.id || !intakePlanningEnabled(queryClient, organizationId, factoryId)) {
         return;
       }
       markBacklogAnalysisPending(order.id);
