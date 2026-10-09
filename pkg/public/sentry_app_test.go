@@ -25,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestHandleSentryAppInstall_missingState(t *testing.T) {
@@ -397,6 +398,7 @@ func TestHandlerSentryAppWebhook_lookupFailure(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	transport := bindTestSentryHub(t)
 	body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":{"issue":{"id":"1"}}}`)
 	req := sentryWebhookRequest(body, "issue")
 
@@ -404,10 +406,63 @@ func TestHandlerSentryAppWebhook_lookupFailure(t *testing.T) {
 	cancel()
 	req = req.WithContext(ctx)
 
+	var before int64
+	require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&before).Error)
+
 	rec := httptest.NewRecorder()
 	server.HandleSentryAppWebhook(rec, req)
 
+	assert.Equal(t, statusClientClosedRequest, rec.Code)
+	assert.Empty(t, transport.Events())
+
+	var after int64
+	require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&after).Error)
+	assert.Equal(t, before, after)
+}
+
+func TestHandlerSentryAppWebhook_lookupErrorIsReported(t *testing.T) {
+	t.Setenv(config.EnvSentryAppSlug, "superplane")
+	t.Setenv(config.EnvSentryAppClientID, "cid")
+	t.Setenv(config.EnvSentryAppClientSecret, "csecret")
+
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-client-secret")
+	server, err := NewServer(
+		r.Encryptor, r.Registry, signer, support.NewOIDCProvider(),
+		"", "", "", "test", "/app/templates", r.AuthService, false,
+	)
+	require.NoError(t, err)
+
+	transport := bindTestSentryHub(t)
+	installationUUID := uuid.NewString()
+	body := []byte(`{"action":"created","installation":{"uuid":"` + installationUUID + `"},"data":{"issue":{"id":"1"}}}`)
+
+	db := database.Conn()
+	const callback = "test:sentry-app-webhook-lookup-failure"
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+		if tx == nil || tx.Statement == nil || tx.Statement.Table != "app_installations" {
+			return
+		}
+		tx.AddError(errors.New("integrations unavailable"))
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, db.Callback().Query().Remove(callback))
+	})
+
+	rec := httptest.NewRecorder()
+	server.HandleSentryAppWebhook(rec, sentryWebhookRequest(body, "issue"))
+
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+	events := transport.Events()
+	require.Len(t, events, 1)
+	assert.Contains(t, capturedExceptionText(events[0]), "lookup failed for installation "+installationUUID)
+	assert.Equal(t, installationUUID, events[0].Tags["installation_uuid"])
+
+	var receipts []models.SentryWebhookReceipt
+	require.NoError(t, database.Conn().Where("installation_uuid = ?", installationUUID).Find(&receipts).Error)
+	require.Len(t, receipts, 1)
+	assert.Equal(t, models.SentryWebhookOutcomeFailed, receipts[0].Outcome)
+	assert.Equal(t, http.StatusInternalServerError, receipts[0].HTTPStatus)
 }
 
 func TestHandlerSentryAppWebhook_droppedDeliveryPreservesStatus(t *testing.T) {
