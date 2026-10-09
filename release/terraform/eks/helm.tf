@@ -360,36 +360,36 @@ resource "helm_release" "cert_manager" {
 }
 
 # -----------------------------------------------------------------------------
-# NGINX Ingress Controller with NLB and Static IP
+# Traefik Ingress Controller with NLB
 # -----------------------------------------------------------------------------
 
-resource "helm_release" "nginx_ingress" {
-  name             = "ingress-nginx"
-  repository       = "https://kubernetes.github.io/ingress-nginx"
-  chart            = "ingress-nginx"
-  namespace        = "ingress-nginx"
+resource "helm_release" "traefik" {
+  name             = "traefik"
+  repository       = "https://traefik.github.io/charts"
+  chart            = "traefik"
+  version          = "41.7.0"
+  namespace        = "traefik"
   create_namespace = true
   timeout          = 1200 # 20 minutes - NLB deletion can take longer than creation
 
-  set {
-    name  = "controller.service.type"
-    value = "LoadBalancer"
-  }
-
-  set {
-    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-type"
-    value = "external"
-  }
-
-  set {
-    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-nlb-target-type"
-    value = "ip"
-  }
-
-  set {
-    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-scheme"
-    value = "internet-facing"
-  }
+  values = [yamlencode({
+    ingressClass = {
+      isDefaultClass = false
+    }
+    providers = {
+      kubernetesIngress = {
+        ingressClass = "traefik"
+      }
+    }
+    service = {
+      type = "LoadBalancer"
+      annotations = {
+        "service.beta.kubernetes.io/aws-load-balancer-type"            = "external"
+        "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type" = "ip"
+        "service.beta.kubernetes.io/aws-load-balancer-scheme"          = "internet-facing"
+      }
+    }
+  })]
 
   depends_on = [
     time_sleep.wait_for_alb_controller
@@ -404,8 +404,10 @@ resource "helm_release" "superplane" {
   name             = "superplane"
   repository       = "oci://ghcr.io/superplanehq"
   chart            = "superplane-chart"
+  version          = var.superplane_chart_version
   namespace        = var.superplane_namespace
   create_namespace = false
+  timeout          = 1200
 
   # Database configuration
   set {
@@ -507,7 +509,7 @@ resource "helm_release" "superplane" {
     value = var.domain_name
   }
 
-  # Ingress configuration for NGINX
+  # Ingress configuration for Traefik
   set {
     name  = "ingress.enabled"
     value = "true"
@@ -515,7 +517,7 @@ resource "helm_release" "superplane" {
 
   set {
     name  = "ingress.className"
-    value = "nginx"
+    value = "traefik"
   }
 
   # SSL configuration with cert-manager
@@ -645,7 +647,7 @@ resource "helm_release" "superplane" {
     kubernetes_secret.encryption,
     kubernetes_secret.oidc,
     helm_release.cert_manager,
-    helm_release.nginx_ingress,
+    helm_release.traefik,
     aws_iam_role_policy.blob_storage,
     aws_s3_bucket_public_access_block.blobs,
     aws_s3_bucket_server_side_encryption_configuration.blobs,
