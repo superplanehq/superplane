@@ -3,7 +3,8 @@
 # -----------------------------------------------------------------------------
 
 resource "random_password" "db_password" {
-  count   = var.db_password == "" ? 1 : 0
+  # The password stays sensitive. Only the empty check is safe for count.
+  count   = nonsensitive(var.db_password) == "" ? 1 : 0
   length  = 32
   special = false
 }
@@ -12,7 +13,8 @@ locals {
   db_password                  = var.db_password != "" ? var.db_password : random_password.db_password[0].result
   fleet_manager_image_tag      = var.fleet_manager_image_tag != "" ? var.fleet_manager_image_tag : var.superplane_image_tag
   fleet_manager_image_registry = var.fleet_manager_image_registry != "" ? var.fleet_manager_image_registry : var.image_registry
-  fleet_manager_enabled        = trimspace(var.fleet_manager_config) != ""
+  # The config stays sensitive. Only the present check is safe for count.
+  fleet_manager_enabled        = nonsensitive(trimspace(var.fleet_manager_config)) != ""
   kubernetes_version           = trimspace(var.kubernetes_version) != "" ? var.kubernetes_version : null
   use_local_helm_chart         = trimspace(var.helm_chart_path) != ""
   helm_chart                   = local.use_local_helm_chart ? "${path.module}/${var.helm_chart_path}" : var.helm_chart_name

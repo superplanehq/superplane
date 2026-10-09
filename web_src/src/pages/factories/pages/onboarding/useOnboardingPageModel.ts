@@ -263,6 +263,8 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
       const integrationId = factory.onboarding?.vcsIntegrationId;
       if (!integrationId) throw new Error("GitHub repository selection returned no integration");
       const installationName = await describeGitHubInstallationName(args.organizationId, integrationId);
+      args.connect.rememberPreferredInstance("github", integrationId);
+      await args.connect.refetchConnections();
       args.integrations.setSelections((current) => ({
         ...current,
         github: githubIntegrationSelection(integrationId, installationName),
@@ -280,6 +282,8 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
       const integrationId = factory.onboarding?.vcsIntegrationId;
       if (!integrationId) throw new Error("Bitbucket repository selection returned no integration");
       const installationName = await describeGitHubInstallationName(args.organizationId, integrationId);
+      args.connect.rememberPreferredInstance("bitbucket", integrationId);
+      await args.connect.refetchConnections();
       args.integrations.setSelections((current) => ({
         ...current,
         bitbucket: { id: integrationId, name: installationName || "bitbucket", ready: true },

@@ -167,6 +167,50 @@ func TestHandler_handleAuth_UsesInstallationGitHubAppClient(t *testing.T) {
 	assert.Equal(t, "https://azure.example/auth/github/callback", location.Query().Get("redirect_uri"))
 }
 
+func TestHandler_handleAuthCallback_LoadsInstallationGitHubAppClient(t *testing.T) {
+	goth.ClearProviders()
+	t.Cleanup(func() { goth.ClearProviders() })
+
+	r := support.Setup(t)
+	t.Cleanup(func() { r.Close() })
+	handler := NewHandler(jwt.NewSigner("test-secret"), r.Encryptor, r.AuthService, "development", "/templates", false, false, false)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	t.Setenv("BASE_URL", "https://azure.example")
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+	require.NoError(t, githubapp.Save(t.Context(), database.DB(t.Context()), r.Encryptor, config.GitHubHostedAppConfig{
+		ID:            44,
+		Slug:          "superplane-self",
+		PrivateKey:    "pem",
+		WebhookSecret: "whsec",
+		ClientID:      "Iv1.installation",
+		ClientSecret:  "installation-secret",
+	}))
+
+	request := mux.SetURLVars(
+		httptest.NewRequest(http.MethodGet, "/auth/github/callback?provider=github", nil),
+		map[string]string{"provider": models.ProviderGitHub},
+	)
+	recorder := httptest.NewRecorder()
+
+	handler.handleAuthCallback(recorder, request)
+
+	require.Equal(t, http.StatusUnauthorized, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), "could not find a matching session")
+	provider, err := goth.GetProvider(models.ProviderGitHub)
+	require.NoError(t, err)
+	session, err := provider.BeginAuth("state")
+	require.NoError(t, err)
+	authorizeURL, err := session.GetAuthURL()
+	require.NoError(t, err)
+	parsed, err := url.Parse(authorizeURL)
+	require.NoError(t, err)
+	assert.Equal(t, "Iv1.installation", parsed.Query().Get("client_id"))
+}
+
 func TestHandler_handleAuthConfig(t *testing.T) {
 	t.Run("reports environment signup block separately from effective signup status", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, true)

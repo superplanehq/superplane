@@ -362,6 +362,15 @@ func (a *Handler) finishProviderAuth(w http.ResponseWriter, r *http.Request, got
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
+	// Login starts on one pod and the callback can land on another. Load the
+	// saved GitHub client before gothic reads it, the same way login does.
+	if mux.Vars(r)["provider"] == models.ProviderGitHub {
+		if err := a.ensureGitHubOAuth(r.Context()); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err != nil {
 		log.WithError(err).Warn("provider authentication failed")

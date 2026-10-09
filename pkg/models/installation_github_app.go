@@ -76,27 +76,21 @@ func SaveInstallationGitHubApp(
 }
 
 // ReplaceInstallationGitHubAppOAuth stores login credentials on the app that
-// was created before those credentials were kept. A row that already has a
-// client id is left unchanged.
+// was created before those credentials were kept. It updates only the client
+// id and secret, and only when the GitHub App id matches. A different app,
+// or a row that already has a client id, is left unchanged.
 func ReplaceInstallationGitHubAppOAuth(
 	tx *gorm.DB,
 	githubAppID int64,
-	slug string,
 	clientID string,
-	encryptedPrivateKey []byte,
-	encryptedWebhookSecret []byte,
 	encryptedClientSecret []byte,
 ) error {
 	result := tx.Model(&InstallationGitHubApp{}).
-		Where("id = ? AND client_id = ''", installationGitHubAppID).
+		Where("id = ? AND client_id = '' AND github_app_id = ?", installationGitHubAppID, githubAppID).
 		Updates(map[string]any{
-			"github_app_id":            githubAppID,
-			"slug":                     slug,
-			"client_id":                clientID,
-			"encrypted_private_key":    encryptedPrivateKey,
-			"encrypted_webhook_secret": encryptedWebhookSecret,
-			"encrypted_client_secret":  encryptedClientSecret,
-			"updated_at":               time.Now(),
+			"client_id":               clientID,
+			"encrypted_client_secret": encryptedClientSecret,
+			"updated_at":              time.Now(),
 		})
 	if result.Error != nil {
 		return result.Error

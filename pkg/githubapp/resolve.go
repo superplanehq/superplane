@@ -127,7 +127,7 @@ func Save(
 	if cfg.ClientID == "" || cfg.ClientSecret == "" {
 		return ErrAlreadyConfigured
 	}
-	err = models.ReplaceInstallationGitHubAppOAuth(tx, cfg.ID, cfg.Slug, cfg.ClientID, privateKey, webhookSecret, encryptedClientSecret)
+	err = models.ReplaceInstallationGitHubAppOAuth(tx, cfg.ID, cfg.ClientID, encryptedClientSecret)
 	if errors.Is(err, models.ErrInstallationGitHubAppExists) {
 		return ErrAlreadyConfigured
 	}
