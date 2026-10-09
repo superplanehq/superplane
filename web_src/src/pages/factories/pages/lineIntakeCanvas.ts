@@ -17,7 +17,7 @@ const INTAKE_CANVAS_BY_SOURCE: Record<LineIntakeSourceId, IntakeCanvasSpec> = {
     triggerComponent: "github.onIssue",
     triggerName: "On Issue",
     createTitle: "{{ root().data.issue.title }}",
-    createDescription: "{{ root().data.issue.body ?? \"\" }}",
+    createDescription: '{{ root().data.issue.body ?? "" }}',
     title: "GitHub issue intake",
   },
   "dependabot-alerts": {
