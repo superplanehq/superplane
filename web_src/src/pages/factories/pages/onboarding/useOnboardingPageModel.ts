@@ -321,6 +321,22 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
   };
 }
 
+function onboardingSetupOptions(
+  factoryId: string,
+  onboarding: FactoriesFactory["onboarding"],
+  connected: Set<IntegrationId>,
+  remainingCreditCents: number,
+) {
+  return {
+    connected,
+    remainingCreditCents,
+    simulateDiscovery: false,
+    initial: initialSetupState(onboarding),
+    persistVcsHostKey: factoryId,
+    persistRepoKey: factoryId,
+  };
+}
+
 export function useOnboardingPageModel(args: {
   organizationId: string;
   factoryId: string;
@@ -352,13 +368,10 @@ export function useOnboardingPageModel(args: {
     [connectedIntegrations],
   );
   const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
-  const setup = useOnboardingSetupState(args.factory?.name ?? "", {
-    connected: integrations.connected,
-    remainingCreditCents: agent.remainingCreditCents,
-    simulateDiscovery: false,
-    initial: initialSetupState(onboarding),
-    persistVcsHostKey: args.factoryId,
-  });
+  const setup = useOnboardingSetupState(
+    args.factory?.name ?? "",
+    onboardingSetupOptions(args.factoryId, onboarding, integrations.connected, agent.remainingCreditCents),
+  );
   useRestoreIntegrationReadiness(setup, integrations.selections);
   const [searchParams] = useSearchParams();
   const [openSection, setOpenSection] = useState<WizardStepId>(() => {
