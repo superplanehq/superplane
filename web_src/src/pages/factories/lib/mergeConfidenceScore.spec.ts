@@ -75,6 +75,19 @@ describe("mergeConfidenceHeadline", () => {
       ],
     });
   });
+
+  it("drops checks that omit a score and still scores the rest", () => {
+    const headline = mergeConfidenceHeadline([
+      { key: "security-review", name: "Security" },
+      { key: "performance-review", name: "Performance", score: 4, maxScore: 0 },
+      { key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 },
+    ]);
+
+    expect(headline).toMatchObject({
+      score: 5,
+      checks: [{ key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 }],
+    });
+  });
 });
 
 describe("consoleCheckList", () => {

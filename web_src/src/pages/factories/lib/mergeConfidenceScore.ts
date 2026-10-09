@@ -21,6 +21,13 @@ export type MergeConfidenceCardCheck = {
   maxScore: number;
 };
 
+type MergeConfidenceHeadlineInput = {
+  key?: string;
+  name?: string;
+  score?: number;
+  maxScore?: number;
+};
+
 /**
  * Same bands the server stores on the check. The board list has the score
  * only, so the card derives the level when it builds the hover list.
@@ -83,8 +90,6 @@ export function isMergeConfidenceMetric(check: { key?: string }): boolean {
   return check.key != null && (MERGE_CONFIDENCE_METRIC_KEYS as readonly string[]).includes(check.key);
 }
 
-type MergeConfidenceHeadlineInput = MergeConfidenceCardCheck;
-
 export type MergeConfidenceCard = {
   score: number;
   maxScore: number;
@@ -98,11 +103,13 @@ export type MergeConfidenceCard = {
 export function mergeConfidenceHeadline(
   checks: readonly MergeConfidenceHeadlineInput[] | undefined,
 ): MergeConfidenceCard | undefined {
-  const metrics = (checks ?? []).flatMap((check) => {
-    if (!isMergeConfidenceMetric(check) || check.score == null || (check.maxScore ?? 0) <= 0) {
+  const metrics = (checks ?? []).flatMap((check): MergeConfidenceCardCheck[] => {
+    const score = check.score;
+    const maxScore = check.maxScore ?? 0;
+    if (!isMergeConfidenceMetric(check) || score == null || maxScore <= 0) {
       return [];
     }
-    return [{ key: check.key, name: check.name, score: check.score, maxScore: check.maxScore ?? 0 }];
+    return [{ key: check.key, name: check.name, score, maxScore }];
   });
   if (metrics.length === 0) {
     return undefined;
