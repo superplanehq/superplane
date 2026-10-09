@@ -8,7 +8,9 @@ resource "kubernetes_namespace" "superplane" {
   }
 
   depends_on = [
-    aws_eks_node_group.superplane
+    # Keep storage drivers running until namespace PVC deletion finishes.
+    aws_eks_addon.ebs_csi,
+    aws_eks_addon.efs_csi
   ]
 }
 

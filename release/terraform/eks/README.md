@@ -81,6 +81,9 @@ kubectl get svc -n traefik traefik -o jsonpath='{.status.loadBalancer.ingress[0]
 
 Create a CNAME record in your DNS provider pointing your domain to the NLB DNS name.
 
+For an existing installation, update its CNAME to the new Traefik NLB hostname.
+Replacing NGINX removes the old NLB. Plan for an interruption while the NLB and DNS change.
+
 ### 6. Verify
 
 ```bash
@@ -160,7 +163,13 @@ terraform destroy
 ```
 
 Repeat `delete-target-group` for each target group. If the Service is already gone, skip `kubectl patch`.
-If the NLB is already gone, skip the NLB and target group commands.
+If the NLB is already gone, skip only the NLB commands. Delete any recorded Traefik target groups before removing the Service finalizer.
+If you did not record their ARNs, list target groups and check their tags before you delete them:
+
+```bash
+aws elbv2 describe-target-groups --query 'TargetGroups[].[TargetGroupArn,TargetGroupName]'
+aws elbv2 describe-tags --resource-arns <target-group-arn>
+```
 
 Terraform keeps a final RDS snapshot when it deletes the instance.
 The snapshot name has a random suffix.

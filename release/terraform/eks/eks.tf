@@ -206,9 +206,7 @@ resource "aws_eks_addon" "ebs_csi" {
 
   depends_on = [
     aws_eks_node_group.superplane,
-    aws_iam_role_policy_attachment.ebs_csi,
-    # Keep the driver running while namespace deletion removes PVCs and EBS volumes.
-    kubernetes_namespace.superplane
+    aws_iam_role_policy_attachment.ebs_csi
   ]
 }
 
@@ -253,9 +251,7 @@ resource "aws_eks_addon" "efs_csi" {
 
   depends_on = [
     aws_eks_node_group.superplane,
-    aws_iam_role_policy_attachment.efs_csi,
-    # Keep the driver running until namespace deletion finishes.
-    kubernetes_namespace.superplane
+    aws_iam_role_policy_attachment.efs_csi
   ]
 }
 
