@@ -21,7 +21,11 @@ import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { OnboardingConnectDialogs } from "./CustomProviderConnectDialog";
-import { describeGitHubInstallationName, githubIntegrationSelection } from "./githubIntegrationSelection";
+import {
+  describeGitHubInstallationName,
+  githubIntegrationSelection,
+  selectionsWithSavedVcsReady,
+} from "./githubIntegrationSelection";
 import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
@@ -65,6 +69,9 @@ const ONBOARDING_HIDDEN_CONFIGURATION_FIELDS: Record<string, string[]> = {
 
 function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
   const [selections, setSelections] = useState<IntegrationSelections>(() => initialOnboardingSelections(onboarding));
+  useEffect(() => {
+    setSelections((current) => selectionsWithSavedVcsReady(onboarding, current));
+  }, [onboarding]);
   const connected = useMemo(() => {
     const ready = new Set<IntegrationId>();
     if (selections.github?.ready) ready.add("github");
@@ -321,6 +328,22 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
   };
 }
 
+function onboardingSetupOptions(
+  factoryId: string,
+  onboarding: FactoriesFactory["onboarding"],
+  connected: Set<IntegrationId>,
+  remainingCreditCents: number,
+) {
+  return {
+    connected,
+    remainingCreditCents,
+    simulateDiscovery: false,
+    initial: initialSetupState(onboarding),
+    persistVcsHostKey: factoryId,
+    persistRepoKey: factoryId,
+  };
+}
+
 export function useOnboardingPageModel(args: {
   organizationId: string;
   factoryId: string;
@@ -352,13 +375,10 @@ export function useOnboardingPageModel(args: {
     [connectedIntegrations],
   );
   const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
-  const setup = useOnboardingSetupState(args.factory?.name ?? "", {
-    connected: integrations.connected,
-    remainingCreditCents: agent.remainingCreditCents,
-    simulateDiscovery: false,
-    initial: initialSetupState(onboarding),
-    persistVcsHostKey: args.factoryId,
-  });
+  const setup = useOnboardingSetupState(
+    args.factory?.name ?? "",
+    onboardingSetupOptions(args.factoryId, onboarding, integrations.connected, agent.remainingCreditCents),
+  );
   useRestoreIntegrationReadiness(setup, integrations.selections);
   const [searchParams] = useSearchParams();
   const [openSection, setOpenSection] = useState<WizardStepId>(() => {
