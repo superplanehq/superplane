@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
-import { consoleCheckList, mergeConfidencePanelTone, mergeConfidenceScore } from "./mergeConfidenceScore";
+import {
+  consoleCheckList,
+  mergeConfidenceCheckLevel,
+  mergeConfidenceHeadline,
+  mergeConfidencePanelTone,
+  mergeConfidenceScore,
+} from "./mergeConfidenceScore";
 import type { WorkOrderCheckPresentation } from "./workOrderChecks";
 
 function check(
@@ -35,6 +41,52 @@ describe("mergeConfidenceScore", () => {
 
     expect(score.score).toBe(5);
     expect(score.level).toBe("positive");
+  });
+});
+
+describe("mergeConfidenceCheckLevel", () => {
+  it("uses the server bands for each check", () => {
+    expect(mergeConfidenceCheckLevel("risk-review", 1)).toBe("positive");
+    expect(mergeConfidenceCheckLevel("risk-review", 3)).toBe("caution");
+    expect(mergeConfidenceCheckLevel("risk-review", 4)).toBe("critical");
+    expect(mergeConfidenceCheckLevel("drift-review", 4)).toBe("critical");
+    expect(mergeConfidenceCheckLevel("performance-review", 5)).toBe("positive");
+    expect(mergeConfidenceCheckLevel("performance-review", 3)).toBe("caution");
+    expect(mergeConfidenceCheckLevel("performance-review", 2)).toBe("critical");
+    expect(mergeConfidenceCheckLevel("security-review", 3)).toBe("caution");
+    expect(mergeConfidenceCheckLevel("reversibility-review", 5)).toBe("positive");
+    expect(mergeConfidenceCheckLevel("api-latency-review", 4)).toBe("critical");
+  });
+});
+
+describe("mergeConfidenceHeadline", () => {
+  it("keeps each check for the card list", () => {
+    const headline = mergeConfidenceHeadline([
+      { key: "security-review", name: "Security", score: 5, maxScore: 5 },
+      { key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 },
+      { key: "confidence", name: "Confidence score", score: 2, maxScore: 5 },
+    ]);
+
+    expect(headline).toMatchObject({
+      score: 5,
+      checks: [
+        { key: "risk-review", name: "Blast radius" },
+        { key: "security-review", name: "Security" },
+      ],
+    });
+  });
+
+  it("drops checks that omit a score and still scores the rest", () => {
+    const headline = mergeConfidenceHeadline([
+      { key: "security-review", name: "Security" },
+      { key: "performance-review", name: "Performance", score: 4, maxScore: 0 },
+      { key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 },
+    ]);
+
+    expect(headline).toMatchObject({
+      score: 5,
+      checks: [{ key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 }],
+    });
   });
 });
 
