@@ -4,11 +4,14 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -17,14 +20,8 @@ import (
 )
 
 func TestSelectFactoryVCSProviderRepositoryWithoutAccountConnection(t *testing.T) {
-	t.Setenv(config.EnvGitHubAppID, "123")
-	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")
-	t.Setenv(config.EnvGitHubAppPrivateKey, "test-private-key")
-	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
-	t.Setenv("GITHUB_CLIENT_ID", "")
-	t.Setenv("GITHUB_CLIENT_SECRET", "")
-
 	r := support.Setup(t)
+	saveInstallationGitHubApp(t)
 	db := database.DB(t.Context())
 	const installationID = int64(303)
 	const repositoryID = int64(404)
@@ -51,6 +48,70 @@ func TestSelectFactoryVCSProviderRepositoryWithoutAccountConnection(t *testing.T
 	require.NoError(t, err)
 	assert.Equal(t, "acme/api", response.Factory.Onboarding.AppRepository)
 	assert.Equal(t, repositoryID, response.Factory.Onboarding.AppRepositoryId)
+
+	outsider := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
+	_, err = SelectFactoryVCSProviderRepository(outsider, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+		Id:           factory.ID.String(),
+		Provider:     models.ProviderGitHub,
+		RepositoryId: repositoryID,
+	})
+	code, _, ok := grpcerrors.HandlerStatus(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, code)
+}
+
+func TestSelectFactoryVCSProviderRepositoryFromPublicAppRequiresLinkedAccount(t *testing.T) {
+	t.Setenv(config.EnvGitHubAppID, "123")
+	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "test-private-key")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 303,
+		AccountLogin:   "acme",
+		AccountType:    "Organization",
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, 303, []models.VCSProviderRepository{{
+		RepositoryID:  404,
+		FullName:      "acme/api",
+		DefaultBranch: "main",
+	}}))
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+	_, err = SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+		Id:           factory.ID.String(),
+		Provider:     models.ProviderGitHub,
+		RepositoryId: 404,
+	})
+	code, _, ok := grpcerrors.HandlerStatus(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, code)
+}
+
+func saveInstallationGitHubApp(t *testing.T) {
+	t.Helper()
+	t.Setenv("NO_ENCRYPTION", "yes")
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	encryptor, err := crypto.FromEnv()
+	require.NoError(t, err)
+	require.NoError(t, githubapp.Save(t.Context(), database.Conn(), encryptor, config.GitHubHostedAppConfig{
+		ID:            12345,
+		Slug:          "superplane-test",
+		PrivateKey:    "test-private-key",
+		WebhookSecret: "test-webhook-secret",
+	}))
 }
 
 func TestSelectFactoryVCSProviderRepository(t *testing.T) {

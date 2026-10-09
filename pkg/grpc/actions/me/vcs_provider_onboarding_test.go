@@ -11,7 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -217,11 +219,34 @@ func TestRefreshBitbucketOnboardingDoesNotQueueGitHub(t *testing.T) {
 	assert.Zero(t, count)
 }
 
-func TestDescribeGitHubOnboardingSkipsAccountConnection(t *testing.T) {
+func TestDescribeGitHubOnboardingKeepsAccountConnectionForPublicApp(t *testing.T) {
 	r := support.Setup(t)
 	setVCSProviderGitHubAppEnvironment(t)
 	t.Setenv("GITHUB_CLIENT_ID", "")
 	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 101,
+		AccountLogin:   "acme",
+		AccountType:    "Organization",
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(database.Conn(), models.ProviderGitHub, 101, []models.VCSProviderRepository{{
+		RepositoryID:  201,
+		FullName:      "acme/api",
+		DefaultBranch: "main",
+	}}))
+
+	response, err := DescribeVCSProviderOnboarding(ctx, models.ProviderGitHub)
+	require.NoError(t, err)
+	assert.True(t, response.GetProviderConfigured())
+	assert.True(t, response.GetAccountConnectionRequired())
+	assert.Empty(t, response.GetRepositories())
+}
+
+func TestDescribeGitHubOnboardingSkipsAccountConnection(t *testing.T) {
+	r := support.Setup(t)
+	saveInstallationGitHubApp(t)
 	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
 	require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
 		Provider:       models.ProviderGitHub,
@@ -247,9 +272,7 @@ func TestDescribeGitHubOnboardingSkipsAccountConnection(t *testing.T) {
 
 func TestStartGitHubInstallationWithoutAccountConnection(t *testing.T) {
 	r := support.Setup(t)
-	setVCSProviderGitHubAppEnvironment(t)
-	t.Setenv("GITHUB_CLIENT_ID", "")
-	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	saveInstallationGitHubApp(t)
 	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
 
 	response, err := StartVCSProviderInstallation(ctx, models.ProviderGitHub)
@@ -258,6 +281,25 @@ func TestStartGitHubInstallationWithoutAccountConnection(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "github.com", installURL.Host)
 	assert.NotEmpty(t, installURL.Query().Get("state"))
+}
+
+func saveInstallationGitHubApp(t *testing.T) {
+	t.Helper()
+	t.Setenv("NO_ENCRYPTION", "yes")
+	t.Setenv(githubcommon.EnvGitHubAppID, "")
+	t.Setenv(githubcommon.EnvGitHubAppSlug, "")
+	t.Setenv(githubcommon.EnvGitHubAppPrivateKey, "")
+	t.Setenv(githubcommon.EnvGitHubAppWebhookSecret, "")
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	encryptor, err := crypto.FromEnv()
+	require.NoError(t, err)
+	require.NoError(t, githubapp.Save(t.Context(), database.Conn(), encryptor, config.GitHubHostedAppConfig{
+		ID:            12345,
+		Slug:          "superplane",
+		PrivateKey:    "-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----",
+		WebhookSecret: "test-webhook-secret",
+	}))
 }
 
 func setGitHubAccountConnection(t *testing.T) {

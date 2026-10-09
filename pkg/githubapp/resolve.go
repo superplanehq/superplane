@@ -115,3 +115,13 @@ func Save(
 func UserConnectReady(_ context.Context) bool {
 	return strings.TrimSpace(os.Getenv("GITHUB_CLIENT_ID")) != "" && strings.TrimSpace(os.Getenv("GITHUB_CLIENT_SECRET")) != ""
 }
+
+// AccountConnectionRequired reports whether repository access stays on the
+// linked GitHub account. Cloud sets the public GitHub App, the login client,
+// or both. A self-hosted app stored on the installation does not.
+func AccountConnectionRequired(ctx context.Context) bool {
+	if UserConnectReady(ctx) {
+		return true
+	}
+	return config.LoadGitHubHostedAppConfig().Enabled()
+}

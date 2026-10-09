@@ -30,7 +30,7 @@ func DescribeVCSProviderOnboarding(ctx context.Context, provider string) (*pb.De
 		return describeBitbucketOnboarding(ctx)
 	}
 
-	accountConnectionRequired := provider == models.ProviderGitHub && githubapp.UserConnectReady(ctx)
+	accountConnectionRequired := provider == models.ProviderGitHub && githubapp.AccountConnectionRequired(ctx)
 	response := &pb.DescribeVCSProviderOnboardingResponse{
 		ProviderConfigured:        vcsProviderConfigured(ctx, provider),
 		AccountConnectionRequired: accountConnectionRequired,
@@ -151,7 +151,7 @@ func StartVCSProviderInstallation(ctx context.Context, provider string) (*pb.Sta
 	if !cfg.Enabled() {
 		return nil, grpcerrors.FailedPrecondition(nil, "public GitHub App is not configured")
 	}
-	if githubapp.UserConnectReady(ctx) {
+	if githubapp.AccountConnectionRequired(ctx) {
 		if _, err := currentVCSProviderIdentity(ctx, provider); err != nil {
 			return nil, vcsProviderIdentityError(err)
 		}
@@ -186,7 +186,7 @@ func ConfigureVCSProviderInstallation(
 	if installationID <= 0 {
 		return nil, grpcerrors.InvalidArgument(nil, "installation id is required")
 	}
-	if githubapp.UserConnectReady(ctx) {
+	if githubapp.AccountConnectionRequired(ctx) {
 		identity, err := currentVCSProviderIdentity(ctx, provider)
 		if err != nil {
 			return nil, vcsProviderIdentityError(err)
@@ -229,7 +229,7 @@ func RefreshVCSProviderOnboarding(
 		return &pb.RefreshVCSProviderOnboardingResponse{}, nil
 	}
 	var repositories []models.AccessibleVCSProviderRepository
-	if githubapp.UserConnectReady(ctx) {
+	if githubapp.AccountConnectionRequired(ctx) {
 		identity, identityErr := currentVCSProviderIdentity(ctx, provider)
 		if identityErr != nil {
 			return nil, vcsProviderIdentityError(identityErr)

@@ -28,5 +28,4 @@ describe("FirstRunConnectScreen", () => {
     await user.click(screen.getByTestId("first-run-connect-github"));
     expect(connect).toHaveBeenCalledTimes(1);
   });
-
 });

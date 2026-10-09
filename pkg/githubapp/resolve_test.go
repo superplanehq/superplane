@@ -142,6 +142,21 @@ func TestUserConnectReadyUsesEnvironmentOnly(t *testing.T) {
 	t.Setenv("GITHUB_CLIENT_ID", "Iv1.env")
 	t.Setenv("GITHUB_CLIENT_SECRET", "env-secret")
 	assert.True(t, UserConnectReady(t.Context()))
+	assert.True(t, AccountConnectionRequired(t.Context()))
+}
+
+func TestAccountConnectionRequiredForPublicAppWithoutLoginClient(t *testing.T) {
+	clearGitHubAppEnv(t)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	assert.False(t, AccountConnectionRequired(t.Context()))
+
+	t.Setenv(config.EnvGitHubAppID, "12345")
+	t.Setenv(config.EnvGitHubAppSlug, "superplane")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "test-pem")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
+	assert.False(t, UserConnectReady(t.Context()))
+	assert.True(t, AccountConnectionRequired(t.Context()))
 }
 
 func clearGitHubAppEnv(t *testing.T) {

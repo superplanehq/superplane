@@ -102,7 +102,7 @@ func VerifyVCSProviderInstallations(
 		return nil, grpcerrors.FailedPrecondition(nil, "public GitHub App is not configured")
 	}
 	var repositories []models.AccessibleVCSProviderRepository
-	if githubapp.UserConnectReady(ctx) {
+	if githubapp.AccountConnectionRequired(ctx) {
 		identity, identityErr := currentVCSProviderIdentity(ctx, provider)
 		if identityErr != nil {
 			return nil, vcsProviderIdentityError(identityErr)
