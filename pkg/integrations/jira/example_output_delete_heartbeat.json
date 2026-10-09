@@ -1,8 +1,0 @@
-{
-  "data": {
-    "deleted": true,
-    "name": "DNS checker"
-  },
-  "timestamp": "2026-01-19T12:00:00Z",
-  "type": "jira.heartbeat.deleted"
-}

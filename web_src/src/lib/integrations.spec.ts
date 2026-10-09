@@ -46,8 +46,8 @@ describe("hiddenFieldsForHostedJira", () => {
   });
 
   it("keeps caller hidden fields and adds the credential fields", () => {
-    expect(hiddenFieldsForHostedJira({ name: "jira", hostedAppInstall: true }, ["enableOpsFeatures"])).toEqual([
-      "enableOpsFeatures",
+    expect(hiddenFieldsForHostedJira({ name: "jira", hostedAppInstall: true }, ["adminKey"])).toEqual([
+      "adminKey",
       "clientId",
       "clientSecret",
     ]);

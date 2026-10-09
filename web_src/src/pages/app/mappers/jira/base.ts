@@ -22,79 +22,21 @@ export function jiraComponentBaseProps(context: ComponentBaseContext, metadata: 
   };
 }
 
-function buildJiraEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-  fallbackWhenIncomplete: boolean,
-): EventSection[] {
+export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const rootEvent = execution.rootEvent;
-  const eventState = getState(componentName)(execution);
+  if (!rootEvent?.id || !execution.createdAt) return [];
 
-  if (!fallbackWhenIncomplete) {
-    if (!rootEvent?.id || !execution.createdAt) return [];
-
-    const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
-    if (!rootTriggerNode?.componentName) return [];
-
-    const { title } = getTriggerRenderer(rootTriggerNode.componentName).getTitleAndSubtitle({ event: rootEvent });
-    return [
-      {
-        receivedAt: new Date(execution.createdAt),
-        eventTitle: title,
-        eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
-        eventState,
-        eventId: rootEvent.id,
-      },
-    ];
-  }
-
-  const receivedAt = execution.createdAt ? new Date(execution.createdAt) : new Date();
-  const subtitleDate = execution.updatedAt ?? execution.createdAt;
-  const eventSubtitle = subtitleDate ? renderTimeAgo(new Date(subtitleDate)) : "";
-
-  const rootTriggerNode = nodes.find((n) => n.id === rootEvent?.nodeId);
-  if (!rootTriggerNode || !rootEvent?.id) {
-    return [{ receivedAt, eventTitle: "Execution", eventSubtitle, eventState, eventId: execution.id ?? "" }];
-  }
+  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
+  if (!rootTriggerNode?.componentName) return [];
 
   const { title } = getTriggerRenderer(rootTriggerNode.componentName).getTitleAndSubtitle({ event: rootEvent });
-  return [{ receivedAt, eventTitle: title, eventSubtitle, eventState, eventId: rootEvent.id }];
-}
-
-export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  return buildJiraEventSections(nodes, execution, componentName, false);
-}
-
-export function jiraBaseEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-): EventSection[] {
-  return buildJiraEventSections(nodes, execution, componentName, true);
-}
-
-export function opsAlertCoreExecutionPayloadDetails(data: Record<string, unknown> | undefined): Record<string, string> {
-  const out: Record<string, string> = {};
-  if (!data) {
-    return out;
-  }
-  if (data.message != null) out.Message = String(data.message);
-  if (data.description != null) out.Description = String(data.description);
-  if (data.status != null) out.Status = String(data.status);
-  if (data.priority != null) out.Priority = String(data.priority);
-  return out;
-}
-
-function trim(s: unknown): string {
-  return typeof s === "string" ? s.trim() : "";
-}
-
-/** Card lines for Ops alert pickers — prefer enriched label from Setup when API fetch succeeded during save. */
-export function buildOpsAlertReferenceMetadata(node: NodeInfo, alertRaw?: string): MetadataItem[] {
-  const label = trim((node.metadata as { alertLabel?: string } | undefined)?.alertLabel);
-  const id = trim(alertRaw ?? "");
-  if (label !== "") return [{ icon: "hash", label }];
-  if (id !== "") return [{ icon: "hash", label: id }];
-  return [];
+  return [
+    {
+      receivedAt: new Date(execution.createdAt),
+      eventTitle: title,
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
+      eventState: getState(componentName)(execution),
+      eventId: rootEvent.id,
+    },
+  ];
 }
