@@ -211,6 +211,59 @@ func TestHandler_handleAuthCallback_LoadsInstallationGitHubAppClient(t *testing.
 	assert.Equal(t, "Iv1.installation", parsed.Query().Get("client_id"))
 }
 
+func TestHandler_handleAuthConfig_LoadsInstallationGitHubAppClient(t *testing.T) {
+	goth.ClearProviders()
+	t.Cleanup(func() { goth.ClearProviders() })
+
+	r := support.Setup(t)
+	t.Cleanup(func() { r.Close() })
+	handler := NewHandler(jwt.NewSigner("test-secret"), r.Encryptor, r.AuthService, "development", "/templates", false, false, false)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	t.Setenv("BASE_URL", "https://azure.example")
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+
+	recorder := httptest.NewRecorder()
+	handler.handleAuthConfig(recorder, httptest.NewRequest(http.MethodGet, "/auth/config", nil))
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var missing struct {
+		Providers []string `json:"providers"`
+	}
+	require.NoError(t, json.NewDecoder(recorder.Body).Decode(&missing))
+	assert.NotContains(t, missing.Providers, models.ProviderGitHub)
+
+	require.NoError(t, githubapp.Save(t.Context(), database.DB(t.Context()), r.Encryptor, config.GitHubHostedAppConfig{
+		ID:            44,
+		Slug:          "superplane-self",
+		PrivateKey:    "pem",
+		WebhookSecret: "whsec",
+		ClientID:      "Iv1.installation",
+		ClientSecret:  "installation-secret",
+	}))
+
+	recorder = httptest.NewRecorder()
+	handler.handleAuthConfig(recorder, httptest.NewRequest(http.MethodGet, "/auth/config", nil))
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var ready struct {
+		Providers []string `json:"providers"`
+	}
+	require.NoError(t, json.NewDecoder(recorder.Body).Decode(&ready))
+	assert.Contains(t, ready.Providers, models.ProviderGitHub)
+
+	provider, err := goth.GetProvider(models.ProviderGitHub)
+	require.NoError(t, err)
+	session, err := provider.BeginAuth("state")
+	require.NoError(t, err)
+	authorizeURL, err := session.GetAuthURL()
+	require.NoError(t, err)
+	parsed, err := url.Parse(authorizeURL)
+	require.NoError(t, err)
+	assert.Equal(t, "Iv1.installation", parsed.Query().Get("client_id"))
+}
+
 func TestHandler_handleAuthConfig(t *testing.T) {
 	t.Run("reports environment signup block separately from effective signup status", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, true)

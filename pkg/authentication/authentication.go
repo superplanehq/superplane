@@ -36,6 +36,8 @@ import (
 
 const SignupDisabledError = "signup is currently disabled"
 
+var errGitHubSignInNotConfigured = errors.New("sign-in with GitHub is not configured: create the GitHub App again")
+
 const (
 	magicCodeLength            = 6
 	magicCodeTTL               = 10 * time.Minute
@@ -207,7 +209,7 @@ func (a *Handler) ensureGitHubOAuth(ctx context.Context) error {
 		return nil
 	}
 	if a.encryptor == nil {
-		return errors.New("sign-in with GitHub is not configured: create the GitHub App again")
+		return errGitHubSignInNotConfigured
 	}
 	cfg, err := githubapp.Resolve(ctx, database.DB(ctx), a.encryptor)
 	if err != nil {
@@ -217,7 +219,7 @@ func (a *Handler) ensureGitHubOAuth(ctx context.Context) error {
 		if _, err := goth.GetProvider(models.ProviderGitHub); err == nil {
 			return nil
 		}
-		return errors.New("sign-in with GitHub is not configured: create the GitHub App again")
+		return errGitHubSignInNotConfigured
 	}
 	goth.UseProviders(github.New(cfg.ClientID, cfg.ClientSecret, githubOAuthCallbackURL(), "user:email"))
 	return nil
@@ -487,6 +489,12 @@ func getPostLogoutRedirectURL(r *http.Request) string {
 }
 
 func (a *Handler) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
+	// The login page lists only providers already registered in this process.
+	// Load the saved self-hosted client first, so a restart does not hide GitHub.
+	if err := a.ensureGitHubOAuth(r.Context()); err != nil && !errors.Is(err, errGitHubSignInNotConfigured) {
+		log.Errorf("failed to load GitHub sign-in: %v", err)
+	}
+
 	providers := goth.GetProviders()
 	providerNames := make([]string, 0, len(providers))
 	for name := range providers {
