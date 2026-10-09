@@ -355,13 +355,13 @@ func assertGitHubVCSCapabilities(t *testing.T, capabilities *pb.FactoryVCSCapabi
 func assertBitbucketVCSCapabilities(t *testing.T, capabilities *pb.FactoryVCSCapabilities) {
 	t.Helper()
 	require.NotNil(t, capabilities)
-	assert.False(t, capabilities.PrClosure)
-	assert.False(t, capabilities.PrFeedback)
-	assert.False(t, capabilities.PrChecks)
-	assert.False(t, capabilities.MergeConfidence)
-	assert.False(t, capabilities.Velocity)
-	assert.False(t, capabilities.BoardMerge)
-	assert.False(t, capabilities.BoardClose)
+	assert.True(t, capabilities.PrClosure)
+	assert.True(t, capabilities.PrFeedback)
+	assert.True(t, capabilities.PrChecks)
+	assert.True(t, capabilities.MergeConfidence)
+	assert.True(t, capabilities.Velocity)
+	assert.True(t, capabilities.BoardMerge)
+	assert.True(t, capabilities.BoardClose)
 	assert.False(t, capabilities.VcsIssueIntake)
 }
 

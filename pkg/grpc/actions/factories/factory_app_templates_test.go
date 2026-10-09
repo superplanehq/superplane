@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
+	goyaml "gopkg.in/yaml.v3"
 )
 
 func TestMaterializeFactoryTemplate(t *testing.T) {
@@ -189,6 +190,54 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	assert.NotContains(t, result.canvasYAML, "discord")
 	assert.NotContains(t, result.canvasYAML, "git push")
 	assert.Contains(t, result.consoleYAML, "app-risk")
+
+	requireValidCanvasExpressions(t, canvas)
+}
+
+func TestMaterializeRiskScoreTemplateBitbucket(t *testing.T) {
+	result, err := materializeFactoryTemplate("risk-score", models.ProviderBitbucket, factoryTemplateInput{
+		appID:   "app-risk",
+		appName: "Merge confidence",
+		installParams: map[string]string{
+			"appRepository": "acme/widgets",
+			"defaultBranch": "main",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"bitbucket": {id: "bitbucket-1", name: "acme-bitbucket"},
+		},
+		agent: &factoryTemplateAgent{
+			component:        models.SuperPlaneRunnerComponent,
+			credentialSource: "hosted",
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+
+	entrypoint := findYAMLNode(t, canvas, "on-pr-risk")
+	assert.Equal(t, map[string]any{
+		"id":       "risk-score",
+		"version":  float64(factoryTemplateVersion),
+		"provider": models.ProviderBitbucket,
+	}, entrypoint.Metadata[factoryTemplateMetadataKey])
+	assert.Equal(t, "bitbucket.onPullRequest", entrypoint.Component)
+	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
+	assert.Equal(t, "acme/widgets", entrypoint.Configuration["repository"])
+	assert.Equal(t, []any{"created", "updated"}, entrypoint.Configuration["actions"])
+	assert.Equal(t, &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}, entrypoint.Integration)
+
+	agent := findYAMLNode(t, canvas, "assess-risk")
+	prompt := agentPrompt(t, agent)
+	assert.Contains(t, prompt, "Merge check: risk.")
+	assert.Contains(t, prompt, "Description: {{ root().data.pull_request.description }}")
+	assert.Contains(t, result.canvasYAML, "git clone --no-checkout")
+	assert.Contains(t, result.canvasYAML, "git merge-base")
+	assert.Contains(t, result.canvasYAML, "SOURCE_REPO")
+	assert.Contains(t, result.canvasYAML, "source?.repository?.full_name")
+	assert.NotContains(t, result.canvasYAML, "git checkout --detach FETCH_HEAD")
+	assert.Contains(t, result.canvasYAML, "SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID")
+	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
 
 	requireValidCanvasExpressions(t, canvas)
 }
@@ -525,7 +574,74 @@ func TestMaterializeFactoryTemplateBitbucketImplement(t *testing.T) {
 	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
 }
 
+func TestMaterializeFactoryTemplateBitbucketPRClosure(t *testing.T) {
+	result, err := materializeFactoryTemplate("pr-closure", models.ProviderBitbucket, factoryTemplateInput{
+		appID:   "app-1",
+		appName: "PR Closure",
+		installParams: map[string]string{
+			"appRepository": "acme/widgets",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"bitbucket": {id: "bitbucket-1", name: "acme-bitbucket"},
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+
+	trigger := findYAMLNode(t, canvas, "on-pr-closed")
+	assert.Equal(t, "bitbucket.onPullRequest", trigger.Component)
+	assert.Equal(t, []any{"merged", "declined"}, trigger.Configuration["actions"])
+	assert.Equal(t, true, trigger.Configuration["onlyFactoryPullRequests"])
+	assert.Equal(t, "acme/widgets", trigger.Configuration["repository"])
+	assert.Equal(t, &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}, trigger.Integration)
+	assert.Equal(t, models.ProviderBitbucket, trigger.Metadata[factoryTemplateMetadataKey].(map[string]any)["provider"])
+
+	merged := findYAMLNode(t, canvas, "is-pr-merged")
+	assert.Contains(t, merged.Configuration["expression"], "pull_request.merged")
+
+	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
+}
+
+func TestBuildDiscussionPRFeedbackCanvasBitbucket(t *testing.T) {
+	canvas := buildDiscussionPRFeedbackCanvas(prFeedbackBuildRequest{
+		Repository:  "acme/widgets",
+		Mention:     "@ada",
+		VCSProvider: models.ProviderBitbucket,
+		Agent: &intakeAgent{
+			Component: "runnerOpenRouter",
+			Model:     "anthropic/claude-sonnet-4-6",
+		},
+	})
+
+	trigger := findSpecNode(t, canvas, prFeedbackCommentTriggerNodeID)
+	assert.Equal(t, "bitbucket.onPullRequestComment", trigger.Component)
+	assert.Equal(t, "acme/widgets", trigger.Configuration["repository"])
+	assert.Equal(t, "@ada", trigger.Configuration["contentFilter"])
+
+	find := findSpecNode(t, canvas, prFeedbackFindNodeID)
+	assert.Equal(t, "bitbucket", find.Configuration["provider"])
+
+	acknowledge := findSpecNode(t, canvas, prFeedbackAcknowledgeCommentNodeID)
+	assert.Equal(t, "bitbucket.createPullRequestComment", acknowledge.Component)
+	assert.Equal(t, "{{ root().data.comment.id }}", acknowledge.Configuration["parentCommentId"])
+
+	for _, node := range canvas.Spec.Nodes {
+		assert.NotContains(t, node.Component, "github.")
+	}
+	encoded, err := goyaml.Marshal(canvas)
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), "GITHUB_TOKEN")
+	assert.NotContains(t, string(encoded), "github.com")
+	assert.Contains(t, string(encoded), "BITBUCKET_TOKEN")
+	assert.Contains(t, string(encoded), "BITBUCKET_EMAIL")
+	assert.Contains(t, string(encoded), "source.repository.full_name")
+	assert.NotContains(t, string(encoded), "git push origin HEAD")
+}
+
 func TestMaterializeFactoryTemplateRejectsRetiredPlan(t *testing.T) {
+
 	_, err := materializeFactoryTemplate("line-planning", "", factoryTemplateInput{
 		appID:   "app-1",
 		appName: "Plan",
