@@ -16,11 +16,50 @@ import (
 	"google.golang.org/grpc/codes"
 )
 
+func TestSelectFactoryVCSProviderRepositoryWithoutAccountConnection(t *testing.T) {
+	t.Setenv(config.EnvGitHubAppID, "123")
+	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "test-private-key")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	const installationID = int64(303)
+	const repositoryID = int64(404)
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: installationID,
+		AccountLogin:   "acme",
+		AccountType:    "Organization",
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, installationID, []models.VCSProviderRepository{{
+		RepositoryID:  repositoryID,
+		FullName:      "acme/api",
+		DefaultBranch: "main",
+	}}))
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	response, err := SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+		Id:           factory.ID.String(),
+		Provider:     models.ProviderGitHub,
+		RepositoryId: repositoryID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "acme/api", response.Factory.Onboarding.AppRepository)
+	assert.Equal(t, repositoryID, response.Factory.Onboarding.AppRepositoryId)
+}
+
 func TestSelectFactoryVCSProviderRepository(t *testing.T) {
 	t.Setenv(config.EnvGitHubAppID, "123")
 	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")
 	t.Setenv(config.EnvGitHubAppPrivateKey, "test-private-key")
 	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
+	t.Setenv("GITHUB_CLIENT_ID", "Iv1.env")
+	t.Setenv("GITHUB_CLIENT_SECRET", "env-secret")
 
 	r := support.Setup(t)
 	db := database.DB(t.Context())

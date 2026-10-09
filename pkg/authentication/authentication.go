@@ -201,9 +201,9 @@ func (a *Handler) beginProviderAuth(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, withGitHubAccountPicker(authURL), http.StatusTemporaryRedirect)
 }
 
-// Cloud registers GitHub at startup from GITHUB_CLIENT_ID. A self-hosted
-// installation stores the login client with the GitHub App, so each request
-// loads that client before Goth starts the redirect.
+// Cloud registers GitHub at startup from GITHUB_CLIENT_ID and
+// GITHUB_CLIENT_SECRET. A self-hosted installation does not store a login
+// client, so those variables are the only way Sign in with GitHub starts.
 func (a *Handler) ensureGitHubOAuth(ctx context.Context) error {
 	if strings.TrimSpace(os.Getenv("GITHUB_CLIENT_ID")) != "" && strings.TrimSpace(os.Getenv("GITHUB_CLIENT_SECRET")) != "" {
 		return nil

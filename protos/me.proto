@@ -270,6 +270,9 @@ message DescribeVCSProviderOnboardingResponse {
   string install_url = 7;
   // Bitbucket installations accessible to the linked account, even without repositories.
   repeated VCSProviderInstalledWorkspace installed_workspaces = 8;
+  // True when Sign in with GitHub can start. A self-hosted GitHub App leaves
+  // this false and continues to organization selection.
+  bool account_connection_required = 9;
 }
 
 message SelectVCSProviderOnboardingIdentityRequest {

@@ -72,6 +72,7 @@ vi.mock("./useGitHubOnboarding", () => ({
   useGitHubOnboarding: () => ({
     data: {
       providerConfigured: true,
+      accountConnectionRequired: true,
       identity: undefined,
       repositories: [],
       pendingRequests: [],

@@ -34,6 +34,7 @@ func (v *recordingInstallationVerifier) VerifyInstallation(ctx context.Context, 
 
 func TestVerifyVCSProviderInstallationsFinishesChecksAfterThePageCancelsTheRequest(t *testing.T) {
 	r := support.Setup(t)
+	setGitHubAccountConnection(t)
 	setVCSProviderGitHubAppEnvironment(t)
 	require.NoError(t, models.SaveAccountLinkedAccount(
 		database.Conn(),
@@ -54,6 +55,7 @@ func TestVerifyVCSProviderInstallationsFinishesChecksAfterThePageCancelsTheReque
 func TestVerifyVCSProviderInstallationsChecksVisibleInstallationsOncePerInterval(t *testing.T) {
 	r := support.Setup(t)
 	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	setGitHubAccountConnection(t)
 	setVCSProviderGitHubAppEnvironment(t)
 	db := database.Conn()
 	require.NoError(t, models.SaveAccountLinkedAccount(
