@@ -52,8 +52,11 @@ export function finishOnboardingError(args: {
   linearReady?: boolean;
   linearProjectIds?: string[];
 }): string | null {
-  if (!args.appRepository || !args.backlogRepository || !args.vcsReady) {
-    return `Connect ${vcsLabel(args.vcsHost ?? "github")}, then select both repositories.`;
+  if (!args.vcsReady) {
+    return `Connect ${vcsLabel(args.vcsHost ?? "github")} before you continue.`;
+  }
+  if (!args.appRepository || !args.backlogRepository) {
+    return "Select the code repository and the backlog repository.";
   }
   if (args.issuesChoice === "jira" && (!args.jiraReady || !args.jiraProjectId)) {
     return "Connect Jira, then choose a project.";
