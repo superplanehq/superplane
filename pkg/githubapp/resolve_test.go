@@ -173,6 +173,46 @@ func TestSaveKeepsFirstApp(t *testing.T) {
 	assert.Equal(t, "first-pem", cfg.PrivateKey)
 }
 
+func TestSaveLoginClientKeepsExistingApp(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	encryptor := testEncryptor()
+	clearGitHubAppEnv(t)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+
+	err := SaveLoginClient(t.Context(), database.DB(t.Context()), encryptor, "Iv1.client", "client-secret")
+	require.ErrorIs(t, err, ErrGitHubAppMissing)
+
+	require.NoError(t, Save(t.Context(), database.DB(t.Context()), encryptor, config.GitHubHostedAppConfig{
+		ID:            11,
+		Slug:          "from-db",
+		PrivateKey:    "db-pem",
+		WebhookSecret: "db-secret",
+	}))
+	state, slug, err := LoginClientStatus(database.DB(t.Context()))
+	require.NoError(t, err)
+	assert.Equal(t, LoginClientNeeded, state)
+	assert.Equal(t, "from-db", slug)
+
+	require.NoError(t, SaveLoginClient(t.Context(), database.DB(t.Context()), encryptor, "Iv1.client", "client-secret"))
+	cfg, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
+	require.NoError(t, err)
+	assert.Equal(t, int64(11), cfg.ID)
+	assert.Equal(t, "from-db", cfg.Slug)
+	assert.Equal(t, "db-pem", cfg.PrivateKey)
+	assert.Equal(t, "db-secret", cfg.WebhookSecret)
+	assert.Equal(t, "Iv1.client", cfg.ClientID)
+	assert.Equal(t, "client-secret", cfg.ClientSecret)
+	assert.True(t, UserConnectReady(t.Context()))
+
+	err = SaveLoginClient(t.Context(), database.DB(t.Context()), encryptor, "Iv1.other", "other-secret")
+	require.ErrorIs(t, err, ErrAlreadyConfigured)
+	kept, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
+	require.NoError(t, err)
+	assert.Equal(t, "db-pem", kept.PrivateKey)
+	assert.Equal(t, "Iv1.client", kept.ClientID)
+}
+
 func clearGitHubAppEnv(t *testing.T) {
 	t.Helper()
 	t.Setenv(config.EnvGitHubAppID, "")

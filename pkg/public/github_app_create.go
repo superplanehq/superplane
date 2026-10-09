@@ -32,7 +32,11 @@ func (s *Server) HandleGitHubAppManifest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	if s.githubAppCreateBlocked(r) {
-		http.Error(w, "GitHub App is already configured", http.StatusConflict)
+		if githubapp.UserConnectReady(r.Context()) {
+			http.Error(w, "GitHub App is already configured", http.StatusConflict)
+			return
+		}
+		http.Error(w, "add the client id and client secret for the existing GitHub App", http.StatusConflict)
 		return
 	}
 
@@ -75,7 +79,7 @@ func (s *Server) HandleGitHubAppCreated(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if s.githubAppCreateBlocked(r) {
-		http.Redirect(w, r, githubAccountConnectURL(returnPath), http.StatusFound)
+		s.redirectExistingGitHubApp(w, r, returnPath)
 		return
 	}
 
@@ -87,7 +91,7 @@ func (s *Server) HandleGitHubAppCreated(w http.ResponseWriter, r *http.Request) 
 	}
 	if err := githubapp.Save(r.Context(), database.DB(r.Context()), s.encryptor, cfg); err != nil {
 		if errors.Is(err, githubapp.ErrAlreadyConfigured) {
-			http.Redirect(w, r, githubAccountConnectURL(returnPath), http.StatusFound)
+			s.redirectExistingGitHubApp(w, r, returnPath)
 			return
 		}
 		log.WithError(err).Error("failed to store GitHub App credentials")
@@ -102,7 +106,83 @@ func (s *Server) githubAppCreateBlocked(r *http.Request) bool {
 		return true
 	}
 	cfg, err := githubapp.Resolve(r.Context(), database.DB(r.Context()), s.encryptor)
-	return err == nil && cfg.ClientID != "" && cfg.ClientSecret != ""
+	return err == nil && cfg.Enabled()
+}
+
+func (s *Server) redirectExistingGitHubApp(w http.ResponseWriter, r *http.Request, returnPath string) {
+	if githubapp.UserConnectReady(r.Context()) {
+		http.Redirect(w, r, githubAccountConnectURL(returnPath), http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, githubLoginClientURL(returnPath), http.StatusFound)
+}
+
+type githubAppLoginResponse struct {
+	State string `json:"state"`
+	Slug  string `json:"slug,omitempty"`
+}
+
+type githubAppLoginRequest struct {
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+}
+
+func (s *Server) HandleGitHubAppLogin(w http.ResponseWriter, r *http.Request) {
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !account.IsInstallationAdmin() {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		state, slug, err := githubapp.LoginClientStatus(database.DB(r.Context()))
+		if err != nil {
+			log.WithError(err).Error("failed to read GitHub login client")
+			http.Error(w, "failed to read GitHub login", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(githubAppLoginResponse{State: state, Slug: slug})
+	case http.MethodPost:
+		var body githubAppLoginRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid GitHub login client", http.StatusBadRequest)
+			return
+		}
+		err := githubapp.SaveLoginClient(r.Context(), database.DB(r.Context()), s.encryptor, body.ClientID, body.ClientSecret)
+		if errors.Is(err, githubapp.ErrAlreadyConfigured) {
+			http.Error(w, "GitHub App is already configured", http.StatusConflict)
+			return
+		}
+		if errors.Is(err, githubapp.ErrGitHubAppMissing) {
+			http.Error(w, "create the GitHub App before adding its login client", http.StatusConflict)
+			return
+		}
+		if err != nil {
+			log.WithError(err).Error("failed to store GitHub login client")
+			http.Error(w, "failed to save GitHub login", http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func githubLoginClientURL(returnPath string) string {
+	target, err := url.Parse(returnPath)
+	if err != nil || target.Path == "" || !strings.HasPrefix(target.Path, "/") {
+		target = &url.URL{Path: "/"}
+	}
+	query := target.Query()
+	query.Set("githubLogin", "needs_client")
+	target.RawQuery = query.Encode()
+	return target.String()
 }
 
 func githubAccountConnectURL(returnPath string) string {

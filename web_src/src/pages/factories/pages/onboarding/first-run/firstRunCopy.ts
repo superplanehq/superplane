@@ -70,6 +70,12 @@ export const FIRST_RUN_COPY = {
     createAppAction: "Create GitHub App",
     createAppBody: "Create a GitHub App. SuperPlane then connects your GitHub account.",
     creatingGitHubApp: "Opening GitHub…",
+    addLoginBody:
+      "This installation already has a GitHub App. Open that app in GitHub settings, copy the client ID, and generate a client secret.",
+    clientIdLabel: "Client ID",
+    clientSecretLabel: "Client secret",
+    saveLoginAction: "Save GitHub login",
+    savingLogin: "Saving GitHub login…",
     stepOrganization: "Choose organization",
     stepOrganizationDone: (organization: string) => `Organization: ${organization}`,
     stepRepository: "Choose repository",

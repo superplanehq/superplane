@@ -32,6 +32,7 @@ const github = vi.hoisted(() => ({
 
 const showErrorToast = vi.hoisted(() => vi.fn());
 const startPublicGitHubAppCreate = vi.hoisted(() => vi.fn().mockResolvedValue(true));
+const fetchGitHubLoginClient = vi.hoisted(() => vi.fn().mockResolvedValue("missing"));
 const startInstallation = vi.fn().mockResolvedValue("https://github.com/apps/superplane/installations/new");
 const configureInstallation = vi.fn().mockResolvedValue("https://github.com/settings/installations/101");
 
@@ -41,6 +42,8 @@ vi.mock("@/lib/toast", () => ({
 
 vi.mock("@/lib/githubAppManifest", () => ({
   startPublicGitHubAppCreate: (...args: unknown[]) => startPublicGitHubAppCreate(...args),
+  fetchGitHubLoginClient: (...args: unknown[]) => fetchGitHubLoginClient(...args),
+  saveGitHubLoginClient: vi.fn(),
 }));
 
 vi.mock("./useBitbucketOnboarding", () => ({
@@ -178,6 +181,8 @@ describe("FirstRunSetup GitHub catalog", () => {
     showErrorToast.mockReset();
     startPublicGitHubAppCreate.mockReset();
     startPublicGitHubAppCreate.mockResolvedValue(true);
+    fetchGitHubLoginClient.mockReset();
+    fetchGitHubLoginClient.mockResolvedValue("missing");
     localStorage.clear();
   });
 
@@ -206,6 +211,17 @@ describe("FirstRunSetup GitHub catalog", () => {
     expect(screen.getByText(FIRST_RUN_COPY.connect.createAppBody)).toBeInTheDocument();
     await user.click(screen.getByTestId("first-run-connect-github"));
     expect(startPublicGitHubAppCreate).toHaveBeenCalledWith("/org-1/workspaces/PAY/setup?step=vcs");
+  });
+
+  it("asks for the existing GitHub App login instead of creating another app", async () => {
+    fetchGitHubLoginClient.mockResolvedValue("needs_client");
+    github.data.providerConfigured = false;
+    renderSetup(pageModel());
+
+    expect(await screen.findByTestId("first-run-github-client-id")).toBeInTheDocument();
+    expect(screen.getByText(FIRST_RUN_COPY.connect.addLoginBody)).toBeInTheDocument();
+    expect(screen.queryByText(FIRST_RUN_COPY.connect.createAppAction)).not.toBeInTheDocument();
+    expect(startPublicGitHubAppCreate).not.toHaveBeenCalled();
   });
 
   it("returns from GitHub connection at repository selection", async () => {
