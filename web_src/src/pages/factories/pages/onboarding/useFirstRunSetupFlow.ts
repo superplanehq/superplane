@@ -243,6 +243,45 @@ function saveSelectedRepository(args: {
   return args.model.selectCatalogRepository(repository);
 }
 
+function saveGitHubLoginClientThenConnect(args: {
+  blocking: FirstRunBlocking;
+  setLoginError: (message: string | undefined) => void;
+  clientId: string;
+  clientSecret: string;
+  returnPath: string;
+}) {
+  return args.blocking.runUntilNavigation("opening-github", async () => {
+    args.setLoginError(undefined);
+    try {
+      await saveGitHubLoginClient(args.clientId, args.clientSecret);
+    } catch {
+      args.setLoginError(FIRST_RUN_COPY.connect.loginSaveError);
+      return false;
+    }
+    window.location.assign(linkedAccountConnectHref("github", args.returnPath));
+    return true;
+  });
+}
+
+function continueFromTicketSource(args: {
+  model: OnboardingPageModel;
+  agentGate: OnboardingAgentGate;
+  blocking: FirstRunBlocking;
+  navigation: ReturnType<typeof useFirstRunNavigation>;
+}) {
+  return args.blocking.run("saving-ticket-source", async () => {
+    const issuesChoice = selectedIssuesChoice(args.model);
+    if (!issuesChoice) return;
+    args.model.setup.setIssuesChoice(issuesChoice);
+    args.model.setup.commitIssuesStep();
+    if (!(await args.model.saveIssues(issuesChoice))) return;
+    if (args.agentGate === "pending") return;
+    if (args.agentGate === "show") return args.navigation.goToScreen("agent");
+    args.blocking.setAction("finishing-setup");
+    await args.model.finish(issuesChoice);
+  });
+}
+
 function useFirstRunCommands(args: {
   model: OnboardingPageModel;
   agentGate: OnboardingAgentGate;
@@ -281,18 +320,7 @@ function useFirstRunCommands(args: {
   const connectBitbucket = () => {
     void model.requestConnect("bitbucket");
   };
-  const continueFromTickets = () =>
-    blocking.run("saving-ticket-source", async () => {
-      const issuesChoice = selectedIssuesChoice(model);
-      if (!issuesChoice) return;
-      model.setup.setIssuesChoice(issuesChoice);
-      model.setup.commitIssuesStep();
-      if (!(await model.saveIssues(issuesChoice))) return;
-      if (agentGate === "pending") return;
-      if (agentGate === "show") return navigation.goToScreen("agent");
-      blocking.setAction("finishing-setup");
-      await model.finish(issuesChoice);
-    });
+  const continueFromTickets = () => continueFromTicketSource({ model, agentGate, blocking, navigation });
   const connectGitHub = () =>
     blocking.runUntilNavigation("opening-github", async () => {
       const returnPath = githubConnectReturnPath(onboardingStepPath(`${location.pathname}${location.search}`, "repo"));
@@ -304,17 +332,12 @@ function useFirstRunCommands(args: {
       return startPublicGitHubAppCreate(onboardingStepPath(`${location.pathname}${location.search}`, "vcs"));
     });
   const saveGitHubLogin = (clientId: string, clientSecret: string) =>
-    blocking.runUntilNavigation("opening-github", async () => {
-      setLoginError(undefined);
-      try {
-        await saveGitHubLoginClient(clientId, clientSecret);
-      } catch {
-        setLoginError(FIRST_RUN_COPY.connect.loginSaveError);
-        return false;
-      }
-      const returnPath = githubConnectReturnPath(onboardingStepPath(`${location.pathname}${location.search}`, "repo"));
-      window.location.assign(linkedAccountConnectHref("github", returnPath));
-      return true;
+    saveGitHubLoginClientThenConnect({
+      blocking,
+      setLoginError,
+      clientId,
+      clientSecret,
+      returnPath: githubConnectReturnPath(onboardingStepPath(`${location.pathname}${location.search}`, "repo")),
     });
   const selectGitHubIdentity = (userId: string) =>
     blocking.run("switching-github-account", async () => {

@@ -18,6 +18,90 @@ function connectIntro(addLogin: boolean, createApp: boolean): string {
   return copy.body;
 }
 
+function ConnectStepper({
+  connecting,
+  createApp,
+  addLogin,
+  savingLogin,
+  onConnectGitHub,
+  onSaveLogin,
+}: {
+  connecting: boolean;
+  createApp: boolean;
+  addLogin: boolean;
+  savingLogin: boolean;
+  onConnectGitHub: () => void;
+  onSaveLogin?: (clientId: string, clientSecret: string) => void;
+}) {
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const canSaveLogin = clientId.trim() !== "" && clientSecret.trim() !== "";
+  const saveLogin = (event: FormEvent) => {
+    event.preventDefault();
+    if (!canSaveLogin || !onSaveLogin) return;
+    onSaveLogin(clientId.trim(), clientSecret.trim());
+  };
+  const saveButton = (
+    <LoadingButton
+      type="submit"
+      form="first-run-github-login"
+      size="sm"
+      loading={savingLogin}
+      loadingText={copy.savingLogin}
+      disabled={!canSaveLogin}
+      data-testid="first-run-save-github-login"
+    >
+      {copy.saveLoginAction}
+    </LoadingButton>
+  );
+  const connectButton = (
+    <LoadingButton
+      type="button"
+      size="sm"
+      onClick={onConnectGitHub}
+      loading={connecting}
+      loadingText={createApp ? copy.creatingGitHubApp : copy.openingGitHub}
+      data-testid="first-run-connect-github"
+    >
+      {createApp ? copy.createAppAction : copy.connectAction}
+    </LoadingButton>
+  );
+
+  return (
+    <FirstRunGithubStepper current="connect" action={addLogin ? saveButton : connectButton}>
+      {addLogin ? (
+        <form id="first-run-github-login" className="w-full space-y-3" onSubmit={saveLogin}>
+          <div className="space-y-1.5">
+            <Label htmlFor="first-run-github-client-id" className="text-[13px] font-normal text-muted-foreground">
+              {copy.clientIdLabel}
+            </Label>
+            <Input
+              id="first-run-github-client-id"
+              autoComplete="off"
+              value={clientId}
+              onChange={(event) => setClientId(event.target.value)}
+              data-testid="first-run-github-client-id"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="first-run-github-client-secret" className="text-[13px] font-normal text-muted-foreground">
+              {copy.clientSecretLabel}
+            </Label>
+            <Input
+              id="first-run-github-client-secret"
+              type="password"
+              autoComplete="off"
+              value={clientSecret}
+              onChange={(event) => setClientSecret(event.target.value)}
+              data-testid="first-run-github-client-secret"
+            />
+          </div>
+        </form>
+      ) : null}
+    </FirstRunGithubStepper>
+  );
+}
+
 export function FirstRunConnectScreen({
   loading = false,
   connecting = false,
@@ -47,15 +131,6 @@ export function FirstRunConnectScreen({
   onChangeLogin?: () => void;
   onSaveLogin?: (clientId: string, clientSecret: string) => void;
 }) {
-  const [clientId, setClientId] = useState("");
-  const [clientSecret, setClientSecret] = useState("");
-  const canSaveLogin = clientId.trim() !== "" && clientSecret.trim() !== "";
-  const saveLogin = (event: FormEvent) => {
-    event.preventDefault();
-    if (!canSaveLogin || !onSaveLogin) return;
-    onSaveLogin(clientId.trim(), clientSecret.trim());
-  };
-
   return (
     <FirstRunShell
       testId="first-run-connect"
@@ -74,68 +149,14 @@ export function FirstRunConnectScreen({
             {copy.loadingAccounts}
           </p>
         ) : (
-          <FirstRunGithubStepper
-            current="connect"
-            action={
-              addLogin ? (
-                <LoadingButton
-                  type="submit"
-                  form="first-run-github-login"
-                  size="sm"
-                  loading={savingLogin}
-                  loadingText={copy.savingLogin}
-                  disabled={!canSaveLogin}
-                  data-testid="first-run-save-github-login"
-                >
-                  {copy.saveLoginAction}
-                </LoadingButton>
-              ) : (
-                <LoadingButton
-                  type="button"
-                  size="sm"
-                  onClick={onConnectGitHub}
-                  loading={connecting}
-                  loadingText={createApp ? copy.creatingGitHubApp : copy.openingGitHub}
-                  data-testid="first-run-connect-github"
-                >
-                  {createApp ? copy.createAppAction : copy.connectAction}
-                </LoadingButton>
-              )
-            }
-          >
-            {addLogin ? (
-              <form id="first-run-github-login" className="w-full space-y-3" onSubmit={saveLogin}>
-                <div className="space-y-1.5">
-                  <Label htmlFor="first-run-github-client-id" className="text-[13px] font-normal text-muted-foreground">
-                    {copy.clientIdLabel}
-                  </Label>
-                  <Input
-                    id="first-run-github-client-id"
-                    autoComplete="off"
-                    value={clientId}
-                    onChange={(event) => setClientId(event.target.value)}
-                    data-testid="first-run-github-client-id"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="first-run-github-client-secret"
-                    className="text-[13px] font-normal text-muted-foreground"
-                  >
-                    {copy.clientSecretLabel}
-                  </Label>
-                  <Input
-                    id="first-run-github-client-secret"
-                    type="password"
-                    autoComplete="off"
-                    value={clientSecret}
-                    onChange={(event) => setClientSecret(event.target.value)}
-                    data-testid="first-run-github-client-secret"
-                  />
-                </div>
-              </form>
-            ) : null}
-          </FirstRunGithubStepper>
+          <ConnectStepper
+            connecting={connecting}
+            createApp={createApp}
+            addLogin={addLogin}
+            savingLogin={savingLogin}
+            onConnectGitHub={onConnectGitHub}
+            onSaveLogin={onSaveLogin}
+          />
         )}
         {!loading && canChangeLogin ? (
           <Button
