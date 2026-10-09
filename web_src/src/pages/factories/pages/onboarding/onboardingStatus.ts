@@ -1,7 +1,17 @@
 import type { FactoriesFactory, FactoriesUpdateFactoryOnboardingBody } from "@/api-client";
 import type { IntegrationSelections } from "@/pages/home/homeIntegrationStatus";
 
+import { AGENT_PROVIDER_IDS } from "./onboardingAgentReadiness";
 import { WIZARD_STEPS, type IssuesChoiceId, type VcsHostId, type WizardStepId } from "./onboardingFixtures";
+
+// The connection list restores a saved installation. GitHub is included so a
+// reload can mark that installation ready. It is also manual: the wizard must
+// not adopt a different GitHub connection that already exists in the organization.
+export const ONBOARDING_CONNECTION_NAMES = ["github", "bitbucket", "jira", "linear", ...AGENT_PROVIDER_IDS] as const;
+
+// Agent keys stay unselected so a new workspace can use the SuperPlane template
+// when hosted credit is available.
+export const ONBOARDING_MANUAL_CONNECTION_NAMES = ["github", ...AGENT_PROVIDER_IDS] as const;
 
 /** The saved Git host of the workspace. An empty provider means GitHub. */
 export function onboardingVcsHost(onboarding: FactoriesFactory["onboarding"]): VcsHostId | null {
