@@ -980,6 +980,8 @@ CREATE TABLE public.installation_github_apps (
     encrypted_webhook_secret bytea NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    client_id character varying(255) DEFAULT ''::character varying NOT NULL,
+    encrypted_client_secret bytea DEFAULT '\x'::bytea NOT NULL,
     CONSTRAINT installation_github_apps_singleton CHECK ((id = 1))
 );
 

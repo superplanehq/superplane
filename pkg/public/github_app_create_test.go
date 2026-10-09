@@ -3,11 +3,13 @@ package public
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -66,6 +68,41 @@ func TestHandleGitHubAppManifest(t *testing.T) {
 		})
 		assert.Equal(t, http.StatusConflict, response.Code)
 	})
+}
+
+func TestHandleGitHubAppCreatedStartsAccountConnection(t *testing.T) {
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+	r := support.Setup(t)
+	server, account, _ := setupTestServer(r, t)
+	require.NoError(t, models.PromoteToInstallationAdmin(account.ID.String()))
+	require.NoError(t, githubapp.Save(t.Context(), database.DB(t.Context()), r.Encryptor, config.GitHubHostedAppConfig{
+		ID:            44,
+		Slug:          "superplane-self",
+		PrivateKey:    "pem",
+		WebhookSecret: "whsec",
+		ClientID:      "Iv1.installation",
+		ClientSecret:  "installation-secret",
+	}))
+	state, err := githubapp.SignCreateState("test-client-secret", "/demo/workspaces/new/setup?step=vcs", account.ID)
+	require.NoError(t, err)
+
+	response := execRequest(server, requestParams{
+		method: http.MethodGet,
+		path:   "/github/app/created?code=abc&state=" + state,
+	})
+
+	require.Equal(t, http.StatusFound, response.Code)
+	location, err := url.Parse(response.Header().Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, "/auth/github", location.Path)
+	assert.Equal(t, "connect", location.Query().Get("intent"))
+	redirect, err := url.Parse(location.Query().Get("redirect"))
+	require.NoError(t, err)
+	assert.Equal(t, "/demo/workspaces/new/setup", redirect.Path)
+	assert.Equal(t, "1", redirect.Query().Get("githubConnected"))
 }
 
 func TestHandleGitHubAppCreatedRejectsInvalidState(t *testing.T) {

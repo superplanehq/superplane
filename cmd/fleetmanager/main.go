@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
@@ -17,6 +18,7 @@ import (
 	fleetconfig "github.com/superplanehq/superplane/pkg/fleets/config"
 	"github.com/superplanehq/superplane/pkg/fleets/provider"
 	awsprovider "github.com/superplanehq/superplane/pkg/fleets/provider/aws"
+	azureprovider "github.com/superplanehq/superplane/pkg/fleets/provider/azure"
 	dockerprovider "github.com/superplanehq/superplane/pkg/fleets/provider/docker"
 	gcpprovider "github.com/superplanehq/superplane/pkg/fleets/provider/gcp"
 	"github.com/superplanehq/superplane/pkg/fleets/reconcile"
@@ -53,6 +55,8 @@ func main() {
 		os.Exit(1)
 	}
 	var releaseArtifactResolver reconcile.ArtifactResolver
+	var awsSDKConfig aws.Config
+	azureClients := map[string]azureprovider.ComputeAPI{}
 	if usesReleaseArtifacts(config) {
 		releaseArtifactResolver, err = artifact.NewResolver(
 			config.RunnerReleaseBaseURL,
@@ -63,7 +67,6 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	var awsSDKConfig aws.Config
 	if usesAWS(config) {
 		loadedAWSConfig, configErr := awsconfig.LoadDefaultConfig(ctx)
 		if configErr != nil {
@@ -71,6 +74,31 @@ func main() {
 			os.Exit(1)
 		}
 		awsSDKConfig = loadedAWSConfig
+	}
+	if usesAzure(config) {
+		credential, credErr := azidentity.NewDefaultAzureCredential(nil)
+		if credErr != nil {
+			log.Error("create Azure credential", slog.Any("error", credErr))
+			os.Exit(1)
+		}
+		for _, fleet := range config.Fleets {
+			if fleet.Provider != fleetconfig.ProviderAzure {
+				continue
+			}
+			if _, exists := azureClients[fleet.Azure.SubscriptionID]; exists {
+				continue
+			}
+			client, clientErr := azureprovider.NewSDK(fleet.Azure.SubscriptionID, credential)
+			if clientErr != nil {
+				log.Error(
+					"create Azure compute client",
+					slog.String("subscription_id", fleet.Azure.SubscriptionID),
+					slog.Any("error", clientErr),
+				)
+				os.Exit(1)
+			}
+			azureClients[fleet.Azure.SubscriptionID] = client
+		}
 	}
 	var gcpClient gcpprovider.ComputeAPI
 	if usesGCP(config) {
@@ -91,6 +119,7 @@ func main() {
 			config.ID,
 			fleet,
 			ec2Client,
+			azureClients[fleet.Azure.SubscriptionID],
 			gcpClient,
 			releaseArtifactResolver,
 			log,
@@ -149,12 +178,16 @@ func usesAWS(config *fleetconfig.Config) bool {
 	return hasProvider(config, fleetconfig.ProviderAWS)
 }
 
+func usesAzure(config *fleetconfig.Config) bool {
+	return hasProvider(config, fleetconfig.ProviderAzure)
+}
+
 func usesGCP(config *fleetconfig.Config) bool {
 	return hasProvider(config, fleetconfig.ProviderGCP)
 }
 
 func usesReleaseArtifacts(config *fleetconfig.Config) bool {
-	return usesAWS(config) || usesGCP(config)
+	return usesAWS(config) || usesAzure(config) || usesGCP(config)
 }
 
 func hasProvider(config *fleetconfig.Config, providerName string) bool {
@@ -170,6 +203,7 @@ func buildProvider(
 	fleetManagerID string,
 	fleet fleetconfig.Fleet,
 	ec2Client *ec2.Client,
+	azureClient azureprovider.ComputeAPI,
 	gcpClient gcpprovider.ComputeAPI,
 	releaseArtifactResolver reconcile.ArtifactResolver,
 	log *slog.Logger,
@@ -193,6 +227,24 @@ func buildProvider(
 			CloudWatchLogGroup:   fleet.AWS.CloudWatch.LogGroupName,
 		}, log)
 		return resourceProvider, releaseArtifactResolver, fleet.AWS.Architecture, err
+	case fleetconfig.ProviderAzure:
+		resourceProvider, err := azureprovider.New(azureClient, azureprovider.Config{
+			FleetManagerID:         fleetManagerID,
+			SubscriptionID:         fleet.Azure.SubscriptionID,
+			ResourceGroup:          fleet.Azure.ResourceGroup,
+			Location:               fleet.Azure.Location,
+			ImageID:                fleet.Azure.ImageID,
+			VMSize:                 fleet.Azure.VMSize,
+			Architecture:           fleet.Azure.Architecture,
+			SubnetID:               fleet.Azure.SubnetID,
+			NetworkSecurityGroupID: fleet.Azure.NetworkSecurityGroupID,
+			IdentityID:             fleet.Azure.IdentityID,
+			Zones:                  fleet.Azure.Zones,
+			DiskSizeGB:             fleet.Azure.DiskSizeGB,
+			EphemeralOSDisk:        fleet.Azure.EphemeralOSDisk,
+			ResourceTags:           fleet.Azure.ResourceTags,
+		}, log)
+		return resourceProvider, releaseArtifactResolver, fleet.Azure.Architecture, err
 	case fleetconfig.ProviderGCP:
 		resourceProvider, err := gcpprovider.New(gcpClient, gcpprovider.Config{
 			FleetManagerID:      fleetManagerID,

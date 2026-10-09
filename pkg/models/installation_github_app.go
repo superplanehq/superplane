@@ -19,8 +19,10 @@ type InstallationGitHubApp struct {
 	ID                     int   `gorm:"primary_key"`
 	GitHubAppID            int64 `gorm:"column:github_app_id"`
 	Slug                   string
+	ClientID               string `gorm:"column:client_id"`
 	EncryptedPrivateKey    []byte
 	EncryptedWebhookSecret []byte
+	EncryptedClientSecret  []byte
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 }
@@ -42,16 +44,20 @@ func SaveInstallationGitHubApp(
 	tx *gorm.DB,
 	githubAppID int64,
 	slug string,
+	clientID string,
 	encryptedPrivateKey []byte,
 	encryptedWebhookSecret []byte,
+	encryptedClientSecret []byte,
 ) error {
 	now := time.Now()
 	app := InstallationGitHubApp{
 		ID:                     installationGitHubAppID,
 		GitHubAppID:            githubAppID,
 		Slug:                   slug,
+		ClientID:               clientID,
 		EncryptedPrivateKey:    encryptedPrivateKey,
 		EncryptedWebhookSecret: encryptedWebhookSecret,
+		EncryptedClientSecret:  encryptedClientSecret,
 		CreatedAt:              now,
 		UpdatedAt:              now,
 	}
@@ -60,6 +66,38 @@ func SaveInstallationGitHubApp(
 		Columns:   []clause.Column{{Name: "id"}},
 		DoNothing: true,
 	}).Create(&app)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrInstallationGitHubAppExists
+	}
+	return nil
+}
+
+// ReplaceInstallationGitHubAppOAuth stores login credentials on the app that
+// was created before those credentials were kept. A row that already has a
+// client id is left unchanged.
+func ReplaceInstallationGitHubAppOAuth(
+	tx *gorm.DB,
+	githubAppID int64,
+	slug string,
+	clientID string,
+	encryptedPrivateKey []byte,
+	encryptedWebhookSecret []byte,
+	encryptedClientSecret []byte,
+) error {
+	result := tx.Model(&InstallationGitHubApp{}).
+		Where("id = ? AND client_id = ''", installationGitHubAppID).
+		Updates(map[string]any{
+			"github_app_id":            githubAppID,
+			"slug":                     slug,
+			"client_id":                clientID,
+			"encrypted_private_key":    encryptedPrivateKey,
+			"encrypted_webhook_secret": encryptedWebhookSecret,
+			"encrypted_client_secret":  encryptedClientSecret,
+			"updated_at":               time.Now(),
+		})
 	if result.Error != nil {
 		return result.Error
 	}
