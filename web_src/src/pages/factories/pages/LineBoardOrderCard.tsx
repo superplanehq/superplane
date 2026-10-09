@@ -11,6 +11,7 @@ import {
   confidenceScoreFromChecks,
 } from "../lib/confidenceScore";
 import { planningReviewFromChecks, planningReviewLevel } from "../lib/planningReviewScore";
+import { mergeConfidenceHeadline } from "../lib/mergeConfidenceScore";
 import { LOADING_REVEAL_CLASSNAME } from "../lib/loadingReveal";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -146,10 +147,17 @@ function cardScores(
   visibility: { showClarity: boolean; showConfidence: boolean },
 ): Pick<
   ComponentProps<typeof WorkOrderCard>,
-  "clarityScore" | "confidenceScore" | "isAnalyzing" | "showClarity" | "showConfidenceScore" | "reviewMetrics"
+  | "clarityScore"
+  | "confidenceScore"
+  | "isAnalyzing"
+  | "showClarity"
+  | "showConfidenceScore"
+  | "reviewMetrics"
+  | "mergeConfidence"
 > {
+  const mergeConfidence = mergeConfidenceHeadline(checks);
   if (!showConfidence) {
-    return { isAnalyzing: false, showClarity: false, showConfidenceScore: false };
+    return { isAnalyzing: false, showClarity: false, showConfidenceScore: false, mergeConfidence };
   }
   const review = planningReviewFromChecks(
     checks?.map((check) => ({
@@ -171,6 +179,7 @@ function cardScores(
       showConfidenceScore: true,
       reviewMetrics: review.metrics,
       isAnalyzing: draftCardAgentIsWorking(session, backlogAnalyzing, review.headline.score),
+      mergeConfidence,
     };
   }
   const clarityScore = visibility.showClarity ? clarityScoreFromChecks(checks) : undefined;
@@ -181,5 +190,6 @@ function cardScores(
     showClarity: visibility.showClarity,
     showConfidenceScore: visibility.showConfidence,
     isAnalyzing: draftCardAgentIsWorking(session, backlogAnalyzing, clarityScore ?? confidenceScore),
+    mergeConfidence,
   };
 }
