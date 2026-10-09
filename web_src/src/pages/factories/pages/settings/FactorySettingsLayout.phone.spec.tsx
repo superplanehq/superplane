@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_MOBILE_FACTORY_BOARD } from "@/lib/experimentalFeatures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
@@ -90,24 +89,11 @@ describe("FactorySettingsLayout at phone width", () => {
     expect(within(index).queryByTestId("factory-settings-nav-workspace-general")).not.toBeInTheDocument();
   }, 10000);
 
-  it("leaves out the bottom bar when the phone workspace shell is off", async () => {
+  it("keeps the bottom bar on settings pages at phone width", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/members`}
         factoriesFixture={defaultFactoriesFixture}
-      />,
-    );
-
-    expect(await screen.findByTestId("factory-settings-mobile-bar", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.queryByTestId("mobile-bottom-bar")).not.toBeInTheDocument();
-  }, 10000);
-
-  it("keeps the bottom bar on settings pages when the phone workspace shell is on", async () => {
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/members`}
-        factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_MOBILE_FACTORY_BOARD]}
       />,
     );
 

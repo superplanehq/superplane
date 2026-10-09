@@ -36,6 +36,3 @@ export const FEATURE_FACTORY_PULL_REQUEST_MERGE = "factory_pull_request_merge";
 
 /** Organization experimental feature: public workspace MCP server for Cursor and other MCP clients. */
 export const FEATURE_SUPERPLANE_MCP_SERVER = "superplane_mcp_server";
-
-/** Organization experimental feature: mobile workspace shell on phone-width screens. */
-export const FEATURE_MOBILE_FACTORY_BOARD = "mobile_factory_board";
