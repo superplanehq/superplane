@@ -162,7 +162,7 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
 		require.NoError(t, err)
 		for _, node := range liveVersion.Nodes {
-			if title, description, ok := prFeedbackDiscussionActivityExpressions(node.ID); ok {
+			if title, description, ok := prFeedbackDiscussionActivityExpressions(node.ID, ""); ok {
 				assert.Equal(t, title, node.Configuration["title"])
 				assert.Equal(t, description, node.Configuration["description"])
 			}

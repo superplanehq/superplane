@@ -165,7 +165,7 @@ func markBadgePeopleSyncComplete(t *testing.T, factoryModel *models.Factory, rep
 	t.Helper()
 	db := database.DB(t.Context())
 	from := time.Now().AddDate(0, 0, -90)
-	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factoryModel.ID, from, time.Now().Add(time.Hour), nil))
+	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factoryModel.ID, models.ProviderGitHub, from, time.Now().Add(time.Hour), nil))
 	sync, err := models.ClaimFactoryVelocitySync(db, factoryModel.ID, time.Now())
 	require.NoError(t, err)
 	require.NotNil(t, sync)
@@ -293,7 +293,7 @@ func seedBadgePeopleMerge(t *testing.T, r *support.ResourceRegistry, factoryMode
 	merge.AuthorLogin = "quinlan"
 	from := time.Now().AddDate(0, 0, -90)
 	to := time.Now().Add(time.Hour)
-	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factoryModel.ID, from, to, []models.FactoryVelocityRepositoryMerge{merge}))
+	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factoryModel.ID, models.ProviderGitHub, from, to, []models.FactoryVelocityRepositoryMerge{merge}))
 	sync, err := models.ClaimFactoryVelocitySync(db, factoryModel.ID, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, sync.RecordSuccess(db, repo, time.Now(), from))

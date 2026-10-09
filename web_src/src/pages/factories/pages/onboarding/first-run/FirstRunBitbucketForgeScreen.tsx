@@ -1,11 +1,19 @@
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 
 import { RepositoryPicker } from "../onboardingSteps";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
+import { FirstRunGithubStepper } from "./FirstRunGithubStepper";
+import { FirstRunMissingAccessLine } from "./FirstRunMissingAccessLine";
+import {
+  findOrganization,
+  ownerOfRepository,
+  repositoriesInOrganization,
+  repositoryOrganizations,
+  repositoryBelongsTo,
+} from "./githubOrganizations";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
@@ -16,7 +24,6 @@ const chooseCopy = FIRST_RUN_COPY.choose;
 type FirstRunBitbucketForgeScreenProps = {
   phase: "connect" | "grant" | "choose";
   connectHref: string;
-  installUrl: string;
   repositories: string[];
   installedWorkspaces?: string[];
   selectedRepository: string | null;
@@ -26,11 +33,14 @@ type FirstRunBitbucketForgeScreenProps = {
   loadError?: boolean;
   lookupFailed?: boolean;
   retrying?: boolean;
+  attemptActive?: boolean;
+  attemptTimedOut?: boolean;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   onRetryLookup?: () => void;
   onGrantAccess: () => void;
   onSelectRepository: (repository: string) => void;
+  onClearRepository?: () => void;
   onContinue: () => void;
 };
 
@@ -84,53 +94,86 @@ function BitbucketConnectScreen({ connectHref, chrome, sphere }: FirstRunBitbuck
       <FirstRunHeading headline={copy.connectHeadline}>
         <p className="text-[15px] leading-6 text-muted-foreground">{copy.connectAccountBody}</p>
       </FirstRunHeading>
-      <div className="mt-8">
-        <Button asChild>
-          <a href={connectHref} data-testid="first-run-bitbucket-oauth">
-            {copy.connectAction}
-          </a>
-        </Button>
+      <div className="mt-8 space-y-6">
+        <FirstRunGithubStepper
+          current="connect"
+          provider="bitbucket"
+          action={
+            <Button asChild size="sm">
+              <a href={connectHref} data-testid="first-run-bitbucket-oauth">
+                {copy.connectAction}
+              </a>
+            </Button>
+          }
+        />
       </div>
     </FirstRunShell>
   );
 }
 
 function BitbucketGrantScreen({
-  installUrl,
   granting = false,
   loadError = false,
+  retrying = false,
+  attemptActive = false,
+  attemptTimedOut = false,
   chrome,
   sphere,
   onGrantAccess,
   onRetryLookup,
-  retrying = false,
-}: FirstRunBitbucketForgeScreenProps) {
+}: FirstRunBitbucketForgeScreenProps & { onRetryLookup?: () => void }) {
+  const waiting = granting || attemptActive;
   return (
     <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={granting} visual="preview">
-      <FirstRunHeading headline={copy.connectHeadline}>
-        <p className="text-[15px] leading-6 text-muted-foreground">{copy.grantBody}</p>
+      <FirstRunHeading headline={copy.workspaceHeadline}>
+        <p className="text-[13px] text-muted-foreground">{copy.grantBody}</p>
       </FirstRunHeading>
-      <div className="mt-8 space-y-4">
-        <p className="text-[13px] text-muted-foreground" role="status">
-          {copy.synchronizing}
-        </p>
-        <p className="text-[13px] text-muted-foreground">{copy.waitingForInstallation}</p>
-        <LoadingButton type="button" onClick={onRetryLookup} loading={retrying} loadingText={copy.retrying}>
-          {copy.checkAgain}
-        </LoadingButton>
-        <p className="text-[13px] text-muted-foreground">{copy.installIfNeeded}</p>
-        <LoadingButton
-          type="button"
-          variant="outline"
-          onClick={onGrantAccess}
-          loading={granting}
-          loadingText={copy.openingBitbucket}
-          data-testid="first-run-bitbucket-install"
-        >
-          {copy.grantAction}
-        </LoadingButton>
-        {installUrl ? <InstallationLink url={installUrl} /> : null}
-        {loadError ? <p className="text-[13px] text-destructive">{copy.loadError}</p> : null}
+      <div className="mt-8 space-y-6">
+        <FirstRunGithubStepper current="organization" provider="bitbucket">
+          <LoadingButton
+            type="button"
+            className="w-full"
+            onClick={onGrantAccess}
+            loading={granting}
+            loadingText={copy.openingBitbucket}
+            data-testid="first-run-bitbucket-install"
+          >
+            {copy.grantAction}
+          </LoadingButton>
+          {waiting ? (
+            <div
+              className="flex gap-3 rounded-md border border-border px-3 py-2.5 text-[13px]"
+              role="status"
+              data-testid="first-run-bitbucket-waiting"
+            >
+              <Loader2 className="mt-0.5 size-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden />
+              <div className="min-w-0 space-y-0.5">
+                <p className="font-medium">{copy.checkingNewWorkspace}</p>
+                <p className="text-pretty text-muted-foreground">{copy.waitingDetail}</p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-[13px] text-muted-foreground" role="status">
+              {copy.synchronizing}
+            </p>
+          )}
+          {attemptTimedOut && onRetryLookup ? (
+            <div className="space-y-2">
+              <p className="text-[13px] text-muted-foreground">{copy.attemptTimedOut}</p>
+              <LoadingButton
+                type="button"
+                variant="outline"
+                onClick={onRetryLookup}
+                loading={retrying}
+                loadingText={copy.retrying}
+                data-testid="first-run-bitbucket-check-again"
+              >
+                {copy.checkAgain}
+              </LoadingButton>
+            </div>
+          ) : null}
+          {loadError ? <p className="text-[13px] text-destructive">{copy.loadError}</p> : null}
+        </FirstRunGithubStepper>
       </div>
     </FirstRunShell>
   );
@@ -138,103 +181,227 @@ function BitbucketGrantScreen({
 
 function BitbucketChooseRepositoryScreen({
   repositories,
-  installedWorkspaces = [],
+  installedWorkspaces,
   selectedRepository,
   saving = false,
-  loadError = false,
+  loadError,
+  attemptActive = false,
   chrome,
   sphere,
   onSelectRepository,
+  onClearRepository,
   onContinue,
   onRetryLookup,
   onGrantAccess,
-  retrying = false,
+  retrying,
   granting = false,
 }: FirstRunBitbucketForgeScreenProps) {
+  const choice = useBitbucketWorkspaceChoice(repositories, installedWorkspaces, selectedRepository, onClearRepository);
+  const { workspace, workspaces, repositorySelected } = choice;
+  const busy = saving || granting;
   return (
     <FirstRunShell
       testId="first-run-bitbucket-choose"
-      chrome={chrome}
-      busy={saving}
+      chrome={workspace && chrome ? { ...chrome, onBack: choice.clear } : chrome}
+      busy={busy}
       contentSpacing="compact"
       sphere={sphere}
       visual="preview"
     >
-      <FirstRunHeading headline={chooseCopy.headline}>
-        <p className="text-[13px] text-muted-foreground">{copy.repositoryHelper}</p>
+      <FirstRunHeading headline={workspace ? chooseCopy.headline : copy.workspaceHeadline}>
+        <p className="text-[13px] text-muted-foreground">{workspace ? copy.repositoryHelper : copy.workspaceHelper}</p>
       </FirstRunHeading>
       <div className="mt-8 space-y-4">
         {loadError ? <p className="text-[13px] text-destructive">{copy.loadError}</p> : null}
-        {repositories.length === 0 ? (
-          <div className="space-y-3">
-            <p className="text-[13px]">{copy.installed}</p>
-            <ul className="text-[13px] text-muted-foreground">
-              {installedWorkspaces.map((workspace) => (
-                <li key={workspace}>{workspace}</li>
-              ))}
-            </ul>
-            <p className="text-[13px] text-muted-foreground">{copy.installedEmpty}</p>
-            <LoadingButton type="button" onClick={onRetryLookup} loading={retrying} loadingText={copy.retrying}>
-              {copy.checkRepositories}
-            </LoadingButton>
-            <LoadingButton
-              type="button"
-              variant="outline"
-              onClick={onGrantAccess}
-              loading={granting}
-              loadingText={copy.openingBitbucket}
-            >
-              {copy.installAnother}
-            </LoadingButton>
-          </div>
-        ) : (
-          <RepositoryPicker
-            host="bitbucket"
-            repos={repositories}
-            selectedRepo={selectedRepository}
-            disabled={saving}
-            listClassName="max-h-48"
-            onSelect={onSelectRepository}
+        <FirstRunGithubStepper
+          provider="bitbucket"
+          current={workspace ? "repository" : "organization"}
+          organizationName={workspace ?? undefined}
+        >
+          {!workspace ? (
+            <>
+              <BitbucketWorkspacePicker workspaces={workspaces} disabled={busy} onSelect={choice.choose} />
+              <FirstRunMissingAccessLine
+                hint={copy.workspaceWriteAccessHint}
+                question={copy.missingWorkspace}
+                action={copy.installAnother}
+                disabled={saving}
+                loading={granting}
+                loadingText={copy.openingBitbucket}
+                onClick={onGrantAccess}
+              />
+            </>
+          ) : (
+            <>
+              <BitbucketWorkspaceRepositories
+                repositories={choice.repositories}
+                selectedRepository={selectedRepository}
+                disabled={busy}
+                retrying={retrying}
+                onRetryLookup={onRetryLookup}
+                onSelectRepository={onSelectRepository}
+              />
+              <FirstRunMissingAccessLine
+                hint={chooseCopy.writeAccessHint}
+                question={chooseCopy.missingRepository}
+                action={copy.installAnother}
+                disabled={saving}
+                loading={granting}
+                loadingText={copy.openingBitbucket}
+                onClick={onGrantAccess}
+              />
+            </>
+          )}
+          <NewWorkspaceCheck active={attemptActive} />
+          <BitbucketContinue
+            workspace={workspace}
+            repositorySelected={repositorySelected}
+            busy={busy}
+            saving={saving}
+            onContinue={onContinue}
           />
-        )}
-        <div className="space-y-2">
-          <LoadingButton
-            type="button"
-            className="w-full"
-            disabled={!selectedRepository || saving}
-            loading={saving}
-            loadingText={chooseCopy.saving}
-            onClick={onContinue}
-            data-testid="first-run-continue-to-tickets"
-          >
-            {selectedRepository ? chooseCopy.continueReady : chooseCopy.continue}
-          </LoadingButton>
-          <p className="text-[12px] text-muted-foreground">{chooseCopy.moreLater}</p>
-        </div>
+        </FirstRunGithubStepper>
       </div>
     </FirstRunShell>
   );
 }
 
-function InstallationLink({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false);
+function useBitbucketWorkspaceChoice(
+  repositories: string[],
+  installedWorkspaces: string[] | undefined,
+  selectedRepository: string | null,
+  onClearRepository?: () => void,
+) {
+  const workspaces = [
+    ...new Map(
+      [...repositoryOrganizations(repositories), ...(installedWorkspaces ?? [])].map((name) => [
+        name.toLowerCase(),
+        name,
+      ]),
+    ).values(),
+  ].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  const [chosen, setChosen] = useState<string | null>(() => ownerOfRepository(selectedRepository));
+  const workspace = findOrganization(workspaces, chosen);
+  return {
+    workspace,
+    workspaces,
+    repositories: workspace ? repositoriesInOrganization(repositories, workspace) : [],
+    repositorySelected: Boolean(workspace && selectedRepository && repositoryBelongsTo(selectedRepository, workspace)),
+    choose: (name: string) => {
+      if (selectedRepository && !repositoryBelongsTo(selectedRepository, name)) onClearRepository?.();
+      setChosen(name);
+    },
+    clear: () => setChosen(null),
+  };
+}
+
+function BitbucketWorkspaceRepositories({
+  repositories,
+  selectedRepository,
+  disabled,
+  retrying = false,
+  onRetryLookup,
+  onSelectRepository,
+}: {
+  repositories: string[];
+  selectedRepository: string | null;
+  disabled: boolean;
+  retrying?: boolean;
+  onRetryLookup?: () => void;
+  onSelectRepository: (repository: string) => void;
+}) {
+  if (repositories.length === 0) {
+    return (
+      <div className="space-y-3">
+        <p className="text-[13px]">{copy.installed}</p>
+        <p className="text-[13px] text-muted-foreground">{copy.installedEmpty}</p>
+        <LoadingButton
+          type="button"
+          onClick={onRetryLookup}
+          loading={retrying}
+          loadingText={copy.retrying}
+          disabled={disabled}
+        >
+          {copy.checkRepositories}
+        </LoadingButton>
+      </div>
+    );
+  }
+  return (
+    <RepositoryPicker
+      host="bitbucket"
+      repos={repositories}
+      selectedRepo={selectedRepository}
+      disabled={disabled}
+      listClassName="max-h-48"
+      onSelect={onSelectRepository}
+    />
+  );
+}
+
+function BitbucketContinue({
+  workspace,
+  repositorySelected,
+  busy,
+  saving,
+  onContinue,
+}: {
+  workspace: string | null;
+  repositorySelected: boolean;
+  busy: boolean;
+  saving: boolean;
+  onContinue: () => void;
+}) {
+  if (!workspace) return null;
   return (
     <div className="space-y-2">
-      <Label htmlFor="bitbucket-install-link">{copy.grantLinkLabel}</Label>
-      <div className="flex gap-2">
-        <Input id="bitbucket-install-link" readOnly value={url} data-testid="first-run-bitbucket-install-link" />
+      <LoadingButton
+        type="button"
+        className="w-full"
+        disabled={!repositorySelected || busy}
+        loading={saving}
+        loadingText={chooseCopy.saving}
+        onClick={onContinue}
+        data-testid="first-run-continue-to-tickets"
+      >
+        {repositorySelected ? chooseCopy.continueReady : chooseCopy.continue}
+      </LoadingButton>
+      <p className="text-[12px] text-muted-foreground">{chooseCopy.moreLater}</p>
+    </div>
+  );
+}
+
+function NewWorkspaceCheck({ active }: { active: boolean }) {
+  if (!active) return null;
+  return (
+    <p className="text-[13px] text-muted-foreground" role="status">
+      {copy.checkingNewWorkspace}
+    </p>
+  );
+}
+
+function BitbucketWorkspacePicker({
+  workspaces,
+  disabled,
+  onSelect,
+}: {
+  workspaces: string[];
+  disabled: boolean;
+  onSelect: (workspace: string) => void;
+}) {
+  return (
+    <div className="space-y-3 text-left">
+      {workspaces.map((name) => (
         <Button
+          key={name}
           type="button"
-          variant="outline"
-          onClick={() => {
-            void navigator.clipboard.writeText(url).then(() => {
-              setCopied(true);
-            });
-          }}
+          className="w-full justify-start"
+          disabled={disabled}
+          onClick={() => onSelect(name)}
         >
-          {copied ? copy.copied : copy.copyLink}
+          {chooseCopy.useOrganization(name)}
         </Button>
-      </div>
+      ))}
     </div>
   );
 }
