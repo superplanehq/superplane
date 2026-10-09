@@ -13,6 +13,11 @@ import {
 
 export type MobileBoardPagingKey = "backlog" | "open" | "done";
 
+export type MobileBoardColumnTotalCounts = {
+  backlog?: number;
+  done?: number;
+};
+
 export type MobileBoardCard = {
   /** Stable React key: the task id, or the execution id on a phase column. */
   key: string;
@@ -28,10 +33,20 @@ export type MobileBoardColumn = {
   /** Live state glyph on a phase column. Bookend columns have none. */
   glyph?: PhaseGlyphKind;
   emptyDescription: string;
+  /** Total work orders in this column from the server, when known. */
+  totalCount?: number;
 };
 
 function cardsForOrders(orders: FactoriesWorkOrder[]): MobileBoardCard[] {
   return orders.flatMap((order) => (order.id ? [{ key: order.id, order }] : []));
+}
+
+function doneColumnTotalCount(serverTotal: number | undefined, cards: MobileBoardCard[]): number | undefined {
+  if (serverTotal === undefined) {
+    return undefined;
+  }
+  const openOnDoneStep = cards.filter((card) => card.order.state !== "STATE_CLOSED").length;
+  return serverTotal + openOnDoneStep;
 }
 
 /**
@@ -43,12 +58,13 @@ export function buildMobileBoardColumns(
   line: FactoriesFactoryLine,
   workOrders: FactoriesWorkOrder[],
   apps: Array<{ id?: string; name?: string; columnKey?: string }>,
+  totalCounts?: MobileBoardColumnTotalCounts,
 ): MobileBoardColumn[] {
   const fullBoard = buildLinePhaseBoard(line, workOrders, apps);
   const verifyOrders = collectLineVerifyOrders(fullBoard);
   const stageColumns = visibleLineStageColumns(fullBoard, verifyOrders);
   const backlogOrders = collectLineBacklogOrders(workOrders);
-  const doneOrders = collectLineDoneOrders(workOrders, line, fullBoard);
+  const doneCards = cardsForOrders(collectLineDoneOrders(workOrders, line, fullBoard));
 
   return [
     {
@@ -57,6 +73,7 @@ export function buildMobileBoardColumns(
       cards: cardsForOrders(backlogOrders),
       paging: "backlog",
       emptyDescription: "No tasks in Backlog. Tap + to create a task.",
+      totalCount: totalCounts?.backlog,
     },
     ...stageColumns.map(
       (column): MobileBoardColumn => ({
@@ -78,9 +95,10 @@ export function buildMobileBoardColumns(
     {
       key: "done",
       title: "Done",
-      cards: cardsForOrders(doneOrders),
+      cards: doneCards,
       paging: "done",
       emptyDescription: "No tasks in Done.",
+      totalCount: doneColumnTotalCount(totalCounts?.done, doneCards),
     },
   ];
 }

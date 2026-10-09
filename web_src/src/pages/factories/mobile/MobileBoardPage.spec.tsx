@@ -21,11 +21,18 @@ import {
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { MobileBoardPage } from "./MobileBoardPage";
 
-const idleBoardPage = () => ({
+const idleBoardPage = (): {
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  isFetchNextPageError: boolean;
+  fetchNextPage: () => void;
+  totalCount?: number;
+} => ({
   hasNextPage: false,
   isFetchingNextPage: false,
   isFetchNextPageError: false,
   fetchNextPage: vi.fn(),
+  totalCount: undefined,
 });
 const boardWorkOrders = vi.fn((): FactoriesWorkOrder[] => []);
 const backlogPage = vi.fn(idleBoardPage);
@@ -460,5 +467,55 @@ describe("MobileBoardPage", () => {
     const location = screen.getByTestId("mobile-test-location");
     expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/42`);
     expect(location).not.toHaveTextContent("lineId=");
+  });
+
+  it("displays server total counts on column tabs instead of loaded card counts", () => {
+    boardWorkOrders.mockReturnValue([
+      {
+        id: "wo-draft-1",
+        number: "42",
+        title: "Fix refund rounding",
+        state: "STATE_DRAFT",
+        lineDispatches: [],
+      },
+    ]);
+    backlogPage.mockReturnValue({
+      ...idleBoardPage(),
+      totalCount: 80,
+    });
+    donePage.mockReturnValue({
+      ...idleBoardPage(),
+      totalCount: 60,
+    });
+    renderBoard();
+
+    expect(screen.getByTestId("mobile-board-tab-backlog")).toHaveTextContent("Backlog80");
+    expect(screen.getByTestId("mobile-board-tab-done")).toHaveTextContent("Done60");
+  });
+
+  it("falls back to loaded card count when search filter is active", async () => {
+    const user = userEvent.setup();
+    boardWorkOrders.mockReturnValue([
+      {
+        id: "wo-draft-1",
+        number: "42",
+        title: "Fix refund rounding",
+        state: "STATE_DRAFT",
+        lineDispatches: [],
+      },
+    ]);
+    backlogPage.mockReturnValue({
+      ...idleBoardPage(),
+      totalCount: 80,
+    });
+    renderBoard();
+
+    expect(screen.getByTestId("mobile-board-tab-backlog")).toHaveTextContent("Backlog80");
+
+    await user.click(screen.getByTestId("mobile-board-search-toggle"));
+    const searchInput = screen.getByTestId("mobile-board-search-input");
+    await user.type(searchInput, "refund");
+
+    expect(screen.getByTestId("mobile-board-tab-backlog")).toHaveTextContent("Backlog1");
   });
 });
