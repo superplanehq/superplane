@@ -32,14 +32,15 @@ Owner setup then opens workspace setup.
    GitHub App is missing.
 2. On Connect, choose **Create GitHub App** if this installation has no
    GitHub App.
-3. GitHub creates a private app. SuperPlane stores its login client and
-   opens GitHub again so you can connect your account.
-4. Choose the source repository. Install the app on the GitHub
-   organization when SuperPlane asks. SuperPlane does not ask for a
-   second repository on an installation wizard.
+3. GitHub creates a private app. SuperPlane stores the app id, private
+   key, and webhook secret, then opens organization selection.
+4. Choose the GitHub organization and the source repository. Install
+   the app on the organization when SuperPlane asks. SuperPlane does
+   not ask for a second repository on an installation wizard.
 
-Do not set `GITHUB_CLIENT_ID`. The created GitHub App is the login
-client. Linear, Jira, and Sentry hosted apps are not part of this flow.
+Do not set `GITHUB_CLIENT_ID`. A self-hosted GitHub App does not offer
+Sign in with GitHub. Linear, Jira, and Sentry hosted apps are not part
+of this flow.
 
 ## 5. Confirm the installation
 

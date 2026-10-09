@@ -71,6 +71,7 @@ vi.mock("./useGitHubOnboarding", () => ({
   useGitHubOnboarding: () => ({
     data: {
       providerConfigured: true,
+      accountConnectionRequired: true,
       identity: { userId: "42", login: "octocat" },
       repositories: [{ repositoryId: "201", installationId: "101", fullName: "acme/api", defaultBranch: "main" }],
       pendingRequests: [],

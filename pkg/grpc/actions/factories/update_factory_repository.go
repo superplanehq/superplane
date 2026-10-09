@@ -90,16 +90,7 @@ func UpdateFactoryRepository(
 		selectedIntegration := integration
 		_, bindingErr := models.FindVCSProviderIntegrationBinding(tx, integration.ID)
 		if bindingErr == nil {
-			providerUserID, userErr := factoryVCSProviderUserID(ctx, tx, organizationID, models.ProviderGitHub)
-			if userErr != nil {
-				return userErr
-			}
-			catalogRepository, findErr := models.FindAccessibleVCSProviderRepositoryByName(
-				tx,
-				models.ProviderGitHub,
-				providerUserID,
-				repository,
-			)
+			catalogRepository, findErr := findGitHubCatalogRepositoryByName(ctx, tx, organizationID, repository)
 			if errors.Is(findErr, gorm.ErrRecordNotFound) {
 				return grpcerrors.PermissionDenied(findErr, "VCS repository is not accessible")
 			}
