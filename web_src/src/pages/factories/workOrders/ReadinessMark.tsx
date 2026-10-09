@@ -13,7 +13,11 @@ import {
 } from "../lib/confidenceScore";
 import { DRAFT_READINESS_SHORT_LABEL, draftReadiness, type DraftReadinessTone } from "../lib/draftReadiness";
 import { PLANNING_REVIEW_SCORE_MAX, planningReviewAtMax, planningReviewLevel } from "../lib/planningReviewScore";
-import { workOrderCheckStatus, type WorkOrderCheckLevel } from "../lib/workOrderChecks";
+import {
+  mergeConfidenceCheckLevel,
+  type MergeConfidenceCardCheck,
+} from "../lib/mergeConfidenceScore";
+import { workOrderCheckDisplayName, workOrderCheckStatus, type WorkOrderCheckLevel } from "../lib/workOrderChecks";
 import { ConfidenceMeter } from "./ConfidenceMeter";
 
 const DOT_TONE: Record<DraftReadinessTone, string> = {
@@ -58,12 +62,6 @@ const BADGE_TONE: Record<ConfidenceBand, string> = {
 };
 
 const BADGE_MUTED = "border-border bg-muted/40 text-muted-foreground";
-
-const NUMBER_TONE: Record<ConfidenceBand, string> = {
-  High: "text-success",
-  Medium: "text-warning",
-  Low: "text-destructive",
-};
 
 /**
  * Tooltip uses `bg-foreground`, so it is dark in light mode and light in
@@ -195,16 +193,13 @@ function ScoreMeterLabel({
       {value == null ? (
         <span>–</span>
       ) : (
-        <>
-          <ConfidenceMeter
-            score={value}
-            max={max}
-            showTooltip={false}
-            decorative
-            testId={testId ? `${testId}-meter` : undefined}
-          />
-          <span className={cn("tabular-nums", NUMBER_TONE[confidenceBandForScore(value, max)])}>{value}</span>
-        </>
+        <ConfidenceMeter
+          score={value}
+          max={max}
+          showTooltip={false}
+          decorative
+          testId={testId ? `${testId}-meter` : undefined}
+        />
       )}
     </span>
   );
@@ -214,23 +209,87 @@ function ConfidenceChip({ score, max, testId }: { score?: number; max: number; t
   return <ScoreMeterLabel label="Confidence" score={score} max={max} testId={testId} />;
 }
 
-/** Board footer score. Same meter as plan Confidence. Visible text is Merge. */
-export function MergeConfidenceChip({ score, maxScore, testId }: { score: number; maxScore: number; testId?: string }) {
+const MERGE_METER_BARS = 3;
+
+/**
+ * Board footer mark. The Confidence prefix matches the backlog card.
+ * A 1–5 score uses three bars: 4–5 fill three, 3 fills two, and 1–2
+ * fill one. Hover opens the check list on the right.
+ */
+export function MergeConfidenceChip({
+  score,
+  maxScore,
+  checks = [],
+  testId,
+}: {
+  score: number;
+  maxScore: number;
+  checks?: MergeConfidenceCardCheck[];
+  testId?: string;
+}) {
   const value = clampConfidenceScore(score, maxScore);
+  const rows = mergeConfidenceRows(checks);
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span
           role="img"
           aria-label={`Merge confidence ${value} of ${maxScore}`}
-          className="pointer-events-auto inline-flex shrink-0"
+          className="pointer-events-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] font-medium leading-none text-muted-foreground"
         >
-          <ScoreMeterLabel label="Merge" score={value} max={maxScore} testId={testId} />
+          <span>Confidence</span>
+          <ConfidenceMeter
+            score={mergeMeterBars(value, maxScore)}
+            max={MERGE_METER_BARS}
+            showTooltip={false}
+            decorative
+            testId={testId ? `${testId}-meter` : undefined}
+          />
         </span>
       </TooltipTrigger>
-      <TooltipContent>Merge confidence</TooltipContent>
+      <TooltipContent side="right" data-testid={testId ? `${testId}-popup` : undefined}>
+        <span className="block font-medium">Merge confidence</span>
+        {rows.length > 0 ? (
+          <span className="mt-1 grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5">
+            {rows.map((row) => (
+              <Fragment key={row.key}>
+                <span>{row.name}</span>
+                <span className={TOOLTIP_RESULT_TONE[row.level]}>{row.label}</span>
+              </Fragment>
+            ))}
+          </span>
+        ) : null}
+      </TooltipContent>
     </Tooltip>
   );
+}
+
+function mergeConfidenceRows(checks: MergeConfidenceCardCheck[]) {
+  return checks.map((check) => {
+    const name = workOrderCheckDisplayName(check);
+    const level = mergeConfidenceCheckLevel(check.key, check.score);
+    const status = workOrderCheckStatus({
+      name,
+      key: check.key,
+      score: check.score,
+      level,
+    });
+    return { key: check.key || name, name, label: status.label, level };
+  });
+}
+
+function mergeMeterBars(score: number, maxScore: number): number {
+  if (maxScore <= MERGE_METER_BARS) {
+    return score;
+  }
+  const band = confidenceBandForScore(score, maxScore);
+  if (band === "High") {
+    return MERGE_METER_BARS;
+  }
+  if (band === "Medium") {
+    return MERGE_METER_BARS - 1;
+  }
+  return score <= 0 ? 0 : 1;
 }
 
 /**

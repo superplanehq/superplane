@@ -24,7 +24,14 @@ function verifyOrder(id: string): FactoriesWorkOrder {
   };
 }
 
-function renderCard(order: FactoriesWorkOrder, mergeConfidence: { score: number; maxScore: number }) {
+function renderCard(
+  order: FactoriesWorkOrder,
+  mergeConfidence: {
+    score: number;
+    maxScore: number;
+    checks?: { key: string; name: string; score: number; maxScore: number }[];
+  },
+) {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -52,21 +59,27 @@ function renderCard(order: FactoriesWorkOrder, mergeConfidence: { score: number;
 }
 
 describe("WorkOrderCard merge confidence", () => {
-  it("shows Merge in the footer and keeps planning scores hidden", async () => {
+  it("shows three bars in the footer and keeps planning scores hidden", async () => {
     const user = userEvent.setup();
     const order = verifyOrder("wo-verify");
-    renderCard(order, { score: 4, maxScore: 5 });
+    renderCard(order, {
+      score: 4,
+      maxScore: 5,
+      checks: [
+        { key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 },
+        { key: "security-review", name: "Security", score: 4, maxScore: 5 },
+      ],
+    });
 
     const chip = screen.getByRole("img", { name: "Merge confidence 4 of 5" });
-    expect(chip).toHaveTextContent(/Merge\s*4/);
-    expect(chip).not.toHaveTextContent("4/5");
-    expect(chip).not.toHaveTextContent("Confidence");
+    expect(chip).toHaveTextContent("Confidence");
+    expect(chip).not.toHaveTextContent("Merge");
+    expect(chip).not.toHaveTextContent(/\d/);
     expect(chip.className).not.toContain("rounded-full");
     const meter = screen.getByTestId("work-order-card-merge-wo-verify-meter");
-    expect(meter.querySelectorAll("[data-filled='true']")).toHaveLength(4);
+    expect(meter.querySelectorAll("[data-filled]")).toHaveLength(3);
+    expect(meter.querySelectorAll("[data-filled='true']")).toHaveLength(3);
     expect(meter.querySelector("[data-filled='true']")).toHaveClass("bg-emerald-500");
-    expect(chip.querySelector(".tabular-nums")).toHaveClass("text-success");
-    expect(screen.queryByText("Confidence")).not.toBeInTheDocument();
     expect(screen.queryByText("Clarity")).not.toBeInTheDocument();
     const footer = screen.getByTestId("work-order-card-footer-leading-wo-verify").parentElement;
     expect(footer).toContainElement(chip);
@@ -75,18 +88,25 @@ describe("WorkOrderCard merge confidence", () => {
     );
 
     await user.hover(chip);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Merge confidence");
+    const popup = await screen.findByRole("tooltip");
+    expect(popup).toHaveAttribute("data-side", "right");
+    expect(popup).toHaveTextContent("Merge confidence");
+    expect(popup).toHaveTextContent("Blast radius");
+    expect(popup).toHaveTextContent("Low");
+    expect(popup).toHaveTextContent("Security");
+    expect(popup).toHaveTextContent("Met");
+    expect(popup).not.toHaveTextContent("4/5");
   });
 
   it("uses the medium band when the score is 3", () => {
     renderCard(verifyOrder("wo-verify-mid"), { score: 3, maxScore: 5 });
 
     const chip = screen.getByRole("img", { name: "Merge confidence 3 of 5" });
-    expect(chip).toHaveTextContent(/Merge\s*3/);
-    expect(chip).not.toHaveTextContent("3/5");
+    expect(chip).not.toHaveTextContent("Merge");
+    expect(chip).not.toHaveTextContent(/\d/);
     const meter = screen.getByTestId("work-order-card-merge-wo-verify-mid-meter");
-    expect(meter.querySelectorAll("[data-filled='true']")).toHaveLength(3);
+    expect(meter.querySelectorAll("[data-filled]")).toHaveLength(3);
+    expect(meter.querySelectorAll("[data-filled='true']")).toHaveLength(2);
     expect(meter.querySelector("[data-filled='true']")).toHaveClass("bg-orange-500");
-    expect(chip.querySelector(".tabular-nums")).toHaveClass("text-warning");
   });
 });

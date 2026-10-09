@@ -329,7 +329,17 @@ export const MergeConfidence: Story = {
       factory,
     ),
     pullRequests: [],
-    mergeConfidence: { score: 5, maxScore: 5 },
+    mergeConfidence: {
+      score: 5,
+      maxScore: 5,
+      checks: [
+        { key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 },
+        { key: "performance-review", name: "Performance", score: 5, maxScore: 5 },
+        { key: "security-review", name: "Security", score: 5, maxScore: 5 },
+        { key: "drift-review", name: "Drift from Specification", score: 1, maxScore: 5 },
+        { key: "reversibility-review", name: "Reversibility", score: 5, maxScore: 5 },
+      ],
+    },
   },
 };
 

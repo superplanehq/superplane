@@ -136,7 +136,7 @@ describe("LineBoardOrderCard", () => {
     expect(planningSessionRequests(fetchMock)).toEqual([]);
   });
 
-  it("shows merge confidence on a verify card and does not show Confidence", () => {
+  it("shows merge confidence on a verify card with the Confidence prefix", () => {
     renderCard({
       ...draft,
       id: "wo-verify",
@@ -149,8 +149,9 @@ describe("LineBoardOrderCard", () => {
       ],
     });
 
-    expect(screen.getByRole("img", { name: "Merge confidence 5 of 5" })).toHaveTextContent(/Merge\s*5/);
-    expect(screen.queryByText("Confidence")).not.toBeInTheDocument();
+    const chip = screen.getByRole("img", { name: "Merge confidence 5 of 5" });
+    expect(chip).toHaveTextContent("Confidence");
+    expect(chip).not.toHaveTextContent(/\d/);
     expect(screen.queryByText("Blast radius")).not.toBeInTheDocument();
   });
 
@@ -165,7 +166,7 @@ describe("LineBoardOrderCard", () => {
       ],
     });
 
-    expect(screen.getByRole("img", { name: "Merge confidence 3 of 5" })).toHaveTextContent(/Merge\s*3/);
+    expect(screen.getByRole("img", { name: "Merge confidence 3 of 5" })).not.toHaveTextContent("Merge");
   });
 
   it("hides the merge chip when no merge confidence check exists", () => {
@@ -188,7 +189,7 @@ describe("LineBoardOrderCard", () => {
       checkScores: [{ key: "security-review", name: "Security", score: 4, maxScore: 5 }],
     });
 
-    expect(screen.getByRole("img", { name: "Merge confidence 4 of 5" })).toHaveTextContent(/Merge\s*4/);
+    expect(screen.getByRole("img", { name: "Merge confidence 4 of 5" })).not.toHaveTextContent("Merge");
   });
 
   it("shows Clarity and Confidence only on a draft", () => {
@@ -260,8 +261,8 @@ describe("LineBoardOrderCard", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("img", { name: "Merge confidence 4 of 5" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Merge confidence 4 of 5" })).toHaveTextContent("Confidence");
     expect(screen.queryByText("Clarity")).not.toBeInTheDocument();
-    expect(screen.queryByText("Confidence")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-score-wo-hidden-planning")).not.toBeInTheDocument();
   });
 });

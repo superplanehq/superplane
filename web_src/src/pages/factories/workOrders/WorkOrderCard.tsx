@@ -17,6 +17,7 @@ import { workOrderCardSource } from "../lib/workOrderCardSource";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
+import type { MergeConfidenceCardCheck } from "../lib/mergeConfidenceScore";
 import { ConfidenceAnalyzingIndicator } from "./ConfidenceMeter";
 import { CardScoreBadges, MergeConfidenceChip } from "./ReadinessMark";
 import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
@@ -85,7 +86,7 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
    * Merge confidence headline from Verify. Independent of Clarity and
    * Confidence. Absent until at least one merge confidence check exists.
    */
-  mergeConfidence?: { score: number; maxScore: number };
+  mergeConfidence?: { score: number; maxScore: number; checks?: MergeConfidenceCardCheck[] };
   /** Review sub-parameters for the Confidence tooltip when the headline is derived. */
   reviewMetrics?: { key: string; name: string; score: number }[];
   /**
@@ -122,7 +123,7 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * intake source on the left, then when the task was last updated. A task
  * with no owner shows a dashed person icon on the title row. Reviewed
  * drafts show Clarity and Confidence scores on the right of the footer.
- * After Verify writes a merge confidence check, that score sits with
+ * After Verify writes a merge confidence check, three bars sit with
  * those scores.
  */
 export function WorkOrderCard({
@@ -387,7 +388,7 @@ function WorkOrderCardMetaRow({
   confidenceScore?: number;
   showClarity?: boolean;
   showConfidenceScore?: boolean;
-  mergeConfidence?: { score: number; maxScore: number };
+  mergeConfidence?: { score: number; maxScore: number; checks?: MergeConfidenceCardCheck[] };
   reviewMetrics?: { key: string; name: string; score: number }[];
   isAnalyzing: boolean;
 }) {
@@ -413,6 +414,7 @@ function WorkOrderCardMetaRow({
             <MergeConfidenceChip
               score={mergeConfidence.score}
               maxScore={mergeConfidence.maxScore}
+              checks={mergeConfidence.checks}
               testId={`work-order-card-merge-${entryId}`}
             />
           ) : null}

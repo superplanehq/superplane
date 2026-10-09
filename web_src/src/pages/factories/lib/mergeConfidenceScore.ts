@@ -11,6 +11,40 @@ export const MERGE_CONFIDENCE_METRIC_KEYS = [
 
 const LOWER_IS_BETTER_KEYS = new Set<string>(["risk-review", "drift-review"]);
 
+/** Performance, security, and reversibility improve as the score rises. Other checks, including custom ones, improve as the score falls. */
+const HIGHER_IS_BETTER_KEYS = new Set<string>(["performance-review", "security-review", "reversibility-review"]);
+
+export type MergeConfidenceCardCheck = {
+  key?: string;
+  name?: string;
+  score: number;
+  maxScore: number;
+};
+
+/**
+ * Same bands the server stores on the check. The board list has the score
+ * only, so the card derives the level when it builds the hover list.
+ */
+export function mergeConfidenceCheckLevel(key: string | undefined, score: number): WorkOrderCheckLevel {
+  const value = Math.round(score);
+  if (key != null && HIGHER_IS_BETTER_KEYS.has(key)) {
+    if (value <= 2) {
+      return "critical";
+    }
+    if (value <= 3) {
+      return "caution";
+    }
+    return "positive";
+  }
+  if (value >= 4) {
+    return "critical";
+  }
+  if (value >= 3) {
+    return "caution";
+  }
+  return "positive";
+}
+
 const LEVEL_SEVERITY: Record<WorkOrderCheckLevel, number> = {
   positive: 0,
   neutral: 1,
@@ -49,10 +83,12 @@ export function isMergeConfidenceMetric(check: { key?: string }): boolean {
   return check.key != null && (MERGE_CONFIDENCE_METRIC_KEYS as readonly string[]).includes(check.key);
 }
 
-type MergeConfidenceHeadlineInput = {
-  key?: string;
-  score?: number;
-  maxScore?: number;
+type MergeConfidenceHeadlineInput = MergeConfidenceCardCheck;
+
+export type MergeConfidenceCard = {
+  score: number;
+  maxScore: number;
+  checks: MergeConfidenceCardCheck[];
 };
 
 /**
@@ -61,21 +97,22 @@ type MergeConfidenceHeadlineInput = {
  */
 export function mergeConfidenceHeadline(
   checks: readonly MergeConfidenceHeadlineInput[] | undefined,
-): { score: number; maxScore: number } | undefined {
+): MergeConfidenceCard | undefined {
   const metrics = (checks ?? []).flatMap((check) => {
     if (!isMergeConfidenceMetric(check) || check.score == null || (check.maxScore ?? 0) <= 0) {
       return [];
     }
-    return [{ key: check.key, score: check.score, maxScore: check.maxScore ?? 0 }];
+    return [{ key: check.key, name: check.name, score: check.score, maxScore: check.maxScore ?? 0 }];
   });
   if (metrics.length === 0) {
     return undefined;
   }
-  const headline = headlineScore(metrics);
+  const ordered = orderMergeConfidenceMetrics(metrics);
+  const headline = headlineScore(ordered);
   if (headline.maxScore <= 0) {
     return undefined;
   }
-  return headline;
+  return { ...headline, checks: ordered };
 }
 
 /**
