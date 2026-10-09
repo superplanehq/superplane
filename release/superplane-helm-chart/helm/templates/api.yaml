@@ -158,6 +158,10 @@ spec:
               value: {{ .Values.blobStorage.localPath | quote }}
             - name: BLOB_STORAGE_CREDENTIALS_FILE
               value: {{ .Values.blobStorage.credentialsFile | quote }}
+            {{- if .Values.runner.api.enabled }}
+            - name: RUNNER_ACTIVE_LOG_BASE_URL
+              value: "http://{{ .Release.Name }}-runner-api:8000"
+            {{- end }}
             - name: START_FILE_CLEANUP_WORKER
               value: "yes"
 {{- if .Values.license.secretName }}
