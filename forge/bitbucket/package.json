@@ -6,5 +6,8 @@
     "@forge/bridge": "^4.0.0",
     "@forge/react": "^11.0.0",
     "react": "^18.0.0"
+  },
+  "overrides": {
+    "prosemirror-view": "1.42.6"
   }
 }
