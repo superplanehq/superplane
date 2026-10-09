@@ -97,6 +97,14 @@ func (f *fakeCompute) ListVMs(_ context.Context, _ string) ([]armcompute.Virtual
 	return vms, nil
 }
 
+func (f *fakeCompute) ListNICs(_ context.Context, _ string) ([]armnetwork.Interface, error) {
+	nics := make([]armnetwork.Interface, 0, len(f.nics))
+	for _, nic := range f.nics {
+		nics = append(nics, nic)
+	}
+	return nics, nil
+}
+
 func TestCreateTagsAzureResourcesWithRunnerIdentity(t *testing.T) {
 	client := &fakeCompute{}
 	azureProvider := newTestProvider(t, client)
@@ -195,6 +203,66 @@ func TestListFiltersAzureResourcesByFleetManagerAndFleet(t *testing.T) {
 	}
 	if len(resources) != 1 || resources[0].ID != "owned" || resources[0].RunnerID != "runner-1" {
 		t.Fatalf("resources = %#v", resources)
+	}
+}
+
+func TestListRetriesOwnedNICAfterTheVMIsGone(t *testing.T) {
+	const vmName = "sprunner-runner1"
+	client := &fakeCompute{nics: map[string]armnetwork.Interface{
+		vmName + "-nic": {
+			Name: to.Ptr(vmName + "-nic"),
+			Tags: map[string]*string{
+				TagKeyFleetManagerID: to.Ptr("fleet-manager-production"),
+				TagKeyFleetID:        to.Ptr("linux-amd64"),
+				TagKeyRunnerID:       to.Ptr("runner-1"),
+			},
+		},
+		"sprunner-kept-nic": {
+			Name: to.Ptr("sprunner-kept-nic"),
+			Tags: map[string]*string{
+				TagKeyFleetManagerID: to.Ptr("fleet-manager-production"),
+				TagKeyFleetID:        to.Ptr("linux-amd64"),
+				TagKeyRunnerID:       to.Ptr("runner-kept"),
+			},
+		},
+	}, vms: map[string]armcompute.VirtualMachine{
+		"sprunner-kept": {
+			Name: to.Ptr("sprunner-kept"),
+			Tags: map[string]*string{
+				TagKeyFleetManagerID: to.Ptr("fleet-manager-production"),
+				TagKeyFleetID:        to.Ptr("linux-amd64"),
+				TagKeyRunnerID:       to.Ptr("runner-kept"),
+			},
+			Properties: &armcompute.VirtualMachineProperties{
+				ProvisioningState: to.Ptr("Succeeded"),
+			},
+		},
+	}}
+	azureProvider := newTestProvider(t, client)
+	resources, err := azureProvider.List(context.Background(), "linux-amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resources) != 2 {
+		t.Fatalf("resources = %#v", resources)
+	}
+	var orphan provider.Resource
+	for _, resource := range resources {
+		if resource.RunnerID == "runner-1" {
+			orphan = resource
+		}
+	}
+	if orphan.ID != vmName {
+		t.Fatalf("orphan = %#v", orphan)
+	}
+	if err := azureProvider.Delete(context.Background(), orphan); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := client.nics[vmName+"-nic"]; exists {
+		t.Fatal("orphan NIC was not deleted")
+	}
+	if _, exists := client.nics["sprunner-kept-nic"]; !exists {
+		t.Fatal("NIC for a live VM was deleted")
 	}
 }
 

@@ -24,6 +24,7 @@ type ComputeAPI interface {
 	) (armcompute.VirtualMachine, error)
 	DeleteVM(ctx context.Context, resourceGroup, name string) error
 	ListVMs(ctx context.Context, resourceGroup string) ([]armcompute.VirtualMachine, error)
+	ListNICs(ctx context.Context, resourceGroup string) ([]armnetwork.Interface, error)
 }
 
 type sdkCompute struct {
@@ -119,4 +120,24 @@ func (s *sdkCompute) ListVMs(
 		}
 	}
 	return vms, nil
+}
+
+func (s *sdkCompute) ListNICs(
+	ctx context.Context,
+	resourceGroup string,
+) ([]armnetwork.Interface, error) {
+	pager := s.nics.NewListPager(resourceGroup, nil)
+	var nics []armnetwork.Interface
+	for pager.More() {
+		page, err := pager.NextPage(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, nic := range page.Value {
+			if nic != nil {
+				nics = append(nics, *nic)
+			}
+		}
+	}
+	return nics, nil
 }

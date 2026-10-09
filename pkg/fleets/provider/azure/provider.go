@@ -131,6 +131,7 @@ func (p *Provider) List(ctx context.Context, fleetID string) ([]provider.Resourc
 		return nil, fmt.Errorf("list Azure runner VMs: %w", err)
 	}
 	var resources []provider.Resource
+	vmNames := map[string]struct{}{}
 	for _, vm := range vms {
 		if tagValue(vm.Tags, TagKeyFleetManagerID) != p.config.FleetManagerID {
 			continue
@@ -154,9 +155,59 @@ func (p *Provider) List(ctx context.Context, fleetID string) ([]provider.Resourc
 		if created := createdAt(vm); !created.IsZero() {
 			resource.CreatedAt = created
 		}
+		vmNames[resource.ID] = struct{}{}
+		resources = append(resources, resource)
+	}
+
+	nics, err := p.client.ListNICs(ctx, p.config.ResourceGroup)
+	if err != nil {
+		return nil, fmt.Errorf("list Azure runner NICs: %w", err)
+	}
+	for _, nic := range nics {
+		resource, ok := orphanNICResource(nic, p.config.FleetManagerID, fleetID, vmNames)
+		if !ok {
+			continue
+		}
 		resources = append(resources, resource)
 	}
 	return resources, nil
+}
+
+func orphanNICResource(
+	nic armnetwork.Interface,
+	fleetManagerID, fleetID string,
+	vmNames map[string]struct{},
+) (provider.Resource, bool) {
+	if tagValue(nic.Tags, TagKeyFleetManagerID) != fleetManagerID {
+		return provider.Resource{}, false
+	}
+	if tagValue(nic.Tags, TagKeyFleetID) != fleetID {
+		return provider.Resource{}, false
+	}
+	runnerID := tagValue(nic.Tags, TagKeyRunnerID)
+	if runnerID == "" || nic.Name == nil {
+		return provider.Resource{}, false
+	}
+	vmName, ok := vmNameFromNIC(*nic.Name)
+	if !ok {
+		return provider.Resource{}, false
+	}
+	if _, exists := vmNames[vmName]; exists {
+		return provider.Resource{}, false
+	}
+	return provider.Resource{
+		ID:       vmName,
+		RunnerID: runnerID,
+		FleetID:  fleetID,
+	}, true
+}
+
+func vmNameFromNIC(name string) (string, bool) {
+	const suffix = "-nic"
+	if !strings.HasSuffix(name, suffix) || len(name) <= len(suffix) {
+		return "", false
+	}
+	return strings.TrimSuffix(name, suffix), true
 }
 
 func (p *Provider) BuildBootstrap(request provider.RunnerBootstrap) ([]byte, error) {
@@ -223,8 +274,11 @@ func (p *Provider) Create(
 		}
 		lastErr = err
 		if !isInsufficientCapacity(err) {
-			_ = p.deleteNIC(ctx, name)
-			return provider.Resource{}, fmt.Errorf("create Azure runner: %w", err)
+			return provider.Resource{}, p.cleanupNIC(
+				ctx,
+				name,
+				fmt.Errorf("create Azure runner: %w", err),
+			)
 		}
 		p.log.Warn(
 			"Azure zone has insufficient capacity",
@@ -232,11 +286,10 @@ func (p *Provider) Create(
 			slog.String("runner_id", request.RunnerID),
 		)
 	}
-	_ = p.deleteNIC(ctx, name)
-	return provider.Resource{}, fmt.Errorf(
+	return provider.Resource{}, p.cleanupNIC(ctx, name, fmt.Errorf(
 		"create Azure runner in configured zones: %w",
 		lastErr,
-	)
+	))
 }
 
 func (p *Provider) Delete(ctx context.Context, resource provider.Resource) error {
@@ -257,6 +310,13 @@ func (p *Provider) Delete(ctx context.Context, resource provider.Resource) error
 		slog.String("vm_name", name),
 	)
 	return nil
+}
+
+func (p *Provider) cleanupNIC(ctx context.Context, vmName string, cause error) error {
+	if err := p.deleteNIC(ctx, vmName); err != nil {
+		return errors.Join(cause, err)
+	}
+	return cause
 }
 
 func (p *Provider) deleteNIC(ctx context.Context, vmName string) error {

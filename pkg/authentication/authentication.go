@@ -207,7 +207,7 @@ func (a *Handler) ensureGitHubOAuth(ctx context.Context) error {
 		return nil
 	}
 	if a.encryptor == nil {
-		return errors.New("GitHub sign-in is not configured. Create the GitHub App again.")
+		return errors.New("sign-in with GitHub is not configured: create the GitHub App again")
 	}
 	cfg, err := githubapp.Resolve(ctx, database.DB(ctx), a.encryptor)
 	if err != nil {
@@ -217,7 +217,7 @@ func (a *Handler) ensureGitHubOAuth(ctx context.Context) error {
 		if _, err := goth.GetProvider(models.ProviderGitHub); err == nil {
 			return nil
 		}
-		return errors.New("GitHub sign-in is not configured. Create the GitHub App again.")
+		return errors.New("sign-in with GitHub is not configured: create the GitHub App again")
 	}
 	goth.UseProviders(github.New(cfg.ClientID, cfg.ClientSecret, githubOAuthCallbackURL(), "user:email"))
 	return nil

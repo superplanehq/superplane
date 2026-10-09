@@ -253,7 +253,8 @@ func (c *Config) applyDefaults() {
 		if fleet.AWS.VolumeSizeGB == 0 {
 			fleet.AWS.VolumeSizeGB = defaultVolumeSizeGB
 		}
-		if strings.TrimSpace(fleet.Azure.VMSize) == "" {
+		azureArchitecture := strings.ToLower(strings.TrimSpace(fleet.Azure.Architecture))
+		if strings.TrimSpace(fleet.Azure.VMSize) == "" && azureArchitecture != "arm64" {
 			fleet.Azure.VMSize = defaultAzureVMSize
 		}
 		if fleet.Azure.DiskSizeGB == 0 {
@@ -403,6 +404,8 @@ func (c *Config) validate() error {
 				"%s.azure.architecture must be amd64 or arm64",
 				prefix,
 			)
+		case fleet.Provider == ProviderAzure && fleet.Azure.VMSize == "":
+			return fmt.Errorf("%s.azure.vmSize is required", prefix)
 		case fleet.Provider == ProviderAzure &&
 			fleet.Azure.SubnetID == "":
 			return fmt.Errorf("%s.azure.subnetId is required", prefix)

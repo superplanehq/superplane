@@ -460,6 +460,33 @@ func TestLoadAppliesAzureDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsARMAzureFleetWithoutVMSize(t *testing.T) {
+	_, err := Load(writeConfig(t, `{
+		"id":"fleet-manager",
+		"superplaneUrl":"https://superplane.example",
+		"installationAdminToken":"personal-token",
+		"runnerReleaseBaseUrl":"https://downloads.example/runner",
+		"fleets":[{
+			"id":"linux-arm64",
+			"provider":"azure",
+			"azure":{
+				"subscriptionId":"00000000-0000-0000-0000-000000000000",
+				"resourceGroup":"superplane-runners",
+				"location":"eastus",
+				"imageId":"/galleries/runners/images/runner/versions/1.0.0",
+				"architecture":"arm64",
+				"subnetId":"/subnets/runners",
+				"networkSecurityGroupId":"/nsgs/runners",
+				"identityId":"/identities/runner",
+				"zones":["1"]
+			}
+		}]
+	}`))
+	if err == nil || !strings.Contains(err.Error(), "azure.vmSize is required") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestLoadRejectsAzureFleetWithoutZones(t *testing.T) {
 	_, err := Load(writeConfig(t, `{
 		"id":"fleet-manager",
