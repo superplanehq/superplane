@@ -345,7 +345,7 @@ func supportedVCSProvider(provider string) (string, error) {
 func vcsProviderConfigured(ctx context.Context, provider string) bool {
 	switch provider {
 	case models.ProviderGitHub:
-		return githubapp.ProcessEnabled(ctx)
+		return githubapp.UserConnectReady(ctx)
 	case models.ProviderBitbucket:
 		return config.LoadBitbucketForgeAppConfig().Enabled()
 	default:
