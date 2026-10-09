@@ -71,6 +71,7 @@ func PublicManifestJSON(baseURL, webhooksBaseURL string) (string, error) {
 			"deployments":                 "write",
 			"organization_administration": "read",
 			"members":                     "read",
+			"email_addresses":             "read",
 		},
 		"default_events": []string{"member"},
 		"setup_url":      baseURL + setupPath,

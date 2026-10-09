@@ -33,6 +33,7 @@ func TestPublicManifestJSON(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "write", permissions["contents"])
 	assert.Equal(t, "read", permissions["members"])
+	assert.Equal(t, "read", permissions["email_addresses"])
 }
 
 func TestConvertManifest(t *testing.T) {
