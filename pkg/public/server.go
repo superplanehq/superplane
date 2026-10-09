@@ -772,6 +772,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	githubAppUserRoute := r.NewRoute().Subrouter()
 	githubAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/manifest", s.HandleGitHubAppManifest).Methods("GET")
+	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/login", s.HandleGitHubAppLogin).Methods("GET", "POST")
 	// Forge calls these routes. The Forge Invocation Token authenticates them.
 	// They stay off the gateway authorizer, the same way the GitHub App webhook does.
 	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/lifecycle", s.HandleBitbucketForgeDelivery).Methods("POST")
