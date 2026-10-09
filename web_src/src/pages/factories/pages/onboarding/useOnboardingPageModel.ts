@@ -21,8 +21,13 @@ import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
 import { OnboardingConnectDialogs } from "./CustomProviderConnectDialog";
-import { describeGitHubInstallationName, githubIntegrationSelection } from "./githubIntegrationSelection";
+import {
+  describeInstallationName,
+  githubIntegrationSelection,
+  selectionsWithSavedVcsInstallation,
+} from "./githubIntegrationSelection";
 import { AGENT_PROVIDER_IDS, isHostedAgentReady } from "./onboardingAgentReadiness";
+import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
@@ -30,7 +35,6 @@ import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
 import {
   apiIssuesSource,
-  initialOnboardingSelections,
   initialWizardStep,
   isWizardStepId,
   localIssuesSource,
@@ -58,22 +62,6 @@ import {
 const ONBOARDING_HIDDEN_CONFIGURATION_FIELDS: Record<string, string[]> = {
   claude: ["adminKey"],
 };
-
-function useIntegrationSelections(onboarding: FactoriesFactory["onboarding"]) {
-  const [selections, setSelections] = useState<IntegrationSelections>(() => initialOnboardingSelections(onboarding));
-  const connected = useMemo(() => {
-    const ready = new Set<IntegrationId>();
-    if (selections.github?.ready) ready.add("github");
-    if (selections.bitbucket?.ready) ready.add("bitbucket");
-    if (selections.jira?.ready) ready.add("jira");
-    if (selections.linear?.ready) ready.add("linear");
-    for (const name of AGENT_PROVIDER_IDS) {
-      if (selections[name]?.ready) ready.add(name);
-    }
-    return ready;
-  }, [selections]);
-  return { selections, connected, setSelections };
-}
 
 function initialSetupState(onboarding: FactoriesFactory["onboarding"]): InitialOnboardingSetupState {
   const appRepository = onboarding?.appRepository || null;
@@ -187,7 +175,7 @@ type OnboardingGithubSavesAndFinishArgs = {
   onboardingEntryPath?: string | null;
   reresolveWorkspace: OnboardingWorkspaceResolution | null;
   setup: OnboardingSetupApi;
-  integrations: ReturnType<typeof useIntegrationSelections>;
+  integrations: ReturnType<typeof useOnboardingIntegrationSelections>;
   connect: ReturnType<typeof useIntegrationConnectDialog>;
   searchParams: URLSearchParams;
   openSection: WizardStepId;
@@ -198,6 +186,24 @@ type OnboardingGithubSavesAndFinishArgs = {
   agent: ReturnType<typeof useOnboardingAgentContext>;
 };
 
+async function rememberBitbucketInstallation(
+  organizationId: string,
+  integrationId: string,
+  setSelections: (update: (current: IntegrationSelections) => IntegrationSelections) => void,
+) {
+  const installationName = await describeInstallationName(organizationId, integrationId);
+  if (!installationName.trim() || installationName.trim() === integrationId.trim()) {
+    throw new Error("Bitbucket integration name is missing");
+  }
+  setSelections((current) =>
+    selectionsWithSavedVcsInstallation(
+      { vcsIntegrationId: integrationId, vcsProvider: "bitbucket" },
+      current,
+      installationName,
+    ),
+  );
+}
+
 function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishArgs) {
   const { updateFactory, updateOnboarding, updateOrganization, createLine, createIntake, deleteIntake, installer } =
     args.mutations;
@@ -205,7 +211,10 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
   const bitbucketIntegrationId = args.integrations.selections.bitbucket?.ready
     ? args.integrations.selections.bitbucket.id
     : "";
-  const vcsIntegrationId = args.setup.vcsHost === "bitbucket" ? bitbucketIntegrationId : githubIntegrationId;
+  const branchIntegrationId =
+    args.setup.vcsHost === "bitbucket"
+      ? (args.integrations.selections.bitbucket?.id ?? "")
+      : (args.integrations.selections.github?.id ?? "");
   const jira = useOnboardingJiraBinding(args.organizationId, args.factoryId, args.integrations.selections.jira);
   const linear = useOnboardingLinearBinding(args.organizationId, args.factoryId, args.integrations.selections.linear);
   const takenNames = useMemo(
@@ -236,7 +245,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     deleteIntake: deleteIntake.mutateAsync,
     listApps: () => fetchFactoryAutomations(args.organizationId, args.factoryId),
     resolveDefaultBranch: (repository: string) =>
-      resolveGithubDefaultBranch(args.organizationId, vcsIntegrationId, repository),
+      resolveGithubDefaultBranch(args.organizationId, branchIntegrationId, repository),
     remainingCreditCents: args.agent.remainingCreditCents,
     hostedModelsLoading: args.agent.hostedModelsLoading,
     plan: args.agent.plan,
@@ -262,7 +271,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
       const factory = await args.mutations.selectGitHubRepository.mutateAsync(repositoryId);
       const integrationId = factory.onboarding?.vcsIntegrationId;
       if (!integrationId) throw new Error("GitHub repository selection returned no integration");
-      const installationName = await describeGitHubInstallationName(args.organizationId, integrationId);
+      const installationName = await describeInstallationName(args.organizationId, integrationId);
       args.connect.rememberPreferredInstance("github", integrationId);
       await args.connect.refetchConnections();
       args.integrations.setSelections((current) => ({
@@ -281,13 +290,9 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
       const factory = await args.mutations.selectBitbucketForgeRepository.mutateAsync({ repository: fullName });
       const integrationId = factory.onboarding?.vcsIntegrationId;
       if (!integrationId) throw new Error("Bitbucket repository selection returned no integration");
-      const installationName = await describeGitHubInstallationName(args.organizationId, integrationId);
       args.connect.rememberPreferredInstance("bitbucket", integrationId);
       await args.connect.refetchConnections();
-      args.integrations.setSelections((current) => ({
-        ...current,
-        bitbucket: { id: integrationId, name: installationName || "bitbucket", ready: true },
-      }));
+      await rememberBitbucketInstallation(args.organizationId, integrationId, args.integrations.setSelections);
       args.setup.selectVcsHost("bitbucket");
       args.setup.selectRepo(fullName);
     });
@@ -321,6 +326,22 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
   };
 }
 
+function onboardingSetupOptions(
+  factoryId: string,
+  onboarding: FactoriesFactory["onboarding"],
+  connected: Set<IntegrationId>,
+  remainingCreditCents: number,
+) {
+  return {
+    connected,
+    remainingCreditCents,
+    simulateDiscovery: false,
+    initial: initialSetupState(onboarding),
+    persistVcsHostKey: factoryId,
+    persistRepoKey: factoryId,
+  };
+}
+
 export function useOnboardingPageModel(args: {
   organizationId: string;
   factoryId: string;
@@ -336,7 +357,7 @@ export function useOnboardingPageModel(args: {
     bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK) && bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER);
   const [agentCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
-  const integrations = useIntegrationSelections(onboarding);
+  const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
   const preferOwnKey = bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK) && agentCredentialChoice !== "hosted";
   const agent = useOnboardingAgentContext(args.organizationId, integrations.connected, preferOwnKey, customProvider);
   const { data: connectedIntegrations = [] } = useConnectedIntegrations(args.organizationId, {
@@ -352,13 +373,10 @@ export function useOnboardingPageModel(args: {
     [connectedIntegrations],
   );
   const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
-  const setup = useOnboardingSetupState(args.factory?.name ?? "", {
-    connected: integrations.connected,
-    remainingCreditCents: agent.remainingCreditCents,
-    simulateDiscovery: false,
-    initial: initialSetupState(onboarding),
-    persistVcsHostKey: args.factoryId,
-  });
+  const setup = useOnboardingSetupState(
+    args.factory?.name ?? "",
+    onboardingSetupOptions(args.factoryId, onboarding, integrations.connected, agent.remainingCreditCents),
+  );
   useRestoreIntegrationReadiness(setup, integrations.selections);
   const [searchParams] = useSearchParams();
   const [openSection, setOpenSection] = useState<WizardStepId>(() => {
