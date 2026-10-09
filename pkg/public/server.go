@@ -1559,37 +1559,48 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 
 	fresh, err := models.FindAccountByID(account.ID.String())
 	if err != nil {
-		log.Errorf("Error reloading account %s: %v", account.ID, err)
-		http.Error(w, "", http.StatusInternalServerError)
+		writeAccountLookupError(w, r, accountLookupFailure{
+			err:            err,
+			detail:         fmt.Sprintf("Error reloading account %s", account.ID),
+			missingAccount: errors.Is(err, gorm.ErrRecordNotFound),
+		})
 		return
 	}
 	account = fresh
 
 	providers, err := account.GetAccountProviders(database.DB(r.Context()))
 	if err != nil {
-		log.Errorf("Error getting account providers for %s: %v", account.Email, err)
-		http.Error(w, "", http.StatusInternalServerError)
+		writeAccountLookupError(w, r, accountLookupFailure{
+			err:    err,
+			detail: fmt.Sprintf("Error getting account providers for %s", account.Email),
+		})
 		return
 	}
 
 	hasPassword, err := accountHasPassword(account.ID)
 	if err != nil {
-		log.Errorf("Error checking password auth for account %s: %v", account.ID, err)
-		http.Error(w, "", http.StatusInternalServerError)
+		writeAccountLookupError(w, r, accountLookupFailure{
+			err:    err,
+			detail: fmt.Sprintf("Error checking password auth for account %s", account.ID),
+		})
 		return
 	}
 
 	linkedAccounts, err := models.ListAccountLinkedAccounts(database.DB(r.Context()), account.ID)
 	if err != nil {
-		log.Errorf("Error getting linked accounts for %s: %v", account.ID, err)
-		http.Error(w, "", http.StatusInternalServerError)
+		writeAccountLookupError(w, r, accountLookupFailure{
+			err:    err,
+			detail: fmt.Sprintf("Error getting linked accounts for %s", account.ID),
+		})
 		return
 	}
 
 	pendingOrgs, err := models.ListOrganizationsPendingAccountDeletion(database.DB(r.Context()), account.ID)
 	if err != nil {
-		log.Errorf("Error listing organizations pending deletion for %s: %v", account.ID, err)
-		http.Error(w, "", http.StatusInternalServerError)
+		writeAccountLookupError(w, r, accountLookupFailure{
+			err:    err,
+			detail: fmt.Sprintf("Error listing organizations pending deletion for %s", account.ID),
+		})
 		return
 	}
 
