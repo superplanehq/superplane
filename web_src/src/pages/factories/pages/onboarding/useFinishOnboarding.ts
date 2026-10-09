@@ -315,7 +315,7 @@ export function useFinishOnboarding(args: {
       appRepository,
       backlogRepository,
       workspaceName,
-      vcsReady: Boolean(vcs?.ready),
+      vcsReady: Boolean(vcs?.id),
       vcsHost,
       remainingCreditCents: args.remainingCreditCents,
       hostedModelsLoading: args.hostedModelsLoading,
@@ -330,7 +330,7 @@ export function useFinishOnboarding(args: {
       showErrorToast(error);
       return;
     }
-    if (!appRepository || !backlogRepository || !vcs?.ready || !args.plan) {
+    if (!appRepository || !backlogRepository || !vcs?.id || !args.plan) {
       return;
     }
 
