@@ -29,6 +29,7 @@ import { AnalysisPopupHeader, LoadingWorkOrderPopup } from "./workOrderPopupHead
 import { workOrderPopupMode } from "./workOrderPopupMode";
 import { factoryPlanningEnabled } from "../planningSettingsModel";
 import { PopupShell } from "../work-order-popup-redesign/popupShared";
+import { taskHasSpec } from "../../lib/forkTask";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 
@@ -218,6 +219,14 @@ function AnalysisWorkOrderPopup({
               showOwnerRow={!unified}
               planningSpend={draftPlanningHeaderSpend(fixture, analysis.view)}
               views={views}
+              fork={popupForkTarget({
+                organizationId,
+                factoryId,
+                factoryKey,
+                orderId,
+                canUpdate,
+                artifacts: popupData.artifacts,
+              })}
             />
           )}
         />
@@ -236,6 +245,27 @@ function popupTitlePrefix(
     return stored;
   }
   return formatWorkOrderIdentifier(factoryKey, orderNumber) || undefined;
+}
+
+function popupForkTarget(args: {
+  organizationId?: string;
+  factoryId?: string;
+  factoryKey?: string;
+  orderId?: string;
+  canUpdate: boolean;
+  artifacts: Array<{ data?: unknown }>;
+}) {
+  if (!args.organizationId || !args.factoryId || !args.factoryKey || !args.orderId) {
+    return undefined;
+  }
+  return {
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    factoryKey: args.factoryKey,
+    orderId: args.orderId,
+    hasPlan: taskHasSpec(args.artifacts),
+    canFork: args.canUpdate,
+  };
 }
 
 function draftPlanningHeaderSpend(

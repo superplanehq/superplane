@@ -13,6 +13,7 @@ import { factoryHomePath, firstFactoryLineId } from "./lib/factoryPagePaths";
 import { latestDispatchForLine } from "./lib/workOrderNumberResolution";
 import { getWorkOrderDisplayKey, type WorkOrderDisplayStatus } from "./lib/workOrderProgress";
 import { factoryContentBodyClassName } from "./pages/factoryPageLayoutStyles";
+import { taskHasSpec } from "./lib/forkTask";
 import { WorkOrderActivityTimeline } from "./WorkOrderActivityTimeline";
 import type { WorkOrderCheckPresentation } from "./lib/workOrderChecks";
 import { WorkOrderChecksSection } from "./WorkOrderChecksSection";
@@ -103,6 +104,7 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
         onClose={props.onClose}
         onStatusChange={props.onStatusChange}
         onSendToBacklog={() => setBacklogConfirmOpen(true)}
+        fork={workOrderForkTarget(props)}
         className={isDialog ? "max-w-none px-6 pt-4 pb-3 pr-12" : undefined}
       />
       <WorkOrderDetailBody {...props} onSendToBacklog={() => setBacklogConfirmOpen(true)} />
@@ -120,6 +122,20 @@ export function WorkOrderDetailLoadedView(props: WorkOrderDetailLoadedViewProps)
       ) : null}
     </>
   );
+}
+
+function workOrderForkTarget(props: WorkOrderDetailLoadedViewProps) {
+  if (!props.factoryId || !props.order.id) {
+    return undefined;
+  }
+  return {
+    organizationId: props.organizationId,
+    factoryId: props.factoryId,
+    factoryKey: props.factoryKey,
+    orderId: props.order.id,
+    hasPlan: taskHasSpec(props.artifacts),
+    canFork: props.canManage,
+  };
 }
 
 function WorkOrderDetailBody(props: WorkOrderDetailLoadedViewProps) {

@@ -9,6 +9,7 @@ import { showsArchive } from "./splitRunFooter";
 import type { useAnalysisPlanningSession } from "./useAnalysisPlanningSession";
 import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import { popupWorkOrderUrl } from "./workOrderPopupActions";
+import type { ForkTaskTarget } from "../../ForkTaskDialog";
 
 export function LoadingWorkOrderPopup({
   title,
@@ -60,6 +61,7 @@ export function AnalysisPopupHeader({
   showOwnerRow,
   planningSpend,
   views,
+  fork,
 }: {
   edits: AnalysisHeaderEdits;
   fixture: WorkOrderSplitRunPopupProps["fixture"];
@@ -82,6 +84,7 @@ export function AnalysisPopupHeader({
     savedCostCents: number;
   };
   views: ReactNode;
+  fork?: ForkTaskTarget;
 }) {
   return (
     <PopupHeader
@@ -99,6 +102,7 @@ export function AnalysisPopupHeader({
           onArchive={showsArchive(fixture.footer) ? onArchive : undefined}
           archiveBusy={footerBusy}
           taskActions={reviewActions}
+          fork={fork}
         />
       }
       accessory={views}

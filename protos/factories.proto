@@ -485,6 +485,18 @@ service Factories {
     };
   }
 
+  rpc ForkWorkOrder(ForkWorkOrderRequest) returns (ForkWorkOrderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/orders/{order_id}/fork"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Fork factory work order";
+      description: "Copies a work order as a new draft. The source task and its run stay as they are.";
+      tags: "Factory";
+    };
+  }
+
   rpc DescribeWorkOrder(DescribeWorkOrderRequest) returns (DescribeWorkOrderResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/orders/{order_id}"
@@ -1776,6 +1788,22 @@ message CreateWorkOrderRequest {
 }
 
 message CreateWorkOrderResponse {
+  WorkOrder order = 1;
+}
+
+message ForkWorkOrderRequest {
+  enum Mode {
+    MODE_UNSPECIFIED = 0;
+    MODE_INTAKE = 1;
+    MODE_PLAN = 2;
+  }
+
+  string factory_id = 1;
+  string order_id = 2;
+  Mode mode = 3;
+}
+
+message ForkWorkOrderResponse {
   WorkOrder order = 1;
 }
 

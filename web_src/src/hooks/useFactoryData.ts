@@ -8,6 +8,7 @@ import {
   factoriesDescribeFactory,
   factoriesDescribeWorkOrder,
   factoriesDispatchWorkOrder,
+  factoriesForkWorkOrder,
   factoriesCreateFactoryAutomation,
   factoriesDeleteFactoryAutomation,
   factoriesListFactories,
@@ -34,6 +35,7 @@ import type {
   FactoriesWorkOrderState,
   FactoryAutomation,
   FactoryLineStep,
+  ForkWorkOrderRequestMode,
 } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { markBacklogAnalysisPending } from "@/pages/factories/lib/backlogAnalysis";
@@ -600,6 +602,37 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
           queryKey: workOrderEventsKey(organizationId, factoryId, order.id),
         });
       }
+    },
+  });
+}
+
+export function useForkWorkOrder(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: { orderId: string; mode: ForkWorkOrderRequestMode }) => {
+      const response = await factoriesForkWorkOrder(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, orderId: input.orderId },
+          body: { mode: input.mode },
+        }),
+      );
+      if (!response.data?.order) {
+        throw new Error("Failed to fork task");
+      }
+      return response.data.order;
+    },
+    onSuccess: (order, input) => {
+      invalidateWorkOrderLists(queryClient, organizationId, factoryId);
+      if (order.id) {
+        queryClient.setQueryData(workOrderDetailKey(organizationId, factoryId, order.id), order);
+      }
+      if (input.mode !== "MODE_INTAKE" || !order.id) {
+        return;
+      }
+      markBacklogAnalysisPending(order.id);
+      void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
     },
   });
 }
