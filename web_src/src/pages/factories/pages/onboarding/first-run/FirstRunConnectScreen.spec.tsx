@@ -28,26 +28,4 @@ describe("FirstRunConnectScreen", () => {
     await user.click(screen.getByTestId("first-run-connect-github"));
     expect(connect).toHaveBeenCalledTimes(1);
   });
-
-  it("saves the login client for an existing GitHub App", async () => {
-    const user = userEvent.setup();
-    const save = vi.fn();
-    render(<FirstRunConnectScreen addLogin onConnectGitHub={vi.fn()} onSaveLogin={save} />);
-
-    expect(screen.getByText(FIRST_RUN_COPY.connect.addLoginBody)).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
-    expect(screen.getByTestId("first-run-save-github-login")).toBeDisabled();
-    expect(screen.getByLabelText(FIRST_RUN_COPY.connect.clientIdLabel)).toBe(
-      screen.getByTestId("first-run-github-client-id"),
-    );
-    expect(screen.getByLabelText(FIRST_RUN_COPY.connect.clientSecretLabel)).toBe(
-      screen.getByTestId("first-run-github-client-secret"),
-    );
-
-    await user.type(screen.getByLabelText(FIRST_RUN_COPY.connect.clientIdLabel), "Iv1.client");
-    await user.type(screen.getByLabelText(FIRST_RUN_COPY.connect.clientSecretLabel), "secret");
-    await user.click(screen.getByTestId("first-run-save-github-login"));
-
-    expect(save).toHaveBeenCalledWith("Iv1.client", "secret");
-  });
 });

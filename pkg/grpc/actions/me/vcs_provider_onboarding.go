@@ -30,7 +30,17 @@ func DescribeVCSProviderOnboarding(ctx context.Context, provider string) (*pb.De
 		return describeBitbucketOnboarding(ctx)
 	}
 
-	response := &pb.DescribeVCSProviderOnboardingResponse{ProviderConfigured: vcsProviderConfigured(ctx, provider)}
+	accountConnectionRequired := provider == models.ProviderGitHub && githubapp.AccountConnectionRequired(ctx)
+	response := &pb.DescribeVCSProviderOnboardingResponse{
+		ProviderConfigured:        vcsProviderConfigured(ctx, provider),
+		AccountConnectionRequired: accountConnectionRequired,
+	}
+	if provider == models.ProviderGitHub && !accountConnectionRequired {
+		if !response.ProviderConfigured {
+			return response, nil
+		}
+		return describeInstalledGitHubOnboarding(ctx, response)
+	}
 	identities, err := vcsProviderIdentities(ctx, provider)
 	if err != nil {
 		return nil, err
@@ -141,8 +151,10 @@ func StartVCSProviderInstallation(ctx context.Context, provider string) (*pb.Sta
 	if !cfg.Enabled() {
 		return nil, grpcerrors.FailedPrecondition(nil, "public GitHub App is not configured")
 	}
-	if _, err := currentVCSProviderIdentity(ctx, provider); err != nil {
-		return nil, vcsProviderIdentityError(err)
+	if githubapp.AccountConnectionRequired(ctx) {
+		if _, err := currentVCSProviderIdentity(ctx, provider); err != nil {
+			return nil, vcsProviderIdentityError(err)
+		}
 	}
 
 	organizationID, ok := authentication.GetOrganizationIdFromMetadata(ctx)
@@ -174,23 +186,25 @@ func ConfigureVCSProviderInstallation(
 	if installationID <= 0 {
 		return nil, grpcerrors.InvalidArgument(nil, "installation id is required")
 	}
-	identity, err := currentVCSProviderIdentity(ctx, provider)
-	if err != nil {
-		return nil, vcsProviderIdentityError(err)
-	}
-	repositories, err := models.ListAccessibleVCSProviderRepositories(database.DB(ctx), provider, identity.userID)
-	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to verify installation access")
-	}
-	accessible := false
-	for _, repository := range repositories {
-		if repository.InstallationID == installationID {
-			accessible = true
-			break
+	if githubapp.AccountConnectionRequired(ctx) {
+		identity, err := currentVCSProviderIdentity(ctx, provider)
+		if err != nil {
+			return nil, vcsProviderIdentityError(err)
 		}
-	}
-	if !accessible {
-		return nil, grpcerrors.PermissionDenied(nil, "provider installation is not accessible")
+		repositories, err := models.ListAccessibleVCSProviderRepositories(database.DB(ctx), provider, identity.userID)
+		if err != nil {
+			return nil, grpcerrors.Internal(err, "failed to verify installation access")
+		}
+		accessible := false
+		for _, repository := range repositories {
+			if repository.InstallationID == installationID {
+				accessible = true
+				break
+			}
+		}
+		if !accessible {
+			return nil, grpcerrors.PermissionDenied(nil, "provider installation is not accessible")
+		}
 	}
 	installation, err := models.FindVCSProviderInstallation(database.DB(ctx), provider, installationID)
 	if err != nil {
@@ -214,11 +228,16 @@ func RefreshVCSProviderOnboarding(
 	if provider == models.ProviderBitbucket {
 		return &pb.RefreshVCSProviderOnboardingResponse{}, nil
 	}
-	identity, err := currentVCSProviderIdentity(ctx, provider)
-	if err != nil {
-		return nil, vcsProviderIdentityError(err)
+	var repositories []models.AccessibleVCSProviderRepository
+	if githubapp.AccountConnectionRequired(ctx) {
+		identity, identityErr := currentVCSProviderIdentity(ctx, provider)
+		if identityErr != nil {
+			return nil, vcsProviderIdentityError(identityErr)
+		}
+		repositories, err = models.ListAccessibleVCSProviderRepositories(database.DB(ctx), provider, identity.userID)
+	} else {
+		repositories, err = models.ListInstalledVCSProviderRepositories(database.DB(ctx), provider)
 	}
-	repositories, err := models.ListAccessibleVCSProviderRepositories(database.DB(ctx), provider, identity.userID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list accessible repositories")
 	}
@@ -342,10 +361,56 @@ func supportedVCSProvider(provider string) (string, error) {
 	}
 }
 
+func describeInstalledGitHubOnboarding(
+	ctx context.Context,
+	response *pb.DescribeVCSProviderOnboardingResponse,
+) (*pb.DescribeVCSProviderOnboardingResponse, error) {
+	repositories, err := models.ListInstalledVCSProviderRepositories(database.DB(ctx), models.ProviderGitHub)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to list accessible repositories")
+	}
+	response.Repositories = make([]*pb.VCSProviderRepository, 0, len(repositories))
+	for _, repository := range repositories {
+		response.Repositories = append(response.Repositories, &pb.VCSProviderRepository{
+			RepositoryId:   repository.RepositoryID,
+			InstallationId: repository.InstallationID,
+			FullName:       repository.FullName,
+			Private:        repository.Private,
+			DefaultBranch:  repository.DefaultBranch,
+			AccountLogin:   repository.AccountLogin,
+			AccountType:    repository.AccountType,
+		})
+	}
+
+	requests, err := models.ListPendingVCSProviderInstallRequests(database.DB(ctx), models.ProviderGitHub)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to list pending installation requests")
+	}
+	response.PendingRequests = make([]*pb.VCSProviderInstallRequest, 0, len(requests))
+	for _, request := range requests {
+		response.PendingRequests = append(response.PendingRequests, &pb.VCSProviderInstallRequest{
+			RequestId:    request.RequestID,
+			AccountLogin: request.AccountLogin,
+			AccountType:  request.AccountType,
+			RequestedAt:  timestamppb.New(request.RequestedAt),
+		})
+	}
+
+	response.Synchronizing, err = models.VCSProviderCatalogHasWork(database.DB(ctx), models.ProviderGitHub)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to inspect repository synchronization")
+	}
+	return response, nil
+}
+
 func vcsProviderConfigured(ctx context.Context, provider string) bool {
 	switch provider {
 	case models.ProviderGitHub:
-		return githubapp.UserConnectReady(ctx)
+		if githubapp.UserConnectReady(ctx) {
+			return true
+		}
+		cfg, err := githubapp.ResolveProcess(ctx)
+		return err == nil && cfg.Enabled()
 	case models.ProviderBitbucket:
 		return config.LoadBitbucketForgeAppConfig().Enabled()
 	default:

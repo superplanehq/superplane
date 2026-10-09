@@ -196,7 +196,9 @@ function AgentScreen({
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
   const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
   // Bitbucket has no separate connect screen.
-  if (backScreen === "connect" && flow.vcsHost === "bitbucket") return () => flow.goToScreen("host");
+  if (backScreen === "connect" && (flow.vcsHost === "bitbucket" || !flow.accountConnectionRequired)) {
+    return () => flow.goToScreen("host");
+  }
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
 }
 
@@ -356,18 +358,12 @@ function VcsScreen({
     return (
       <FirstRunConnectScreen
         loading={flow.repositoriesLoading}
-        connecting={flow.blockingAction === "opening-github" && !flow.loginClientNeeded}
-        createApp={!flow.appConfigured && !flow.loginClientNeeded}
-        addLogin={flow.loginClientNeeded}
-        savingLogin={flow.blockingAction === "opening-github" && flow.loginClientNeeded}
-        canChangeLogin={flow.canChangeLogin}
-        loginError={flow.loginError}
+        connecting={flow.blockingAction === "opening-github"}
+        createApp={!flow.appConfigured}
         connectError={flow.connectError}
         chrome={chrome}
         sphere={sphereFor("connect", setup.selectedRepo)}
         onConnectGitHub={() => void (flow.appConfigured ? flow.connectGitHub() : flow.createGitHubApp())}
-        onChangeLogin={flow.startGitHubLoginEdit}
-        onSaveLogin={(clientId, clientSecret) => void flow.saveGitHubLogin(clientId, clientSecret)}
       />
     );
   }

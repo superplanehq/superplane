@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/me"
@@ -100,11 +101,16 @@ func VerifyVCSProviderInstallations(
 	if !vcsProviderConfigured(ctx, provider) {
 		return nil, grpcerrors.FailedPrecondition(nil, "public GitHub App is not configured")
 	}
-	identity, err := currentVCSProviderIdentity(ctx, provider)
-	if err != nil {
-		return nil, vcsProviderIdentityError(err)
+	var repositories []models.AccessibleVCSProviderRepository
+	if githubapp.AccountConnectionRequired(ctx) {
+		identity, identityErr := currentVCSProviderIdentity(ctx, provider)
+		if identityErr != nil {
+			return nil, vcsProviderIdentityError(identityErr)
+		}
+		repositories, err = models.ListAccessibleVCSProviderRepositories(database.DB(ctx), provider, identity.userID)
+	} else {
+		repositories, err = models.ListInstalledVCSProviderRepositories(database.DB(ctx), provider)
 	}
-	repositories, err := models.ListAccessibleVCSProviderRepositories(database.DB(ctx), provider, identity.userID)
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list accessible repositories")
 	}
