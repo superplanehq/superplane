@@ -28,4 +28,25 @@ describe("onboardingRepoChoice", () => {
 
     expect(readOnboardingRepoChoice("factory-1")).toBeNull();
   });
+
+  it("keeps going when session storage rejects the write", () => {
+    const storage = sessionStorage;
+    const setItem = storage.setItem.bind(storage);
+    Object.defineProperty(storage, "setItem", {
+      configurable: true,
+      value() {
+        throw new DOMException("quota", "QuotaExceededError");
+      },
+    });
+
+    try {
+      expect(() => writeOnboardingRepoChoice("factory-1", "acme/payments")).not.toThrow();
+      expect(readOnboardingRepoChoice("factory-1")).toBeNull();
+    } finally {
+      Object.defineProperty(storage, "setItem", {
+        configurable: true,
+        value: setItem,
+      });
+    }
+  });
 });
