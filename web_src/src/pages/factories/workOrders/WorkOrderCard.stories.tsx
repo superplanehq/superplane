@@ -316,6 +316,33 @@ export const DraftScoredIntakeOnly: Story = {
   },
 };
 
+/** Verify wrote merge confidence. The meter sits on the right of the footer. */
+export const MergeConfidence: Story = {
+  name: "Merge confidence",
+  args: {
+    entry: buildWorkOrderListEntry(
+      waitingOrder({
+        id: "wo-verify",
+        title: "Ship idempotent refund retries",
+        statusNotes: [],
+      }),
+      factory,
+    ),
+    pullRequests: [],
+    mergeConfidence: {
+      score: 5,
+      maxScore: 5,
+      checks: [
+        { key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 },
+        { key: "performance-review", name: "Performance", score: 5, maxScore: 5 },
+        { key: "security-review", name: "Security", score: 5, maxScore: 5 },
+        { key: "drift-review", name: "Drift from Specification", score: 1, maxScore: 5 },
+        { key: "reversibility-review", name: "Reversibility", score: 5, maxScore: 5 },
+      ],
+    },
+  },
+};
+
 /**
  * Draft with no score yet. The footer keeps created time and does not
  * leave an empty action area.
