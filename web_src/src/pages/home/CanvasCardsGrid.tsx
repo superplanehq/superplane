@@ -113,7 +113,7 @@ function CanvasCard({
           {canvas.description ? <CanvasCardDescription description={canvas.description} /> : null}
         </div>
 
-        <div className="mt-3 border-t border-gray-950/10 px-3 pb-3 pt-3 dark:border-gray-700/70">
+        <div className="mt-auto border-t border-gray-950/10 px-3 pb-3 pt-3 dark:border-gray-700/70">
           <p className="text-left text-[11px] leading-none text-gray-500 dark:text-gray-400">
             Created by {canvas.createdBy.name}, on {canvas.createdAt}
           </p>
