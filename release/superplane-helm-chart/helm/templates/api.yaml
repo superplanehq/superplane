@@ -1,5 +1,5 @@
 {{- $mountRunnerLogs := or .Values.runner.api.enabled (eq (include "runner.workers.enabled" .) "true") -}}
-{{- $pinRunnerLogs := and .Values.runner.api.enabled (not .Values.runner.activeLogs.existingClaim) -}}
+{{- $pinRunnerLogs := and $mountRunnerLogs (not .Values.runner.activeLogs.existingClaim) -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -55,7 +55,7 @@ spec:
             - labelSelector:
                 matchLabels:
                   app: superplane
-                  service: {{ .Release.Name }}-runner-api
+                  service: {{ .Release.Name }}-{{ if .Values.runner.api.enabled }}runner-api{{ else }}runner-workers{{ end }}
               topologyKey: kubernetes.io/hostname
       {{- end }}
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
