@@ -158,7 +158,10 @@ resource "aws_eks_node_group" "superplane" {
   depends_on = [
     aws_iam_role_policy_attachment.eks_worker_node_policy,
     aws_iam_role_policy_attachment.eks_cni_policy,
-    aws_iam_role_policy_attachment.eks_container_registry
+    aws_iam_role_policy_attachment.eks_container_registry,
+    # Keep outbound access until Helm releases and their load balancers are removed.
+    aws_route_table_association.public,
+    aws_route_table_association.private
   ]
 }
 
@@ -203,7 +206,9 @@ resource "aws_eks_addon" "ebs_csi" {
 
   depends_on = [
     aws_eks_node_group.superplane,
-    aws_iam_role_policy_attachment.ebs_csi
+    aws_iam_role_policy_attachment.ebs_csi,
+    # Keep the driver running while namespace deletion removes PVCs and EBS volumes.
+    kubernetes_namespace.superplane
   ]
 }
 
@@ -248,7 +253,9 @@ resource "aws_eks_addon" "efs_csi" {
 
   depends_on = [
     aws_eks_node_group.superplane,
-    aws_iam_role_policy_attachment.efs_csi
+    aws_iam_role_policy_attachment.efs_csi,
+    # Keep the driver running until namespace deletion finishes.
+    kubernetes_namespace.superplane
   ]
 }
 
