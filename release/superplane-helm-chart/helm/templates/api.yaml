@@ -1,3 +1,5 @@
+{{- $mountRunnerLogs := or .Values.runner.api.enabled (eq (include "runner.workers.enabled" .) "true") -}}
+{{- $pinRunnerLogs := and $mountRunnerLogs (not .Values.runner.activeLogs.existingClaim) -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -29,6 +31,12 @@ metadata:
     service: {{ .Release.Name }}-api
 spec:
   replicas: {{ .Values.api.replicas }}
+  {{- if $pinRunnerLogs }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  {{- end }}
   selector:
     matchLabels:
       app: superplane
@@ -40,8 +48,22 @@ spec:
         app: superplane
         service: {{ .Release.Name }}-api
     spec:
+      {{- if $pinRunnerLogs }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: superplane
+                  service: {{ .Release.Name }}-{{ if .Values.runner.api.enabled }}runner-api{{ else }}runner-workers{{ end }}
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
+      {{- end }}
+      {{- if $mountRunnerLogs }}
+      securityContext:
+        fsGroup: {{ .Values.runner.activeLogs.fsGroup }}
       {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
@@ -170,6 +192,10 @@ spec:
 {{- end }}
             - name: SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER
               value: {{ ternary "yes" "no" .Values.license.hideExpiryBanner | quote }}
+            {{- if $mountRunnerLogs }}
+            - name: RUNNER_ACTIVE_LOG_FS_PATH
+              value: {{ .Values.runner.activeLogs.path | quote }}
+            {{- end }}
 
           volumeMounts:
             - name: oidc-keys
@@ -183,6 +209,10 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
             - name: blob-data
               mountPath: {{ .Values.blobStorage.localPath }}
+{{- end }}
+{{- if $mountRunnerLogs }}
+            - name: runner-active-logs
+              mountPath: {{ .Values.runner.activeLogs.path }}
 {{- end }}
 
           ports:
@@ -236,4 +266,9 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
         - name: blob-data
           emptyDir: {}
+{{- end }}
+{{- if $mountRunnerLogs }}
+        - name: runner-active-logs
+          persistentVolumeClaim:
+            claimName: {{ include "runner.activeLogs.claimName" . }}
 {{- end }}
