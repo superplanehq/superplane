@@ -135,4 +135,134 @@ describe("LineBoardOrderCard", () => {
     expect(screen.queryByTestId("work-order-card-analyzing-wo-1")).not.toBeInTheDocument();
     expect(planningSessionRequests(fetchMock)).toEqual([]);
   });
+
+  it("shows merge confidence on a verify card with the Confidence prefix", () => {
+    renderCard({
+      ...draft,
+      id: "wo-verify",
+      state: "STATE_OPEN",
+      title: "Ship refund retries",
+      checkScores: [
+        { key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 },
+        { key: "drift-review", name: "Drift", score: 1, maxScore: 5 },
+        { key: "code-coverage", name: "Code quality", score: 80, maxScore: 100 },
+      ],
+    });
+
+    const chip = screen.getByRole("img", { name: "Merge confidence 5 of 5" });
+    expect(chip).toHaveTextContent("Confidence");
+    expect(chip).not.toHaveTextContent(/\d/);
+    expect(screen.queryByText("Blast radius")).not.toBeInTheDocument();
+  });
+
+  it("shows the weakest flipped merge confidence check", () => {
+    renderCard({
+      ...draft,
+      id: "wo-verify",
+      state: "STATE_OPEN",
+      checkScores: [
+        { key: "performance-review", name: "Performance", score: 5, maxScore: 5 },
+        { key: "risk-review", name: "Blast radius", score: 3, maxScore: 5 },
+      ],
+    });
+
+    expect(screen.getByRole("img", { name: "Merge confidence 3 of 5" })).not.toHaveTextContent("Merge");
+  });
+
+  it("hides the merge chip when no merge confidence check exists", () => {
+    renderCard({
+      ...draft,
+      id: "wo-open",
+      state: "STATE_OPEN",
+      checkScores: [{ key: "code-coverage", name: "Code quality", score: 80, maxScore: 100 }],
+    });
+
+    expect(screen.queryByRole("img", { name: /Merge confidence/ })).not.toBeInTheDocument();
+  });
+
+  it("shows merge confidence on a done card", () => {
+    renderCard({
+      ...draft,
+      id: "wo-done",
+      state: "STATE_CLOSED",
+      result: "RESULT_COMPLETED",
+      checkScores: [{ key: "security-review", name: "Security", score: 4, maxScore: 5 }],
+    });
+
+    expect(screen.getByRole("img", { name: "Merge confidence 4 of 5" })).not.toHaveTextContent("Merge");
+  });
+
+  it("shows Clarity and Confidence only on a draft", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <FactoriesLayoutContext.Provider
+            value={{
+              ...layout,
+              factory: {
+                id: "factory-1",
+                name: "Refunds",
+                key: "RF",
+                planning: { enabled: true, clarity: true, confidence: true },
+              },
+            }}
+          >
+            <LineBoardOrderCard
+              order={{
+                ...draft,
+                checkScores: [
+                  { key: "clarity", name: "Clarity score", score: 5, maxScore: 5 },
+                  { key: "confidence", name: "Confidence score", score: 3, maxScore: 5 },
+                ],
+              }}
+              workOrderCardContext={cardContext}
+              onOpenWorkOrder={vi.fn()}
+            />
+          </FactoriesLayoutContext.Provider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Clarity")).toBeInTheDocument();
+    expect(screen.getByText("Confidence")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /Merge confidence/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps merge confidence when planning hides Clarity and Confidence", () => {
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <FactoriesLayoutContext.Provider
+            value={{
+              ...layout,
+              factory: {
+                id: "factory-1",
+                name: "Refunds",
+                key: "RF",
+                planning: { enabled: true, clarity: false, confidence: false },
+              },
+            }}
+          >
+            <LineBoardOrderCard
+              order={{
+                ...draft,
+                id: "wo-hidden-planning",
+                checkScores: [
+                  { key: "clarity", name: "Clarity score", score: 5, maxScore: 5 },
+                  { key: "confidence", name: "Confidence score", score: 2, maxScore: 5 },
+                  { key: "reversibility-review", name: "Reversibility", score: 4, maxScore: 5 },
+                ],
+              }}
+              workOrderCardContext={cardContext}
+              onOpenWorkOrder={vi.fn()}
+            />
+          </FactoriesLayoutContext.Provider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("img", { name: "Merge confidence 4 of 5" })).toHaveTextContent("Confidence");
+    expect(screen.queryByText("Clarity")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-card-score-wo-hidden-planning")).not.toBeInTheDocument();
+  });
 });

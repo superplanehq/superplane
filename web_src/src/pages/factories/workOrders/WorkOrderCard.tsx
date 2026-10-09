@@ -17,8 +17,9 @@ import { workOrderCardSource } from "../lib/workOrderCardSource";
 import { workOrderOpenPath } from "../lib/factoryPagePaths";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 import { getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
+import type { MergeConfidenceCardCheck } from "../lib/mergeConfidenceScore";
 import { ConfidenceAnalyzingIndicator } from "./ConfidenceMeter";
-import { CardScoreBadges } from "./ReadinessMark";
+import { CardScoreBadges, MergeConfidenceChip } from "./ReadinessMark";
 import { WorkOrderAttentionChip } from "./WorkOrderAttentionChip";
 import { WorkOrderPullRequestChip, WorkOrderMergeableChip } from "./WorkOrderPullRequestChip";
 import { CardOwnerMark, type WorkOrderRowCallbacks } from "./WorkOrderRowActions";
@@ -81,6 +82,11 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
   showClarity?: boolean;
   /** Hide Confidence when Planning has that score off. */
   showConfidenceScore?: boolean;
+  /**
+   * Merge confidence headline from Verify. Independent of Clarity and
+   * Confidence. Absent until at least one merge confidence check exists.
+   */
+  mergeConfidence?: { score: number; maxScore: number; checks?: MergeConfidenceCardCheck[] };
   /** Review sub-parameters for the Confidence tooltip when the headline is derived. */
   reviewMetrics?: { key: string; name: string; score: number }[];
   /**
@@ -117,6 +123,8 @@ export interface WorkOrderCardProps extends WorkOrderCardContext {
  * intake source on the left, then when the task was last updated. A task
  * with no owner shows a dashed person icon on the title row. Reviewed
  * drafts show Clarity and Confidence scores on the right of the footer.
+ * After Verify writes a merge confidence check, three bars sit with
+ * those scores.
  */
 export function WorkOrderCard({
   entry,
@@ -136,6 +144,7 @@ export function WorkOrderCard({
   confidenceScore,
   showClarity,
   showConfidenceScore,
+  mergeConfidence,
   reviewMetrics,
   isAnalyzing = false,
   className,
@@ -214,6 +223,7 @@ export function WorkOrderCard({
           confidenceScore={confidenceScore}
           showClarity={showClarity}
           showConfidenceScore={showConfidenceScore}
+          mergeConfidence={mergeConfidence}
           reviewMetrics={reviewMetrics}
           isAnalyzing={agentWorking}
         />
@@ -367,6 +377,7 @@ function WorkOrderCardMetaRow({
   confidenceScore,
   showClarity = true,
   showConfidenceScore = true,
+  mergeConfidence,
   reviewMetrics,
   isAnalyzing,
 }: {
@@ -377,12 +388,14 @@ function WorkOrderCardMetaRow({
   confidenceScore?: number;
   showClarity?: boolean;
   showConfidenceScore?: boolean;
+  mergeConfidence?: { score: number; maxScore: number; checks?: MergeConfidenceCardCheck[] };
   reviewMetrics?: { key: string; name: string; score: number }[];
   isAnalyzing: boolean;
 }) {
   const updatedLabel = updatedAt ? formatRelative(updatedAt) : "—";
   const hasScore = (showClarity && clarityScore != null) || (showConfidenceScore && confidenceScore != null);
   const showActions = hasScore || isAnalyzing;
+  const showTrailing = showActions || mergeConfidence != null;
 
   return (
     <div className="mt-2 flex items-center justify-between gap-2">
@@ -395,17 +408,27 @@ function WorkOrderCardMetaRow({
           {updatedLabel}
         </span>
       </div>
-      {showActions ? (
+      {showTrailing ? (
         <div className="flex shrink-0 items-center gap-1.5">
-          <CardScores
-            entryId={entryId}
-            clarity={clarityScore}
-            confidence={confidenceScore}
-            showClarity={showClarity}
-            showConfidence={showConfidenceScore}
-            reviewMetrics={reviewMetrics}
-            isAnalyzing={isAnalyzing}
-          />
+          {mergeConfidence ? (
+            <MergeConfidenceChip
+              score={mergeConfidence.score}
+              maxScore={mergeConfidence.maxScore}
+              checks={mergeConfidence.checks}
+              testId={`work-order-card-merge-${entryId}`}
+            />
+          ) : null}
+          {showActions ? (
+            <CardScores
+              entryId={entryId}
+              clarity={clarityScore}
+              confidence={confidenceScore}
+              showClarity={showClarity}
+              showConfidence={showConfidenceScore}
+              reviewMetrics={reviewMetrics}
+              isAnalyzing={isAnalyzing}
+            />
+          ) : null}
         </div>
       ) : null}
     </div>
