@@ -2,7 +2,12 @@ import type { MeVcsProviderRepository } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
 import { FEATURE_FACTORY_BITBUCKET } from "@/lib/experimentalFeatures";
-import { startPublicGitHubAppCreate } from "@/lib/githubAppManifest";
+import {
+  fetchGitHubLoginClient,
+  saveGitHubLoginClient,
+  startPublicGitHubAppCreate,
+  type GitHubLoginClientState,
+} from "@/lib/githubAppManifest";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
 
@@ -287,6 +292,13 @@ function useFirstRunCommands(args: {
     blocking.runUntilNavigation("opening-github", async () => {
       return startPublicGitHubAppCreate(onboardingStepPath(`${location.pathname}${location.search}`, "vcs"));
     });
+  const saveGitHubLogin = (clientId: string, clientSecret: string) =>
+    blocking.runUntilNavigation("opening-github", async () => {
+      await saveGitHubLoginClient(clientId, clientSecret);
+      const returnPath = githubConnectReturnPath(onboardingStepPath(`${location.pathname}${location.search}`, "repo"));
+      window.location.assign(linkedAccountConnectHref("github", returnPath));
+      return true;
+    });
   const selectGitHubIdentity = (userId: string) =>
     blocking.run("switching-github-account", async () => {
       await connection.onboarding.selectIdentity.mutateAsync(userId);
@@ -327,6 +339,7 @@ function useFirstRunCommands(args: {
     connectBitbucket,
     connectGitHub,
     createGitHubApp,
+    saveGitHubLogin,
     connectJira: () => connectIssueTracker("jira"),
     connectLinear: () => connectIssueTracker("linear"),
     continueFromRepository,
@@ -370,6 +383,22 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     forgeConfigured: bitbucketConnect.configured,
     installScope,
   });
+  const [loginClientState, setLoginClientState] = useState<GitHubLoginClientState>("missing");
+  useEffect(() => {
+    if (connection.appConfigured) return;
+    let cancelled = false;
+    void fetchGitHubLoginClient()
+      .then((state) => {
+        if (!cancelled) setLoginClientState(state);
+      })
+      .catch(() => {
+        if (!cancelled) setLoginClientState("missing");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [connection.appConfigured]);
+  const loginClientNeeded = loginClientState === "needs_client";
   return {
     ...navigation,
     ...commands,
@@ -406,6 +435,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     pendingOrganizations: connection.pendingOrganizations,
     synchronizing: connection.synchronizing || checkingGitHub,
     appConfigured: connection.appConfigured,
+    loginClientNeeded: loginClientNeeded && !connection.appConfigured,
     connectError: connection.onboarding.error
       ? githubOnboardingMessage(connection.onboarding.error, "SuperPlane could not load GitHub access")
       : undefined,

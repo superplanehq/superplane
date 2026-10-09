@@ -750,6 +750,11 @@ test("signedFileURLs keeps HMAC and object-storage image URLs", () => {
   assert.deepEqual(signedFileURLs(text), [gcs, hmac]);
 });
 
+test("signedFileURLs keeps Azure Blob image URLs", () => {
+  const azure = `https://account.blob.core.windows.net/runner/orgs/x/workspaces/y/tasks/z/${FILE_ID}?sp_file=1`;
+  assert.deepEqual(signedFileURLs(`See ![shot.png](${azure})`), [azure]);
+});
+
 test("signedFileURLs ignores unsigned URLs", () => {
   assert.deepEqual(
     signedFileURLs("See https://example.test/shot.png and https://app.example/api/v1/public/files/not-a-uuid?sp_file=1"),

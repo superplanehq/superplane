@@ -37,6 +37,9 @@ spec:
       labels:
         app: superplane
         service: {{ .Release.Name }}-fleet-manager
+        {{- with .Values.fleetManager.podLabels }}
+        {{- include "superplane.podLabels" . | nindent 8 }}
+        {{- end }}
       {{- with .Values.fleetManager.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
