@@ -104,7 +104,10 @@ function PhoneOverrideDrawer({
                   ) : null}
                 </div>
               ) : null}
-              <div className="flex w-full min-w-0 items-center justify-end gap-2" data-testid="split-run-intent-settings">
+              <div
+                className="flex w-full min-w-0 items-center justify-end gap-2"
+                data-testid="split-run-intent-settings"
+              >
                 {modelSelect}
                 {actions}
               </div>
