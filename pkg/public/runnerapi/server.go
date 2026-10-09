@@ -74,10 +74,6 @@ func (s *Server) registerRoutes() {
 		"/runner/v1/tasks/{task_id}/logs/chunks/{sequence}",
 		s.authenticateRunner(http.HandlerFunc(s.uploadTaskLogChunk)),
 	).Methods(http.MethodPut)
-	s.router.HandleFunc(
-		"/internal/v1/tasks/{task_id}/logs",
-		s.readActiveTaskLogs,
-	).Methods(http.MethodGet)
 }
 
 func (s *Server) Serve(address string) error {

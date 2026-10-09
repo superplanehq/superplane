@@ -6,7 +6,6 @@ import (
 	"context"
 	"io"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -20,7 +19,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 	runnerlogsfs "github.com/superplanehq/superplane/pkg/runners/logs/fs"
-	remotelogs "github.com/superplanehq/superplane/pkg/runners/logs/remote"
 	"github.com/superplanehq/superplane/test/support"
 	"go.opentelemetry.io/otel"
 	"gorm.io/datatypes"
@@ -232,66 +230,6 @@ func TestHandleRunnerTaskLogsWaitsUntilTheTaskStarts(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, missing.Code)
 	assert.Empty(t, missing.Header().Get(runneraction.LiveLogErrorCodeHeader))
 	assert.Contains(t, missing.Body.String(), "Task logs not found")
-}
-
-func TestHandleRunnerTaskLogsReadsActiveLogsFromRunnerAPI(t *testing.T) {
-	resource := support.Setup(t)
-	defer resource.Close()
-	server, signer := mustRunnerLiveLogServer(t, resource)
-	previousActiveStore := runnerlogs.Current()
-	runnerlogs.SetCurrent(nil)
-	t.Cleanup(func() { runnerlogs.SetCurrent(previousActiveStore) })
-
-	fleet := models.RunnerFleet{
-		ID:            uuid.New(),
-		Slug:          "task-log-remote",
-		ScopeType:     models.RunnerFleetScopeInstallation,
-		Enabled:       true,
-		Spec:          datatypes.NewJSONType(models.RunnerFleetSpec{}),
-		RunnerVersion: "0.1.0",
-	}
-	require.NoError(t, fleet.Create(database.Conn()))
-	task := createRunnerTaskForLogTest(t, resource, fleet.ID, models.RunnerTaskStateRunning)
-	require.NoError(t, database.Conn().Create(&models.RunnerTaskLogLifecycle{
-		TaskID:      task.ID,
-		ActiveStore: runnerlogs.StoreFS,
-		State:       models.RunnerTaskLogStateActive,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-	}).Error)
-	canvasID, executionID := createCanvasWithComponentExecution(
-		t,
-		resource,
-		runneraction.ComponentName,
-		"runner-logs-remote",
-		map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: task.ID.String(),
-			runneraction.ExecutionMetadataTaskBackend:  "integrated",
-		},
-	)
-
-	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := runnerlogs.VerifyActiveLogRead(
-			signer.Secret,
-			r.Header.Get("Authorization"),
-			task.ID,
-			r.URL.Query().Get("after"),
-			time.Now(),
-		); err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		w.Header().Set(runnerlogs.HeaderCursor, "6")
-		_, _ = w.Write([]byte("first\n"))
-	}))
-	t.Cleanup(remote.Close)
-	t.Setenv(remotelogs.BaseURLEnv, remote.URL)
-
-	live := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
-	require.Equal(t, http.StatusOK, live.Code)
-	assert.Equal(t, models.RunnerTaskLogStateActive, live.Header().Get(runnerlogs.HeaderState))
-	assert.Equal(t, "6", live.Header().Get(runnerlogs.HeaderCursor))
-	assert.Equal(t, "first\n", live.Body.String())
 }
 
 func createRunnerTaskForLogTest(
