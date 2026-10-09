@@ -78,12 +78,14 @@ export function LineBoardOrderCard({
   onOpenWorkOrder,
   isAnalyzing = false,
   creditLabel,
+  showMergeConfidence = true,
 }: {
   order: FactoriesWorkOrderSummary;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrderSummary) => void;
   isAnalyzing?: boolean;
   creditLabel?: string;
+  showMergeConfidence?: boolean;
 }) {
   return (
     <LineBoardWorkOrderCard
@@ -91,6 +93,7 @@ export function LineBoardOrderCard({
       workOrderCardContext={workOrderCardContext}
       isAnalyzing={isAnalyzing}
       creditLabel={creditLabel}
+      showMergeConfidence={showMergeConfidence}
       onOpen={() => {
         if (order.id) {
           onOpenWorkOrder(order.id, order);
@@ -106,12 +109,14 @@ export function LineBoardWorkOrderCard({
   onOpen,
   isAnalyzing = false,
   creditLabel,
+  showMergeConfidence = true,
 }: {
   order: FactoriesWorkOrderSummary;
   workOrderCardContext: WorkOrderCardContext;
   onOpen: () => void;
   isAnalyzing?: boolean;
   creditLabel?: string;
+  showMergeConfidence?: boolean;
 }) {
   const { factory } = useFactoriesLayout();
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
@@ -120,6 +125,7 @@ export function LineBoardWorkOrderCard({
   const scores = cardScores(showConfidence, order.checkScores, session, isAnalyzing, {
     showClarity: factoryShowsClarity(factory),
     showConfidence: factoryShowsConfidence(factory),
+    showMergeConfidence,
   });
 
   return (
@@ -144,7 +150,7 @@ function cardScores(
   checks: FactoriesWorkOrderCheckScore[] | undefined,
   session: FactoriesWorkOrderSummary["planningSession"],
   backlogAnalyzing: boolean,
-  visibility: { showClarity: boolean; showConfidence: boolean },
+  visibility: { showClarity: boolean; showConfidence: boolean; showMergeConfidence: boolean },
 ): Pick<
   ComponentProps<typeof WorkOrderCard>,
   | "clarityScore"
@@ -155,9 +161,9 @@ function cardScores(
   | "reviewMetrics"
   | "mergeConfidence"
 > {
-  const mergeConfidence = mergeConfidenceHeadline(checks);
+  const mergeConfidence = mergeConfidenceFields(checks, visibility.showMergeConfidence);
   if (!showConfidence) {
-    return { isAnalyzing: false, showClarity: false, showConfidenceScore: false, mergeConfidence };
+    return { isAnalyzing: false, showClarity: false, showConfidenceScore: false, ...mergeConfidence };
   }
   const review = planningReviewFromChecks(
     checks?.map((check) => ({
@@ -179,7 +185,7 @@ function cardScores(
       showConfidenceScore: true,
       reviewMetrics: review.metrics,
       isAnalyzing: draftCardAgentIsWorking(session, backlogAnalyzing, review.headline.score),
-      mergeConfidence,
+      ...mergeConfidence,
     };
   }
   const clarityScore = visibility.showClarity ? clarityScoreFromChecks(checks) : undefined;
@@ -190,6 +196,16 @@ function cardScores(
     showClarity: visibility.showClarity,
     showConfidenceScore: visibility.showConfidence,
     isAnalyzing: draftCardAgentIsWorking(session, backlogAnalyzing, clarityScore ?? confidenceScore),
-    mergeConfidence,
+    ...mergeConfidence,
   };
+}
+
+function mergeConfidenceFields(
+  checks: FactoriesWorkOrderCheckScore[] | undefined,
+  showMergeConfidence: boolean,
+): { mergeConfidence?: ReturnType<typeof mergeConfidenceHeadline> } {
+  if (!showMergeConfidence) {
+    return {};
+  }
+  return { mergeConfidence: mergeConfidenceHeadline(checks) };
 }
