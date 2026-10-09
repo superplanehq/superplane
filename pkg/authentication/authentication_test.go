@@ -14,8 +14,10 @@ import (
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -123,6 +125,143 @@ func TestHandler_handleAuth_GitHubAccountPicker(t *testing.T) {
 
 		assert.Empty(t, query.Get("prompt"))
 	})
+}
+
+func TestHandler_handleAuth_UsesInstallationGitHubAppClient(t *testing.T) {
+	handler, r := setupAuthHandler(t, false)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	t.Setenv("BASE_URL", "https://azure.example")
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+	require.NoError(t, githubapp.Save(t.Context(), database.DB(t.Context()), r.Encryptor, config.GitHubHostedAppConfig{
+		ID:            44,
+		Slug:          "superplane-self",
+		PrivateKey:    "pem",
+		WebhookSecret: "whsec",
+		ClientID:      "Iv1.installation",
+		ClientSecret:  "installation-secret",
+	}))
+
+	token, err := handler.jwtSigner.GenerateWithClaims(time.Hour, map[string]string{
+		"sub":             r.Account.ID.String(),
+		sessionStartClaim: strconv.FormatInt(time.Now().Unix(), 10),
+	})
+	require.NoError(t, err)
+	request := mux.SetURLVars(
+		httptest.NewRequest(http.MethodGet, "/auth/github?intent=connect&redirect=/demo/workspaces/new/setup", nil),
+		map[string]string{"provider": models.ProviderGitHub},
+	)
+	request.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	recorder := httptest.NewRecorder()
+
+	handler.handleAuth(recorder, request)
+
+	require.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
+	location, err := url.Parse(recorder.Header().Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, "github.com", location.Host)
+	assert.Equal(t, "Iv1.installation", location.Query().Get("client_id"))
+	assert.Equal(t, "https://azure.example/auth/github/callback", location.Query().Get("redirect_uri"))
+}
+
+func TestHandler_handleAuthCallback_LoadsInstallationGitHubAppClient(t *testing.T) {
+	goth.ClearProviders()
+	t.Cleanup(func() { goth.ClearProviders() })
+
+	r := support.Setup(t)
+	t.Cleanup(func() { r.Close() })
+	handler := NewHandler(jwt.NewSigner("test-secret"), r.Encryptor, r.AuthService, "development", "/templates", false, false, false)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	t.Setenv("BASE_URL", "https://azure.example")
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+	require.NoError(t, githubapp.Save(t.Context(), database.DB(t.Context()), r.Encryptor, config.GitHubHostedAppConfig{
+		ID:            44,
+		Slug:          "superplane-self",
+		PrivateKey:    "pem",
+		WebhookSecret: "whsec",
+		ClientID:      "Iv1.installation",
+		ClientSecret:  "installation-secret",
+	}))
+
+	request := mux.SetURLVars(
+		httptest.NewRequest(http.MethodGet, "/auth/github/callback?provider=github", nil),
+		map[string]string{"provider": models.ProviderGitHub},
+	)
+	recorder := httptest.NewRecorder()
+
+	handler.handleAuthCallback(recorder, request)
+
+	require.Equal(t, http.StatusUnauthorized, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), "could not find a matching session")
+	provider, err := goth.GetProvider(models.ProviderGitHub)
+	require.NoError(t, err)
+	session, err := provider.BeginAuth("state")
+	require.NoError(t, err)
+	authorizeURL, err := session.GetAuthURL()
+	require.NoError(t, err)
+	parsed, err := url.Parse(authorizeURL)
+	require.NoError(t, err)
+	assert.Equal(t, "Iv1.installation", parsed.Query().Get("client_id"))
+}
+
+func TestHandler_handleAuthConfig_LoadsInstallationGitHubAppClient(t *testing.T) {
+	goth.ClearProviders()
+	t.Cleanup(func() { goth.ClearProviders() })
+
+	r := support.Setup(t)
+	t.Cleanup(func() { r.Close() })
+	handler := NewHandler(jwt.NewSigner("test-secret"), r.Encryptor, r.AuthService, "development", "/templates", false, false, false)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	t.Setenv("BASE_URL", "https://azure.example")
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+
+	recorder := httptest.NewRecorder()
+	handler.handleAuthConfig(recorder, httptest.NewRequest(http.MethodGet, "/auth/config", nil))
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var missing struct {
+		Providers []string `json:"providers"`
+	}
+	require.NoError(t, json.NewDecoder(recorder.Body).Decode(&missing))
+	assert.NotContains(t, missing.Providers, models.ProviderGitHub)
+
+	require.NoError(t, githubapp.Save(t.Context(), database.DB(t.Context()), r.Encryptor, config.GitHubHostedAppConfig{
+		ID:            44,
+		Slug:          "superplane-self",
+		PrivateKey:    "pem",
+		WebhookSecret: "whsec",
+		ClientID:      "Iv1.installation",
+		ClientSecret:  "installation-secret",
+	}))
+
+	recorder = httptest.NewRecorder()
+	handler.handleAuthConfig(recorder, httptest.NewRequest(http.MethodGet, "/auth/config", nil))
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var ready struct {
+		Providers []string `json:"providers"`
+	}
+	require.NoError(t, json.NewDecoder(recorder.Body).Decode(&ready))
+	assert.Contains(t, ready.Providers, models.ProviderGitHub)
+
+	provider, err := goth.GetProvider(models.ProviderGitHub)
+	require.NoError(t, err)
+	session, err := provider.BeginAuth("state")
+	require.NoError(t, err)
+	authorizeURL, err := session.GetAuthURL()
+	require.NoError(t, err)
+	parsed, err := url.Parse(authorizeURL)
+	require.NoError(t, err)
+	assert.Equal(t, "Iv1.installation", parsed.Query().Get("client_id"))
 }
 
 func TestHandler_handleAuthConfig(t *testing.T) {

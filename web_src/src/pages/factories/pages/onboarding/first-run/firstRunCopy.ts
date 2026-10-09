@@ -68,8 +68,17 @@ export const FIRST_RUN_COPY = {
     connectGitHub: "Connect GitHub",
     connectAction: "Connect GitHub",
     createAppAction: "Create GitHub App",
-    createAppBody: "This installation has no GitHub App yet. Create a GitHub App, then connect your GitHub account.",
+    createAppBody: "Create a GitHub App. SuperPlane then connects your GitHub account.",
     creatingGitHubApp: "Opening GitHub…",
+    addLoginBody:
+      "This installation already has a GitHub App. Open that app in GitHub settings, copy the client ID, and generate a client secret.",
+    clientIdLabel: "Client ID",
+    clientSecretLabel: "Client secret",
+    saveLoginAction: "Save GitHub login",
+    savingLogin: "Saving GitHub login…",
+    changeLoginAction: "Change client ID",
+    loginSaveError:
+      "SuperPlane could not save the GitHub login. Check the client ID and client secret, then try again.",
     stepOrganization: "Choose organization",
     stepOrganizationDone: (organization: string) => `Organization: ${organization}`,
     stepRepository: "Choose repository",

@@ -15,11 +15,15 @@ const (
 
 // GitHubHostedAppConfig is SuperPlane Cloud's public GitHub App. The process
 // holds the credentials. New connections store only the GitHub installation id.
+// ClientID and ClientSecret are the app's user-login credentials. Cloud keeps
+// those in GITHUB_CLIENT_ID. Self-host stores them with the created app.
 type GitHubHostedAppConfig struct {
 	ID            int64
 	Slug          string
 	PrivateKey    string
 	WebhookSecret string
+	ClientID      string
+	ClientSecret  string
 }
 
 // LoadGitHubHostedAppConfig reads the public GitHub App from the process
