@@ -385,7 +385,7 @@ func Test__applySentryWebhookErrorTags_noRequestAddsOnlyManualTags(t *testing.T)
 	assert.False(t, hasHookResource)
 }
 
-func TestHandlerSentryAppWebhook_lookupFailure(t *testing.T) {
+func TestHandlerSentryAppWebhook_lookupCanceledWhileRunning(t *testing.T) {
 	t.Setenv(config.EnvSentryAppSlug, "superplane")
 	t.Setenv(config.EnvSentryAppClientID, "cid")
 	t.Setenv(config.EnvSentryAppClientSecret, "csecret")
@@ -400,17 +400,42 @@ func TestHandlerSentryAppWebhook_lookupFailure(t *testing.T) {
 
 	transport := bindTestSentryHub(t)
 	body := []byte(`{"action":"created","installation":{"uuid":"install-1"},"data":{"issue":{"id":"1"}}}`)
-	req := sentryWebhookRequest(body, "issue")
-
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	req = req.WithContext(ctx)
+	defer cancel()
+	req := sentryWebhookRequest(body, "issue").WithContext(ctx)
+
+	lookupStarted := make(chan struct{})
+	const callback = "test:sentry-app-webhook-lookup-canceled"
+	db := database.Conn()
+	require.NoError(t, db.Callback().Query().Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+		holdSentryInstallationLookupUntilCanceled(tx, lookupStarted)
+	}))
+	t.Cleanup(func() {
+		require.NoError(t, db.Callback().Query().Remove(callback))
+	})
 
 	var before int64
 	require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&before).Error)
 
 	rec := httptest.NewRecorder()
-	server.HandleSentryAppWebhook(rec, req)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		server.HandleSentryAppWebhook(rec, req)
+	}()
+
+	select {
+	case <-lookupStarted:
+	case <-time.After(10 * time.Second):
+		t.Fatal("installation lookup did not start")
+	}
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("webhook handler did not return after the caller disconnected")
+	}
 
 	assert.Equal(t, statusClientClosedRequest, rec.Code)
 	assert.Empty(t, transport.Events())
@@ -418,6 +443,24 @@ func TestHandlerSentryAppWebhook_lookupFailure(t *testing.T) {
 	var after int64
 	require.NoError(t, database.Conn().Model(&models.SentryWebhookReceipt{}).Count(&after).Error)
 	assert.Equal(t, before, after)
+}
+
+func holdSentryInstallationLookupUntilCanceled(tx *gorm.DB, started chan struct{}) {
+	if tx == nil || tx.Statement == nil || tx.Statement.Table != "app_installations" {
+		return
+	}
+	requestCtx := tx.Statement.Context
+	if requestCtx == nil {
+		return
+	}
+
+	select {
+	case <-started:
+	default:
+		close(started)
+	}
+	<-requestCtx.Done()
+	tx.AddError(requestCtx.Err())
 }
 
 func TestHandlerSentryAppWebhook_lookupErrorIsReported(t *testing.T) {
