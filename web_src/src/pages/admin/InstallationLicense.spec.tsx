@@ -126,6 +126,25 @@ describe("InstallationLicense", () => {
     expect(screen.queryByTestId("license-key-input")).not.toBeInTheDocument();
   });
 
+  it("shows that a revoked license no longer grants Enterprise features", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          ...enterpriseStatus,
+          edition: "community",
+          state: "revoked",
+        }),
+      ),
+    );
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId("license-state")).toHaveTextContent("Revoked"));
+    expect(screen.getByText("This license was revoked. Enterprise features are not available.")).toBeInTheDocument();
+    expect(screen.getByText("SuperPlane Community")).toBeInTheDocument();
+  });
+
   it("explains why a configured license is invalid", async () => {
     vi.stubGlobal(
       "fetch",

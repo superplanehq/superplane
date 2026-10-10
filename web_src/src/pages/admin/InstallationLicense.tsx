@@ -43,6 +43,10 @@ const stateBadges: Record<LicenseState, { label: string; className: string }> = 
     label: "Invalid",
     className: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300",
   },
+  revoked: {
+    label: "Revoked",
+    className: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300",
+  },
 };
 
 const sectionClass = "border-t border-slate-200 py-6 first:border-t-0 dark:border-gray-700/70";
@@ -102,6 +106,12 @@ const CurrentLicenseSection = ({ status }: { status: InstallationLicenseStatus }
     {status.state === "expired" ? (
       <Text className="mt-2 text-sm text-gray-600 dark:text-gray-400">
         Enterprise features on this license are not available. Install a renewed license to enable them again.
+      </Text>
+    ) : null}
+
+    {status.state === "revoked" ? (
+      <Text className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+        This license was revoked. Enterprise features are not available.
       </Text>
     ) : null}
 

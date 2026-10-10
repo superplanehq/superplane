@@ -929,7 +929,13 @@ func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {
 	}
 
 	keySync := licensing.NewKeySync(keys, licensing.DatabaseKeyListCache{}, keysURL)
-	service := licensing.NewService(licensing.NewVerifier(keys), source, licensing.WithKeySync(keySync))
+	revocations := licensing.NewRevocationSync(keys.Roots(), licensing.DatabaseRevocationListCache{}, licensing.RevocationsURL(keysURL))
+	service := licensing.NewService(
+		licensing.NewVerifier(keys),
+		source,
+		licensing.WithKeySync(keySync),
+		licensing.WithRevocationSync(revocations),
+	)
 	service.Start(context.Background())
 	return service
 }
