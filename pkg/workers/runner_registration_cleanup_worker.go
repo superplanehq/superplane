@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
 )
 
@@ -79,6 +80,7 @@ func (w *RunnerCleanupWorker) Process() error {
 		return err
 	}
 	for _, id := range staleIDs {
+		var lostRunningTask *models.RunnerTask
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
 			runner, err := models.LockRunner(tx, id)
 			if errors.Is(err, models.ErrRunnerNotFound) {
@@ -87,12 +89,17 @@ func (w *RunnerCleanupWorker) Process() error {
 			if err != nil {
 				return err
 			}
-			return runner.MarkLost(tx, now.Add(-runnerConnectionLossTimeout), now)
+			lostRunningTask, err = runner.MarkLost(tx, now.Add(-runnerConnectionLossTimeout), now)
+			return err
 		})
 		if err != nil {
 			w.logger.WithError(err).
 				WithField("runner_id", id).
 				Error("Failed to mark disconnected runner as lost")
+			continue
+		}
+		if lostRunningTask != nil {
+			telemetry.RecordRunnerTaskExecutionDuration(context.Background(), lostRunningTask)
 		}
 	}
 	return models.RevokeTerminatedRunnerCredentials(

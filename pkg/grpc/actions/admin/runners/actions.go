@@ -18,6 +18,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	"github.com/superplanehq/superplane/pkg/public/runnerapi"
 	runnercontrol "github.com/superplanehq/superplane/pkg/runners/control"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -390,6 +391,7 @@ func (s *Service) createRunner(
 ) (*models.Runner, *models.RunnerRegistration, error) {
 	var runner *models.Runner
 	var registration *models.RunnerRegistration
+	var reservedTask *models.RunnerTask
 
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if idempotencyKey != "" {
@@ -453,6 +455,7 @@ func (s *Service) createRunner(
 			if taskErr := task.Reserve(tx, runner.ID); taskErr != nil {
 				return taskErr
 			}
+			reservedTask = task
 		}
 
 		registration = &models.RunnerRegistration{
@@ -463,6 +466,9 @@ func (s *Service) createRunner(
 		}
 		return tx.Create(registration).Error
 	})
+	if err == nil && reservedTask != nil {
+		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask)
+	}
 	if idempotencyKey != "" && models.IsRunnerCreationIdempotencyKeyConflict(err) {
 		runner, err = loadIdempotentRunner(database.DB(ctx), idempotencyKey, requestHash)
 		if err == nil {
