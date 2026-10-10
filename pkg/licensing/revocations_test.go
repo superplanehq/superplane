@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 
@@ -117,6 +118,34 @@ func TestFailedRevocationDownloadKeepsLastResult(t *testing.T) {
 		_, err = revocations.Sync(context.Background())
 		require.Error(t, err)
 		assert.Equal(t, licensing.StateRevoked, service.Status().State)
+		assert.False(t, service.IsEntitled(licensing.FeatureGroups))
+	})
+
+	t.Run("a bad signature keeps the trusted list", func(t *testing.T) {
+		trusted := root.RevocationList(1, license.ID)
+		segments := strings.Split(string(trusted), ".")
+		other := strings.Split(string(root.RevocationList(2)), ".")
+		tampered := []byte(segments[0] + "." + other[1] + "." + segments[2])
+		_, err := licensing.VerifyRevocationList(tampered, licensingtest.KeySet(root))
+		require.ErrorIs(t, err, licensing.ErrInvalidRevocationList)
+
+		server := newKeyServer(t, trusted)
+		revocations := licensing.NewRevocationSync(licensingtest.KeySet(root), &memoryRevocationCache{}, server.URL)
+		service := licensing.NewService(
+			licensing.NewVerifier(licensingtest.KeySet(signer)),
+			&memorySource{raw: raw},
+			licensing.WithRevocationSync(revocations),
+		)
+		require.NoError(t, service.Refresh(context.Background()))
+		_, err = revocations.Sync(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, licensing.StateRevoked, service.Status().State)
+
+		server.serve(tampered)
+		_, err = revocations.Sync(context.Background())
+		require.ErrorIs(t, err, licensing.ErrInvalidRevocationList)
+		assert.Equal(t, licensing.StateRevoked, service.Status().State)
+		assert.True(t, revocations.Contains(license.ID))
 		assert.False(t, service.IsEntitled(licensing.FeatureGroups))
 	})
 }
