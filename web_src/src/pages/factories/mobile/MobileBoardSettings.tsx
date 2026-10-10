@@ -56,6 +56,7 @@ export function MobileBoardSettings({
           intake={settingsIntake}
           repository={onboarding?.backlogRepository}
           vcsIntegrationId={onboarding?.vcsIntegrationId}
+          page
           initialTab={intakeTab(intakeSettingsTabFromSearch(search))}
           onClose={close}
         />

@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import { toDate } from "@/lib/datetime";
 import { formatIntakeCreatedTime } from "./backlogIntakeCreatedTime";
 import type { BacklogIntakeItem } from "./backlogIntakeItems";
@@ -32,6 +33,36 @@ export function BacklogIntakeSearchRow({
           {createdTimeLabel}
         </time>
       ) : null}
+    </button>
+  );
+}
+
+export function CreateMenuAction({
+  testId,
+  icon: Icon,
+  title,
+  hint,
+  onClick,
+}: {
+  testId: string;
+  icon: LucideIcon;
+  title: string;
+  hint: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={title}
+      className="flex w-full items-start gap-3 rounded-md px-2.5 py-2.5 text-left hover:bg-accent"
+      data-testid={testId}
+      onClick={onClick}
+    >
+      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium">{title}</span>
+        <span className="mt-0.5 block text-[13px] text-muted-foreground">{hint}</span>
+      </span>
     </button>
   );
 }
