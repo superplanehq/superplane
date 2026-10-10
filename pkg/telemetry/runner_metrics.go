@@ -3,19 +3,27 @@ package telemetry
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
 
 const (
-	runnerCountMetricName     = "runners.count"
-	runnerTaskCountMetricName = "runner_tasks.count"
+	runnerCountMetricName                 = "runners.count"
+	runnerTaskCountMetricName             = "runner_tasks.count"
+	runnerTaskQueueDurationMetricName     = "runner_tasks.queue_wait.seconds"
+	runnerTaskExecutionDurationMetricName = "runner_tasks.execution_time.seconds"
+	runnerTaskLogSizeMetricName           = "runner_tasks.log_size.bytes"
 )
 
 var (
-	runnerCountGauge     metric.Int64Gauge
-	runnerTaskCountGauge metric.Int64Gauge
+	runnerCountGauge             metric.Int64Gauge
+	runnerTaskCountGauge         metric.Int64Gauge
+	runnerTaskQueueDuration      metric.Float64Histogram
+	runnerTaskExecutionDuration  metric.Float64Histogram
+	runnerTaskLogSize            metric.Int64Histogram
+	runnerTaskDurationBoundaries = []float64{1, 5, 10, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 28800, 86400}
 )
 
 func registerRunnerMetrics() error {
@@ -35,7 +43,89 @@ func registerRunnerMetrics() error {
 		metric.WithDescription("Current number of non-terminal runner tasks by fleet and state"),
 		metric.WithUnit("1"),
 	)
+	if err != nil {
+		return err
+	}
+
+	runnerTaskQueueDuration, err = meter.Float64Histogram(
+		runnerTaskQueueDurationMetricName,
+		metric.WithDescription("Time from runner task queueing to reservation"),
+		metric.WithUnit("s"),
+		metric.WithExplicitBucketBoundaries(runnerTaskDurationBoundaries...),
+	)
+	if err != nil {
+		return err
+	}
+
+	runnerTaskExecutionDuration, err = meter.Float64Histogram(
+		runnerTaskExecutionDurationMetricName,
+		metric.WithDescription("Time from runner task start to completion"),
+		metric.WithUnit("s"),
+		metric.WithExplicitBucketBoundaries(runnerTaskDurationBoundaries...),
+	)
+	if err != nil {
+		return err
+	}
+
+	runnerTaskLogSize, err = meter.Int64Histogram(
+		runnerTaskLogSizeMetricName,
+		metric.WithDescription("Retained uncompressed runner task log size after archiving"),
+		metric.WithUnit("By"),
+		metric.WithExplicitBucketBoundaries(0, 1024, 4096, 16384, 65536, 262144, 1048576, 4194304, 8388608, 10485760),
+	)
 	return err
+}
+
+func RecordRunnerTaskQueueDuration(ctx context.Context, task *models.RunnerTask) {
+	if !metricsReady.Load() || task.ReservedAt == nil || task.QueuedAt.IsZero() {
+		return
+	}
+
+	duration := task.ReservedAt.Sub(task.QueuedAt)
+	if duration < 0 {
+		return
+	}
+
+	runnerTaskQueueDuration.Record(
+		ctx,
+		duration.Seconds(),
+		metric.WithAttributes(attribute.String("fleet_id", task.FleetID.String())),
+	)
+}
+
+func RecordRunnerTaskExecutionDuration(ctx context.Context, task *models.RunnerTask) {
+	if !metricsReady.Load() || task.StartedAt == nil || task.FinishedAt == nil {
+		return
+	}
+
+	duration := task.FinishedAt.Sub(*task.StartedAt)
+	if duration < 0 {
+		return
+	}
+
+	runnerTaskExecutionDuration.Record(
+		ctx,
+		duration.Seconds(),
+		metric.WithAttributes(
+			attribute.String("fleet_id", task.FleetID.String()),
+			attribute.String("state", task.State),
+		),
+	)
+}
+
+func RecordRunnerTaskLogSize(ctx context.Context, fleetID uuid.UUID, size int64, truncated bool) {
+	if !metricsReady.Load() || size < 0 {
+		return
+	}
+
+	runnerTaskLogSize.Record(
+		ctx,
+		size,
+		metric.WithAttributes(
+			attribute.String("fleet_id", fleetID.String()),
+			attribute.Bool("truncated", truncated),
+		),
+	)
 }
 
 func recordRunnerCount(ctx context.Context, count models.FleetStateCount) {

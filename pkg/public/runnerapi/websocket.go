@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -294,6 +295,7 @@ func (s *Server) reconcileRunnerConnection(
 	var shouldStartTask bool
 	var shouldShutdown bool
 	var shouldCancel bool
+	var reservedTask *models.RunnerTask
 
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		current, err := models.FindRunner(tx, runner.ID)
@@ -362,6 +364,7 @@ func (s *Server) reconcileRunnerConnection(
 			if err != nil {
 				return err
 			}
+			reservedTask = task
 		default:
 			return activeErr
 		}
@@ -370,6 +373,9 @@ func (s *Server) reconcileRunnerConnection(
 	})
 	if err != nil {
 		return err
+	}
+	if reservedTask != nil {
+		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask)
 	}
 
 	if shouldStartTask {
@@ -467,7 +473,8 @@ func (s *Server) completeRunnerTask(
 		return errInvalidRunnerMessage
 	}
 
-	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+	var completedTask *models.RunnerTask
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		currentRunner, err := models.FindRunner(tx, runner.ID)
 		if err != nil {
 			return err
@@ -480,7 +487,7 @@ func (s *Server) completeRunnerTask(
 		if err != nil {
 			return err
 		}
-		if err := task.Complete(
+		completedNow, err := task.Complete(
 			tx,
 			currentRunner,
 			hash,
@@ -489,12 +496,20 @@ func (s *Server) completeRunnerTask(
 			complete.Error,
 			complete.Canceled,
 			time.Now(),
-		); err != nil {
+		)
+		if err != nil {
 			return err
+		}
+		if completedNow {
+			completedTask = task
 		}
 		*runner = *currentRunner
 		return nil
 	})
+	if err == nil && completedTask != nil {
+		telemetry.RecordRunnerTaskExecutionDuration(ctx, completedTask)
+	}
+	return err
 }
 
 func completionHash(complete completeMessage) (string, error) {
