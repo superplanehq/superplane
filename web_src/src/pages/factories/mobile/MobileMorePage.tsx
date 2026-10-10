@@ -2,6 +2,7 @@ import githubIcon from "@/assets/icons/integrations/github.svg";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { OrganizationSwitchMenu } from "@/components/OrganizationSwitchMenu";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAccount } from "@/contexts/useAccount";
 import { useTheme } from "@/contexts/useTheme";
@@ -14,7 +15,7 @@ import type { FeedbackCategory } from "@/lib/submitFeedback";
 import { posthog } from "@/posthog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { ArrowRightLeft, Bug, ChevronRight, CreditCard, LogOut, MessageSquare, Settings, Shield } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -38,6 +39,8 @@ import { MobileWorkspaceSwitcher } from "./MobileWorkspaceSwitcher";
 
 const ROW_CLASS =
   "flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground";
+const ROW_BUTTON_CLASS =
+  "h-auto min-h-14 w-full justify-start gap-3 rounded-none px-4 py-3 text-left whitespace-normal hover:bg-accent";
 const GROUP_CLASS = "overflow-hidden rounded-lg border border-border bg-card divide-y divide-border";
 
 export function MobileMorePage() {
@@ -45,6 +48,7 @@ export function MobileMorePage() {
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId);
   const { preference, setPreference } = useTheme();
+  const appearanceId = useId();
   const { headerKicker } = useHostedCreditChrome(organizationId, routeSegment);
   const [feedbackCategory, setFeedbackCategory] = useState<FeedbackCategory>();
   usePageTitle(["More", factory?.name ?? "Workspace"]);
@@ -71,12 +75,12 @@ export function MobileMorePage() {
         </MoreLink>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button type="button" className={ROW_CLASS}>
-              <ArrowRightLeft aria-hidden />
+            <Button type="button" variant="ghost" className={ROW_BUTTON_CLASS}>
+              <ArrowRightLeft className="size-5 text-muted-foreground" aria-hidden />
               <span className="min-w-0 flex-1 truncate">{organization?.metadata?.name || "Organization"}</span>
-              <span className="text-xs text-muted-foreground">Switch</span>
-              <ChevronRight aria-hidden />
-            </button>
+              <span className="text-xs font-normal text-muted-foreground">Switch</span>
+              <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-[min(22rem,calc(100vw-2rem))] [&_[role=menuitem]]:min-h-11">
             <OrganizationSwitchMenu currentOrganizationRouteId={organizationId} />
@@ -91,14 +95,14 @@ export function MobileMorePage() {
           Billing
         </MoreLink>
         <div className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
-          <span className="text-sm font-medium">Appearance</span>
+          <Label htmlFor={appearanceId}>Appearance</Label>
           <Select
             value={preference}
             onValueChange={(value) => {
               if (isThemePreference(value)) setPreference(value);
             }}
           >
-            <SelectTrigger aria-label="Appearance" className="!h-11 w-32">
+            <SelectTrigger id={appearanceId} className="!h-11 w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="[&_[role=option]]:min-h-11">
@@ -113,26 +117,27 @@ export function MobileMorePage() {
       </div>
       <MobileBoardOptions />
       <div className={GROUP_CLASS}>
-        <button type="button" className={ROW_CLASS} onClick={() => setFeedbackCategory("bug")}>
-          <Bug aria-hidden />
+        <Button type="button" variant="ghost" className={ROW_BUTTON_CLASS} onClick={() => setFeedbackCategory("bug")}>
+          <Bug className="size-5 text-muted-foreground" aria-hidden />
           Report issue
-        </button>
-        <button type="button" className={ROW_CLASS} onClick={() => setFeedbackCategory("other")}>
-          <MessageSquare aria-hidden />
+        </Button>
+        <Button type="button" variant="ghost" className={ROW_BUTTON_CLASS} onClick={() => setFeedbackCategory("other")}>
+          <MessageSquare className="size-5 text-muted-foreground" aria-hidden />
           Send feedback
-        </button>
+        </Button>
       </div>
-      <button
+      <Button
         type="button"
-        className={`${ROW_CLASS} rounded-lg border border-border bg-card`}
+        variant="ghost"
+        className={`${ROW_BUTTON_CLASS} rounded-lg border border-border bg-card`}
         onClick={() => {
           posthog.reset();
           window.location.href = "/logout";
         }}
       >
-        <LogOut aria-hidden />
+        <LogOut className="size-5 text-muted-foreground" aria-hidden />
         Sign out
-      </button>
+      </Button>
       <FeedbackDialog
         open={feedbackCategory !== undefined}
         onOpenChange={(open) => {
@@ -163,20 +168,21 @@ function MobileBoardOptions() {
   const intakes = useFactoryIntakes(organizationId, factoryId);
   const handlers = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const { view, setView } = useLineBoardColumnColorViewPreference();
+  const columnColorId = useId();
   const sources = intakeSourcesFromFactoryIntakes(intakes.data ?? []);
   return (
     <section aria-label="Board options" className="space-y-3">
       <h2 className="text-sm font-medium text-muted-foreground">Board options</h2>
       <div className={GROUP_CLASS}>
         <div className="flex min-h-14 items-center justify-between gap-3 px-4 py-2">
-          <span className="text-sm font-medium">Column colors</span>
+          <Label htmlFor={columnColorId}>Column colors</Label>
           <Select
             value={view}
             onValueChange={(value) => {
               if (isLineBoardColumnColorView(value)) setView(value);
             }}
           >
-            <SelectTrigger aria-label="Column colors" className="!h-11 w-36">
+            <SelectTrigger id={columnColorId} className="!h-11 w-36">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="[&_[role=option]]:min-h-11">

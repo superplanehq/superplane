@@ -81,7 +81,10 @@ describe("MobileBoardHeader", () => {
     await user.click(screen.getByRole("button", { name: /Switch workspace,/ }));
     const sheet = screen.getByRole("dialog", { name: "Switch workspace" });
     expect(within(sheet).getByRole("button", { name: /Current workspace/ })).toHaveAttribute("aria-current", "true");
-    await user.type(within(sheet).getByRole("textbox", { name: "Search workspaces" }), "engineering");
+    const search = within(sheet).getByRole("textbox", { name: "Search workspaces" });
+    expect(search.getAttribute("aria-label")).toBeNull();
+    expect(document.querySelector(`label[for="${CSS.escape(search.id)}"]`)).toHaveTextContent("Search workspaces");
+    await user.type(search, "engineering");
     expect(within(sheet).queryByText("Current workspace")).not.toBeInTheDocument();
     await user.click(within(sheet).getByRole("button", { name: "Engineering" }));
     expect(screen.getByTestId("location")).toHaveTextContent(

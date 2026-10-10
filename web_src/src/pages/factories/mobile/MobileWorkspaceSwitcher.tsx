@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/contexts/usePermissions";
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/ui/sheet";
 import { Check, ChevronDown, Plus, Search } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
@@ -17,6 +18,7 @@ export function MobileWorkspaceSwitcher() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const searchId = useId();
   const name = factory?.name?.trim() || "Workspace";
   const choices = factories.filter((entry) =>
     (entry.name ?? "").toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
@@ -53,12 +55,15 @@ export function MobileWorkspaceSwitcher() {
         <SheetTitle className="pr-12 text-left text-xl">Switch workspace</SheetTitle>
         <SheetDescription className="sr-only">Select a workspace to open.</SheetDescription>
         <div className="relative mt-5">
+          <Label htmlFor={searchId} className="sr-only">
+            Search workspaces
+          </Label>
           <Search className="absolute left-3 top-3.5 size-4 text-muted-foreground" aria-hidden />
           <Input
+            id={searchId}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search workspaces"
-            aria-label="Search workspaces"
             className="h-11 pl-10 text-base"
           />
         </div>
