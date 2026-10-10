@@ -110,6 +110,7 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 		authenticatedRunner,
 		connectionID,
 		hello.CurrentTaskID,
+		fleet.Slug,
 	); err != nil {
 		s.writeConnectionError(connection, err, "")
 		return
@@ -149,6 +150,7 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 					authenticatedRunner,
 					connectionID,
 					"",
+					fleet.Slug,
 				); err != nil {
 					s.writeConnectionError(connection, err, "")
 					return
@@ -193,6 +195,7 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 				authenticatedRunner,
 				connectionID,
 				complete,
+				fleet.Slug,
 			); err != nil {
 				s.writeConnectionError(connection, err, complete.RequestID)
 				continue
@@ -213,6 +216,7 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 				authenticatedRunner,
 				connectionID,
 				"",
+				fleet.Slug,
 			); err != nil {
 				s.writeConnectionError(connection, err, "")
 				return
@@ -289,6 +293,7 @@ func (s *Server) reconcileRunnerConnection(
 	runner *models.Runner,
 	connectionID uuid.UUID,
 	reportedTaskID string,
+	fleetSlug string,
 ) error {
 	var task *models.RunnerTask
 	var shouldSendTask bool
@@ -375,7 +380,7 @@ func (s *Server) reconcileRunnerConnection(
 		return err
 	}
 	if reservedTask != nil {
-		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask)
+		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetSlug)
 	}
 
 	if shouldStartTask {
@@ -456,6 +461,7 @@ func (s *Server) completeRunnerTask(
 	runner *models.Runner,
 	connectionID uuid.UUID,
 	complete completeMessage,
+	fleetSlug string,
 ) error {
 	if _, err := uuid.Parse(complete.RequestID); err != nil {
 		return errInvalidRunnerMessage
@@ -507,7 +513,7 @@ func (s *Server) completeRunnerTask(
 		return nil
 	})
 	if err == nil && completedTask != nil {
-		telemetry.RecordRunnerTaskExecutionDuration(ctx, completedTask)
+		telemetry.RecordRunnerTaskExecutionDuration(ctx, completedTask, fleetSlug)
 	}
 	return err
 }

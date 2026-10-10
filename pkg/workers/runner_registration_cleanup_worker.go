@@ -99,7 +99,14 @@ func (w *RunnerCleanupWorker) Process() error {
 			continue
 		}
 		if lostRunningTask != nil {
-			telemetry.RecordRunnerTaskExecutionDuration(context.Background(), lostRunningTask)
+			fleet, err := models.FindRunnerFleet(database.Conn().Unscoped(), lostRunningTask.FleetID)
+			if err != nil {
+				w.logger.WithError(err).
+					WithField("task_id", lostRunningTask.ID).
+					Error("Failed to find fleet for lost runner task metric")
+				continue
+			}
+			telemetry.RecordRunnerTaskExecutionDuration(context.Background(), lostRunningTask, fleet.Slug)
 		}
 	}
 	return models.RevokeTerminatedRunnerCredentials(
