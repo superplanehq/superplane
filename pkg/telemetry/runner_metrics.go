@@ -3,7 +3,6 @@ package telemetry
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -76,7 +75,7 @@ func registerRunnerMetrics() error {
 	return err
 }
 
-func RecordRunnerTaskQueueDuration(ctx context.Context, task *models.RunnerTask) {
+func RecordRunnerTaskQueueDuration(ctx context.Context, task *models.RunnerTask, fleetSlug string) {
 	if !metricsReady.Load() || task.ReservedAt == nil || task.QueuedAt.IsZero() {
 		return
 	}
@@ -89,11 +88,11 @@ func RecordRunnerTaskQueueDuration(ctx context.Context, task *models.RunnerTask)
 	runnerTaskQueueDuration.Record(
 		ctx,
 		duration.Seconds(),
-		metric.WithAttributes(attribute.String("fleet_id", task.FleetID.String())),
+		metric.WithAttributes(attribute.String("fleet_id", fleetSlug)),
 	)
 }
 
-func RecordRunnerTaskExecutionDuration(ctx context.Context, task *models.RunnerTask) {
+func RecordRunnerTaskExecutionDuration(ctx context.Context, task *models.RunnerTask, fleetSlug string) {
 	if !metricsReady.Load() || task.StartedAt == nil || task.FinishedAt == nil {
 		return
 	}
@@ -107,13 +106,13 @@ func RecordRunnerTaskExecutionDuration(ctx context.Context, task *models.RunnerT
 		ctx,
 		duration.Seconds(),
 		metric.WithAttributes(
-			attribute.String("fleet_id", task.FleetID.String()),
+			attribute.String("fleet_id", fleetSlug),
 			attribute.String("state", task.State),
 		),
 	)
 }
 
-func RecordRunnerTaskLogSize(ctx context.Context, fleetID uuid.UUID, size int64, truncated bool) {
+func RecordRunnerTaskLogSize(ctx context.Context, fleetSlug string, size int64, truncated bool) {
 	if !metricsReady.Load() || size < 0 {
 		return
 	}
@@ -122,7 +121,7 @@ func RecordRunnerTaskLogSize(ctx context.Context, fleetID uuid.UUID, size int64,
 		ctx,
 		size,
 		metric.WithAttributes(
-			attribute.String("fleet_id", fleetID.String()),
+			attribute.String("fleet_id", fleetSlug),
 			attribute.Bool("truncated", truncated),
 		),
 	)
@@ -146,7 +145,7 @@ func recordRunnerTaskCount(ctx context.Context, count models.FleetStateCount) {
 
 func fleetStateAttributes(count models.FleetStateCount) metric.RecordOption {
 	return metric.WithAttributes(
-		attribute.String("fleet_id", count.FleetID.String()),
+		attribute.String("fleet_id", count.FleetSlug),
 		attribute.String("fleet_slug", count.FleetSlug),
 		attribute.String("state", count.State),
 	)

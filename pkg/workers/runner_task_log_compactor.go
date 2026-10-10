@@ -136,7 +136,7 @@ func (w *RunnerTaskLogCompactor) processTask(ctx context.Context, candidate LogA
 	); err != nil {
 		return err
 	}
-	telemetry.RecordRunnerTaskLogSize(ctx, candidate.FleetID, size, active.Truncated)
+	telemetry.RecordRunnerTaskLogSize(ctx, candidate.FleetSlug, size, active.Truncated)
 	return nil
 }
 
@@ -193,7 +193,7 @@ func writeGzipStream(writer *io.PipeWriter, active io.Reader) (int64, error) {
 type LogArchivingCandidate struct {
 	TaskID          uuid.UUID
 	OrganizationID  uuid.UUID
-	FleetID         uuid.UUID
+	FleetSlug       string
 	ActiveStore     string
 	State           string
 	ProcessingUntil time.Time
@@ -207,10 +207,11 @@ func claimLogArchiving(tx *gorm.DB, now, processingUntil time.Time) (*LogArchivi
 	err := tx.Transaction(func(tx *gorm.DB) error {
 		err := tx.Table("runner_task_log_lifecycles AS lifecycles").
 			Select(
-				"lifecycles.task_id, tasks.organization_id, tasks.fleet_id, "+
+				"lifecycles.task_id, tasks.organization_id, fleets.slug AS fleet_slug, "+
 					"lifecycles.active_store, lifecycles.state",
 			).
 			Joins("JOIN runner_tasks AS tasks ON tasks.id = lifecycles.task_id").
+			Joins("JOIN runner_fleets AS fleets ON fleets.id = tasks.fleet_id").
 			Clauses(clause.Locking{
 				Strength: "UPDATE",
 				Table:    clause.Table{Name: "lifecycles"},
