@@ -24,8 +24,7 @@ describe("WorkspaceLoadingScreen", () => {
     const status = screen.getByRole("status", { name: WORKSPACE_LOADING_COPY.board });
     expect(status).toHaveAttribute("data-testid", WORKSPACE_LOADING_TEST_ID);
     expect(status).toHaveAttribute("aria-busy", "true");
-    expect(status.querySelectorAll("svg path")).toHaveLength(4);
-    expect(status.querySelector(".workspace-loading-pen")).not.toBeNull();
+    expect(status.querySelector("img")).toHaveAttribute("alt", "");
     expect(screen.getByText(WORKSPACE_LOADING_COPY.board)).toBeInTheDocument();
   });
 
