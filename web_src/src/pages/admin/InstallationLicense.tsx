@@ -7,9 +7,8 @@ import { useAccount } from "@/contexts/useAccount";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import {
   ENTERPRISE_FEATURES,
-  LICENSE_EXPIRY_WARNING_DAYS,
-  daysUntil,
   fetchInstallationLicenseWhenKeysReady,
+  licenseExpiryWarning,
   licenseReasonMessage,
   removeInstallationLicense,
   type InstallationLicense as InstallationLicenseStatus,
@@ -68,28 +67,44 @@ const DetailRow = ({ label, children }: { label: string; children: React.ReactNo
   </div>
 );
 
-const ExpiryValue = ({ status }: { status: InstallationLicenseStatus }) => {
+const ExpiryValue = ({ status, hideExpiryBadge }: { status: InstallationLicenseStatus; hideExpiryBadge: boolean }) => {
   const expiresAt = status.license?.expires_at;
   if (!expiresAt) {
     return <>—</>;
   }
 
-  const daysLeft = daysUntil(expiresAt);
-  const showWarning = status.state === "active" && daysLeft <= LICENSE_EXPIRY_WARNING_DAYS;
+  const warning = hideExpiryBadge
+    ? null
+    : licenseExpiryWarning({
+        edition: status.edition,
+        features: status.license?.features ?? [],
+        state: status.state,
+        expires_at: expiresAt,
+      });
+  const showWarning = warning !== null && !warning.expired;
 
   return (
     <span className="flex flex-wrap items-center gap-2">
       {formatDate(expiresAt)}
       {showWarning ? (
-        <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-          {daysLeft <= 1 ? "Expires today" : `Expires in ${daysLeft} days`}
+        <span
+          data-testid="license-expiry-badge"
+          className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+        >
+          {warning.daysLeft <= 1 ? "Expires today" : `Expires in ${warning.daysLeft} days`}
         </span>
       ) : null}
     </span>
   );
 };
 
-const CurrentLicenseSection = ({ status }: { status: InstallationLicenseStatus }) => (
+const CurrentLicenseSection = ({
+  status,
+  hideExpiryBadge,
+}: {
+  status: InstallationLicenseStatus;
+  hideExpiryBadge: boolean;
+}) => (
   <section className={sectionClass}>
     <p className={eyebrowClass}>Current plan</p>
     <div className="mt-1 flex flex-wrap items-center gap-3">
@@ -125,7 +140,7 @@ const CurrentLicenseSection = ({ status }: { status: InstallationLicenseStatus }
         </DetailRow>
         <DetailRow label="Valid from">{formatDate(status.license.valid_from)}</DetailRow>
         <DetailRow label="Expires">
-          <ExpiryValue status={status} />
+          <ExpiryValue status={status} hideExpiryBadge={hideExpiryBadge} />
         </DetailRow>
       </dl>
     ) : null}
@@ -274,7 +289,7 @@ const InstallSection = ({ status, onInstalled, onRemoveClick }: InstallSectionPr
 };
 
 const useInstallationLicense = () => {
-  const { refreshAccount } = useAccount();
+  const { account, refreshAccount } = useAccount();
   const [status, setStatus] = useState<InstallationLicenseStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -316,11 +331,20 @@ const useInstallationLicense = () => {
     }
   }, [refreshAccount]);
 
-  return { status, loadError, removing, handleInstalled, handleKeysUploaded, remove };
+  return {
+    status,
+    loadError,
+    removing,
+    hideExpiryBadge: account?.license?.hide_expiry_banner === true,
+    handleInstalled,
+    handleKeysUploaded,
+    remove,
+  };
 };
 
 const InstallationLicense: React.FC = () => {
-  const { status, loadError, removing, handleInstalled, handleKeysUploaded, remove } = useInstallationLicense();
+  const { status, loadError, removing, hideExpiryBadge, handleInstalled, handleKeysUploaded, remove } =
+    useInstallationLicense();
   const [confirmingRemoval, setConfirmingRemoval] = useState(false);
 
   useReportPageReady(status !== null || loadError !== null);
@@ -345,7 +369,7 @@ const InstallationLicense: React.FC = () => {
 
       {status ? (
         <div className="mt-5 bg-white px-6 dark:bg-gray-900">
-          <CurrentLicenseSection status={status} />
+          <CurrentLicenseSection status={status} hideExpiryBadge={hideExpiryBadge} />
           <FeaturesSection status={status} />
           {status.managed_by_configuration ? (
             <ManagedByConfigurationNote />
