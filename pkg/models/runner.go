@@ -72,6 +72,12 @@ type Runner struct {
 	CreationRequestHash    *string
 }
 
+type StaleRunner struct {
+	ID         uuid.UUID
+	FleetSlug  string
+	FleetScope string
+}
+
 /*
  * RunnerCredential stores the hash of the bearer token that authenticates a
  * registered runner. The plaintext token is returned once at registration and
@@ -190,16 +196,36 @@ func RevokeTerminatedRunnerCredentials(tx *gorm.DB, terminatedBefore, now time.T
 	).Error
 }
 
-func ListStaleRunnerIDs(tx *gorm.DB, lastSeenBefore time.Time, limit int) ([]uuid.UUID, error) {
-	var ids []uuid.UUID
-	err := tx.Model(&Runner{}).
-		Where("state IN ?", []string{RunnerStateIdle, RunnerStateBusy}).
-		Where("last_seen_at IS NOT NULL AND last_seen_at <= ?", lastSeenBefore).
-		Order("last_seen_at ASC").
+func ListStaleRunners(tx *gorm.DB, lastSeenBefore time.Time, limit int) ([]StaleRunner, error) {
+	type row struct {
+		ID               uuid.UUID
+		FleetSlug        string
+		ScopeType        string
+		OrganizationSlug string
+	}
+	var rows []row
+	err := tx.Table("runners").
+		Select("runners.id, runner_fleets.slug AS fleet_slug, runner_fleets.scope_type, organizations.slug AS organization_slug").
+		Joins("JOIN runner_fleets ON runner_fleets.id = runners.fleet_id").
+		Joins("LEFT JOIN organizations ON organizations.id = runner_fleets.scope_id").
+		Where("runners.state IN ?", []string{RunnerStateIdle, RunnerStateBusy}).
+		Where("runners.last_seen_at IS NOT NULL AND runners.last_seen_at <= ?", lastSeenBefore).
+		Order("runners.last_seen_at ASC").
 		Limit(limit).
-		Pluck("id", &ids).
-		Error
-	return ids, err
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	runners := make([]StaleRunner, 0, len(rows))
+	for _, row := range rows {
+		runners = append(runners, StaleRunner{
+			ID:         row.ID,
+			FleetSlug:  row.FleetSlug,
+			FleetScope: RunnerFleetMetricScope(row.ScopeType, row.OrganizationSlug),
+		})
+	}
+	return runners, nil
 }
 
 /*

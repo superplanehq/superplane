@@ -137,25 +137,103 @@ func TestPeriodicRunnerMetricsReportEveryNonTerminalStateForEachFleet(t *testing
 		models.RunnerStatePending: 2,
 		models.RunnerStateIdle:    0,
 		models.RunnerStateBusy:    1,
-	}, gaugeStateCounts(t, resourceMetrics, runnerCountMetricName, fleet))
+	}, gaugeStateCounts(t, resourceMetrics, runnerCountMetricName, fleet, models.RunnerFleetScopeInstallation))
 
 	require.Equal(t, map[string]int64{
 		models.RunnerTaskStateQueued:   2,
 		models.RunnerTaskStateReserved: 0,
 		models.RunnerTaskStateRunning:  1,
-	}, gaugeStateCounts(t, resourceMetrics, runnerTaskCountMetricName, fleet))
+	}, gaugeStateCounts(t, resourceMetrics, runnerTaskCountMetricName, fleet, models.RunnerFleetScopeInstallation))
 
 	require.Equal(t, map[string]int64{
 		models.RunnerStatePending: 0,
 		models.RunnerStateIdle:    2,
 		models.RunnerStateBusy:    0,
-	}, gaugeStateCounts(t, resourceMetrics, runnerCountMetricName, secondFleet))
+	}, gaugeStateCounts(t, resourceMetrics, runnerCountMetricName, secondFleet, models.RunnerFleetScopeInstallation))
 
 	require.Equal(t, map[string]int64{
 		models.RunnerTaskStateQueued:   0,
 		models.RunnerTaskStateReserved: 2,
 		models.RunnerTaskStateRunning:  0,
-	}, gaugeStateCounts(t, resourceMetrics, runnerTaskCountMetricName, secondFleet))
+	}, gaugeStateCounts(t, resourceMetrics, runnerTaskCountMetricName, secondFleet, models.RunnerFleetScopeInstallation))
+}
+
+func TestRunnerMetricsSeparateOrganizationsSharingFleetSlug(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	firstOrganization, err := models.CreateOrganization("First shared fleet organization", "")
+	require.NoError(t, err)
+	secondOrganization, err := models.CreateOrganization("Second shared fleet organization", "")
+	require.NoError(t, err)
+
+	db := database.DB(t.Context())
+	createFleet := func(organization *models.Organization) *models.RunnerFleet {
+		fleet := &models.RunnerFleet{
+			ID:            uuid.New(),
+			Slug:          "shared-runner-fleet",
+			ScopeType:     models.RunnerFleetScopeOrganization,
+			ScopeID:       &organization.ID,
+			Enabled:       true,
+			Spec:          datatypes.NewJSONType(models.RunnerFleetSpec{}),
+			RunnerVersion: "0.1.0",
+		}
+		require.NoError(t, fleet.Create(db))
+		return fleet
+	}
+	firstFleet := createFleet(firstOrganization)
+	secondFleet := createFleet(secondOrganization)
+
+	now := time.Now()
+	for _, fleet := range []*models.RunnerFleet{firstFleet, secondFleet} {
+		require.NoError(t, db.Create(&models.Runner{
+			ID:            uuid.New(),
+			FleetID:       fleet.ID,
+			State:         models.RunnerStatePending,
+			RunnerVersion: fleet.RunnerVersion,
+			CreatedAt:     now,
+			UpdatedAt:     now,
+		}).Error)
+	}
+
+	reader := setupRunnerMetricsReader(t)
+	startedAt := now.Add(-time.Minute)
+	firstScope := "organization/" + firstOrganization.Slug
+	secondScope := "organization/" + secondOrganization.Slug
+	RecordRunnerTaskExecutionDuration(t.Context(), &models.RunnerTask{
+		State:      models.RunnerTaskStateSucceeded,
+		StartedAt:  &startedAt,
+		FinishedAt: &now,
+	}, firstFleet.Slug, firstScope)
+	RecordRunnerTaskExecutionDuration(t.Context(), &models.RunnerTask{
+		State:      models.RunnerTaskStateSucceeded,
+		StartedAt:  &startedAt,
+		FinishedAt: &now,
+	}, secondFleet.Slug, secondScope)
+	NewPeriodic(t.Context()).reportRunnerCounts()
+
+	var resourceMetrics metricdata.ResourceMetrics
+	require.NoError(t, reader.Collect(t.Context(), &resourceMetrics))
+	require.Equal(t, int64(1), gaugeStateCounts(t, resourceMetrics, runnerCountMetricName, firstFleet, firstScope)[models.RunnerStatePending])
+	require.Equal(t, int64(1), gaugeStateCounts(t, resourceMetrics, runnerCountMetricName, secondFleet, secondScope)[models.RunnerStatePending])
+
+	for _, scope := range resourceMetrics.ScopeMetrics {
+		for _, collected := range scope.Metrics {
+			if collected.Name != runnerTaskExecutionDurationMetricName {
+				continue
+			}
+			histogram, ok := collected.Data.(metricdata.Histogram[float64])
+			require.True(t, ok)
+			require.Len(t, histogram.DataPoints, 2)
+			seen := map[string]bool{}
+			for _, point := range histogram.DataPoints {
+				value, found := point.Attributes.Value(attribute.Key("fleet_scope"))
+				require.True(t, found)
+				seen[value.AsString()] = true
+			}
+			require.Equal(t, map[string]bool{firstScope: true, secondScope: true}, seen)
+			return
+		}
+	}
+	t.Fatalf("metric %q was not collected", runnerTaskExecutionDurationMetricName)
 }
 
 func TestRunnerTaskQueueDurationRecordsSecondsByFleet(t *testing.T) {
@@ -163,12 +241,11 @@ func TestRunnerTaskQueueDurationRecordsSecondsByFleet(t *testing.T) {
 
 	queuedAt := time.Now().Add(-3 * time.Minute)
 	reservedAt := queuedAt.Add(2 * time.Minute)
-	fleetID := uuid.New()
+	fleetSlug := "e1-large-amd64"
 	RecordRunnerTaskQueueDuration(t.Context(), &models.RunnerTask{
-		FleetID:    fleetID,
 		QueuedAt:   queuedAt,
 		ReservedAt: &reservedAt,
-	})
+	}, fleetSlug, models.RunnerFleetScopeInstallation)
 
 	var resourceMetrics metricdata.ResourceMetrics
 	require.NoError(t, reader.Collect(t.Context(), &resourceMetrics))
@@ -185,7 +262,10 @@ func TestRunnerTaskQueueDurationRecordsSecondsByFleet(t *testing.T) {
 			require.InDelta(t, 120, point.Sum, 0.001)
 			fleet, found := point.Attributes.Value(attribute.Key("fleet_id"))
 			require.True(t, found)
-			require.Equal(t, fleetID.String(), fleet.AsString())
+			require.Equal(t, fleetSlug, fleet.AsString())
+			fleetScope, found := point.Attributes.Value(attribute.Key("fleet_scope"))
+			require.True(t, found)
+			require.Equal(t, models.RunnerFleetScopeInstallation, fleetScope.AsString())
 			require.Contains(t, point.Bounds, float64(120))
 			return
 		}
@@ -199,19 +279,17 @@ func TestRunnerTaskExecutionDurationRecordsSecondsByFleetAndTerminalState(t *tes
 	startedAt := time.Now().Add(-5 * time.Minute)
 	finishedAt := startedAt.Add(3 * time.Minute)
 	lostAt := startedAt.Add(4 * time.Minute)
-	fleetID := uuid.New()
+	fleetSlug := "e1-large-amd64"
 	RecordRunnerTaskExecutionDuration(t.Context(), &models.RunnerTask{
-		FleetID:    fleetID,
 		State:      models.RunnerTaskStateSucceeded,
 		StartedAt:  &startedAt,
 		FinishedAt: &finishedAt,
-	})
+	}, fleetSlug, models.RunnerFleetScopeInstallation)
 	RecordRunnerTaskExecutionDuration(t.Context(), &models.RunnerTask{
-		FleetID:    fleetID,
 		State:      models.RunnerTaskStateLost,
 		StartedAt:  &startedAt,
 		FinishedAt: &lostAt,
-	})
+	}, fleetSlug, models.RunnerFleetScopeInstallation)
 
 	var resourceMetrics metricdata.ResourceMetrics
 	require.NoError(t, reader.Collect(t.Context(), &resourceMetrics))
@@ -228,7 +306,10 @@ func TestRunnerTaskExecutionDurationRecordsSecondsByFleetAndTerminalState(t *tes
 				require.Equal(t, uint64(1), point.Count)
 				fleet, found := point.Attributes.Value(attribute.Key("fleet_id"))
 				require.True(t, found)
-				require.Equal(t, fleetID.String(), fleet.AsString())
+				require.Equal(t, fleetSlug, fleet.AsString())
+				fleetScope, found := point.Attributes.Value(attribute.Key("fleet_scope"))
+				require.True(t, found)
+				require.Equal(t, models.RunnerFleetScopeInstallation, fleetScope.AsString())
 				state, found := point.Attributes.Value(attribute.Key("state"))
 				require.True(t, found)
 				require.Contains(t, point.Bounds, float64(300))
@@ -246,9 +327,9 @@ func TestRunnerTaskExecutionDurationRecordsSecondsByFleetAndTerminalState(t *tes
 
 func TestRunnerTaskLogSizeRecordsRetainedBytesByFleet(t *testing.T) {
 	reader := setupRunnerMetricsReader(t)
-	fleetID := uuid.New()
-	RecordRunnerTaskLogSize(t.Context(), fleetID, 13, false)
-	RecordRunnerTaskLogSize(t.Context(), fleetID, 0, false)
+	fleetSlug := "e1-large-amd64"
+	RecordRunnerTaskLogSize(t.Context(), fleetSlug, models.RunnerFleetScopeInstallation, 13, false)
+	RecordRunnerTaskLogSize(t.Context(), fleetSlug, models.RunnerFleetScopeInstallation, 0, false)
 
 	var resourceMetrics metricdata.ResourceMetrics
 	require.NoError(t, reader.Collect(t.Context(), &resourceMetrics))
@@ -265,7 +346,10 @@ func TestRunnerTaskLogSizeRecordsRetainedBytesByFleet(t *testing.T) {
 			require.Equal(t, int64(13), point.Sum)
 			fleet, found := point.Attributes.Value(attribute.Key("fleet_id"))
 			require.True(t, found)
-			require.Equal(t, fleetID.String(), fleet.AsString())
+			require.Equal(t, fleetSlug, fleet.AsString())
+			fleetScope, found := point.Attributes.Value(attribute.Key("fleet_scope"))
+			require.True(t, found)
+			require.Equal(t, models.RunnerFleetScopeInstallation, fleetScope.AsString())
 			truncated, found := point.Attributes.Value(attribute.Key("truncated"))
 			require.True(t, found)
 			require.False(t, truncated.AsBool())
@@ -296,6 +380,7 @@ func gaugeStateCounts(
 	resourceMetrics metricdata.ResourceMetrics,
 	metricName string,
 	fleet *models.RunnerFleet,
+	fleetScope string,
 ) map[string]int64 {
 	t.Helper()
 
@@ -312,11 +397,13 @@ func gaugeStateCounts(
 			for _, point := range gauge.DataPoints {
 				fleetID, hasFleetID := point.Attributes.Value(attribute.Key("fleet_id"))
 				fleetSlug, hasFleetSlug := point.Attributes.Value(attribute.Key("fleet_slug"))
+				scope, hasScope := point.Attributes.Value(attribute.Key("fleet_scope"))
 				state, hasState := point.Attributes.Value(attribute.Key("state"))
 				require.True(t, hasFleetID)
 				require.True(t, hasFleetSlug)
+				require.True(t, hasScope)
 				require.True(t, hasState)
-				if fleetID.AsString() != fleet.ID.String() {
+				if fleetID.AsString() != fleet.Slug || scope.AsString() != fleetScope {
 					continue
 				}
 				require.Equal(t, fleet.Slug, fleetSlug.AsString())
