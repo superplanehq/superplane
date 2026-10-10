@@ -68,7 +68,7 @@ spec:
       component: createWorkOrder
       configuration:
         title: '{{ root().data.issue.title }}'
-        description: '{{ root().data.issue.body }}'
+        description: '{{ root().data.issue.body ?? "" }}'
       position:
         x: 810
         'y': 978
