@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { toDate } from "@/lib/datetime";
 import { formatIntakeCreatedTime } from "./backlogIntakeCreatedTime";
 import type { BacklogIntakeItem } from "./backlogIntakeItems";
@@ -51,10 +52,11 @@ export function CreateMenuAction({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       aria-label={title}
-      className="flex w-full items-start gap-3 rounded-md px-2.5 py-2.5 text-left hover:bg-accent"
+      className="h-auto w-full items-start justify-start gap-3 rounded-md px-2.5 py-2.5 text-left font-normal whitespace-normal hover:bg-accent"
       data-testid={testId}
       onClick={onClick}
     >
@@ -63,6 +65,6 @@ export function CreateMenuAction({
         <span className="block text-sm font-medium">{title}</span>
         <span className="mt-0.5 block text-[13px] text-muted-foreground">{hint}</span>
       </span>
-    </button>
+    </Button>
   );
 }
