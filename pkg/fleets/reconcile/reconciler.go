@@ -373,7 +373,6 @@ func (r *Reconciler) provision(
 	r.logAction("creating logical runner")
 	created, err := r.admin.CreateRunner(ctx, r.config.FleetID, adminclient.CreateRunnerRequest{
 		IdempotencyKey: idempotencyKey,
-		Ephemeral:      true,
 	})
 	if err != nil {
 		return fmt.Errorf("create logical runner for fleet %s: %w", r.config.FleetID, err)

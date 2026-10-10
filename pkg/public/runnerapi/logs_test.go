@@ -85,7 +85,6 @@ func TestUploadTaskLogChunk(t *testing.T) {
 			FleetID:       fleet.ID,
 			State:         models.RunnerStateIdle,
 			RunnerVersion: fleet.RunnerVersion,
-			Ephemeral:     true,
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
 		}

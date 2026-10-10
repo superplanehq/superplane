@@ -16,8 +16,7 @@ The runner:
 6. Waits for the WebSocket completion acknowledgement.
 7. Requests a controlled shutdown when it receives `SIGINT` or `SIGTERM`.
 
-An ephemeral runner exits after one acknowledged task. A reusable runner waits
-for another task.
+The runner exits after one acknowledged task.
 
 ## Local development
 
@@ -29,7 +28,7 @@ personal API token for an installation administrator:
 make runner.new
 ```
 
-The target rebuilds the local runner image and starts one attached ephemeral
+The target rebuilds the local runner image and starts one attached
 runner. It pauses the local Fleet Manager and restores it after the runner
 exits. `make dev.setup` creates the default `e1-large-amd64` fleet. To use a
 different fleet, create it through the admin CLI and set `RUNNER_FLEET`:

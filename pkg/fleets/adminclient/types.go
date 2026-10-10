@@ -38,7 +38,6 @@ type Runner struct {
 	CreatedAt         time.Time  `json:"createdAt"`
 	UpdatedAt         time.Time  `json:"updatedAt"`
 	TerminatedAt      *time.Time `json:"terminatedAt,omitempty"`
-	Ephemeral         bool       `json:"ephemeral"`
 }
 
 type Capacity struct {
@@ -52,7 +51,6 @@ type Capacity struct {
 
 type CreateRunnerRequest struct {
 	IdempotencyKey string `json:"idempotencyKey,omitempty"`
-	Ephemeral      bool   `json:"ephemeral"`
 }
 
 type CreateRunnerResponse struct {

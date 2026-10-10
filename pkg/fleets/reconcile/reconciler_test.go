@@ -196,8 +196,7 @@ func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
 		!strings.HasPrefix(
 			admin.createRequests[0].IdempotencyKey,
 			"fleet-manager/fleet-a/generic/",
-		) ||
-		!admin.createRequests[0].Ephemeral {
+		) {
 		t.Fatalf("create request = %#v", admin.createRequests)
 	}
 	if len(admin.deletedRunnerIDs) != 0 {
@@ -659,7 +658,6 @@ func newFakeAdmin() *fakeAdmin {
 				FleetID:       "fleet-a",
 				State:         adminclient.RunnerStatePending,
 				RunnerVersion: "1.2.3",
-				Ephemeral:     true,
 			},
 			RegistrationToken: "registration-token",
 			RunnerAPIURL:      "https://superplane.example/runner/v1",

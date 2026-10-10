@@ -35,7 +35,6 @@ const runners = (id: string, hasNextPage = false) =>
         id,
         state: "idle",
         runnerVersion: "1.0.0",
-        ephemeral: false,
         createdAt: "2026-10-06T12:00:00Z",
       },
     ],

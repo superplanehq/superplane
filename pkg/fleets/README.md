@@ -123,7 +123,7 @@ Docker fleets use a configured runner image instead of a release artifact.
 The local development configuration uses the tool-rich
 `superplane-runner-local:dev` image.
 
-Fleet Manager creates unbound ephemeral runners. An idle runner can reserve the
+Fleet Manager creates unbound runners. An idle runner can reserve the
 next queued task. The target capacity is the number of queued tasks plus
 `warmCapacity`. Set `warmCapacity` to the number of idle runners that the
 fleet must keep when no tasks are queued. Set `maxCapacity` to limit the total

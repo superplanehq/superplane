@@ -99,7 +99,6 @@ func TestAgentCompletesOnlyAfterEveryLogChunkIsAcknowledged(t *testing.T) {
 				RunnerID:    "runner-1",
 				FleetID:     "linux-amd64",
 				AccessToken: "access-token",
-				Ephemeral:   true,
 			},
 			Version:           "0.1.0",
 			TaskWorkDir:       t.TempDir(),
@@ -247,7 +246,6 @@ func TestAgentRequestsShutdownBeforeCancelingCurrentTask(t *testing.T) {
 				RunnerID:    "runner-1",
 				FleetID:     "linux-amd64",
 				AccessToken: "access-token",
-				Ephemeral:   true,
 			},
 			Version:           "0.1.0",
 			TaskWorkDir:       t.TempDir(),
@@ -307,107 +305,5 @@ func TestAgentRequestsShutdownBeforeCancelingCurrentTask(t *testing.T) {
 	}
 	if !bytes.Contains(agentLogs.Bytes(), []byte("runner received shutdown instruction")) {
 		t.Fatalf("missing shutdown instruction log:\n%s", agentLogs.String())
-	}
-}
-
-func TestReusableAgentExecutesMoreThanOneTask(t *testing.T) {
-	upgrader := websocket.Upgrader{}
-	completions := make(chan string, 2)
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /runner/v1/connect", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/runner/v1/connect" {
-			http.NotFound(w, r)
-			return
-		}
-		socket, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			t.Errorf("upgrade: %v", err)
-			return
-		}
-		defer socket.Close()
-
-		var hello map[string]any
-		if err := socket.ReadJSON(&hello); err != nil {
-			t.Errorf("read hello: %v", err)
-			return
-		}
-		for _, taskID := range []string{"task-1", "task-2"} {
-			if err := socket.WriteJSON(map[string]any{
-				"type": "task",
-				"task": map[string]any{
-					"id":             taskID,
-					"run_mode":       "argv",
-					"command":        []string{"sh", "-c", "true"},
-					"execution_mode": "host",
-				},
-			}); err != nil {
-				t.Errorf("write task: %v", err)
-				return
-			}
-			for {
-				var message protocol.CompleteMessage
-				if err := socket.ReadJSON(&message); err != nil {
-					t.Errorf("read completion: %v", err)
-					return
-				}
-				if message.Type != "complete" {
-					continue
-				}
-				completions <- message.TaskID
-				if err := socket.WriteJSON(map[string]any{
-					"type":       "ack",
-					"request_id": message.RequestID,
-				}); err != nil {
-					t.Errorf("write acknowledgement: %v", err)
-					return
-				}
-				break
-			}
-		}
-		_ = socket.WriteJSON(map[string]any{"type": "shutdown"})
-	})
-	mux.HandleFunc(
-		"PUT /runner/v1/tasks/{task_id}/logs/chunks/{sequence}",
-		func(w http.ResponseWriter, r *http.Request) {
-			_, _ = io.Copy(io.Discard, r.Body)
-			w.WriteHeader(http.StatusNoContent)
-		},
-	)
-	server := httptest.NewServer(mux)
-	defer server.Close()
-
-	runner := &Agent{
-		Config: Config{
-			BaseURL: server.URL,
-			Registration: protocol.Registration{
-				RunnerID:    "runner-1",
-				FleetID:     "linux-amd64",
-				AccessToken: "access-token",
-				Ephemeral:   false,
-			},
-			Version:           "0.1.0",
-			TaskWorkDir:       t.TempDir(),
-			LogSpoolDirectory: t.TempDir(),
-			LogChunkBytes:     1024,
-			LogSpoolMaxBytes:  4096,
-			ReconnectMin:      time.Millisecond,
-			ReconnectMax:      2 * time.Millisecond,
-			Log:               slog.New(slog.NewTextHandler(io.Discard, nil)),
-		},
-		HTTP: server.Client(),
-	}
-
-	if err := runner.Run(t.Context()); err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	for _, expected := range []string{"task-1", "task-2"} {
-		select {
-		case actual := <-completions:
-			if actual != expected {
-				t.Fatalf("completion task = %q, want %q", actual, expected)
-			}
-		default:
-			t.Fatalf("missing completion for %s", expected)
-		}
 	}
 }

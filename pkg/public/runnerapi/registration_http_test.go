@@ -54,7 +54,6 @@ func TestRegisterRunnerConsumesGrantAndReturnsCredential(t *testing.T) {
 	assert.Equal(t, runner.ID.String(), body.RunnerID)
 	assert.Equal(t, fleet.Slug, body.FleetID)
 	assert.NotEmpty(t, body.AccessToken)
-	assert.True(t, body.Ephemeral)
 
 	reloaded, err := models.FindRunner(database.DB(t.Context()), runner.ID)
 	require.NoError(t, err)
@@ -140,7 +139,6 @@ func createRegistrationFixture(
 		FleetID:       fleet.ID,
 		State:         models.RunnerStatePending,
 		RunnerVersion: fleet.RunnerVersion,
-		Ephemeral:     true,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}

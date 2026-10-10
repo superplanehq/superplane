@@ -43,7 +43,6 @@ func serializeRunner(runner *models.Runner, fleetID string) *pb.Runner {
 		FleetId:       fleetID,
 		State:         runner.State,
 		RunnerVersion: runner.RunnerVersion,
-		Ephemeral:     runner.Ephemeral,
 		CreatedAt:     timestamppb.New(runner.CreatedAt),
 		UpdatedAt:     timestamppb.New(runner.UpdatedAt),
 	}

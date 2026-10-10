@@ -32,7 +32,6 @@ func TestCreateRunnerIsIdempotentAndReservesTask(t *testing.T) {
 		FleetId:        fleet.Slug,
 		TaskId:         stringPointer(task.ID.String()),
 		IdempotencyKey: "request-1",
-		Ephemeral:      true,
 	}
 
 	first, err := service.CreateRunner(ctx, request)
@@ -42,7 +41,6 @@ func TestCreateRunnerIsIdempotentAndReservesTask(t *testing.T) {
 
 	assert.Equal(t, first.Runner.Id, second.Runner.Id)
 	assert.Equal(t, first.RegistrationToken, second.RegistrationToken)
-	assert.True(t, first.Runner.Ephemeral)
 	assert.Equal(t, "https://example.com/runner/v1", first.RunnerApiUrl)
 	assert.Equal(t, "runner-"+first.Runner.Id, first.DisplayName)
 
@@ -71,7 +69,6 @@ func TestCreateRunnerReplacesTerminatedIdempotentRunner(t *testing.T) {
 		FleetId:        fleet.Slug,
 		TaskId:         stringPointer(task.ID.String()),
 		IdempotencyKey: "replacement-request",
-		Ephemeral:      true,
 	}
 
 	first, err := service.CreateRunner(ctx, request)
@@ -82,7 +79,7 @@ func TestCreateRunnerReplacesTerminatedIdempotentRunner(t *testing.T) {
 
 	// Simulate a terminated row written before termination started releasing
 	// creation keys.
-	requestHash := createRunnerRequestHash(fleet.Slug, &task.ID, true)
+	requestHash := createRunnerRequestHash(fleet.Slug, &task.ID)
 	require.NoError(t, db.Model(runner).Updates(map[string]any{
 		"creation_idempotency_key": request.IdempotencyKey,
 		"creation_request_hash":    requestHash,
@@ -94,7 +91,7 @@ func TestCreateRunnerReplacesTerminatedIdempotentRunner(t *testing.T) {
 	assert.Equal(t, models.RunnerStatePending, replacement.Runner.State)
 }
 
-func TestCreateGenericRunnerWithoutIdempotencyKeyCreatesNewRunnerEachTime(t *testing.T) {
+func TestCreateGenericRunnerAcceptsLegacyLifecycleValues(t *testing.T) {
 	support.Setup(t)
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
 	service := newTestRunnerService()
@@ -102,25 +99,11 @@ func TestCreateGenericRunnerWithoutIdempotencyKeyCreatesNewRunnerEachTime(t *tes
 
 	first, err := service.CreateRunner(t.Context(), request)
 	require.NoError(t, err)
+	request.Ephemeral = true
 	second, err := service.CreateRunner(t.Context(), request)
 	require.NoError(t, err)
 
 	assert.NotEqual(t, first.Runner.Id, second.Runner.Id)
-	assert.False(t, first.Runner.Ephemeral)
-	assert.False(t, second.Runner.Ephemeral)
-}
-
-func TestCreateGenericEphemeralRunner(t *testing.T) {
-	support.Setup(t)
-	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
-	service := newTestRunnerService()
-
-	response, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
-		FleetId:   fleet.Slug,
-		Ephemeral: true,
-	})
-	require.NoError(t, err)
-	assert.True(t, response.Runner.Ephemeral)
 }
 
 func TestCreateFleetCreatesInstallationFleet(t *testing.T) {
@@ -230,28 +213,8 @@ func TestCreateTaskSpecificRunnerRequiresIdempotencyKey(t *testing.T) {
 	service := newTestRunnerService()
 
 	_, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
-		FleetId:   fleet.Slug,
-		TaskId:    stringPointer(task.ID.String()),
-		Ephemeral: true,
-	})
-
-	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
-	var runnerCount int64
-	require.NoError(t, db.Model(&models.Runner{}).Count(&runnerCount).Error)
-	assert.Zero(t, runnerCount)
-}
-
-func TestCreateTaskSpecificRunnerMustBeEphemeral(t *testing.T) {
-	resource := support.Setup(t)
-	db := database.DB(t.Context())
-	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
-	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
-	service := newTestRunnerService()
-
-	_, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
-		FleetId:        fleet.Slug,
-		TaskId:         stringPointer(task.ID.String()),
-		IdempotencyKey: "request-1",
+		FleetId: fleet.Slug,
+		TaskId:  stringPointer(task.ID.String()),
 	})
 
 	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
@@ -280,25 +243,6 @@ func TestCreateRunnerRejectsReusedIdempotencyKeyForDifferentRequest(t *testing.T
 	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
 }
 
-func TestCreateRunnerRejectsReusedIdempotencyKeyForDifferentLifecycle(t *testing.T) {
-	support.Setup(t)
-	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
-	service := newTestRunnerService()
-
-	_, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
-		FleetId:        fleet.Slug,
-		IdempotencyKey: "request-1",
-	})
-	require.NoError(t, err)
-
-	_, err = service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
-		FleetId:        fleet.Slug,
-		IdempotencyKey: "request-1",
-		Ephemeral:      true,
-	})
-	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
-}
-
 func TestCreateTaskSpecificRunnerHandlesConcurrentIdempotentRequests(t *testing.T) {
 	resource := support.Setup(t)
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
@@ -310,7 +254,6 @@ func TestCreateTaskSpecificRunnerHandlesConcurrentIdempotentRequests(t *testing.
 		FleetId:        fleet.Slug,
 		TaskId:         stringPointer(task.ID.String()),
 		IdempotencyKey: "concurrent-request",
-		Ephemeral:      true,
 	}
 
 	start := make(chan struct{})
@@ -528,7 +471,7 @@ func TestListFleetTasksPagesOldestFirst(t *testing.T) {
 	assert.Equal(t, int64(3), missing.TotalCount)
 }
 
-func TestDeleteBusyEphemeralRunnerRequestsTaskCancellation(t *testing.T) {
+func TestDeleteBusyRunnerRequestsTaskCancellation(t *testing.T) {
 	resource := support.Setup(t)
 	db := database.DB(t.Context())
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
@@ -539,7 +482,6 @@ func TestDeleteBusyEphemeralRunnerRequestsTaskCancellation(t *testing.T) {
 		FleetID:       fleet.ID,
 		State:         models.RunnerStateIdle,
 		RunnerVersion: "0.1.0",
-		Ephemeral:     true,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -564,31 +506,6 @@ func TestDeleteBusyEphemeralRunnerRequestsTaskCancellation(t *testing.T) {
 	assert.Equal(t, models.RunnerStateBusy, reloadedRunner.State)
 }
 
-func TestDeleteRunnerRejectsBusyReusableRunnerWithConflict(t *testing.T) {
-	resource := support.Setup(t)
-	db := database.DB(t.Context())
-	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
-	now := time.Now()
-	runner := &models.Runner{
-		ID:            uuid.New(),
-		FleetID:       fleet.ID,
-		State:         models.RunnerStateBusy,
-		RunnerVersion: "0.1.0",
-		CreatedAt:     now,
-		UpdatedAt:     now,
-	}
-	require.NoError(t, db.Create(runner).Error)
-
-	ctx := authentication.SetAccountIDInMetadata(t.Context(), resource.Account.ID.String())
-	service := newTestRunnerService()
-	_, err := service.DeleteRunner(ctx, &pb.DeleteRunnerRequest{
-		FleetId:  fleet.Slug,
-		RunnerId: runner.ID.String(),
-	})
-
-	assert.Equal(t, codes.Aborted, grpcerrors.Code(err))
-}
-
 func TestDeletePendingTaskRunnerReleasesReservation(t *testing.T) {
 	resource := support.Setup(t)
 	db := database.DB(t.Context())
@@ -601,7 +518,6 @@ func TestDeletePendingTaskRunnerReleasesReservation(t *testing.T) {
 		FleetId:        fleet.Slug,
 		TaskId:         stringPointer(task.ID.String()),
 		IdempotencyKey: "task-runner-to-delete",
-		Ephemeral:      true,
 	})
 	require.NoError(t, err)
 

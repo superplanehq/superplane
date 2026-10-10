@@ -136,7 +136,7 @@ func TestLostRunningTaskBecomesArchivable(t *testing.T) {
 	assert.Equal(t, models.RunnerTaskLogStateArchivable, lifecycle.State)
 }
 
-func TestReusableRunnerCanCompleteSequentialTasks(t *testing.T) {
+func TestRunnerTerminatesAfterOneTask(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	resource := support.Setup(t)
 	db := database.DB(t.Context())
@@ -155,25 +155,34 @@ func TestReusableRunnerCanCompleteSequentialTasks(t *testing.T) {
 	}
 	require.NoError(t, db.Create(runner).Error)
 
-	newTask := func() *models.RunnerTask {
-		return &models.RunnerTask{
-			ID:                uuid.New(),
-			OrganizationID:    resource.Organization.ID,
-			FleetID:           fleet.ID,
-			Backend:           models.RunnerTaskBackendIntegrated,
-			State:             models.RunnerTaskStateQueued,
-			PayloadCiphertext: []byte("ciphertext"),
-			QueuedAt:          now,
-			CreatedAt:         now,
-			UpdatedAt:         now,
-		}
+	firstTask := &models.RunnerTask{
+		ID:                uuid.New(),
+		OrganizationID:    resource.Organization.ID,
+		FleetID:           fleet.ID,
+		Backend:           models.RunnerTaskBackendIntegrated,
+		State:             models.RunnerTaskStateQueued,
+		PayloadCiphertext: []byte("ciphertext"),
+		QueuedAt:          now,
+		CreatedAt:         now,
+		UpdatedAt:         now,
 	}
-	firstTask := newTask()
-	secondTask := newTask()
+	secondTask := &models.RunnerTask{
+		ID:                uuid.New(),
+		OrganizationID:    resource.Organization.ID,
+		FleetID:           fleet.ID,
+		Backend:           models.RunnerTaskBackendIntegrated,
+		State:             models.RunnerTaskStateQueued,
+		PayloadCiphertext: []byte("ciphertext"),
+		QueuedAt:          now.Add(time.Second),
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
 	require.NoError(t, db.Create(firstTask).Error)
 	require.NoError(t, db.Create(secondTask).Error)
-
-	require.NoError(t, firstTask.Reserve(db, runner.ID))
+	reserved, err := runner.ReserveNextTask(db)
+	require.NoError(t, err)
+	assert.Equal(t, firstTask.ID, reserved.ID)
+	firstTask = reserved
 	require.NoError(t, firstTask.Start(db, runner, "test-store", now))
 	completed, err := firstTask.Complete(
 		db,
@@ -187,6 +196,7 @@ func TestReusableRunnerCanCompleteSequentialTasks(t *testing.T) {
 	)
 	require.NoError(t, err)
 	assert.True(t, completed)
+	assert.Equal(t, models.RunnerStateTerminated, runner.State)
 	completed, err = firstTask.Complete(
 		db,
 		runner,
@@ -200,6 +210,9 @@ func TestReusableRunnerCanCompleteSequentialTasks(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, completed)
 
-	require.NoError(t, secondTask.Reserve(db, runner.ID))
-	assert.Equal(t, models.RunnerTaskStateReserved, secondTask.State)
+	_, err = runner.ReserveNextTask(db)
+	require.ErrorIs(t, err, models.ErrRunnerTaskNotReservable)
+	reloaded, err := models.FindRunnerTask(db, secondTask.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.RunnerTaskStateQueued, reloaded.State)
 }
