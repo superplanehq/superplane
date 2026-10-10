@@ -193,17 +193,24 @@ func TestRunnerTaskQueueDurationRecordsSecondsByFleet(t *testing.T) {
 	t.Fatalf("metric %q was not collected", runnerTaskQueueDurationMetricName)
 }
 
-func TestRunnerTaskExecutionDurationRecordsSecondsByFleetAndState(t *testing.T) {
+func TestRunnerTaskExecutionDurationRecordsSecondsByFleetAndTerminalState(t *testing.T) {
 	reader := setupRunnerMetricsReader(t)
 
 	startedAt := time.Now().Add(-5 * time.Minute)
 	finishedAt := startedAt.Add(3 * time.Minute)
+	lostAt := startedAt.Add(4 * time.Minute)
 	fleetID := uuid.New()
 	RecordRunnerTaskExecutionDuration(t.Context(), &models.RunnerTask{
 		FleetID:    fleetID,
 		State:      models.RunnerTaskStateSucceeded,
 		StartedAt:  &startedAt,
 		FinishedAt: &finishedAt,
+	})
+	RecordRunnerTaskExecutionDuration(t.Context(), &models.RunnerTask{
+		FleetID:    fleetID,
+		State:      models.RunnerTaskStateLost,
+		StartedAt:  &startedAt,
+		FinishedAt: &lostAt,
 	})
 
 	var resourceMetrics metricdata.ResourceMetrics
@@ -215,17 +222,22 @@ func TestRunnerTaskExecutionDurationRecordsSecondsByFleetAndState(t *testing.T) 
 			}
 			histogram, ok := collected.Data.(metricdata.Histogram[float64])
 			require.True(t, ok)
-			require.Len(t, histogram.DataPoints, 1)
-			point := histogram.DataPoints[0]
-			require.Equal(t, uint64(1), point.Count)
-			require.InDelta(t, 180, point.Sum, 0.001)
-			fleet, found := point.Attributes.Value(attribute.Key("fleet_id"))
-			require.True(t, found)
-			require.Equal(t, fleetID.String(), fleet.AsString())
-			state, found := point.Attributes.Value(attribute.Key("state"))
-			require.True(t, found)
-			require.Equal(t, models.RunnerTaskStateSucceeded, state.AsString())
-			require.Contains(t, point.Bounds, float64(300))
+			require.Len(t, histogram.DataPoints, 2)
+			durations := make(map[string]float64, 2)
+			for _, point := range histogram.DataPoints {
+				require.Equal(t, uint64(1), point.Count)
+				fleet, found := point.Attributes.Value(attribute.Key("fleet_id"))
+				require.True(t, found)
+				require.Equal(t, fleetID.String(), fleet.AsString())
+				state, found := point.Attributes.Value(attribute.Key("state"))
+				require.True(t, found)
+				require.Contains(t, point.Bounds, float64(300))
+				durations[state.AsString()] = point.Sum
+			}
+			require.Equal(t, map[string]float64{
+				models.RunnerTaskStateSucceeded: 180,
+				models.RunnerTaskStateLost:      240,
+			}, durations)
 			return
 		}
 	}

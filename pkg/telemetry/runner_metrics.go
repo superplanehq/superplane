@@ -59,7 +59,7 @@ func registerRunnerMetrics() error {
 
 	runnerTaskExecutionDuration, err = meter.Float64Histogram(
 		runnerTaskExecutionDurationMetricName,
-		metric.WithDescription("Time from runner task start to completion"),
+		metric.WithDescription("Time from runner task start to terminal state"),
 		metric.WithUnit("s"),
 		metric.WithExplicitBucketBoundaries(runnerTaskDurationBoundaries...),
 	)

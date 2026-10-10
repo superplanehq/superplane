@@ -104,13 +104,29 @@ func TestLostRunningTaskBecomesArchivable(t *testing.T) {
 		UpdatedAt:   now,
 	}).Error)
 
+	var lostTask *models.RunnerTask
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		locked, err := models.LockRunner(tx, runner.ID)
 		if err != nil {
 			return err
 		}
-		return locked.MarkLost(tx, now.Add(-time.Minute), now)
+		lostTask, err = locked.MarkLost(tx, now.Add(-time.Minute), now)
+		return err
 	}))
+	require.NotNil(t, lostTask)
+	assert.Equal(t, task.ID, lostTask.ID)
+	assert.Equal(t, models.RunnerTaskStateLost, lostTask.State)
+	require.NotNil(t, lostTask.FinishedAt)
+	assert.Equal(t, now, *lostTask.FinishedAt)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockRunner(tx, runner.ID)
+		if err != nil {
+			return err
+		}
+		lostTask, err = locked.MarkLost(tx, now.Add(-time.Minute), now)
+		return err
+	}))
+	assert.Nil(t, lostTask)
 
 	reloadedTask, err := models.FindRunnerTask(db, task.ID)
 	require.NoError(t, err)
