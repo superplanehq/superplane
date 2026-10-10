@@ -1,101 +1,113 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { createRef } from "react";
-import { MemoryRouter } from "react-router";
-import { describe, expect, it, vi } from "bun:test";
+import { MemoryRouter, useLocation } from "react-router";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
+
+import {
+  REFUND_FACTORY,
+  REFUND_FACTORY_LINES,
+  REFUND_LINE_PLAN_ID,
+  PRIMARY_FACTORY_ROUTE_SEGMENT,
+} from "../__fixtures__/factoryPageResponses";
+import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
+import { useWorkOrderListState } from "../lib/useWorkOrderListState";
+import { MobileBoardHeader } from "./MobileBoardHeader";
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryWorkOrdersPage: () => ({ data: [], isLoading: false }),
   useWorkOrderArtifacts: () => ({ data: [], isLoading: false }),
   useSendWorkOrderToBacklog: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
-
-import { REFUND_FACTORY_LINES, REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageResponses";
-import { HostedCreditHeaderKicker } from "../HostedCreditHeaderKicker";
-import { useWorkOrderListState } from "../lib/useWorkOrderListState";
-import { MobileBoardHeader } from "./MobileBoardHeader";
-
-const PHONE_HEADER_WIDTH_PX = 390;
+const permissions = { create: true };
+vi.mock("@/contexts/usePermissions", () => ({ usePermissions: () => ({ canAct: () => permissions.create }) }));
+const nextFactory = { ...REFUND_FACTORY, id: "next-workspace", name: "Engineering", key: "ENG", urlId: "abcd1234" };
 
 function PhoneBoardHeader() {
   const state = useWorkOrderListState("factory-1");
-  const expiresAt = new Date(Date.now() + 13 * 24 * 60 * 60 * 1000);
-
+  const location = useLocation();
   return (
-    <div data-testid="phone-board-header-frame" style={{ width: PHONE_HEADER_WIDTH_PX }}>
+    <>
       <MobileBoardHeader
         state={state}
         searchRef={createRef()}
-        creditKicker={
-          <HostedCreditHeaderKicker
-            compact
-            spendingHref="/org/workspaces/RF/settings/organization/billing"
-            welcomeCreditExpiresAt={expiresAt.toISOString()}
-            remainingCreditCents={4124}
-          />
-        }
         sourceOptions={[]}
         assigneeOptions={[]}
         showPullRequestMerge={false}
-        colorView="vivid"
-        onColorViewChange={vi.fn()}
-        intakes={[]}
-        prFeedbackHandlers={[]}
-        onOpenIntake={vi.fn()}
-        onOpenPRFeedback={vi.fn()}
         lines={REFUND_FACTORY_LINES}
         lineId={REFUND_LINE_PLAN_ID}
         onSelectLine={vi.fn()}
         organizationId="org-1"
         factoryId="factory-1"
-        factoryKey="RF"
+        factoryKey={PRIMARY_FACTORY_ROUTE_SEGMENT}
         canManageClosedStatus={false}
       />
-    </div>
+      <p data-testid="location">{location.pathname}</p>
+    </>
   );
 }
 
-function creditSlot(row: HTMLElement, chip: HTMLElement): HTMLElement {
-  const slot = Array.from(row.children).find((child) => child.contains(chip));
-  if (!(slot instanceof HTMLElement)) {
-    throw new Error("credit chip is not in the phone header row");
-  }
-  return slot;
+function renderHeader(path = `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <FactoriesLayoutContext.Provider
+        value={{
+          organizationId: "org-1",
+          factoryId: REFUND_FACTORY.id!,
+          factoryKey: REFUND_FACTORY.key!,
+          routeSegment: PRIMARY_FACTORY_ROUTE_SEGMENT,
+          factory: REFUND_FACTORY,
+          factories: [REFUND_FACTORY, nextFactory],
+          openCreateWorkOrder: vi.fn(),
+        }}
+      >
+        <PhoneBoardHeader />
+      </FactoriesLayoutContext.Provider>
+    </MemoryRouter>,
+  );
 }
 
-describe("MobileBoardHeader credit chip", () => {
-  it("keeps the trial balance in a phone-width row beside the line switcher and controls", () => {
-    render(
-      <MemoryRouter>
-        <PhoneBoardHeader />
-      </MemoryRouter>,
+describe("MobileBoardHeader", () => {
+  beforeEach(() => {
+    permissions.create = true;
+    window.localStorage.clear();
+  });
+
+  it("searches workspace choices and opens the new workspace board", async () => {
+    const user = userEvent.setup();
+    renderHeader();
+    expect(screen.getByRole("heading", { name: "Board" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter" })).toHaveTextContent("Filter");
+    await user.click(screen.getByRole("button", { name: /Switch workspace,/ }));
+    const sheet = screen.getByRole("dialog", { name: "Switch workspace" });
+    expect(within(sheet).getByRole("button", { name: /Current workspace/ })).toHaveAttribute("aria-current", "true");
+    const search = within(sheet).getByRole("textbox", { name: "Search workspaces" });
+    expect(search.getAttribute("aria-label")).toBeNull();
+    expect(document.querySelector(`label[for="${CSS.escape(search.id)}"]`)).toHaveTextContent("Search workspaces");
+    await user.type(search, "engineering");
+    expect(within(sheet).queryByText("Current workspace")).not.toBeInTheDocument();
+    await user.click(within(sheet).getByRole("button", { name: "Engineering" }));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      `/org-1/workspaces/eng-abcd1234/lines/${REFUND_LINE_PLAN_ID}`,
     );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
 
-    const row = screen.getByTestId("mobile-board-header");
-    const chip = screen.getByTestId("hosted-credit-header-kicker");
-    const slot = creditSlot(row, chip);
-    const switcher = screen.getByTestId("mobile-board-line-switcher");
-    const filter = screen.getByTestId("work-orders-filter-trigger");
-    const search = screen.getByTestId("mobile-board-search-toggle");
-    const view = screen.getByTestId("lines-board-view-menu");
-    const menu = screen.getByTestId("mobile-board-menu");
+  it("preserves Velocity when switching and hides creation without permission", async () => {
+    permissions.create = false;
+    const user = userEvent.setup();
+    renderHeader(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/velocity`);
+    await user.click(screen.getByRole("button", { name: /Switch workspace,/ }));
+    expect(screen.queryByRole("button", { name: "Create workspace" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Engineering" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/eng-abcd1234/velocity");
+  });
 
-    const frame = screen.getByTestId("phone-board-header-frame");
-    expect(frame).toContainElement(row);
-    expect(frame.getAttribute("style")).toBe(`width: ${PHONE_HEADER_WIDTH_PX}px;`);
-    expect(chip).toHaveTextContent("Trial");
-    expect(chip).toHaveTextContent("$41.24");
-    expect(chip).not.toHaveTextContent("Subscribe");
-    expect(switcher.compareDocumentPosition(chip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(chip.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(row).toContainElement(search);
-    expect(row).toContainElement(view);
-    expect(row).toContainElement(menu);
-
-    expect(slot).toHaveClass("min-w-0", "flex-1", "overflow-hidden");
-    expect(slot.className).not.toContain("overflow-x-auto");
-    expect(chip).toHaveClass("min-w-0", "max-w-full", "overflow-hidden");
-    expect(chip).not.toHaveClass("shrink-0");
-    expect(chip.querySelector(".truncate")).not.toBeNull();
-    expect(filter.parentElement).toHaveClass("shrink-0");
+  it("opens workspace creation from the sheet", async () => {
+    const user = userEvent.setup();
+    renderHeader();
+    await user.click(screen.getByRole("button", { name: /Switch workspace,/ }));
+    await user.click(screen.getByRole("button", { name: "Create workspace" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/org-1/workspaces/new");
   });
 });
