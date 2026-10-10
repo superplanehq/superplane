@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { defaultMergeMethod, pullRequestReviewNote } from "./splitRunPullRequestReview";
+import { defaultMergeMethod, pullRequestReviewNote, supportsPullRequestMerge } from "./splitRunPullRequestReview";
 
 describe("pullRequestReviewNote", () => {
   it("recognizes a note whose call to action opens a GitHub pull request", () => {
@@ -10,6 +10,24 @@ describe("pullRequestReviewNote", () => {
         cta: { label: "Review PR #6812", href: "https://github.com/acme/payments/pull/6812" },
       }),
     ).toEqual({ href: "https://github.com/acme/payments/pull/6812", number: 6812 });
+  });
+
+  it("recognizes a note whose call to action opens a Bitbucket pull request", () => {
+    expect(
+      pullRequestReviewNote({
+        headline: "Waiting for user review",
+        cta: { label: "Review PR #7", href: "https://bitbucket.org/acme/payments/pull-requests/7" },
+      }),
+    ).toEqual({ href: "https://bitbucket.org/acme/payments/pull-requests/7", number: 7 });
+  });
+
+  it("accepts a Bitbucket pull request link with a trailing path", () => {
+    expect(
+      pullRequestReviewNote({
+        headline: "Review",
+        cta: { label: "Review", href: "https://bitbucket.org/acme/payments/pull-requests/7/diff" },
+      }),
+    ).toEqual({ href: "https://bitbucket.org/acme/payments/pull-requests/7/diff", number: 7 });
   });
 
   it("accepts a pull request link with a trailing path or query", () => {
@@ -47,5 +65,17 @@ describe("defaultMergeMethod", () => {
     expect(defaultMergeMethod(["MERGE_METHOD_REBASE", "MERGE_METHOD_SQUASH"])).toBe("MERGE_METHOD_SQUASH");
     expect(defaultMergeMethod(["MERGE_METHOD_REBASE", "MERGE_METHOD_MERGE"])).toBe("MERGE_METHOD_MERGE");
     expect(defaultMergeMethod(["MERGE_METHOD_REBASE"])).toBe("MERGE_METHOD_REBASE");
+  });
+});
+
+describe("supportsPullRequestMerge", () => {
+  it("supports GitHub and Bitbucket pull requests", () => {
+    expect(supportsPullRequestMerge({ provider: "PROVIDER_GITHUB" })).toBe(true);
+    expect(supportsPullRequestMerge({ provider: "PROVIDER_BITBUCKET" })).toBe(true);
+    expect(supportsPullRequestMerge(undefined)).toBe(true);
+  });
+
+  it("rejects other providers", () => {
+    expect(supportsPullRequestMerge({ provider: "PROVIDER_UNSPECIFIED" })).toBe(false);
   });
 });

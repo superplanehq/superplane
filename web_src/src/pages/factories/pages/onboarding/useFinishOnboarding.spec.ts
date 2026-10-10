@@ -245,8 +245,10 @@ describe("provisionWorkspace", () => {
     );
 
     expect(createIntake).not.toHaveBeenCalled();
-    expect(listApps).not.toHaveBeenCalled();
-    expect(installFactory).toHaveBeenCalledWith(expect.objectContaining({ vcsProvider: "bitbucket" }));
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["line-implementation", "pr-closure"]);
+    for (const [input] of installFactory.mock.calls) {
+      expect(input.vcsProvider).toBe("bitbucket");
+    }
   });
 
   it("does not create a comments handler during workspace setup", async () => {

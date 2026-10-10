@@ -1,6 +1,7 @@
 import { useCreateFactoryPRFeedbackHandler } from "@/hooks/useFactoryPRFeedbackData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
+import { factoryVCSProvider } from "@/pages/home/factories";
 import { useEffect, useState } from "react";
 
 import {
@@ -57,6 +58,7 @@ export function useDiscussionPRFeedbackSetup(
   factoryId: string,
   githubIntegrationId: string,
   repository: string,
+  vcsProvider?: string,
 ) {
   const [step, setStep] = useState<"mention" | "bots">("mention");
   const [mentionRequired, setMentionRequired] = useState(true);
@@ -64,20 +66,23 @@ export function useDiscussionPRFeedbackSetup(
   const [allowedBots, setAllowedBots] = useState<string[]>([]);
   const [error, setError] = useState<string>();
   const [catalogApplied, setCatalogApplied] = useState(false);
+  const supportsReviewBots = factoryVCSProvider(vcsProvider) !== "bitbucket";
 
   const catalogParameters = repository.trim() ? { repository: repository.trim() } : undefined;
-  const catalogQuery = useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters);
-  const catalog = catalogReviewBots(catalogQuery.data ?? []);
-  const catalogLoading = catalogQuery.isPending || catalogQuery.isFetching;
+  const catalogQuery = useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters, {
+    enabled: supportsReviewBots,
+  });
+  const catalog = catalogReviewBots(supportsReviewBots ? (catalogQuery.data ?? []) : []);
+  const catalogLoading = supportsReviewBots && (catalogQuery.isPending || catalogQuery.isFetching);
   const createHandler = useCreateFactoryPRFeedbackHandler(organizationId, factoryId);
 
   useEffect(() => {
-    if (catalogApplied || catalogLoading) {
+    if (!supportsReviewBots || catalogApplied || catalogLoading) {
       return;
     }
     setAllowedBots(catalog.map((bot) => bot.login));
     setCatalogApplied(true);
-  }, [catalog, catalogApplied, catalogLoading]);
+  }, [catalog, catalogApplied, catalogLoading, supportsReviewBots]);
 
   const toggleBot = (login: string) => {
     setAllowedBots((current) => toggleUniqueString(current, login));
@@ -132,6 +137,7 @@ export function useDiscussionPRFeedbackSetup(
     catalog,
     catalogQuery,
     catalogLoading,
+    supportsReviewBots,
     error,
     createHandler,
     finish,

@@ -66,6 +66,7 @@ export function MobileBoardSettings({
           factoryId={factoryId}
           factoryKey={routeSegment}
           githubIntegrationId={onboarding?.vcsIntegrationId?.trim() ?? ""}
+          vcsProvider={onboarding?.vcsProvider}
           repository={onboarding?.appRepository?.trim() ?? ""}
           lineId={lineId}
           canUpdate={canUpdate}

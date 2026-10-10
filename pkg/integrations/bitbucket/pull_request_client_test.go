@@ -33,7 +33,7 @@ func Test__GetPullRequest(t *testing.T) {
 	client, httpCtx := stubBitbucketClient(okResponse(`{
 		"id": 42, "state": "OPEN",
 		"source": {"branch": {"name": "feat/x"}, "commit": {"hash": "abc123"}},
-		"destination": {"branch": {"name": "main"}, "commit": {"hash": "def456"}},
+		"destination": {"branch": {"name": "main", "merge_strategies": ["squash", "merge_commit", "fast_forward"]}, "commit": {"hash": "def456"}},
 		"merge_commit": {"hash": "merge789"}
 	}`))
 
@@ -44,22 +44,68 @@ func Test__GetPullRequest(t *testing.T) {
 	assert.Equal(t, "abc123", pr.SourceHash)
 	assert.Equal(t, "feat/x", pr.SourceBr)
 	assert.Equal(t, "main", pr.DestBranch)
+	assert.Equal(t, []string{"squash", "merge_commit", "fast_forward"}, pr.DestMergeStrategies)
 
 	require.Len(t, httpCtx.Requests, 1)
 	assert.Equal(t, "/2.0/repositories/acme/widgets/pullrequests/42", httpCtx.Requests[0].URL.Path)
 }
 
+func Test__ListMergeabilityChecks(t *testing.T) {
+	t.Run("follows pagination", func(t *testing.T) {
+		client, _ := stubBitbucketClient(
+			okResponse(`{"values": [{"type": "git_mergeability_check", "status": "PASSED", "required": true, "blocking": false}], "next": "https://api.bitbucket.org/2.0/next-page"}`),
+			okResponse(`{"values": [{"type": "current_user_permission_check", "status": "FAILED", "required": true, "blocking": true}]}`),
+		)
+
+		checks, err := client.ListMergeabilityChecks("acme/widgets", 42)
+		require.NoError(t, err)
+		require.Len(t, checks, 2)
+		assert.Equal(t, "git_mergeability_check", checks[0].Type)
+		assert.False(t, checks[0].Blocking)
+		assert.Equal(t, "current_user_permission_check", checks[1].Type)
+		assert.True(t, checks[1].Blocking)
+	})
+
+	t.Run("api failures surface the status", func(t *testing.T) {
+		client, _ := stubBitbucketClient(&http.Response{
+			StatusCode: http.StatusInternalServerError,
+			Body:       io.NopCloser(strings.NewReader(`{"error": {"message": "boom"}}`)),
+		})
+
+		_, err := client.ListMergeabilityChecks("acme/widgets", 42)
+		require.Error(t, err)
+		var apiErr *APIError
+		require.ErrorAs(t, err, &apiErr)
+		assert.Equal(t, http.StatusInternalServerError, apiErr.StatusCode)
+	})
+}
+
 func Test__MergePullRequest(t *testing.T) {
-	client, httpCtx := stubBitbucketClient(okResponse(`{"id": 42, "state": "MERGED"}`))
+	t.Run("sends the merge strategy", func(t *testing.T) {
+		client, httpCtx := stubBitbucketClient(okResponse(`{"id": 42, "state": "MERGED"}`))
 
-	merged, err := client.MergePullRequest("acme/widgets", 42, "squash")
-	require.NoError(t, err)
-	assert.Equal(t, "MERGED", merged.State)
+		merged, err := client.MergePullRequest("acme/widgets", 42, "squash")
+		require.NoError(t, err)
+		assert.Equal(t, "MERGED", merged.State)
 
-	require.Len(t, httpCtx.Requests, 1)
-	request := httpCtx.Requests[0]
-	assert.Equal(t, http.MethodPost, request.Method)
-	assert.Equal(t, "/2.0/repositories/acme/widgets/pullrequests/42/merge", request.URL.Path)
+		require.Len(t, httpCtx.Requests, 1)
+		request := httpCtx.Requests[0]
+		assert.Equal(t, http.MethodPost, request.Method)
+		assert.Equal(t, "/2.0/repositories/acme/widgets/pullrequests/42/merge", request.URL.Path)
+		body, err := io.ReadAll(request.Body)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"type": "pullrequest", "merge_strategy": "squash"}`, string(body))
+	})
+
+	t.Run("asynchronous merges do not count as merged", func(t *testing.T) {
+		client, _ := stubBitbucketClient(&http.Response{
+			StatusCode: http.StatusAccepted,
+			Body:       io.NopCloser(strings.NewReader(`{"type": "error", "error": {"message": "pending"}}`)),
+		})
+
+		_, err := client.MergePullRequest("acme/widgets", 42, "merge_commit")
+		require.ErrorIs(t, err, errBitbucketMergeAsync)
+	})
 }
 
 func Test__DeclinePullRequest(t *testing.T) {
