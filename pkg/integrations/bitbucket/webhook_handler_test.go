@@ -5,12 +5,52 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+func TestBitbucketWebhookHandlerForgeUsesLocalSubscription(t *testing.T) {
+	bitbucketapp.SetSystemTokenSource(func(string) (string, time.Time, error) { return "token", time.Now().Add(time.Hour), nil })
+	t.Cleanup(func() { bitbucketapp.SetSystemTokenSource(nil) })
+	integration := &contexts.IntegrationContext{Metadata: map[string]any{
+		"authType": AuthTypeForgeApp, "forgeInstallationId": "installation-1", "workspace": map[string]any{"slug": "acme"},
+	}}
+	httpContext := &contexts.HTTPContext{Responses: []*http.Response{{StatusCode: http.StatusOK,
+		Body: io.NopCloser(strings.NewReader(`{"uuid":"{repo-1}","full_name":"acme/widgets"}`)),
+	}}}
+	webhook := &contexts.WebhookContext{Configuration: WebhookConfiguration{
+		RepositorySlug: "widgets", EventTypes: []string{"pullrequest:fulfilled", "pullrequest:rejected"},
+	}}
+	ctx := core.WebhookHandlerContext{HTTP: httpContext, Integration: integration, Webhook: webhook}
+	handler := &BitbucketWebhookHandler{}
+	metadata, err := handler.Setup(ctx)
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+	assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+	assert.Equal(t, &BitbucketWebhook{RepositoryUUID: "{repo-1}", RepositoryFullName: "acme/widgets"}, metadata)
+	require.NoError(t, handler.Cleanup(ctx))
+	webhook.Configuration = WebhookConfiguration{RepositorySlug: "widgets", EventTypes: []string{"repo:push"}}
+	_, err = handler.Setup(ctx)
+	require.ErrorContains(t, err, "does not support event")
+	assert.Len(t, httpContext.Requests, 1)
+
+	// Build-status subscriptions share the Forge bridge with PR events
+	httpContext.Responses = []*http.Response{{StatusCode: http.StatusOK,
+		Body: io.NopCloser(strings.NewReader(`{"uuid":"{repo-1}","full_name":"acme/widgets"}`)),
+	}}
+	webhook.Configuration = WebhookConfiguration{
+		RepositorySlug: "widgets",
+		EventTypes:     []string{"pullrequest:created", "repo:commit_status_created", "repo:commit_status_updated", "pullrequest:comment_created"},
+	}
+	metadata, err = handler.Setup(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, &BitbucketWebhook{RepositoryUUID: "{repo-1}", RepositoryFullName: "acme/widgets"}, metadata)
+}
 
 func Test__BitbucketWebhookHandler__SetupUpdatesExistingHook(t *testing.T) {
 	handler := &BitbucketWebhookHandler{}

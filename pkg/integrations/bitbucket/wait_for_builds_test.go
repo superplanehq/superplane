@@ -206,6 +206,136 @@ func Test__WaitForBuilds__HandleWebhook(t *testing.T) {
 		assert.Equal(t, http.StatusOK, code)
 		assert.NoError(t, err)
 	})
+
+	t.Run("prefers active execution lookup when available", func(t *testing.T) {
+		body := []byte(`{"repository": {"full_name": "acme/widgets"}, "commit_status": {"key": "build-a", "state": "SUCCESSFUL", "commit": {"hash": "abc123"}}}`)
+		headers := http.Header{}
+		headers.Set("X-Event-Key", "repo:commit_status_updated")
+		headers.Set("X-Hub-Signature", "sha256="+signBitbucketPayload("test-secret", body))
+
+		activeCalled := false
+		legacyCalled := false
+		requests := &contexts.RequestContext{}
+		executionCtx := &core.ExecutionContext{
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       requests,
+		}
+		code, _, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Configuration: configuration,
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				legacyCalled = true
+				return executionCtx, nil
+			},
+			FindActiveExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				activeCalled = true
+				assert.Equal(t, waitBuildsRefKV, key)
+				return executionCtx, nil
+			},
+		})
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.True(t, activeCalled)
+		assert.False(t, legacyCalled)
+		assert.Equal(t, waitBuildsEvaluateHook, requests.Action)
+	})
+
+	t.Run("falls back to legacy lookup when active lookup is absent", func(t *testing.T) {
+		body := []byte(`{"repository": {"full_name": "acme/widgets"}, "commit_status": {"key": "build-a", "state": "SUCCESSFUL", "commit": {"hash": "abc123"}}}`)
+		headers := http.Header{}
+		headers.Set("X-Event-Key", "repo:commit_status_created")
+		headers.Set("X-Hub-Signature", "sha256="+signBitbucketPayload("test-secret", body))
+
+		requests := &contexts.RequestContext{}
+		executionCtx := &core.ExecutionContext{
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Requests:       requests,
+		}
+		code, _, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Configuration: configuration,
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				return executionCtx, nil
+			},
+		})
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		assert.Equal(t, waitBuildsEvaluateHook, requests.Action)
+	})
+
+	t.Run("completed active lookup does not schedule a re-evaluation", func(t *testing.T) {
+		body := []byte(`{"repository": {"full_name": "acme/widgets"}, "commit_status": {"key": "build-a", "state": "SUCCESSFUL", "commit": {"hash": "abc123"}}}`)
+		headers := http.Header{}
+		headers.Set("X-Event-Key", "repo:commit_status_updated")
+		headers.Set("X-Hub-Signature", "sha256="+signBitbucketPayload("test-secret", body))
+
+		code, _, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Configuration: configuration,
+			FindActiveExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				return nil, nil
+			},
+			FindExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				t.Fatal("legacy lookup must not run when active lookup is available")
+				return nil, nil
+			},
+		})
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+	})
+
+	t.Run("duplicate delivery only schedules evaluation, terminal emit stays single", func(t *testing.T) {
+		sha := "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(
+					`{"values": [{"key": "build-a", "name": "Build A", "state": "SUCCESSFUL"}]}`,
+				)),
+			},
+		}}
+		executionState := &contexts.ExecutionStateContext{}
+		requests := &contexts.RequestContext{}
+		metadata := &contexts.MetadataContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: WaitForBuildsConfiguration{
+				Repository: "acme/widgets",
+				Ref:        sha,
+				BuildKeys:  []string{"build-a"},
+			},
+			HTTP:           httpCtx,
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"token": "token"}, Metadata: Metadata{AuthType: AuthTypeWorkspaceAccessToken, Workspace: &WorkspaceMetadata{Slug: "acme"}}},
+			ExecutionState: executionState,
+			Requests:       requests,
+			Metadata:       metadata,
+			Logger:         logrus.NewEntry(logrus.New()),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, waitBuildsPassedChannel, executionState.Channel)
+		// A delayed event after completion finds no active wait, so polling is the fallback
+		body := []byte(`{"repository": {"full_name": "acme/widgets"}, "commit_status": {"key": "build-a", "state": "FAILED", "commit": {"hash": "` + sha + `"}}}`)
+		headers := http.Header{}
+		headers.Set("X-Event-Key", "repo:commit_status_updated")
+		headers.Set("X-Hub-Signature", "sha256="+signBitbucketPayload("test-secret", body))
+		code, _, err := component.HandleWebhook(core.WebhookRequestContext{
+			Body:          body,
+			Headers:       headers,
+			Webhook:       &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Configuration: map[string]any{"repository": "acme/widgets", "ref": sha, "buildKeys": []string{"build-a"}},
+			FindActiveExecutionByKV: func(key, value string) (*core.ExecutionContext, error) {
+				return nil, nil
+			},
+		})
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+	})
 }
 
 func Test__WaitBuildsTimeout(t *testing.T) {

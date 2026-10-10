@@ -19,6 +19,7 @@ interface DiscussionPRFeedbackSetupDialogProps {
   githubIntegrationId: string;
   repository: string;
   source: PRFeedbackSource;
+  vcsProvider?: string;
   onClose: () => void;
   onCreated: (handlerId: string) => void;
 }
@@ -29,6 +30,7 @@ export function DiscussionPRFeedbackSetupDialog(props: DiscussionPRFeedbackSetup
     props.factoryId,
     props.githubIntegrationId,
     props.repository,
+    props.vcsProvider,
   );
   const canLeaveStep = setup.step === "bots";
 
@@ -179,6 +181,25 @@ function SetupFooter({
   onClose: () => void;
   onCreated: (handlerId: string) => void;
 }) {
+  const finishButton = (
+    <Button
+      type="button"
+      disabled={setup.createHandler.isPending}
+      onClick={() => {
+        void setup.finish(source).then((handler) => {
+          if (handler?.id) {
+            onCreated(handler.id);
+            onClose();
+          }
+        });
+      }}
+      data-testid="discussion-setup-finish"
+    >
+      {setup.createHandler.isPending
+        ? PR_FEEDBACK_SETTINGS_COPY.wizardFinishing
+        : PR_FEEDBACK_SETTINGS_COPY.wizardFinish}
+    </Button>
+  );
   return (
     <footer className="flex items-center justify-end gap-3 pt-2">
       {setup.step === "mention" ? (
@@ -186,23 +207,7 @@ function SetupFooter({
           {PR_FEEDBACK_SETTINGS_COPY.wizardContinue}
         </Button>
       ) : (
-        <Button
-          type="button"
-          disabled={setup.createHandler.isPending}
-          onClick={() => {
-            void setup.finish(source).then((handler) => {
-              if (handler?.id) {
-                onCreated(handler.id);
-                onClose();
-              }
-            });
-          }}
-          data-testid="discussion-setup-finish"
-        >
-          {setup.createHandler.isPending
-            ? PR_FEEDBACK_SETTINGS_COPY.wizardFinishing
-            : PR_FEEDBACK_SETTINGS_COPY.wizardFinish}
-        </Button>
+        finishButton
       )}
     </footer>
   );

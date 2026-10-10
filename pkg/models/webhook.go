@@ -208,6 +208,20 @@ func SoftDeleteWebhookIfUnreferenced(tx *gorm.DB, webhookID uuid.UUID) error {
 	return tx.Delete(webhook).Error
 }
 
+func ListBitbucketForgeWebhooks(tx *gorm.DB, installationID, repositoryUUID string) ([]Webhook, error) {
+	var webhooks []Webhook
+	err := tx.Model(&Webhook{}).
+		Select("webhooks.*").
+		Joins("JOIN app_installations ON app_installations.id = webhooks.app_installation_id").
+		Where("app_installations.deleted_at IS NULL AND app_installations.app_name = ?", "bitbucket").
+		Where("app_installations.metadata->>'forgeInstallationId' = ?", installationID).
+		Where("app_installations.metadata->>'authType' = ?", "forgeApp").
+		Where("webhooks.state = ?", WebhookStateReady).
+		Where("trim(both '{}' from webhooks.metadata->>'repositoryUUID') = ?", repositoryUUID).
+		Find(&webhooks).Error
+	return webhooks, err
+}
+
 func ListPendingWebhooks() ([]Webhook, error) {
 	var webhooks []Webhook
 	err := database.Conn().

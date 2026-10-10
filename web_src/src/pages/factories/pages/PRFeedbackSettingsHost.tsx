@@ -8,6 +8,7 @@ import {
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
+import { factoryVCSProvider } from "@/pages/home/factories";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
@@ -34,11 +35,16 @@ import {
 import { useIntakeAutomationCanvas } from "./useIntakeAutomationCanvas";
 import { PopupHeader, PopupShell } from "./work-order-popup-redesign/popupShared";
 
+function reviewBotPrefetchEnabled(pickerOpen: boolean, githubIntegrationId: string, vcsProvider?: string): boolean {
+  return pickerOpen && Boolean(githubIntegrationId) && factoryVCSProvider(vcsProvider) !== "bitbucket";
+}
+
 interface PRFeedbackSettingsHostProps {
   organizationId: string;
   factoryId: string;
   factoryKey: string;
   githubIntegrationId?: string;
+  vcsProvider?: string;
   repository?: string;
   lineId?: string;
   canUpdate: boolean;
@@ -53,6 +59,7 @@ export function PRFeedbackSettingsHost({
   factoryId,
   factoryKey,
   githubIntegrationId = "",
+  vcsProvider,
   repository = "",
   lineId,
   canUpdate,
@@ -69,7 +76,7 @@ export function PRFeedbackSettingsHost({
     enabled: pickerOpen && Boolean(githubIntegrationId),
   });
   useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters, {
-    enabled: pickerOpen && Boolean(githubIntegrationId),
+    enabled: reviewBotPrefetchEnabled(pickerOpen, githubIntegrationId, vcsProvider),
   });
   const handlers = handlersQuery.data ?? [];
   const takenSourceIds = takenPRFeedbackSourceIds(handlers);
@@ -144,6 +151,7 @@ export function PRFeedbackSettingsHost({
       factoryId={factoryId}
       factoryKey={factoryKey}
       githubIntegrationId={githubIntegrationId}
+      vcsProvider={vcsProvider}
       lineId={lineId}
       canUpdate={canUpdate}
       initialTab={initialTab}
@@ -161,6 +169,7 @@ function PRFeedbackSettingsLoaded({
   factoryId,
   factoryKey,
   githubIntegrationId,
+  vcsProvider,
   lineId,
   canUpdate,
   initialTab,
@@ -174,6 +183,7 @@ function PRFeedbackSettingsLoaded({
   factoryId: string;
   factoryKey: string;
   githubIntegrationId: string;
+  vcsProvider?: string;
   lineId?: string;
   canUpdate: boolean;
   initialTab?: PRFeedbackSettingsTab;
@@ -202,6 +212,7 @@ function PRFeedbackSettingsLoaded({
     <PRFeedbackSettingsPopup
       organizationId={organizationId}
       githubIntegrationId={githubIntegrationId}
+      vcsProvider={vcsProvider}
       settings={settings}
       healthy={healthy}
       automationGraph={automation.graph}

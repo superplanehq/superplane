@@ -45,6 +45,19 @@ const GITHUB_PR: FactoriesFactoryPullRequest = {
   state: "STATE_OPEN",
 };
 
+const BITBUCKET_PR_NOTE: SplitRunFooterNote = {
+  ...PR_NOTE,
+  cta: { label: "Review PR #7", href: "https://bitbucket.org/acme/payments/pull-requests/7" },
+};
+
+const BITBUCKET_PR: FactoriesFactoryPullRequest = {
+  id: "pr-7",
+  provider: "PROVIDER_BITBUCKET",
+  url: "https://bitbucket.org/acme/payments/pull-requests/7",
+  number: "7",
+  state: "STATE_OPEN",
+};
+
 beforeAll(() => {
   Element.prototype.hasPointerCapture ??= () => false;
   Element.prototype.setPointerCapture ??= () => {};
@@ -339,5 +352,59 @@ describe("SplitRunAttentionNote for a pull request", () => {
 
     expect(screen.getByTestId("split-run-pr-merged")).toHaveTextContent("The pull request is merged.");
     expect(screen.queryByTestId("split-run-merge-button")).not.toBeInTheDocument();
+  });
+
+  it("shows the merge control for a Bitbucket pull request", () => {
+    renderNote({ note: BITBUCKET_PR_NOTE, pullRequests: [BITBUCKET_PR] });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(note).toHaveAttribute("data-variant", "pull-request");
+    expect(within(note).getByRole("heading", { name: "The pull request is ready for review" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-merge-button")).toBeEnabled();
+  });
+
+  it("disables Bitbucket merge and explains the blocker", async () => {
+    const user = userEvent.setup();
+    mergeability.current = {
+      canMerge: false,
+      blockedReason: "BLOCKED_REASON_CONFLICTING",
+      message: "The pull request has conflicts.",
+      allowedMethods: ["MERGE_METHOD_SQUASH"],
+      headSha: "abc123",
+    };
+    renderNote({ note: BITBUCKET_PR_NOTE, pullRequests: [BITBUCKET_PR] });
+
+    const note = screen.getByTestId("split-run-attention-note");
+    expect(within(note).getByRole("heading", { name: "The pull request has conflicts" })).toBeInTheDocument();
+    expect(screen.getByTestId("split-run-merge-button")).toBeDisabled();
+
+    await user.hover(screen.getByTestId("split-run-merge-reason"));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("The pull request has conflicts.");
+  });
+
+  it("offers only the branch merge strategies for Bitbucket, never rebase", async () => {
+    const user = userEvent.setup();
+    renderNote({ note: BITBUCKET_PR_NOTE, pullRequests: [BITBUCKET_PR] });
+
+    await user.click(screen.getByTestId("split-run-merge-method"));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((item) => item.textContent),
+    ).toEqual(["✓ Squash and merge", "Create a merge commit"]);
+  });
+
+  it("merges a Bitbucket pull request with the selected method", async () => {
+    const user = userEvent.setup();
+    renderNote({ note: BITBUCKET_PR_NOTE, pullRequests: [BITBUCKET_PR] });
+
+    await user.click(screen.getByTestId("split-run-merge-button"));
+    expect(mergeMutate).toHaveBeenCalledTimes(1);
+    expect(mergeMutate.mock.calls[0]?.[0]).toEqual({
+      pullRequestId: "pr-7",
+      mergeMethod: "MERGE_METHOD_SQUASH",
+      expectedHeadSha: "abc123",
+    });
   });
 });
