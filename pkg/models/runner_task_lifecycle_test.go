@@ -159,7 +159,7 @@ func TestReusableRunnerCanCompleteSequentialTasks(t *testing.T) {
 
 	require.NoError(t, firstTask.Reserve(db, runner.ID))
 	require.NoError(t, firstTask.Start(db, runner, "test-store", now))
-	require.NoError(t, firstTask.Complete(
+	completed, err := firstTask.Complete(
 		db,
 		runner,
 		"first-completion",
@@ -168,7 +168,21 @@ func TestReusableRunnerCanCompleteSequentialTasks(t *testing.T) {
 		"",
 		false,
 		now,
-	))
+	)
+	require.NoError(t, err)
+	assert.True(t, completed)
+	completed, err = firstTask.Complete(
+		db,
+		runner,
+		"first-completion",
+		datatypes.JSON([]byte(`{}`)),
+		0,
+		"",
+		false,
+		now,
+	)
+	require.NoError(t, err)
+	assert.False(t, completed)
 
 	require.NoError(t, secondTask.Reserve(db, runner.ID))
 	assert.Equal(t, models.RunnerTaskStateReserved, secondTask.State)

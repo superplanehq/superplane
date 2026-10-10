@@ -158,6 +158,127 @@ func TestPeriodicRunnerMetricsReportEveryNonTerminalStateForEachFleet(t *testing
 	}, gaugeStateCounts(t, resourceMetrics, runnerTaskCountMetricName, secondFleet))
 }
 
+func TestRunnerTaskQueueDurationRecordsSecondsByFleet(t *testing.T) {
+	reader := setupRunnerMetricsReader(t)
+
+	queuedAt := time.Now().Add(-3 * time.Minute)
+	reservedAt := queuedAt.Add(2 * time.Minute)
+	fleetID := uuid.New()
+	RecordRunnerTaskQueueDuration(t.Context(), &models.RunnerTask{
+		FleetID:    fleetID,
+		QueuedAt:   queuedAt,
+		ReservedAt: &reservedAt,
+	})
+
+	var resourceMetrics metricdata.ResourceMetrics
+	require.NoError(t, reader.Collect(t.Context(), &resourceMetrics))
+	for _, scope := range resourceMetrics.ScopeMetrics {
+		for _, collected := range scope.Metrics {
+			if collected.Name != runnerTaskQueueDurationMetricName {
+				continue
+			}
+			histogram, ok := collected.Data.(metricdata.Histogram[float64])
+			require.True(t, ok)
+			require.Len(t, histogram.DataPoints, 1)
+			point := histogram.DataPoints[0]
+			require.Equal(t, uint64(1), point.Count)
+			require.InDelta(t, 120, point.Sum, 0.001)
+			fleet, found := point.Attributes.Value(attribute.Key("fleet_id"))
+			require.True(t, found)
+			require.Equal(t, fleetID.String(), fleet.AsString())
+			require.Contains(t, point.Bounds, float64(120))
+			return
+		}
+	}
+	t.Fatalf("metric %q was not collected", runnerTaskQueueDurationMetricName)
+}
+
+func TestRunnerTaskExecutionDurationRecordsSecondsByFleetAndState(t *testing.T) {
+	reader := setupRunnerMetricsReader(t)
+
+	startedAt := time.Now().Add(-5 * time.Minute)
+	finishedAt := startedAt.Add(3 * time.Minute)
+	fleetID := uuid.New()
+	RecordRunnerTaskExecutionDuration(t.Context(), &models.RunnerTask{
+		FleetID:    fleetID,
+		State:      models.RunnerTaskStateSucceeded,
+		StartedAt:  &startedAt,
+		FinishedAt: &finishedAt,
+	})
+
+	var resourceMetrics metricdata.ResourceMetrics
+	require.NoError(t, reader.Collect(t.Context(), &resourceMetrics))
+	for _, scope := range resourceMetrics.ScopeMetrics {
+		for _, collected := range scope.Metrics {
+			if collected.Name != runnerTaskExecutionDurationMetricName {
+				continue
+			}
+			histogram, ok := collected.Data.(metricdata.Histogram[float64])
+			require.True(t, ok)
+			require.Len(t, histogram.DataPoints, 1)
+			point := histogram.DataPoints[0]
+			require.Equal(t, uint64(1), point.Count)
+			require.InDelta(t, 180, point.Sum, 0.001)
+			fleet, found := point.Attributes.Value(attribute.Key("fleet_id"))
+			require.True(t, found)
+			require.Equal(t, fleetID.String(), fleet.AsString())
+			state, found := point.Attributes.Value(attribute.Key("state"))
+			require.True(t, found)
+			require.Equal(t, models.RunnerTaskStateSucceeded, state.AsString())
+			require.Contains(t, point.Bounds, float64(300))
+			return
+		}
+	}
+	t.Fatalf("metric %q was not collected", runnerTaskExecutionDurationMetricName)
+}
+
+func TestRunnerTaskLogSizeRecordsRetainedBytesByFleet(t *testing.T) {
+	reader := setupRunnerMetricsReader(t)
+	fleetID := uuid.New()
+	RecordRunnerTaskLogSize(t.Context(), fleetID, 13, false)
+	RecordRunnerTaskLogSize(t.Context(), fleetID, 0, false)
+
+	var resourceMetrics metricdata.ResourceMetrics
+	require.NoError(t, reader.Collect(t.Context(), &resourceMetrics))
+	for _, scope := range resourceMetrics.ScopeMetrics {
+		for _, collected := range scope.Metrics {
+			if collected.Name != runnerTaskLogSizeMetricName {
+				continue
+			}
+			histogram, ok := collected.Data.(metricdata.Histogram[int64])
+			require.True(t, ok)
+			require.Len(t, histogram.DataPoints, 1)
+			point := histogram.DataPoints[0]
+			require.Equal(t, uint64(2), point.Count)
+			require.Equal(t, int64(13), point.Sum)
+			fleet, found := point.Attributes.Value(attribute.Key("fleet_id"))
+			require.True(t, found)
+			require.Equal(t, fleetID.String(), fleet.AsString())
+			truncated, found := point.Attributes.Value(attribute.Key("truncated"))
+			require.True(t, found)
+			require.False(t, truncated.AsBool())
+			require.Contains(t, point.Bounds, float64(1024))
+			return
+		}
+	}
+	t.Fatalf("metric %q was not collected", runnerTaskLogSizeMetricName)
+}
+
+func setupRunnerMetricsReader(t *testing.T) *sdkmetric.ManualReader {
+	t.Helper()
+
+	reader := sdkmetric.NewManualReader()
+	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	t.Cleanup(func() {
+		_ = provider.Shutdown(context.Background())
+		metricsReady.Store(false)
+	})
+	meter = provider.Meter("superplane-test")
+	require.NoError(t, registerRunnerMetrics())
+	metricsReady.Store(true)
+	return reader
+}
+
 func gaugeStateCounts(
 	t *testing.T,
 	resourceMetrics metricdata.ResourceMetrics,
