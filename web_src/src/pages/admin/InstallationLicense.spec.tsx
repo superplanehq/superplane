@@ -1,9 +1,22 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
 
 import type { InstallationLicense as InstallationLicenseStatus } from "@/lib/license";
 import InstallationLicense from "./InstallationLicense";
+
+const { accountRef } = vi.hoisted(() => ({
+  accountRef: { current: null as { license?: { hide_expiry_banner?: boolean } } | null },
+}));
+
+vi.mock("@/contexts/useAccount", () => ({
+  useAccount: () => ({
+    account: accountRef.current,
+    loading: false,
+    setupRequired: false,
+    refreshAccount: async () => undefined,
+  }),
+}));
 
 const communityStatus: InstallationLicenseStatus = {
   edition: "community",
@@ -36,6 +49,10 @@ const renderPage = () =>
       <InstallationLicense />
     </MemoryRouter>,
   );
+
+beforeEach(() => {
+  accountRef.current = null;
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -124,6 +141,50 @@ describe("InstallationLicense", () => {
 
     expect(await screen.findByText("Managed license")).toBeInTheDocument();
     expect(screen.queryByTestId("license-key-input")).not.toBeInTheDocument();
+  });
+
+  it("shows that a revoked license no longer grants Enterprise features", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({
+          ...enterpriseStatus,
+          edition: "community",
+          state: "revoked",
+        }),
+      ),
+    );
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId("license-state")).toHaveTextContent("Revoked"));
+    expect(screen.getByText("This license was revoked. Enterprise features are not available.")).toBeInTheDocument();
+    expect(screen.getByText("SuperPlane Community")).toBeInTheDocument();
+  });
+
+  it("shows the expiry badge for a revoked license unless the installation hides it", async () => {
+    const expiresAt = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+    const revoked = {
+      ...enterpriseStatus,
+      edition: "community" as const,
+      state: "revoked" as const,
+      license: { ...enterpriseStatus.license!, expires_at: expiresAt },
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(revoked)),
+    );
+    const { unmount } = renderPage();
+
+    expect(await screen.findByTestId("license-expiry-badge")).toHaveTextContent(/Expires in \d+ days/);
+
+    unmount();
+    accountRef.current = { license: { hide_expiry_banner: true } };
+    renderPage();
+
+    await screen.findByTestId("license-state");
+    expect(screen.queryByTestId("license-expiry-badge")).not.toBeInTheDocument();
   });
 
   it("explains why a configured license is invalid", async () => {
