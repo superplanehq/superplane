@@ -1,14 +1,12 @@
-import { useAccount } from "@/contexts/useAccount";
-import { useOrganization } from "@/hooks/useOrganizationData";
 import { cn } from "@/lib/utils";
-import { Gauge, LayoutGrid, Plus, Settings } from "lucide-react";
+import { Gauge, LayoutGrid, MoreHorizontal } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
-import { SidebarUserMenu } from "../layout/SidebarUserMenu";
 import {
   factoryHomePath,
   factorySettingsPath,
+  factoryMorePath,
   factoryVelocityPath,
   firstFactoryLineId,
   workOrderBoardLineIdFromSearch,
@@ -17,7 +15,7 @@ import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { MOBILE_BOTTOM_BAR_COPY } from "./mobileCopy";
 
 const TAB_CLASSNAME =
-  "flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-1 text-xs font-medium tracking-[-0.01em] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function isActivePath(pathname: string, target: string): boolean {
   return pathname === target || pathname.startsWith(`${target}/`);
@@ -60,27 +58,23 @@ function useBoardLineId(factory: { lines?: Array<{ id?: string }> | null } | nul
   return routeLineId ?? knownLineId(factory, rememberedLineId) ?? firstFactoryLineId(factory);
 }
 
-/**
- * Phone navigation. Create task sits in the middle because it is the main
- * action on every workspace page. The other slots open full pages.
- */
-export function MobileBottomBar({ canCreateWorkOrder }: { canCreateWorkOrder: boolean }) {
-  const { organizationId, routeSegment, factory, openCreateWorkOrder } = useFactoriesLayout();
+/** Phone navigation keeps account and workspace controls in More. */
+export function MobileBottomBar() {
+  const { organizationId, routeSegment, factory } = useFactoriesLayout();
   const { pathname } = useLocation();
-  const { account } = useAccount();
-  const { data: organization } = useOrganization(organizationId);
 
   const boardLineId = useBoardLineId(factory);
   const boardHref = factoryHomePath(organizationId, routeSegment, boardLineId);
   const velocityHref = factoryVelocityPath(organizationId, routeSegment);
   const settingsHref = factorySettingsPath(organizationId, routeSegment);
+  const moreHref = factoryMorePath(organizationId, routeSegment, boardLineId);
   const boardActive = pathname.includes("/lines/") || pathname.includes("/task/");
 
   return (
     <nav
       aria-label="Workspace"
       data-testid="mobile-bottom-bar"
-      className="flex h-[calc(3.5rem+env(safe-area-inset-bottom))] shrink-0 items-stretch border-t border-border bg-background pb-[env(safe-area-inset-bottom)]"
+      className="flex h-[calc(4rem+env(safe-area-inset-bottom))] shrink-0 items-stretch border-t border-border bg-background pb-[env(safe-area-inset-bottom)]"
     >
       <BottomTab href={boardHref} label={MOBILE_BOTTOM_BAR_COPY.board} active={boardActive} testId="mobile-tab-board">
         <LayoutGrid className="size-5" aria-hidden />
@@ -93,36 +87,16 @@ export function MobileBottomBar({ canCreateWorkOrder }: { canCreateWorkOrder: bo
       >
         <Gauge className="size-5" aria-hidden />
       </BottomTab>
-      <div className="flex flex-1 items-center justify-center">
-        <button
-          type="button"
-          onClick={openCreateWorkOrder}
-          disabled={!canCreateWorkOrder}
-          aria-label={MOBILE_BOTTOM_BAR_COPY.createTask}
-          title={MOBILE_BOTTOM_BAR_COPY.createTask}
-          data-testid="mobile-create-task"
-          className="flex size-12 -translate-y-3 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-opacity hover:opacity-90 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          <Plus className="size-6" aria-hidden />
-        </button>
-      </div>
       <BottomTab
-        href={settingsHref}
-        label={MOBILE_BOTTOM_BAR_COPY.settings}
-        active={isActivePath(pathname, settingsHref)}
-        testId="mobile-tab-settings"
+        href={moreHref}
+        label={MOBILE_BOTTOM_BAR_COPY.more}
+        active={
+          isActivePath(pathname, factoryMorePath(organizationId, routeSegment)) || isActivePath(pathname, settingsHref)
+        }
+        testId="mobile-tab-more"
       >
-        <Settings className="size-5" aria-hidden />
+        <MoreHorizontal className="size-5" aria-hidden />
       </BottomTab>
-      <div className="flex min-w-0 flex-1 items-center justify-center [&>div]:border-t-0 [&>div]:py-0">
-        <SidebarUserMenu
-          organizationId={organizationId}
-          factoryKey={routeSegment}
-          userName={account?.name ?? "You"}
-          userAvatarUrl={account?.avatar_url}
-          organizationName={organization?.metadata?.name || "Organization"}
-        />
-      </div>
     </nav>
   );
 }
