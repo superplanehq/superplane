@@ -31,8 +31,6 @@ type CreateForm struct {
 type convertedApp struct {
 	ID            int64  `json:"id"`
 	Slug          string `json:"slug"`
-	ClientID      string `json:"client_id"`
-	ClientSecret  string `json:"client_secret"`
 	WebhookSecret string `json:"webhook_secret"`
 	PEM           string `json:"pem"`
 }
@@ -60,6 +58,8 @@ func PublicManifestJSON(baseURL, webhooksBaseURL string) (string, error) {
 		"name":   "SuperPlane",
 		"public": false,
 		"url":    publicAppHomepageURL,
+		// GitHub's app creation form rejects email_addresses. Sign-in
+		// still requests the user:email scope.
 		"default_permissions": map[string]string{
 			"issues":                      "write",
 			"actions":                     "write",
@@ -71,12 +71,10 @@ func PublicManifestJSON(baseURL, webhooksBaseURL string) (string, error) {
 			"deployments":                 "write",
 			"organization_administration": "read",
 			"members":                     "read",
-			"email_addresses":             "read",
 		},
 		"default_events": []string{"member"},
 		"setup_url":      baseURL + setupPath,
 		"redirect_url":   baseURL + createdPath,
-		"callback_urls":  []string{OAuthCallbackURL(baseURL)},
 		"hook_attributes": map[string]any{
 			"url": webhooksBaseURL + webhookPath,
 		},
@@ -125,10 +123,8 @@ func ConvertManifest(httpCtx core.HTTPContext, code string) (config.GitHubHosted
 		Slug:          strings.TrimSpace(app.Slug),
 		PrivateKey:    strings.TrimSpace(app.PEM),
 		WebhookSecret: strings.TrimSpace(app.WebhookSecret),
-		ClientID:      strings.TrimSpace(app.ClientID),
-		ClientSecret:  strings.TrimSpace(app.ClientSecret),
 	}
-	if !cfg.Enabled() || cfg.ClientID == "" || cfg.ClientSecret == "" {
+	if !cfg.Enabled() {
 		return config.GitHubHostedAppConfig{}, fmt.Errorf("GitHub App manifest conversion is incomplete")
 	}
 	return cfg, nil

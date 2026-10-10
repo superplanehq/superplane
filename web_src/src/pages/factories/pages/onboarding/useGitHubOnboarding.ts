@@ -18,10 +18,15 @@ const githubOnboardingPollIntervalMs = 3_000;
 const githubOnboardingSyncPollIntervalMs = 1_000;
 const githubInstallationCheckIntervalMs = 10_000;
 
-type GitHubOnboardingPollingState = Pick<MeDescribeVcsProviderOnboardingResponse, "identity" | "synchronizing">;
+type GitHubOnboardingPollingState = Pick<
+  MeDescribeVcsProviderOnboardingResponse,
+  "identity" | "synchronizing" | "providerConfigured" | "accountConnectionRequired"
+>;
 
 export function githubOnboardingPollInterval(data: GitHubOnboardingPollingState | undefined): number | false {
-  if (!data?.identity) return false;
+  if (!data) return false;
+  const appOnly = data.providerConfigured === true && data.accountConnectionRequired !== true;
+  if (!data.identity && !appOnly) return false;
   return data.synchronizing ? githubOnboardingSyncPollIntervalMs : githubOnboardingPollIntervalMs;
 }
 
