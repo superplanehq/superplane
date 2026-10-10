@@ -310,6 +310,7 @@ function MobileLineBoard(props: {
         onColorViewChange={setColorView}
         intakes={configuredIntakes}
         prFeedbackHandlers={model.prFeedbackHandlers}
+        vcsProvider={factory?.onboarding?.vcsProvider}
         onOpenIntake={(intake) => navigate(factoryIntakePath(organizationId, routeSegment, lineId, intake.intakeId))}
         onOpenPRFeedback={(handlerId) =>
           navigate(factoryPRFeedbackPath(organizationId, routeSegment, lineId, undefined, handlerId))

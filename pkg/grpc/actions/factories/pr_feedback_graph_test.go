@@ -95,7 +95,12 @@ func Test__ResolvePRFeedbackGraph(t *testing.T) {
 				Repository:  "acme/widgets",
 				Mention:     "@ada",
 				VCSProvider: models.ProviderBitbucket,
+				AllowedBots: []string{"open-code-review"},
+				IgnoreBots:  true,
 			})
+			trigger := findSpecNode(t, canvas, prFeedbackCommentTriggerNodeID)
+			assert.Equal(t, []any{"open-code-review"}, trigger.Configuration["allowedBots"])
+			assert.Equal(t, true, trigger.Configuration["ignoreBots"])
 			spec := models.LiveCanvasSpec{Nodes: canvas.Nodes(), Edges: canvas.Edges()}
 
 			graph := resolvePRFeedbackGraph(spec)

@@ -53,6 +53,7 @@ function resolvePRFeedbackSetupModel(
     factoryId: string;
     githubIntegrationId: string;
     repository: string;
+    vcsProvider?: string;
     source: PRFeedbackSource;
   };
 } {
@@ -61,7 +62,7 @@ function resolvePRFeedbackSetupModel(
   const boardHref = factoryHomePath(organizationId, routeSegment, firstFactoryLineId(factory));
   const line = bindings.lines.find((entry) => entry.id === lineId);
   const returnHref = line?.id ? factoryLineDetailPath(organizationId, routeSegment, line.id) : boardHref;
-  const source = prFeedbackSourceById(kind === "checks" ? "checks" : "discussion");
+  const source = prFeedbackSourceById(kind === "checks" ? "checks" : "discussion", bindings.vcsProvider);
   const titleParts = [prFeedbackSetupPageTitle(kind), bindings.workspaceName];
   const redirectTo = prFeedbackSetupRedirect({
     kind,
@@ -88,6 +89,7 @@ function resolvePRFeedbackSetupModel(
       factoryId,
       githubIntegrationId: bindings.githubIntegrationId,
       repository: bindings.repository,
+      vcsProvider: bindings.vcsProvider,
       source,
     },
   };
@@ -99,6 +101,7 @@ function factoryPRFeedbackSetupBindings(factory: ResolvedFactoriesLayout["factor
     lines: factory?.lines ?? [],
     githubIntegrationId: factory?.onboarding?.vcsIntegrationId?.trim() ?? "",
     repository: factory?.onboarding?.appRepository?.trim() ?? "",
+    vcsProvider: factory?.onboarding?.vcsProvider,
   };
 }
 
@@ -134,6 +137,7 @@ function PRFeedbackSetupDialogs({
   factoryId,
   githubIntegrationId,
   repository,
+  vcsProvider,
   source,
   onClose,
   onCreated,
@@ -143,6 +147,7 @@ function PRFeedbackSetupDialogs({
   factoryId: string;
   githubIntegrationId: string;
   repository: string;
+  vcsProvider?: string;
   source: PRFeedbackSource;
   onClose: () => void;
   onCreated: () => void;
@@ -162,7 +167,7 @@ function PRFeedbackSetupDialogs({
       {kind === "checks" ? (
         <ChecksPRFeedbackSetupDialog {...shared} />
       ) : (
-        <DiscussionPRFeedbackSetupDialog {...shared} />
+        <DiscussionPRFeedbackSetupDialog {...shared} vcsProvider={vcsProvider} />
       )}
     </div>
   );

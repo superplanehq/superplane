@@ -11,12 +11,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { SplitRunPullRequestMergeAction } from "./SplitRunPullRequestMergeAction";
 import type { SplitRunDecisionTone, SplitRunFooterAction, SplitRunFooterNote } from "./splitRunFooter";
 import {
-  isGitHubPullRequest,
   isMergedPullRequest,
   PULL_REQUEST_REVIEW_COPY,
   pullRequestForReviewHref,
   pullRequestReviewCopy,
   pullRequestReviewNote,
+  supportsPullRequestMerge,
   type PullRequestReviewCopy,
   type PullRequestReviewTarget,
 } from "./splitRunPullRequestReview";
@@ -147,7 +147,7 @@ function usePullRequestReviewCopy(
       organizationId &&
       factoryId &&
       pullRequest?.id &&
-      isGitHubPullRequest(pullRequest) &&
+      supportsPullRequestMerge(pullRequest) &&
       !isMergedPullRequest(pullRequest),
   );
   const mergeability = useFactoryPullRequestMergeability(organizationId ?? "", factoryId ?? "", pullRequest?.id ?? "", {
