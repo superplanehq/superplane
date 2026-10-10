@@ -191,7 +191,7 @@ endif
 dev.runners:
 	@$(MAKE) dev.setup.runner.fleet
 	$(COMPOSE_RUNNER) up -d --no-build --no-deps fleet-manager
-	@echo "Fleet Manager is running with ephemeral Docker runners."
+	@echo "Fleet Manager is running with Docker runners."
 
 runner.new:
 	@bash ./scripts/runner-new

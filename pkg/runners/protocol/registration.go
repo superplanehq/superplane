@@ -23,7 +23,6 @@ type Registration struct {
 	RunnerID    string `json:"runner_id"`
 	FleetID     string `json:"fleet_id"`
 	AccessToken string `json:"access_token"`
-	Ephemeral   bool   `json:"ephemeral"`
 }
 
 func Register(

@@ -22,7 +22,7 @@ func TestCreateRunnerUsesFleetPathAndAdminBearer(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{
-			"runner":{"id":"runner-1","fleetId":"linux-amd64","state":"pending","runnerVersion":"1.2.3","ephemeral":true},
+			"runner":{"id":"runner-1","fleetId":"linux-amd64","state":"pending","runnerVersion":"1.2.3"},
 			"registrationToken":"registration-token",
 			"registrationExpiresAt":"2026-09-27T15:00:00Z",
 			"runnerApiUrl":"https://superplane.example/runner/v1",
@@ -37,14 +37,12 @@ func TestCreateRunnerUsesFleetPathAndAdminBearer(t *testing.T) {
 	}
 	response, err := client.CreateRunner(context.Background(), "linux-amd64", CreateRunnerRequest{
 		IdempotencyKey: "fleet-manager/linux-amd64/generic/request-1",
-		Ephemeral:      true,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if received.IdempotencyKey != "fleet-manager/linux-amd64/generic/request-1" ||
-		!received.Ephemeral {
+	if received.IdempotencyKey != "fleet-manager/linux-amd64/generic/request-1" {
 		t.Fatalf("request = %#v", received)
 	}
 	if response.Runner.ID != "runner-1" || response.Runner.RunnerVersion != "1.2.3" {
@@ -177,7 +175,6 @@ func TestCreateRunnerRetriesServerFailureWithSameIdempotencyKey(t *testing.T) {
 	}
 	if _, err := client.CreateRunner(context.Background(), "fleet-a", CreateRunnerRequest{
 		IdempotencyKey: "stable-key",
-		Ephemeral:      true,
 	}); err != nil {
 		t.Fatal(err)
 	}

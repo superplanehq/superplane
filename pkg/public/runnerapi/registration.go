@@ -26,7 +26,6 @@ type registerRunnerResponse struct {
 	RunnerID    string `json:"runner_id"`
 	FleetID     string `json:"fleet_id"`
 	AccessToken string `json:"access_token"`
-	Ephemeral   bool   `json:"ephemeral"`
 }
 
 type errorResponse struct {
@@ -119,7 +118,6 @@ func (s *Server) registerRunner(w http.ResponseWriter, r *http.Request) {
 		RunnerID:    runner.ID.String(),
 		FleetID:     claims.FleetID,
 		AccessToken: accessToken,
-		Ephemeral:   runner.Ephemeral,
 	})
 }
 

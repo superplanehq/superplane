@@ -32,7 +32,6 @@ type createCommand struct {
 	FleetID        string
 	TaskID         string
 	IdempotencyKey string
-	Ephemeral      bool
 }
 
 func newCreateCommand(options core.BindOptions) *cobra.Command {
@@ -46,7 +45,6 @@ func newCreateCommand(options core.BindOptions) *cobra.Command {
 		"",
 		"idempotency key",
 	)
-	cmd.Flags().BoolVar(&handler.Ephemeral, "ephemeral", false, "terminate after one task")
 	_ = cmd.MarkFlagRequired("fleet")
 	core.Bind(cmd, handler, options)
 	return cmd
@@ -54,7 +52,6 @@ func newCreateCommand(options core.BindOptions) *cobra.Command {
 
 func (c *createCommand) Execute(ctx core.CommandContext) error {
 	request := openapi_client.RunnersCreateRunnerBody{}
-	request.SetEphemeral(c.Ephemeral)
 	if taskID := strings.TrimSpace(c.TaskID); taskID != "" {
 		request.SetTaskId(taskID)
 	}
@@ -146,18 +143,17 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 		writer := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
 		if _, err := fmt.Fprintln(
 			writer,
-			"ID\tSTATE\tRUNNER_VERSION\tEPHEMERAL\tCREATED_AT\tLAST_SEEN_AT",
+			"ID\tSTATE\tRUNNER_VERSION\tCREATED_AT\tLAST_SEEN_AT",
 		); err != nil {
 			return err
 		}
 		for _, runner := range response.GetRunners() {
 			if _, err := fmt.Fprintf(
 				writer,
-				"%s\t%s\t%s\t%t\t%s\t%s\n",
+				"%s\t%s\t%s\t%s\t%s\n",
 				runner.GetId(),
 				runner.GetState(),
 				valueOrDash(runner.GetRunnerVersion()),
-				runner.GetEphemeral(),
 				formatRelativeTime(runner.CreatedAt),
 				formatRelativeTime(runner.LastSeenAt),
 			); err != nil {
@@ -254,12 +250,11 @@ func renderRunner(ctx core.CommandContext, runner *openapi_client.RunnersRunner)
 		}
 		_, err := fmt.Fprintf(
 			stdout,
-			"ID: %s\nFleet: %s\nState: %s\nRunner version: %s\nEphemeral: %t\nRegistered: %s\nLast seen: %s\nCreated: %s\nUpdated: %s\nTerminated: %s\nTermination reason: %s\n",
+			"ID: %s\nFleet: %s\nState: %s\nRunner version: %s\nRegistered: %s\nLast seen: %s\nCreated: %s\nUpdated: %s\nTerminated: %s\nTermination reason: %s\n",
 			runner.GetId(),
 			runner.GetFleetId(),
 			runner.GetState(),
 			valueOrDash(runner.GetRunnerVersion()),
-			runner.GetEphemeral(),
 			formatRelativeTime(runner.RegisteredAt),
 			formatRelativeTime(runner.LastSeenAt),
 			formatRelativeTime(runner.CreatedAt),

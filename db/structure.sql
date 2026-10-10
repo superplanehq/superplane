@@ -1392,7 +1392,6 @@ CREATE TABLE public.runners (
     fleet_id uuid NOT NULL,
     state character varying(32) DEFAULT 'pending'::character varying NOT NULL,
     runner_version text NOT NULL,
-    ephemeral boolean DEFAULT false NOT NULL,
     creation_idempotency_key text,
     creation_request_hash text,
     registered_at timestamp with time zone,
@@ -5659,7 +5658,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261010003855	f
+20261010182039	f
 \.
 
 

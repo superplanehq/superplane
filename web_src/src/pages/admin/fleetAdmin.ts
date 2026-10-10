@@ -14,7 +14,6 @@ export type FleetRunner = {
   id: string;
   state: string;
   runnerVersion?: string;
-  ephemeral?: boolean;
   createdAt?: string | null;
   lastSeenAt?: string | null;
 };

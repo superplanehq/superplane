@@ -101,7 +101,6 @@ message Runner {
   google.protobuf.Timestamp created_at = 8;
   google.protobuf.Timestamp updated_at = 9;
   optional google.protobuf.Timestamp terminated_at = 10;
-  bool ephemeral = 11;
 }
 
 message Task {
@@ -184,7 +183,8 @@ message CreateRunnerRequest {
   string fleet_id = 1;
   optional string task_id = 2;
   string idempotency_key = 3;
-  bool ephemeral = 4;
+  // Accepted for older clients. All runners terminate after one task.
+  bool ephemeral = 4 [deprecated = true];
 }
 
 message CreateRunnerResponse {

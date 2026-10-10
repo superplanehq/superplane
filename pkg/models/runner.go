@@ -43,8 +43,7 @@ const runnerCreationIdempotencyKeyConstraint = "runners_creation_idempotency_key
  * SuperPlane creates it in the pending state before infrastructure starts,
  * then uses it to track registration, connectivity, workload state, and termination.
  *
- * Ephemeral runners terminate after their first task. Reusable runners return
- * to idle. This is an instance property because one fleet can contain both.
+ * A runner terminates after its first task.
  *
  * CreationIdempotencyKey is optional for generic capacity. Task-specific
  * runners require it so a lost create response can recover the runner and
@@ -60,7 +59,6 @@ type Runner struct {
 	FleetID                uuid.UUID
 	State                  string
 	RunnerVersion          string
-	Ephemeral              bool
 	RegisteredAt           *time.Time
 	LastSeenAt             *time.Time
 	CurrentConnectionID    *uuid.UUID
@@ -81,7 +79,7 @@ type StaleRunner struct {
 /*
  * RunnerCredential stores the hash of the bearer token that authenticates a
  * registered runner. The plaintext token is returned once at registration and
- * is never persisted. A recently completed ephemeral runner can reconnect to
+ * is never persisted. A recently completed runner can reconnect to
  * retry its idempotent completion until credential cleanup revokes the token.
  */
 type RunnerCredential struct {

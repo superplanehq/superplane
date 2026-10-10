@@ -276,7 +276,7 @@ func (s *Server) requestRunnerShutdown(
 			shouldShutdown = true
 			return nil
 		}
-		if runner.State != models.RunnerStateBusy || !runner.Ephemeral {
+		if runner.State != models.RunnerStateBusy {
 			return errRunnerStateMismatch
 		}
 		task, err := runner.FindActiveTask(tx)

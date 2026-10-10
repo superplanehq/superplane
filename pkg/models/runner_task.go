@@ -203,6 +203,9 @@ func (r *Runner) FindActiveTask(tx *gorm.DB) (*RunnerTask, error) {
 }
 
 func (r *Runner) ReserveNextTask(tx *gorm.DB) (*RunnerTask, error) {
+	if r.State != RunnerStateIdle {
+		return nil, ErrRunnerTaskNotReservable
+	}
 	var task RunnerTask
 	err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Where("fleet_id = ? AND backend = ? AND state = ? AND runner_id IS NULL",
@@ -337,21 +340,10 @@ func (t *RunnerTask) Complete(
 	}
 
 	runnerUpdates := map[string]any{
-		"updated_at": now,
-	}
-	if runner.Ephemeral {
-		runnerUpdates["state"] = RunnerStateTerminated
-		runnerUpdates["termination_reason"] = RunnerTerminationTaskCompleted
-		runnerUpdates["terminated_at"] = now
-		runner.State = RunnerStateTerminated
-		reason := RunnerTerminationTaskCompleted
-		runner.TerminationReason = &reason
-		runner.TerminatedAt = &now
-	} else {
-		runnerUpdates["state"] = RunnerStateIdle
-		runnerUpdates["termination_reason"] = nil
-		runnerUpdates["terminated_at"] = nil
-		runner.State = RunnerStateIdle
+		"state":              RunnerStateTerminated,
+		"termination_reason": RunnerTerminationTaskCompleted,
+		"terminated_at":      now,
+		"updated_at":         now,
 	}
 	runnerResult := tx.Model(runner).
 		Where("state = ?", RunnerStateBusy).
@@ -370,6 +362,10 @@ func (t *RunnerTask) Complete(
 	t.FinishedAt = &now
 	t.UpdatedAt = now
 	runner.UpdatedAt = now
+	runner.State = RunnerStateTerminated
+	reason := RunnerTerminationTaskCompleted
+	runner.TerminationReason = &reason
+	runner.TerminatedAt = &now
 	return true, nil
 }
 

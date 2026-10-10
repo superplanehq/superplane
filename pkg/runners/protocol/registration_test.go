@@ -34,7 +34,6 @@ func TestRegisterExchangesOpaqueRegistrationToken(t *testing.T) {
 					RunnerID:    "runner-1",
 					FleetID:     "linux-amd64",
 					AccessToken: "runner-access-token",
-					Ephemeral:   true,
 				})
 			}))
 			defer server.Close()
@@ -51,8 +50,7 @@ func TestRegisterExchangesOpaqueRegistrationToken(t *testing.T) {
 			}
 			if registration.RunnerID != "runner-1" ||
 				registration.FleetID != "linux-amd64" ||
-				registration.AccessToken != "runner-access-token" ||
-				!registration.Ephemeral {
+				registration.AccessToken != "runner-access-token" {
 				t.Fatalf("registration = %#v", registration)
 			}
 		})

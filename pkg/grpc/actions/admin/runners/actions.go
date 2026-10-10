@@ -244,9 +244,6 @@ func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest)
 	if err != nil {
 		return nil, err
 	}
-	if taskID != nil && !req.GetEphemeral() {
-		return nil, grpcerrors.InvalidArgument(nil, "task-specific runners must be ephemeral")
-	}
 
 	idempotencyKey := strings.TrimSpace(req.GetIdempotencyKey())
 	// Generic capacity can tolerate creating another pending runner after a
@@ -260,14 +257,13 @@ func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest)
 	}
 	requestHash := ""
 	if idempotencyKey != "" {
-		requestHash = createRunnerRequestHash(fleetID, taskID, req.GetEphemeral())
+		requestHash = createRunnerRequestHash(fleetID, taskID)
 	}
 
 	runner, registration, err := s.createRunner(
 		ctx,
 		fleetID,
 		taskID,
-		req.GetEphemeral(),
 		idempotencyKey,
 		requestHash,
 	)
@@ -354,9 +350,6 @@ func (s *Service) DeleteRunner(ctx context.Context, req *pb.DeleteRunnerRequest)
 			return err
 		}
 		if runner.State == models.RunnerStateBusy {
-			if !runner.Ephemeral {
-				return models.ErrRunnerBusy
-			}
 			task, taskErr := runner.FindActiveTask(tx)
 			if errors.Is(taskErr, models.ErrRunnerTaskNotFound) {
 				return models.ErrRunnerBusy
@@ -386,7 +379,6 @@ func (s *Service) createRunner(
 	ctx context.Context,
 	fleetID string,
 	taskID *uuid.UUID,
-	ephemeral bool,
 	idempotencyKey, requestHash string,
 ) (*models.Runner, *models.RunnerRegistration, error) {
 	var runner *models.Runner
@@ -426,7 +418,6 @@ func (s *Service) createRunner(
 			FleetID:       fleet.ID,
 			State:         models.RunnerStatePending,
 			RunnerVersion: fleet.RunnerVersion,
-			Ephemeral:     ephemeral,
 			CreatedAt:     now,
 			UpdatedAt:     now,
 		}
@@ -616,8 +607,10 @@ func optionalID(value *string, field string) (*uuid.UUID, error) {
 	return &id, nil
 }
 
-func createRunnerRequestHash(fleetID string, taskID *uuid.UUID, ephemeral bool) string {
-	source := fmt.Sprintf("%s:%s:%t", fleetID, optionalIDString(taskID), ephemeral)
+func createRunnerRequestHash(fleetID string, taskID *uuid.UUID) string {
+	// Keep the historical true suffix so retries can find runners created
+	// before the lifecycle field was removed.
+	source := fmt.Sprintf("%s:%s:true", fleetID, optionalIDString(taskID))
 	sum := sha256.Sum256([]byte(source))
 	return hex.EncodeToString(sum[:])
 }

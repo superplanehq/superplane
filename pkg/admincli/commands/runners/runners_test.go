@@ -22,7 +22,7 @@ func TestCreateRunnerPassesLifecycleAndRendersRegistration(t *testing.T) {
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&request))
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprint(w, `{
-			"runner":{"id":"runner-1","fleetId":"e1-large-arm64","state":"pending","runnerVersion":"dev","ephemeral":true},
+			"runner":{"id":"runner-1","fleetId":"e1-large-arm64","state":"pending","runnerVersion":"dev"},
 			"registrationToken":"registration-token",
 			"registrationExpiresAt":"2026-10-02T19:00:00Z",
 			"runnerApiUrl":"http://localhost:8000"
@@ -35,13 +35,11 @@ func TestCreateRunnerPassesLifecycleAndRendersRegistration(t *testing.T) {
 		FleetID:        "e1-large-arm64",
 		TaskID:         "task-1",
 		IdempotencyKey: "request-1",
-		Ephemeral:      true,
 	}).Execute(ctx)
 
 	require.NoError(t, err)
 	assert.Equal(t, "task-1", request.GetTaskId())
 	assert.Equal(t, "request-1", request.GetIdempotencyKey())
-	assert.True(t, request.GetEphemeral())
 	assert.Contains(t, stdout.String(), "runner-1")
 	assert.Contains(t, stdout.String(), "registration-token")
 	assert.Contains(t, stdout.String(), "http://localhost:8000")

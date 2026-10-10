@@ -141,7 +141,7 @@ func TestRunnerWebSocketDeliversAndCompletesTask(t *testing.T) {
 	require.NoError(t, err, "credential must remain valid for completion acknowledgement retries")
 }
 
-func TestRunnerWebSocketShutdownRequestCancelsBusyEphemeralRunner(t *testing.T) {
+func TestRunnerWebSocketShutdownRequestCancelsBusyRunner(t *testing.T) {
 	resource := support.Setup(t)
 	signer := jwt.NewSigner("registration-secret")
 	runner, registration, fleet := createRegistrationFixture(t)

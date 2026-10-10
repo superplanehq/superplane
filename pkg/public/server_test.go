@@ -25,6 +25,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
@@ -345,6 +346,20 @@ func Test__GRPCGatewayRejectsUnknownFields(t *testing.T) {
 	require.Equal(t, int32(3), statusBody.Code)
 	require.Contains(t, statusBody.Message, `unknown field "hello"`)
 	require.False(t, server.createCanvasCalled)
+}
+
+func TestRunnerCreateAcceptsLegacyLifecycleField(t *testing.T) {
+	for _, value := range []bool{false, true} {
+		request := &pbAdminRunners.CreateRunnerRequest{}
+		body, err := json.Marshal(map[string]any{
+			"fleetId":   "linux-amd64",
+			"ephemeral": value,
+		})
+		require.NoError(t, err)
+		require.NoError(t, newGRPCGatewayMarshaler().Unmarshal(body, request))
+		assert.Equal(t, "linux-amd64", request.GetFleetId())
+		assert.Equal(t, value, request.GetEphemeral())
+	}
 }
 
 // Helper function to check if the required Swagger files exist

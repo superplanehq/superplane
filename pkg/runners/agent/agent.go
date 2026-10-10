@@ -82,8 +82,7 @@ func (r taskExecutionResult) errorMessage() string {
 	return r.RunErr.Error()
 }
 
-// Run executes one task for an ephemeral runner or continues accepting tasks
-// for a reusable runner. A task completes only after all retained logs and its
+// Run executes one task. A task completes only after all retained logs and its
 // terminal result have been acknowledged.
 func (a *Agent) Run(ctx context.Context) error {
 	if a.HTTP == nil {
@@ -129,9 +128,6 @@ func (a *Agent) Run(ctx context.Context) error {
 		case rawTask := <-session.Tasks():
 			if err := a.runTask(sessionContext, session, sessionStatus, rawTask); err != nil {
 				return err
-			}
-			if !a.Config.Registration.Ephemeral && !shutdownRequested.Load() {
-				continue
 			}
 			a.logger().Info(
 				"runner waiting for shutdown",

@@ -67,7 +67,6 @@ const runnersBody = (fleet: FleetFixture) =>
       id: runner.id,
       state: runner.state ?? "idle",
       runnerVersion: "1.0.0",
-      ephemeral: false,
       createdAt: "2026-10-06T12:00:00Z",
     })),
     totalCount: fleet.runnerTotal ?? String(fleet.runners?.length ?? 0),

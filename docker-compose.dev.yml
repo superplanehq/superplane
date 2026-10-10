@@ -242,7 +242,7 @@ services:
       timeout: 3s
       retries: 5
 
-  # Build-only service. Fleet Manager starts ephemeral containers from this
+  # Build-only service. Fleet Manager starts runner containers from this
   # image when a task is queued.
   runner:
     profiles: [local-runner-image]

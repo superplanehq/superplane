@@ -11,7 +11,6 @@ export const RunnerRows = ({ rows }: { rows: FleetRunner[] }) => (
           <th className={headerCellClass}>ID</th>
           <th className={headerCellClass}>State</th>
           <th className={headerCellClass}>Runner version</th>
-          <th className={headerCellClass}>Ephemeral</th>
           <th className={headerCellClass}>Created</th>
           <th className={headerCellClass}>Last seen</th>
         </tr>
@@ -26,7 +25,6 @@ export const RunnerRows = ({ rows }: { rows: FleetRunner[] }) => (
             <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300">
               {runner.runnerVersion?.trim() || "—"}
             </td>
-            <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">{runner.ephemeral ? "Yes" : "No"}</td>
             <td className="px-4 py-2.5">
               <RelativeTimestamp value={runner.createdAt} />
             </td>
