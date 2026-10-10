@@ -106,3 +106,43 @@ func FirstNodeExecutionByKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, node
 
 	return &execution, nil
 }
+
+// FirstActiveNodeExecutionByKV resolves the oldest active execution a
+// key/value pair points at. It exists for Bitbucket build waits, where
+// repeated waits for the same repository and SHA can leave a completed wait
+// sharing a KV with a later active wait; the oldest-wins lookup would route
+// build events to the completed wait and hide the active one. Other
+// components keep the oldest-wins behavior. When several waits are active,
+// the event wakes one and polling remains the fallback for the rest.
+func FirstActiveNodeExecutionByKV(tx *gorm.DB, workflowID uuid.UUID, nodeID, key, value string) (*CanvasNodeExecution, error) {
+	var executionIDs []uuid.UUID
+	err := tx.
+		Table("workflow_node_execution_kvs").
+		Distinct("execution_id").
+		Where("key = ? AND value = ?", key, value).
+		Where("workflow_id = ?", workflowID).
+		Where("node_id = ?", nodeID).
+		Pluck("execution_id", &executionIDs).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	if len(executionIDs) == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+
+	var execution CanvasNodeExecution
+	err = tx.
+		Where("workflow_id = ?", workflowID).
+		Where("id IN ?", executionIDs).
+		Where("state IN ?", CanvasNodeExecutionActiveStates).
+		Order("created_at ASC").
+		First(&execution).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
+}

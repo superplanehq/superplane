@@ -14,14 +14,13 @@ import {
 import { Check, MoreHorizontal, Radio, Search, X } from "lucide-react";
 import { useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 
-import githubIcon from "@/assets/icons/integrations/github.svg";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
 import type { WorkOrderFilterOption } from "../lib/workOrderFilterOptions";
 import type { LineBoardColumnColorView } from "../lib/lineBoardColumnColorViewPreference";
 import { LineBoardViewMenu } from "../pages/LineBoardViewMenu";
 import type { ConfiguredLineIntakeSource } from "../pages/lineIntakeModel";
 import { lineIntakeListenTitle } from "../pages/lineIntakeModel";
-import { prFeedbackListenTitle } from "../pages/prFeedbackSettingsModel";
+import { prFeedbackListenTitle, prFeedbackVCSIcon } from "../pages/prFeedbackSettingsModel";
 import { humanizeLineName } from "../lib/humanizeLineName";
 import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
@@ -54,6 +53,7 @@ export function MobileBoardHeader({
   factoryId,
   factoryKey,
   canManageClosedStatus,
+  vcsProvider,
 }: {
   state: WorkOrderListState;
   searchRef: RefObject<HTMLInputElement | null>;
@@ -74,6 +74,7 @@ export function MobileBoardHeader({
   factoryId: string;
   factoryKey: string;
   canManageClosedStatus: boolean;
+  vcsProvider?: string;
 }) {
   const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
 
@@ -108,6 +109,7 @@ export function MobileBoardHeader({
             prFeedbackHandlers={prFeedbackHandlers}
             onOpenIntake={onOpenIntake}
             onOpenPRFeedback={onOpenPRFeedback}
+            vcsProvider={vcsProvider}
           />
         </div>
       </div>
@@ -239,15 +241,18 @@ function MobileBoardMenu({
   prFeedbackHandlers,
   onOpenIntake,
   onOpenPRFeedback,
+  vcsProvider,
 }: {
   intakes: ConfiguredLineIntakeSource[];
   prFeedbackHandlers: FactoriesFactoryPrFeedbackHandler[];
   onOpenIntake: (intake: ConfiguredLineIntakeSource) => void;
   onOpenPRFeedback: (handlerId: string) => void;
+  vcsProvider?: string;
 }) {
   const handlers = prFeedbackHandlers.filter((handler): handler is typeof handler & { id: string } =>
     Boolean(handler.id),
   );
+  const verifyIcon = prFeedbackVCSIcon(vcsProvider);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -296,8 +301,8 @@ function MobileBoardMenu({
               >
                 <ListenerRow
                   title={prFeedbackListenTitle(handler.source)}
-                  iconSrc={githubIcon}
-                  iconAlt="GitHub"
+                  iconSrc={verifyIcon.iconSrc}
+                  iconAlt={verifyIcon.iconAlt}
                   healthy={handler.healthy !== false}
                 />
               </DropdownMenuItem>

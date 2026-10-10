@@ -9,8 +9,12 @@ import { pullRequestLabel, pullRequestState } from "../../lib/workOrderPullReque
 
 import type { SplitRunFooter, SplitRunFooterNote } from "./splitRunFooter";
 
-/** `https://github.com/<owner>/<repo>/pull/<number>` with an optional tail. */
-const PULL_REQUEST_URL = /^https?:\/\/[^/]+\/[^/]+\/[^/]+\/pull\/(\d+)(?:[/?#]|$)/;
+/**
+ * `https://github.com/<owner>/<repo>/pull/<number>` or
+ * `https://bitbucket.org/<workspace>/<repo>/pull-requests/<number>`,
+ * each with an optional tail.
+ */
+const PULL_REQUEST_URL = /^https?:\/\/[^/]+\/[^/]+\/[^/]+\/(?:pull\/(\d+)|pull-requests\/(\d+))(?:[/?#]|$)/;
 
 export interface PullRequestReviewTarget {
   href: string;
@@ -31,7 +35,7 @@ export function pullRequestReviewNote(note: SplitRunFooterNote): PullRequestRevi
   if (!match) {
     return undefined;
   }
-  return { href, number: Number(match[1]) };
+  return { href, number: Number(match[1] ?? match[2]) };
 }
 
 export function isPullRequestReviewFooter(footer: SplitRunFooter): boolean {
@@ -70,6 +74,17 @@ export function pullRequestForReviewHref(
 
 export function isGitHubPullRequest(pullRequest: FactoriesFactoryPullRequest | undefined): boolean {
   return (pullRequest?.provider ?? "PROVIDER_GITHUB") === "PROVIDER_GITHUB";
+}
+
+/** Pull requests SuperPlane can merge: GitHub and Bitbucket. */
+export function supportsPullRequestMerge(pullRequest: FactoriesFactoryPullRequest | undefined): boolean {
+  switch (pullRequest?.provider ?? "PROVIDER_GITHUB") {
+    case "PROVIDER_GITHUB":
+    case "PROVIDER_BITBUCKET":
+      return true;
+    default:
+      return false;
+  }
 }
 
 export function isMergedPullRequest(pullRequest: FactoriesFactoryPullRequest | undefined): boolean {
