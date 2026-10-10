@@ -3,7 +3,6 @@ package telemetry
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -25,6 +24,10 @@ var (
 	runnerTaskLogSize            metric.Int64Histogram
 	runnerTaskDurationBoundaries = []float64{1, 5, 10, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 14400, 28800, 86400}
 )
+
+func MetricsEnabled() bool {
+	return metricsReady.Load()
+}
 
 func registerRunnerMetrics() error {
 	var err error
@@ -76,8 +79,8 @@ func registerRunnerMetrics() error {
 	return err
 }
 
-func RecordRunnerTaskQueueDuration(ctx context.Context, task *models.RunnerTask) {
-	if !metricsReady.Load() || task.ReservedAt == nil || task.QueuedAt.IsZero() {
+func RecordRunnerTaskQueueDuration(ctx context.Context, task *models.RunnerTask, fleetSlug, fleetScope string) {
+	if !metricsReady.Load() || fleetScope == "" || task.ReservedAt == nil || task.QueuedAt.IsZero() {
 		return
 	}
 
@@ -89,12 +92,15 @@ func RecordRunnerTaskQueueDuration(ctx context.Context, task *models.RunnerTask)
 	runnerTaskQueueDuration.Record(
 		ctx,
 		duration.Seconds(),
-		metric.WithAttributes(attribute.String("fleet_id", task.FleetID.String())),
+		metric.WithAttributes(
+			attribute.String("fleet_id", fleetSlug),
+			attribute.String("fleet_scope", fleetScope),
+		),
 	)
 }
 
-func RecordRunnerTaskExecutionDuration(ctx context.Context, task *models.RunnerTask) {
-	if !metricsReady.Load() || task.StartedAt == nil || task.FinishedAt == nil {
+func RecordRunnerTaskExecutionDuration(ctx context.Context, task *models.RunnerTask, fleetSlug, fleetScope string) {
+	if !metricsReady.Load() || fleetScope == "" || task.StartedAt == nil || task.FinishedAt == nil {
 		return
 	}
 
@@ -107,14 +113,15 @@ func RecordRunnerTaskExecutionDuration(ctx context.Context, task *models.RunnerT
 		ctx,
 		duration.Seconds(),
 		metric.WithAttributes(
-			attribute.String("fleet_id", task.FleetID.String()),
+			attribute.String("fleet_id", fleetSlug),
+			attribute.String("fleet_scope", fleetScope),
 			attribute.String("state", task.State),
 		),
 	)
 }
 
-func RecordRunnerTaskLogSize(ctx context.Context, fleetID uuid.UUID, size int64, truncated bool) {
-	if !metricsReady.Load() || size < 0 {
+func RecordRunnerTaskLogSize(ctx context.Context, fleetSlug, fleetScope string, size int64, truncated bool) {
+	if !metricsReady.Load() || fleetScope == "" || size < 0 {
 		return
 	}
 
@@ -122,7 +129,8 @@ func RecordRunnerTaskLogSize(ctx context.Context, fleetID uuid.UUID, size int64,
 		ctx,
 		size,
 		metric.WithAttributes(
-			attribute.String("fleet_id", fleetID.String()),
+			attribute.String("fleet_id", fleetSlug),
+			attribute.String("fleet_scope", fleetScope),
 			attribute.Bool("truncated", truncated),
 		),
 	)
@@ -146,8 +154,9 @@ func recordRunnerTaskCount(ctx context.Context, count models.FleetStateCount) {
 
 func fleetStateAttributes(count models.FleetStateCount) metric.RecordOption {
 	return metric.WithAttributes(
-		attribute.String("fleet_id", count.FleetID.String()),
+		attribute.String("fleet_id", count.FleetSlug),
 		attribute.String("fleet_slug", count.FleetSlug),
+		attribute.String("fleet_scope", count.FleetScope),
 		attribute.String("state", count.State),
 	)
 }
