@@ -32,6 +32,16 @@ describe("licenseExpiryWarning", () => {
     expect(licenseExpiryWarning(license, now)).toEqual({ expired: true, daysLeft: 0 });
   });
 
+  it("does not warn for a revoked license", () => {
+    const license = {
+      edition: "community" as const,
+      features: [],
+      state: "revoked" as const,
+      expires_at: inDays(5),
+    };
+    expect(licenseExpiryWarning(license, now)).toBeNull();
+  });
+
   it("does not warn for a license that is not valid yet", () => {
     const license = {
       edition: "community" as const,

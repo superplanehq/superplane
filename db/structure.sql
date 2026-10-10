@@ -1000,6 +1000,21 @@ CREATE TABLE public.installation_license_keys (
 
 
 --
+-- Name: installation_license_revocations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_license_revocations (
+    id integer NOT NULL,
+    document text NOT NULL,
+    version bigint NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT installation_license_revocations_singleton CHECK ((id = 1)),
+    CONSTRAINT installation_license_revocations_version_positive CHECK ((version > 0))
+);
+
+
+--
 -- Name: installation_licenses; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2518,6 +2533,14 @@ ALTER TABLE ONLY public.installation_github_apps
 
 ALTER TABLE ONLY public.installation_license_keys
     ADD CONSTRAINT installation_license_keys_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: installation_license_revocations installation_license_revocations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_license_revocations
+    ADD CONSTRAINT installation_license_revocations_pkey PRIMARY KEY (id);
 
 
 --
@@ -5636,7 +5659,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261009215225	f
+20261010003855	f
 \.
 
 
