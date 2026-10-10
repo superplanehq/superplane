@@ -170,7 +170,7 @@ func (c *CreateReview) Execute(ctx core.ExecutionContext) error {
 
 	review, _, err := client.CreatePullRequestReview(context.Background(), config.Repository, pullNumber, req)
 	if err != nil {
-		return fmt.Errorf("failed to create review: %w", err)
+		return fmt.Errorf("failed to create review: %w", explainGitHubError(err))
 	}
 
 	return ctx.ExecutionState.Emit(
