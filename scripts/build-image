@@ -34,8 +34,10 @@ build_frontend_for_cdn() {
 
   echo "Building frontend with VITE_ASSET_BASE_URL=${asset_base_url}"
   make pb.gen
+  # Match the Dockerfile frontend build. The default Node heap (~2GB) is too
+  # small for tsc + vite on the f1-standard-2 image job.
   compose_exec -e VITE_ASSET_BASE_URL="${asset_base_url}" app bash -lc \
-    "cd web_src && VITE_ASSET_BASE_URL='${asset_base_url}' npm run build"
+    "cd web_src && NODE_OPTIONS=--max-old-space-size=4096 VITE_ASSET_BASE_URL='${asset_base_url}' npm run build"
 }
 
 upload_static_assets() {
