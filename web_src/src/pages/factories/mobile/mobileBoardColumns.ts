@@ -72,7 +72,7 @@ export function buildMobileBoardColumns(
       title: "Backlog",
       cards: cardsForOrders(backlogOrders),
       paging: "backlog",
-      emptyDescription: "No tasks in Backlog. Tap + to create a task.",
+      emptyDescription: "No tasks in Backlog.",
       totalCount: totalCounts?.backlog,
     },
     ...stageColumns.map(

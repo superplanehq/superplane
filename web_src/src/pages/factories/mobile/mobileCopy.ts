@@ -2,7 +2,7 @@ export const MOBILE_BOTTOM_BAR_COPY = {
   board: "Board",
   velocity: "Velocity",
   createTask: "Create task",
-  settings: "Settings",
+  more: "More",
 } as const;
 
 export const MOBILE_BOARD_COPY = {
