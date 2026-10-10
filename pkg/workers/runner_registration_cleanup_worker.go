@@ -71,7 +71,7 @@ func (w *RunnerCleanupWorker) Process() error {
 				Error("Failed to expire runner registration")
 		}
 	}
-	staleIDs, err := models.ListStaleRunnerIDs(
+	staleRunners, err := models.ListStaleRunners(
 		database.Conn(),
 		now.Add(-runnerConnectionLossTimeout),
 		runnerRegistrationCleanupBatchSize,
@@ -79,10 +79,10 @@ func (w *RunnerCleanupWorker) Process() error {
 	if err != nil {
 		return err
 	}
-	for _, id := range staleIDs {
+	for _, staleRunner := range staleRunners {
 		var lostRunningTask *models.RunnerTask
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
-			runner, err := models.LockRunner(tx, id)
+			runner, err := models.LockRunner(tx, staleRunner.ID)
 			if errors.Is(err, models.ErrRunnerNotFound) {
 				return nil
 			}
@@ -94,19 +94,12 @@ func (w *RunnerCleanupWorker) Process() error {
 		})
 		if err != nil {
 			w.logger.WithError(err).
-				WithField("runner_id", id).
+				WithField("runner_id", staleRunner.ID).
 				Error("Failed to mark disconnected runner as lost")
 			continue
 		}
-		if lostRunningTask != nil {
-			fleet, err := models.FindRunnerFleet(database.Conn().Unscoped(), lostRunningTask.FleetID)
-			if err != nil {
-				w.logger.WithError(err).
-					WithField("task_id", lostRunningTask.ID).
-					Error("Failed to find fleet for lost runner task metric")
-				continue
-			}
-			telemetry.RecordRunnerTaskExecutionDuration(context.Background(), lostRunningTask, fleet.Slug)
+		if lostRunningTask != nil && telemetry.MetricsEnabled() {
+			telemetry.RecordRunnerTaskExecutionDuration(context.Background(), lostRunningTask, staleRunner.FleetSlug, staleRunner.FleetScope)
 		}
 	}
 	return models.RevokeTerminatedRunnerCredentials(
