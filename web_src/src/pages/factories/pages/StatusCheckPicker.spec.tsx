@@ -74,10 +74,10 @@ describe("StatusCheckPicker", () => {
     expect(screen.getByTestId("pr-feedback-check-option-lint")).toBeInTheDocument();
   });
 
-  it("shows the key beside the label when they differ", () => {
+  it("shows only the label when the key is unique", () => {
     render(<StatusCheckPicker names={[]} catalog={[{ id: "build-a", name: "Build A" }]} onToggle={vi.fn()} />);
 
-    expect(screen.getByTestId("pr-feedback-check-option-build-a")).toHaveTextContent("Build A (build-a)");
+    expect(screen.getByTestId("pr-feedback-check-option-build-a")).toHaveTextContent(/^Build A$/);
   });
 
   it("keeps separate choices when two keys share one name", async () => {
@@ -94,8 +94,8 @@ describe("StatusCheckPicker", () => {
       />,
     );
 
-    expect(screen.getByTestId("pr-feedback-check-option-e2e-1")).toBeInTheDocument();
-    expect(screen.getByTestId("pr-feedback-check-option-e2e-2")).toBeInTheDocument();
+    expect(screen.getByTestId("pr-feedback-check-option-e2e-1")).toHaveTextContent("E2E (e2e-1)");
+    expect(screen.getByTestId("pr-feedback-check-option-e2e-2")).toHaveTextContent("E2E (e2e-2)");
     await user.click(screen.getByTestId("pr-feedback-check-option-e2e-2"));
     expect(onToggle).toHaveBeenCalledWith("e2e-2");
   });

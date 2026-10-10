@@ -91,6 +91,51 @@ esac
 	}
 }
 
+func TestBitbucketPushStopsWhenRemoteHeadIsAbsent(t *testing.T) {
+	remote := bareRepository(t)
+	commitRemoteBranch(t, remote, "feedback")
+	head := strings.TrimSpace(runGit(t, remote, "rev-parse", "refs/heads/feedback"))
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "bin")
+	require.NoError(t, os.Mkdir(bin, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "curl"), []byte("#!/bin/sh\nprintf '{}'\n"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(bin, "jq"), []byte(`#!/bin/sh
+cat >/dev/null
+case "$2" in
+  '.source.repository.full_name // empty') printf '%s' acme/widgets ;;
+  '.source.branch.name // empty') printf '%s' feedback ;;
+  '.source.commit.hash // empty') printf '%s' "$FIXTURE_HASH" ;;
+  *) exit 1 ;;
+esac
+`), 0o755))
+	config := filepath.Join(dir, "gitconfig")
+	denyNetworkGit(t, config)
+	runGit(t, dir, "config", "--file", config, "url."+fileURL(remote)+".insteadOf", "https://bitbucket.org/acme/widgets.git")
+	env := []string{"PATH=" + bin + ":" + os.Getenv("PATH"), "GIT_CONFIG_GLOBAL=" + config, "GIT_CONFIG_NOSYSTEM=1",
+		"GIT_TERMINAL_PROMPT=0", "FIXTURE_HASH=" + head, "REPO=acme/widgets", "PR_NUMBER=7", "BITBUCKET_TOKEN=test",
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@example.com", "GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@example.com"}
+	command := exec.Command("bash", "-c", bitbucketCheckoutCommand())
+	command.Dir, command.Env = dir, env
+	output, err := command.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+
+	repo := filepath.Join(dir, "repo")
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "fix.txt"), []byte("local change"), 0o644))
+	absent := "0123456789abcdef0123456789abcdef01234567"
+	pushEnv := append([]string(nil), env...)
+	for i, value := range pushEnv {
+		if strings.HasPrefix(value, "FIXTURE_HASH=") {
+			pushEnv[i] = "FIXTURE_HASH=" + absent
+		}
+	}
+	command = exec.Command("bash", "-c", bitbucketCommitPushCommand("fix: address feedback"))
+	command.Dir, command.Env = repo, pushEnv
+	output, err = command.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+	assert.Contains(t, string(output), "Stop without pushing")
+	assert.Equal(t, head, strings.TrimSpace(runGit(t, remote, "rev-parse", "refs/heads/feedback")))
+}
+
 func TestBitbucketCheckoutCommandChecksOutTheSourceBranch(t *testing.T) {
 	command := bitbucketCheckoutCommand()
 

@@ -63,6 +63,15 @@ func bitbucketValidateStoredSourceLines() []string {
 	}
 }
 
+func bitbucketStopWhenRemoteHeadIsAbsentLines() []string {
+	return []string{
+		`if ! git rev-parse --verify --quiet --end-of-options "${SOURCE_HASH}^{commit}" >/dev/null; then`,
+		`  echo "Remote pull request head changed. Stop without pushing."`,
+		`  exit 0`,
+		`fi`,
+	}
+}
+
 func bitbucketNormalizeSourceCommitsLines() []string {
 	return []string{
 		`SOURCE_HASH=$(git rev-parse --verify --end-of-options "${SOURCE_HASH}^{commit}")`,
@@ -149,6 +158,7 @@ func bitbucketCommitPushCommand(message string) string {
 		`SOURCE_BRANCH=$(cat ../.superplane/source-branch)`,
 	)
 	lines = append(lines, bitbucketValidateStoredSourceLines()...)
+	lines = append(lines, bitbucketStopWhenRemoteHeadIsAbsentLines()...)
 	lines = append(lines, bitbucketNormalizeSourceCommitsLines()...)
 	lines = append(lines,
 		`CHECKED_OUT=$(git rev-parse --verify --end-of-options "${CHECKED_OUT}^{commit}")`,
