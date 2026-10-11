@@ -50,17 +50,6 @@ export interface JiraComment {
   updateAuthor?: JiraUser;
 }
 
-export interface JiraServiceDesk {
-  id?: string;
-  projectKey?: string;
-  projectName?: string;
-}
-
-export interface JiraOpsTeam {
-  teamId?: string;
-  teamName?: string;
-}
-
 export interface JiraNodeMetadata {
   project?: JiraProject;
   issueType?: string;
@@ -92,16 +81,6 @@ export interface JiraWorkflow {
   currentStatusId?: string;
   statuses?: JiraWorkflowStatus[];
   availableTransitions?: JiraWorkflowAvailableTransition[];
-}
-
-export interface JiraApproval {
-  id?: string;
-  name?: string;
-  finalDecision?: string;
-  approvers?: Array<{
-    approver?: JiraUser;
-    approverDecision?: string;
-  }>;
 }
 
 export interface CreateIssueConfiguration {
@@ -148,12 +127,4 @@ export interface TransitionIssueConfiguration {
   targetStatus?: string;
   comment?: string;
   resolution?: string;
-}
-
-export interface ApproveWorkflowConfiguration {
-  issueKey?: string;
-  decision?: string;
-  approvalSelector?: string;
-  approvalId?: string;
-  comment?: string;
 }

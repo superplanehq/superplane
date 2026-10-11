@@ -32,18 +32,22 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-SuperPlane connects to Linear with OAuth. A workspace admin must authorize the connection, because the triggers register webhooks. That person must also be a member of each private team you want to listen to.
-
-The connection requests the **read**, **write**, and **admin** scopes. Write covers creating and editing issues, comments, attachments, and reactions. Admin lets SuperPlane register webhooks.
+SuperPlane connects to Linear with OAuth. The person who authorizes the connection must be a member of each private team you want to listen to.
 
 1. Open Linear, then **Settings**, then **Administration**, then **API**.
 2. Under **OAuth applications**, click **Create new**.
-3. Set the callback URL to the address SuperPlane shows, then create the application.
-4. Copy the **Client ID** into the **Client ID** field.
-5. Copy the **Client Secret** into the **Client Secret** field.
-6. Click **Save**. SuperPlane opens Linear so a workspace admin can authorize the connection.
+3. Set the callback URL to the address SuperPlane shows.
+4. Set the webhook URL to the SuperPlane address plus `/api/v1/linear/webhook`.
+5. Select **Issues**, **Comments**, and **Issue attachments**.
+6. Create the application.
+7. Copy the **Client ID** into the **Client ID** field.
+8. Copy the **Client Secret** into the **Client Secret** field.
+9. Copy the **Webhook signing secret** into the **Webhook signing secret** field.
+10. Click **Save**. SuperPlane opens Linear so you can authorize the connection.
 
-You can also leave both fields empty and click **Save**. SuperPlane opens Linear's application form with the callback URL filled in. Copy the **Client ID** and **Client Secret** from the credentials page into the fields above, then click **Save** again.
+You can also leave the fields empty and click **Save**. SuperPlane opens Linear's application form with the callback URL and the webhook URL filled in. Copy the **Client ID**, the **Client Secret**, and the **Webhook signing secret** into the fields above, then click **Save** again.
+
+When the webhook signing secret is set, the connection requests the **read** and **write** scopes. Write covers creating and editing issues, comments, attachments, and reactions. When the secret is empty, the connection also requests the **admin** scope so SuperPlane can create a webhook for each trigger. A workspace admin must authorize that connection.
 
 Linear lets only a comment's own author edit it, so **Update Issue Comment** can only change comments that this same connection posted.
 
@@ -75,9 +79,9 @@ The On Issue trigger starts a workflow execution when issue events occur in a Li
 
 ### Webhook Setup
 
-This trigger registers a Linear webhook automatically when configured, and removes it when the
-trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
-the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.
+SuperPlane receives Linear events for this trigger. When the Linear OAuth application has a webhook URL and a signing secret, SuperPlane uses that webhook. The connection needs the **read** and **write** scopes.
+
+When the application has no signing secret, SuperPlane creates a webhook in Linear for this trigger and removes it when the trigger is deleted. Linear allows that only for a workspace admin or a token with the **admin** scope.
 
 ### Example Data
 
@@ -186,9 +190,9 @@ Linear deduplicates attachments by URL within an issue, so re-attaching an exist
 
 ### Webhook Setup
 
-This trigger registers a Linear webhook automatically when configured, and removes it when the
-trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
-the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.
+SuperPlane receives Linear events for this trigger. When the Linear OAuth application has a webhook URL and a signing secret, SuperPlane uses that webhook. The connection needs the **read** and **write** scopes.
+
+When the application has no signing secret, SuperPlane creates a webhook in Linear for this trigger and removes it when the trigger is deleted. Linear allows that only for a workspace admin or a token with the **admin** scope.
 
 ### Example Data
 
@@ -262,9 +266,9 @@ updated or deleted on an issue in a Linear team.
 
 ### Webhook Setup
 
-This trigger registers a Linear webhook automatically when configured, and removes it when the
-trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
-the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.
+SuperPlane receives Linear events for this trigger. When the Linear OAuth application has a webhook URL and a signing secret, SuperPlane uses that webhook. The connection needs the **read** and **write** scopes.
+
+When the application has no signing secret, SuperPlane creates a webhook in Linear for this trigger and removes it when the trigger is deleted. Linear allows that only for a workspace admin or a token with the **admin** scope.
 
 ### Example Data
 
@@ -342,9 +346,9 @@ added to an issue in a Linear team.
 
 ### Webhook Setup
 
-This trigger registers a Linear webhook automatically when configured, and removes it when the
-trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
-the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.
+SuperPlane receives Linear events for this trigger. When the Linear OAuth application has a webhook URL and a signing secret, SuperPlane uses that webhook. The connection needs the **read** and **write** scopes.
+
+When the application has no signing secret, SuperPlane creates a webhook in Linear for this trigger and removes it when the trigger is deleted. Linear allows that only for a workspace admin or a token with the **admin** scope.
 
 ### Example Data
 

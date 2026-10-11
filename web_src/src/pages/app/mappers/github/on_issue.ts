@@ -7,7 +7,9 @@ import type { BaseNodeMetadata, Issue } from "./types";
 import { buildGithubSubtitle } from "./utils";
 
 interface OnIssueConfiguration {
-  actions: string[];
+  actions?: string[];
+  labels?: unknown;
+  authorsWithAccess?: boolean;
 }
 
 interface OnIssueEventData {
@@ -36,7 +38,29 @@ function buildOnIssueMetadataItems(metadata?: BaseNodeMetadata, configuration?: 
     });
   }
 
+  const labels = configuredLabels(configuration?.labels);
+  if (labels.length > 0) {
+    metadataItems.push({
+      icon: "tag",
+      label: labels.join(", "),
+    });
+  }
+
+  if (configuration?.authorsWithAccess) {
+    metadataItems.push({
+      icon: "user",
+      label: "Author is a repository collaborator",
+    });
+  }
+
   return metadataItems;
+}
+
+function configuredLabels(labels: unknown): string[] {
+  if (!Array.isArray(labels)) {
+    return [];
+  }
+  return labels.filter((label): label is string => typeof label === "string" && label.trim() !== "");
 }
 
 /**

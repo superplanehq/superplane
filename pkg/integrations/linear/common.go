@@ -1,9 +1,6 @@
 package linear
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"net/http"
 	"strings"
@@ -43,6 +40,12 @@ const (
 	AttachmentResourceType = "Attachment"
 )
 
+const triggerWebhookDocumentation = `## Webhook Setup
+
+SuperPlane receives Linear events for this trigger. When the Linear OAuth application has a webhook URL and a signing secret, SuperPlane uses that webhook. The connection needs the **read** and **write** scopes.
+
+When the application has no signing secret, SuperPlane creates a webhook in Linear for this trigger and removes it when the trigger is deleted. Linear allows that only for a workspace admin or a token with the **admin** scope.`
+
 // NodeMetadata is stored on Linear nodes at setup time, so canvas cards can
 // show the team without re-querying Linear.
 type NodeMetadata struct {
@@ -70,6 +73,8 @@ func requireTeam(integration core.IntegrationContext, teamID string) (*Team, err
 // verifyWebhookSignature checks the Linear-Signature header against an HMAC-SHA256
 // of the raw request body. Linear signs the bytes exactly as delivered, so the
 // raw body must be used rather than a re-serialized payload.
+// An application webhook is signed with the OAuth application's signing secret.
+// A webhook created through the API is signed with the secret stored on that webhook.
 func verifyWebhookSignature(ctx core.WebhookRequestContext) (int, error) {
 	signature := strings.TrimSpace(ctx.Headers.Get(SignatureHeader))
 	if signature == "" {
@@ -77,21 +82,25 @@ func verifyWebhookSignature(ctx core.WebhookRequestContext) (int, error) {
 	}
 
 	secret, err := ctx.Webhook.GetSecret()
-	if err != nil {
+	if err != nil && AppWebhookSigningSecret(ctx.Integration) == "" {
 		return http.StatusInternalServerError, fmt.Errorf("error getting webhook secret: %v", err)
 	}
 
-	if len(secret) == 0 {
+	if SignatureMatches(signature, ctx.Body, secret) {
+		return http.StatusOK, nil
+	}
+
+	appSecret := AppWebhookSigningSecret(ctx.Integration)
+	if SignatureMatches(signature, ctx.Body, []byte(appSecret)) {
+		return http.StatusOK, nil
+	}
+
+	if err != nil {
+		return http.StatusInternalServerError, fmt.Errorf("error getting webhook secret: %v", err)
+	}
+	if len(secret) == 0 && appSecret == "" {
 		return http.StatusInternalServerError, fmt.Errorf("missing webhook secret")
 	}
 
-	mac := hmac.New(sha256.New, secret)
-	mac.Write(ctx.Body)
-	expected := hex.EncodeToString(mac.Sum(nil))
-
-	if !hmac.Equal([]byte(strings.ToLower(signature)), []byte(expected)) {
-		return http.StatusForbidden, fmt.Errorf("invalid webhook signature")
-	}
-
-	return http.StatusOK, nil
+	return http.StatusForbidden, fmt.Errorf("invalid webhook signature")
 }

@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "bun:test";
 
 import type { IntegrationId } from "./onboardingFixtures";
+import { readOnboardingRepoChoice, writeOnboardingRepoChoice } from "./onboardingRepoChoice";
 import { writeOnboardingVcsHostChoice } from "./onboardingVcsHostChoice";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";
 
@@ -29,6 +30,116 @@ describe("useOnboardingSetupState", () => {
     );
 
     expect(second.result.current.vcsHost).toBe("bitbucket");
+  });
+
+  it("restores the selected repository after the page reloads", () => {
+    const first = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        persistRepoKey: "factory-1",
+      }),
+    );
+    act(() => {
+      first.result.current.selectVcsHost("github");
+      first.result.current.selectRepo("acme/payments");
+    });
+    first.unmount();
+
+    const second = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        persistRepoKey: "factory-1",
+      }),
+    );
+
+    expect(second.result.current.selectedRepo).toBe("acme/payments");
+  });
+
+  it("keeps the saved repository and drops the stored choice", () => {
+    writeOnboardingRepoChoice("factory-1", "acme/stored");
+    const first = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        persistRepoKey: "factory-1",
+        initial: { selectedRepo: "acme/saved" },
+      }),
+    );
+
+    expect(first.result.current.selectedRepo).toBe("acme/saved");
+    expect(readOnboardingRepoChoice("factory-1")).toBeNull();
+    first.unmount();
+
+    const second = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        persistRepoKey: "factory-1",
+      }),
+    );
+
+    expect(second.result.current.selectedRepo).toBeNull();
+  });
+
+  it("removes the stored repository when the selection is cleared", () => {
+    const first = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        persistRepoKey: "factory-1",
+      }),
+    );
+    act(() => first.result.current.selectRepo("acme/payments"));
+    act(() => first.result.current.clearRepository());
+    first.unmount();
+
+    const second = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        persistRepoKey: "factory-1",
+      }),
+    );
+
+    expect(second.result.current.selectedRepo).toBeNull();
+  });
+
+  it("removes the stored repository when the host changes", () => {
+    const first = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        persistRepoKey: "factory-1",
+      }),
+    );
+    act(() => {
+      first.result.current.selectVcsHost("github");
+      first.result.current.selectRepo("acme/payments");
+      first.result.current.selectVcsHost("bitbucket");
+    });
+    first.unmount();
+
+    const second = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        persistRepoKey: "factory-1",
+      }),
+    );
+
+    expect(second.result.current.selectedRepo).toBeNull();
+    expect(second.result.current.vcsHost).toBeNull();
+  });
+
+  it("keeps the stored repository when the same host is selected again", () => {
+    const { result } = renderHook(() =>
+      useOnboardingSetupState("Payments", {
+        simulateDiscovery: false,
+        persistRepoKey: "factory-1",
+      }),
+    );
+    act(() => {
+      result.current.selectVcsHost("github");
+      result.current.selectRepo("acme/payments");
+    });
+    act(() => result.current.selectVcsHost("github"));
+
+    expect(result.current.selectedRepo).toBe("acme/payments");
+    expect(readOnboardingRepoChoice("factory-1")).toBe("acme/payments");
   });
 
   it("keeps the workspace host that onboarding already saved", () => {

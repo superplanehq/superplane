@@ -449,6 +449,22 @@ func ListFactories(tx *gorm.DB, organizationID uuid.UUID) ([]Factory, error) {
 	return factories, nil
 }
 
+// ListFactoriesAll returns every factory on the installation.
+func ListFactoriesAll(tx *gorm.DB) ([]Factory, error) {
+	var factories []Factory
+	err := tx.
+		Order("organization_id ASC").
+		Order("name ASC").
+		Order("id ASC").
+		Find(&factories).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return factories, nil
+}
+
 // ListOrganizationFactoriesByRecentUpdate returns non-deleted workspaces of an
 // organization, most recently updated first. Equal update times use id
 // descending so the order stays stable.
@@ -1117,33 +1133,24 @@ type ListFactoryWorkOrdersFilters struct {
 	PublicBoard bool
 }
 
+func (f *Factory) CountWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) (int64, error) {
+	var count int64
+	err := f.workOrdersQuery(tx, filters).Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) ([]FactoryWorkOrder, error) {
 	if filters.Limit <= 0 {
 		filters.Limit = DefaultFactoryWorkOrderListLimit
 	}
 
-	query := tx.
-		Model(&FactoryWorkOrder{}).
+	query := f.workOrdersQuery(tx, filters).
 		Preload("CreatedBy").
 		Preload("Assignees").
-		Preload("Assignees.User").
-		Where("factory_work_orders.organization_id = ?", f.OrganizationID).
-		Where("factory_work_orders.factory_id = ?", f.ID)
-
-	if len(filters.States) > 0 {
-		query = query.Where("factory_work_orders.state IN ?", filters.States)
-	}
-
-	if len(filters.Results) > 0 {
-		query = query.Where("factory_work_orders.result IN ?", filters.Results)
-	}
-
-	query = applyWorkOrderUserFilters(query, filters)
-	if filters.PublicBoard {
-		query = applyPublicBoardFilter(query, filters.LineID)
-	} else {
-		query = applyWorkOrderLineFilter(query, filters.LineID)
-	}
+		Preload("Assignees.User")
 
 	if filters.BeforeID != nil {
 		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)
@@ -1172,6 +1179,30 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 	}
 
 	return orders, nil
+}
+
+func (f *Factory) workOrdersQuery(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) *gorm.DB {
+	query := tx.
+		Model(&FactoryWorkOrder{}).
+		Where("factory_work_orders.organization_id = ?", f.OrganizationID).
+		Where("factory_work_orders.factory_id = ?", f.ID)
+
+	if len(filters.States) > 0 {
+		query = query.Where("factory_work_orders.state IN ?", filters.States)
+	}
+
+	if len(filters.Results) > 0 {
+		query = query.Where("factory_work_orders.result IN ?", filters.Results)
+	}
+
+	query = applyWorkOrderUserFilters(query, filters)
+	if filters.PublicBoard {
+		query = applyPublicBoardFilter(query, filters.LineID)
+	} else {
+		query = applyWorkOrderLineFilter(query, filters.LineID)
+	}
+
+	return query
 }
 
 func applyWorkOrderUserFilters(query *gorm.DB, filters ListFactoryWorkOrdersFilters) *gorm.DB {

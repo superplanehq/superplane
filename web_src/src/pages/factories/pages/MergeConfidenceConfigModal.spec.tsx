@@ -11,6 +11,7 @@ import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
+import { mergeConfidenceAvailableIntegrations } from "./MergeConfidenceConfigModal.spec.fixtures";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
@@ -57,73 +58,7 @@ vi.mock("@/hooks/useIntegrations", () => {
   return {
     ...actual,
     useAvailableIntegrations: () => ({
-      data: [
-        {
-          name: "github",
-          label: "GitHub",
-          capabilities: [
-            {
-              type: "TYPE_TRIGGER",
-              name: "github.onPullRequest",
-              label: "On Pull Request",
-              configuration: [
-                { name: "customName", label: "Run title", type: "string" },
-                { name: "repository", label: "Repository", type: "string", required: true },
-                {
-                  name: "actions",
-                  label: "Actions",
-                  type: "multi-select",
-                  typeOptions: {
-                    multiSelect: {
-                      options: [
-                        { label: "Labeled", value: "labeled" },
-                        { label: "Assigned", value: "assigned" },
-                      ],
-                    },
-                  },
-                },
-                {
-                  name: "ignoreDrafts",
-                  label: "Ignore draft pull requests",
-                  type: "boolean",
-                  description: "Do not start a run when the pull request is a draft.",
-                },
-                {
-                  name: "onlyFactoryPullRequests",
-                  label: "Only pull requests in this factory",
-                  type: "boolean",
-                  description: "Start a run only when the pull request belongs to this factory.",
-                },
-              ],
-            },
-            {
-              type: "TYPE_TRIGGER",
-              name: "github.onIssue",
-              label: "On Issue",
-              configuration: [
-                { name: "customName", label: "Run title", type: "string" },
-                { name: "repository", label: "Repository", type: "string", required: true },
-                {
-                  name: "actions",
-                  label: "Actions",
-                  type: "multi-select",
-                  typeOptions: {
-                    multiSelect: {
-                      options: [
-                        { label: "Opened", value: "opened" },
-                        { label: "Edited", value: "edited" },
-                        { label: "Reopened", value: "reopened" },
-                        { label: "Labeled", value: "labeled" },
-                        { label: "Closed", value: "closed" },
-                      ],
-                    },
-                  },
-                },
-              ],
-            },
-          ],
-        },
-      ],
+      data: mergeConfidenceAvailableIntegrations,
       isLoading: false,
     }),
     useConnectedIntegrations: () => ({ data: [], isLoading: false }),
@@ -260,14 +195,15 @@ function renderModal(
   onSaveNode = vi.fn(),
   graph: IntakeAutomationGraph = confidenceGraph(),
 ) {
-  return render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const element = (nextGraph: IntakeAutomationGraph = graph) => (
+    <QueryClientProvider client={client}>
       <MemoryRouter>
         <ThemeProvider>
           <TooltipProvider>
             <MergeConfidenceConfigModal
               title="Merge confidence"
-              graph={graph}
+              graph={nextGraph}
               canvasId="merge-confidence"
               onClose={vi.fn()}
               onSaveNode={onSaveNode}
@@ -276,8 +212,10 @@ function renderModal(
           </TooltipProvider>
         </ThemeProvider>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(element());
+  return { ...view, rerenderGraph: (nextGraph: IntakeAutomationGraph) => view.rerender(element(nextGraph)) };
 }
 
 beforeEach(() => {
@@ -289,16 +227,17 @@ afterEach(() => {
 });
 
 describe("MergeConfidenceConfigModal", () => {
-  it("shows the automation and no step form", () => {
+  it("opens the first component beside the automation", () => {
     renderModal();
 
     expect(screen.getByRole("heading", { name: "Merge confidence" })).toBeInTheDocument();
-    expect(screen.getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "false");
+    expect(screen.getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
     expect(screen.getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
     expect(screen.getByTestId("merge-confidence-config-tab-automation")).toHaveAttribute("data-state", "active");
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Automation", "Runs"]);
     expect(screen.queryByTestId("factory-automation-runs-sidebar")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
+    const form = screen.getByTestId("merge-confidence-config-form");
+    expect(within(form).getByRole("heading", { name: "On Pull Request" })).toBeInTheDocument();
     expect(screen.queryByTestId("merge-confidence-settings")).not.toBeInTheDocument();
     expect(screen.queryByTestId("merge-confidence-config-footer")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
@@ -307,6 +246,23 @@ describe("MergeConfidenceConfigModal", () => {
     expect(screen.queryByRole("button", { name: "Errors" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Warnings" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+  });
+
+  it("selects the trigger when the automation loads with the agent listed first", () => {
+    const loaded = confidenceGraph();
+    const agentFirst: IntakeAutomationGraph = {
+      ...loaded,
+      specNodes: [...(loaded.specNodes ?? [])].reverse(),
+    };
+    const view = renderModal(vi.fn(), vi.fn(), { nodes: [], edges: [], specNodes: [] });
+
+    expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
+
+    view.rerenderGraph(agentFirst);
+
+    expect(
+      within(screen.getByTestId("merge-confidence-config-form")).getByRole("heading", { name: "On Pull Request" }),
+    ).toBeInTheDocument();
   });
 
   it("opens the component settings beside the automation when a step is selected", async () => {
@@ -405,6 +361,9 @@ describe("MergeConfidenceConfigModal", () => {
     expect(within(form).getByText("Filters")).toBeInTheDocument();
     expect(within(form).getByRole("checkbox", { name: "Issue has one of these labels" })).toBeDisabled();
     expect(within(form).getByRole("checkbox", { name: "Author is a repository collaborator" })).toBeDisabled();
+    expect(within(form).queryByText("Label filter")).not.toBeInTheDocument();
+    expect(within(form).queryByText("Assignment")).not.toBeInTheDocument();
+    expect(within(form).queryByRole("button", { name: "Add Label" })).not.toBeInTheDocument();
     expect(within(form).getByRole("checkbox", { name: "A new issue is opened" })).toBeChecked();
     expect(within(form).getByRole("checkbox", { name: "A closed issue is re-opened" })).not.toBeChecked();
     expect(
@@ -420,7 +379,7 @@ describe("MergeConfidenceConfigModal", () => {
 
   it("opens the trigger settings from the component fields and can close them", async () => {
     const user = userEvent.setup();
-    renderModal();
+    const view = renderModal();
 
     await user.click(screen.getByTestId("factory-node-on-pull-request"));
 
@@ -457,6 +416,10 @@ describe("MergeConfidenceConfigModal", () => {
 
     expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
     expect(screen.getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
+
+    view.rerenderGraph(confidenceGraph());
+
+    expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
   });
 
   it("selects the latest run when the Runs tab opens", async () => {

@@ -743,6 +743,65 @@ func ReplaceVCSProviderRepositoryCollaborators(
 	})
 }
 
+func ListInstalledVCSProviderRepositories(
+	tx *gorm.DB,
+	provider string,
+) ([]AccessibleVCSProviderRepository, error) {
+	var repositories []AccessibleVCSProviderRepository
+	err := tx.
+		Table("vcs_provider_repositories AS repository").
+		Select("repository.*, installation.account_login, installation.account_type").
+		Joins("JOIN vcs_provider_installations AS installation ON installation.provider = repository.provider AND installation.installation_id = repository.installation_id").
+		Where("repository.provider = ?", provider).
+		Where("installation.suspended_at IS NULL").
+		Order("LOWER(repository.full_name) ASC").
+		Scan(&repositories).
+		Error
+	return repositories, err
+}
+
+func FindInstalledVCSProviderRepository(
+	tx *gorm.DB,
+	provider string,
+	repositoryID int64,
+) (*AccessibleVCSProviderRepository, error) {
+	var repository AccessibleVCSProviderRepository
+	err := tx.
+		Table("vcs_provider_repositories AS repository").
+		Select("repository.*, installation.account_login, installation.account_type").
+		Joins("JOIN vcs_provider_installations AS installation ON installation.provider = repository.provider AND installation.installation_id = repository.installation_id").
+		Where("repository.provider = ?", provider).
+		Where("repository.repository_id = ?", repositoryID).
+		Where("installation.suspended_at IS NULL").
+		First(&repository).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &repository, nil
+}
+
+func FindInstalledVCSProviderRepositoryByName(
+	tx *gorm.DB,
+	provider string,
+	fullName string,
+) (*AccessibleVCSProviderRepository, error) {
+	var repository AccessibleVCSProviderRepository
+	err := tx.
+		Table("vcs_provider_repositories AS repository").
+		Select("repository.*, installation.account_login, installation.account_type").
+		Joins("JOIN vcs_provider_installations AS installation ON installation.provider = repository.provider AND installation.installation_id = repository.installation_id").
+		Where("repository.provider = ?", provider).
+		Where("LOWER(repository.full_name) = LOWER(?)", strings.TrimSpace(fullName)).
+		Where("installation.suspended_at IS NULL").
+		First(&repository).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &repository, nil
+}
+
 func ListAccessibleVCSProviderRepositories(
 	tx *gorm.DB,
 	provider string,
@@ -847,6 +906,39 @@ const vcsProviderInstallRequestNotInstalled = `NOT EXISTS (
 
 // ListVCSProviderInstallRequests lists the requests that still wait for
 // approval.
+func ListPendingVCSProviderInstallRequests(tx *gorm.DB, provider string) ([]VCSProviderInstallRequest, error) {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return nil, err
+	}
+	var requests []VCSProviderInstallRequest
+	err = tx.
+		Where("provider = ?", provider).
+		Where(vcsProviderInstallRequestNotInstalled).
+		Order("requested_at ASC").
+		Find(&requests).
+		Error
+	return requests, err
+}
+
+func VCSProviderCatalogHasWork(tx *gorm.DB, provider string) (bool, error) {
+	provider, err := normalizeVCSProvider(provider)
+	if err != nil {
+		return false, err
+	}
+	var synchronizing bool
+	err = tx.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM vcs_provider_repository_sync_jobs WHERE provider = ?
+			UNION ALL
+			SELECT 1 FROM vcs_provider_installation_reconcile_jobs WHERE provider = ?
+			UNION ALL
+			SELECT 1 FROM vcs_provider_reconcile_jobs WHERE provider = ?
+		)
+	`, provider, provider, provider).Scan(&synchronizing).Error
+	return synchronizing, err
+}
+
 func ListVCSProviderInstallRequests(tx *gorm.DB, provider string, requesterID int64) ([]VCSProviderInstallRequest, error) {
 	var requests []VCSProviderInstallRequest
 	err := tx.

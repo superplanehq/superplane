@@ -45,7 +45,28 @@ export function formatPrArtifactLabel(data: ArtifactData): string | undefined {
 }
 
 export function extractArtifactMarkdownBody(data: ArtifactData): string | undefined {
-  return extractArtifactField(data, "body");
+  const body = extractArtifactField(data, "body");
+  if (body === undefined) {
+    return undefined;
+  }
+  return unwrapJSONString(body);
+}
+
+/** Agents sometimes JSON-encode markdown twice. Show the inner document. */
+function unwrapJSONString(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('"')) {
+    return value;
+  }
+  try {
+    const decoded = JSON.parse(trimmed);
+    if (typeof decoded === "string" && decoded.trim() !== "") {
+      return decoded;
+    }
+  } catch {
+    // The body is not a JSON string.
+  }
+  return value;
 }
 
 /**

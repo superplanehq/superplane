@@ -106,3 +106,30 @@ func TestFactory_ListWorkOrders_UsesDefaultLimit(t *testing.T) {
 	require.Len(t, orders, 1)
 	assert.Equal(t, created.ID, orders[0].ID)
 }
+
+func TestFactory_CountWorkOrders(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	org, callerID, factoryModel := setupFactoryWithUser(t, "count-orders")
+	otherUser := createOrgUser(t, org.ID, "count-orders-other")
+	db := database.Conn()
+
+	_, err := factoryModel.CreateWorkOrder(db, "Order 1", "", &callerID, nil, nil)
+	require.NoError(t, err)
+	order2, err := factoryModel.CreateWorkOrder(db, "Order 2", "", &otherUser.ID, nil, nil)
+	require.NoError(t, err)
+	_, err = order2.UpdateStatus(db, FactoryWorkOrderStatusUpdate{ToState: FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+
+	total, err := factoryModel.CountWorkOrders(db, ListFactoryWorkOrdersFilters{})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), total)
+
+	drafts, err := factoryModel.CountWorkOrders(db, ListFactoryWorkOrdersFilters{States: []string{FactoryWorkOrderStateDraft}})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), drafts)
+
+	mine, err := factoryModel.CountWorkOrders(db, ListFactoryWorkOrdersFilters{UserID: &callerID})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), mine)
+}

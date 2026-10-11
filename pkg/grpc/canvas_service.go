@@ -46,7 +46,7 @@ func (s *CanvasService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRe
 	if err != nil {
 		return nil, err
 	}
-	return canvases.ListCanvases(ctx, s.registry, organizationID, userID)
+	return canvases.ListCanvases(ctx, s.registry, organizationID, userID, req.GetIncludeGraph())
 }
 
 func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {

@@ -1,6 +1,5 @@
 import { formatCompactTokenLabel, formatCompactTokenValue } from "@/lib/formatTokenCount";
 import { concreteClaudeModelId, displayModelName } from "@/lib/hostedLLMModels";
-import { machineTypeLabel } from "@/lib/machineType";
 
 export function parseWorkOrderMetric(value: string | number | undefined): number {
   const parsed = Number(value ?? 0);
@@ -262,7 +261,7 @@ function uniqueUsageLabels(values: string[] | undefined): string[] {
   const seen = new Set<string>();
   const labels: string[] = [];
   for (const value of values ?? []) {
-    const label = machineTypeLabel(value.trim());
+    const label = value.trim();
     if (!label || seen.has(label)) {
       continue;
     }

@@ -26,10 +26,20 @@ import {
   repositoryOrganizations,
 } from "./githubOrganizations";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
+import { repositorySphereFor, sphereFor } from "./firstRunSphereFor";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
 
 const copy = FIRST_RUN_COPY.choose;
+
+function chooseSphere(
+  organization: string | null,
+  selectedRepository: string | null,
+  sphere: FirstRunSphereProps | undefined,
+): FirstRunSphereProps | undefined {
+  if (organization) return repositorySphereFor(selectedRepository ?? organization);
+  return sphere ?? sphereFor("choose", selectedRepository);
+}
 
 export function FirstRunChooseScreen({
   repositories,
@@ -84,8 +94,17 @@ export function FirstRunChooseScreen({
   const syncStatus = synchronizing ? <RepositorySyncStatus text={syncText} /> : undefined;
   const grantAccessDisabled = busy || !appConfigured;
 
+  const displaySphere = chooseSphere(organization, selectedRepository, sphere);
+
   return (
-    <FirstRunShell testId="first-run-choose" chrome={screenChrome} busy={busy} contentSpacing="compact" sphere={sphere}>
+    <FirstRunShell
+      testId="first-run-choose"
+      chrome={screenChrome}
+      busy={busy}
+      contentSpacing="compact"
+      sphere={displaySphere}
+      visual="preview"
+    >
       <FirstRunHeading headline={organization ? copy.headline : copy.organizationHeadline}>
         <p className="text-[13px] text-muted-foreground">
           {organization ? copy.repositoryHelper : copy.organizationHelper}

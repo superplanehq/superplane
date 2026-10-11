@@ -772,6 +772,24 @@ describe("CanvasPage fit-to-view on canvas/version switch", () => {
     );
   });
 
+  it("keeps the factory display fit at 100% zoom when lockNativeZoom is set", async () => {
+    const hasFitToViewRef = { current: false };
+    const lastFittedContentKeyRef = { current: null as string | null };
+
+    renderCanvas({ factoryDisplayLayout: true, lockNativeZoom: true, hasFitToViewRef, lastFittedContentKeyRef });
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: vi.fn() });
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    });
+
+    const lastFit = fitViewMock.mock.calls.at(-1)?.[0] as { minZoom?: number; maxZoom?: number } | undefined;
+    expect(lastFit).toEqual(expect.objectContaining({ minZoom: 1, maxZoom: 1 }));
+  });
+
   it("locks the first-load fit to 100% zoom when lockNativeZoom is set", () => {
     const hasFitToViewRef = { current: false };
     const lastFittedContentKeyRef = { current: null as string | null };

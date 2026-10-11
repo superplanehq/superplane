@@ -63,11 +63,7 @@ object.
 Linear deduplicates attachments by URL within an issue, so re-attaching an existing URL arrives as an
 ` + "`update`" + ` rather than a ` + "`create`" + `. Select **Updated** to catch those.
 
-## Webhook Setup
-
-This trigger registers a Linear webhook automatically when configured, and removes it when the
-trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
-the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.`
+` + triggerWebhookDocumentation
 }
 
 func (i *OnIssueAttachment) Icon() string {
@@ -142,7 +138,7 @@ func (i *OnIssueAttachment) Setup(ctx core.TriggerContext) error {
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		TeamID:       config.Team,
 		ResourceType: AttachmentResourceType,
-	})
+	}.withDeliveryMode(ctx.Integration))
 }
 
 func (i *OnIssueAttachment) Hooks() []core.Hook {

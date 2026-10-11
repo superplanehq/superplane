@@ -72,9 +72,10 @@ describe("workOrderListPagination", () => {
   });
 
   it("maps a list response onto a page", () => {
-    expect(workOrdersPageFromResponse({ orders: [{ id: "wo-1" }], hasNextPage: true })).toEqual({
+    expect(workOrdersPageFromResponse({ orders: [{ id: "wo-1" }], hasNextPage: true, totalCount: 42 })).toEqual({
       orders: [{ id: "wo-1" }],
       hasNextPage: true,
+      totalCount: 42,
     });
   });
 

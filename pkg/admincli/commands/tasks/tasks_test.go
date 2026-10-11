@@ -16,6 +16,7 @@ func TestListTasksPassesFleetAndFilters(t *testing.T) {
 		assert.Equal(t, "/admin/api/installation/fleets/aws-large-amd64/tasks", r.URL.Path)
 		assert.Equal(t, []string{"running", "failed"}, r.URL.Query()["states"])
 		assert.Equal(t, "50", r.URL.Query().Get("limit"))
+		assert.Empty(t, r.URL.Query().Get("afterId"))
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprint(w, `{"tasks":[{"id":"task-1","state":"running"}]}`)
 	}))
@@ -36,4 +37,23 @@ func TestListTasksRejectsInvalidState(t *testing.T) {
 	ctx, _ := clitest.NewCommandContext(t, nil, "text")
 	err := (&listCommand{FleetID: "fleet", States: []string{"unknown"}, Limit: 200}).Execute(ctx)
 	require.EqualError(t, err, `invalid task state "unknown"`)
+}
+
+func TestListTasksPassesAfterID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/admin/api/installation/fleets/aws-large-amd64/tasks", r.URL.Path)
+		assert.Equal(t, "task-9", r.URL.Query().Get("afterId"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"tasks":[]}`)
+	}))
+	defer server.Close()
+
+	ctx, _ := clitest.NewCommandContext(t, server, "text")
+	err := (&listCommand{
+		FleetID: "aws-large-amd64",
+		Limit:   200,
+		AfterID: "task-9",
+	}).Execute(ctx)
+
+	require.NoError(t, err)
 }

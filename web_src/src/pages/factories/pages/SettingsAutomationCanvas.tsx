@@ -16,6 +16,9 @@ interface SettingsAutomationCanvasProps {
   showFindControls?: boolean;
   focusNodeId?: string | null;
   focusNonce?: number;
+  /** When false, selecting a node does not move the viewport. */
+  focusFit?: boolean;
+  lockNativeZoom?: boolean;
   layoutFitNonce?: number | null;
 }
 
@@ -37,6 +40,8 @@ export function SettingsAutomationCanvas({
   showFindControls = true,
   focusNodeId = null,
   focusNonce = 0,
+  focusFit = true,
+  lockNativeZoom = false,
   layoutFitNonce = null,
 }: SettingsAutomationCanvasProps) {
   return (
@@ -46,6 +51,7 @@ export function SettingsAutomationCanvas({
       factoryId={graph.factoryId}
       factoryEmbed
       factoryDisplayLayout
+      lockNativeZoom={lockNativeZoom}
       isEditing={false}
       readOnly
       hidePageChrome
@@ -69,6 +75,7 @@ export function SettingsAutomationCanvas({
               nodeId: focusNodeId,
               requestId: focusNonce,
               targetMode: "live",
+              fit: focusFit,
             }
           : null
       }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -14,26 +15,70 @@ import (
 )
 
 const (
-	defaultReconcileIntervalSeconds = 15
-	defaultRequestTimeoutSeconds    = 90
-	defaultInstanceType             = "t3.micro"
-	defaultVolumeSizeGB             = 30
+	defaultPollTimeout         = 30 * time.Second
+	defaultErrorRetryInterval  = 15 * time.Second
+	defaultRequestTimeout      = 90 * time.Second
+	maxPollTimeout             = 30 * time.Second
+	defaultInstanceType        = "t3.micro"
+	defaultAzureVMSize         = "Standard_D2ds_v4"
+	defaultVolumeSizeGB        = 30
+	defaultGCPAMD64MachineType = "e2-standard-4"
+	defaultGCPARM64MachineType = "t2a-standard-4"
+	defaultGCPDiskType         = "pd-balanced"
 
 	fleetManagerConfigEnvironment = "FLEET_MANAGER_CONFIG"
 	installationTokenEnvironment  = "INSTALLATION_ADMIN_TOKEN"
 
 	ProviderAWS    = "aws"
+	ProviderAzure  = "azure"
 	ProviderDocker = "docker"
+	ProviderGCP    = "gcp"
 )
 
+// GCP stores the Fleet Manager and fleet IDs as instance labels.
+var gcpLabelValuePattern = regexp.MustCompile(`^[a-z0-9_-]{1,63}$`)
+
 type Config struct {
-	ID                       string  `json:"id"`
-	SuperPlaneURL            string  `json:"superplaneUrl"`
-	InstallationAdminToken   string  `json:"installationAdminToken"`
-	RunnerReleaseBaseURL     string  `json:"runnerReleaseBaseUrl"`
-	ReconcileIntervalSeconds int     `json:"reconcileIntervalSeconds"`
-	RequestTimeoutSeconds    int     `json:"requestTimeoutSeconds"`
-	Fleets                   []Fleet `json:"fleets"`
+	ID                     string               `json:"id"`
+	SuperPlaneURL          string               `json:"superplaneUrl"`
+	InstallationAdminToken string               `json:"installationAdminToken"`
+	RunnerReleaseBaseURL   string               `json:"runnerReleaseBaseUrl"`
+	Reconciliation         ReconciliationConfig `json:"reconciliation"`
+	HTTP                   HTTPConfig           `json:"http"`
+	Fleets                 []Fleet              `json:"fleets"`
+}
+
+type ReconciliationConfig struct {
+	PollTimeout        Duration `json:"pollTimeout"`
+	Interval           Duration `json:"interval"`
+	ErrorRetryInterval Duration `json:"errorRetryInterval"`
+}
+
+type HTTPConfig struct {
+	RequestTimeout Duration `json:"requestTimeout"`
+}
+
+type Duration struct {
+	value time.Duration
+	set   bool
+}
+
+func (d *Duration) UnmarshalJSON(data []byte) error {
+	var raw string
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return fmt.Errorf("duration must be a string: %w", err)
+	}
+	value, err := time.ParseDuration(raw)
+	if err != nil {
+		return fmt.Errorf("parse duration %q: %w", raw, err)
+	}
+	d.value = value
+	d.set = true
+	return nil
+}
+
+func newDuration(value time.Duration) Duration {
+	return Duration{value: value, set: true}
 }
 
 type Fleet struct {
@@ -42,6 +87,8 @@ type Fleet struct {
 	MaxCapacity  int    `json:"maxCapacity"`
 	Provider     string `json:"provider"`
 	AWS          AWS    `json:"aws"`
+	Azure        Azure  `json:"azure"`
+	GCP          GCP    `json:"gcp"`
 	Docker       Docker `json:"docker"`
 }
 
@@ -63,6 +110,36 @@ type AWS struct {
 
 type CloudWatch struct {
 	LogGroupName string `json:"logGroupName"`
+}
+
+type Azure struct {
+	SubscriptionID         string            `json:"subscriptionId"`
+	ResourceGroup          string            `json:"resourceGroup"`
+	Location               string            `json:"location"`
+	ImageID                string            `json:"imageId"`
+	VMSize                 string            `json:"vmSize"`
+	Architecture           string            `json:"architecture"`
+	SubnetID               string            `json:"subnetId"`
+	NetworkSecurityGroupID string            `json:"networkSecurityGroupId"`
+	IdentityID             string            `json:"identityId"`
+	Zones                  []string          `json:"zones"`
+	DiskSizeGB             int32             `json:"diskSizeGb"`
+	EphemeralOSDisk        bool              `json:"ephemeralOSDisk"`
+	ResourceTags           map[string]string `json:"resourceTags"`
+}
+
+type GCP struct {
+	ProjectID           string            `json:"projectId"`
+	Zones               []string          `json:"zones"`
+	MachineType         string            `json:"machineType"`
+	Image               string            `json:"image"`
+	Architecture        string            `json:"architecture"`
+	Subnetwork          string            `json:"subnetwork"`
+	ServiceAccountEmail string            `json:"serviceAccountEmail"`
+	NetworkTags         []string          `json:"networkTags"`
+	DiskSizeGB          int64             `json:"diskSizeGb"`
+	DiskType            string            `json:"diskType"`
+	Labels              map[string]string `json:"labels"`
 }
 
 type Docker struct {
@@ -133,12 +210,20 @@ func decodeJSON(reader io.Reader, config *Config) error {
 	return decoder.Decode(config)
 }
 
-func (c *Config) ReconcileInterval() time.Duration {
-	return time.Duration(c.ReconcileIntervalSeconds) * time.Second
+func (c *Config) PollTimeout() time.Duration {
+	return c.Reconciliation.PollTimeout.value
+}
+
+func (c *Config) ReconciliationInterval() time.Duration {
+	return c.Reconciliation.Interval.value
+}
+
+func (c *Config) ErrorRetryInterval() time.Duration {
+	return c.Reconciliation.ErrorRetryInterval.value
 }
 
 func (c *Config) RequestTimeout() time.Duration {
-	return time.Duration(c.RequestTimeoutSeconds) * time.Second
+	return c.HTTP.RequestTimeout.value
 }
 
 func (c *Config) applyDefaults() {
@@ -147,11 +232,14 @@ func (c *Config) applyDefaults() {
 		strings.TrimSpace(c.RunnerReleaseBaseURL),
 		"/",
 	)
-	if c.ReconcileIntervalSeconds == 0 {
-		c.ReconcileIntervalSeconds = defaultReconcileIntervalSeconds
+	if !c.Reconciliation.PollTimeout.set && !c.Reconciliation.Interval.set {
+		c.Reconciliation.PollTimeout = newDuration(defaultPollTimeout)
 	}
-	if c.RequestTimeoutSeconds == 0 {
-		c.RequestTimeoutSeconds = defaultRequestTimeoutSeconds
+	if !c.Reconciliation.ErrorRetryInterval.set {
+		c.Reconciliation.ErrorRetryInterval = newDuration(defaultErrorRetryInterval)
+	}
+	if !c.HTTP.RequestTimeout.set {
+		c.HTTP.RequestTimeout = newDuration(defaultRequestTimeout)
 	}
 	for index := range c.Fleets {
 		fleet := &c.Fleets[index]
@@ -165,6 +253,13 @@ func (c *Config) applyDefaults() {
 		if fleet.AWS.VolumeSizeGB == 0 {
 			fleet.AWS.VolumeSizeGB = defaultVolumeSizeGB
 		}
+		azureArchitecture := strings.ToLower(strings.TrimSpace(fleet.Azure.Architecture))
+		if strings.TrimSpace(fleet.Azure.VMSize) == "" && azureArchitecture != "arm64" {
+			fleet.Azure.VMSize = defaultAzureVMSize
+		}
+		if fleet.Azure.DiskSizeGB == 0 {
+			fleet.Azure.DiskSizeGB = defaultVolumeSizeGB
+		}
 		fleet.ID = strings.TrimSpace(fleet.ID)
 		fleet.AWS.Region = strings.TrimSpace(fleet.AWS.Region)
 		fleet.AWS.Architecture = strings.ToLower(strings.TrimSpace(fleet.AWS.Architecture))
@@ -173,6 +268,19 @@ func (c *Config) applyDefaults() {
 		fleet.AWS.CloudWatch.LogGroupName = strings.TrimSpace(
 			fleet.AWS.CloudWatch.LogGroupName,
 		)
+		fleet.Azure.SubscriptionID = strings.TrimSpace(fleet.Azure.SubscriptionID)
+		fleet.Azure.ResourceGroup = strings.TrimSpace(fleet.Azure.ResourceGroup)
+		fleet.Azure.Location = strings.TrimSpace(fleet.Azure.Location)
+		fleet.Azure.ImageID = strings.TrimSpace(fleet.Azure.ImageID)
+		fleet.Azure.VMSize = strings.TrimSpace(fleet.Azure.VMSize)
+		fleet.Azure.Architecture = strings.ToLower(strings.TrimSpace(fleet.Azure.Architecture))
+		fleet.Azure.SubnetID = strings.TrimSpace(fleet.Azure.SubnetID)
+		fleet.Azure.NetworkSecurityGroupID = strings.TrimSpace(
+			fleet.Azure.NetworkSecurityGroupID,
+		)
+		fleet.Azure.IdentityID = strings.TrimSpace(fleet.Azure.IdentityID)
+		fleet.Azure.Zones = nonEmpty(fleet.Azure.Zones)
+		fleet.GCP.applyDefaults()
 		fleet.Docker.Image = strings.TrimSpace(fleet.Docker.Image)
 		fleet.Docker.Architecture = strings.ToLower(
 			strings.TrimSpace(fleet.Docker.Architecture),
@@ -195,14 +303,41 @@ func (c *Config) validate() error {
 		return fmt.Errorf("id is required")
 	case strings.TrimSpace(c.InstallationAdminToken) == "":
 		return fmt.Errorf("installationAdminToken is required")
-	case c.ReconcileIntervalSeconds < 1:
-		return fmt.Errorf("reconcileIntervalSeconds must be positive")
-	case c.RequestTimeoutSeconds < 1:
-		return fmt.Errorf("requestTimeoutSeconds must be positive")
+	case c.Reconciliation.PollTimeout.set && c.Reconciliation.Interval.set:
+		return fmt.Errorf(
+			"reconciliation.pollTimeout and reconciliation.interval are mutually exclusive",
+		)
+	case c.Reconciliation.PollTimeout.value <= 0 &&
+		c.Reconciliation.PollTimeout.set:
+		return fmt.Errorf("reconciliation.pollTimeout must be positive")
+	case c.Reconciliation.PollTimeout.value > maxPollTimeout:
+		return fmt.Errorf(
+			"reconciliation.pollTimeout must not exceed %s",
+			maxPollTimeout,
+		)
+	case c.Reconciliation.PollTimeout.value%time.Second != 0:
+		return fmt.Errorf("reconciliation.pollTimeout must use whole seconds")
+	case c.Reconciliation.Interval.value <= 0 && c.Reconciliation.Interval.set:
+		return fmt.Errorf("reconciliation.interval must be positive")
+	case c.Reconciliation.ErrorRetryInterval.value <= 0:
+		return fmt.Errorf("reconciliation.errorRetryInterval must be positive")
+	case c.HTTP.RequestTimeout.value <= 0:
+		return fmt.Errorf("http.requestTimeout must be positive")
+	case c.Reconciliation.PollTimeout.set &&
+		c.HTTP.RequestTimeout.value <= c.Reconciliation.PollTimeout.value:
+		return fmt.Errorf(
+			"http.requestTimeout must be longer than reconciliation.pollTimeout",
+		)
 	case len(c.Fleets) == 0:
 		return fmt.Errorf("fleets must contain at least one fleet")
 	}
-	if c.hasProvider(ProviderAWS) {
+	if c.hasProvider(ProviderGCP) && !gcpLabelValuePattern.MatchString(c.ID) {
+		return fmt.Errorf(
+			"id must be a valid GCP label value when a GCP fleet is configured: " +
+				"use 1-63 lowercase letters, digits, underscores, or dashes",
+		)
+	}
+	if c.hasProvider(ProviderAWS) || c.hasProvider(ProviderAzure) || c.hasProvider(ProviderGCP) {
 		switch {
 		case c.RunnerReleaseBaseURL == "":
 			return fmt.Errorf("runnerReleaseBaseUrl is required")
@@ -230,8 +365,14 @@ func (c *Config) validate() error {
 				prefix,
 			)
 		case fleet.Provider != ProviderAWS &&
+			fleet.Provider != ProviderAzure &&
+			fleet.Provider != ProviderGCP &&
 			fleet.Provider != ProviderDocker:
 			return fmt.Errorf("%s.provider is invalid", prefix)
+		case fleet.Provider == ProviderGCP:
+			if err := fleet.validateGCP(prefix); err != nil {
+				return err
+			}
 		case fleet.Provider == ProviderDocker &&
 			fleet.Docker.Image == "":
 			return fmt.Errorf("%s.docker.image is required", prefix)
@@ -243,6 +384,47 @@ func (c *Config) validate() error {
 				prefix,
 			)
 		case fleet.Provider == ProviderDocker:
+			break
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.SubscriptionID == "":
+			return fmt.Errorf("%s.azure.subscriptionId is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.ResourceGroup == "":
+			return fmt.Errorf("%s.azure.resourceGroup is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.Location == "":
+			return fmt.Errorf("%s.azure.location is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.ImageID == "":
+			return fmt.Errorf("%s.azure.imageId is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.Architecture != "amd64" &&
+			fleet.Azure.Architecture != "arm64":
+			return fmt.Errorf(
+				"%s.azure.architecture must be amd64 or arm64",
+				prefix,
+			)
+		case fleet.Provider == ProviderAzure && fleet.Azure.VMSize == "":
+			return fmt.Errorf("%s.azure.vmSize is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.SubnetID == "":
+			return fmt.Errorf("%s.azure.subnetId is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.NetworkSecurityGroupID == "":
+			return fmt.Errorf(
+				"%s.azure.networkSecurityGroupId is required",
+				prefix,
+			)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.IdentityID == "":
+			return fmt.Errorf("%s.azure.identityId is required", prefix)
+		case fleet.Provider == ProviderAzure &&
+			len(fleet.Azure.Zones) == 0:
+			return fmt.Errorf("%s.azure.zones must not be empty", prefix)
+		case fleet.Provider == ProviderAzure &&
+			fleet.Azure.DiskSizeGB < 1:
+			return fmt.Errorf("%s.azure.diskSizeGb must be positive", prefix)
+		case fleet.Provider == ProviderAzure:
 			break
 		case fleet.AWS.Region == "":
 			return fmt.Errorf("%s.aws.region is required", prefix)
@@ -265,6 +447,54 @@ func (c *Config) validate() error {
 			return fmt.Errorf("fleet ID %q is duplicated", fleet.ID)
 		}
 		seen[fleet.ID] = struct{}{}
+	}
+	return nil
+}
+
+func (g *GCP) applyDefaults() {
+	g.ProjectID = strings.TrimSpace(g.ProjectID)
+	g.Zones = nonEmpty(g.Zones)
+	g.Image = strings.TrimSpace(g.Image)
+	g.Architecture = strings.ToLower(strings.TrimSpace(g.Architecture))
+	g.Subnetwork = strings.TrimSpace(g.Subnetwork)
+	g.ServiceAccountEmail = strings.TrimSpace(g.ServiceAccountEmail)
+	g.NetworkTags = nonEmpty(g.NetworkTags)
+	g.MachineType = strings.TrimSpace(g.MachineType)
+	if g.MachineType == "" && g.Architecture == "arm64" {
+		g.MachineType = defaultGCPARM64MachineType
+	}
+	if g.MachineType == "" {
+		g.MachineType = defaultGCPAMD64MachineType
+	}
+	g.DiskType = strings.TrimSpace(g.DiskType)
+	if g.DiskType == "" {
+		g.DiskType = defaultGCPDiskType
+	}
+	if g.DiskSizeGB == 0 {
+		g.DiskSizeGB = defaultVolumeSizeGB
+	}
+}
+
+func (f *Fleet) validateGCP(prefix string) error {
+	switch {
+	case !gcpLabelValuePattern.MatchString(f.ID):
+		return fmt.Errorf(
+			"%s.id must be a valid GCP label value: "+
+				"use 1-63 lowercase letters, digits, underscores, or dashes",
+			prefix,
+		)
+	case f.GCP.ProjectID == "":
+		return fmt.Errorf("%s.gcp.projectId is required", prefix)
+	case len(f.GCP.Zones) == 0:
+		return fmt.Errorf("%s.gcp.zones must not be empty", prefix)
+	case f.GCP.Image == "":
+		return fmt.Errorf("%s.gcp.image is required", prefix)
+	case f.GCP.Architecture != "amd64" && f.GCP.Architecture != "arm64":
+		return fmt.Errorf("%s.gcp.architecture must be amd64 or arm64", prefix)
+	case f.GCP.Subnetwork == "":
+		return fmt.Errorf("%s.gcp.subnetwork is required", prefix)
+	case f.GCP.DiskSizeGB < 1:
+		return fmt.Errorf("%s.gcp.diskSizeGb must be positive", prefix)
 	}
 	return nil
 }

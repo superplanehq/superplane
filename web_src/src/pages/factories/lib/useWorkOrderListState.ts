@@ -28,7 +28,7 @@ export type WorkOrderFilterDimension = keyof WorkOrderFilters;
  * factory-specific data, so they're persisted in `localStorage` under a
  * single factory-agnostic key and follow the user everywhere.
  *
- * Scope (All/Active/My) and filters are also persisted, but namespaced per
+ * Scope (All/Active/My/Unassigned) and filters are also persisted, but namespaced per
  * factory: filters can reference factory-specific data (lines), so a value
  * chosen in one factory shouldn't silently apply — and likely hide
  * everything — in another. Search stays session-local; it expresses what

@@ -1,5 +1,3 @@
-import type { ComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
-
 export interface CanvasCardData {
   id: string;
   name: string;
@@ -8,6 +6,4 @@ export interface CanvasCardData {
   isStarred?: boolean;
   starredAt?: string;
   createdBy: { name: string };
-  nodes?: SuperplaneComponentsNode[];
-  edges?: ComponentsEdge[];
 }

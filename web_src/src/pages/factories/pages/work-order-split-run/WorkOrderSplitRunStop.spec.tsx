@@ -59,6 +59,10 @@ import { REVIEW_CANDIDATE_WORK_ORDERS } from "../onboarding/first-run/reviewCand
 import { WorkOrderSplitRunPopup } from "./WorkOrderSplitRunPopup";
 import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
+function implementationSettings() {
+  return within(screen.getByRole("region", { name: "Implementation" })).getByTestId("split-run-intent-settings");
+}
+
 function renderPopup(fixture: ComponentProps<typeof WorkOrderSplitRunPopup>["fixture"], onClose?: () => void) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -177,11 +181,10 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       </QueryClientProvider>,
     );
 
-    const strip = screen.getByTestId("split-run-intent-status-card");
-    const settings = within(strip).getByTestId("split-run-intent-settings");
+    const settings = implementationSettings();
     expect(screen.queryByTestId("split-run-header-actions")).not.toBeInTheDocument();
     expect(within(settings).getByRole("button", { name: "Model: Auto Medium" })).toBeInTheDocument();
-    await user.click(within(strip).getByRole("button", { name: "Start" }));
+    await user.click(within(settings).getByRole("button", { name: "Start" }));
     await user.click(await screen.findByRole("button", { name: "Start anyway" }));
     expect(onDispatch).toHaveBeenCalledTimes(1);
     expect(onDispatch).toHaveBeenCalledWith(undefined, "medium");
@@ -271,8 +274,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       </QueryClientProvider>,
     );
 
-    const strip = screen.getByTestId("split-run-intent-status-card");
-    const settings = within(strip).getByTestId("split-run-intent-settings");
+    const settings = implementationSettings();
     const model = within(settings).getByRole("button", { name: "Model: Auto Medium" });
     expect(model).toHaveTextContent("Auto Medium");
     await user.click(model);
@@ -280,7 +282,7 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.keyboard("{Escape}");
     expect(within(settings).getByRole("button", { name: "Model: claude-opus-4-6 Medium" })).toBeInTheDocument();
-    const actions = within(strip).getByTestId("split-run-draft-action-group");
+    const actions = within(settings).getByTestId("split-run-draft-action-group");
     expect(within(actions).queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
     await user.click(within(actions).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6", "medium");
@@ -305,12 +307,12 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       </QueryClientProvider>,
     );
 
-    const strip = screen.getByTestId("split-run-intent-status-card");
-    await user.click(within(strip).getByRole("button", { name: "Model: Auto Medium" }));
+    const settings = implementationSettings();
+    await user.click(within(settings).getByRole("button", { name: "Model: Auto Medium" }));
     await user.hover(screen.getByTestId("split-run-draft-thinking"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Low" }));
     await user.keyboard("{Escape}");
-    await user.click(within(strip).getByRole("button", { name: "Start" }));
+    await user.click(within(settings).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith(undefined, "low");
   });
 
@@ -333,14 +335,14 @@ describe("WorkOrderSplitRunPopup decision footer", () => {
       </QueryClientProvider>,
     );
 
-    const strip = screen.getByTestId("split-run-intent-status-card");
-    await user.click(within(strip).getByRole("button", { name: "Model: Auto Medium" }));
+    const settings = implementationSettings();
+    await user.click(within(settings).getByRole("button", { name: "Model: Auto Medium" }));
     await user.hover(screen.getByTestId("split-run-draft-thinking"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "High" }));
     await user.hover(screen.getByTestId("split-run-draft-model-list"));
     fireEvent.click(await screen.findByRole("menuitem", { name: "claude-opus-4-6" }));
     await user.keyboard("{Escape}");
-    await user.click(within(strip).getByRole("button", { name: "Start" }));
+    await user.click(within(settings).getByRole("button", { name: "Start" }));
     expect(onDispatch).toHaveBeenCalledWith("claude-opus-4-6", "high");
   });
 

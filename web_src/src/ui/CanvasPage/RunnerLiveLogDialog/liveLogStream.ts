@@ -53,6 +53,7 @@ const INTEGRATED_POLL_INTERVAL_MS = 2000;
 const LOG_CURSOR_HEADER = "X-SuperPlane-Log-Cursor";
 const LOG_STATE_HEADER = "X-SuperPlane-Log-State";
 const LOG_RESET_HEADER = "X-SuperPlane-Log-Reset";
+const LOG_URL_HEADER = "X-SuperPlane-Log-URL";
 
 export type LiveLogStreamHandlers = {
   onOpen?: () => void;
@@ -332,6 +333,36 @@ function processCompleteLines(buffer: string, handlers: LiveLogStreamHandlers): 
   return remainder;
 }
 
+async function pumpIntegratedLogResponse(
+  res: Response,
+  handlers: LiveLogStreamHandlers,
+  signal: AbortSignal,
+): Promise<void> {
+  const signedURL = res.headers.get(LOG_URL_HEADER)?.trim();
+  if (signedURL) {
+    await pumpSignedLog(signedURL, handlers, signal);
+    return;
+  }
+  if (res.body) {
+    await pumpReaderNdjson(requireBodyReader(res), handlers);
+  }
+}
+
+async function pumpSignedLog(signedURL: string, handlers: LiveLogStreamHandlers, signal: AbortSignal): Promise<void> {
+  const objectRes = await fetch(signedURL, {
+    method: "GET",
+    credentials: "omit",
+    signal,
+    headers: { Accept: "application/x-ndjson" },
+  });
+  if (!objectRes.ok) {
+    throw liveLogRequestErrorFromResponse(objectRes, await objectRes.text());
+  }
+  if (objectRes.body) {
+    await pumpReaderNdjson(requireBodyReader(objectRes), handlers);
+  }
+}
+
 async function pumpReaderNdjson(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   handlers: LiveLogStreamHandlers,
@@ -428,9 +459,7 @@ export class LiveLogStream {
         handlers.onOpen?.();
         opened = true;
       }
-      if (res.body) {
-        await pumpReaderNdjson(requireBodyReader(res), handlers);
-      }
+      await pumpIntegratedLogResponse(res, handlers, this.abortController.signal);
 
       const nextCursor = res.headers.get(LOG_CURSOR_HEADER);
       if (nextCursor !== null) {

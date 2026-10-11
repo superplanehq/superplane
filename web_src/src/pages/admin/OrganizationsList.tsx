@@ -1,4 +1,5 @@
 import { Text } from "@/components/Text/text";
+import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
 import { Building, CircleCheck, ClipboardList, Palette, User } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
@@ -15,10 +16,18 @@ interface AdminOrganization {
   task_count: number;
   done_task_count: number;
   member_count: number;
+  remaining_credit_cents?: number;
   created_at?: string;
 }
 
-type SortField = "canvas_count" | "created_at" | "done_task_count" | "member_count" | "name" | "task_count";
+type SortField =
+  | "canvas_count"
+  | "created_at"
+  | "done_task_count"
+  | "member_count"
+  | "name"
+  | "remaining_credit_cents"
+  | "task_count";
 
 const PAGE_SIZE = 50;
 
@@ -33,9 +42,63 @@ function organizationPath(orgId: string): string {
   return `/admin/organizations/${orgId}`;
 }
 
-function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: OrganizationsTableProps) {
-  const navigate = useNavigate();
+function openOrganization(path: string, event: React.MouseEvent, navigate: (path: string) => void) {
+  if (event.metaKey || event.ctrlKey || event.shiftKey) {
+    window.open(path, "_blank", "noopener,noreferrer");
+    return;
+  }
+  navigate(path);
+}
 
+function CountCell({ icon, value }: { icon: React.ReactNode; value: number }) {
+  return (
+    <td className="px-4 py-2.5">
+      <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
+        {icon}
+        {value}
+      </span>
+    </td>
+  );
+}
+
+function OrganizationRow({ organization }: { organization: AdminOrganization }) {
+  const navigate = useNavigate();
+  const path = organizationPath(organization.id);
+
+  return (
+    <tr
+      className="relative cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors dark:border-gray-800/70 dark:hover:bg-gray-800/50"
+      onClick={(event) => openOrganization(path, event, navigate)}
+    >
+      <td className="px-4 py-2.5">
+        <Link
+          to={path}
+          onClick={(event) => event.stopPropagation()}
+          className="flex items-center gap-2 text-gray-800 hover:text-blue-600 transition-colors font-medium before:absolute before:inset-0 before:z-10 before:content-[''] dark:text-gray-100 dark:hover:text-blue-400"
+        >
+          <Building size={14} className="text-gray-400 shrink-0 dark:text-gray-500" />
+          {organization.name || (
+            <span className="text-gray-400 italic dark:text-gray-500" title={organization.id}>
+              {organization.id.slice(0, 8)}...
+            </span>
+          )}
+        </Link>
+      </td>
+      <CountCell icon={<Palette size={13} />} value={organization.canvas_count} />
+      <CountCell icon={<ClipboardList size={13} />} value={organization.task_count} />
+      <CountCell icon={<CircleCheck size={13} />} value={organization.done_task_count} />
+      <CountCell icon={<User size={13} />} value={organization.member_count} />
+      <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap dark:text-gray-400">
+        {formatUsdCents(organization.remaining_credit_cents ?? 0)}
+      </td>
+      <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap dark:text-gray-500">
+        {formatDate(organization.created_at)}
+      </td>
+    </tr>
+  );
+}
+
+function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: OrganizationsTableProps) {
   return (
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
       <table className="w-full text-sm">
@@ -77,6 +140,13 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
               onSort={onSort}
             />
             <SortableHeader
+              label="Credits"
+              field="remaining_credit_cents"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
+            <SortableHeader
               label="Created"
               field="created_at"
               currentSort={sortBy}
@@ -86,61 +156,8 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
           </tr>
         </thead>
         <tbody>
-          {organizations.map((org) => (
-            <tr
-              key={org.id}
-              className="relative cursor-pointer border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors dark:border-gray-800/70 dark:hover:bg-gray-800/50"
-              onClick={(event) => {
-                const path = organizationPath(org.id);
-                if (event.metaKey || event.ctrlKey || event.shiftKey) {
-                  window.open(path, "_blank", "noopener,noreferrer");
-                  return;
-                }
-                navigate(path);
-              }}
-            >
-              <td className="px-4 py-2.5">
-                <Link
-                  to={organizationPath(org.id)}
-                  onClick={(event) => event.stopPropagation()}
-                  className="flex items-center gap-2 text-gray-800 hover:text-blue-600 transition-colors font-medium before:absolute before:inset-0 before:z-10 before:content-[''] dark:text-gray-100 dark:hover:text-blue-400"
-                >
-                  <Building size={14} className="text-gray-400 shrink-0 dark:text-gray-500" />
-                  {org.name || (
-                    <span className="text-gray-400 italic dark:text-gray-500" title={org.id}>
-                      {org.id.slice(0, 8)}...
-                    </span>
-                  )}
-                </Link>
-              </td>
-              <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                  <Palette size={13} />
-                  {org.canvas_count}
-                </span>
-              </td>
-              <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                  <ClipboardList size={13} />
-                  {org.task_count}
-                </span>
-              </td>
-              <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                  <CircleCheck size={13} />
-                  {org.done_task_count}
-                </span>
-              </td>
-              <td className="px-4 py-2.5">
-                <span className="inline-flex items-center gap-1.5 text-gray-500 dark:text-gray-400">
-                  <User size={13} />
-                  {org.member_count}
-                </span>
-              </td>
-              <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap dark:text-gray-500">
-                {formatDate(org.created_at)}
-              </td>
-            </tr>
+          {organizations.map((organization) => (
+            <OrganizationRow key={organization.id} organization={organization} />
           ))}
         </tbody>
       </table>

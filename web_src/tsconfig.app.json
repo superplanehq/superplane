@@ -19,6 +19,7 @@
     "paths": {
       "@/*": ["./src/*"],
       "@/canvas/*": ["./src/pages/canvas/*"],
+      "@runner/hosted_video_hosts.json": ["../pkg/components/runner/hosted_video_hosts.json"]
     },
 
     /* Linting */
@@ -29,6 +30,6 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"],
+  "include": ["src", "../pkg/components/runner/hosted_video_hosts.json"],
   "exclude": ["src/**/*.stories.tsx"]
 }

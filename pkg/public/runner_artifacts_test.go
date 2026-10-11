@@ -403,6 +403,18 @@ func TestServePublicArtifactRedirectsGCSGets(t *testing.T) {
 	assert.Equal(t, 5*time.Minute, provider.signedTTL)
 }
 
+func TestServePublicArtifactRedirectsAzureGets(t *testing.T) {
+	provider := &artifactProvider{name: blob.ProviderAzure, signedURL: "https://acct.blob.core.windows.net/superplane/signed"}
+	file := &models.File{Filename: "screen.png", ContentType: "image/png", SizeBytes: 8, StorageKey: "artifact/screen"}
+	response := httptest.NewRecorder()
+
+	servePublicArtifact(response, httptest.NewRequest(http.MethodGet, "/artifact", nil), provider, file)
+
+	assert.Equal(t, http.StatusTemporaryRedirect, response.Code)
+	assert.Equal(t, provider.signedURL, response.Header().Get("Location"))
+	assert.Equal(t, 5*time.Minute, provider.signedTTL)
+}
+
 func TestServePublicArtifactAnswersHeadWithoutReadingObject(t *testing.T) {
 	provider := &artifactProvider{name: blob.ProviderFilesystem}
 	file := &models.File{Filename: "screen.png", ContentType: "image/png", SizeBytes: 42}

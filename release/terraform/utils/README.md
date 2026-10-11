@@ -1,6 +1,6 @@
 # Utils
 
-Docker image for managing SuperPlane infrastructure on GKE and EKS.
+Docker image for managing SuperPlane infrastructure on GKE, EKS, and AKS.
 
 ## Image
 
@@ -12,6 +12,7 @@ Docker image for managing SuperPlane infrastructure on GKE and EKS.
 - gcloud
 - gke-gcloud-auth-plugin
 - AWS CLI
+- Azure CLI
 - eksctl
 - vim and jq
 
@@ -24,8 +25,10 @@ From this directory, run:
 ```bash
 make gke.shell
 make eks.shell
+make aks.shell
 ```
 
-Both targets build the same image and mount the install stacks at `/workspace`.
+These targets build the same image and mount the install stacks at `/workspace`.
 `make gke.shell` mounts gcloud credentials at `/root/.config/gcloud`.
 `make eks.shell` mounts AWS credentials at `/root/.aws`.
+`make aks.shell` mounts Azure credentials at `/root/.azure`.

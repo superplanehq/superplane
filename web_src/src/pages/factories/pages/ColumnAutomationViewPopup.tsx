@@ -1,7 +1,5 @@
 import type { RunsSidebarHrefForRun } from "@/components/CanvasToolSidebar/runsSidebarHref";
 import { Button } from "@/components/ui/button";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_RISK_SCORE } from "@/lib/experimentalFeatures";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, Settings, Workflow } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -280,9 +278,8 @@ export function ColumnAutomationViewHost({
 }) {
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
-  const allowRiskScore = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_RISK_SCORE);
   const isRiskScoreCanvas = automation.graph?.specNodes?.some((node) => node.id === "on-pr-risk") ?? false;
-  if (allowRiskScore && isRiskScoreCanvas) {
+  if (isRiskScoreCanvas) {
     return (
       <MergeConfidenceConfigModal
         title={automation.name?.trim() || title}

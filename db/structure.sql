@@ -251,6 +251,26 @@ CREATE TABLE public.app_messages (
 
 
 --
+-- Name: bitbucket_forge_installations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.bitbucket_forge_installations (
+    installation_id text NOT NULL,
+    workspace_uuid text DEFAULT ''::text NOT NULL,
+    workspace_slug text DEFAULT ''::text NOT NULL,
+    installer_account_id text DEFAULT ''::text NOT NULL,
+    api_base_url text DEFAULT ''::text NOT NULL,
+    system_token bytea,
+    token_expires_at timestamp without time zone,
+    last_delivery_at timestamp without time zone,
+    installed_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    uninstalled_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+
+--
 -- Name: canvas_memories; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -670,6 +690,8 @@ CREATE TABLE public.factory_velocity_repository_merges (
     merged_at timestamp with time zone NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    provider text DEFAULT 'github'::text NOT NULL,
+    author_uuid text DEFAULT ''::text NOT NULL,
     CONSTRAINT factory_velocity_repository_merges_number_positive CHECK ((number > 0)),
     CONSTRAINT factory_velocity_repository_merges_source_valid CHECK ((source = ANY (ARRAY['people'::text, 'agent'::text])))
 );
@@ -947,6 +969,22 @@ CREATE TABLE public.hosted_llm_providers (
 
 
 --
+-- Name: installation_github_apps; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_github_apps (
+    id integer NOT NULL,
+    github_app_id bigint NOT NULL,
+    slug character varying(255) NOT NULL,
+    encrypted_private_key bytea NOT NULL,
+    encrypted_webhook_secret bytea NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT installation_github_apps_singleton CHECK ((id = 1))
+);
+
+
+--
 -- Name: installation_license_keys; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -958,6 +996,21 @@ CREATE TABLE public.installation_license_keys (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT installation_license_keys_singleton CHECK ((id = 1)),
     CONSTRAINT installation_license_keys_version_positive CHECK ((version > 0))
+);
+
+
+--
+-- Name: installation_license_revocations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_license_revocations (
+    id integer NOT NULL,
+    document text NOT NULL,
+    version bigint NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT installation_license_revocations_singleton CHECK ((id = 1)),
+    CONSTRAINT installation_license_revocations_version_positive CHECK ((version > 0))
 );
 
 
@@ -1030,7 +1083,8 @@ CREATE TABLE public.linear_webhook_receipts (
     http_status integer NOT NULL,
     outcome text NOT NULL,
     subscription_count integer DEFAULT 0 NOT NULL,
-    task_ids text DEFAULT ''::text NOT NULL
+    task_ids text DEFAULT ''::text NOT NULL,
+    delivery_key text DEFAULT ''::text NOT NULL
 );
 
 
@@ -2124,6 +2178,14 @@ ALTER TABLE ONLY public.app_messages
 
 
 --
+-- Name: bitbucket_forge_installations bitbucket_forge_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.bitbucket_forge_installations
+    ADD CONSTRAINT bitbucket_forge_installations_pkey PRIMARY KEY (installation_id);
+
+
+--
 -- Name: canvas_memories canvas_memories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2476,11 +2538,27 @@ ALTER TABLE ONLY public.factory_pull_request_runs
 
 
 --
+-- Name: installation_github_apps installation_github_apps_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_github_apps
+    ADD CONSTRAINT installation_github_apps_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: installation_license_keys installation_license_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.installation_license_keys
     ADD CONSTRAINT installation_license_keys_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: installation_license_revocations installation_license_revocations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_license_revocations
+    ADD CONSTRAINT installation_license_revocations_pkey PRIMARY KEY (id);
 
 
 --
@@ -3048,6 +3126,13 @@ CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USIN
 
 
 --
+-- Name: bitbucket_forge_installations_workspace_uuid_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX bitbucket_forge_installations_workspace_uuid_idx ON public.bitbucket_forge_installations USING btree (workspace_uuid);
+
+
+--
 -- Name: factories_organization_id_key_active_key; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3482,17 +3567,17 @@ CREATE INDEX idx_factory_pull_requests_work_order ON public.factory_pull_request
 
 
 --
+-- Name: idx_factory_velocity_merges_factory_provider_repo_num; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_factory_velocity_merges_factory_provider_repo_num ON public.factory_velocity_repository_merges USING btree (factory_id, provider, repository, number);
+
+
+--
 -- Name: idx_factory_velocity_repository_merges_factory_merged_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_factory_velocity_repository_merges_factory_merged_at ON public.factory_velocity_repository_merges USING btree (factory_id, merged_at DESC);
-
-
---
--- Name: idx_factory_velocity_repository_merges_factory_repo_number; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_factory_velocity_repository_merges_factory_repo_number ON public.factory_velocity_repository_merges USING btree (factory_id, repository, number);
 
 
 --
@@ -3696,6 +3781,13 @@ CREATE INDEX idx_files_work_order_id ON public.files USING btree (work_order_id)
 --
 
 CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (group_name, domain_type, domain_id);
+
+
+--
+-- Name: idx_linear_webhook_receipts_delivery; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_linear_webhook_receipts_delivery ON public.linear_webhook_receipts USING btree (webhook_id, delivery_key) WHERE ((delivery_key <> ''::text) AND (outcome = 'accepted'::text));
 
 
 --
@@ -3948,6 +4040,13 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 --
 
 CREATE INDEX idx_workflow_runs_cancelling ON public.workflow_runs USING btree (cancelled_at) WHERE ((state)::text = 'cancelling'::text);
+
+
+--
+-- Name: idx_workflow_runs_parent_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_parent_run_id ON public.workflow_runs USING btree (parent_run_id) INCLUDE (id) WHERE (parent_run_id IS NOT NULL);
 
 
 --
@@ -5600,7 +5699,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261006151335	f
+20261010003855	f
 \.
 
 

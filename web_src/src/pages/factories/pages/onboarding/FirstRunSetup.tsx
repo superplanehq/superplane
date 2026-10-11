@@ -10,6 +10,7 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { AgentStep } from "./AgentStep";
 import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
 import { FirstRunBitbucketChooseScreen } from "./first-run/FirstRunBitbucketChooseScreen";
+import { FirstRunBitbucketForgeScreen } from "./first-run/FirstRunBitbucketForgeScreen";
 import { FirstRunHostScreen } from "./first-run/FirstRunHostScreen";
 import { FirstRunModelSourceChoice } from "./first-run/FirstRunModelSourceChoice";
 import { FirstRunChooseScreen } from "./first-run/FirstRunChooseScreen";
@@ -20,7 +21,7 @@ import type { FirstRunChrome } from "./first-run/firstRunTypes";
 import { FIRST_RUN_COPY } from "./first-run/firstRunCopy";
 import { FirstRunWelcomeScreen } from "./first-run/FirstRunWelcomeScreen";
 import type { FirstRunSphereProps } from "./first-run/FirstRunSpherePane";
-import { sphereFor } from "./first-run/firstRunSphereFor";
+import { repositorySphereFor, sphereFor } from "./first-run/firstRunSphereFor";
 import {
   agentFinishReady,
   isAgentProviderConnected,
@@ -134,7 +135,14 @@ function AgentScreen({
   });
   const showProviders = !modelSource.offered || modelSource.choice === "own-key";
   return (
-    <FirstRunShell testId="first-run-agent" chrome={chrome} busy={saving || loading} width="wide" sphere={sphere}>
+    <FirstRunShell
+      testId="first-run-agent"
+      chrome={chrome}
+      busy={saving || loading}
+      width="wide"
+      sphere={sphere}
+      visual="preview"
+    >
       <FirstRunHeading headline={FIRST_RUN_COPY.agent.headline}>
         <p className="text-[13px] text-muted-foreground">{agentScreenBody(modelSource, showCustomProvider)}</p>
       </FirstRunHeading>
@@ -188,7 +196,9 @@ function AgentScreen({
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
   const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
   // Bitbucket has no separate connect screen.
-  if (backScreen === "connect" && flow.vcsHost === "bitbucket") return () => flow.goToScreen("host");
+  if (backScreen === "connect" && (flow.vcsHost === "bitbucket" || !flow.accountConnectionRequired)) {
+    return () => flow.goToScreen("host");
+  }
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
 }
 
@@ -216,12 +226,6 @@ function TicketsScreenHost({
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
-      jiraAvailable={flow.jiraAvailable}
-      jiraFeatureLoading={flow.jiraFeatureLoading}
-      jiraChoiceBlock={flow.jiraChoiceBlock}
-      linearAvailable={flow.linearAvailable}
-      linearFeatureLoading={flow.linearFeatureLoading}
-      linearChoiceBlock={flow.linearChoiceBlock}
       continueLabel={ticketsContinueLabel(flow.ticketsFinishSetup)}
       continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
@@ -248,24 +252,63 @@ function TicketsScreenHost({
   );
 }
 
+function bitbucketForgePhase(
+  identityLinked: boolean,
+  repositoryCount: number,
+  installedWorkspaceCount: number,
+): "connect" | "grant" | "choose" {
+  if (!identityLinked) return "connect";
+  if (repositoryCount === 0 && installedWorkspaceCount === 0) return "grant";
+  return "choose";
+}
+
 function BitbucketChooseHost({
   organizationId,
   flow,
   model,
   chrome,
-  sphere,
 }: {
   organizationId: string;
   flow: FirstRunSetupFlow;
   model: OnboardingPageModel;
   chrome: FirstRunChrome;
-  sphere?: FirstRunSphereProps;
 }) {
   const connected = model.setup.connected.has("bitbucket");
   const resources = useIntegrationResources(organizationId, model.bitbucketIntegrationId, "repository", undefined, {
-    enabled: connected,
+    enabled: connected && !flow.bitbucketForgeConfigured,
   });
   const repositories = (resources.data ?? []).map((resource) => resource.name ?? "").filter(Boolean);
+  const sphere = connected ? repositorySphereFor(model.setup.selectedRepo) : sphereFor("connect", null);
+  if (flow.bitbucketOnboardingPending || flow.bitbucketForgeConfigured || flow.bitbucketLookupFailed) {
+    return (
+      <FirstRunBitbucketForgeScreen
+        phase={bitbucketForgePhase(
+          flow.bitbucketIdentityLinked,
+          flow.bitbucketRepositories.length,
+          flow.bitbucketInstalledWorkspaces.length,
+        )}
+        connectHref={flow.bitbucketConnectHref}
+        repositories={flow.bitbucketRepositories}
+        installedWorkspaces={flow.bitbucketInstalledWorkspaces}
+        selectedRepository={model.setup.selectedRepo}
+        granting={flow.blockingAction === "opening-bitbucket"}
+        saving={flow.blockingAction === "saving-repository"}
+        loading={flow.bitbucketOnboardingPending}
+        loadError={flow.bitbucketLoadError}
+        lookupFailed={flow.bitbucketLookupFailed}
+        retrying={flow.bitbucketLookupRetrying}
+        attemptActive={flow.bitbucketInstallationAttemptActive}
+        attemptTimedOut={flow.bitbucketInstallationAttemptTimedOut}
+        chrome={chrome}
+        sphere={sphere}
+        onRetryLookup={flow.retryBitbucketLookup}
+        onGrantAccess={() => void flow.grantBitbucketAccess()}
+        onSelectRepository={model.setup.selectRepo}
+        onClearRepository={model.setup.clearRepository}
+        onContinue={() => void flow.continueFromRepository()}
+      />
+    );
+  }
   return (
     <FirstRunBitbucketChooseScreen
       connected={connected}
@@ -316,24 +359,17 @@ function VcsScreen({
       <FirstRunConnectScreen
         loading={flow.repositoriesLoading}
         connecting={flow.blockingAction === "opening-github"}
+        createApp={!flow.appConfigured}
         connectError={flow.connectError}
         chrome={chrome}
         sphere={sphereFor("connect", setup.selectedRepo)}
-        onConnectGitHub={() => void flow.connectGitHub()}
+        onConnectGitHub={() => void (flow.appConfigured ? flow.connectGitHub() : flow.createGitHubApp())}
       />
     );
   }
 
   if (flow.vcsHost === "bitbucket") {
-    return (
-      <BitbucketChooseHost
-        organizationId={organizationId}
-        flow={flow}
-        model={model}
-        chrome={chrome}
-        sphere={sphereFor("choose", setup.selectedRepo)}
-      />
-    );
+    return <BitbucketChooseHost organizationId={organizationId} flow={flow} model={model} chrome={chrome} />;
   }
 
   return (

@@ -42,6 +42,7 @@ type TaskAttachment struct {
 	ContentType string
 	SizeBytes   int64
 	Checksum    string
+	Kind        string
 }
 
 func BuildAgentBrokerTask(input AgentBrokerTaskInput) (commands []BrokerCommand, files []BrokerTaskFile) {
@@ -313,7 +314,7 @@ func CollectTaskAttachments(texts ...string) []TaskAttachment {
 			})
 		}
 	}
-	return attachments
+	return uniqueTaskAttachments(append(attachments, HostedVideoAttachments(texts...)...))
 }
 
 func AttachmentSetup(attachments []TaskAttachment) (files []BrokerTaskFile, commands []BrokerCommand) {

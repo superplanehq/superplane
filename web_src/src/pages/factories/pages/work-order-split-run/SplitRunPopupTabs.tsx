@@ -6,6 +6,7 @@ import { useWorkOrder } from "@/hooks/useFactoryData";
 import type { IntentAnalysisChat } from "./WorkOrderIntentDocument";
 import { phasesWithRunArtifacts } from "./attachStreamArtifacts";
 import { AutomationsConsoleVariant } from "./redesign/AutomationsConsoleVariant";
+import { ANALYSIS_PLANNING_COPY } from "./useAnalysisPlanningSession";
 import { useSplitRunStreamArtifacts } from "./useSplitRunStreamArtifacts";
 import { SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import type { SplitRunFixture } from "./splitRunMocks";
@@ -175,6 +176,11 @@ export function SplitRunPopupTabs({
           canEditDescription={edits.canEditDescription}
           descriptionBusy={edits.descriptionBusy}
           onDescriptionSave={edits.saveDescription}
+          owner={edits.owner}
+          assigneeIds={edits.assigneeIds}
+          canEditOwner={edits.canEdit}
+          ownerBusy={edits.ownerBusy}
+          onOwnerSave={edits.saveOwner}
           source={fixture.source}
           files={files}
           pullRequests={popupData.pullRequests}
@@ -202,7 +208,7 @@ function sessionLookupErrorNote(error?: string) {
   }
   return (
     <p className="shrink-0 px-8 pt-4 text-[13px] text-destructive" role="alert">
-      The refinement session did not load. Refresh the page to try again.
+      {ANALYSIS_PLANNING_COPY.failedLoadRefinement}
     </p>
   );
 }

@@ -25,6 +25,7 @@ var (
 	errFactoryPullRequestNotMergeable            = errors.New("the pull request cannot merge")
 	errFactoryPullRequestMergeMethodNotAllowed   = errors.New("the repository does not allow this merge method")
 	errFactoryPullRequestHeadMoved               = errors.New("the pull request head changed")
+	errFactoryBitbucketMergeNotRevisionSafe      = errors.New("bitbucket cannot lock the approved revision")
 	errFactoryPullRequestMergeabilityUnavailable = errors.New("merge status is unavailable")
 	errFactoryPullRequestMergeabilityTemporary   = errors.New("merge status lookup failed temporarily")
 )
@@ -37,6 +38,7 @@ const (
 	mergeBlockedConflicting        = "The pull request has conflicts."
 	mergeBlockedMissingIntegration = "GitHub is not connected."
 	mergeBlockedUnavailable        = "Merge status is unavailable right now."
+	bitbucketMergeNotRevisionSafe  = "Bitbucket cannot lock the approved revision. Merge this pull request in Bitbucket."
 )
 
 type factoryPullRequestMergeability struct {
@@ -70,7 +72,7 @@ func loadFactoryPullRequestForMerge(
 	if err != nil {
 		return nil, nil, err
 	}
-	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
+	if !strings.EqualFold(pullRequest.Provider, factory.OnboardingConfigValue().EffectiveVCSProvider()) {
 		return nil, nil, errFactoryPullRequestNotGitHub
 	}
 	if pullRequest.State != models.FactoryPullRequestStateOpen {

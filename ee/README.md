@@ -90,7 +90,13 @@ verification, and the admin endpoints, see
    - E2E tests: add the feature to `server.SetLicenseServiceForTests` in
      `test/e2e/test_context.go`.
 
-7. **Update the documentation.** Add the feature and its operations to the
+7. **Update the UI.** Add the feature to `ENTERPRISE_FEATURES` in
+   `web_src/src/lib/license.ts`, so that the License page shows it. To show or
+   hide the feature, read `account.license.features` from the account
+   context. The UI check is only for display. The backend checks enforce the
+   license.
+
+8. **Update the documentation.** Add the feature and its operations to the
    feature table in `docs/contributing/enterprise-licensing.md`.
 
 ## Development

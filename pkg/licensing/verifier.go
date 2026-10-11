@@ -47,6 +47,7 @@ const (
 	ReasonInvalidClaims        Reason = "invalid_claims"
 	ReasonExpired              Reason = "expired"
 	ReasonNotYetValid          Reason = "not_yet_valid"
+	ReasonRevoked              Reason = "revoked"
 	ReasonUnreadable           Reason = "unreadable"
 )
 

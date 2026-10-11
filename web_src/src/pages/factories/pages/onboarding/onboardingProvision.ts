@@ -133,7 +133,7 @@ function matchesEventAppTitle(appName: string | undefined, title: string): boole
 
 // Event apps listen for GitHub events and are not factory line steps. Skip an
 // app whose title already matches an app the workspace has, so a retry after
-// a failed finish does not create a second PR Closure. Known limitation: a
+// a failed finish does not create a second copy. Known limitation: a
 // user-renamed app (to something other than "<title>" or "<title> (N)") is
 // not matched, so onboarding installs another copy — see ListFactoryApps,
 // which does not return the source factory id needed for an exact match.

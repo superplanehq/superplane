@@ -36,6 +36,7 @@ type MergedPullRequest struct {
 	Number          int64
 	Source          string
 	AuthorLogin     string
+	AuthorUUID      string
 	AuthorName      string
 	AuthorAvatarURL string
 	MergedAt        time.Time

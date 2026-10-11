@@ -1,6 +1,7 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 
 import { cn } from "@/lib/utils";
+import { DARK_SURFACE_MARK_INVERT_CLASS } from "@/ui/componentSidebar/integrationIcons";
 
 import type { OnboardingAgentCredentialChoice } from "../onboardingAgentReadiness";
 import { ConnectOptionRow } from "../onboardingSteps";
@@ -23,7 +24,7 @@ export function FirstRunModelSourceChoice({
       <legend className="mb-3 text-[13px] font-medium">{copy.modelSourceHeading}</legend>
       <div className="space-y-3">
         <ConnectOptionRow
-          icon={<img src={SuperplaneLogo} alt="" className="size-5 dark:brightness-0 dark:invert" />}
+          icon={<img src={SuperplaneLogo} alt="" className={cn("size-5", DARK_SURFACE_MARK_INVERT_CLASS)} />}
           title={copy.hostedModels}
           detail={copy.hostedModelsHelper}
           selected={modelSource !== "own-key"}

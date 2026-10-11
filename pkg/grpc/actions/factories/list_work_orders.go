@@ -44,6 +44,16 @@ func ListWorkOrders(ctx context.Context, organizationID string, req *pb.ListWork
 		orders = orders[:limit]
 	}
 
+	var totalCount int64
+	if req.GetBeforeId() == "" && !hasNextPage {
+		totalCount = int64(len(orders))
+	} else {
+		totalCount, err = factory.CountWorkOrders(db, filters)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to list work orders")
+		}
+	}
+
 	serialized, err := loadAndSerializeWorkOrders(ctx, factory, orders)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list work orders")
@@ -52,6 +62,7 @@ func ListWorkOrders(ctx context.Context, organizationID string, req *pb.ListWork
 	return &pb.ListWorkOrdersResponse{
 		Orders:      serialized,
 		HasNextPage: hasNextPage,
+		TotalCount:  uint32(totalCount),
 	}, nil
 }
 

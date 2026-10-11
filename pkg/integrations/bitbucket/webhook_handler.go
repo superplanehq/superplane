@@ -1,6 +1,7 @@
 package bitbucket
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -49,7 +50,34 @@ func (h *BitbucketWebhookHandler) CompareConfig(a, b any) (bool, error) {
 }
 
 func (h *BitbucketWebhookHandler) Merge(current, requested any) (any, bool, error) {
-	return current, false, nil
+	currentConfig := WebhookConfiguration{}
+	if err := mapstructure.Decode(current, &currentConfig); err != nil {
+		return nil, false, err
+	}
+	requestedConfig := WebhookConfiguration{}
+	if err := mapstructure.Decode(requested, &requestedConfig); err != nil {
+		return nil, false, err
+	}
+
+	// Webhooks are per repository. A different repository never merges.
+	if currentConfig.RepositorySlug != requestedConfig.RepositorySlug {
+		return current, false, nil
+	}
+
+	// ponytail: union event types so one repository webhook serves every
+	// trigger; re-provision updates that remote hook with the union
+	merged := WebhookConfiguration{
+		EventTypes:     slices.Clone(currentConfig.EventTypes),
+		RepositorySlug: currentConfig.RepositorySlug,
+	}
+	changed := false
+	for _, event := range requestedConfig.EventTypes {
+		if !slices.Contains(merged.EventTypes, event) {
+			merged.EventTypes = append(merged.EventTypes, event)
+			changed = true
+		}
+	}
+	return merged, changed, nil
 }
 
 func (h *BitbucketWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
@@ -77,6 +105,32 @@ func (h *BitbucketWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, er
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return nil, fmt.Errorf("error getting webhook secret: %w", err)
+	}
+
+	existing := BitbucketWebhook{}
+	if raw := ctx.Webhook.GetMetadata(); raw != nil {
+		if err := mapstructure.Decode(raw, &existing); err != nil {
+			return nil, fmt.Errorf("failed to decode webhook metadata: %w", err)
+		}
+	}
+	if existing.UUID != "" {
+		hook, err := client.UpdateWebhook(
+			metadata.Workspace.Slug,
+			config.RepositorySlug,
+			existing.UUID,
+			ctx.Webhook.GetURL(),
+			string(secret),
+			config.EventTypes,
+		)
+		if err == nil {
+			if hook.UUID == "" {
+				hook.UUID = existing.UUID
+			}
+			return &BitbucketWebhook{UUID: hook.UUID}, nil
+		}
+		if !errors.Is(err, errBitbucketWebhookNotFound) {
+			return nil, fmt.Errorf("error updating webhook: %w", err)
+		}
 	}
 
 	hook, err := client.CreateWebhook(

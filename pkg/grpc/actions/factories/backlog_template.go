@@ -100,9 +100,10 @@ func createBacklogCanvas(
 	}
 
 	canvasDoc := buildBacklogCanvas(backlogCanvasRequest{
-		Name:    name,
-		Agent:   resolveIntakeAgent(db, factoryModel),
-		VCSName: resolveVCSInstallationName(db, factoryModel),
+		Name:        name,
+		Agent:       resolveIntakeAgent(db, factoryModel),
+		VCSName:     resolveVCSInstallationName(db, factoryModel),
+		VCSProvider: factoryVCSProviderOrDefault(factoryModel),
 	})
 
 	nodes, edges, err := canvasDoc.Parse(deps.Registry, factoryModel.OrganizationID.String())
@@ -150,9 +151,10 @@ func createBacklogCanvas(
 }
 
 type backlogCanvasRequest struct {
-	Name    string
-	Agent   *intakeAgent
-	VCSName string
+	Name        string
+	Agent       *intakeAgent
+	VCSName     string
+	VCSProvider string
 }
 
 func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
@@ -199,7 +201,7 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 					Name:          "Refine Task",
 					Type:          yaml.NodeTypeAction,
 					Component:     request.Agent.component(),
-					Configuration: intakeRefinementConfiguration(request.Agent, request.VCSName),
+					Configuration: intakeRefinementConfiguration(request.Agent, request.VCSName, request.VCSProvider),
 					Concurrency:   intakeConcurrency(),
 					Position:      yaml.Position{X: 160, Y: 440},
 				},

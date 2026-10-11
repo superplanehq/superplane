@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -17,6 +18,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
 )
+
+const runnerLogSignedURLTTL = 15 * time.Minute
 
 func (s *Server) handleRunnerTaskLogs(w http.ResponseWriter, r *http.Request) {
 	user, ok := middleware.GetUserFromContext(r.Context())
@@ -84,6 +87,12 @@ func (s *Server) serveRunnerTaskLogs(
 	if errors.Is(err, models.ErrTaskLogLifecycleNotFound) {
 		if cursor != "" {
 			writeRunnerLogReset(w)
+			return
+		}
+		// The lifecycle row is created when the task starts. Until then the
+		// execution already has a task ID, so this is a wait, not a missing log.
+		if !task.IsTerminal() {
+			writeRunnerLogNotReady(w)
 			return
 		}
 		s.serveFinalRunnerTaskLog(w, r, task, nil)
@@ -163,6 +172,16 @@ func writeRunnerLogState(w http.ResponseWriter, state, cursor string) {
 	w.Header().Set(runnerlogs.HeaderCursor, cursor)
 }
 
+func writeRunnerLogNotReady(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set(runneraction.LiveLogErrorCodeHeader, runneraction.LiveLogSessionNotReadyErrorCode)
+	http.Error(
+		w,
+		"Logs are not available for this execution yet. Check again shortly.",
+		http.StatusNotFound,
+	)
+}
+
 func writeRunnerLogReset(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set(runnerlogs.HeaderState, models.RunnerTaskLogStateArchived)
@@ -201,6 +220,18 @@ func (s *Server) serveFinalRunnerTaskLog(
 		return
 	}
 	if err != nil {
+		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
+		return
+	}
+
+	signedURL, signErr := provider.SignedGetURL(r.Context(), key, runnerLogSignedURLTTL)
+	if signErr == nil {
+		writeRunnerLogState(w, models.RunnerTaskLogStateArchived, cursor)
+		w.Header().Set(runnerlogs.HeaderURL, signedURL)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if !errors.Is(signErr, blob.ErrSignedURLUnsupported) {
 		http.Error(w, "Could not read task logs", http.StatusInternalServerError)
 		return
 	}

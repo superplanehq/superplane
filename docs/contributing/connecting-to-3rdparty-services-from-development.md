@@ -73,12 +73,15 @@ The AWS integration uses OpenID Connect. When running locally, AWS IAM needs an 
 
 ## Factory GitHub App (local workspace setup)
 
-Factory workspace setup installs SuperPlane's public GitHub App. The process
-must hold the app credentials. If the `SUPERPLANE_GITHUB_APP_*` variables are
-empty, SuperPlane blocks organization onboarding and new workspace setup.
+Factory workspace setup installs a GitHub App. Cloud holds the public
+SuperPlane app in `SUPERPLANE_GITHUB_APP_*`. Self-host and local development
+can create a GitHub App from the workspace Connect screen. That app stays
+private to the GitHub account that creates it. SuperPlane stores the
+credentials on the installation. You do not need Helm or `.env` values for
+the process app.
 
-Cloud already holds these values. Local development must create a GitHub App
-that points at a stable public tunnel.
+A stable public tunnel is still required. GitHub must reach setup and
+webhook URLs on this SuperPlane instance.
 
 ### 1. Start a stable tunnel
 
@@ -95,7 +98,23 @@ WEBHOOKS_BASE_URL=https://<stable-tunnel-url>
 Restart SuperPlane after you change these values. See the tunnel steps
 above if you still need to expose `localhost:8000`.
 
-### 2. Create a public GitHub App
+### 2. Create a GitHub App from workspace setup
+
+1. Open `/onboarding` or create a workspace.
+2. SuperPlane opens the workspace wizard. The Connect screen shows
+   **Create GitHub App** when this installation has no process app.
+3. Create the GitHub App. The app stays private. GitHub returns to
+   Connect. Then install the app on a GitHub organization and choose the
+   repository.
+
+If Cloud or a previous run already configured the app, Connect stays
+**Connect GitHub**. SuperPlane does not show a second repository picker.
+
+To reuse an existing app instead of the wizard, follow the manual steps
+below and set `SUPERPLANE_GITHUB_APP_*`. Environment values win over the
+installation row.
+
+### 3. Create a GitHub App by hand (optional)
 
 1. Open GitHub, then **Settings**, then **Developer settings**, then **GitHub Apps**.
 2. Click **New GitHub App**.
@@ -108,7 +127,7 @@ above if you still need to expose `localhost:8000`.
    - Webhook secret: a random string. Copy it for `.env`.
 
    Disable **Request user authorization (OAuth) during installation**. The
-   public GitHub App does not authorize users.
+   GitHub App does not authorize users.
 
 5. Grant repository permissions that match the private-app manifest:
    - Issues: Read and write
@@ -128,16 +147,17 @@ above if you still need to expose `localhost:8000`.
    repositories in SuperPlane.
 
    Subscribe the app to the **Member** event. SuperPlane uses this event to
-   refresh cached push access after repository membership changes.
+   refresh cached push access after repository membership changes. Do not
+   subscribe to installation or installation_repositories events.
 
 6. Create the app.
-7. Make the app **public**. GitHub creates it as private. Open the app
-   settings and change the visibility. Factory onboarding cannot install a
-   private app on other accounts.
+7. Leave the app **private**. Self-host and local development install the
+   app only on GitHub accounts that the owner controls. Cloud keeps the
+   public SuperPlane app in `SUPERPLANE_GITHUB_APP_*`.
 8. Generate a private key and download the PEM file.
 9. Copy the App ID and slug from the app page.
 
-### 3. Configure the GitHub OAuth App
+### 4. Configure the GitHub OAuth App
 
 GitHub identity is separate from GitHub App installation access. Configure the
 OAuth App that supplies `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` with this
@@ -149,7 +169,24 @@ SuperPlane requests exactly the `user:email` scope. It stores the GitHub user
 ID and login, but it does not use the OAuth token for repositories,
 collaborators, or automation.
 
-### 4. Set the SuperPlane environment
+### Bitbucket OAuth consumer
+
+Bitbucket connect links an account. It does not add a sign-in method.
+
+1. Open Bitbucket and create an OAuth consumer.
+2. Set the callback URL to `{BASE_URL}/auth/bitbucket/callback`.
+3. Set the scope to `account`.
+4. Copy the key and secret into `.env` as `BITBUCKET_CLIENT_ID` and `BITBUCKET_CLIENT_SECRET`.
+
+SuperPlane stores the Bitbucket account id and username. It does not use this
+OAuth token to open pull requests.
+
+The Forge app is optional. Its source is in `forge/bitbucket/`. Set
+`SUPERPLANE_BITBUCKET_FORGE_APP_ID` and `SUPERPLANE_BITBUCKET_FORGE_INSTALL_URL`
+when you install that app. When those values are empty, workspace setup keeps
+the Bitbucket token screen.
+
+### 5. Set the SuperPlane environment
 
 Add these values to `.env`. Do not commit real secrets.
 
@@ -169,18 +206,19 @@ If the catalog still reports no hosted GitHub App, confirm every required
 value is set and that the App ID is a positive integer. Then restart
 `make dev.server`.
 
-### 5. Confirm setup
+### 6. Confirm setup
 
 1. Open `/onboarding` or create a workspace.
-2. SuperPlane must show the workspace wizard, not the GitHub App notice.
-3. Connect GitHub. The browser must open your public app install page.
+2. SuperPlane must show the workspace wizard. If the process has no app,
+   Connect shows **Create GitHub App**.
+3. After the app exists, Connect GitHub. The browser must open your
+   GitHub App install page.
 
-If setup stays blocked, the installation still has no complete
-`SUPERPLANE_GITHUB_APP_*` set. Check `.env` and restart the server.
+If Connect cannot create the app, confirm `BASE_URL` and
+`WEBHOOKS_BASE_URL` point at a stable tunnel. Then try again.
 
-CI sets dummy GitHub App values so factory E2E can open workspace setup.
-Local `make test.e2e` needs the same dummy values or a real app. Without
-them, `/account/onboarding` returns 503.
+CI sets dummy GitHub App values so factory E2E can skip create-app.
+Local `make test.e2e` needs the same dummy values or a real app.
 
 ## Factory Sentry App (local issue intake)
 
@@ -261,11 +299,10 @@ SuperPlane after you change this value.
 2. Under **OAuth applications**, click **Create new**.
 3. Set the application to public.
 4. Set the callback URL to `{BASE_URL}/api/v1/linear/oauth/callback`.
-5. Request the **read**, **write**, and **admin** scopes. Admin lets
-   SuperPlane register webhooks. A workspace admin must authorize the
-   connection, and that person must be a member of each private team.
-6. Create the application.
-7. Copy the **Client ID** and **Client Secret**.
+5. Set the webhook URL to `{BASE_URL}/api/v1/linear/webhook`.
+6. Select **Issues**, **Comments**, and **Issue attachments**.
+7. Create the application.
+8. Copy the **Client ID**, the **Client Secret**, and the **Webhook signing secret**.
 
 ### 3. Set the SuperPlane environment
 
@@ -274,7 +311,10 @@ Add these values to `.env`. Do not commit real secrets.
 ```env
 SUPERPLANE_LINEAR_OAUTH_CLIENT_ID=
 SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET=
+SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET=
 ```
+
+`SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET` is the webhook signing secret from the Linear application. When it is set, Connect requests the **read** and **write** scopes. Linear sends issue, comment, and attachment events to the webhook URL. When it is empty, Connect also requests the **admin** scope and SuperPlane creates a webhook for each trigger.
 
 Restart the server after you save `.env`.
 
@@ -282,8 +322,8 @@ Restart the server after you save `.env`.
 
 1. Open a factory line board.
 2. Add a **Linear issues** intake.
-3. When both variables are set, Connect opens Linear's authorize page.
-4. When either variable is empty, Connect asks for a Client ID and a
+3. When the client ID and the client secret are set, Connect opens Linear's authorize page.
+4. When either of those values is empty, Connect asks for a Client ID and a
    Client Secret.
 
 ## Local hosted OpenRouter
@@ -322,6 +362,6 @@ SuperPlane does not write the provider.
 
 - **Webhooks not received:** Check `WEBHOOKS_BASE_URL`, ensure the tunnel is running, and that the third-party service uses the correct webhook URL.
 - **AWS "Could not connect":** Restart SuperPlane with the tunnel URL as base; confirm `/.well-known/openid-configuration` returns the right issuer; try the Provider URL with a trailing slash; keep the tunnel running. If trycloudflare.com is blocked, use ngrok (paid avoids interstitial) or another tunnel.
-- **Factory setup is not available:** The process has no complete GitHub App. Set `SUPERPLANE_GITHUB_APP_*` and restart. See the Factory GitHub App section above.
+- **Create GitHub App fails:** Confirm `BASE_URL` and `WEBHOOKS_BASE_URL` match the public tunnel. See the Factory GitHub App section above.
 - **Sentry intake asks for a personal token:** The process has no complete public Sentry app. Set `SUPERPLANE_SENTRY_APP_*` and restart. See the Factory Sentry App section above.
 - **Hosted OpenRouter is missing:** Set `SUPERPLANE_DEV_HOSTED_OPENROUTER=yes`, both keys, and the model list. Run `make dev.up`. See the Local hosted OpenRouter section above.

@@ -172,6 +172,15 @@ func intakeAgentFromHostedProvider(tx *gorm.DB, factory *models.Factory) *intake
 	}
 }
 
+// factoryVCSProviderOrDefault returns the workspace Git host for clone
+// generation. A nil factory means GitHub, matching resolveVCSInstallationName.
+func factoryVCSProviderOrDefault(factory *models.Factory) string {
+	if factory == nil {
+		return ""
+	}
+	return factory.OnboardingConfigValue().EffectiveVCSProvider()
+}
+
 // resolveVCSInstallationName returns the integration name that runner steps
 // read repository credentials from.
 func resolveVCSInstallationName(tx *gorm.DB, factory *models.Factory) string {

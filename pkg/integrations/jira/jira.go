@@ -50,18 +50,6 @@ type Metadata struct {
 	// has access to the integration, not any particular webhook record - can find it.
 	WebhookID *int64 `json:"webhookId,omitempty" mapstructure:"webhookId,omitempty"`
 
-	// OpsScopesRequested records whether the currently stored OAuth token was granted with JSM Ops
-	// scopes. Set only after a successful OAuth callback — never when building the authorize URL —
-	// so a Sync that prompts reconnect for ops keeps re-prompting until the user actually finishes
-	// authorization. Atlassian has no incremental-consent mechanism; a token granted without ops
-	// scopes never gains them, so if enableOpsFeatures is turned on while this is false, Sync
-	// knows the connection needs a fresh authorize round trip.
-	OpsScopesRequested bool `json:"opsScopesRequested,omitempty" mapstructure:"opsScopesRequested,omitempty"`
-
-	// OpsScopesPending records whether the authorize URL currently outstanding includes JSM Ops
-	// scopes. Copied into OpsScopesRequested (and cleared) only after a successful OAuth callback.
-	OpsScopesPending bool `json:"opsScopesPending,omitempty" mapstructure:"opsScopesPending,omitempty"`
-
 	// IssueWebhookScopesRequested records whether the currently stored OAuth token was granted
 	// with read:issue-details:jira. Atlassian will not deliver jira:issue_* webhooks without
 	// that scope, even when manage:jira-webhook lets SuperPlane register the callback. Existing
@@ -126,13 +114,6 @@ func (j *Jira) Configuration() []configuration.Field {
 			Sensitive:   true,
 			Description: "OAuth Client Secret from your Atlassian OAuth 2.0 (3LO) app",
 		},
-		{
-			Name:        "enableOpsFeatures",
-			Label:       "Enable Ops features (incidents, alerts, heartbeats)",
-			Type:        configuration.FieldTypeBool,
-			Default:     false,
-			Description: "Most Jira Cloud sites don't have the JSM Ops product enabled. Only turn this on if yours does - it requests extra OAuth scopes that Atlassian will otherwise reject the authorization request for.",
-		},
 	}
 }
 
@@ -142,20 +123,8 @@ func (j *Jira) Actions() []core.Action {
 		&GetIssue{},
 		&UpdateIssue{},
 		&DeleteIssue{},
-		&CreateIncident{},
-		&GetIncident{},
-		&DeleteIncident{},
 		&GetWorkflow{},
 		&TransitionIssue{},
-		&ApproveWorkflow{},
-		&CreateHeartbeat{},
-		&PingHeartbeat{},
-		&UpdateHeartbeat{},
-		&DeleteHeartbeat{},
-		&CreateAlert{},
-		&GetAlert{},
-		&DeleteAlert{},
-		&UpdateAlert{},
 	}
 }
 
@@ -163,8 +132,6 @@ func (j *Jira) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnIssue{},
 		&OnIssueComment{},
-		&OnIncident{},
-		&OnAlert{},
 	}
 }
 
@@ -185,7 +152,7 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 	//
 	if app.ClientID == "" || app.ClientSecret == "" {
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
-			Description: appSetupInstructions(callbackURL, jsmOpsFeaturesEnabled(ctx.Configuration)),
+			Description: appSetupInstructions(callbackURL),
 		})
 
 		// An install still carrying config from the old Basic Auth (site URL + API token) flow
@@ -223,16 +190,9 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
 
-	// Ops features were turned on after this connection's token was granted without those scopes,
-	// or the token predates read:issue-details:jira. Atlassian has no incremental-consent
-	// mechanism to add them to an existing grant, so this stays Ready with its current
-	// (narrower) scope in the meantime, and a reconnect prompt is attached on top rather than
-	// blocking the rest of Sync - requestAuthorization only replaces the browser action just
-	// cleared above, it doesn't touch the secrets or state set by Ready().
+	// Older grants need fresh consent to receive issue events.
 	metadata := readMetadata(ctx.Integration)
-	needsReconnect := !metadata.IssueWebhookScopesRequested ||
-		(jsmOpsFeaturesEnabled(ctx.Configuration) && !metadata.OpsScopesRequested)
-	if needsReconnect {
+	if !metadata.IssueWebhookScopesRequested {
 		return j.requestAuthorization(ctx, app, callbackURL)
 	}
 
@@ -313,62 +273,32 @@ func accessTokenValidity(integration core.IntegrationContext) (time.Duration, bo
 	return time.Until(expiresAt), true
 }
 
-// The scopes below are grouped by the separate API products they actually belong to in the
-// Developer Console's Permissions tab. They used to be listed as one flat list under just "the
-// Jira API and the Jira Service Management API", but the incident and ops-alert/ops-config
-// scopes live under two other, separate API products there - the (classic) "Jira Service
-// Management API" only ever offers servicedesk-request/servicedesk-customer/insight-object
-// scopes, so a user could never find the rest under it. offline_access is requested on the
-// authorize URL too (see scopeList in client.go) but omitted here since it isn't selectable in
-// the Permissions tab at all.
-const (
-	coreJiraScopesForInstructions    = "`read:jira-work`, `write:jira-work`, `manage:jira-webhook`, `read:jira-user`, `read:issue-details:jira`"
-	jsmRequestScopesForInstructions  = "`read:servicedesk-request`, `write:servicedesk-request`"
-	jsmIncidentScopesForInstructions = "`read:incident:jira-service-management`, `write:incident:jira-service-management`"
-	jsmOpsScopesForInstructions      = "`read:ops-alert:jira-service-management`, `write:ops-alert:jira-service-management`, `delete:ops-alert:jira-service-management`, " +
-		"`read:ops-config:jira-service-management`, `write:ops-config:jira-service-management`, `delete:ops-config:jira-service-management`"
-)
+// offline_access is requested separately because the Permissions tab does not list it.
+const coreJiraScopesForInstructions = "`read:jira-work`, `write:jira-work`, `manage:jira-webhook`, `read:jira-user`, `read:issue-details:jira`"
 
-// jsmOpsFeaturesEnabled reads the "Enable Ops features" config option - see Configuration().
-func jsmOpsFeaturesEnabled(configuration any) bool {
-	config, ok := configuration.(map[string]any)
-	if !ok {
-		return false
-	}
-	enabled, _ := config["enableOpsFeatures"].(bool)
-	return enabled
-}
-
-func appSetupInstructions(callbackURL string, opsEnabled bool) string {
-	apis := fmt.Sprintf("- **Jira API**: %s\n- **Jira Service Management API**: %s",
-		coreJiraScopesForInstructions, jsmRequestScopesForInstructions)
-
-	if opsEnabled {
-		apis += fmt.Sprintf("\n- **Jira Service Management Incident API**: %s\n- **Jira Service Management Ops API**: %s",
-			jsmIncidentScopesForInstructions, jsmOpsScopesForInstructions)
-	}
-
+func appSetupInstructions(callbackURL string) string {
 	return fmt.Sprintf(`
 **1. Create an OAuth 2.0 (3LO) app**
 
 Open the [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/) and create an **OAuth 2.0 (3LO)** app.
 
-**2. Add these APIs, each with their listed scopes**
+**2. Add Jira permissions**
 
-Go to the **Permissions** tab. These are separate API entries - scopes for one won't appear under another, so add each one and its own scopes:
+Go to the **Permissions** tab. Add the **Jira API** with these scopes:
 
 %s
 
 **3. Configure the callback URL**
 
-Go to the **Authorization** tab, click **Configure** next to OAuth 2.0 (3LO), and paste this callback URL:
+Go to the **Authorization** tab. Click **Configure** next to OAuth 2.0 (3LO) and paste this callback URL:
 
 %s
 
 **4. Complete the installation setup**
 
-Go to the **Settings** tab to find the app's **Client ID** and **Client Secret**. Paste them into the fields below and click **Save**.
-`, apis, callbackURL)
+Go to the **Settings** tab to find the app's **Client ID** and **Client Secret**.
+Paste them into the fields below and click **Save**.
+`, coreJiraScopesForInstructions, callbackURL)
 }
 
 // requestAuthorization sends the user to Atlassian to approve the OAuth app.
@@ -386,26 +316,15 @@ func (j *Jira) requestAuthorization(ctx core.SyncContext, app oauthApp, callback
 		metadata.State = &state
 	}
 
-	// Record what this authorize URL requests, but do not claim the token has those scopes yet —
-	// OpsScopesRequested is only set after a successful callback. Setting it here made the next
-	// Sync think reconnect already succeeded, permanently clearing the ops prompt while the
-	// token still lacked the scopes.
-	opsEnabled := jsmOpsFeaturesEnabled(ctx.Configuration)
-	metadata.OpsScopesPending = opsEnabled
 	metadata.HostedOAuth = app.Hosted
 	ctx.Integration.SetMetadata(metadata)
-
-	scope := coreScopeList
-	if opsEnabled {
-		scope = scope + " " + jsmOpsScopeList
-	}
 
 	authorizeURL := fmt.Sprintf(
 		"%s?audience=api.atlassian.com&client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s&prompt=consent",
 		AuthorizeURL,
 		url.QueryEscape(app.ClientID),
 		url.QueryEscape(callbackURL),
-		url.QueryEscape(scope),
+		url.QueryEscape(coreScopeList),
 		url.QueryEscape(*metadata.State),
 	)
 
@@ -520,9 +439,6 @@ func (j *Jira) HandleRequest(ctx core.HTTPRequestContext) {
 	if expiresAt := token.ExpiresAt(); !expiresAt.IsZero() {
 		metadata.AccessTokenExpiresAt = expiresAt.Format(time.RFC3339)
 	}
-	// Commit the scopes that were actually on the authorize URL that produced this token.
-	metadata.OpsScopesRequested = metadata.OpsScopesPending
-	metadata.OpsScopesPending = false
 	metadata.IssueWebhookScopesRequested = true
 	ctx.Integration.SetMetadata(metadata)
 

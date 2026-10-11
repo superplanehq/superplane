@@ -111,8 +111,6 @@ function makeCanvas(id: string, name: string, overrides: Partial<CanvasesCanvasS
     name,
     createdAt: "2026-05-05T00:00:00Z",
     createdBy: { name: "Ada Lovelace" },
-    nodes: [],
-    edges: [],
     ...overrides,
   } as CanvasesCanvasSummary;
 }

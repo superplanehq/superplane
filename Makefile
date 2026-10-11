@@ -146,7 +146,7 @@ dev.setup:
 	$(MAKE) dev.setup.go
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
-	@$(COMPOSE) exec app ./scripts/db_seed_local_runner_fleet.sh superplane_dev
+	@$(MAKE) dev.setup.runner.fleet
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
@@ -156,6 +156,11 @@ dev.setup.npm:
 dev.setup.go:
 	@$(COMPOSE) exec app bash /app/scripts/go-mod-download
 	@$(COMPOSE) exec app go build cmd/server/main.go
+
+.PHONY: dev.setup.runner.fleet
+dev.setup.runner.fleet:
+	@$(MAKE) dev.test.is.running
+	@$(COMPOSE) exec -T app ./scripts/db_seed_local_runner_fleet.sh superplane_dev
 
 dev.clean.go.cache:
 	@$(MAKE) dev.test.is.running
@@ -184,6 +189,7 @@ endif
 	$(COMPOSE) exec app bash /app/docker-entrypoint.dev.sh
 
 dev.runners:
+	@$(MAKE) dev.setup.runner.fleet
 	$(COMPOSE_RUNNER) up -d --no-build --no-deps fleet-manager
 	@echo "Fleet Manager is running with ephemeral Docker runners."
 
@@ -250,7 +256,7 @@ dev.down:
 doctor-local:
 	$(COMPOSE_RUNNER) run --rm -T --no-deps --entrypoint sh runner -c '\
 	  missing=0; \
-	  for cmd in claude codex opencode playwright node git gh jq python3 bash ffmpeg ffprobe whisper-cli; do \
+	  for cmd in claude codex opencode playwright node git gh jq python3 bash ffmpeg ffprobe whisper-cli yt-dlp; do \
 	    if ! command -v "$$cmd" >/dev/null 2>&1; then \
 	      echo "$$cmd missing" >&2; \
 	      missing=1; \
@@ -267,6 +273,7 @@ doctor-local:
 	  echo "gh=$$(gh --version 2>/dev/null | head -n1)"; \
 	  echo "ffmpeg=$$(ffmpeg -version 2>/dev/null | head -n1)"; \
 	  echo "ffprobe=$$(ffprobe -version 2>/dev/null | head -n1)"; \
+	  echo "yt-dlp=$$(yt-dlp --version 2>/dev/null | head -n1)"; \
 	  whisper-cli --help >/dev/null 2>&1 || missing=1; \
 	  model=$${WHISPER_MODEL:-/usr/local/share/whisper/ggml-tiny.bin}; \
 	  if [ ! -s "$$model" ]; then \
@@ -337,6 +344,7 @@ check.test.ui.shard: ensure.bun
 	$(COMPOSE) exec -e SHARD_INDEX="$(SHARD_INDEX)" -e SHARD_COUNT="$(SHARD_COUNT)" app bash -lc "bash /app/scripts/test_ui_autoparallel.sh"
 
 check.test.ui.browser:
+	$(COMPOSE) exec app bash -lc "bash /app/scripts/check_monaco_worker_startup.sh"
 	$(COMPOSE) exec app bash -lc "bash /app/scripts/check_backlog_create_tabs.sh"
 
 check.format.js:
@@ -520,6 +528,7 @@ pb.gen: dev.test.is.running
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
 	$(MAKE) openapi.web.client.gen
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc 'date +%s%N > /app/.air-rebuild'
 
 pb.gen.models:
 	@$(COMPOSE) exec app /app/scripts/protoc.sh $(MODULES)
@@ -530,8 +539,10 @@ pb.gen.gateway:
 openapi.spec.gen: dev.test.is.running
 	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
 
+# Recreate the output directory in the app container. A host rm and mkdir
+# leaves Docker Desktop with a stale directory, and the generator cannot write.
 openapi.client.gen: dev.test.is.running
-	@rm -rf pkg/openapi_client
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "rm -rf pkg/openapi_client && mkdir -p pkg/openapi_client"
 	@./scripts/docker-pull-retry $(OPENAPI_GENERATOR_IMAGE)
 	@log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
 	if ! docker run --rm --user $(shell id -u):$(shell id -g) \

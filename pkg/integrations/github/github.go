@@ -252,7 +252,7 @@ func (g *GitHub) findWebhookSecret(ctx core.HTTPRequestContext) (string, error) 
 	if ctx.Integration.LegacySetup() {
 		var metadata common.Metadata
 		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err == nil && metadata.HostedApp {
-			app, ok := common.HostedAppFromEnv()
+			app, ok := common.ResolveHostedApp(context.Background())
 			if !ok {
 				return "", fmt.Errorf("hosted GitHub App is not configured")
 			}

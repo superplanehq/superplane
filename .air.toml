@@ -8,7 +8,9 @@ bin = "tmp/superplane"
 delay = 500
 # Include js so go:embed sources (e.g. pkg/components/runner/claude/run.js) trigger rebuilds.
 include_ext = ["go", "yaml", "yml", "js"]
-exclude_dir = ["web_src", "tmp", "build", "api/swagger", "node_modules"]
+# Generated Go files change throughout pb.gen; rebuild once after it finishes.
+include_file = [".air-rebuild"]
+exclude_dir = ["web_src", "tmp", "build", "release", "api/swagger", "node_modules", "pkg/protos", "pkg/openapi_client"]
 stop_on_error = true
 send_interrupt = true
 kill_delay = "3s"

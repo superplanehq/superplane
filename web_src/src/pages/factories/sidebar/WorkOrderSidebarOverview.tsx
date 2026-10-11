@@ -15,7 +15,8 @@ import {
   formatUsdCents,
   parseWorkOrderMetric,
 } from "../lib/workOrderUsage";
-import { OrgUserReference } from "../OrgUserReference";
+import { OrgUserReference, EmptyOwnerMark } from "../OrgUserReference";
+import { OwnerAssignTrigger } from "../WorkOrderAssigneesPopover";
 import { OverviewRow, SidebarSectionHeading } from "./SidebarPrimitives";
 import { useWorkOrderOverviewMissionSlot } from "./workOrderOverviewSlots";
 
@@ -40,6 +41,9 @@ export function WorkOrderSidebarOverview({
   statusMeta,
   assigneeIds,
   assigneeNames,
+  canAssign,
+  isAssigneesSaving,
+  onAssigneesSave,
 }: WorkOrderSidebarOverviewProps) {
   const createdAt = order.createdAt ? new Date(order.createdAt) : null;
   const totalTokens = parseWorkOrderMetric(order.totalTokens);
@@ -60,7 +64,14 @@ export function WorkOrderSidebarOverview({
           <CreatorValue organizationId={organizationId} factoryKey={factoryKey} order={order} />
         </OverviewRow>
 
-        <AssigneeOverviewRow organizationId={organizationId} assigneeIds={assigneeIds} assigneeNames={assigneeNames} />
+        <AssigneeOverviewRow
+          organizationId={organizationId}
+          assigneeIds={assigneeIds}
+          assigneeNames={assigneeNames}
+          canAssign={canAssign}
+          isAssigneesSaving={isAssigneesSaving}
+          onAssigneesSave={onAssigneesSave}
+        />
 
         {MissionSlot ? <MissionSlot workOrderId={order.id ?? ""} /> : null}
 
@@ -170,16 +181,33 @@ function AssigneeOverviewRow({
   organizationId,
   assigneeIds,
   assigneeNames,
+  canAssign,
+  isAssigneesSaving,
+  onAssigneesSave,
 }: {
   organizationId: string;
   assigneeIds: string[];
   assigneeNames: string[];
+  canAssign: boolean;
+  isAssigneesSaving: boolean;
+  onAssigneesSave: (assigneeIds: string[]) => Promise<void>;
 }) {
   const { resolveUser } = useOrgUserLookup(organizationId);
+  const ownerName = assigneeIds.length > 0 ? resolveUser(assigneeIds[0], assigneeNames[0])?.name : undefined;
   return (
     <OverviewRow icon={<User className="size-3.5" aria-hidden />} srLabel="Owner">
-      <span data-testid="work-order-edit-assignees">
-        <AssigneeButtonBody assigneeIds={assigneeIds} assigneeNames={assigneeNames} resolveUser={resolveUser} />
+      <span data-testid="work-order-edit-assignees" className="inline-flex min-w-0 max-w-full">
+        <OwnerAssignTrigger
+          organizationId={organizationId}
+          selectedIds={assigneeIds}
+          canAssign={canAssign}
+          isSaving={isAssigneesSaving}
+          onSave={onAssigneesSave}
+          align="start"
+          label={ownerName ? `Owner: ${ownerName}` : "Assign owner"}
+        >
+          <AssigneeButtonBody assigneeIds={assigneeIds} assigneeNames={assigneeNames} resolveUser={resolveUser} />
+        </OwnerAssignTrigger>
       </span>
     </OverviewRow>
   );
@@ -195,7 +223,7 @@ function AssigneeButtonBody({
   resolveUser: ReturnType<typeof useOrgUserLookup>["resolveUser"];
 }) {
   if (assigneeIds.length === 0) {
-    return <span className="min-w-0 truncate text-muted-foreground">No owner</span>;
+    return <EmptyOwnerMark />;
   }
   const display = resolveUser(assigneeIds[0], assigneeNames[0]);
   return <OrgUserReference display={display} size="xs" nameClassName="truncate text-[13px]" />;

@@ -1,34 +1,58 @@
+import type { FirstRunArtScene } from "./firstRunArtScene";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunScreen } from "../useFirstRunSetupFlow";
 
 export type FirstRunSphereScreen = FirstRunScreen;
 
-/**
- * The Discover chip keeps the latest confirmed context: the organization
- * once it is chosen, then the repository once it is selected. The chip is a
- * ghost placeholder until the first choice exists.
- */
-function discoverChip(value: string | null | undefined): FirstRunSphereProps["leftChip"] {
+const WELCOME_ART = { mode: "school", background: "#87ae9d", arrowColor: "#eeede9" } as const;
+const CONNECT_ART = { mode: "globe", background: "#b7b174", arrowColor: "#eeede9", count: 100 } as const;
+const ORGANIZATION_ART = { mode: "globe", background: "#b09532", arrowColor: "#eeede9", count: 400 } as const;
+const REPOSITORY_ART = { mode: "globe", background: "#c5ebc3", arrowColor: "#11110e", count: 700 } as const;
+const ANALYSIS_ART = { mode: "globe", background: "#EF8D0B", arrowColor: "#11110e", count: 1000 } as const;
+
+function awaitingPill(): NonNullable<FirstRunArtScene["pill"]> {
   const copy = FIRST_RUN_COPY.sphere;
-  if (!value) return { label: copy.discover, value: copy.awaitingCode, tone: "ghost" };
-  return { label: copy.discover, value };
+  return { label: copy.discover, value: copy.awaitingCode, light: false };
 }
 
-/** Sphere for the analysis screen: fully lit, flickering while scoring runs. */
+function namedPill(value: string): NonNullable<FirstRunArtScene["pill"]> {
+  return { label: FIRST_RUN_COPY.sphere.discover, value, light: true };
+}
+
+function sphere(level: number, caption: string, art: FirstRunArtScene, captionHighlight?: string): FirstRunSphereProps {
+  return { level, caption, captionHighlight, art };
+}
+
+/** Repository, tickets, and agent share the light green globe. */
+export function repositorySphereFor(name?: string | null): FirstRunSphereProps {
+  const copy = FIRST_RUN_COPY.sphere;
+  const label = name?.trim() ?? "";
+  return sphere(
+    0.74,
+    label || copy.captionAwaitingRepository,
+    {
+      ...REPOSITORY_ART,
+      pill: label ? namedPill(label) : awaitingPill(),
+    },
+    label ? "Repository:" : undefined,
+  );
+}
+
+/** Sphere for the analysis screen: orange globe with Discover and Verify badges. */
 export function analysisSphereFor(selectedRepo: string | null, total: number): FirstRunSphereProps {
   const copy = FIRST_RUN_COPY.sphere;
+  const discover = total > 0 ? copy.ticketsFound(total) : selectedRepo || copy.awaitingCode;
   return {
     level: 1,
     animate: true,
     phasesLit: true,
     caption: selectedRepo ?? "",
     captionHighlight: "Scoring:",
-    leftChip:
-      total > 0
-        ? { label: copy.discover, value: copy.ticketsFound(total), tone: "amber" }
-        : { label: copy.discover, value: copy.awaitingCode, tone: "ghost" },
-    rightChip: { label: copy.verify, value: copy.reviewReadyPr, tone: "amber" },
+    art: {
+      ...ANALYSIS_ART,
+      badges: { discover, verify: copy.reviewReadyPr },
+    },
   };
 }
 
@@ -38,28 +62,16 @@ export function sphereFor(
   organization?: string,
 ): FirstRunSphereProps {
   const copy = FIRST_RUN_COPY.sphere;
-  if (screen === "welcome") return { level: 0.14, caption: copy.captionSetup };
+  if (screen === "welcome") {
+    return sphere(0.14, copy.captionSetup, { ...WELCOME_ART, pill: awaitingPill() });
+  }
   if (screen === "host" || screen === "connect") {
-    return {
-      level: 0.24,
-      caption: copy.captionConnect,
-      leftChip: discoverChip(null),
-    };
+    return sphere(0.24, copy.captionConnect, { ...CONNECT_ART, pill: awaitingPill() });
   }
   if (screen === "choose") {
     return selectedRepo
-      ? {
-          level: 0.74,
-          caption: selectedRepo,
-          captionHighlight: "Repository:",
-          leftChip: discoverChip(selectedRepo),
-        }
-      : { level: 0.58, caption: copy.captionAwaitingRepository, leftChip: discoverChip(organization) };
+      ? repositorySphereFor(selectedRepo)
+      : sphere(0.58, copy.captionAwaitingRepository, { ...ORGANIZATION_ART, pill: awaitingPill() });
   }
-  return {
-    level: 0.9,
-    caption: copy.captionTickets,
-    leftChip: discoverChip(selectedRepo ?? organization),
-    rightChip: { label: copy.verify, value: copy.reviewReadyPr, tone: "ghost" },
-  };
+  return repositorySphereFor(selectedRepo ?? organization);
 }

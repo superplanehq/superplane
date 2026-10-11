@@ -10,8 +10,6 @@ type TicketProject = { id?: string; name?: string };
 export function FirstRunTicketChoices({
   ticketSource,
   saving,
-  jiraAvailable,
-  jiraFeatureLoading,
   jiraConnected,
   jiraProjects,
   jiraProjectsLoading,
@@ -34,8 +32,6 @@ export function FirstRunTicketChoices({
 }: {
   ticketSource: FirstRunTicketSource | null;
   saving: boolean;
-  jiraAvailable: boolean;
-  jiraFeatureLoading: boolean;
   jiraConnected: boolean;
   jiraProjects: TicketProject[];
   jiraProjectsLoading: boolean;
@@ -68,17 +64,14 @@ export function FirstRunTicketChoices({
           disabled={saving}
           onSelect={() => onSelectTicketSource("github-issues")}
         />
-        <FirstRunFlaggedTicketRow
-          icon="jira"
+        <ConnectOptionRow
+          icon={<IntegrationChoiceIcon name="jira" />}
           title={copy.jira}
-          helper={copy.jiraHelper}
-          soonHelper={copy.jiraSoonHelper}
-          lookupLoading={copy.jiraLookupLoading}
-          available={jiraAvailable}
-          featureLoading={jiraFeatureLoading}
+          detail={copy.jiraHelper}
           selected={ticketSource === "jira"}
+          connectLabel={copy.jira}
           connected={jiraConnected}
-          saving={saving}
+          disabled={saving}
           onSelect={() => onSelectTicketSource("jira")}
           onConnect={onConnectJira}
         />
@@ -98,7 +91,6 @@ export function FirstRunTicketChoices({
         />
       </div>
       <FirstRunJiraProjectFields
-        jiraAvailable={jiraAvailable}
         visible={ticketSource === "jira" && jiraConnected}
         copy={copy}
         saving={saving}
@@ -235,7 +227,6 @@ function FirstRunLinearProjectFields({
 }
 
 function FirstRunJiraProjectFields({
-  jiraAvailable,
   visible,
   copy,
   saving,
@@ -246,7 +237,6 @@ function FirstRunJiraProjectFields({
   onSelectJiraProject,
   onRetryJiraProjects,
 }: {
-  jiraAvailable: boolean;
   visible: boolean;
   copy: (typeof FIRST_RUN_COPY)["tickets"];
   saving: boolean;
@@ -257,7 +247,7 @@ function FirstRunJiraProjectFields({
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
 }) {
-  if (!jiraAvailable || !visible) {
+  if (!visible) {
     return null;
   }
 

@@ -18,7 +18,7 @@ import (
 func Test__ListCanvases__ReturnsEmptyListWhenNoCanvasesExist(t *testing.T) {
 	r := support.Setup(t)
 
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), false)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Empty(t, response.Canvases)
@@ -67,7 +67,7 @@ func Test__ListCanvases__ReturnsAllCanvasesForAnOrganization(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), false)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	assert.Len(t, response.Canvases, 2)
@@ -113,7 +113,7 @@ func Test__ListCanvases__ExcludesFactoryOwnedCanvases(t *testing.T) {
 	)
 	require.NoError(t, database.Conn().Model(factoryCanvas).Update("factory_id", factory.ID).Error)
 
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), false)
 	require.NoError(t, err)
 	require.Len(t, response.Canvases, 1)
 	assert.Equal(t, orgCanvas.ID.String(), response.Canvases[0].Id)
@@ -153,7 +153,7 @@ func Test__ListCanvases__IncludesUserCanvasPreferences(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), false)
 	require.NoError(t, err)
 	require.Len(t, response.Canvases, 2)
 
@@ -215,7 +215,7 @@ func Test__ListCanvases__DoesNotReturnCanvasesFromOtherOrganizations(t *testing.
 	//
 	// List canvases for original organization
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), false)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 
@@ -261,7 +261,7 @@ func Test__ListCanvases__ReturnsCanvasesWithoutStatusInformation(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), false)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Canvases, 1)
@@ -307,7 +307,7 @@ func Test__ListCanvases__ReturnsSummaries(t *testing.T) {
 	//
 	// List canvases
 	//
-	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String())
+	response, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), false)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Canvases, 1)
@@ -325,6 +325,21 @@ func Test__ListCanvases__ReturnsSummaries(t *testing.T) {
 	assert.NotNil(t, listedCanvas.UpdatedAt)
 	assert.NotNil(t, listedCanvas.CreatedBy.Id)
 	assert.NotNil(t, listedCanvas.CreatedBy.Name)
+	assert.Empty(t, listedCanvas.Nodes)
+	assert.Empty(t, listedCanvas.Edges)
+
+	withGraph, err := ListCanvases(context.Background(), r.Registry, r.Organization.ID.String(), r.User.String(), true)
+	require.NoError(t, err)
+	require.Len(t, withGraph.Canvases, 1)
+	graphCanvas := withGraph.Canvases[0]
+	require.Len(t, graphCanvas.Nodes, 2)
+	assert.Equal(t, "node-1", graphCanvas.Nodes[0].Id)
+	assert.Equal(t, "node-2", graphCanvas.Nodes[1].Id)
+	require.NotNil(t, graphCanvas.Nodes[0].Position)
+	require.Len(t, graphCanvas.Edges, 1)
+	assert.Equal(t, "node-1", graphCanvas.Edges[0].SourceId)
+	assert.Equal(t, "node-2", graphCanvas.Edges[0].TargetId)
+	assert.Equal(t, "default", graphCanvas.Edges[0].Channel)
 }
 
 func findCanvasSummary(canvases []*pb.CanvasSummary, canvasID string) *pb.CanvasSummary {

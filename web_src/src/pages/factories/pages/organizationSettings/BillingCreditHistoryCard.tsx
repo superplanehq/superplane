@@ -19,30 +19,32 @@ export function BillingCreditHistoryCard({ grants }: { grants: OrganizationsOrga
 
 export function CreditGrantTable({ grants }: { grants: OrganizationsOrganizationCreditGrant[] }) {
   return (
-    <table className="mt-1 w-full text-left text-[13px]">
-      <thead>
-        <tr className="border-b border-border text-muted-foreground">
-          <th className="py-2 pr-3 font-medium">Date</th>
-          <th className="py-2 pr-3 font-medium">Source</th>
-          <th className="py-2 pr-3 font-medium">Amount</th>
-          <th className="py-2 font-medium">Details</th>
-        </tr>
-      </thead>
-      <tbody>
-        {grants.map((grant) => (
-          <tr key={grant.id ?? `${grant.kind}-${grant.createdAt}`} className="border-b border-border last:border-0">
-            <td className="py-2 pr-3 whitespace-nowrap">{formatGrantDate(grant.createdAt)}</td>
-            <td className="py-2 pr-3">
-              <Badge variant="secondary">{creditGrantSourceLabel(grant.kind)}</Badge>
-            </td>
-            <td className="py-2 pr-3 whitespace-nowrap">
-              {formatCreditGrantAmount(parseWorkOrderMetric(grant.amountCents))}
-            </td>
-            <td className="py-2 text-muted-foreground">{creditGrantDetails(grant) || "—"}</td>
+    <div className="overflow-x-auto">
+      <table className="mt-1 w-full text-left text-[13px]">
+        <thead>
+          <tr className="border-b border-border text-muted-foreground">
+            <th className="py-2 pr-3 font-medium">Date</th>
+            <th className="py-2 pr-3 font-medium">Source</th>
+            <th className="py-2 pr-3 font-medium">Amount</th>
+            <th className="py-2 font-medium">Details</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {grants.map((grant) => (
+            <tr key={grant.id ?? `${grant.kind}-${grant.createdAt}`} className="border-b border-border last:border-0">
+              <td className="py-2 pr-3 whitespace-nowrap">{formatGrantDate(grant.createdAt)}</td>
+              <td className="py-2 pr-3">
+                <Badge variant="secondary">{creditGrantSourceLabel(grant.kind)}</Badge>
+              </td>
+              <td className="py-2 pr-3 whitespace-nowrap">
+                {formatCreditGrantAmount(parseWorkOrderMetric(grant.amountCents))}
+              </td>
+              <td className="py-2 text-muted-foreground">{creditGrantDetails(grant) || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

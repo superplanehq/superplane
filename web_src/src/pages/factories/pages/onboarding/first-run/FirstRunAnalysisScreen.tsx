@@ -82,7 +82,7 @@ export function FirstRunAnalysisScreen({
   const rows = stageRows(progress, sourceName);
 
   return (
-    <FirstRunShell testId="first-run-analysis" chrome={chrome} sphere={sphere}>
+    <FirstRunShell testId="first-run-analysis" chrome={chrome} sphere={sphere} visual="preview">
       <FirstRunHeading headline={copy.headline}>
         <p className="text-[13px] text-muted-foreground">{copy.body}</p>
       </FirstRunHeading>

@@ -275,8 +275,9 @@ function formatUsageTooltip(totalTokens: number, totalCostCents: number, duratio
 /**
  * Scope pills next to the page title. `active` keeps drafts, waiting
  * work, and failed runs. `my` keeps work assigned to the viewer.
+ * `unassigned` keeps tasks with no owner, including closed tasks.
  */
-export type WorkOrderScope = "all" | "active" | "my";
+export type WorkOrderScope = "all" | "active" | "my" | "unassigned";
 
 export const WORK_ORDER_SCOPES: Array<{ id: WorkOrderScope; label: string; tooltip: string }> = [
   { id: "all", label: "All", tooltip: "Every task in this workspace." },
@@ -286,6 +287,7 @@ export const WORK_ORDER_SCOPES: Array<{ id: WorkOrderScope; label: string; toolt
     label: "My",
     tooltip: "Tasks you created or started. SuperPlane assigns those to you.",
   },
+  { id: "unassigned", label: "Unassigned", tooltip: "Tasks with no owner." },
 ];
 
 /** Statuses that the Active scope keeps. Running is in flight. */
@@ -384,10 +386,34 @@ export function applyWorkOrderScope(
   if (scope === "active") {
     return entries.filter((entry) => ACTIVE_SCOPE_STATUSES.includes(entry.displayStatus));
   }
+  if (scope === "unassigned") {
+    return entries.filter((entry) => entry.assigneeIds.length === 0);
+  }
   if (!currentUserId) {
     return [];
   }
   return entries.filter((entry) => workOrderMatchesUser(entry.order, currentUserId));
+}
+
+/**
+ * Server filters for the workspace and phone boards.
+ * Unassigned does not add a user id, so a selected owner is not OR'd into that request.
+ */
+export function boardWorkOrderScopeQuery(
+  scope: WorkOrderScope,
+  assigneeFilterIds: readonly string[],
+  currentUserId?: string,
+): { userId?: string; unassigned: boolean; requireUser: boolean } {
+  if (scope === "unassigned") {
+    return { userId: undefined, unassigned: true, requireUser: false };
+  }
+  const ownerIds = assigneeFilterIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
+  const mine = scope === "my";
+  return {
+    userId: ownerIds.length === 1 ? ownerIds[0] : mine ? currentUserId : undefined,
+    unassigned: assigneeFilterIds.includes(UNASSIGNED_FILTER_VALUE),
+    requireUser: mine && ownerIds.length !== 1,
+  };
 }
 
 function workOrderMatchesFilterLabel(order: FactoriesWorkOrderSummary, label: WorkOrderFilterLabel): boolean {

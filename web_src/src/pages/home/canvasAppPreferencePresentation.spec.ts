@@ -24,8 +24,6 @@ function makeCanvas(id: string, name: string, overrides: Partial<CanvasCardData>
     name,
     createdAt: "2026-05-05",
     createdBy: { name: "Ada Lovelace" },
-    nodes: [],
-    edges: [],
     ...overrides,
   };
 }

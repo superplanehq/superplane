@@ -10,7 +10,9 @@ import {
   parseWorkOrderFileId,
   resolveWorkOrderFileSrc,
 } from "@/lib/workOrderFiles";
+import { HOSTED_VIDEO_COPY, parseHostedVideoUrl } from "@/lib/hostedVideo";
 import { WorkOrderVideo } from "@/pages/app/WorkOrderVideo";
+import { HostedVideoEmbed } from "@/pages/app/HostedVideoEmbed";
 
 declare module "@tiptap/core" {
   interface Storage {
@@ -41,6 +43,14 @@ function workOrderMediaHTML(
 
 function WorkOrderMediaView({ node, editor }: NodeViewProps) {
   const rawSrc = node.attrs.src as string | undefined;
+  const hosted = parseHostedVideoUrl(rawSrc ?? "");
+  if (hosted) {
+    return (
+      <NodeViewWrapper className="inline-block max-w-full">
+        <HostedVideoEmbed video={hosted} className="work-order-file-image" />
+      </NodeViewWrapper>
+    );
+  }
   const src =
     (node.attrs.resolvedSrc as string | null | undefined) ??
     resolveWorkOrderFileSrc(rawSrc, editor.storage.image?.downloadUrls);
@@ -76,6 +86,26 @@ export const WorkOrderImage = Image.extend({
   },
   renderHTML({ HTMLAttributes }) {
     const { resolvedSrc, ...rest } = HTMLAttributes;
+    const hosted = parseHostedVideoUrl(String(rest.src ?? ""));
+    if (hosted?.embedUrl) {
+      return [
+        "iframe",
+        {
+          src: hosted.embedUrl,
+          title: hosted.providerName,
+          class: "hosted-video-embed aspect-video w-full max-w-xl rounded-md border border-border",
+          allowfullscreen: "true",
+        },
+      ];
+    }
+    if (hosted) {
+      return [
+        "span",
+        { class: "hosted-video-card" },
+        ["span", {}, hosted.providerName],
+        ["a", { href: hosted.pageUrl, target: "_blank", rel: "noopener noreferrer" }, HOSTED_VIDEO_COPY.open],
+      ];
+    }
     const src =
       (resolvedSrc as string | undefined | null) ??
       resolveWorkOrderFileSrc(rest.src as string | undefined, this.editor?.storage.image?.downloadUrls);

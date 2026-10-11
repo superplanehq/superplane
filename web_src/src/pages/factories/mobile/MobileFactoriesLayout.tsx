@@ -20,6 +20,7 @@ import { firstFactoryLineId } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
 import { MobileBottomBar } from "./MobileBottomBar";
+import { PinnedPhoneShell } from "./PinnedPhoneShell";
 
 /**
  * Phone shell for a workspace. No sidebar: pages fill the screen and a
@@ -139,13 +140,12 @@ function MobileFactoryShell({
 
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
-      <div
-        className="flex h-dvh w-full flex-col bg-background text-foreground [--workspace-navigation-width:0px]"
-        data-testid="mobile-factories-layout"
-      >
-        <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto">{children ?? <Outlet />}</main>
+      <PinnedPhoneShell testId="mobile-factories-layout">
+        <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-none">
+          {children ?? <Outlet />}
+        </main>
         <MobileBottomBar canCreateWorkOrder={canCreateWorkOrder} />
-      </div>
+      </PinnedPhoneShell>
       {canCreateWorkOrder ? (
         <CreateWorkOrderDialog
           open={createWorkOrderOpen}

@@ -1,4 +1,5 @@
 import type { FactoriesAutomationRef, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
+import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
@@ -24,6 +25,7 @@ export const CREATED_MANUALLY = "Created manually";
 
 export type SplitRunIntakeKind =
   | "github-issues"
+  | "bitbucket-prs"
   | "dependabot-alerts"
   | "jira-issues"
   | "sentry-exceptions"
@@ -87,6 +89,7 @@ const SOURCE_PERSON_FALLBACK: OrgUserDisplay = {
 
 export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; iconSrc: string; iconAlt: string }> = {
   "github-issues": { name: "GitHub issues", iconSrc: githubIcon, iconAlt: "GitHub" },
+  "bitbucket-prs": { name: "Bitbucket pull requests", iconSrc: bitbucketIcon, iconAlt: "Bitbucket" },
   "dependabot-alerts": { name: "Dependabot alerts", iconSrc: dependabotIcon, iconAlt: "Dependabot" },
   "jira-issues": { name: "Jira issues", iconSrc: jiraIcon, iconAlt: "Jira" },
   "sentry-exceptions": { name: "Sentry exceptions", iconSrc: sentryIcon, iconAlt: "Sentry" },
@@ -104,6 +107,7 @@ export const INTAKE_PRESENTATION: Record<SplitRunIntakeKind, { name: string; ico
 // names an automation when the task has no origin link.
 const INTAKE_KIND_HINTS: Array<{ pattern: RegExp; kind: SplitRunIntakeKind }> = [
   { pattern: /dependabot/i, kind: "dependabot-alerts" },
+  { pattern: /bitbucket/i, kind: "bitbucket-prs" },
   { pattern: /jira/i, kind: "jira-issues" },
   { pattern: /productive/i, kind: "productive-tasks" },
   { pattern: /pagerduty/i, kind: "pagerduty-incidents" },
@@ -115,6 +119,10 @@ export function sourceTicketLabel(url: string): string {
   const parsed = parseUrl(url);
   if (!parsed) {
     return url;
+  }
+  const bitbucket = bitbucketPullRequestLabel(parsed);
+  if (bitbucket) {
+    return bitbucket;
   }
   const github = githubTicketLabel(parsed);
   if (github) {
@@ -246,6 +254,9 @@ function intakeSourceFromKind(intakeKind: SplitRunIntakeKind): SplitRunIntakeSou
 function intakeKindFromHref(href: string): SplitRunIntakeKind {
   const parsed = parseUrl(href);
   const host = parsed?.hostname ?? "";
+  if (host === "bitbucket.org") {
+    return "bitbucket-prs";
+  }
   if (host.includes("sentry.io")) {
     return "sentry-exceptions";
   }
@@ -302,6 +313,17 @@ function githubTicketLabel(parsed: URL): string | undefined {
   }
   const [, owner, repo, kind, number] = parsed.pathname.split("/");
   if (!owner || !repo || !number || (kind !== "issues" && kind !== "pull")) {
+    return undefined;
+  }
+  return `${owner}/${repo}#${number}`;
+}
+
+function bitbucketPullRequestLabel(parsed: URL): string | undefined {
+  if (parsed.hostname !== "bitbucket.org") {
+    return undefined;
+  }
+  const [, owner, repo, kind, number] = parsed.pathname.split("/");
+  if (!owner || !repo || kind !== "pull-requests" || !number) {
     return undefined;
   }
   return `${owner}/${repo}#${number}`;

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -87,72 +88,6 @@ func findProject(projects []Project, projectKey string) (*Project, error) {
 	}
 
 	return nil, fmt.Errorf("project %s not found", projectKey)
-}
-
-func requireOpsTeam(httpCtx core.HTTPContext, integration core.IntegrationContext, teamID string) (*OpsTeam, error) {
-	cloudID, err := cloudIDFromIntegration(integration)
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := NewClient(httpCtx, integration)
-	if err != nil {
-		return nil, err
-	}
-
-	teams, err := client.ListOpsTeams(cloudID)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, team := range teams {
-		if team.TeamID == teamID {
-			t := team
-			return &t, nil
-		}
-	}
-
-	return nil, fmt.Errorf("team %s not found", teamID)
-}
-
-func requireServiceDesk(httpCtx core.HTTPContext, integration core.IntegrationContext, serviceDeskID string) (*ServiceDesk, error) {
-	client, err := NewClient(httpCtx, integration)
-	if err != nil {
-		return nil, err
-	}
-
-	desks, err := client.ListServiceDesks()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, desk := range desks {
-		if desk.ID == serviceDeskID {
-			d := desk
-			return &d, nil
-		}
-	}
-
-	return nil, fmt.Errorf("service desk %s not found", serviceDeskID)
-}
-
-// CreateIncidentNodeMetadata is stored on create-incident nodes at setup for canvas labels and field mapping.
-type CreateIncidentNodeMetadata struct {
-	ServiceDeskName string `json:"serviceDeskName,omitempty"`
-	RequestTypeName string `json:"requestTypeName,omitempty"`
-	ImpactFieldID   string `json:"impactFieldId,omitempty"`
-	UrgencyFieldID  string `json:"urgencyFieldId,omitempty"`
-}
-
-// OpsAlertPickerMetadata summarizes the Ops alert referenced on picker-driven components.
-type OpsAlertPickerMetadata struct {
-	AlertLabel string `json:"alertLabel,omitempty"`
-}
-
-// UpdateAlertNodeMetadata summarizes configured update operations for workflow cards.
-type UpdateAlertNodeMetadata struct {
-	AlertLabel      string   `json:"alertLabel,omitempty"`
-	UpdateSummaries []string `json:"updateSummaries,omitempty"`
 }
 
 func cloudIDFromIntegration(integration core.IntegrationContext) (string, error) {
@@ -349,58 +284,19 @@ func IssueAlreadyInColumn(issue *Issue, column string) bool {
 	return isDoneCategory(IssueStatusCategory(issue))
 }
 
-// resolveCloudID returns the Atlassian cloud id stored during the OAuth connect flow.
-func resolveCloudID(httpCtx core.HTTPContext, integration core.IntegrationContext) (string, error) {
-	return cloudIDFromIntegration(integration)
-}
-
-// heartbeatAlertTagsFromList converts a raw list of any values into a slice of
-// trimmed, non-empty strings suitable for the JSM heartbeat alert tags field.
-func heartbeatAlertTagsFromList(raw []any) []string {
-	if len(raw) == 0 {
-		return nil
+// ParseJiraDateTime parses timestamps returned by Jira APIs.
+func ParseJiraDateTime(raw string) (time.Time, bool) {
+	raw = strings.TrimSpace(raw)
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02T15:04:05.000-0700",
+		"2006-01-02T15:04:05-0700",
 	}
-	out := make([]string, 0, len(raw))
-	for _, e := range raw {
-		s := strings.TrimSpace(fmt.Sprint(e))
-		if s != "" {
-			out = append(out, s)
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, raw); err == nil {
+			return t, true
 		}
 	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-// heartbeatAlertPriorityForAPI normalises a priority string for the JSM API,
-// returning an empty string when the value is unset or the sentinel "__none__".
-func heartbeatAlertPriorityForAPI(priority string) string {
-	p := strings.TrimSpace(priority)
-	if p == "" || p == "__none__" {
-		return ""
-	}
-	return p
-}
-
-// ConfigurationAsSliceMap returns slice-style configuration as map[string]any if possible.
-func ConfigurationAsSliceMap(cfg any) map[string]any {
-	if cfg == nil {
-		return map[string]any{}
-	}
-	if m, ok := cfg.(map[string]any); ok {
-		return m
-	}
-	b, err := json.Marshal(cfg)
-	if err != nil {
-		return map[string]any{}
-	}
-	var out map[string]any
-	if err := json.Unmarshal(b, &out); err != nil {
-		return map[string]any{}
-	}
-	if out == nil {
-		return map[string]any{}
-	}
-	return out
+	return time.Time{}, false
 }

@@ -136,7 +136,7 @@ export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
 // Event-driven factory apps provisioned during onboarding. These listen for
 // GitHub events; they are not factory line steps. Issue intake is not here: the
 // workspace gets a first-class factory intake instead.
-export const ONBOARDING_EVENT_APPS = ["pr-closure"] as const;
+export const ONBOARDING_EVENT_APPS = ["pr-closure", "risk-score"] as const;
 
 // Event apps listen for GitHub webhooks. Other providers have no event app templates yet.
 export function onboardingEventAppsFor(vcsProvider?: string): readonly string[] {

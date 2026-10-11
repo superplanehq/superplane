@@ -367,6 +367,165 @@ func TestListRunnersOnlyReturnsRunnersForFleet(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, response.Runners, 1)
 	assert.Equal(t, installationRunner.ID.String(), response.Runners[0].Id)
+	assert.Equal(t, int64(1), response.TotalCount)
+	assert.False(t, response.HasNextPage)
+}
+
+func TestListRunnersRejectsCursorThatIsNotUUID(t *testing.T) {
+	_ = support.Setup(t)
+	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
+	service := newTestRunnerService()
+
+	_, err := service.ListRunners(t.Context(), &pb.ListRunnersRequest{
+		FleetId: fleet.Slug,
+		AfterId: stringPointer("not-a-uuid"),
+		Limit:   listLimitPointer(10),
+	})
+
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+}
+
+func TestListRunnersPagesOldestFirst(t *testing.T) {
+	resource := support.Setup(t)
+	fleet := createTestFleetWithSlug(t, "page-runners")
+	otherFleet := createTestFleetWithSlug(t, "other-runners")
+	base := time.Now().UTC().Truncate(time.Microsecond)
+	sameTime := base.Add(time.Minute)
+
+	oldest := createListedRunner(t, fleet.ID, testUUID(1), models.RunnerStateIdle, base)
+	middle := createListedRunner(t, fleet.ID, testUUID(2), models.RunnerStateBusy, base.Add(time.Second))
+	sharedEarly := createListedRunner(t, fleet.ID, testUUID(3), models.RunnerStateIdle, sameTime)
+	sharedLate := createListedRunner(t, fleet.ID, testUUID(4), models.RunnerStateIdle, sameTime)
+	newest := createListedRunner(t, fleet.ID, testUUID(5), models.RunnerStateIdle, sameTime.Add(time.Second))
+	terminated := createListedRunner(t, fleet.ID, testUUID(6), models.RunnerStateTerminated, base.Add(-time.Second))
+	other := createListedRunner(t, otherFleet.ID, testUUID(7), models.RunnerStateIdle, base)
+	_ = resource
+
+	service := newTestRunnerService()
+	states := []string{models.RunnerStateIdle, models.RunnerStateBusy}
+
+	first, err := service.ListRunners(t.Context(), &pb.ListRunnersRequest{
+		FleetId: fleet.Slug,
+		States:  states,
+		Limit:   listLimitPointer(2),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{oldest.ID.String(), middle.ID.String()}, runnerIDs(first.Runners))
+	assert.Equal(t, int64(5), first.TotalCount)
+	assert.True(t, first.HasNextPage)
+
+	afterTerminated, err := service.ListRunners(t.Context(), &pb.ListRunnersRequest{
+		FleetId: fleet.Slug,
+		States:  states,
+		Limit:   listLimitPointer(2),
+		AfterId: stringPointer(terminated.ID.String()),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{oldest.ID.String(), middle.ID.String()}, runnerIDs(afterTerminated.Runners))
+	assert.Equal(t, int64(5), afterTerminated.TotalCount)
+
+	fullLast, err := service.ListRunners(t.Context(), &pb.ListRunnersRequest{
+		FleetId: fleet.Slug,
+		States:  states,
+		Limit:   listLimitPointer(2),
+		AfterId: stringPointer(middle.ID.String()),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{sharedEarly.ID.String(), sharedLate.ID.String()}, runnerIDs(fullLast.Runners))
+	assert.Equal(t, int64(5), fullLast.TotalCount)
+	assert.True(t, fullLast.HasNextPage)
+
+	afterShared, err := service.ListRunners(t.Context(), &pb.ListRunnersRequest{
+		FleetId: fleet.Slug,
+		States:  states,
+		Limit:   listLimitPointer(2),
+		AfterId: stringPointer(sharedEarly.ID.String()),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{sharedLate.ID.String(), newest.ID.String()}, runnerIDs(afterShared.Runners))
+	assert.False(t, afterShared.HasNextPage)
+	assert.Equal(t, int64(5), afterShared.TotalCount)
+
+	lastCursor, err := service.ListRunners(t.Context(), &pb.ListRunnersRequest{
+		FleetId: fleet.Slug,
+		States:  states,
+		Limit:   listLimitPointer(2),
+		AfterId: stringPointer(newest.ID.String()),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, lastCursor.Runners)
+	assert.False(t, lastCursor.HasNextPage)
+	assert.Equal(t, int64(5), lastCursor.TotalCount)
+
+	missing, err := service.ListRunners(t.Context(), &pb.ListRunnersRequest{
+		FleetId: fleet.Slug,
+		States:  states,
+		Limit:   listLimitPointer(2),
+		AfterId: stringPointer(other.ID.String()),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, missing.Runners)
+	assert.False(t, missing.HasNextPage)
+	assert.Equal(t, int64(5), missing.TotalCount)
+}
+
+func TestListFleetTasksPagesOldestFirst(t *testing.T) {
+	resource := support.Setup(t)
+	fleet := createTestFleetWithSlug(t, "page-tasks")
+	otherFleet := createTestFleetWithSlug(t, "other-tasks")
+	base := time.Now().UTC().Truncate(time.Microsecond)
+	sameTime := base.Add(time.Minute)
+
+	oldest := createListedTask(t, resource.Organization.ID, fleet.ID, testUUID(1), models.RunnerTaskStateQueued, base)
+	sharedEarly := createListedTask(t, resource.Organization.ID, fleet.ID, testUUID(2), models.RunnerTaskStateReserved, sameTime)
+	sharedLate := createListedTask(t, resource.Organization.ID, fleet.ID, testUUID(3), models.RunnerTaskStateRunning, sameTime)
+	createListedTask(t, resource.Organization.ID, fleet.ID, testUUID(4), models.RunnerTaskStateSucceeded, base.Add(-time.Second))
+	other := createListedTask(t, resource.Organization.ID, otherFleet.ID, testUUID(5), models.RunnerTaskStateQueued, base)
+
+	service := newTestRunnerService()
+	states := []string{
+		models.RunnerTaskStateQueued,
+		models.RunnerTaskStateReserved,
+		models.RunnerTaskStateRunning,
+	}
+
+	_, err := service.ListFleetTasks(t.Context(), &pb.ListFleetTasksRequest{
+		FleetId: fleet.Slug,
+		AfterId: stringPointer("not-a-uuid"),
+	})
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+
+	first, err := service.ListFleetTasks(t.Context(), &pb.ListFleetTasksRequest{
+		FleetId: fleet.Slug,
+		States:  states,
+		Limit:   listLimitPointer(2),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{oldest.ID.String(), sharedEarly.ID.String()}, taskIDs(first.Tasks))
+	assert.Equal(t, int64(3), first.TotalCount)
+	assert.True(t, first.HasNextPage)
+
+	lastPage, err := service.ListFleetTasks(t.Context(), &pb.ListFleetTasksRequest{
+		FleetId: fleet.Slug,
+		States:  states,
+		Limit:   listLimitPointer(2),
+		AfterId: stringPointer(oldest.ID.String()),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{sharedEarly.ID.String(), sharedLate.ID.String()}, taskIDs(lastPage.Tasks))
+	assert.False(t, lastPage.HasNextPage)
+	assert.Equal(t, int64(3), lastPage.TotalCount)
+
+	missing, err := service.ListFleetTasks(t.Context(), &pb.ListFleetTasksRequest{
+		FleetId: fleet.Slug,
+		States:  states,
+		Limit:   listLimitPointer(2),
+		AfterId: stringPointer(other.ID.String()),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, missing.Tasks)
+	assert.False(t, missing.HasNextPage)
+	assert.Equal(t, int64(3), missing.TotalCount)
 }
 
 func TestDeleteBusyEphemeralRunnerRequestsTaskCancellation(t *testing.T) {
@@ -535,6 +694,77 @@ func createTestTask(
 	return task
 }
 
+func listLimitPointer(value int32) *int32 {
+	return &value
+}
+
 func stringPointer(value string) *string {
 	return &value
+}
+
+func testUUID(suffix byte) uuid.UUID {
+	return uuid.UUID{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, suffix}
+}
+
+func createListedRunner(
+	t *testing.T,
+	fleetID, id uuid.UUID,
+	state string,
+	createdAt time.Time,
+) *models.Runner {
+	t.Helper()
+	runner := &models.Runner{
+		ID:            id,
+		FleetID:       fleetID,
+		State:         state,
+		RunnerVersion: "0.1.0",
+		CreatedAt:     createdAt,
+		UpdatedAt:     createdAt,
+	}
+	if state == models.RunnerStateTerminated {
+		terminatedAt := createdAt
+		reason := models.RunnerTerminationRequested
+		runner.TerminatedAt = &terminatedAt
+		runner.TerminationReason = &reason
+	}
+	require.NoError(t, database.DB(t.Context()).Create(runner).Error)
+	return runner
+}
+
+func createListedTask(
+	t *testing.T,
+	organizationID, fleetID, id uuid.UUID,
+	state string,
+	queuedAt time.Time,
+) *models.RunnerTask {
+	t.Helper()
+	task := &models.RunnerTask{
+		ID:                id,
+		OrganizationID:    organizationID,
+		FleetID:           fleetID,
+		Backend:           models.RunnerTaskBackendIntegrated,
+		State:             state,
+		PayloadCiphertext: []byte("encrypted secret"),
+		QueuedAt:          queuedAt,
+		CreatedAt:         queuedAt,
+		UpdatedAt:         queuedAt,
+	}
+	require.NoError(t, database.DB(t.Context()).Create(task).Error)
+	return task
+}
+
+func runnerIDs(runners []*pb.Runner) []string {
+	ids := make([]string, 0, len(runners))
+	for _, runner := range runners {
+		ids = append(ids, runner.Id)
+	}
+	return ids
+}
+
+func taskIDs(tasks []*pb.Task) []string {
+	ids := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		ids = append(ids, task.Id)
+	}
+	return ids
 }

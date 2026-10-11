@@ -72,11 +72,12 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.Contains(t, tools, "Read")
 	assert.Contains(t, tools, "Bash")
 	assert.Contains(t, tools, "mcp__superplane")
-	assert.Contains(t, tools, "mcp__superplane__propose_spec")
-	assert.Contains(t, tools, "mcp__superplane__propose_clarity")
-	assert.Contains(t, tools, "mcp__superplane__propose_confidence")
-	assert.NotContains(t, tools, "mcp__superplane__propose_plan")
-	assert.Contains(t, tools, "mcp__superplane__survey")
+	assert.Contains(t, tools, "mcp__superplane__propose_update")
+	assert.Contains(t, tools, "mcp__superplane__inspect_attachment")
+	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+	assert.NotContains(t, tools, "mcp__superplane__propose_clarity")
+	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")
+	assert.NotContains(t, tools, "mcp__superplane__survey")
 	assert.NotContains(t, tools, "mcp__superplane__create_task")
 	assert.Contains(t, tools, "mcp__superplane__inspect_attachment")
 	assert.NotContains(t, tools, "mcp__superplane__propose_draft")
@@ -84,26 +85,29 @@ func TestAllowedClaudeToolsAllowsAnalysisPublishTools(t *testing.T) {
 	assert.NotContains(t, tools, "Write")
 }
 
-func TestAllowedClaudeToolsOmitsDisabledPlanningScores(t *testing.T) {
-	clarityOnly := allowedClaudeToolsFromScript(t, map[string]string{
+func TestAllowedClaudeToolsUsesProposeUpdateWithoutReviewEnv(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_RUN_TOKEN":             "token",
+		"SUPERPLANE_BASE_URL":              "http://localhost:8000",
+	})
+	assert.Contains(t, tools, "mcp__superplane__propose_update")
+	assert.NotContains(t, tools, "mcp__superplane__propose_spec")
+}
+
+func TestAllowedClaudeToolsIgnoresLegacyScoreEnv(t *testing.T) {
+	tools := allowedClaudeToolsFromScript(t, map[string]string{
+		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
+		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
+		"SUPERPLANE_PLANNING_CLARITY":      "false",
 		"SUPERPLANE_PLANNING_CONFIDENCE":   "false",
 		"SUPERPLANE_RUN_TOKEN":             "token",
 		"SUPERPLANE_BASE_URL":              "http://localhost:8000",
 	})
-	assert.Contains(t, clarityOnly, "mcp__superplane__propose_clarity")
-	assert.NotContains(t, clarityOnly, "mcp__superplane__propose_confidence")
-
-	confidenceOnly := allowedClaudeToolsFromScript(t, map[string]string{
-		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
-		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
-		"SUPERPLANE_PLANNING_CLARITY":      "false",
-		"SUPERPLANE_RUN_TOKEN":             "token",
-		"SUPERPLANE_BASE_URL":              "http://localhost:8000",
-	})
-	assert.Contains(t, confidenceOnly, "mcp__superplane__propose_confidence")
-	assert.NotContains(t, confidenceOnly, "mcp__superplane__propose_clarity")
+	assert.Contains(t, tools, "mcp__superplane__propose_update")
+	assert.NotContains(t, tools, "mcp__superplane__propose_clarity")
+	assert.NotContains(t, tools, "mcp__superplane__propose_confidence")
 }
 
 func TestAllowedClaudeToolsAllowsMergeConfidenceReport(t *testing.T) {
@@ -159,22 +163,23 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	})
-	assert.Contains(t, analysis, "propose_spec")
-	assert.Contains(t, analysis, "propose_clarity")
-	assert.Contains(t, analysis, "propose_confidence")
+	assert.Contains(t, analysis, "propose_update")
+	assert.Contains(t, analysis, "integer from 1 through 3")
+	assert.NotContains(t, analysis, "Call propose_clarity")
+	assert.NotContains(t, analysis, "Call propose_confidence")
 	assert.NotContains(t, analysis, "propose_plan")
 	assert.Contains(t, analysis, "Follow the task prompt")
 	assert.Contains(t, analysis, "Use only the analysis tools")
-	assert.Contains(t, analysis, "call survey with 2 to 4 options")
+	assert.Contains(t, analysis, "Do not call propose_spec, propose_clarity, propose_confidence, or survey")
 	assert.Contains(t, analysis, "Do not paste the specification")
-	assert.Contains(t, analysis, "does not publish the specification or the score")
-	assert.Contains(t, analysis, "Do not leave a written plan unpublished")
+	assert.Contains(t, analysis, "does not publish the specification or the scores")
+	assert.NotContains(t, analysis, "Do not leave a written plan unpublished")
 	assert.NotContains(t, analysis, "Call propose_spec when the task prompt says")
 	assert.Contains(t, analysis, "inspect_attachment")
 	assert.Contains(t, analysis, "Do not curl a signed URL")
 	assert.Contains(t, analysis, "Do not use OCR")
 	assert.Contains(t, analysis, "Do not name files")
-	assert.Contains(t, analysis, "Do not add an Open questions section")
+	assert.NotContains(t, analysis, "Do not add an Open questions section")
 	assert.NotContains(t, analysis, "Talk like a colleague")
 	assert.NotContains(t, analysis, "## 1. Research")
 	assert.NotContains(t, analysis, "how suitable the work is for an agent")
@@ -194,7 +199,7 @@ func TestPlanningSystemPromptUsesAnalysisCopy(t *testing.T) {
 }
 
 func TestPlanningSystemPromptKeepsProtocolAtSystemPriority(t *testing.T) {
-	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol_review.md"))
 	require.NoError(t, err)
 
 	analysis := planningSystemPromptFromScriptWithPrompt(t, map[string]string{

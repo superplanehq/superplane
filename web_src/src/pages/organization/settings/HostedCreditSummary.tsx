@@ -394,26 +394,28 @@ function InvoiceList({
       {invoices.length === 0 ? (
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">No Polar invoices yet.</p>
       ) : (
-        <table className="mt-2 w-full text-left text-[13px]">
-          <thead>
-            <tr className="border-b border-border text-muted-foreground">
-              <th className="py-2 font-medium">Date</th>
-              <th className="py-2 font-medium">Item</th>
-              <th className="py-2 font-medium">Amount</th>
-              <th className="py-2 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map((invoice) => (
-              <tr key={invoice.id} className="border-b border-border last:border-0">
-                <td className="py-2">{formatInvoiceDate(invoice.createdAt)}</td>
-                <td className="py-2">{invoice.productName || "Hosted credit"}</td>
-                <td className="py-2">{formatUsdCents(parseWorkOrderMetric(invoice.amountCents))}</td>
-                <td className="py-2">{invoiceStatusLabel(invoice.status)}</td>
+        <div className="overflow-x-auto">
+          <table className="mt-2 w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground">
+                <th className="py-2 font-medium">Date</th>
+                <th className="py-2 font-medium">Item</th>
+                <th className="py-2 font-medium">Amount</th>
+                <th className="py-2 font-medium">Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {invoices.map((invoice) => (
+                <tr key={invoice.id} className="border-b border-border last:border-0">
+                  <td className="py-2">{formatInvoiceDate(invoice.createdAt)}</td>
+                  <td className="py-2">{invoice.productName || "Hosted credit"}</td>
+                  <td className="py-2">{formatUsdCents(parseWorkOrderMetric(invoice.amountCents))}</td>
+                  <td className="py-2">{invoiceStatusLabel(invoice.status)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

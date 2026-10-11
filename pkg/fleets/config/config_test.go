@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestLoadAppliesAWSDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
@@ -71,6 +72,75 @@ func TestLoadRejectsSnakeCaseFields(t *testing.T) {
 func TestLoadRejectsRemovedTaskSpecificField(t *testing.T) {
 	_, err := Load(writeConfig(t, `{"fleets":[{"taskSpecific":true}]}`))
 	if err == nil || !strings.Contains(err.Error(), `unknown field "taskSpecific"`) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLoadDefaultsToLongPolling(t *testing.T) {
+	config, err := Load(writeConfig(t, validDockerConfig("")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.PollTimeout() != 30*time.Second {
+		t.Fatalf("poll timeout = %s", config.PollTimeout())
+	}
+	if config.ReconciliationInterval() != 0 {
+		t.Fatalf("reconciliation interval = %s", config.ReconciliationInterval())
+	}
+	if config.ErrorRetryInterval() != 15*time.Second {
+		t.Fatalf("error retry interval = %s", config.ErrorRetryInterval())
+	}
+	if config.RequestTimeout() != 90*time.Second {
+		t.Fatalf("request timeout = %s", config.RequestTimeout())
+	}
+}
+
+func TestLoadAcceptsPeriodicReconciliation(t *testing.T) {
+	config, err := Load(writeConfig(t, validDockerConfig(`
+		"reconciliation":{
+			"interval":"2s",
+			"errorRetryInterval":"3s"
+		},
+		"http":{"requestTimeout":"4s"},`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.PollTimeout() != 0 {
+		t.Fatalf("poll timeout = %s", config.PollTimeout())
+	}
+	if config.ReconciliationInterval() != 2*time.Second {
+		t.Fatalf("reconciliation interval = %s", config.ReconciliationInterval())
+	}
+	if config.ErrorRetryInterval() != 3*time.Second {
+		t.Fatalf("error retry interval = %s", config.ErrorRetryInterval())
+	}
+	if config.RequestTimeout() != 4*time.Second {
+		t.Fatalf("request timeout = %s", config.RequestTimeout())
+	}
+}
+
+func TestLoadRejectsAmbiguousReconciliationStrategy(t *testing.T) {
+	_, err := Load(writeConfig(t, validDockerConfig(`
+		"reconciliation":{
+			"pollTimeout":"20s",
+			"interval":"2s"
+		},`)))
+	if err == nil || !strings.Contains(
+		err.Error(),
+		"reconciliation.pollTimeout and reconciliation.interval are mutually exclusive",
+	) {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLoadRejectsRequestTimeoutNotLongerThanPollTimeout(t *testing.T) {
+	_, err := Load(writeConfig(t, validDockerConfig(`
+		"reconciliation":{"pollTimeout":"30s"},
+		"http":{"requestTimeout":"30s"},`)))
+	if err == nil || !strings.Contains(
+		err.Error(),
+		"http.requestTimeout must be longer than reconciliation.pollTimeout",
+	) {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -178,6 +248,11 @@ func TestLoadYAML(t *testing.T) {
 id: fleet-manager
 superplaneUrl: http://app:8000
 installationAdminToken: personal-token
+reconciliation:
+  interval: 2s
+  errorRetryInterval: 3s
+http:
+  requestTimeout: 4s
 fleets:
   - id: e1-large-amd64
     provider: docker
@@ -199,6 +274,12 @@ fleets:
 			}
 			if config.Fleets[0].Docker.Image != "runner:dev" {
 				t.Fatalf("image = %q", config.Fleets[0].Docker.Image)
+			}
+			if config.ReconciliationInterval() != 2*time.Second {
+				t.Fatalf(
+					"reconciliation interval = %s",
+					config.ReconciliationInterval(),
+				)
 			}
 		})
 	}
@@ -333,6 +414,262 @@ func TestLoadDockerProviderDoesNotRequireAWSConfiguration(t *testing.T) {
 	if config.Fleets[0].Provider != ProviderDocker {
 		t.Fatalf("provider = %q", config.Fleets[0].Provider)
 	}
+}
+
+func TestLoadAppliesAzureDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
+	body := `{
+		"id":"fleet-manager",
+		"superplaneUrl":"https://superplane.example",
+		"installationAdminToken":"personal-token",
+		"runnerReleaseBaseUrl":"https://downloads.example/runner/",
+		"fleets":[{
+			"id":"linux-amd64",
+			"provider":"azure",
+			"azure":{
+				"subscriptionId":"00000000-0000-0000-0000-000000000000",
+				"resourceGroup":"superplane-runners",
+				"location":"eastus",
+				"imageId":"/galleries/runners/images/superplane-runner-amd64/versions/1.0.0",
+				"architecture":"amd64",
+				"subnetId":"/subnets/runners",
+				"networkSecurityGroupId":"/nsgs/runners",
+				"identityId":"/identities/runner",
+				"zones":["1","2"]
+			}
+		}]
+	}`
+	config, err := Load(writeConfig(t, body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Fleets[0].Azure.VMSize != defaultAzureVMSize ||
+		config.Fleets[0].Azure.DiskSizeGB != defaultVolumeSizeGB {
+		t.Fatalf("defaults were not applied: %#v", config.Fleets[0].Azure)
+	}
+	if config.Fleets[0].Provider != ProviderAzure {
+		t.Fatalf("provider = %q", config.Fleets[0].Provider)
+	}
+	mutable := strings.Replace(
+		body,
+		"https://downloads.example/runner/",
+		"https://downloads.example/runner/latest/",
+		1,
+	)
+	if _, err := Load(writeConfig(t, mutable)); err == nil {
+		t.Fatal("expected mutable artifact URL to fail")
+	}
+}
+
+func TestLoadRejectsARMAzureFleetWithoutVMSize(t *testing.T) {
+	_, err := Load(writeConfig(t, `{
+		"id":"fleet-manager",
+		"superplaneUrl":"https://superplane.example",
+		"installationAdminToken":"personal-token",
+		"runnerReleaseBaseUrl":"https://downloads.example/runner",
+		"fleets":[{
+			"id":"linux-arm64",
+			"provider":"azure",
+			"azure":{
+				"subscriptionId":"00000000-0000-0000-0000-000000000000",
+				"resourceGroup":"superplane-runners",
+				"location":"eastus",
+				"imageId":"/galleries/runners/images/runner/versions/1.0.0",
+				"architecture":"arm64",
+				"subnetId":"/subnets/runners",
+				"networkSecurityGroupId":"/nsgs/runners",
+				"identityId":"/identities/runner",
+				"zones":["1"]
+			}
+		}]
+	}`))
+	if err == nil || !strings.Contains(err.Error(), "azure.vmSize is required") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLoadRejectsAzureFleetWithoutZones(t *testing.T) {
+	_, err := Load(writeConfig(t, `{
+		"id":"fleet-manager",
+		"superplaneUrl":"https://superplane.example",
+		"installationAdminToken":"personal-token",
+		"runnerReleaseBaseUrl":"https://downloads.example/runner",
+		"fleets":[{
+			"id":"linux-amd64",
+			"provider":"azure",
+			"azure":{
+				"subscriptionId":"00000000-0000-0000-0000-000000000000",
+				"resourceGroup":"superplane-runners",
+				"location":"eastus",
+				"imageId":"/galleries/runners/images/runner/versions/1.0.0",
+				"architecture":"amd64",
+				"subnetId":"/subnets/runners",
+				"networkSecurityGroupId":"/nsgs/runners",
+				"identityId":"/identities/runner"
+			}
+		}]
+	}`))
+	if err == nil || !strings.Contains(err.Error(), "azure.zones must not be empty") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestExampleConfigsLoad(t *testing.T) {
+	for _, name := range []string{"config.example.json", "config.gcp.example.json"} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Load(filepath.Join("..", name)); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestLoadAppliesGCPDefaultsAndRejectsMutableReleaseURL(t *testing.T) {
+	body := `{
+		"id":"gke",
+		"superplaneUrl":"https://superplane.example",
+		"installationAdminToken":"personal-token",
+		"runnerReleaseBaseUrl":"https://downloads.example/runner/",
+		"fleets":[
+			{
+				"id":"e1-large-amd64",
+				"provider":"gcp",
+				"gcp":{
+					"projectId":"my-project",
+					"zones":[" us-central1-a ",""],
+					"image":"projects/my-project/global/images/family/superplane-runner-amd64",
+					"architecture":"AMD64",
+					"subnetwork":"projects/my-project/regions/us-central1/subnetworks/superplane-runners"
+				}
+			},
+			{
+				"id":"e1-large-arm64",
+				"provider":"gcp",
+				"gcp":{
+					"projectId":"my-project",
+					"zones":["us-central1-a"],
+					"image":"projects/my-project/global/images/family/superplane-runner-arm64",
+					"architecture":"arm64",
+					"subnetwork":"projects/my-project/regions/us-central1/subnetworks/superplane-runners"
+				}
+			}
+		]
+	}`
+	config, err := Load(writeConfig(t, body))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	amd64 := config.Fleets[0].GCP
+	if amd64.MachineType != "e2-standard-4" ||
+		amd64.DiskSizeGB != defaultVolumeSizeGB ||
+		amd64.DiskType != "pd-balanced" ||
+		amd64.Architecture != "amd64" {
+		t.Fatalf("amd64 defaults were not applied: %#v", amd64)
+	}
+	if len(amd64.Zones) != 1 || amd64.Zones[0] != "us-central1-a" {
+		t.Fatalf("zones = %#v", amd64.Zones)
+	}
+	if config.Fleets[1].GCP.MachineType != "t2a-standard-4" {
+		t.Fatalf("arm64 machine type = %q", config.Fleets[1].GCP.MachineType)
+	}
+
+	mutable := strings.Replace(
+		body,
+		"https://downloads.example/runner/",
+		"https://downloads.example/runner/latest/",
+		1,
+	)
+	if _, err := Load(writeConfig(t, mutable)); err == nil {
+		t.Fatal("expected mutable artifact URL to fail")
+	}
+}
+
+func TestLoadRejectsInvalidGCPFleets(t *testing.T) {
+	tests := map[string]struct {
+		fleetManagerID string
+		fleetID        string
+		gcp            string
+		expected       string
+	}{
+		"missing project": {
+			fleetManagerID: "gke",
+			fleetID:        "e1-large-amd64",
+			gcp:            `"zones":["us-central1-a"],"image":"img","architecture":"amd64","subnetwork":"subnet"`,
+			expected:       "fleets[0].gcp.projectId is required",
+		},
+		"missing zones": {
+			fleetManagerID: "gke",
+			fleetID:        "e1-large-amd64",
+			gcp:            `"projectId":"p","image":"img","architecture":"amd64","subnetwork":"subnet"`,
+			expected:       "fleets[0].gcp.zones must not be empty",
+		},
+		"missing image": {
+			fleetManagerID: "gke",
+			fleetID:        "e1-large-amd64",
+			gcp:            `"projectId":"p","zones":["us-central1-a"],"architecture":"amd64","subnetwork":"subnet"`,
+			expected:       "fleets[0].gcp.image is required",
+		},
+		"invalid architecture": {
+			fleetManagerID: "gke",
+			fleetID:        "e1-large-amd64",
+			gcp:            `"projectId":"p","zones":["us-central1-a"],"image":"img","architecture":"x86","subnetwork":"subnet"`,
+			expected:       "fleets[0].gcp.architecture must be amd64 or arm64",
+		},
+		"missing subnetwork": {
+			fleetManagerID: "gke",
+			fleetID:        "e1-large-amd64",
+			gcp:            `"projectId":"p","zones":["us-central1-a"],"image":"img","architecture":"amd64"`,
+			expected:       "fleets[0].gcp.subnetwork is required",
+		},
+		"fleet ID is not a label value": {
+			fleetManagerID: "gke",
+			fleetID:        "E1.Large",
+			gcp:            `"projectId":"p","zones":["us-central1-a"],"image":"img","architecture":"amd64","subnetwork":"subnet"`,
+			expected:       "fleets[0].id must be a valid GCP label value",
+		},
+		"fleet manager ID is not a label value": {
+			fleetManagerID: "GKE Production",
+			fleetID:        "e1-large-amd64",
+			gcp:            `"projectId":"p","zones":["us-central1-a"],"image":"img","architecture":"amd64","subnetwork":"subnet"`,
+			expected:       "id must be a valid GCP label value when a GCP fleet is configured",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := Load(writeConfig(t, `{
+				"id":"`+test.fleetManagerID+`",
+				"superplaneUrl":"https://superplane.example",
+				"installationAdminToken":"personal-token",
+				"runnerReleaseBaseUrl":"https://downloads.example/runner",
+				"fleets":[{
+					"id":"`+test.fleetID+`",
+					"provider":"gcp",
+					"gcp":{`+test.gcp+`}
+				}]
+			}`))
+			if err == nil || !strings.Contains(err.Error(), test.expected) {
+				t.Fatalf("error = %v, expected %q", err, test.expected)
+			}
+		})
+	}
+}
+
+func validDockerConfig(extra string) string {
+	return `{
+		"id":"fleet-manager",
+		"superplaneUrl":"http://app:8000",
+		"installationAdminToken":"personal-token",
+		` + extra + `
+		"fleets":[{
+			"id":"e1-large-amd64",
+			"provider":"docker",
+			"docker":{
+				"image":"runner:dev",
+				"architecture":"amd64"
+			}
+		}]
+	}`
 }
 
 func writeConfig(t *testing.T, body string) string {

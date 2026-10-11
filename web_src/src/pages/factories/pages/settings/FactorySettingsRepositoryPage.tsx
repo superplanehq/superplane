@@ -17,6 +17,7 @@ export function FactorySettingsRepositoryPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const integrationId = factory.onboarding?.vcsIntegrationId ?? "";
+  const bitbucket = factory.onboarding?.vcsProvider === "bitbucket";
   const resources = useIntegrationResources(organizationId, integrationId, "repository");
   const githubOnboarding = useGitHubOnboarding(organizationId, { poll: false });
   const usesCatalogRepository = Boolean(factory.onboarding?.appRepositoryId || factory.onboarding?.backlogRepositoryId);
@@ -65,30 +66,46 @@ export function FactorySettingsRepositoryPage() {
   if (!integrationId) {
     repositoryContent = (
       <p className="text-[13px] text-muted-foreground">
-        Connect GitHub during workspace setup before you select a repository.
+        {bitbucket
+          ? "Connect Bitbucket during workspace setup before you select a repository."
+          : "Connect GitHub during workspace setup before you select a repository."}
       </p>
     );
   } else if ((usesCatalogRepository ? githubOnboarding.isPending : resources.isLoading) && repositories.length === 0) {
     repositoryContent = <p className="text-[13px] text-muted-foreground">Loading repositories...</p>;
   } else {
     repositoryContent = (
-      <RepositoryPicker host="github" repos={repositories} selectedRepo={repository || null} onSelect={setRepository} />
+      <RepositoryPicker
+        host={bitbucket ? "bitbucket" : "github"}
+        repos={repositories}
+        selectedRepo={repository || null}
+        onSelect={setRepository}
+      />
     );
   }
 
   return (
     <FactorySettingsPageFrame
       title="Repository"
-      subtitle="Select the GitHub repository for workspace work and issue intake."
+      subtitle={
+        bitbucket
+          ? "Select the Bitbucket repository for this workspace."
+          : "Select the GitHub repository for workspace work and issue intake."
+      }
     >
-      <FactorySettingsCard title="GitHub repository" data-testid="factory-settings-repository">
+      <FactorySettingsCard
+        title={bitbucket ? "Bitbucket repository" : "GitHub repository"}
+        data-testid="factory-settings-repository"
+      >
         {repositoryContent}
         {(usesCatalogRepository ? githubOnboarding.isError : resources.isError) && repositories.length === 0 ? (
           <p className="mt-3 text-[13px] text-destructive">We could not load repositories. Try again.</p>
         ) : null}
         <div className="mt-4 flex items-center justify-between gap-4 border-t border-border pt-4">
           <p className="text-[12px] text-muted-foreground">
-            Saving updates factory GitHub issue intake and pull request automations.
+            {bitbucket
+              ? "Saving updates the repository this workspace uses."
+              : "Saving updates factory GitHub issue intake and pull request automations."}
           </p>
           <PermissionTooltip
             allowed={canUpdate || permissionsLoading}

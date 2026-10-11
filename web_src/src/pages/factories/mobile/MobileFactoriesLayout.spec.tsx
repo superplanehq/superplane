@@ -52,6 +52,18 @@ describe("MobileFactoriesLayout", () => {
     factoryQuery.error = undefined;
   });
 
+  it("pins the shell to the visible screen instead of the layout viewport", async () => {
+    renderLayout();
+
+    const shell = await screen.findByTestId("mobile-factories-layout");
+    expect(shell.className).not.toContain("h-dvh");
+    expect(shell).toHaveStyle({ position: "fixed", left: "0px", right: "0px" });
+    expect(shell.style.bottom).toBe("");
+    expect(shell.style.top).not.toBe("");
+    expect(shell.style.height).not.toBe("");
+    expect(shell.querySelector("main")).toHaveClass("overscroll-none");
+  });
+
   it("saves the workspace a phone visit opens", async () => {
     renderLayout();
 

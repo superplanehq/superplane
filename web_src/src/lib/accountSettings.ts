@@ -110,7 +110,7 @@ export function ssoLinkHref(provider: "github" | "google", redirectPath: string)
   return `/auth/${provider}?intent=link&redirect=${redirect}`;
 }
 
-export type LinkableProvider = "github";
+export type LinkableProvider = "github" | "bitbucket";
 
 export async function disconnectLinkedAccount(provider: LinkableProvider, providerId: string): Promise<void> {
   const response = await fetch(`/account/linked-accounts/${provider}/${encodeURIComponent(providerId)}`, {

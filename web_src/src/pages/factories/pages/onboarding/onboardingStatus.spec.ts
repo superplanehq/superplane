@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
-import type { FactoriesFactory } from "@/api-client";
+import type { FactoriesFactory, OrganizationsIntegration } from "@/api-client";
+import { syncSelectionsWithInstances, type IntegrationInstanceSummary } from "@/pages/home/homeIntegrationStatus";
 
 import {
   apiIssuesSource,
@@ -8,7 +9,24 @@ import {
   initialWizardStep,
   isFactoryOnboardingComplete,
   localIssuesSource,
+  ONBOARDING_CONNECTION_NAMES,
+  ONBOARDING_MANUAL_CONNECTION_NAMES,
 } from "./onboardingStatus";
+
+function githubInstance(id: string, name: string): OrganizationsIntegration {
+  return {
+    metadata: { id, name, integrationName: "github" },
+    status: { state: "ready" },
+  };
+}
+
+function connectionData(instances: OrganizationsIntegration[]): IntegrationInstanceSummary[] {
+  return ONBOARDING_CONNECTION_NAMES.map((name) => ({
+    name,
+    allInstances: name === "github" ? instances : [],
+    readyInstances: name === "github" ? instances : [],
+  }));
+}
 
 describe("isFactoryOnboardingComplete", () => {
   it("returns false while completion time is absent", () => {
@@ -96,5 +114,30 @@ describe("initialOnboardingSelections", () => {
     ).toEqual({
       bitbucket: { id: "bitbucket-1", name: "bitbucket-1", ready: false },
     });
+  });
+
+  it("marks the saved GitHub installation ready after a reload", () => {
+    const saved = initialOnboardingSelections({ vcsIntegrationId: "saved-github" });
+    const synced = syncSelectionsWithInstances(
+      connectionData([githubInstance("saved-github", "github-acme"), githubInstance("other-github", "github-other")]),
+      saved,
+      {},
+      ONBOARDING_MANUAL_CONNECTION_NAMES,
+    );
+
+    expect(synced).toEqual({
+      github: { id: "saved-github", name: "github-acme", ready: true },
+    });
+  });
+
+  it("does not adopt a different GitHub connection when the workspace has none saved", () => {
+    const synced = syncSelectionsWithInstances(
+      connectionData([githubInstance("other-github", "github-other")]),
+      {},
+      {},
+      ONBOARDING_MANUAL_CONNECTION_NAMES,
+    );
+
+    expect(synced).toBeNull();
   });
 });

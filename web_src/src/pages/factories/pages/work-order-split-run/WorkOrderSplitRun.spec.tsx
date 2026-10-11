@@ -493,11 +493,16 @@ describe("WorkOrderSplitRunPopup", () => {
   });
 
   it("moves owner and spend off the header into the summary panel", () => {
-    renderSplitRun();
-    expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
+    renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: "wo-running",
+      fixture: SPLIT_RUN_RUNNING,
+    });
     expect(screen.queryByTestId("popup-owner-time-cost")).not.toBeInTheDocument();
     expect(screen.queryByRole("tablist", { name: "Task views" })).not.toBeInTheDocument();
     const panel = screen.getByTestId("redesign-console-summary");
+    expect(within(panel).getByTestId("task-edit-owner")).toHaveAccessibleName(`Owner: ${SPLIT_RUN_RUNNING.owner.name}`);
     expect(panel).toHaveTextContent("$0.73");
     expect(panel).toHaveTextContent("2.7k tokens");
     expect(within(panel).getByTestId("split-run-source")).toHaveTextContent("GitHub issues");
@@ -1028,41 +1033,6 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.getByTestId("split-run-review")).toBeInTheDocument();
   });
 
-  it("opens a compact check in the analysis dialog", async () => {
-    const user = userEvent.setup();
-    renderPopup({
-      fixture: splitRunFixtureForWorkOrder(
-        {
-          ...OPEN_WORK_ORDER,
-          title: "Add refund reason enum to schema",
-          lineDispatches: [
-            {
-              id: "dispatch-verify",
-              line: { id: "line-1", name: "plan-and-implement" },
-              state: "STATE_ACTIVE",
-              stepExecutions: [
-                {
-                  id: "e-verify",
-                  step: "Verify",
-                  stepIndex: 2,
-                  state: "STATE_STARTED",
-                  result: "RESULT_UNKNOWN",
-                },
-              ],
-            },
-          ],
-        },
-        { checks: OPEN_WORK_ORDER_CHECKS },
-      ),
-    });
-
-    await user.click(screen.getByRole("button", { name: "Merge confidence" }));
-    await user.click(screen.getByTestId("split-run-check-check-risk-review"));
-
-    expect(screen.getByRole("heading", { name: "Blast radius" })).toBeInTheDocument();
-    expect(screen.getByText(/Moderate risk: retry policy/)).toBeInTheDocument();
-  });
-
   it("omits the decision footer when logs are complete and the order waits with no note", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
@@ -1221,6 +1191,9 @@ describe("WorkOrderSplitRunPopup", () => {
 
   it("hides work-order close actions when the user cannot update the task", () => {
     renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: OPEN_WORK_ORDER.id,
       fixture: splitRunFixtureForWorkOrder(OPEN_WORK_ORDER),
       canUpdate: false,
     });
@@ -1230,6 +1203,11 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("split-run-stop")).not.toBeInTheDocument();
     expect(screen.queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("task-edit-owner")).not.toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-summary")).toHaveTextContent(
+      splitRunFixtureForWorkOrder(OPEN_WORK_ORDER).owner.name,
+    );
   });
 
   it("offers automation Stop on a live running task", () => {
@@ -1946,7 +1924,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(within(panel).getByText("Duration")).toBeInTheDocument();
   });
 
-  it("shows a manual source by the owner without repeating the person", () => {
+  it("shows the author on a manual source when the task has no owner", () => {
     renderPopup({
       fixture: splitRunFixtureForWorkOrder({
         ...LINE_BOARD_DONE_RECEIPTS_ORDER,
@@ -1957,9 +1935,24 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     const panel = screen.getByTestId("redesign-console-summary");
+    expect(within(panel).getByTestId("empty-owner-mark")).toBeInTheDocument();
+    expect(within(panel).getByTestId("split-run-source")).toHaveTextContent("Igor Šarčević");
+    expect(within(panel).getByText("Created manually")).toBeInTheDocument();
+  });
+
+  it("does not repeat the owner on a manual source", () => {
+    renderPopup({
+      fixture: splitRunFixtureForWorkOrder({
+        ...LINE_BOARD_DONE_RECEIPTS_ORDER,
+        origin: undefined,
+        createdBy: { user: { id: "user-owner-1", name: "Igor Šarčević" } },
+        assignees: [{ id: "user-owner-1", name: "Igor Šarčević" }],
+      }),
+    });
+
+    const panel = screen.getByTestId("redesign-console-summary");
     expect(within(panel).getByText("Created manually")).toBeInTheDocument();
     expect(within(panel).queryByTestId("split-run-source")).not.toBeInTheDocument();
-    // The avatar title also carries the name; visible text shows it once.
     expect(within(panel).getAllByText("Igor Šarčević", { ignore: "script, style, title" })).toHaveLength(1);
   });
 
@@ -2169,6 +2162,9 @@ describe("WorkOrderSplitRunPopup", () => {
 
   it("does not let you edit a completed task", () => {
     renderPopup({
+      organizationId: FACTORIES_ORGANIZATION_ID,
+      factoryId: PRIMARY_FACTORY_ID,
+      orderId: "wo-done",
       fixture: {
         ...SPLIT_RUN_RUNNING,
         footer: buildSplitRunFooter({ kind: "done" }),
@@ -2179,5 +2175,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("popup-work-order-title")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("task-edit-owner")).not.toBeInTheDocument();
+    expect(screen.getByTestId("redesign-console-summary")).toHaveTextContent(SPLIT_RUN_RUNNING.owner.name);
   });
 });

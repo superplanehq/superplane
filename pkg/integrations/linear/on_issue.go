@@ -55,11 +55,7 @@ func (i *OnIssue) Documentation() string {
 - **Default channel**: Emits the Linear webhook payload, including ` + "`action`" + `, ` + "`actor`" + `, the issue
   ` + "`url`" + `, and a ` + "`data`" + ` object with the issue ` + "`identifier`" + `, ` + "`title`" + `, ` + "`state`" + `, ` + "`team`" + ` and ` + "`labels`" + `.
 
-## Webhook Setup
-
-This trigger registers a Linear webhook automatically when configured, and removes it when the
-trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
-the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.`
+` + triggerWebhookDocumentation
 }
 
 func (i *OnIssue) Icon() string {
@@ -171,7 +167,7 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		TeamID:       config.Team,
 		ResourceType: IssueResourceType,
-	})
+	}.withDeliveryMode(ctx.Integration))
 }
 
 func (i *OnIssue) setupProjectWebhooks(ctx core.TriggerContext, projects []string) error {
@@ -192,7 +188,7 @@ func (i *OnIssue) setupProjectWebhooks(ctx core.TriggerContext, projects []strin
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		TeamIDs:      teamIDs,
 		ResourceType: IssueResourceType,
-	})
+	}.withDeliveryMode(ctx.Integration))
 }
 
 func (i *OnIssue) Hooks() []core.Hook {

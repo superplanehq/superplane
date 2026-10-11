@@ -75,6 +75,12 @@ export function resolveHomeIntegrationStatus(
     : { kind: "none", label: "Not connected" };
 }
 
+function sameSelection(current: IntegrationSelection | undefined, nextSelection: IntegrationSelection): boolean {
+  return (
+    current?.id === nextSelection.id && current.name === nextSelection.name && current.ready === nextSelection.ready
+  );
+}
+
 function applyPreferredInstance(
   data: IntegrationInstanceSummary,
   next: IntegrationSelections,
@@ -83,15 +89,13 @@ function applyPreferredInstance(
   const preferred = data.allInstances.find((instance) => instance.metadata?.id === preferredId);
   if (!preferred) return false;
   const selection = selectionFromInstance(preferred);
-  if (!selection) return false;
-  const current = next[data.name];
-  if (current?.id === selection.id && current.ready === selection.ready) return false;
+  if (!selection || sameSelection(next[data.name], selection)) return false;
   next[data.name] = selection;
   return true;
 }
 
 function selectionNeedsUpdate(current: IntegrationSelection | undefined, nextSelection: IntegrationSelection): boolean {
-  return !current || current.id !== nextSelection.id || current.ready !== nextSelection.ready;
+  return !sameSelection(current, nextSelection);
 }
 
 /** Clears a selection whose instance is gone or not ready, or refreshes its readiness. */

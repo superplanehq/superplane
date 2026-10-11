@@ -23,7 +23,7 @@ export function FirstRunHostScreen({
   onChooseHost: (host: VcsHostId) => void;
 }) {
   return (
-    <FirstRunShell testId="first-run-host" chrome={chrome} sphere={sphere}>
+    <FirstRunShell testId="first-run-host" chrome={chrome} sphere={sphere} visual="preview">
       <FirstRunHeading headline={copy.headline}>
         <p className="text-[15px] leading-6 text-muted-foreground">{copy.body}</p>
       </FirstRunHeading>

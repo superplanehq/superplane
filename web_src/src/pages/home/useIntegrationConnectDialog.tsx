@@ -273,6 +273,8 @@ export function useIntegrationConnectDialog({
     connectionsLoading,
     /** Refetches the connected list, for screens that must not show a stale cache. */
     refetchConnections: refetch,
+    /** Keeps a just-created instance selected until the connection list includes it. */
+    rememberPreferredInstance,
     requestConnect,
     requestPrivateGitHubConnect,
     offersPrivateGitHubAppSetup: githubConnect.privateApp,

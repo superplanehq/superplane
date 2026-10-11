@@ -8,6 +8,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Switch } from "@/ui/switch";
 import React, { useCallback, useEffect, useState } from "react";
 import { HostedLLMSettings } from "./HostedLLMSettings";
+import { InstallationFactoryTemplates } from "./InstallationFactoryTemplates";
 
 type InstallationSettingsResponse = {
   allow_private_network_access: boolean;
@@ -639,7 +640,8 @@ const InstallationSettings: React.FC = () => {
       <div className="pb-2">
         <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Installation Settings</h1>
         <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Configure installation-wide network policy, email delivery, and SuperPlane-hosted LLM credentials.
+          Configure installation-wide network policy, email delivery, SuperPlane-hosted LLM credentials, and onboarding
+          templates.
         </Text>
       </div>
 
@@ -675,6 +677,8 @@ const InstallationSettings: React.FC = () => {
           onFieldChange={setSMTPField}
           onSave={saveSMTPSettings}
         />
+
+        <InstallationFactoryTemplates />
 
         <HostedLLMSettings />
       </div>

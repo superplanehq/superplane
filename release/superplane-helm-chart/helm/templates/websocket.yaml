@@ -45,6 +45,9 @@ spec:
       labels:
         app: superplane
         service: {{ .Release.Name }}-websocket
+        {{- with .Values.podLabels }}
+        {{- include "superplane.podLabels" . | nindent 8 }}
+        {{- end }}
     spec:
       terminationGracePeriodSeconds: 75
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
@@ -54,10 +57,15 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.database.local.enabled }}
+      initContainers:
+        {{- include "superplane.migrateWaitContainer" . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Release.Name }}-websocket
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/build/superplane"]
           envFrom:
             - configMapRef:
                 name: {{ .Values.domain.configMapName }}
@@ -148,8 +156,12 @@ spec:
               value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
             - name: SUPERPLANE_INSTALLATION_TYPE
               value: {{ .Values.installation.type | quote }}
+            - name: SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER
+              value: {{ ternary "yes" "no" .Values.license.hideExpiryBanner | quote }}
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
+            - name: BLOB_STORAGE_ACCOUNT
+              value: {{ .Values.blobStorage.account | quote }}
             - name: BLOB_STORAGE_BUCKET
               value: {{ .Values.blobStorage.bucket | quote }}
             - name: BLOB_STORAGE_REGION

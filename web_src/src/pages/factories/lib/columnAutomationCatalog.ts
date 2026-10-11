@@ -87,12 +87,8 @@ export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
   unique: true,
 };
 
-export function catalogForColumn(
-  key: ColumnKey,
-  options?: { allowCustom?: boolean; allowRiskScore?: boolean },
-): ColumnAutomationCatalogEntry[] {
+export function catalogForColumn(key: ColumnKey, options?: { allowCustom?: boolean }): ColumnAutomationCatalogEntry[] {
   const allowCustom = options?.allowCustom === true;
-  const allowRiskScore = options?.allowRiskScore === true;
   if (key === "backlog") {
     return [
       ...LINE_INTAKE_SOURCES.map((source) => ({
@@ -125,7 +121,7 @@ export function catalogForColumn(
           unique: true,
         };
       }),
-      ...(allowRiskScore ? [RISK_SCORE_ENTRY] : []),
+      RISK_SCORE_ENTRY,
       ...(allowCustom ? [EVENT_CUSTOM_ENTRY] : []),
     ];
   }

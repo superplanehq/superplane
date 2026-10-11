@@ -8,6 +8,16 @@ describe("githubOnboardingPollInterval", () => {
     expect(githubOnboardingPollInterval({ synchronizing: true })).toBe(false);
   });
 
+  it("polls organization selection when sign-in is not required", () => {
+    expect(
+      githubOnboardingPollInterval({
+        providerConfigured: true,
+        accountConnectionRequired: false,
+        synchronizing: false,
+      }),
+    ).toBe(3_000);
+  });
+
   it("polls every three seconds while waiting for GitHub changes", () => {
     expect(
       githubOnboardingPollInterval({

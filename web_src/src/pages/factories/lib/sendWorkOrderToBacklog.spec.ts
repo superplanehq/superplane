@@ -4,6 +4,7 @@ import {
   CLOSED_STATUS_DIALOG_RESULTS,
   closedStatusEmptyLabel,
   closedStatusTaskMatchesSearch,
+  closePullRequestsLabel,
   shouldLoadClosedStatusSearchPage,
   workOrderHasClearableArtifacts,
   workOrderHasCloseablePullRequests,
@@ -83,6 +84,29 @@ describe("workOrderHasCloseablePullRequests", () => {
     expect(workOrderHasCloseablePullRequests([{ id: "pr-4", state: "STATE_CLOSED" }])).toBe(false);
     expect(workOrderHasCloseablePullRequests([])).toBe(false);
     expect(workOrderHasCloseablePullRequests(undefined)).toBe(false);
+  });
+});
+
+describe("closePullRequestsLabel", () => {
+  it("labels Bitbucket pull requests as declines", () => {
+    expect(closePullRequestsLabel([{ id: "pr-1", state: "STATE_OPEN", provider: "PROVIDER_BITBUCKET" }])).toBe(
+      "Decline pull request",
+    );
+  });
+
+  it("keeps the close label for GitHub, mixed, or missing pull requests", () => {
+    expect(closePullRequestsLabel([{ id: "pr-1", state: "STATE_OPEN", provider: "PROVIDER_GITHUB" }])).toBe(
+      "Close previous PRs",
+    );
+    expect(
+      closePullRequestsLabel([
+        { id: "pr-1", state: "STATE_OPEN", provider: "PROVIDER_BITBUCKET" },
+        { id: "pr-2", state: "STATE_OPEN", provider: "PROVIDER_GITHUB" },
+      ]),
+    ).toBe("Close previous PRs");
+    expect(closePullRequestsLabel([{ id: "pr-1", state: "STATE_OPEN" }])).toBe("Close previous PRs");
+    expect(closePullRequestsLabel([])).toBe("Close previous PRs");
+    expect(closePullRequestsLabel(undefined)).toBe("Close previous PRs");
   });
 });
 

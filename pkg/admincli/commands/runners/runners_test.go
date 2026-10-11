@@ -57,6 +57,7 @@ func TestListRunnersPassesFleetAndFilters(t *testing.T) {
 		assert.Equal(t, "/admin/api/installation/fleets/aws-large-amd64/runners", r.URL.Path)
 		assert.Equal(t, []string{"idle", "busy"}, r.URL.Query()["states"])
 		assert.Equal(t, "25", r.URL.Query().Get("limit"))
+		assert.Empty(t, r.URL.Query().Get("afterId"))
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = fmt.Fprintf(
 			w,
@@ -80,6 +81,26 @@ func TestListRunnersPassesFleetAndFilters(t *testing.T) {
 	assert.Contains(t, stdout.String(), "5m ago")
 	assert.NotContains(t, stdout.String(), created.Format(time.RFC3339))
 	assert.NotContains(t, stdout.String(), seen.Format(time.RFC3339))
+}
+
+func TestListRunnersPassesAfterID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/admin/api/installation/fleets/aws-large-amd64/runners", r.URL.Path)
+		assert.Equal(t, "runner-9", r.URL.Query().Get("afterId"))
+		assert.Equal(t, "200", r.URL.Query().Get("limit"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprint(w, `{"runners":[]}`)
+	}))
+	defer server.Close()
+
+	ctx, _ := clitest.NewCommandContext(t, server, "text")
+	err := (&listCommand{
+		FleetID: "aws-large-amd64",
+		Limit:   200,
+		AfterID: "runner-9",
+	}).Execute(ctx)
+
+	require.NoError(t, err)
 }
 
 func TestDescribeRunnerUsesFleetAndRunnerIDs(t *testing.T) {

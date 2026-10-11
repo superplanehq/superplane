@@ -128,8 +128,8 @@ export const ADMIN_LINKS: Array<{
   },
   {
     id: "runner-tasks",
-    label: "Runner Tasks",
-    description: "Inspect runner task activity",
+    label: "Fleets",
+    description: "Inspect installation fleets, runners, and tasks",
     href: "/admin/runner-tasks",
     icon: Terminal,
   },

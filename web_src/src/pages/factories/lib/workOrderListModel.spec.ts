@@ -17,6 +17,7 @@ import {
   applyWorkOrderOrdering,
   applyWorkOrderScope,
   applyWorkOrderSearch,
+  boardWorkOrderScopeQuery,
   buildWorkOrderListEntries,
   buildWorkOrderListEntry,
   groupWorkOrderEntriesByLane,
@@ -315,6 +316,8 @@ describe("scope + filter + search + ordering", () => {
     expect(WORK_ORDER_SCOPES.find((scope) => scope.id === "my")?.tooltip).toBe(
       "Tasks you created or started. SuperPlane assigns those to you.",
     );
+    expect(WORK_ORDER_SCOPES.map((scope) => scope.id)).toEqual(["all", "active", "my", "unassigned"]);
+    expect(WORK_ORDER_SCOPES.at(-1)).toMatchObject({ label: "Unassigned", tooltip: "Tasks with no owner." });
   });
 
   it("scope=my keeps orders assigned to the current user or created by them", () => {
@@ -334,6 +337,25 @@ describe("scope + filter + search + ordering", () => {
 
   it("scope=all keeps everything", () => {
     expect(applyWorkOrderScope(entries, "all")).toHaveLength(7);
+  });
+
+  it("scope=unassigned keeps tasks with no owner, including closed tasks and creators", () => {
+    const createdByMe = order({
+      id: "created-1",
+      assignees: [],
+      createdBy: { user: { id: "me", name: "You" } },
+      updatedAt: "2024-06-04T00:00:00Z",
+    });
+    const withCreated = buildWorkOrderListEntries([meAssigned, createdByMe, others, closed], factory);
+    expect(applyWorkOrderScope(withCreated, "unassigned", "me").map((entry) => entry.id)).toEqual(["created-1", "c-1"]);
+  });
+
+  it("requests only tasks with no owner and does not add a selected owner", () => {
+    expect(boardWorkOrderScopeQuery("unassigned", ["alex"], "me")).toEqual({
+      userId: undefined,
+      unassigned: true,
+      requireUser: false,
+    });
   });
 
   it("status filter narrows down to the selected display statuses", () => {

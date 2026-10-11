@@ -121,7 +121,7 @@ func ListMembers(ctx core.ListResourcesContext) ([]core.IntegrationResource, err
 
 func ListLabels(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	teamID := ctx.Parameters["team"]
-	if teamID == "" {
+	if teamID == "" && ctx.Parameters["scope"] != "workspace" {
 		return []core.IntegrationResource{}, nil
 	}
 

@@ -40,30 +40,32 @@ export function AccountSecurityTokensCard({
           </p>
         </div>
       ) : (
-        <table className="mt-4 w-full text-left" data-testid="account-redesign-token-list">
-          <thead>
-            <tr>
-              <th className="border-b border-border pb-2 text-xs font-medium text-muted-foreground">Name</th>
-              <th className="border-b border-border pb-2 text-xs font-medium text-muted-foreground">Created</th>
-              <th className="border-b border-border pb-2 text-xs font-medium text-muted-foreground">Last used</th>
-              <th className="border-b border-border pb-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {tokens.map((token) => (
-              <tr key={token.id}>
-                <td className="py-2.5 text-[13px] text-foreground">{token.name}</td>
-                <td className="py-2.5 text-[13px] text-muted-foreground">{token.createdAt}</td>
-                <td className="py-2.5 text-[13px] text-muted-foreground">{token.lastUsedAt ?? "Never"}</td>
-                <td className="py-2.5 text-right">
-                  <Button type="button" size="sm" variant="ghost" onClick={() => onRevokeToken(token.id)}>
-                    Revoke
-                  </Button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="mt-4 w-full text-left" data-testid="account-redesign-token-list">
+            <thead>
+              <tr>
+                <th className="border-b border-border pb-2 text-xs font-medium text-muted-foreground">Name</th>
+                <th className="border-b border-border pb-2 text-xs font-medium text-muted-foreground">Created</th>
+                <th className="border-b border-border pb-2 text-xs font-medium text-muted-foreground">Last used</th>
+                <th className="border-b border-border pb-2" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {tokens.map((token) => (
+                <tr key={token.id}>
+                  <td className="py-2.5 text-[13px] text-foreground">{token.name}</td>
+                  <td className="py-2.5 text-[13px] text-muted-foreground">{token.createdAt}</td>
+                  <td className="py-2.5 text-[13px] text-muted-foreground">{token.lastUsedAt ?? "Never"}</td>
+                  <td className="py-2.5 text-right">
+                    <Button type="button" size="sm" variant="ghost" onClick={() => onRevokeToken(token.id)}>
+                      Revoke
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </FactorySettingsCard>
   );

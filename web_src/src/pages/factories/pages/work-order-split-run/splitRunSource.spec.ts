@@ -42,6 +42,10 @@ describe("sourceTicketLabel", () => {
   it("uses the issue key for Jira project issue links", () => {
     expect(sourceTicketLabel("https://acme.atlassian.net/jira/software/projects/DEV/issues/DEV-3")).toBe("DEV-3");
   });
+
+  it("uses owner/repo#number for Bitbucket pull requests", () => {
+    expect(sourceTicketLabel("https://bitbucket.org/acme/widgets/pull-requests/42")).toBe("acme/widgets#42");
+  });
 });
 
 describe("splitRunSourceForOrder", () => {
@@ -89,6 +93,25 @@ describe("splitRunSourceForOrder", () => {
         name: "GitHub issues",
         ticket: { label: "acme/payments#12", href: "https://github.com/acme/payments/issues/12" },
         addedBy: { kind: "imported", personName: "Leonardo DiCaprio" },
+      }),
+    );
+  });
+
+  it("uses the Bitbucket pull request instead of GitHub issues for bitbucket.org origins", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: {
+          url: "https://bitbucket.org/acme/widgets/pull-requests/42",
+          label: "acme/widgets#42",
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "Bitbucket pull requests",
+        iconAlt: "Bitbucket",
+        ticket: { label: "acme/widgets#42", href: "https://bitbucket.org/acme/widgets/pull-requests/42" },
       }),
     );
   });

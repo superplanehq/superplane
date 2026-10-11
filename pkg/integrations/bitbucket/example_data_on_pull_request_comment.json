@@ -1,0 +1,48 @@
+{
+  "comment": {
+    "id": 7001,
+    "content": {
+      "raw": "@ada please check the retry backoff on line 42",
+      "markup": "markdown"
+    },
+    "user": {
+      "display_name": "Grace Hopper",
+      "nickname": "grace",
+      "uuid": "{e401aafa-d676-4ee0-a3f1-8b94c681feaa}"
+    },
+    "created_on": "2026-04-22T10:05:00.000000+00:00",
+    "updated_on": "2026-04-22T10:05:00.000000+00:00",
+    "inline": {
+      "path": "pkg/workers/retry.go",
+      "from": 40,
+      "to": 44
+    },
+    "links": {
+      "html": {
+        "href": "https://bitbucket.org/acme/widgets/pull-requests/42/_/diff/pkg/workers/retry.go#chg-7001"
+      }
+    }
+  },
+  "pullrequest": {
+    "id": 42,
+    "title": "feat: Add retry handling",
+    "state": "OPEN",
+    "source": {
+      "branch": { "name": "feat/retry-handling" },
+      "commit": { "hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2" }
+    },
+    "links": {
+      "html": { "href": "https://bitbucket.org/acme/widgets/pull-requests/42" }
+    }
+  },
+  "repository": {
+    "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}",
+    "name": "widgets",
+    "full_name": "acme/widgets"
+  },
+  "actor": {
+    "display_name": "Grace Hopper",
+    "nickname": "grace",
+    "uuid": "{e401aafa-d676-4ee0-a3f1-8b94c681feaa}"
+  }
+}

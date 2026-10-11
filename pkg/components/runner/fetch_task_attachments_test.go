@@ -148,6 +148,35 @@ func TestFetchTaskAttachmentsScriptContinuesAfterOneFailure(t *testing.T) {
 	assert.Equal(t, payload, got)
 }
 
+func TestFetchTaskAttachmentsScriptSkipsHostedVideo(t *testing.T) {
+	if _, err := exec.LookPath("python3"); err != nil {
+		t.Skip("python3 is not installed")
+	}
+
+	hits := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits++
+		_, _ = w.Write([]byte("<html>video</html>"))
+	}))
+	t.Cleanup(server.Close)
+
+	dir := t.TempDir()
+	attachments := filepath.Join(dir, "attachments")
+	require.NoError(t, os.MkdirAll(attachments, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(attachments, "manifest.json"), []byte(`{
+  "version": 1,
+  "files": [{"filename":"youtube","dest":"01-youtube","url":"`+server.URL+`","kind":"hosted_video","status":"pending"}]
+}`), 0o644))
+
+	cmd := exec.Command("bash", "fetch_task_attachments.sh")
+	cmd.Env = append(os.Environ(), "SUPERPLANE_TASK_DIR="+dir)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Equal(t, 0, hits)
+	assert.NoFileExists(t, filepath.Join(attachments, "01-youtube"))
+	assert.Equal(t, "pending", fetchManifestFile(t, attachments, "01-youtube")["status"])
+}
+
 func fetchManifestFile(t *testing.T, attachments, dest string) map[string]any {
 	t.Helper()
 	body, err := os.ReadFile(filepath.Join(attachments, "manifest.json"))

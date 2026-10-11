@@ -62,6 +62,7 @@ import {
   type WorkOrdersPageQuery,
 } from "@/pages/factories/lib/workOrderListPagination";
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
+import { integrationKeys } from "./useIntegrations";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const factoryQueryKeys = {
@@ -276,13 +277,16 @@ export function useFactoryWorkOrdersPage(
     fetchNextPage: query.fetchNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     isFetchNextPageError: query.isFetchNextPageError,
+    totalCount: query.data?.pages[0]?.totalCount,
   };
 }
 
 export type FactoryBoardColumnPage = {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
+  isFetchNextPageError: boolean;
   fetchNextPage: () => void;
+  totalCount?: number;
 };
 
 export type FactoryBoardWorkOrders = {
@@ -298,9 +302,11 @@ function boardColumnPage(page: ReturnType<typeof useFactoryWorkOrdersPage>): Fac
   return {
     hasNextPage: page.hasNextPage,
     isFetchingNextPage: page.isFetchingNextPage,
+    isFetchNextPageError: page.isFetchNextPageError,
     fetchNextPage: () => {
       void page.fetchNextPage();
     },
+    totalCount: page.totalCount,
   };
 }
 
@@ -513,20 +519,28 @@ export function useSelectFactoryVcsProviderRepository(organizationId: string, fa
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (repositoryId: string) => {
+    mutationFn: async (selection: string | { repositoryId?: string; repository?: string }) => {
+      const repositoryId = typeof selection === "string" ? selection : selection.repositoryId;
+      const repository = typeof selection === "string" ? undefined : selection.repository;
       const response = await factoriesSelectFactoryVcsProviderRepository(
         withOrganizationHeader({
           organizationId,
           path: { id: factoryId },
-          body: { provider, repositoryId },
+          body: {
+            provider,
+            ...(repositoryId ? { repositoryId } : {}),
+            ...(repository ? { repository } : {}),
+          },
         }),
       );
       if (!response.data?.factory) throw new Error("Failed to select the repository");
       return response.data.factory;
     },
-    onSuccess: (factory) => {
+    onSuccess: async (factory) => {
       queryClient.setQueryData(factoryDetailKey(organizationId, factoryId), factory);
       void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
+      // Repository selection can create the connection that onboarding reads next.
+      await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
     },
   });
 }
@@ -644,11 +658,12 @@ export function useUpdateWorkOrderAssignees(organizationId: string, factoryId: s
       }
       return response.data.order;
     },
-    onSuccess: (_data, variables) => {
-      invalidateWorkOrderLists(queryClient, organizationId, factoryId);
-      void queryClient.invalidateQueries({
-        queryKey: workOrderDetailKey(organizationId, factoryId, variables.orderId),
-      });
+    onSuccess: (order, variables) => {
+      // Assignee saves bump updated_at on the server, so a ListWorkOrders
+      // refetch would resort the backlog and jump the card. Patch in place
+      // instead and keep the column order the user was looking at.
+      applyWorkOrderToListCaches(queryClient, organizationId, factoryId, variables.orderId, order);
+      queryClient.setQueryData(workOrderDetailKey(organizationId, factoryId, variables.orderId), order);
       void queryClient.invalidateQueries({
         queryKey: workOrderEventsKey(organizationId, factoryId, variables.orderId),
       });

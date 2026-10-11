@@ -55,11 +55,7 @@ updated or deleted on an issue in a Linear team.
 - **Default channel**: Emits the Linear webhook payload, including ` + "`action`" + `, ` + "`actor`" + `, the comment
   ` + "`url`" + `, and a ` + "`data`" + ` object with the comment ` + "`body`" + `, its ` + "`user`" + `, and the ` + "`issue`" + ` it belongs to.
 
-## Webhook Setup
-
-This trigger registers a Linear webhook automatically when configured, and removes it when the
-trigger is deleted. Linear only allows webhook management for workspace admins or OAuth tokens with
-the **admin** scope, so the Linear connection must be authorized by a **workspace admin**.`
+` + triggerWebhookDocumentation
 }
 
 func (i *OnIssueComment) Icon() string {
@@ -148,7 +144,7 @@ func (i *OnIssueComment) Setup(ctx core.TriggerContext) error {
 	return ctx.Integration.RequestWebhook(WebhookConfiguration{
 		TeamID:       config.Team,
 		ResourceType: CommentResourceType,
-	})
+	}.withDeliveryMode(ctx.Integration))
 }
 
 func (i *OnIssueComment) Hooks() []core.Hook {

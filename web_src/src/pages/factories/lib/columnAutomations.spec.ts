@@ -335,20 +335,12 @@ describe("catalogForColumn", () => {
     expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
   });
 
-  it("offers discussion and status-check setup in the verify catalog", () => {
-    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks"]);
-  });
-
-  it("offers risk score in the verify catalog when the feature is on", () => {
-    expect(catalogForColumn("verify", { allowRiskScore: true }).map((entry) => entry.id)).toEqual([
-      "discussion",
-      "checks",
-      "risk-score",
-    ]);
+  it("offers discussion, status-check, and merge confidence setup in the verify catalog", () => {
+    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks", "risk-score"]);
   });
 
   it("offers a custom canvas in the verify catalog when the feature is on", () => {
-    expect(catalogForColumn("verify", { allowCustom: true, allowRiskScore: true }).map((entry) => entry.id)).toEqual([
+    expect(catalogForColumn("verify", { allowCustom: true }).map((entry) => entry.id)).toEqual([
       "discussion",
       "checks",
       "risk-score",
@@ -385,12 +377,12 @@ describe("catalogForColumn", () => {
 
 describe("onlyCustomCatalogRemains", () => {
   it("is true when every unique Verify type is taken", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true, allowRiskScore: true });
+    const catalog = catalogForColumn("verify", { allowCustom: true });
     expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score"])).toBe(true);
   });
 
   it("is false when risk score is still available", () => {
-    const catalog = catalogForColumn("verify", { allowCustom: true, allowRiskScore: true });
+    const catalog = catalogForColumn("verify", { allowCustom: true });
     expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks"])).toBe(false);
   });
 

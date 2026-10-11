@@ -100,7 +100,7 @@ export function FactorySettingsCard({
       {showHeader ? (
         <div
           className={cn(
-            "flex justify-between gap-3",
+            "flex flex-wrap justify-between gap-3",
             attachedList ? "pb-2" : "mb-3",
             action ? "items-start" : "items-center",
           )}

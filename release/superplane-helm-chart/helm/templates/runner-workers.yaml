@@ -1,0 +1,127 @@
+{{- if eq (include "runner.workers.enabled" .) "true" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-runner-workers
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: superplane
+    service: {{ .Release.Name }}-runner-workers
+spec:
+  replicas: {{ .Values.runner.workers.replicas }}
+  selector:
+    matchLabels:
+      app: superplane
+      service: {{ .Release.Name }}-runner-workers
+  template:
+    metadata:
+      name: {{ .Release.Name }}-runner-workers
+      labels:
+        app: superplane
+        service: {{ .Release.Name }}-runner-workers
+        {{- with .Values.podLabels }}
+        {{- include "superplane.podLabels" . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if and .Values.runner.api.enabled (not .Values.runner.activeLogs.existingClaim) }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: superplane
+                  service: {{ .Release.Name }}-runner-api
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
+      {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
+      serviceAccountName: {{ include "superplane.serviceAccountName" . }}
+      {{- end }}
+      securityContext:
+        fsGroup: {{ .Values.runner.activeLogs.fsGroup }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.database.local.enabled }}
+      initContainers:
+        {{- include "superplane.migrateWaitContainer" . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Release.Name }}-runner-workers
+          image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/build/superplane"]
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.domain.configMapName }}
+            - secretRef:
+                name: {{ include "secrets.database.name" . }}
+            - secretRef:
+                name: {{ include "secrets.rabbitmq.name" . }}
+            - secretRef:
+                name: {{ include "secrets.telemetry.name" . }}
+            - secretRef:
+                name: {{ include "secrets.encryption.name" . }}
+            - secretRef:
+                name: {{ include "secrets.jwt.name" . }}
+            - secretRef:
+                name: {{ include "secrets.sentry.name" . }}
+          env:
+            {{- include "runner.processEnv" (dict "enabled" (list "START_RUNNER_LOG_COMPACTOR" "START_RUNNER_CLEANUP_WORKER")) | nindent 12 }}
+            - name: PUBLIC_API_BASE_PATH
+              value: "/api/v1"
+            - name: RBAC_MODEL_PATH
+              value: /app/rbac/rbac_model.conf
+            - name: RBAC_ORG_POLICY_PATH
+              value: /app/rbac/rbac_org_policy.csv
+            - name: RBAC_CANVAS_POLICY_PATH
+              value: /app/rbac/rbac_canvas_policy.csv
+            - name: APPLICATION_NAME
+              value: superplane
+            - name: DB_POOL_SIZE
+              value: "{{ .Values.workers.dbPoolSize }}"
+            - name: DB_STATEMENT_TIMEOUT
+              value: "{{ .Values.database.statementTimeout }}"
+            - name: DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT
+              value: "{{ .Values.database.idleInTransactionSessionTimeout }}"
+            - name: TEMPLATE_DIR
+              value: /app/templates
+            - name: OIDC_KEYS_PATH
+              value: /app/oidc-keys
+            - name: BLOB_STORAGE_PROVIDER
+              value: {{ .Values.blobStorage.provider | quote }}
+            - name: BLOB_STORAGE_ACCOUNT
+              value: {{ .Values.blobStorage.account | quote }}
+            - name: BLOB_STORAGE_BUCKET
+              value: {{ .Values.blobStorage.bucket | quote }}
+            - name: BLOB_STORAGE_REGION
+              value: {{ .Values.blobStorage.region | quote }}
+            - name: BLOB_STORAGE_LOCAL_PATH
+              value: {{ .Values.blobStorage.localPath | quote }}
+            - name: BLOB_STORAGE_CREDENTIALS_FILE
+              value: {{ .Values.blobStorage.credentialsFile | quote }}
+            - name: RUNNER_ACTIVE_LOG_FS_PATH
+              value: {{ .Values.runner.activeLogs.path | quote }}
+          volumeMounts:
+            - name: oidc-keys
+              mountPath: /app/oidc-keys
+              readOnly: true
+            - name: runner-active-logs
+              mountPath: {{ .Values.runner.activeLogs.path }}
+          securityContext:
+            privileged: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          {{- with .Values.workers.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: oidc-keys
+          secret:
+            secretName: {{ include "secrets.oidc.name" . }}
+        - name: runner-active-logs
+          persistentVolumeClaim:
+            claimName: {{ include "runner.activeLogs.claimName" . }}
+{{- end }}

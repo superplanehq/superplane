@@ -1,6 +1,6 @@
 <p align="center">
 <a href="https://superplane.com/">
-  <img src="./docs/images/superplane-hero.png" alt="SuperPlane software factory moving routine engineering work from backlog to a reviewed pull request" width="100%">
+  <img src="./docs/images/background_image.png" alt="SuperPlane factory board with Backlog, Implement, Verify, and Done columns" width="100%">
 </a>
 </p>
 
@@ -8,6 +8,7 @@
   <a href="https://superplanehq.semaphoreci.com/projects/superplane"><img src="https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields" alt="Build"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-F4D35E?style=flat-square&amp;labelColor=171714" alt="Apache 2.0"></a>
   <a href="https://discord.superplane.com"><img src="https://img.shields.io/discord/1409914582239023200?label=Discord&amp;style=flat-square&amp;labelColor=171714&amp;color=F4D35E" alt="Discord"></a>
+  <a href="https://mcpservers.org/servers/superplanehq/superplane"><img src="https://mcpservers.org/badge.svg" alt="Listed on mcpservers.org"></a>
 </p>
 
 <p align="center">
@@ -40,7 +41,7 @@ constraints.
 
 ## How the factory works
 
-![SuperPlane work order analysis running through a guarded automation line](./docs/images/factory-backlog.png)
+![SuperPlane work order with a GitHub issue summary and agent controls](./docs/images/board_image.png)
 
 A SuperPlane Factory turns incoming work into a durable operational record.
 A work order enters through the backlog, moves through one or more automation
@@ -99,9 +100,3 @@ Contributor setup is Docker-based. Start with the repository instructions in
 - [X](https://x.com/superplanehq) for product updates
 
 SuperPlane is available under the [Apache License 2.0](./LICENSE).
-
-## Factory activity
-
-<a href="https://app.superplane.com/superplane/workspaces/super/lines/9f2a291c-057d-4159-8eba-b4c59a125df2">
-  <img src="https://app.superplane.com/api/v1/public/badges/haMI0i2GHXrK7G0QADjtSY8jsHWtA4efC3M3zQ82eOo.svg?period=30&size=wide&theme=gruvbox&accent=f5b914&muted=ffffff" alt="SuperPlane Factory activity in the last 30 days" width="100%">
-</a>

@@ -257,6 +257,16 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 			}
 		}
 	}
+
+	if bitbucketKey := os.Getenv("BITBUCKET_CLIENT_ID"); bitbucketKey != "" {
+		if bitbucketSecret := os.Getenv("BITBUCKET_CLIENT_SECRET"); bitbucketSecret != "" {
+			providers["bitbucket"] = authentication.ProviderConfig{
+				Key:         bitbucketKey,
+				Secret:      bitbucketSecret,
+				CallbackURL: fmt.Sprintf("%s/auth/bitbucket/callback", baseURL),
+			}
+		}
+	}
 	return providers
 }
 
@@ -417,6 +427,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/specs", s.handleRunnerPlanningSpec).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/updates", s.handleRunnerPlanningUpdate).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/clarity", s.handleRunnerPlanningClarity).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/confidence", s.handleRunnerPlanningConfidence).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys", s.handleRunnerPlanningSurvey).Methods("POST")
@@ -756,7 +767,17 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	r.PathPrefix(s.BasePath+"/integrations/{integrationID}").HandlerFunc(s.HandleIntegrationRequest).
 		Methods("GET", "POST")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/github/app/created", s.HandleGitHubAppCreated).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/webhook", s.HandleGitHubAppWebhook).Methods("POST")
+	githubAppUserRoute := r.NewRoute().Subrouter()
+	githubAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/manifest", s.HandleGitHubAppManifest).Methods("GET")
+	// Forge calls these routes. The Forge Invocation Token authenticates them.
+	// They stay off the gateway authorizer, the same way the GitHub App webhook does.
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/lifecycle", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/scheduled", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/bootstrap", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/uninstall", s.HandleBitbucketForgeUninstall).Methods("POST")
 	sentryAppUserRoute := r.NewRoute().Subrouter()
 	sentryAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/install", s.HandleSentryAppInstall).Methods("GET")
@@ -764,6 +785,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc(s.BasePath+"/sentry/app/webhook", s.HandleSentryAppWebhook).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/jira/oauth/callback", s.HandleJiraOAuthCallback).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/linear/oauth/callback", s.HandleLinearOAuthCallback).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/linear/webhook", s.HandleLinearAppWebhook).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/mcp-oauth/callback", s.HandleMCPOAuthCallback).Methods("GET")
 
 	// Account-based endpoints (use account session, not organization context)
@@ -795,8 +817,15 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features", s.adminListOrgExperimentalFeatures).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminEnableOrgExperimentalFeature).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminDisableOrgExperimentalFeature).Methods("DELETE")
+	adminRoute.HandleFunc("/installation/factory-templates", s.adminListFactoryTemplates).Methods("GET")
+	adminRoute.HandleFunc("/installation/factory-templates/{templateId}/reset", s.adminResetFactoryTemplate).Methods("POST")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminUpdateInstallationNetworkSettings).Methods("PATCH")
+	adminRoute.HandleFunc("/installation/first-run/fleet-manager", s.adminPrepareFleetManager).Methods("POST")
+	adminRoute.HandleFunc("/installation/license", s.adminGetInstallationLicense).Methods("GET")
+	adminRoute.HandleFunc("/installation/license", s.adminInstallInstallationLicense).Methods("PUT")
+	adminRoute.HandleFunc("/installation/license", s.adminRemoveInstallationLicense).Methods("DELETE")
+	adminRoute.HandleFunc("/installation/license/keys", s.adminInstallLicenseKeyList).Methods("PUT")
 	adminRoute.HandleFunc("/installation/llm-settings", s.adminGetInstallationLLMSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/llm-settings", s.adminUpdateInstallationLLMSettings).Methods("PATCH")
 	adminRoute.HandleFunc("/installation/llm-providers/{provider}", s.adminUpdateHostedLLMProvider).Methods("PATCH")
@@ -1157,20 +1186,6 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Workspace setup cannot connect GitHub without the SuperPlane GitHub
-	// App, so onboarding stops here on installations that do not hold the
-	// app credentials (for example, local development without a tunnel).
-	if !config.LoadGitHubHostedAppConfig().Enabled() {
-		http.Error(
-			w,
-			"This installation has no GitHub App configured, so workspace setup is not available. "+
-				"Set the SUPERPLANE_GITHUB_APP_* environment variables and restart the server. "+
-				"See docs/contributing/connecting-to-3rdparty-services-from-development.md.",
-			http.StatusServiceUnavailable,
-		)
-		return
-	}
-
 	var req initialWorkspaceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -1474,6 +1489,54 @@ type AccountResponse struct {
 	LinkedAccounts               []AccountLinkedAccountResponse       `json:"linked_accounts"`
 	OrganizationsPendingDeletion []AccountOrganizationPendingDeletion `json:"organizations_pending_deletion"`
 	Impersonation                *AccountImpersonation                `json:"impersonation,omitempty"`
+	License                      AccountLicense                       `json:"license"`
+}
+
+// HideLicenseExpiryBannerEnv hides the license expiry banner when it is "yes"
+// or "true". The default is "no", so the banner stays visible.
+const HideLicenseExpiryBannerEnv = "SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER"
+
+// AccountLicense tells the UI which Enterprise features are available. Only
+// installation administrators receive the license state and expiry.
+type AccountLicense struct {
+	Edition          string     `json:"edition"`
+	Features         []string   `json:"features"`
+	State            string     `json:"state,omitempty"`
+	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
+	HideExpiryBanner bool       `json:"hide_expiry_banner,omitempty"`
+}
+
+func hideLicenseExpiryBanner() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(HideLicenseExpiryBannerEnv))) {
+	case "yes", "true":
+		return true
+	default:
+		return false
+	}
+}
+
+func accountLicense(status licensing.Status, installationAdmin bool) AccountLicense {
+	license := AccountLicense{
+		Edition:          string(status.Edition),
+		Features:         []string{},
+		HideExpiryBanner: hideLicenseExpiryBanner(),
+	}
+
+	if status.Edition == licensing.EditionEnterprise && status.License != nil {
+		license.Features = featureKeys(status.License.Features)
+	}
+
+	if !installationAdmin {
+		return license
+	}
+
+	license.State = string(status.State)
+	if status.License != nil {
+		expiresAt := status.License.ExpiresAt.UTC()
+		license.ExpiresAt = &expiresAt
+	}
+
+	return license
 }
 
 func accountOrganizationsPendingDeletion(organizations []models.Organization) []AccountOrganizationPendingDeletion {
@@ -1540,6 +1603,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		Providers:                    accountProviderResponses(providers),
 		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
 		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
+		License:                      accountLicense(s.licenseStatus(), account.IsInstallationAdmin()),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
@@ -1651,13 +1715,18 @@ func (s *Server) Serve(host string, port int) error {
 	log.Info("Starting WebSocket hub")
 	s.wsHub.Run()
 
+	handler := http.Handler(s.Router)
+	if os.Getenv("REDIRECT_HTTP_REQUESTS") == "yes" {
+		handler = middleware.RedirectInsecureForwardedHTTP(handler)
+	}
+
 	s.httpServer = &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       15 * time.Minute,
 		WriteTimeout:      15 * time.Minute,
 		IdleTimeout:       60 * time.Second,
-		Handler:           s.Router,
+		Handler:           handler,
 	}
 
 	return s.httpServer.ListenAndServe()

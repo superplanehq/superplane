@@ -669,11 +669,11 @@ func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID
 
 	now := time.Now()
 	assignees := make([]FactoryWorkOrderAssignee, 0, len(assigneeIDs))
-	for _, assigneeID := range assigneeIDs {
+	for i, assigneeID := range assigneeIDs {
 		assignees = append(assignees, FactoryWorkOrderAssignee{
 			WorkOrderID: o.ID,
 			UserID:      assigneeID,
-			CreatedAt:   now,
+			CreatedAt:   now.Add(time.Duration(i) * time.Millisecond),
 		})
 	}
 

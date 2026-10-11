@@ -13,6 +13,7 @@ export const SETUP_APP_REPOSITORY = "acme/api";
 
 const READY_GITHUB_ONBOARDING: MeDescribeVcsProviderOnboardingResponse = {
   providerConfigured: true,
+  accountConnectionRequired: true,
   identity: { userId: "42", login: "forestileao" },
   repositories: [
     {

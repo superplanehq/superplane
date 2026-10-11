@@ -16,6 +16,9 @@ import (
 )
 
 func Test__Linear__Sync(t *testing.T) {
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_ID", "")
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET", "")
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET", "")
 	integration := &Linear{}
 
 	t.Run("no client credentials - setup wizard with pre-filled app form", func(t *testing.T) {
@@ -43,6 +46,8 @@ func Test__Linear__Sync(t *testing.T) {
 		assert.Equal(t, "https://sp.example.com", params.Get("oauth.client_uri"))
 		assert.Contains(t, params.Get("oauth.redirect_uris"), "/api/v1/integrations/")
 		assert.Contains(t, params.Get("oauth.redirect_uris"), "/callback")
+		assert.Equal(t, "https://sp.example.com/api/v1/linear/webhook", params.Get("webhook.url"))
+		assert.Equal(t, []string{IssueResourceType, CommentResourceType, AttachmentResourceType}, params["webhook.resourceTypes"])
 	})
 
 	t.Run("missing client secret - setup wizard", func(t *testing.T) {
@@ -98,6 +103,33 @@ func Test__Linear__Sync(t *testing.T) {
 		require.True(t, ok)
 		require.NotNil(t, metadata.State)
 		assert.Equal(t, *metadata.State, params.Get("state"))
+		assert.Equal(t, "read,write,admin", metadata.OAuthScopes)
+	})
+
+	t.Run("webhook signing secret omits the admin scope", func(t *testing.T) {
+		integrationContext := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"clientId":      testClientID,
+				"clientSecret":  testClientSecret,
+				"webhookSecret": "app-signing-secret",
+			},
+		}
+
+		err := integration.Sync(core.SyncContext{
+			BaseURL:       "https://sp.example.com",
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			Logger:        logrus.NewEntry(logrus.New()),
+		})
+
+		require.NoError(t, err)
+		actionURL, parseErr := url.Parse(integrationContext.BrowserAction.URL)
+		require.NoError(t, parseErr)
+		assert.Equal(t, "read,write", actionURL.Query().Get("scope"))
+
+		metadata, ok := integrationContext.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.Equal(t, "read,write", metadata.OAuthScopes)
 	})
 
 	t.Run("state is not regenerated on subsequent syncs", func(t *testing.T) {
@@ -123,7 +155,8 @@ func Test__Linear__Sync(t *testing.T) {
 	})
 
 	t.Run("access token present - refreshes and becomes ready", func(t *testing.T) {
-		integrationContext := newAuthorizedIntegration()
+		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{OAuthScopes: "read,write"})
+		integrationContext.Configuration["webhookSecret"] = "app-signing-secret"
 
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -159,7 +192,9 @@ func Test__Linear__Sync(t *testing.T) {
 		require.NotNil(t, metadata.User)
 		assert.Equal(t, "Jane Doe", metadata.User.Name)
 		assert.Equal(t, "Acme", metadata.Organization)
+		assert.Equal(t, "o1", metadata.OrganizationID)
 		assert.Equal(t, "acme", metadata.URLKey)
+		assert.Equal(t, "read,write", metadata.OAuthScopes)
 		require.Len(t, metadata.Teams, 1)
 		assert.Equal(t, "ENG", metadata.Teams[0].Key)
 
@@ -508,6 +543,7 @@ func Test__Linear__Instructions(t *testing.T) {
 }
 
 func Test__Linear__Instructions__Hosted(t *testing.T) {
+	t.Setenv("SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET", "")
 	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_ID", "hosted-client")
 	t.Setenv("SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET", "hosted-secret")
 

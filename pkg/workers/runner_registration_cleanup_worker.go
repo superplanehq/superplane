@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/gorm"
 )
 
@@ -70,7 +71,7 @@ func (w *RunnerCleanupWorker) Process() error {
 				Error("Failed to expire runner registration")
 		}
 	}
-	staleIDs, err := models.ListStaleRunnerIDs(
+	staleRunners, err := models.ListStaleRunners(
 		database.Conn(),
 		now.Add(-runnerConnectionLossTimeout),
 		runnerRegistrationCleanupBatchSize,
@@ -78,21 +79,27 @@ func (w *RunnerCleanupWorker) Process() error {
 	if err != nil {
 		return err
 	}
-	for _, id := range staleIDs {
+	for _, staleRunner := range staleRunners {
+		var lostRunningTask *models.RunnerTask
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
-			runner, err := models.LockRunner(tx, id)
+			runner, err := models.LockRunner(tx, staleRunner.ID)
 			if errors.Is(err, models.ErrRunnerNotFound) {
 				return nil
 			}
 			if err != nil {
 				return err
 			}
-			return runner.MarkLost(tx, now.Add(-runnerConnectionLossTimeout), now)
+			lostRunningTask, err = runner.MarkLost(tx, now.Add(-runnerConnectionLossTimeout), now)
+			return err
 		})
 		if err != nil {
 			w.logger.WithError(err).
-				WithField("runner_id", id).
+				WithField("runner_id", staleRunner.ID).
 				Error("Failed to mark disconnected runner as lost")
+			continue
+		}
+		if lostRunningTask != nil && telemetry.MetricsEnabled() {
+			telemetry.RecordRunnerTaskExecutionDuration(context.Background(), lostRunningTask, staleRunner.FleetSlug, staleRunner.FleetScope)
 		}
 	}
 	return models.RevokeTerminatedRunnerCredentials(

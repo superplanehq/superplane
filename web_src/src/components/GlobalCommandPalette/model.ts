@@ -56,8 +56,6 @@ export function useCommandPaletteModel(): CommandPaletteModel | null {
   const enabled = !loading && !!account;
 
   useCommandPaletteShortcuts({
-    canvasId: route.canvasId,
-    organizationId: route.organizationId,
     createCanvas,
     createCanvasDisabled: data.createCanvasDisabled,
     enabled,

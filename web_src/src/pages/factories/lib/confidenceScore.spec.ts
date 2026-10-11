@@ -76,11 +76,38 @@ describe("confidenceScore", () => {
     expect(confidenceCheckLevel(2)).toBe("caution");
   });
 
+  it("bands and clamps a 1 to 3 review score on its own scale", () => {
+    expect(confidenceBandForScore(3, 3)).toBe("High");
+    expect(confidenceBandForScore(2, 3)).toBe("Medium");
+    expect(confidenceBandForScore(1, 3)).toBe("Low");
+    expect(clampConfidenceScore(5, 3)).toBe(3);
+  });
+
   it("labels a confidence check High Medium or Low, not Healthy", () => {
     expect(workOrderCheckStatus({ name: "Confidence score", score: 5, level: "positive" }).label).toBe("High");
     expect(workOrderCheckStatus({ name: "Confidence score", score: 3, level: "neutral" }).label).toBe("Medium");
     expect(workOrderCheckStatus({ name: "Clarity score", score: 2, level: "critical" }).label).toBe("Low");
     expect(workOrderCheckStatus({ name: "Risk score", score: 65, level: "caution" }).label).toBe("Moderate");
+  });
+
+  it("labels planning review metrics with a result word", () => {
+    expect(workOrderCheckStatus({ name: "Clarity", key: "clarity", score: 5, level: "positive" }).label).toBe("Clear");
+    expect(workOrderCheckStatus({ name: "Complexity", key: "complexity", score: 3, level: "caution" }).label).toBe(
+      "Moderate",
+    );
+    expect(
+      workOrderCheckStatus({ name: "Verifiability", key: "verifiability", score: 2, level: "critical" }).label,
+    ).toBe("Unproven");
+  });
+
+  it("keeps the result word for a stored Risk check from an older report", () => {
+    expect(workOrderCheckStatus({ name: "Risk", key: "risk", score: 2, level: "critical" }).label).toBe("High");
+  });
+
+  it("keeps High Medium Low on the stored Clarity score name", () => {
+    expect(workOrderCheckStatus({ name: "Clarity score", key: "clarity", score: 5, level: "positive" }).label).toBe(
+      "High",
+    );
   });
 
   it("summarizes how suitable the issue is for an agent", () => {

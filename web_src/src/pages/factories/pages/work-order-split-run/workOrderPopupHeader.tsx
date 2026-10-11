@@ -39,6 +39,8 @@ type AnalysisHeaderEdits = {
   saveTitle: (next: string) => void;
   owner: WorkOrderSplitRunPopupProps["fixture"]["owner"];
   assigneeIds: string[];
+  ownerBusy: boolean;
+  saveOwner: (assigneeIds: string[]) => Promise<void>;
 };
 
 export function AnalysisPopupHeader({
@@ -111,7 +113,11 @@ export function AnalysisPopupHeader({
       {showOwnerRow ? (
         <LiveOwnerTimeCostRow
           fixture={{ ...fixture, owner: edits.owner }}
+          organizationId={organizationId}
+          canEditOwner={edits.canEdit}
           assigneeIds={edits.assigneeIds}
+          ownerBusy={edits.ownerBusy}
+          onOwnerSave={edits.saveOwner}
           usageByModel={fixture.usageByModel}
           usageByMachineType={fixture.usageByMachineType}
         />

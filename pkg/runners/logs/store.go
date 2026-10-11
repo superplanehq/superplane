@@ -20,6 +20,7 @@ const (
 	HeaderCursor = "X-SuperPlane-Log-Cursor"
 	HeaderState  = "X-SuperPlane-Log-State"
 	HeaderReset  = "X-SuperPlane-Log-Reset"
+	HeaderURL    = "X-SuperPlane-Log-URL"
 )
 
 var (

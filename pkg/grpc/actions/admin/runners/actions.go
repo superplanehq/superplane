@@ -18,6 +18,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	"github.com/superplanehq/superplane/pkg/public/runnerapi"
 	runnercontrol "github.com/superplanehq/superplane/pkg/runners/control"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -208,21 +209,29 @@ func (s *Service) ListFleetTasks(
 	if err := validateTaskStates(req.GetStates()); err != nil {
 		return nil, err
 	}
+	afterID, err := parseOptionalID(req.GetAfterId(), "after ID")
+	if err != nil {
+		return nil, err
+	}
 
-	tasks, err := fleet.ListTasks(
-		database.DB(ctx),
-		req.GetStates(),
-		listLimit(req.GetLimit()),
-	)
+	page, err := fleet.ListTasks(database.DB(ctx), models.ListPage{
+		States:  req.GetStates(),
+		Limit:   listLimit(req.GetLimit()),
+		AfterID: afterID,
+	})
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list fleet tasks")
 	}
 
-	out := make([]*pb.Task, 0, len(tasks))
-	for i := range tasks {
-		out = append(out, serializeTask(&tasks[i], fleet.Slug))
+	out := make([]*pb.Task, 0, len(page.Tasks))
+	for i := range page.Tasks {
+		out = append(out, serializeTask(&page.Tasks[i], fleet.Slug))
 	}
-	return &pb.ListFleetTasksResponse{Tasks: out}, nil
+	return &pb.ListFleetTasksResponse{
+		Tasks:       out,
+		TotalCount:  page.TotalCount,
+		HasNextPage: page.HasNextPage,
+	}, nil
 }
 
 func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest) (*pb.CreateRunnerResponse, error) {
@@ -288,17 +297,29 @@ func (s *Service) ListRunners(ctx context.Context, req *pb.ListRunnersRequest) (
 	if err := validateRunnerStates(req.GetStates()); err != nil {
 		return nil, err
 	}
+	afterID, err := parseOptionalID(req.GetAfterId(), "after ID")
+	if err != nil {
+		return nil, err
+	}
 
-	runners, err := fleet.ListRunners(database.DB(ctx), req.GetStates(), listLimit(req.GetLimit()))
+	page, err := fleet.ListRunners(database.DB(ctx), models.ListPage{
+		States:  req.GetStates(),
+		Limit:   listLimit(req.GetLimit()),
+		AfterID: afterID,
+	})
 	if err != nil {
 		return nil, grpcerrors.Internal(err, "failed to list runners")
 	}
 
-	out := make([]*pb.Runner, 0, len(runners))
-	for i := range runners {
-		out = append(out, serializeRunner(&runners[i], fleet.Slug))
+	out := make([]*pb.Runner, 0, len(page.Runners))
+	for i := range page.Runners {
+		out = append(out, serializeRunner(&page.Runners[i], fleet.Slug))
 	}
-	return &pb.ListRunnersResponse{Runners: out}, nil
+	return &pb.ListRunnersResponse{
+		Runners:     out,
+		TotalCount:  page.TotalCount,
+		HasNextPage: page.HasNextPage,
+	}, nil
 }
 
 func (s *Service) DescribeRunner(
@@ -370,6 +391,7 @@ func (s *Service) createRunner(
 ) (*models.Runner, *models.RunnerRegistration, error) {
 	var runner *models.Runner
 	var registration *models.RunnerRegistration
+	var reservedTask *models.RunnerTask
 
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		if idempotencyKey != "" {
@@ -433,6 +455,7 @@ func (s *Service) createRunner(
 			if taskErr := task.Reserve(tx, runner.ID); taskErr != nil {
 				return taskErr
 			}
+			reservedTask = task
 		}
 
 		registration = &models.RunnerRegistration{
@@ -443,6 +466,9 @@ func (s *Service) createRunner(
 		}
 		return tx.Create(registration).Error
 	})
+	if err == nil && reservedTask != nil {
+		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetID, models.RunnerFleetScopeInstallation)
+	}
 	if idempotencyKey != "" && models.IsRunnerCreationIdempotencyKeyConflict(err) {
 		runner, err = loadIdempotentRunner(database.DB(ctx), idempotencyKey, requestHash)
 		if err == nil {
@@ -566,6 +592,17 @@ func parseID(value, field string) (uuid.UUID, error) {
 		return uuid.Nil, grpcerrors.InvalidArgument(err, "invalid "+field)
 	}
 	return id, nil
+}
+
+func parseOptionalID(value, field string) (*uuid.UUID, error) {
+	if strings.TrimSpace(value) == "" {
+		return nil, nil
+	}
+	id, err := parseID(value, field)
+	if err != nil {
+		return nil, err
+	}
+	return &id, nil
 }
 
 func optionalID(value *string, field string) (*uuid.UUID, error) {

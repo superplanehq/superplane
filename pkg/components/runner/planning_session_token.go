@@ -22,6 +22,7 @@ const (
 	EnvSuperplanePlanningSessionKind = "SUPERPLANE_PLANNING_SESSION_KIND"
 	EnvSuperplanePlanningClarity     = "SUPERPLANE_PLANNING_CLARITY"
 	EnvSuperplanePlanningConfidence  = "SUPERPLANE_PLANNING_CONFIDENCE"
+	EnvSuperplanePlanningReview      = "SUPERPLANE_PLANNING_REVIEW"
 	EnvSuperplaneAnalysisSpecFile    = "SUPERPLANE_ANALYSIS_SPEC_FILE"
 	EnvSuperplaneAnalysisScoreFile   = "SUPERPLANE_ANALYSIS_SCORE_FILE"
 	EnvSuperplaneBaseURL             = "SUPERPLANE_BASE_URL"
@@ -169,6 +170,9 @@ func AttachPlanningSessionEnv(ctx core.ExecutionContext, environment []BrokerEnv
 	}, BrokerEnvironmentVariable{
 		Name:  EnvSuperplanePlanningConfidence,
 		Value: planningScoreEnvValue(planning.Confidence),
+	}, BrokerEnvironmentVariable{
+		Name:  EnvSuperplanePlanningReview,
+		Value: "true",
 	}, BrokerEnvironmentVariable{
 		Name:  EnvSuperplaneAnalysisSpecFile,
 		Value: "/tmp/intent.md",

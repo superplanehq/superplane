@@ -95,6 +95,41 @@ export function workOrdersPageStatesFromKey(queryKey: readonly unknown[]): Facto
   return joined.split(",") as FactoriesWorkOrderState[];
 }
 
+function orderIsOnLoadedPages(pages: readonly WorkOrdersPage[], orderId: string): boolean {
+  return pages.some((page) => page.orders.some((order) => order.id === orderId));
+}
+
+function loadedWorkOrderPagesAreComplete(pages: readonly WorkOrdersPage[]): boolean {
+  const last = pages.at(-1);
+  return last !== undefined && !last.hasNextPage;
+}
+
+function describedOrderBelongsOnPage(
+  described: FactoriesWorkOrder,
+  states: readonly FactoriesWorkOrderState[],
+  query: WorkOrdersPageQuery,
+): boolean {
+  return (
+    pageIncludesState(states, described.state) &&
+    pageIncludesResults(query.results, described.result) &&
+    workOrderMatchesPageQuery(described, query)
+  );
+}
+
+function shiftPageTotalCount(page: WorkOrdersPage, delta: number): WorkOrdersPage {
+  if (page.totalCount === undefined || delta === 0) {
+    return page;
+  }
+  return { ...page, totalCount: Math.max(0, page.totalCount + delta) };
+}
+
+function shiftPagesTotalCount(pages: WorkOrdersPage[], delta: number): WorkOrdersPage[] {
+  if (delta === 0) {
+    return pages;
+  }
+  return pages.map((page) => shiftPageTotalCount(page, delta));
+}
+
 export function patchCachedWorkOrderPages(
   data: InfiniteData<WorkOrdersPage> | undefined,
   orderId: string,
@@ -106,11 +141,8 @@ export function patchCachedWorkOrderPages(
     return data;
   }
 
-  const belongs =
-    pageIncludesState(states, described.state) &&
-    pageIncludesResults(query.results, described.result) &&
-    workOrderMatchesPageQuery(described, query);
-  const exists = data.pages.some((page) => page.orders.some((order) => order.id === orderId));
+  const belongs = describedOrderBelongsOnPage(described, states, query);
+  const exists = orderIsOnLoadedPages(data.pages, orderId);
 
   if (!belongs) {
     if (!exists) {
@@ -118,10 +150,13 @@ export function patchCachedWorkOrderPages(
     }
     return {
       ...data,
-      pages: data.pages.map((page) => ({
-        ...page,
-        orders: page.orders.filter((order) => order.id !== orderId),
-      })),
+      pages: shiftPagesTotalCount(
+        data.pages.map((page) => ({
+          ...page,
+          orders: page.orders.filter((order) => order.id !== orderId),
+        })),
+        -1,
+      ),
     };
   }
 
@@ -143,16 +178,52 @@ export function patchCachedWorkOrderPages(
     };
   }
 
+  const totalDelta = loadedWorkOrderPagesAreComplete(data.pages) ? 1 : 0;
   return {
     ...data,
-    pages: [
-      {
-        ...first,
-        orders: [patchedWorkOrder({ id: described.id ?? orderId }, described), ...first.orders],
-      },
-      ...rest,
-    ],
+    pages: shiftPagesTotalCount(
+      [
+        {
+          ...first,
+          orders: [patchedWorkOrder({ id: described.id ?? orderId }, described), ...first.orders],
+        },
+        ...rest,
+      ],
+      totalDelta,
+    ),
   };
+}
+
+export function pageKeysWithUnknownWorkOrderMembership(
+  queryClient: QueryClient,
+  organizationId: string,
+  factoryId: string,
+  orderId: string,
+  described: FactoriesWorkOrder,
+): ReadonlyArray<readonly unknown[]> {
+  const keys: Array<readonly unknown[]> = [];
+  for (const query of queryClient.getQueryCache().findAll({
+    queryKey: factoryWorkOrdersPagePrefix(organizationId, factoryId),
+  })) {
+    const data = queryClient.getQueryData<InfiniteData<WorkOrdersPage>>(query.queryKey);
+    if (!data || data.pages.length === 0) {
+      continue;
+    }
+    if (loadedWorkOrderPagesAreComplete(data.pages) || orderIsOnLoadedPages(data.pages, orderId)) {
+      continue;
+    }
+    if (
+      !describedOrderBelongsOnPage(
+        described,
+        workOrdersPageStatesFromKey(query.queryKey),
+        workOrdersPageQueryFromKey(query.queryKey),
+      )
+    ) {
+      continue;
+    }
+    keys.push(query.queryKey);
+  }
+  return keys;
 }
 
 export function applyWorkOrderToListCaches(
@@ -194,10 +265,14 @@ function pageHasNextCursor(page: WorkOrdersPage | undefined): boolean {
 }
 
 function withoutWorkOrderPages(data: InfiniteData<WorkOrdersPage>, orderId: string): InfiniteData<WorkOrdersPage> {
-  const pages = data.pages.map((page) => ({
-    ...page,
-    orders: withoutWorkOrder(page.orders, orderId),
-  }));
+  const removed = data.pages.some((page) => pageContainsWorkOrder(page, orderId));
+  const pages = shiftPagesTotalCount(
+    data.pages.map((page) => ({
+      ...page,
+      orders: withoutWorkOrder(page.orders, orderId),
+    })),
+    removed ? -1 : 0,
+  );
   const pageParams = data.pageParams.slice(0, pages.length);
 
   while (pages.length > 1 && (pages[pages.length - 1]?.orders.length ?? 0) === 0) {

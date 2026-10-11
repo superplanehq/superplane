@@ -196,6 +196,10 @@ promotions:
     pipeline_file: release-fleet-manager-image.yml
     deployment_target: ghcr
 
+  - name: Publish Helm Chart
+    pipeline_file: release-helm-chart.yml
+    deployment_target: ghcr
+
   - name: Deploy to Production
     pipeline_file: deploy-to-production.yml
     deployment_target: production

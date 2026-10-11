@@ -207,6 +207,51 @@ func TestVelocityPeopleBuilder_JoinsGitHubAuthorWithMember(t *testing.T) {
 	assert.Equal(t, "https://avatars/ada", rows[0].avatarURL, "a member without a photo borrows the GitHub one")
 }
 
+func TestVelocityPeopleBuilder_JoinsBitbucketAuthorByUUID(t *testing.T) {
+	userID := uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: userID, Name: "Ada Lovelace", BitbucketUUID: "11111111-1111-1111-1111-111111111111"},
+	})
+
+	builder.addAuthoredMerge(&models.FactoryVelocityRepositoryMerge{
+		Provider:    models.ProviderBitbucket,
+		AuthorUUID:  "{11111111-1111-1111-1111-111111111111}",
+		AuthorLogin: "renamed-nick",
+		AuthorName:  "Renamed Nick",
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 1)
+	assert.Equal(t, userID.String(), rows[0].id)
+	assert.Equal(t, 1, rows[0].authoredMerged)
+}
+
+func TestVelocityPeopleBuilder_NeverMatchesBitbucketNicknames(t *testing.T) {
+	userID := uuid.New()
+	builder := newVelocityPeopleBuilder([]models.FactoryVelocityMember{
+		{UserID: userID, Name: "Ada Lovelace", GitHubLogin: "adalovelace"},
+	})
+	builder.addFactoryOrder(&velocityOrder{createdByID: &userID, merged: true})
+
+	builder.addAuthoredMerge(&models.FactoryVelocityRepositoryMerge{
+		Provider:    models.ProviderBitbucket,
+		AuthorUUID:  "{22222222-2222-2222-2222-222222222222}",
+		AuthorLogin: "adalovelace",
+		AuthorName:  "Ada Lovelace",
+	})
+
+	rows := builder.rowsSorted(velocitySortTotal, velocitySortDesc)
+	require.Len(t, rows, 2, "the Bitbucket author buckets by UUID even when the nickname collides")
+	ids := []string{rows[0].id, rows[1].id}
+	assert.Contains(t, ids, userID.String())
+	assert.Contains(t, ids, "bitbucket:22222222-2222-2222-2222-222222222222")
+	for _, row := range rows {
+		if row.id == userID.String() {
+			assert.Equal(t, 0, row.authoredMerged)
+		}
+	}
+}
+
 func TestVelocityPeopleBuilder_KeepsAuthorsOutsideTheOrganization(t *testing.T) {
 	builder := newVelocityPeopleBuilder(nil)
 

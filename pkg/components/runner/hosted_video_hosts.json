@@ -1,0 +1,26 @@
+{
+  "maxDurationSeconds": 300,
+  "maxBytes": 268435456,
+  "hosts": [
+    {
+      "id": "youtube",
+      "name": "YouTube",
+      "suffixes": ["youtube.com", "youtu.be", "youtube-nocookie.com"]
+    },
+    {
+      "id": "vimeo",
+      "name": "Vimeo",
+      "suffixes": ["vimeo.com"]
+    },
+    {
+      "id": "loom",
+      "name": "Loom",
+      "suffixes": ["loom.com"]
+    },
+    {
+      "id": "cleanshot",
+      "name": "CleanShot",
+      "suffixes": ["cln.sh", "cleanshot.com"]
+    }
+  ]
+}

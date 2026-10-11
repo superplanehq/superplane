@@ -17,6 +17,7 @@ import {
   buildWorkOrderListEntries,
   countWorkOrderFilters,
   visibleWorkOrderFilters,
+  type WorkOrderScope,
 } from "../lib/workOrderListModel";
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
 import { factoryKanbanPageClassName, factoryWorkOrdersBodyClassName } from "../pages/factoryPageLayoutStyles";
@@ -31,6 +32,16 @@ import { WorkOrdersHeader } from "./header/WorkOrdersHeader";
 import { WorkOrdersListView } from "./WorkOrdersListView";
 import { WorkOrdersTableView } from "./WorkOrdersTableView";
 import { WorkOrderClosedStatusDialog } from "./WorkOrderClosedStatusDialog";
+
+function scopedEmptyLabel(scope: WorkOrderScope): string {
+  if (scope === "my") {
+    return "your work";
+  }
+  if (scope === "unassigned") {
+    return "unassigned work";
+  }
+  return "active work";
+}
 
 interface WorkOrdersLoadedViewProps {
   organizationId: string;
@@ -105,7 +116,7 @@ export function WorkOrdersLoadedView(props: WorkOrdersLoadedViewProps) {
       if (state.scope !== "all" && visibleFilterCount === 0 && state.search.trim().length === 0) {
         return (
           <WorkOrdersScopedEmptyState
-            scopeLabel={state.scope === "my" ? "your work" : "active work"}
+            scopeLabel={scopedEmptyLabel(state.scope)}
             onResetScope={() => state.setScope("all")}
           />
         );

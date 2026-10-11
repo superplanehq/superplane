@@ -13,6 +13,7 @@ e2e.test
 wget-log*
 .env
 .env.docker
+.air-rebuild
 vendor/bundle
 .claude/settings.local.json
 CLAUDE.local.md

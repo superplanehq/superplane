@@ -109,6 +109,9 @@ func prFeedbackSettingsFromGraph(graph prFeedbackGraph, spec models.LiveCanvasSp
 	if graph.isChecks() {
 		wait := findIntakeNode(spec.Nodes, graph.WaitChecksNodeID)
 		settings.CheckNames = prFeedbackNodeStringSlice(wait, "checkNames")
+		if len(settings.CheckNames) == 0 {
+			settings.CheckNames = prFeedbackNodeStringSlice(wait, "buildKeys")
+		}
 		if settings.Repository == "" {
 			settings.Repository = strings.TrimSpace(prFeedbackNodeString(wait, "repository"))
 		}

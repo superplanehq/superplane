@@ -15,7 +15,7 @@ import (
 )
 
 func TestCloneRepositoryChecksRemoteHeads(t *testing.T) {
-	analysis := intakeAnalysisCloneCommand()
+	analysis := intakeAnalysisCloneCommand("")
 	implementation := implementationCloneCommand(t)
 	clone := cloneRepositoryCommand()
 

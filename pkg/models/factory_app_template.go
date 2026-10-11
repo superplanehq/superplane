@@ -93,12 +93,17 @@ var (
 // its normalized trigger node. Canvas changesets keep component metadata
 // private, so generated templates stamp this server-owned key after publish.
 func (c *Canvas) StampFactoryAppTemplate(tx *gorm.DB, triggerNodeID, templateID string, version int) error {
+	return c.StampFactoryAppTemplateFor(tx, triggerNodeID, templateID, version, "")
+}
+
+// StampFactoryAppTemplateFor records template identity and the Git host.
+func (c *Canvas) StampFactoryAppTemplateFor(tx *gorm.DB, triggerNodeID, templateID string, version int, provider string) error {
 	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, c.ID)
 	if err != nil {
 		return err
 	}
 
-	metadata := FactoryAppTemplateMetadata(templateID, version)
+	metadata := FactoryAppTemplateMetadataFor(templateID, version, provider)
 	found := false
 	for i := range liveVersion.Nodes {
 		if liveVersion.Nodes[i].ID != triggerNodeID {

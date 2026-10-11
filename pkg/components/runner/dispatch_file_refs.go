@@ -30,9 +30,11 @@ type dispatchFileRewriter struct {
 	resolveErr     error
 	mu             sync.Mutex
 	files          []storedfiles.DispatchFile
+	hosted         []TaskAttachment
 }
 
 func (r *dispatchFileRewriter) Rewrite(text string) (string, error) {
+	r.recordHosted(HostedVideoAttachments(text))
 	if len(blob.FileIDsInMarkdown(text)) == 0 {
 		return text, nil
 	}
@@ -64,7 +66,29 @@ func (r *dispatchFileRewriter) Rewrite(text string) (string, error) {
 func (r *dispatchFileRewriter) Attachments() []TaskAttachment {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return TaskAttachmentsFromDispatch(r.files)
+	return append(TaskAttachmentsFromDispatch(r.files), r.hosted...)
+}
+
+func (r *dispatchFileRewriter) recordHosted(incoming []TaskAttachment) {
+	if len(incoming) == 0 {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	seen := map[string]struct{}{}
+	for _, attachment := range r.hosted {
+		seen[attachment.URL] = struct{}{}
+	}
+	for _, attachment := range incoming {
+		if attachment.URL == "" {
+			continue
+		}
+		if _, exists := seen[attachment.URL]; exists {
+			continue
+		}
+		seen[attachment.URL] = struct{}{}
+		r.hosted = append(r.hosted, attachment)
+	}
 }
 
 func mergeDispatchFiles(existing, incoming []storedfiles.DispatchFile) []storedfiles.DispatchFile {

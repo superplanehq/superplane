@@ -24,8 +24,6 @@ function toCanvasCardData(canvas: CanvasesCanvasSummary): CanvasCardData | null 
     isStarred: canvas.starred ?? false,
     starredAt: canvas.starredAt,
     createdBy: { name: createdByName },
-    nodes: canvas.nodes || [],
-    edges: canvas.edges || [],
   };
 }
 

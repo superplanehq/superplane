@@ -66,6 +66,7 @@ describe("FactorySettingsAccountProfilePage associated accounts", () => {
       "Velocity uses this GitHub account to credit your pull requests.",
     );
     expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Link Bitbucket" })).toBeInTheDocument();
     expect(screen.queryByTestId("account-redesign-sso-github")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sign in with GitHub" })).not.toBeInTheDocument();
   });

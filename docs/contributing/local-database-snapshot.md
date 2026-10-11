@@ -37,7 +37,8 @@ Restore replaces `superplane_dev` only. It does not change `superplane_test`.
 ## Limits
 
 The dump stores Postgres rows. It does not restore blob files. GitHub App
-credentials stay in `.env`.
+credentials can live in the dump (`installation_github_apps`) or in `.env`.
+Environment values win.
 
 ## Multiple local instances
 

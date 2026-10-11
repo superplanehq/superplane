@@ -121,6 +121,9 @@ func MergeFactoryPullRequest(
 		if errors.Is(err, errFactoryPullRequestNotMergeable) {
 			return nil, factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(mergeBlockedActiveRun)), "failed to merge factory pull request")
 		}
+		if errors.Is(err, errFactoryPullRequestHeadMoved) || errors.Is(err, errFactoryBitbucketMergeNotRevisionSafe) {
+			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+		}
 		if isGitHubHeadMovedError(err) {
 			_, _ = syncFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
 			return nil, factoryErrorToStatus(errFactoryPullRequestHeadMoved, "failed to merge factory pull request")

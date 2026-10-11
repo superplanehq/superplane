@@ -180,7 +180,8 @@ spec:
 
   it("installs no GitHub event apps for a Bitbucket workspace", () => {
     expect(onboardingEventAppsFor("bitbucket")).toEqual([]);
-    expect(onboardingEventAppsFor(undefined)).toEqual(["pr-closure"]);
+    expect(onboardingEventAppsFor(undefined)).toEqual(["pr-closure", "risk-score"]);
+    expect(onboardingEventAppsFor("github")).toEqual(["pr-closure", "risk-score"]);
   });
 
   it("routes issue work to backlog and branch/PR/CI work to app repositories", () => {

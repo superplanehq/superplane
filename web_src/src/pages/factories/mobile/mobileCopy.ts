@@ -15,7 +15,16 @@ export const MOBILE_BOARD_COPY = {
   closeSearch: "Close search",
   switchLine: "Switch line",
   lines: "Lines",
-  loadMore: "Load more",
+  loadingMore: "Loading more",
+  loadMoreError: "SuperPlane could not load more tasks.",
+  loadMoreRetry: "Try again",
+} as const;
+
+export const MOBILE_SETTINGS_COPY = {
+  title: "Settings",
+  backToWorkspace: "Back to workspace",
+  findPlaceholder: "Find settings",
+  noResults: "No matching settings.",
 } as const;
 
 export const MOBILE_TASK_COPY = {
@@ -29,6 +38,7 @@ export const MOBILE_TASK_COPY = {
   noActivity: "No activity yet. Start the task to run the line.",
   pullRequests: "Pull requests",
   files: "Files",
-  showSteps: "Show steps",
-  hideSteps: "Hide steps",
+  showLog: "Show log",
+  hideLog: "Hide log",
+  noRefinementSession: "This task has no refinement session, so replies are not available.",
 } as const;

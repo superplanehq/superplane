@@ -22,7 +22,8 @@ import { useRef, useState, type ReactNode } from "react";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
 
 import { hrefFromInput } from "./lib/workOrderDescriptionHref";
-import { insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
+import { insertHostedVideo, insertUploadedFiles } from "./lib/workOrderDescriptionFiles";
+import { HostedVideoLinkField } from "./HostedVideoLinkField";
 
 type HeadingLevel = 1 | 2 | 3 | 4;
 
@@ -232,6 +233,7 @@ function FormatToolbarActions({
         <LinkIcon className="size-3.5" aria-hidden />
       </FormatButton>
       {onUploadFiles ? <AttachFileButton disabled={disabled} editor={editor} onUploadFiles={onUploadFiles} /> : null}
+      <HostedVideoLinkField disabled={disabled} onAdd={(video) => insertHostedVideo(editor, video)} />
     </div>
   );
 }

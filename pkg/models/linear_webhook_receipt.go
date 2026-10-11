@@ -41,6 +41,9 @@ type LinearWebhookReceipt struct {
 	SubscriptionCount int
 	// TaskIDs lists SuperPlane tasks this webhook created. IDs are comma-separated.
 	TaskIDs string
+	// DeliveryKey identifies the Linear payload. A later retry of the same
+	// payload uses this key to skip a subscription that already accepted it.
+	DeliveryKey string
 }
 
 func (LinearWebhookReceipt) TableName() string {
@@ -65,11 +68,31 @@ func CreateLinearWebhookReceipt(tx *gorm.DB, receipt LinearWebhookReceipt) (uuid
 	receipt.TeamKey = clipWebhookField(receipt.TeamKey)
 	receipt.WorkspaceKey = clipWebhookField(receipt.WorkspaceKey)
 	receipt.Outcome = clipWebhookField(receipt.Outcome)
+	receipt.DeliveryKey = clipWebhookField(receipt.DeliveryKey)
 
 	if err := tx.Create(&receipt).Error; err != nil {
 		return uuid.Nil, err
 	}
 	return receipt.ID, nil
+}
+
+// LinearWebhookDeliveryAccepted reports whether this subscription already
+// accepted the same Linear payload.
+func LinearWebhookDeliveryAccepted(tx *gorm.DB, webhookID uuid.UUID, deliveryKey string) (bool, error) {
+	deliveryKey = strings.TrimSpace(deliveryKey)
+	if tx == nil || webhookID == uuid.Nil || deliveryKey == "" {
+		return false, nil
+	}
+
+	var count int64
+	err := tx.Model(&LinearWebhookReceipt{}).
+		Where("webhook_id = ? AND delivery_key = ? AND outcome = ?", webhookID, deliveryKey, LinearWebhookOutcomeAccepted).
+		Limit(1).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 // DeleteExpiredLinearWebhookReceipts removes receipts older than olderThan.

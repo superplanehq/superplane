@@ -56,6 +56,11 @@ type AutomationsConsoleVariantProps = {
   canEditDescription?: boolean;
   descriptionBusy?: boolean;
   onDescriptionSave?: (next: string) => void | Promise<void>;
+  owner?: SplitRunFixture["owner"];
+  assigneeIds?: string[];
+  canEditOwner?: boolean;
+  ownerBusy?: boolean;
+  onOwnerSave?: (assigneeIds: string[]) => Promise<void>;
   source?: SplitRunSource;
   files?: FilesFile[];
   /** Pull requests tracked on this task, for the summary panel. */
@@ -83,6 +88,11 @@ export function AutomationsConsoleVariant({
   canEditDescription = false,
   descriptionBusy = false,
   onDescriptionSave,
+  owner,
+  assigneeIds,
+  canEditOwner = false,
+  ownerBusy = false,
+  onOwnerSave,
   source,
   files,
   pullRequests,
@@ -102,7 +112,7 @@ export function AutomationsConsoleVariant({
   const anyLive = hasLiveAutomation(columns);
   const expandIdleCards = !anyLive && (fixture.lineStatus === "pending" || fixture.footerTone === "draft");
   const liveRun = liveRunTarget(fixture);
-  const stopLiveRun = canStopRun && onStopRun && liveRun ? () => onStopRun(liveRun) : undefined;
+  const stopLiveRun = liveRunStop(canStopRun, onStopRun, liveRun);
   const showIntake = Boolean(source) || Boolean(taskDescription?.trim()) || canEditDescription;
 
   return (
@@ -140,6 +150,12 @@ export function AutomationsConsoleVariant({
         source={source}
         actionBusy={actionBusy}
         onStopLiveRun={stopLiveRun}
+        organizationId={organizationId}
+        assigneeIds={assigneeIds}
+        owner={owner}
+        canEditOwner={canEditOwner}
+        ownerBusy={ownerBusy}
+        onOwnerSave={onOwnerSave}
       />
     </div>
   );
@@ -156,6 +172,17 @@ interface ConsoleColumn {
   id: ConsoleColumnId;
   title: string;
   automations: ConsoleAutomation[];
+}
+
+function liveRunStop(
+  canStopRun: boolean,
+  onStopRun: AutomationsConsoleVariantProps["onStopRun"],
+  liveRun: { appId: string; runId: string } | undefined,
+) {
+  if (!canStopRun || !onStopRun || !liveRun) {
+    return undefined;
+  }
+  return () => onStopRun(liveRun);
 }
 
 /**

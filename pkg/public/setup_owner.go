@@ -8,7 +8,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"gorm.io/gorm"
@@ -96,13 +95,6 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
-			return err
-		}
-		if err := models.EnableExperimentalFeatureInTransaction(
-			tx,
-			organization.ID,
-			features.FeatureNewRunners,
-		); err != nil {
 			return err
 		}
 		return models.GrantWelcomeCredit(tx, organization.ID, account.ID)

@@ -42,7 +42,7 @@ variable "cluster_name" {
 variable "cluster_version" {
   description = "Kubernetes version for the EKS cluster"
   type        = string
-  default     = "1.36"
+  default     = "1.37"
 }
 
 variable "node_count" {
@@ -120,10 +120,22 @@ variable "superplane_namespace" {
   default     = "superplane"
 }
 
-variable "superplane_image_tag" {
-  description = "SuperPlane image tag (e.g., stable, beta, v0.4)"
+variable "superplane_chart_version" {
+  description = "Published SuperPlane Helm chart version with a matching self-hosted image"
   type        = string
-  default     = "stable"
+  default     = "0.0.0-782e528cea1fd707313bcfa4a2e8f57e9148f5c5"
+}
+
+variable "superplane_image_tag" {
+  description = "Self-hosted SuperPlane image tag. Empty uses the chart's matching self-hosted image."
+  type        = string
+  default     = ""
+}
+
+variable "runner_active_log_volume_capacity" {
+  description = "Nominal Kubernetes PV/PVC capacity for runner active logs. EFS grows elastically and does not reserve this capacity."
+  type        = string
+  default     = "1Gi"
 }
 
 # -----------------------------------------------------------------------------

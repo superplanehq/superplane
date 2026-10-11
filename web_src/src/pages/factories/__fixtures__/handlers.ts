@@ -1060,7 +1060,7 @@ function listWorkOrdersFixture(
   fixture: FactoriesFixture,
   orders: FactoriesWorkOrder[],
   url: URL,
-): { orders: FactoriesWorkOrder[]; hasNextPage: boolean } {
+): { orders: FactoriesWorkOrder[]; hasNextPage: boolean; totalCount?: number } {
   const states = url.searchParams.getAll("states");
   const results = url.searchParams.getAll("results");
   const userId = url.searchParams.get("userId");
@@ -1108,10 +1108,11 @@ function listWorkOrdersFixture(
     }
     return (right.id ?? "").localeCompare(left.id ?? "");
   });
+  const totalCount = filtered.length;
   if (beforeId) {
     const cursor = filtered.find((order) => order.id === beforeId);
     if (!cursor) {
-      return { orders: [], hasNextPage: false };
+      return { orders: [], hasNextPage: false, totalCount };
     }
     const cursorTime = Date.parse(cursor.updatedAt ?? cursor.createdAt ?? "") || 0;
     filtered = filtered.filter((order) => {
@@ -1125,6 +1126,7 @@ function listWorkOrdersFixture(
   return {
     orders: filtered.slice(0, limit).map((order) => orderWithListChecks(fixture, order)),
     hasNextPage: filtered.length > limit,
+    totalCount,
   };
 }
 
@@ -1497,6 +1499,7 @@ function githubOnboardingRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   const onboarding = (): MeDescribeVcsProviderOnboardingResponse =>
     fixture.githubOnboarding ?? {
       providerConfigured: true,
+      accountConnectionRequired: true,
       repositories: [],
       pendingRequests: [],
       synchronizing: false,

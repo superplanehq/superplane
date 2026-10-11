@@ -30,6 +30,12 @@ func UseHostedOAuth() bool {
 	return config.LoadLinearHostedOAuthConfig().Enabled()
 }
 
+// HostedWebhookSecret is the signing secret of SuperPlane's Linear OAuth application.
+// An empty value means triggers still create webhooks through the Linear API.
+func HostedWebhookSecret() string {
+	return strings.TrimSpace(config.LoadLinearHostedOAuthConfig().WebhookSecret)
+}
+
 // UseHostedInstall is true when Connect should authorize SuperPlane's Linear
 // OAuth app. The manual Client ID and Client Secret fields stay available.
 func UseHostedInstall(integrationName string) bool {

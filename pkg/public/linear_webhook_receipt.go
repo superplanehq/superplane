@@ -42,6 +42,7 @@ func (s *Server) openLinearWebhookReceipt(ctx context.Context, webhook *models.W
 		TeamKey:         summary.TeamKey,
 		WorkspaceKey:    summary.WorkspaceKey,
 		Outcome:         models.LinearWebhookOutcomePending,
+		DeliveryKey:     linear.DeliveryKey(body),
 	})
 	if err != nil {
 		logging.ForIntegration(*integration).WithError(err).Error("failed to store Linear webhook receipt")

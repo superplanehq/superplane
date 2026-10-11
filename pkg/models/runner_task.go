@@ -286,27 +286,27 @@ func (t *RunnerTask) Complete(
 	errorMessage string,
 	canceled bool,
 	now time.Time,
-) error {
+) (bool, error) {
 	var current RunnerTask
 	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("id = ? AND runner_id = ?", t.ID, runner.ID).
 		First(&current).
 		Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrRunnerTaskNotCompletable
+			return false, ErrRunnerTaskNotCompletable
 		}
-		return err
+		return false, err
 	}
 	*t = current
 
 	if t.IsTerminal() {
 		if t.CompletionHash != nil && *t.CompletionHash == completionHash {
-			return nil
+			return false, nil
 		}
-		return ErrRunnerTaskCompletionConflict
+		return false, ErrRunnerTaskCompletionConflict
 	}
 	if t.State != RunnerTaskStateRunning {
-		return ErrRunnerTaskNotCompletable
+		return false, ErrRunnerTaskNotCompletable
 	}
 
 	state := RunnerTaskStateSucceeded
@@ -330,10 +330,10 @@ func (t *RunnerTask) Complete(
 		"updated_at":      now,
 	})
 	if taskResult.Error != nil {
-		return taskResult.Error
+		return false, taskResult.Error
 	}
 	if err := t.markLogsArchivable(tx, now); err != nil {
-		return err
+		return false, err
 	}
 
 	runnerUpdates := map[string]any{
@@ -357,10 +357,10 @@ func (t *RunnerTask) Complete(
 		Where("state = ?", RunnerStateBusy).
 		Updates(runnerUpdates)
 	if runnerResult.Error != nil {
-		return runnerResult.Error
+		return false, runnerResult.Error
 	}
 	if runnerResult.RowsAffected != 1 {
-		return ErrRunnerTaskNotCompletable
+		return false, ErrRunnerTaskNotCompletable
 	}
 	t.State = state
 	t.Result = result
@@ -370,7 +370,7 @@ func (t *RunnerTask) Complete(
 	t.FinishedAt = &now
 	t.UpdatedAt = now
 	runner.UpdatedAt = now
-	return nil
+	return true, nil
 }
 
 /*
