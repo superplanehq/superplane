@@ -7,6 +7,7 @@ import type {
   FactoriesFactoryPullRequestActivity,
   FactoriesFactoryPullRequestRevision,
 } from "@/api-client";
+import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { isActiveCanvasRun } from "../lib/workOrderPullRequest";
@@ -34,6 +35,12 @@ export interface PRFeedbackSource {
   defaultName: string;
 }
 
+export function prFeedbackVCSIcon(vcsProvider?: string): { iconSrc: string; iconAlt: string } {
+  return vcsProvider === "bitbucket"
+    ? { iconSrc: bitbucketIcon, iconAlt: "Bitbucket" }
+    : { iconSrc: githubIcon, iconAlt: "GitHub" };
+}
+
 export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
   {
     id: "discussion",
@@ -55,16 +62,24 @@ export const PR_FEEDBACK_SOURCES: PRFeedbackSource[] = [
   },
 ];
 
-export function availablePRFeedbackSources(): PRFeedbackSource[] {
-  return PR_FEEDBACK_SOURCES;
+export function availablePRFeedbackSources(vcsProvider?: string): PRFeedbackSource[] {
+  if (vcsProvider !== "bitbucket") {
+    return PR_FEEDBACK_SOURCES;
+  }
+  const icon = prFeedbackVCSIcon(vcsProvider);
+  return PR_FEEDBACK_SOURCES.map((source) => ({ ...source, ...icon }));
 }
 
 export function isPRFeedbackSetupAvailable(sourceId: PRFeedbackSourceId): boolean {
   return availablePRFeedbackSources().some((source) => source.id === sourceId);
 }
 
-export function prFeedbackSourceById(id: string | undefined): PRFeedbackSource | undefined {
-  return PR_FEEDBACK_SOURCES.find((source) => source.id === id);
+export function prFeedbackSourceById(id: string | undefined, vcsProvider?: string): PRFeedbackSource | undefined {
+  const source = PR_FEEDBACK_SOURCES.find((entry) => entry.id === id);
+  if (!source || vcsProvider !== "bitbucket") {
+    return source;
+  }
+  return { ...source, ...prFeedbackVCSIcon(vcsProvider) };
 }
 
 export function prFeedbackSourceId(source?: FactoriesFactoryPrFeedbackHandlerSource): PRFeedbackSourceId {
@@ -258,9 +273,9 @@ export function isActivePRFeedbackActivity(activity: FactoriesFactoryPullRequest
   return activity?.state === "active" && isActiveCanvasRun(activity.run);
 }
 
-const WAITING_ON_CHECKS_DESCRIPTION = /^Waiting for checks\b/i;
-const CHECKS_PASSED_DESCRIPTION = /^Checks passed\b/i;
-const FIXING_CHECKS_DESCRIPTION = /^Fixing failed checks\b/i;
+const WAITING_ON_CHECKS_DESCRIPTION = /^Waiting for (checks|builds)\b/i;
+const CHECKS_PASSED_DESCRIPTION = /^(Checks|Builds) passed\b/i;
+const FIXING_CHECKS_DESCRIPTION = /^Fixing failed (checks|builds)\b/i;
 
 /**
  * Built-in checks wait. Custom canvases also use concurrent access when they

@@ -52,7 +52,7 @@ function renderBar(initialPath: string) {
                 path="/org-1/workspaces/:factoryKey/*"
                 element={
                   <>
-                    <MobileBottomBar canCreateWorkOrder={false} />
+                    <MobileBottomBar />
                     <Outlet />
                   </>
                 }
@@ -105,12 +105,16 @@ describe("MobileBottomBar", () => {
     );
   });
 
-  it("opens the settings index and stays active on every settings page", () => {
+  it("opens More and stays active on settings pages", () => {
     const settingsIndex = factorySettingsPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT);
     renderBar(`${settingsIndex}/organization/members`);
 
-    const settingsTab = screen.getByTestId("mobile-tab-settings");
-    expect(settingsTab).toHaveAttribute("href", settingsIndex);
+    const settingsTab = screen.getByRole("link", { name: "More" });
+    expect(settingsTab).toHaveAttribute(
+      "href",
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/more?lineId=${REFUND_LINE_PLAN_ID}`,
+    );
+    expect(screen.queryByTestId("factories-sidebar-user-menu-trigger")).not.toBeInTheDocument();
     expect(settingsTab).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("mobile-tab-velocity")).not.toHaveAttribute("aria-current");
   });
