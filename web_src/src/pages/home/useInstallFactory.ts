@@ -5,6 +5,7 @@ import { writeCanvasAgentSidebarOpen } from "@/components/CanvasToolSidebar/useC
 import { writeCanvasRunsSidebarOpen } from "@/components/CanvasRunsSidebar/useCanvasRunsSidebarState";
 import { usePermissions } from "@/contexts/usePermissions";
 import { canvasKeys, useCreateCanvas } from "@/hooks/useCanvasData";
+import { factoryAppsKey } from "@/hooks/useFactoryData";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { appPath } from "@/lib/appPaths";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -67,6 +68,7 @@ async function prepareFactoryCanvas(
 
 async function finishFactoryInstall(args: {
   organizationId: string;
+  workspaceFactoryId?: string;
   canvasId: string;
   definition: FactoryDefinition;
   startingTaskPrompt: string;
@@ -75,6 +77,12 @@ async function finishFactoryInstall(args: {
   queryClient: ReturnType<typeof useQueryClient>;
   navigate: (path: string) => void;
 }) {
+  if (args.workspaceFactoryId) {
+    await args.queryClient.invalidateQueries({
+      queryKey: factoryAppsKey(args.organizationId, args.workspaceFactoryId),
+    });
+  }
+
   const shouldTriggerRun = args.startInitialRun && args.startingTaskPrompt.length > 0;
   if (shouldTriggerRun) {
     await invokeFactoryRun(args.organizationId, args.canvasId, args.definition, args.startingTaskPrompt);
@@ -160,6 +168,7 @@ export function useInstallFactory({ organizationId: organizationIdOverride }: Us
 
         await finishFactoryInstall({
           organizationId,
+          workspaceFactoryId: input.workspaceFactoryId,
           canvasId,
           definition,
           startingTaskPrompt: input.startingTaskPrompt.trim(),
