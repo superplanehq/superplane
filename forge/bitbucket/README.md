@@ -1,5 +1,9 @@
 # Bitbucket Forge synchronization
 
+For app registration, authentication, tunnel configuration, and installation, follow
+[Bitbucket Forge local development](../../docs/contributing/connecting-to-3rdparty-services-from-development.md#bitbucket-forge-local-development).
+Export your test app ID and remote URL before running Forge commands. The manifest defaults target the Cloud app.
+
 ## Pull request events
 
 Forge sends created, updated, merged, and declined pull request events to
@@ -53,7 +57,7 @@ cannot restore an installation after uninstall.
 
 ## Activate the schedule
 
-1. Confirm the manifest's remote URL points to the intended SuperPlane instance.
+1. Export your app ID and remote URL as described in the local development guide.
 2. Run these commands from `forge/bitbucket/`:
 
    ```sh
