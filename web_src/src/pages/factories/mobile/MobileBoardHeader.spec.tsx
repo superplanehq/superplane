@@ -76,8 +76,9 @@ describe("MobileBoardHeader", () => {
   it("searches workspace choices and opens the new workspace board", async () => {
     const user = userEvent.setup();
     renderHeader();
-    expect(screen.getByRole("heading", { name: "Board" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Filter" })).toHaveTextContent("Filter");
+    expect(screen.getByTestId("mobile-board-header")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Board" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter" })).not.toHaveTextContent("Filter");
     await user.click(screen.getByRole("button", { name: /Switch workspace,/ }));
     const sheet = screen.getByRole("dialog", { name: "Switch workspace" });
     expect(within(sheet).getByRole("button", { name: /Current workspace/ })).toHaveAttribute("aria-current", "true");

@@ -32,6 +32,7 @@ interface FilterMenuProps {
   showPullRequestMerge?: boolean;
   onOpenStatusDialog?: () => void;
   triggerLabel?: string;
+  triggerClassName?: string;
 }
 
 /** Filter trigger plus one submenu per dimension. Selections are additive. */
@@ -43,6 +44,7 @@ export function FilterMenu({
   showPullRequestMerge = false,
   onOpenStatusDialog,
   triggerLabel,
+  triggerClassName,
 }: FilterMenuProps) {
   const visibleFilters = visibleWorkOrderFilters(state.filters, showPullRequestMerge);
   const filterCount = countWorkOrderFilters(visibleFilters) - (lineOptions ? 0 : visibleFilters.lineIds.length);
@@ -54,7 +56,11 @@ export function FilterMenu({
           variant={triggerLabel ? "outline" : "ghost"}
           size={triggerLabel ? "default" : "icon"}
           aria-label="Filter"
-          className={cn("relative shrink-0 text-muted-foreground", triggerLabel ? "h-11 gap-2 px-3" : "size-8")}
+          className={cn(
+            "relative shrink-0 text-muted-foreground",
+            triggerLabel ? "h-11 gap-2 px-3" : "size-8",
+            triggerClassName,
+          )}
           data-testid="work-orders-filter-trigger"
         >
           <Funnel className={triggerLabel ? "size-4" : "size-3.5"} aria-hidden />

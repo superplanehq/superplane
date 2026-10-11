@@ -52,10 +52,18 @@ export function MobileBoardHeader({
   const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
   return (
     <header className="shrink-0 border-b border-border bg-background px-4 pt-[env(safe-area-inset-top)]">
-      <div className="flex h-16 items-center justify-between gap-3" data-testid="mobile-board-header">
+      <div className="flex h-16 items-center justify-between gap-1" data-testid="mobile-board-header">
         <div className="min-w-0 flex-1">
           <MobileWorkspaceSwitcher />
         </div>
+        <FilterMenu
+          state={state}
+          sourceOptions={sourceOptions}
+          assigneeOptions={assigneeOptions}
+          showPullRequestMerge={showPullRequestMerge}
+          onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
+          triggerClassName="size-11 [&_svg]:size-5"
+        />
         <Button
           type="button"
           variant="ghost"
@@ -70,17 +78,6 @@ export function MobileBoardHeader({
         </Button>
       </div>
       {state.searchOpen ? <MobileSearchRow state={state} searchRef={searchRef} /> : null}
-      <div className="flex min-h-16 items-center gap-2 pb-2">
-        <h1 className="min-w-0 flex-1 text-2xl font-semibold tracking-tight">Board</h1>
-        <FilterMenu
-          state={state}
-          sourceOptions={sourceOptions}
-          assigneeOptions={assigneeOptions}
-          showPullRequestMerge={showPullRequestMerge}
-          onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
-          triggerLabel="Filter"
-        />
-      </div>
       {lines.length > 1 ? (
         <div className="pb-2">
           <MobileLineSwitcher lines={lines} lineId={lineId} onSelect={onSelectLine} />
