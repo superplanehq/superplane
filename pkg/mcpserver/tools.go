@@ -1,15 +1,19 @@
 package mcpserver
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/grpc/codes"
 )
@@ -110,6 +114,27 @@ func Tools() []Tool {
 				"required": []string{"title", "plan", "column"},
 			},
 		},
+		{
+			Name:        "assign_task",
+			Description: "Set or clear the owner of an existing task. assignee is an email, a GitHub login, or a user id. Set unassign to true to clear every owner. Set one of those values, not both.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"task":     map[string]any{"type": "string", "description": "Task id, number, or key."},
+					"assignee": map[string]any{"type": "string", "description": "Workspace member email, GitHub login, or user id."},
+					"unassign": map[string]any{"type": "boolean", "description": "When true, clear every owner."},
+				},
+				"required": []string{"task"},
+			},
+		},
+		{
+			Name:        "list_members",
+			Description: "List human members of this organization. Each member has an id, a name, an email, and a GitHub login. Use this list to choose an assignee.",
+			InputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
 	}
 }
 
@@ -132,6 +157,10 @@ func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name stri
 		return rt.createTask(ctx, claims, args)
 	case "hand_off_task":
 		return rt.handOffTask(ctx, claims, args)
+	case "assign_task":
+		return rt.assignTask(ctx, claims, args)
+	case "list_members":
+		return rt.listMembers(ctx, claims, args)
 	default:
 		return ToolResult{}, ToolError("Unknown tool: " + name)
 	}
@@ -160,18 +189,20 @@ func (rt *Runtime) listTasks(ctx context.Context, claims *AccessClaims, args map
 		return ToolResult{}, actionError(err)
 	}
 	type taskRow struct {
-		ID    string `json:"id"`
-		Key   string `json:"key"`
-		Title string `json:"title"`
-		State string `json:"state"`
+		ID        string        `json:"id"`
+		Key       string        `json:"key"`
+		Title     string        `json:"title"`
+		State     string        `json:"state"`
+		Assignees []assigneeRef `json:"assignees"`
 	}
 	rows := make([]taskRow, 0, len(resp.GetOrders()))
 	for _, order := range resp.GetOrders() {
 		rows = append(rows, taskRow{
-			ID:    order.GetId(),
-			Key:   order.GetKey(),
-			Title: order.GetTitle(),
-			State: protoStateName(order.GetState()),
+			ID:        order.GetId(),
+			Key:       order.GetKey(),
+			Title:     order.GetTitle(),
+			State:     protoStateName(order.GetState()),
+			Assignees: assigneeRefs(order.GetAssignees()),
 		})
 	}
 	payload := map[string]any{"tasks": rows, "has_next_page": resp.GetHasNextPage()}
@@ -203,6 +234,7 @@ func (rt *Runtime) getTask(ctx context.Context, claims *AccessClaims, args map[s
 		"title":       order.GetTitle(),
 		"description": order.GetDescription(),
 		"state":       protoStateName(order.GetState()),
+		"assignees":   assigneeRefs(order.GetAssignees()),
 	})), nil
 }
 
@@ -386,6 +418,212 @@ func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args m
 		payload["pull_request_url"] = result.PullRequestURL
 	}
 	return TextResult(mustJSON(payload)), nil
+}
+
+func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
+	if err := rt.authorize(ctx, claims, "work_orders:update"); err != nil {
+		return ToolResult{}, err
+	}
+	task, err := stringArg(args, "task")
+	if err != nil {
+		return ToolResult{}, err
+	}
+	assignee, unassign, err := assignmentArgs(args)
+	if err != nil {
+		return ToolResult{}, err
+	}
+	orderID, err := resolveTaskID(ctx, claims, task)
+	if err != nil {
+		return ToolResult{}, err
+	}
+
+	assigneeIDs := []string{}
+	if !unassign {
+		if err := rt.authorizeMembersRead(ctx, claims); err != nil {
+			return ToolResult{}, err
+		}
+		member, err := rt.findAssignee(ctx, claims, assignee)
+		if err != nil {
+			return ToolResult{}, err
+		}
+		assigneeIDs = []string{member.UserID.String()}
+	}
+
+	resp, err := factories.UpdateWorkOrderAssignees(toolContext(ctx, claims), claims.OrgID.String(), &pb.UpdateWorkOrderAssigneesRequest{
+		FactoryId:   claims.FactoryID.String(),
+		OrderId:     orderID,
+		AssigneeIds: assigneeIDs,
+	})
+	if err != nil {
+		return ToolResult{}, actionError(err)
+	}
+	order := resp.GetOrder()
+	return TextResult(mustJSON(map[string]any{
+		"id":        order.GetId(),
+		"key":       order.GetKey(),
+		"assignees": assigneeRefs(order.GetAssignees()),
+	})), nil
+}
+
+func (rt *Runtime) listMembers(ctx context.Context, claims *AccessClaims, _ map[string]any) (ToolResult, error) {
+	if err := rt.authorize(ctx, claims, "work_orders:read"); err != nil {
+		return ToolResult{}, err
+	}
+	if err := rt.authorizeMembersRead(ctx, claims); err != nil {
+		return ToolResult{}, err
+	}
+
+	members, err := models.ListFactoryVelocityMembers(database.DB(ctx), claims.OrgID)
+	if err != nil {
+		return ToolResult{}, ToolError("The request failed.")
+	}
+	slices.SortFunc(members, func(left, right models.FactoryVelocityMember) int {
+		if name := cmp.Compare(left.Name, right.Name); name != 0 {
+			return name
+		}
+		return cmp.Compare(left.UserID.String(), right.UserID.String())
+	})
+
+	rows := make([]memberRow, 0, len(members))
+	for _, member := range members {
+		rows = append(rows, memberRow{
+			ID:          member.UserID.String(),
+			Name:        member.Name,
+			Email:       member.Email,
+			GitHubLogin: member.GitHubLogin,
+		})
+	}
+	return TextResult(mustJSON(map[string]any{"members": rows})), nil
+}
+
+func (rt *Runtime) findAssignee(ctx context.Context, claims *AccessClaims, assignee string) (models.FactoryVelocityMember, error) {
+	members, err := models.ListFactoryVelocityMembers(database.DB(ctx), claims.OrgID)
+	if err != nil {
+		return models.FactoryVelocityMember{}, ToolError("The request failed.")
+	}
+	return resolveAssigneeMember(members, assignee)
+}
+
+type assigneeRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type memberRow struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	GitHubLogin string `json:"github_login"`
+}
+
+func assigneeRefs(users []*pb.UserRef) []assigneeRef {
+	refs := make([]assigneeRef, 0, len(users))
+	for _, user := range users {
+		if user == nil {
+			continue
+		}
+		refs = append(refs, assigneeRef{ID: user.GetId(), Name: user.GetName()})
+	}
+	return refs
+}
+
+func assignmentArgs(args map[string]any) (string, bool, error) {
+	assignee, err := optionalStringArg(args, "assignee")
+	if err != nil {
+		return "", false, err
+	}
+	unassign, err := optionalBoolArg(args, "unassign")
+	if err != nil {
+		return "", false, err
+	}
+	if assignee != "" && unassign {
+		return "", false, ToolError("Do not set assignee and unassign.")
+	}
+	if assignee == "" && !unassign {
+		return "", false, ToolError("Set assignee or set unassign to true.")
+	}
+	return assignee, unassign, nil
+}
+
+func optionalStringArg(args map[string]any, name string) (string, error) {
+	raw, ok := args[name]
+	if !ok || raw == nil {
+		return "", nil
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return "", ToolError(name + " must be text.")
+	}
+	return strings.TrimSpace(value), nil
+}
+
+func optionalBoolArg(args map[string]any, name string) (bool, error) {
+	raw, ok := args[name]
+	if !ok || raw == nil {
+		return false, nil
+	}
+	value, ok := raw.(bool)
+	if !ok {
+		return false, ToolError(name + " must be true or false.")
+	}
+	return value, nil
+}
+
+func resolveAssigneeMember(members []models.FactoryVelocityMember, assignee string) (models.FactoryVelocityMember, error) {
+	query := strings.TrimSpace(assignee)
+	if id, err := uuid.Parse(query); err == nil {
+		for _, member := range members {
+			if member.UserID == id {
+				return member, nil
+			}
+		}
+	}
+
+	emailMatches := membersMatching(members, query, func(member models.FactoryVelocityMember) string {
+		return member.Email
+	})
+	if len(emailMatches) > 1 {
+		return models.FactoryVelocityMember{}, ambiguousMemberError()
+	}
+	if len(emailMatches) == 1 {
+		return emailMatches[0], nil
+	}
+
+	loginMatches := membersMatching(members, query, func(member models.FactoryVelocityMember) string {
+		return member.GitHubLogin
+	})
+	if len(loginMatches) > 1 {
+		return models.FactoryVelocityMember{}, ambiguousMemberError()
+	}
+	if len(loginMatches) == 1 {
+		return loginMatches[0], nil
+	}
+	return models.FactoryVelocityMember{}, ToolError("The member was not found.")
+}
+
+func membersMatching(members []models.FactoryVelocityMember, query string, field func(models.FactoryVelocityMember) string) []models.FactoryVelocityMember {
+	folded := strings.ToLower(query)
+	matches := make([]models.FactoryVelocityMember, 0)
+	for _, member := range members {
+		value := strings.ToLower(strings.TrimSpace(field(member)))
+		if value == "" || value != folded {
+			continue
+		}
+		matches = append(matches, member)
+	}
+	return matches
+}
+
+func ambiguousMemberError() error {
+	return ToolError("More than one member matches. Use a user id.")
+}
+
+func (rt *Runtime) authorizeMembersRead(ctx context.Context, claims *AccessClaims) error {
+	allowed, err := rt.Auth.CheckOrganizationPermission(ctx, claims.UserID.String(), claims.OrgID.String(), "members", "read")
+	if err != nil || !allowed {
+		return ToolError("Not found")
+	}
+	return nil
 }
 
 func (rt *Runtime) authorize(ctx context.Context, claims *AccessClaims, scope string) error {
