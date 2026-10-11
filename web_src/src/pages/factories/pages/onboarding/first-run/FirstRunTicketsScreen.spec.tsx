@@ -96,7 +96,7 @@ describe("FirstRunTicketsScreen", () => {
     expect(onConnectJira).toHaveBeenCalledTimes(1);
   });
 
-  it("lets the user select Linear and keeps scan stopped until a project is chosen", async () => {
+  it("lets the user select Linear and starts scan on connection; projects are an optional filter", async () => {
     const user = userEvent.setup();
     const onSelectTicketSource = vi.fn();
     const onConnectLinear = vi.fn();
@@ -136,7 +136,7 @@ describe("FirstRunTicketsScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
     expect(screen.getByText(FIRST_RUN_COPY.tickets.linearProjectHeading)).toBeInTheDocument();
     await user.click(screen.getByTestId("linear-project-project-1"));
     expect(onToggleLinearProject).toHaveBeenCalledWith("project-1");
@@ -160,7 +160,7 @@ describe("FirstRunTicketsScreen", () => {
     expect(onAnalyzeTickets).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps scan stopped while Linear projects are still loading", () => {
+  it("keeps scan running while Linear projects are still loading", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="linear"
@@ -173,10 +173,10 @@ describe("FirstRunTicketsScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
   });
 
-  it("keeps scan stopped when Linear projects fail to load", () => {
+  it("keeps scan running when Linear projects fail to load", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="linear"
@@ -189,7 +189,7 @@ describe("FirstRunTicketsScreen", () => {
       />,
     );
 
-    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled();
   });
 
   it("keeps scan stopped until Jira is connected and a project is chosen", async () => {

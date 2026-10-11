@@ -33,9 +33,9 @@ describe("firstRunTicketSource", () => {
     expect(canAnalyzeTicketSource({ ticketSource: "jira", jiraConnected: true, jiraProjectId: "PAY" })).toBe(true);
   });
 
-  it("allows analysis for Linear only after a connection and a project", () => {
+  it("allows analysis for Linear after a connection; projects are an optional filter", () => {
     expect(canAnalyzeTicketSource({ ticketSource: "linear" })).toBe(false);
-    expect(canAnalyzeTicketSource({ ticketSource: "linear", linearConnected: true })).toBe(false);
+    expect(canAnalyzeTicketSource({ ticketSource: "linear", linearConnected: true })).toBe(true);
     expect(
       canAnalyzeTicketSource({ ticketSource: "linear", linearConnected: true, linearProjectIds: ["project-1"] }),
     ).toBe(true);

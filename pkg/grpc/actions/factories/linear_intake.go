@@ -13,6 +13,7 @@ func defaultLinearIntakeSettings() intakeSettings {
 	settings := defaultIntakeSettings()
 	settings.LinearProjectIDs = []string{}
 	settings.LinearLabels = []string{}
+	settings.LinearMoveOnComplete = true
 	return settings
 }
 

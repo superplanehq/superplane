@@ -58,14 +58,24 @@ func issueEvent(action string, labels []map[string]any) map[string]any {
 func Test__OnIssue__Setup(t *testing.T) {
 	trigger := &OnIssue{}
 
-	t.Run("missing team -> error", func(t *testing.T) {
+	t.Run("missing team and projects listens to the whole workspace", func(t *testing.T) {
+		integration := integrationWithTeam()
+		metadataContext := &contexts.MetadataContext{}
+
 		err := trigger.Setup(core.TriggerContext{
-			Integration:   integrationWithTeam(),
-			Metadata:      &contexts.MetadataContext{},
+			Integration:   integration,
+			Metadata:      metadataContext,
 			Configuration: map[string]any{"actions": []string{"create"}},
 		})
 
-		require.ErrorContains(t, err, "team is required")
+		require.NoError(t, err)
+
+		require.Len(t, integration.WebhookRequests, 1)
+		webhookConfig, ok := integration.WebhookRequests[0].(WebhookConfiguration)
+		require.True(t, ok)
+		assert.Empty(t, webhookConfig.TeamID)
+		assert.Empty(t, webhookConfig.TeamIDs)
+		assert.Equal(t, IssueResourceType, webhookConfig.ResourceType)
 	})
 
 	t.Run("unknown team -> error", func(t *testing.T) {

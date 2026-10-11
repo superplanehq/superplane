@@ -24,7 +24,6 @@ import {
   type IntakeSettingsTab,
 } from "./intakeSourceSettingsModel";
 import { JIRA_COMPLETION_COLUMN_COPY } from "./jiraCompletionColumnCopy";
-import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
@@ -477,7 +476,7 @@ describe("IntakeSourceSettingsPopup", () => {
     );
   });
 
-  it("does not save a Linear intake with no project", async () => {
+  it("saves a Linear intake with no project filter", async () => {
     const onSave = vi.fn();
     const user = userEvent.setup();
     renderPopup({
@@ -486,11 +485,18 @@ describe("IntakeSourceSettingsPopup", () => {
       onSave,
     });
 
-    expect(screen.getByText(LINEAR_INTAKE_SETUP_COPY.projectsRequired)).toBeInTheDocument();
     const save = screen.getByTestId("intake-source-settings-save");
-    expect(save).toBeDisabled();
+    expect(save).toBeEnabled();
+    expect(screen.getByTestId("linear-completion-state")).toBeInTheDocument();
+    expect(screen.getByTestId("linear-move-on-complete")).toBeChecked();
     await user.click(save);
-    expect(onSave).not.toHaveBeenCalled();
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        linearProjectIds: [],
+        linearMoveOnComplete: true,
+        linearCompletionState: "",
+      }),
+    );
   });
 
   it("does not save a Sentry intake with no project", async () => {

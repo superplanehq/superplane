@@ -72,12 +72,9 @@ function ticketScanAllowed(args: {
   linearChoiceBlock: FirstRunFlaggedChoiceBlock | null;
   linearConnected: boolean;
   linearProjectIds: string[];
-  linearProjectsLoading: boolean;
-  linearProjectsError: boolean;
 }): boolean {
   const linearSelectionBlocked =
     Boolean(args.linearChoiceBlock) || (args.ticketSource === "linear" && !args.linearAvailable);
-  if (args.ticketSource === "linear" && (args.linearProjectsLoading || args.linearProjectsError)) return false;
   return (
     !linearSelectionBlocked &&
     canAnalyzeTicketSource({
@@ -144,8 +141,6 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
     linearChoiceBlock,
     linearConnected,
     linearProjectIds,
-    linearProjectsLoading,
-    linearProjectsError,
   });
   const continueButton = ticketContinueButton({ canAnalyze, continuePending, saving, savingLabel });
 

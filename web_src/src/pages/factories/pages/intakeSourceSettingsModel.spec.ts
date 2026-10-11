@@ -103,6 +103,27 @@ describe("intakeSourceSettingsModel", () => {
     });
   });
 
+  it("round-trips the Linear completion state through the API shape", () => {
+    const settings = intakeSettingsFromApi("Linear issues", {
+      linearMoveOnComplete: false,
+      linearCompletionState: "  In Review ",
+    });
+
+    expect(settings.linearMoveOnComplete).toBe(false);
+    expect(settings.linearCompletionState).toBe("In Review");
+    expect(intakeSettingsToApi(settings)).toMatchObject({
+      linearMoveOnComplete: false,
+      linearCompletionState: "",
+    });
+  });
+
+  it("defaults the Linear completion move on when the API omits it", () => {
+    const settings = intakeSettingsFromApi("Linear issues", {});
+
+    expect(settings.linearMoveOnComplete).toBe(true);
+    expect(settings.linearCompletionState).toBe("");
+  });
+
   it("keeps the new and re-opened toggles apart", () => {
     const settings = intakeSettingsFromApi("GitHub issues", {
       newIssues: true,

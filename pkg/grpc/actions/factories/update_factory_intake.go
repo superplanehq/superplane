@@ -273,9 +273,6 @@ func applyIntakeSettingsToGraph(
 ) ([]models.Node, []models.Edge, error) {
 	current := intakeSettingsFromGraph(source, graph, spec)
 	updated := parseIntakeSettings(current, settings)
-	if source == models.FactoryIntakeSourceLinearIssues && len(updated.LinearProjectIDs) == 0 {
-		return nil, nil, invalidArgument("at least one Linear project is required")
-	}
 	if source == models.FactoryIntakeSourceSentryExceptions && len(updated.SentryProjectIDs) == 0 {
 		return nil, nil, invalidArgument("at least one Sentry project is required")
 	}
@@ -324,6 +321,7 @@ func applyIntakeSettingsToGraph(
 				configuration["labels"] = linearLabelPredicates(updated.LinearLabels)
 				configuration["actions"] = []any{"create", "update"}
 				nodes[i].Configuration = configuration
+				nodes[i].Metadata = mergeLinearCompletionMetadata(nodes[i].Metadata, updated)
 			default:
 				continue
 			}
