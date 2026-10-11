@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -26,6 +27,8 @@ func TestAccountBlockAndUnblock(t *testing.T) {
 
 	personalToken := NewUserAPIToken(human.ID, "CI token", "personal-token-hash")
 	require.NoError(t, CreateUserAPIToken(database.Conn(), personalToken))
+	mcpToken := NewMCPAPIToken(human.ID, org.ID, uuid.New(), "Build server", "http://localhost:8000/mcp", "mcp-token-hash", nil)
+	require.NoError(t, CreateMCPAPIToken(database.Conn(), mcpToken))
 
 	description := "org key"
 	apiKey, err := CreateAPIKey(database.Conn(), org.ID, "org-key", &description, human.ID, nil, nil)
@@ -54,6 +57,8 @@ func TestAccountBlockAndUnblock(t *testing.T) {
 	remainingTokens, err := ListUserAPITokens(database.Conn(), human.ID)
 	require.NoError(t, err)
 	assert.Empty(t, remainingTokens, "personal API tokens should be revoked when the account is blocked")
+	_, err = FindMCPAPITokenByHash(database.Conn(), "mcp-token-hash")
+	assert.ErrorIs(t, err, ErrMCPAPITokenNotFound)
 
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
 		return blocked.Unblock(tx)

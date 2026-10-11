@@ -185,6 +185,9 @@ func (a *Account) SoftDelete(tx *gorm.DB, now time.Time) error {
 	if err := DeleteUserAPITokensForAccount(tx, a.ID); err != nil {
 		return err
 	}
+	if err := DeleteMCPAPITokensForAccount(tx, a.ID); err != nil {
+		return err
+	}
 
 	return tx.Model(a).Updates(map[string]any{
 		"email":      tombstoneEmail(a.ID, now),

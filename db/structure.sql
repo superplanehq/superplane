@@ -1089,6 +1089,24 @@ CREATE TABLE public.linear_webhook_receipts (
 
 
 --
+-- Name: mcp_api_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.mcp_api_tokens (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name text NOT NULL,
+    user_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    resource text NOT NULL,
+    scopes jsonb DEFAULT '[]'::jsonb NOT NULL,
+    token_hash text NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    last_used_at timestamp without time zone
+);
+
+
+--
 -- Name: mcp_oauth_clients; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2573,6 +2591,14 @@ ALTER TABLE ONLY public.installation_metadata
 
 ALTER TABLE ONLY public.linear_webhook_receipts
     ADD CONSTRAINT linear_webhook_receipts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: mcp_api_tokens mcp_api_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.mcp_api_tokens
+    ADD CONSTRAINT mcp_api_tokens_pkey PRIMARY KEY (id);
 
 
 --
@@ -4161,6 +4187,20 @@ CREATE INDEX idx_workspace_usage_events_work_order ON public.workspace_usage_eve
 --
 
 CREATE INDEX index_accounts_on_deleted_at ON public.accounts USING btree (deleted_at);
+
+
+--
+-- Name: index_mcp_api_tokens_on_organization_id_and_factory_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX index_mcp_api_tokens_on_organization_id_and_factory_id ON public.mcp_api_tokens USING btree (organization_id, factory_id);
+
+
+--
+-- Name: index_mcp_api_tokens_on_token_hash; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX index_mcp_api_tokens_on_token_hash ON public.mcp_api_tokens USING btree (token_hash);
 
 
 --

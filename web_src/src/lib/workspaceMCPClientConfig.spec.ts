@@ -42,24 +42,26 @@ describe("workspaceMCPClientConfig", () => {
     );
   });
 
-  it("builds an OpenCode config object and strips a trailing slash", () => {
-    const openCodeConfig = (url: string) =>
-      JSON.stringify(
-        {
-          mcp: {
-            superplane: {
-              type: "remote",
-              url,
-              enabled: true,
-            },
-          },
-        },
-        null,
-        2,
-      );
+  it("builds an OpenCode config under mcp and strips a trailing slash", () => {
+    const openCodeServer = (url: string) => ({
+      type: "remote",
+      url,
+      oauth: false,
+      headers: {
+        Authorization: "Bearer {file:/path/to/superplane.key}",
+      },
+    });
 
-    expect(workspaceMCPOpenCodeConfig(ORIGIN)).toBe(openCodeConfig(URL));
-    expect(workspaceMCPOpenCodeConfig("https://app.example.com/")).toBe(openCodeConfig("https://app.example.com/mcp"));
+    const parsed = JSON.parse(workspaceMCPOpenCodeConfig(ORIGIN)) as {
+      mcp?: { superplane?: unknown };
+      servers?: unknown;
+    };
+    expect(parsed.servers).toBeUndefined();
+    expect(parsed.mcp?.superplane).toEqual(openCodeServer(URL));
+    expect(JSON.parse(workspaceMCPOpenCodeConfig("https://app.example.com/")).mcp.superplane).toEqual(
+      openCodeServer("https://app.example.com/mcp"),
+    );
+    expect(workspaceMCPOpenCodeConfig(ORIGIN)).not.toContain("sp_mcp_");
   });
 
   it("selects the snippet for each tool", () => {

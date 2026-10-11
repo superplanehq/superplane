@@ -48,7 +48,6 @@ export function workspaceMCPVSCodeConfig(origin: string): string {
   );
 }
 
-/** OpenCode config snippet for the SuperPlane workspace MCP URL. */
 export function workspaceMCPOpenCodeConfig(origin: string): string {
   return JSON.stringify(
     {
@@ -56,7 +55,10 @@ export function workspaceMCPOpenCodeConfig(origin: string): string {
         superplane: {
           type: "remote",
           url: workspaceMCPServerURL(origin),
-          enabled: true,
+          oauth: false,
+          headers: {
+            Authorization: "Bearer {file:/path/to/superplane.key}",
+          },
         },
       },
     },

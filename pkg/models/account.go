@@ -105,7 +105,10 @@ func (a *Account) Block(tx *gorm.DB, now time.Time) error {
 	if err := ClearAPIKeyTokenHashesCreatedByAccount(tx, a.ID); err != nil {
 		return err
 	}
-	return DeleteUserAPITokensForAccount(tx, a.ID)
+	if err := DeleteUserAPITokensForAccount(tx, a.ID); err != nil {
+		return err
+	}
+	return DeleteMCPAPITokensForAccount(tx, a.ID)
 }
 
 // Unblock clears the blocked flag. Existing sessions remain invalid; the user
