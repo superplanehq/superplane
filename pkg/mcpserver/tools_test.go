@@ -2,12 +2,15 @@ package mcpserver
 
 import (
 	"encoding/json"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	factorycomp "github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
@@ -329,4 +332,414 @@ func createOnWorkOrderCanvasForMCP(t *testing.T, r *support.ResourceRegistry, fa
 		return tx.Create(&version).Error
 	}))
 	return canvas
+}
+
+func TestResolveAssigneeMemberMatchesEmailBeforeGitHubLogin(t *testing.T) {
+	ada := models.FactoryVelocityMember{
+		UserID:      uuid.New(),
+		Name:        "Ada Lovelace",
+		Email:       "ada@example.com",
+		GitHubLogin: "ada",
+	}
+	grace := models.FactoryVelocityMember{
+		UserID:      uuid.New(),
+		Name:        "Grace Hopper",
+		Email:       "grace@example.com",
+		GitHubLogin: "ada@example.com",
+	}
+	twin := models.FactoryVelocityMember{
+		UserID:      uuid.New(),
+		Name:        "Other Ada",
+		Email:       "ada@example.com",
+		GitHubLogin: "other",
+	}
+
+	member, err := resolveAssigneeMember([]models.FactoryVelocityMember{ada, grace}, " ADA@example.com ")
+	require.NoError(t, err)
+	assert.Equal(t, ada.UserID, member.UserID)
+
+	member, err = resolveAssigneeMember([]models.FactoryVelocityMember{ada, grace}, ada.UserID.String())
+	require.NoError(t, err)
+	assert.Equal(t, ada.UserID, member.UserID)
+
+	_, err = resolveAssigneeMember([]models.FactoryVelocityMember{ada, grace}, "Ada Lovelace")
+	require.EqualError(t, err, "The member was not found.")
+
+	_, err = resolveAssigneeMember([]models.FactoryVelocityMember{ada, twin}, "ada@example.com")
+	require.EqualError(t, err, "More than one member matches. Use a user id.")
+}
+
+func TestAssignTaskSetsOneOwner(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Assign", "", "ASN")
+	require.NoError(t, err)
+	owner := createHumanMember(t, r.Organization.ID, "Ada Lovelace", "ada-"+uuid.NewString()+"@example.com")
+	linkGitHub(t, owner, "OctoCat")
+	other := createHumanMember(t, r.Organization.ID, "Grace Hopper", "grace-"+uuid.NewString()+"@example.com")
+	runtime := &Runtime{Auth: r.AuthService}
+	claims := toolClaims(r, factoryModel.ID)
+
+	t.Run("assigns by email, GitHub login, and user id", func(t *testing.T) {
+		byEmail := createDraftTask(t, factoryModel, r.User)
+		result, err := runtime.CallTool(ctx, claims, "assign_task", map[string]any{
+			"task":     factoryModel.WorkOrderKey(byEmail.Number),
+			"assignee": strings.ToUpper(*owner.Email),
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, decodeToolJSON(t, result)["assignees"]))
+
+		byLogin := createDraftTask(t, factoryModel, r.User)
+		result, err = runtime.CallTool(ctx, claims, "assign_task", map[string]any{
+			"task":     strconv.FormatInt(byLogin.Number, 10),
+			"assignee": " octocat ",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, decodeToolJSON(t, result)["assignees"]))
+
+		byID := createDraftTask(t, factoryModel, r.User)
+		result, err = runtime.CallTool(ctx, claims, "assign_task", map[string]any{
+			"task":     byID.ID.String(),
+			"assignee": strings.ToUpper(owner.ID.String()),
+		})
+		require.NoError(t, err)
+		payload := decodeToolJSON(t, result)
+		assert.Equal(t, byID.ID.String(), payload["id"])
+		assert.Equal(t, factoryModel.WorkOrderKey(byID.Number), payload["key"])
+		assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, payload["assignees"]))
+		assert.Equal(t, []string{owner.ID.String()}, storedAssigneeIDs(t, factoryModel, byID.ID))
+	})
+
+	t.Run("replaces the owner on a draft, an open task, and a closed task", func(t *testing.T) {
+		for _, state := range []string{
+			models.FactoryWorkOrderStateDraft,
+			models.FactoryWorkOrderStateOpen,
+			models.FactoryWorkOrderStateClosed,
+		} {
+			order := createDraftTask(t, factoryModel, r.User)
+			setTaskState(t, order, state, r.User)
+			_, err := runtime.CallTool(ctx, claims, "assign_task", map[string]any{
+				"task":     order.ID.String(),
+				"assignee": owner.ID.String(),
+			})
+			require.NoError(t, err)
+			_, err = runtime.CallTool(ctx, claims, "assign_task", map[string]any{
+				"task":     order.ID.String(),
+				"assignee": other.ID.String(),
+			})
+			require.NoError(t, err)
+			assert.Equal(t, []string{other.ID.String()}, storedAssigneeIDs(t, factoryModel, order.ID))
+		}
+	})
+
+	t.Run("clears every owner", func(t *testing.T) {
+		order := createDraftTask(t, factoryModel, r.User)
+		require.NoError(t, order.ReplaceAssignees(db, []uuid.UUID{owner.ID, other.ID}))
+
+		result, err := runtime.CallTool(ctx, claims, "assign_task", map[string]any{
+			"task":     order.ID.String(),
+			"unassign": true,
+		})
+		require.NoError(t, err)
+		assert.Empty(t, assigneeIDs(t, decodeToolJSON(t, result)["assignees"]))
+		assert.Empty(t, storedAssigneeIDs(t, factoryModel, order.ID))
+	})
+}
+
+func TestAssignTaskRejectsInvalidChanges(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Assign Reject", "", "ARJ")
+	require.NoError(t, err)
+	owner := createHumanMember(t, r.Organization.ID, "Visible Owner", "owner-"+uuid.NewString()+"@example.com")
+	first := createHumanMember(t, r.Organization.ID, "First Twin", "first-"+uuid.NewString()+"@example.com")
+	second := createHumanMember(t, r.Organization.ID, "Second Twin", "second-"+uuid.NewString()+"@example.com")
+	linkGitHub(t, first, "shared-login")
+	linkGitHub(t, second, "Shared-Login")
+	apiKey, err := models.CreateAPIKey(db, r.Organization.ID, "bot-key", nil, r.User, nil, nil)
+	require.NoError(t, err)
+
+	order := createDraftTask(t, factoryModel, r.User)
+	require.NoError(t, order.ReplaceAssignees(db, []uuid.UUID{owner.ID}))
+	runtime := &Runtime{Auth: r.AuthService}
+	claims := toolClaims(r, factoryModel.ID)
+
+	reject := func(args map[string]any, message string) {
+		t.Helper()
+		_, err := runtime.CallTool(ctx, claims, "assign_task", args)
+		require.EqualError(t, err, message)
+		assert.Equal(t, []string{owner.ID.String()}, storedAssigneeIDs(t, factoryModel, order.ID))
+	}
+
+	reject(map[string]any{"task": order.ID.String()}, "Set assignee or set unassign to true.")
+	reject(map[string]any{"task": order.ID.String(), "assignee": "   "}, "Set assignee or set unassign to true.")
+	reject(map[string]any{
+		"task":     order.ID.String(),
+		"assignee": *owner.Email,
+		"unassign": true,
+	}, "Do not set assignee and unassign.")
+	reject(map[string]any{"task": order.ID.String(), "assignee": "missing@example.com"}, "The member was not found.")
+	reject(map[string]any{"task": order.ID.String(), "assignee": "Visible Owner"}, "The member was not found.")
+	reject(map[string]any{"task": order.ID.String(), "assignee": apiKey.ID.String()}, "The member was not found.")
+	reject(map[string]any{"task": order.ID.String(), "assignee": "shared-login"}, "More than one member matches. Use a user id.")
+
+	otherFactory, err := models.CreateFactory(db, r.Organization.ID, "Other workspace", "", "OTH")
+	require.NoError(t, err)
+	secret, err := otherFactory.CreateWorkOrder(db, "Secret", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, secret.ReplaceAssignees(db, []uuid.UUID{owner.ID}))
+	_, err = runtime.CallTool(ctx, claims, "assign_task", map[string]any{
+		"task":     secret.ID.String(),
+		"assignee": *first.Email,
+	})
+	require.EqualError(t, err, "Not found")
+	assert.Equal(t, []string{owner.ID.String()}, storedAssigneeIDs(t, otherFactory, secret.ID))
+
+	denied := toolClaims(r, factoryModel.ID)
+	denied.Scopes = []string{"work_orders:read"}
+	_, err = runtime.CallTool(ctx, denied, "assign_task", map[string]any{
+		"task":     order.ID.String(),
+		"assignee": *owner.Email,
+	})
+	require.EqualError(t, err, "Not found")
+	assert.Equal(t, []string{owner.ID.String()}, storedAssigneeIDs(t, factoryModel, order.ID))
+}
+
+func TestTaskReadsIncludeAssignees(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Owners", "", "OWN")
+	require.NoError(t, err)
+	owner := createHumanMember(t, r.Organization.ID, "Ada Lovelace", "ada-"+uuid.NewString()+"@example.com")
+	order := createDraftTask(t, factoryModel, r.User)
+	runtime := &Runtime{Auth: r.AuthService}
+	claims := toolClaims(r, factoryModel.ID)
+
+	_, err = runtime.CallTool(ctx, claims, "assign_task", map[string]any{
+		"task":     order.ID.String(),
+		"assignee": *owner.Email,
+	})
+	require.NoError(t, err)
+
+	got, err := runtime.CallTool(ctx, claims, "get_task", map[string]any{"task": order.ID.String()})
+	require.NoError(t, err)
+	payload := decodeToolJSON(t, got)
+	assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, payload["assignees"]))
+	assert.Equal(t, "Ada Lovelace", payload["assignees"].([]any)[0].(map[string]any)["name"])
+
+	listed, err := runtime.CallTool(ctx, claims, "list_tasks", map[string]any{})
+	require.NoError(t, err)
+	row := taskRowByID(t, decodeToolJSON(t, listed), order.ID.String())
+	assert.Equal(t, []string{owner.ID.String()}, assigneeIDs(t, row["assignees"]))
+
+	_, err = runtime.CallTool(ctx, claims, "assign_task", map[string]any{
+		"task":     order.ID.String(),
+		"unassign": true,
+	})
+	require.NoError(t, err)
+
+	got, err = runtime.CallTool(ctx, claims, "get_task", map[string]any{"task": order.ID.String()})
+	require.NoError(t, err)
+	assert.Empty(t, assigneeIDs(t, decodeToolJSON(t, got)["assignees"]))
+
+	listed, err = runtime.CallTool(ctx, claims, "list_tasks", map[string]any{})
+	require.NoError(t, err)
+	row = taskRowByID(t, decodeToolJSON(t, listed), order.ID.String())
+	assert.Empty(t, assigneeIDs(t, row["assignees"]))
+}
+
+func TestListMembersReturnsHumanMembers(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Members", "", "MBR")
+	require.NoError(t, err)
+	amy := createHumanMember(t, r.Organization.ID, "Amy", "amy-"+uuid.NewString()+"@example.com")
+	zoe := createHumanMember(t, r.Organization.ID, "Zoe", "zoe-"+uuid.NewString()+"@example.com")
+	linkGitHub(t, zoe, "zoe-gh")
+	_, err = models.CreateAPIKey(db, r.Organization.ID, "Key Bot", nil, r.User, nil, nil)
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "list_members", map[string]any{})
+	require.NoError(t, err)
+	members, ok := decodeToolJSON(t, result)["members"].([]any)
+	require.True(t, ok)
+
+	amyRow := memberByEmail(t, members, *amy.Email)
+	assert.Equal(t, amy.ID.String(), amyRow["id"])
+	assert.Equal(t, "Amy", amyRow["name"])
+	assert.Equal(t, "", amyRow["github_login"])
+
+	zoeRow := memberByEmail(t, members, *zoe.Email)
+	assert.Equal(t, "zoe-gh", zoeRow["github_login"])
+	assert.Less(t, memberIndex(t, members, *amy.Email), memberIndex(t, members, *zoe.Email))
+
+	setup := memberByID(t, members, r.User.String())
+	assert.Equal(t, "testuser", setup["github_login"])
+	for _, member := range members {
+		row, ok := member.(map[string]any)
+		require.True(t, ok)
+		assert.NotEqual(t, "Key Bot", row["name"])
+	}
+}
+
+func TestListMembersRequiresMembersRead(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Member Deny", "", "MDN")
+	require.NoError(t, err)
+	reader := createHumanMember(t, r.Organization.ID, "Reader", "reader-"+uuid.NewString()+"@example.com")
+	roleName := "task-reader-" + uuid.NewString()
+	require.NoError(t, r.AuthService.CreateCustomRole(r.Organization.ID.String(), &authorization.RoleDefinition{
+		Name:        roleName,
+		DisplayName: "Task reader",
+		DomainType:  models.DomainTypeOrganization,
+		Permissions: []*authorization.Permission{{
+			Resource:   "work_orders",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		}},
+	}))
+	require.NoError(t, r.AuthService.AssignRole(reader.ID.String(), roleName, r.Organization.ID.String(), models.DomainTypeOrganization))
+
+	claims := toolClaims(r, factoryModel.ID)
+	claims.UserID = reader.ID
+	runtime := &Runtime{Auth: r.AuthService}
+	_, err = runtime.CallTool(ctx, claims, "list_members", map[string]any{})
+	require.EqualError(t, err, "Not found")
+}
+
+func createDraftTask(t *testing.T, factoryModel *models.Factory, creator uuid.UUID) *models.FactoryWorkOrder {
+	t.Helper()
+	order, err := factoryModel.CreateWorkOrder(database.DB(t.Context()), support.RandomName("task"), "", &creator, nil, nil)
+	require.NoError(t, err)
+	return order
+}
+
+func setTaskState(t *testing.T, order *models.FactoryWorkOrder, state string, actor uuid.UUID) {
+	t.Helper()
+	if state == models.FactoryWorkOrderStateDraft {
+		return
+	}
+	update := models.FactoryWorkOrderStatusUpdate{ToState: state, Actor: &actor}
+	if state == models.FactoryWorkOrderStateClosed {
+		update.Result = models.FactoryWorkOrderResultRejected
+	}
+	_, err := order.UpdateStatus(database.DB(t.Context()), update)
+	require.NoError(t, err)
+}
+
+func createHumanMember(t *testing.T, orgID uuid.UUID, name, email string) *models.User {
+	t.Helper()
+	account, err := models.CreateAccount(name, email)
+	require.NoError(t, err)
+	user, err := models.CreateUser(orgID, account.ID, email, name)
+	require.NoError(t, err)
+	return user
+}
+
+func linkGitHub(t *testing.T, user *models.User, login string) {
+	t.Helper()
+	require.NotNil(t, user.AccountID)
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		database.DB(t.Context()),
+		models.NewAccountLinkedAccount(*user.AccountID, models.ProviderGitHub, uuid.NewString(), login, "", ""),
+	))
+}
+
+func assigneeIDs(t *testing.T, value any) []string {
+	t.Helper()
+	rows, ok := value.([]any)
+	require.True(t, ok)
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		item, ok := row.(map[string]any)
+		require.True(t, ok)
+		id, _ := item["id"].(string)
+		require.NotEmpty(t, id)
+		_, hasEmail := item["email"]
+		assert.False(t, hasEmail)
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+func storedAssigneeIDs(t *testing.T, factoryModel *models.Factory, orderID uuid.UUID) []string {
+	t.Helper()
+	order, err := factoryModel.FindWorkOrder(database.DB(t.Context()), orderID)
+	require.NoError(t, err)
+	ids := make([]string, 0, len(order.Assignees))
+	for _, assignee := range order.Assignees {
+		ids = append(ids, assignee.UserID.String())
+	}
+	return ids
+}
+
+func taskRowByID(t *testing.T, payload map[string]any, id string) map[string]any {
+	t.Helper()
+	tasks, ok := payload["tasks"].([]any)
+	require.True(t, ok)
+	for _, task := range tasks {
+		row, ok := task.(map[string]any)
+		require.True(t, ok)
+		if row["id"] == id {
+			return row
+		}
+	}
+	t.Fatalf("task %s not found", id)
+	return nil
+}
+
+func memberByEmail(t *testing.T, members []any, email string) map[string]any {
+	t.Helper()
+	for _, member := range members {
+		row, ok := member.(map[string]any)
+		require.True(t, ok)
+		if row["email"] == email {
+			return row
+		}
+	}
+	t.Fatalf("member %s not found", email)
+	return nil
+}
+
+func memberByID(t *testing.T, members []any, id string) map[string]any {
+	t.Helper()
+	for _, member := range members {
+		row, ok := member.(map[string]any)
+		require.True(t, ok)
+		if row["id"] == id {
+			return row
+		}
+	}
+	t.Fatalf("member %s not found", id)
+	return nil
+}
+
+func memberIndex(t *testing.T, members []any, email string) int {
+	t.Helper()
+	for index, member := range members {
+		row, ok := member.(map[string]any)
+		require.True(t, ok)
+		if row["email"] == email {
+			return index
+		}
+	}
+	t.Fatalf("member %s not found", email)
+	return -1
 }
