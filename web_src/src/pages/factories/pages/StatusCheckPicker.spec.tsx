@@ -63,7 +63,9 @@ describe("StatusCheckPicker", () => {
     const onToggle = vi.fn();
     render(<StatusCheckPicker names={["lint"]} catalog={[{ name: "lint" }, { name: "e2e" }]} onToggle={onToggle} />);
 
-    await user.click(screen.getByTestId("pr-feedback-check-option-e2e"));
+    const option = screen.getByTestId("pr-feedback-check-option-e2e");
+    expect(option).toHaveAttribute("data-slot", "button");
+    await user.click(option);
     expect(onToggle).toHaveBeenCalledWith("e2e");
   });
 
