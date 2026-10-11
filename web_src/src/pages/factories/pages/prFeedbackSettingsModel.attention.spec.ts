@@ -136,6 +136,48 @@ describe("activePRFeedbackWorkOrderIds", () => {
     expect(addressingFeedbackLabelsByWorkOrder(pullRequests).get("wo-repair")).toBe("Fixing failed checks on a82fd91");
   });
 
+  it("recognizes Bitbucket build titles as check activity", () => {
+    const pullRequests: FactoriesFactoryPullRequest[] = [
+      {
+        workOrderId: "wo-waiting-build",
+        activities: [
+          {
+            access: "concurrent",
+            state: "active",
+            description: "Waiting for builds on a82fd91",
+            run: run({ id: "r1", state: "STATE_STARTED" }),
+          },
+        ],
+      },
+      {
+        workOrderId: "wo-repair-build",
+        activities: [
+          {
+            access: "exclusive",
+            state: "active",
+            description: "Fixing failed builds on a82fd91",
+            run: run({ id: "r2", state: "STATE_STARTED" }),
+          },
+        ],
+      },
+      {
+        workOrderId: "wo-passed-build",
+        activities: [
+          {
+            access: "concurrent",
+            state: "finished",
+            description: "Builds passed on a82fd91",
+            run: run({ id: "r3", state: "STATE_FINISHED", result: "RESULT_PASSED" }),
+          },
+        ],
+      },
+    ];
+
+    expect(waitingOnChecksWorkOrderIds(pullRequests)).toEqual(new Set(["wo-waiting-build"]));
+    expect(addressingFeedbackWorkOrderIds(pullRequests)).toEqual(new Set(["wo-repair-build"]));
+    expect(checksPassedWorkOrderIds(pullRequests)).toEqual(new Set(["wo-passed-build"]));
+  });
+
   it("keeps the commit link in the check-fix label", () => {
     expect(
       addressingFeedbackLabelsByWorkOrder([

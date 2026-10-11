@@ -19,12 +19,13 @@ import {
 import { firstFactoryLineId } from "../lib/factoryPagePaths";
 import { clearLastVisitedFactory, recordLastVisitedFactory } from "../lib/lastVisitedFactory";
 import { useFactoriesThemeClass } from "../lib/useFactoriesThemeClass";
+import { MobileWorkspaceSwitcher } from "./MobileWorkspaceSwitcher";
 import { MobileBottomBar } from "./MobileBottomBar";
 import { PinnedPhoneShell } from "./PinnedPhoneShell";
 
 /**
  * Phone shell for a workspace. No sidebar: pages fill the screen and a
- * bottom bar carries navigation and Create task. Provides the same layout
+ * bottom bar carries navigation. Provides the same layout
  * context as the desktop shell so shared cards, dialogs, and gates work.
  */
 export function MobileFactoriesLayout({ children }: { children?: ReactNode }) {
@@ -93,6 +94,7 @@ function MobileFactoryShell({
   children?: ReactNode;
 }) {
   useFactoriesThemeClass();
+  const { pathname } = useLocation();
   const { account } = useAccount();
   const { canAct } = usePermissions();
   const { data: describedFactory, error: factoryError } = useFactory(organizationId, factoryId);
@@ -141,10 +143,15 @@ function MobileFactoryShell({
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
       <PinnedPhoneShell testId="mobile-factories-layout">
+        {pathname.endsWith("/velocity") ? (
+          <header className="flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-center border-b border-border px-4 pt-[env(safe-area-inset-top)]">
+            <MobileWorkspaceSwitcher />
+          </header>
+        ) : null}
         <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-none">
           {children ?? <Outlet />}
         </main>
-        <MobileBottomBar canCreateWorkOrder={canCreateWorkOrder} />
+        <MobileBottomBar />
       </PinnedPhoneShell>
       {canCreateWorkOrder ? (
         <CreateWorkOrderDialog

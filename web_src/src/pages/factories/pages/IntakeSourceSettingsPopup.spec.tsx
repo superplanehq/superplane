@@ -142,6 +142,7 @@ function renderPopup(
     runHrefFor?: (runId: string) => string;
     agent?: PlanningReviewAgentSlot;
     initialTab?: IntakeSettingsTab;
+    page?: boolean;
     labelOptions?: string[];
     labelOptionsLoading?: boolean;
     sourceId?: LineIntakeSourceId;
@@ -187,6 +188,7 @@ function renderPopup(
               agent={props.agent}
               onClose={props.onClose ?? vi.fn()}
               initialTab={props.initialTab}
+              page={props.page}
               fixed={false}
             />
           </TooltipProvider>
@@ -225,6 +227,22 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the intake form and save action on a page without a dialog", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const onClose = vi.fn();
+    renderPopup({ page: true, onSave, onClose });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Intake GitHub issues" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
+    await user.click(screen.getByRole("checkbox", { name: "A closed issue is re-opened" }));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ reopenedIssues: false })));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it.each([

@@ -15,7 +15,9 @@ type WebhookConfiguration struct {
 }
 
 type BitbucketWebhook struct {
-	UUID string `json:"uuid"`
+	UUID               string `json:"uuid"`
+	RepositoryUUID     string `json:"repositoryUUID,omitempty"`
+	RepositoryFullName string `json:"repositoryFullName,omitempty"`
 }
 
 type BitbucketWebhookHandler struct{}
@@ -102,6 +104,25 @@ func (h *BitbucketWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, er
 		return nil, fmt.Errorf("repository is required")
 	}
 
+	if metadata.AuthType == AuthTypeForgeApp {
+		for _, event := range config.EventTypes {
+			switch event {
+			case pullRequestEventCreated, pullRequestEventUpdated, pullRequestEventFulfilled, pullRequestEventRejected,
+				waitBuildsStatusCreated, waitBuildsStatusUpdated, pullRequestCommentCreated:
+			default:
+				return nil, fmt.Errorf("Bitbucket Forge does not support event %q", event)
+			}
+		}
+		repo, err := client.GetRepository(metadata.Workspace.Slug + "/" + config.RepositorySlug)
+		if err != nil {
+			return nil, fmt.Errorf("error resolving Forge webhook repository: %w", err)
+		}
+		if repo.UUID == "" || repo.FullName == "" {
+			return nil, fmt.Errorf("missing Forge webhook repository identity")
+		}
+		return &BitbucketWebhook{RepositoryUUID: repo.UUID, RepositoryFullName: repo.FullName}, nil
+	}
+
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return nil, fmt.Errorf("error getting webhook secret: %w", err)
@@ -153,6 +174,9 @@ func (h *BitbucketWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error 
 	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+	if metadata.AuthType == AuthTypeForgeApp {
+		return nil
 	}
 
 	client, err := NewClient(metadata.AuthType, ctx.HTTP, ctx.Integration)

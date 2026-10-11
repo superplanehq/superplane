@@ -775,6 +775,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// Forge calls these routes. The Forge Invocation Token authenticates them.
 	// They stay off the gateway authorizer, the same way the GitHub App webhook does.
 	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/lifecycle", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/events", s.HandleBitbucketForgeEvent).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/scheduled", s.HandleBitbucketForgeDelivery).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/bootstrap", s.HandleBitbucketForgeDelivery).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/uninstall", s.HandleBitbucketForgeUninstall).Methods("POST")
@@ -2291,6 +2292,44 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 		Integration:   integrationCtx,
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
+			if err != nil {
+				return nil, err
+			}
+
+			if recordExecution != nil {
+				recordExecution(execution.WorkflowID, execution.ID)
+			}
+
+			organizationID := ""
+			var organizationUUID uuid.UUID
+			var factoryID *uuid.UUID
+			if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
+				organizationID = workflow.OrganizationID.String()
+				organizationUUID = workflow.OrganizationID
+				factoryID = workflow.FactoryID
+			}
+
+			return &core.ExecutionContext{
+				ID:             execution.ID,
+				WorkflowID:     execution.WorkflowID.String(),
+				OrganizationID: organizationID,
+				NodeID:         execution.NodeID,
+				BaseURL:        s.BaseURL,
+				Configuration:  execution.Configuration.Data(),
+				HTTP:           s.registry.HTTPContext(),
+				Integration:    integrationCtx,
+				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
+				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
+				ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
+				Requests:       contexts.NewExecutionRequestContext(tx, execution),
+				Logger:         logging.ForExecution(execution),
+				CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
+				Usage:          contexts.NewUsageContext(organizationUUID, execution),
+				HostedLLM:      contexts.NewHostedLLMContext(tx, s.encryptor, organizationUUID, factoryID),
+			}, nil
+		},
+		FindActiveExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
+			execution, err := models.FirstActiveNodeExecutionByKV(tx, node.WorkflowID, node.NodeID, key, value)
 			if err != nil {
 				return nil, err
 			}

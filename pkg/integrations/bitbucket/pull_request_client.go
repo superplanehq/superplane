@@ -3,6 +3,7 @@ package bitbucket
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,6 +23,8 @@ type PullRequestListOptions struct {
 	SourceBranch      string
 	DestinationBranch string
 	States            []string
+	Sort              string
+	Pagelen           int
 }
 
 type CreatePullRequestRequest struct {
@@ -76,6 +79,29 @@ func (c *Client) GetMainBranch(repository string) (string, error) {
 	return response.MainBranch.Name, nil
 }
 
+// GetBranchHead returns the head commit SHA of a branch.
+func (c *Client) GetBranchHead(repository, branch string) (string, error) {
+	path, err := repositoryPath(repository)
+	if err != nil {
+		return "", err
+	}
+	branch = strings.TrimSpace(branch)
+	if branch == "" {
+		return "", fmt.Errorf("branch is required")
+	}
+
+	var response struct {
+		Target struct {
+			Hash string `json:"hash"`
+		} `json:"target"`
+	}
+	endpoint := fmt.Sprintf("%s/repositories/%s/refs/branches/%s", baseURL, path, url.PathEscape(branch))
+	if err := c.doJSON(http.MethodGet, endpoint, nil, http.StatusOK, &response); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(response.Target.Hash), nil
+}
+
 func (c *Client) ListPullRequests(repository string, opts PullRequestListOptions) ([]map[string]any, error) {
 	path, err := repositoryPath(repository)
 	if err != nil {
@@ -95,6 +121,12 @@ func (c *Client) ListPullRequests(repository string, opts PullRequestListOptions
 	}
 	for _, state := range opts.States {
 		query.Add("state", state)
+	}
+	if strings.TrimSpace(opts.Sort) != "" {
+		query.Set("sort", strings.TrimSpace(opts.Sort))
+	}
+	if opts.Pagelen > 0 {
+		query.Set("pagelen", strconv.Itoa(opts.Pagelen))
 	}
 
 	var response struct {
@@ -155,6 +187,22 @@ func (c *Client) CreatePullRequestComment(repository string, id int64, content s
 	return c.CreatePullRequestCommentWithParent(repository, id, content, "")
 }
 
+func (c *Client) GetPullRequestComment(repository string, pullRequestID, commentID int64) (map[string]any, error) {
+	path, err := repositoryPath(repository)
+	if err != nil {
+		return nil, err
+	}
+	if pullRequestID <= 0 || commentID <= 0 {
+		return nil, fmt.Errorf("pull request and comment IDs must be positive")
+	}
+	var comment map[string]any
+	endpoint := fmt.Sprintf("%s/repositories/%s/pullrequests/%d/comments/%d", baseURL, path, pullRequestID, commentID)
+	if err := c.doJSON(http.MethodGet, endpoint, nil, http.StatusOK, &comment); err != nil {
+		return nil, err
+	}
+	return comment, nil
+}
+
 // CreatePullRequestCommentWithParent posts a comment, or a threaded reply
 // when parentID names an existing comment.
 func (c *Client) CreatePullRequestCommentWithParent(repository string, id int64, content, parentID string) (map[string]any, error) {
@@ -208,13 +256,14 @@ func PullRequestMergeStrategy(method string) string {
 
 // BitbucketPullRequest is the merge-relevant subset of a pull request.
 type BitbucketPullRequest struct {
-	ID          int64  `json:"id"`
-	State       string `json:"state"`
-	Draft       bool   `json:"draft"`
-	SourceHash  string
-	SourceBr    string
-	DestBranch  string
-	MergeCommit string
+	ID                  int64  `json:"id"`
+	State               string `json:"state"`
+	Draft               bool   `json:"draft"`
+	SourceHash          string
+	SourceBr            string
+	DestBranch          string
+	DestMergeStrategies []string
+	MergeCommit         string
 }
 
 // GetPullRequest reads one pull request by number.
@@ -238,7 +287,8 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 		} `json:"source"`
 		Destination struct {
 			Branch struct {
-				Name string `json:"name"`
+				Name            string   `json:"name"`
+				MergeStrategies []string `json:"merge_strategies"`
 			} `json:"branch"`
 			Commit struct {
 				Hash string `json:"hash"`
@@ -253,25 +303,34 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 		return nil, err
 	}
 	return &BitbucketPullRequest{
-		ID:          response.ID,
-		State:       response.State,
-		Draft:       response.Draft,
-		SourceHash:  response.Source.Commit.Hash,
-		SourceBr:    response.Source.Branch.Name,
-		DestBranch:  response.Destination.Branch.Name,
-		MergeCommit: response.MergeCommit.Hash,
+		ID:                  response.ID,
+		State:               response.State,
+		Draft:               response.Draft,
+		SourceHash:          response.Source.Commit.Hash,
+		SourceBr:            response.Source.Branch.Name,
+		DestBranch:          response.Destination.Branch.Name,
+		DestMergeStrategies: response.Destination.Branch.MergeStrategies,
+		MergeCommit:         response.MergeCommit.Hash,
 	}, nil
 }
 
+// errBitbucketMergeAsync reports a merge that Bitbucket accepted for
+// background processing. The merge may still fail, so callers must not
+// treat it as completed.
+var errBitbucketMergeAsync = errors.New("bitbucket is still merging the pull request")
+
 // MergePullRequest merges one open pull request with the given strategy.
 // Bitbucket has no head precondition, so callers compare the source hash first.
+// A push between that read and this call can still change the merged commit.
+// Only a synchronous MERGED response counts as merged; a 202 task response
+// returns errBitbucketMergeAsync.
 func (c *Client) MergePullRequest(repository string, id int64, strategy string) (*BitbucketPullRequest, error) {
 	path, err := repositoryPath(repository)
 	if err != nil {
 		return nil, err
 	}
 
-	body := map[string]any{"type": PullRequestMergeStrategy(strategy)}
+	body := map[string]any{"type": "pullrequest", "merge_strategy": PullRequestMergeStrategy(strategy)}
 
 	var response struct {
 		ID    int64  `json:"id"`
@@ -279,9 +338,59 @@ func (c *Client) MergePullRequest(repository string, id int64, strategy string) 
 	}
 	endpoint := fmt.Sprintf("%s/repositories/%s/pullrequests/%d/merge", baseURL, path, id)
 	if err := c.doJSON(http.MethodPost, endpoint, body, http.StatusOK, &response); err != nil {
+		var apiErr *APIError
+		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusAccepted {
+			return nil, fmt.Errorf("%w: %s", errBitbucketMergeAsync, apiErr.Message)
+		}
 		return nil, err
 	}
 	return &BitbucketPullRequest{ID: response.ID, State: response.State}, nil
+}
+
+// MergeabilityCheck is one Bitbucket mergeability check on a pull request.
+// Blocking tells whether the check currently prevents merging; a failed
+// check does not necessarily block.
+type MergeabilityCheck struct {
+	Type     string `json:"type"`
+	Status   string `json:"status"`
+	Required bool   `json:"required"`
+	Blocking bool   `json:"blocking"`
+}
+
+// Mergeability check types reported by Bitbucket.
+const (
+	MergeabilityCheckState      = "pullrequest_state_check"
+	MergeabilityCheckPermission = "current_user_permission_check"
+	MergeabilityCheckGit        = "git_mergeability_check"
+	MergeabilityCheckStandard   = "standard_merge_check"
+	MergeabilityCheckPreMerge   = "custom_pre_merge_check"
+	MergeabilityCheckOnMerge    = "custom_on_merge_check"
+	MergeabilityCheckQueue      = "merge_queue_check"
+)
+
+// ListMergeabilityChecks returns the mergeability checks Bitbucket performs
+// for a pull request, following pagination. A 500 means configured custom or
+// queue checks are unretrievable, so the real merge would fail the same way.
+func (c *Client) ListMergeabilityChecks(repository string, id int64) ([]MergeabilityCheck, error) {
+	path, err := repositoryPath(repository)
+	if err != nil {
+		return nil, err
+	}
+
+	checks := []MergeabilityCheck{}
+	endpoint := fmt.Sprintf("%s/repositories/%s/pullrequests/%d/mergeability/checks?pagelen=100", baseURL, path, id)
+	for endpoint != "" {
+		var response struct {
+			Values []MergeabilityCheck `json:"values"`
+			Next   string              `json:"next"`
+		}
+		if err := c.doJSON(http.MethodGet, endpoint, nil, http.StatusOK, &response); err != nil {
+			return nil, err
+		}
+		checks = append(checks, response.Values...)
+		endpoint = response.Next
+	}
+	return checks, nil
 }
 
 // DeclinePullRequest declines one open pull request.

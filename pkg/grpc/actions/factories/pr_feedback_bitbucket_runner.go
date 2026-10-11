@@ -63,6 +63,28 @@ func bitbucketValidateStoredSourceLines() []string {
 	}
 }
 
+func bitbucketStopWhenRemoteHeadIsAbsentLines() []string {
+	return []string{
+		`if ! git rev-parse --verify --quiet --end-of-options "${SOURCE_HASH}^{commit}" >/dev/null; then`,
+		`  echo "Remote pull request head changed. Stop without pushing."`,
+		`  exit 0`,
+		`fi`,
+	}
+}
+
+func bitbucketNormalizeSourceCommitsLines() []string {
+	return []string{
+		`SOURCE_HASH=$(git rev-parse --verify --end-of-options "${SOURCE_HASH}^{commit}")`,
+		`if [ -n "${PR_REVISION:-}" ]; then`,
+		`  if ! printf '%s' "${PR_REVISION}" | grep -Eq '^[0-9a-fA-F]{7,64}$'; then`,
+		`    echo "Invalid pull request revision." >&2`,
+		`    exit 1`,
+		`  fi`,
+		`  PR_REVISION=$(git rev-parse --verify --end-of-options "${PR_REVISION}^{commit}")`,
+		`fi`,
+	}
+}
+
 // bitbucketCheckoutCommand clones the pull request source repository and
 // checks out that source commit. A same-named branch on the destination
 // repository is not a checkout target.
@@ -70,22 +92,25 @@ func bitbucketCheckoutCommand() string {
 	lines := []string{"set -euo pipefail"}
 	lines = append(lines, bitbucketPullRequestSourceLines()...)
 	lines = append(lines,
+		`mkdir -p .superplane`,
+		`printf '%s' "${SOURCE_REPO}" > .superplane/source-repo`,
+		`printf '%s' "${SOURCE_BRANCH}" > .superplane/source-branch`,
+		`git clone "https://bitbucket.org/${SOURCE_REPO}.git" repo`,
+		`cd repo`,
+		`git fetch origin -- "${SOURCE_BRANCH}"`,
+	)
+	lines = append(lines, bitbucketNormalizeSourceCommitsLines()...)
+	lines = append(lines,
 		`if [ -n "${PR_REVISION:-}" ] && [ "${SOURCE_HASH}" != "${PR_REVISION}" ]; then`,
 		`  echo "Remote pull request head changed. Stop without checking out." >&2`,
 		`  exit 1`,
 		`fi`,
-		`mkdir -p .superplane`,
-		`printf '%s' "${SOURCE_REPO}" > .superplane/source-repo`,
-		`printf '%s' "${SOURCE_BRANCH}" > .superplane/source-branch`,
-		`printf '%s' "${SOURCE_HASH}" > .superplane/source-hash`,
-		`git clone "https://bitbucket.org/${SOURCE_REPO}.git" repo`,
-		`cd repo`,
-		`git fetch origin -- "${SOURCE_BRANCH}"`,
 		`FETCHED=$(git rev-parse FETCH_HEAD)`,
 		`if [ "${FETCHED}" != "${SOURCE_HASH}" ]; then`,
 		`  echo "Source branch tip does not match the pull request commit. Stop without changing it." >&2`,
 		`  exit 1`,
 		`fi`,
+		`printf '%s' "${SOURCE_HASH}" > ../.superplane/source-hash`,
 		`git checkout -B "${SOURCE_BRANCH}" "${SOURCE_HASH}"`,
 		`if [ "$(git rev-parse HEAD)" != "${SOURCE_HASH}" ]; then`,
 		`  echo "Local checkout does not match the pull request source commit." >&2`,
@@ -93,6 +118,33 @@ func bitbucketCheckoutCommand() string {
 		`fi`,
 	)
 	return strings.Join(lines, "\n")
+}
+
+// refreshBitbucketRunnerSteps replaces the checkout and push step commands
+// on an existing runner node so already-created automations pick up
+// checkout fixes on the next settings save. Every other step field
+// (credentials, model, prompt) stays untouched.
+func refreshBitbucketRunnerSteps(configuration map[string]any, isChecks bool) {
+	steps, ok := configuration["steps"].([]any)
+	if !ok {
+		return
+	}
+	push := bitbucketCommitPushCommand("fix: address PR #${PR_NUMBER} feedback")
+	if isChecks {
+		push = bitbucketCommitPushCommand("fix: repair failing builds on PR #${PR_NUMBER}")
+	}
+	for _, item := range steps {
+		step, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		switch step["name"] {
+		case "Checkout Pull Request":
+			step["command"] = bitbucketCheckoutCommand()
+		case "Commit and Push":
+			step["command"] = push
+		}
+	}
 }
 
 // bitbucketCommitPushCommand pushes only when the local checkout is the
@@ -106,7 +158,10 @@ func bitbucketCommitPushCommand(message string) string {
 		`SOURCE_BRANCH=$(cat ../.superplane/source-branch)`,
 	)
 	lines = append(lines, bitbucketValidateStoredSourceLines()...)
+	lines = append(lines, bitbucketStopWhenRemoteHeadIsAbsentLines()...)
+	lines = append(lines, bitbucketNormalizeSourceCommitsLines()...)
 	lines = append(lines,
+		`CHECKED_OUT=$(git rev-parse --verify --end-of-options "${CHECKED_OUT}^{commit}")`,
 		`if [ "${SOURCE_HASH}" != "${CHECKED_OUT}" ]; then`,
 		`  echo "Remote pull request head changed. Stop without pushing."`,
 		`  exit 0`,

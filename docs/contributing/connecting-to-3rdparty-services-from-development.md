@@ -186,6 +186,9 @@ The Forge app is optional. Its source is in `forge/bitbucket/`. Set
 when you install that app. When those values are empty, workspace setup keeps
 the Bitbucket token screen.
 
+For a separate development app and tunnel, follow
+[Bitbucket Forge local development](#bitbucket-forge-local-development).
+
 ### 5. Set the SuperPlane environment
 
 Add these values to `.env`. Do not commit real secrets.
@@ -219,6 +222,127 @@ If Connect cannot create the app, confirm `BASE_URL` and
 
 CI sets dummy GitHub App values so factory E2E can skip create-app.
 Local `make test.e2e` needs the same dummy values or a real app.
+
+## Bitbucket Forge local development
+
+Create a separate Forge app for your local instance. Keep the shared manifest unchanged when you configure your app and tunnel.
+The manifest accepts shell variables for the app ID and remote URL. Its defaults target the SuperPlane Cloud app.
+
+### 1. Authenticate with Forge
+
+Use Node.js 22 or 24 for the Forge CLI. The SuperPlane application still uses the Docker development environment.
+
+```sh
+npm install -g @forge/cli
+```
+
+1. Open [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
+2. Select **Create API token with scopes**.
+3. Select **Forge** and the recommended scopes.
+4. Create and copy the token.
+5. Run `forge login`.
+6. Enter your Atlassian email and paste the token when prompted.
+
+Forge stores the credentials in your system keychain. Do not put the token in the repository.
+See [Forge authentication](https://developer.atlassian.com/platform/forge/getting-started/#log-in-with-an-atlassian-api-scoped-token).
+
+### 2. Register your development app
+
+If you already own a test app, copy its App ID from the developer console and skip registration.
+
+`forge register` writes a new app ID into the manifest. Run registration in a temporary copy to preserve the shared manifest:
+
+```sh
+cd forge/bitbucket
+FORGE_REGISTER_DIR=$(mktemp -d)
+cp manifest.yml package.json "$FORGE_REGISTER_DIR/"
+cp -R src "$FORGE_REGISTER_DIR/"
+(cd "$FORGE_REGISTER_DIR" && forge register superplane-local)
+```
+
+Follow the registration prompts. Copy the new App ID from the temporary manifest or the
+[developer console](https://developer.atlassian.com/console/myapps/).
+Use the complete ID, including `ari:cloud:ecosystem::app/`.
+Registration creates the app without deploying or installing it.
+See [Forge registration](https://developer.atlassian.com/platform/forge/cli-reference/register/).
+
+### 3. Configure the tunnel and deploy
+
+Start a stable HTTPS tunnel to `http://localhost:8000`. Use the tunnel steps at the start of this guide.
+Keep the tunnel running during testing.
+
+Run these commands from `forge/bitbucket/`. Replace both example values with your app ID and tunnel URL:
+
+```sh
+export SUPERPLANE_BITBUCKET_FORGE_APP_ID="ari:cloud:ecosystem::app/<your-app-id>"
+export SUPERPLANE_BITBUCKET_FORGE_REMOTE_URL="https://<your-tunnel-domain>"
+
+npm ci
+forge lint
+forge deploy --environment production
+```
+
+Keep both exports active for all Forge commands. Forge reads shell variables; it does not automatically load the repository's `.env`.
+Without the exports, commands use the Cloud app defaults.
+These are manifest variables, not runtime variables configured with `forge variables set`.
+See [manifest variables](https://developer.atlassian.com/platform/forge/manifest-reference/variables/).
+
+The `production` environment belongs to your separate test app. Forge hosts its code and sends requests to your tunnel.
+This command does not deploy SuperPlane to production or install the app in a workspace.
+The production environment supplies the installation link for SuperPlane's **Grant access** flow.
+
+If Forge requests `MAJOR_VERSION_RULE` approval after an egress or permission change, acknowledge the change:
+
+```sh
+forge deploy --environment production --approve MAJOR_VERSION_RULE
+```
+
+### 4. Configure SuperPlane
+
+1. Open your test app in the developer console.
+2. Open **Distribution** and enable **Sharing**.
+3. Select **Bitbucket** and copy the installation link.
+
+See [Forge distribution](https://developer.atlassian.com/platform/forge/distribute-your-apps/).
+
+Add these values to the repository's `.env`. Use the same app ID and tunnel URL as the deployment:
+
+```env
+WEBHOOKS_BASE_URL=https://<your-tunnel-domain>
+SUPERPLANE_BITBUCKET_FORGE_APP_ID=ari:cloud:ecosystem::app/<your-app-id>
+SUPERPLANE_BITBUCKET_FORGE_INSTALL_URL=<installation-link-from-distribution>
+```
+
+Configure the separate [Bitbucket OAuth consumer](#bitbucket-oauth-consumer) to connect your account.
+Its callback must match `{BASE_URL}/auth/bitbucket/callback`.
+
+From the repository root, reload the container configuration and start SuperPlane:
+
+```sh
+make dev.up
+make dev.server
+```
+
+### 5. Install and confirm through SuperPlane
+
+1. Open workspace setup in your local SuperPlane instance.
+2. Connect your Bitbucket account.
+3. Select **Grant access** and install your test app in the intended Bitbucket workspace.
+4. In that Bitbucket workspace, open **Apps → SuperPlane**.
+5. Wait for **Installation confirmed**.
+6. Return to SuperPlane and select the repository.
+7. Test a pull request or comment event with a configured trigger.
+
+You do not need `forge install` when you install through SuperPlane.
+Existing installations must accept a new major version before they use its remote URL or permissions.
+Upgrade from Bitbucket workspace settings, or optionally run `forge install --upgrade --environment production`.
+
+Local Go changes do not require a Forge deployment. Forge source and manifest changes require redeployment.
+When your tunnel URL changes, update the shell export and `.env`, redeploy Forge, and reload SuperPlane.
+If deployment creates a major version, upgrade existing installations.
+Keep the tunnel reachable for the scheduled token refresh, which runs every five minutes.
+
+See [Forge synchronization](../../forge/bitbucket/README.md) for supported events and delivery monitoring.
 
 ## Factory Sentry App (local issue intake)
 
