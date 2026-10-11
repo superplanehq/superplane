@@ -70,7 +70,6 @@ export function MobileMorePage() {
       <div className="flex h-16 items-center">
         <MobileWorkspaceSwitcher />
       </div>
-      <h1 className="text-2xl font-semibold tracking-tight">More</h1>
       <MobileAccountCard
         href={settingsHref("account", "general")}
         name={account?.name}
