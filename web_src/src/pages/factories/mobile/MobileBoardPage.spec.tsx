@@ -288,6 +288,28 @@ describe("MobileBoardPage", () => {
     expect(screen.getByTestId("mobile-board-column-verify")).not.toHaveAttribute("inert");
   });
 
+  it("shows repair and paused labels for backlog intakes", () => {
+    factoryIntakes.mockReturnValue([
+      GITHUB_ISSUES_INTAKE,
+      {
+        id: "intake-sentry",
+        name: "Sentry exceptions",
+        source: "SOURCE_SENTRY_EXCEPTIONS",
+        healthy: false,
+        paused: true,
+      },
+    ]);
+    renderBoard(REFUND_FACTORY, true);
+
+    const healthy = screen.getByRole("link", { name: /GitHub issues/i });
+    expect(healthy).not.toHaveTextContent("Needs repair");
+    expect(healthy).not.toHaveTextContent("Paused");
+
+    const stopped = screen.getByRole("link", { name: /Sentry exceptions/i });
+    expect(stopped).toHaveTextContent("Needs repair");
+    expect(stopped).toHaveTextContent("Paused");
+  });
+
   it("opens intake settings from More", async () => {
     const user = userEvent.setup();
     factoryIntakes.mockReturnValue([GITHUB_ISSUES_INTAKE]);

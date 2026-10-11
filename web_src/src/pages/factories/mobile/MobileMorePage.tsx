@@ -34,12 +34,14 @@ import { ColumnAutomationGlyph } from "../pages/ColumnAutomationsPopup";
 import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import {
   buildColumnAutomations,
+  COLUMN_AUTOMATIONS_COPY,
   columnAutomationOpenPath,
   columnTitleForKey,
   type ColumnAutomation,
   type ColumnKey,
 } from "../lib/columnAutomations";
 import { columnAutomationHeadline } from "../lib/columnAutomationHeadline";
+import { LINE_INTAKE_COPY } from "../pages/lineIntakeModel";
 import { buildLinePhaseBoard } from "../lib/linePhaseRuns";
 import { MobileWorkspaceSwitcher } from "./MobileWorkspaceSwitcher";
 
@@ -333,7 +335,7 @@ function useMobileBoardOptionColumns({
     return keys.map((key) => ({
       key,
       title: columnTitleForKey(key, board),
-      automations: buildColumnAutomations(key, {
+      automations: mobileColumnAutomations(key, {
         columnTitle: columnTitleForKey(key, board),
         columns: board,
         intakes: intakes ?? [],
@@ -347,14 +349,48 @@ function useMobileBoardOptionColumns({
   }, [board, handlers, intakes, normalizedApps, planningEnabled, vcsProvider]);
 }
 
-function MobileAutomationRow({ automation, href }: { automation: ColumnAutomation; href: string | undefined }) {
+type MobileColumnAutomation = ColumnAutomation & { paused?: boolean };
+
+function mobileColumnAutomations(
+  key: ColumnKey,
+  input: Parameters<typeof buildColumnAutomations>[1],
+): MobileColumnAutomation[] {
+  const intakes = input.intakes ?? [];
+  return buildColumnAutomations(key, input).map((automation) => {
+    if (automation.kind !== "intake") {
+      return automation;
+    }
+    const intake = intakes.find((item) => item.id === automation.id);
+    if (!intake) {
+      return automation;
+    }
+    return {
+      ...automation,
+      health: intake.healthy === false ? "needs-repair" : automation.health,
+      paused: intake.paused === true,
+    };
+  });
+}
+
+function MobileAutomationRow({ automation, href }: { automation: MobileColumnAutomation; href: string | undefined }) {
   const icon = <ColumnAutomationGlyph automation={automation} className="size-5" />;
   const label = (
     <span>
       <span className="block">{automation.name}</span>
       <span className="block text-xs font-normal text-muted-foreground">{columnAutomationHeadline(automation)}</span>
-      {automation.health === "needs-repair" ? <span className="block text-xs text-amber-600">Needs repair</span> : null}
-      {automation.health === "disabled" ? <span className="block text-xs text-muted-foreground">Disabled</span> : null}
+      {automation.health === "needs-repair" ? (
+        <span className="block text-xs text-amber-700 dark:text-amber-400">
+          {COLUMN_AUTOMATIONS_COPY.needsRepairLabel}
+        </span>
+      ) : null}
+      {automation.paused ? (
+        <span className="block text-xs text-muted-foreground" title={LINE_INTAKE_COPY.pausedHelper}>
+          {LINE_INTAKE_COPY.paused}
+        </span>
+      ) : null}
+      {automation.health === "disabled" ? (
+        <span className="block text-xs text-muted-foreground">{COLUMN_AUTOMATIONS_COPY.disabledLabel}</span>
+      ) : null}
     </span>
   );
   if (!href) {
