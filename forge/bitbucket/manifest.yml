@@ -14,6 +14,16 @@ modules:
       events:
         - avi:forge:installed:app
         - avi:forge:upgraded:app
+    - key: pull-request-trigger
+      endpoint: pull-request-events
+      events:
+        - avi:bitbucket:created:pullrequest
+        - avi:bitbucket:updated:pullrequest
+        - avi:bitbucket:fulfilled:pullrequest
+        - avi:bitbucket:rejected:pullrequest
+        - avi:bitbucket:created:pullrequest-comment
+        - avi:bitbucket:created:build-status
+        - avi:bitbucket:updated:build-status
   preUninstall:
     - key: uninstall-hook
       endpoint: uninstall
@@ -35,6 +45,13 @@ modules:
     - key: bootstrap
       handler: index.bootstrap
   endpoint:
+    - key: pull-request-events
+      remote: superplane
+      route:
+        path: /api/v1/bitbucket/forge/events
+      auth:
+        appSystemToken:
+          enabled: true
     - key: lifecycle
       remote: superplane
       route:
