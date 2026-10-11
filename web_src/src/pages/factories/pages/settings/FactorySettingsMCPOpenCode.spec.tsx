@@ -38,7 +38,7 @@ describe("Factory MCP OpenCode token", () => {
     expect(screen.getByText("Name the token so you can revoke it later.")).toBeInTheDocument();
     expect(screen.getByText("Paste this configuration. Replace the file path.")).toBeInTheDocument();
 
-    const writeText = vi.fn(() => Promise.resolve());
+    const writeText = vi.fn<(text: string) => Promise<void>>(() => Promise.resolve());
     const previousClipboard = navigator.clipboard;
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
