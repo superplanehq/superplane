@@ -1,8 +1,7 @@
 import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, FactoriesWorkOrder } from "@/api-client";
-import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { lineIntakeSourceForApiSource } from "../pages/lineIntakeModel";
-import { PR_FEEDBACK_SOURCES, prFeedbackSourceId } from "../pages/prFeedbackSettingsModel";
+import { prFeedbackSourceById, prFeedbackSourceId, prFeedbackVCSIcon } from "../pages/prFeedbackSettingsModel";
 import {
   buildColumnAutomationActivity,
   emptyColumnAutomationActivity,
@@ -82,6 +81,7 @@ export type ColumnAutomationsInput = {
   apps?: Array<{ id?: string; name?: string; columnKey?: string }>;
   workOrders?: FactoriesWorkOrder[];
   planningEnabled?: boolean;
+  vcsProvider?: string;
 };
 
 const PHASE_KEY_PATTERN = /^phase-(\d+)$/;
@@ -153,13 +153,13 @@ function automationsForColumn(
     const riskScore = riskScoreAutomation(input.apps ?? [], workOrders);
     const skip = new Set(riskScore.flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])));
     return [
-      ...prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders),
+      ...prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders, input.vcsProvider),
       ...riskScore,
       ...customColumnAutomations(input.apps ?? [], "verify", workOrders, skip),
     ];
   }
   if (key === "done") {
-    const closure = closureAutomation(input.apps ?? [], workOrders);
+    const closure = closureAutomation(input.apps ?? [], workOrders, input.vcsProvider);
     const skip = new Set(closure.flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])));
     return [...closure, ...customColumnAutomations(input.apps ?? [], "done", workOrders, skip)];
   }
@@ -231,13 +231,15 @@ function analysisAutomation(
 function prFeedbackAutomation(
   handler: FactoriesFactoryPrFeedbackHandler,
   workOrders: FactoriesWorkOrder[],
+  vcsProvider?: string,
 ): ColumnAutomation | null {
   const handlerId = handler.id?.trim();
   if (!handlerId) {
     return null;
   }
   const sourceId = prFeedbackSourceId(handler.source);
-  const source = PR_FEEDBACK_SOURCES.find((entry) => entry.id === sourceId);
+  const source = prFeedbackSourceById(sourceId, vcsProvider);
+  const fallbackIcon = prFeedbackVCSIcon(vcsProvider);
   const sentence = prFeedbackSentence(sourceId);
   return {
     id: handlerId,
@@ -245,8 +247,8 @@ function prFeedbackAutomation(
     name: handler.name?.trim() || source?.name || "PR feedback",
     trigger: sentence.trigger,
     action: sentence.action,
-    iconSrc: source?.iconSrc ?? githubIcon,
-    iconAlt: source?.iconAlt ?? "GitHub",
+    iconSrc: source?.iconSrc ?? fallbackIcon.iconSrc,
+    iconAlt: source?.iconAlt ?? fallbackIcon.iconAlt,
     health: handler.healthy === false ? "needs-repair" : "healthy",
     runningCount: runningCountForApp(handler.canvasId, workOrders),
     catalogId: sourceId,
@@ -257,9 +259,10 @@ function prFeedbackAutomation(
 function prFeedbackAutomations(
   handlers: FactoriesFactoryPrFeedbackHandler[],
   workOrders: FactoriesWorkOrder[],
+  vcsProvider?: string,
 ): ColumnAutomation[] {
   return handlers.flatMap((handler) => {
-    const automation = prFeedbackAutomation(handler, workOrders);
+    const automation = prFeedbackAutomation(handler, workOrders, vcsProvider);
     return automation ? [automation] : [];
   });
 }
@@ -336,11 +339,13 @@ function riskScoreAutomation(
 function closureAutomation(
   apps: Array<{ id?: string; name?: string }>,
   workOrders: FactoriesWorkOrder[],
+  vcsProvider?: string,
 ): ColumnAutomation[] {
   const app = findClosureAutomationApp(apps);
   if (!app) {
     return [];
   }
+  const icon = prFeedbackVCSIcon(vcsProvider);
   return [
     {
       id: `closure-${app.id}`,
@@ -348,8 +353,8 @@ function closureAutomation(
       name: app.name,
       trigger: PR_CLOSURE_ENTRY.trigger,
       action: PR_CLOSURE_ENTRY.action,
-      iconSrc: githubIcon,
-      iconAlt: "GitHub",
+      iconSrc: icon.iconSrc,
+      iconAlt: icon.iconAlt,
       health: "healthy",
       runningCount: runningCountForApp(app.id, workOrders),
       catalogId: PR_CLOSURE_CATALOG_ID,

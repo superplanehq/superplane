@@ -339,6 +339,9 @@ function automationIcon(
   if (source) {
     return { src: source.iconSrc, alt: source.iconAlt };
   }
+  if (icon && PUBLIC_AUTOMATION_ICONS[icon]) {
+    return PUBLIC_AUTOMATION_ICONS[icon];
+  }
   if (kind === "pr-closure") {
     return { src: PR_CLOSURE_ENTRY.iconSrc, alt: PR_CLOSURE_ENTRY.iconAlt };
   }
