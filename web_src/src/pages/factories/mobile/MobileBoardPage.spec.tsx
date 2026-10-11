@@ -1,27 +1,20 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { useLocation } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, FactoriesWorkOrder } from "@/api-client";
-import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { TooltipProvider } from "@/ui/tooltip";
 
 import {
   GITHUB_ISSUES_INTAKE,
   GITHUB_ISSUES_INTAKE_ID,
-  PRIMARY_FACTORY_ID,
-  PRIMARY_FACTORY_KEY,
   PRIMARY_FACTORY_ROUTE_SEGMENT,
   REFUND_FACTORY,
   REFUND_FACTORY_APPS,
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
-import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
-import { MobileMorePage } from "./MobileMorePage";
-import { MobileBoardPage } from "./MobileBoardPage";
+import { DRAFT_WORK_ORDER, createMobileBoardRenderer, stubElementHeights } from "./mobileBoardPageSpecHarness";
 
 const idleBoardPage = (): {
   hasNextPage: boolean;
@@ -30,13 +23,6 @@ const idleBoardPage = (): {
   fetchNextPage: () => void;
   totalCount?: number;
 } => ({ hasNextPage: false, isFetchingNextPage: false, isFetchNextPageError: false, fetchNextPage: vi.fn() });
-const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
-  id: "wo-draft",
-  number: "42",
-  title: "Fix refund rounding",
-  state: "STATE_DRAFT",
-  lineDispatches: [],
-};
 const boardWorkOrders = vi.fn((): FactoriesWorkOrder[] => []);
 const backlogPage = vi.fn(idleBoardPage);
 const openPage = vi.fn(idleBoardPage);
@@ -48,6 +34,13 @@ const factoryAutomations = vi.fn(() => REFUND_FACTORY_APPS);
 vi.mock("@/contexts/useAccount", () => ({ useAccount: () => ({ account: { id: "account-1", name: "Ada" } }) }));
 const openCreateWorkOrder = vi.fn();
 const importIntakeItem = vi.fn(async () => ({ id: "imported-task", number: "47", title: "Imported issue" }));
+
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="mobile-test-location">{`${location.pathname}${location.search}`}</div>;
+}
+
+const { boardElement, renderBoard } = createMobileBoardRenderer(openCreateWorkOrder, LocationProbe);
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryBoardWorkOrders: () => ({
@@ -119,61 +112,6 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
 vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, currentUserId: "user-1", isLoading: false }),
 }));
-
-function stubElementHeights(measurements: { scrollHeight: number; clientHeight: number }) {
-  for (const [name, value] of Object.entries(measurements)) {
-    Object.defineProperty(HTMLElement.prototype, name, { configurable: true, value });
-  }
-  return () => {
-    for (const name of Object.keys(measurements)) Reflect.deleteProperty(HTMLElement.prototype, name);
-  };
-}
-
-function LocationProbe() {
-  const location = useLocation();
-  return <div data-testid="mobile-test-location">{`${location.pathname}${location.search}`}</div>;
-}
-
-function renderBoard(factory = REFUND_FACTORY, more = false) {
-  return render(boardElement(factory, more));
-}
-
-function boardElement(factory = REFUND_FACTORY, more = false) {
-  return (
-    <QueryClientProvider client={new QueryClient()}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <MemoryRouter
-            initialEntries={[
-              more
-                ? `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/more?lineId=${REFUND_LINE_PLAN_ID}`
-                : `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
-            ]}
-          >
-            <FactoriesLayoutContext.Provider
-              value={{
-                organizationId: "org-1",
-                factoryId: PRIMARY_FACTORY_ID,
-                factoryKey: PRIMARY_FACTORY_KEY,
-                routeSegment: PRIMARY_FACTORY_ROUTE_SEGMENT,
-                factory,
-                factories: [factory],
-                openCreateWorkOrder,
-              }}
-            >
-              <Routes>
-                <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<MobileBoardPage />} />
-                <Route path="/org-1/workspaces/:factoryKey/more" element={<MobileMorePage />} />
-                <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<div>Task page</div>} />
-              </Routes>
-              <LocationProbe />
-            </FactoriesLayoutContext.Provider>
-          </MemoryRouter>
-        </TooltipProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
-  );
-}
 
 describe("MobileBoardPage", () => {
   beforeEach(() => {
