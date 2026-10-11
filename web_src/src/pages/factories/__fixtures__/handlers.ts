@@ -672,6 +672,35 @@ function ensureMCPClients(fixture: FactoriesFixture, factoryId: string): Factori
 function factoryMCPClientRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   return [
     {
+      pattern: re("/api/v1/factories/([^/]+)/mcp-api-tokens/([^/]+)"),
+      resolve: (match, method) => {
+        if (method !== "DELETE") return { json: {} };
+        const clients = ensureMCPClients(fixture, match[1]);
+        const index = clients.findIndex((entry) => entry.id === match[2]);
+        if (index >= 0) {
+          clients.splice(index, 1);
+        }
+        return { json: {} };
+      },
+    },
+    {
+      pattern: re("/api/v1/factories/([^/]+)/mcp-api-tokens"),
+      resolve: (match, method, body) => {
+        if (method !== "POST") return { json: {} };
+        const name = typeof body?.name === "string" ? body.name.trim() : "OpenCode";
+        const created: FactoriesFactoryMcpClient = {
+          id: `mcp-api-token-${name.toLowerCase().replace(/\s+/g, "-")}`,
+          clientName: name,
+          kind: "api_token",
+          userId: STORYBOOK_ME_USER_ID,
+          userName: STORYBOOK_ME_USER_NAME,
+          createdAt: new Date().toISOString(),
+        };
+        ensureMCPClients(fixture, match[1]).unshift(created);
+        return { json: { token: created, plaintext: "sp_mcp_secret-shown-once" } };
+      },
+    },
+    {
       pattern: re("/api/v1/factories/([^/]+)/mcp-clients/([^/]+)"),
       resolve: (match, method) => {
         if (method !== "DELETE") return { json: {} };

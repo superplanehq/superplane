@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -284,6 +285,8 @@ func TestDeleteAccount_SoftDeletesCreatedOrgAndFreesEmail(t *testing.T) {
 
 	body, err := json.Marshal(map[string]string{"email": originalEmail})
 	require.NoError(t, err)
+	mcpToken := models.NewMCPAPIToken(r.User, r.Organization.ID, uuid.New(), "Build server", "http://localhost:8000/mcp", crypto.HashToken("sp_mcp_deleted"), nil)
+	require.NoError(t, models.CreateMCPAPIToken(database.Conn(), mcpToken))
 	req, _ := http.NewRequest(http.MethodDelete, "/account", bytes.NewReader(body))
 	req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
 	res := httptest.NewRecorder()
@@ -299,6 +302,8 @@ func TestDeleteAccount_SoftDeletesCreatedOrgAndFreesEmail(t *testing.T) {
 
 	_, err = models.FindOrganizationByID(r.Organization.ID.String())
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
+	_, err = models.FindMCPAPITokenByHash(database.Conn(), crypto.HashToken("sp_mcp_deleted"))
+	assert.ErrorIs(t, err, models.ErrMCPAPITokenNotFound)
 
 	_, err = models.FindAccountByProvider(database.Conn(), models.ProviderGitHub, "testuser")
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)

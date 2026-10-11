@@ -120,6 +120,14 @@ func ClientDisplayName(tx *gorm.DB, clientID string) string {
 	if row, err := models.FindMCPOAuthClient(tx, clientID); err == nil {
 		stored = row.ClientName
 	}
+	if id, err := uuid.Parse(clientID); err == nil {
+		if token, err := models.FindMCPAPITokenByID(tx, id); err == nil {
+			name := strings.TrimSpace(token.Name)
+			if name != "" {
+				return name
+			}
+		}
+	}
 	return mcp.ClientDisplayName(stored, clientID, models.DefaultMCPClientName)
 }
 

@@ -391,3 +391,13 @@ func (s *FactoryService) RevokeFactoryMCPClient(ctx context.Context, req *pb.Rev
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.RevokeFactoryMCPClient(ctx, organizationID, req)
 }
+
+func (s *FactoryService) CreateFactoryMCPAPIToken(ctx context.Context, req *pb.CreateFactoryMCPAPITokenRequest) (*pb.CreateFactoryMCPAPITokenResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.CreateFactoryMCPAPIToken(ctx, organizationID, req)
+}
+
+func (s *FactoryService) RevokeFactoryMCPAPIToken(ctx context.Context, req *pb.RevokeFactoryMCPAPITokenRequest) (*pb.RevokeFactoryMCPAPITokenResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RevokeFactoryMCPAPIToken(ctx, organizationID, req)
+}
