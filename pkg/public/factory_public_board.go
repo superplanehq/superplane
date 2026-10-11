@@ -350,14 +350,14 @@ func assemblePublicBoard(
 			Key:         "verify",
 			Title:       "Verify",
 			Color:       line.ColumnColorsValue()["verify"],
-			Automations: verifyAutomations(canvases, handlers),
+			Automations: verifyAutomations(canvases, handlers, factory.OnboardingConfigValue().EffectiveVCSProvider()),
 			Cards:       []publicCard{},
 		},
 		publicColumn{
 			Key:         "done",
 			Title:       "Done",
 			Color:       line.ColumnColorsValue()["done"],
-			Automations: doneAutomations(canvases),
+			Automations: doneAutomations(canvases, factory.OnboardingConfigValue().EffectiveVCSProvider()),
 			Cards:       []publicCard{},
 		},
 	)
@@ -789,8 +789,8 @@ func agentStepAutomation(index int, title string) publicAutomation {
 	}
 }
 
-func verifyAutomations(canvases []models.Canvas, handlers []models.FactoryPRFeedbackHandler) []publicAutomation {
-	rows := prFeedbackAutomations(handlers)
+func verifyAutomations(canvases []models.Canvas, handlers []models.FactoryPRFeedbackHandler, vcsProvider string) []publicAutomation {
+	rows := prFeedbackAutomations(handlers, vcsProvider)
 	skip := map[uuid.UUID]struct{}{}
 	for _, canvas := range canvases {
 		if !isRiskScoreCanvas(canvas) {
@@ -808,7 +808,7 @@ func verifyAutomations(canvases []models.Canvas, handlers []models.FactoryPRFeed
 	return append(rows, customColumnAutomations(canvases, models.CanvasColumnKeyVerify, skip)...)
 }
 
-func doneAutomations(canvases []models.Canvas) []publicAutomation {
+func doneAutomations(canvases []models.Canvas, vcsProvider string) []publicAutomation {
 	rows := []publicAutomation{}
 	skip := map[uuid.UUID]struct{}{}
 	if canvas := closureCanvas(canvases); canvas != nil {
@@ -818,14 +818,14 @@ func doneAutomations(canvases []models.Canvas) []publicAutomation {
 			Kind:      "pr-closure",
 			Name:      "PR Closure",
 			CatalogID: "pr-closure",
-			Icon:      publicIconGitHub,
+			Icon:      publicVCSIcon(vcsProvider),
 			Health:    "healthy",
 		})
 	}
 	return append(rows, customColumnAutomations(canvases, models.CanvasColumnKeyDone, skip)...)
 }
 
-func prFeedbackAutomations(handlers []models.FactoryPRFeedbackHandler) []publicAutomation {
+func prFeedbackAutomations(handlers []models.FactoryPRFeedbackHandler, vcsProvider string) []publicAutomation {
 	rows := make([]publicAutomation, 0, len(handlers))
 	for index, handler := range handlers {
 		kind := "pr-discussion"
@@ -842,7 +842,7 @@ func prFeedbackAutomations(handlers []models.FactoryPRFeedbackHandler) []publicA
 			Kind:      kind,
 			Name:      name,
 			CatalogID: kind,
-			Icon:      publicIconGitHub,
+			Icon:      publicVCSIcon(vcsProvider),
 			Health:    "healthy",
 		})
 	}
@@ -923,6 +923,7 @@ func intakeSourceName(source string) string {
 
 const (
 	publicIconGitHub     = "github"
+	publicIconBitbucket  = "bitbucket"
 	publicIconDependabot = "dependabot"
 	publicIconSentry     = "sentry"
 	publicIconJira       = "jira"
@@ -930,6 +931,13 @@ const (
 	publicIconProductive = "productive"
 	publicIconDatadog    = "datadog"
 )
+
+func publicVCSIcon(vcsProvider string) string {
+	if vcsProvider == models.ProviderBitbucket {
+		return publicIconBitbucket
+	}
+	return publicIconGitHub
+}
 
 func intakeIcon(source string) string {
 	switch source {

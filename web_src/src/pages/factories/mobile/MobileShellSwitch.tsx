@@ -1,3 +1,7 @@
+import { Navigate } from "react-router";
+import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { factorySettingsPath } from "../lib/factoryPagePaths";
+import { MobileMorePage } from "./MobileMorePage";
 import type { ReactNode } from "react";
 
 import { FactoriesLayout } from "../layout/FactoriesLayout";
@@ -26,4 +30,10 @@ export function LineBoardRouteSwitch() {
 
 export function WorkOrderDetailRouteSwitch() {
   return useMobileFactoryShell() ? <MobileTaskDetailPage /> : <WorkOrderDetailPage />;
+}
+
+export function FactoryMoreRouteSwitch() {
+  const mobile = useMobileFactoryShell();
+  const { organizationId, routeSegment } = useFactoriesLayout();
+  return mobile ? <MobileMorePage /> : <Navigate to={factorySettingsPath(organizationId, routeSegment)} replace />;
 }

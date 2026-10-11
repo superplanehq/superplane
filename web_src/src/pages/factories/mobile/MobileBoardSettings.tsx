@@ -56,6 +56,7 @@ export function MobileBoardSettings({
           intake={settingsIntake}
           repository={onboarding?.backlogRepository}
           vcsIntegrationId={onboarding?.vcsIntegrationId}
+          page
           initialTab={intakeTab(intakeSettingsTabFromSearch(search))}
           onClose={close}
         />
@@ -66,6 +67,7 @@ export function MobileBoardSettings({
           factoryId={factoryId}
           factoryKey={routeSegment}
           githubIntegrationId={onboarding?.vcsIntegrationId?.trim() ?? ""}
+          vcsProvider={onboarding?.vcsProvider}
           repository={onboarding?.appRepository?.trim() ?? ""}
           lineId={lineId}
           canUpdate={canUpdate}

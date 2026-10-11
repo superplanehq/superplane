@@ -31,6 +31,7 @@ interface FilterMenuProps {
   /** When false, hide Mergeable so the menu matches the card pill. */
   showPullRequestMerge?: boolean;
   onOpenStatusDialog?: () => void;
+  triggerLabel?: string;
 }
 
 /** Filter trigger plus one submenu per dimension. Selections are additive. */
@@ -41,6 +42,7 @@ export function FilterMenu({
   assigneeOptions,
   showPullRequestMerge = false,
   onOpenStatusDialog,
+  triggerLabel,
 }: FilterMenuProps) {
   const visibleFilters = visibleWorkOrderFilters(state.filters, showPullRequestMerge);
   const filterCount = countWorkOrderFilters(visibleFilters) - (lineOptions ? 0 : visibleFilters.lineIds.length);
@@ -49,13 +51,14 @@ export function FilterMenu({
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
-          variant="ghost"
-          size="icon"
+          variant={triggerLabel ? "outline" : "ghost"}
+          size={triggerLabel ? "default" : "icon"}
           aria-label="Filter"
-          className="relative size-8 shrink-0 text-muted-foreground"
+          className={cn("relative shrink-0 text-muted-foreground", triggerLabel ? "h-11 gap-2 px-3" : "size-8")}
           data-testid="work-orders-filter-trigger"
         >
-          <Funnel className="size-3.5" aria-hidden />
+          <Funnel className={triggerLabel ? "size-4" : "size-3.5"} aria-hidden />
+          {triggerLabel}
           {filterCount > 0 ? (
             <span className="absolute -top-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-accent text-[9px] font-medium text-foreground">
               {filterCount}
