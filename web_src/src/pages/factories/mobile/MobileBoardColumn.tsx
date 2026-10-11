@@ -2,10 +2,12 @@ import type { FactoriesWorkOrder } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Inbox, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 
 import { LineBoardColumnCardList } from "../pages/LineBoardOrderCard";
+import { usePermissions } from "@/contexts/usePermissions";
+import { MobileCreateTaskButton } from "./MobileCreateTaskButton";
 import type { MobileBoardColumn } from "./mobileBoardColumns";
 import { MOBILE_BOARD_COPY } from "./mobileCopy";
 
@@ -23,6 +25,7 @@ export function MobileColumn({
   lane,
   paging,
   renderCard,
+  onImported,
 }: {
   column: MobileBoardColumn;
   hidden: boolean;
@@ -30,7 +33,10 @@ export function MobileColumn({
   lane: { className?: string; surfaceClassName?: string };
   paging: ColumnPaging;
   renderCard: (order: FactoriesWorkOrder) => ReactNode;
+  onImported: (order: FactoriesWorkOrder) => void;
 }) {
+  const { canAct } = usePermissions();
+  const showCreate = canAct("work_orders", "create") && !hidden;
   const listRef = useRef<HTMLUListElement>(null);
   const loadIfVisible = useVisibleColumnLoadMore(listRef, hidden, column.cards.length, paging);
   const showEmpty = !cardsPending && column.cards.length === 0 && !paging.hasMore;
@@ -41,17 +47,28 @@ export function MobileColumn({
       aria-hidden={hidden || undefined}
       inert={hidden || undefined}
       data-testid={`mobile-board-column-${column.key}`}
-      className={cn("flex h-full w-full shrink-0 snap-start flex-col p-3", lane.className, lane.surfaceClassName)}
+      className={cn(
+        "relative flex h-full w-full shrink-0 snap-start flex-col p-3",
+        lane.className,
+        lane.surfaceClassName,
+      )}
     >
       {showEmpty ? (
-        <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-[13px] text-muted-foreground">
-          {column.emptyDescription}
-        </p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 pb-12 text-center">
+          <Inbox className="mb-2 size-12 text-muted-foreground/60" strokeWidth={1.25} aria-hidden />
+          <h2 className="text-lg font-semibold">{column.emptyDescription}</h2>
+          {column.key === "backlog" && showCreate ? (
+            <>
+              <p className="text-sm text-muted-foreground">Create a task to start work.</p>
+              <MobileCreateTaskButton className="mt-3 h-12 gap-2 px-6" onImported={onImported} />
+            </>
+          ) : null}
+        </div>
       ) : (
         <LineBoardColumnCardList
           ref={listRef}
           pending={cardsPending}
-          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 [scrollbar-width:none]"
+          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-24 [scrollbar-width:none]"
           testId={`mobile-board-column-scroll-${column.key}`}
           onScroll={loadIfVisible}
         >
@@ -62,6 +79,11 @@ export function MobileColumn({
       )}
       {paging.isLoading ? <MobileColumnLoadingMore /> : null}
       {paging.hasPageError && !paging.isLoading ? <MobileColumnPageError onRetry={paging.onLoadMore} /> : null}
+      {showCreate && !(showEmpty && column.key === "backlog") ? (
+        <div className="absolute right-4 bottom-5">
+          <MobileCreateTaskButton className="h-12 gap-2 px-5 shadow-sm" onImported={onImported} />
+        </div>
+      ) : null}
     </section>
   );
 }

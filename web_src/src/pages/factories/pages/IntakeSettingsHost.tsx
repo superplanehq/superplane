@@ -26,6 +26,7 @@ interface IntakeSettingsHostProps {
   /** GitHub integration that has access to that repository. */
   vcsIntegrationId?: string;
   initialTab?: IntakeSettingsTab;
+  page?: boolean;
   onClose: () => void;
 }
 
@@ -39,6 +40,7 @@ export function IntakeSettingsHost({
   repository,
   vcsIntegrationId,
   initialTab = "general",
+  page = false,
   onClose,
 }: IntakeSettingsHostProps) {
   const automation = useIntakeAutomationCanvas(organizationId, intake.appId);
@@ -113,6 +115,7 @@ export function IntakeSettingsHost({
       }
       onClose={onClose}
       initialTab={initialTab}
+      page={page}
       fixed
     />
   );

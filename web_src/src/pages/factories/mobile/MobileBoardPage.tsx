@@ -1,7 +1,6 @@
 import type {
   FactoriesFactoryIntake,
   FactoriesFactoryLine,
-  FactoriesFactoryPrFeedbackHandler,
   FactoriesWorkOrder,
   FactoriesWorkOrderSummary,
 } from "@/api-client";
@@ -23,21 +22,23 @@ import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Navigate, useNavigate, useParams } from "react-router";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 
 import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
 import {
   factoryHomePath,
-  factoryIntakePath,
   factoryLineDetailPath,
-  factoryPRFeedbackPath,
+  intakeIdFromSearch,
+  isIntakeSearchOpen,
+  isPRFeedbackSearchOpen,
+  isPlanningSearchOpen,
+  columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
   workOrderDetailPath,
 } from "../lib/factoryPagePaths";
 import { boardDoneResultsForStatuses, uniqueWorkOrdersById } from "../lib/workOrderListPagination";
-import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
 import {
@@ -130,7 +131,7 @@ type MobileBoardModel = {
   sourceOptions: WorkOrderFilterOption[];
   assigneeOptions: WorkOrderFilterOption[];
   factoryIntakes: FactoriesFactoryIntake[];
-  prFeedbackHandlers: FactoriesFactoryPrFeedbackHandler[];
+  apps: Array<{ id?: string; name?: string }>;
   workOrderCardContext: WorkOrderCardContext;
   analyzingOrderIds: Set<string>;
   creditFailureLabels: ReadonlyMap<string, string>;
@@ -244,7 +245,7 @@ function useMobileBoardModel({
     sourceOptions,
     assigneeOptions,
     factoryIntakes,
-    prFeedbackHandlers,
+    apps,
     workOrderCardContext: {
       organizationId,
       factoryId,
@@ -278,8 +279,7 @@ function MobileLineBoard(props: {
   const { canAct } = usePermissions();
   const model = useMobileBoardModel(props);
   const searchRef = useWorkOrdersHeaderShortcuts(model.listState);
-  const { view: colorView, setView: setColorView } = useLineBoardColumnColorViewPreference();
-  const { headerKicker } = useHostedCreditChrome(organizationId, routeSegment, { compact: true });
+  const { view: colorView } = useLineBoardColumnColorViewPreference();
   const columnColors = useMemo(() => normalizeColumnColors(line.columnColors), [line.columnColors]);
   const configuredIntakes = useMemo(
     () => intakeSourcesFromFactoryIntakes(model.factoryIntakes),
@@ -287,9 +287,16 @@ function MobileLineBoard(props: {
   );
   const canConfigureFactory = canAct("factories", "update");
   const lines = factory?.lines ?? [];
+  const { search } = useLocation();
+  const settingsOpen =
+    (isIntakeSearchOpen(search) &&
+      configuredIntakes.some((intake) => intake.intakeId === intakeIdFromSearch(search))) ||
+    isPRFeedbackSearchOpen(search) ||
+    isPlanningSearchOpen(search) ||
+    Boolean(columnAutomationViewCanvasIdFromSearch(search));
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-testid="mobile-board-page">
+    <div className="relative flex h-full min-h-0 flex-col" data-testid="mobile-board-page">
       <MobileBoardSettings
         organizationId={organizationId}
         factoryId={factoryId}
@@ -298,52 +305,49 @@ function MobileLineBoard(props: {
         intakes={configuredIntakes}
         canUpdate={canConfigureFactory}
         onboarding={factory?.onboarding}
+        apps={model.apps}
       />
-      <MobileBoardHeader
-        state={model.listState}
-        searchRef={searchRef}
-        creditKicker={headerKicker}
-        sourceOptions={model.sourceOptions}
-        assigneeOptions={model.assigneeOptions}
-        showPullRequestMerge={model.showPullRequestMerge}
-        colorView={colorView}
-        onColorViewChange={setColorView}
-        intakes={configuredIntakes}
-        prFeedbackHandlers={model.prFeedbackHandlers}
-        onOpenIntake={(intake) => navigate(factoryIntakePath(organizationId, routeSegment, lineId, intake.intakeId))}
-        onOpenPRFeedback={(handlerId) =>
-          navigate(factoryPRFeedbackPath(organizationId, routeSegment, lineId, undefined, handlerId))
-        }
-        lines={lines}
-        lineId={lineId}
-        onSelectLine={(nextLineId) => {
-          if (nextLineId !== lineId) {
-            navigate(factoryLineDetailPath(organizationId, routeSegment, nextLineId));
-          }
-        }}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={routeSegment}
-        canManageClosedStatus={canConfigureFactory}
-      />
-      <MobileColumnCarousel
-        columns={model.columns}
-        cardsPending={model.cardsPending}
-        laneClassName={(column) =>
-          lineBoardColumnLaneProps(columnColors[column.key] ?? null, colorView, { mutedFallback: true })
-        }
-        paging={model.paging}
-        renderCard={(column, order) => (
-          <LineBoardWorkOrderCard
-            order={order}
-            workOrderCardContext={model.workOrderCardContext}
-            onOpen={() => onOpenWorkOrder(order)}
-            isAnalyzing={column.key === "backlog" && Boolean(order.id && model.analyzingOrderIds.has(order.id))}
-            creditLabel={order.id ? model.creditFailureLabels.get(order.id) : undefined}
-            showMergeConfidence={column.key !== "done"}
+      {!settingsOpen ? (
+        <>
+          <MobileBoardHeader
+            state={model.listState}
+            searchRef={searchRef}
+            sourceOptions={model.sourceOptions}
+            assigneeOptions={model.assigneeOptions}
+            showPullRequestMerge={model.showPullRequestMerge}
+            lines={lines}
+            lineId={lineId}
+            onSelectLine={(nextLineId) => {
+              if (nextLineId !== lineId) {
+                navigate(factoryLineDetailPath(organizationId, routeSegment, nextLineId));
+              }
+            }}
+            organizationId={organizationId}
+            factoryId={factoryId}
+            factoryKey={routeSegment}
+            canManageClosedStatus={canConfigureFactory}
           />
-        )}
-      />
+          <MobileColumnCarousel
+            onImported={onOpenWorkOrder}
+            columns={model.columns}
+            cardsPending={model.cardsPending}
+            laneClassName={(column) =>
+              lineBoardColumnLaneProps(columnColors[column.key] ?? null, colorView, { mutedFallback: true })
+            }
+            paging={model.paging}
+            renderCard={(column, order) => (
+              <LineBoardWorkOrderCard
+                order={order}
+                workOrderCardContext={model.workOrderCardContext}
+                onOpen={() => onOpenWorkOrder(order)}
+                isAnalyzing={column.key === "backlog" && Boolean(order.id && model.analyzingOrderIds.has(order.id))}
+                creditLabel={order.id ? model.creditFailureLabels.get(order.id) : undefined}
+                showMergeConfidence={column.key !== "done"}
+              />
+            )}
+          />
+        </>
+      ) : null}
     </div>
   );
 }
@@ -358,12 +362,14 @@ function MobileColumnCarousel({
   laneClassName,
   paging,
   renderCard,
+  onImported,
 }: {
   columns: MobileBoardColumn[];
   cardsPending: boolean;
   laneClassName: (column: MobileBoardColumn) => { className?: string; surfaceClassName?: string };
   paging: Record<MobileBoardColumn["paging"], ColumnPaging>;
   renderCard: (column: MobileBoardColumn, order: FactoriesWorkOrder) => ReactNode;
+  onImported: (order: FactoriesWorkOrder) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -409,6 +415,7 @@ function MobileColumnCarousel({
             lane={laneClassName(column)}
             paging={paging[column.paging]}
             renderCard={(order) => renderCard(column, order)}
+            onImported={onImported}
           />
         ))}
       </div>
@@ -434,7 +441,7 @@ function MobileColumnTabs({
     <div
       role="tablist"
       aria-label="Board columns"
-      className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 [scrollbar-width:none]"
+      className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-4 [scrollbar-width:none]"
       data-testid="mobile-board-tabs"
     >
       {columns.map((column, index) => {
@@ -451,7 +458,7 @@ function MobileColumnTabs({
             onClick={() => onSelect(index)}
             data-testid={`mobile-board-tab-${column.key}`}
             className={cn(
-              "flex h-10 shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-[13px] font-medium tracking-[-0.01em] transition-colors",
+              "flex h-12 shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-[13px] font-medium tracking-[-0.01em] transition-colors",
               active ? "border-foreground text-foreground" : "border-transparent text-muted-foreground",
             )}
           >

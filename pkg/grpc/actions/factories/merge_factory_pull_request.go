@@ -44,9 +44,16 @@ func MergeFactoryPullRequest(
 	}
 
 	provider := openFactoryVCS(db, deps, factory)
-	result, cached, err := mergeabilityFromCache(db, factory, pullRequest)
-	if err != nil {
-		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+	// Bitbucket mergeability always reads fresh. Cached snapshots predate
+	// merge support and would keep a mergeable pull request blocked.
+	_, freshOnly := provider.(*bitbucketProvider)
+	var result *factoryPullRequestMergeability
+	var cached bool
+	if !freshOnly {
+		result, cached, err = mergeabilityFromCache(db, factory, pullRequest)
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
+		}
 	}
 	if !cached {
 		result, err = readFactoryPullRequestMergeability(ctx, db, provider, pullRequest)
@@ -85,6 +92,12 @@ func MergeFactoryPullRequest(
 				"failed to merge factory pull request",
 			)
 		}
+		if errors.Is(err, errFactoryBitbucketNotConnected) {
+			return nil, factoryErrorToStatus(
+				errors.Join(errFactoryPullRequestNotMergeable, errors.New(bitbucketMergeBlockedMissingIntegration)),
+				"failed to merge factory pull request",
+			)
+		}
 		return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 	}
 
@@ -94,7 +107,7 @@ func MergeFactoryPullRequest(
 			return err
 		}
 
-		if err := provider.MergePullRequest(ctx, pullRequest.Repository, int(pullRequest.Number), method, expectedSHA); err != nil {
+		if err := provider.MergePullRequest(ctx, pullRequest, method, expectedSHA); err != nil {
 			return err
 		}
 
@@ -121,7 +134,7 @@ func MergeFactoryPullRequest(
 		if errors.Is(err, errFactoryPullRequestNotMergeable) {
 			return nil, factoryErrorToStatus(errors.Join(errFactoryPullRequestNotMergeable, errors.New(mergeBlockedActiveRun)), "failed to merge factory pull request")
 		}
-		if errors.Is(err, errFactoryPullRequestHeadMoved) || errors.Is(err, errFactoryBitbucketMergeNotRevisionSafe) {
+		if errors.Is(err, errFactoryPullRequestHeadMoved) {
 			return nil, factoryErrorToStatus(err, "failed to merge factory pull request")
 		}
 		if isGitHubHeadMovedError(err) {

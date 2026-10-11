@@ -178,8 +178,11 @@ spec:
     ]);
   });
 
-  it("installs no GitHub event apps for a Bitbucket workspace", () => {
-    expect(onboardingEventAppsFor("bitbucket")).toEqual([]);
+  it("selects event apps for the workspace Git host", () => {
+    expect(onboardingEventAppsFor("bitbucket")).toEqual(["pr-closure"]);
+    const closure = getFactoryDefinition("pr-closure", "bitbucket");
+    expect(closure.integrations).toEqual(["bitbucket"]);
+    expect(closure.componentIntegrations).toEqual({ "bitbucket.onPullRequest": "bitbucket" });
     expect(onboardingEventAppsFor(undefined)).toEqual(["pr-closure", "risk-score"]);
     expect(onboardingEventAppsFor("github")).toEqual(["pr-closure", "risk-score"]);
   });

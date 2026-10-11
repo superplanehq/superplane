@@ -342,6 +342,20 @@ func (c *WaitForBuilds) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 		return http.StatusOK, nil, nil
 	}
 
+	if ctx.FindActiveExecutionByKV != nil {
+		executionCtx, err := ctx.FindActiveExecutionByKV(waitBuildsRefKV, waitBuildsRefValue(config.Repository, sha))
+		if err != nil || executionCtx == nil {
+			return http.StatusOK, nil, nil
+		}
+		if waitBuildsStopped(executionCtx.ExecutionState) {
+			return http.StatusOK, nil, nil
+		}
+		if err := executionCtx.Requests.ScheduleActionCall(waitBuildsEvaluateHook, map[string]any{}, waitBuildsWebhookDelay); err != nil {
+			return http.StatusInternalServerError, nil, err
+		}
+		return http.StatusOK, nil, nil
+	}
+
 	if ctx.FindExecutionByKV == nil {
 		return http.StatusOK, nil, nil
 	}

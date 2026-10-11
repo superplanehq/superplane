@@ -19,9 +19,9 @@ import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 
 import {
   defaultMergeMethod,
-  isGitHubPullRequest,
   isMergedPullRequest,
   PULL_REQUEST_REVIEW_COPY,
+  supportsPullRequestMerge,
   type FactoryPullRequestMergeMethodChoice,
 } from "./splitRunPullRequestReview";
 
@@ -47,7 +47,7 @@ export function SplitRunPullRequestMergeAction({
   compact?: boolean;
 }) {
   const { has } = useExperimentalFeature(organizationId);
-  if (!isGitHubPullRequest(pullRequest) || !pullRequest?.id) {
+  if (!supportsPullRequestMerge(pullRequest) || !pullRequest?.id) {
     return null;
   }
   if (isMergedPullRequest(pullRequest)) {
