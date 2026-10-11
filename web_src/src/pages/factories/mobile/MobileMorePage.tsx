@@ -1,3 +1,4 @@
+import { Avatar } from "@/components/Avatar/avatar";
 import { FeedbackDialog } from "@/components/FeedbackDialog";
 import { OrganizationSwitchMenu } from "@/components/OrganizationSwitchMenu";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { initialsForName } from "../layout/factoriesRail";
 import {
   factorySettingsPath,
   factorySettingsSectionPath,
@@ -69,13 +71,11 @@ export function MobileMorePage() {
         <MobileWorkspaceSwitcher />
       </div>
       <h1 className="text-2xl font-semibold tracking-tight">More</h1>
-      <Link
-        to={settingsHref("account", "general")}
-        className="block rounded-lg border border-border bg-card p-4 hover:bg-accent"
-      >
-        <p className="text-base font-semibold">{account?.name || "Your account"}</p>
-        <p className="mt-1 text-sm text-muted-foreground">Profile and account settings</p>
-      </Link>
+      <MobileAccountCard
+        href={settingsHref("account", "general")}
+        name={account?.name}
+        avatarUrl={account?.avatar_url}
+      />
       {headerKicker ? <div className="flex flex-wrap items-center gap-2">{headerKicker}</div> : null}
       <div className={GROUP_CLASS}>
         <MoreLink href={factorySettingsPath(organizationId, routeSegment)} icon={<Settings />}>
@@ -155,6 +155,32 @@ export function MobileMorePage() {
         initialCategory={feedbackCategory}
       />
     </div>
+  );
+}
+
+function MobileAccountCard({
+  href,
+  name,
+  avatarUrl,
+}: {
+  href: string;
+  name?: string | null;
+  avatarUrl?: string | null;
+}) {
+  const displayName = name || "Your account";
+  return (
+    <Link to={href} className="flex items-center gap-3 rounded-lg border border-border bg-card p-4 hover:bg-accent">
+      <Avatar
+        src={avatarUrl || undefined}
+        initials={avatarUrl ? undefined : initialsForName(displayName)}
+        alt={displayName}
+        className="size-10"
+      />
+      <span className="min-w-0">
+        <p className="truncate text-base font-semibold">{displayName}</p>
+        <p className="mt-1 text-sm text-muted-foreground">Profile and account settings</p>
+      </span>
+    </Link>
   );
 }
 
