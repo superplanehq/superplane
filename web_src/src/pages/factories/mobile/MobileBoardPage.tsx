@@ -32,6 +32,9 @@ import {
   factoryLineDetailPath,
   intakeIdFromSearch,
   isIntakeSearchOpen,
+  isPRFeedbackSearchOpen,
+  isPlanningSearchOpen,
+  columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
   workOrderDetailPath,
 } from "../lib/factoryPagePaths";
@@ -128,6 +131,7 @@ type MobileBoardModel = {
   sourceOptions: WorkOrderFilterOption[];
   assigneeOptions: WorkOrderFilterOption[];
   factoryIntakes: FactoriesFactoryIntake[];
+  apps: Array<{ id?: string; name?: string }>;
   workOrderCardContext: WorkOrderCardContext;
   analyzingOrderIds: Set<string>;
   creditFailureLabels: ReadonlyMap<string, string>;
@@ -241,6 +245,7 @@ function useMobileBoardModel({
     sourceOptions,
     assigneeOptions,
     factoryIntakes,
+    apps,
     workOrderCardContext: {
       organizationId,
       factoryId,
@@ -283,8 +288,12 @@ function MobileLineBoard(props: {
   const canConfigureFactory = canAct("factories", "update");
   const lines = factory?.lines ?? [];
   const { search } = useLocation();
-  const intakeSettingsOpen =
-    isIntakeSearchOpen(search) && configuredIntakes.some((intake) => intake.intakeId === intakeIdFromSearch(search));
+  const settingsOpen =
+    (isIntakeSearchOpen(search) &&
+      configuredIntakes.some((intake) => intake.intakeId === intakeIdFromSearch(search))) ||
+    isPRFeedbackSearchOpen(search) ||
+    isPlanningSearchOpen(search) ||
+    Boolean(columnAutomationViewCanvasIdFromSearch(search));
 
   return (
     <div className="relative flex h-full min-h-0 flex-col" data-testid="mobile-board-page">
@@ -296,8 +305,9 @@ function MobileLineBoard(props: {
         intakes={configuredIntakes}
         canUpdate={canConfigureFactory}
         onboarding={factory?.onboarding}
+        apps={model.apps}
       />
-      {!intakeSettingsOpen ? (
+      {!settingsOpen ? (
         <>
           <MobileBoardHeader
             state={model.listState}

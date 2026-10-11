@@ -7,6 +7,7 @@ import { useAccount } from "@/contexts/useAccount";
 import { useTheme } from "@/contexts/useTheme";
 import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
+import { useFactoryAutomations } from "@/hooks/useFactoryData";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { isThemePreference } from "@/lib/themePreference";
@@ -14,13 +15,12 @@ import type { FeedbackCategory } from "@/lib/submitFeedback";
 import { posthog } from "@/posthog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { ArrowRightLeft, Bug, ChevronRight, CreditCard, LogOut, MessageSquare, Settings, Shield } from "lucide-react";
-import { useId, useState, type ReactNode } from "react";
+import type { FactoriesFactoryLine } from "@/api-client";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import {
-  factoryIntakePath,
-  factoryPRFeedbackPath,
   factorySettingsPath,
   factorySettingsSectionPath,
   firstFactoryLineId,
@@ -30,10 +30,17 @@ import {
   isLineBoardColumnColorView,
   useLineBoardColumnColorViewPreference,
 } from "../lib/lineBoardColumnColorViewPreference";
-import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
-import { intakeSourcesFromFactoryIntakes, lineIntakeListenTitle } from "../pages/lineIntakeModel";
-import { prFeedbackListenTitle, prFeedbackVCSIcon } from "../pages/prFeedbackSettingsModel";
 import { ColumnAutomationGlyph } from "../pages/ColumnAutomationsPopup";
+import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
+import {
+  buildColumnAutomations,
+  columnAutomationOpenPath,
+  columnTitleForKey,
+  type ColumnAutomation,
+  type ColumnKey,
+} from "../lib/columnAutomations";
+import { columnAutomationHeadline } from "../lib/columnAutomationHeadline";
+import { buildLinePhaseBoard } from "../lib/linePhaseRuns";
 import { MobileWorkspaceSwitcher } from "./MobileWorkspaceSwitcher";
 
 const ROW_CLASS =
@@ -162,14 +169,25 @@ function MoreLink({ href, icon, children }: { href: string; icon: ReactNode; chi
 function MobileBoardOptions() {
   const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const { search } = useLocation();
-  const requestedLineId = workOrderBoardLineIdFromSearch(search);
-  const lineId = factory?.lines?.find((line) => line.id === requestedLineId)?.id ?? firstFactoryLineId(factory);
+  const { line, lineId } = useMobileBoardOptionLine(factory?.lines, workOrderBoardLineIdFromSearch(search));
   const intakes = useFactoryIntakes(organizationId, factoryId);
   const handlers = useFactoryPRFeedbackHandlers(organizationId, factoryId);
+  const automations = useFactoryAutomations(organizationId, factoryId);
   const { view, setView } = useLineBoardColumnColorViewPreference();
   const columnColorId = useId();
-  const sources = intakeSourcesFromFactoryIntakes(intakes.data ?? []);
-  const verifyIcon = prFeedbackVCSIcon(factory?.onboarding?.vcsProvider);
+  const columns = useMobileBoardOptionColumns({
+    line,
+    apps: automations.data,
+    intakes: intakes.data,
+    handlers: handlers.data,
+    planningEnabled: factory?.planning?.enabled !== false,
+    vcsProvider: factory?.onboarding?.vcsProvider,
+  });
+  const retry = () => {
+    void intakes.refetch();
+    void handlers.refetch();
+    void automations.refetch();
+  };
   return (
     <section aria-label="Board options" className="space-y-3">
       <h2 className="text-sm font-medium text-muted-foreground">Board options</h2>
@@ -193,63 +211,163 @@ function MobileBoardOptions() {
             </SelectContent>
           </Select>
         </div>
-        {intakes.isLoading || handlers.isLoading ? (
-          <p role="status" className="p-4 text-sm text-muted-foreground">
-            Loading board options…
-          </p>
-        ) : null}
-        {intakes.isError || handlers.isError ? (
-          <div role="alert" className="p-4 text-sm">
-            <p>SuperPlane could not load board options.</p>
-            <Button
-              variant="outline"
-              className="mt-2 h-11"
-              onClick={() => {
-                void intakes.refetch();
-                void handlers.refetch();
-              }}
-            >
-              Try again
-            </Button>
-          </div>
-        ) : null}
-        {sources.map((intake) => (
-          <MoreLink
-            key={intake.intakeId}
-            href={factoryIntakePath(organizationId, routeSegment, lineId, intake.intakeId)}
-            icon={
-              <ColumnAutomationGlyph
-                automation={{ kind: "intake", iconSrc: intake.source.iconSrc, iconAlt: intake.source.iconAlt }}
-                className="size-5"
-              />
-            }
-          >
-            <span>
-              {lineIntakeListenTitle(intake.source, intake.paused)}
-              {!intake.healthy ? <span className="block text-xs text-amber-600">Needs repair</span> : null}
-            </span>
-          </MoreLink>
-        ))}
-        {(handlers.data ?? [])
-          .filter((handler) => handler.id)
-          .map((handler) => (
-            <MoreLink
-              key={handler.id}
-              href={factoryPRFeedbackPath(organizationId, routeSegment, lineId, undefined, handler.id)}
-              icon={
-                <ColumnAutomationGlyph
-                  automation={{ kind: "pr-checks", iconSrc: verifyIcon.iconSrc, iconAlt: verifyIcon.iconAlt }}
-                  className="size-5"
-                />
-              }
-            >
-              <span>
-                {prFeedbackListenTitle(handler.source)}
-                {handler.healthy === false ? <span className="block text-xs text-amber-600">Needs repair</span> : null}
-              </span>
-            </MoreLink>
-          ))}
+        <MobileBoardOptionsStatus
+          isLoading={intakes.isLoading || handlers.isLoading || automations.isLoading}
+          isError={intakes.isError || handlers.isError || automations.isError}
+          onRetry={retry}
+        />
       </div>
+      <MobileBoardOptionColumnSections
+        columns={columns}
+        organizationId={organizationId}
+        factoryKey={routeSegment}
+        lineId={lineId}
+      />
     </section>
+  );
+}
+
+function MobileBoardOptionsStatus({
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
+  if (isLoading) {
+    return (
+      <p role="status" className="p-4 text-sm text-muted-foreground">
+        Loading board options…
+      </p>
+    );
+  }
+  if (isError) {
+    return (
+      <div role="alert" className="p-4 text-sm">
+        <p>SuperPlane could not load board options.</p>
+        <Button variant="outline" className="mt-2 h-11" onClick={onRetry}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+  return null;
+}
+
+function MobileBoardOptionColumnSections({
+  columns,
+  organizationId,
+  factoryKey,
+  lineId,
+}: {
+  columns: Array<{ key: ColumnKey; title: string; automations: ColumnAutomation[] }>;
+  organizationId: string;
+  factoryKey: string;
+  lineId: string | undefined;
+}) {
+  return (
+    <>
+      {columns.map((column) => (
+        <div key={column.key} className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground">{column.title}</h3>
+          <div className={GROUP_CLASS}>
+            {column.automations.length === 0 ? (
+              <p className="p-4 text-sm text-muted-foreground">No automations in {column.title}.</p>
+            ) : (
+              column.automations.map((automation) => (
+                <MobileAutomationRow
+                  key={automation.id}
+                  automation={automation}
+                  href={columnAutomationOpenPath(automation, {
+                    organizationId,
+                    factoryKey,
+                    lineId,
+                  })}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
+function useMobileBoardOptionLine(lines: FactoriesFactoryLine[] | undefined, requestedLineId: string | null) {
+  return useMemo(() => {
+    const list = lines ?? [];
+    const line = list.find((l) => l.id === requestedLineId) ?? list[0];
+    return {
+      line,
+      lineId: line?.id ?? firstFactoryLineId({ lines: list }),
+    };
+  }, [lines, requestedLineId]);
+}
+
+function useMobileBoardOptionColumns({
+  line,
+  apps,
+  intakes,
+  handlers,
+  planningEnabled,
+  vcsProvider,
+}: {
+  line?: FactoriesFactoryLine;
+  apps?: Array<{ id?: string; name?: string; columnKey?: string }>;
+  intakes?: Parameters<typeof buildColumnAutomations>[1]["intakes"];
+  handlers?: Parameters<typeof buildColumnAutomations>[1]["prFeedbackHandlers"];
+  planningEnabled: boolean;
+  vcsProvider?: string;
+}) {
+  const normalizedApps = useMemo(() => apps ?? [], [apps]);
+  const board = useMemo(() => (line ? buildLinePhaseBoard(line, [], normalizedApps) : []), [line, normalizedApps]);
+  return useMemo(() => {
+    const keys: ColumnKey[] = [
+      "backlog",
+      ...board.map((column): ColumnKey => `phase-${column.stepIndex}`),
+      "verify",
+      "done",
+    ];
+    return keys.map((key) => ({
+      key,
+      title: columnTitleForKey(key, board),
+      automations: buildColumnAutomations(key, {
+        columnTitle: columnTitleForKey(key, board),
+        columns: board,
+        intakes: intakes ?? [],
+        prFeedbackHandlers: handlers ?? [],
+        apps: normalizedApps,
+        workOrders: [],
+        planningEnabled,
+        vcsProvider,
+      }),
+    }));
+  }, [board, handlers, intakes, normalizedApps, planningEnabled, vcsProvider]);
+}
+
+function MobileAutomationRow({ automation, href }: { automation: ColumnAutomation; href: string | undefined }) {
+  const icon = <ColumnAutomationGlyph automation={automation} className="size-5" />;
+  const label = (
+    <span>
+      <span className="block">{automation.name}</span>
+      <span className="block text-xs font-normal text-muted-foreground">{columnAutomationHeadline(automation)}</span>
+      {automation.health === "needs-repair" ? <span className="block text-xs text-amber-600">Needs repair</span> : null}
+      {automation.health === "disabled" ? <span className="block text-xs text-muted-foreground">Disabled</span> : null}
+    </span>
+  );
+  if (!href) {
+    return (
+      <div className={ROW_CLASS}>
+        {icon}
+        <span className="min-w-0 flex-1">{label}</span>
+      </div>
+    );
+  }
+  return (
+    <MoreLink href={href} icon={icon}>
+      {label}
+    </MoreLink>
   );
 }
