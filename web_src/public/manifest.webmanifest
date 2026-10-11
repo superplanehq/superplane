@@ -5,20 +5,26 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#ed8e09",
   "theme_color": "#14120b",
   "icons": [
     {
-      "src": "/assets/pwa/icon-192.png",
+      "src": "/assets/pwa/superplane-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "/assets/pwa/icon-512.png",
+      "src": "/assets/pwa/superplane-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/pwa/superplane-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

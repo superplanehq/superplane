@@ -15,10 +15,12 @@ import {
   PRIMARY_FACTORY_KEY,
   PRIMARY_FACTORY_ROUTE_SEGMENT,
   REFUND_FACTORY,
+  REFUND_FACTORY_APPS,
   REFUND_LINE_HOTFIX_ID,
   REFUND_LINE_PLAN_ID,
 } from "../__fixtures__/factoryPageResponses";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
+import { MobileMorePage } from "./MobileMorePage";
 import { MobileBoardPage } from "./MobileBoardPage";
 
 const idleBoardPage = (): {
@@ -27,19 +29,25 @@ const idleBoardPage = (): {
   isFetchNextPageError: boolean;
   fetchNextPage: () => void;
   totalCount?: number;
-} => ({
-  hasNextPage: false,
-  isFetchingNextPage: false,
-  isFetchNextPageError: false,
-  fetchNextPage: vi.fn(),
-  totalCount: undefined,
-});
+} => ({ hasNextPage: false, isFetchingNextPage: false, isFetchNextPageError: false, fetchNextPage: vi.fn() });
+const DRAFT_WORK_ORDER: FactoriesWorkOrder = {
+  id: "wo-draft",
+  number: "42",
+  title: "Fix refund rounding",
+  state: "STATE_DRAFT",
+  lineDispatches: [],
+};
 const boardWorkOrders = vi.fn((): FactoriesWorkOrder[] => []);
 const backlogPage = vi.fn(idleBoardPage);
 const openPage = vi.fn(idleBoardPage);
 const donePage = vi.fn(idleBoardPage);
 const factoryIntakes = vi.fn((): FactoriesFactoryIntake[] => []);
 const prFeedbackHandlers = vi.fn((): FactoriesFactoryPrFeedbackHandler[] => []);
+const factoryAutomations = vi.fn(() => REFUND_FACTORY_APPS);
+
+vi.mock("@/contexts/useAccount", () => ({ useAccount: () => ({ account: { id: "account-1", name: "Ada" } }) }));
+const openCreateWorkOrder = vi.fn();
+const importIntakeItem = vi.fn(async () => ({ id: "imported-task", number: "47", title: "Imported issue" }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useFactoryBoardWorkOrders: () => ({
@@ -50,22 +58,20 @@ vi.mock("@/hooks/useFactoryData", () => ({
     open: openPage(),
     done: donePage(),
   }),
-  useFactoryWorkOrdersPage: () => ({
-    orders: [],
-    isLoading: false,
-    isPlaceholderData: false,
-    hasNextPage: false,
-    fetchNextPage: vi.fn(),
-    isFetchingNextPage: false,
-    isFetchNextPageError: false,
-  }),
-  useFactoryAutomations: () => ({ data: [] }),
+  useFactoryAutomations: () => ({ data: factoryAutomations() }),
+  useCreateWorkOrder: () => ({ mutateAsync: vi.fn() }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderAssignees: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
   useFactoryIntakes: () => ({ data: factoryIntakes() }),
+  useImportFactoryIntakeItem: () => ({ mutateAsync: importIntakeItem }),
+  useSearchFactoryIntakeItems: () => ({
+    data: [{ id: "12", key: "#12", title: "Imported issue" }],
+    isLoading: false,
+    isFetching: false,
+  }),
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
@@ -84,6 +90,23 @@ vi.mock("../pages/PRFeedbackSettingsHost", () => ({
   ),
 }));
 
+vi.mock("../pages/PlanningSettingsHost", () => ({
+  PlanningSettingsHost: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid="planning-settings">
+      <button onClick={onClose}>Close analysis</button>
+    </div>
+  ),
+}));
+
+vi.mock("../pages/ColumnAutomationViewPopup", () => ({
+  ColumnAutomationViewHost: ({ canvasId, onClose }: { canvasId: string; onClose: () => void }) => (
+    <div data-testid="column-automation-settings">
+      {canvasId}
+      <button onClick={onClose}>Close automation</button>
+    </div>
+  ),
+}));
+
 vi.mock("@/hooks/useWorkOrderCardActions", () => ({
   useWorkOrderCardActions: () => ({
     dispatchingOrderIds: new Set<string>(),
@@ -97,12 +120,12 @@ vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, currentUserId: "user-1", isLoading: false }),
 }));
 
-function stubElementHeights({ scrollHeight, clientHeight }: { scrollHeight: number; clientHeight: number }) {
-  Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, value: scrollHeight });
-  Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, value: clientHeight });
+function stubElementHeights(measurements: { scrollHeight: number; clientHeight: number }) {
+  for (const [name, value] of Object.entries(measurements)) {
+    Object.defineProperty(HTMLElement.prototype, name, { configurable: true, value });
+  }
   return () => {
-    delete (HTMLElement.prototype as unknown as { scrollHeight?: number }).scrollHeight;
-    delete (HTMLElement.prototype as unknown as { clientHeight?: number }).clientHeight;
+    for (const name of Object.keys(measurements)) Reflect.deleteProperty(HTMLElement.prototype, name);
   };
 }
 
@@ -111,17 +134,21 @@ function LocationProbe() {
   return <div data-testid="mobile-test-location">{`${location.pathname}${location.search}`}</div>;
 }
 
-function renderBoard(factory = REFUND_FACTORY) {
-  return render(boardElement(factory));
+function renderBoard(factory = REFUND_FACTORY, more = false) {
+  return render(boardElement(factory, more));
 }
 
-function boardElement(factory = REFUND_FACTORY) {
+function boardElement(factory = REFUND_FACTORY, more = false) {
   return (
     <QueryClientProvider client={new QueryClient()}>
       <ThemeProvider>
         <TooltipProvider>
           <MemoryRouter
-            initialEntries={[`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`]}
+            initialEntries={[
+              more
+                ? `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/more?lineId=${REFUND_LINE_PLAN_ID}`
+                : `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`,
+            ]}
           >
             <FactoriesLayoutContext.Provider
               value={{
@@ -131,11 +158,12 @@ function boardElement(factory = REFUND_FACTORY) {
                 routeSegment: PRIMARY_FACTORY_ROUTE_SEGMENT,
                 factory,
                 factories: [factory],
-                openCreateWorkOrder: vi.fn(),
+                openCreateWorkOrder,
               }}
             >
               <Routes>
                 <Route path="/org-1/workspaces/:factoryKey/lines/:lineId" element={<MobileBoardPage />} />
+                <Route path="/org-1/workspaces/:factoryKey/more" element={<MobileMorePage />} />
                 <Route path="/org-1/workspaces/:factoryKey/task/:orderNumber" element={<div>Task page</div>} />
               </Routes>
               <LocationProbe />
@@ -150,6 +178,8 @@ function boardElement(factory = REFUND_FACTORY) {
 describe("MobileBoardPage", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    openCreateWorkOrder.mockClear();
+    importIntakeItem.mockClear();
     boardWorkOrders.mockReturnValue([]);
     backlogPage.mockReset();
     openPage.mockReset();
@@ -159,6 +189,63 @@ describe("MobileBoardPage", () => {
     donePage.mockImplementation(idleBoardPage);
     factoryIntakes.mockReturnValue([]);
     prFeedbackHandlers.mockReturnValue([]);
+    factoryAutomations.mockReturnValue([
+      ...REFUND_FACTORY_APPS,
+      { id: "analysis-app", name: "Ingest" },
+      { id: "confidence-app", name: "Merge confidence", columnKey: "verify" },
+      { id: "custom-app", name: "Notify team", columnKey: "done" },
+    ]);
+  });
+
+  it("creates a task from the empty Backlog without a duplicate action when Done has tasks", async () => {
+    boardWorkOrders.mockReturnValue([
+      {
+        id: "done-task",
+        number: "43",
+        title: "Done task",
+        state: "STATE_CLOSED",
+        result: "RESULT_COMPLETED",
+        lineDispatches: [{ id: "done-dispatch", line: { id: REFUND_LINE_PLAN_ID } }],
+      },
+    ]);
+    renderBoard();
+    expect(screen.getAllByRole("button", { name: "Create task" })).toHaveLength(1);
+    await userEvent
+      .setup()
+      .click(within(screen.getByTestId("mobile-board-column-backlog")).getByRole("button", { name: "Create task" }));
+    await userEvent.setup().click(screen.getByRole("button", { name: "Create task manually" }));
+    expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it("imports an intake issue through Create task and opens the imported task", async () => {
+    const user = userEvent.setup();
+    factoryIntakes.mockReturnValue([GITHUB_ISSUES_INTAKE]);
+    renderBoard();
+
+    await user.click(screen.getByRole("button", { name: "Create task" }));
+    expect(screen.getByRole("textbox", { name: "Import from GitHub issue" })).toBeInTheDocument();
+    await user.click(await screen.findByTestId("lines-backlog-create-item-12"));
+
+    expect(importIntakeItem).toHaveBeenCalledWith({ intakeId: GITHUB_ISSUES_INTAKE_ID, itemId: "12" });
+    expect(await screen.findByText("Task page")).toBeInTheDocument();
+    expect(screen.getByTestId("mobile-test-location")).toHaveTextContent("/task/47");
+    expect(openCreateWorkOrder).not.toHaveBeenCalled();
+  });
+
+  it("saves appearance and board colors from More", async () => {
+    const user = userEvent.setup();
+    renderBoard(REFUND_FACTORY, true);
+    expect(screen.queryByRole("button", { name: "Create task" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("combobox", { name: "Appearance" }));
+    await user.click(await screen.findByRole("option", { name: "Dark" }));
+    expect(document.documentElement).toHaveClass("dark");
+    await user.click(screen.getByRole("combobox", { name: "Column colors" }));
+    await user.click(await screen.findByRole("option", { name: "Off" }));
+    expect(window.localStorage.getItem("factories-column-color-view")).toBe("off");
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
+      "href",
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/settings`,
+    );
   });
 
   it("sets the tab title from the workspace name, not the line name", () => {
@@ -201,31 +288,61 @@ describe("MobileBoardPage", () => {
     expect(screen.getByTestId("mobile-board-column-verify")).not.toHaveAttribute("inert");
   });
 
-  it("keeps intakes out of the board and lists them under the three-dots menu", async () => {
+  it("opens intake settings from More", async () => {
     const user = userEvent.setup();
     factoryIntakes.mockReturnValue([GITHUB_ISSUES_INTAKE]);
-    renderBoard();
+    renderBoard(REFUND_FACTORY, true);
 
-    expect(screen.queryByTestId(`mobile-board-intake-${GITHUB_ISSUES_INTAKE_ID}`)).not.toBeInTheDocument();
-
-    await user.click(screen.getByTestId("mobile-board-menu"));
-    await user.click(await screen.findByTestId(`mobile-board-intake-${GITHUB_ISSUES_INTAKE_ID}`));
+    await user.click(screen.getByRole("link", { name: /GitHub issues/i }));
 
     expect(screen.getByTestId("mobile-test-location")).toHaveTextContent(
       `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`,
     );
     expect(screen.getByTestId("intake-source-settings")).toHaveTextContent(GITHUB_ISSUES_INTAKE_ID);
+    expect(screen.queryByRole("tablist", { name: "Board columns" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Search tasks" })).not.toBeInTheDocument();
   });
 
   it("opens pull request feedback settings for the selected listener", async () => {
     const user = userEvent.setup();
     prFeedbackHandlers.mockReturnValue([{ id: "handler-checks", source: "SOURCE_PULL_REQUEST_CHECKS", healthy: true }]);
-    renderBoard();
+    renderBoard(REFUND_FACTORY, true);
 
-    await user.click(screen.getByTestId("mobile-board-menu"));
-    await user.click(await screen.findByTestId("mobile-board-listener-handler-checks"));
+    await user.click(screen.getByRole("link", { name: /pull request checks/i }));
 
     expect(screen.getByTestId("pr-feedback-settings")).toHaveTextContent("handler-checks");
+    expect(screen.queryByRole("tablist", { name: "Board columns" })).not.toBeInTheDocument();
+  });
+
+  it("opens task analysis settings from More and returns to the board on close", async () => {
+    const user = userEvent.setup();
+    renderBoard(REFUND_FACTORY, true);
+
+    await user.click(screen.getByRole("link", { name: /Task analysis/i }));
+
+    expect(screen.getByTestId("planning-settings")).toBeInTheDocument();
+    expect(screen.queryByRole("tablist", { name: "Board columns" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close analysis" }));
+    expect(screen.queryByTestId("planning-settings")).not.toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Board columns" })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["Refund Implementer", "app-refund-implementer"],
+    ["Merge confidence", "confidence-app"],
+    ["PR Closure", "app-pr-closure"],
+    ["Notify team", "custom-app"],
+  ])("opens %s settings from More and returns to the board on close", async (name, canvasId) => {
+    const user = userEvent.setup();
+    renderBoard(REFUND_FACTORY, true);
+
+    await user.click(screen.getByRole("link", { name: new RegExp(name) }));
+
+    expect(screen.getByTestId("column-automation-settings")).toHaveTextContent(canvasId);
+    expect(screen.queryByRole("tablist", { name: "Board columns" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Close automation" }));
+    expect(screen.queryByTestId("column-automation-settings")).not.toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Board columns" })).toBeInTheDocument();
   });
 
   it("switches to another line from the board header", async () => {
@@ -246,15 +363,13 @@ describe("MobileBoardPage", () => {
     const fetchDone = vi.fn();
     const fetchBacklog = vi.fn();
     backlogPage.mockReturnValue({
+      ...idleBoardPage(),
       hasNextPage: true,
-      isFetchingNextPage: false,
-      isFetchNextPageError: false,
       fetchNextPage: fetchBacklog,
     });
     donePage.mockReturnValue({
+      ...idleBoardPage(),
       hasNextPage: true,
-      isFetchingNextPage: false,
-      isFetchNextPageError: false,
       fetchNextPage: fetchDone,
     });
     renderBoard();
@@ -276,19 +391,10 @@ describe("MobileBoardPage", () => {
 
   it("loads the next page when the visible list does not fill the screen", () => {
     const fetchNextPage = vi.fn();
-    boardWorkOrders.mockReturnValue([
-      {
-        id: "wo-draft",
-        number: "42",
-        title: "Fix refund rounding",
-        state: "STATE_DRAFT",
-        lineDispatches: [],
-      },
-    ]);
+    boardWorkOrders.mockReturnValue([DRAFT_WORK_ORDER]);
     backlogPage.mockReturnValue({
+      ...idleBoardPage(),
       hasNextPage: true,
-      isFetchingNextPage: false,
-      isFetchNextPageError: false,
       fetchNextPage,
     });
     renderBoard();
@@ -303,19 +409,10 @@ describe("MobileBoardPage", () => {
     const restoreHeights = stubElementHeights({ scrollHeight: 1000, clientHeight: 400 });
     try {
       const fetchNextPage = vi.fn();
-      boardWorkOrders.mockReturnValue([
-        {
-          id: "wo-draft",
-          number: "42",
-          title: "Fix refund rounding",
-          state: "STATE_DRAFT",
-          lineDispatches: [],
-        },
-      ]);
+      boardWorkOrders.mockReturnValue([DRAFT_WORK_ORDER]);
       backlogPage.mockReturnValue({
+        ...idleBoardPage(),
         hasNextPage: true,
-        isFetchingNextPage: false,
-        isFetchNextPageError: false,
         fetchNextPage,
       });
       renderBoard();
@@ -357,9 +454,8 @@ describe("MobileBoardPage", () => {
     expect(fetchNextPage).not.toHaveBeenCalled();
 
     backlogPage.mockReturnValue({
+      ...idleBoardPage(),
       hasNextPage: true,
-      isFetchingNextPage: false,
-      isFetchNextPageError: false,
       fetchNextPage,
     });
     view.rerender(boardElement());
@@ -386,15 +482,7 @@ describe("MobileBoardPage", () => {
     globalThis.ResizeObserver = ImmediateResizeObserver as unknown as typeof ResizeObserver;
 
     try {
-      boardWorkOrders.mockReturnValue([
-        {
-          id: "wo-draft",
-          number: "42",
-          title: "Fix refund rounding",
-          state: "STATE_DRAFT",
-          lineDispatches: [],
-        },
-      ]);
+      boardWorkOrders.mockReturnValue([DRAFT_WORK_ORDER]);
       backlogPage.mockReturnValue({
         hasNextPage: true,
         isFetchingNextPage: false,
@@ -447,15 +535,7 @@ describe("MobileBoardPage", () => {
 
   it("opens a task without a line id in the URL", async () => {
     const user = userEvent.setup();
-    boardWorkOrders.mockReturnValue([
-      {
-        id: "wo-draft",
-        number: "42",
-        title: "Fix refund rounding",
-        state: "STATE_DRAFT",
-        lineDispatches: [],
-      },
-    ]);
+    boardWorkOrders.mockReturnValue([DRAFT_WORK_ORDER]);
     renderBoard();
 
     await user.click(
@@ -470,23 +550,9 @@ describe("MobileBoardPage", () => {
   });
 
   it("displays server total counts on column tabs instead of loaded card counts", () => {
-    boardWorkOrders.mockReturnValue([
-      {
-        id: "wo-draft-1",
-        number: "42",
-        title: "Fix refund rounding",
-        state: "STATE_DRAFT",
-        lineDispatches: [],
-      },
-    ]);
-    backlogPage.mockReturnValue({
-      ...idleBoardPage(),
-      totalCount: 80,
-    });
-    donePage.mockReturnValue({
-      ...idleBoardPage(),
-      totalCount: 60,
-    });
+    boardWorkOrders.mockReturnValue([DRAFT_WORK_ORDER]);
+    backlogPage.mockReturnValue({ ...idleBoardPage(), totalCount: 80 });
+    donePage.mockReturnValue({ ...idleBoardPage(), totalCount: 60 });
     renderBoard();
 
     expect(screen.getByTestId("mobile-board-tab-backlog")).toHaveTextContent("Backlog80");
@@ -495,19 +561,8 @@ describe("MobileBoardPage", () => {
 
   it("falls back to loaded card count when search filter is active", async () => {
     const user = userEvent.setup();
-    boardWorkOrders.mockReturnValue([
-      {
-        id: "wo-draft-1",
-        number: "42",
-        title: "Fix refund rounding",
-        state: "STATE_DRAFT",
-        lineDispatches: [],
-      },
-    ]);
-    backlogPage.mockReturnValue({
-      ...idleBoardPage(),
-      totalCount: 80,
-    });
+    boardWorkOrders.mockReturnValue([DRAFT_WORK_ORDER]);
+    backlogPage.mockReturnValue({ ...idleBoardPage(), totalCount: 80 });
     renderBoard();
 
     expect(screen.getByTestId("mobile-board-tab-backlog")).toHaveTextContent("Backlog80");

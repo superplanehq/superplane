@@ -102,7 +102,7 @@ describe("FactorySettingsLayout at phone width", () => {
     expect(shell.className).not.toContain("h-dvh");
     expect(shell).toHaveStyle({ position: "fixed", left: "0px", right: "0px" });
     expect(shell.style.bottom).toBe("");
-    expect(within(bottomBar).getByTestId("mobile-tab-settings")).toHaveAttribute("aria-current", "page");
+    expect(within(bottomBar).getByTestId("mobile-tab-more")).toHaveAttribute("aria-current", "page");
     expect(screen.getByTestId("factory-settings-mobile-bar")).toBeInTheDocument();
   }, 10000);
 });

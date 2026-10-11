@@ -46,7 +46,7 @@ export function MobileSettingsBottomBar({
 
   return (
     <FactoriesLayoutContext.Provider value={layoutContextValue}>
-      <MobileBottomBar canCreateWorkOrder={canCreateWorkOrder} />
+      <MobileBottomBar />
       {canCreateWorkOrder ? (
         <CreateWorkOrderDialog
           open={createWorkOrderOpen}

@@ -470,16 +470,14 @@ describe("ChecksPRFeedbackSetupDialog", () => {
     );
 
     await waitFor(() => expect(screen.getByTestId("checks-setup-empty")).toBeInTheDocument());
-    expect(screen.getByTestId("checks-setup-preview")).toHaveTextContent("No status checks yet.");
+    expect(screen.getByTestId("checks-setup-preview")).toHaveTextContent("No status checks found on recent commits.");
     expect(screen.getByTestId("checks-setup-preview-caption")).toHaveTextContent(
-      "This repository has no status checks yet.",
+      "No status checks found on recent commits.",
     );
     expect(screen.queryByTestId("checks-setup-preview-attempts")).not.toBeInTheDocument();
+    expect(screen.getByTestId("checks-setup-empty")).toHaveTextContent("No status checks found on recent commits.");
     expect(screen.getByTestId("checks-setup-empty")).toHaveTextContent(
-      "This repository does not have status checks yet. That is OK.",
-    );
-    expect(screen.getByTestId("checks-setup-empty")).toHaveTextContent(
-      "After you add them, you can configure SuperPlane to fix them automatically.",
+      "Run CI on a recent pull request, then reopen Configure to select checks.",
     );
     expect(screen.queryByTestId("pr-feedback-check-names-picker")).not.toBeInTheDocument();
     expect(screen.queryByTestId("checks-setup-maximum-attempts")).not.toBeInTheDocument();
