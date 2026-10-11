@@ -369,6 +369,31 @@ func TestResolveAssigneeMemberMatchesEmailBeforeGitHubLogin(t *testing.T) {
 	require.EqualError(t, err, "More than one member matches. Use a user id.")
 }
 
+func TestResolveAssigneeMemberMatchesUUIDShapedLogin(t *testing.T) {
+	login := "123e4567-e89b-12d3-a456-426614174000"
+	ownerID := uuid.MustParse(login)
+	ada := models.FactoryVelocityMember{
+		UserID:      uuid.New(),
+		Name:        "Ada Lovelace",
+		Email:       "ada@example.com",
+		GitHubLogin: login,
+	}
+	grace := models.FactoryVelocityMember{
+		UserID:      ownerID,
+		Name:        "Grace Hopper",
+		Email:       "grace@example.com",
+		GitHubLogin: "grace",
+	}
+
+	member, err := resolveAssigneeMember([]models.FactoryVelocityMember{ada}, login)
+	require.NoError(t, err)
+	assert.Equal(t, ada.UserID, member.UserID)
+
+	member, err = resolveAssigneeMember([]models.FactoryVelocityMember{ada, grace}, login)
+	require.NoError(t, err)
+	assert.Equal(t, grace.UserID, member.UserID)
+}
+
 func TestAssignTaskSetsOneOwner(t *testing.T) {
 	r := support.Setup(t)
 	enableFactories(t, r.Organization.ID)
@@ -488,6 +513,16 @@ func TestAssignTaskRejectsInvalidChanges(t *testing.T) {
 	reject(map[string]any{"task": order.ID.String(), "assignee": "Visible Owner"}, "The member was not found.")
 	reject(map[string]any{"task": order.ID.String(), "assignee": apiKey.ID.String()}, "The member was not found.")
 	reject(map[string]any{"task": order.ID.String(), "assignee": "shared-login"}, "More than one member matches. Use a user id.")
+	reject(map[string]any{
+		"task":     order.ID.String(),
+		"assignee": float64(123),
+		"unassign": true,
+	}, "assignee must be text.")
+	reject(map[string]any{
+		"task":     order.ID.String(),
+		"assignee": *owner.Email,
+		"unassign": "true",
+	}, "unassign must be true or false.")
 
 	otherFactory, err := models.CreateFactory(db, r.Organization.ID, "Other workspace", "", "OTH")
 	require.NoError(t, err)
@@ -622,6 +657,54 @@ func TestListMembersRequiresMembersRead(t *testing.T) {
 	runtime := &Runtime{Auth: r.AuthService}
 	_, err = runtime.CallTool(ctx, claims, "list_members", map[string]any{})
 	require.EqualError(t, err, "Not found")
+}
+
+func TestAssignTaskRequiresMembersRead(t *testing.T) {
+	r := support.Setup(t)
+	enableFactories(t, r.Organization.ID)
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "MCP Assign Deny", "", "ADN")
+	require.NoError(t, err)
+	owner := createHumanMember(t, r.Organization.ID, "Visible Owner", "owner-"+uuid.NewString()+"@example.com")
+	linkGitHub(t, owner, "visible-owner")
+	editor := createHumanMember(t, r.Organization.ID, "Task Editor", "editor-"+uuid.NewString()+"@example.com")
+	roleName := "task-editor-" + uuid.NewString()
+	require.NoError(t, r.AuthService.CreateCustomRole(r.Organization.ID.String(), &authorization.RoleDefinition{
+		Name:        roleName,
+		DisplayName: "Task editor",
+		DomainType:  models.DomainTypeOrganization,
+		Permissions: []*authorization.Permission{{
+			Resource:   "work_orders",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		}},
+	}))
+	require.NoError(t, r.AuthService.AssignRole(editor.ID.String(), roleName, r.Organization.ID.String(), models.DomainTypeOrganization))
+
+	order := createDraftTask(t, factoryModel, r.User)
+	require.NoError(t, order.ReplaceAssignees(db, []uuid.UUID{owner.ID}))
+	claims := toolClaims(r, factoryModel.ID)
+	claims.UserID = editor.ID
+	runtime := &Runtime{Auth: r.AuthService}
+
+	for _, assignee := range []string{*owner.Email, "visible-owner", owner.ID.String(), "missing@example.com"} {
+		_, err = runtime.CallTool(ctx, claims, "assign_task", map[string]any{
+			"task":     order.ID.String(),
+			"assignee": assignee,
+		})
+		require.EqualError(t, err, "Not found")
+		assert.Equal(t, []string{owner.ID.String()}, storedAssigneeIDs(t, factoryModel, order.ID))
+	}
+
+	result, err := runtime.CallTool(ctx, claims, "assign_task", map[string]any{
+		"task":     order.ID.String(),
+		"unassign": true,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, assigneeIDs(t, decodeToolJSON(t, result)["assignees"]))
+	assert.Empty(t, storedAssigneeIDs(t, factoryModel, order.ID))
 }
 
 func createDraftTask(t *testing.T, factoryModel *models.Factory, creator uuid.UUID) *models.FactoryWorkOrder {

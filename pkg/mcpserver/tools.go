@@ -439,6 +439,9 @@ func (rt *Runtime) assignTask(ctx context.Context, claims *AccessClaims, args ma
 
 	assigneeIDs := []string{}
 	if !unassign {
+		if err := rt.authorizeMembersRead(ctx, claims); err != nil {
+			return ToolResult{}, err
+		}
 		member, err := rt.findAssignee(ctx, claims, assignee)
 		if err != nil {
 			return ToolResult{}, err
@@ -466,9 +469,8 @@ func (rt *Runtime) listMembers(ctx context.Context, claims *AccessClaims, _ map[
 	if err := rt.authorize(ctx, claims, "work_orders:read"); err != nil {
 		return ToolResult{}, err
 	}
-	allowed, err := rt.Auth.CheckOrganizationPermission(ctx, claims.UserID.String(), claims.OrgID.String(), "members", "read")
-	if err != nil || !allowed {
-		return ToolResult{}, ToolError("Not found")
+	if err := rt.authorizeMembersRead(ctx, claims); err != nil {
+		return ToolResult{}, err
 	}
 
 	members, err := models.ListFactoryVelocityMembers(database.DB(ctx), claims.OrgID)
@@ -526,9 +528,14 @@ func assigneeRefs(users []*pb.UserRef) []assigneeRef {
 }
 
 func assignmentArgs(args map[string]any) (string, bool, error) {
-	assignee, _ := args["assignee"].(string)
-	assignee = strings.TrimSpace(assignee)
-	unassign, _ := args["unassign"].(bool)
+	assignee, err := optionalStringArg(args, "assignee")
+	if err != nil {
+		return "", false, err
+	}
+	unassign, err := optionalBoolArg(args, "unassign")
+	if err != nil {
+		return "", false, err
+	}
 	if assignee != "" && unassign {
 		return "", false, ToolError("Do not set assignee and unassign.")
 	}
@@ -536,6 +543,30 @@ func assignmentArgs(args map[string]any) (string, bool, error) {
 		return "", false, ToolError("Set assignee or set unassign to true.")
 	}
 	return assignee, unassign, nil
+}
+
+func optionalStringArg(args map[string]any, name string) (string, error) {
+	raw, ok := args[name]
+	if !ok || raw == nil {
+		return "", nil
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return "", ToolError(name + " must be text.")
+	}
+	return strings.TrimSpace(value), nil
+}
+
+func optionalBoolArg(args map[string]any, name string) (bool, error) {
+	raw, ok := args[name]
+	if !ok || raw == nil {
+		return false, nil
+	}
+	value, ok := raw.(bool)
+	if !ok {
+		return false, ToolError(name + " must be true or false.")
+	}
+	return value, nil
 }
 
 func resolveAssigneeMember(members []models.FactoryVelocityMember, assignee string) (models.FactoryVelocityMember, error) {
@@ -546,7 +577,6 @@ func resolveAssigneeMember(members []models.FactoryVelocityMember, assignee stri
 				return member, nil
 			}
 		}
-		return models.FactoryVelocityMember{}, ToolError("The member was not found.")
 	}
 
 	emailMatches := membersMatching(members, query, func(member models.FactoryVelocityMember) string {
@@ -586,6 +616,14 @@ func membersMatching(members []models.FactoryVelocityMember, query string, field
 
 func ambiguousMemberError() error {
 	return ToolError("More than one member matches. Use a user id.")
+}
+
+func (rt *Runtime) authorizeMembersRead(ctx context.Context, claims *AccessClaims) error {
+	allowed, err := rt.Auth.CheckOrganizationPermission(ctx, claims.UserID.String(), claims.OrgID.String(), "members", "read")
+	if err != nil || !allowed {
+		return ToolError("Not found")
+	}
+	return nil
 }
 
 func (rt *Runtime) authorize(ctx context.Context, claims *AccessClaims, scope string) error {
