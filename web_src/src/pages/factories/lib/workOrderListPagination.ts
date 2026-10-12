@@ -19,6 +19,7 @@ export const BOARD_DONE_STATES = ["STATE_CLOSED"] as const satisfies readonly Fa
 export const BOARD_DONE_RESULTS = [
   "RESULT_COMPLETED",
   "RESULT_FAILED",
+  "RESULT_REJECTED",
 ] as const satisfies readonly FactoriesWorkOrderResult[];
 
 /** Done-page results. Failed or Completed alone narrows the page so that filter can see those tasks. */

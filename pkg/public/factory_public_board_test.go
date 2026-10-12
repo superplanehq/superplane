@@ -307,6 +307,82 @@ func automationsNamed(board *publicBoard, key string) []publicAutomation {
 	return nil
 }
 
+func TestPublicFactoryBoardKeepsClosedRejectedTasksInDone(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	server, _, _ := setupTestServer(r, t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+
+	factory, line := openPublicLine(t, r, true)
+	db := database.Conn()
+
+	rejected, err := factory.CreateWorkOrder(db, "Rejected refund export", "", nil, nil, nil)
+	require.NoError(t, err)
+	_, err = rejected.Close(db, models.FactoryWorkOrderResultRejected, nil)
+	require.NoError(t, err)
+
+	canceled, err := factory.CreateWorkOrder(db, "Canceled refund cutover", "", nil, nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&models.FactoryWorkOrder{}).Where("id = ?", canceled.ID).Updates(map[string]any{
+		"state":  models.FactoryWorkOrderStateClosed,
+		"result": "",
+	}).Error)
+	canceled.State = models.FactoryWorkOrderStateClosed
+	canceled.Result = ""
+
+	listed, err := factory.ListWorkOrders(db, models.ListFactoryWorkOrdersFilters{
+		LineID:      &line.ID,
+		PublicBoard: true,
+		Limit:       20,
+	})
+	require.NoError(t, err)
+	assert.Contains(t, publicBoardOrderTitles(listed), "Rejected refund export")
+	assert.NotContains(t, publicBoardOrderTitles(listed), "Canceled refund cutover")
+	assert.Equal(t, "done", publicCardColumn(rejected, line.ID, nil, nil, nil, nil))
+	assert.Equal(t, "", publicCardColumn(canceled, line.ID, nil, nil, nil, nil))
+
+	response := execRequest(server, requestParams{
+		method: http.MethodGet,
+		path:   publicBoardPath(r, factory, line),
+	})
+	require.Equal(t, http.StatusOK, response.Code)
+
+	var board struct {
+		Columns []struct {
+			Key   string `json:"key"`
+			Cards []struct {
+				Title  string `json:"title"`
+				Result string `json:"result"`
+			} `json:"cards"`
+		} `json:"columns"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &board))
+
+	var doneCards []struct {
+		Title  string `json:"title"`
+		Result string `json:"result"`
+	}
+	for _, column := range board.Columns {
+		for _, card := range column.Cards {
+			assert.NotEqual(t, "Canceled refund cutover", card.Title)
+		}
+		if column.Key == "done" {
+			doneCards = column.Cards
+		}
+	}
+	require.Len(t, doneCards, 1)
+	assert.Equal(t, "Rejected refund export", doneCards[0].Title)
+	assert.Equal(t, "RESULT_REJECTED", doneCards[0].Result)
+}
+
+func publicBoardOrderTitles(orders []models.FactoryWorkOrder) []string {
+	titles := make([]string, len(orders))
+	for i, order := range orders {
+		titles[i] = order.Title
+	}
+	return titles
+}
+
 func openPublicLine(t *testing.T, r *support.ResourceRegistry, public bool) (*models.Factory, *models.FactoryLine) {
 	t.Helper()
 	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "desc", "")

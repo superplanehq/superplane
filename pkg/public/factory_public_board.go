@@ -418,7 +418,7 @@ func publicCardColumn(
 	case models.FactoryWorkOrderStateDraft:
 		return "backlog"
 	case models.FactoryWorkOrderStateClosed:
-		if order.Result != models.FactoryWorkOrderResultCompleted && order.Result != models.FactoryWorkOrderResultFailed {
+		if !closedOrderBelongsInPublicDone(order.Result) {
 			return ""
 		}
 		return "done"
@@ -444,6 +444,12 @@ func publicCardColumn(
 		return "verify"
 	}
 	return phaseOrDone(execution.StepIndex, steps, names, columnKey)
+}
+
+func closedOrderBelongsInPublicDone(result string) bool {
+	return result == models.FactoryWorkOrderResultCompleted ||
+		result == models.FactoryWorkOrderResultFailed ||
+		result == models.FactoryWorkOrderResultRejected
 }
 
 func phaseOrDone(stepIndex int, steps []models.FactoryLineStep, names map[uuid.UUID]string, columnKey map[uuid.UUID]string) string {

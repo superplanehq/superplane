@@ -157,8 +157,8 @@ export const WORK_ORDER_BOARD_LANES: WorkOrderBoardLaneDefinition[] = [
   {
     id: "done",
     title: "Done",
-    description: "Completed and failed work.",
-    statuses: ["completed", "failed"],
+    description: "Completed, failed, and rejected work.",
+    statuses: ["completed", "failed", "rejected"],
   },
 ];
 

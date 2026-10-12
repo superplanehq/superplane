@@ -105,7 +105,7 @@ describe("buildLinePhaseBoard with a board Done column", () => {
 });
 
 describe("collectLineDoneOrders", () => {
-  it("returns completed and failed orders of this line in source-list order", () => {
+  it("returns completed, failed, and rejected orders of this line in source-list order", () => {
     const completed = closedOrder({
       id: "wo-completed",
       result: "RESULT_COMPLETED",
@@ -138,9 +138,19 @@ describe("collectLineDoneOrders", () => {
       updatedAt: "2026-08-11T13:00:00.000Z",
     });
 
-    const done = collectLineDoneOrders([completed, olderCompleted, failed, rejected, canceled], LINE);
+    const rejectedOtherLine = closedOrder({
+      id: "wo-rejected-other",
+      result: "RESULT_REJECTED",
+      lineId: "line-other",
+      updatedAt: "2026-08-11T15:00:00.000Z",
+    });
 
-    expect(done.map((entry) => entry.id)).toEqual(["wo-completed", "wo-completed-old", "wo-failed"]);
+    const done = collectLineDoneOrders(
+      [completed, olderCompleted, failed, rejected, canceled, rejectedOtherLine],
+      LINE,
+    );
+
+    expect(done.map((entry) => entry.id)).toEqual(["wo-completed", "wo-completed-old", "wo-failed", "wo-rejected"]);
   });
 
   it("keeps a task in its source-list place when updated_at changes", () => {
@@ -182,12 +192,12 @@ describe("collectLineDoneOrders", () => {
     expect(done.map((entry) => entry.id)).toEqual(["wo-backlog-closed"]);
   });
 
-  it("excludes a rejected draft and a rejected order that already dispatched", () => {
+  it("includes a rejected task that closed before a line and a rejected task that ran on this line", () => {
     const rejectedDraft = closedOrder({ id: "wo-rejected-draft", result: "RESULT_REJECTED" });
     const rejectedAfterRun = closedOrder({ id: "wo-rejected-ran", result: "RESULT_REJECTED", lineId: "line-1" });
 
     const done = collectLineDoneOrders([rejectedDraft, rejectedAfterRun], LINE);
 
-    expect(done).toEqual([]);
+    expect(done.map((entry) => entry.id)).toEqual(["wo-rejected-draft", "wo-rejected-ran"]);
   });
 });
