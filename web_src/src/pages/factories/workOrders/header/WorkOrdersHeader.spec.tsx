@@ -12,13 +12,11 @@ function HeaderHarness({
   canCreate = true,
   intakes = [],
   showPullRequestMerge = false,
-  onOpenStatusDialog,
 }: {
   onCreateWorkOrder: () => void;
   canCreate?: boolean;
   intakes?: FactoriesFactoryIntake[];
   showPullRequestMerge?: boolean;
-  onOpenStatusDialog?: () => void;
 }) {
   const state = useWorkOrderListState("factory-1");
   return (
@@ -31,7 +29,6 @@ function HeaderHarness({
       canCreate={canCreate}
       permissionsLoading={false}
       showPullRequestMerge={showPullRequestMerge}
-      onOpenStatusDialog={onOpenStatusDialog}
     />
   );
 }
@@ -111,28 +108,23 @@ describe("WorkOrdersHeader", () => {
     expect(screen.getByTestId("work-orders-filter-sourceIds")).toHaveTextContent("Source");
   });
 
-  it("opens Canceled and Rejected from Status instead of applying a board filter", async () => {
+  it("filters Rejected without opening the closed-tasks dialog and omits Canceled", async () => {
     const user = userEvent.setup();
-    const onOpenStatusDialog = vi.fn();
-    render(<HeaderHarness onCreateWorkOrder={vi.fn()} onOpenStatusDialog={onOpenStatusDialog} />);
 
+    render(<HeaderHarness onCreateWorkOrder={vi.fn()} />);
     await user.click(screen.getByTestId("work-orders-filter-trigger"));
     await user.hover(screen.getByTestId("work-orders-filter-statuses"));
     fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-failed"));
 
-    expect(onOpenStatusDialog).not.toHaveBeenCalled();
     expect(screen.getByTestId("work-orders-filter-chips")).toHaveTextContent("Failed");
     await user.keyboard("{Escape}");
 
     await user.click(screen.getByTestId("work-orders-filter-trigger"));
     await user.hover(screen.getByTestId("work-orders-filter-statuses"));
     fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-rejected"));
-    expect(onOpenStatusDialog).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("work-orders-filter-chips")).toHaveTextContent("Rejected");
 
-    await user.click(screen.getByTestId("work-orders-filter-trigger"));
-    await user.hover(screen.getByTestId("work-orders-filter-statuses"));
-    fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-cancelled"));
-    expect(onOpenStatusDialog).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId("work-orders-filter-statuses-cancelled")).not.toBeInTheDocument();
   });
 
   it("shows a removable Source chip for a selected tool", async () => {

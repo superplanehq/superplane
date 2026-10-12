@@ -1124,9 +1124,9 @@ type ListFactoryWorkOrdersFilters struct {
 	// LineID keeps orders that ran on this line, plus orders with no line.
 	LineID *uuid.UUID
 	// PublicBoard keeps the orders a public line board can show. Drafts stay
-	// even after a run on another line. Closed rejected orders are omitted
-	// so they do not consume the page.
-	PublicBoard bool
+	// even after a run on another line. Archives do not consume the page.
+	PublicBoard     bool
+	ExcludeArchived bool
 }
 
 func (f *Factory) CountWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) (int64, error) {
@@ -1191,6 +1191,11 @@ func (f *Factory) workOrdersQuery(tx *gorm.DB, filters ListFactoryWorkOrdersFilt
 		query = query.Where("factory_work_orders.result IN ?", filters.Results)
 	}
 
+	if filters.ExcludeArchived || filters.PublicBoard {
+		query = query.Where("NOT (factory_work_orders.state = ? AND COALESCE(factory_work_orders.result, '') IN ?)",
+			FactoryWorkOrderStateClosed, []string{FactoryWorkOrderResultArchived, FactoryWorkOrderResultRejected})
+	}
+
 	query = applyWorkOrderUserFilters(query, filters)
 	if filters.PublicBoard {
 		query = applyPublicBoardFilter(query, filters.LineID)
@@ -1253,7 +1258,7 @@ func applyPublicBoardFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {
 		)`,
 		[]string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen},
 		FactoryWorkOrderStateClosed,
-		[]string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed},
+		[]string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed, FactoryWorkOrderResultManualRejected, FactoryWorkOrderResultPRClosed},
 	)
 	if lineID == nil {
 		return query

@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdownMenu";
 import { Check, Search, X } from "lucide-react";
-import { useState, type KeyboardEvent, type RefObject } from "react";
+import { type KeyboardEvent, type RefObject } from "react";
 
 import type { WorkOrderListState } from "../lib/useWorkOrderListState";
 import type { WorkOrderFilterOption } from "../lib/workOrderFilterOptions";
@@ -18,7 +18,6 @@ import { humanizeLineName } from "../lib/humanizeLineName";
 import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
 import { MENU_ITEM_CLASSNAME, MENU_LABEL_CLASSNAME } from "../workOrders/header/menuStyles";
-import { WorkOrderClosedStatusDialog } from "../workOrders/WorkOrderClosedStatusDialog";
 import { MOBILE_BOARD_COPY } from "./mobileCopy";
 import { MobileWorkspaceSwitcher } from "./MobileWorkspaceSwitcher";
 
@@ -31,10 +30,6 @@ export function MobileBoardHeader({
   lines,
   lineId,
   onSelectLine,
-  organizationId,
-  factoryId,
-  factoryKey,
-  canManageClosedStatus,
 }: {
   state: WorkOrderListState;
   searchRef: RefObject<HTMLInputElement | null>;
@@ -44,12 +39,7 @@ export function MobileBoardHeader({
   lines: FactoriesFactoryLine[];
   lineId: string;
   onSelectLine: (lineId: string) => void;
-  organizationId: string;
-  factoryId: string;
-  factoryKey: string;
-  canManageClosedStatus: boolean;
 }) {
-  const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
   return (
     <header className="shrink-0 border-b border-border bg-background px-4 pt-[env(safe-area-inset-top)]">
       <div className="flex h-16 items-center justify-between gap-1" data-testid="mobile-board-header">
@@ -61,7 +51,6 @@ export function MobileBoardHeader({
           sourceOptions={sourceOptions}
           assigneeOptions={assigneeOptions}
           showPullRequestMerge={showPullRequestMerge}
-          onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
           triggerClassName="size-11 [&_svg]:size-5"
         />
         <Button
@@ -92,17 +81,6 @@ export function MobileBoardHeader({
             showPullRequestMerge={showPullRequestMerge}
           />
         </div>
-      ) : null}
-      {closedStatusDialogOpen ? (
-        <WorkOrderClosedStatusDialog
-          open
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={factoryKey}
-          lineId={lineId}
-          canManage={canManageClosedStatus}
-          onOpenChange={setClosedStatusDialogOpen}
-        />
       ) : null}
     </header>
   );

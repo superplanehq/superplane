@@ -1560,7 +1560,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
   });
 
-  it("archives a started open task as rejected and closes the popup", async () => {
+  it("archives a started open task and closes the popup", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     renderPopup({
@@ -1574,7 +1574,7 @@ describe("WorkOrderSplitRunPopup", () => {
     await user.click(screen.getByTestId("popup-work-order-archive-button"));
 
     await waitFor(() => {
-      expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: OPEN_WORK_ORDER.id, result: "RESULT_REJECTED" });
+      expect(closeMutateAsync).toHaveBeenCalledWith({ orderId: OPEN_WORK_ORDER.id, result: "RESULT_ARCHIVED" });
     });
     expect(showSuccessToast).toHaveBeenCalledWith("Task archived.");
     expect(onClose).toHaveBeenCalledTimes(1);

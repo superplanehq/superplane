@@ -418,10 +418,13 @@ func publicCardColumn(
 	case models.FactoryWorkOrderStateDraft:
 		return "backlog"
 	case models.FactoryWorkOrderStateClosed:
-		if order.Result != models.FactoryWorkOrderResultCompleted && order.Result != models.FactoryWorkOrderResultFailed {
+		switch order.Result {
+		case models.FactoryWorkOrderResultCompleted, models.FactoryWorkOrderResultFailed,
+			models.FactoryWorkOrderResultManualRejected, models.FactoryWorkOrderResultPRClosed:
+			return "done"
+		default:
 			return ""
 		}
-		return "done"
 	}
 
 	dispatch := newestDispatch(dispatches, lineID)
@@ -577,10 +580,14 @@ func uiWorkOrderResult(result string) string {
 	switch result {
 	case models.FactoryWorkOrderResultCompleted:
 		return "RESULT_COMPLETED"
-	case models.FactoryWorkOrderResultRejected:
+	case models.FactoryWorkOrderResultRejected, models.FactoryWorkOrderResultManualRejected:
 		return "RESULT_REJECTED"
 	case models.FactoryWorkOrderResultFailed:
 		return "RESULT_FAILED"
+	case models.FactoryWorkOrderResultArchived:
+		return "RESULT_ARCHIVED"
+	case models.FactoryWorkOrderResultPRClosed:
+		return "RESULT_PR_CLOSED"
 	default:
 		return ""
 	}
