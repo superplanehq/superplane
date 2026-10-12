@@ -33,7 +33,7 @@ function order(overrides: Partial<FactoriesWorkOrder> = {}): FactoriesWorkOrder 
 }
 
 describe("buildStatusFilterOptions", () => {
-  it("lists every display status with its dot class", () => {
+  it("lists board filter statuses with their dot class", () => {
     const options = buildStatusFilterOptions();
     expect(options.map((option) => option.value)).toEqual([
       "draft",
@@ -42,7 +42,6 @@ describe("buildStatusFilterOptions", () => {
       "completed",
       "failed",
       "rejected",
-      "cancelled",
     ]);
     expect(options.every((option) => Boolean(option.dot))).toBe(true);
     expect(options.find((option) => option.value === "waiting")?.label).toBe("Waiting");

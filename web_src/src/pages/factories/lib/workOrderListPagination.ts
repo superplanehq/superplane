@@ -19,18 +19,24 @@ export const BOARD_DONE_STATES = ["STATE_CLOSED"] as const satisfies readonly Fa
 export const BOARD_DONE_RESULTS = [
   "RESULT_COMPLETED",
   "RESULT_FAILED",
+  "RESULT_REJECTED",
+  "RESULT_PR_CLOSED",
 ] as const satisfies readonly FactoriesWorkOrderResult[];
 
-/** Done-page results. Failed or Completed alone narrows the page so that filter can see those tasks. */
+/** Done-page results. A single selected status narrows the page to that result. */
 export function boardDoneResultsForStatuses(
   statuses: readonly WorkOrderDisplayStatus[],
 ): readonly FactoriesWorkOrderResult[] {
-  const wantsCompleted = statuses.includes("completed");
-  const wantsFailed = statuses.includes("failed");
-  if (wantsCompleted === wantsFailed) {
+  const results = statuses.flatMap((status) => {
+    if (status === "completed") return ["RESULT_COMPLETED"] as const;
+    if (status === "failed") return ["RESULT_FAILED"] as const;
+    if (status === "rejected") return ["RESULT_REJECTED", "RESULT_PR_CLOSED"] as const;
+    return [];
+  });
+  if (results.length === 0) {
     return BOARD_DONE_RESULTS;
   }
-  return wantsFailed ? ["RESULT_FAILED"] : ["RESULT_COMPLETED"];
+  return results;
 }
 
 export type WorkOrdersPageCursor = {

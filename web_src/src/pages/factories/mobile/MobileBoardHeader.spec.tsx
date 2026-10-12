@@ -37,10 +37,6 @@ function PhoneBoardHeader() {
         lines={REFUND_FACTORY_LINES}
         lineId={REFUND_LINE_PLAN_ID}
         onSelectLine={vi.fn()}
-        organizationId="org-1"
-        factoryId="factory-1"
-        factoryKey={PRIMARY_FACTORY_ROUTE_SEGMENT}
-        canManageClosedStatus={false}
       />
       <p data-testid="location">{location.pathname}</p>
     </>

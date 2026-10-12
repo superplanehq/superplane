@@ -19,7 +19,6 @@ import {
   type WorkOrderFilterOption,
 } from "../../lib/workOrderFilterOptions";
 import { countWorkOrderFilters, visibleWorkOrderFilters } from "../../lib/workOrderListModel";
-import { isWorkOrderDialogStatus } from "../../lib/workOrderProgress";
 import { MENU_ITEM_CLASSNAME, MENU_LABEL_CLASSNAME } from "./menuStyles";
 
 interface FilterMenuProps {
@@ -30,7 +29,6 @@ interface FilterMenuProps {
   assigneeOptions: WorkOrderFilterOption[];
   /** When false, hide Mergeable so the menu matches the card pill. */
   showPullRequestMerge?: boolean;
-  onOpenStatusDialog?: () => void;
   triggerLabel?: string;
   triggerClassName?: string;
 }
@@ -42,7 +40,6 @@ export function FilterMenu({
   sourceOptions,
   assigneeOptions,
   showPullRequestMerge = false,
-  onOpenStatusDialog,
   triggerLabel,
   triggerClassName,
 }: FilterMenuProps) {
@@ -81,7 +78,6 @@ export function FilterMenu({
           dimension="statuses"
           state={state}
           options={buildStatusFilterOptions()}
-          onOpenStatusDialog={onOpenStatusDialog}
         />
 
         <FilterSubMenu
@@ -130,18 +126,9 @@ interface FilterSubMenuProps {
   state: WorkOrderListState;
   options: WorkOrderFilterOption[];
   emptyLabel?: string;
-  onOpenStatusDialog?: () => void;
 }
 
-function FilterSubMenu({
-  label,
-  resetLabel,
-  dimension,
-  state,
-  options,
-  emptyLabel,
-  onOpenStatusDialog,
-}: FilterSubMenuProps) {
+function FilterSubMenu({ label, resetLabel, dimension, state, options, emptyLabel }: FilterSubMenuProps) {
   const selected: readonly string[] = state.filters[dimension];
   return (
     <DropdownMenuSub>
@@ -172,21 +159,12 @@ function FilterSubMenu({
               data-testid={`work-orders-filter-${dimension}-${option.value}`}
               onSelect={(event) => {
                 event.preventDefault();
-                if (dimension === "statuses" && isWorkOrderDialogStatus(option.value)) {
-                  state.setFilterMenuOpen(false);
-                  onOpenStatusDialog?.();
-                  return;
-                }
                 state.toggleFilter(dimension, option.value);
               }}
             >
               {option.dot ? <span className={cn("size-1.5 rounded-full", option.dot)} aria-hidden /> : null}
               <span className="flex-1 truncate">{option.label}</span>
-              {dimension === "statuses" && isWorkOrderDialogStatus(option.value) ? null : selected.includes(
-                  option.value,
-                ) ? (
-                <Check className="size-3.5" aria-hidden />
-              ) : null}
+              {selected.includes(option.value) ? <Check className="size-3.5" aria-hidden /> : null}
             </DropdownMenuItem>
           ))}
         </DropdownMenuSubContent>

@@ -13,10 +13,25 @@ import {
 } from "./workOrderListPagination";
 
 describe("boardDoneResultsForStatuses", () => {
-  it("keeps completed and failed when the board is not narrowed to one of them", () => {
-    expect(boardDoneResultsForStatuses([])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED"]);
-    expect(boardDoneResultsForStatuses(["completed", "failed"])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED"]);
-    expect(boardDoneResultsForStatuses(["waiting"])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED"]);
+  it("keeps completed, failed, and rejected when the board is not narrowed to one of them", () => {
+    expect(boardDoneResultsForStatuses([])).toEqual([
+      "RESULT_COMPLETED",
+      "RESULT_FAILED",
+      "RESULT_REJECTED",
+      "RESULT_PR_CLOSED",
+    ]);
+    expect(boardDoneResultsForStatuses(["completed", "failed", "rejected"])).toEqual([
+      "RESULT_COMPLETED",
+      "RESULT_FAILED",
+      "RESULT_REJECTED",
+      "RESULT_PR_CLOSED",
+    ]);
+    expect(boardDoneResultsForStatuses(["waiting"])).toEqual([
+      "RESULT_COMPLETED",
+      "RESULT_FAILED",
+      "RESULT_REJECTED",
+      "RESULT_PR_CLOSED",
+    ]);
   });
 
   it("asks only for failed tasks when Failed is the status filter", () => {
@@ -25,6 +40,10 @@ describe("boardDoneResultsForStatuses", () => {
 
   it("asks only for completed tasks when Completed is the status filter", () => {
     expect(boardDoneResultsForStatuses(["completed"])).toEqual(["RESULT_COMPLETED"]);
+  });
+
+  it("asks only for rejected tasks when Rejected is the status filter", () => {
+    expect(boardDoneResultsForStatuses(["rejected"])).toEqual(["RESULT_REJECTED", "RESULT_PR_CLOSED"]);
   });
 });
 
