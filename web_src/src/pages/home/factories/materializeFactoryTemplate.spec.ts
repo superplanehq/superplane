@@ -172,7 +172,6 @@ spec:
     expect(definition.integrations).toEqual(["bitbucket", "claude"]);
     expect(Object.keys(definition.componentIntegrations).sort()).toEqual([
       "bitbucket.createPullRequest",
-      "bitbucket.createPullRequestComment",
       "bitbucket.findPullRequest",
       "bitbucket.updatePullRequest",
     ]);
@@ -183,8 +182,8 @@ spec:
     const closure = getFactoryDefinition("pr-closure", "bitbucket");
     expect(closure.integrations).toEqual(["bitbucket"]);
     expect(closure.componentIntegrations).toEqual({ "bitbucket.onPullRequest": "bitbucket" });
-    expect(onboardingEventAppsFor(undefined)).toEqual(["pr-closure", "risk-score"]);
-    expect(onboardingEventAppsFor("github")).toEqual(["pr-closure", "risk-score"]);
+    expect(onboardingEventAppsFor(undefined)).toEqual(["pr-closure", "risk-score", "visual-evidence"]);
+    expect(onboardingEventAppsFor("github")).toEqual(["pr-closure", "risk-score", "visual-evidence"]);
   });
 
   it("routes issue work to backlog and branch/PR/CI work to app repositories", () => {
