@@ -22,6 +22,7 @@ interface FooterActorPayload {
 const CLOSED_RESULT_FOR_STATUS: Partial<Record<WorkOrderDisplayStatus, string>> = {
   completed: "completed",
   rejected: "rejected",
+  archived: "rejected",
   failed: "failed",
 };
 

@@ -203,11 +203,12 @@ describe("useWorkOrderListState", () => {
     expect(result.current.filters.statuses).toEqual(["completed"]);
   });
 
-  it("persists Failed as a board filter and skips Rejected", () => {
+  it("persists Failed as a board filter and skips Rejected and Archived", () => {
     const { result } = renderHook(() => useWorkOrderListState("factory-1"));
     act(() => {
       result.current.toggleFilter("statuses", "failed");
       result.current.toggleFilter("statuses", "rejected");
+      result.current.toggleFilter("statuses", "archived");
     });
     expect(result.current.filters.statuses).toEqual(["failed"]);
   });

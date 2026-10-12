@@ -2,8 +2,22 @@ import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { DRAFT_READINESS_NOTES, draftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
-import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
+import {
+  getWorkOrderDisplayStatusMeta,
+  isWorkOrderRecoveryStatus,
+  type WorkOrderDisplayStatus,
+} from "../../lib/workOrderProgress";
 import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+import {
+  closedDecisionNote,
+  SPLIT_RUN_COMPLETED_HEADLINE,
+  SPLIT_RUN_COMPLETED_HEADLINE_ACTOR,
+  SPLIT_RUN_COMPLETED_NOTE_TEXT,
+  SPLIT_RUN_REJECTED_HEADLINE,
+  SPLIT_RUN_REJECTED_HEADLINE_ACTOR,
+  SPLIT_RUN_REJECTED_NOTE_TEXT,
+} from "./closedDecisionNote";
+
 export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "stopped" | "done";
 
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
@@ -86,7 +100,7 @@ export function splitRunCloseNeedsConfirm(kind: SplitRunFooterKind): boolean {
 }
 
 export function isClosedWorkOrderDisplayStatus(status?: WorkOrderDisplayStatus): boolean {
-  return status === "completed" || status === "failed" || status === "rejected" || status === "cancelled";
+  return status === "completed" || (status != null && isWorkOrderRecoveryStatus(status));
 }
 
 export function showsArchive(footer: Pick<SplitRunFooter, "kind" | "status">): boolean {
@@ -188,12 +202,14 @@ export const SPLIT_RUN_STOPPED_NOTE_TEXT = "This automation did not finish. This
 export const SPLIT_RUN_STOPPED_HEADLINE = "stopped this automation";
 export const SPLIT_RUN_STOPPED_HEADLINE_UNKNOWN = "A person stopped this automation";
 
-export const SPLIT_RUN_COMPLETED_NOTE_TEXT = "The work is done. The result met the goal.";
-export const SPLIT_RUN_REJECTED_NOTE_TEXT = "The work is done. The result did not meet the goal.";
-export const SPLIT_RUN_COMPLETED_HEADLINE = "This task succeeded";
-export const SPLIT_RUN_REJECTED_HEADLINE = "This task did not succeed";
-export const SPLIT_RUN_COMPLETED_HEADLINE_ACTOR = "marked this task as successful";
-export const SPLIT_RUN_REJECTED_HEADLINE_ACTOR = "marked this task as unsuccessful";
+export {
+  SPLIT_RUN_COMPLETED_HEADLINE,
+  SPLIT_RUN_COMPLETED_HEADLINE_ACTOR,
+  SPLIT_RUN_COMPLETED_NOTE_TEXT,
+  SPLIT_RUN_REJECTED_HEADLINE,
+  SPLIT_RUN_REJECTED_HEADLINE_ACTOR,
+  SPLIT_RUN_REJECTED_NOTE_TEXT,
+};
 
 export const SPLIT_RUN_DRAFT_NOTE: SplitRunFooterNote = { ...DRAFT_READINESS_NOTES.pending };
 
@@ -258,51 +274,14 @@ export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTo
   if (footer.kind === "failed" || footer.status === "failed") {
     return "failed";
   }
-  if (footer.kind === "stopped" || footer.status === "rejected") {
+  if (footer.kind === "stopped" || footer.status === "rejected" || footer.status === "archived") {
     return "rejected";
   }
   return "done";
 }
 
-function closerHeadline(verb: string, actor?: OrgUserDisplay, automationName?: string): string {
-  if (actor) {
-    return verb;
-  }
-  if (automationName) {
-    return `${automationName} ${verb}`;
-  }
-  return "";
-}
-
-function closedDecisionNote(
-  status?: WorkOrderDisplayStatus,
-  closer?: { actor?: OrgUserDisplay; automationName?: string },
-): SplitRunFooterNote {
-  if (status === "rejected") {
-    const headline =
-      closerHeadline(SPLIT_RUN_REJECTED_HEADLINE_ACTOR, closer?.actor, closer?.automationName) ||
-      SPLIT_RUN_REJECTED_HEADLINE;
-    return {
-      headline,
-      text: SPLIT_RUN_REJECTED_NOTE_TEXT,
-      ...(closer?.actor ? { actor: closer.actor } : {}),
-    };
-  }
-  if (status === "failed") {
-    return { headline: "This task is closed as failed", text: "Reopen this task to start the line again." };
-  }
-  const headline =
-    closerHeadline(SPLIT_RUN_COMPLETED_HEADLINE_ACTOR, closer?.actor, closer?.automationName) ||
-    SPLIT_RUN_COMPLETED_HEADLINE;
-  return {
-    headline,
-    text: SPLIT_RUN_COMPLETED_NOTE_TEXT,
-    ...(closer?.actor ? { actor: closer.actor } : {}),
-  };
-}
-
 function closedDecisionActions(status?: WorkOrderDisplayStatus): SplitRunFooterAction[] {
-  if (status === "failed" || status === "rejected" || status === "cancelled") {
+  if (status && isWorkOrderRecoveryStatus(status)) {
     return [SEND_TO_BACKLOG, REOPEN];
   }
   return [];
@@ -452,7 +431,7 @@ function closedFooterNote(input: FooterInput, note?: SplitRunFooterNote): SplitR
   if (input.status === "failed" || input.kind === "failed") {
     return closedDecisionNote(input.status ?? "failed");
   }
-  if (input.status === "completed" || input.status === "rejected") {
+  if (input.status === "completed" || input.status === "rejected" || input.status === "archived") {
     return closedDecisionNote(input.status, {
       actor: input.actor,
       automationName: input.automationName,
