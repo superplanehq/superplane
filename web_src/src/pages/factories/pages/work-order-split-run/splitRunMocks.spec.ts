@@ -1625,7 +1625,7 @@ describe("line board work-order examples", () => {
         {
           id: "art-spec",
           type: "TYPE_MARKDOWN",
-          data: { name: "spec.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" },
+          data: { name: "plan.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" },
         },
       ],
       analysisRuns: [
@@ -1754,7 +1754,7 @@ describe("line board work-order examples", () => {
         {
           id: "art-spec",
           type: "TYPE_MARKDOWN",
-          data: { name: "spec.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" },
+          data: { name: "plan.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" },
         },
       ],
       analysisRuns: [
@@ -1810,7 +1810,7 @@ describe("line board work-order examples", () => {
         {
           id: "art-spec",
           type: "TYPE_MARKDOWN",
-          data: { name: "spec.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" },
+          data: { name: "plan.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" },
         },
       ],
       analysisRuns: [
@@ -1865,7 +1865,7 @@ describe("line board work-order examples", () => {
         {
           id: "art-spec",
           type: "TYPE_MARKDOWN",
-          data: { name: "spec.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" },
+          data: { name: "plan.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" },
         },
       ],
       analysisRuns: [

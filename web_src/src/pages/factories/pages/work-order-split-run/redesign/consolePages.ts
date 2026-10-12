@@ -1,3 +1,4 @@
+import { planningArtifactDisplayData } from "../../../lib/intentDocument";
 import {
   branchTreeUrl,
   extractArtifactContentType,
@@ -99,7 +100,7 @@ export function isExpandableArtifact(kind: ConsoleArtifactKind): boolean {
 }
 
 export function artifactLabel(artifact: StageArtifact): string {
-  const data = toArtifactDataRecord(artifact.data);
+  const data = planningArtifactDisplayData(toArtifactDataRecord(artifact.data), artifact.key);
   return (
     extractArtifactFilename(data) ??
     extractArtifactTitle(data) ??

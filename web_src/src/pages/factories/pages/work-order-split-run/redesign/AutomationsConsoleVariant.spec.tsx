@@ -334,9 +334,15 @@ describe("AutomationsConsoleVariant summary strip", () => {
           createdAt: new Date(Date.now() - 180_000).toISOString(),
         },
         {
-          id: "art-spec",
+          id: "art-description",
           type: "TYPE_MARKDOWN",
-          data: { name: "spec.md", body: "# Spec" },
+          data: { name: "description.md", title: "description.md", body: "The task." },
+          createdAt: new Date(Date.now() - 300_000).toISOString(),
+        },
+        {
+          id: "art-plan",
+          type: "TYPE_MARKDOWN",
+          data: { name: "plan.md", title: "plan.md", body: "# Plan" },
           createdAt: new Date(Date.now() - 240_000).toISOString(),
         },
         {
@@ -350,13 +356,38 @@ describe("AutomationsConsoleVariant summary strip", () => {
 
     const section = screen.getByTestId("redesign-console-artifacts");
     const text = section.textContent ?? "";
-    expect(text).toContain("spec.md");
+    expect(text).toContain("description.md");
+    expect(text).toContain("plan.md");
     expect(text).toContain("report.md");
     expect(text).toContain("trace.log");
     expect(text).toContain("Design doc");
-    expect(text.indexOf("spec.md")).toBeLessThan(text.indexOf("report.md"));
+    expect(text.indexOf("description.md")).toBeLessThan(text.indexOf("plan.md"));
+    expect(text.indexOf("plan.md")).toBeLessThan(text.indexOf("report.md"));
     expect(text.indexOf("report.md")).toBeLessThan(text.indexOf("trace.log"));
     expect(text.indexOf("trace.log")).toBeLessThan(text.indexOf("Design doc"));
+  });
+
+  it("shows a stored spec.md planning row as plan.md", () => {
+    renderConsole(SPLIT_RUN_RUNNING, {
+      artifacts: [
+        {
+          id: "art-old-plan",
+          key: "spec:11111111-1111-4111-8111-111111111111",
+          type: "TYPE_MARKDOWN",
+          data: { name: "spec.md", title: "spec.md", body: "# Old plan" },
+        },
+        {
+          id: "art-user-spec",
+          type: "TYPE_MARKDOWN",
+          data: { name: "spec.md", title: "spec.md", body: "# User file" },
+        },
+      ],
+    });
+
+    const section = screen.getByTestId("redesign-console-artifacts");
+    expect(section.textContent).toContain("plan.md");
+    expect(section.textContent).toContain("spec.md");
+    expect(section.textContent?.indexOf("plan.md")).toBeLessThan(section.textContent?.indexOf("spec.md") ?? -1);
   });
 
   it("shows the decision note when the footer carries one", () => {
