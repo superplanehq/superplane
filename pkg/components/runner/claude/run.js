@@ -642,7 +642,7 @@ function createFormatter(promptFile, onSession, activityOverride) {
           const ended = endTextStream(inText, textBuf);
           inText = ended.inText;
           textBuf = ended.textBuf;
-          telemetry.applyBilledUsage(event.usage);
+          telemetry.applyBilledUsage(event);
           resultLine = line;
           resultFailed = Boolean(event.is_error);
           formatResult(event);
