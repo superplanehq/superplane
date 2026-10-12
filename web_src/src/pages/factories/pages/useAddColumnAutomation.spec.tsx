@@ -122,4 +122,46 @@ describe("add visual evidence", () => {
     expect(result.current.automation.pickerOpen).toBe(false);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["apps", "org", "factory"] });
   });
+
+  it("does not install visual evidence for Bitbucket", async () => {
+    const { result } = renderHook(
+      () =>
+        useAddColumnAutomation({
+          organizationId: "org",
+          factoryId: "factory",
+          factoryKey: "workspace",
+          lineId: "line",
+          appRepository: "acme/app",
+          backlogRepository: "acme/app",
+          defaultBranch: "main",
+          githubIntegrationId: "vcs-integration",
+          vcsProvider: "bitbucket",
+          automationsFor: () => [],
+        }),
+      {
+        wrapper: ({ children }: { children: ReactNode }) => (
+          <QueryClientProvider client={new QueryClient()}>
+            <MemoryRouter>{children}</MemoryRouter>
+          </QueryClientProvider>
+        ),
+      },
+    );
+    act(() => result.current.openPicker("verify"));
+    expect(result.current.catalog.some((item) => item.kind === "visual-evidence")).toBe(false);
+    await act(async () =>
+      result.current.onSelect({
+        id: "visual-evidence",
+        kind: "visual-evidence",
+        name: "Visual Evidence",
+        description: "Capture screenshots or a short video when a pull request changes the user interface.",
+        trigger: "On pull request opened or updated",
+        action: "Capture screenshots or a short video",
+        iconSrc: "",
+        iconAlt: "",
+        unique: true,
+      }),
+    );
+    expect(installFactory).not.toHaveBeenCalled();
+    expect(result.current.pickerOpen).toBe(true);
+  });
 });

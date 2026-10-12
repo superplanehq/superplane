@@ -80,6 +80,10 @@ export function useAddColumnAutomation(args: {
       return;
     }
     if (entry.kind === "visual-evidence") {
+      if (factoryVCSProvider(args.vcsProvider) !== "github") {
+        showErrorToast("Visual evidence is available for GitHub only.");
+        return;
+      }
       await installBundledCanvas(args, installFactory, queryClient, closePicker, {
         factoryId: "visual-evidence",
         provider: "github",
