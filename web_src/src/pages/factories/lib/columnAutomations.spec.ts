@@ -7,6 +7,7 @@ import {
   buildColumnAutomations,
   catalogForColumn,
   columnAutomationOpenPath,
+  columnAutomationUsesSplitConfig,
   columnAutomationViewTabs,
   columnAutomationsEmptyCopy,
   columnAutomationsNeedRepair,
@@ -285,7 +286,7 @@ describe("buildColumnAutomations", () => {
       catalogId: "visual-evidence",
       name: "Visual Evidence",
       trigger: "On pull request opened or updated",
-      action: "Publish visual evidence",
+      action: "Capture screenshots or a short video",
       canvasId: "app-evidence",
     });
     expect(automations[5]).toMatchObject({ canvasId: "app-evidence-2" });
@@ -525,6 +526,14 @@ describe("columnAutomationViewTabs", () => {
 
   it("shows General then Automation when a form exists without an agent", () => {
     expect(columnAutomationViewTabs({ hasGeneral: true, hasAgent: false })).toEqual(["general", "automation"]);
+  });
+});
+
+describe("columnAutomationUsesSplitConfig", () => {
+  it("opens the split settings panel for merge confidence and visual evidence", () => {
+    expect(columnAutomationUsesSplitConfig(["on-pr-risk"])).toBe(true);
+    expect(columnAutomationUsesSplitConfig(["on-pr-visual-evidence", "capture-visual-evidence"])).toBe(true);
+    expect(columnAutomationUsesSplitConfig(["on-pr-closed"])).toBe(false);
   });
 });
 

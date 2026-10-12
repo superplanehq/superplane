@@ -1,7 +1,7 @@
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { Bot, LoaderCircle, Sparkles, Workflow } from "lucide-react";
+import { Bot, Camera, LoaderCircle, Sparkles, Workflow } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 
@@ -15,6 +15,7 @@ export type ColumnAutomationRowAction = "settings" | "disable" | "enable" | "rem
 const KIND_FALLBACK_ICON: Partial<Record<ColumnAutomationKind, LucideIcon>> = {
   analysis: Sparkles,
   "risk-score": Sparkles,
+  "visual-evidence": Camera,
   "agent-step": Bot,
   custom: Workflow,
 };

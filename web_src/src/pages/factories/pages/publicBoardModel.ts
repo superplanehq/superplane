@@ -351,9 +351,6 @@ function automationIcon(
   if (kind === "pr-closure") {
     return { src: PR_CLOSURE_ENTRY.iconSrc, alt: PR_CLOSURE_ENTRY.iconAlt };
   }
-  if (kind === "visual-evidence") {
-    return { src: VISUAL_EVIDENCE_ENTRY.iconSrc, alt: VISUAL_EVIDENCE_ENTRY.iconAlt };
-  }
   return PUBLIC_AUTOMATION_ICONS[icon ?? ""] ?? { src: "", alt: "" };
 }
 

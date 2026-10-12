@@ -83,9 +83,9 @@ export const VISUAL_EVIDENCE_ENTRY: ColumnAutomationCatalogEntry = {
   name: "Visual Evidence",
   description: "Capture screenshots or a short video when a pull request changes the user interface.",
   trigger: "On pull request opened or updated",
-  action: "Publish visual evidence",
-  iconSrc: githubIcon,
-  iconAlt: "GitHub",
+  action: "Capture screenshots or a short video",
+  iconSrc: "",
+  iconAlt: "",
   unique: true,
 };
 

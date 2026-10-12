@@ -23,7 +23,7 @@ args=(
 if [[ -n "${SHARD_COUNT:-}" ]]; then
   source "${script_dir}/lib/shard_args.sh"
   echo "Running UI unit tests shard ${SHARD_INDEX}/${SHARD_COUNT}"
-  args+=(--parallel=1 --shard="${SHARD_INDEX}/${SHARD_COUNT}")
+  args+=(--parallel --shard="${SHARD_INDEX}/${SHARD_COUNT}")
 else
   args+=(--isolate)
 fi
@@ -33,19 +33,8 @@ if [[ -n "${FILES:-}" ]]; then
   read -r -a file_args <<< "${FILES}"
 fi
 
-run_bun_test() {
-  bun test "${args[@]}" "${file_args[@]}"
-}
-
 bun_status=0
-log_file="$(mktemp)"
-run_bun_test 2>&1 | tee "${log_file}" || bun_status=$?
-if [[ "${bun_status}" -ne 0 ]] && grep -q "worker crashed" "${log_file}"; then
-  echo "UI test worker crashed. Retry the run once."
-  bun_status=0
-  run_bun_test || bun_status=$?
-fi
-rm -f "${log_file}"
+bun test "${args[@]}" "${file_args[@]}" || bun_status=$?
 
 bun "${script_dir}/flatten_junit.mjs" "${junit_file}"
 exit "${bun_status}"

@@ -55,7 +55,9 @@ describe("columnAutomationHeadline", () => {
     expect(columnAutomationHeadline(automation({ kind: "pr-checks" }))).toBe("Fixes failing status checks");
     expect(columnAutomationHeadline(automation({ kind: "pr-closure" }))).toBe("Closes tasks when pull requests merge");
     expect(columnAutomationHeadline(automation({ kind: "risk-score" }))).toBe("Scores merge confidence");
-    expect(columnAutomationHeadline(automation({ kind: "visual-evidence" }))).toBe("Publishes visual evidence");
+    expect(columnAutomationHeadline(automation({ kind: "visual-evidence" }))).toBe(
+      "Captures screenshots or a short video",
+    );
   });
 });
 

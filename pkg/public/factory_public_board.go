@@ -816,7 +816,6 @@ func verifyAutomations(canvases []models.Canvas, handlers []models.FactoryPRFeed
 			Kind:      "visual-evidence",
 			Name:      strings.TrimSpace(canvas.Name),
 			CatalogID: "visual-evidence",
-			Icon:      publicIconGitHub,
 			Health:    "healthy",
 		})
 	}
