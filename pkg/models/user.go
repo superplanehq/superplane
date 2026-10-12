@@ -99,6 +99,10 @@ func (u *User) RestoreInTransaction(tx *gorm.DB) error {
 		Error
 }
 
+func PreloadRemovedMember(db *gorm.DB) *gorm.DB {
+	return db.Unscoped()
+}
+
 func (u *User) UpdateTokenHash(tokenHash string) error {
 	u.UpdatedAt = time.Now()
 	u.TokenHash = tokenHash
@@ -198,6 +202,16 @@ func FindUsersByIDsInOrganization(db *gorm.DB, orgID string, ids []string) ([]Us
 		Find(&users).
 		Error
 
+	return users, err
+}
+
+func FindUnscopedUsersByIDs(tx *gorm.DB, ids []uuid.UUID) ([]User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	var users []User
+	err := tx.Unscoped().Where("id IN ?", ids).Find(&users).Error
 	return users, err
 }
 

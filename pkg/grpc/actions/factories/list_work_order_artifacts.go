@@ -77,12 +77,11 @@ func serializeArtifactCreator(artifact *models.FactoryWorkOrderArtifact) *pb.Use
 		return nil
 	}
 
-	name := artifact.CreatedByID.String()
-	if artifact.CreatedBy != nil {
-		name = artifact.CreatedBy.Name
+	return &pb.UserRef{
+		Id:      artifact.CreatedByID.String(),
+		Name:    loadedMemberName(artifact.CreatedBy),
+		Deleted: loadedMemberDeleted(artifact.CreatedBy),
 	}
-
-	return &pb.UserRef{Id: artifact.CreatedByID.String(), Name: name}
 }
 
 func artifactTypeToProto(t string) pb.WorkOrderArtifact_Type {

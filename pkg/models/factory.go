@@ -1144,9 +1144,9 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 	}
 
 	query := f.workOrdersQuery(tx, filters).
-		Preload("CreatedBy").
+		Preload("CreatedBy", PreloadRemovedMember).
 		Preload("Assignees").
-		Preload("Assignees.User")
+		Preload("Assignees.User", PreloadRemovedMember)
 
 	if filters.BeforeID != nil {
 		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)
@@ -1320,9 +1320,9 @@ func (f *Factory) findWorkOrderByKey(tx *gorm.DB, key string) (*FactoryWorkOrder
 func (f *Factory) findWorkOrder(tx *gorm.DB, cond string, arg any) (*FactoryWorkOrder, error) {
 	var order FactoryWorkOrder
 	err := tx.
-		Preload("CreatedBy").
+		Preload("CreatedBy", PreloadRemovedMember).
 		Preload("Assignees").
-		Preload("Assignees.User").
+		Preload("Assignees.User", PreloadRemovedMember).
 		Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID).
 		Where(cond, arg).
 		First(&order).

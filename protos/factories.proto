@@ -1945,6 +1945,7 @@ message WorkOrderCreator {
 message UserRef {
   string id = 1;
   string name = 2;
+  bool deleted = 3;
 }
 
 // LineRef identifies a factory line as it was at the time it was
