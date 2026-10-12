@@ -16,9 +16,18 @@ vi.mock("./ownerSetup/LicenseStep", () => ({
   ),
 }));
 
+const posthogMock = vi.hoisted(() => ({
+  enabled: false,
+  getActiveMatchingSurveys: vi.fn(),
+  capture: vi.fn(),
+}));
+
 vi.mock("@/posthog", () => ({
-  isPostHogEnabled: false,
-  posthog: { getActiveMatchingSurveys: vi.fn() },
+  isPostHogEnabled: () => posthogMock.enabled,
+  posthog: {
+    getActiveMatchingSurveys: posthogMock.getActiveMatchingSurveys,
+    capture: posthogMock.capture,
+  },
 }));
 
 const ONBOARDING_LABELS = ["Discover", "Awaiting code", "Verify", "01 Plan", "02 Build", "03 Check", "04 Review"];
@@ -40,10 +49,68 @@ function expectOwnerSetupPreview() {
   }
 }
 
+const OWNER_SETUP_SURVEY = {
+  id: "owner-setup-survey",
+  name: "Owner Setup Survey",
+  questions: [
+    {
+      id: "role",
+      question: "What best describes your role?",
+      type: "single_choice",
+      choices: ["Software engineer"],
+    },
+  ],
+};
+
+function stubOwnerSetupFetch() {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/setup-owner") && init?.method === "POST") {
+        return jsonResponse({ organization_id: "org-1", organization_slug: "acme" });
+      }
+      if (url.endsWith("/admin/api/installation/first-run/fleet-manager")) {
+        return jsonResponse({ yaml: "id: self-host\n", token: "tok" });
+      }
+      return new Response("", { status: 404 });
+    }),
+  );
+}
+
+function renderOwnerSetup() {
+  render(
+    <MemoryRouter>
+      <OwnerSetup />
+    </MemoryRouter>,
+  );
+}
+
+async function reachFleetStep() {
+  fireEvent.change(screen.getByPlaceholderText("First name"), { target: { value: "Ada" } });
+  fireEvent.change(screen.getByPlaceholderText("Last name"), { target: { value: "Lovelace" } });
+  fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "ada@example.com" } });
+  fireEvent.change(screen.getByPlaceholderText("Password"), { target: { value: "Secret1x" } });
+  fireEvent.change(screen.getByPlaceholderText("Confirm password"), { target: { value: "Secret1x" } });
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+  expect(await screen.findByTestId("owner-setup-license-skip")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("owner-setup-license-skip"));
+
+  expect(await screen.findByTestId("owner-setup-smtp")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("owner-setup-smtp-skip"));
+
+  expect(await screen.findByTestId("owner-setup-fleet")).toBeInTheDocument();
+  await screen.findByTestId("owner-setup-fleet-yaml");
+}
+
 describe("OwnerSetup", () => {
   const originalLocation = window.location;
 
   beforeEach(() => {
+    posthogMock.enabled = false;
+    posthogMock.getActiveMatchingSurveys.mockReset();
+    posthogMock.capture.mockReset();
     Object.defineProperty(window, "location", {
       configurable: true,
       value: { ...originalLocation, href: "http://localhost/setup" },
@@ -56,11 +123,7 @@ describe("OwnerSetup", () => {
   });
 
   it("shows the gold arrow preview without onboarding labels", () => {
-    render(
-      <MemoryRouter>
-        <OwnerSetup />
-      </MemoryRouter>,
-    );
+    renderOwnerSetup();
 
     expectOwnerSetupPreview();
     expect(screen.queryByTestId("first-run-signed-in")).not.toBeInTheDocument();
@@ -69,47 +132,42 @@ describe("OwnerSetup", () => {
   });
 
   it("reaches workspace setup when SMTP and Fleet Manager are skipped", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-        const url = String(input);
-        if (url.endsWith("/api/v1/setup-owner") && init?.method === "POST") {
-          return jsonResponse({ organization_id: "org-1", organization_slug: "acme" });
-        }
-        if (url.endsWith("/admin/api/installation/first-run/fleet-manager")) {
-          return jsonResponse({ yaml: "id: self-host\n", token: "tok" });
-        }
-        return new Response("", { status: 404 });
-      }),
-    );
+    stubOwnerSetupFetch();
+    renderOwnerSetup();
+    await reachFleetStep();
 
-    render(
-      <MemoryRouter>
-        <OwnerSetup />
-      </MemoryRouter>,
-    );
-
-    fireEvent.change(screen.getByPlaceholderText("First name"), { target: { value: "Ada" } });
-    fireEvent.change(screen.getByPlaceholderText("Last name"), { target: { value: "Lovelace" } });
-    fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "ada@example.com" } });
-    fireEvent.change(screen.getByPlaceholderText("Password"), { target: { value: "Secret1x" } });
-    fireEvent.change(screen.getByPlaceholderText("Confirm password"), { target: { value: "Secret1x" } });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-
-    expect(await screen.findByTestId("owner-setup-license-skip")).toBeInTheDocument();
     expectOwnerSetupPreview();
     expect(screen.getByTestId("first-run-signed-in")).toHaveTextContent("ada@example.com");
     expect(screen.getByTestId("first-run-log-out")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("owner-setup-license-skip"));
-
-    expect(await screen.findByTestId("owner-setup-smtp")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("owner-setup-smtp-skip"));
-
-    expect(await screen.findByTestId("owner-setup-fleet")).toBeInTheDocument();
-    await screen.findByTestId("owner-setup-fleet-yaml");
+    expect(screen.getByTestId("first-run-progress")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("owner-setup-fleet-skip"));
 
     await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
     expect(screen.queryByText(OWNER_SETUP_COPY.smtp.headline)).not.toBeInTheDocument();
+  });
+
+  it("keeps the gold scene and hides step dots while the survey is completed", async () => {
+    posthogMock.enabled = true;
+    posthogMock.getActiveMatchingSurveys.mockImplementation((callback: (surveys: unknown[]) => void) => {
+      callback([OWNER_SETUP_SURVEY]);
+    });
+    stubOwnerSetupFetch();
+    renderOwnerSetup();
+    await reachFleetStep();
+
+    expect(screen.getByTestId("first-run-progress")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("owner-setup-fleet-skip"));
+
+    expect(await screen.findByText("What best describes your role?")).toBeInTheDocument();
+    expectOwnerSetupPreview();
+    expect(screen.queryByTestId("first-run-progress")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /software engineer/i }));
+
+    await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
+    expect(posthogMock.capture).toHaveBeenCalledWith(
+      "survey sent",
+      expect.objectContaining({ $survey_id: "owner-setup-survey", $survey_completed: true }),
+    );
   });
 });

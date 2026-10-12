@@ -139,7 +139,7 @@ function continueAfterOwnerSetup(args: {
   setActiveSurvey: (survey: PostHogSurvey | null) => void;
   setStep: (step: OwnerSetupStep) => void;
 }) {
-  if (!isPostHogEnabled) {
+  if (!isPostHogEnabled()) {
     window.location.href = newOrganizationLandingPath(args.orgSlug);
     return;
   }
