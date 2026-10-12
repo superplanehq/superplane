@@ -1,10 +1,44 @@
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { type FleetRunner, type FleetTask, fetchRunner, nextCursor, previousCursor } from "./fleetAdmin";
 import { PageControls, RelativeTimestamp, StateBadge, headerCellClass, rowClass, tableClass } from "./fleetTable";
+
+const RunnerTags = ({ tags }: { tags?: Record<string, string> }) => {
+  const entries = Object.entries(tags ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  if (entries.length === 0) {
+    return "—";
+  }
+
+  return (
+    <HoverCard openDelay={150} closeDelay={150}>
+      <HoverCardTrigger asChild>
+        <Button type="button" variant="outline" size="xs" className="whitespace-nowrap">
+          {entries.length} {entries.length === 1 ? "tag" : "tags"}
+        </Button>
+      </HoverCardTrigger>
+      <HoverCardContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-0">
+        <div className="max-h-64 overflow-auto">
+          <table aria-label="Runner tags" className="w-full text-left text-xs">
+            <tbody>
+              {entries.map(([key, value]) => (
+                <tr key={key} className="border-b border-slate-100 last:border-0 dark:border-gray-700">
+                  <th scope="row" className="max-w-36 px-3 py-2 align-top font-mono font-medium break-all">
+                    {key}
+                  </th>
+                  <td className="px-3 py-2 align-top font-mono break-all">{value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+};
 
 export const RunnerRows = ({ rows }: { rows: FleetRunner[] }) => (
   <div className={tableClass}>
@@ -18,10 +52,10 @@ export const RunnerRows = ({ rows }: { rows: FleetRunner[] }) => (
           <th className={headerCellClass}>Architecture</th>
           <th className={headerCellClass}>Hostname</th>
           <th className={headerCellClass}>IP address</th>
-          <th className={headerCellClass}>Tags</th>
           <th className={headerCellClass}>Ephemeral</th>
           <th className={headerCellClass}>Created</th>
           <th className={headerCellClass}>Last seen</th>
+          <th className={headerCellClass}>Tags</th>
         </tr>
       </thead>
       <tbody>
@@ -38,28 +72,15 @@ export const RunnerRows = ({ rows }: { rows: FleetRunner[] }) => (
             <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300">{runner.arch || "—"}</td>
             <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300">{runner.hostname || "—"}</td>
             <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300">{runner.ip || "—"}</td>
-            <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300">
-              {Object.entries(runner.tags ?? {}).length === 0 ? (
-                "—"
-              ) : (
-                <dl className="space-y-1">
-                  {Object.entries(runner.tags ?? {})
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([key, value]) => (
-                      <div key={key} className="flex gap-1">
-                        <dt className="font-medium">{key}:</dt>
-                        <dd className="font-mono break-all">{value}</dd>
-                      </div>
-                    ))}
-                </dl>
-              )}
-            </td>
             <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">{runner.ephemeral ? "Yes" : "No"}</td>
             <td className="px-4 py-2.5">
               <RelativeTimestamp value={runner.createdAt} />
             </td>
             <td className="px-4 py-2.5">
               <RelativeTimestamp value={runner.lastSeenAt} />
+            </td>
+            <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300">
+              <RunnerTags tags={runner.tags} />
             </td>
           </tr>
         ))}
