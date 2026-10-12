@@ -1046,6 +1046,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-column-automation-template-discussion")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-checks")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-risk-score")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toBeInTheDocument();
     expect(screen.queryByTestId("add-column-automation-template-custom")).not.toBeInTheDocument();
   });
 
@@ -1072,7 +1073,10 @@ describe("LinesPage board extras", () => {
       isPending: false,
     });
     useFactoryAutomations.mockReturnValue({
-      data: [{ id: "app-risk", name: "Risk score", columnKey: "verify" }],
+      data: [
+        { id: "app-risk", name: "Risk score", columnKey: "verify" },
+        { id: "app-evidence", name: "Visual Evidence", columnKey: "verify" },
+      ],
     });
     const user = userEvent.setup();
     renderLinesBoard();

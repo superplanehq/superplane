@@ -21,7 +21,6 @@ import {
   serializeColumnAgentCanvasNodes,
 } from "../lib/columnCanvasAgent";
 import { canvasHasNode, serializeNodeConfiguration, type NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
-import { resolveFactoryAppTemplate } from "../lib/factoryAppTemplate";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 
 const UPDATE_AGENT_COMMIT_MESSAGE = "Update agent";
@@ -99,8 +98,7 @@ export function useColumnCanvasAgentEditor(
   const agentNode = primaryAgentNode(canvas?.spec, preferredAgentNodeId);
   const agentNodeIds = editableAgentNodeIds(canvas, agentNode?.id, options.synchronizedAgentNodeIds);
   const draft = canvas && agentNode?.id ? planningReviewDraftFromCanvas(canvas, agentNode.id) : null;
-  const showVisualEvidenceSetting =
-    options.showVisualEvidenceSetting ?? resolveFactoryAppTemplate(canvas)?.id === "line-implementation";
+  const showVisualEvidenceSetting = options.showVisualEvidenceSetting ?? false;
 
   const canvasEditDeps = {
     appId: canvasId,
