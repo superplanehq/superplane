@@ -46,15 +46,18 @@ func (b *bitbucketVelocity) listMerges(
 //
 // A non-zero until continues a bounded rebuild: only pulls older than that
 // instant are read. When the page cap cuts the walk short, the read is not
-// an error. ContinueBefore is the oldest instant in the slice, and the next
-// read must start strictly before it.
+// an error. ContinueBefore is the oldest instant fully included in the slice.
+// The next read must start strictly before it. An instant the page cap splits
+// is left out, so unread pulls at that instant are not deleted or skipped.
 func listBitbucketMerges(
 	ctx context.Context,
 	client *bitbucketintegration.Client,
 	repository string,
 	from, to, until time.Time,
 ) ([]vcs.MergedPullRequest, velocityReadCoverage, error) {
-	prs, truncated, err := client.ListMergedPullRequests(repository, from, until, velocitySyncMaxPages)
+	prs, truncated, err := client.ListMergedPullRequestsThroughBoundary(
+		repository, from, until, velocitySyncMaxPages, bitbucketVelocityBoundaryPages,
+	)
 	if err != nil {
 		return nil, velocityReadCoverage{}, err
 	}

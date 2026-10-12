@@ -225,6 +225,47 @@ func TestDescribeFactoryVelocity_PendingSyncKeepsSuperPlaneCounts(t *testing.T) 
 	assert.Equal(t, "example/repo", resp.Repository)
 }
 
+func TestDescribeFactoryVelocity_PartialSyncStaysPending(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now()
+	merge := models.NewFactoryVelocityRepositoryMerge(
+		r.Organization.ID,
+		factoryModel.ID,
+		"example/repo",
+		50,
+		models.FactoryVelocityMergeSourcePeople,
+		now.Add(-2*time.Hour),
+	)
+	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(
+		db,
+		factoryModel.ID,
+		models.ProviderGitHub,
+		now.AddDate(0, 0, -90),
+		now.Add(time.Hour),
+		[]models.FactoryVelocityRepositoryMerge{merge},
+	))
+	sync, err := models.ClaimFactoryVelocitySync(db, factoryModel.ID, now)
+	require.NoError(t, err)
+	require.NoError(t, sync.RecordProgress(db, "example/repo", now.Add(-2*24*time.Hour)))
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+		Repository: "example/repo",
+	})
+	require.NoError(t, err)
+	assert.True(t, resp.PeopleSyncPending, "a short slice is not a finished people report")
+	assert.False(t, resp.HasPeopleCohort)
+	assert.Nil(t, resp.PeopleSyncedAt)
+	assert.Equal(t, int32(0), resp.Totals.PeopleMerged)
+}
+
 func TestDescribeFactoryVelocity_CountsSyncedPeopleMerges(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())

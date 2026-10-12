@@ -3,6 +3,7 @@ package bitbucket
 import (
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -168,7 +169,16 @@ func Test__ListMergedPullRequests(t *testing.T) {
 		require.Len(t, prs, 1)
 		assert.Equal(t, int64(9), prs[0].ID)
 		assert.False(t, truncated)
-		assert.Contains(t, httpCtx.Requests[0].URL.Query().Get("q"), "updated_on < "+until.UTC().Format(time.RFC3339))
+		assert.Contains(t, httpCtx.Requests[0].URL.Query().Get("q"), "updated_on < "+until.UTC().Format(time.RFC3339Nano))
+	})
+
+	t.Run("until keeps fractional seconds", func(t *testing.T) {
+		until := time.Date(2026, 10, 12, 10, 5, 0, 500*int(time.Millisecond), time.UTC)
+		client, httpCtx := stubBitbucketClient(okResponse(`{"values": []}`))
+
+		_, _, err := client.ListMergedPullRequests("acme/widgets", from, until, 1)
+		require.NoError(t, err)
+		assert.Equal(t, "updated_on < "+until.Format(time.RFC3339Nano), httpCtx.Requests[0].URL.Query().Get("q"))
 	})
 
 	t.Run("unparseable timestamps are skipped", func(t *testing.T) {
@@ -180,6 +190,73 @@ func Test__ListMergedPullRequests(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, prs)
 	})
+}
+
+func Test__ListMergedPullRequestsThroughBoundary(t *testing.T) {
+	from := time.Now().Add(-30 * 24 * time.Hour)
+	newer := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
+	boundary := newer.Add(-time.Second)
+	older := boundary.Add(-time.Second)
+	next := "https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests?page=2"
+
+	t.Run("finishes a timestamp the page cap splits", func(t *testing.T) {
+		client, _ := stubBitbucketClient(
+			okResponse(mergedPullPage([]mergedPullFixture{{2, newer}, {1, boundary}}, next)),
+			okResponse(mergedPullPage([]mergedPullFixture{{3, boundary}, {4, older}}, next)),
+		)
+
+		prs, truncated, err := client.ListMergedPullRequestsThroughBoundary("acme/widgets", from, time.Time{}, 1, 1)
+		require.NoError(t, err)
+		require.Len(t, prs, 3)
+		assert.Equal(t, int64(2), prs[0].ID)
+		assert.Equal(t, int64(1), prs[1].ID)
+		assert.Equal(t, int64(3), prs[2].ID)
+		assert.True(t, truncated, "older pulls remain, but the shared instant is fully read")
+	})
+
+	t.Run("leaves an unfinished timestamp for the next slice", func(t *testing.T) {
+		client, _ := stubBitbucketClient(
+			okResponse(mergedPullPage([]mergedPullFixture{{2, newer}, {1, boundary}}, next)),
+			okResponse(mergedPullPage([]mergedPullFixture{{3, boundary}}, next)),
+		)
+
+		prs, truncated, err := client.ListMergedPullRequestsThroughBoundary("acme/widgets", from, time.Time{}, 1, 1)
+		require.NoError(t, err)
+		require.Len(t, prs, 1)
+		assert.Equal(t, int64(2), prs[0].ID)
+		assert.True(t, truncated)
+	})
+
+	t.Run("does not skip a timestamp that fills the page cap", func(t *testing.T) {
+		client, _ := stubBitbucketClient(
+			okResponse(mergedPullPage([]mergedPullFixture{{1, boundary}}, next)),
+			okResponse(mergedPullPage([]mergedPullFixture{{2, boundary}}, next)),
+		)
+
+		_, _, err := client.ListMergedPullRequestsThroughBoundary("acme/widgets", from, time.Time{}, 1, 1)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "updated_on")
+	})
+}
+
+type mergedPullFixture struct {
+	id      int64
+	updated time.Time
+}
+
+func mergedPullPage(pulls []mergedPullFixture, next string) string {
+	values := ""
+	for i, pull := range pulls {
+		if i > 0 {
+			values += ","
+		}
+		values += `{"id":` + strconv.FormatInt(pull.id, 10) + `,"state":"MERGED","updated_on":"` + pull.updated.Format(time.RFC3339Nano) + `","author":{},"source":{},"merge_commit":{}}`
+	}
+	page := `{"values":[` + values + `]`
+	if next != "" {
+		page += `,"next":"` + next + `"`
+	}
+	return page + `}`
 }
 
 func Test__RateLimitedResponsesSurfaceStatus(t *testing.T) {

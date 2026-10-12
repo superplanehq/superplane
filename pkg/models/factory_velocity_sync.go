@@ -50,6 +50,27 @@ func (s *FactoryVelocitySync) CoversRepository(repository string) bool {
 	return strings.EqualFold(strings.TrimSpace(s.Repository), strings.TrimSpace(repository))
 }
 
+// RecordProgress saves a short slice without stamping a finished sync.
+// SyncedAt stays at the last finished read so a partial history is not
+// reported as complete.
+func (s *FactoryVelocitySync) RecordProgress(tx *gorm.DB, repository string, backfilledFrom time.Time) error {
+	now := time.Now()
+	s.Repository = strings.TrimSpace(repository)
+	s.BackfilledFrom = &backfilledFrom
+	s.Error = ""
+	s.UpdatedAt = now
+
+	return tx.Model(s).
+		Where("factory_id = ?", s.FactoryID).
+		Updates(map[string]any{
+			"repository":       s.Repository,
+			"backfilled_from":  s.BackfilledFrom,
+			"rules_generation": s.RulesGeneration,
+			"error":            "",
+			"updated_at":       now,
+		}).Error
+}
+
 // RecordSuccess stamps a finished sync and clears any earlier failure.
 func (s *FactoryVelocitySync) RecordSuccess(tx *gorm.DB, repository string, syncedAt, backfilledFrom time.Time) error {
 	now := time.Now()

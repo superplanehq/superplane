@@ -132,11 +132,13 @@ func TestToBitbucketRepositoryMerge(t *testing.T) {
 
 func TestListBitbucketMergesKeepsAShortPageWalkIncomplete(t *testing.T) {
 	updated := time.Now().UTC().Truncate(time.Second)
+	older := updated.Add(-time.Minute)
 	body := `{"values":[{"id":1,"state":"MERGED","updated_on":"` + updated.Format(time.RFC3339) + `","author":{},"source":{}}],"next":"https://api.bitbucket.org/2.0/next"}`
-	responses := make([]*http.Response, velocitySyncMaxPages)
-	for i := range responses {
+	responses := make([]*http.Response, velocitySyncMaxPages+1)
+	for i := 0; i < velocitySyncMaxPages; i++ {
 		responses[i] = okJSONResponse(body)
 	}
+	responses[velocitySyncMaxPages] = okJSONResponse(`{"values":[{"id":99,"state":"MERGED","updated_on":"` + older.Format(time.RFC3339) + `","author":{},"source":{}}],"next":"https://api.bitbucket.org/2.0/next"}`)
 	client, _ := stubBitbucketVelocityClient(responses...)
 
 	merges, coverage, err := listBitbucketMerges(
@@ -149,6 +151,9 @@ func TestListBitbucketMergesKeepsAShortPageWalkIncomplete(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotEmpty(t, merges)
+	for _, merge := range merges {
+		assert.NotEqual(t, int64(99), merge.Number, "a pull older than the finished instant waits for the next slice")
+	}
 	assert.False(t, coverage.Complete)
 	assert.WithinDuration(t, updated, coverage.ContinueBefore, time.Second)
 }
@@ -169,7 +174,7 @@ func TestListBitbucketMergesContinuesBeforeTheSavedSlice(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, merges, 1)
 	assert.True(t, coverage.Complete)
-	assert.Contains(t, httpCtx.Requests[0].URL.Query().Get("q"), "updated_on < "+until.Format(time.RFC3339))
+	assert.Contains(t, httpCtx.Requests[0].URL.Query().Get("q"), "updated_on < "+until.Format(time.RFC3339Nano))
 }
 
 func TestListBitbucketMergesExcludesAppsUnlessTheyProducedAgentWork(t *testing.T) {

@@ -536,6 +536,30 @@ type MergedBitbucketPullRequest struct {
 // history without repeating the newest pages. At most maxPages pages are
 // read; truncated reports whether the page cap cut the walk short.
 func (c *Client) ListMergedPullRequests(repository string, from, until time.Time, maxPages int) ([]MergedBitbucketPullRequest, bool, error) {
+	return c.listMergedPullRequests(repository, from, until, maxPages, 0)
+}
+
+// ListMergedPullRequestsThroughBoundary is the velocity history read.
+// After maxPages, it keeps reading until the oldest updated_on is fully
+// consumed, or until boundaryPages more pages are read. A truncated result
+// then ends on an instant that was fully read. An instant the caps split is
+// left out, so the next slice can read it instead of skipping the unread pages.
+func (c *Client) ListMergedPullRequestsThroughBoundary(
+	repository string,
+	from, until time.Time,
+	maxPages, boundaryPages int,
+) ([]MergedBitbucketPullRequest, bool, error) {
+	if boundaryPages < 0 {
+		boundaryPages = 0
+	}
+	return c.listMergedPullRequests(repository, from, until, maxPages, boundaryPages)
+}
+
+func (c *Client) listMergedPullRequests(
+	repository string,
+	from, until time.Time,
+	maxPages, boundaryPages int,
+) ([]MergedBitbucketPullRequest, bool, error) {
 	path, err := repositoryPath(repository)
 	if err != nil {
 		return nil, false, err
@@ -544,46 +568,105 @@ func (c *Client) ListMergedPullRequests(repository string, from, until time.Time
 		maxPages = 1
 	}
 
-	merged := []MergedBitbucketPullRequest{}
+	endpoint := mergedPullRequestsEndpoint(path, until)
+	walk, err := c.readMergedPullRequestPages(endpoint, from, until, time.Time{}, maxPages, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	if walk.reachedFrom || walk.next == "" || boundaryPages <= 0 || len(walk.merged) == 0 {
+		return walk.merged, walk.next != "" && !walk.reachedFrom, nil
+	}
+
+	boundary := oldestMergedBitbucketUpdate(walk.merged)
+	if boundary.IsZero() {
+		return walk.merged, true, nil
+	}
+	walk, err = c.readMergedPullRequestPages(walk.next, from, until, boundary, boundaryPages, walk.merged)
+	if err != nil {
+		return nil, false, err
+	}
+	if walk.reachedFrom || walk.passedStop || walk.next == "" {
+		return walk.merged, walk.next != "" && !walk.reachedFrom, nil
+	}
+	if !oldestMergedBitbucketUpdate(walk.merged).Equal(boundary) {
+		return walk.merged, true, nil
+	}
+
+	trimmed := dropBitbucketUpdatesAt(walk.merged, boundary)
+	if len(trimmed) == 0 {
+		return nil, false, fmt.Errorf(
+			"bitbucket merge list exceeded %d pages on updated_on %s",
+			maxPages+boundaryPages,
+			boundary.UTC().Format(time.RFC3339Nano),
+		)
+	}
+	return trimmed, true, nil
+}
+
+type bitbucketMergedPullPage struct {
+	Values []bitbucketMergedPullValue `json:"values"`
+	Next   string                     `json:"next"`
+}
+
+type bitbucketMergedPullValue struct {
+	ID        int64  `json:"id"`
+	State     string `json:"state"`
+	Title     string `json:"title"`
+	UpdatedOn string `json:"updated_on"`
+	Author    struct {
+		Type        string `json:"type"`
+		UUID        string `json:"uuid"`
+		Nickname    string `json:"nickname"`
+		DisplayName string `json:"display_name"`
+		Links       struct {
+			Avatar struct {
+				Href string `json:"href"`
+			} `json:"avatar"`
+		} `json:"links"`
+	} `json:"author"`
+	Source struct {
+		Commit struct {
+			Hash string `json:"hash"`
+		} `json:"commit"`
+	} `json:"source"`
+	MergeCommit struct {
+		Hash string `json:"hash"`
+	} `json:"merge_commit"`
+}
+
+type mergedPullWalk struct {
+	merged      []MergedBitbucketPullRequest
+	next        string
+	reachedFrom bool
+	passedStop  bool
+}
+
+func mergedPullRequestsEndpoint(path string, until time.Time) string {
 	query := url.Values{}
 	query.Set("state", PullRequestStateMerged)
 	query.Set("sort", "-updated_on")
 	query.Set("pagelen", "50")
 	if !until.IsZero() {
-		query.Set("q", fmt.Sprintf("updated_on < %s", until.UTC().Format(time.RFC3339)))
+		// Keep fractional seconds. RFC3339 drops them, so a bound of
+		// 10:05:00.500Z would be sent as 10:05:00Z and skip older pulls.
+		query.Set("q", fmt.Sprintf("updated_on < %s", until.UTC().Format(time.RFC3339Nano)))
 	}
-	endpoint := fmt.Sprintf("%s/repositories/%s/pullrequests?%s", baseURL, path, query.Encode())
+	return fmt.Sprintf("%s/repositories/%s/pullrequests?%s", baseURL, path, query.Encode())
+}
+
+// readMergedPullRequestPages appends pulls from endpoint, newest first.
+// A non-zero stopBefore ends the walk before pulls older than that instant
+// and leaves them unread. The caller then continues strictly before it.
+func (c *Client) readMergedPullRequestPages(
+	endpoint string,
+	from, until, stopBefore time.Time,
+	maxPages int,
+	merged []MergedBitbucketPullRequest,
+) (mergedPullWalk, error) {
 	for page := 0; page < maxPages && endpoint != ""; page++ {
-		var response struct {
-			Values []struct {
-				ID        int64  `json:"id"`
-				State     string `json:"state"`
-				Title     string `json:"title"`
-				UpdatedOn string `json:"updated_on"`
-				Author    struct {
-					Type        string `json:"type"`
-					UUID        string `json:"uuid"`
-					Nickname    string `json:"nickname"`
-					DisplayName string `json:"display_name"`
-					Links       struct {
-						Avatar struct {
-							Href string `json:"href"`
-						} `json:"avatar"`
-					} `json:"links"`
-				} `json:"author"`
-				Source struct {
-					Commit struct {
-						Hash string `json:"hash"`
-					} `json:"commit"`
-				} `json:"source"`
-				MergeCommit struct {
-					Hash string `json:"hash"`
-				} `json:"merge_commit"`
-			} `json:"values"`
-			Next string `json:"next"`
-		}
+		var response bitbucketMergedPullPage
 		if err := c.doJSON(http.MethodGet, endpoint, nil, http.StatusOK, &response); err != nil {
-			return nil, false, err
+			return mergedPullWalk{}, err
 		}
 		for _, pr := range response.Values {
 			updated, err := parseBitbucketTime(pr.UpdatedOn)
@@ -594,25 +677,61 @@ func (c *Client) ListMergedPullRequests(repository string, from, until time.Time
 				continue
 			}
 			if updated.Before(from) {
-				return merged, false, nil
+				return mergedPullWalk{merged: merged, reachedFrom: true}, nil
 			}
-			merged = append(merged, MergedBitbucketPullRequest{
-				ID:           pr.ID,
-				State:        pr.State,
-				Title:        pr.Title,
-				AuthorType:   pr.Author.Type,
-				AuthorUUID:   bitbucketUUID(pr.Author.UUID),
-				AuthorNick:   pr.Author.Nickname,
-				AuthorName:   pr.Author.DisplayName,
-				AuthorAvatar: pr.Author.Links.Avatar.Href,
-				SourceHash:   pr.Source.Commit.Hash,
-				MergeHash:    pr.MergeCommit.Hash,
-				UpdatedOn:    updated,
-			})
+			if !stopBefore.IsZero() && updated.Before(stopBefore) {
+				next := response.Next
+				if next == "" {
+					next = endpoint
+				}
+				return mergedPullWalk{merged: merged, next: next, passedStop: true}, nil
+			}
+			merged = append(merged, mergedPullFromValue(pr, updated))
 		}
 		endpoint = response.Next
 	}
-	return merged, endpoint != "", nil
+	return mergedPullWalk{merged: merged, next: endpoint}, nil
+}
+
+func mergedPullFromValue(pr bitbucketMergedPullValue, updated time.Time) MergedBitbucketPullRequest {
+	return MergedBitbucketPullRequest{
+		ID:           pr.ID,
+		State:        pr.State,
+		Title:        pr.Title,
+		AuthorType:   pr.Author.Type,
+		AuthorUUID:   bitbucketUUID(pr.Author.UUID),
+		AuthorNick:   pr.Author.Nickname,
+		AuthorName:   pr.Author.DisplayName,
+		AuthorAvatar: pr.Author.Links.Avatar.Href,
+		SourceHash:   pr.Source.Commit.Hash,
+		MergeHash:    pr.MergeCommit.Hash,
+		UpdatedOn:    updated,
+	}
+}
+
+func oldestMergedBitbucketUpdate(prs []MergedBitbucketPullRequest) time.Time {
+	var oldest time.Time
+	for i := range prs {
+		updated := prs[i].UpdatedOn
+		if updated.IsZero() {
+			continue
+		}
+		if oldest.IsZero() || updated.Before(oldest) {
+			oldest = updated
+		}
+	}
+	return oldest
+}
+
+func dropBitbucketUpdatesAt(prs []MergedBitbucketPullRequest, at time.Time) []MergedBitbucketPullRequest {
+	kept := make([]MergedBitbucketPullRequest, 0, len(prs))
+	for i := range prs {
+		if prs[i].UpdatedOn.Equal(at) {
+			continue
+		}
+		kept = append(kept, prs[i])
+	}
+	return kept
 }
 
 // MergeCommit carries the merge timestamp and message of one commit.

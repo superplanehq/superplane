@@ -50,6 +50,10 @@ const (
 	// the REST budget is 5000 requests an hour, so the cap can be generous.
 	velocitySyncMaxPages = 50
 
+	// Extra pages used only to finish the oldest updated_on when the page cap
+	// splits that instant. The next slice must not skip the unread pages.
+	bitbucketVelocityBoundaryPages = 50
+
 	// Repositories read at once, which bounds how fast the worker spends the
 	// installation's request budget.
 	velocitySyncConcurrency = 4
@@ -414,6 +418,11 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 	}
 
 	sync.RulesGeneration = rulesGeneration
+	if !coverage.Complete {
+		// A short slice is progress, not a finished sync. SyncedAt stays put
+		// so the report stays pending and a refresh keeps waiting.
+		return sync.RecordProgress(database.Conn(), target.Repository, backfilledFrom)
+	}
 	return sync.RecordSuccess(database.Conn(), target.Repository, now, backfilledFrom)
 }
 
@@ -592,7 +601,9 @@ func bitbucketRebuildUntil(target models.FactoryVelocitySyncTarget, now time.Tim
 	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
 		return time.Time{}, false
 	}
-	if target.SyncedAt == nil || !sameRepository(target) || target.BackfilledFrom == nil {
+	// SyncedAt stays unset until the rebuild finishes. The cursor is
+	// BackfilledFrom, so a first sync can continue without looking finished.
+	if !sameRepository(target) || target.BackfilledFrom == nil {
 		return time.Time{}, false
 	}
 	if !target.BackfilledFrom.After(velocitySyncBackfillStart(now)) {
@@ -605,8 +616,8 @@ func bitbucketRebuildUntil(target models.FactoryVelocitySyncTarget, now time.Tim
 type velocityReadCoverage struct {
 	// Complete reports that the read reached the requested window start.
 	Complete bool
-	// ContinueBefore is the oldest instant in a short read. The next read
-	// must ask for pulls strictly older than it.
+	// ContinueBefore is the oldest instant fully included in a short read. The
+	// next read must ask for pulls strictly older than it.
 	ContinueBefore time.Time
 }
 

@@ -225,6 +225,22 @@ func Test__BitbucketRebuildUntil__ContinuesOlderThanTheSavedSlice(t *testing.T) 
 	assert.Equal(t, cursor, bound)
 }
 
+func Test__BitbucketRebuildUntil__ContinuesAFirstSliceWithoutAFinishedSync(t *testing.T) {
+	now := time.Now()
+	cursor := now.Add(-2 * 24 * time.Hour)
+	target := models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		BackfilledFrom:   &cursor,
+		RulesGeneration:  bitbucketVelocityRulesRebuilding,
+	}
+
+	until, ok := bitbucketRebuildUntil(target, now)
+	require.True(t, ok)
+	assert.Equal(t, cursor, until, "a short first slice must continue even though SyncedAt is still unset")
+}
+
 func Test__BitbucketRebuildUntil__DoesNotContinueAFinishedOrMovedRepository(t *testing.T) {
 	now := time.Now()
 	syncedAt := now.Add(-time.Minute)
