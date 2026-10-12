@@ -129,8 +129,8 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		consoleFile:      "templates/github/visual-evidence.console.yaml",
 		columnKey:        models.CanvasColumnKeyVerify,
 		componentIntegrations: map[string]string{
-			"github.createIssueComment": "github",
-			"github.onPullRequest":      "github",
+			"github.updatePullRequest": "github",
+			"github.onPullRequest":     "github",
 		},
 	}),
 	{id: "risk-score", provider: models.ProviderBitbucket}: bitbucketFactoryTemplate(factoryAppTemplate{

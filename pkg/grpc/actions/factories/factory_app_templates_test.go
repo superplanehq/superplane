@@ -1,9 +1,11 @@
 package factories
 
 import (
+	"encoding/base64"
 	"strings"
 	"testing"
 
+	"github.com/expr-lang/expr"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -351,23 +353,110 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 	)
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "capture-visual-evidence", TargetID: "has-visual-evidence", Channel: "passed"})
 
-	comment := findYAMLNode(t, canvas, "comment-visual-evidence")
-	assert.Equal(t, "github.createIssueComment", comment.Component)
-	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, comment.Integration)
-	assert.Equal(t, "{{ root().data.repository.full_name }}", comment.Configuration["repository"])
-	assert.Equal(t, "{{ root().data.pull_request.number }}", comment.Configuration["issueNumber"])
-	body, ok := comment.Configuration["body"].(string)
+	update := findYAMLNode(t, canvas, "update-pr-description")
+	assert.Equal(t, "github.updatePullRequest", update.Component)
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, update.Integration)
+	assert.Equal(t, "{{ root().data.repository.full_name }}", update.Configuration["repository"])
+	assert.Equal(t, "{{ root().data.pull_request.number }}", update.Configuration["pullNumber"])
+	body, ok := update.Configuration["body"].(string)
 	require.True(t, ok)
 	assert.Contains(t, body, "## Visual evidence")
 	assert.Contains(t, body, "root().data.pull_request.head.sha[:7]")
 	assert.Contains(t, body, `fromBase64($["Capture Visual Evidence"].data.result.visualEvidence.markdown)`)
-	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "has-visual-evidence", TargetID: "comment-visual-evidence", Channel: "true"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "has-visual-evidence", TargetID: "update-pr-description", Channel: "true"})
 	assert.Contains(t, result.consoleYAML, "This app is not a factory line step.")
 	assert.Contains(t, result.consoleYAML, "The first capture starts when")
-	assert.Contains(t, result.consoleYAML, "posts one comment")
+	assert.Contains(t, result.consoleYAML, "bottom of the pull request description")
+	assert.NotContains(t, result.consoleYAML, "posts one comment")
 	assert.NotContains(t, result.consoleYAML, "closed pull")
 
 	requireValidCanvasExpressions(t, canvas)
+}
+
+func TestVisualEvidenceDescriptionKeepsExistingText(t *testing.T) {
+	result, err := materializeFactoryTemplate("visual-evidence", "", factoryTemplateInput{
+		appID:   "app-evidence",
+		appName: "Visual Evidence",
+	})
+	require.NoError(t, err)
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	update := findYAMLNode(t, canvas, "update-pr-description")
+	body, ok := update.Configuration["body"].(string)
+	require.True(t, ok)
+	source := templateExpressionSource(t, body)
+
+	const markdown = "![Checkout](https://example.com/checkout.png)"
+	section := visualEvidenceDescriptionSection(markdown)
+	previous := visualEvidenceDescriptionSection("![Old](https://example.com/old.png)")
+
+	tests := []struct {
+		name    string
+		current any
+		want    string
+	}{
+		{name: "empty description", current: "", want: section},
+		{name: "missing description", current: nil, want: section},
+		{
+			name:    "keeps text above the section",
+			current: "Closes acme/app#1",
+			want:    "Closes acme/app#1\n\n" + section,
+		},
+		{
+			name:    "replaces the previous section and keeps the text around it",
+			current: "Closes acme/app#1\n\n" + previous + "\n\nThanks for the review.",
+			want:    "Closes acme/app#1\n\nThanks for the review.\n\n" + section,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, evalVisualEvidenceDescription(t, source, test.current, markdown))
+		})
+	}
+}
+
+func visualEvidenceDescriptionSection(markdown string) string {
+	return "<!-- superplane:visual-evidence -->\n## Visual evidence\n\nCaptured for commit `0123456`.\n\n" + markdown + "\n<!-- /superplane:visual-evidence -->"
+}
+
+func evalVisualEvidenceDescription(t *testing.T, source string, body any, markdown string) string {
+	t.Helper()
+
+	payload := map[string]any{
+		"data": map[string]any{
+			"pull_request": map[string]any{
+				"body": body,
+				"head": map[string]any{"sha": "0123456789abcdef0123456789abcdef01234567"},
+			},
+		},
+	}
+	env := map[string]any{
+		"$": map[string]any{
+			"Capture Visual Evidence": map[string]any{
+				"data": map[string]any{
+					"result": map[string]any{
+						"visualEvidence": map[string]any{
+							"markdown": base64.StdEncoding.EncodeToString([]byte(markdown)),
+						},
+					},
+				},
+			},
+		},
+	}
+	program, err := expr.Compile(
+		source,
+		expr.AsAny(),
+		expr.Env(env),
+		expr.Function("root", func(params ...any) (any, error) {
+			return payload, nil
+		}),
+	)
+	require.NoError(t, err)
+	got, err := expr.Run(program, env)
+	require.NoError(t, err)
+	text, ok := got.(string)
+	require.True(t, ok)
+	return text
 }
 
 func TestDeriveFactoryTemplateInputCarriesVisualEvidence(t *testing.T) {

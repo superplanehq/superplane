@@ -387,7 +387,7 @@ func factoryTemplateVCSNodeIDs(templateID string) []string {
 	case "risk-score":
 		return []string{"on-pr-risk"}
 	case "visual-evidence":
-		return []string{"on-pr-visual-evidence", "comment-visual-evidence"}
+		return []string{"on-pr-visual-evidence", "update-pr-description"}
 	default:
 		return nil
 	}

@@ -176,11 +176,11 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		_, _, err = materialized.Parse(r.Registry, orgID)
 		require.NoError(t, err)
 		trigger := findYAMLNode(t, materialized, "on-pr-visual-evidence")
-		comment := findYAMLNode(t, materialized, "comment-visual-evidence")
+		description := findYAMLNode(t, materialized, "update-pr-description")
 		agent := findYAMLNode(t, materialized, "capture-visual-evidence")
 		github := &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}
 		assert.Equal(t, github, trigger.Integration)
-		assert.Equal(t, github, comment.Integration)
+		assert.Equal(t, github, description.Integration)
 		assert.Equal(t, true, agent.Configuration["includeVisualEvidence"])
 		assert.Equal(t, map[string]any{
 			"source":      "integration",

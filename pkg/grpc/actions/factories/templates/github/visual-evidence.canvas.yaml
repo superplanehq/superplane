@@ -13,7 +13,7 @@ spec:
       targetId: has-visual-evidence
     - channel: "true"
       sourceId: has-visual-evidence
-      targetId: comment-visual-evidence
+      targetId: update-pr-description
   nodes:
     - id: on-pr-visual-evidence
       name: On Pull Request
@@ -155,19 +155,26 @@ spec:
         x: 1200
         "y": 80
       isCollapsed: true
-    - id: comment-visual-evidence
-      name: Comment Visual Evidence
+    - id: update-pr-description
+      name: Update Pull Request Description
       type: TYPE_ACTION
-      component: github.createIssueComment
+      component: github.updatePullRequest
       configuration:
         repository: '{{ root().data.repository.full_name }}'
-        issueNumber: '{{ root().data.pull_request.number }}'
+        pullNumber: '{{ root().data.pull_request.number }}'
         body: |-
-          ## Visual evidence
-
-          Captured for commit `{{ root().data.pull_request.head.sha[:7] }}`.
-
-          {{ fromBase64($["Capture Visual Evidence"].data.result.visualEvidence.markdown) }}
+          {{
+            let current = root().data.pull_request.body == nil ? "" : string(root().data.pull_request.body);
+            let start = "<!-- superplane:visual-evidence -->";
+            let end = "<!-- /superplane:visual-evidence -->";
+            let parts = current contains start ? split(current, start) : [current];
+            let prefix = parts[0];
+            let rest = len(parts) > 1 ? parts[1] : "";
+            let suffix = rest contains end ? split(rest, end)[1] : "";
+            let base = trim(current contains start ? trim(prefix) + (trim(suffix) == "" ? "" : "\n\n" + trim(suffix)) : current);
+            let section = start + "\n## Visual evidence\n\nCaptured for commit `" + root().data.pull_request.head.sha[:7] + "`.\n\n" + fromBase64($["Capture Visual Evidence"].data.result.visualEvidence.markdown) + "\n" + end;
+            base == "" ? section : base + "\n\n" + section
+          }}
       position:
         x: 1760
         "y": 80

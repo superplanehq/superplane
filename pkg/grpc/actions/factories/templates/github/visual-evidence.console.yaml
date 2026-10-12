@@ -16,7 +16,9 @@ spec:
           > a pull request is attached to the task. Later updates start from
           > pull request events.
           >
-          > When the change has visual evidence, it posts one comment.
+          > When the change has screenshots or a short video, the app adds
+          > them to the bottom of the pull request description.
+          > A later run replaces that section.
   layout:
     - i: about
       x: 0

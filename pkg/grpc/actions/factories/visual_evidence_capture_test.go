@@ -38,6 +38,7 @@ func TestStartVisualEvidenceCaptureEmitsTheAttachedRevision(t *testing.T) {
 	head, ok := pullRequestPayload["head"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, headSHA, head["sha"])
+	assert.Equal(t, "Closes the checkout gap.", pullRequestPayload["body"])
 	assert.Equal(t, order.ID.String(), payload["workOrder"].(map[string]any)["id"])
 }
 
@@ -126,6 +127,7 @@ func openVisualEvidencePullRequest(headSHA string) *github.PullRequest {
 		State: github.Ptr("open"),
 		Head:  &github.PullRequestBranch{SHA: github.Ptr(headSHA)},
 		Base:  &github.PullRequestBranch{Ref: github.Ptr("main")},
+		Body:  github.Ptr("Closes the checkout gap."),
 	}
 }
 

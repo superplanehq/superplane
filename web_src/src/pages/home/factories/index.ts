@@ -137,7 +137,7 @@ export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
 // Event-driven factory apps provisioned during onboarding. These listen for
 // Git host events; they are not factory line steps. Issue intake is not here: the
 // workspace gets a first-class factory intake instead.
-export const ONBOARDING_EVENT_APPS = ["pr-closure", "risk-score", "visual-evidence"] as const;
+export const ONBOARDING_EVENT_APPS = ["pr-closure", "risk-score"] as const;
 
 // Bitbucket closure listens for merge and decline events.
 export function onboardingEventAppsFor(vcsProvider?: string): readonly string[] {
@@ -170,7 +170,7 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     description: "Capture screenshots or a short video when a pull request changes the user interface.",
     integrations: ["github"],
     componentIntegrations: {
-      "github.createIssueComment": "github",
+      "github.updatePullRequest": "github",
       "github.onPullRequest": "github",
     },
     entrypointNodeId: "on-pr-visual-evidence",

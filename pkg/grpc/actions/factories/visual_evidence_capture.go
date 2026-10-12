@@ -330,7 +330,7 @@ func captureVisualEvidenceRequest(
 	if err != nil {
 		return nil, err
 	}
-	payload := visualEvidenceEventData(pullRequest, order, headSHA, baseRef)
+	payload := visualEvidenceEventData(pullRequest, order, headSHA, baseRef, githubPR.GetBody())
 	var created []models.CanvasEvent
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := lockVisualEvidenceCapture(tx, node.WorkflowID, pullRequest.Number); err != nil {
@@ -429,7 +429,7 @@ func lockVisualEvidenceCapture(tx *gorm.DB, canvasID uuid.UUID, number int64) er
 func visualEvidenceEventData(
 	pullRequest *models.FactoryPullRequest,
 	order *models.FactoryWorkOrder,
-	headSHA, baseRef string,
+	headSHA, baseRef, body string,
 ) map[string]any {
 	return map[string]any{
 		"action": "opened",
@@ -442,6 +442,7 @@ func visualEvidenceEventData(
 			"title":    pullRequest.Title,
 			"html_url": pullRequest.URL,
 			"draft":    false,
+			"body":     body,
 			"head":     map[string]any{"sha": headSHA},
 			"base":     map[string]any{"ref": baseRef},
 		},
