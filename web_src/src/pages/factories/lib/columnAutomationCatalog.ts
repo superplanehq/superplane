@@ -139,7 +139,7 @@ export function catalogForColumn(
         };
       }),
       RISK_SCORE_ENTRY,
-      VISUAL_EVIDENCE_ENTRY,
+      ...(options?.vcsProvider === "bitbucket" ? [] : [VISUAL_EVIDENCE_ENTRY]),
       ...(allowCustom ? [EVENT_CUSTOM_ENTRY] : []),
     ];
   }
