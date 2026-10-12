@@ -129,6 +129,7 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		consoleFile:      "templates/github/visual-evidence.console.yaml",
 		columnKey:        models.CanvasColumnKeyVerify,
 		componentIntegrations: map[string]string{
+			"github.getIssue":          "github",
 			"github.updatePullRequest": "github",
 			"github.onPullRequest":     "github",
 		},
