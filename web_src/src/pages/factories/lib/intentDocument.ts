@@ -4,9 +4,7 @@ export const INTENT_ARTIFACT_NAME = "intent.md";
 
 export const SPEC_ARTIFACT_NAME = "plan.md";
 
-export const LEGACY_SPEC_ARTIFACT_NAME = "spec.md";
-
-export const PLANNING_ARTIFACT_NAMES = [SPEC_ARTIFACT_NAME, LEGACY_SPEC_ARTIFACT_NAME, INTENT_ARTIFACT_NAME] as const;
+export const PLANNING_ARTIFACT_NAMES = [SPEC_ARTIFACT_NAME, INTENT_ARTIFACT_NAME] as const;
 
 const PLANNING_ARTIFACT_KEY = /^spec:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

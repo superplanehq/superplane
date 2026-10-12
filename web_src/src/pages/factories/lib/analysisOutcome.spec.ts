@@ -48,9 +48,9 @@ describe("analysisFirstResultDelivered", () => {
     expect(hasAnalysisScore([{ name: "Risk score", score: 3 }])).toBe(false);
   });
 
-  it("accepts a leftover spec.md as the plan", () => {
-    expect(hasAnalysisPlan([{ data: { name: "spec.md", body: "A retry loop." } }])).toBe(true);
-    expect(analysisPlanBody([{ data: { title: "spec.md", body: "A retry loop." } }])).toBe("A retry loop.");
+  it("does not treat an old spec.md file as the plan", () => {
+    expect(hasAnalysisPlan([{ data: { name: "spec.md", body: "A retry loop." } }])).toBe(false);
+    expect(analysisPlanBody([{ data: { title: "spec.md", body: "A retry loop." } }])).toBeUndefined();
   });
 
   it("keeps the saved plan when a later file uses the same name", () => {
@@ -69,20 +69,20 @@ describe("analysisFirstResultDelivered", () => {
     ).toBeUndefined();
   });
 
-  it("prefers plan.md over spec.md and intent.md", () => {
+  it("prefers plan.md over intent.md", () => {
     expect(
       analysisPlanBody([
         { data: { name: "intent.md", body: "Old intent." } },
-        { data: { name: "spec.md", body: "Leftover spec." } },
+        { data: { name: "spec.md", body: "User file." } },
         { data: { name: "plan.md", body: "Current plan." } },
       ]),
     ).toBe("Current plan.");
     expect(
       analysisPlanBody([
         { data: { name: "intent.md", body: "Old intent." } },
-        { data: { name: "spec.md", body: "Leftover spec." } },
+        { data: { name: "spec.md", body: "User file." } },
       ]),
-    ).toBe("Leftover spec.");
+    ).toBe("Old intent.");
   });
 
   it("accepts intent.md as the plan", () => {

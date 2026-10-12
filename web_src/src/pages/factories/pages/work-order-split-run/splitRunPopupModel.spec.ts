@@ -182,7 +182,7 @@ describe("splitRunPopupModel", () => {
     ).toEqual({ title: "", summary: "", plan: "" });
   });
 
-  it("prefers plan.md, then spec.md, then intent.md", () => {
+  it("prefers plan.md over intent.md and leaves spec.md in Artifacts", () => {
     const artifacts = [
       {
         id: "art-intent",
@@ -192,7 +192,7 @@ describe("splitRunPopupModel", () => {
       {
         id: "art-spec",
         type: "TYPE_MARKDOWN" as const,
-        data: { name: "spec.md", body: "# Leftover spec\n\n## Executive summary\n\nLeftover summary.\n" },
+        data: { name: "spec.md", body: "# User file\n\n## Executive summary\n\nUser file.\n" },
       },
       {
         id: "art-plan",
@@ -203,13 +203,13 @@ describe("splitRunPopupModel", () => {
 
     expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).title).toBe("New plan");
     expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).summary).toBe("New summary.");
-    expect(splitRunLinkedArtifacts(artifacts)).toEqual([]);
+    expect(splitRunLinkedArtifacts(artifacts).map((artifact) => artifact.id)).toEqual(["art-spec"]);
     expect(
       splitRunIntentDocument({
         artifacts: artifacts.filter((artifact) => artifact.id !== "art-plan"),
         description: "Webhook timeouts.",
       }).title,
-    ).toBe("Leftover spec");
+    ).toBe("Old intent");
   });
 
   it("keeps the planning document out of the overview Artifacts list", () => {
