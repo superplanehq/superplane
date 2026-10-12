@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -294,6 +295,148 @@ func Test__FactoryPullRequestActions(t *testing.T) {
 			assert.Empty(t, listed.GetPullRequests())
 		}
 	})
+}
+
+func Test__FactoryPullRequestActivityAuthor(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	orgID := r.Organization.ID.String()
+	db := database.DB(t.Context())
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Feedback", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	bot := true
+	person := false
+	cases := []struct {
+		name   string
+		source string
+		event  map[string]any
+		want   *bool
+	}{
+		{
+			name:   "github bot comment",
+			source: models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+			event:  githubDiscussionEvent("github.prComment", "comment", "user", "Bot"),
+			want:   &bot,
+		},
+		{
+			name:   "github person review",
+			source: models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+			event:  githubDiscussionEvent("github.prReview", "review", "user", "User"),
+			want:   &person,
+		},
+		{
+			name:   "missing author",
+			source: models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+			event: map[string]any{
+				"type": "github.prComment",
+				"data": map[string]any{"comment": map[string]any{"body": "hello"}},
+			},
+		},
+		{
+			name:   "bitbucket bot comment",
+			source: models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+			event:  githubDiscussionEvent("bitbucket.pullRequestComment", "comment", "author", "app_user"),
+			want:   &bot,
+		},
+		{
+			name:   "check activity",
+			source: models.FactoryPRFeedbackHandlerSourcePullRequestChecks,
+			event:  githubDiscussionEvent("github.prComment", "comment", "user", "Bot"),
+		},
+	}
+
+	for i, tc := range cases {
+		canvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+			nil,
+		)
+		require.NoError(t, db.Model(canvas).Update("factory_id", factory.ID).Error)
+		_, err := factory.CreatePRFeedbackHandler(
+			db,
+			canvas.ID,
+			models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest,
+			tc.source,
+		)
+		require.NoError(t, err)
+		handler, err := models.FindPRFeedbackHandlerByCanvasID(db, canvas.ID)
+		require.NoError(t, err)
+		require.NotNil(t, handler)
+
+		created, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
+			FactoryId:   factory.ID.String(),
+			WorkOrderId: order.ID.String(),
+			Url:         fmt.Sprintf("https://github.com/acme/app/pull/%d", 80+i),
+			Title:       tc.name,
+		})
+		require.NoError(t, err)
+
+		rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, "trigger", "default", nil, tc.event)
+		run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, rootEvent)
+		require.NoError(t, err)
+		support.CreateCanvasNodeExecution(t, canvas.ID, "trigger", rootEvent.ID, rootEvent.ID)
+
+		modelPR, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: parseUUID(t, created.GetPullRequest().GetId())})
+		require.NoError(t, err)
+		_, err = modelPR.CreateActivity(db, models.FactoryPullRequestActivityParams{
+			RunID:             run.ID,
+			Description:       tc.name,
+			Access:            models.FactoryPullRequestAccessExclusive,
+			FeedbackHandlerID: &handler.ID,
+		})
+		require.NoError(t, err)
+	}
+
+	resp, err := DescribeWorkOrder(ctx, orgID, &pb.DescribeWorkOrderRequest{
+		FactoryId: factory.ID.String(),
+		OrderId:   order.ID.String(),
+	})
+	require.NoError(t, err)
+
+	byDescription := map[string]*pb.FactoryPullRequestActivity{}
+	for _, pullRequest := range resp.GetOrder().GetPullRequests() {
+		for _, activity := range pullRequest.GetActivities() {
+			byDescription[activity.GetDescription()] = activity
+		}
+	}
+
+	for _, tc := range cases {
+		activity := byDescription[tc.name]
+		require.NotNil(t, activity, tc.name)
+		if tc.want == nil {
+			assert.Nil(t, activity.AuthorIsBot, tc.name)
+		} else {
+			require.NotNil(t, activity.AuthorIsBot, tc.name)
+			assert.Equal(t, *tc.want, activity.GetAuthorIsBot(), tc.name)
+		}
+
+		runID := parseUUID(t, activity.GetRun().GetId())
+		stored, err := models.FindPullRequestActivityByRunID(db, runID)
+		require.NoError(t, err)
+		if tc.want == nil {
+			assert.Nil(t, stored.AuthorIsBot, tc.name)
+			continue
+		}
+		require.NotNil(t, stored.AuthorIsBot, tc.name)
+		assert.Equal(t, *tc.want, *stored.AuthorIsBot, tc.name)
+	}
+}
+
+func githubDiscussionEvent(eventType, parent, authorKey, authorType string) map[string]any {
+	return map[string]any{
+		"type": eventType,
+		"data": map[string]any{
+			parent: map[string]any{
+				authorKey: map[string]any{"login": "reviewer", "type": authorType},
+			},
+		},
+	}
 }
 
 func workOrdersByID(orders []*pb.WorkOrderSummary) map[string]*pb.WorkOrderSummary {

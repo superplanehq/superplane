@@ -50,7 +50,8 @@ export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideI
  * Maps a task to attention reasons. Closed failed orders and waiting
  * orders with a failed latest step are Run failed. A cancelled latest
  * step is Stopped. An exclusive or discussion PR-feedback run is
- * Addressing user feedback. An active concurrent check wait is Waiting
+ * Addressing user feedback, or Addressing bot feedback when a bot wrote
+ * the comment. An active concurrent check wait is Waiting
  * on status checks and hides user review. A check handler at its attempt
  * limit is Automatic fixes paused and hides user review. A finished
  * passed check wait is Status checks passed. A visible status note is

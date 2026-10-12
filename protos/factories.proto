@@ -1572,6 +1572,7 @@ message FactoryPullRequestActivity {
   int64 total_tokens = 9;
   int64 cost_cents = 10;
   repeated string models = 11;
+  optional bool author_is_bot = 12;
 }
 
 message FactoryPullRequest {
