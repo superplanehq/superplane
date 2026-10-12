@@ -1,7 +1,7 @@
 # Fleet Manager
 
 This process reconciles SuperPlane runner demand with configured infrastructure
-providers. A fleet can use AWS, GCP, or Docker. Fleet Manager only uses the
+providers. A fleet can use AWS, Azure, GCP, or Docker. Fleet Manager only uses the
 installation admin HTTP API.
 
 Set `FLEET_MANAGER_CONFIG` to the JSON or YAML configuration body, or set
@@ -14,9 +14,10 @@ extension. The default file path is `/etc/superplane/fleet-manager.yaml`.
 configuration source.
 
 Set the top-level `id` to a stable identifier for the Fleet Manager
-deployment. AWS providers apply it as the `superplane_fleet_manager_id`
-resource tag and use it with the fleet ID to find owned runners. GCP
-providers apply it as the `superplane_fleet_manager_id` instance label.
+deployment. AWS and Azure providers apply it as the
+`superplane_fleet_manager_id` resource tag and use it with the fleet ID to
+find owned runners. GCP providers apply it as the
+`superplane_fleet_manager_id` instance label.
 
 Each AWS fleet can define additional `resourceTags`. Fleet Manager applies
 them to runner instances and root volumes. Additional tags cannot override the
@@ -76,6 +77,20 @@ allows `ssm:UpdateInstanceInformation` and the
 Its trust policy must allow EC2 to assume the role. The example sets
 `aws.iamInstanceProfile` to `superplane-runner-instance-profile` and leaves
 `aws.keyName` empty because Session Manager does not require an SSH key.
+
+Azure fleets also require `runnerReleaseBaseUrl`. Bootstrap uses the same
+archive layout and `install.sh` flow as AWS. Set `azure.imageId` to a
+Compute Gallery image version. Set `azure.vmSize` to a Trusted Launch size.
+`Standard_D2ds_v4` is the default for amd64. An arm64 fleet must set
+`azure.vmSize`. Set `azure.ephemeralOSDisk` to `true`
+only when that size has a local SSD. Fleet Manager creates one virtual
+machine per runner. It places the NIC on `azure.subnetId`, applies
+`azure.networkSecurityGroupId`, and assigns `azure.identityId`. It does not
+give the VM a public IP. Set `azure.zones` to the availability zones that
+the fleet may use. Fleet Manager retries the next zone when Azure reports
+insufficient capacity.
+
+See `config.azure.example.json` for a complete Azure fleet.
 
 GCP fleets also require `runnerReleaseBaseUrl`. Bootstrap uses the same
 archive layout and `install.sh` flow as AWS. Fleet Manager uses Application

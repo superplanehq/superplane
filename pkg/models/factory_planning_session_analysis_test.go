@@ -145,6 +145,15 @@ func TestFactoryWorkOrder_StatusTransitionEndsAnalysisSession(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			var automation *CanvasRun
+			if test.state == FactoryWorkOrderStateClosed {
+				automation, err = CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
+				require.NoError(t, err)
+				event := analysisWorkOrderCreatedEvent(canvas.ID, automation.ID, order.ID, true)
+				event.ID = uuid.New()
+				require.NoError(t, db.Create(event).Error)
+			}
+
 			changed, err := order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
 				ToState: test.state,
 				Result:  test.result,
@@ -160,6 +169,11 @@ func TestFactoryWorkOrder_StatusTransitionEndsAnalysisSession(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, CanvasRunStateCancelling, run.State)
 			assert.Equal(t, test.expectedRunResult, run.Result)
+			if automation != nil {
+				automation, err = FindUnscopedCanvasRun(db, automation.ID)
+				require.NoError(t, err)
+				assert.Equal(t, CanvasRunStateCancelling, automation.State)
+			}
 		})
 	}
 }

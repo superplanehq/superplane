@@ -180,6 +180,7 @@ function AnalysisRequestChat({
       ) : null}
       <PlanningImplementationControls
         startDiscouraged={analysis.startDiscouraged}
+        readinessNote={analysis.readinessNote}
         modelSelect={analysis.modelSelect}
         actions={analysis.closedDecision}
         canSend={analysis.canSend}

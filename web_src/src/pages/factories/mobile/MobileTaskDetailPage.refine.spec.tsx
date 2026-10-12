@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
@@ -20,6 +20,8 @@ import {
   CLOSED_WORK_ORDER,
   factoryWithPlanning,
 } from "../__fixtures__/factoryPageResponses";
+import { clarityCheck } from "../__fixtures__/workOrderCheckFixtures";
+import { CONFIDENCE_CHECK_NAME } from "../lib/confidenceScore";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { MOBILE_TASK_COPY } from "./mobileCopy";
 import { MobileTaskDetailPage } from "./MobileTaskDetailPage";
@@ -311,6 +313,65 @@ describe("MobileTaskDetailPage refine chat", () => {
     expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-composer")).not.toBeInTheDocument();
     expect(findPlanningSession).not.toHaveBeenCalled();
+  });
+
+  it("opens the override drawer without clipping the plan message", async () => {
+    const desktopWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 390 });
+    findPlanningSession.mockResolvedValue(WAITING_SESSION);
+    useWorkOrder.mockReturnValue({
+      data: {
+        ...DRAFT_WORK_ORDER,
+        checks: [
+          clarityCheck(DRAFT_WORK_ORDER.id ?? "wo-draft-refunds", 5),
+          {
+            id: "check-confidence-draft",
+            key: "confidence",
+            name: CONFIDENCE_CHECK_NAME,
+            score: 3,
+            maxScore: 5,
+            level: "LEVEL_CAUTION",
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    const user = userEvent.setup();
+    try {
+      renderTask(
+        `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${DRAFT_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
+      );
+
+      expect(await screen.findByRole("button", { name: "Override" })).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Override" }));
+
+      const implementation = screen.getByRole("region", { name: "Implementation" });
+      expect(within(implementation).getByRole("heading", { name: "Review the plan before you start" })).toBeVisible();
+      expect(
+        within(implementation).getByText(
+          "The work is still uncertain. Add more context, or start if you accept the risk.",
+        ),
+      ).toBeVisible();
+      const actions = within(implementation).getByTestId("split-run-intent-settings");
+      expect(actions).toContainElement(screen.getByRole("button", { name: "Start" }));
+      expect(actions).toContainElement(screen.getByTestId("split-run-draft-model"));
+      expect(actions.className).not.toMatch(/flex-wrap/);
+      expect(
+        screen
+          .getByRole("heading", { name: "Review the plan before you start" })
+          .closest("[data-testid=split-run-intent-settings]"),
+      ).toBeNull();
+
+      await user.click(screen.getByRole("button", { name: "Hide options" }));
+      expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+      expect(screen.queryByTestId("phone-override-drawer")).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: desktopWidth });
+    }
   });
 });
 

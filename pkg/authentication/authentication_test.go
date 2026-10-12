@@ -14,8 +14,10 @@ import (
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -123,6 +125,78 @@ func TestHandler_handleAuth_GitHubAccountPicker(t *testing.T) {
 
 		assert.Empty(t, query.Get("prompt"))
 	})
+}
+
+func TestHandler_handleAuth_UsesEnvironmentGitHubClient(t *testing.T) {
+	handler, r := setupAuthHandler(t, false)
+	t.Setenv("GITHUB_CLIENT_ID", "Iv1.env")
+	t.Setenv("GITHUB_CLIENT_SECRET", "env-secret")
+	t.Setenv("BASE_URL", "https://azure.example")
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+	goth.ClearProviders()
+	t.Cleanup(func() { goth.ClearProviders() })
+	handler.InitializeProviders(map[string]ProviderConfig{
+		models.ProviderGitHub: {
+			Key:         "Iv1.env",
+			Secret:      "env-secret",
+			CallbackURL: "https://azure.example/auth/github/callback",
+		},
+	})
+
+	token, err := handler.jwtSigner.GenerateWithClaims(time.Hour, map[string]string{
+		"sub":             r.Account.ID.String(),
+		sessionStartClaim: strconv.FormatInt(time.Now().Unix(), 10),
+	})
+	require.NoError(t, err)
+	request := mux.SetURLVars(
+		httptest.NewRequest(http.MethodGet, "/auth/github?intent=connect&redirect=/demo/workspaces/new/setup", nil),
+		map[string]string{"provider": models.ProviderGitHub},
+	)
+	request.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	recorder := httptest.NewRecorder()
+
+	handler.handleAuth(recorder, request)
+
+	require.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
+	location, err := url.Parse(recorder.Header().Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, "github.com", location.Host)
+	assert.Equal(t, "Iv1.env", location.Query().Get("client_id"))
+	assert.Equal(t, "https://azure.example/auth/github/callback", location.Query().Get("redirect_uri"))
+}
+
+func TestHandler_handleAuthConfig_IgnoresInstallationGitHubApp(t *testing.T) {
+	goth.ClearProviders()
+	t.Cleanup(func() { goth.ClearProviders() })
+
+	r := support.Setup(t)
+	t.Cleanup(func() { r.Close() })
+	handler := NewHandler(jwt.NewSigner("test-secret"), r.Encryptor, r.AuthService, "development", "/templates", false, false, false)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	t.Setenv("BASE_URL", "https://azure.example")
+	t.Setenv(config.EnvGitHubAppID, "")
+	t.Setenv(config.EnvGitHubAppSlug, "")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
+	require.NoError(t, githubapp.Save(t.Context(), database.DB(t.Context()), r.Encryptor, config.GitHubHostedAppConfig{
+		ID:            44,
+		Slug:          "superplane-self",
+		PrivateKey:    "pem",
+		WebhookSecret: "whsec",
+	}))
+
+	recorder := httptest.NewRecorder()
+	handler.handleAuthConfig(recorder, httptest.NewRequest(http.MethodGet, "/auth/config", nil))
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var body struct {
+		Providers []string `json:"providers"`
+	}
+	require.NoError(t, json.NewDecoder(recorder.Body).Decode(&body))
+	assert.NotContains(t, body.Providers, models.ProviderGitHub)
 }
 
 func TestHandler_handleAuthConfig(t *testing.T) {

@@ -105,7 +105,7 @@ describe("buildLinePhaseBoard with a board Done column", () => {
 });
 
 describe("collectLineDoneOrders", () => {
-  it("returns completed and failed orders of this line, newest first", () => {
+  it("returns completed and failed orders of this line in source-list order", () => {
     const completed = closedOrder({
       id: "wo-completed",
       result: "RESULT_COMPLETED",
@@ -140,7 +140,29 @@ describe("collectLineDoneOrders", () => {
 
     const done = collectLineDoneOrders([completed, olderCompleted, failed, rejected, canceled], LINE);
 
-    expect(done.map((entry) => entry.id)).toEqual(["wo-failed", "wo-completed", "wo-completed-old"]);
+    expect(done.map((entry) => entry.id)).toEqual(["wo-completed", "wo-completed-old", "wo-failed"]);
+  });
+
+  it("keeps a task in its source-list place when updated_at changes", () => {
+    const first = closedOrder({
+      id: "wo-first",
+      result: "RESULT_COMPLETED",
+      lineId: "line-1",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    const second = closedOrder({
+      id: "wo-second",
+      result: "RESULT_COMPLETED",
+      lineId: "line-1",
+      updatedAt: "2026-02-01T00:00:00.000Z",
+    });
+    const bumpedSecond = { ...second, updatedAt: "2026-03-01T00:00:00.000Z" };
+
+    expect(collectLineDoneOrders([first, second], LINE).map((entry) => entry.id)).toEqual(["wo-first", "wo-second"]);
+    expect(collectLineDoneOrders([first, bumpedSecond], LINE).map((entry) => entry.id)).toEqual([
+      "wo-first",
+      "wo-second",
+    ]);
   });
 
   it("leaves out open orders and orders of another line", () => {

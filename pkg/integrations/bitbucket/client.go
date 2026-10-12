@@ -3,6 +3,7 @@ package bitbucket
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,6 +33,7 @@ type Repository struct {
 	FullName   string         `json:"full_name" mapstructure:"full_name"`
 	Slug       string         `json:"slug" mapstructure:"slug"`
 	Mainbranch *Branch        `json:"mainbranch,omitempty" mapstructure:"mainbranch,omitempty"`
+	Workspace  *Workspace     `json:"workspace,omitempty" mapstructure:"workspace,omitempty"`
 	Links      RepositoryLink `json:"links" mapstructure:"links"`
 }
 
@@ -72,6 +74,17 @@ func NewClient(authType string, httpContext core.HTTPContext, integration core.I
 		}
 		return &Client{
 			AuthType: AuthTypeWorkspaceAccessToken,
+			Token:    string(token),
+			HTTP:     httpContext,
+		}, nil
+
+	case AuthTypeRepositoryAccessToken:
+		token, err := integration.GetConfig("token")
+		if err != nil {
+			return nil, fmt.Errorf("error getting token config: %w", err)
+		}
+		return &Client{
+			AuthType: AuthTypeRepositoryAccessToken,
 			Token:    string(token),
 			HTTP:     httpContext,
 		}, nil
@@ -142,6 +155,20 @@ func (c *Client) GetWorkspace(workspaceSlug string) (*Workspace, error) {
 	}
 
 	return &workspace, nil
+}
+
+func (c *Client) GetRepository(repository string) (*Repository, error) {
+	path, err := repositoryPath(repository)
+	if err != nil {
+		return nil, err
+	}
+
+	var repo Repository
+	endpoint := fmt.Sprintf("%s/repositories/%s", baseURL, path)
+	if err := c.doJSON(http.MethodGet, endpoint, nil, http.StatusOK, &repo); err != nil {
+		return nil, err
+	}
+	return &repo, nil
 }
 
 func (c *Client) ListRepositories(workspace string) ([]Repository, error) {
@@ -246,6 +273,66 @@ func (c *Client) CreateWebhook(workspace, repoSlug, webhookURL, secret string, e
 		return nil, fmt.Errorf("error decoding response: %w", err)
 	}
 
+	return &hookResp, nil
+}
+
+var errBitbucketWebhookNotFound = errors.New("bitbucket webhook not found")
+
+// UpdateWebhook replaces the events on an existing repository webhook.
+func (c *Client) UpdateWebhook(workspace, repoSlug, webhookUID, webhookURL, secret string, events []string) (*BitbucketHookResponse, error) {
+	endpoint := fmt.Sprintf("%s/repositories/%s/%s/hooks/%s", baseURL, workspace, repoSlug, webhookUID)
+	hook, status, err := c.saveWebhook(http.MethodPut, endpoint, BitbucketHookRequest{
+		Description: "SuperPlane",
+		URL:         webhookURL,
+		Active:      true,
+		Secret:      secret,
+		Events:      events,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if status == http.StatusNotFound {
+		return nil, errBitbucketWebhookNotFound
+	}
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %d: %s", status, hook)
+	}
+	return decodeHookResponse(hook)
+}
+
+func (c *Client) saveWebhook(method, endpoint string, hookReq BitbucketHookRequest) ([]byte, int, error) {
+	body, err := json.Marshal(hookReq)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error marshaling webhook request: %w", err)
+	}
+
+	req, err := http.NewRequest(method, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, 0, fmt.Errorf("error creating request: %w", err)
+	}
+
+	c.setAuthHeaders(req)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.HTTP.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error executing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("error reading response body: %w", err)
+	}
+	return respBody, resp.StatusCode, nil
+}
+
+func decodeHookResponse(body []byte) (*BitbucketHookResponse, error) {
+	var hookResp BitbucketHookResponse
+	if err := json.Unmarshal(body, &hookResp); err != nil {
+		return nil, fmt.Errorf("error decoding response: %w", err)
+	}
 	return &hookResp, nil
 }
 

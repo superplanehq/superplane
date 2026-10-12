@@ -96,6 +96,15 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 			"github.updateIssue":        "github",
 		},
 	}),
+	{id: "pr-closure", provider: models.ProviderBitbucket}: bitbucketFactoryTemplate(factoryAppTemplate{
+		id:               "pr-closure",
+		entrypointNodeID: "on-pr-closed",
+		canvasFile:       "templates/bitbucket/pr-closure.canvas.yaml",
+		consoleFile:      "templates/bitbucket/event-app.console.yaml",
+		componentIntegrations: map[string]string{
+			"bitbucket.onPullRequest": "bitbucket",
+		},
+	}),
 	{id: "issue-intake", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
 		id:               "issue-intake",
 		entrypointNodeID: "on-issue-labeled",
@@ -113,6 +122,16 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		columnKey:        models.CanvasColumnKeyVerify,
 		componentIntegrations: map[string]string{
 			"github.onPullRequest": "github",
+		},
+	}),
+	{id: "risk-score", provider: models.ProviderBitbucket}: bitbucketFactoryTemplate(factoryAppTemplate{
+		id:               "risk-score",
+		entrypointNodeID: "on-pr-risk",
+		canvasFile:       "templates/bitbucket/risk-score.canvas.yaml",
+		consoleFile:      "templates/bitbucket/risk-score.console.yaml",
+		columnKey:        models.CanvasColumnKeyVerify,
+		componentIntegrations: map[string]string{
+			"bitbucket.onPullRequest": "bitbucket",
 		},
 	}),
 }
@@ -744,9 +763,10 @@ func materializeBacklogDefaults(
 	version *models.CanvasVersion,
 ) (*materializedFactoryTemplate, error) {
 	defaults := buildBacklogCanvas(backlogCanvasRequest{
-		Name:    canvas.Name,
-		Agent:   resetFactoryIntakeAgent(tx, factory, version.Nodes),
-		VCSName: resolveVCSInstallationName(tx, factory),
+		Name:        canvas.Name,
+		Agent:       resetFactoryIntakeAgent(tx, factory, version.Nodes),
+		VCSName:     resolveVCSInstallationName(tx, factory),
+		VCSProvider: factoryVCSProviderOrDefault(factory),
 	})
 	defaults.Metadata.ID = canvas.ID.String()
 	for i := range defaults.Spec.Nodes {
@@ -825,6 +845,7 @@ func materializePRFeedbackDefaults(
 		RunnerIntegrationNames: settings.RunnerIntegrationNames,
 		Binding:                resolvePRFeedbackBinding(tx, factory, settings.Repository),
 		Agent:                  resetFactoryIntakeAgent(tx, factory, version.Nodes),
+		VCSProvider:            factoryVCSProviderOrDefault(factory),
 	}
 
 	templateID := prFeedbackDiscussionTemplateID

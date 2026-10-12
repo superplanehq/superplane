@@ -21,7 +21,6 @@ import { useFactoriesThemeClass } from "../../lib/useFactoriesThemeClass";
 import { MobileSettingsBottomBar } from "../../mobile/MobileSettingsBottomBar";
 import { PinnedPhoneShell } from "../../mobile/PinnedPhoneShell";
 import { MOBILE_SETTINGS_COPY } from "../../mobile/mobileCopy";
-import { useMobileFactoryShell } from "../../mobile/useMobileFactoryShell";
 import { FactorySettingsLayoutContext } from "./factorySettingsLayoutContext";
 import {
   factorySettingsNavGroupHeading,
@@ -104,7 +103,7 @@ function FactorySettingsLayoutContent({
   useFactoriesThemeClass();
   useFactorySettingsSectionScroll();
   const isMobile = useIsMobile();
-  const showMobileBottomBar = useMobileFactoryShell(organizationId);
+  const showMobileBottomBar = isMobile;
   const { pathname } = useLocation();
   const { data: describedFactory, isLoading, error } = useFactory(organizationId, factoryId);
   const factory = describedFactory ?? factories.find((item) => item.id === factoryId);

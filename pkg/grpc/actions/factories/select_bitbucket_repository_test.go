@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func TestSelectBitbucketRepositoryUsesTheForgeInstallation(t *testing.T) {
@@ -94,6 +95,16 @@ func TestUpdateFactoryRepositoryBitbucketDoesNotRequireGitHub(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
+	require.NoError(t, db.Model(&models.Integration{}).
+		Where("id = ?", integrationID).
+		Update("metadata", datatypes.NewJSONType(map[string]any{
+			"authType": "workspaceAccessToken",
+			"workspace": map[string]any{
+				"uuid": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+				"name": "acme",
+				"slug": "acme",
+			},
+		})).Error)
 	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 	require.NoError(t, err)
 	provider := models.ProviderBitbucket
@@ -118,4 +129,11 @@ func TestUpdateFactoryRepositoryBitbucketDoesNotRequireGitHub(t *testing.T) {
 	assert.Equal(t, "acme/web", updated.Factory.Onboarding.AppRepository)
 	assert.Equal(t, "develop", updated.Factory.Onboarding.DefaultBranch)
 	assert.Equal(t, models.ProviderBitbucket, updated.Factory.Onboarding.VcsProvider)
+
+	_, err = UpdateFactoryRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryRepositoryRequest{
+		Id:            factory.ID.String(),
+		Repository:    "other/web",
+		DefaultBranch: "develop",
+	})
+	require.ErrorContains(t, err, "not accessible")
 }

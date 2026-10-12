@@ -158,7 +158,10 @@ resource "aws_eks_node_group" "superplane" {
   depends_on = [
     aws_iam_role_policy_attachment.eks_worker_node_policy,
     aws_iam_role_policy_attachment.eks_cni_policy,
-    aws_iam_role_policy_attachment.eks_container_registry
+    aws_iam_role_policy_attachment.eks_container_registry,
+    # Keep outbound access until Helm releases and their load balancers are removed.
+    aws_route_table_association.public,
+    aws_route_table_association.private
   ]
 }
 

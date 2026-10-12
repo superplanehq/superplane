@@ -39,6 +39,10 @@ func CreateURL() string {
 	return githubAppCreateURL
 }
 
+func OAuthCallbackURL(baseURL string) string {
+	return strings.TrimRight(strings.TrimSpace(baseURL), "/") + "/auth/github/callback"
+}
+
 func CreatedPath() string {
 	return createdPath
 }
@@ -54,6 +58,8 @@ func PublicManifestJSON(baseURL, webhooksBaseURL string) (string, error) {
 		"name":   "SuperPlane",
 		"public": false,
 		"url":    publicAppHomepageURL,
+		// GitHub's app creation form rejects email_addresses. Sign-in
+		// still requests the user:email scope.
 		"default_permissions": map[string]string{
 			"issues":                      "write",
 			"actions":                     "write",

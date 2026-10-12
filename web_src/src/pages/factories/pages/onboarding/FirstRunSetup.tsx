@@ -196,7 +196,9 @@ function AgentScreen({
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
   const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
   // Bitbucket has no separate connect screen.
-  if (backScreen === "connect" && flow.vcsHost === "bitbucket") return () => flow.goToScreen("host");
+  if (backScreen === "connect" && (flow.vcsHost === "bitbucket" || !flow.accountConnectionRequired)) {
+    return () => flow.goToScreen("host");
+  }
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
 }
 
@@ -224,9 +226,6 @@ function TicketsScreenHost({
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
-      linearAvailable={flow.linearAvailable}
-      linearFeatureLoading={flow.linearFeatureLoading}
-      linearChoiceBlock={flow.linearChoiceBlock}
       continueLabel={ticketsContinueLabel(flow.ticketsFinishSetup)}
       continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
@@ -289,7 +288,6 @@ function BitbucketChooseHost({
           flow.bitbucketInstalledWorkspaces.length,
         )}
         connectHref={flow.bitbucketConnectHref}
-        installUrl={flow.bitbucketInstallUrl}
         repositories={flow.bitbucketRepositories}
         installedWorkspaces={flow.bitbucketInstalledWorkspaces}
         selectedRepository={model.setup.selectedRepo}
@@ -299,11 +297,14 @@ function BitbucketChooseHost({
         loadError={flow.bitbucketLoadError}
         lookupFailed={flow.bitbucketLookupFailed}
         retrying={flow.bitbucketLookupRetrying}
+        attemptActive={flow.bitbucketInstallationAttemptActive}
+        attemptTimedOut={flow.bitbucketInstallationAttemptTimedOut}
         chrome={chrome}
         sphere={sphere}
         onRetryLookup={flow.retryBitbucketLookup}
         onGrantAccess={() => void flow.grantBitbucketAccess()}
         onSelectRepository={model.setup.selectRepo}
+        onClearRepository={model.setup.clearRepository}
         onContinue={() => void flow.continueFromRepository()}
       />
     );

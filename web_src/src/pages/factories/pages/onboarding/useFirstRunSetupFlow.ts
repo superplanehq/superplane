@@ -1,7 +1,7 @@
 import type { MeVcsProviderRepository } from "@/api-client";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
-import { FEATURE_FACTORY_BITBUCKET, FEATURE_FACTORY_LINEAR_INTAKE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_BITBUCKET } from "@/lib/experimentalFeatures";
 import { startPublicGitHubAppCreate } from "@/lib/githubAppManifest";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
@@ -81,9 +81,21 @@ function resumeFirstRunScreen(args: {
 // only after the user connects GitHub for this workspace.
 function screenWithGitHubConnection(
   screen: FirstRunScreen,
-  github: { pending: boolean; identity: boolean; ready: boolean; stayOnConnect: boolean },
+  github: {
+    pending: boolean;
+    identity: boolean;
+    ready: boolean;
+    stayOnConnect: boolean;
+    appConfigured: boolean;
+    accountConnectionRequired: boolean;
+  },
 ): FirstRunScreen {
   if (github.pending || screen === "welcome") return screen;
+  if (!github.accountConnectionRequired) {
+    if (!github.appConfigured) return screen === "choose" ? "connect" : screen;
+    if (screen === "connect" && !github.stayOnConnect) return "choose";
+    return screen;
+  }
   if (!github.identity) return "connect";
   if (screen === "connect" && github.ready && !github.stayOnConnect) return "choose";
   if (screen === "choose" && !github.ready) return "connect";
@@ -170,6 +182,8 @@ function useFirstRunNavigation(
       identity: Boolean(connection.identity),
       ready: githubReady,
       stayOnConnect,
+      appConfigured: connection.appConfigured,
+      accountConnectionRequired: connection.accountConnectionRequired,
     },
     bitbucket,
   );
@@ -200,10 +214,9 @@ function waitForBrowserPaint(): Promise<void> {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
-function selectedIssuesChoice(model: OnboardingPageModel, linearAvailable: boolean): IssuesChoiceId | null {
+function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null {
   const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice);
   const issuesChoice = issuesChoiceForTicketSource(ticketSource);
-  if (issuesChoice === "linear" && !linearAvailable) return null;
   if (issuesChoice === "linear" && (model.linearProjectsLoading || model.linearProjectsError)) return null;
   if (
     !issuesChoice ||
@@ -238,28 +251,37 @@ function saveSelectedRepository(args: {
   return args.model.selectCatalogRepository(repository);
 }
 
+function continueFromTicketSource(args: {
+  model: OnboardingPageModel;
+  agentGate: OnboardingAgentGate;
+  blocking: FirstRunBlocking;
+  navigation: ReturnType<typeof useFirstRunNavigation>;
+}) {
+  return args.blocking.run("saving-ticket-source", async () => {
+    const issuesChoice = selectedIssuesChoice(args.model);
+    if (!issuesChoice) return;
+    args.model.setup.setIssuesChoice(issuesChoice);
+    args.model.setup.commitIssuesStep();
+    if (!(await args.model.saveIssues(issuesChoice))) return;
+    if (args.agentGate === "pending") return;
+    if (args.agentGate === "show") return args.navigation.goToScreen("agent");
+    args.blocking.setAction("finishing-setup");
+    await args.model.finish(issuesChoice);
+  });
+}
+
 function useFirstRunCommands(args: {
   model: OnboardingPageModel;
   agentGate: OnboardingAgentGate;
   connection: GitHubConnectionState;
   navigation: ReturnType<typeof useFirstRunNavigation>;
   blocking: FirstRunBlocking;
-  linearAvailable: boolean;
   bitbucketAvailable: boolean;
   forgeConfigured: boolean;
   installScope: GitHubInstallScope;
 }) {
-  const {
-    model,
-    agentGate,
-    connection,
-    navigation,
-    blocking,
-    linearAvailable,
-    bitbucketAvailable,
-    forgeConfigured,
-    installScope,
-  } = args;
+  const { model, agentGate, connection, navigation, blocking, bitbucketAvailable, forgeConfigured, installScope } =
+    args;
   const location = useLocation();
   const saveRepository = () => saveSelectedRepository({ model, connection, forgeConfigured });
   const continueFromRepository = () =>
@@ -276,18 +298,7 @@ function useFirstRunCommands(args: {
   const connectBitbucket = () => {
     void model.requestConnect("bitbucket");
   };
-  const continueFromTickets = () =>
-    blocking.run("saving-ticket-source", async () => {
-      const issuesChoice = selectedIssuesChoice(model, linearAvailable);
-      if (!issuesChoice) return;
-      model.setup.setIssuesChoice(issuesChoice);
-      model.setup.commitIssuesStep();
-      if (!(await model.saveIssues(issuesChoice))) return;
-      if (agentGate === "pending") return;
-      if (agentGate === "show") return navigation.goToScreen("agent");
-      blocking.setAction("finishing-setup");
-      await model.finish(issuesChoice);
-    });
+  const continueFromTickets = () => continueFromTicketSource({ model, agentGate, blocking, navigation });
   const connectGitHub = () =>
     blocking.runUntilNavigation("opening-github", async () => {
       const returnPath = githubConnectReturnPath(onboardingStepPath(`${location.pathname}${location.search}`, "repo"));
@@ -318,7 +329,6 @@ function useFirstRunCommands(args: {
     });
   const connectIssueTracker = (source: "jira" | "linear") =>
     blocking.runUntilNavigation(source === "jira" ? "connecting-jira" : "connecting-linear", async () => {
-      if (source === "linear" && !linearAvailable) return false;
       model.setup.setIssuesChoice(source);
       if (!(await model.saveIssues(source))) return false;
       await waitForBrowserPaint();
@@ -331,7 +341,6 @@ function useFirstRunCommands(args: {
     });
   };
   const selectTicketSource = (source: FirstRunTicketSource) => {
-    if (source === "linear" && !linearAvailable) return;
     const issuesChoice = issuesChoiceForTicketSource(source);
     if (issuesChoice) model.setup.setIssuesChoice(issuesChoice);
   };
@@ -351,11 +360,6 @@ function useFirstRunCommands(args: {
   };
 }
 
-import { savedLinearChoiceBlock, shouldClearSavedLinearChoice } from "./firstRunFlaggedChoice";
-
-export { savedLinearChoiceBlock, shouldClearSavedLinearChoice };
-export type { SavedFlaggedChoiceBlock } from "./firstRunFlaggedChoice";
-
 export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId, factoryId } = useFactoriesLayout();
   const setupFinished = model.provisionedDestination != null;
@@ -369,7 +373,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const bitbucketConnect = useFirstRunBitbucket({ organizationId, setupFinished, blocking });
   const intakeFeatures = useExperimentalFeature(organizationId);
   const intakeFeatureLoading = intakeFeatures.isLoading;
-  const linearAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_LINEAR_INTAKE);
   const bitbucketAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_BITBUCKET);
   const bitbucket = { available: bitbucketAvailable, loading: intakeFeatureLoading };
   const agentGate = onboardingAgentGate({
@@ -385,30 +388,10 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     connection,
     navigation,
     blocking,
-    linearAvailable,
     bitbucketAvailable,
     forgeConfigured: bitbucketConnect.configured,
     installScope,
   });
-  // A saved Linear choice is not valid when the organization does not have the
-  // Linear intake feature. Clear it only after the organization lookup confirms
-  // the feature is off. A failed lookup has no organization data and must not
-  // replace the saved choice with the GitHub Issues default.
-  const issuesChoice = model.setup.issuesChoice;
-  const setIssuesChoice = model.setup.setIssuesChoice;
-  const organizationReady = intakeFeatures.organizationReady;
-  const linearChoiceArgs = {
-    issuesChoice,
-    featureLoading: intakeFeatureLoading,
-    linearAvailable,
-    organizationReady,
-  };
-  const clearSavedLinearChoice = shouldClearSavedLinearChoice(linearChoiceArgs);
-  const linearChoiceBlock = savedLinearChoiceBlock(linearChoiceArgs);
-  useEffect(() => {
-    if (!clearSavedLinearChoice) return;
-    setIssuesChoice(null);
-  }, [clearSavedLinearChoice, setIssuesChoice]);
   return {
     ...navigation,
     ...commands,
@@ -417,9 +400,10 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bitbucketFeatureLoading: intakeFeatureLoading,
     bitbucketForgeConfigured: bitbucketConnect.configured,
     bitbucketOnboardingPending: bitbucketConnect.pending,
-    bitbucketInstallUrl: bitbucketConnect.installUrl,
     bitbucketRepositories: bitbucketConnect.repositories,
     bitbucketInstalledWorkspaces: bitbucketConnect.installedWorkspaces,
+    bitbucketInstallationAttemptActive: bitbucketConnect.installationAttemptActive,
+    bitbucketInstallationAttemptTimedOut: bitbucketConnect.installationAttemptTimedOut,
     bitbucketIdentityLinked: bitbucketConnect.identityLinked,
     bitbucketLoadError: bitbucketConnect.loadError,
     bitbucketLookupFailed: bitbucketConnect.lookupFailed,
@@ -435,9 +419,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     selectCredentialChoice: model.setAgentCredentialChoice,
     agentGatePending: agentGate === "pending",
     ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
-    linearAvailable,
-    linearFeatureLoading: intakeFeatureLoading,
-    linearChoiceBlock,
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
     repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
     repositoriesLoading: connection.onboarding.isPending,
@@ -447,6 +428,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     pendingOrganizations: connection.pendingOrganizations,
     synchronizing: connection.synchronizing || checkingGitHub,
     appConfigured: connection.appConfigured,
+    accountConnectionRequired: connection.accountConnectionRequired,
     connectError: connection.onboarding.error
       ? githubOnboardingMessage(connection.onboarding.error, "SuperPlane could not load GitHub access")
       : undefined,

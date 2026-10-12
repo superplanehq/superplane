@@ -10,6 +10,7 @@ import (
 const (
 	ProviderGCS        = "gcs"
 	ProviderS3         = "s3"
+	ProviderAzure      = "azure"
 	ProviderFilesystem = "filesystem"
 )
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -124,6 +125,7 @@ func createPRFeedbackCanvas(
 		RunnerIntegrationNames: settings.RunnerIntegrationNames,
 		Binding:                binding,
 		Agent:                  resolveIntakeAgent(db, factory),
+		VCSProvider:            factory.OnboardingConfigValue().EffectiveVCSProvider(),
 	}
 	var canvasDoc *yaml.Canvas
 	if source == models.FactoryPRFeedbackHandlerSourcePullRequestChecks {
@@ -168,7 +170,7 @@ func resolvePRFeedbackBinding(tx *gorm.DB, factory *models.Factory, repository s
 		return &intakeBinding{Configuration: map[string]any{"repository": repository}}
 	}
 
-	integration := findIntakeGitHubIntegration(tx, factory, config.VCSIntegrationID)
+	integration := findIntakeVCSIntegration(tx, factory, config.VCSIntegrationID)
 	if integration == nil {
 		return &intakeBinding{Configuration: map[string]any{"repository": repository}}
 	}
@@ -181,4 +183,32 @@ func resolvePRFeedbackBinding(tx *gorm.DB, factory *models.Factory, repository s
 		Configuration: map[string]any{"repository": repository},
 		Installation:  integration,
 	}
+}
+
+// findIntakeVCSIntegration resolves the workspace VCS installation for
+// feedback bindings. GitHub and Bitbucket installations both qualify;
+// anything else leaves the handler unbound.
+func findIntakeVCSIntegration(tx *gorm.DB, factory *models.Factory, integrationID string) *models.Integration {
+	id, err := uuid.Parse(strings.TrimSpace(integrationID))
+	if err != nil {
+		log.Warnf("factory %s: feedback left unbound, invalid integration id %q", factory.ID, integrationID)
+		return nil
+	}
+
+	integration, err := models.FindIntegrationInTransaction(tx, factory.OrganizationID, id)
+	if err != nil {
+		log.Warnf("factory %s: feedback left unbound, integration %s not found: %v", factory.ID, id, err)
+		return nil
+	}
+
+	if integration.AppName != intakeGitHubAppName && integration.AppName != models.ProviderBitbucket {
+		log.Warnf("factory %s: feedback left unbound, integration %s is a %s installation", factory.ID, id, integration.AppName)
+		return nil
+	}
+	if integration.State != models.IntegrationStateReady {
+		log.Warnf("factory %s: feedback left unbound, integration %s is not ready", factory.ID, id)
+		return nil
+	}
+
+	return integration
 }

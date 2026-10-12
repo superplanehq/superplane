@@ -73,6 +73,32 @@ func TestResolveEmptyWhenMissing(t *testing.T) {
 	assert.False(t, cfg.Enabled())
 }
 
+func TestSaveDoesNotPersistLoginClient(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	encryptor := testEncryptor()
+	clearGitHubAppEnv(t)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	require.NoError(t, Save(t.Context(), database.DB(t.Context()), encryptor, config.GitHubHostedAppConfig{
+		ID:            11,
+		Slug:          "from-db",
+		PrivateKey:    "db-pem",
+		WebhookSecret: "db-secret",
+		ClientID:      "Iv1.client",
+		ClientSecret:  "client-secret",
+	}))
+
+	cfg, err := Resolve(t.Context(), database.DB(t.Context()), encryptor)
+	require.NoError(t, err)
+	assert.Equal(t, int64(11), cfg.ID)
+	assert.Equal(t, "from-db", cfg.Slug)
+	assert.Equal(t, "db-pem", cfg.PrivateKey)
+	assert.Equal(t, "db-secret", cfg.WebhookSecret)
+	assert.Empty(t, cfg.ClientID)
+	assert.Empty(t, cfg.ClientSecret)
+	assert.False(t, UserConnectReady(t.Context()))
+}
+
 func TestSaveKeepsFirstApp(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	encryptor := testEncryptor()
@@ -97,6 +123,40 @@ func TestSaveKeepsFirstApp(t *testing.T) {
 	assert.Equal(t, int64(11), cfg.ID)
 	assert.Equal(t, "first", cfg.Slug)
 	assert.Equal(t, "first-pem", cfg.PrivateKey)
+}
+
+func TestUserConnectReadyUsesEnvironmentOnly(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	encryptor := testEncryptor()
+	clearGitHubAppEnv(t)
+	require.NoError(t, Save(t.Context(), database.DB(t.Context()), encryptor, config.GitHubHostedAppConfig{
+		ID:            11,
+		Slug:          "from-db",
+		PrivateKey:    "db-pem",
+		WebhookSecret: "db-secret",
+	}))
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	assert.False(t, UserConnectReady(t.Context()))
+
+	t.Setenv("GITHUB_CLIENT_ID", "Iv1.env")
+	t.Setenv("GITHUB_CLIENT_SECRET", "env-secret")
+	assert.True(t, UserConnectReady(t.Context()))
+	assert.True(t, AccountConnectionRequired(t.Context()))
+}
+
+func TestAccountConnectionRequiredForPublicAppWithoutLoginClient(t *testing.T) {
+	clearGitHubAppEnv(t)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	assert.False(t, AccountConnectionRequired(t.Context()))
+
+	t.Setenv(config.EnvGitHubAppID, "12345")
+	t.Setenv(config.EnvGitHubAppSlug, "superplane")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "test-pem")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
+	assert.False(t, UserConnectReady(t.Context()))
+	assert.True(t, AccountConnectionRequired(t.Context()))
 }
 
 func clearGitHubAppEnv(t *testing.T) {

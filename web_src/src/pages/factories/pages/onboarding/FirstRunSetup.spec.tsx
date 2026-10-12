@@ -14,6 +14,7 @@ type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 const github = vi.hoisted(() => ({
   data: {
     providerConfigured: true,
+    accountConnectionRequired: true,
     identity: undefined as { userId: string; login: string } | undefined,
     repositories: [] as Array<{
       repositoryId: string;
@@ -167,6 +168,7 @@ const runningDestination = {
 describe("FirstRunSetup GitHub catalog", () => {
   beforeEach(() => {
     github.data.providerConfigured = true;
+    github.data.accountConnectionRequired = true;
     github.data.identity = undefined;
     github.data.repositories = [];
     github.data.pendingRequests = [];
@@ -195,6 +197,23 @@ describe("FirstRunSetup GitHub catalog", () => {
     expect(screen.getByRole("status")).toHaveTextContent(FIRST_RUN_COPY.connect.loadingAccounts);
     expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
     expect(startPublicGitHubAppCreate).not.toHaveBeenCalled();
+  });
+
+  it("opens organization selection after the GitHub App exists without sign-in", () => {
+    github.data.providerConfigured = true;
+    github.data.accountConnectionRequired = false;
+    github.data.repositories = [
+      {
+        repositoryId: "201",
+        installationId: "101",
+        fullName: "acme/api",
+        defaultBranch: "main",
+      },
+    ];
+    renderSetup(pageModel());
+
+    expect(screen.getByText(FIRST_RUN_COPY.choose.organizationHeadline)).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
   });
 
   it("asks to create the GitHub App when the process has none", async () => {

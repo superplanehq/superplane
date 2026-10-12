@@ -12,7 +12,6 @@ import { startDirectLinearConnect } from "@/lib/startDirectLinearConnect";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router";
 
-import { addIntakeLabel, toggleIntakeLabel } from "./intakeSourceSettingsModel";
 import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
 
 export type LinearSetupStep = "connection" | "project";
@@ -21,7 +20,6 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
   const [step, setStep] = useState<LinearSetupStep>("connection");
   const [integrationId, setIntegrationId] = useState("");
   const [projectIds, setProjectIds] = useState<string[]>([]);
-  const [labels, setLabels] = useState<string[]>([]);
   const [skipInitialImport, setSkipInitialImport] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [stayOnConnection, setStayOnConnection] = useState(false);
@@ -87,7 +85,7 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
         integrationId,
         settings: {
           linearProjectIds: projectIds,
-          linearLabels: labels,
+          linearLabels: [],
         },
         ...(skipInitialImport ? { skipInitialImport: true } : {}),
       });
@@ -106,10 +104,6 @@ export function useLinearIntakeSetup(organizationId: string, factoryId: string, 
     setIntegrationId,
     projectIds,
     toggleProject,
-    labels,
-    addLabel: (label: string) => setLabels((current) => addIntakeLabel(current, label)),
-    removeLabel: (label: string) => setLabels((current) => toggleIntakeLabel(current, label)),
-    setLabels,
     skipInitialImport,
     setSkipInitialImport,
     connectOpen,

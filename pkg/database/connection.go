@@ -234,6 +234,7 @@ func TruncateTables() error {
 			installation_github_apps,
 			installation_licenses,
 			installation_license_keys,
+			installation_license_revocations,
 			workflows,
 			workflow_runs,
 			workflow_nodes,
@@ -249,7 +250,9 @@ func TruncateTables() error {
 			factory_planning_session_messages,
 			factory_planning_session_work_orders,
 			workspace_usage_events,
+			factories,
 			files,
+			hosted_llm_providers,
 			mcp_oauth_clients,
 			mcp_oauth_codes,
 			mcp_oauth_refresh_tokens

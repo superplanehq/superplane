@@ -184,9 +184,7 @@ func projectAndEventsFields(projectDescription, eventsDescription string) []conf
 	}
 }
 
-// issueEventsField is the "Events" multi-select shared by triggers scoped to Jira's standard
-// issue lifecycle events (created, updated, deleted) - currently jira.onIssue and jira.onIncident,
-// since an incident is just an issue on an incident-practice request type.
+// issueEventsField configures the issue lifecycle events for jira.onIssue.
 func issueEventsField(description string) configuration.Field {
 	return configuration.Field{
 		Name:        "events",

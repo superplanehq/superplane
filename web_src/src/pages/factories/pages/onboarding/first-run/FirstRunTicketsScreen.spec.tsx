@@ -47,7 +47,7 @@ describe("FirstRunTicketsScreen", () => {
     expect(onAnalyzeTickets).toHaveBeenCalledTimes(1);
   });
 
-  it("lets the user select Jira and keeps Linear as coming soon", async () => {
+  it("lets the user select Jira and Linear", async () => {
     const user = userEvent.setup();
     const onSelectTicketSource = vi.fn();
     const onConnectJira = vi.fn();
@@ -65,9 +65,10 @@ describe("FirstRunTicketsScreen", () => {
     expect(onSelectTicketSource).toHaveBeenCalledWith("jira");
     expect(onConnectJira).toHaveBeenCalledTimes(1);
 
-    expect(screen.getByText("Coming soon")).toBeInTheDocument();
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
     expect(screen.getByText(FIRST_RUN_COPY.tickets.jiraHelper)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Linear/ })).toBeDisabled();
+    expect(screen.getByText(FIRST_RUN_COPY.tickets.linearHelper)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Connect Linear" })).toBeEnabled();
   });
 
   it("keeps Linear as coming soon while the feature lookup is loading and still lets the user select Jira", async () => {
@@ -95,7 +96,7 @@ describe("FirstRunTicketsScreen", () => {
     expect(onConnectJira).toHaveBeenCalledTimes(1);
   });
 
-  it("lets the user select Linear when the feature is on and keeps scan stopped until a project is chosen", async () => {
+  it("lets the user select Linear and keeps scan stopped until a project is chosen", async () => {
     const user = userEvent.setup();
     const onSelectTicketSource = vi.fn();
     const onConnectLinear = vi.fn();
