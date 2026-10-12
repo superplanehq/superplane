@@ -20,14 +20,18 @@ export function planningHeaderSpendActive(
 export function headerSpendFromUsageSeries(series: AgentPromptUsageSeries[]): LiveHeaderSpend {
   let tokens = 0;
   let usd = 0;
+  let hasHostedUsage = false;
   for (const prompt of series) {
     tokens += agentRunNewTokenCount(prompt.telemetry);
-    const promptUsd = prompt.telemetry.usage.total_cost_usd;
+    hasHostedUsage ||= prompt.telemetry.usage.hosted_cost_usd != null;
+    const promptUsd = prompt.telemetry.usage.hosted_cost_usd ?? prompt.telemetry.usage.total_cost_usd;
     if (promptUsd != null && Number.isFinite(promptUsd)) {
       usd += promptUsd;
     }
   }
-  return { tokens, cents: Math.round(usd * 100) };
+  // Hosted totals use the same whole-cent truncation as the usage ledger.
+  const cents = hasHostedUsage ? Math.floor(Math.round(usd * 1_000_000) / 10_000) : Math.round(usd * 100);
+  return { tokens, cents };
 }
 
 export type PlanningHeaderSpendMemory = {

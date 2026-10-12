@@ -7,6 +7,7 @@ import {
   startPromptUsageSeries,
   type AgentPromptUsageSeries,
 } from "@/lib/agentRunTelemetry";
+import { withHostedUsageCost, type HostedUsagePricing } from "@/lib/hostedUsagePricing";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { liveLogRequestErrorFromResponse } from "./liveLogErrors";
 
@@ -47,6 +48,7 @@ type LiveLogSessionResponse = {
   stream_url?: string;
   token?: string;
   expires_at?: string;
+  hosted_pricing?: HostedUsagePricing | null;
 };
 
 const INTEGRATED_POLL_INTERVAL_MS = 2000;
@@ -425,6 +427,14 @@ export class LiveLogStream {
   async pump(handlers: LiveLogStreamHandlers): Promise<boolean> {
     const session = await fetchRunnerLiveLogSession(this.sessionUrl, this.organizationId, this.abortController.signal);
     const required = requireLiveLogSession(session);
+    if (session.hosted_pricing) {
+      const pricing = session.hosted_pricing;
+      const onTurn = handlers.onTurn;
+      handlers = {
+        ...handlers,
+        onTurn: (turn, usage, message) => onTurn?.(turn, withHostedUsageCost(usage, pricing), message),
+      };
+    }
     if (required.backend === "integrated") {
       return this.pollIntegrated(required, handlers);
     }
