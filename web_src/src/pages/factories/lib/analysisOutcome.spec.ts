@@ -11,11 +11,11 @@ import {
 } from "./analysisOutcome";
 
 describe("analysisFirstResultDelivered", () => {
-  it("is true when a score and spec.md exist", () => {
+  it("is true when a score and plan.md exist", () => {
     expect(
       analysisFirstResultDelivered({
         checks: [{ name: "Confidence score", key: "confidence", score: 4 }],
-        artifacts: [{ data: { name: "spec.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" } }],
+        artifacts: [{ data: { name: "plan.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" } }],
       }),
     ).toBe(true);
   });
@@ -24,7 +24,7 @@ describe("analysisFirstResultDelivered", () => {
     expect(
       analysisFirstResultDelivered({
         checks: [],
-        artifacts: [{ data: { name: "spec.md", body: "# Add breed\n" } }],
+        artifacts: [{ data: { name: "plan.md", body: "# Add breed\n" } }],
       }),
     ).toBe(false);
   });
@@ -73,7 +73,7 @@ describe("analysisFinishedStatus", () => {
 describe("analysisResultDeliveredForRun", () => {
   const scoreAndPlan = {
     checks: [{ name: "Confidence score", key: "confidence", score: 4, runId: "run-b" }],
-    artifacts: [{ data: { name: "spec.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" } }],
+    artifacts: [{ data: { name: "plan.md", body: "# Add breed\n\n## Executive summary\n\nAdd breed.\n" } }],
   };
 
   it("attributes the first result to the run that reported the score", () => {
@@ -87,7 +87,7 @@ describe("analysisResultDeliveredForRun", () => {
         { id: "run-a" },
         {
           checks: [{ name: "Confidence score", key: "confidence", score: 4 }],
-          artifacts: [{ data: { name: "spec.md", body: "# Add breed\n" } }],
+          artifacts: [{ data: { name: "plan.md", body: "# Add breed\n" } }],
           isLast: true,
         },
       ),
@@ -100,7 +100,7 @@ describe("analysisResultDeliveredForRun", () => {
         { id: "run-a" },
         {
           checks: [{ name: "Confidence score", key: "confidence", score: 4 }],
-          artifacts: [{ data: { name: "spec.md", body: "# Add breed\n" } }],
+          artifacts: [{ data: { name: "plan.md", body: "# Add breed\n" } }],
           isLast: false,
         },
       ),
