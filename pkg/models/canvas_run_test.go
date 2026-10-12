@@ -258,6 +258,43 @@ func Test__CanvasRun__RequestCancellation__OverridesCompletionRequest(t *testing
 	assert.Equal(t, models.CanvasRunResultCancelled, result)
 }
 
+func Test__CanvasRun__RequestCancellation__StopsDescendantsOfFinishedExecutions(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+	require.NoError(t, db.Model(execution).Updates(map[string]any{
+		"state":  models.CanvasNodeExecutionStateFinished,
+		"result": models.CanvasNodeExecutionResultPassed,
+	}).Error)
+	child := createSubRun(t, run.WorkflowID, "node-1", &run.ID, &run.WorkflowID, &execution.ID)
+	require.NoError(t, db.Model(child).Updates(map[string]any{
+		"state":  models.CanvasRunStateFinished,
+		"result": models.CanvasRunResultPassed,
+	}).Error)
+	grandchild := createSubRun(t, run.WorkflowID, "node-1", &child.ID, &run.WorkflowID, nil)
+	unrelated := createSubRun(t, run.WorkflowID, "node-1", nil, nil, nil)
+
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		_, err := run.RequestCancellation(tx, nil)
+		return err
+	}))
+
+	for _, expected := range []struct {
+		run    *models.CanvasRun
+		state  string
+		result string
+	}{
+		{run, models.CanvasRunStateCancelling, ""},
+		{child, models.CanvasRunStateFinished, models.CanvasRunResultPassed},
+		{grandchild, models.CanvasRunStateCancelling, ""},
+		{unrelated, models.CanvasRunStatePending, ""},
+	} {
+		loaded, err := models.FindUnscopedCanvasRun(db, expected.run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, expected.state, loaded.State)
+		assert.Equal(t, expected.result, loaded.Result)
+	}
+}
+
 func Test__CanvasRun__RequestCompletion__DoesNotOverrideCancellationRequest(t *testing.T) {
 	run, _ := setupRunWithExecution(t)
 	db := database.DB(t.Context())

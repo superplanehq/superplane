@@ -106,6 +106,9 @@ func UpdateWorkOrderStatus(
 	}
 
 	if changed {
+		if toState == models.FactoryWorkOrderStateClosed {
+			messages.PublishWorkOrderRunCancellations(db, order)
+		}
 		notification := messages.FactoryWorkOrderNotificationMessage{
 			OrganizationID: orgID.String(),
 			FactoryID:      factory.ID.String(),
