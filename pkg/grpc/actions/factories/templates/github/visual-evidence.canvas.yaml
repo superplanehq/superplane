@@ -13,6 +13,9 @@ spec:
       targetId: has-visual-evidence
     - channel: "true"
       sourceId: has-visual-evidence
+      targetId: read-pr-description
+    - channel: default
+      sourceId: read-pr-description
       targetId: update-pr-description
   nodes:
     - id: on-pr-visual-evidence
@@ -28,7 +31,7 @@ spec:
         onlyFactoryPullRequests: true
         repository: '{{ install_params.appRepository }}'
       position:
-        x: 80
+        x: 2320
         "y": 80
       isCollapsed: true
     - id: capture-visual-evidence
@@ -155,6 +158,17 @@ spec:
         x: 1200
         "y": 80
       isCollapsed: true
+    - id: read-pr-description
+      name: Read Pull Request Description
+      type: TYPE_ACTION
+      component: github.getIssue
+      configuration:
+        repository: '{{ root().data.repository.full_name }}'
+        issueNumber: '{{ root().data.pull_request.number }}'
+      position:
+        x: 1760
+        "y": 80
+      isCollapsed: true
     - id: update-pr-description
       name: Update Pull Request Description
       type: TYPE_ACTION
@@ -164,7 +178,7 @@ spec:
         pullNumber: '{{ root().data.pull_request.number }}'
         body: |-
           {{
-            let current = root().data.pull_request.body == nil ? "" : string(root().data.pull_request.body);
+            let current = $["Read Pull Request Description"].data.body == nil ? "" : string($["Read Pull Request Description"].data.body);
             let start = "<!-- superplane:visual-evidence -->";
             let end = "<!-- /superplane:visual-evidence -->";
             let parts = current contains start ? split(current, start) : [current];
@@ -176,6 +190,6 @@ spec:
             base == "" ? section : base + "\n\n" + section
           }}
       position:
-        x: 1760
+        x: 2320
         "y": 80
       isCollapsed: true

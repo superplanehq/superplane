@@ -353,6 +353,12 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 	)
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "capture-visual-evidence", TargetID: "has-visual-evidence", Channel: "passed"})
 
+	read := findYAMLNode(t, canvas, "read-pr-description")
+	assert.Equal(t, "github.getIssue", read.Component)
+	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, read.Integration)
+	assert.Equal(t, "{{ root().data.pull_request.number }}", read.Configuration["issueNumber"])
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "has-visual-evidence", TargetID: "read-pr-description", Channel: "true"})
+
 	update := findYAMLNode(t, canvas, "update-pr-description")
 	assert.Equal(t, "github.updatePullRequest", update.Component)
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, update.Integration)
@@ -362,8 +368,10 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 	require.True(t, ok)
 	assert.Contains(t, body, "## Visual evidence")
 	assert.Contains(t, body, "root().data.pull_request.head.sha[:7]")
+	assert.Contains(t, body, `$["Read Pull Request Description"].data.body`)
+	assert.NotContains(t, body, "root().data.pull_request.body")
 	assert.Contains(t, body, `fromBase64($["Capture Visual Evidence"].data.result.visualEvidence.markdown)`)
-	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "has-visual-evidence", TargetID: "update-pr-description", Channel: "true"})
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "read-pr-description", TargetID: "update-pr-description", Channel: "default"})
 	assert.Contains(t, result.consoleYAML, "This app is not a factory line step.")
 	assert.Contains(t, result.consoleYAML, "The first capture starts when")
 	assert.Contains(t, result.consoleYAML, "bottom of the pull request description")
@@ -392,6 +400,7 @@ func TestVisualEvidenceDescriptionKeepsExistingText(t *testing.T) {
 
 	tests := []struct {
 		name    string
+		event   any
 		current any
 		want    string
 	}{
@@ -407,10 +416,16 @@ func TestVisualEvidenceDescriptionKeepsExistingText(t *testing.T) {
 			current: "Closes acme/app#1\n\n" + previous + "\n\nThanks for the review.",
 			want:    "Closes acme/app#1\n\nThanks for the review.\n\n" + section,
 		},
+		{
+			name:    "keeps edits made while capture runs",
+			event:   "Closes acme/app#1",
+			current: "Closes acme/app#1\n\nAdded a test plan.",
+			want:    "Closes acme/app#1\n\nAdded a test plan.\n\n" + section,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.want, evalVisualEvidenceDescription(t, source, test.current, markdown))
+			assert.Equal(t, test.want, evalVisualEvidenceDescription(t, source, test.event, test.current, markdown))
 		})
 	}
 }
@@ -419,19 +434,27 @@ func visualEvidenceDescriptionSection(markdown string) string {
 	return "<!-- superplane:visual-evidence -->\n## Visual evidence\n\nCaptured for commit `0123456`.\n\n" + markdown + "\n<!-- /superplane:visual-evidence -->"
 }
 
-func evalVisualEvidenceDescription(t *testing.T, source string, body any, markdown string) string {
+func evalVisualEvidenceDescription(t *testing.T, source string, eventBody any, body any, markdown string) string {
 	t.Helper()
 
+	if eventBody == nil {
+		eventBody = "stale event description"
+	}
 	payload := map[string]any{
 		"data": map[string]any{
 			"pull_request": map[string]any{
-				"body": body,
+				"body": eventBody,
 				"head": map[string]any{"sha": "0123456789abcdef0123456789abcdef01234567"},
 			},
 		},
 	}
 	env := map[string]any{
 		"$": map[string]any{
+			"Read Pull Request Description": map[string]any{
+				"data": map[string]any{
+					"body": body,
+				},
+			},
 			"Capture Visual Evidence": map[string]any{
 				"data": map[string]any{
 					"result": map[string]any{

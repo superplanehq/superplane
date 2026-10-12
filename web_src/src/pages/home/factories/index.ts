@@ -170,6 +170,7 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     description: "Capture screenshots or a short video when a pull request changes the user interface.",
     integrations: ["github"],
     componentIntegrations: {
+      "github.getIssue": "github",
       "github.updatePullRequest": "github",
       "github.onPullRequest": "github",
     },
