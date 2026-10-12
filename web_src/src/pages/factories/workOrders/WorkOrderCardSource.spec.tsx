@@ -9,7 +9,7 @@ import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from 
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
-import superplaneIcon from "@/assets/superplane.svg";
+import superplaneMark from "@/assets/superplane-mark.svg";
 
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard } from "./WorkOrderCard";
@@ -136,8 +136,23 @@ describe("WorkOrderCard source icon", () => {
     const icon = screen.getByTestId("work-order-card-source-wo-1");
     expect(icon.tagName).toBe("SPAN");
     expect(icon).not.toHaveAttribute("href");
-    expect(icon.querySelector("img")).toHaveAttribute("src", superplaneIcon);
+    expect(icon.querySelector("img")).toHaveAttribute("src", superplaneMark);
     expect(icon).toHaveAttribute("aria-label", "Created manually");
+  });
+
+  it("renders a SuperPlane source mark for an MCP task", () => {
+    renderCard({
+      ...baseOrder,
+      mcpClient: { id: "superplane-local", name: "Cursor" },
+    });
+
+    const icon = screen.getByTestId("work-order-card-source-wo-1");
+    expect(icon.tagName).toBe("SPAN");
+    expect(icon).not.toHaveAttribute("href");
+    expect(icon.querySelector("img")).toHaveAttribute("src", superplaneMark);
+    expect(icon.querySelector("img")?.className).toContain("object-contain");
+    expect(icon.querySelector("img")?.className).toContain("dark:invert");
+    expect(icon).toHaveAttribute("aria-label", "Cursor");
   });
 
   it("names the creator on a manual source mark", () => {
