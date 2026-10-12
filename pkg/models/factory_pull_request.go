@@ -115,6 +115,7 @@ type FactoryPullRequestRun struct {
 	Description       string
 	Attempt           *int
 	AttemptLimit      *int
+	AuthorIsBot       *bool
 	AccessRequestedAt *time.Time
 	AccessGrantedAt   *time.Time
 	CreatedAt         time.Time
@@ -129,6 +130,7 @@ type FactoryPullRequestLinkedRun struct {
 	State        string
 	Attempt      *int
 	AttemptLimit *int
+	AuthorIsBot  *bool
 	Revision     *FactoryPullRequestRevision
 }
 
@@ -642,6 +644,7 @@ func ListPullRequestRuns(tx *gorm.DB, pullRequestIDs []uuid.UUID) (map[uuid.UUID
 			State:        link.State,
 			Attempt:      link.Attempt,
 			AttemptLimit: link.AttemptLimit,
+			AuthorIsBot:  link.AuthorIsBot,
 		}
 		if link.RevisionID != nil {
 			if revision, ok := revisionByID[*link.RevisionID]; ok {

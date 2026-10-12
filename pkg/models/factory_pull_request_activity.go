@@ -18,6 +18,7 @@ type FactoryPullRequestActivityParams struct {
 	RevisionSHA       string
 	Access            string
 	FeedbackHandlerID *uuid.UUID
+	AuthorIsBot       *bool
 }
 
 type FactoryPullRequestActivityOutcome string
@@ -149,6 +150,18 @@ func (a *FactoryPullRequestRun) UpdateContent(tx *gorm.DB, title, description *s
 		Updates(updates).Error
 }
 
+func (a *FactoryPullRequestRun) SetAuthorIsBot(tx *gorm.DB, authorIsBot bool) error {
+	now := time.Now()
+	a.AuthorIsBot = &authorIsBot
+	a.UpdatedAt = now
+	return tx.Model(a).
+		Where("pull_request_id = ? AND run_id = ?", a.PullRequestID, a.RunID).
+		Updates(map[string]any{
+			"author_is_bot": authorIsBot,
+			"updated_at":    now,
+		}).Error
+}
+
 func (a *FactoryPullRequestRun) Finalize(tx *gorm.DB, run *CanvasRun) error {
 	if run == nil {
 		return fmt.Errorf("%w: run is required", ErrFactoryPullRequestInvalid)
@@ -222,6 +235,7 @@ func (p *FactoryPullRequest) insertActivity(
 		State:             state,
 		Title:             strings.TrimSpace(params.Title),
 		Description:       strings.TrimSpace(params.Description),
+		AuthorIsBot:       params.AuthorIsBot,
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
