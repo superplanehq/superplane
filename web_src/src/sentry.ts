@@ -43,6 +43,23 @@ export function isMonacoCanceledEvent(event: Sentry.ErrorEvent): boolean {
   );
 }
 
+const USER_AGENT_PERMISSION_DENIAL =
+  "The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.";
+
+// True when Safari denies a speculative clipboard write inside monaco-editor.
+// The editor logs that denial, and captureConsoleIntegration forwards it as an
+// application error. A permission denial from app code has no editor frame and
+// still reports.
+export function isMonacoClipboardDeniedEvent(event: Sentry.ErrorEvent): boolean {
+  const exception = event.exception?.values?.[0];
+  if (exception?.type !== "NotAllowedError" || exception.value !== USER_AGENT_PERMISSION_DENIAL) {
+    return false;
+  }
+
+  const frames = exception.stacktrace?.frames ?? [];
+  return frames.some((frame) => frame.filename?.includes("monaco-editor"));
+}
+
 // Matches a UUID (with or without dashes normalized) anywhere in a path
 // segment, so a UUID organization ID normalizes the same way as a slug.
 const UUID_SEGMENT = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
@@ -131,6 +148,26 @@ export function normalizeSentryFingerprint<E extends Sentry.Event>(event: E): E 
   } as E;
 }
 
+// Drops known browser noise before send. A permission denial from application
+// code has no editor frame and still reports.
+export function filterSentryEvent(event: Sentry.ErrorEvent): Sentry.ErrorEvent | null {
+  const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
+  const allDash0 = frames.length > 0 && frames.every((frame) => frame.filename?.includes("@dash0/sdk-web"));
+  if (allDash0) {
+    return null;
+  }
+
+  if (isMonacoCanceledEvent(event)) {
+    return null;
+  }
+
+  if (isMonacoClipboardDeniedEvent(event)) {
+    return null;
+  }
+
+  return normalizeSentryFingerprint(event);
+}
+
 let dsn: string | undefined;
 let environment: string | undefined;
 
@@ -145,19 +182,7 @@ if (dsn) {
     dsn,
     environment,
     ignoreErrors: IGNORED_CONSOLE_MESSAGES,
-    beforeSend(event) {
-      const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
-      const allDash0 = frames.length > 0 && frames.every((frame) => frame.filename?.includes("@dash0/sdk-web"));
-      if (allDash0) {
-        return null;
-      }
-
-      if (isMonacoCanceledEvent(event)) {
-        return null;
-      }
-
-      return normalizeSentryFingerprint(event);
-    },
+    beforeSend: filterSentryEvent,
     beforeBreadcrumb(breadcrumb) {
       if (breadcrumb.category === "console" && isIgnoredConsoleMessage(breadcrumb.message)) {
         return null;
