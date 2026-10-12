@@ -74,6 +74,55 @@ func Test__VelocitySyncWindow__RestartsWhenTheRepositoryChanges(t *testing.T) {
 		"a new repository has no history, whatever the old one reached")
 }
 
+func Test__VelocitySyncWindow__RebuildsStaleBitbucketHistory(t *testing.T) {
+	now := time.Now()
+	syncedAt := now.Add(-10 * time.Minute)
+	backfilledFrom := now.AddDate(0, 0, -velocitySyncBackfillDays-1)
+
+	from := velocitySyncWindow(models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		SyncedAt:         &syncedAt,
+		BackfilledFrom:   &backfilledFrom,
+	}, now)
+
+	assert.WithinDuration(t, now.AddDate(0, 0, -velocitySyncBackfillDays), from, time.Second,
+		"a Bitbucket workspace saved before the app filter must rebuild the full history, not only the last seven days")
+}
+
+func Test__VelocitySyncWindow__KeepsBitbucketIncrementalAfterRulesRebuild(t *testing.T) {
+	now := time.Now()
+	syncedAt := now.Add(-10 * time.Minute)
+	backfilledFrom := now.AddDate(0, 0, -velocitySyncBackfillDays-1)
+
+	from := velocitySyncWindow(models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		SyncedAt:         &syncedAt,
+		BackfilledFrom:   &backfilledFrom,
+		RulesGeneration:  bitbucketVelocityRulesGeneration,
+	}, now)
+
+	assert.WithinDuration(t, now.Add(-velocitySyncRecomputeWindow), from, time.Second,
+		"a Bitbucket workspace that already rebuilt under the current rules only recomputes recent days")
+}
+
+func Test__NextVelocityRulesGeneration__RecordsBitbucketRulesOnlyAfterFullRebuild(t *testing.T) {
+	now := time.Now()
+	target := models.FactoryVelocitySyncTarget{VCSProvider: models.ProviderBitbucket}
+
+	assert.Equal(t, bitbucketVelocityRulesGeneration, nextVelocityRulesGeneration(target, velocitySyncBackfillStart(now), now),
+		"replacing the full history window is what makes the app filter apply to saved merges")
+	assert.Equal(t, 0, nextVelocityRulesGeneration(target, now.Add(-velocitySyncRecomputeWindow), now),
+		"a seven-day recompute must not mark the older app merges as corrected")
+
+	github := models.FactoryVelocitySyncTarget{VCSProvider: models.ProviderGitHub, RulesGeneration: 4}
+	assert.Equal(t, 4, nextVelocityRulesGeneration(github, velocitySyncBackfillStart(now), now),
+		"a GitHub rebuild must not consume the Bitbucket rules generation")
+}
+
 func Test__EarliestBackfill__KeepsTheOldestWindowEverCollected(t *testing.T) {
 	now := time.Now()
 	backfilledFrom := now.AddDate(0, 0, -velocitySyncBackfillDays)

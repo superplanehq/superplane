@@ -60,6 +60,11 @@ const (
 	// its merge was first seen.
 	velocitySyncRecomputeWindow = 7 * 24 * time.Hour
 
+	// bitbucketVelocityRulesGeneration bumps when Bitbucket merge
+	// classification changes. A stored generation below this value forces one
+	// full history rebuild so older rows are not left under the previous rules.
+	bitbucketVelocityRulesGeneration = 1
+
 	// How far past the merge window commits are read. A commit is dated when it
 	// was written, which can be well before the merge that brought it in.
 	velocitySyncCommitDateSlack = 14 * 24 * time.Hour
@@ -381,6 +386,7 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 	}
 
 	backfilledFrom := earliestBackfill(target, from, repositoryChanged)
+	sync.RulesGeneration = nextVelocityRulesGeneration(target, from, now)
 	return sync.RecordSuccess(database.Conn(), target.Repository, now, backfilledFrom)
 }
 
@@ -504,9 +510,11 @@ func (w *FactoryVelocitySyncWorker) bitbucketClient(orgID, integrationID uuid.UU
 	return client, nil
 }
 
-// velocitySyncWindow returns the earliest merge date to ask GitHub for. A
-// workspace that already covers the full history window only recomputes recent
-// days. Anything else backfills the full window.
+// velocitySyncWindow returns the earliest merge date to ask the Git host for.
+// A workspace that already covers the full history window only recomputes
+// recent days. Anything else backfills the full window. A Bitbucket workspace
+// whose stored rules generation is stale also backfills once, so a
+// classification change corrects merges older than the recompute window.
 func velocitySyncWindow(target models.FactoryVelocitySyncTarget, now time.Time) time.Time {
 	backfillFrom := velocitySyncBackfillStart(now)
 
@@ -518,7 +526,33 @@ func velocitySyncWindow(target models.FactoryVelocitySyncTarget, now time.Time) 
 	if target.BackfilledFrom == nil || target.BackfilledFrom.After(backfillFrom) {
 		return backfillFrom
 	}
+	if bitbucketRulesNeedRebuild(target) {
+		return backfillFrom
+	}
 	return now.Add(-velocitySyncRecomputeWindow)
+}
+
+// bitbucketRulesNeedRebuild reports that saved Bitbucket merges were
+// classified before the current app filter. The next sync must replace the
+// full history window, not only the last seven days.
+func bitbucketRulesNeedRebuild(target models.FactoryVelocitySyncTarget) bool {
+	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
+		return false
+	}
+	return target.RulesGeneration < bitbucketVelocityRulesGeneration
+}
+
+// nextVelocityRulesGeneration records the current Bitbucket rules only after a
+// sync that replaced the full history window. An incremental sync must not
+// mark the rebuild done.
+func nextVelocityRulesGeneration(target models.FactoryVelocitySyncTarget, from, now time.Time) int {
+	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
+		return target.RulesGeneration
+	}
+	if from.After(velocitySyncBackfillStart(now)) {
+		return target.RulesGeneration
+	}
+	return bitbucketVelocityRulesGeneration
 }
 
 // velocitySyncBackfillStart is the start of the whole history window a report
