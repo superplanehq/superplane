@@ -2,7 +2,7 @@ import { Avatar } from "@/components/Avatar/avatar";
 import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { UNKNOWN_ORG_USER_NAME } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
-import { User, UserRoundX } from "lucide-react";
+import { User, UserRoundX, UserRoundMinus } from "lucide-react";
 
 const avatarSizeClass = {
   xs: "size-5",
@@ -33,10 +33,13 @@ export function OrgUserReference({
     initials: "?",
   };
 
+  const memberStatus = resolvedDisplay.deleted ? "Deleted user" : resolvedDisplay.formerMember ? "Former member" : null;
+  const StatusIcon = resolvedDisplay.deleted ? UserRoundX : UserRoundMinus;
+
   return (
     <span
       className={cn("inline-flex min-w-0 max-w-full items-center gap-1.5", className)}
-      title={resolvedDisplay.deleted ? `${resolvedDisplay.name} (deleted user)` : undefined}
+      title={memberStatus ? `${resolvedDisplay.name} (${memberStatus.toLowerCase()})` : undefined}
     >
       <Avatar
         src={resolvedDisplay.avatarUrl}
@@ -49,13 +52,13 @@ export function OrgUserReference({
           {resolvedDisplay.name}
         </span>
       ) : null}
-      {resolvedDisplay.deleted ? (
+      {memberStatus ? (
         showName ? (
           <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-            Deleted user
+            {memberStatus}
           </span>
         ) : (
-          <UserRoundX className="size-3 shrink-0 text-muted-foreground" role="img" aria-label="Deleted user" />
+          <StatusIcon className="size-3 shrink-0 text-muted-foreground" role="img" aria-label={memberStatus} />
         )
       ) : null}
     </span>

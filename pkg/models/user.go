@@ -21,6 +21,7 @@ type User struct {
 	ID              uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	OrganizationID  uuid.UUID
 	AccountID       *uuid.UUID
+	Account         *Account `gorm:"foreignKey:AccountID"`
 	Email           *string
 	Name            string
 	Type            string
@@ -100,7 +101,7 @@ func (u *User) RestoreInTransaction(tx *gorm.DB) error {
 }
 
 func PreloadRemovedMember(db *gorm.DB) *gorm.DB {
-	return db.Unscoped()
+	return db.Unscoped().Preload("Account", func(tx *gorm.DB) *gorm.DB { return tx.Unscoped() })
 }
 
 func (u *User) UpdateTokenHash(tokenHash string) error {
@@ -211,7 +212,7 @@ func FindUnscopedUsersByIDs(tx *gorm.DB, ids []uuid.UUID) ([]User, error) {
 	}
 
 	var users []User
-	err := tx.Unscoped().Where("id IN ?", ids).Find(&users).Error
+	err := PreloadRemovedMember(tx).Where("id IN ?", ids).Find(&users).Error
 	return users, err
 }
 

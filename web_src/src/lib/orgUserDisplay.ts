@@ -10,12 +10,14 @@ export interface OrgUserDisplay {
   initials: string;
   avatarUrl?: string;
   deleted?: boolean;
+  formerMember?: boolean;
 }
 
 export type OrgUserDisplayLookup = (
   userId: string | undefined,
   fallbackName?: string,
   deleted?: boolean,
+  formerMember?: boolean,
 ) => OrgUserDisplay | null;
 
 export function getUserInitials(name: string): string {
@@ -56,13 +58,14 @@ export function resolveOrgUserDisplay(
   userId: string | undefined,
   fallbackName?: string,
   deleted = false,
+  formerMember = false,
 ): OrgUserDisplay | null {
   if (!userId) {
     return null;
   }
 
   const fromMap = usersById.get(userId);
-  if (fromMap && !deleted) {
+  if (fromMap && !deleted && !formerMember) {
     return fromMap;
   }
 
@@ -74,9 +77,11 @@ export function resolveOrgUserDisplay(
     name,
     initials: getUserInitials(name),
     ...(deleted ? { deleted: true } : {}),
+    ...(formerMember ? { formerMember: true } : {}),
   };
 }
 
 export function createOrgUserDisplayLookup(usersById: Map<string, OrgUserDisplay>): OrgUserDisplayLookup {
-  return (userId, fallbackName, deleted) => resolveOrgUserDisplay(usersById, userId, fallbackName, deleted);
+  return (userId, fallbackName, deleted, formerMember) =>
+    resolveOrgUserDisplay(usersById, userId, fallbackName, deleted, formerMember);
 }

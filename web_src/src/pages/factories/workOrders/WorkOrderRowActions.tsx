@@ -35,7 +35,7 @@ export function CardOwnerMark({
 }: CardOwnerMarkProps) {
   const { resolveUser } = useOrgUserLookup(organizationId);
   const owner = entry.order.assignees?.[0] as
-    | { id?: string; name?: string; avatarUrl?: string; deleted?: boolean }
+    | { id?: string; name?: string; avatarUrl?: string; deleted?: boolean; formerMember?: boolean }
     | undefined;
   if (!owner?.id) {
     return (
@@ -54,7 +54,7 @@ export function CardOwnerMark({
     );
   }
 
-  const display = resolveUser(owner.id, owner.name, owner.deleted);
+  const display = resolveUser(owner.id, owner.name, owner.deleted, owner.formerMember);
   const ownerName = display?.name ?? owner.name;
   if (!ownerName || !display) {
     return null;
@@ -131,7 +131,7 @@ export function AssigneeGroup({
   const mark = (
     <span className="inline-flex items-center" data-testid={`work-order-row-assignees-${entry.id}`} title={owner.name}>
       <OrgUserReference
-        display={resolveUser(owner.id, owner.name, owner.deleted)}
+        display={resolveUser(owner.id, owner.name, owner.deleted, owner.formerMember)}
         size={size}
         showName={false}
         className="rounded-full ring-2 ring-background"

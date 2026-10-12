@@ -180,10 +180,10 @@ export function findLatestDispatchIndex(events: WorkOrderTimelineEvent[]): numbe
 
 function addOrderFallbackNames(usersById: Map<string, OrgUserDisplay>, order: FactoriesWorkOrder): void {
   const creator = order.createdBy?.user;
-  registerOrderUserFallback(usersById, creator?.id, creator?.name, creator?.deleted);
+  registerOrderUserFallback(usersById, creator?.id, creator?.name, creator?.deleted, creator?.formerMember);
 
   for (const assignee of order.assignees ?? []) {
-    registerOrderUserFallback(usersById, assignee.id, assignee.name, assignee.deleted);
+    registerOrderUserFallback(usersById, assignee.id, assignee.name, assignee.deleted, assignee.formerMember);
   }
 }
 
@@ -192,10 +192,11 @@ function registerOrderUserFallback(
   id: string | undefined,
   name: string | undefined,
   deleted?: boolean,
+  formerMember?: boolean,
 ): void {
-  if (!id || (usersById.has(id) && !deleted) || (!name?.trim() && !deleted)) {
+  if (!id || (usersById.has(id) && !deleted && !formerMember) || (!name?.trim() && !deleted && !formerMember)) {
     return;
   }
 
-  usersById.set(id, resolveOrgUserDisplay(new Map(), id, name, deleted)!);
+  usersById.set(id, resolveOrgUserDisplay(new Map(), id, name, deleted, formerMember)!);
 }

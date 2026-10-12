@@ -1946,6 +1946,7 @@ message UserRef {
   string id = 1;
   string name = 2;
   bool deleted = 3;
+  bool former_member = 4;
 }
 
 // LineRef identifies a factory line as it was at the time it was

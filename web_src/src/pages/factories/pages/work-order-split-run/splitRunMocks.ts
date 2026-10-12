@@ -264,7 +264,7 @@ function splitRunOwnerDisplay(order: FactoriesWorkOrder, resolveUser?: OrgUserDi
   if (assignee?.id) {
     // `resolveUser` looks the owner up against the org members list, which
     // carries the avatar image. Without it we can only show initials.
-    const resolved = resolveUser?.(assignee.id, assignee.name, assignee.deleted);
+    const resolved = resolveUser?.(assignee.id, assignee.name, assignee.deleted, assignee.formerMember);
     if (resolved) {
       return resolved;
     }
@@ -274,6 +274,7 @@ function splitRunOwnerDisplay(order: FactoriesWorkOrder, resolveUser?: OrgUserDi
       name,
       initials: getUserInitials(name) || UNKNOWN_OWNER.initials,
       ...(assignee.deleted ? { deleted: true } : {}),
+      ...(assignee.formerMember ? { formerMember: true } : {}),
     };
   }
   return workOrderOwnerDisplay(order, UNKNOWN_OWNER, resolveUser);

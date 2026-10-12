@@ -78,9 +78,10 @@ func serializeArtifactCreator(artifact *models.FactoryWorkOrderArtifact) *pb.Use
 	}
 
 	return &pb.UserRef{
-		Id:      artifact.CreatedByID.String(),
-		Name:    loadedMemberName(artifact.CreatedBy),
-		Deleted: loadedMemberDeleted(artifact.CreatedBy),
+		Id:           artifact.CreatedByID.String(),
+		Name:         loadedMemberName(artifact.CreatedBy),
+		Deleted:      loadedMemberDeleted(artifact.CreatedBy),
+		FormerMember: loadedMemberFormer(artifact.CreatedBy),
 	}
 }
 
