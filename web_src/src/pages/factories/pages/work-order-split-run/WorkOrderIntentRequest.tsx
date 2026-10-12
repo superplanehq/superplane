@@ -383,8 +383,9 @@ function AnalysisComposerField({
               onSend();
             }
           }}
-          className="min-h-[4.2rem] py-2 text-[13px]"
-          rows={2}
+          className="min-h-0 px-3 pt-3 pb-1 text-[13px]"
+          style={{ paddingTop: "0.75rem", paddingLeft: "0.75rem", paddingRight: "0.75rem" }}
+          rows={1}
         />
         <InputGroupAddon
           align="block-end"

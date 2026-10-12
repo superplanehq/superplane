@@ -247,7 +247,11 @@ describe("WorkOrderIntentDocument", () => {
     expect(screen.getByTestId("split-run-intent-composer").closest("[data-slot=input-group]")).not.toBeNull();
     expect(columns[columns.length - 1].className).toContain("[scrollbar-gutter:stable]");
     expect(screen.getByTestId("split-run-intent-composer").closest("form")).toHaveClass("min-h-[5.5rem]");
-    expect(screen.getByTestId("split-run-intent-composer")).toHaveValue("Need the existing empty-state component.");
+    const composer = screen.getByTestId("split-run-intent-composer");
+    expect(composer).toHaveValue("Need the existing empty-state component.");
+    expect(composer).toHaveClass("pt-3", "px-3", "min-h-0");
+    expect(composer).not.toHaveClass("py-2");
+    expect(composer.className).not.toContain("min-h-[4.2rem]");
     expect(screen.getByTestId("split-run-intent-composer-kbd")).toHaveTextContent(ANALYSIS_PLANNING_COPY.sendShortcut);
     const send = screen.getByTestId("split-run-intent-composer-send");
     expect(send).toHaveAttribute("data-size", "icon-sm");
