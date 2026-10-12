@@ -451,6 +451,17 @@ func TestUpdateWorkOrderStatus_ValidatesConfiguration(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+
+	t.Run("accepts closed with archived result", func(t *testing.T) {
+		err := configuration.ValidateConfiguration(fields, map[string]any{
+			"orderId": "{{ order().id }}",
+			"status":  "closed",
+			"result":  "archived",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }
 
 func TestAddWorkOrderComment_ValidatesConfiguration(t *testing.T) {

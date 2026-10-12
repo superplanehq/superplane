@@ -113,6 +113,7 @@ func (c *UpdateWorkOrderStatus) Configuration() []configuration.Field {
 						{Label: "Rejected", Value: "rejected"},
 						{Label: "Failed", Value: "failed"},
 						{Label: "Closed", Value: "pr_closed"},
+						{Label: "Archived", Value: "archived"},
 					},
 				},
 			},
