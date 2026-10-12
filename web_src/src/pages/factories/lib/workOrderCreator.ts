@@ -20,7 +20,7 @@ export function resolveWorkOrderCreatorDisplay(
 ): OrgUserDisplay | null {
   const user = createdBy?.user;
   if (user?.id || user?.name) {
-    return resolveUser(user.id, user.name);
+    return resolveUser(user.id, user.name, user.deleted);
   }
   const automation = createdBy?.automation;
   if (automation) {
@@ -66,7 +66,7 @@ function userOwnerDisplay(
   // `resolveUser` looks the owner up against the org members list, which
   // carries the avatar image. Without it we can only show initials (or the
   // fallback's avatar when the ids happen to match).
-  const resolved = resolveUser?.(user.id, user.name);
+  const resolved = resolveUser?.(user.id, user.name, user.deleted);
   if (resolved) {
     return resolved;
   }
@@ -75,6 +75,7 @@ function userOwnerDisplay(
     id: user.id ?? fallback.id,
     name,
     initials: getUserInitials(name),
+    ...(user.deleted ? { deleted: true } : {}),
     avatarUrl: user.id === fallback.id ? fallback.avatarUrl : undefined,
   };
 }

@@ -68,6 +68,8 @@ func Test__DescribeWorkOrder_KeepsRemovedMemberName(t *testing.T) {
 	require.Len(t, resp.Order.GetAssignees(), 1)
 	assert.Equal(t, member.ID.String(), resp.Order.Assignees[0].GetId())
 	assert.Equal(t, member.Name, resp.Order.Assignees[0].GetName())
+	assert.True(t, resp.Order.GetCreatedBy().GetUser().GetDeleted())
+	assert.True(t, resp.Order.Assignees[0].GetDeleted())
 	assert.NotEqual(t, member.ID.String(), resp.Order.Assignees[0].GetName())
 }
 

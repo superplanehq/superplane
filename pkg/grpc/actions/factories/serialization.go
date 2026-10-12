@@ -725,8 +725,9 @@ func serializeWorkOrderCreator(
 	return &pb.WorkOrderCreator{
 		Kind: &pb.WorkOrderCreator_User{
 			User: &pb.UserRef{
-				Id:   order.CreatedByID.String(),
-				Name: loadedMemberName(order.CreatedBy),
+				Id:      order.CreatedByID.String(),
+				Name:    loadedMemberName(order.CreatedBy),
+				Deleted: loadedMemberDeleted(order.CreatedBy),
 			},
 		},
 	}
@@ -953,8 +954,9 @@ func serializeWorkOrderAssignees(assignees []models.FactoryWorkOrderAssignee) []
 	result := make([]*pb.UserRef, 0, len(assignees))
 	for _, assignee := range assignees {
 		result = append(result, &pb.UserRef{
-			Id:   assignee.UserID.String(),
-			Name: loadedMemberName(assignee.User),
+			Id:      assignee.UserID.String(),
+			Name:    loadedMemberName(assignee.User),
+			Deleted: loadedMemberDeleted(assignee.User),
 		})
 	}
 	return result
@@ -965,4 +967,8 @@ func loadedMemberName(user *models.User) string {
 		return ""
 	}
 	return user.Name
+}
+
+func loadedMemberDeleted(user *models.User) bool {
+	return user != nil && user.DeletedAt.Valid
 }
