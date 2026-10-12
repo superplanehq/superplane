@@ -240,7 +240,7 @@ func (w *FactoryVelocitySyncWorker) SyncFactory(ctx context.Context, factoryID u
 
 	now := w.now()
 	from, until := velocityRefreshBounds(*target, now)
-	err = w.claimAndSync(ctx, *target, now.Add(-velocitySyncOnDemandGuard), from, until)
+	err = w.claimAndSync(ctx, *target, now.Add(-velocitySyncOnDemandGuard), from, until, now)
 	if err != nil {
 		return false, err
 	}
@@ -275,7 +275,7 @@ func (w *FactoryVelocitySyncWorker) tick(ctx context.Context) {
 
 			now := w.now()
 			from, until := velocitySyncBounds(target, now)
-			if err := w.claimAndSync(ctx, target, now.Add(-velocitySyncLease), from, until); err != nil {
+			if err := w.claimAndSync(ctx, target, now.Add(-velocitySyncLease), from, until, now); err != nil {
 				w.logger.Errorf("Error syncing velocity for workspace %s: %v", target.FactoryID, err)
 			}
 		}(target)
@@ -292,6 +292,7 @@ func (w *FactoryVelocitySyncWorker) claimAndSync(
 	claimableBefore time.Time,
 	from time.Time,
 	until time.Time,
+	requestedAt time.Time,
 ) error {
 	if _, _, ok := splitOwnerRepo(target.Repository); !ok {
 		return fmt.Errorf("repository %q is not owner/name", target.Repository)
@@ -305,6 +306,9 @@ func (w *FactoryVelocitySyncWorker) claimAndSync(
 		return nil
 	}
 
+	// requestedAt chose the read window. This later clock stamps the stored
+	// rows. The short-read decision must keep requestedAt, or a seven-day
+	// recompute looks like a full refresh.
 	now := w.now()
 	to := now.Add(time.Hour)
 	merged, coverage, err := w.listTargetMerges(ctx, target, from, to, until)
@@ -313,7 +317,7 @@ func (w *FactoryVelocitySyncWorker) claimAndSync(
 		return nil
 	}
 
-	if err := w.storeMerges(target, sync, from, until, merged, coverage, now); err != nil {
+	if err := w.storeMerges(target, sync, from, until, merged, coverage, now, requestedAt); err != nil {
 		w.recordSyncError(target, sync, err)
 		return nil
 	}
@@ -406,10 +410,11 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 	merged []repositoryMerge,
 	coverage velocityReadCoverage,
 	now time.Time,
+	requestedAt time.Time,
 ) error {
 	repositoryChanged := target.SyncedRepository != "" && !sameRepository(target)
 	replaceFrom, replaceTo, backfilledFrom, rulesGeneration := progressAfterVelocityRead(
-		target, from, until, coverage, now, repositoryChanged,
+		target, from, until, coverage, now, repositoryChanged, requestedAt,
 	)
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -478,7 +483,7 @@ func (w *FactoryVelocitySyncWorker) catchUpBitbucketNewerWindow(
 	if err != nil {
 		return err
 	}
-	if err := w.storeMerges(caught, sync, from, time.Time{}, merged, coverage, now); err != nil {
+	if err := w.storeMerges(caught, sync, from, time.Time{}, merged, coverage, now, now); err != nil {
 		return err
 	}
 	if !coverage.Complete {
@@ -726,6 +731,7 @@ func progressAfterVelocityRead(
 	coverage velocityReadCoverage,
 	now time.Time,
 	repositoryChanged bool,
+	requestedAt time.Time,
 ) (time.Time, time.Time, time.Time, int) {
 	// The stored window ends past now so a merge later today replaces the
 	// right rows on the next tick. A continuation must stop at the slice
@@ -736,7 +742,7 @@ func progressAfterVelocityRead(
 	}
 	if !coverage.Complete && effectiveVelocityProvider(target) == models.ProviderBitbucket {
 		generation := bitbucketVelocityRulesRebuilding
-		if bitbucketShortReadContinuesCatchUp(target, requestedFrom, now) {
+		if bitbucketShortReadContinuesCatchUp(target, requestedFrom, requestedAt) {
 			generation = bitbucketVelocityRulesCatchingUp
 		}
 		return coverage.ContinueBefore, replaceTo, coverage.ContinueBefore, generation
@@ -795,16 +801,20 @@ func bitbucketCatchUpState(generation int) bool {
 // cursor would make the next sync read that history again, then repeat this
 // window. The shortcut is only for a recent-window read. A full refresh must
 // keep its original start across short reads, or the next read would start at
-// seven days and finish before the saved cursor.
+// seven days and finish before the saved cursor. requestedAt is the clock
+// that chose requestedFrom. The store clock is later, after the claim and the
+// host read. A seven-day bound taken from that later clock makes a scheduled
+// recompute look like a full refresh, and the next sync reads the older
+// history again.
 func bitbucketShortReadContinuesCatchUp(
 	target models.FactoryVelocitySyncTarget,
 	requestedFrom time.Time,
-	now time.Time,
+	requestedAt time.Time,
 ) bool {
 	if bitbucketCatchUpPending(target) {
 		return true
 	}
-	if requestedFrom.Before(now.Add(-velocitySyncRecomputeWindow)) {
+	if requestedFrom.Before(requestedAt.Add(-velocitySyncRecomputeWindow)) {
 		return false
 	}
 	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
@@ -816,7 +826,7 @@ func bitbucketShortReadContinuesCatchUp(
 	if target.SyncedAt == nil || target.BackfilledFrom == nil {
 		return false
 	}
-	return !target.BackfilledFrom.After(velocitySyncBackfillStart(now))
+	return !target.BackfilledFrom.After(velocitySyncBackfillStart(requestedAt))
 }
 
 // bitbucketCatchUpPending reports that older history is saved and the next

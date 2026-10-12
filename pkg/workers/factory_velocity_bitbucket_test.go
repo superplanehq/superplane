@@ -58,7 +58,7 @@ func TestFactoryVelocitySync_BitbucketMergesKeepTheirProvider(t *testing.T) {
 	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factory.ID, models.ProviderGitHub, from, now, []models.FactoryVelocityRepositoryMerge{githubMerge}))
 	worker := NewFactoryVelocitySyncWorker("", nil, nil)
 	merged := []repositoryMerge{{repository: target.Repository, number: 42, source: models.FactoryVelocityMergeSourcePeople, authorUUID: uuid.NewString(), mergedAt: now.Add(-time.Hour)}}
-	require.NoError(t, worker.storeMerges(target, sync, from, time.Time{}, merged, completeVelocityRead(), now))
+	require.NoError(t, worker.storeMerges(target, sync, from, time.Time{}, merged, completeVelocityRead(), now, now))
 	rows, err := models.ListFactoryVelocityRepositoryMerges(db, factory.ID, from, now)
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
@@ -69,7 +69,7 @@ func TestFactoryVelocitySync_BitbucketMergesKeepTheirProvider(t *testing.T) {
 		}
 	}
 	assert.Equal(t, merged[0].authorUUID, bitbucketMerge.AuthorUUID)
-	require.NoError(t, worker.storeMerges(target, sync, from, time.Time{}, nil, completeVelocityRead(), now))
+	require.NoError(t, worker.storeMerges(target, sync, from, time.Time{}, nil, completeVelocityRead(), now, now))
 	rows, err = models.ListFactoryVelocityRepositoryMerges(db, factory.ID, from, now)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
@@ -110,6 +110,7 @@ func TestFactoryVelocitySync_ShortBitbucketReadDoesNotFinish(t *testing.T) {
 		merged,
 		velocityReadCoverage{ContinueBefore: cursor},
 		now,
+		now,
 	))
 
 	stored, err := models.FindFactoryVelocitySync(db, factory.ID)
@@ -129,6 +130,7 @@ func TestFactoryVelocitySync_ShortBitbucketReadDoesNotFinish(t *testing.T) {
 		cursor,
 		nil,
 		velocityReadCoverage{ContinueBefore: cursor.Add(-24 * time.Hour)},
+		later,
 		later,
 	))
 	stored, err = models.FindFactoryVelocitySync(db, factory.ID)
@@ -163,6 +165,7 @@ func TestFactoryVelocitySync_FinishedOlderSliceWaitsForTheNewerWindow(t *testing
 		nil,
 		velocityReadCoverage{ContinueBefore: cursor},
 		now.Add(-time.Hour),
+		now.Add(-time.Hour),
 	))
 
 	rebuilding := target
@@ -175,6 +178,7 @@ func TestFactoryVelocitySync_FinishedOlderSliceWaitsForTheNewerWindow(t *testing
 		cursor,
 		nil,
 		completeVelocityRead(),
+		now,
 		now,
 	))
 
@@ -204,6 +208,7 @@ func TestFactoryVelocitySync_FinishedOlderSliceWaitsForTheNewerWindow(t *testing
 		time.Time{},
 		[]repositoryMerge{recent},
 		completeVelocityRead(),
+		now,
 		now,
 	))
 
@@ -245,6 +250,7 @@ func TestFactoryVelocitySync_ShortCatchUpContinuesWithoutRereadingOlderHistory(t
 		nil,
 		velocityReadCoverage{ContinueBefore: firstSlice},
 		firstSlice,
+		firstSlice,
 	))
 
 	older := repositoryMerge{
@@ -264,6 +270,7 @@ func TestFactoryVelocitySync_ShortCatchUpContinuesWithoutRereadingOlderHistory(t
 		firstSlice,
 		[]repositoryMerge{older},
 		completeVelocityRead(),
+		now.Add(-time.Hour),
 		now.Add(-time.Hour),
 	))
 
@@ -286,6 +293,7 @@ func TestFactoryVelocitySync_ShortCatchUpContinuesWithoutRereadingOlderHistory(t
 		time.Time{},
 		[]repositoryMerge{recent},
 		velocityReadCoverage{ContinueBefore: cursor},
+		now,
 		now,
 	))
 

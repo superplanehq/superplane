@@ -182,6 +182,7 @@ func Test__ProgressAfterVelocityRead__ShortBitbucketReadContinuesOlderHistory(t 
 		velocityReadCoverage{ContinueBefore: cursor},
 		now,
 		false,
+		now,
 	)
 
 	assert.Equal(t, cursor, replaceFrom, "a short read must not delete merges it did not read")
@@ -208,6 +209,7 @@ func Test__ProgressAfterVelocityRead__ContinuationKeepsTheNewerSlice(t *testing.
 		velocityReadCoverage{ContinueBefore: older},
 		now,
 		false,
+		now,
 	)
 
 	assert.Equal(t, older, replaceFrom)
@@ -222,6 +224,7 @@ func Test__ProgressAfterVelocityRead__ContinuationKeepsTheNewerSlice(t *testing.
 		completeVelocityRead(),
 		now,
 		false,
+		now,
 	)
 	assert.Equal(t, requestedFrom, replaceFrom)
 	assert.Equal(t, savedSlice, replaceTo)
@@ -252,6 +255,7 @@ func Test__ProgressAfterVelocityRead__ShortCatchUpDoesNotRestartTheOlderHistory(
 		velocityReadCoverage{ContinueBefore: cursor},
 		now,
 		false,
+		now,
 	)
 
 	assert.Equal(t, cursor, replaceFrom, "a short catch-up must not delete merges it did not read")
@@ -270,6 +274,7 @@ func Test__ProgressAfterVelocityRead__ShortCatchUpDoesNotRestartTheOlderHistory(
 		velocityReadCoverage{ContinueBefore: older},
 		now,
 		false,
+		now,
 	)
 	assert.Equal(t, older, replaceFrom)
 	assert.Equal(t, cursor, replaceTo, "the next catch-up slice must not delete the newer slice already saved")
@@ -283,6 +288,7 @@ func Test__ProgressAfterVelocityRead__ShortCatchUpDoesNotRestartTheOlderHistory(
 		completeVelocityRead(),
 		now,
 		false,
+		now,
 	)
 	assert.Equal(t, catchUpFrom, replaceFrom)
 	assert.Equal(t, cursor, replaceTo)
@@ -312,11 +318,24 @@ func Test__ProgressAfterVelocityRead__ShortFullRefreshKeepsTheOriginalStart(t *t
 		velocityReadCoverage{ContinueBefore: cursor},
 		now,
 		false,
+		now,
 	)
 
 	assert.Equal(t, cursor, backfilledFrom)
 	assert.Equal(t, bitbucketVelocityRulesRebuilding, generation,
 		"a short full refresh must not switch to the seven-day catch-up")
+
+	_, _, _, generation = progressAfterVelocityRead(
+		target,
+		velocitySyncBackfillStart(now),
+		time.Time{},
+		velocityReadCoverage{ContinueBefore: cursor},
+		now.Add(time.Minute),
+		false,
+		now,
+	)
+	assert.Equal(t, bitbucketVelocityRulesRebuilding, generation,
+		"a later store clock must not turn a full refresh into the seven-day catch-up")
 
 	target.RulesGeneration = generation
 	target.BackfilledFrom = &backfilledFrom
@@ -345,18 +364,32 @@ func Test__ProgressAfterVelocityRead__ShortRecomputeDoesNotRestartTheOlderHistor
 		RulesGeneration:  bitbucketVelocityRulesGeneration,
 	}
 
+	requestedFrom := now.Add(-velocitySyncRecomputeWindow)
 	_, _, backfilledFrom, generation := progressAfterVelocityRead(
 		target,
-		now.Add(-velocitySyncRecomputeWindow),
+		requestedFrom,
 		time.Time{},
 		velocityReadCoverage{ContinueBefore: cursor},
 		now,
 		false,
+		now,
 	)
 
 	assert.Equal(t, cursor, backfilledFrom)
 	assert.Equal(t, bitbucketVelocityRulesCatchingUp, generation,
 		"a busy seven-day recompute must not rebuild the older history")
+
+	_, _, _, generation = progressAfterVelocityRead(
+		target,
+		requestedFrom,
+		time.Time{},
+		velocityReadCoverage{ContinueBefore: cursor},
+		now.Add(time.Minute),
+		false,
+		now,
+	)
+	assert.Equal(t, bitbucketVelocityRulesCatchingUp, generation,
+		"a later store clock must not turn a seven-day recompute into an older rebuild")
 }
 
 func Test__VelocitySyncBounds__CatchUpSliceDoesNotRereadOlderHistory(t *testing.T) {
@@ -393,6 +426,7 @@ func Test__ProgressAfterVelocityRead__CompleteWindowFinishesTheRebuild(t *testin
 		completeVelocityRead(),
 		now,
 		false,
+		now,
 	)
 
 	assert.Equal(t, requestedFrom, replaceFrom)
