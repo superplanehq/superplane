@@ -34,6 +34,7 @@ const factoryAutomations = vi.fn(() => REFUND_FACTORY_APPS);
 vi.mock("@/contexts/useAccount", () => ({ useAccount: () => ({ account: { id: "account-1", name: "Ada" } }) }));
 const openCreateWorkOrder = vi.fn();
 const importIntakeItem = vi.fn(async () => ({ id: "imported-task", number: "47", title: "Imported issue" }));
+let canCreateWorkOrder = true;
 
 function LocationProbe() {
   const location = useLocation();
@@ -110,12 +111,18 @@ vi.mock("@/hooks/useWorkOrderCardActions", () => ({
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
-  usePermissions: () => ({ canAct: () => true, currentUserId: "user-1", isLoading: false }),
+  usePermissions: () => ({
+    canAct: (resource: string, action: string) =>
+      resource === "work_orders" && action === "create" ? canCreateWorkOrder : true,
+    currentUserId: "user-1",
+    isLoading: false,
+  }),
 }));
 
 describe("MobileBoardPage", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    canCreateWorkOrder = true;
     openCreateWorkOrder.mockClear();
     importIntakeItem.mockClear();
     boardWorkOrders.mockReturnValue([]);
@@ -148,11 +155,20 @@ describe("MobileBoardPage", () => {
     ]);
     renderBoard();
     expect(screen.getAllByRole("button", { name: "Create task" })).toHaveLength(1);
-    await userEvent
-      .setup()
-      .click(within(screen.getByTestId("mobile-board-column-backlog")).getByRole("button", { name: "Create task" }));
+    const createTask = screen.getByRole("button", { name: "Create task" });
+    expect(screen.getByTestId("mobile-board-column-backlog")).not.toContainElement(createTask);
+    expect(screen.getByTestId("mobile-board-track")).not.toContainElement(createTask);
+    await userEvent.setup().click(createTask);
     await userEvent.setup().click(screen.getByRole("button", { name: "Create task manually" }));
     expect(openCreateWorkOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides Create task when the user cannot create work orders", () => {
+    canCreateWorkOrder = false;
+    renderBoard();
+    expect(screen.queryByRole("button", { name: "Create task" })).not.toBeInTheDocument();
+    expect(screen.getByText("No tasks in Backlog.")).toBeInTheDocument();
+    expect(screen.queryByText("Create a task to start work.")).not.toBeInTheDocument();
   });
 
   it("imports an intake issue through Create task and opens the imported task", async () => {
@@ -261,6 +277,7 @@ describe("MobileBoardPage", () => {
     expect(screen.getByTestId("intake-source-settings")).toHaveTextContent(GITHUB_ISSUES_INTAKE_ID);
     expect(screen.queryByRole("tablist", { name: "Board columns" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Search tasks" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Create task" })).not.toBeInTheDocument();
   });
 
   it("opens pull request feedback settings for the selected listener", async () => {
