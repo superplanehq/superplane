@@ -2,8 +2,16 @@ package common
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
+)
+
+const (
+	gitHubAccountTypeOrganization = "Organization"
+	gitHubAccountTypeUser         = "User"
 )
 
 func AppURL(properties core.IntegrationPropertyStorageReader, appSlug string) (string, error) {
@@ -40,4 +48,30 @@ func AppInstallationURL(properties core.IntegrationPropertyStorageReader, instal
 	}
 
 	return fmt.Sprintf("https://github.com/settings/installations/%s", installationID), nil
+}
+
+// InstallationSettingsURL is the GitHub page where an admin manages this App
+// installation. GitHub's html_url wins. Account login and type fill the same
+// page when catalog sync has not stored that URL yet.
+func InstallationSettingsURL(installation models.VCSProviderInstallation) string {
+	if url := strings.TrimSpace(installation.HTMLURL); url != "" {
+		return url
+	}
+	if installation.InstallationID <= 0 {
+		return ""
+	}
+
+	installationID := strconv.FormatInt(installation.InstallationID, 10)
+	login := strings.TrimSpace(installation.AccountLogin)
+	switch installation.AccountType {
+	case gitHubAccountTypeOrganization:
+		if login == "" {
+			return ""
+		}
+		return fmt.Sprintf("https://github.com/organizations/%s/settings/installations/%s", login, installationID)
+	case gitHubAccountTypeUser:
+		return fmt.Sprintf("https://github.com/settings/installations/%s", installationID)
+	default:
+		return ""
+	}
 }
