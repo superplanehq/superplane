@@ -471,7 +471,7 @@ describe("MobileBoardPage", () => {
     }
   });
 
-  it("opens the closed-task dialog from a status that needs it", async () => {
+  it("filters Rejected without opening a dialog", async () => {
     const user = userEvent.setup();
     renderBoard();
 
@@ -479,7 +479,8 @@ describe("MobileBoardPage", () => {
     await user.hover(screen.getByTestId("work-orders-filter-statuses"));
     fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-rejected"));
 
-    expect(await screen.findByTestId("work-order-closed-status-dialog")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-closed-status-dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-orders-filter-chips")).toHaveTextContent("Rejected");
   });
 
   it("opens search as a full-width row from the top bar", async () => {

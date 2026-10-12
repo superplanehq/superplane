@@ -20,9 +20,12 @@ const (
 	FactoryWorkOrderStateOpen   = "open"
 	FactoryWorkOrderStateClosed = "closed"
 
-	FactoryWorkOrderResultCompleted = "completed"
-	FactoryWorkOrderResultRejected  = "rejected"
-	FactoryWorkOrderResultFailed    = "failed"
+	FactoryWorkOrderResultCompleted      = "completed"
+	FactoryWorkOrderResultRejected       = "rejected"
+	FactoryWorkOrderResultFailed         = "failed"
+	FactoryWorkOrderResultArchived       = "archived"
+	FactoryWorkOrderResultPRClosed       = "pr_closed"
+	FactoryWorkOrderResultManualRejected = "manual_rejected"
 
 	DefaultMCPClientName = "MCP client"
 )
@@ -39,21 +42,23 @@ var (
 		FactoryWorkOrderStateClosed,
 	}
 
-	// Allowed close results per source state. A draft was never dispatched,
-	// so it can only be `rejected` (abandoned). Open orders may terminate
-	// with any of the three results depending on outcome.
+	// Draft tasks can be rejected or archived. Open tasks can also complete,
+	// fail, or close with their pull request.
 	factoryWorkOrderCloseResultsByFromState = map[string][]string{
-		FactoryWorkOrderStateDraft: {FactoryWorkOrderResultRejected},
+		FactoryWorkOrderStateDraft: {FactoryWorkOrderResultRejected, FactoryWorkOrderResultManualRejected, FactoryWorkOrderResultArchived},
 		FactoryWorkOrderStateOpen: {
 			FactoryWorkOrderResultCompleted,
 			FactoryWorkOrderResultRejected,
+			FactoryWorkOrderResultManualRejected,
 			FactoryWorkOrderResultFailed,
+			FactoryWorkOrderResultArchived,
+			FactoryWorkOrderResultPRClosed,
 		},
 	}
 
 	// Allowed transitions. `open → draft` is "back to draft"; `closed →
 	// open` is reopen; `closed → draft` is send to backlog; `draft → closed`
-	// is "abandon before dispatch" (rejected only). See TransitionOnDispatch
+	// is reject or archive before dispatch. See TransitionOnDispatch
 	// for the draft → open promotion.
 	factoryWorkOrderAllowedTransitions = map[string][]string{
 		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateOpen, FactoryWorkOrderStateClosed},
@@ -529,6 +534,11 @@ func (o *FactoryWorkOrder) loadSourceRunRefs(tx *gorm.DB) (*factory.RunRef, *fac
 		runRef.Result = &result
 	}
 	return runRef, &factory.AppRef{ID: run.WorkflowID}, nil
+}
+
+// shortcut: legacy rejected records may be archives; classify them before making them visible.
+func (o *FactoryWorkOrder) IsArchived() bool {
+	return o.State == FactoryWorkOrderStateClosed && (o.Result == FactoryWorkOrderResultArchived || o.Result == FactoryWorkOrderResultRejected)
 }
 
 // Close is kept for backwards compatibility with existing handlers. New code

@@ -322,10 +322,6 @@ function MobileLineBoard(props: {
                 navigate(factoryLineDetailPath(organizationId, routeSegment, nextLineId));
               }
             }}
-            organizationId={organizationId}
-            factoryId={factoryId}
-            factoryKey={routeSegment}
-            canManageClosedStatus={canConfigureFactory}
           />
           <MobileColumnCarousel
             onImported={onOpenWorkOrder}

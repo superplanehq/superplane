@@ -103,7 +103,7 @@ spec:
       component: updateWorkOrderStatus
       configuration:
         orderId: '{{ root().data.workOrder.id }}'
-        result: rejected
+        result: pr_closed
         status: closed
       position:
         x: 1600

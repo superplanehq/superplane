@@ -22,6 +22,7 @@ interface FooterActorPayload {
 const CLOSED_RESULT_FOR_STATUS: Partial<Record<WorkOrderDisplayStatus, string>> = {
   completed: "completed",
   rejected: "rejected",
+  closed: "pr_closed",
   failed: "failed",
 };
 
@@ -89,6 +90,8 @@ function statusEventMatchesFooter(payload: FooterActorPayload, displayStatus: Wo
   if (displayStatus === "completed") {
     return result === "completed" || result === "";
   }
+  if (displayStatus === "rejected" && result === "manual_rejected") return true;
+  if (displayStatus === "closed" && result === "rejected") return true;
   return Boolean(wanted) && result === wanted;
 }
 

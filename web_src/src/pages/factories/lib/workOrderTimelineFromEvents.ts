@@ -489,5 +489,8 @@ function appendCheckReportedEvent(state: TimelineBuildState, index: number, payl
 const CLOSED_RESULT_TO_PROTO: Record<string, FactoriesWorkOrderResult> = {
   completed: "RESULT_COMPLETED",
   rejected: "RESULT_REJECTED",
+  manual_rejected: "RESULT_REJECTED",
+  pr_closed: "RESULT_PR_CLOSED",
+  archived: "RESULT_ARCHIVED",
   failed: "RESULT_FAILED",
 };
