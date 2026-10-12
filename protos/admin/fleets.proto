@@ -102,6 +102,11 @@ message Runner {
   google.protobuf.Timestamp updated_at = 9;
   optional google.protobuf.Timestamp terminated_at = 10;
   bool ephemeral = 11;
+  map<string, string> tags = 12;
+  string os = 13;
+  string arch = 14;
+  string hostname = 15;
+  string ip = 16;
 }
 
 message Task {

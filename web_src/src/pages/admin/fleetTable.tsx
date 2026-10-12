@@ -71,7 +71,7 @@ export const PageControls = ({
 };
 
 export const tableClass =
-  "overflow-hidden rounded-md bg-white shadow-sm outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-700/70";
+  "overflow-x-auto rounded-md bg-white shadow-sm outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-700/70";
 
 export const headerCellClass = "px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400";
 
