@@ -50,27 +50,15 @@ func (c *RunExecutionContext) Cancel() error {
 		return fmt.Errorf("list child runs: %w", err)
 	}
 
-	for _, childRun := range childRuns {
-		run, err := models.LockCanvasRunInTransaction(c.tx, childRun.ID)
+	for i := range childRuns {
+		run := &childRuns[i]
+		cancellation, err := run.RequestCancellation(c.tx, c.execution.CancelledBy)
 		if err != nil {
-			return fmt.Errorf("lock child run %s: %w", childRun.ID, err)
+			return fmt.Errorf("cancel child run %s: %w", run.ID, err)
 		}
 
-		if run.State == models.CanvasRunStateFinished {
-			continue
-		}
-
-		drainResult, err := run.DrainForCancellation(c.tx, c.execution.CancelledBy)
-		if err != nil {
-			return fmt.Errorf("cancel child run %s: %w", childRun.ID, err)
-		}
-
-		if err := run.MarkAsCancelling(c.tx, c.execution.CancelledBy); err != nil {
-			return fmt.Errorf("mark child run %s cancelling: %w", childRun.ID, err)
-		}
-
-		if c.onRunCancelled != nil {
-			c.onRunCancelled(run.WorkflowID, run.ID, drainResult)
+		if c.onRunCancelled != nil && cancellation.Drain != nil {
+			c.onRunCancelled(run.WorkflowID, run.ID, cancellation.Drain)
 		}
 	}
 

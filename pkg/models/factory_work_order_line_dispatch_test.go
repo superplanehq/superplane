@@ -122,6 +122,52 @@ func Test__FactoryWorkOrder__AbandonActiveLineDispatch(t *testing.T) {
 	assert.ErrorIs(t, err, gorm.ErrRecordNotFound)
 }
 
+func Test__FactoryWorkOrder__Close__CancelsLineRun(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Order", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "build", "start")
+	line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
+	})
+	require.NoError(t, err)
+	var result *models.FactoryLineStepResult
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		if err := order.TransitionOnDispatch(tx, &r.User); err != nil {
+			return err
+		}
+		_, result, err = line.Dispatch(tx, order)
+		return err
+	}))
+
+	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL: "https://github.com/acme/app/pull/42",
+	})
+	require.NoError(t, err)
+	feedbackRun, err := models.CreateCanvasRunInTransaction(db, app.ID, entrypoint, models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, pullRequest.LinkRun(db, feedbackRun.ID, "Review feedback"))
+	unrelated, err := models.CreateCanvasRunInTransaction(db, app.ID, entrypoint, models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+
+	_, err = order.Close(db, models.FactoryWorkOrderResultRejected, &r.User)
+	require.NoError(t, err)
+	run, err := models.FindUnscopedCanvasRun(db, result.Run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, run.State)
+	require.NotNil(t, run.CancelledBy)
+	assert.Equal(t, r.User, *run.CancelledBy)
+	feedbackRun, err = models.FindUnscopedCanvasRun(db, feedbackRun.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, feedbackRun.State)
+	unrelated, err = models.FindUnscopedCanvasRun(db, unrelated.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, unrelated.State)
+}
+
 func Test__FactoryWorkOrder__AbandonActiveLineDispatch__FreesTheStepSlot(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
