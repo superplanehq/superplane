@@ -2,6 +2,7 @@ import { Link } from "@/components/Link/link";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/usePermissions";
+import { resolveCanUpdateFactory, resolveCanUpdateFactoryAutomation } from "@/lib/factoryAutomationPermissions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,7 +20,6 @@ import { RESTORE_DEFAULT_PROMPT_COPY } from "../lib/defaultAgentPrompt";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import { PLANNING_REVIEW_DRAFT, singleAgentDraft, type PlanningReviewDraft } from "./planningReviewMockup";
 import { PopupBody } from "./work-order-popup-redesign/popupShared";
-import { resolveCanUpdateFactory, resolveCanUpdateFactoryAutomation } from "./factoryAutomationPermissions";
 import { useRestoreDefaultPrompt } from "./useRestoreDefaultPrompt";
 
 const SAVE_AGENT_PERMISSION_NOTE = "You do not have permission to update this agent.";

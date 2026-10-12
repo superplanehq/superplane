@@ -1,4 +1,5 @@
 import { usePermissions } from "@/contexts/usePermissions";
+import { resolveCanUpdateFactoryAutomation } from "@/lib/factoryAutomationPermissions";
 import type { FactoryConfigureActions } from "@/pages/app";
 import { useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -7,7 +8,6 @@ import { factoryAppViewPath, parseFactoryAppNavFrom } from "../lib/factoryPagePa
 import { useFactoryAppCanvasEditActions } from "./useFactoryAppCanvasEditActions";
 import { useFactoryAppCanvasRoute } from "./useFactoryAppCanvasRoute";
 import { useFactoryAppConfigureTitle } from "./useFactoryAppConfigureTitle";
-import { resolveCanUpdateFactoryAutomation } from "./factoryAutomationPermissions";
 
 export function useFactoryAppCanvasPageModel() {
   const route = useFactoryAppCanvasRoute();

@@ -304,6 +304,29 @@ describe("PlanningReviewEditor permissions", () => {
     permissions.allowCanvasUpdate = true;
   });
 
+  it("hides the restore error and Retry when factory edit rights are removed", async () => {
+    loadDefault.mockRejectedValue(new Error("Not found"));
+    const view = renderEditor();
+
+    expect(await screen.findByTestId("planning-review-restore-default-prompt-error")).toHaveTextContent("Not found");
+    expect(screen.getByTestId("planning-review-restore-default-prompt-retry")).toBeInTheDocument();
+
+    permissions.allowFactoryUpdate = false;
+    view.rerender(editorTree());
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("planning-review-restore-default-prompt-error")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("planning-review-restore-default-prompt-retry")).not.toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-step-summary-1")).toHaveTextContent("Refine Task");
+
+    permissions.allowFactoryUpdate = true;
+    view.rerender(editorTree());
+
+    expect(await screen.findByTestId("planning-review-restore-default-prompt-error")).toHaveTextContent("Not found");
+    expect(screen.getByTestId("planning-review-restore-default-prompt-retry")).toBeInTheDocument();
+  });
+
   it("shows steps without an error when the member cannot update factories", async () => {
     permissions.allowFactoryUpdate = false;
     loadDefault.mockRejectedValue(new Error("Not found"));
