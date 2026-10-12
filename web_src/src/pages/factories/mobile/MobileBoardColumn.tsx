@@ -60,7 +60,7 @@ export function MobileColumn({
           {column.key === "backlog" && showCreate ? (
             <>
               <p className="text-sm text-muted-foreground">Create a task to start work.</p>
-              <MobileCreateTaskButton className="mt-3 h-12 gap-2 px-6" onImported={onImported} />
+              <MobileCreateTaskButton className="mt-3 size-14 rounded-full shadow-lg" onImported={onImported} />
             </>
           ) : null}
         </div>
@@ -81,7 +81,7 @@ export function MobileColumn({
       {paging.hasPageError && !paging.isLoading ? <MobileColumnPageError onRetry={paging.onLoadMore} /> : null}
       {showCreate && !(showEmpty && column.key === "backlog") ? (
         <div className="absolute right-4 bottom-5">
-          <MobileCreateTaskButton className="h-12 gap-2 px-5 shadow-sm" onImported={onImported} />
+          <MobileCreateTaskButton className="size-14 rounded-full shadow-lg" onImported={onImported} />
         </div>
       ) : null}
     </section>
