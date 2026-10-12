@@ -68,14 +68,14 @@ resource "azurerm_shared_image_gallery" "runners" {
 }
 
 resource "azurerm_shared_image" "runner_amd64" {
-  name                     = "superplane-runner-amd64"
-  gallery_name             = azurerm_shared_image_gallery.runners.name
-  resource_group_name      = azurerm_resource_group.runners.name
-  location                 = azurerm_resource_group.runners.location
-  os_type                  = "Linux"
-  hyper_v_generation       = "V2"
-  architecture             = "x64"
-  trusted_launch_supported = true
+  name                   = "superplane-runner-amd64"
+  gallery_name           = azurerm_shared_image_gallery.runners.name
+  resource_group_name    = azurerm_resource_group.runners.name
+  location               = azurerm_resource_group.runners.location
+  os_type                = "Linux"
+  hyper_v_generation     = "V2"
+  architecture           = "x64"
+  trusted_launch_enabled = true
 
   identifier {
     publisher = "superplane"
@@ -85,14 +85,14 @@ resource "azurerm_shared_image" "runner_amd64" {
 }
 
 resource "azurerm_shared_image" "runner_arm64" {
-  name                     = "superplane-runner-arm64"
-  gallery_name             = azurerm_shared_image_gallery.runners.name
-  resource_group_name      = azurerm_resource_group.runners.name
-  location                 = azurerm_resource_group.runners.location
-  os_type                  = "Linux"
-  hyper_v_generation       = "V2"
-  architecture             = "Arm64"
-  trusted_launch_supported = true
+  name                   = "superplane-runner-arm64"
+  gallery_name           = azurerm_shared_image_gallery.runners.name
+  resource_group_name    = azurerm_resource_group.runners.name
+  location               = azurerm_resource_group.runners.location
+  os_type                = "Linux"
+  hyper_v_generation     = "V2"
+  architecture           = "Arm64"
+  trusted_launch_enabled = true
 
   identifier {
     publisher = "superplane"
