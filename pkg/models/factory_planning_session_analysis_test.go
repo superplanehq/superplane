@@ -831,6 +831,12 @@ func TestWorkOrderReadyForAutoStart(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, ready)
 
+	session.State = PlanningSessionStateEnded
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+	session.State = PlanningSessionStateRunning
+
 	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 2)}))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
@@ -851,7 +857,7 @@ func TestWorkOrderReadyForAutoStart(t *testing.T) {
 	assert.False(t, ready)
 }
 
-func TestWorkOrderReadyForAutoStartIgnoresEarlierScore(t *testing.T) {
+func TestWorkOrderReadyForAutoStartRequiresCurrentScoresAndNoQueuedMessage(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "auto-start-earlier-score")
 	db := database.DB(t.Context())
@@ -871,6 +877,11 @@ func TestWorkOrderReadyForAutoStartIgnoresEarlierScore(t *testing.T) {
 	assert.False(t, ready)
 
 	require.NoError(t, session.ProposeUpdate(db, PlanningSessionUpdate{Scores: reviewScores(3, 3, 3)}))
+	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
+	require.NoError(t, err)
+	assert.False(t, ready)
+
+	require.NoError(t, session.MarkUserMessagesDelivered(db))
 	ready, err = WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	require.NoError(t, err)
 	assert.True(t, ready)
