@@ -476,18 +476,6 @@ export function columnAutomationOpenPath(
   return factoryColumnAutomationViewPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
 }
 
-const SPLIT_CONFIG_NODE_IDS = new Set(["on-pr-risk", "on-pr-visual-evidence"]);
-
-/** Merge confidence and visual evidence open the split node settings panel. */
-export function columnAutomationUsesSplitConfig(nodeIds: Iterable<string | undefined>): boolean {
-  for (const id of nodeIds) {
-    if (id && SPLIT_CONFIG_NODE_IDS.has(id)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 export type ColumnAutomationViewTab = "general" | "agent" | "automation";
 
 /** Tab order: form first, then agent, then the canvas. */

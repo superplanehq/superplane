@@ -2,12 +2,12 @@ import { describe, expect, it } from "bun:test";
 
 import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, FactoriesWorkOrder } from "@/api-client";
 
+import { columnAutomationUsesSplitConfig } from "./columnAutomationHeadline";
 import {
   applyColumnAutomationsOverlay,
   buildColumnAutomations,
   catalogForColumn,
   columnAutomationOpenPath,
-  columnAutomationUsesSplitConfig,
   columnAutomationViewTabs,
   columnAutomationsEmptyCopy,
   columnAutomationsNeedRepair,

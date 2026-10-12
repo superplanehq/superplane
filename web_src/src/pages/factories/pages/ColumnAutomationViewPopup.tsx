@@ -6,9 +6,9 @@ import { useState, type ReactNode } from "react";
 
 import { ColumnAutomationFooterSlotProvider } from "./columnAutomationFooterSlot";
 
+import { columnAutomationUsesSplitConfig } from "../lib/columnAutomationHeadline";
 import {
   COLUMN_AUTOMATIONS_COPY,
-  columnAutomationUsesSplitConfig,
   columnAutomationViewTabs,
   type ColumnAutomationViewTab,
 } from "../lib/columnAutomations";
