@@ -625,7 +625,7 @@ func isOwnerSetupAllowedPath(path string) bool {
 	}
 
 	switch path {
-	case "/favicon.ico", "/robots.txt", "/manifest.webmanifest":
+	case "/favicon.ico", "/robots.txt", "/manifest.webmanifest", "/sw.js":
 		return true
 	}
 

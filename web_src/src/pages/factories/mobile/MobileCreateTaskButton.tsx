@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { BacklogCreatePopover } from "../pages/BacklogCreatePopover";
 import { useBacklogCreateMenu } from "../pages/useBacklogCreateMenu";
+import { MOBILE_BOTTOM_BAR_COPY } from "./mobileCopy";
 
 export function MobileCreateTaskButton({
   className,
@@ -23,9 +24,8 @@ export function MobileCreateTaskButton({
       canAdd
       variant="mobile"
       trigger={
-        <Button className={className}>
-          <Plus className="size-5" aria-hidden />
-          Create task
+        <Button size="icon" aria-label={MOBILE_BOTTOM_BAR_COPY.createTask} className={className}>
+          <Plus className="size-6" aria-hidden />
         </Button>
       }
       sources={menu.sources}
