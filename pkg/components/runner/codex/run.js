@@ -495,7 +495,7 @@ function loadTurnTelemetry() {
 
 function extractUsage(event) {
   const source = event.usage || (event.item && event.item.usage) || event;
-  return {
+  const usage = {
     input_tokens: Number(source.input_tokens || source.prompt_tokens || 0),
     output_tokens: Number(
       source.output_tokens || source.completion_tokens || 0,
@@ -505,6 +505,9 @@ function extractUsage(event) {
     ),
     reasoning_tokens: Number(source.reasoning_tokens || 0),
   };
+  const cost = event.total_cost_usd ?? source.total_cost_usd;
+  if (cost != null && Number.isFinite(Number(cost))) usage.total_cost_usd = Number(cost);
+  return usage;
 }
 
 function accumulateLLMUsage(payload) {
@@ -687,6 +690,11 @@ function createCodexFormatter(telemetry, activityOverride) {
 
   return {
     handleEvent(event) {
+      if (event.type === "turn.completed" || event.type === "result") {
+        tracker.updateCurrentUsage(extractUsage(event));
+        roundOpen = false;
+        return;
+      }
       const item = event.item;
       if (!item || typeof item !== "object") {
         return;
