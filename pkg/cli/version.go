@@ -45,12 +45,15 @@ func init() {
 	RootCmd.Flags().Bool("version", false, "Print the CLI version")
 }
 
-// StartUpdateCheck begins an async check for a newer CLI version.
-// It is a no-op for dev builds.
-func StartUpdateCheck() {
+// StartUpdateCheck begins an async check for a newer CLI version and records
+// the check in the CLI configuration file, so commands run during the rest of
+// the day skip it. It is a no-op for dev builds.
+func StartUpdateCheck(args []string) {
 	if isDevBuild() {
 		return
 	}
+
+	recordLastUpdateCheck(updateCheckConfigPath(args), time.Now())
 
 	ch := make(chan *updateInfo, 1)
 	updateCheckResult = ch
@@ -60,7 +63,17 @@ func StartUpdateCheck() {
 	}()
 }
 
+// ShouldStartUpdateCheck reports whether the command being run is one that can
+// afford an update check, and whether enough time has passed since the last one.
 func ShouldStartUpdateCheck(args []string) bool {
+	if !isUpdateCheckableCommand(args) {
+		return false
+	}
+
+	return dueForUpdateCheck(readLastUpdateCheck(updateCheckConfigPath(args)), time.Now())
+}
+
+func isUpdateCheckableCommand(args []string) bool {
 	if isDevBuild() {
 		return false
 	}
