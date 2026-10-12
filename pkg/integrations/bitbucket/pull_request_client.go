@@ -520,6 +520,7 @@ type MergedBitbucketPullRequest struct {
 	ID           int64
 	State        string
 	Title        string
+	AuthorType   string
 	AuthorUUID   string
 	AuthorNick   string
 	AuthorName   string
@@ -551,6 +552,7 @@ func (c *Client) ListMergedPullRequests(repository string, from time.Time, maxPa
 				Title     string `json:"title"`
 				UpdatedOn string `json:"updated_on"`
 				Author    struct {
+					Type        string `json:"type"`
 					UUID        string `json:"uuid"`
 					Nickname    string `json:"nickname"`
 					DisplayName string `json:"display_name"`
@@ -586,6 +588,7 @@ func (c *Client) ListMergedPullRequests(repository string, from time.Time, maxPa
 				ID:           pr.ID,
 				State:        pr.State,
 				Title:        pr.Title,
+				AuthorType:   pr.Author.Type,
 				AuthorUUID:   bitbucketUUID(pr.Author.UUID),
 				AuthorNick:   pr.Author.Nickname,
 				AuthorName:   pr.Author.DisplayName,
