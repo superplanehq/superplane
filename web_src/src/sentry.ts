@@ -148,6 +148,26 @@ export function normalizeSentryFingerprint<E extends Sentry.Event>(event: E): E 
   } as E;
 }
 
+// Drops known browser noise before send. A permission denial from application
+// code has no editor frame and still reports.
+export function filterSentryEvent(event: Sentry.ErrorEvent): Sentry.ErrorEvent | null {
+  const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
+  const allDash0 = frames.length > 0 && frames.every((frame) => frame.filename?.includes("@dash0/sdk-web"));
+  if (allDash0) {
+    return null;
+  }
+
+  if (isMonacoCanceledEvent(event)) {
+    return null;
+  }
+
+  if (isMonacoClipboardDeniedEvent(event)) {
+    return null;
+  }
+
+  return normalizeSentryFingerprint(event);
+}
+
 let dsn: string | undefined;
 let environment: string | undefined;
 
@@ -162,23 +182,7 @@ if (dsn) {
     dsn,
     environment,
     ignoreErrors: IGNORED_CONSOLE_MESSAGES,
-    beforeSend(event) {
-      const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
-      const allDash0 = frames.length > 0 && frames.every((frame) => frame.filename?.includes("@dash0/sdk-web"));
-      if (allDash0) {
-        return null;
-      }
-
-      if (isMonacoCanceledEvent(event)) {
-        return null;
-      }
-
-      if (isMonacoClipboardDeniedEvent(event)) {
-        return null;
-      }
-
-      return normalizeSentryFingerprint(event);
-    },
+    beforeSend: filterSentryEvent,
     beforeBreadcrumb(breadcrumb) {
       if (breadcrumb.category === "console" && isIgnoredConsoleMessage(breadcrumb.message)) {
         return null;

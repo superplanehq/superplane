@@ -4,6 +4,7 @@ import {
   IGNORED_CONSOLE_MESSAGES,
   Sentry,
   isIgnoredConsoleMessage,
+  filterSentryEvent,
   isMonacoCanceledEvent,
   isMonacoClipboardDeniedEvent,
   normalizeApiRouteTemplate,
@@ -242,9 +243,63 @@ describe("normalizeSentryFingerprint", () => {
   });
 });
 
+function loggedPermissionDenial(filenames: string[]): DOMException {
+  const error = new DOMException(USER_AGENT_PERMISSION_DENIAL, "NotAllowedError");
+  error.stack = [
+    `NotAllowedError: ${USER_AGENT_PERMISSION_DENIAL}`,
+    ...filenames.map((filename) => `    at writeText (${filename}:10:20)`),
+  ].join("\n");
+  return error;
+}
+
 function unknownTouch(): object {
   return Object.defineProperty({}, Symbol.toStringTag, { value: "Touch" });
 }
+
+describe("captureConsole editor clipboard denials", () => {
+  it("drops the denial Sentry builds from a logged editor error", async () => {
+    const kept: string[][] = [];
+    const client = Sentry.init({
+      dsn: "https://public@o0.ingest.sentry.io/0",
+      autoSessionTracking: false,
+      sendClientReports: false,
+      beforeSend(event) {
+        const filtered = filterSentryEvent(event);
+        if (!filtered) {
+          return null;
+        }
+
+        const frames = filtered.exception?.values?.[0]?.stacktrace?.frames ?? [];
+        kept.push(frames.map((frame) => frame.filename ?? ""));
+        return null;
+      },
+      integrations: [
+        Sentry.captureConsoleIntegration({
+          levels: ["warn", "error"],
+        }),
+      ],
+    });
+
+    expect(client).toBeDefined();
+
+    try {
+      console.error(
+        loggedPermissionDenial([
+          "../../../../../web_src/node_modules/monaco-editor/esm/vs/platform/clipboard/browser/clipboardService.js",
+          "../../../../../web_src/node_modules/@dash0/sdk-web/dist/dash0.js",
+          "../../../../../web_src/node_modules/@sentry/browser/build/npm/esm/helpers.js",
+        ]),
+      );
+      console.error(loggedPermissionDenial(["web_src/src/components/CopyButton.tsx"]));
+
+      await Sentry.flush(2000);
+
+      expect(kept).toEqual([["web_src/src/components/CopyButton.tsx"]]);
+    } finally {
+      await client?.close(0);
+    }
+  });
+});
 
 describe("captureConsole unknown-touch warnings", () => {
   it("drops the warning Sentry builds from a two-argument console call", async () => {
