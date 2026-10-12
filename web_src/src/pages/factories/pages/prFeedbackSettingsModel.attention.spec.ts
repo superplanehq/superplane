@@ -310,7 +310,7 @@ describe("activePRFeedbackWorkOrderIds", () => {
           ],
         },
       ]).get("wo-discussion"),
-    ).toBe("Addressing user feedback");
+    ).toBe("Addressing PR comments");
   });
 
   it("uses active activities when they are present", () => {
