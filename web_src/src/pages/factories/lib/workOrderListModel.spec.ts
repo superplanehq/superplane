@@ -543,7 +543,7 @@ describe("groupWorkOrderEntriesByLane", () => {
           order({ id: "waiting" }),
           order({ id: "completed", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
           order({ id: "failed", state: "STATE_CLOSED", result: "RESULT_FAILED" }),
-          order({ id: "cancelled", state: "STATE_CLOSED", result: "RESULT_REJECTED" }),
+          order({ id: "rejected", state: "STATE_CLOSED", result: "RESULT_REJECTED" }),
         ],
         factory,
       ),
@@ -552,6 +552,6 @@ describe("groupWorkOrderEntriesByLane", () => {
     expect(grouped.get("backlog")?.map((entry) => entry.id)).toEqual(["draft"]);
     expect(grouped.get("running")).toEqual([]);
     expect(grouped.get("review")?.map((entry) => entry.id)).toEqual(["waiting"]);
-    expect(grouped.get("done")?.map((entry) => entry.id)).toEqual(["completed", "failed"]);
+    expect(grouped.get("done")?.map((entry) => entry.id)).toEqual(["completed", "failed", "rejected"]);
   });
 });

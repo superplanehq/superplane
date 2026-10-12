@@ -1124,7 +1124,7 @@ type ListFactoryWorkOrdersFilters struct {
 	// LineID keeps orders that ran on this line, plus orders with no line.
 	LineID *uuid.UUID
 	// PublicBoard keeps the orders a public line board can show. Drafts stay
-	// even after a run on another line. Closed rejected orders are omitted
+	// even after a run on another line. Closed canceled orders are omitted
 	// so they do not consume the page.
 	PublicBoard bool
 }
@@ -1253,7 +1253,7 @@ func applyPublicBoardFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {
 		)`,
 		[]string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen},
 		FactoryWorkOrderStateClosed,
-		[]string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed},
+		[]string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed, FactoryWorkOrderResultRejected},
 	)
 	if lineID == nil {
 		return query

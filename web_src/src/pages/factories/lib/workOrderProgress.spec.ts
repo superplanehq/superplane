@@ -57,9 +57,10 @@ describe("WORK_ORDER_BOARD_LANES", () => {
     expect(review?.description).toBe("Tasks that wait for a human decision.");
   });
 
-  it("keeps completed and failed tasks in Done", () => {
+  it("keeps completed, failed, and rejected tasks in Done", () => {
     const done = WORK_ORDER_BOARD_LANES.find((lane) => lane.id === "done");
-    expect(done?.statuses).toEqual(["completed", "failed"]);
+    expect(done?.statuses).toEqual(["completed", "failed", "rejected"]);
+    expect(done?.description).toBe("Completed, failed, and rejected work.");
   });
 });
 
@@ -209,6 +210,12 @@ describe("groupWorkOrdersByLane", () => {
       order({ id: "c", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
       order({ id: "f", state: "STATE_CLOSED", result: "RESULT_FAILED" }),
       order({ id: "x", state: "STATE_CLOSED", result: "RESULT_REJECTED" }),
+      order({
+        id: "z",
+        state: "STATE_CLOSED",
+        result: "RESULT_UNSPECIFIED",
+        lineDispatches: [{ id: "d1", result: "RESULT_CANCELLED" }],
+      }),
     ];
 
     const grouped = groupWorkOrdersByLane(orders);
@@ -218,8 +225,9 @@ describe("groupWorkOrdersByLane", () => {
       backlog: ["d"],
       running: ["r"],
       review: ["w"],
-      done: ["c", "f"],
+      done: ["c", "f", "x"],
     });
+    expect(Object.values(byLane).flat()).not.toContain("z");
   });
 });
 
