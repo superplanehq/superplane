@@ -10,8 +10,11 @@ import (
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
+	"github.com/getsentry/sentry-go"
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -180,6 +183,62 @@ func TestRefreshFactoryPullRequestMergeabilityReportsUnavailable(t *testing.T) {
 	assert.True(t, stored.Mergeable)
 	assert.Empty(t, stored.MergeBlockedReason)
 	assert.Equal(t, headSHA, stored.MergeableHeadSHA)
+}
+
+func TestRefreshFactoryPullRequestMergeabilitySkipsTemporarySentryReport(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		err        error
+		wantReport bool
+	}{
+		{
+			name: "bad gateway",
+			err:  &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusBadGateway}},
+		},
+		{
+			name:       "forbidden",
+			err:        &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusForbidden}},
+			wantReport: true,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			r := support.Setup(t)
+			db := database.Conn()
+			factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, "acme/app", 96)
+			const headSHA = "abc123def456"
+			require.NoError(t, pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+				Mergeable:      true,
+				HeadSHA:        headSHA,
+				AllowedMethods: "SQUASH",
+			}))
+			pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+			require.NoError(t, err)
+			stubFactoryGitHub(t, &fakeFactoryGitHub{getPullErr: test.err})
+			hook := logtest.NewGlobal()
+			t.Cleanup(func() { hook.Reset() })
+			transport := bindFactoryMergeabilitySentryHub(t)
+
+			err = refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
+			require.ErrorIs(t, err, errFactoryPullRequestMergeabilityUnavailable)
+
+			stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+			require.NoError(t, err)
+			assert.True(t, stored.Mergeable)
+			assert.Empty(t, stored.MergeBlockedReason)
+			assert.Equal(t, headSHA, stored.MergeableHeadSHA)
+			requireFactoryMergeabilityLookupWarning(t, hook, factory.ID.String(), pullRequest.ID.String(), pullRequest.Repository)
+
+			events := transport.Events()
+			if !test.wantReport {
+				assert.Empty(t, events)
+				return
+			}
+			require.Len(t, events, 1)
+			assert.Equal(t, factory.ID.String(), events[0].Tags["factory_id"])
+			assert.Equal(t, pullRequest.ID.String(), events[0].Tags["pull_request_id"])
+			assert.Equal(t, pullRequest.Repository, events[0].Tags["repository"])
+		})
+	}
 }
 
 func TestRefreshFactoryPullRequestMergeabilityFromGitHubEventRetriesUnavailableLookup(t *testing.T) {
@@ -539,6 +598,61 @@ func stubFactoryGitHub(t *testing.T, api factoryGitHubAPI) {
 		return api, nil
 	}
 	t.Cleanup(func() { newFactoryGitHubAPI = original })
+}
+
+func bindFactoryMergeabilitySentryHub(t *testing.T) *memorySentryTransport {
+	t.Helper()
+	transport := &memorySentryTransport{}
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn:       "https://public@localhost/1",
+		Transport: transport,
+	})
+	require.NoError(t, err)
+	hub := sentry.CurrentHub()
+	previous := hub.Client()
+	hub.BindClient(client)
+	t.Cleanup(func() {
+		hub.BindClient(previous)
+	})
+	return transport
+}
+
+func requireFactoryMergeabilityLookupWarning(t *testing.T, hook *logtest.Hook, factoryID, pullRequestID, repository string) {
+	t.Helper()
+	for _, entry := range hook.AllEntries() {
+		if entry.Message != "factory pull request mergeability lookup failed" || entry.Level != log.WarnLevel {
+			continue
+		}
+		assert.Equal(t, factoryID, entry.Data["factory_id"])
+		assert.Equal(t, pullRequestID, entry.Data["pull_request_id"])
+		assert.Equal(t, repository, entry.Data["repository"])
+		return
+	}
+	require.Fail(t, "expected a mergeability lookup warning")
+}
+
+type memorySentryTransport struct {
+	mu     sync.Mutex
+	events []*sentry.Event
+}
+
+func (t *memorySentryTransport) Configure(sentry.ClientOptions) {}
+
+func (t *memorySentryTransport) Flush(time.Duration) bool { return true }
+
+func (t *memorySentryTransport) SendEvent(event *sentry.Event) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	clone := *event
+	t.events = append(t.events, &clone)
+}
+
+func (t *memorySentryTransport) Events() []*sentry.Event {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	out := make([]*sentry.Event, len(t.events))
+	copy(out, t.events)
+	return out
 }
 
 func mergeableFactoryGitHub(headSHA string) *fakeFactoryGitHub {
