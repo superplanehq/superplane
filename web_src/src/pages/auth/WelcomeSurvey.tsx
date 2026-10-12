@@ -21,7 +21,7 @@ const WelcomeSurvey: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [survey, setSurvey] = useState<PostHogSurvey | null>(null);
-  const [shouldRedirect, setShouldRedirect] = useState(!isPostHogEnabled);
+  const [shouldRedirect, setShouldRedirect] = useState(!isPostHogEnabled());
 
   const redirectTo = useMemo(() => getWelcomeSurveyRedirectPath(searchParams.get("redirect")), [searchParams]);
 
@@ -30,7 +30,7 @@ const WelcomeSurvey: React.FC = () => {
   }, [navigate, redirectTo]);
 
   useEffect(() => {
-    if (!isPostHogEnabled) {
+    if (!isPostHogEnabled()) {
       return;
     }
 
