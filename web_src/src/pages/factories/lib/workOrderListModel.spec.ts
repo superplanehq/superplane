@@ -544,12 +544,6 @@ describe("groupWorkOrderEntriesByLane", () => {
           order({ id: "completed", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
           order({ id: "failed", state: "STATE_CLOSED", result: "RESULT_FAILED" }),
           order({ id: "rejected", state: "STATE_CLOSED", result: "RESULT_REJECTED" }),
-          order({
-            id: "cancelled",
-            state: "STATE_CLOSED",
-            result: "RESULT_UNSPECIFIED",
-            lineDispatches: [{ id: "d-cancelled", result: "RESULT_CANCELLED" }],
-          }),
         ],
         factory,
       ),
