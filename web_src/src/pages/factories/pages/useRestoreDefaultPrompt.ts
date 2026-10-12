@@ -17,15 +17,17 @@ export function useRestoreDefaultPrompt({
   organizationId,
   factoryId,
   automationId,
+  canLoadDefaults,
 }: {
   draft: PlanningReviewDraft;
   setDraft: Dispatch<SetStateAction<PlanningReviewDraft>>;
   organizationId?: string;
   factoryId?: string;
   automationId?: string;
+  canLoadDefaults: boolean;
 }) {
   const agentNodeId = draft.components[0]?.id;
-  const restoreEnabled = Boolean(organizationId && factoryId && automationId && agentNodeId);
+  const restoreEnabled = canLoadDefaults && Boolean(organizationId && factoryId && automationId && agentNodeId);
   const loadRestorePrompt = useCallback(() => {
     if (!organizationId || !factoryId || !automationId || !agentNodeId) {
       return Promise.reject(new Error(RESTORE_DEFAULT_PROMPT_COPY.error));

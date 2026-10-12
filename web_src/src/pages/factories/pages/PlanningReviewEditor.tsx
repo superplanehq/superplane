@@ -1,5 +1,7 @@
 import { Link } from "@/components/Link/link";
+import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/contexts/usePermissions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +19,10 @@ import { RESTORE_DEFAULT_PROMPT_COPY } from "../lib/defaultAgentPrompt";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import { PLANNING_REVIEW_DRAFT, singleAgentDraft, type PlanningReviewDraft } from "./planningReviewMockup";
 import { PopupBody } from "./work-order-popup-redesign/popupShared";
+import { resolveCanUpdateFactory, resolveCanUpdateFactoryAutomation } from "./factoryAutomationPermissions";
 import { useRestoreDefaultPrompt } from "./useRestoreDefaultPrompt";
+
+const SAVE_AGENT_PERMISSION_NOTE = "You do not have permission to update this agent.";
 
 function AutomationNote({ href }: { href?: string }) {
   return (
@@ -83,17 +88,27 @@ export function PlanningReviewEditor({
 }) {
   const [draft, setDraft] = useState(() => singleAgentDraft(initialDraft));
   const [isSaving, setIsSaving] = useState(false);
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const canUpdateFactory = resolveCanUpdateFactory(permissionsLoading, canAct);
+  const canUpdateCanvas = resolveCanUpdateFactoryAutomation(permissionsLoading, canAct);
   const restore = useRestoreDefaultPrompt({
     draft,
     setDraft,
     organizationId,
     factoryId,
     automationId,
+    canLoadDefaults: canUpdateFactory,
   });
-  const saveDisabled = isLoading || isSaving || restore.isRestoring || draft.components.length === 0;
+  const saveDisabled = agentSaveDisabled({
+    isLoading,
+    isSaving,
+    isRestoring: restore.isRestoring,
+    hasSteps: draft.components.length > 0,
+    canUpdateCanvas,
+  });
 
   const handleSave = async () => {
-    if (restore.isRestoring) {
+    if (!canSaveAgent({ isRestoring: restore.isRestoring, canUpdateCanvas })) {
       return;
     }
     if (!onSave) {
@@ -136,23 +151,17 @@ export function PlanningReviewEditor({
           />
         </PopupBody>
       )}
-      <footer className="flex shrink-0 items-center gap-4 border-t border-border px-6 py-4">
-        {showAutomationNote ? <AutomationNote href={automationHref} /> : <span className="min-w-0 flex-1" />}
-        {showCancel ? (
-          <Button type="button" variant="outline" className="shrink-0" onClick={onCancel} disabled={isSaving}>
-            Cancel
-          </Button>
-        ) : null}
-        <Button
-          type="button"
-          className="shrink-0"
-          onClick={() => void handleSave()}
-          disabled={saveDisabled}
-          data-testid="planning-review-save"
-        >
-          {isSaving ? "Saving…" : "Save Agent"}
-        </Button>
-      </footer>
+      <AgentEditorFooter
+        showAutomationNote={showAutomationNote}
+        automationHref={automationHref}
+        showCancel={showCancel}
+        onCancel={onCancel}
+        isSaving={isSaving}
+        permissionsLoading={permissionsLoading}
+        canUpdateCanvas={canUpdateCanvas}
+        saveDisabled={saveDisabled}
+        onSave={() => void handleSave()}
+      />
       <RestoreDefaultPromptDialog
         open={restore.confirmOpen}
         onOpenChange={restore.setConfirmOpen}
@@ -160,6 +169,74 @@ export function PlanningReviewEditor({
       />
     </div>
   );
+}
+
+function AgentEditorFooter({
+  showAutomationNote,
+  automationHref,
+  showCancel,
+  onCancel,
+  isSaving,
+  permissionsLoading,
+  canUpdateCanvas,
+  saveDisabled,
+  onSave,
+}: {
+  showAutomationNote: boolean;
+  automationHref?: string;
+  showCancel: boolean;
+  onCancel?: () => void;
+  isSaving: boolean;
+  permissionsLoading: boolean;
+  canUpdateCanvas: boolean;
+  saveDisabled: boolean;
+  onSave: () => void;
+}) {
+  return (
+    <footer className="flex shrink-0 items-center gap-4 border-t border-border px-6 py-4">
+      {showAutomationNote ? <AutomationNote href={automationHref} /> : <span className="min-w-0 flex-1" />}
+      {showCancel ? (
+        <Button type="button" variant="outline" className="shrink-0" onClick={onCancel} disabled={isSaving}>
+          Cancel
+        </Button>
+      ) : null}
+      <PermissionTooltip
+        allowed={permissionsLoading || canUpdateCanvas}
+        message={SAVE_AGENT_PERMISSION_NOTE}
+        className="shrink-0"
+      >
+        <Button
+          type="button"
+          className="shrink-0"
+          onClick={onSave}
+          disabled={saveDisabled}
+          data-testid="planning-review-save"
+        >
+          {isSaving ? "Saving…" : "Save Agent"}
+        </Button>
+      </PermissionTooltip>
+    </footer>
+  );
+}
+
+function canSaveAgent({ isRestoring, canUpdateCanvas }: { isRestoring: boolean; canUpdateCanvas: boolean }) {
+  return !isRestoring && canUpdateCanvas;
+}
+
+function agentSaveDisabled({
+  isLoading,
+  isSaving,
+  isRestoring,
+  hasSteps,
+  canUpdateCanvas,
+}: {
+  isLoading: boolean;
+  isSaving: boolean;
+  isRestoring: boolean;
+  hasSteps: boolean;
+  canUpdateCanvas: boolean;
+}) {
+  return isLoading || isSaving || isRestoring || !hasSteps || !canUpdateCanvas;
 }
 
 function RestoreDefaultPromptDialog({
