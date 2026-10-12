@@ -16,9 +16,12 @@ type FactoryVelocitySync struct {
 	Repository     string
 	SyncedAt       *time.Time
 	BackfilledFrom *time.Time
-	Error          string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	// RulesGeneration records which classification rules produced the stored
+	// merges. The sync worker bumps it after a full rebuild.
+	RulesGeneration int
+	Error           string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 // FactoryVelocitySyncTarget is a workspace the sync worker must visit, together
@@ -34,6 +37,7 @@ type FactoryVelocitySyncTarget struct {
 	SyncedRepository string
 	SyncedAt         *time.Time
 	BackfilledFrom   *time.Time
+	RulesGeneration  int
 }
 
 func (FactoryVelocitySync) TableName() string {
@@ -44,6 +48,47 @@ func (FactoryVelocitySync) TableName() string {
 // workspace reports on now.
 func (s *FactoryVelocitySync) CoversRepository(repository string) bool {
 	return strings.EqualFold(strings.TrimSpace(s.Repository), strings.TrimSpace(repository))
+}
+
+// SyncInProgress reports a bounded read that has not finished. SyncedAt may
+// still hold the time the newest pages were read. That stamp is not a
+// finished sync.
+func (s *FactoryVelocitySync) SyncInProgress() bool {
+	return s != nil && s.RulesGeneration < 0
+}
+
+// RecordProgress saves a short slice without marking the sync finished.
+// newestReadAt is when the newest pages were read. A zero time clears the
+// stamp. A later slice keeps the earlier stamp so the finishing read can
+// include merges made after the first slice. A negative rules generation
+// stays unfinished even when the stamp is set.
+func (s *FactoryVelocitySync) RecordProgress(tx *gorm.DB, repository string, backfilledFrom, newestReadAt time.Time) error {
+	now := time.Now()
+	s.Repository = strings.TrimSpace(repository)
+	s.BackfilledFrom = &backfilledFrom
+	s.Error = ""
+	s.UpdatedAt = now
+
+	var syncedAt any
+	if newestReadAt.IsZero() {
+		s.SyncedAt = nil
+		syncedAt = gorm.Expr("NULL")
+	} else {
+		readAt := newestReadAt
+		s.SyncedAt = &readAt
+		syncedAt = s.SyncedAt
+	}
+
+	return tx.Model(s).
+		Where("factory_id = ?", s.FactoryID).
+		Updates(map[string]any{
+			"repository":       s.Repository,
+			"synced_at":        syncedAt,
+			"backfilled_from":  s.BackfilledFrom,
+			"rules_generation": s.RulesGeneration,
+			"error":            "",
+			"updated_at":       now,
+		}).Error
 }
 
 // RecordSuccess stamps a finished sync and clears any earlier failure.
@@ -58,11 +103,12 @@ func (s *FactoryVelocitySync) RecordSuccess(tx *gorm.DB, repository string, sync
 	return tx.Model(s).
 		Where("factory_id = ?", s.FactoryID).
 		Updates(map[string]any{
-			"repository":      s.Repository,
-			"synced_at":       s.SyncedAt,
-			"backfilled_from": s.BackfilledFrom,
-			"error":           "",
-			"updated_at":      now,
+			"repository":       s.Repository,
+			"synced_at":        s.SyncedAt,
+			"backfilled_from":  s.BackfilledFrom,
+			"rules_generation": s.RulesGeneration,
+			"error":            "",
+			"updated_at":       now,
 		}).Error
 }
 
@@ -162,7 +208,8 @@ const factoryVelocitySyncTargetColumns = `
 	COALESCE(f.onboarding_config->>'vcs_provider', '') AS vcs_provider,
 	COALESCE(s.repository, '') AS synced_repository,
 	s.synced_at,
-	s.backfilled_from`
+	s.backfilled_from,
+	COALESCE(s.rules_generation, 0) AS rules_generation`
 
 // ClaimFactoryVelocitySync takes ownership of a workspace's sync for the length
 // of the lease, and returns nil when another worker holds it.
@@ -203,5 +250,5 @@ const claimFactoryVelocitySyncSQL = `
 UPDATE factory_velocity_syncs
 SET updated_at = ?
 WHERE factory_id = ? AND updated_at < ?
-RETURNING factory_id, repository, synced_at, backfilled_from, error, created_at, updated_at
+RETURNING factory_id, repository, synced_at, backfilled_from, rules_generation, error, created_at, updated_at
 `
