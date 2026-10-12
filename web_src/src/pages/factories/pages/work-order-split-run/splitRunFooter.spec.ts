@@ -87,7 +87,9 @@ describe("buildSplitRunFooter", () => {
     const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 5, confidenceScore: 2 });
 
     expect(footer.note?.headline).toBe("Review before you start");
-    expect(footer.note?.text).toBe("An agent may need steering. Start if you accept the risk, or split the work.");
+    expect(footer.note?.text).toBe(
+      "An agent may need steering. Start if you accept the risk, or narrow the scope in the chat.",
+    );
     expect(splitRunDecisionTone(footer)).toBe("draft-caution");
   });
 
