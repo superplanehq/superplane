@@ -531,9 +531,11 @@ type MergedBitbucketPullRequest struct {
 }
 
 // ListMergedPullRequests returns merged pull requests, newest first,
-// stopping once updated_on predates from. At most maxPages pages are read;
-// truncated reports whether the page cap cut the walk short.
-func (c *Client) ListMergedPullRequests(repository string, from time.Time, maxPages int) ([]MergedBitbucketPullRequest, bool, error) {
+// stopping once updated_on predates from. A non-zero until excludes pulls
+// updated at or after that instant, so a later read can continue older
+// history without repeating the newest pages. At most maxPages pages are
+// read; truncated reports whether the page cap cut the walk short.
+func (c *Client) ListMergedPullRequests(repository string, from, until time.Time, maxPages int) ([]MergedBitbucketPullRequest, bool, error) {
 	path, err := repositoryPath(repository)
 	if err != nil {
 		return nil, false, err
@@ -543,7 +545,14 @@ func (c *Client) ListMergedPullRequests(repository string, from time.Time, maxPa
 	}
 
 	merged := []MergedBitbucketPullRequest{}
-	endpoint := fmt.Sprintf("%s/repositories/%s/pullrequests?state=MERGED&sort=-updated_on&pagelen=50", baseURL, path)
+	query := url.Values{}
+	query.Set("state", PullRequestStateMerged)
+	query.Set("sort", "-updated_on")
+	query.Set("pagelen", "50")
+	if !until.IsZero() {
+		query.Set("q", fmt.Sprintf("updated_on < %s", until.UTC().Format(time.RFC3339)))
+	}
+	endpoint := fmt.Sprintf("%s/repositories/%s/pullrequests?%s", baseURL, path, query.Encode())
 	for page := 0; page < maxPages && endpoint != ""; page++ {
 		var response struct {
 			Values []struct {
@@ -579,6 +588,9 @@ func (c *Client) ListMergedPullRequests(repository string, from time.Time, maxPa
 		for _, pr := range response.Values {
 			updated, err := parseBitbucketTime(pr.UpdatedOn)
 			if err != nil {
+				continue
+			}
+			if !until.IsZero() && !updated.Before(until) {
 				continue
 			}
 			if updated.Before(from) {
