@@ -438,7 +438,15 @@ func parseOptionalActivityID(w http.ResponseWriter, raw string) (uuid.UUID, bool
 }
 
 func beginPlanningWaitAndNotify(db *gorm.DB, session *models.FactoryPlanningSession) error {
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	if err != nil {
+		return err
+	}
+	*session = *reloaded
 	alreadyWaiting := session.WaitState == models.PlanningWaitPending || session.WaitState == models.PlanningWaitResolved
+	if !alreadyWaiting && tryAutoStartPlannedWorkOrder(db, session) {
+		return nil
+	}
 	if err := session.BeginWait(db); err != nil {
 		return err
 	}
@@ -446,7 +454,6 @@ func beginPlanningWaitAndNotify(db *gorm.DB, session *models.FactoryPlanningSess
 		return nil
 	}
 	messages.PublishPlanningBoardStatus(session)
-	maybeAutoStartPlannedWorkOrder(db, session)
 	if !hasOutstandingPlanningQuestion(session) {
 		return nil
 	}
@@ -454,45 +461,47 @@ func beginPlanningWaitAndNotify(db *gorm.DB, session *models.FactoryPlanningSess
 	return nil
 }
 
-func maybeAutoStartPlannedWorkOrder(db *gorm.DB, session *models.FactoryPlanningSession) {
+func tryAutoStartPlannedWorkOrder(db *gorm.DB, session *models.FactoryPlanningSession) bool {
 	if session == nil || session.DraftWorkOrderID == nil {
-		return
+		return false
 	}
 	factoryModel, err := models.FindFactory(db, session.OrganizationID, session.FactoryID)
 	if err != nil {
 		log.WithError(err).Warnf("auto-start skipped for session %s", session.ID)
-		return
+		return false
 	}
 	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
 	if err != nil {
 		log.WithError(err).Warnf("auto-start skipped for work order %s", session.DraftWorkOrderID)
-		return
+		return false
 	}
 	ready, err := models.WorkOrderReadyForAutoStart(db, factoryModel, order, session)
 	if err != nil {
 		log.WithError(err).Warnf("auto-start readiness check failed for order %s", order.ID)
-		return
+		return false
 	}
 	if !ready || factoryModel.PlanningAutoStartLineID == nil {
-		return
+		return false
 	}
 	lineID := *factoryModel.PlanningAutoStartLineID
 	claimed, err := order.ClaimAutoStart(db, lineID)
 	if err != nil {
 		log.WithError(err).Warnf("auto-start could not claim the line for order %s", order.ID)
-		return
+		return false
 	}
 	if !claimed {
-		return
+		return false
 	}
 	line, err := factoryModel.FindLine(db, lineID)
 	if err != nil {
 		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
-		return
+		return false
 	}
 	if _, _, err := factoryactions.DispatchWorkOrderOnLine(db, factoryModel, order.ID, line, order.CreatedByID, 0, false, "", ""); err != nil {
 		log.WithError(err).Warnf("auto-start dispatch failed for order %s", order.ID)
+		return false
 	}
+	return true
 }
 
 func proposePlanningSpecAndNotify(db *gorm.DB, session *models.FactoryPlanningSession, body string) error {

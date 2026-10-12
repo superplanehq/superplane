@@ -566,6 +566,9 @@ func WorkOrderReadyForAutoStart(
 	if factoryModel == nil || order == nil || session == nil {
 		return false, nil
 	}
+	if session.State != PlanningSessionStateRunning {
+		return false, nil
+	}
 	if order.State != FactoryWorkOrderStateDraft {
 		return false, nil
 	}
@@ -573,6 +576,13 @@ func WorkOrderReadyForAutoStart(
 		return false, nil
 	}
 	if len(session.CurrentSurvey().Questions) > 0 {
+		return false, nil
+	}
+	_, hasUndeliveredMessage, err := session.nextUndeliveredUserMessage(tx)
+	if err != nil {
+		return false, err
+	}
+	if hasUndeliveredMessage {
 		return false, nil
 	}
 	checks, err := order.ListChecks(tx)
