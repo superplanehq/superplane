@@ -916,9 +916,12 @@ function livePhaseSpend(agents: PhaseAgentUsageEntry[]): { tokens: number; cents
   let cents = 0;
   for (const agent of agents) {
     tokens += agentRunNewTokenCount(agent.telemetry);
-    const usd = agent.telemetry.usage.total_cost_usd;
+    const usd = agent.telemetry.usage.hosted_cost_usd ?? agent.telemetry.usage.total_cost_usd;
     if (usd != null && Number.isFinite(usd)) {
-      cents += Math.round(usd * 100);
+      cents +=
+        agent.telemetry.usage.hosted_cost_usd != null
+          ? Math.floor(Math.round(usd * 1_000_000) / 10_000)
+          : Math.round(usd * 100);
     }
   }
   return { tokens, cents };
