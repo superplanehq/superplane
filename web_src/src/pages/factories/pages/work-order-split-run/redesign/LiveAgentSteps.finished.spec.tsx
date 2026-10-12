@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,6 +9,21 @@ import { idleStream, implementPhase, implementStage, RUNNING_RUNNER } from "./Li
 
 const FAILED_RUN_HREF =
   "/demo/workspaces/newwo/automations/a455baf7-cee0-42ed-bb87-ef8849a24ff2?run=b3bac36f-7a97-488c-9a12-c11e5bdef8e6&from=task&orderNumber=78";
+
+function bashSection(status: "running" | "passed" | "failed") {
+  return {
+    index: 1,
+    text: "Run script",
+    kind: "bash",
+    preview: "bash script.sh",
+    lines: ["ok"],
+    events: [],
+    status,
+    duration_ms: status === "running" ? null : 20,
+    started_at: 1,
+    collapsed: status !== "running",
+  };
+}
 
 vi.mock("../useSplitRunLiveCanvas", () => ({ useSplitRunLiveCanvas: vi.fn() }));
 vi.mock("@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream", () => ({ useLiveLogStream: vi.fn() }));
@@ -323,6 +338,125 @@ describe("LiveAgentSteps finished runs", () => {
     expect(screen.getByText("Clone Repo")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Debug" })).toHaveAttribute("href", FAILED_RUN_HREF);
     expect(screen.queryByText("No steps for this run.")).not.toBeInTheDocument();
+  });
+
+  it("stops a stored running command on a failed task without marking it failed", async () => {
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      rootEventId: undefined,
+      stream: [{ ...RUNNING_RUNNER, status: "failed" as const }],
+    });
+    vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: false, isLoading: false, sections: [] }));
+    const stage = {
+      ...implementStage(),
+      status: "failed" as const,
+      agentSteps: [
+        {
+          id: "command",
+          title: "Run script",
+          type: "bash" as const,
+          status: "running" as const,
+          summary: "",
+          toolCount: 0,
+          output: "bash script.sh",
+          events: [],
+        },
+      ],
+    };
+
+    render(
+      <LiveAgentSteps
+        stage={stage}
+        phase={{ ...implementPhase(), status: "failed" as const }}
+        organizationId="org-1"
+        emptyNote="No steps for this run."
+      />,
+    );
+
+    const command = await screen.findByRole("button", { name: /Run script/ });
+    expect(command).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Failed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Canceled")).not.toBeInTheDocument();
+
+    fireEvent.click(command);
+
+    expect(screen.queryByLabelText("failed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Failed")).not.toBeInTheDocument();
+  });
+
+  it("does not mark a successful command failed when a later step fails", async () => {
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      rootEventId: undefined,
+      stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
+    });
+    vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: true, sections: [bashSection("running")] }));
+    const stage = { ...implementStage(), status: "failed" as const, agentSteps: [] };
+    const phase = { ...implementPhase(), status: "failed" as const };
+    const view = render(
+      <LiveAgentSteps
+        stage={stage}
+        phase={phase}
+        organizationId="org-1"
+        expandSteps
+        emptyNote="No steps for this run."
+      />,
+    );
+
+    expect(await screen.findByText("Run script")).toBeInTheDocument();
+    expect(screen.getByText("bash script.sh")).toBeInTheDocument();
+    expect(screen.queryByText("Failed")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("failed")).not.toBeInTheDocument();
+
+    vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: false, sections: [bashSection("passed")] }));
+    view.rerender(
+      <LiveAgentSteps
+        stage={stage}
+        phase={phase}
+        organizationId="org-1"
+        expandSteps
+        emptyNote="No steps for this run."
+      />,
+    );
+
+    expect(await screen.findByText("<1s")).toBeInTheDocument();
+    expect(screen.getByText("bash script.sh")).toBeInTheDocument();
+    expect(screen.queryByText("Failed")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("failed")).not.toBeInTheDocument();
+  });
+
+  it("marks a command failed when that command failed", async () => {
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      rootEventId: undefined,
+      stream: [{ ...RUNNING_RUNNER, status: "passed" as const }],
+    });
+    vi.mocked(useLiveLogStream).mockReturnValue(idleStream({ isStreaming: false, sections: [bashSection("failed")] }));
+    const stage = { ...implementStage(), status: "failed" as const, agentSteps: [] };
+    const phase = { ...implementPhase(), status: "failed" as const };
+
+    render(
+      <LiveAgentSteps
+        stage={stage}
+        phase={phase}
+        organizationId="org-1"
+        expandSteps
+        emptyNote="No steps for this run."
+      />,
+    );
+
+    expect(await screen.findByText("Failed")).toBeInTheDocument();
+    expect(screen.getByText("Run script")).toBeInTheDocument();
+    expect(screen.getByLabelText("failed")).toBeInTheDocument();
   });
 
   it("keeps the empty sentence for a finished run with no steps", async () => {
