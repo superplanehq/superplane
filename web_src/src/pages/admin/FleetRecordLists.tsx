@@ -41,7 +41,7 @@ const RunnerTags = ({ tags }: { tags?: Record<string, string> }) => {
 };
 
 export const RunnerRows = ({ rows }: { rows: FleetRunner[] }) => (
-  <div className={tableClass}>
+  <div className={tableClass} role="region" aria-label="Runners" tabIndex={0}>
     <table className="w-full text-sm">
       <thead>
         <tr className="border-b border-slate-100 dark:border-gray-700/70">
@@ -66,7 +66,7 @@ export const RunnerRows = ({ rows }: { rows: FleetRunner[] }) => (
               <StateBadge state={runner.state} />
             </td>
             <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300">
-              {runner.runnerVersion?.trim() || "—"}
+              <span className="block max-w-52 break-all">{runner.runnerVersion?.trim() || "—"}</span>
             </td>
             <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300">{runner.os || "—"}</td>
             <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300">{runner.arch || "—"}</td>
