@@ -34,6 +34,20 @@ func TestIntakeRunTitle_JiraUsesKeyWhenSummaryIsMissing(t *testing.T) {
 	})
 }
 
+func TestIntakeRunTitle_LinearUsesIdentifierAndTitle(t *testing.T) {
+	event := models.CanvasEvent{Data: models.NewJSONValue(map[string]any{
+		"type": "linear.issue",
+		"data": map[string]any{
+			"url": "https://linear.app/acme/issue/ENG-142/deploy-pipeline-fails",
+			"data": map[string]any{
+				"identifier": "ENG-142",
+				"title":      "Deploy pipeline fails on retry",
+			},
+		},
+	})}
+	assert.Equal(t, "ENG-142: Deploy pipeline fails on retry", intakeRunTitle(models.FactoryIntakeSourceLinearIssues, event))
+}
+
 func Test__IntakeRunPlacement(t *testing.T) {
 	runID := uuid.New()
 	run := models.CanvasRun{ID: runID}

@@ -148,6 +148,7 @@ function PlanningSettingsLoaded({
               organizationId,
               factoryId,
               factoryKey,
+              automationId: canvasId,
               onSave: agent.save,
               showVisualEvidenceSetting: false,
             }

@@ -1,0 +1,4 @@
+aws_region = "us-east-1"
+
+# Override this value only when the default does not fit the build account.
+ami_name_prefix = "superplane-runner"

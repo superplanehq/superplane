@@ -5,13 +5,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/models"
 	actionpb "github.com/superplanehq/superplane/pkg/protos/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
@@ -28,7 +29,7 @@ func ListIntegrations(ctx context.Context, registry *registry.Registry) (*pb.Lis
 
 	return &pb.ListIntegrationsResponse{
 		Integrations:        serializeIntegrations(registry, orgID, registry.ListIntegrations()),
-		GithubAppConfigured: config.LoadGitHubHostedAppConfig().Enabled(),
+		GithubAppConfigured: githubapp.ProcessEnabled(ctx),
 	}, nil
 }
 
@@ -64,7 +65,8 @@ func serializeIntegrations(registry *registry.Registry, orgID uuid.UUID, in []co
 		// Connect uses HostedAppInstall. The wizard needs new_integration_setup_flow.
 		useNewFlow := registry.UseNewSetupFlow(orgID, integration.Name())
 		hostedAppInstall := github.UseHostedInstall(orgID.String(), integration.Name()) ||
-			jira.UseHostedInstall(integration.Name())
+			jira.UseHostedInstall(integration.Name()) ||
+			linear.UseHostedInstall(integration.Name())
 		out[i] = &pb.IntegrationDefinition{
 			Name:             integration.Name(),
 			Label:            integration.Label(),

@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -181,11 +182,9 @@ func mcpClientName(clientID string, clients map[string]models.MCPOAuthClient) st
 	if clientID == localMCPClientID {
 		return localMCPClientName
 	}
+	stored := ""
 	if client, ok := clients[clientID]; ok {
-		name := strings.TrimSpace(client.ClientName)
-		if name != "" {
-			return name
-		}
+		stored = client.ClientName
 	}
-	return strings.TrimSpace(clientID)
+	return mcp.ClientDisplayName(stored, clientID, clientID)
 }

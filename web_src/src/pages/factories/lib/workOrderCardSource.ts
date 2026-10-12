@@ -1,5 +1,5 @@
 import type { FactoriesWorkOrder } from "@/api-client";
-import superplaneIcon from "@/assets/superplane.svg";
+import superplaneMark from "@/assets/superplane-mark.svg";
 
 import {
   CREATED_MANUALLY,
@@ -22,9 +22,16 @@ export function workOrderCardSource(order: FactoriesWorkOrder): WorkOrderCardSou
     const creatorName = order.createdBy?.user?.name?.trim();
     return {
       name: CREATED_MANUALLY,
-      iconSrc: superplaneIcon,
+      iconSrc: superplaneMark,
       iconAlt: "SuperPlane",
       ...(creatorName ? { creatorName } : {}),
+    };
+  }
+  if (source.kind === "mcp") {
+    return {
+      name: source.name,
+      iconSrc: superplaneMark,
+      iconAlt: source.iconAlt,
     };
   }
   if (source.kind !== "intake") {
@@ -40,11 +47,15 @@ export function workOrderCardSource(order: FactoriesWorkOrder): WorkOrderCardSou
 
 /** Sentinel source filter value that matches tasks created by a person. */
 export const MANUAL_FILTER_VALUE = "manual";
+export const MCP_SOURCE_FILTER_PREFIX = "mcp:";
 
 export function workOrderListSource(order: FactoriesWorkOrder): { id: string; label: string } {
   const source = splitRunSourceForOrder(order);
   if (source.kind === "manual") {
     return { id: MANUAL_FILTER_VALUE, label: CREATED_MANUALLY };
+  }
+  if (source.kind === "mcp") {
+    return { id: `${MCP_SOURCE_FILTER_PREFIX}${source.name}`, label: source.name };
   }
   const intakeKind = intakeKindForPresentationName(source.name);
   return {

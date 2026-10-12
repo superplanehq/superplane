@@ -1,11 +1,18 @@
 package grpc
 
 import (
+	"errors"
+
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/enterprise"
+	adminRunnerActions "github.com/superplanehq/superplane/pkg/grpc/actions/admin/runners"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
+	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -39,23 +46,54 @@ type Services struct {
 	Files         pbFiles.FilesServer
 	APIKeys       pbAPIKeys.ApiKeysServer
 	Agents        pbAgents.AgentsServer
+	AdminRunners  pbAdminRunners.RunnersServer
 }
 
 type ServicesConfig struct {
-	BaseURL         string
-	WebhooksBaseURL string
-	Encryptor       crypto.Encryptor
-	AuthService     authorization.Authorization
-	Registry        *registry.Registry
-	OIDCProvider    oidc.Provider
-	AgentService    agentsActions.AgentsService
+	BaseURL          string
+	WebhooksBaseURL  string
+	RunnerAPIBaseURL string
+	Encryptor        crypto.Encryptor
+	AuthService      authorization.Authorization
+	Registry         *registry.Registry
+	OIDCProvider     oidc.Provider
+	AgentService     agentsActions.AgentsService
+	JWTSigner        *jwt.Signer
+
+	// Entitlements defaults to Community mode. Enterprise defaults to a
+	// registry whose Community implementations refuse every operation.
+	Entitlements licensing.Entitlements
+	Enterprise   *enterprise.Registry
 }
 
 func NewServices(cfg ServicesConfig) (*Services, error) {
+	if cfg.JWTSigner == nil {
+		return nil, errors.New("JWT signer is required")
+	}
+
+	entitlements := cfg.Entitlements
+	if entitlements == nil {
+		entitlements = licensing.Community
+	}
+
+	featureRegistry := cfg.Enterprise
+	if featureRegistry == nil {
+		featureRegistry = enterprise.NewRegistry()
+	}
+
+	groups, err := NewGroupsService(cfg.AuthService, featureRegistry)
+	if err != nil {
+		return nil, err
+	}
+	roles, err := NewRoleService(cfg.AuthService, entitlements, featureRegistry)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Services{
 		Users:  NewUsersService(cfg.AuthService),
-		Groups: NewGroupsService(cfg.AuthService),
-		Roles:  NewRoleService(cfg.AuthService),
+		Groups: groups,
+		Roles:  roles,
 		Organizations: NewOrganizationService(
 			cfg.AuthService,
 			cfg.Registry,
@@ -84,5 +122,11 @@ func NewServices(cfg ServicesConfig) (*Services, error) {
 		Files:   NewFilesService(cfg.AuthService),
 		APIKeys: NewAPIKeysService(cfg.AuthService),
 		Agents:  NewAgentsService(cfg.AgentService),
+		AdminRunners: NewAdminRunnersService(
+			adminRunnerActions.NewService(
+				cfg.JWTSigner,
+				cfg.RunnerAPIBaseURL,
+			),
+		),
 	}, nil
 }

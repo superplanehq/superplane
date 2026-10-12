@@ -3,9 +3,8 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useAccount } from "@/contexts/useAccount";
 import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 
-import { FactoriesLayout } from "../layout/FactoriesLayout";
 import { WorkspaceLoadingProvider } from "../layout/workspaceLoading";
-import { LinesPage } from "./LinesPage";
+import { FactoryWorkspaceLayoutSwitch, LineBoardRouteSwitch } from "../mobile/MobileShellSwitch";
 import { OnboardingGate } from "./onboarding/OnboardingGate";
 import { PublicFactoryBoardPage } from "./PublicFactoryBoardPage";
 
@@ -42,11 +41,11 @@ function MemberLineGate() {
   return (
     <WorkspaceLoadingProvider>
       <RequireExperimentalFeature featureId={FEATURE_FACTORIES}>
-        <FactoriesLayout>
+        <FactoryWorkspaceLayoutSwitch>
           <OnboardingGate>
-            <LinesPage />
+            <LineBoardRouteSwitch />
           </OnboardingGate>
-        </FactoriesLayout>
+        </FactoryWorkspaceLayoutSwitch>
       </RequireExperimentalFeature>
     </WorkspaceLoadingProvider>
   );

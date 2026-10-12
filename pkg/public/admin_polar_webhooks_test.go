@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -367,4 +368,142 @@ func TestAdminPolarWebhookEndpoints(t *testing.T) {
 		assert.Equal(t, http.StatusBadGateway, response.Code)
 		assert.Contains(t, response.Body.String(), "webhooks:read")
 	})
+}
+
+func TestAdminPolarWebhookServerErrorCapturesPolarCause(t *testing.T) {
+	const (
+		polarBody  = "polar-upstream-body-must-stay-in-sentry"
+		polarToken = "oat_secret_must_stay_out_of_sentry"
+	)
+
+	server, _, token := setupAdminTestServer(t)
+
+	testCases := []struct {
+		name         string
+		method       string
+		path         string
+		status       int
+		echoVersion  bool
+		wantStatus   int
+		wantBody     string
+		captureCause bool
+		wantCauses   []string
+	}{
+		{
+			name:         "list failure keeps the response and records the polar body",
+			method:       http.MethodGet,
+			path:         "/admin/api/polar/webhooks",
+			status:       http.StatusInternalServerError,
+			wantStatus:   http.StatusBadGateway,
+			wantBody:     "Failed to load Polar webhook deliveries",
+			captureCause: true,
+			wantCauses:   []string{polarBody},
+		},
+		{
+			name:         "endpoint list failure records the polar body",
+			method:       http.MethodGet,
+			path:         "/admin/api/polar/webhooks/endpoints",
+			status:       http.StatusInternalServerError,
+			wantStatus:   http.StatusBadGateway,
+			wantBody:     "Failed to load Polar webhook endpoints",
+			captureCause: true,
+			wantCauses:   []string{polarBody},
+		},
+		{
+			name:         "redelivery failure records the polar body",
+			method:       http.MethodPost,
+			path:         "/admin/api/polar/webhooks/evt_1/redeliver",
+			status:       http.StatusInternalServerError,
+			wantStatus:   http.StatusBadGateway,
+			wantBody:     "Failed to redeliver Polar webhook event",
+			captureCause: true,
+			wantCauses:   []string{polarBody},
+		},
+		{
+			name:         "token rejection records the polar error",
+			method:       http.MethodGet,
+			path:         "/admin/api/polar/webhooks",
+			status:       http.StatusUnauthorized,
+			wantStatus:   http.StatusBadGateway,
+			wantBody:     "Polar rejected the access token. Add webhooks:read and webhooks:write scopes.",
+			captureCause: true,
+			wantCauses:   []string{"polar unauthorized", polarBody},
+		},
+		{
+			name:         "unsupported api version records the polar error",
+			method:       http.MethodPost,
+			path:         "/admin/api/polar/webhooks/evt_1/redeliver",
+			status:       http.StatusNotFound,
+			wantStatus:   http.StatusBadGateway,
+			wantBody:     "Polar does not support API version " + polar.APIVersion() + ". Upgrade the pinned Polar API version.",
+			captureCause: true,
+			wantCauses:   []string{"polar api version is not supported", polar.APIVersion()},
+		},
+		{
+			name:         "rate limit records the polar error",
+			method:       http.MethodGet,
+			path:         "/admin/api/polar/webhooks/endpoints",
+			status:       http.StatusTooManyRequests,
+			wantStatus:   http.StatusBadGateway,
+			wantBody:     "Polar rate-limited the request. Try again later.",
+			captureCause: true,
+			wantCauses:   []string{"polar rate limited"},
+		},
+		{
+			name:         "missing event does not create an error tracker event",
+			method:       http.MethodPost,
+			path:         "/admin/api/polar/webhooks/evt_missing/redeliver",
+			status:       http.StatusNotFound,
+			echoVersion:  true,
+			wantStatus:   http.StatusNotFound,
+			wantBody:     "Polar webhook event was not found.",
+			captureCause: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			transport := bindTestSentryHub(t)
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if testCase.echoVersion {
+					w.Header().Set("Polar-Version", r.Header.Get("Polar-Version"))
+				}
+				http.Error(w, polarBody, testCase.status)
+			}))
+			t.Cleanup(upstream.Close)
+
+			t.Setenv("POLAR_ACCESS_TOKEN", polarToken)
+			t.Setenv("POLAR_API_BASE_URL", upstream.URL)
+
+			response := execRequest(server, requestParams{
+				method:     testCase.method,
+				path:       testCase.path,
+				authCookie: token,
+			})
+
+			require.Equal(t, testCase.wantStatus, response.Code)
+			assert.Equal(t, testCase.wantBody+"\n", response.Body.String())
+			assert.NotContains(t, response.Body.String(), polarToken)
+
+			events := transport.Events()
+			if !testCase.captureCause {
+				assert.Empty(t, events)
+				return
+			}
+
+			assert.NotContains(t, response.Body.String(), polarBody)
+			require.Len(t, events, 1)
+			event := events[0]
+			assert.Empty(t, event.Message)
+			exception := capturedExceptionText(event)
+			for _, cause := range testCase.wantCauses {
+				assert.Contains(t, exception, cause)
+			}
+			assert.Equal(t, strconv.Itoa(http.StatusBadGateway), event.Tags["status"])
+
+			encoded, err := json.Marshal(event)
+			require.NoError(t, err)
+			assert.NotContains(t, string(encoded), polarToken)
+		})
+	}
 }

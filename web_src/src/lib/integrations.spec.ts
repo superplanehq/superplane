@@ -6,6 +6,7 @@ import {
   offersPrivateGitHubAppSetup,
   usesHostedGitHubAppInstall,
   usesHostedJiraOAuth,
+  usesHostedLinearOAuth,
   usesPrivateGitHubAppWizard,
 } from "./integrations";
 
@@ -27,6 +28,15 @@ describe("usesHostedJiraOAuth", () => {
   });
 });
 
+describe("usesHostedLinearOAuth", () => {
+  it("is true only for Linear with hostedAppInstall", () => {
+    expect(usesHostedLinearOAuth({ name: "linear", hostedAppInstall: true })).toBe(true);
+    expect(usesHostedLinearOAuth({ name: "linear", hostedAppInstall: false })).toBe(false);
+    expect(usesHostedLinearOAuth({ name: "jira", hostedAppInstall: true })).toBe(false);
+    expect(usesHostedLinearOAuth(undefined)).toBe(false);
+  });
+});
+
 describe("hiddenFieldsForHostedJira", () => {
   it("hides Client ID and Client Secret for hosted Jira", () => {
     expect(hiddenFieldsForHostedJira({ name: "jira", hostedAppInstall: true }, [])).toEqual([
@@ -36,8 +46,8 @@ describe("hiddenFieldsForHostedJira", () => {
   });
 
   it("keeps caller hidden fields and adds the credential fields", () => {
-    expect(hiddenFieldsForHostedJira({ name: "jira", hostedAppInstall: true }, ["enableOpsFeatures"])).toEqual([
-      "enableOpsFeatures",
+    expect(hiddenFieldsForHostedJira({ name: "jira", hostedAppInstall: true }, ["adminKey"])).toEqual([
+      "adminKey",
       "clientId",
       "clientSecret",
     ]);

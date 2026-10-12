@@ -3,6 +3,7 @@ package contexts
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -31,7 +32,14 @@ func (c *WebhookContext) GetID() string {
 }
 
 func (c *WebhookContext) GetURL() string {
-	return fmt.Sprintf("%s/api/v1/webhooks/%s", c.baseURL, c.webhook.ID)
+	return webhookCallbackURL(c.baseURL, c.webhook.ID.String())
+}
+
+// webhookCallbackURL is the callback third-party services POST to.
+// A trailing slash on the base URL must not produce a double slash.
+// Proxies answer //api with a redirect, and Linear does not follow it.
+func webhookCallbackURL(baseURL, webhookID string) string {
+	return fmt.Sprintf("%s/api/v1/webhooks/%s", strings.TrimRight(strings.TrimSpace(baseURL), "/"), webhookID)
 }
 
 func (c *WebhookContext) CallbackHasActiveNodes(webhookID string) (bool, error) {

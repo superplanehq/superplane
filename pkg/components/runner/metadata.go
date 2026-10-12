@@ -2,6 +2,7 @@ package runner
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -10,6 +11,7 @@ import (
 const (
 	ExecutionMetadataBrokerTaskID = "runner_broker_task_id"
 	ExecutionMetadataTaskLog      = "runner_task_log"
+	ExecutionMetadataTaskBackend  = "runner_task_backend"
 )
 
 // TaskLogSink matches the task-broker / fleet-manager JSON shape for CloudWatch-backed live logs.
@@ -49,6 +51,27 @@ func mergeRunnerBrokerTaskID(meta core.MetadataWriter, brokerTaskID string) erro
 	return mergeExecutionMetadata(meta, map[string]any{
 		ExecutionMetadataBrokerTaskID: brokerTaskID,
 	})
+}
+
+func mergeRunnerTaskBackend(meta core.MetadataWriter, backend string) error {
+	backend = normalizeTaskBackend(backend)
+	return mergeExecutionMetadata(meta, map[string]any{
+		ExecutionMetadataTaskBackend: backend,
+	})
+}
+
+func TaskBackendFromExecutionMetadata(meta map[string]any) string {
+	if meta == nil {
+		return core.RunnerTaskBackendLegacy
+	}
+	return normalizeTaskBackend(fmt.Sprint(meta[ExecutionMetadataTaskBackend]))
+}
+
+func normalizeTaskBackend(backend string) string {
+	if strings.TrimSpace(backend) == core.RunnerTaskBackendIntegrated {
+		return core.RunnerTaskBackendIntegrated
+	}
+	return core.RunnerTaskBackendLegacy
 }
 
 func mergeRunnerTaskLog(meta core.MetadataWriter, brokerTaskID string, sink *TaskLogSink) error {

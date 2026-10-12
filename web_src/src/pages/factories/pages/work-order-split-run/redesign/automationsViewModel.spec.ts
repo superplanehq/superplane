@@ -5,7 +5,12 @@ import {
   LINE_BOARD_DONE_RECEIPTS_ORDER,
   LINE_BOARD_VERIFY_ENUM_ORDER,
 } from "../../../__fixtures__/lineMetricsFactoriesFixture";
-import { SPLIT_RUN_RUNNING, splitRunFixtureForWorkOrder, type SplitRunPhase } from "../splitRunMocks";
+import {
+  SPLIT_RUN_RUNNING,
+  splitRunFixtureForWorkOrder,
+  type SplitRunPhase,
+  type SplitRunStreamLine,
+} from "../splitRunMocks";
 import {
   allStages,
   agentStepsFromNotes,
@@ -46,9 +51,19 @@ describe("automations view model", () => {
     expect(outcome.spend).toBe("$0.73");
     expect(outcome.tokens).toBe("2.7k tokens");
     expect(outcome.models).toEqual(["claude-sonnet-4-6"]);
-    expect(outcome.headline).toBe("Implement is running");
+    expect(outcome.headline).toBe("Implementation in progress");
   });
 });
+
+function note(overrides: Partial<SplitRunStreamLine> & Pick<SplitRunStreamLine, "id">): SplitRunStreamLine {
+  return {
+    at: "12:00",
+    componentName: "Step",
+    status: "passed",
+    note: true,
+    ...overrides,
+  };
+}
 
 describe("agentStepsFromNotes", () => {
   it("does not put a tool-count summary on a prompt step", () => {
@@ -85,6 +100,48 @@ describe("agentStepsFromNotes", () => {
     expect(steps[0]?.summary).toBe("");
     expect(steps[0]?.toolCount).toBe(2);
   });
+
+  it("does not mark a prompt step Failed when the run passed", () => {
+    const steps = agentStepsFromNotes(
+      [
+        note({ id: "refine", componentType: "prompt", componentName: "Refine Task", status: "failed" }),
+        note({
+          id: "refine-note",
+          componentType: "note",
+          componentName: "OpenCode started",
+          status: "passed",
+          noteParentId: "refine",
+        }),
+      ],
+      "passed",
+    );
+
+    expect(steps[0]?.status).toBe("passed");
+    expect(steps[0]?.promptStatus).toBe("failed");
+  });
+
+  it("keeps Failed on the prompt step that stopped the run", () => {
+    const steps = agentStepsFromNotes(
+      [
+        note({ id: "first", componentType: "prompt", componentName: "Refine Task", status: "failed" }),
+        note({ id: "stop", componentType: "prompt", componentName: "Implement", status: "failed" }),
+      ],
+      "failed",
+    );
+
+    expect(steps.map((step) => step.status)).toEqual(["passed", "failed"]);
+    expect(steps[0]?.promptStatus).toBe("failed");
+  });
+
+  it("keeps a failed bash step failed", () => {
+    const steps = agentStepsFromNotes(
+      [note({ id: "clone", componentType: "bash", componentName: "Clone repository", status: "failed" })],
+      "passed",
+    );
+
+    expect(steps[0]?.status).toBe("failed");
+    expect(steps[0]?.type).toBe("bash");
+  });
 });
 
 describe("settleStoppedSteps", () => {
@@ -104,6 +161,17 @@ describe("settleStoppedSteps", () => {
 
   it("leaves a running step alone while the stage is still running", () => {
     expect(settleStoppedSteps([running], "running")).toEqual([running]);
+  });
+
+  it("marks a running prompt failed when the stage failed", () => {
+    expect(settleStoppedSteps([running], "failed").map((step) => step.status)).toEqual(["failed"]);
+  });
+
+  it("stops a running command when the stage failed without marking it failed", () => {
+    const command = { ...running, id: "command", title: "bash script.sh", type: "bash" } satisfies AgentStep;
+
+    expect(settleStoppedSteps([command], "failed").map((step) => step.status)).toEqual(["stopped"]);
+    expect(settleStoppedSteps([command], "cancelled").map((step) => step.status)).toEqual(["cancelled"]);
   });
 });
 

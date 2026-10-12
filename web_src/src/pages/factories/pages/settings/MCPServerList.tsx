@@ -1,9 +1,11 @@
 import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
-import { useFactoryAgentResourceTools } from "@/hooks/useFactoryAgentResources";
+import { factoryAgentResourcesKey, useFactoryAgentResourceTools } from "@/hooks/useFactoryAgentResources";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
 import { Plug, Settings2 } from "lucide-react";
+import { useEffect } from "react";
 import { Link } from "react-router";
 
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
@@ -153,6 +155,16 @@ function useMCPServerRowToolsLine(
   const workspaceOff = resource.enabled === false;
   const showTools = connected && !workspaceOff && Boolean(resourceId);
   const toolsQuery = useFactoryAgentResourceTools(organizationId, factoryId, resourceId, showTools);
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (!showTools || !toolsQuery.isSuccess) {
+      return;
+    }
+    void queryClient.invalidateQueries({
+      queryKey: factoryAgentResourcesKey(organizationId, factoryId, "KIND_MCP_SERVER"),
+      exact: true,
+    });
+  }, [factoryId, organizationId, queryClient, showTools, toolsQuery.dataUpdatedAt, toolsQuery.isSuccess]);
   const tools = mcpToolItems(toolsQuery.data);
   const disabled = workspaceDisabledTools(resource);
 

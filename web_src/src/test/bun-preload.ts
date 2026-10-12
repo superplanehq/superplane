@@ -9,8 +9,8 @@ const importMetaEnv: ImportMetaEnv = {
   DEV: true,
   PROD: false,
   SSR: false,
-  BASE_URL: "/",
   ...process.env,
+  BASE_URL: "/",
 };
 
 Object.defineProperty(globalThis, "__IMPORT_META_ENV", {

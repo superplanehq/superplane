@@ -10,6 +10,7 @@ import (
 const (
 	ProviderGCS        = "gcs"
 	ProviderS3         = "s3"
+	ProviderAzure      = "azure"
 	ProviderFilesystem = "filesystem"
 )
 
@@ -20,12 +21,14 @@ var (
 )
 
 type PutOptions struct {
-	ContentType string
+	ContentType     string
+	ContentEncoding string
 }
 
 type ObjectInfo struct {
-	Size        int64
-	ContentType string
+	Size            int64
+	ContentType     string
+	ContentEncoding string
 }
 
 // Provider stores opaque object bytes. Catalog metadata lives in Postgres.

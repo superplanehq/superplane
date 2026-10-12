@@ -163,7 +163,7 @@ func TestBuildOpenCodeConfigWritesAnalysisInstructions(t *testing.T) {
 }
 
 func TestBuildOpenCodeConfigKeepsProtocolAtInstructionPriority(t *testing.T) {
-	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol_review.md"))
 	require.NoError(t, err)
 	config := jsBuildConfigWithPrompt(t, "/task", map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
@@ -236,6 +236,18 @@ func TestBuildOpenCodeConfigReadsWorkspaceMCPFromTaskDir(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "remote", deepwiki["type"])
 	assert.Equal(t, "https://mcp.deepwiki.com/mcp", deepwiki["url"])
+}
+
+func TestBuildOpenCodeConfigAddsMergeConfidenceMCP(t *testing.T) {
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "token",
+	})
+	mcp, _ := config["mcp"].(map[string]any)
+	superplane, _ := mcp["superplane"].(map[string]any)
+	command, _ := superplane["command"].([]any)
+
+	assert.Equal(t, []any{"node", "/task/merge_confidence_mcp.js"}, command)
+	assert.Equal(t, true, superplane["enabled"])
 }
 
 func TestBuildOpenCodeConfigAddsArtifactMCPOutsidePlanning(t *testing.T) {
@@ -484,16 +496,18 @@ func TestFormatOpenCodeJsonLinesEmitsUsageForEachFinishedStep(t *testing.T) {
 	output := runOpenCodeFormatter(t, []string{
 		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
 		`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":"First reply"}}`,
-		`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","tokens":{"input":100,"output":20,"reasoning":3,"cache":{"read":40,"write":5}}}}`,
+		`{"type":"step_finish","sessionID":"ses_1","part":{"type":"step-finish","cost":0.12,"tokens":{"input":100,"output":20,"reasoning":3,"cache":{"read":40,"write":5}}}}`,
 		`{"type":"step_start","sessionID":"ses_1","part":{"type":"step-start"}}`,
 		`{"type":"text","sessionID":"ses_1","part":{"type":"text","text":"Second reply"}}`,
-		`{"type":"step-finish","sessionID":"ses_1","part":{"type":"step-finish","tokens":{"input":80,"output":10,"reasoning":2,"cache":{"read":30,"write":4}}}}`,
+		`{"type":"step-finish","sessionID":"ses_1","part":{"type":"step-finish","cost":0.08,"tokens":{"input":80,"output":10,"reasoning":2,"cache":{"read":30,"write":4}}}}`,
 	})
 
 	turns := latestTurnRecords(t, output)
 	require.Len(t, turns, 2)
 	assertTurnRecordUsage(t, turns[1], 100, 20, 40, 5, 3)
 	assertTurnRecordUsage(t, turns[2], 80, 10, 30, 4, 2)
+	assert.InDelta(t, 0.12, turns[1]["usage"].(map[string]any)["total_cost_usd"], 1e-9)
+	assert.InDelta(t, 0.08, turns[2]["usage"].(map[string]any)["total_cost_usd"], 1e-9)
 }
 
 func TestFormatOpenCodeJsonLinesMarksFailedTools(t *testing.T) {

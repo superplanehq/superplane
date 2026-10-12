@@ -76,14 +76,8 @@ export const PLANNING_REVIEW_RUNNER_FIELDS: ConfigurationField[] = [
   {
     name: "machineType",
     label: "Environment",
-    type: "select",
+    type: "runner-fleet",
     required: true,
-    typeOptions: select([
-      { label: "e1-large-amd64", value: "e1-large-amd64" },
-      { label: "e1-large-arm64", value: "e1-large-arm64" },
-      { label: "e1-tiny-amd64", value: "e1-tiny-amd64" },
-      { label: "e1-tiny-arm64", value: "e1-tiny-arm64" },
-    ]),
   },
   {
     name: "credentials",
@@ -174,7 +168,7 @@ const SUPERPLANE_AGENT_MODEL_FIELD: ConfigurationField = {
 };
 
 function withModelUsedLabel(field: ConfigurationField): ConfigurationField {
-  return { ...field, label: "Model used", description: "" };
+  return { ...field, label: "Model", description: "" };
 }
 
 /** Model picker for the agent editor. SuperPlane agents use the hosted allowlist. */

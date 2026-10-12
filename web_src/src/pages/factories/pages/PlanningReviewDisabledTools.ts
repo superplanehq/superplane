@@ -1,7 +1,20 @@
 export function disabledAgentResourceTools(
   configuration: Record<string, unknown> | undefined,
 ): Record<string, string[]> {
-  const value = configuration?.disabledAgentResourceTools;
+  return agentResourceToolMap(configuration, "disabledAgentResourceTools");
+}
+
+export function enabledAgentResourceTools(
+  configuration: Record<string, unknown> | undefined,
+): Record<string, string[]> {
+  return agentResourceToolMap(configuration, "enabledAgentResourceTools");
+}
+
+function agentResourceToolMap(
+  configuration: Record<string, unknown> | undefined,
+  field: string,
+): Record<string, string[]> {
+  const value = configuration?.[field];
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
   }

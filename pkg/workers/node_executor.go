@@ -493,12 +493,18 @@ func (w *NodeExecutor) executeActionNode(
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithWorkOrderNotification(onFactoryWorkOrderNotification).
+			WithRunsCancelled(runCancellations.RecordRuns).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
 			WithFileBindCleanup(onFileBindCleanup).
 			WithRemoteImageIngest(w.encryptor, w.registry),
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
-		Logger:    logger,
+		RunnerTasks: contexts.NewRunnerTaskContext(
+			tx,
+			w.encryptor,
+			workflow.OrganizationID,
+		),
+		Logger: logger,
 	}
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)

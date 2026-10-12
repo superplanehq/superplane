@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
 import type { FactoriesWorkOrder } from "@/api-client";
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import superplaneIcon from "@/assets/superplane.svg";
+import superplaneMark from "@/assets/superplane-mark.svg";
 
 import { CREATED_MANUALLY } from "../pages/work-order-split-run/splitRunSource";
 import {
@@ -23,7 +24,7 @@ describe("workOrderCardSource", () => {
   it("returns the product logo for a manual task", () => {
     expect(workOrderCardSource(baseOrder)).toEqual({
       name: CREATED_MANUALLY,
-      iconSrc: superplaneIcon,
+      iconSrc: superplaneMark,
       iconAlt: "SuperPlane",
     });
   });
@@ -36,7 +37,7 @@ describe("workOrderCardSource", () => {
       }),
     ).toEqual({
       name: CREATED_MANUALLY,
-      iconSrc: superplaneIcon,
+      iconSrc: superplaneMark,
       iconAlt: "SuperPlane",
       creatorName: "Ada Lovelace",
     });
@@ -64,6 +65,35 @@ describe("workOrderCardSource", () => {
       ticket: { label: "acme/payments#12", href: "https://github.com/acme/payments/issues/12" },
     });
   });
+
+  it("returns Dependabot alerts for a Dependabot alert origin", () => {
+    const href = "https://github.com/acme/payments/security/dependabot?q=is:open+package:vitest+ecosystem:npm";
+    expect(
+      workOrderCardSource({
+        ...baseOrder,
+        title: "Fix Dependabot alerts for vitest (npm)",
+        origin: { url: href, label: "Dependabot: vitest" },
+      }),
+    ).toEqual({
+      name: "Dependabot alerts",
+      iconSrc: dependabotIcon,
+      iconAlt: "Dependabot",
+      ticket: { label: "Dependabot: vitest", href },
+    });
+  });
+
+  it("returns the MCP client name for a handed-off task", () => {
+    expect(
+      workOrderCardSource({
+        ...baseOrder,
+        mcpClient: { id: "superplane-local", name: "Cursor" },
+      }),
+    ).toEqual({
+      name: "Cursor",
+      iconSrc: superplaneMark,
+      iconAlt: "SuperPlane",
+    });
+  });
 });
 
 describe("workOrderListSource", () => {
@@ -85,6 +115,47 @@ describe("workOrderListSource", () => {
       label: "GitHub issues",
     });
   });
+
+  it("uses dependabot-alerts for a Dependabot alert origin", () => {
+    expect(
+      workOrderListSource({
+        ...baseOrder,
+        title: "Fix Dependabot alerts for vitest (npm)",
+        origin: {
+          url: "https://github.com/acme/payments/security/dependabot?q=is:open+package:vitest+ecosystem:npm",
+          label: "Dependabot: vitest",
+        },
+      }),
+    ).toEqual({
+      id: "dependabot-alerts",
+      label: "Dependabot alerts",
+    });
+  });
+
+  it("keeps github-issues when an issue label mentions Dependabot", () => {
+    expect(
+      workOrderListSource({
+        ...baseOrder,
+        title: "Fix Dependabot alerts for vitest (npm)",
+        origin: { url: "https://github.com/acme/payments/issues/12", label: "Dependabot: vitest" },
+      }),
+    ).toEqual({
+      id: "github-issues",
+      label: "GitHub issues",
+    });
+  });
+
+  it("uses the MCP client name for a handed-off task", () => {
+    expect(
+      workOrderListSource({
+        ...baseOrder,
+        mcpClient: { id: "superplane-local", name: "Cursor" },
+      }),
+    ).toEqual({
+      id: "mcp:Cursor",
+      label: "Cursor",
+    });
+  });
 });
 
 describe("workOrderCardSourceLabel", () => {
@@ -92,7 +163,7 @@ describe("workOrderCardSourceLabel", () => {
     expect(
       workOrderCardSourceLabel({
         name: CREATED_MANUALLY,
-        iconSrc: superplaneIcon,
+        iconSrc: superplaneMark,
         iconAlt: "SuperPlane",
         creatorName: "Ada Lovelace",
       }),
@@ -103,7 +174,7 @@ describe("workOrderCardSourceLabel", () => {
     expect(
       workOrderCardSourceLabel({
         name: CREATED_MANUALLY,
-        iconSrc: superplaneIcon,
+        iconSrc: superplaneMark,
         iconAlt: "SuperPlane",
       }),
     ).toBe(CREATED_MANUALLY);

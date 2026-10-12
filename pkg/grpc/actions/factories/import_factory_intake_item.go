@@ -3,6 +3,7 @@ package factories
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
@@ -161,6 +163,33 @@ func ImportFactoryIntakeItem(
 				}
 			}
 		}
+		if reader, ok := source.(interface {
+			IssueFiles(context.Context, string, string) ([]linear.IssueFile, []linear.IssueLink, error)
+		}); ok {
+			issueFiles, links, readErr := reader.IssueFiles(ctx, item.ID, body)
+			if readErr != nil {
+				return errors.Join(errLinearIssueFiles, readErr)
+			}
+			body = linear.DescriptionWithLinks(body, links)
+			if len(issueFiles) > 0 {
+				ingested, ingestErr := storedfiles.AppendTaskFiles(
+					ctx,
+					tx,
+					blob.Current(),
+					orgID,
+					factory.ID,
+					order.ID,
+					&createdByID,
+					body,
+					incomingLinearFiles(issueFiles),
+				)
+				bound.CopiedKeys = append(bound.CopiedKeys, ingested.ObjectKeys...)
+				if ingestErr != nil {
+					return errors.Join(errLinearIssueFiles, ingestErr)
+				}
+				body = ingested.Markdown
+			}
+		}
 		if body != order.Description {
 			if err := order.UpdateContent(tx, nil, &body); err != nil {
 				return err
@@ -194,6 +223,19 @@ func ImportFactoryIntakeItem(
 	}
 
 	return &pb.ImportFactoryIntakeItemResponse{Order: serialized}, nil
+}
+
+func incomingLinearFiles(files []linear.IssueFile) []storedfiles.IncomingFile {
+	incoming := make([]storedfiles.IncomingFile, 0, len(files))
+	for _, file := range files {
+		incoming = append(incoming, storedfiles.IncomingFile{
+			Filename:    file.Name,
+			ContentType: file.ContentType,
+			Body:        bytes.NewReader(file.Body),
+			ReplaceURLs: file.ReplaceURLs,
+		})
+	}
+	return incoming
 }
 
 func incomingJiraFiles(files []jira.IssueFile) []storedfiles.IncomingFile {

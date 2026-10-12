@@ -264,4 +264,14 @@ describe("adminCreditGrantCents", () => {
       ]),
     ).toBe(13500);
   });
+
+  it("includes signed SuperPlane grant adjustments", () => {
+    expect(
+      adminCreditGrantCents([
+        { kind: "admin", amountCents: "11000" },
+        { kind: "admin_adjustment", amountCents: "-4000" },
+        { kind: "trial_adjustment", amountCents: "-1000" },
+      ]),
+    ).toBe(7000);
+  });
 });

@@ -18,32 +18,40 @@ interface HostedCreditHeaderKickerProps {
   kind?: HostedCreditHeaderKickerKind;
   /** Whether the signed-in organization can buy credit. Hides the action and link for low and empty credit. */
   canAddCredit?: boolean;
+  /** Phone board chip. Hides the action pill and lets the row truncate. */
+  compact?: boolean;
 }
 
-/** Compact credit chip next to the workspace page title. */
+/** Credit chip next to the workspace page title. */
 export function HostedCreditHeaderKicker({
   spendingHref,
   welcomeCreditExpiresAt,
   remainingCreditCents = 0,
   kind = "trial",
   canAddCredit = true,
+  compact = false,
 }: HostedCreditHeaderKickerProps) {
   const palette = KICKER_PALETTE[kind];
   const label = hostedCreditHeaderKickerLabel(kind);
   const actionLabel = hostedCreditHeaderKickerActionLabel(kind);
   const details = kickerDetails(kind, welcomeCreditExpiresAt, remainingCreditCents);
   const showAction = kind !== "low" && kind !== "empty" ? true : canAddCredit;
+  const showActionPill = showAction && !compact;
   const className = cn(
-    "inline-flex h-8 shrink-0 items-center gap-2 rounded-full py-1 pl-2.5 pr-1.5 text-[12px]",
+    "inline-flex h-8 items-center rounded-full py-1 text-[12px]",
+    compact ? "min-w-0 max-w-full overflow-hidden px-2.5" : "shrink-0 pl-2.5 pr-1.5",
     palette.shell,
     showAction && palette.hover,
   );
   const content = (
-    <>
+    <span className={cn(compact ? "block min-w-0 truncate" : "inline-flex items-center gap-2")}>
       <span className={cn("whitespace-nowrap font-medium", palette.text)}>{label}</span>
       {details.map((detail) => (
-        <span key={detail.key} className="inline-flex items-center gap-2">
-          <ChipDot className={palette.dot} />
+        <span
+          key={detail.key}
+          className={cn("whitespace-nowrap", compact ? "inline" : "inline-flex items-center gap-2")}
+        >
+          <ChipDot className={cn(palette.dot, compact && "mx-2")} />
           <span
             className={cn(
               "whitespace-nowrap",
@@ -54,7 +62,7 @@ export function HostedCreditHeaderKicker({
           </span>
         </span>
       ))}
-      {showAction ? (
+      {showActionPill ? (
         <span
           className={cn(
             "inline-flex h-5 items-center rounded-full px-2.5 text-[11px] leading-none font-medium text-white",
@@ -64,7 +72,7 @@ export function HostedCreditHeaderKicker({
           {actionLabel}
         </span>
       ) : null}
-    </>
+    </span>
   );
 
   if (!showAction) {
@@ -78,7 +86,7 @@ export function HostedCreditHeaderKicker({
   return (
     <Link
       to={spendingHref}
-      aria-label={actionLabel}
+      aria-label={compact ? compactAccessibleName(label, details, actionLabel) : actionLabel}
       data-testid="hosted-credit-header-kicker"
       data-kind={kind}
       className={className}
@@ -86,6 +94,10 @@ export function HostedCreditHeaderKicker({
       {content}
     </Link>
   );
+}
+
+function compactAccessibleName(label: string, details: Array<{ text: string }>, actionLabel: string): string {
+  return [label, ...details.map((detail) => detail.text), actionLabel].join(", ");
 }
 
 type KickPalette = {

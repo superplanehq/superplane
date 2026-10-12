@@ -157,6 +157,17 @@ var intakeSpecsBySource = map[string]intakeSpec{
 		createTitle:       "{{ root().data.title }}",
 		createDescription: "{{ root().data.description }}",
 	},
+	models.FactoryIntakeSourceLinearIssues: {
+		name:             "Linear issues",
+		description:      "Create a work order when a Linear issue is added to a selected project.",
+		triggerComponent: "linear.onIssue",
+		triggerName:      "On Issue",
+		triggerConfiguration: map[string]any{
+			"actions": []any{"create", "update"},
+		},
+		createTitle:       `{{ root().data.data.identifier }}: {{ root().data.data.title }}`,
+		createDescription: `{{ root().data.data.description }}`,
+	},
 }
 
 // dependabotAlertCreateTitle names the package, not the manifest, because
@@ -443,6 +454,24 @@ func intakeTriggerConfiguration(spec intakeSpec, request intakeCanvasRequest) ma
 	if request.Source == models.FactoryIntakeSourceProductiveTasks {
 		configuration["actions"] = intakeProductiveTriggerActions(request.Settings)
 	}
+	if request.Source == models.FactoryIntakeSourceLinearIssues {
+		projects := request.Settings.LinearProjectIDs
+		if len(projects) == 0 {
+			projects = configurationStrings(configuration["projects"])
+		}
+		configuration["projects"] = configurationAnyStrings(projects)
+		configuration["labels"] = linearLabelPredicates(request.Settings.LinearLabels)
+		configuration["actions"] = []any{"create", "update"}
+	}
+	if request.Source == models.FactoryIntakeSourceSentryExceptions {
+		projects := request.Settings.SentryProjectIDs
+		if len(projects) == 0 {
+			projects = sentryProjectIDsFromConfiguration(configuration)
+		}
+		if len(projects) > 0 {
+			applySentryProjectConfiguration(configuration, projects)
+		}
+	}
 
 	return configuration
 }
@@ -473,16 +502,19 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	if source == models.FactoryIntakeSourceDatadog {
 		return defaultDatadogIntakeSettings()
 	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		return defaultLinearIntakeSettings()
+	}
 	return defaultIntakeSettings()
 }
 
-func intakeRefinementConfiguration(agent *intakeAgent, githubName string) map[string]any {
-	configuration := intakeRunnerConfiguration(agent, githubName)
+func intakeRefinementConfiguration(agent *intakeAgent, vcsName, vcsProvider string) map[string]any {
+	configuration := intakeRunnerConfiguration(agent, vcsName)
 	configuration["steps"] = []any{
 		map[string]any{
 			"name":    "Clone repository",
 			"type":    runner.AgentStepBash,
-			"command": intakeAnalysisCloneCommand(),
+			"command": intakeAnalysisCloneCommand(vcsProvider),
 		},
 		map[string]any{
 			"name":             "Refine Task",
@@ -494,9 +526,9 @@ func intakeRefinementConfiguration(agent *intakeAgent, githubName string) map[st
 	return configuration
 }
 
-func intakeRunnerConfiguration(agent *intakeAgent, githubName string) map[string]any {
-	if strings.TrimSpace(githubName) == "" {
-		githubName = intakeGitHubAppName
+func intakeRunnerConfiguration(agent *intakeAgent, vcsName string) map[string]any {
+	if strings.TrimSpace(vcsName) == "" {
+		vcsName = intakeGitHubAppName
 	}
 
 	configuration := map[string]any{
@@ -506,7 +538,7 @@ func intakeRunnerConfiguration(agent *intakeAgent, githubName string) map[string
 			map[string]any{
 				"source": "integration",
 				"integration": map[string]any{
-					"name": githubName,
+					"name": vcsName,
 				},
 			},
 		},
@@ -535,20 +567,41 @@ func intakeRunnerConfiguration(agent *intakeAgent, githubName string) map[string
 	return configuration
 }
 
+// intakeRefinementPrompt returns the Refine Task node prompt. New and reset
+// Backlog templates use the 1 through 3 review pack. A saved canvas prompt
+// is left unchanged.
 func intakeRefinementPrompt() string {
 	return runner.PlanningSessionUserPromptMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
 }
 
-func intakeAnalysisCloneCommand() string {
-	return strings.Join([]string{
+func intakeAnalysisCloneCommand(vcsProvider string) string {
+	lines := []string{
 		"set -euo pipefail",
 		`if [ -z "${REPO_URL:-}" ]; then`,
 		`  echo "This workspace has no repository to analyze." >&2`,
 		"  exit 1",
 		"fi",
-		`git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`,
-		"rm -rf repo",
-		`git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo`,
+	}
+	// ponytail: GitHub-only auth rewrite; Bitbucket uses the credential helper
+	if !strings.EqualFold(strings.TrimSpace(vcsProvider), models.ProviderBitbucket) {
+		lines = append(lines, `git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`)
+	}
+	lines = append(lines, "rm -rf repo", cloneRepositoryCommand())
+	return strings.Join(lines, "\n")
+}
+
+func cloneRepositoryCommand() string {
+	return strings.Join([]string{
+		`branch="${BASE:-main}"`,
+		`heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1`,
+		`if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then`,
+		`  git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo`,
+		`elif [ -z "$heads" ]; then`,
+		`  git clone "${REPO_URL}" repo`,
+		`else`,
+		`  echo "Remote branch ${branch} not found. The repository has other branches." >&2`,
+		`  exit 1`,
+		`fi`,
 	}, "\n")
 }
 

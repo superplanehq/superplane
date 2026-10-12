@@ -15,6 +15,9 @@ describe("creditGrantSourceLabel", () => {
     expect(creditGrantSourceLabel("included")).toBe("Included");
     expect(creditGrantSourceLabel("topup")).toBe("Top-up");
     expect(creditGrantSourceLabel("topup_refund")).toBe("Refund");
+    expect(creditGrantSourceLabel("trial_adjustment")).toBe("Trial adjustment");
+    expect(creditGrantSourceLabel("topup_adjustment")).toBe("Top-up adjustment");
+    expect(creditGrantSourceLabel("admin_adjustment")).toBe("SuperPlane grant adjustment");
   });
 });
 
@@ -27,6 +30,12 @@ describe("creditGrantDetails", () => {
         actorName: "Ada",
       }),
     ).toBe("Support grant · Granted by Ada");
+  });
+
+  it("names the admin who adjusted a balance", () => {
+    expect(creditGrantDetails({ kind: "trial_adjustment", note: "Refund", actorName: "Ada" })).toBe(
+      "Refund · Adjusted by Ada",
+    );
   });
 
   it("shows a stored purchase order id", () => {

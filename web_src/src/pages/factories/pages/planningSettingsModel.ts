@@ -43,13 +43,14 @@ export function planningAutoStartLines(factory?: FactoriesFactory | null): Plann
 }
 
 export function planningSettingsFromFactory(factory?: FactoriesFactory | null): PlanningDraftSettings {
-  const stored = factory?.planning?.autoStartLineId ?? "";
+  const planning = factory?.planning;
+  const stored = planning?.autoStartLineId ?? "";
   const lines = factory?.lines;
   const autoStartLineId = !lines || lines.some((line) => line.id === stored) ? stored : "";
   return {
-    enabled: factory?.planning?.enabled ?? DEFAULT_PLANNING_SETTINGS.enabled,
-    clarity: factory?.planning?.clarity ?? DEFAULT_PLANNING_SETTINGS.clarity,
-    confidence: factory?.planning?.confidence ?? DEFAULT_PLANNING_SETTINGS.confidence,
+    enabled: planning?.enabled ?? DEFAULT_PLANNING_SETTINGS.enabled,
+    clarity: planning?.clarity ?? DEFAULT_PLANNING_SETTINGS.clarity,
+    confidence: planning?.confidence ?? DEFAULT_PLANNING_SETTINGS.confidence,
     autoStartLineId,
   };
 }

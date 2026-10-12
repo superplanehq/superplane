@@ -12,10 +12,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
+	goyaml "gopkg.in/yaml.v3"
 )
 
 func TestMaterializeFactoryTemplate(t *testing.T) {
-	result, err := materializeFactoryTemplate("line-implementation", factoryTemplateInput{
+	result, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
 		appID:   "app-1",
 		appName: "Implement refunds",
 		installParams: map[string]string{
@@ -40,8 +41,9 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 
 	entrypoint := findYAMLNode(t, canvas, "onrun-implement")
 	assert.Equal(t, map[string]any{
-		"id":      "line-implementation",
-		"version": float64(factoryTemplateVersion),
+		"id":       "line-implementation",
+		"version":  float64(factoryTemplateVersion),
+		"provider": models.ProviderGitHub,
 	}, entrypoint.Metadata[factoryTemplateMetadataKey])
 
 	agent := findYAMLNode(t, canvas, "implementation-agent-no-issue")
@@ -123,7 +125,7 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 }
 
 func TestMaterializeRiskScoreTemplate(t *testing.T) {
-	result, err := materializeFactoryTemplate("risk-score", factoryTemplateInput{
+	result, err := materializeFactoryTemplate("risk-score", "", factoryTemplateInput{
 		appID:   "app-risk",
 		appName: "Merge confidence",
 		installParams: map[string]string{
@@ -146,66 +148,41 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 
 	entrypoint := findYAMLNode(t, canvas, "on-pr-risk")
 	assert.Equal(t, map[string]any{
-		"id":      "risk-score",
-		"version": float64(factoryTemplateVersion),
+		"id":       "risk-score",
+		"version":  float64(factoryTemplateVersion),
+		"provider": models.ProviderGitHub,
 	}, entrypoint.Metadata[factoryTemplateMetadataKey])
+	assert.Equal(t, "github.onPullRequest", entrypoint.Component)
+	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
 	assert.Equal(t, "acme/app", entrypoint.Configuration["repository"])
+	assert.Equal(t, true, entrypoint.Configuration["ignoreDrafts"])
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, entrypoint.Integration)
-
-	gate := findYAMLNode(t, canvas, "should-assess")
-	assert.Equal(
-		t,
-		`root().data.pull_request.base.ref == "main" && root().data.pull_request.draft != true`,
-		gate.Configuration["expression"],
-	)
+	assert.NotContains(t, result.canvasYAML, "should-assess")
+	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "on-pr-risk", TargetID: "assess-risk", Channel: "default"})
 
 	agent := findYAMLNode(t, canvas, "assess-risk")
 	assert.Equal(t, models.SuperPlaneRunnerComponent, agent.Component)
 	assert.NotContains(t, agent.Configuration, "credentials")
 	assert.NotContains(t, agent.Configuration, "model")
 	prompt := agentPrompt(t, agent)
+	assert.Contains(t, prompt, "Merge check: risk.")
 	assert.Contains(t, prompt, "Additive database changes = 3 (medium).")
 	assert.Contains(t, prompt, "Authorization changes = 4 (high).")
-	assert.Contains(t, prompt, "Enabled checks: risk, performance, security, drift, reversibility.")
+	assert.Contains(t, prompt, "report_merge_check")
+	assert.Contains(t, prompt, "check is risk.")
+	for _, name := range []string{"Checkout Pull Request", "Blast radius", "Performance", "Security", "Drift from Specification", "Reversibility"} {
+		implementationStep(t, agent, name)
+	}
 	assert.NotContains(t, prompt, "install_params.riskRules")
 	assert.NotContains(t, prompt, "install_params.enabledChecks")
 	assert.Contains(t, result.canvasYAML, `gh api -H "Accept: application/vnd.github.v3.diff"`)
 	assert.Contains(t, result.canvasYAML, `/compare/${base_ref}...${revision}" > /tmp/pr.diff`)
-
-	format := findYAMLNode(t, canvas, "format-merge-confidence")
-	assert.Contains(t, format.Configuration["script"], "Math.min(5")
-
-	report := findYAMLNode(t, canvas, "report-risk-score")
-	assert.Equal(t, "risk-review", report.Configuration["checkKey"])
-	assert.Equal(t, "Blast radius", report.Configuration["name"])
-	assert.Equal(t, "5", report.Configuration["maxScore"])
-	assert.Equal(t, "lowerIsBetter", report.Configuration["direction"])
-	assert.Equal(t, float64(3), report.Configuration["cautionAt"])
-	assert.Equal(t, float64(4), report.Configuration["criticalAt"])
-
-	performance := findYAMLNode(t, canvas, "report-performance")
-	assert.Equal(t, "performance-review", performance.Configuration["checkKey"])
-	assert.Equal(t, "higherIsBetter", performance.Configuration["direction"])
-	assert.Equal(t, float64(3), performance.Configuration["cautionAt"])
-	assert.Equal(t, float64(2), performance.Configuration["criticalAt"])
-
-	security := findYAMLNode(t, canvas, "report-security")
-	assert.Equal(t, "security-review", security.Configuration["checkKey"])
-	assert.Equal(t, "higherIsBetter", security.Configuration["direction"])
-
-	drift := findYAMLNode(t, canvas, "report-drift")
-	assert.Equal(t, "drift-review", drift.Configuration["checkKey"])
-	assert.Equal(t, "Drift from Specification", drift.Configuration["name"])
-	assert.Equal(t, "lowerIsBetter", drift.Configuration["direction"])
-	assert.Equal(t, float64(3), drift.Configuration["cautionAt"])
-	assert.Equal(t, float64(4), drift.Configuration["criticalAt"])
-
-	reversibility := findYAMLNode(t, canvas, "report-reversibility")
-	assert.Equal(t, "reversibility-review", reversibility.Configuration["checkKey"])
-	assert.Equal(t, "Reversibility", reversibility.Configuration["name"])
-	assert.Equal(t, "higherIsBetter", reversibility.Configuration["direction"])
-	assert.Equal(t, float64(3), reversibility.Configuration["cautionAt"])
-	assert.Equal(t, float64(2), reversibility.Configuration["criticalAt"])
+	assert.Contains(t, result.canvasYAML, "SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID")
+	assert.Contains(t, result.canvasYAML, `root().data.workOrder.id`)
+	assert.NotContains(t, result.canvasYAML, "findPullRequest")
+	assert.NotContains(t, result.canvasYAML, "reportWorkOrderCheck")
+	assert.NotContains(t, result.canvasYAML, "merge-confidence.json")
+	assert.Len(t, canvas.Spec.Nodes, 2)
 
 	assert.NotContains(t, result.canvasYAML, "github.createIssueComment")
 	assert.NotContains(t, result.canvasYAML, "github.publishCommitStatus")
@@ -217,10 +194,91 @@ func TestMaterializeRiskScoreTemplate(t *testing.T) {
 	requireValidCanvasExpressions(t, canvas)
 }
 
+func TestMaterializeRiskScoreTemplateBitbucket(t *testing.T) {
+	result, err := materializeFactoryTemplate("risk-score", models.ProviderBitbucket, factoryTemplateInput{
+		appID:   "app-risk",
+		appName: "Merge confidence",
+		installParams: map[string]string{
+			"appRepository": "acme/widgets",
+			"defaultBranch": "main",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"bitbucket": {id: "bitbucket-1", name: "acme-bitbucket"},
+		},
+		agent: &factoryTemplateAgent{
+			component:        models.SuperPlaneRunnerComponent,
+			credentialSource: "hosted",
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+
+	entrypoint := findYAMLNode(t, canvas, "on-pr-risk")
+	assert.Equal(t, map[string]any{
+		"id":       "risk-score",
+		"version":  float64(factoryTemplateVersion),
+		"provider": models.ProviderBitbucket,
+	}, entrypoint.Metadata[factoryTemplateMetadataKey])
+	assert.Equal(t, "bitbucket.onPullRequest", entrypoint.Component)
+	assert.Equal(t, true, entrypoint.Configuration["onlyFactoryPullRequests"])
+	assert.Equal(t, "acme/widgets", entrypoint.Configuration["repository"])
+	assert.Equal(t, []any{"created", "updated"}, entrypoint.Configuration["actions"])
+	assert.Equal(t, &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}, entrypoint.Integration)
+
+	agent := findYAMLNode(t, canvas, "assess-risk")
+	prompt := agentPrompt(t, agent)
+	assert.Contains(t, prompt, "Merge check: risk.")
+	assert.Contains(t, prompt, "Description: {{ root().data.pull_request.description }}")
+	assert.Contains(t, result.canvasYAML, "git clone --no-checkout")
+	assert.Contains(t, result.canvasYAML, "git merge-base")
+	assert.Contains(t, result.canvasYAML, "SOURCE_REPO")
+	assert.Contains(t, result.canvasYAML, "source?.repository?.full_name")
+	assert.NotContains(t, result.canvasYAML, "git checkout --detach FETCH_HEAD")
+	assert.Contains(t, result.canvasYAML, "SUPERPLANE_MERGE_CONFIDENCE_ORDER_ID")
+	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
+
+	requireValidCanvasExpressions(t, canvas)
+}
+
+func TestMaterializeRiskScoreOmitsDisabledChecks(t *testing.T) {
+	result, err := materializeFactoryTemplate("risk-score", "", factoryTemplateInput{
+		appID:   "app-risk",
+		appName: "Merge confidence",
+		installParams: map[string]string{
+			"appRepository": "acme/app",
+			"enabledChecks": "risk",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"github": {id: "github-1", name: "acme-github"},
+		},
+		agent: &factoryTemplateAgent{
+			component:        models.SuperPlaneRunnerComponent,
+			credentialSource: "hosted",
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+	agent := findYAMLNode(t, canvas, "assess-risk")
+	implementationStep(t, agent, "Checkout Pull Request")
+	implementationStep(t, agent, "Blast radius")
+	steps, ok := agent.Configuration["steps"].([]any)
+	require.True(t, ok)
+	for _, step := range steps {
+		item, isMap := step.(map[string]any)
+		require.True(t, isMap)
+		assert.NotEqual(t, "Performance", item["name"])
+		assert.NotEqual(t, "Security", item["name"])
+	}
+}
+
 func TestMaterializeLineImplementationKeepsVisualEvidence(t *testing.T) {
 	for _, enabled := range []bool{true, false} {
 		t.Run(visualEvidenceCaseName(enabled), func(t *testing.T) {
-			seed, err := materializeFactoryTemplate("line-implementation", factoryTemplateInput{
+			seed, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
 				appID:   "app-1",
 				appName: "Implement",
 			})
@@ -232,7 +290,7 @@ func TestMaterializeLineImplementationKeepsVisualEvidence(t *testing.T) {
 			includeVisualEvidence := canvasAgentIncludesVisualEvidence(live.Nodes())
 			assert.Equal(t, enabled, includeVisualEvidence)
 
-			result, err := materializeFactoryTemplate("line-implementation", factoryTemplateInput{
+			result, err := materializeFactoryTemplate("line-implementation", "", factoryTemplateInput{
 				appID:                 "app-1",
 				appName:               "Implement",
 				includeVisualEvidence: &includeVisualEvidence,
@@ -263,7 +321,7 @@ func TestDeriveFactoryTemplateInputCarriesVisualEvidence(t *testing.T) {
 						"includeVisualEvidence": enabled,
 					},
 				}}},
-				factoryAppTemplates["line-implementation"],
+				mustFactoryAppTemplate(t, "line-implementation"),
 			)
 			require.NotNil(t, input.includeVisualEvidence)
 			assert.Equal(t, enabled, *input.includeVisualEvidence)
@@ -296,7 +354,7 @@ func TestCanvasAgentIncludesVisualEvidenceIgnoresUnrelatedRunners(t *testing.T) 
 		nil,
 		&models.Canvas{ID: uuid.New(), Name: "Implement"},
 		&models.CanvasVersion{Nodes: nodes},
-		factoryAppTemplates["line-implementation"],
+		mustFactoryAppTemplate(t, "line-implementation"),
 	)
 	require.NotNil(t, input.includeVisualEvidence)
 	assert.False(t, *input.includeVisualEvidence)
@@ -397,7 +455,7 @@ func visualEvidenceCaseName(enabled bool) string {
 }
 
 func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
-	result, err := materializeFactoryTemplate("pr-closure", factoryTemplateInput{
+	result, err := materializeFactoryTemplate("pr-closure", "", factoryTemplateInput{
 		appID:   "app-1",
 		appName: "PR Closure",
 		installParams: map[string]string{
@@ -416,15 +474,15 @@ func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
 	assert.Equal(t, "if", hasGitHubOrigin.Component)
 	assert.Equal(
 		t,
-		`$["Find Pull Request"].data.workOrder.origin != nil && split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[0] == "" && len(split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")) == 2`,
+		`root().data.workOrder.origin != nil && split(root().data.workOrder.origin.url, "https://github.com/")[0] == "" && len(split(root().data.workOrder.origin.url, "/issues/")) == 2`,
 		hasGitHubOrigin.Configuration["expression"],
 	)
 
 	comment := findYAMLNode(t, canvas, "comment-source-issue")
 	assert.Equal(t, "github.createIssueComment", comment.Component)
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, comment.Integration)
-	assert.Equal(t, `{{ split(split($["Find Pull Request"].data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}`, comment.Configuration["repository"])
-	assert.Equal(t, `{{ split($["Find Pull Request"].data.workOrder.origin.url, "/issues/")[1] }}`, comment.Configuration["issueNumber"])
+	assert.Equal(t, `{{ split(split(root().data.workOrder.origin.url, "https://github.com/")[1], "/issues/")[0] }}`, comment.Configuration["repository"])
+	assert.Equal(t, `{{ split(root().data.workOrder.origin.url, "/issues/")[1] }}`, comment.Configuration["issueNumber"])
 	assert.Equal(
 		t,
 		`SuperPlane completed this task in pull request [#{{ root().data.pull_request.number }}]({{ root().data.pull_request.html_url }}).`,
@@ -444,12 +502,19 @@ func TestMaterializePRClosureClosesGitHubOriginAfterMerge(t *testing.T) {
 	assert.NotContains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "reject-work-order", TargetID: "has-github-issue-origin", Channel: "default"})
 }
 
+func mustFactoryAppTemplate(t *testing.T, id string) factoryAppTemplate {
+	t.Helper()
+	template, ok := lookupFactoryAppTemplate(id, "")
+	require.True(t, ok)
+	return template
+}
+
 func TestMaterializeFactoryTemplates(t *testing.T) {
-	for id := range factoryAppTemplates {
-		t.Run(id, func(t *testing.T) {
-			result, err := materializeFactoryTemplate(id, factoryTemplateInput{
+	for key, template := range factoryAppTemplates {
+		t.Run(key.provider+"/"+key.id, func(t *testing.T) {
+			result, err := materializeFactoryTemplate(template.id, template.provider, factoryTemplateInput{
 				appID:   "app-1",
-				appName: id,
+				appName: template.id,
 				installParams: map[string]string{
 					"appRepository":     "acme/app",
 					"backlogRepository": "acme/backlog",
@@ -468,8 +533,116 @@ func TestMaterializeFactoryTemplates(t *testing.T) {
 	}
 }
 
+func TestMaterializeFactoryTemplateBitbucketImplement(t *testing.T) {
+	result, err := materializeFactoryTemplate("line-implementation", models.ProviderBitbucket, factoryTemplateInput{
+		appID:   "app-1",
+		appName: "Implement",
+		integrations: map[string]factoryTemplateIntegration{
+			"bitbucket": {id: "bitbucket-1", name: "acme-bitbucket"},
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+
+	entrypoint := findYAMLNode(t, canvas, "onrun-implement")
+	assert.Equal(t, models.ProviderBitbucket, entrypoint.Metadata[factoryTemplateMetadataKey].(map[string]any)["provider"])
+
+	agent := findYAMLNode(t, canvas, "implementation-agent-no-issue")
+	assert.Equal(t, []any{map[string]any{
+		"source":      "integration",
+		"integration": map[string]any{"name": "acme-bitbucket"},
+	}}, agent.Configuration["environmentFrom"])
+
+	bitbucket := &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}
+	for nodeID, component := range map[string]string{
+		"find-pr":                         "bitbucket.findPullRequest",
+		"create-pr":                       "bitbucket.createPullRequest",
+		"update-pr":                       "bitbucket.updatePullRequest",
+		"comment-visual-evidence":         "bitbucket.createPullRequestComment",
+		"comment-visual-evidence-updated": "bitbucket.createPullRequestComment",
+	} {
+		node := findYAMLNode(t, canvas, nodeID)
+		assert.Equal(t, component, node.Component, nodeID)
+		assert.Equal(t, bitbucket, node.Integration, nodeID)
+	}
+
+	attach := findYAMLNode(t, canvas, "attach-pr-artifact")
+	assert.Equal(t, "bitbucket", attach.Configuration["provider"])
+	assert.Equal(t, `{{ $["Create Pull Request"].data.links.html.href }}`, attach.Configuration["url"])
+	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
+}
+
+func TestMaterializeFactoryTemplateBitbucketPRClosure(t *testing.T) {
+	result, err := materializeFactoryTemplate("pr-closure", models.ProviderBitbucket, factoryTemplateInput{
+		appID:   "app-1",
+		appName: "PR Closure",
+		installParams: map[string]string{
+			"appRepository": "acme/widgets",
+		},
+		integrations: map[string]factoryTemplateIntegration{
+			"bitbucket": {id: "bitbucket-1", name: "acme-bitbucket"},
+		},
+	})
+	require.NoError(t, err)
+
+	canvas, err := yaml.CanvasFromYAML([]byte(result.canvasYAML))
+	require.NoError(t, err)
+
+	trigger := findYAMLNode(t, canvas, "on-pr-closed")
+	assert.Equal(t, "bitbucket.onPullRequest", trigger.Component)
+	assert.Equal(t, []any{"merged", "declined"}, trigger.Configuration["actions"])
+	assert.Equal(t, true, trigger.Configuration["onlyFactoryPullRequests"])
+	assert.Equal(t, "acme/widgets", trigger.Configuration["repository"])
+	assert.Equal(t, &yaml.IntegrationRef{ID: "bitbucket-1", Name: "acme-bitbucket"}, trigger.Integration)
+	assert.Equal(t, models.ProviderBitbucket, trigger.Metadata[factoryTemplateMetadataKey].(map[string]any)["provider"])
+
+	merged := findYAMLNode(t, canvas, "is-pr-merged")
+	assert.Contains(t, merged.Configuration["expression"], "pull_request.merged")
+
+	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
+}
+
+func TestBuildDiscussionPRFeedbackCanvasBitbucket(t *testing.T) {
+	canvas := buildDiscussionPRFeedbackCanvas(prFeedbackBuildRequest{
+		Repository:  "acme/widgets",
+		Mention:     "@ada",
+		VCSProvider: models.ProviderBitbucket,
+		Agent: &intakeAgent{
+			Component: "runnerOpenRouter",
+			Model:     "anthropic/claude-sonnet-4-6",
+		},
+	})
+
+	trigger := findSpecNode(t, canvas, prFeedbackCommentTriggerNodeID)
+	assert.Equal(t, "bitbucket.onPullRequestComment", trigger.Component)
+	assert.Equal(t, "acme/widgets", trigger.Configuration["repository"])
+	assert.Equal(t, "@ada", trigger.Configuration["contentFilter"])
+
+	find := findSpecNode(t, canvas, prFeedbackFindNodeID)
+	assert.Equal(t, "bitbucket", find.Configuration["provider"])
+
+	acknowledge := findSpecNode(t, canvas, prFeedbackAcknowledgeCommentNodeID)
+	assert.Equal(t, "bitbucket.createPullRequestComment", acknowledge.Component)
+	assert.Equal(t, "{{ root().data.comment.id }}", acknowledge.Configuration["parentCommentId"])
+
+	for _, node := range canvas.Spec.Nodes {
+		assert.NotContains(t, node.Component, "github.")
+	}
+	encoded, err := goyaml.Marshal(canvas)
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), "GITHUB_TOKEN")
+	assert.NotContains(t, string(encoded), "github.com")
+	assert.Contains(t, string(encoded), "BITBUCKET_TOKEN")
+	assert.Contains(t, string(encoded), "BITBUCKET_EMAIL")
+	assert.Contains(t, string(encoded), "source.repository.full_name")
+	assert.NotContains(t, string(encoded), "git push origin HEAD")
+}
+
 func TestMaterializeFactoryTemplateRejectsRetiredPlan(t *testing.T) {
-	_, err := materializeFactoryTemplate("line-planning", factoryTemplateInput{
+
+	_, err := materializeFactoryTemplate("line-planning", "", factoryTemplateInput{
 		appID:   "app-1",
 		appName: "Plan",
 	})
@@ -603,11 +776,32 @@ func TestMaterializeBacklogDefaults(t *testing.T) {
 		"source":      "integration",
 		"integration": map[string]any{"name": "acme-openrouter"},
 	}, refinement.Configuration["credentials"])
+	prompt := implementationStep(t, refinement, "Refine Task")
+	text, ok := prompt["prompt"].(string)
+	require.True(t, ok)
+	assert.Contains(t, text, runner.PlanningSessionUserPromptReviewMarkdown())
+	assert.Contains(t, text, "Task:\n{{ root().data.workOrder }}")
+}
+
+func TestBuildBacklogCanvasUsesReviewPrompt(t *testing.T) {
+	text := backlogRefinementPromptText(t, buildBacklogCanvas(backlogCanvasRequest{}))
+	assert.Contains(t, text, runner.PlanningSessionUserPromptReviewMarkdown())
+	assert.Contains(t, text, "Task:\n{{ root().data.workOrder }}")
+	assert.Contains(t, text, "Clarity, Complexity, and Verifiability")
+	assert.NotContains(t, text, "1 through 5")
+}
+
+func backlogRefinementPromptText(t *testing.T, canvas *yaml.Canvas) string {
+	t.Helper()
+	refinement := findYAMLNode(t, canvas, backlogRefinementNodeID)
+	text, ok := implementationStep(t, refinement, "Refine Task")["prompt"].(string)
+	require.True(t, ok)
+	return text
 }
 
 func agentPrompt(t *testing.T, agent *yaml.Node) string {
 	t.Helper()
-	prompt, ok := implementationStep(t, agent, "Review Pull Request")["prompt"].(string)
+	prompt, ok := implementationStep(t, agent, "Blast radius")["prompt"].(string)
 	require.True(t, ok)
 	return prompt
 }

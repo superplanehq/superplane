@@ -145,6 +145,7 @@ export function SummaryCard({
   periodDays,
   medianCycleHours,
   comparison,
+  showMedianCycleTime = true,
 }: {
   totals: VelocityTotals;
   caption: string;
@@ -152,11 +153,18 @@ export function SummaryCard({
   /** Median cycle time of the tasks that closed in this window. */
   medianCycleHours?: number;
   comparison?: VelocityComparison;
+  /** Installation Admin hides cycle time because the admin API does not return it. */
+  showMedianCycleTime?: boolean;
 }) {
   return (
     <section className={velocityCardClassName} data-testid="velocity-summary">
       <p className="text-[12px] text-muted-foreground">{caption}</p>
-      <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-6 lg:grid-cols-4">
+      <div
+        className={cn(
+          "mt-4 grid grid-cols-2 gap-x-8 gap-y-6",
+          showMedianCycleTime ? "lg:grid-cols-4" : "lg:grid-cols-3",
+        )}
+      >
         <Metric
           label="Tasks closed"
           value={String(totals.tasksClosed)}
@@ -177,16 +185,18 @@ export function SummaryCard({
               : buildChange(comparison.taskWasteRate, "down", (magnitude) => `${magnitude} pp`)
           }
         />
-        <Metric
-          label="Median cycle time"
-          value={medianCycleHours === undefined ? "—" : formatDurationHours(medianCycleHours)}
-          tooltip="From task start to close"
-          change={
-            comparison?.cycleHours === undefined
-              ? undefined
-              : buildChange(comparison.cycleHours, "down", (magnitude) => formatDurationHours(magnitude))
-          }
-        />
+        {showMedianCycleTime ? (
+          <Metric
+            label="Median cycle time"
+            value={medianCycleHours === undefined ? "—" : formatDurationHours(medianCycleHours)}
+            tooltip="From task start to close"
+            change={
+              comparison?.cycleHours === undefined
+                ? undefined
+                : buildChange(comparison.cycleHours, "down", (magnitude) => formatDurationHours(magnitude))
+            }
+          />
+        ) : null}
         <Metric
           label="Cost per task"
           value={formatUsd(totals.costPerTask)}
@@ -208,14 +218,17 @@ export function DeliveryCard({
   onBreakdownChange,
   intakeSeries,
   hasOutput,
+  includePeople = true,
 }: {
   points: VelocityPoint[];
   breakdown: VelocityBreakdown;
   onBreakdownChange: (breakdown: VelocityBreakdown) => void;
   intakeSeries: VelocityIntakeSeries[];
   hasOutput: boolean;
+  /** False when repository merges are not stored, so the chart omits the people series. */
+  includePeople?: boolean;
 }) {
-  const copy = VELOCITY_BREAKDOWN_COPY[breakdown];
+  const copy = deliveryCopy(breakdown, includePeople);
   const canSplitByIntake = intakeSeries.length > 0;
   const options = VELOCITY_BREAKDOWN_OPTIONS.filter((option) => option.value !== "intake" || canSplitByIntake);
 
@@ -236,13 +249,28 @@ export function DeliveryCard({
       </div>
       {hasOutput ? (
         <div className="mt-5">
-          <DeliveryChart points={points} breakdown={breakdown} intakeSeries={intakeSeries} />
+          <DeliveryChart
+            points={points}
+            breakdown={breakdown}
+            intakeSeries={intakeSeries}
+            includePeople={includePeople}
+          />
         </div>
       ) : (
         <ChartEmptyNote>No pull requests merged or closed in this period.</ChartEmptyNote>
       )}
     </section>
   );
+}
+
+function deliveryCopy(breakdown: VelocityBreakdown, includePeople: boolean) {
+  if (includePeople || breakdown !== "origin") {
+    return VELOCITY_BREAKDOWN_COPY[breakdown];
+  }
+  return {
+    title: "Merged pull requests SuperPlane created",
+    description: "Merged pull requests SuperPlane created in this period.",
+  };
 }
 
 export function TaskTimeCard({

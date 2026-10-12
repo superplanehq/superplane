@@ -52,4 +52,25 @@ describe("MCPToolsList", () => {
     const names = screen.getAllByRole("switch").map((node) => node.getAttribute("aria-label"));
     expect(names).toEqual(["Enable create_issue", "Enable write_issue", "Enable search"]);
   });
+
+  it("lets a disabled write tool be switched on", async () => {
+    const user = userEvent.setup();
+    const onToggleTool = vi.fn();
+    render(
+      <MCPToolsList
+        tools={tools}
+        isLoading={false}
+        isError={false}
+        disabledTools={["create_issue"]}
+        canUpdate
+        onToggleTool={onToggleTool}
+      />,
+    );
+
+    const toggle = screen.getByTestId("mcp-tool-enabled-create_issue");
+    expect(toggle).toBeEnabled();
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+    expect(onToggleTool).toHaveBeenCalledWith("create_issue", true);
+  });
 });

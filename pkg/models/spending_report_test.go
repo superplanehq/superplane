@@ -309,7 +309,7 @@ func TestSpendingModelDisplayName(t *testing.T) {
 
 func TestSpendingBreakdownLabelUsesFundingSourceNames(t *testing.T) {
 	assert.Equal(t, "SuperPlane-hosted", models.SpendingBreakdownLabel("hosted", models.SpendingCatalogs{}, models.SpendingGroupByFundingSource))
-	assert.Equal(t, "Your keys", models.SpendingBreakdownLabel("byok", models.SpendingCatalogs{}, models.SpendingGroupByFundingSource))
+	assert.Equal(t, "Bring your own key", models.SpendingBreakdownLabel("byok", models.SpendingCatalogs{}, models.SpendingGroupByFundingSource))
 }
 
 func TestSpendingBreakdownLabelStripsOpenRouterPrefix(t *testing.T) {
@@ -406,7 +406,7 @@ func TestSummarizeSpendingExplorerSplitsHostedAndBYOK(t *testing.T) {
 		grouped.Breakdown[1].ID,
 	})
 	assert.Equal(t, "SuperPlane-hosted", models.SpendingBreakdownLabel(models.UsageFundingSourceHosted, models.SpendingCatalogs{}, models.SpendingGroupByFundingSource))
-	assert.Equal(t, "Your keys", models.SpendingBreakdownLabel(models.UsageFundingSourceBYOK, models.SpendingCatalogs{}, models.SpendingGroupByFundingSource))
+	assert.Equal(t, "Bring your own key", models.SpendingBreakdownLabel(models.UsageFundingSourceBYOK, models.SpendingCatalogs{}, models.SpendingGroupByFundingSource))
 
 	byokFilter := modelFilter
 	byokFilter.FundingSource = models.UsageFundingSourceBYOK

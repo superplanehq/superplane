@@ -5,9 +5,28 @@ export const CREDIT_GRANT_KIND_ADMIN = "admin";
 export const CREDIT_GRANT_KIND_INCLUDED = "included";
 export const CREDIT_GRANT_KIND_TOPUP = "topup";
 export const CREDIT_GRANT_KIND_TOPUP_REFUND = "topup_refund";
+export const CREDIT_GRANT_KIND_TRIAL_ADJUSTMENT = "trial_adjustment";
+export const CREDIT_GRANT_KIND_TOPUP_ADJUSTMENT = "topup_adjustment";
+export const CREDIT_GRANT_KIND_ADMIN_ADJUSTMENT = "admin_adjustment";
+
+const CREDIT_ADJUSTMENT_KINDS = [
+  CREDIT_GRANT_KIND_TRIAL_ADJUSTMENT,
+  CREDIT_GRANT_KIND_TOPUP_ADJUSTMENT,
+  CREDIT_GRANT_KIND_ADMIN_ADJUSTMENT,
+];
+
+export function isCreditAdjustmentKind(kind: string | undefined): boolean {
+  return kind !== undefined && CREDIT_ADJUSTMENT_KINDS.includes(kind);
+}
 
 export function creditGrantSourceLabel(kind: string | undefined): string {
   switch (kind) {
+    case CREDIT_GRANT_KIND_TRIAL_ADJUSTMENT:
+      return "Trial adjustment";
+    case CREDIT_GRANT_KIND_TOPUP_ADJUSTMENT:
+      return "Top-up adjustment";
+    case CREDIT_GRANT_KIND_ADMIN_ADJUSTMENT:
+      return "SuperPlane grant adjustment";
     case CREDIT_GRANT_KIND_WELCOME:
       return "Trial";
     case CREDIT_GRANT_KIND_ADMIN:
@@ -41,6 +60,9 @@ export function creditGrantDetails(
   const actorName = grant.actorName?.trim();
   if (grant.kind === CREDIT_GRANT_KIND_ADMIN && actorName) {
     parts.push(`Granted by ${actorName}`);
+  }
+  if (isCreditAdjustmentKind(grant.kind) && actorName) {
+    parts.push(`Adjusted by ${actorName}`);
   }
   const orderId = grant.polarOrderId?.trim();
   if ((grant.kind === CREDIT_GRANT_KIND_TOPUP || grant.kind === CREDIT_GRANT_KIND_TOPUP_REFUND) && orderId) {

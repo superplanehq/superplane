@@ -619,9 +619,13 @@ Supported types:
 
 Use the Add Pull Request component to attach a pull request to a task.
 
+Choose **Add new** or **Update existing**. Add new inserts another artifact. Update existing replaces the newest unkeyed artifact on this task with the same type and title. Artifacts with a key stay unchanged. When no unkeyed match exists, Update existing creates an unkeyed artifact.
+
+Update existing needs a stable title. A changed title adds a new artifact and leaves the old one. A duplicate title updates only the newest unkeyed match. Do not use Update existing for a branch. A branch has no title.
+
 Markdown and link types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key.
 
-Set `artifactKey` to tag the artifact with a queryable key so a later `findWorkOrder` (`by: artifactKey`) step can resolve this task. Keys are unique per factory.
+Set `artifactKey` to tag the artifact with a queryable key so a later `findWorkOrder` (`by: artifactKey`) step can resolve this task. Keys are unique per factory. The artifact key applies to Add new. Update existing does not use the artifact key.
 
 If you set a key, later runs update that artifact when `orderId` identifies the task that owns it. A run that targets another task with the same key fails. The update replaces the artifact data, so values that you leave blank are cleared. The first run sets the type. A later run with a different type fails.
 
@@ -1507,7 +1511,7 @@ Runs shell commands on a fleet runner.
 - **Docker**: Commands run inside a container started from **Docker image**. The runner pulls the image, starts a long-lived container, and executes your script via `docker exec`. The image must include a usable `sleep` (common base images do).
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
 - **Custom container image**: Shown only for **Other**; use a normal reference (`my.registry.example.com/org/repo:1.2.3` or `debian:bookworm-slim@sha256:…`). Private registries require the runner to be configured with registry credentials.
@@ -1572,7 +1576,7 @@ printf '{"pr":%s}\n' "$num" > "$SUPERPLANE_RESULT_FILE"
 ```
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Defaults to a Debian image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
@@ -1628,7 +1632,7 @@ Example:
 4. bash — `git push`
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Anthropic API Key**: SuperPlane secret or Claude integration used as `ANTHROPIC_API_KEY`.
 - **Model**: Select a model from Organization LLM Models.
@@ -1683,7 +1687,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **prompt** — a Codex turn. Later prompts continue in the same working directory.
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Credentials**: SuperPlane secret or OpenAI integration used as `OPENAI_API_KEY`.
 - **Model**: Select a model from Organization LLM Models.
@@ -1739,7 +1743,7 @@ function main() {
 ```
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Defaults to a Node.js image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
@@ -1789,7 +1793,7 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **prompt** — one OpenCode turn in the same working directory. Later prompts continue one OpenCode session.
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Credentials**: SuperPlane secret or OpenRouter integration used as `OPENROUTER_API_KEY`.
 - **Model**: Required. Select a model from Organization LLM Models.
@@ -1846,7 +1850,7 @@ def main(payload):
 ```
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Defaults to a Python image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
@@ -1897,8 +1901,8 @@ Configure an ordered list of **bash** and **prompt** steps:
 - **prompt** — an agent turn. Later prompts continue the same session.
 
 ### Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
-- **Model**: Optional SuperPlane-hosted model. The instance SuperPlane agent model is used when this field is empty.
+- **Machine type**: Runner fleet available to the organization (required).
+- **Model**: Optional SuperPlane-hosted model. The instance SuperPlane agent model is used when this field is empty. If the organization does not allow that model, SuperPlane uses another allowed model.
 - **Steps**: Ordered bash/prompt actions (at least one prompt required).
 - **Working directory**: Optional starting directory.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour).

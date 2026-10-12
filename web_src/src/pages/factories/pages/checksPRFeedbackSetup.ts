@@ -8,8 +8,19 @@ export function isChecksHandlerCIIntegration(name: string | undefined): boolean 
   return CHECKS_HANDLER_CI_INTEGRATIONS.has(name?.trim().toLowerCase() ?? "");
 }
 
+export function statusCheckValue(check: OrganizationsIntegrationResourceRef): string {
+  return check.id?.trim() || check.name?.trim() || "";
+}
+
+export function statusCheckLabel(check: OrganizationsIntegrationResourceRef): string {
+  return check.name?.trim() || check.id?.trim() || "";
+}
+
 export function catalogStatusCheckNames(catalog: OrganizationsIntegrationResourceRef[]): string[] {
-  return catalog.flatMap((check) => (check.name?.trim() ? [check.name.trim()] : []));
+  return catalog.flatMap((check) => {
+    const value = statusCheckValue(check);
+    return value ? [value] : [];
+  });
 }
 
 export function suggestIntegrationFromCheckURL(rawURL: string | undefined): string {
@@ -47,7 +58,8 @@ export function selectedChecksUseGitHubActions(
 ): boolean {
   const selected = new Set(selectedNames.map((name) => name.toLowerCase()));
   return catalog.some((check) => {
-    if (!check.name || !selected.has(check.name.toLowerCase())) {
+    const value = statusCheckValue(check);
+    if (!value || !selected.has(value.toLowerCase())) {
       return false;
     }
     return isGitHubActionsCheckURL(check.url);
@@ -82,24 +94,26 @@ function hostHasSuffix(host: string, suffix: string): boolean {
   return host === suffix || host.endsWith(`.${suffix}`);
 }
 
+export type StatusCheckRow = { value: string; label: string };
+
 export function statusCheckRows(
   catalog: OrganizationsIntegrationResourceRef[],
   names: string[],
-): Array<{ name: string }> {
-  const rows: Array<{ name: string }> = [];
+): Array<StatusCheckRow> {
+  const rows: Array<StatusCheckRow> = [];
   const seen = new Set<string>();
 
   for (const check of catalog) {
-    const name = check.name?.trim();
-    if (!name) {
+    const value = statusCheckValue(check);
+    if (!value) {
       continue;
     }
-    const key = name.toLowerCase();
+    const key = value.toLowerCase();
     if (seen.has(key)) {
       continue;
     }
     seen.add(key);
-    rows.push({ name });
+    rows.push({ value, label: statusCheckLabel(check) || value });
   }
 
   for (const name of names) {
@@ -112,10 +126,26 @@ export function statusCheckRows(
       continue;
     }
     seen.add(key);
-    rows.push({ name: trimmed });
+    rows.push({ value: trimmed, label: trimmed });
   }
 
   return rows;
+}
+
+export function statusCheckDisplay(row: StatusCheckRow, rows: StatusCheckRow[]): string {
+  if (!row.label || row.label === row.value || !row.value) {
+    return row.label || row.value;
+  }
+  // The key is only shown when sibling rows share the label. Otherwise the
+  // native display name (e.g. Bitbucket's "Pipeline - default") is enough and
+  // the key suffix is noise.
+  const collides = rows.some(
+    (other) =>
+      other !== row &&
+      other.label.toLowerCase() === row.label.toLowerCase() &&
+      other.value.toLowerCase() !== row.value.toLowerCase(),
+  );
+  return collides ? `${row.label} (${row.value})` : row.label;
 }
 
 export function suggestedIntegrationsForChecks(
@@ -125,7 +155,8 @@ export function suggestedIntegrationsForChecks(
   const selected = new Set(selectedNames.map((name) => name.toLowerCase()));
   const names = new Set<string>();
   for (const check of catalog) {
-    if (!check.name || !selected.has(check.name.toLowerCase())) {
+    const value = statusCheckValue(check);
+    if (!value || !selected.has(value.toLowerCase())) {
       continue;
     }
     const integration = suggestIntegrationFromCheckURL(check.url);

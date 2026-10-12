@@ -1,7 +1,9 @@
 import { organizationsDescribeIntegration } from "@/api-client";
-import { useCreateFactoryAutomation } from "@/hooks/useFactoryData";
+import { useQueryClient } from "@tanstack/react-query";
+import { factoryVCSProvider } from "@/pages/home/factories";
+import { factoryAppsKey, useCreateFactoryAutomation } from "@/hooks/useFactoryData";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS, FEATURE_FACTORY_RISK_SCORE } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_CUSTOM_AUTOMATIONS } from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
@@ -32,17 +34,18 @@ export function useAddColumnAutomation(args: {
   backlogRepository: string;
   defaultBranch: string;
   githubIntegrationId: string;
+  vcsProvider?: string;
   automationsFor: (key: ColumnKey) => ColumnAutomation[];
 }) {
   const [column, setColumn] = useState<ColumnKey | null>(null);
   const [naming, setNaming] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const createAutomation = useCreateFactoryAutomation(args.organizationId, args.factoryId);
   const { installFactory, isInstalling } = useInstallFactory({ organizationId: args.organizationId });
   const experimentalFeatures = useExperimentalFeature(args.organizationId);
   const allowCustom = experimentalFeatures.has(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-  const allowRiskScore = experimentalFeatures.has(FEATURE_FACTORY_RISK_SCORE);
-  const catalogOptions = { allowCustom, allowRiskScore };
+  const catalogOptions = { allowCustom, vcsProvider: args.vcsProvider };
 
   const catalog = column ? catalogForColumn(column, catalogOptions) : [];
   const takenIds = column ? takenCatalogIds(args.automationsFor(column), catalog) : [];
@@ -68,10 +71,7 @@ export function useAddColumnAutomation(args: {
       return;
     }
     if (entry.kind === "pr-closure") {
-      await installBundledCanvas(args, installFactory, navigate, closePicker, {
-        factoryId: "pr-closure",
-        missingGitHubMessage: "Connect GitHub in workspace setup before you add pull request closure.",
-      });
+      await installBundledCanvas(args, installFactory, queryClient, closePicker);
       return;
     }
     if (entry.kind === "risk-score") {
@@ -161,26 +161,29 @@ async function installBundledCanvas(
     backlogRepository: string;
     defaultBranch: string;
     githubIntegrationId: string;
+    vcsProvider?: string;
   },
   installFactory: ReturnType<typeof useInstallFactory>["installFactory"],
-  navigate: (path: string) => void,
+  queryClient: ReturnType<typeof useQueryClient>,
   close: () => void,
-  options: { factoryId: string; missingGitHubMessage: string },
 ) {
+  const provider = factoryVCSProvider(args.vcsProvider);
+  const missingIntegrationMessage = `Connect ${provider === "bitbucket" ? "Bitbucket" : "GitHub"} in workspace setup before you add pull request closure.`;
   if (!args.githubIntegrationId) {
-    showErrorToast(options.missingGitHubMessage);
+    showErrorToast(missingIntegrationMessage);
     return;
   }
-  const githubInstallationName = await installationName(args.organizationId, args.githubIntegrationId);
-  if (!githubInstallationName) {
-    showErrorToast(options.missingGitHubMessage);
+  const vcsInstallationName = await installationName(args.organizationId, args.githubIntegrationId);
+  if (!vcsInstallationName) {
+    showErrorToast(missingIntegrationMessage);
     return;
   }
   try {
     const installed = await installFactory({
-      factoryId: options.factoryId,
+      factoryId: "pr-closure",
+      vcsProvider: provider,
       workspaceFactoryId: args.factoryId,
-      integrations: { github: { id: args.githubIntegrationId, name: githubInstallationName, ready: true } },
+      integrations: { [provider]: { id: args.githubIntegrationId, name: vcsInstallationName, ready: true } },
       installParams: {
         appRepository: args.appRepository,
         backlogRepository: args.backlogRepository,
@@ -190,16 +193,11 @@ async function installBundledCanvas(
       navigateOnComplete: false,
       startInitialRun: false,
     });
-    close();
     if (!installed?.canvasId) {
       return;
     }
-    navigate(
-      factoryAppConfigurePath(args.organizationId, args.factoryKey, installed.canvasId, {
-        from: "lines",
-        lineId: args.lineId,
-      }),
-    );
+    await queryClient.invalidateQueries({ queryKey: factoryAppsKey(args.organizationId, args.factoryId) });
+    close();
   } catch {
     // useInstallFactory already reports the error.
   }

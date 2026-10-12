@@ -140,6 +140,11 @@ export function createSpinePickers(outgoing: Map<string, FactoryRunLayoutEdge[]>
   }
 
   function pickMainChildEdge(childEdges: FactoryRunLayoutEdge[]): FactoryRunLayoutEdge | null {
+    // One next node continues the column, including when that node ends the graph.
+    if (childEdges.length === 1) {
+      return childEdges[0];
+    }
+
     const nonLeaf = childEdges.filter((edge) => !isLeaf(edge.target));
     if (nonLeaf.length === 0) return null;
 
@@ -407,7 +412,8 @@ export function placeComponentNodes(options: PlaceComponentNodesOptions): number
   for (const col of columnsAsc) {
     const ids = byColumn.get(col)!;
     ids.sort((a, b) => (layer.get(a) ?? 0) - (layer.get(b) ?? 0) || a.localeCompare(b));
-    const x = componentOriginX + col * strideX;
+    const columnLeft = componentOriginX + col * strideX;
+    const columnCenter = columnLeft + DEFAULT_NODE_WIDTH / 2;
     const hasSpineNodes = ids.some((id) => spineColumns.has(id));
     const gapY = hasSpineNodes ? VERTICAL_GAP : VERTICAL_GAP + SIDE_COLUMN_EXTRA_GAP;
     let nextY = 0;
@@ -415,7 +421,7 @@ export function placeComponentNodes(options: PlaceComponentNodesOptions): number
       const size = nodeSize(nodeById.get(id)!);
       const placed = placeOneColumnNode({
         id,
-        x,
+        x: columnCenter - size.width / 2,
         col,
         preferredY: (layer.get(id) ?? 0) * strideY,
         nextY,

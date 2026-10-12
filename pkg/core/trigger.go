@@ -143,12 +143,21 @@ type WebhookRequestContext struct {
 	Webhook       NodeWebhookContext
 	Events        EventContext
 	Integration   IntegrationContext
+	Factory       FactoryContext
 
 	//
 	// Return an execution context for a given execution,
 	// through a referencing key-value pair.
 	//
 	FindExecutionByKV func(key string, value string) (*ExecutionContext, error)
+
+	//
+	// Return the oldest active execution for a key-value pair.
+	// Narrowly scoped for Bitbucket build waits, where a completed wait can
+	// share a KV with a later active wait. Nil when the caller does not
+	// support active lookups; other components keep FindExecutionByKV.
+	//
+	FindActiveExecutionByKV func(key string, value string) (*ExecutionContext, error)
 
 	// Do not make HTTP calls as part of handling the webhook. This is useful for
 	// retrieving more data that is not part of the webhook payload.

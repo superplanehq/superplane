@@ -1,10 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_JIRA_INTAKE,
-  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_DATADOG_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE } from "@/lib/experimentalFeatures";
 
 import {
   ADD_INTAKE_TEMPLATES,
@@ -29,6 +25,7 @@ describe("lineIntakeModel", () => {
       "pagerduty-incidents",
       "productive-tasks",
       "datadog",
+      "linear-issues",
     ]);
 
     const github = lineIntakeSourceById("github-issues");
@@ -134,6 +131,19 @@ describe("lineIntakeModel", () => {
 
     expect(intake?.paused).toBe(true);
     expect(intake?.source.id).toBe("sentry-exceptions");
+  });
+
+  it("selects the current Sentry project when settings have no project ids", () => {
+    const [intake] = intakeSourcesFromFactoryIntakes([
+      {
+        id: "intake-sentry",
+        canvasId: "canvas-sentry",
+        source: "SOURCE_SENTRY_EXCEPTIONS",
+        resourceId: "payments",
+      },
+    ]);
+
+    expect(intake?.settings.sentryProjectIds).toEqual(["payments"]);
   });
 
   it("builds a ticket analysis fixture with ingest, analyze, plan, and score", () => {
@@ -276,7 +286,7 @@ describe("lineIntakeModel", () => {
 
     expect(fixture.phases.map((phase) => [phase.id, phase.status, phase.duration])).toEqual([
       ["ingest", "passed", "2s"],
-      ["analyze", "running", "3m 12s so far"],
+      ["analyze", "running", "3m 12s"],
       ["plan", "pending", "—"],
       ["score", "pending", "—"],
     ]);
@@ -361,28 +371,28 @@ describe("lineIntakeModel", () => {
       "sentry-exceptions",
       "productive-tasks",
       "datadog",
+      "linear-issues",
       "notion",
     ]);
     expect(ADD_INTAKE_TEMPLATES.filter((template) => template.soon).map((template) => template.id)).toEqual(["notion"]);
   });
 
-  it("marks Jira, Productive.io, and Datadog as coming soon when their organization features are off", () => {
+  it("keeps Jira and Linear live when other flagged intake sources are off", () => {
     const templates = addIntakeTemplatesForOrg(() => false);
 
     expect(templates.find((template) => template.id === "github-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBeFalsy();
-    expect(templates.find((template) => template.id === "jira-issues")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "jira-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "linear-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "notion")?.soon).toBe(true);
   });
 
-  it("keeps Jira, Productive.io, and Datadog live when their organization features are on", () => {
+  it("keeps Productive.io and Datadog live when their organization features are on", () => {
     const templates = addIntakeTemplatesForOrg((featureId) =>
-      [FEATURE_FACTORY_DATADOG_INTAKE, FEATURE_FACTORY_JIRA_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE].includes(
-        featureId,
-      ),
+      [FEATURE_FACTORY_DATADOG_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE].includes(featureId),
     );
 
     expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBeFalsy();
@@ -390,6 +400,7 @@ describe("lineIntakeModel", () => {
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "datadog")?.soon).toBeFalsy();
+    expect(templates.find((template) => template.id === "linear-issues")?.soon).toBeFalsy();
   });
 
   it("maps every intake template id to an API source the picker can create", () => {
@@ -402,5 +413,6 @@ describe("lineIntakeModel", () => {
 
     expect(apiIntakeSource("productive-tasks")).toBe("SOURCE_PRODUCTIVE_TASKS");
     expect(apiIntakeSource("dependabot-alerts")).toBe("SOURCE_DEPENDABOT_ALERTS");
+    expect(apiIntakeSource("linear-issues")).toBe("SOURCE_LINEAR_ISSUES");
   });
 });

@@ -20,6 +20,7 @@ import (
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	ghdependabot "github.com/superplanehq/superplane/pkg/integrations/github/dependabot"
 	"github.com/superplanehq/superplane/pkg/integrations/jira"
+	"github.com/superplanehq/superplane/pkg/integrations/linear"
 	"github.com/superplanehq/superplane/pkg/integrations/productive"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -46,6 +47,7 @@ type FactoryContext struct {
 	// owners/creators. The node executor collects these and publishes
 	// them after the surrounding transaction commits.
 	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
+	onRunsCancelled         func([]*models.RunCancellationResult)
 	onFileBindCleanup       func(FileBindCleanup)
 
 	encryptor crypto.Encryptor
@@ -58,6 +60,9 @@ type FactoryContext struct {
 	// readJiraIssueFiles, when set, supplies Jira files without calling the
 	// Jira API.
 	readJiraIssueFiles jiraFileRead
+	// readLinearIssueFiles, when set, supplies Linear files without calling
+	// the Linear API.
+	readLinearIssueFiles linearFileRead
 
 	lineStepOnce   bool
 	lineStepLoaded bool
@@ -95,6 +100,11 @@ func (c *FactoryContext) WithWorkOrderNotification(
 	callback func(messages.FactoryWorkOrderNotificationMessage),
 ) *FactoryContext {
 	c.onWorkOrderNotification = callback
+	return c
+}
+
+func (c *FactoryContext) WithRunsCancelled(callback func([]*models.RunCancellationResult)) *FactoryContext {
+	c.onRunsCancelled = callback
 	return c
 }
 
@@ -186,6 +196,14 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 		return nil, false, nil
 	}
 
+	skip, err = c.skipDuplicateLinearWorkOrder(f)
+	if err != nil {
+		return nil, false, err
+	}
+	if skip {
+		return nil, false, nil
+	}
+
 	merged, err := c.mergeDependabotWorkOrder(f)
 	if err != nil {
 		return nil, false, err
@@ -205,6 +223,7 @@ func (c *FactoryContext) CreateWorkOrder(params core.WorkOrderParams) (*core.Wor
 	}
 	c.recordSentryWebhookTask(order)
 	c.recordDatadogWebhookTask(order)
+	c.recordLinearWebhookTask(order)
 	EmitWorkOrderCreated(c.tx, f, order)
 	c.notifyWorkOrderUpdated(f.ID, order.ID, factory.EventTypeOrderStatusUpdated)
 	return workOrderToCore(order), true, nil
@@ -386,6 +405,26 @@ func (c *FactoryContext) recordSentryWebhookTask(order *models.FactoryWorkOrder)
 	}
 }
 
+func (c *FactoryContext) recordLinearWebhookTask(order *models.FactoryWorkOrder) {
+	if c.execution == nil || order == nil {
+		return
+	}
+
+	event, err := models.FindRootEventForRun(c.tx, c.execution.RunID)
+	if err != nil || event == nil {
+		return
+	}
+
+	receiptID, ok := linear.ReceiptIDFromEventData(event.Data.Data())
+	if !ok {
+		return
+	}
+
+	if err := models.AppendLinearWebhookTask(c.tx, receiptID, order.ID); err != nil {
+		log.WithError(err).Warnf("failed to record task %s on Linear webhook %s", order.ID, receiptID)
+	}
+}
+
 func (c *FactoryContext) recordDatadogWebhookTask(order *models.FactoryWorkOrder) {
 	if c.execution == nil || order == nil {
 		return
@@ -430,6 +469,7 @@ func (c *FactoryContext) prepareWorkOrderFiles(order *models.FactoryWorkOrder) e
 	c.ingestGitHubImages(order)
 	c.ingestProductiveFiles(order)
 	c.ingestJiraFiles(order)
+	c.ingestLinearFiles(order)
 	return c.bindDescriptionFiles(order)
 }
 
@@ -556,12 +596,13 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 
 	fromState := order.State
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
-		ToState:    params.State,
-		Result:     params.Result,
-		Automation: c.automationRef(),
-		Run:        c.runRef(),
-		App:        c.appRef(),
-		SkipSame:   true,
+		ToState:         params.State,
+		Result:          params.Result,
+		Automation:      c.automationRef(),
+		Run:             c.runRef(),
+		App:             c.appRef(),
+		SkipSame:        true,
+		OnRunsCancelled: c.onRunsCancelled,
 	})
 	if err != nil {
 		return nil, false, err
@@ -624,13 +665,23 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		return nil, err
 	}
 
-	artifact, created, err := order.UpsertArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
+	artifactParams := models.FactoryWorkOrderArtifactParams{
 		Type:       params.Type,
 		Data:       params.Data,
-		Key:        params.Key,
 		Automation: c.automationRef(),
 		Run:        c.runRef(),
-	})
+	}
+
+	var (
+		artifact *models.FactoryWorkOrderArtifact
+		created  bool
+	)
+	if params.UpdateByTitle {
+		artifact, created, err = order.UpsertArtifactByTypeAndTitle(c.tx, artifactParams)
+	} else {
+		artifactParams.Key = params.Key
+		artifact, created, err = order.UpsertArtifact(c.tx, artifactParams)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -960,6 +1011,19 @@ func (c *FactoryContext) currentFactory() (*models.Factory, error) {
 		return nil, errors.New("app is not owned by a factory")
 	}
 	return models.FindFactory(c.tx, c.canvas.OrganizationID, *c.canvas.FactoryID)
+}
+
+// VCSProvider returns the stored Git host. An empty value means GitHub.
+// A canvas that is not owned by a factory has no provider.
+func (c *FactoryContext) VCSProvider() (string, error) {
+	if c.canvas == nil || c.canvas.FactoryID == nil {
+		return "", nil
+	}
+	factory, err := c.currentFactory()
+	if err != nil {
+		return "", err
+	}
+	return factory.OnboardingConfigValue().VCSProvider, nil
 }
 
 func (c *FactoryContext) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {

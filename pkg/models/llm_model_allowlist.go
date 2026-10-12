@@ -319,7 +319,14 @@ func parentSelectableLLMModels(tx *gorm.DB, orgID uuid.UUID, provider, fundingSo
 		if !row.OffersHostedModels() {
 			return nil, nil
 		}
-		return compactModelIDs(row.AllowedModels), nil
+		selection, err := FindOrganizationHostedModelAllowlist(tx, orgID, provider)
+		if err != nil {
+			return nil, err
+		}
+		if selection == nil {
+			return compactModelIDs(row.AllowedModels), nil
+		}
+		return IntersectModelIDs(row.AllowedModels, selection.AllowedModels), nil
 	}
 
 	row, err := FindOrganizationBYOKModelAllowlist(tx, orgID, provider)

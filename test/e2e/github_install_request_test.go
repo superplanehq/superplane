@@ -70,7 +70,7 @@ func (s *githubInstallRequestSteps) givenALinkedGitHubIdentityWithPendingApprova
 }
 
 func (s *githubInstallRequestSteps) visitWorkspaceRepositorySelection(factory *models.Factory) {
-	s.session.Visit("/" + s.session.OrgSlug + "/workspaces/" + factory.Key + "/setup?step=repo")
+	s.session.Visit("/" + s.session.OrgSlug + "/workspaces/" + factory.Key + "/setup?step=repo&githubConnected=1")
 	s.session.AssertVisible(q.TestID("workspace-setup"))
 }
 

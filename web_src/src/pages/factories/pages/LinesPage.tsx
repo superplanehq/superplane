@@ -38,7 +38,6 @@ import { Clock, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 import { backlogAnalysisCreditLabels, type BacklogAnalysisRun } from "../lib/backlogAnalysis";
-import { ClickToRename } from "../layout/ClickToRename";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { WorkspacePageHeader } from "../layout/WorkspacePageHeader";
 import { useColumnAutomationViewPreference, type ColumnAutomationView } from "../lib/columnAutomationViewPreference";
@@ -99,6 +98,7 @@ import {
 import { flattenWorkOrderExecutions, isQueuedStepRow } from "../lib/workOrderExecutions";
 import {
   latestDispatchForLine,
+  boardLineIdFromNavigationState,
   canonicalWorkOrderNumber,
   displayedBoardLineId,
   peekOrderFromNavigationState,
@@ -110,9 +110,9 @@ import {
   applyWorkOrderFilters,
   applyWorkOrderScope,
   applyWorkOrderSearch,
+  boardWorkOrderScopeQuery,
   buildWorkOrderListEntries,
   countWorkOrderFilters,
-  UNASSIGNED_FILTER_VALUE,
   visibleWorkOrderFilters,
   WORK_ORDER_SCOPES,
   type WorkOrderScope,
@@ -138,6 +138,7 @@ import { type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { WorkOrderSplitRunPopup } from "./work-order-split-run/WorkOrderSplitRunPopup";
 import { canvasKeyForAutomation, type SplitRunCanvasKey } from "./work-order-split-run/splitRunCanvases";
 import { columnAppsFromFactoryApps, splitRunFixtureForWorkOrder } from "./work-order-split-run/splitRunMocks";
+import { useColumnAppCheckRuns } from "./work-order-split-run/useColumnAppCheckRuns";
 import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFooterCloser";
 import {
   factoryAppConfigurePath,
@@ -148,6 +149,7 @@ import {
   factoryIntakePath,
   factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
+  factoryLinearIntakeSetupPath,
   factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
   factoryPRFeedbackSetupPath,
@@ -169,7 +171,6 @@ import {
   prFeedbackSettingsTabFromSearch,
   prFeedbackSetupKindFromSourceId,
 } from "../lib/factoryPagePaths";
-import { humanizeLineName } from "../lib/humanizeLineName";
 import { WorkspaceLoadingScreen } from "../layout/WorkspaceLoadingScreen";
 import {
   factoryKanbanPageClassName,
@@ -209,13 +210,13 @@ import {
   isPRFeedbackSetupAvailable,
   isPRFeedbackSettingsTab,
   prFeedbackListenTitle,
+  prFeedbackVCSIcon,
   takenPRFeedbackSourceIds,
   type PRFeedbackSource,
   type PRFeedbackSourceId,
 } from "./prFeedbackSettingsModel";
 import { isFactoryOnboardingComplete } from "./onboarding/onboardingStatus";
 import { LaneListenerList, type LaneListener } from "./LaneListenerList";
-import githubIcon from "@/assets/icons/integrations/github.svg";
 import { usePRFeedbackWorkOrderAttention, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
 import {
   normalizeColumnColors,
@@ -224,14 +225,18 @@ import {
   type LineBoardColumnColorId,
 } from "./lineBoardColumnColors";
 
-type LineBoardScope = Extract<WorkOrderScope, "all" | "my">;
+type LineBoardScope = Extract<WorkOrderScope, "all" | "my" | "unassigned">;
 
 const LINE_BOARD_SCOPES: ReadonlyArray<ScopePillOption<LineBoardScope>> = WORK_ORDER_SCOPES.filter(
-  (scope): scope is ScopePillOption<LineBoardScope> => scope.id === "all" || scope.id === "my",
+  (scope): scope is ScopePillOption<LineBoardScope> =>
+    scope.id === "all" || scope.id === "my" || scope.id === "unassigned",
 );
 
 function lineBoardWorkOrderScope(scope: WorkOrderScope): LineBoardScope {
-  return scope === "my" ? "my" : "all";
+  if (scope === "my" || scope === "unassigned") {
+    return scope;
+  }
+  return "all";
 }
 
 function boardWorkOrdersPageOptions(
@@ -239,12 +244,8 @@ function boardWorkOrdersPageOptions(
   lineId: string | undefined,
   currentUserId?: string,
 ): FactoryBoardWorkOrdersOptions {
-  const ownerIds = state.filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
-  const scope = lineBoardWorkOrderScope(state.scope);
   return {
-    userId: ownerIds.length === 1 ? ownerIds[0] : scope === "my" ? currentUserId : undefined,
-    unassigned: state.filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE),
-    requireUser: scope === "my" && ownerIds.length !== 1,
+    ...boardWorkOrderScopeQuery(lineBoardWorkOrderScope(state.scope), state.filters.assigneeIds, currentUserId),
     done: {
       lineId,
       results: boardDoneResultsForStatuses(state.filters.statuses),
@@ -329,21 +330,21 @@ export function LinesPage() {
   const prFeedbackHandlerId = prFeedbackHandlerIdFromSearch(search);
   const listState = useWorkOrderListState(factoryId);
   const lines = useMemo(() => factory?.lines ?? [], [factory?.lines]);
-  const routeOrSearchLineId = displayedBoardLineId(routeLineId, boardLineId, lines, undefined, undefined);
-  const taskLineOrderId = !routeOrSearchLineId && routeOrderNumber ? routeOrderNumber : "";
+  const navigationLineId = boardLineIdFromNavigationState(locationState);
+  const lineSources = { routeLineId, queryLineId: boardLineId, navigationLineId, lines };
+  const knownBoardLineId = displayedBoardLineId(lineSources);
+  const taskLineOrderId = !knownBoardLineId && routeOrderNumber ? routeOrderNumber : "";
   const { data: taskForBoardLine, isLoading: taskLineLoading } = useWorkOrder(
     organizationId,
     factoryId,
     taskLineOrderId,
   );
   const taskLinePending = Boolean(taskLineOrderId) && taskLineLoading && !taskForBoardLine;
-  const selectedLineId = displayedBoardLineId(
-    routeLineId,
-    boardLineId,
-    lines,
-    taskForBoardLine,
-    taskLinePending ? undefined : firstFactoryLineId(factory),
-  );
+  const selectedLineId = displayedBoardLineId({
+    ...lineSources,
+    order: taskForBoardLine,
+    fallbackLineId: taskLinePending ? undefined : firstFactoryLineId(factory),
+  });
   const {
     workOrders,
     isLoading: workOrdersLoading,
@@ -378,12 +379,14 @@ export function LinesPage() {
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
+  const vcsProvider = factory?.onboarding?.vcsProvider;
+  const supportsReviewBots = vcsProvider !== "bitbucket";
   const catalogParameters = appRepository ? { repository: appRepository } : undefined;
   useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters, {
     enabled: addPRFeedbackOpen && Boolean(githubIntegrationId),
   });
   useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters, {
-    enabled: addPRFeedbackOpen && Boolean(githubIntegrationId),
+    enabled: addPRFeedbackOpen && Boolean(githubIntegrationId) && supportsReviewBots,
   });
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
@@ -440,7 +443,7 @@ export function LinesPage() {
     peekHint,
   );
 
-  usePageTitle([selectedLine ? humanizeLineName(selectedLine.name) : "Board", factory?.name ?? "Workspace"]);
+  usePageTitle([factory?.name?.trim() || "Workspace"]);
 
   const takenPRFeedbackSources = takenPRFeedbackSourceIds(prFeedbackHandlers);
   const canAddPRFeedback = canUpdate && hasAvailablePRFeedbackSource(takenPRFeedbackSources);
@@ -509,6 +512,7 @@ export function LinesPage() {
         onAddIntake: () => setAddIntakeOpen(true),
       };
 
+  const verifyIcon = prFeedbackVCSIcon(vcsProvider);
   const verifyListeners: LaneListener[] = prFeedbackHandlers.flatMap((handler) => {
     if (!handler.id) {
       return [];
@@ -517,8 +521,8 @@ export function LinesPage() {
       {
         id: handler.id,
         title: prFeedbackListenTitle(handler.source),
-        iconSrc: githubIcon,
-        iconAlt: "GitHub",
+        iconSrc: verifyIcon.iconSrc,
+        iconAlt: verifyIcon.iconAlt,
         healthy: handler.healthy !== false,
         needsRepairLabel: "Needs repair",
         settingsLabel: "Open PR feedback settings",
@@ -582,6 +586,12 @@ export function LinesPage() {
       }
       return;
     }
+    if (template.id === "linear-issues") {
+      if (selectedLine.id) {
+        navigate(factoryLinearIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
+      }
+      return;
+    }
     if (!isLineIntakeSourceId(template.id)) {
       showErrorToast("This intake template is not available yet.");
       return;
@@ -611,8 +621,8 @@ export function LinesPage() {
       setPeekHint(target);
       return;
     }
-    navigate(workOrderDetailPath(organizationId, routeSegment, number, selectedLine.id), {
-      state: { peekOrder: target },
+    navigate(workOrderDetailPath(organizationId, routeSegment, number), {
+      state: { peekOrder: target, lineId: selectedLine.id },
     });
   };
 
@@ -667,6 +677,7 @@ export function LinesPage() {
         onClose={() => setAddPRFeedbackOpen(false)}
         onSelect={createPRFeedbackFromSource}
         takenSourceIds={takenPRFeedbackSources}
+        vcsProvider={vcsProvider}
       />
       {automationViewCanvasId ? (
         <ColumnAutomationViewHost
@@ -697,6 +708,7 @@ export function LinesPage() {
           factoryId={factoryId}
           factoryKey={routeSegment}
           githubIntegrationId={githubIntegrationId}
+          vcsProvider={vcsProvider}
           repository={appRepository}
           lineId={selectedLine.id}
           canUpdate={canUpdate}
@@ -775,6 +787,7 @@ export function LinesPage() {
             backlogRepository={factory?.onboarding?.backlogRepository?.trim() ?? ""}
             defaultBranch={factory?.onboarding?.defaultBranch?.trim() ?? ""}
             githubIntegrationId={githubIntegrationId}
+            vcsProvider={vcsProvider}
             showColumnAutomations={showColumnAutomations}
             showAutomationRows={showAutomationRows}
             colorView={columnColorView}
@@ -854,7 +867,6 @@ function LineDetailHeader({
   colorView: LineBoardColumnColorView;
   onColorViewChange: (view: LineBoardColumnColorView) => void;
 }) {
-  const updateLine = useUpdateFactoryLine(organizationId, factoryId);
   const { data: orgUsers = [] } = useOrganizationUsers(organizationId);
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const showPullRequestMerge = useExperimentalFeature(organizationId).has(FEATURE_FACTORY_PULL_REQUEST_MERGE);
@@ -871,39 +883,17 @@ function LineDetailHeader({
       ),
     [entries, orgUsers],
   );
-  const title = humanizeLineName(line.name);
   const visibleFilterCount =
     countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge)) - state.filters.lineIds.length;
   const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
   const factoryKey = factoryRouteSegment(factory);
-
-  const handleRename = async (name: string) => {
-    if (!line.id) {
-      return;
-    }
-    try {
-      await updateLine.mutateAsync({ lineId: line.id, name });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to rename line"));
-    }
-  };
 
   return (
     <>
       <WorkspacePageHeader
         className={factorySectionHeaderClassName}
         data-testid="lines-detail-header"
-        title={
-          <ClickToRename
-            value={title}
-            onSave={(name) => void handleRename(name)}
-            canEdit={canUpdate && Boolean(line.id)}
-            busy={updateLine.isPending}
-            testId="lines-board-title"
-            ariaLabel="Line name"
-            inputClassName="font-medium text-[length:var(--workspace-page-title-size)] leading-[var(--workspace-page-title-line-height)] tracking-[var(--workspace-page-title-tracking)]"
-          />
-        }
+        title={factory?.name?.trim() || "Workspace"}
         leading={
           nextStepsRestore || hostedCreditHeaderKicker ? (
             <>
@@ -994,6 +984,7 @@ function LineDetail({
   backlogRepository,
   defaultBranch,
   githubIntegrationId,
+  vcsProvider,
   showColumnAutomations,
   showAutomationRows,
   colorView,
@@ -1024,6 +1015,7 @@ function LineDetail({
   backlogRepository: string;
   defaultBranch: string;
   githubIntegrationId: string;
+  vcsProvider?: string;
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
   colorView: LineBoardColumnColorView;
@@ -1036,7 +1028,7 @@ function LineDetail({
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
-  const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard), [fullBoard]);
+  const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard, workOrders ?? []), [fullBoard, workOrders]);
   const board = useMemo(() => visibleLineStageColumns(fullBoard, verifyOrders), [fullBoard, verifyOrders]);
   const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
   const doneOrders = useMemo(
@@ -1065,10 +1057,11 @@ function LineDetail({
         apps,
         workOrders,
         planningEnabled,
+        vcsProvider,
       });
       return applyColumnAutomationsOverlay(base, undefined, overlay.disabledIds, overlay.removedIds);
     },
-    [apps, board, factoryIntakes, overlay, planningEnabled, prFeedbackHandlers, workOrders],
+    [apps, board, factoryIntakes, overlay, planningEnabled, prFeedbackHandlers, vcsProvider, workOrders],
   );
 
   const addAutomation = useAddColumnAutomation({
@@ -1080,6 +1073,7 @@ function LineDetail({
     backlogRepository,
     defaultBranch,
     githubIntegrationId,
+    vcsProvider,
     automationsFor: (key) => automationsFor(key, columnTitleForKey(key, board)),
   });
   const canAddColumnAutomation = showColumnAutomations && canUpdate && addAutomation.allowCustom;
@@ -1232,40 +1226,46 @@ function LineBoardSplitRunPopup({
   const closer = useSplitRunFooterCloser(organizationId, factoryId, popupOrder);
   const { resolveUser } = useOrgUserLookup(organizationId);
   const resolvedLineName = lineName?.trim();
+  const columnApps = columnAppsFromFactoryApps(factoryApps);
+  const columnAppCheckRuns = useColumnAppCheckRuns(describedOrder?.checks, columnApps, peekPullRequests);
   return (
-    <WorkOrderSplitRunPopup
-      key={peekOrderId}
-      organizationId={organizationId}
-      factoryId={factoryId}
-      factoryKey={factoryKey}
-      orderId={peekOrderId}
-      orderNumber={popupOrder.number}
-      lineId={lineId}
-      fixture={splitRunFixtureForWorkOrder(popupOrder, {
-        checks: describedOrder?.checks,
-        artifacts: peekArtifacts,
-        lineId,
-        lineName: resolvedLineName,
-        demoArtifacts: false,
-        prFeedbackRuns,
-        analysisRuns,
-        columnApps: columnAppsFromFactoryApps(factoryApps),
-        isAnalyzing,
-        stoppedBy: closer.actor,
-        closer,
-        resolveUser,
-      })}
-      canDispatch={canDispatch && Boolean(resolvedLineName)}
-      canUpdate={canUpdate}
-      isDispatching={isDispatching}
-      onDispatch={
-        resolvedLineName
-          ? (model, thinkingLevel) => onDispatch(peekOrderId, { lineName: resolvedLineName, model, thinkingLevel })
-          : undefined
-      }
-      onClose={onClose}
-      fixed
-    />
+    <>
+      {columnAppCheckRuns.queries}
+      <WorkOrderSplitRunPopup
+        key={peekOrderId}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={factoryKey}
+        orderId={peekOrderId}
+        orderNumber={popupOrder.number}
+        lineId={lineId}
+        fixture={splitRunFixtureForWorkOrder(popupOrder, {
+          checks: describedOrder?.checks,
+          artifacts: peekArtifacts,
+          lineId,
+          lineName: resolvedLineName,
+          demoArtifacts: false,
+          prFeedbackRuns,
+          analysisRuns,
+          columnApps,
+          isAnalyzing,
+          stoppedBy: closer.actor,
+          closer,
+          resolveUser,
+          columnAppRuns: columnAppCheckRuns.lookup,
+        })}
+        canDispatch={canDispatch && Boolean(resolvedLineName)}
+        canUpdate={canUpdate}
+        isDispatching={isDispatching}
+        onDispatch={
+          resolvedLineName
+            ? (model, thinkingLevel) => onDispatch(peekOrderId, { lineName: resolvedLineName, model, thinkingLevel })
+            : undefined
+        }
+        onClose={onClose}
+        fixed
+      />
+    </>
   );
 }
 
@@ -1877,6 +1877,7 @@ function DoneColumn({
               order={order}
               workOrderCardContext={workOrderCardContext}
               onOpenWorkOrder={onOpenWorkOrder}
+              showMergeConfidence={false}
             />
           </li>
         ))}

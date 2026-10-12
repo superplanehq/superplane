@@ -46,6 +46,7 @@ func ListFactoryAgentResources(
 
 func CreateFactoryAgentResource(
 	ctx context.Context,
+	deps IntakeDependencies,
 	organizationID string,
 	req *pb.CreateFactoryAgentResourceRequest,
 ) (*pb.CreateFactoryAgentResourceResponse, error) {
@@ -76,6 +77,9 @@ func CreateFactoryAgentResource(
 	)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
+	}
+	if resource.Kind == models.FactoryAgentResourceKindMCPServer && resource.Config.Data().MCPAuth() == models.FactoryAgentResourceAuthHeaders {
+		applyDefaultMCPWriteTools(ctx, deps, db, resource)
 	}
 	return &pb.CreateFactoryAgentResourceResponse{Resource: serializeFactoryAgentResource(resource)}, nil
 }
@@ -138,6 +142,7 @@ func UpdateFactoryAgentResource(
 		}
 		if req.GetReplaceDisabledTools() {
 			merged.DisabledTools = models.NormalizeDisabledTools(req.GetDisabledTools())
+			merged.ToolsDefaultApplied = true
 		}
 		if err := validateMCPURL(merged.URL); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to update agent resource")

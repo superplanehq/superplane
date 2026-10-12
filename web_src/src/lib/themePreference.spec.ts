@@ -13,6 +13,7 @@ describe("themePreference", () => {
     localStorage.clear();
     document.documentElement.classList.remove("dark");
     document.documentElement.style.colorScheme = "";
+    document.head.querySelectorAll('meta[name="theme-color"]').forEach((meta) => meta.remove());
   });
 
   afterEach(() => {
@@ -56,6 +57,24 @@ describe("themePreference", () => {
     applyResolvedThemeToDocument("light");
     expect(document.documentElement.classList.contains("dark")).toBe(false);
     expect(document.documentElement.style.colorScheme).toBe("light");
+  });
+
+  it("sets theme-color from the resolved theme and drops media overrides", () => {
+    document.head.insertAdjacentHTML(
+      "beforeend",
+      '<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />' +
+        '<meta name="theme-color" content="#14120b" media="(prefers-color-scheme: dark)" />',
+    );
+
+    applyResolvedThemeToDocument("dark");
+
+    const metas = document.head.querySelectorAll('meta[name="theme-color"]');
+    expect(metas).toHaveLength(1);
+    expect(metas[0]?.getAttribute("content")).toBe("#14120b");
+    expect(metas[0]?.hasAttribute("media")).toBe(false);
+
+    applyResolvedThemeToDocument("light");
+    expect(document.head.querySelector('meta[name="theme-color"]')?.getAttribute("content")).toBe("#ffffff");
   });
 
   it("reads system prefers dark from matchMedia", () => {

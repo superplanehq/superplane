@@ -203,7 +203,7 @@ func OrganizationBillingIsPolarManaged(plan *OrganizationBillingPlan) bool {
 	return polarPaidAccessContinues(plan, time.Now())
 }
 
-func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*OrganizationBillingPlan, error) {
+func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string, trialEndsAt *time.Time) (*OrganizationBillingPlan, error) {
 	if orgID == uuid.Nil {
 		return nil, fmt.Errorf("organization is required")
 	}
@@ -231,8 +231,8 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*O
 			UpdatedAt:      now,
 		}
 		if planName == BillingPlanTrial {
-			trialEnd := now.Add(DefaultWelcomeGrantTTL)
-			next.TrialStartedAt = &now
+			trialEnd := adminTrialEnd(now, trialEndsAt)
+			next.TrialStartedAt = adminTrialStart(existing, now)
 			next.TrialEndsAt = &trialEnd
 		}
 		if existing != nil {
@@ -273,6 +273,11 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*O
 		if err != nil {
 			return err
 		}
+		if planName == BillingPlanTrial && trialEndsAt != nil && saved.TrialEndsAt != nil {
+			if err := SetWelcomeGrantExpiresAt(inner, orgID, *saved.TrialEndsAt); err != nil {
+				return err
+			}
+		}
 		return SyncIncludedLLMCreditGrant(inner, IncludedUsageSync{
 			OrganizationID:   orgID,
 			SubscriptionID:   includedUsageSubscriptionID(saved),
@@ -285,6 +290,22 @@ func SetAdminOrganizationPlan(tx *gorm.DB, orgID uuid.UUID, planName string) (*O
 		return nil, err
 	}
 	return saved, nil
+}
+
+func adminTrialEnd(now time.Time, trialEndsAt *time.Time) time.Time {
+	if trialEndsAt == nil {
+		return now.Add(DefaultWelcomeGrantTTL)
+	}
+	return trialEndsAt.UTC()
+}
+
+func adminTrialStart(existing *OrganizationBillingPlan, now time.Time) *time.Time {
+	if existing != nil && existing.IsOpenTrial(now) && existing.TrialStartedAt != nil {
+		started := *existing.TrialStartedAt
+		return &started
+	}
+	started := now
+	return &started
 }
 
 func ApplyPolarSubscription(tx *gorm.DB, orgID uuid.UUID, sub PolarSubscriptionApply) (*OrganizationBillingPlan, bool, error) {

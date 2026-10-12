@@ -1,4 +1,4 @@
-import { durationLabelMs, formatMinutesSecondsDuration } from "@/lib/duration";
+import { durationLabelMs, formatMinutesSecondsDuration, isSubSecondDurationLabel } from "@/lib/duration";
 
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
 import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
@@ -62,17 +62,11 @@ function liveAgentLine(stage: AutomationStage): string {
  */
 export function runMetaLine(stage: AutomationStage, runs: AutomationStage[] = [stage]): string {
   const totalMs = runs.reduce((sum, run) => sum + durationLabelMs(run.duration ?? ""), 0);
-  const duration =
+  return (
     formatMinutesSecondsDuration(totalMs) ||
-    (runs.some((run) => isSubSecondDuration(run.duration)) ? "<1s" : "") ||
-    (runs.length <= 1 ? (stage.duration ?? "") : "");
-  if (!duration) {
-    return "";
-  }
-  if (stage.status === "running" || runs.some((run) => run.status === "running")) {
-    return `${duration} so far`;
-  }
-  return duration;
+    (runs.some((run) => isSubSecondDurationLabel(run.duration ?? "")) ? "<1s" : "") ||
+    (runs.length <= 1 ? (stage.duration ?? "") : "")
+  );
 }
 
 /**
@@ -131,10 +125,6 @@ function plainText(markdown: string): string {
     .replace(/^·\s*/, "")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function isSubSecondDuration(label?: string): boolean {
-  return /^<\s*1s$/i.test((label ?? "").replace(/\s+so far$/i, "").trim());
 }
 
 function artifactLabel(artifact: AutomationStage["outputs"]["artifacts"][number]): string {

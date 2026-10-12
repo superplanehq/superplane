@@ -6,6 +6,7 @@ import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SegmentedNav } from "@/ui/SegmentedNav";
 import type { ConfigurationField } from "../../api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
+import { integrationListNotices, withoutIntegrationListNotices } from "@/lib/integrationListNotice";
 import { toTestId } from "@/lib/testID";
 import { type RefObject, useEffect, useMemo, useState } from "react";
 
@@ -104,10 +105,12 @@ export const IntegrationResourceFieldRenderer = ({
   }, [field.typeOptions?.resource?.parameters, allValues]);
 
   const {
-    data: resources,
+    data: loadedResources,
     isLoading: isLoadingResources,
     error: resourcesError,
   } = useIntegrationResources(organizationId ?? "", integrationId ?? "", resourceType ?? "", additionalQueryParameters);
+  const listNotices = useMemo(() => integrationListNotices(loadedResources ?? []), [loadedResources]);
+  const resources = useMemo(() => withoutIntegrationListNotices(loadedResources ?? []), [loadedResources]);
 
   // All hooks must be called before any early returns
   // Multi-select options (always compute, even if not used)
@@ -259,11 +262,17 @@ export const IntegrationResourceFieldRenderer = ({
         <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)} className="space-y-2">
           {toggleInLabelRow ?? <div className="flex justify-end">{modeToggle}</div>}
           {useExpressionMode ? expressionInput : picker}
+          <ListNotices notices={listNotices} />
         </div>
       );
     }
 
-    return <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>{picker}</div>;
+    return (
+      <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)} className="space-y-2">
+        {picker}
+        <ListNotices notices={listNotices} />
+      </div>
+    );
   }
 
   // Multi-select mode
@@ -273,12 +282,13 @@ export const IntegrationResourceFieldRenderer = ({
 
   if (!hasResources) {
     return (
-      <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>
+      <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)} className="space-y-2">
         <Select value="" disabled>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="No resources available" />
           </SelectTrigger>
         </Select>
+        <ListNotices notices={listNotices} />
       </div>
     );
   }
@@ -299,7 +309,7 @@ export const IntegrationResourceFieldRenderer = ({
   };
 
   return (
-    <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)}>
+    <div data-testid={toTestId(`app-installation-resource-field-${field.name}`)} className="space-y-2">
       <MultiCombobox<SelectOption>
         options={multiSelectOptions}
         displayValue={(option) => option.label}
@@ -310,6 +320,23 @@ export const IntegrationResourceFieldRenderer = ({
       >
         {(option) => <MultiComboboxLabel>{option.label}</MultiComboboxLabel>}
       </MultiCombobox>
+      <ListNotices notices={listNotices} />
     </div>
   );
 };
+
+function ListNotices({ notices }: { notices: Array<{ id?: string; name?: string }> }) {
+  const visible = notices.filter((notice) => notice.name?.trim());
+  if (visible.length === 0) {
+    return null;
+  }
+  return (
+    <>
+      {visible.map((notice) => (
+        <p key={notice.id ?? notice.name} className="text-xs text-muted-foreground">
+          {notice.name}
+        </p>
+      ))}
+    </>
+  );
+}

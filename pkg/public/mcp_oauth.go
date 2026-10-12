@@ -15,15 +15,13 @@ func (s *Server) HandleMCPOAuthCallback(w http.ResponseWriter, r *http.Request) 
 	}
 
 	baseURL := s.mcpOAuthBaseURL()
-	httpClient := mcp.DoerFromCore(nil)
-	if s.registry != nil {
-		httpClient = mcp.DoerFromCore(s.registry.HTTPContext())
-	}
 
 	path, status, message := factoryactions.CompleteFactoryAgentResourceOAuth(
 		r.Context(),
-		s.encryptor,
-		httpClient,
+		factoryactions.IntakeDependencies{
+			Encryptor: s.encryptor,
+			Registry:  s.registry,
+		},
 		baseURL,
 		r.URL.Query().Get("code"),
 		state,

@@ -354,7 +354,7 @@ func (s *FactoryService) ListFactoryAgentResources(ctx context.Context, req *pb.
 
 func (s *FactoryService) CreateFactoryAgentResource(ctx context.Context, req *pb.CreateFactoryAgentResourceRequest) (*pb.CreateFactoryAgentResourceResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return actions.CreateFactoryAgentResource(ctx, organizationID, req)
+	return actions.CreateFactoryAgentResource(ctx, s.intakeDeps, organizationID, req)
 }
 
 func (s *FactoryService) UpdateFactoryAgentResource(ctx context.Context, req *pb.UpdateFactoryAgentResourceRequest) (*pb.UpdateFactoryAgentResourceResponse, error) {

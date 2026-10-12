@@ -339,6 +339,16 @@ func intakeRunTitle(source string, event models.CanvasEvent) string {
 			Name:      name,
 			Ecosystem: nestedString(payload, "alert", "dependency", "package", "ecosystem"),
 		})
+	case models.FactoryIntakeSourceLinearIssues:
+		identifier := nestedString(payload, "data", "identifier")
+		title := nestedString(payload, "data", "title")
+		if identifier != "" && title != "" {
+			return identifier + ": " + title
+		}
+		if identifier != "" {
+			return identifier
+		}
+		return title
 	case models.FactoryIntakeSourceJiraIssues:
 		summary := nestedString(payload, "issue", "fields", "summary")
 		key := nestedString(payload, "issue", "key")

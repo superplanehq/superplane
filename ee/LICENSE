@@ -1,0 +1,44 @@
+The SuperPlane Enterprise Edition (EE) license (the "EE License")
+Copyright (c) 2026-present SuperPlane, Inc.
+
+With regard to the SuperPlane Software:
+
+This software and associated documentation files (the "Software") may only be
+used if you (and any entity that you represent) have:
+(1) agreed to, and are in compliance with, the SuperPlane Terms of Service,
+available at https://superplane.com/terms/ (the "Terms"), or other written
+agreement with SuperPlane, Inc. governing the use of the Software, and
+(2) have a valid SuperPlane Enterprise Edition license for self-hosted
+deployments.
+
+Subject to the foregoing conditions, you are free to modify this Software and
+publish patches to the Software. You agree that SuperPlane, Inc. and/or its
+licensors (as applicable) retain all right, title and interest in and to all
+such modifications and/or patches, and all such modifications and/or patches may
+only be used, copied, modified, displayed, distributed, or otherwise exploited
+with a valid subscription or license as described above. Notwithstanding the
+foregoing, you may copy and modify the Software for development and testing
+purposes, without requiring a subscription or license. You agree that
+SuperPlane, Inc. and/or its licensors (as applicable) retain all right, title
+and interest in and to all such modifications. You are not granted any other
+rights beyond what is expressly stated herein. Subject to the foregoing, it is
+forbidden to copy, merge, publish, distribute, sublicense, and/or sell the
+Software.
+
+This EE License applies only to the part of this Software that is not
+distributed as part of SuperPlane Community Edition (CE). Any part of this
+Software distributed as part of SuperPlane CE is copyrighted under the Apache
+License, Version 2.0. The full text of this EE License shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+For all third party components incorporated into the SuperPlane Software, those
+components are licensed under the original license provided by the owner of the
+applicable component.

@@ -32,7 +32,7 @@ describe("client-side navigation updates document.title", () => {
     expect(
       within(permalinkPopup).getByRole("heading", { name: "RF-101 Reconcile duplicate refunds in ledger" }),
     ).toBeInTheDocument();
-    expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
+    expect(document.title).toBe("Semaphore · SuperPlane");
   }, 15000);
 
   it("canonicalizes a legacy /work-orders/:id URL onto the task permalink", async () => {
@@ -77,7 +77,7 @@ describe("client-side navigation updates document.title", () => {
     expect(
       within(permalinkPopup).getByRole("heading", { name: "RF-101 Reconcile duplicate refunds in ledger" }),
     ).toBeInTheDocument();
-    expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
+    expect(document.title).toBe("Semaphore · SuperPlane");
   }, 15000);
 
   it("updates the tab title on the line board home", async () => {
@@ -90,7 +90,7 @@ describe("client-side navigation updates document.title", () => {
     );
 
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
+    expect(document.title).toBe("Semaphore · SuperPlane");
   }, 15000);
 
   it("sends /lines to the line board", async () => {
@@ -103,7 +103,7 @@ describe("client-side navigation updates document.title", () => {
     );
 
     expect(await screen.findByTestId("lines-detail-page", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(document.title).toBe("Plan and Implement · Semaphore · SuperPlane");
+    expect(document.title).toBe("Semaphore · SuperPlane");
   }, 15000);
 
   it("updates the tab title when selecting an automation inline, then back to the list", async () => {

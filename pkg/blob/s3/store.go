@@ -63,6 +63,9 @@ func (s *Store) Put(ctx context.Context, key string, r io.Reader, opts blob.PutO
 	if contentType := strings.TrimSpace(opts.ContentType); contentType != "" {
 		input.ContentType = aws.String(contentType)
 	}
+	if contentEncoding := strings.TrimSpace(opts.ContentEncoding); contentEncoding != "" {
+		input.ContentEncoding = aws.String(contentEncoding)
+	}
 	if _, err := s.client.PutObject(ctx, input); err != nil {
 		return fmt.Errorf("write S3 object: %w", err)
 	}
@@ -127,6 +130,9 @@ func (s *Store) Head(ctx context.Context, key string) (*blob.ObjectInfo, error) 
 	}
 	if output.ContentType != nil {
 		info.ContentType = *output.ContentType
+	}
+	if output.ContentEncoding != nil {
+		info.ContentEncoding = *output.ContentEncoding
 	}
 	return info, nil
 }

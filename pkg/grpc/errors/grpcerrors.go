@@ -117,6 +117,11 @@ func AlreadyExists(err error, message string) error {
 	return handlerErrorWithCode(err, message, codes.AlreadyExists)
 }
 
+// Conflict wraps err as an aborted error, which grpc-gateway maps to HTTP 409.
+func Conflict(err error, message string) error {
+	return handlerErrorWithCode(err, message, codes.Aborted)
+}
+
 // FailedPrecondition wraps err as a failed-precondition error for the grpc-gateway sanitizer.
 func FailedPrecondition(err error, message string) error {
 	return handlerErrorWithCode(err, message, codes.FailedPrecondition)

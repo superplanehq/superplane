@@ -83,16 +83,17 @@ type FactoryAgentResource struct {
 }
 
 type FactoryAgentResourceConfig struct {
-	Transport     string                       `json:"transport,omitempty"`
-	URL           string                       `json:"url,omitempty"`
-	Auth          string                       `json:"auth,omitempty"`
-	Headers       []FactoryAgentResourceHeader `json:"headers,omitempty"`
-	Source        string                       `json:"source,omitempty"`
-	Repository    string                       `json:"repository,omitempty"`
-	Ref           string                       `json:"ref,omitempty"`
-	Path          string                       `json:"path,omitempty"`
-	Markdown      string                       `json:"markdown,omitempty"`
-	DisabledTools []string                     `json:"disabledTools,omitempty"`
+	Transport           string                       `json:"transport,omitempty"`
+	URL                 string                       `json:"url,omitempty"`
+	Auth                string                       `json:"auth,omitempty"`
+	Headers             []FactoryAgentResourceHeader `json:"headers,omitempty"`
+	Source              string                       `json:"source,omitempty"`
+	Repository          string                       `json:"repository,omitempty"`
+	Ref                 string                       `json:"ref,omitempty"`
+	Path                string                       `json:"path,omitempty"`
+	Markdown            string                       `json:"markdown,omitempty"`
+	DisabledTools       []string                     `json:"disabledTools,omitempty"`
+	ToolsDefaultApplied bool                         `json:"toolsDefaultApplied,omitempty"`
 }
 
 type FactoryAgentResourceHeader struct {

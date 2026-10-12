@@ -15,7 +15,7 @@ function useOrganizationId() {
 export function FactoryOrganizationMembersPage() {
   const organizationId = useOrganizationId();
   return (
-    <FactorySettingsPageFrame title="Members" subtitle="Invite people and manage organization access.">
+    <FactorySettingsPageFrame title="Members" subtitle="Invite people and manage organization access." wide>
       <Members organizationId={organizationId} />
     </FactorySettingsPageFrame>
   );

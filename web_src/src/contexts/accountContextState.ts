@@ -1,4 +1,5 @@
 import { createContext } from "react";
+import type { AccountLicense } from "@/lib/license";
 
 interface AccountImpersonation {
   active: boolean;
@@ -43,6 +44,7 @@ interface Account {
   roles?: string[];
   groups?: string[];
   impersonation?: AccountImpersonation;
+  license?: AccountLicense;
 }
 
 export interface AccountContextType {

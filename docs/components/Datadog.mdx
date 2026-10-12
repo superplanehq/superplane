@@ -32,7 +32,7 @@ To configure Datadog to work with SuperPlane:
 - `monitors_read` finds an existing Error Tracking monitor for a service.
 - `monitors_write` creates and removes the Error Tracking monitor for a service.
 
-Grant these optional permissions to add the error sample and related logs to each task:
+Grant these optional permissions. `apm_read` or `logs_read_data` lists services that have no open issues. These permissions also add the error sample and related logs to each task:
 
 - `apm_read` reads the sample error span: trace, request, user, and environment.
 - `logs_read_data` reads log samples and the logs that share the sample trace.

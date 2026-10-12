@@ -95,6 +95,14 @@ func (s *OrganizationService) DescribeOrganizationSpendingReport(
 	return organizations.DescribeOrganizationSpendingReport(ctx, orgID, req)
 }
 
+func (s *OrganizationService) ListOrganizationRunnerFleets(
+	ctx context.Context,
+	_ *pb.ListOrganizationRunnerFleetsRequest,
+) (*pb.ListOrganizationRunnerFleetsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListOrganizationRunnerFleets(ctx, orgID)
+}
+
 func (s *OrganizationService) ListHostedLLMModels(
 	ctx context.Context,
 	req *pb.ListHostedLLMModelsRequest,
@@ -125,6 +133,16 @@ func (s *OrganizationService) UpdateBYOKLLMModels(
 ) (*pb.UpdateBYOKLLMModelsResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
 	return organizations.UpdateBYOKLLMModels(ctx, orgID, req)
+}
+
+func (s *OrganizationService) ListOrganizationHostedLLMModels(ctx context.Context, _ *pb.ListOrganizationHostedLLMModelsRequest) (*pb.ListOrganizationHostedLLMModelsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListOrganizationHostedLLMModels(ctx, orgID)
+}
+
+func (s *OrganizationService) UpdateOrganizationHostedLLMModels(ctx context.Context, req *pb.UpdateOrganizationHostedLLMModelsRequest) (*pb.UpdateOrganizationHostedLLMModelsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateOrganizationHostedLLMModels(ctx, orgID, req)
 }
 
 func (s *OrganizationService) ListHostedCreditProducts(

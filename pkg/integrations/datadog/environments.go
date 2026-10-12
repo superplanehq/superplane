@@ -23,7 +23,7 @@ const (
 // for the last 30 days. service narrows the query when it is set.
 func (c *Client) ListEnvironments(service string) ([]string, error) {
 	query := environmentQuery(service)
-	names, err := c.aggregateFacet(spansAggregatePath, environmentFacet, query)
+	names, err := c.aggregateFacet(spansAggregatePath, environmentFacet, query, environmentAggregateMax)
 	if err == nil {
 		return names, nil
 	}
@@ -31,7 +31,7 @@ func (c *Client) ListEnvironments(service string) ([]string, error) {
 		return nil, err
 	}
 
-	names, logsErr := c.aggregateFacet(logsAggregatePath, environmentFacet, query)
+	names, logsErr := c.aggregateFacet(logsAggregatePath, environmentFacet, query, environmentAggregateMax)
 	if logsErr != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func quoteQueryValue(value string) string {
 	return `"` + escaped + `"`
 }
 
-func (c *Client) aggregateFacet(path, facet, query string) ([]string, error) {
+func (c *Client) aggregateFacet(path, facet, query string, limit int) ([]string, error) {
 	payload := map[string]any{
 		"data": map[string]any{
 			"type": "aggregate_request",
@@ -68,7 +68,7 @@ func (c *Client) aggregateFacet(path, facet, query string) ([]string, error) {
 				"group_by": []any{
 					map[string]any{
 						"facet": facet,
-						"limit": environmentAggregateMax,
+						"limit": limit,
 						"sort":  map[string]any{"type": "alphabetical", "order": "asc"},
 					},
 				},
@@ -77,7 +77,7 @@ func (c *Client) aggregateFacet(path, facet, query string) ([]string, error) {
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return nil, fmt.Errorf("error marshaling environment query: %v", err)
+		return nil, fmt.Errorf("error marshaling aggregate query: %v", err)
 	}
 
 	responseBody, err := c.execRequest(http.MethodPost, c.BaseURL+path, bytes.NewReader(body))
@@ -87,7 +87,7 @@ func (c *Client) aggregateFacet(path, facet, query string) ([]string, error) {
 
 	names, err := facetValues(responseBody, facet)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing environment list: %w", err)
+		return nil, fmt.Errorf("error parsing aggregate list: %w", err)
 	}
 	return names, nil
 }
@@ -166,8 +166,15 @@ func facetString(value any) string {
 }
 
 func isForbidden(err error) bool {
+	return apiStatus(err) == http.StatusForbidden
+}
+
+func apiStatus(err error) int {
 	apiError, ok := err.(*APIError)
-	return ok && apiError.StatusCode == http.StatusForbidden
+	if !ok {
+		return 0
+	}
+	return apiError.StatusCode
 }
 
 func environmentResources(names []string) []core.IntegrationResource {

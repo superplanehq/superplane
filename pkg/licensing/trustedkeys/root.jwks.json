@@ -1,0 +1,13 @@
+{
+  "keys": [
+    {
+      "alg": "ES256",
+      "crv": "P-256",
+      "kid": "license-root",
+      "kty": "EC",
+      "use": "sig",
+      "x": "VVSNcBwMRMHPuxRf9TzLHLuy9tUH_P1_t2KiBrOqeeU",
+      "y": "_ib3YVpymwhpVmJr8B6zQmKnjjw59o7TemtxR2qEVkc"
+    }
+  ]
+}

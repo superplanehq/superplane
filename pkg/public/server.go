@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,6 +34,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations/sentry"
 	"github.com/superplanehq/superplane/pkg/jwt"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/mcpserver"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -46,6 +48,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
+	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -88,12 +91,28 @@ type Server struct {
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
 	Router                *mux.Router
+	adminRouter           *mux.Router
 	BasePath              string
 	BaseURL               string
 	WebhooksBaseURL       string
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
 	isDev                 bool
+	licenseService        *licensing.Service
+}
+
+// SetLicenseService connects the installation license. Without it, the server
+// runs in Community mode and grants no Enterprise features.
+func (s *Server) SetLicenseService(service *licensing.Service) {
+	s.licenseService = service
+}
+
+func (s *Server) entitlements() licensing.Entitlements {
+	if s.licenseService == nil {
+		return licensing.Community
+	}
+
+	return s.licenseService
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -238,6 +257,16 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 			}
 		}
 	}
+
+	if bitbucketKey := os.Getenv("BITBUCKET_CLIENT_ID"); bitbucketKey != "" {
+		if bitbucketSecret := os.Getenv("BITBUCKET_CLIENT_SECRET"); bitbucketSecret != "" {
+			providers["bitbucket"] = authentication.ProviderConfig{
+				Key:         bitbucketKey,
+				Secret:      bitbucketSecret,
+				CallbackURL: fmt.Sprintf("%s/auth/bitbucket/callback", baseURL),
+			}
+		}
+	}
 	return providers
 }
 
@@ -267,7 +296,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 	ctx := context.Background()
 
-	authorizer := authorization.NewGatewayAuthorizer(s.authService)
+	authorizer := authorization.NewGatewayAuthorizer(s.authService).WithEntitlements(s.entitlements())
 
 	var grpcGatewayMux *runtime.ServeMux
 	grpcGatewayMux = runtime.NewServeMux(
@@ -370,6 +399,27 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		return err
 	}
 
+	adminGatewayMux := runtime.NewServeMux(
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
+		runtime.WithForwardResponseOption(middleware.GatewayForwardResponseTraceOption()),
+		runtime.WithIncomingHeaderMatcher(headersMatcher),
+		runtime.WithMiddlewares(grpc.GatewayRecoveryMiddleware()),
+		runtime.WithErrorHandler(grpc.SanitizedGatewayErrorHandler),
+		runtime.WithMetadata(func(ctx context.Context, _ *http.Request) metadata.MD {
+			pattern, ok := runtime.HTTPPathPattern(ctx)
+			if ok {
+				setOtelMetricRoute(ctx, pattern)
+			}
+			return nil
+		}),
+		runtime.SetQueryParameterParser(&grpc.QueryParser{}),
+	)
+	if err := pbAdminRunners.RegisterRunnersHandlerServer(ctx, adminGatewayMux, services.AdminRunners); err != nil {
+		return err
+	}
+	adminGatewayHandler := s.grpcGatewayAccountHandler(adminGatewayMux)
+	s.adminRouter.PathPrefix("/installation/fleets").Handler(adminGatewayHandler)
+
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -377,17 +427,23 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/specs", s.handleRunnerPlanningSpec).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/planning-sessions/updates", s.handleRunnerPlanningUpdate).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/clarity", s.handleRunnerPlanningClarity).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/confidence", s.handleRunnerPlanningConfidence).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/surveys", s.handleRunnerPlanningSurvey).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/agent-messages", s.handleRunnerPlanningAgentMessage).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/activities/{activity_id}", s.handleRunnerPlanningActivity).Methods("PUT")
+	s.Router.HandleFunc("/api/v1/runner/merge-confidence/checks", s.handleRunnerMergeConfidenceCheck).Methods(http.MethodPost)
 	s.Router.HandleFunc("/api/v1/runner/artifacts", s.handleRunnerArtifactUpload).Methods(http.MethodPost)
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
 		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogSession)),
 	).Methods("GET")
+	s.Router.Handle(
+		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-logs",
+		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerTaskLogs)),
+	).Methods(http.MethodGet)
 
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
@@ -711,13 +767,26 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	r.PathPrefix(s.BasePath+"/integrations/{integrationID}").HandlerFunc(s.HandleIntegrationRequest).
 		Methods("GET", "POST")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/setup", s.HandleGitHubAppSetup).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/github/app/created", s.HandleGitHubAppCreated).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/github/app/webhook", s.HandleGitHubAppWebhook).Methods("POST")
+	githubAppUserRoute := r.NewRoute().Subrouter()
+	githubAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	githubAppUserRoute.HandleFunc(s.BasePath+"/github/app/manifest", s.HandleGitHubAppManifest).Methods("GET")
+	// Forge calls these routes. The Forge Invocation Token authenticates them.
+	// They stay off the gateway authorizer, the same way the GitHub App webhook does.
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/lifecycle", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/events", s.HandleBitbucketForgeEvent).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/scheduled", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/bootstrap", s.HandleBitbucketForgeDelivery).Methods("POST")
+	publicRoute.HandleFunc(s.BasePath+"/bitbucket/forge/uninstall", s.HandleBitbucketForgeUninstall).Methods("POST")
 	sentryAppUserRoute := r.NewRoute().Subrouter()
 	sentryAppUserRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/install", s.HandleSentryAppInstall).Methods("GET")
 	sentryAppUserRoute.HandleFunc(s.BasePath+"/sentry/app/setup", s.HandleSentryAppSetup).Methods("GET")
 	publicRoute.HandleFunc(s.BasePath+"/sentry/app/webhook", s.HandleSentryAppWebhook).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/jira/oauth/callback", s.HandleJiraOAuthCallback).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/linear/oauth/callback", s.HandleLinearOAuthCallback).Methods("GET")
+	publicRoute.HandleFunc(s.BasePath+"/linear/webhook", s.HandleLinearAppWebhook).Methods("POST")
 	publicRoute.HandleFunc(s.BasePath+"/mcp-oauth/callback", s.HandleMCPOAuthCallback).Methods("GET")
 
 	// Account-based endpoints (use account session, not organization context)
@@ -738,7 +807,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
-	adminRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	adminRoute.Use(middleware.AdminAuthMiddleware(s.jwt))
 	adminRoute.Use(middleware.RequireInstallationAdmin())
 	adminRoute.HandleFunc("/accounts", s.adminListAccounts).Methods("GET")
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
@@ -749,22 +818,34 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features", s.adminListOrgExperimentalFeatures).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminEnableOrgExperimentalFeature).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminDisableOrgExperimentalFeature).Methods("DELETE")
+	adminRoute.HandleFunc("/installation/factory-templates", s.adminListFactoryTemplates).Methods("GET")
+	adminRoute.HandleFunc("/installation/factory-templates/{templateId}/reset", s.adminResetFactoryTemplate).Methods("POST")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminUpdateInstallationNetworkSettings).Methods("PATCH")
+	adminRoute.HandleFunc("/installation/first-run/fleet-manager", s.adminPrepareFleetManager).Methods("POST")
+	adminRoute.HandleFunc("/installation/license", s.adminGetInstallationLicense).Methods("GET")
+	adminRoute.HandleFunc("/installation/license", s.adminInstallInstallationLicense).Methods("PUT")
+	adminRoute.HandleFunc("/installation/license", s.adminRemoveInstallationLicense).Methods("DELETE")
+	adminRoute.HandleFunc("/installation/license/keys", s.adminInstallLicenseKeyList).Methods("PUT")
 	adminRoute.HandleFunc("/installation/llm-settings", s.adminGetInstallationLLMSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/llm-settings", s.adminUpdateInstallationLLMSettings).Methods("PATCH")
 	adminRoute.HandleFunc("/installation/llm-providers/{provider}", s.adminUpdateHostedLLMProvider).Methods("PATCH")
 	adminRoute.HandleFunc("/installation/llm-providers/{provider}/models", s.adminListHostedLLMProviderModels).Methods("POST")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit", s.adminGetOrganizationLLMCredit).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/grants", s.adminAddOrganizationLLMCredit).Methods("POST")
+	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/grants", s.adminListOrganizationCreditGrants).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/llm-credit/balances", s.adminSetOrganizationCreditBalance).Methods("PUT")
 	adminRoute.HandleFunc("/organizations/{orgId}/llm-settings", s.adminUpdateOrganizationLLMMarkup).Methods("PATCH")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminGetOrganizationBillingPlan).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/billing-plan", s.adminSetOrganizationBillingPlan).Methods("PUT")
+	adminRoute.HandleFunc("/organizations/{orgId}/spending-report", s.adminGetOrganizationSpendingReport).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/velocity", s.adminGetOrganizationVelocity).Methods("GET")
 	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks", s.adminListPolarWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks/endpoints", s.adminListPolarWebhookEndpoints).Methods("GET")
 	adminRoute.HandleFunc("/sentry/webhooks", s.adminListSentryWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/datadog/webhooks", s.adminListDatadogWebhooks).Methods("GET")
+	adminRoute.HandleFunc("/linear/webhooks", s.adminListLinearWebhooks).Methods("GET")
 	adminRoute.HandleFunc("/polar/webhooks/{eventId}/redeliver", s.adminRedeliverPolarWebhook).Methods("POST")
 	adminRoute.HandleFunc("/price-books", s.adminGetPriceBooks).Methods("GET")
 	adminRoute.HandleFunc("/price-books", s.adminSavePriceBooks).Methods("PUT")
@@ -779,6 +860,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/accounts/{accountId}/block", s.blockAccount).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/unblock", s.unblockAccount).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}", s.adminDeleteAccount).Methods("DELETE")
+	s.adminRouter = adminRoute
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
@@ -1105,20 +1187,6 @@ func (s *Server) createInitialWorkspace(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Workspace setup cannot connect GitHub without the SuperPlane GitHub
-	// App, so onboarding stops here on installations that do not hold the
-	// app credentials (for example, local development without a tunnel).
-	if !config.LoadGitHubHostedAppConfig().Enabled() {
-		http.Error(
-			w,
-			"This installation has no GitHub App configured, so workspace setup is not available. "+
-				"Set the SUPERPLANE_GITHUB_APP_* environment variables and restart the server. "+
-				"See docs/contributing/connecting-to-3rdparty-services-from-development.md.",
-			http.StatusServiceUnavailable,
-		)
-		return
-	}
-
 	var req initialWorkspaceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -1422,6 +1490,54 @@ type AccountResponse struct {
 	LinkedAccounts               []AccountLinkedAccountResponse       `json:"linked_accounts"`
 	OrganizationsPendingDeletion []AccountOrganizationPendingDeletion `json:"organizations_pending_deletion"`
 	Impersonation                *AccountImpersonation                `json:"impersonation,omitempty"`
+	License                      AccountLicense                       `json:"license"`
+}
+
+// HideLicenseExpiryBannerEnv hides the license expiry banner when it is "yes"
+// or "true". The default is "no", so the banner stays visible.
+const HideLicenseExpiryBannerEnv = "SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER"
+
+// AccountLicense tells the UI which Enterprise features are available. Only
+// installation administrators receive the license state and expiry.
+type AccountLicense struct {
+	Edition          string     `json:"edition"`
+	Features         []string   `json:"features"`
+	State            string     `json:"state,omitempty"`
+	ExpiresAt        *time.Time `json:"expires_at,omitempty"`
+	HideExpiryBanner bool       `json:"hide_expiry_banner,omitempty"`
+}
+
+func hideLicenseExpiryBanner() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(HideLicenseExpiryBannerEnv))) {
+	case "yes", "true":
+		return true
+	default:
+		return false
+	}
+}
+
+func accountLicense(status licensing.Status, installationAdmin bool) AccountLicense {
+	license := AccountLicense{
+		Edition:          string(status.Edition),
+		Features:         []string{},
+		HideExpiryBanner: hideLicenseExpiryBanner(),
+	}
+
+	if status.Edition == licensing.EditionEnterprise && status.License != nil {
+		license.Features = featureKeys(status.License.Features)
+	}
+
+	if !installationAdmin {
+		return license
+	}
+
+	license.State = string(status.State)
+	if status.License != nil {
+		expiresAt := status.License.ExpiresAt.UTC()
+		license.ExpiresAt = &expiresAt
+	}
+
+	return license
 }
 
 func accountOrganizationsPendingDeletion(organizations []models.Organization) []AccountOrganizationPendingDeletion {
@@ -1488,6 +1604,7 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		Providers:                    accountProviderResponses(providers),
 		LinkedAccounts:               accountLinkedAccountResponses(linkedAccounts),
 		OrganizationsPendingDeletion: accountOrganizationsPendingDeletion(pendingOrgs),
+		License:                      accountLicense(s.licenseStatus(), account.IsInstallationAdmin()),
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
@@ -1599,13 +1716,18 @@ func (s *Server) Serve(host string, port int) error {
 	log.Info("Starting WebSocket hub")
 	s.wsHub.Run()
 
+	handler := http.Handler(s.Router)
+	if os.Getenv("REDIRECT_HTTP_REQUESTS") == "yes" {
+		handler = middleware.RedirectInsecureForwardedHTTP(handler)
+	}
+
 	s.httpServer = &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", host, port),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       15 * time.Minute,
 		WriteTimeout:      15 * time.Minute,
 		IdleTimeout:       60 * time.Second,
-		Handler:           s.Router,
+		Handler:           handler,
 	}
 
 	return s.httpServer.ListenAndServe()
@@ -1840,8 +1962,10 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	body, err := io.ReadAll(r.Body)
+	track := s.openLinearWebhookReceipt(r.Context(), webhook, r.Header, body)
 	if err != nil {
 		if _, ok := err.(*http.MaxBytesError); ok {
+			track.complete(r.Context(), http.StatusRequestEntityTooLarge, 0)
 			http.Error(
 				w,
 				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxEventSize),
@@ -1851,12 +1975,14 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		track.complete(r.Context(), http.StatusBadRequest, 0)
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
 		return
 	}
 
 	nodes, err := models.FindActiveWebhookNodes(webhookID)
 	if err != nil {
+		track.complete(r.Context(), http.StatusNotFound, 0)
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
 	}
@@ -1865,6 +1991,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	mergeabilityWebhook := factoryactions.IsFactoryMergeabilityWebhook(webhook)
 	if len(nodes) == 0 {
 		if !mergeabilityWebhook || !factoryactions.IsGitHubFactoryMergeabilityEvent(eventType) {
+			track.complete(r.Context(), http.StatusNotFound, 0)
 			http.Error(w, "webhook not found", http.StatusNotFound)
 			return
 		}
@@ -1875,10 +2002,13 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 			r.Header,
 			body,
 		); err != nil {
+			track.complete(r.Context(), code, 0)
 			http.Error(w, "invalid signature", code)
 			return
 		}
 	}
+
+	requestCtx := withLinearWebhookTrack(r.Context(), track)
 
 	newEvents := []models.CanvasEvent{}
 	onNewEvents := func(events []models.CanvasEvent) {
@@ -1893,8 +2023,9 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	var firstResponse *core.WebhookResponseBody
 
 	for _, node := range nodes {
-		code, response, organizationID, err := s.executeWebhookNode(r.Context(), body, r.Header, webhookDeliveryQuery(r), node, onNewEvents, recordExecution)
+		code, response, organizationID, err := s.executeWebhookNode(requestCtx, body, r.Header, webhookDeliveryQuery(r), node, onNewEvents, recordExecution)
 		if err != nil {
+			track.complete(requestCtx, code, len(nodes))
 			s.replyWebhookError(w, r, webhook, node, code, err, organizationID)
 			return
 		}
@@ -1925,6 +2056,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		)
 	}
 
+	track.complete(requestCtx, http.StatusOK, len(nodes))
 	if firstResponse != nil {
 		if firstResponse.ContentType != "" {
 			w.Header().Set("Content-Type", firstResponse.ContentType)
@@ -1942,6 +2074,136 @@ func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers ht
 	}
 
 	return s.executeActionNode(ctx, body, headers, query, node, onNewEvents, recordExecution)
+}
+
+// lazyWebhookFactory reads the canvas only when a trigger calls it.
+// A webhook must send its response before that lookup.
+type lazyWebhookFactory struct {
+	tx       *gorm.DB
+	canvasID uuid.UUID
+	once     sync.Once
+	inner    core.FactoryContext
+	err      error
+}
+
+func newLazyWebhookFactory(tx *gorm.DB, canvasID uuid.UUID) core.FactoryContext {
+	return &lazyWebhookFactory{tx: tx, canvasID: canvasID}
+}
+
+func (l *lazyWebhookFactory) load() (core.FactoryContext, error) {
+	l.once.Do(func() {
+		canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(l.tx, l.canvasID)
+		if err != nil || canvas == nil || canvas.FactoryID == nil {
+			l.err = errors.New("app is not owned by a factory")
+			return
+		}
+		l.inner = contexts.NewFactoryContext(l.tx, canvas, nil)
+	})
+	return l.inner, l.err
+}
+
+func (l *lazyWebhookFactory) CreateWorkOrder(params core.WorkOrderParams) (*core.WorkOrder, bool, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, false, err
+	}
+	return inner.CreateWorkOrder(params)
+}
+
+func (l *lazyWebhookFactory) FindWorkOrder(params core.FindWorkOrderParams) (*core.WorkOrder, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.FindWorkOrder(params)
+}
+
+func (l *lazyWebhookFactory) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatusParams) (*core.WorkOrder, bool, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, false, err
+	}
+	return inner.UpdateWorkOrderStatus(params)
+}
+
+func (l *lazyWebhookFactory) AddWorkOrderComment(params core.AddWorkOrderCommentParams) error {
+	inner, err := l.load()
+	if err != nil {
+		return err
+	}
+	return inner.AddWorkOrderComment(params)
+}
+
+func (l *lazyWebhookFactory) AddWorkOrderArtifact(params core.AddWorkOrderArtifactParams) (*core.WorkOrderArtifact, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.AddWorkOrderArtifact(params)
+}
+
+func (l *lazyWebhookFactory) ReportWorkOrderCheck(params core.ReportWorkOrderCheckParams) (*core.WorkOrderCheck, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.ReportWorkOrderCheck(params)
+}
+
+func (l *lazyWebhookFactory) SetWorkOrderStatusNote(params core.SetWorkOrderStatusNoteParams) (*core.WorkOrderStatusNote, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.SetWorkOrderStatusNote(params)
+}
+
+func (l *lazyWebhookFactory) AddPullRequest(params core.AddPullRequestParams) (*core.PullRequest, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.AddPullRequest(params)
+}
+
+func (l *lazyWebhookFactory) UpdatePullRequest(params core.UpdatePullRequestParams) (*core.PullRequest, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.UpdatePullRequest(params)
+}
+
+func (l *lazyWebhookFactory) FindPullRequest(params core.FindPullRequestParams) (*core.PullRequestMatch, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.FindPullRequest(params)
+}
+
+func (l *lazyWebhookFactory) AddPullRequestActivity(params core.AddPullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.AddPullRequestActivity(params)
+}
+
+func (l *lazyWebhookFactory) UpdatePullRequestActivity(params core.UpdatePullRequestActivityParams) (*core.PullRequestActivityResult, error) {
+	inner, err := l.load()
+	if err != nil {
+		return nil, err
+	}
+	return inner.UpdatePullRequestActivity(params)
+}
+
+func (l *lazyWebhookFactory) VCSProvider() (string, error) {
+	inner, err := l.load()
+	if err != nil {
+		return "", err
+	}
+	return inner.VCSProvider()
 }
 
 func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, string, error) {
@@ -1972,6 +2234,11 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		integrationCtx = contexts.NewIntegrationContext(tx, &node, integration, s.encryptor, s.registry, onNewEvents)
 	}
 
+	events := core.EventContext(contexts.NewEventContext(tx, &node, nil, onNewEvents))
+	if track := linearWebhookTrackFrom(ctx); track != nil {
+		events = &linearReceiptEvents{inner: events, track: track}
+	}
+
 	code, response, err := trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
 		Headers:       headers,
@@ -1983,8 +2250,9 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 		Logger:        webhookNodeLogger(node, integration),
 		HTTP:          s.registry.HTTPContext(),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, s.encryptor, &node, s.BaseURL+s.BasePath),
-		Events:        contexts.NewEventContext(tx, &node, nil, onNewEvents),
+		Events:        events,
 		Integration:   integrationCtx,
+		Factory:       newLazyWebhookFactory(tx, node.WorkflowID),
 	})
 	return code, response, integrationOrganizationID(integration), err
 }
@@ -2024,6 +2292,44 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 		Integration:   integrationCtx,
 		FindExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
 			execution, err := models.FirstNodeExecutionByKVInTransaction(tx, node.WorkflowID, node.NodeID, key, value)
+			if err != nil {
+				return nil, err
+			}
+
+			if recordExecution != nil {
+				recordExecution(execution.WorkflowID, execution.ID)
+			}
+
+			organizationID := ""
+			var organizationUUID uuid.UUID
+			var factoryID *uuid.UUID
+			if workflow, err := models.FindCanvasWithoutOrgScopeInTransaction(tx, execution.WorkflowID); err == nil && workflow != nil {
+				organizationID = workflow.OrganizationID.String()
+				organizationUUID = workflow.OrganizationID
+				factoryID = workflow.FactoryID
+			}
+
+			return &core.ExecutionContext{
+				ID:             execution.ID,
+				WorkflowID:     execution.WorkflowID.String(),
+				OrganizationID: organizationID,
+				NodeID:         execution.NodeID,
+				BaseURL:        s.BaseURL,
+				Configuration:  execution.Configuration.Data(),
+				HTTP:           s.registry.HTTPContext(),
+				Integration:    integrationCtx,
+				Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
+				NodeMetadata:   contexts.NewNodeMetadataContext(tx, &node),
+				ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
+				Requests:       contexts.NewExecutionRequestContext(tx, execution),
+				Logger:         logging.ForExecution(execution),
+				CanvasMemory:   contexts.NewCanvasMemoryContext(tx, execution.WorkflowID),
+				Usage:          contexts.NewUsageContext(organizationUUID, execution),
+				HostedLLM:      contexts.NewHostedLLMContext(tx, s.encryptor, organizationUUID, factoryID),
+			}, nil
+		},
+		FindActiveExecutionByKV: func(key string, value string) (*core.ExecutionContext, error) {
+			execution, err := models.FirstActiveNodeExecutionByKV(tx, node.WorkflowID, node.NodeID, key, value)
 			if err != nil {
 				return nil, err
 			}

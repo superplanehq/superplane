@@ -5,21 +5,34 @@ import (
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type GatewayAuthorizer struct {
-	auth  organizationPermissionChecker
-	rules map[HTTPRoute]AuthorizationRule
+	auth         organizationPermissionChecker
+	rules        map[HTTPRoute]AuthorizationRule
+	entitlements licensing.Entitlements
 }
 
 func NewGatewayAuthorizer(auth organizationPermissionChecker) *GatewayAuthorizer {
 	return &GatewayAuthorizer{
-		auth:  auth,
-		rules: DefaultAuthorizationRules(),
+		auth:         auth,
+		rules:        DefaultAuthorizationRules(),
+		entitlements: licensing.Community,
 	}
+}
+
+// WithEntitlements sets the license entitlements for rules with
+// RequiredLicenseFeatures. Without it, those rules are always denied.
+func (a *GatewayAuthorizer) WithEntitlements(entitlements licensing.Entitlements) *GatewayAuthorizer {
+	if entitlements != nil {
+		a.entitlements = entitlements
+	}
+
+	return a
 }
 
 func (a *GatewayAuthorizer) Rule(route HTTPRoute) (AuthorizationRule, bool) {
@@ -79,6 +92,20 @@ func (a *GatewayAuthorizer) AuthorizeHTTP(
 			organizationID,
 		)
 		return nil, err
+	}
+
+	for _, feature := range rule.RequiredLicenseFeatures {
+		if err := licensing.Require(a.entitlements, feature); err != nil {
+			log.Warnf(
+				"User %s tried to access %s:%s in organization %s without the %s license feature",
+				userID,
+				rule.Resource,
+				rule.Action,
+				organizationID,
+				feature,
+			)
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		}
 	}
 
 	return withAuthorizedContext(ctx, pathParams, organizationID), nil

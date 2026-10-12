@@ -1,5 +1,6 @@
+import type { OrganizationsOrganizationCreditGrant } from "@/api-client";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { bpsToPercentInput, dollarInputToCents, percentInputToBps } from "@/lib/hostedCredit";
+import { bpsToPercentInput, centsToDollarInput, parseDollarInputToCents, percentInputToBps } from "@/lib/hostedCredit";
 import { useCallback, useEffect, useState } from "react";
 
 export type OrganizationLLMCredit = {
@@ -8,6 +9,11 @@ export type OrganizationLLMCredit = {
   superplane_grant_cents: number;
   purchased_credit_cents: number;
   hosted_billed_cents: number;
+  welcome_remaining_cents: number;
+  included_remaining_cents: number;
+  purchased_remaining_cents: number;
+  admin_remaining_cents: number;
+  welcome_credit_expires_at: string | null;
   markup_bps: number;
   markup_override_bps: number | null;
   warning: boolean;
@@ -21,6 +27,82 @@ export type OrganizationBillingPlan = {
   trial_ends_at: string | null;
   current_period_end: string | null;
 };
+
+export type CreditBalanceBucket = "trial" | "topup" | "grant";
+
+export type CreditBalanceInputs = Record<CreditBalanceBucket, string>;
+
+export const CREDIT_BALANCE_CHANGED_COPY = "The balance changed. Reload and try again.";
+
+const EMPTY_BALANCE_INPUTS: CreditBalanceInputs = { trial: "", topup: "", grant: "" };
+const TRIAL_LENGTH_DAYS = 14;
+
+export function creditRemainingCents(credit: OrganizationLLMCredit, bucket: CreditBalanceBucket): number {
+  switch (bucket) {
+    case "trial":
+      return credit.welcome_remaining_cents ?? 0;
+    case "topup":
+      return credit.purchased_remaining_cents ?? 0;
+    case "grant":
+      return credit.admin_remaining_cents ?? 0;
+  }
+}
+
+function balanceInputsFromCredit(credit: OrganizationLLMCredit): CreditBalanceInputs {
+  return {
+    trial: centsToDollarInput(creditRemainingCents(credit, "trial")),
+    topup: centsToDollarInput(creditRemainingCents(credit, "topup")),
+    grant: centsToDollarInput(creditRemainingCents(credit, "grant")),
+  };
+}
+
+class CreditBalanceChangedError extends Error {}
+
+export function utcCalendarDate(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+export function prefilledTrialEndDate(trialEndsAt: string | null, now = new Date()): string {
+  if (trialEndsAt) {
+    const parsed = new Date(trialEndsAt);
+    if (!Number.isNaN(parsed.getTime()) && parsed.getTime() > now.getTime()) {
+      return utcCalendarDate(parsed);
+    }
+  }
+  const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  day.setUTCDate(day.getUTCDate() + TRIAL_LENGTH_DAYS);
+  return utcCalendarDate(day);
+}
+
+export function utcTrialEndTimestamp(calendarDate: string): string {
+  return `${calendarDate}T23:59:59Z`;
+}
+
+export function isFutureUtcTrialEnd(calendarDate: string, now = new Date()): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(calendarDate)) {
+    return false;
+  }
+  const end = new Date(utcTrialEndTimestamp(calendarDate));
+  return !Number.isNaN(end.getTime()) && end.getTime() > now.getTime();
+}
+
+function billingPlanRequest(plan: string, trialEndsOn: string): { plan: string; trial_ends_at?: string } {
+  if (plan !== "trial") {
+    return { plan };
+  }
+  return { plan, trial_ends_at: utcTrialEndTimestamp(trialEndsOn) };
+}
+
+export function formatUtcTrialEnd(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return utcCalendarDate(parsed);
+}
 
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
   const text = await response.text();
@@ -38,17 +120,48 @@ async function fetchOrganizationBillingPlan(orgId: string): Promise<Organization
   return (await response.json()) as OrganizationBillingPlan;
 }
 
-async function putOrganizationBillingPlan(orgId: string, plan: string): Promise<OrganizationBillingPlan> {
+async function putOrganizationBillingPlan(
+  orgId: string,
+  body: { plan: string; trial_ends_at?: string },
+): Promise<OrganizationBillingPlan> {
   const response = await fetch(`/admin/api/organizations/${orgId}/billing-plan`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
-    body: JSON.stringify({ plan }),
+    body: JSON.stringify(body),
   });
   if (!response.ok) {
     throw new Error(await readErrorMessage(response, "Failed to set billing plan"));
   }
   return (await response.json()) as OrganizationBillingPlan;
+}
+
+async function fetchOrganizationCreditGrants(orgId: string): Promise<OrganizationsOrganizationCreditGrant[]> {
+  const response = await fetch(`/admin/api/organizations/${orgId}/llm-credit/grants`, { credentials: "include" });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Failed to load credit history"));
+  }
+  const data = (await response.json()) as { grants?: OrganizationsOrganizationCreditGrant[] };
+  return data.grants ?? [];
+}
+
+async function putOrganizationCreditBalance(
+  orgId: string,
+  body: { bucket: CreditBalanceBucket; target_cents: number; expected_remaining_cents: number; note: string },
+): Promise<OrganizationLLMCredit> {
+  const response = await fetch(`/admin/api/organizations/${orgId}/llm-credit/balances`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(body),
+  });
+  if (response.status === 409) {
+    throw new CreditBalanceChangedError(CREDIT_BALANCE_CHANGED_COPY);
+  }
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, "Failed to set credit balance"));
+  }
+  return (await response.json()) as OrganizationLLMCredit;
 }
 
 async function loadOrganizationCreditState(
@@ -73,68 +186,56 @@ async function loadOrganizationCreditState(
   showErrorToast("Failed to load billing plan");
 }
 
-export function useOrgLLMCredit(orgId: string) {
-  const [credit, setCredit] = useState<OrganizationLLMCredit | null>(null);
+function useOrgBillingPlan(orgId: string) {
   const [plan, setPlan] = useState<OrganizationBillingPlan | null>(null);
   const [planValue, setPlanValue] = useState("trial");
-  const [loading, setLoading] = useState(true);
-  const [grantDollars, setGrantDollars] = useState("");
-  const [note, setNote] = useState("");
-  const [markupPercent, setMarkupPercent] = useState("");
-  const [savingGrant, setSavingGrant] = useState(false);
-  const [savingMarkup, setSavingMarkup] = useState(false);
+  const [trialEndsOn, setTrialEndsOn] = useState("");
   const [savingPlan, setSavingPlan] = useState(false);
-
-  const applyCredit = useCallback((data: OrganizationLLMCredit) => {
-    setCredit(data);
-    setMarkupPercent(data.markup_override_bps == null ? "" : bpsToPercentInput(data.markup_override_bps));
-  }, []);
 
   const applyPlan = useCallback((nextPlan: OrganizationBillingPlan) => {
     setPlan(nextPlan);
     setPlanValue(nextPlan.plan || "none");
+    setTrialEndsOn(prefilledTrialEndDate(nextPlan.trial_ends_at));
   }, []);
 
-  const loadCredit = useCallback(async () => {
-    setLoading(true);
-    try {
-      await loadOrganizationCreditState(orgId, applyCredit, applyPlan, () => setPlan(null));
-    } catch (error) {
-      showErrorToast(error instanceof Error ? error.message : "Failed to load organization credit");
-    } finally {
-      setLoading(false);
+  const clearPlan = useCallback(() => setPlan(null), []);
+
+  const savePlan = async () => {
+    if (planValue === "trial" && !isFutureUtcTrialEnd(trialEndsOn)) {
+      return;
     }
-  }, [applyCredit, applyPlan, orgId]);
-
-  useEffect(() => {
-    loadCredit();
-  }, [loadCredit]);
-
-  const addGrant = async () => {
-    setSavingGrant(true);
+    setSavingPlan(true);
     try {
-      const response = await fetch(`/admin/api/organizations/${orgId}/llm-credit/grants`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          amount_cents: dollarInputToCents(grantDollars),
-          note: note.trim(),
-        }),
-      });
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response, "Failed to add hosted credit"));
-      }
-      applyCredit(await response.json());
-      setGrantDollars("");
-      setNote("");
-      showSuccessToast("Hosted credit increased");
+      applyPlan(await putOrganizationBillingPlan(orgId, billingPlanRequest(planValue, trialEndsOn)));
+      showSuccessToast("Billing plan updated");
     } catch (error) {
-      showErrorToast(error instanceof Error ? error.message : "Failed to add hosted credit");
+      showErrorToast(error instanceof Error ? error.message : "Failed to set billing plan");
     } finally {
-      setSavingGrant(false);
+      setSavingPlan(false);
     }
   };
+
+  return {
+    plan,
+    planValue,
+    setPlanValue,
+    trialEndsOn,
+    setTrialEndsOn,
+    trialEndInvalid: planValue === "trial" && !isFutureUtcTrialEnd(trialEndsOn),
+    savingPlan,
+    savePlan,
+    applyPlan,
+    clearPlan,
+  };
+}
+
+function useOrgMarkupOverride(orgId: string, setCredit: (credit: OrganizationLLMCredit) => void) {
+  const [markupPercent, setMarkupPercent] = useState("");
+  const [savingMarkup, setSavingMarkup] = useState(false);
+
+  const resetMarkup = useCallback((data: OrganizationLLMCredit) => {
+    setMarkupPercent(data.markup_override_bps == null ? "" : bpsToPercentInput(data.markup_override_bps));
+  }, []);
 
   const saveMarkup = async () => {
     setSavingMarkup(true);
@@ -150,7 +251,9 @@ export function useOrgLLMCredit(orgId: string) {
       if (!response.ok) {
         throw new Error(await readErrorMessage(response, "Failed to update markup override"));
       }
-      applyCredit(await response.json());
+      const next = (await response.json()) as OrganizationLLMCredit;
+      setCredit(next);
+      resetMarkup(next);
       showSuccessToast("Markup override updated");
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to update markup override");
@@ -159,35 +262,112 @@ export function useOrgLLMCredit(orgId: string) {
     }
   };
 
-  const savePlan = async () => {
-    setSavingPlan(true);
+  return { markupPercent, setMarkupPercent, savingMarkup, saveMarkup, resetMarkup };
+}
+
+export function useOrgLLMCredit(orgId: string) {
+  const [credit, setCredit] = useState<OrganizationLLMCredit | null>(null);
+  const [grants, setGrants] = useState<OrganizationsOrganizationCreditGrant[]>([]);
+  const [grantsLoadFailed, setGrantsLoadFailed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [balanceInputs, setBalanceInputs] = useState<CreditBalanceInputs>(EMPTY_BALANCE_INPUTS);
+  const [note, setNote] = useState("");
+  const [savingBalance, setSavingBalance] = useState<CreditBalanceBucket | null>(null);
+  const billingPlan = useOrgBillingPlan(orgId);
+  const markup = useOrgMarkupOverride(orgId, setCredit);
+  const { applyPlan, clearPlan } = billingPlan;
+  const { resetMarkup } = markup;
+
+  const applyCredit = useCallback(
+    (data: OrganizationLLMCredit) => {
+      setCredit(data);
+      resetMarkup(data);
+    },
+    [resetMarkup],
+  );
+
+  const applyCreditAndBalances = useCallback(
+    (data: OrganizationLLMCredit) => {
+      applyCredit(data);
+      setBalanceInputs(balanceInputsFromCredit(data));
+    },
+    [applyCredit],
+  );
+
+  const loadGrants = useCallback(async () => {
     try {
-      applyPlan(await putOrganizationBillingPlan(orgId, planValue));
-      showSuccessToast("Billing plan updated");
+      setGrants(await fetchOrganizationCreditGrants(orgId));
+      setGrantsLoadFailed(false);
     } catch (error) {
-      showErrorToast(error instanceof Error ? error.message : "Failed to set billing plan");
+      setGrantsLoadFailed(true);
+      showErrorToast(error instanceof Error ? error.message : "Failed to load credit history");
+    }
+  }, [orgId]);
+
+  const loadCredit = useCallback(async () => {
+    setLoading(true);
+    try {
+      await Promise.all([
+        loadOrganizationCreditState(orgId, applyCreditAndBalances, applyPlan, clearPlan),
+        loadGrants(),
+      ]);
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : "Failed to load organization credit");
     } finally {
-      setSavingPlan(false);
+      setLoading(false);
+    }
+  }, [applyCreditAndBalances, applyPlan, clearPlan, loadGrants, orgId]);
+
+  useEffect(() => {
+    loadCredit();
+  }, [loadCredit]);
+
+  const setBalanceInput = useCallback((bucket: CreditBalanceBucket, value: string) => {
+    setBalanceInputs((current) => ({ ...current, [bucket]: value }));
+  }, []);
+
+  const saveBalance = async (bucket: CreditBalanceBucket) => {
+    const targetCents = parseDollarInputToCents(balanceInputs[bucket]);
+    if (!credit || targetCents === null) {
+      return;
+    }
+
+    setSavingBalance(bucket);
+    try {
+      const next = await putOrganizationCreditBalance(orgId, {
+        bucket,
+        target_cents: targetCents,
+        expected_remaining_cents: creditRemainingCents(credit, bucket),
+        note: note.trim(),
+      });
+      applyCredit(next);
+      setBalanceInput(bucket, centsToDollarInput(creditRemainingCents(next, bucket)));
+      setNote("");
+      await loadGrants();
+      showSuccessToast("Credit balance updated");
+    } catch (error) {
+      showErrorToast(error instanceof Error ? error.message : "Failed to set credit balance");
+      if (error instanceof CreditBalanceChangedError) {
+        await loadCredit();
+      }
+    } finally {
+      setSavingBalance(null);
     }
   };
 
   return {
+    ...billingPlan,
+    ...markup,
     credit,
-    plan,
-    planValue,
-    setPlanValue,
+    grants,
+    grantsLoadFailed,
+    reloadGrants: loadGrants,
     loading,
-    grantDollars,
-    setGrantDollars,
+    balanceInputs,
+    setBalanceInput,
     note,
     setNote,
-    markupPercent,
-    setMarkupPercent,
-    savingGrant,
-    savingMarkup,
-    savingPlan,
-    addGrant,
-    saveMarkup,
-    savePlan,
+    savingBalance,
+    saveBalance,
   };
 }

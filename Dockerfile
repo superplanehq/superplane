@@ -31,7 +31,7 @@ ENV GOPROXY="https://proxy.golang.org|direct"
 ENV PLAYWRIGHT_BROWSERS_PATH="/ms-playwright"
 
 RUN apt-get update && \
-  apt-get install -y --no-install-recommends bash ca-certificates make unzip && \
+  apt-get install -y --no-install-recommends bash ca-certificates git make unzip && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
@@ -76,6 +76,8 @@ ARG FRONTEND_PREBUILT=0
 
 WORKDIR /app
 COPY pkg /app/pkg
+COPY ee /app/ee
+COPY LICENSE NOTICE /app/
 COPY cmd /app/cmd
 COPY go.mod /app/go.mod
 COPY go.sum /app/go.sum
@@ -106,9 +108,9 @@ RUN if [ "$FRONTEND_PREBUILT" = "1" ]; then \
     else \
       npm install && \
       if [ -n "$VITE_ASSET_BASE_URL" ]; then \
-        VITE_BASE_URL=$BASE_URL VITE_ASSET_BASE_URL=$VITE_ASSET_BASE_URL npm run build; \
+        NODE_OPTIONS=--max-old-space-size=4096 VITE_BASE_URL=$BASE_URL VITE_ASSET_BASE_URL=$VITE_ASSET_BASE_URL npm run build; \
       else \
-        VITE_BASE_URL=$BASE_URL npm run build; \
+        NODE_OPTIONS=--max-old-space-size=4096 VITE_BASE_URL=$BASE_URL npm run build; \
       fi; \
     fi
 
@@ -159,6 +161,8 @@ COPY --from=builder /app/pkg/web/assets/dist /app/pkg/web/assets/dist
 COPY --from=builder /app/api/swagger /app/api/swagger
 COPY --from=builder /app/rbac /app/rbac
 COPY --from=builder /app/templates /app/templates
+COPY --from=builder /app/LICENSE /app/NOTICE /app/
+COPY --from=builder /app/ee/LICENSE /app/ee/LICENSE
 
 # Trial entrypoint that runs embedded Postgres and RabbitMQ and then SuperPlane.
 COPY release/superplane-demo-image/entrypoint.sh /app/entrypoint.sh
@@ -207,6 +211,8 @@ COPY --from=builder --chown=nobody:root /app/pkg/web/assets/dist /app/pkg/web/as
 COPY --from=builder --chown=nobody:root /app/api/swagger /app/api/swagger
 COPY --from=builder --chown=nobody:root /app/rbac /app/rbac
 COPY --from=builder --chown=nobody:root /app/templates /app/templates
+COPY --from=builder --chown=nobody:root /app/LICENSE /app/NOTICE /app/
+COPY --from=builder --chown=nobody:root /app/ee/LICENSE /app/ee/LICENSE
 
 USER nobody
 

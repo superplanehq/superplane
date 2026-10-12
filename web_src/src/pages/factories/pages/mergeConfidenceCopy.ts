@@ -38,3 +38,9 @@ export const MERGE_CONFIDENCE_SETTINGS_COPY = {
   save: "Save checks",
   saving: "Saving...",
 } as const;
+
+export const MERGE_CONFIDENCE_CONFIG_COPY = {
+  automationTab: "Automation",
+  runsTab: "Runs",
+  tabsLabel: "Merge confidence sections",
+} as const;

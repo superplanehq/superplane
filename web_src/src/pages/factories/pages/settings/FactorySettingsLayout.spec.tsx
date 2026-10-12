@@ -445,6 +445,24 @@ describe("FactorySettingsLayout sidebar", () => {
     }, 10000);
   });
 
+  it("redirects the settings index to Workspace General on desktop", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    await waitFor(() => {
+      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-general")).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+    expect(screen.queryByTestId("factory-settings-mobile-index")).not.toBeInTheDocument();
+  }, 10000);
+
   describe("settings group headings", () => {
     it("shows the workspace and organization names without a switcher", async () => {
       render(

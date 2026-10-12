@@ -47,6 +47,43 @@ export const NoProviders: Story = {
   ),
 };
 
+export const HostedSelection: Story = {
+  name: "SuperPlane organization selection",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={modelsPath}
+      experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        factories: defaultFactoriesFixture.factories.map((factory) => ({
+          ...factory,
+          onboarding: { ...factory.onboarding, agentHarness: "AGENT_HARNESS_SUPERPLANE" },
+        })),
+        byokConnectedProviders: [],
+      }}
+    />
+  ),
+};
+
+export const EmptyHostedSelection: Story = {
+  name: "No SuperPlane models selected",
+  render: () => (
+    <FactoriesHarness
+      pathSuffix={modelsPath}
+      experimentalFeatures={[FEATURE_ORGANIZATION_BYOK]}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        factories: defaultFactoriesFixture.factories.map((factory) => ({
+          ...factory,
+          onboarding: { ...factory.onboarding, agentHarness: "AGENT_HARNESS_SUPERPLANE" },
+        })),
+        byokConnectedProviders: [],
+        hostedSelectedKeys: [],
+      }}
+    />
+  ),
+};
+
 export const OpenRouterOnly: Story = {
   name: "OpenRouter connected",
   render: () => (

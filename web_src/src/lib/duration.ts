@@ -204,8 +204,16 @@ export function formatClockDuration(durationMs: number): string {
 
 const KNOWN_DURATION_WORDS = new Set(["—", "-", "Running", "Waiting", "Pending"]);
 
+function withoutRunningDurationSuffix(label: string): string {
+  return label.replace(/\s+so far$/i, "").trim();
+}
+
+export function isSubSecondDurationLabel(label: string): boolean {
+  return /^<\s*1s$/i.test(withoutRunningDurationSuffix(label));
+}
+
 function parseSpokenDurationMs(label: string): number | null {
-  const trimmed = label.replace(/\s+so far$/i, "").trim();
+  const trimmed = withoutRunningDurationSuffix(label);
   if (!trimmed || KNOWN_DURATION_WORDS.has(trimmed)) {
     return null;
   }
@@ -235,7 +243,7 @@ export function durationLabelMs(label: string): number {
 
 /** Turn a stored label such as `2m 59s` into a clock column value. */
 export function formatClockDurationLabel(label: string): string {
-  const trimmed = label.replace(/\s+so far$/i, "").trim();
+  const trimmed = withoutRunningDurationSuffix(label);
   if (!trimmed) {
     return "—";
   }
@@ -268,7 +276,7 @@ export function formatGoDuration(durationMs: number): string {
 
 /** Turn a stored label such as `1m 12s` or `4m so far` into `1m12s` / `4m`. */
 export function formatGoDurationLabel(label: string): string {
-  const trimmed = label.replace(/\s+so far$/i, "").trim();
+  const trimmed = withoutRunningDurationSuffix(label);
   if (!trimmed || KNOWN_DURATION_WORDS.has(trimmed)) {
     return "";
   }

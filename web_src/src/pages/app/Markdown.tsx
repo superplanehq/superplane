@@ -13,6 +13,7 @@ import { MarkdownCode } from "@/components/AgentSidebar/widgets/MarkdownCode";
 import { MermaidWidget } from "@/components/AgentSidebar/widgets/MermaidWidget";
 import { NodeChipFromLink } from "@/components/AgentSidebar/widgets/NodeChip";
 import { isGitHubAttachmentAutolink, isGitHubUserAttachmentUrl } from "@/lib/githubAttachments";
+import { parseHostedVideoUrl } from "@/lib/hostedVideo";
 import {
   isReachableWorkOrderFileUrl,
   isWorkOrderMediaSource,
@@ -39,6 +40,7 @@ import { parseGithubSectionChildren } from "./markdownSectionParse";
 import { markdownHeadingClassName } from "./markdownHeadingStyles";
 import { highlightMentionChildren } from "./markdownMentionHighlight";
 import { GitHubAttachmentMedia } from "./GitHubAttachmentMedia";
+import { HostedVideoEmbed } from "./HostedVideoEmbed";
 import { WorkOrderVideo } from "./WorkOrderVideo";
 import {
   MARKDOWN_TABLE_CLASSES,
@@ -520,6 +522,10 @@ function MarkdownImage({
     hideUntilLoaded?: boolean;
   }) {
   const resolved = resolveWorkOrderFileSrc(src, fileUrls);
+  const hosted = parseHostedVideoUrl(resolved) ?? parseHostedVideoUrl(src ?? "");
+  if (hosted) {
+    return <HostedVideoEmbed video={hosted} className={className} />;
+  }
   if (!isReachableWorkOrderFileUrl(resolved)) {
     return <span>{alt?.trim() || "image"}</span>;
   }

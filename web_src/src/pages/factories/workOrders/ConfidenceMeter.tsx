@@ -27,11 +27,11 @@ const BAR_CLASS: Record<MeterSize, string> = {
   sm: "h-2 w-1.5 rounded-[1px]",
 };
 
-function MeterBars({ value, size }: { value: number; size: MeterSize }) {
-  const band = confidenceBandForScore(value);
+function MeterBars({ value, max, size }: { value: number; max: number; size: MeterSize }) {
+  const band = confidenceBandForScore(value, max);
   return (
     <>
-      {Array.from({ length: CONFIDENCE_SCORE_MAX }, (_, index) => (
+      {Array.from({ length: max }, (_, index) => (
         <span
           key={index}
           data-filled={index < value ? "true" : "false"}
@@ -44,6 +44,7 @@ function MeterBars({ value, size }: { value: number; size: MeterSize }) {
 
 export function ConfidenceMeter({
   score,
+  max = CONFIDENCE_SCORE_MAX,
   label = CONFIDENCE_CHECK_NAME,
   className,
   testId,
@@ -52,6 +53,8 @@ export function ConfidenceMeter({
   size = "sm",
 }: {
   score: number;
+  /** Top of the scale: 5 for legacy scores, 3 for review scores. */
+  max?: number;
   /** Check name read by screen readers and the tooltip. */
   label?: string;
   className?: string;
@@ -60,8 +63,8 @@ export function ConfidenceMeter({
   decorative?: boolean;
   size?: "sm" | "lg";
 }) {
-  const value = clampConfidenceScore(score);
-  const scoreLabel = `${value}/${CONFIDENCE_SCORE_MAX}`;
+  const value = clampConfidenceScore(score, max);
+  const scoreLabel = `${value}/${max}`;
 
   const meter = (
     <span
@@ -69,13 +72,13 @@ export function ConfidenceMeter({
       aria-hidden={decorative || undefined}
       aria-label={decorative ? undefined : label}
       aria-valuemin={decorative ? undefined : 0}
-      aria-valuemax={decorative ? undefined : CONFIDENCE_SCORE_MAX}
+      aria-valuemax={decorative ? undefined : max}
       aria-valuenow={decorative ? undefined : value}
-      aria-valuetext={decorative ? undefined : `${value} of ${CONFIDENCE_SCORE_MAX}`}
+      aria-valuetext={decorative ? undefined : `${value} of ${max}`}
       data-testid={testId}
       className={cn("pointer-events-auto inline-flex items-center gap-0.5", size === "lg" && "gap-1", className)}
     >
-      <MeterBars value={value} size={size} />
+      <MeterBars value={value} max={max} size={size} />
     </span>
   );
 

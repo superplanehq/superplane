@@ -80,6 +80,14 @@ func DispatchWorkOrder(ctx context.Context, organizationID string, req *pb.Dispa
 	}, nil
 }
 
+type workOrderLineDispatchResult struct {
+	factory      *models.Factory
+	order        *models.FactoryWorkOrder
+	startedSteps []*models.FactoryLineStepResult
+	fromState    string
+	logger       *log.Entry
+}
+
 func DispatchWorkOrderOnLine(
 	db *gorm.DB,
 	factory *models.Factory,
@@ -91,111 +99,144 @@ func DispatchWorkOrderOnLine(
 	model string,
 	thinkingLevel string,
 ) (*models.Factory, *models.FactoryWorkOrder, error) {
-	if factory == nil || line == nil || orderID == uuid.Nil {
-		return nil, nil, invalidArgument("work order dispatch is incomplete")
-	}
-
-	var order *models.FactoryWorkOrder
-	var startedSteps []*models.FactoryLineStepResult
-	var logger *log.Entry
-	var fromState string
-	orgID := factory.OrganizationID
-	factoryID := factory.ID
-	lineID := line.ID
-
+	var result *workOrderLineDispatchResult
 	err := db.Transaction(func(tx *gorm.DB) error {
-		f, err := models.FindFactory(tx, orgID, factoryID)
-		if err != nil {
-			return err
-		}
-		factory = f
-
-		order, err = factory.FindWorkOrder(tx, orderID)
-		if err != nil {
-			return err
-		}
-		if err := order.LockForUpdate(tx); err != nil {
-			return err
-		}
-
-		logger = logging.WithWorkOrder(logging.ForFactory(*factory), *order).
-			WithField("organization_id", factory.OrganizationID)
-		if !order.IsDispatchable() {
-			return models.ErrFactoryWorkOrderNotDispatchable
-		}
-
-		currentLine, err := factory.FindLine(tx, lineID)
-		if err != nil {
-			return err
-		}
-
-		if len(currentLine.Steps) == 0 {
-			return models.ErrFactoryLineHasNoSteps
-		}
-
-		model = strings.TrimSpace(model)
-		if model != "" {
-			allowed, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name)
-			if err != nil {
-				return err
-			}
-			if !slices.Contains(allowed, model) {
-				return invalidArgument("model is not available on this line")
-			}
-		}
-		normalizedThinking, err := runner.NormalizeDispatchThinkingLevel(thinkingLevel)
-		if err != nil {
-			return invalidArgument(err.Error())
-		}
-
-		fromState = order.State
-		if err := fillMissingWorkOrderTitle(tx, order); err != nil {
-			return err
-		}
-		if err := order.TransitionOnDispatch(tx, actor); err != nil {
-			return err
-		}
-		if _, err := order.ClearAutoStart(tx); err != nil {
-			return err
-		}
-
-		if replaceActive && startIndex > 0 {
-			_, started, err := order.RetryLineStep(tx, currentLine, startIndex)
-			if err != nil {
-				return err
-			}
-			startedSteps = started
-			return nil
-		}
-
-		var abandoned []*models.FactoryLineStepResult
-		_, err = order.FindActiveLineDispatch(tx)
-		if err == nil {
-			if !replaceActive {
-				return models.ErrFactoryWorkOrderLineDispatchActive
-			}
-			abandoned, err = order.AbandonActiveLineDispatch(tx)
-			if err != nil {
-				return err
-			}
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-
-		_, result, err := currentLine.DispatchFromWithModel(tx, order, startIndex, model, normalizedThinking)
-		if err != nil {
-			return err
-		}
-
-		startedSteps = append(abandoned, result)
-		return nil
+		var err error
+		result, err = dispatchWorkOrderOnLineTx(tx, factory, orderID, line, actor, startIndex, replaceActive, model, thinkingLevel)
+		return err
 	})
 	if err != nil {
 		return nil, nil, err
 	}
 
-	publishDispatchedWorkOrder(logger, orgID, factoryID, order, actor, fromState, startedSteps)
-	return factory, order, nil
+	publishDispatchedWorkOrder(
+		result.logger,
+		result.factory.OrganizationID,
+		result.factory.ID,
+		result.order,
+		actor,
+		result.fromState,
+		result.startedSteps,
+	)
+	return result.factory, result.order, nil
+}
+
+func dispatchWorkOrderOnLineTx(
+	tx *gorm.DB,
+	factory *models.Factory,
+	orderID uuid.UUID,
+	line *models.FactoryLine,
+	actor *uuid.UUID,
+	startIndex int,
+	replaceActive bool,
+	model string,
+	thinkingLevel string,
+) (*workOrderLineDispatchResult, error) {
+	if factory == nil || line == nil || orderID == uuid.Nil {
+		return nil, invalidArgument("work order dispatch is incomplete")
+	}
+
+	orgID := factory.OrganizationID
+	factoryID := factory.ID
+	lineID := line.ID
+
+	f, err := models.FindFactory(tx, orgID, factoryID)
+	if err != nil {
+		return nil, err
+	}
+	factory = f
+
+	order, err := factory.FindWorkOrder(tx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if err := order.LockForUpdate(tx); err != nil {
+		return nil, err
+	}
+
+	logger := logging.WithWorkOrder(logging.ForFactory(*factory), *order).
+		WithField("organization_id", factory.OrganizationID)
+	if !order.IsDispatchable() {
+		return nil, models.ErrFactoryWorkOrderNotDispatchable
+	}
+
+	currentLine, err := factory.FindLine(tx, lineID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(currentLine.Steps) == 0 {
+		return nil, models.ErrFactoryLineHasNoSteps
+	}
+
+	model = strings.TrimSpace(model)
+	if model != "" {
+		allowed, err := listLineRunnerModels(tx, orgID, factoryID, currentLine.Name)
+		if err != nil {
+			return nil, err
+		}
+		if !slices.Contains(allowed, model) {
+			return nil, invalidArgument("model is not available on this line")
+		}
+	}
+	normalizedThinking, err := runner.NormalizeDispatchThinkingLevel(thinkingLevel)
+	if err != nil {
+		return nil, invalidArgument(err.Error())
+	}
+
+	fromState := order.State
+	if err := fillMissingWorkOrderTitle(tx, order); err != nil {
+		return nil, err
+	}
+	if err := order.TransitionOnDispatch(tx, actor); err != nil {
+		return nil, err
+	}
+	if _, err := order.ClearAutoStart(tx); err != nil {
+		return nil, err
+	}
+
+	var startedSteps []*models.FactoryLineStepResult
+	if replaceActive && startIndex > 0 {
+		_, started, err := order.RetryLineStep(tx, currentLine, startIndex)
+		if err != nil {
+			return nil, err
+		}
+		startedSteps = started
+		return &workOrderLineDispatchResult{
+			factory:      factory,
+			order:        order,
+			startedSteps: startedSteps,
+			fromState:    fromState,
+			logger:       logger,
+		}, nil
+	}
+
+	var abandoned []*models.FactoryLineStepResult
+	_, err = order.FindActiveLineDispatch(tx)
+	if err == nil {
+		if !replaceActive {
+			return nil, models.ErrFactoryWorkOrderLineDispatchActive
+		}
+		abandoned, err = order.AbandonActiveLineDispatch(tx)
+		if err != nil {
+			return nil, err
+		}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	_, result, err := currentLine.DispatchFromWithModel(tx, order, startIndex, model, normalizedThinking)
+	if err != nil {
+		return nil, err
+	}
+
+	return &workOrderLineDispatchResult{
+		factory:      factory,
+		order:        order,
+		startedSteps: append(abandoned, result),
+		fromState:    fromState,
+		logger:       logger,
+	}, nil
 }
 
 func publishDispatchedWorkOrder(

@@ -103,6 +103,18 @@ async function selectFlyoutOption(user: ReturnType<typeof userEvent.setup>, pare
   fireEvent.click(await screen.findByRole("menuitem", { name: optionName }));
 }
 
+function expectClosedThinkingWord(modelName: string, thinkingWord: string) {
+  const control = screen.getByTestId("field-model-hosted-model");
+  const name = control.querySelector(".truncate");
+  const word = control.querySelector(".text-muted-foreground");
+
+  expect(name).toHaveTextContent(modelName);
+  expect(name).not.toHaveTextContent(thinkingWord);
+  expect(word).toHaveTextContent(thinkingWord);
+  expect(word).toHaveClass("ml-auto", "shrink-0", "text-[11px]", "text-muted-foreground");
+  expect(word?.nextElementSibling?.tagName).toBe("svg");
+}
+
 function renderField(ui: ReactElement, path = "/") {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -370,6 +382,30 @@ describe("HostedModelFieldRenderer", () => {
     await user.click(screen.getByTestId("field-model-hosted-model"));
     await selectFlyoutOption(user, "field-model-hosted-thinking", "High");
     expect(onValuesChange).toHaveBeenCalledWith({ model: undefined, thinkingLevel: "high" });
+  });
+
+  it("shows the thinking word beside the closed model name", () => {
+    const cases = [
+      [{}, "Default"],
+      [{ thinkingLevel: "low" }, "Low"],
+      [{ thinkingLevel: "medium" }, "Medium"],
+      [{ thinkingLevel: "high" }, "High"],
+    ] as const;
+
+    for (const [extra, word] of cases) {
+      const view = renderField(
+        <HostedModelFieldRenderer
+          field={createField()}
+          value="claude-sonnet-4-6"
+          onChange={vi.fn()}
+          allValues={{ model: "claude-sonnet-4-6", ...extra }}
+          organizationId="org-1"
+        />,
+      );
+
+      expectClosedThinkingWord("sonnet 4-6", word);
+      view.unmount();
+    }
   });
 
   it("writes thinkingLevel next to the model", async () => {

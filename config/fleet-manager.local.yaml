@@ -1,0 +1,19 @@
+id: local
+superplaneUrl: http://app:8000
+installationAdminToken: ""
+reconciliation:
+  pollTimeout: 30s
+  errorRetryInterval: 2s
+http:
+  requestTimeout: 60s
+fleets:
+  - id: e1-large-amd64
+    provider: docker
+    maxCapacity: 10
+    docker:
+      image: superplane-runner-local:dev
+      architecture: amd64
+      runnerApiUrl: http://app:8000
+      network: superplane_default
+      extraHosts:
+        - host.docker.internal:host-gateway

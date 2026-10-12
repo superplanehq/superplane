@@ -1,3 +1,4 @@
+import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
@@ -89,10 +90,9 @@ export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
 
 export function catalogForColumn(
   key: ColumnKey,
-  options?: { allowCustom?: boolean; allowRiskScore?: boolean },
+  options?: { allowCustom?: boolean; vcsProvider?: string },
 ): ColumnAutomationCatalogEntry[] {
   const allowCustom = options?.allowCustom === true;
-  const allowRiskScore = options?.allowRiskScore === true;
   if (key === "backlog") {
     return [
       ...LINE_INTAKE_SOURCES.map((source) => ({
@@ -111,7 +111,7 @@ export function catalogForColumn(
   }
   if (key === "verify") {
     return [
-      ...availablePRFeedbackSources().map((source) => {
+      ...availablePRFeedbackSources(options?.vcsProvider).map((source) => {
         const sentence = prFeedbackSentence(source.id);
         return {
           id: source.id,
@@ -125,12 +125,16 @@ export function catalogForColumn(
           unique: true,
         };
       }),
-      ...(allowRiskScore ? [RISK_SCORE_ENTRY] : []),
+      RISK_SCORE_ENTRY,
       ...(allowCustom ? [EVENT_CUSTOM_ENTRY] : []),
     ];
   }
   if (key === "done") {
-    return allowCustom ? [PR_CLOSURE_ENTRY, EVENT_CUSTOM_ENTRY] : [PR_CLOSURE_ENTRY];
+    const closureEntry =
+      options?.vcsProvider === "bitbucket"
+        ? { ...PR_CLOSURE_ENTRY, iconSrc: bitbucketIcon, iconAlt: "Bitbucket" }
+        : PR_CLOSURE_ENTRY;
+    return allowCustom ? [closureEntry, EVENT_CUSTOM_ENTRY] : [closureEntry];
   }
   return allowCustom ? [AGENT_STEP_ENTRY, CUSTOM_ENTRY] : [AGENT_STEP_ENTRY];
 }

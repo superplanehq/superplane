@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/superplanehq/superplane/pkg/factories/vcs"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/integrations/datadog"
 	ghcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -18,6 +19,7 @@ import (
 const (
 	intakeConnectFirstMessage      = "Connect this intake first."
 	intakeCouldNotLoadItemsMessage = "SuperPlane could not load items from this intake."
+	linearIssueFilesMessage        = "SuperPlane could not store the Linear files. Try the import again."
 )
 
 func factoryErrorToStatus(err error, internalMessage string) error {
@@ -59,6 +61,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "invalid provisioned app id")
 	case errors.Is(err, models.ErrFactoryOnboardingInvalidLineID):
 		return grpcerrors.InvalidArgument(err, "invalid provisioned line id")
+	case errors.Is(err, models.ErrFactoryOnboardingInvalidVCSProvider):
+		return grpcerrors.InvalidArgument(err, "invalid version control provider")
 	case errors.Is(err, models.ErrFactoryOnboardingInvalidRepository):
 		return grpcerrors.InvalidArgument(err, "repository must use the owner/name format")
 	case errors.Is(err, models.ErrFactoryOnboardingVCSIntegrationRequired):
@@ -129,14 +133,18 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "pull request lookup is incomplete")
 	case errors.Is(err, errFactoryGitHubNotConnected):
 		return grpcerrors.FailedPrecondition(err, "GitHub is not connected.")
+	case errors.Is(err, errFactoryBitbucketNotConnected):
+		return grpcerrors.FailedPrecondition(err, "Bitbucket is not connected.")
 	case errors.Is(err, errCannotCloseBitbucketPullRequest):
 		return grpcerrors.FailedPrecondition(err, "SuperPlane cannot close a Bitbucket pull request.")
+	case errors.Is(err, vcs.ErrNotSupported):
+		return grpcerrors.FailedPrecondition(err, "SuperPlane does not support this for Bitbucket.")
 	case errors.Is(err, errCannotClosePullRequest):
 		return grpcerrors.FailedPrecondition(err, joinedErrorMessage(err, "SuperPlane could not close a previous pull request."))
 	case errors.Is(err, errWorkOrderNotClosedForBacklog):
 		return grpcerrors.FailedPrecondition(err, "Only a closed task can move to the Backlog.")
 	case errors.Is(err, errFactoryPullRequestNotGitHub):
-		return grpcerrors.FailedPrecondition(err, "Only GitHub pull requests can merge from SuperPlane.")
+		return grpcerrors.FailedPrecondition(err, "Only pull requests on the workspace Git host can merge from SuperPlane.")
 	case errors.Is(err, errFactoryPullRequestNotOpen):
 		return grpcerrors.FailedPrecondition(err, "The pull request is not open.")
 	case errors.Is(err, errFactoryPullRequestNotMergeable):
@@ -201,6 +209,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "Add a readable intake before you refresh the backlog.")
 	case errors.Is(err, errIntakeItemNotFound):
 		return grpcerrors.NotFound(err, "intake item not found")
+	case errors.Is(err, errLinearIssueFiles):
+		return grpcerrors.FailedPrecondition(err, linearIssueFilesMessage)
 	case errors.Is(err, datadog.ErrErrorTrackingForbidden):
 		return grpcerrors.FailedPrecondition(err, datadog.ErrorTrackingForbiddenMessage)
 	case errors.Is(err, models.ErrFileNotFound):
@@ -215,8 +225,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
 	case errors.Is(err, errFactoryPullRequestMergeDisabled):
 		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
-	case errors.Is(err, errRiskScoreDisabled):
-		return grpcerrors.FailedPrecondition(err, "Merge confidence is not enabled for this organization.")
+	case errors.Is(err, errFactoryBitbucketDisabled):
+		return grpcerrors.FailedPrecondition(err, "Bitbucket workspaces are not enabled for this organization.")
 	case errors.Is(err, errWorkspaceMCPDisabled):
 		return grpcerrors.FailedPrecondition(err, "Workspace MCP is not enabled for this organization.")
 	case errors.Is(err, errWorkspaceSkillsDisabled):
@@ -239,8 +249,9 @@ var errCustomAutomationsDisabled = errors.New("custom automations are not enable
 var errFactoryAutomationReserved = errors.New("factory automation is reserved")
 var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server first")
 var errListMCPTools = errors.New("could not list MCP tools")
+var errMCPConnectionChanged = errors.New("mcp connection changed before tool defaults were saved")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
-var errRiskScoreDisabled = errors.New("risk score is not enabled")
+var errFactoryBitbucketDisabled = errors.New("bitbucket workspaces are not enabled")
 var errWorkspaceMCPDisabled = errors.New("workspace MCP is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")
 var errSuperPlaneMCPServerDisabled = errors.New("superplane MCP server is not enabled")

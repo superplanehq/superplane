@@ -57,21 +57,31 @@ const settingsColumn = "mx-auto w-full max-w-3xl";
 /** Shorter measure for list-first settings such as Agent MCP servers and skills. */
 const settingsNarrowColumn = "mx-auto w-full max-w-2xl";
 const settingsWideColumn = "mx-auto w-full max-w-6xl";
+/** Phones show a slim title bar above the page, so the title sits closer to it. */
+const settingsHeaderTopInset = "pt-6 md:pt-14";
 
-export const factorySettingsSectionHeaderClassName = cn(factorySectionHeaderClassName, settingsColumn, "pt-14");
+export const factorySettingsSectionHeaderClassName = cn(
+  factorySectionHeaderClassName,
+  settingsColumn,
+  settingsHeaderTopInset,
+);
 
 export const factorySettingsSectionBodyClassName = cn(factorySectionBodyClassName, settingsColumn, "pb-10");
 
 export const factorySettingsNarrowSectionHeaderClassName = cn(
   factorySectionHeaderClassName,
   settingsNarrowColumn,
-  "pt-14",
+  settingsHeaderTopInset,
 );
 
 export const factorySettingsNarrowSectionBodyClassName = cn(factorySectionBodyClassName, settingsNarrowColumn, "pb-10");
 
 /** Wider settings column for tables that cannot stay readable at the form measure. */
-export const factorySettingsWideSectionHeaderClassName = cn(factorySectionHeaderClassName, settingsWideColumn, "pt-14");
+export const factorySettingsWideSectionHeaderClassName = cn(
+  factorySectionHeaderClassName,
+  settingsWideColumn,
+  settingsHeaderTopInset,
+);
 
 export const factorySettingsWideSectionBodyClassName = cn(factorySectionBodyClassName, settingsWideColumn, "pb-10");
 

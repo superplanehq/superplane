@@ -106,6 +106,20 @@ function artifactEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
 }
 
+function mergeConfidenceEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
+}
+
+function superplaneMCPScript(taskDir, env = process.env) {
+  if (planningEnabled(env)) {
+    return path.join(taskDir, "planning_session_mcp.js");
+  }
+  if (mergeConfidenceEnabled(env)) {
+    return path.join(taskDir, "merge_confidence_mcp.js");
+  }
+  return path.join(taskDir, "task_artifact_mcp.js");
+}
+
 function planningSystemPrompt(env = process.env) {
   return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
 }
@@ -149,7 +163,7 @@ function codexExecArgs(
     );
   } else {
     args.push("--dangerously-bypass-approvals-and-sandbox");
-    if (artifactEnabled(env)) {
+    if (artifactEnabled(env) || mergeConfidenceEnabled(env)) {
       args.push(...mcpConfigOverrides(mcpScriptPath, env));
     } else {
       args.push(...workspaceMCPConfigOverrides(env));
@@ -338,10 +352,7 @@ async function runPrompt(promptFile, model, thinking) {
     turn: promptCount + 1,
   });
   activity.start();
-  const mcpScript = path.join(
-    sp,
-    planning ? "planning_session_mcp.js" : "task_artifact_mcp.js",
-  );
+  const mcpScript = superplaneMCPScript(sp);
   const codexArgs = codexExecArgs(
     process.env,
     model,
@@ -484,7 +495,7 @@ function loadTurnTelemetry() {
 
 function extractUsage(event) {
   const source = event.usage || (event.item && event.item.usage) || event;
-  return {
+  const usage = {
     input_tokens: Number(source.input_tokens || source.prompt_tokens || 0),
     output_tokens: Number(
       source.output_tokens || source.completion_tokens || 0,
@@ -494,6 +505,9 @@ function extractUsage(event) {
     ),
     reasoning_tokens: Number(source.reasoning_tokens || 0),
   };
+  const cost = event.total_cost_usd ?? source.total_cost_usd;
+  if (cost != null && Number.isFinite(Number(cost))) usage.total_cost_usd = Number(cost);
+  return usage;
 }
 
 function accumulateLLMUsage(payload) {
@@ -676,6 +690,11 @@ function createCodexFormatter(telemetry, activityOverride) {
 
   return {
     handleEvent(event) {
+      if (event.type === "turn.completed" || event.type === "result") {
+        tracker.updateCurrentUsage(extractUsage(event));
+        roundOpen = false;
+        return;
+      }
       const item = event.item;
       if (!item || typeof item !== "object") {
         return;
@@ -909,6 +928,7 @@ module.exports = {
   codexSessionForPrompt,
   codexSessionIDFromEvent,
   planningEnabled,
+  superplaneMCPScript,
   planningSystemPrompt,
   planningAnalysisEnabled,
   workspaceMCPConfigOverrides,

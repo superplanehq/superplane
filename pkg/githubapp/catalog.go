@@ -60,13 +60,19 @@ func NewCatalog(db *gorm.DB, cfg config.GitHubHostedAppConfig) (*Catalog, error)
 // onboarding-guide.md.
 func (c *Catalog) Reconcile(ctx context.Context, priority models.VCSProviderRepositorySyncPriority) error {
 	reconciliationStartedAt := c.now()
+	reconcileErrors := make([]error, 0)
+	// Requests come first. The installation loop below can take minutes, and
+	// users wait on the request list while it runs.
+	if err := c.ReconcileInstallRequests(ctx); err != nil {
+		reconcileErrors = append(reconcileErrors, err)
+	}
+
 	installations, err := c.listInstallations(ctx)
 	if err != nil {
-		return err
+		return errors.Join(append(reconcileErrors, err)...)
 	}
 
 	seen := make(map[int64]struct{}, len(installations))
-	reconcileErrors := make([]error, 0)
 	for _, installation := range installations {
 		if installation == nil || installation.GetID() <= 0 || installation.GetAccount() == nil {
 			continue
@@ -84,18 +90,25 @@ func (c *Catalog) Reconcile(ctx context.Context, priority models.VCSProviderRepo
 		reconcileErrors = append(reconcileErrors, fmt.Errorf("remove missing GitHub installations: %w", err))
 	}
 
+	return errors.Join(reconcileErrors...)
+}
+
+// ReconcileInstallRequests replaces the stored approval requests with the
+// current GitHub list. GitHub sends no webhook when a member requests the App
+// or cancels a request, so this list is the only source.
+func (c *Catalog) ReconcileInstallRequests(ctx context.Context) error {
 	requests, err := c.listInstallationRequests(ctx)
 	if err != nil {
-		reconcileErrors = append(reconcileErrors, err)
-	} else if err := models.ReplaceVCSProviderInstallRequests(
+		return err
+	}
+	if err := models.ReplaceVCSProviderInstallRequests(
 		c.db,
 		models.ProviderGitHub,
 		installRequestModels(requests, c.now()),
 	); err != nil {
-		reconcileErrors = append(reconcileErrors, fmt.Errorf("save GitHub App installation requests: %w", err))
+		return fmt.Errorf("save GitHub App installation requests: %w", err)
 	}
-
-	return errors.Join(reconcileErrors...)
+	return nil
 }
 
 func (c *Catalog) ReconcileInstallation(
@@ -104,10 +117,38 @@ func (c *Catalog) ReconcileInstallation(
 	priority models.VCSProviderRepositorySyncPriority,
 ) error {
 	installation, _, err := c.appClient.Apps.GetInstallation(ctx, installationID)
+	if installationNotFound(err) {
+		return models.DeleteVCSProviderInstallation(c.db, models.ProviderGitHub, installationID)
+	}
 	if err != nil {
 		return fmt.Errorf("get GitHub App installation %d: %w", installationID, err)
 	}
 	return c.reconcileInstallation(ctx, installation, priority)
+}
+
+// VerifyInstallation reads one installation from GitHub without its
+// repositories. GitHub does not always send a webhook when an App is
+// uninstalled, so an installation that GitHub no longer has is deleted here.
+func (c *Catalog) VerifyInstallation(ctx context.Context, installationID int64) error {
+	installation, _, err := c.appClient.Apps.GetInstallation(ctx, installationID)
+	if installationNotFound(err) {
+		return models.DeleteVCSProviderInstallation(c.db, models.ProviderGitHub, installationID)
+	}
+	if err != nil {
+		return fmt.Errorf("get GitHub App installation %d: %w", installationID, err)
+	}
+	model := installationModel(installation)
+	if err := models.UpsertVCSProviderInstallation(c.db, &model); err != nil {
+		return fmt.Errorf("save GitHub App installation %d: %w", installationID, err)
+	}
+	return nil
+}
+
+func installationNotFound(err error) bool {
+	var responseErr *gh.ErrorResponse
+	return errors.As(err, &responseErr) &&
+		responseErr.Response != nil &&
+		responseErr.Response.StatusCode == http.StatusNotFound
 }
 
 func (c *Catalog) HasInstallationRequest(ctx context.Context, installationID int64) (bool, error) {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	factoryactions "github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/mcpserver"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -62,7 +63,7 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to start authorization", http.StatusInternalServerError)
 			return
 		}
-		s.writeConsentPage(w, r, account, client.Name, consent, "", http.StatusOK)
+		s.writeConsentPage(w, r, account, consentClientName(client), consent, "", http.StatusOK)
 		return
 	}
 
@@ -87,7 +88,7 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to start authorization", http.StatusInternalServerError)
 			return
 		}
-		s.writeConsentPage(w, r, account, client.Name, token, "Choose a workspace this account can use.", http.StatusBadRequest)
+		s.writeConsentPage(w, r, account, consentClientName(client), token, "Choose a workspace this account can use.", http.StatusBadRequest)
 		return
 	}
 
@@ -110,6 +111,13 @@ func (s *Server) handleMCPAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, redirect, http.StatusFound)
+}
+
+func consentClientName(client *mcpserver.Client) string {
+	if client == nil {
+		return ""
+	}
+	return mcp.ClientDisplayName(client.Name, client.ID, "")
 }
 
 func (s *Server) writeConsentPage(
@@ -266,7 +274,14 @@ func (s *Server) handleMCP(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	runtime := &mcpserver.Runtime{Auth: s.authService}
+	runtime := &mcpserver.Runtime{
+		Auth: s.authService,
+		Intake: factoryactions.IntakeDependencies{
+			Registry:    s.registry,
+			Encryptor:   s.encryptor,
+			AuthService: s.authService,
+		},
+	}
 	response := mcpserver.HandleJSONRPC(r.Context(), runtime, claims, message)
 	if response == nil {
 		w.WriteHeader(http.StatusAccepted)

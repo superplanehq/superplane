@@ -17,6 +17,11 @@ export const SUPERPLANE_MCP_SERVER_COPY = {
   unnamedUser: "Unknown user",
   clientsSearchPlaceholder: "Search by user or editor",
   clientsSearchEmpty: "No clients match this search.",
+  clientsTableLabel: "Connected clients",
+  clientsColumnUser: "User",
+  clientsColumnClient: "Client",
+  clientsColumnConnected: "Connected",
+  clientsColumnAction: "Action",
   revoke: "Revoke",
   revokeTitle: (name: string) => `Revoke "${name}"?`,
   revokeDescription: "This disconnects the client from this workspace. The client must sign in again.",
@@ -38,6 +43,18 @@ export const SUPERPLANE_MCP_SERVER_COPY = {
     vscode: {
       label: "VS Code",
       steps: ["Open MCP settings in VS Code.", "Paste this object into mcp.json.", "Sign in when VS Code asks."],
+    },
+    codex: {
+      label: "Codex",
+      steps: ["Run this command in a terminal.", "Open Codex CLI or the IDE extension.", "Sign in when Codex asks."],
+    },
+    opencode: {
+      label: "OpenCode",
+      steps: [
+        "Open opencode.json.",
+        "Add the superplane server under mcp. Keep other servers.",
+        "Run opencode mcp auth superplane and sign in.",
+      ],
     },
   },
 } as const;

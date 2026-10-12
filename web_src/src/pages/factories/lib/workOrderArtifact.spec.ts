@@ -95,6 +95,16 @@ describe("extractArtifactMarkdownBody", () => {
     expect(extractArtifactMarkdownBody({ body: "" })).toBeUndefined();
     expect(extractArtifactMarkdownBody({ body: 123 })).toBe("123");
   });
+
+  it("unwraps a JSON-encoded markdown body so the plan renders as a document", () => {
+    expect(extractArtifactMarkdownBody({ body: '"# Retry refunds\\n\\nStop double charges.\\n"' })).toBe(
+      "# Retry refunds\n\nStop double charges.\n",
+    );
+  });
+
+  it("keeps a body that only starts with a quote", () => {
+    expect(extractArtifactMarkdownBody({ body: '"quoted title" is the name' })).toBe('"quoted title" is the name');
+  });
 });
 
 describe("extractArtifactUrl", () => {

@@ -224,6 +224,29 @@ func TestHandleRunnerLiveLogSession(t *testing.T) {
 		assert.Equal(t, "http://localhost:8091/v1/tasks/task-public-ok/live-logs", session.StreamURL)
 	})
 
+	t.Run("returns organization-authorized integrated stream", func(t *testing.T) {
+		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-integrated-1", map[string]any{
+			runneraction.ExecutionMetadataBrokerTaskID: "task-integrated",
+			runneraction.ExecutionMetadataTaskBackend:  "integrated",
+		})
+		rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
+		assert.Equal(t, http.StatusOK, rec.Code)
+
+		var session runneraction.LiveLogSession
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
+		assert.Equal(t, "integrated", session.Backend)
+		assert.Equal(
+			t,
+			fmt.Sprintf(
+				"/api/v1/canvases/%s/node-executions/%s/runner-logs",
+				canvasID,
+				execID,
+			),
+			session.StreamURL,
+		)
+		assert.Empty(t, session.Token)
+	})
+
 	t.Run("returns stream session for runnerBash", func(t *testing.T) {
 		t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
 		t.Setenv("TASK_BROKER_AUTH_TOKEN", "live-log-secret")

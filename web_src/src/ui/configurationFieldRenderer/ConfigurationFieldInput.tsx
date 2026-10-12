@@ -19,6 +19,7 @@ import { MultiSelectFieldRenderer } from "./MultiSelectFieldRenderer";
 import { NumberFieldRenderer } from "./NumberFieldRenderer";
 import { ObjectFieldRenderer } from "./ObjectFieldRenderer";
 import { RoleFieldRenderer } from "./RoleFieldRenderer";
+import { RunnerFleetFieldRenderer } from "./RunnerFleetFieldRenderer";
 import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
 import { IntegrationFieldRenderer, type IntegrationRefValue } from "./IntegrationFieldRenderer";
 import { SecretFieldRenderer, type SecretRefValue } from "./SecretFieldRenderer";
@@ -318,6 +319,8 @@ function renderFallbackField(commonProps: FieldRendererProps) {
       return <BooleanFieldRenderer {...commonProps} />;
     case "hosted-model":
       return <HostedModelFieldRenderer {...commonProps} />;
+    case "runner-fleet":
+      return <RunnerFleetFieldRenderer {...commonProps} />;
     case "select":
       return <SelectFieldRenderer {...commonProps} />;
     case "multi-select":

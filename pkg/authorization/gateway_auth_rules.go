@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/licensing"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -434,6 +435,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/fleets"}: {
+			Resource:   "org",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/hosted-llm-models"}: {
 			Resource:   "org",
 			Action:     "read",
@@ -445,6 +451,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "GET", Pattern: "/api/v1/organizations/{id}/byok-models"}: {
+			Resource:   "org",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		{Method: "GET", Pattern: "/api/v1/organizations/{id}/hosted-models"}: {
 			Resource:   "org",
 			Action:     "read",
 			DomainType: models.DomainTypeOrganization,
@@ -874,14 +885,16 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			RequiredExperimentalFeatures: []string{features.FeatureFactories, features.FeatureWorkspaceMCP},
 		},
 		{Method: "POST", Pattern: "/api/v1/groups"}: {
-			Resource:   "groups",
-			Action:     "create",
-			DomainType: models.DomainTypeOrganization,
+			Resource:                "groups",
+			Action:                  "create",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureGroups},
 		},
 		{Method: "POST", Pattern: "/api/v1/groups/{group_name}/users"}: {
-			Resource:   "groups",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
+			Resource:                "groups",
+			Action:                  "update",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureGroups},
 		},
 		{Method: "POST", Pattern: "/api/v1/organizations/{id}/integrations"}: {
 			Resource:   "integrations",
@@ -924,9 +937,10 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "POST", Pattern: "/api/v1/roles"}: {
-			Resource:   "roles",
-			Action:     "create",
-			DomainType: models.DomainTypeOrganization,
+			Resource:                "roles",
+			Action:                  "create",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureCustomRoles},
 		},
 		{Method: "POST", Pattern: "/api/v1/roles/{role_name}/users"}: {
 			Resource:   "members",
@@ -984,6 +998,11 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			Action:     "update",
 			DomainType: models.DomainTypeOrganization,
 		},
+		{Method: "PUT", Pattern: "/api/v1/organizations/{id}/hosted-models"}: {
+			Resource:   "org",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
 		// Self-scoped: members update their own notification settings.
 		{Method: "PUT", Pattern: "/api/v1/me/notification-settings"}: {
 			Resource:                     "notifications",
@@ -998,9 +1017,10 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			ResourcePathParams: []string{IDPathParam},
 		},
 		{Method: "PUT", Pattern: "/api/v1/groups/{group_name}"}: {
-			Resource:   "groups",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
+			Resource:                "groups",
+			Action:                  "update",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureGroups},
 		},
 		{Method: "PUT", Pattern: "/api/v1/organizations/{id}/integrations/{integration_id}/capabilities"}: {
 			Resource:   "integrations",
@@ -1018,9 +1038,10 @@ func DefaultAuthorizationRules() map[HTTPRoute]AuthorizationRule {
 			DomainType: models.DomainTypeOrganization,
 		},
 		{Method: "PUT", Pattern: "/api/v1/roles/{role_name}"}: {
-			Resource:   "roles",
-			Action:     "update",
-			DomainType: models.DomainTypeOrganization,
+			Resource:                "roles",
+			Action:                  "update",
+			DomainType:              models.DomainTypeOrganization,
+			RequiredLicenseFeatures: []licensing.Feature{licensing.FeatureCustomRoles},
 		},
 		{Method: "PUT", Pattern: "/api/v1/secrets/{id_or_name}/keys/{key_name}"}: {
 			Resource:   "secrets",

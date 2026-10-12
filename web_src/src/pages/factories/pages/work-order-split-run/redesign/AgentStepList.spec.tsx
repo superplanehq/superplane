@@ -1,9 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import { render, screen } from "@testing-library/react";
 
+import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
+
 import type { AgentActivity } from "../agentActivity";
+import { notesFromLiveLogSections } from "../streamNotesFromLiveLog";
 import { AgentStepMarkers } from "./AgentStepList";
-import type { AgentStep, AutomationStage } from "./automationsViewModel";
+import { agentStepsFromNotes, type AgentStep, type AutomationStage } from "./automationsViewModel";
 
 const LONG_PROMPT =
   "You refine draft tasks so a coding agent can build them in one run. You read the task and the repository.";
@@ -23,6 +26,45 @@ function stageWithStep(step: AgentStep): AutomationStage {
     steps: [step],
     rawLog: "",
   };
+}
+
+function stageWithSteps(steps: AgentStep[], status: AutomationStage["status"] = "passed"): AutomationStage {
+  return {
+    ...stageWithStep(steps[0] ?? stepPlaceholder()),
+    status,
+    statusLabel: status === "failed" ? "Failed" : "Passed",
+    agentSteps: steps,
+    steps,
+  };
+}
+
+function stepPlaceholder(): AgentStep {
+  return {
+    id: "empty",
+    title: "Empty",
+    type: "prompt",
+    status: "passed",
+    summary: "",
+    toolCount: 0,
+    events: [],
+  };
+}
+
+function section(overrides: Partial<CommandSection> & Pick<CommandSection, "index" | "text" | "kind">): CommandSection {
+  return {
+    preview: "",
+    lines: [],
+    events: [],
+    status: "passed",
+    duration_ms: 20,
+    started_at: 1,
+    collapsed: true,
+    ...overrides,
+  };
+}
+
+function stepsFromSections(sections: CommandSection[], runStatus: "passed" | "failed"): AgentStep[] {
+  return agentStepsFromNotes(notesFromLiveLogSections("agent", sections, runStatus), runStatus);
 }
 
 describe("AgentStepMarkers", () => {
@@ -195,5 +237,114 @@ describe("AgentStepMarkers", () => {
     );
 
     expect(screen.getByRole("status", { name: "Writing response…" })).toBeInTheDocument();
+  });
+
+  it("keeps a failed prompt red and does not mark the step Failed when the run passed", () => {
+    render(
+      <AgentStepMarkers
+        expandSteps
+        stage={stageWithSteps(
+          stepsFromSections(
+            [
+              section({
+                index: 1,
+                text: "Refine Task",
+                kind: "prompt",
+                status: "failed",
+                preview: "You refine draft tasks so a coding agent can build them in one run.",
+                events: [{ kind: "note", text: "OpenCode started" }],
+              }),
+            ],
+            "passed",
+          ),
+        )}
+      />,
+    );
+
+    expect(screen.queryByText("Failed")).not.toBeInTheDocument();
+    expect(screen.getByTestId("agent-tool-agent-step-1-output")).toHaveAttribute("data-status", "failed");
+  });
+
+  it("shows Failed on the prompt step that stopped the run", () => {
+    render(
+      <AgentStepMarkers
+        expandSteps
+        stage={stageWithSteps(
+          stepsFromSections(
+            [
+              section({
+                index: 1,
+                text: "Refine Task",
+                kind: "prompt",
+                status: "failed",
+                preview: "You refine draft tasks so a coding agent can build them in one run.",
+              }),
+            ],
+            "failed",
+          ),
+          "failed",
+        )}
+      />,
+    );
+
+    expect(screen.getByText("Failed")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-tool-agent-step-1-output")).toHaveAttribute("data-status", "failed");
+  });
+
+  it("does not show Failed on an earlier prompt when a later step stopped the run", () => {
+    render(
+      <AgentStepMarkers
+        expandSteps
+        stage={stageWithSteps(
+          stepsFromSections(
+            [
+              section({
+                index: 1,
+                text: "Refine Task",
+                kind: "prompt",
+                status: "failed",
+                preview: "You refine draft tasks so a coding agent can build them in one run.",
+              }),
+              section({
+                index: 2,
+                text: "Clone repository",
+                kind: "bash",
+                status: "failed",
+                preview: "git clone https://example.com/repo.git",
+              }),
+            ],
+            "failed",
+          ),
+          "failed",
+        )}
+      />,
+    );
+
+    expect(screen.getByText("Refine Task").parentElement).not.toHaveTextContent("Failed");
+    expect(screen.getByText("Clone repository").parentElement).toHaveTextContent("Failed");
+    expect(screen.getByTestId("agent-tool-agent-step-1-output")).toHaveAttribute("data-status", "failed");
+  });
+
+  it("shows Failed on a failed bash step", () => {
+    render(
+      <AgentStepMarkers
+        stage={stageWithSteps(
+          stepsFromSections(
+            [
+              section({
+                index: 1,
+                text: "Clone repository",
+                kind: "bash",
+                status: "failed",
+                preview: "git clone https://example.com/repo.git",
+              }),
+            ],
+            "passed",
+          ),
+        )}
+      />,
+    );
+
+    expect(screen.getByText("Failed")).toBeInTheDocument();
   });
 });

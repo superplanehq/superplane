@@ -26,4 +26,5 @@ export interface FieldRendererProps {
   expressionPreviewContext?: Record<string, unknown> | null;
   expressionErrorMessage?: string;
   expressionTemplateValue?: unknown;
+  triggerClassName?: string;
 }

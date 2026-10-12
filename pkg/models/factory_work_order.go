@@ -23,6 +23,8 @@ const (
 	FactoryWorkOrderResultCompleted = "completed"
 	FactoryWorkOrderResultRejected  = "rejected"
 	FactoryWorkOrderResultFailed    = "failed"
+
+	DefaultMCPClientName = "MCP client"
 )
 
 var (
@@ -75,7 +77,10 @@ type FactoryWorkOrder struct {
 	OriginLabel     *string
 	Repository      *string
 	DefaultBranch   *string
+	VCSProvider     *string // Git host saved with the repository. Empty means a legacy GitHub row.
 	AutoStartLineID *uuid.UUID
+	MCPClientID     *string
+	MCPClientName   *string
 	// StatusNote is the jsonb array of current-wait announcements (see
 	// FactoryWorkOrderStatusNote). Cleared on every state transition.
 	StatusNote datatypes.JSON
@@ -88,6 +93,12 @@ type FactoryWorkOrder struct {
 
 func (FactoryWorkOrder) TableName() string {
 	return "factory_work_orders"
+}
+
+// WorkOrderMCPClient is the MCP OAuth client that handed this task off.
+type WorkOrderMCPClient struct {
+	ID   string
+	Name string
 }
 
 // URLPath is the canonical UI permalink of the work order, relative to the
@@ -136,6 +147,44 @@ func (o *FactoryWorkOrder) Origin() *WorkOrderOrigin {
 	return &WorkOrderOrigin{URL: url, Label: label}
 }
 
+func (o *FactoryWorkOrder) MCPClient() *WorkOrderMCPClient {
+	if o == nil {
+		return nil
+	}
+
+	id := ""
+	if o.MCPClientID != nil {
+		id = strings.TrimSpace(*o.MCPClientID)
+	}
+	name := ""
+	if o.MCPClientName != nil {
+		name = strings.TrimSpace(*o.MCPClientName)
+	}
+	if id == "" && name == "" {
+		return nil
+	}
+	if name == "" {
+		name = DefaultMCPClientName
+	}
+	return &WorkOrderMCPClient{ID: id, Name: name}
+}
+
+func (o *FactoryWorkOrder) SetMCPClient(tx *gorm.DB, id, name string) error {
+	id = strings.TrimSpace(id)
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = DefaultMCPClientName
+	}
+
+	o.MCPClientID = &id
+	o.MCPClientName = &name
+	return tx.Model(o).Updates(map[string]any{
+		"mcp_client_id":   id,
+		"mcp_client_name": name,
+		"updated_at":      time.Now(),
+	}).Error
+}
+
 type FactoryWorkOrderAssignee struct {
 	WorkOrderID uuid.UUID `gorm:"primaryKey"`
 	UserID      uuid.UUID `gorm:"primaryKey"`
@@ -152,13 +201,14 @@ func (FactoryWorkOrderAssignee) TableName() string {
 // shared status FSM. Actor / Automation / Run + App are optional attribution
 // fields that populate the emitted `order.status.updated` event.
 type FactoryWorkOrderStatusUpdate struct {
-	ToState    string
-	Result     string
-	Actor      *uuid.UUID
-	Automation *factory.AutomationRef
-	Run        *factory.RunRef
-	App        *factory.AppRef
-	SkipSame   bool // when true, no-op transitions to the current state succeed silently
+	ToState         string
+	Result          string
+	Actor           *uuid.UUID
+	Automation      *factory.AutomationRef
+	Run             *factory.RunRef
+	App             *factory.AppRef
+	SkipSame        bool // when true, no-op transitions to the current state succeed silently
+	OnRunsCancelled func([]*RunCancellationResult)
 }
 
 // NOTE: this is only OK to be used in the workers.
@@ -387,6 +437,9 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		// queue; a queued dispatch has no run to finish it later.
 		if toState == FactoryWorkOrderStateClosed {
 			if err := o.dropQueuedLineWork(tx); err != nil {
+				return err
+			}
+			if err := o.cancelRuns(tx, update); err != nil {
 				return err
 			}
 		}
@@ -620,11 +673,11 @@ func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID
 
 	now := time.Now()
 	assignees := make([]FactoryWorkOrderAssignee, 0, len(assigneeIDs))
-	for _, assigneeID := range assigneeIDs {
+	for i, assigneeID := range assigneeIDs {
 		assignees = append(assignees, FactoryWorkOrderAssignee{
 			WorkOrderID: o.ID,
 			UserID:      assigneeID,
-			CreatedAt:   now,
+			CreatedAt:   now.Add(time.Duration(i) * time.Millisecond),
 		})
 	}
 

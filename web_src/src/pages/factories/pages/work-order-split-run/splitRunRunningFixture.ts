@@ -28,7 +28,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
   descriptionText: OPEN_WORK_ORDER.description ?? "",
   owner: OWNER,
   assigneeIds: [STORYBOOK_ME_USER_ID],
-  elapsed: "4 min so far",
+  elapsed: "4 min",
   startedLabel: "Started 1h ago",
   costUsd: "$0.73",
   tokensLabel: "2.7k tokens",
@@ -44,8 +44,8 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
     kind: "running",
     note: {
       key: "running-step",
-      headline: "Implement is running",
-      text: "Implementation works on this step now. The log shows live progress.",
+      headline: "Implementation in progress",
+      text: "View the log for live progress.",
     },
     run: { appId: "app-refund-implementer", runId: LINE_RUN_IMPLEMENT_ID },
   }),
@@ -128,7 +128,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
           at: "12:25:33",
           componentName: "Implementation",
           status: "running",
-          duration: "4m so far",
+          duration: "4m",
           detail: "reconciliation_worker_test.go",
         },
         {
@@ -156,7 +156,7 @@ export const SPLIT_RUN_RUNNING: SplitRunFixture = {
           provider: "superplane",
           status: "running",
           detail: "reconciliation_worker_test.go",
-          duration: "4m so far",
+          duration: "4m",
         },
         {
           id: "open-pr",

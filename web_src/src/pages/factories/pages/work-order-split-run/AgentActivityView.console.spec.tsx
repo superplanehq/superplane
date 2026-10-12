@@ -155,6 +155,7 @@ describe("AgentActivityView console", () => {
     expect(screen.queryByRole("button", { name: "Inspected Git" })).not.toBeInTheDocument();
     expect(screen.getByText("4 lines")).toBeInTheDocument();
     expect(screen.queryByText("Output")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cloning into 'repo'/)).not.toBeInTheDocument();
     await user.click(
       screen.getByRole("button", { name: 'git clone --depth 1 --branch "${BASE:-main}" "${REPO_URL}" repo' }),
     );
@@ -163,13 +164,17 @@ describe("AgentActivityView console", () => {
     const output = screen.getByText(/Cloning into 'repo'/);
     expect(command.textContent).toBe(script);
     expect(command.textContent).not.toContain("Cloning into");
-    expect(command).toHaveClass("text-foreground/90");
-    expect(output).toHaveClass("text-muted-foreground");
+    expect(command).toHaveClass("whitespace-pre", "text-foreground/90");
+    expect(output).toHaveClass("whitespace-pre-wrap", "break-words", "text-muted-foreground");
+    expect(output).not.toHaveClass("max-h-32");
+    expect(output).not.toHaveClass("overflow-auto");
+    expect(output).not.toHaveClass("overflow-x-auto");
     expect(output.parentElement).toBe(command.parentElement);
     expect(screen.queryByText("Output")).not.toBeInTheDocument();
   });
 
-  it("collapses carriage-return progress into finished output lines", () => {
+  it("collapses carriage-return progress into finished output lines", async () => {
+    const user = userEvent.setup();
     render(
       <AgentActivityView
         collapseCompleted={false}
@@ -185,8 +190,39 @@ describe("AgentActivityView console", () => {
 
     expect(screen.queryByRole("button", { name: "Inspected Git" })).not.toBeInTheDocument();
     expect(screen.queryByText("Output")).not.toBeInTheDocument();
+    expect(screen.queryByText("remote: Enumerating objects: 9364, done.")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Enumerating objects: 1/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "git clone repo" }));
+
     expect(screen.getByText("remote: Enumerating objects: 9364, done.")).toBeInTheDocument();
     expect(screen.queryByText(/Enumerating objects: 1/)).not.toBeInTheDocument();
+  });
+
+  it("hides running command output until the row is opened", async () => {
+    const user = userEvent.setup();
+    render(
+      <AgentActivityView
+        live
+        collapseCompleted={false}
+        expandableCommands
+        tone="log"
+        activity={activityWith({
+          ...completedTool("command-1", "bash", "Bash"),
+          input: "echo hi",
+          status: "running",
+          output: "partial output",
+        })}
+      />,
+    );
+
+    const row = screen.getByRole("button", { name: "echo hi" });
+    expect(row).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("partial output")).not.toBeInTheDocument();
+
+    await user.click(row);
+
+    expect(screen.getByText("partial output")).toBeInTheDocument();
   });
 
   it("shows the exit code when a console command fails", async () => {
@@ -211,7 +247,12 @@ describe("AgentActivityView console", () => {
     expect(screen.getByText("Exit code 1")).toBeInTheDocument();
     expect(screen.queryByText(/permission denied/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "false" }));
-    expect(screen.getByText(/permission denied/).textContent).toBe("permission denied\nremote rejected");
+    const failedOutput = screen.getByText(/permission denied/);
+    expect(failedOutput.textContent).toBe("permission denied\nremote rejected");
+    expect(failedOutput).toHaveClass("whitespace-pre-wrap", "break-words");
+    expect(failedOutput).not.toHaveClass("max-h-32");
+    expect(failedOutput).not.toHaveClass("overflow-auto");
+    expect(failedOutput).not.toHaveClass("overflow-x-auto");
     expect(screen.queryByText("Output")).not.toBeInTheDocument();
   });
 

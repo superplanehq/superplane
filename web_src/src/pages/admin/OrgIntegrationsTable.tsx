@@ -32,6 +32,7 @@ const DETAIL_LABELS: Record<string, string> = {
   installation_uuid: "Installation UUID",
   installation_id: "Installation ID",
   hosted_app: "Hosted app",
+  workspace_key: "Workspace key",
 };
 
 function integrationListUrl(orgId: string, search: string, offset: number) {

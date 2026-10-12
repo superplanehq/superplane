@@ -32,11 +32,7 @@ const RECONNECT_DELAY_MS = 2000;
 
 type LiveLogFailureSource = "broker" | "request";
 
-type LiveLogFailureContext = {
-  organizationId: string;
-  canvasId: string;
-  executionId: string;
-};
+type LiveLogFailureContext = { organizationId: string; canvasId: string; executionId: string };
 
 const initialLogState: LogState = {
   sections: [],
@@ -167,6 +163,11 @@ function createStreamHandlers(ctx: StreamHandlerContext): LiveLogStreamHandlers 
         setUsage(emptyPromptUsageState());
       }
       setState((prev) => logStateAfterStreamOpen(prev, reconnecting, resetParsedLogs));
+    },
+    onReset: () => {
+      commandCursor.index = undefined;
+      setUsage(emptyPromptUsageState());
+      setState({ ...initialLogState, isStreaming: true });
     },
     onRecord: (record) => {
       if (record.schema_version !== 2) {
@@ -368,12 +369,12 @@ async function pumpLiveLogConnection(
   params: LiveLogSessionParams,
   reconnecting: boolean,
   reportFailure: (source: LiveLogFailureSource, error: Error) => void,
-): Promise<"aborted" | "open"> {
+): Promise<"aborted" | "final" | "open"> {
   const { organizationId, canvasId, executionId, sessionAbort, setState, setUsage, setActiveStream } = params;
   const stream = new LiveLogStream(organizationId, canvasId, executionId);
   setActiveStream(stream);
   try {
-    await stream.pump(
+    const final = await stream.pump(
       createStreamHandlers({
         reconnecting,
         resetParsedLogs: !reconnecting && params.resetParsedLogs,
@@ -384,6 +385,9 @@ async function pumpLiveLogConnection(
         onFailure: (message) => reportFailure("broker", new Error(message)),
       }),
     );
+    if (final) {
+      return "final";
+    }
   } catch (error) {
     const streamError = errorFromUnknown(error);
     if (streamError.name === "AbortError") {
@@ -416,7 +420,7 @@ async function runLiveLogSession(params: LiveLogSessionParams): Promise<void> {
 
   while (!sessionAbort.signal.aborted) {
     const result = await pumpLiveLogConnection(params, reconnecting, reportFailure);
-    if (result === "aborted") {
+    if (result === "aborted" || result === "final") {
       return;
     }
     if (!executionInFlight) {
@@ -442,10 +446,7 @@ export function liveLogScrollTrigger(state: Pick<LogState, "sections" | "orphanL
   return `${state.sections.length}:${state.orphanLines.length}:${lineCount}:${activityProgress}`;
 }
 
-export type LiveLogStreamSession = {
-  organizationId?: string;
-  canvasId?: string;
-};
+export type LiveLogStreamSession = { organizationId?: string; canvasId?: string };
 
 export function useLiveLogStream(
   executionId: string,

@@ -7,6 +7,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/factories"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -14,7 +15,8 @@ import (
 )
 
 type Runtime struct {
-	Auth authorization.PermissionChecker
+	Auth   authorization.PermissionChecker
+	Intake factories.IntakeDependencies
 }
 
 func Tools() []Tool {
@@ -92,6 +94,22 @@ func Tools() []Tool {
 				"required": []string{"title"},
 			},
 		},
+		{
+			Name:        "hand_off_task",
+			Description: "Create an open task from this MCP client and move it to Implement or Verify. Store plan as the spec the implement agent reads. Implement starts the implementation stage. Verify tracks an open pull request and does not start an agent. It does not wait for an agent.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"title":            map[string]any{"type": "string", "description": "Short task title."},
+					"description":      map[string]any{"type": "string", "description": "Task description in markdown."},
+					"plan":             map[string]any{"type": "string", "description": "Implementation plan stored as the task spec."},
+					"column":           map[string]any{"type": "string", "enum": []string{"implement", "verify"}, "description": "Board column to hand the task to."},
+					"pull_request_url": map[string]any{"type": "string", "description": "Open GitHub pull request URL. Required when column is verify."},
+					"line":             map[string]any{"type": "string", "description": "Line name. Required when the workspace has more than one line."},
+				},
+				"required": []string{"title", "plan", "column"},
+			},
+		},
 	}
 }
 
@@ -112,6 +130,8 @@ func (rt *Runtime) CallTool(ctx context.Context, claims *AccessClaims, name stri
 		return rt.sendTaskMessage(ctx, claims, args)
 	case "create_task":
 		return rt.createTask(ctx, claims, args)
+	case "hand_off_task":
+		return rt.handOffTask(ctx, claims, args)
 	default:
 		return ToolResult{}, ToolError("Unknown tool: " + name)
 	}
@@ -315,6 +335,57 @@ func (rt *Runtime) createTask(ctx context.Context, claims *AccessClaims, args ma
 		"title": order.GetTitle(),
 		"state": protoStateName(order.GetState()),
 	})), nil
+}
+
+func (rt *Runtime) handOffTask(ctx context.Context, claims *AccessClaims, args map[string]any) (ToolResult, error) {
+	if err := rt.authorize(ctx, claims, "work_orders:create"); err != nil {
+		return ToolResult{}, err
+	}
+	if err := rt.authorize(ctx, claims, "work_orders:update"); err != nil {
+		return ToolResult{}, err
+	}
+	title, err := stringArg(args, "title")
+	if err != nil {
+		return ToolResult{}, err
+	}
+	plan, err := stringArg(args, "plan")
+	if err != nil {
+		return ToolResult{}, err
+	}
+	column, err := stringArg(args, "column")
+	if err != nil {
+		return ToolResult{}, err
+	}
+	description, _ := args["description"].(string)
+	pullRequestURL, _ := args["pull_request_url"].(string)
+	line, _ := args["line"].(string)
+
+	clientName := ClientDisplayName(database.DB(ctx), claims.ClientID)
+	result, err := factories.HandOffWorkOrder(toolContext(ctx, claims), rt.Intake, claims.OrgID.String(), factories.HandOffWorkOrderRequest{
+		FactoryID:      claims.FactoryID.String(),
+		Title:          title,
+		Description:    strings.TrimSpace(description),
+		Plan:           plan,
+		Column:         column,
+		PullRequestURL: strings.TrimSpace(pullRequestURL),
+		LineName:       strings.TrimSpace(line),
+		MCPClientID:    claims.ClientID,
+		MCPClientName:  clientName,
+	})
+	if err != nil {
+		return ToolResult{}, actionError(err)
+	}
+	order := result.Order
+	payload := map[string]any{
+		"id":     order.GetId(),
+		"key":    order.GetKey(),
+		"state":  protoStateName(order.GetState()),
+		"column": result.Column,
+	}
+	if result.PullRequestURL != "" {
+		payload["pull_request_url"] = result.PullRequestURL
+	}
+	return TextResult(mustJSON(payload)), nil
 }
 
 func (rt *Runtime) authorize(ctx context.Context, claims *AccessClaims, scope string) error {

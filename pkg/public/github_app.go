@@ -13,7 +13,6 @@ import (
 	gh "github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	appcatalog "github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
@@ -21,10 +20,13 @@ import (
 	"gorm.io/gorm"
 )
 
-const githubInstallApprovedPath = "/github/approved"
+const (
+	githubInstallApprovedPath         = "/github/approved"
+	githubInstallRequestRefreshWindow = 2 * time.Minute
+)
 
-var enqueueGitHubAppReconciliation = func(ctx context.Context, availableAt time.Time) error {
-	return models.EnqueueVCSProviderReconciliation(database.DB(ctx), models.ProviderGitHub, availableAt)
+var requestGitHubAppInstallRequestRefresh = func(ctx context.Context, until time.Time) error {
+	return models.RequestVCSProviderInstallRequestRefresh(database.DB(ctx), models.ProviderGitHub, until)
 }
 
 var enqueueGitHubAppInstallationReconciliation = func(
@@ -57,7 +59,11 @@ var hasGitHubAppInstallationRequest = func(ctx context.Context, installationID i
 		return false, fmt.Errorf("find GitHub App installation %d: %w", installationID, err)
 	}
 
-	catalog, err := appcatalog.NewCatalog(db, config.LoadGitHubHostedAppConfig())
+	cfg, resolveErr := appcatalog.ResolveProcess(ctx)
+	if resolveErr != nil {
+		return false, resolveErr
+	}
+	catalog, err := appcatalog.NewCatalog(db, cfg)
 	if err != nil {
 		return false, err
 	}
@@ -69,11 +75,7 @@ var hasGitHubAppInstallationRequest = func(ctx context.Context, installationID i
 func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	if query.Get("setup_action") == "request" {
-		if err := enqueueGitHubAppReconciliation(r.Context(), time.Now()); err != nil {
-			http.Error(w, "failed to queue GitHub App reconciliation", http.StatusInternalServerError)
-			return
-		}
-		http.Redirect(w, r, "/", http.StatusFound)
+		s.handleGitHubAppInstallRequest(w, r)
 		return
 	}
 	installationID, err := strconv.ParseInt(strings.TrimSpace(query.Get("installation_id")), 10, 64)
@@ -81,7 +83,7 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing installation id", http.StatusBadRequest)
 		return
 	}
-	organizationID := githubAppSetupOrganizationID(query.Get("state"))
+	organizationID := githubAppSetupOrganizationIDAt(r.Context(), query.Get("state"))
 
 	switch query.Get("setup_action") {
 	case "install":
@@ -111,8 +113,27 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid setup action", http.StatusBadRequest)
 	}
 }
+
+// Anyone can open this redirect, so it must not call GitHub. It only asks the
+// catalog worker to read the request list often for a short time.
+func (s *Server) handleGitHubAppInstallRequest(w http.ResponseWriter, r *http.Request) {
+	until := time.Now().Add(githubInstallRequestRefreshWindow)
+	if err := requestGitHubAppInstallRequestRefresh(r.Context(), until); err != nil {
+		http.Error(w, "failed to queue GitHub App request refresh", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
 func githubAppSetupOrganizationID(state string) uuid.UUID {
-	cfg := config.LoadGitHubHostedAppConfig()
+	return githubAppSetupOrganizationIDAt(context.Background(), state)
+}
+
+func githubAppSetupOrganizationIDAt(ctx context.Context, state string) uuid.UUID {
+	cfg, err := appcatalog.ResolveProcess(ctx)
+	if err != nil || !cfg.Enabled() {
+		return uuid.Nil
+	}
 	organizationID, err := common.VerifyHostedAppInstallState(cfg.WebhookSecret, state)
 	if err != nil {
 		return uuid.Nil
@@ -125,7 +146,7 @@ func githubAppSetupOrganizationID(state string) uuid.UUID {
 // that WebhookProvisioner registers for each webhook, so this endpoint does
 // not deliver them.
 func (s *Server) HandleGitHubAppWebhook(w http.ResponseWriter, r *http.Request) {
-	app, ok := common.HostedAppFromEnv()
+	app, ok := common.ResolveHostedApp(r.Context())
 	if !ok {
 		http.Error(w, "not found", http.StatusNotFound)
 		return

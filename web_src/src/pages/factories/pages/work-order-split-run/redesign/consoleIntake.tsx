@@ -181,5 +181,8 @@ function addedByLabel(addedBy: SplitRunAddedBy): string {
   if (addedBy.kind === "imported") {
     return `Imported by ${addedBy.personName}`;
   }
+  if (addedBy.kind === "mcp") {
+    return addedBy.name;
+  }
   return CREATED_MANUALLY;
 }

@@ -18,7 +18,7 @@ export const AGENT_RESOURCES_COPY = {
   agentTitle: "Agent",
   agentPageSubtitle: "MCP servers and skills agents use during work.",
   superplaneMcpServerTitle: "MCP Server",
-  superplaneMcpServerPageSubtitle: "Connect from Cursor, Claude, Codex, or any other external service.",
+  superplaneMcpServerPageSubtitle: "Connect from Cursor, Claude, Codex, OpenCode, or any other external service.",
   mcpTitle: "MCP servers",
   mcpPageSubtitle: "Manage MCP connections for agents and external clients in this workspace.",
   mcpConnectionsSectionTitle: "MCP servers",

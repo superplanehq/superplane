@@ -5,6 +5,7 @@ import type {
   FactoriesWorkOrderExecution,
   FactoriesWorkOrderLineDispatch,
 } from "@/api-client";
+import { durationLabelMs } from "@/lib/duration";
 import { getUserInitials, type OrgUserDisplay } from "@/lib/orgUserDisplay";
 import { workOrderOwnerDisplay } from "../../lib/workOrderCreator";
 
@@ -132,7 +133,7 @@ export const AGENT_WORK_POPUP: PopupFixture = {
 export const AGENT_WORK_POPUP_RUNNING: PopupFixture = {
   ...AGENT_WORK_POPUP,
   title: "Add refund reconciliation test",
-  elapsed: "4 min so far",
+  elapsed: "4 min",
   startedLabel: "Started 1h ago",
   costUsd: "$0.73",
   tokensLabel: "2.7k tokens",
@@ -159,7 +160,7 @@ export const AGENT_WORK_POPUP_RUNNING: PopupFixture = {
       id: "implement",
       actor: "Implement",
       title: "Add reconciliation test",
-      duration: "4m so far",
+      duration: "4m",
       state: "running",
     },
   ],
@@ -175,7 +176,7 @@ export function buildPopupDispatchEvent(fixture: PopupFixture): WorkOrderTimelin
   let cursor = Date.parse(HOUR_AGO);
   const steps: WorkOrderTimelineStep[] = fixture.log.map((entry) => {
     const startedAt = new Date(cursor).toISOString();
-    const durationMs = logDurationMs(entry.duration);
+    const durationMs = entry.state === "running" ? null : logDurationMs(entry.duration);
     const finishedAt = durationMs != null ? new Date(cursor + durationMs).toISOString() : undefined;
     cursor += durationMs ?? 60_000;
     const execution = logExecution(entry.state);
@@ -323,7 +324,7 @@ function executionToLogEntry(order: FactoriesWorkOrder, execution: FactoriesWork
     id: execution.id ?? actor,
     actor,
     title: isDone ? doneLogTitle(order, execution) : (execution.step ?? actor),
-    duration: state === "running" ? "4m so far" : "1m 12s",
+    duration: state === "running" ? "4m" : "1m 12s",
     state,
     artifactId: undefined,
   };
@@ -346,13 +347,7 @@ function logStateForExecution(execution: FactoriesWorkOrderExecution): PopupLogS
 }
 
 function logDurationMs(duration: string): number | null {
-  if (duration.includes("so far")) {
-    return null;
-  }
-
-  const minutes = duration.match(/(\d+)\s*m/);
-  const seconds = duration.match(/(\d+)\s*s/);
-  const ms = (minutes ? Number(minutes[1]) * 60_000 : 0) + (seconds ? Number(seconds[1]) * 1000 : 0);
+  const ms = durationLabelMs(duration);
   return ms > 0 ? ms : null;
 }
 

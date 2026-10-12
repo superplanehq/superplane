@@ -24,7 +24,10 @@ export function firstRunBacklogIntake(
   intakes: FactoriesFactoryIntake[] | undefined,
 ): FactoriesFactoryIntake | undefined {
   const backlog = intakes?.filter(
-    (intake) => intake.source === "SOURCE_GITHUB_ISSUES" || intake.source === "SOURCE_JIRA_ISSUES",
+    (intake) =>
+      intake.source === "SOURCE_GITHUB_ISSUES" ||
+      intake.source === "SOURCE_JIRA_ISSUES" ||
+      intake.source === "SOURCE_LINEAR_ISSUES",
   );
   if (!backlog?.length) return undefined;
   return backlog.reduce((latest, intake) => {

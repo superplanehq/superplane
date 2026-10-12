@@ -14,14 +14,26 @@ export function WorkOrderSplitRunSource({ source, compact = false }: { source: S
         className="flex min-w-0 items-center gap-1.5 text-[11px] font-medium leading-none tracking-[-0.01em]"
         data-testid="split-run-source"
       >
-        {source.kind === "intake" ? <CompactIntakeSource source={source} /> : <CompactManualSource source={source} />}
+        {source.kind === "intake" ? (
+          <CompactIntakeSource source={source} />
+        ) : source.kind === "mcp" ? (
+          <CompactMcpSource source={source} />
+        ) : (
+          <CompactManualSource source={source} />
+        )}
       </div>
     );
   }
 
   return (
     <div className="mt-2 flex flex-col gap-1.5 text-[13px] tracking-[-0.01em]" data-testid="split-run-source">
-      {source.kind === "intake" ? <IntakeSource source={source} /> : <ManualSource source={source} />}
+      {source.kind === "intake" ? (
+        <IntakeSource source={source} />
+      ) : source.kind === "mcp" ? (
+        <McpSource source={source} />
+      ) : (
+        <ManualSource source={source} />
+      )}
     </div>
   );
 }
@@ -84,7 +96,7 @@ function IntakeSourceLogo({
   source,
   className,
 }: {
-  source: Extract<SplitRunSource, { kind: "intake" }>;
+  source: Extract<SplitRunSource, { kind: "intake" | "mcp" }>;
   className: string;
 }) {
   return (
@@ -97,6 +109,24 @@ function IntakeSourceLogo({
         logoDarkInvertClass(source.iconSrc),
       )}
     />
+  );
+}
+
+function McpSource({ source }: { source: Extract<SplitRunSource, { kind: "mcp" }> }) {
+  return (
+    <p className="flex min-w-0 items-center gap-1.5 text-foreground">
+      <IntakeSourceLogo source={source} className="dark:brightness-0 dark:invert" />
+      <span className="truncate">{source.name}</span>
+    </p>
+  );
+}
+
+function CompactMcpSource({ source }: { source: Extract<SplitRunSource, { kind: "mcp" }> }) {
+  return (
+    <>
+      <IntakeSourceLogo source={source} className="dark:brightness-0 dark:invert" />
+      <span className="truncate">{source.name}</span>
+    </>
   );
 }
 

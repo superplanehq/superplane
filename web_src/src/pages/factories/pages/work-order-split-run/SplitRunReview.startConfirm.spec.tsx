@@ -11,6 +11,34 @@ import { SplitRunReview } from "./SplitRunReview";
 import { START_CONFIRM_COPY, START_CONFIRM_STORAGE_KEY } from "./startConfirm";
 import { splitRunFixtureForWorkOrder } from "./splitRunMocks";
 
+function reviewCheck(key: string, name: string, score: number, maxScore = 3) {
+  return {
+    id: `check-${key}`,
+    key,
+    name,
+    score,
+    maxScore,
+    format: "FORMAT_FRACTION" as const,
+    level:
+      score <= 1 ? ("LEVEL_CRITICAL" as const) : score <= 2 ? ("LEVEL_CAUTION" as const) : ("LEVEL_POSITIVE" as const),
+  };
+}
+
+function reviewTaskFooter(
+  scores: { clarity: number; complexity: number; verifiability: number },
+  leftoverConfidence?: number,
+) {
+  return splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
+    demoArtifacts: false,
+    checks: [
+      ...(leftoverConfidence == null ? [] : [reviewCheck("confidence", "Confidence score", leftoverConfidence, 5)]),
+      reviewCheck("clarity", "Clarity score", scores.clarity),
+      reviewCheck("complexity", "Complexity", scores.complexity),
+      reviewCheck("verifiability", "Verifiability", scores.verifiability),
+    ],
+  }).footer;
+}
+
 function renderConfirmReview(onStart: () => void, footer = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -94,6 +122,62 @@ describe("SplitRunReview start confirm", () => {
     await user.click(screen.getByRole("button", { name: "Start" }));
     expect(onStart).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("split-run-start-confirm")).not.toBeInTheDocument();
+  });
+
+  it("starts a review task at the top of the scale on the first click", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    const footer = reviewTaskFooter({ clarity: 3, complexity: 3, verifiability: 3 });
+    expect(footer.note?.headline).toBe("This task is ready to start");
+    renderConfirmReview(onStart, footer);
+
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("split-run-start-confirm")).not.toBeInTheDocument();
+  });
+
+  it("ignores a leftover Confidence check when review scores are all 3", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    renderConfirmReview(onStart, reviewTaskFooter({ clarity: 3, complexity: 3, verifiability: 3 }, 2));
+
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("split-run-start-confirm")).not.toBeInTheDocument();
+  });
+
+  it("asks before Start when a review sub-parameter is 2", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    renderConfirmReview(onStart, reviewTaskFooter({ clarity: 3, complexity: 2, verifiability: 3 }));
+
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onStart).not.toHaveBeenCalled();
+    expect(screen.getByText(START_CONFIRM_COPY.mid)).toBeInTheDocument();
+  });
+
+  it("explains an unclear review task when Clarity is 1", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    renderConfirmReview(onStart, reviewTaskFooter({ clarity: 1, complexity: 3, verifiability: 3 }));
+
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onStart).not.toHaveBeenCalled();
+    expect(screen.getByText(START_CONFIRM_COPY.low)).toBeInTheDocument();
+  });
+
+  it("still asks when a legacy score is 3", async () => {
+    const user = userEvent.setup();
+    const onStart = vi.fn();
+    renderConfirmReview(onStart, {
+      ...splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer,
+      clarityScore: 5,
+      confidenceScore: 3,
+    });
+
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(onStart).not.toHaveBeenCalled();
+    expect(screen.getByText(START_CONFIRM_COPY.mid)).toBeInTheDocument();
   });
 
   it("starts immediately on an intake draft with a high Confidence", async () => {

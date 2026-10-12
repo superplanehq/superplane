@@ -82,3 +82,19 @@ describe("insertUploadedFiles", () => {
     editor.destroy();
   });
 });
+
+describe("WorkOrderImage HTML", () => {
+  it("keeps the CleanShot open link in HTML output", () => {
+    const editor = markdownEditor();
+    editor.commands.insertContent({
+      type: "image",
+      attrs: { src: "https://cln.sh/abcd1234", alt: "CleanShot" },
+    });
+
+    const html = editor.getHTML();
+    expect(html).toContain("CleanShot");
+    expect(html).toContain('href="https://cln.sh/abcd1234"');
+    expect(html).toContain("Open video");
+    editor.destroy();
+  });
+});

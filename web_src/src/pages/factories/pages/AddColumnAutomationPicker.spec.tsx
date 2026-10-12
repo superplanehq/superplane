@@ -12,7 +12,7 @@ describe("AddColumnAutomationPicker", () => {
         open
         onClose={vi.fn()}
         onSelect={vi.fn()}
-        catalog={catalogForColumn("verify", { allowCustom: true, allowRiskScore: true })}
+        catalog={catalogForColumn("verify", { allowCustom: true })}
       />,
     );
 

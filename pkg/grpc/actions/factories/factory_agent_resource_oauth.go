@@ -211,8 +211,7 @@ func FactoryAgentResourceSettingsPath(orgSlug, factoryKey string) string {
 
 func CompleteFactoryAgentResourceOAuth(
 	ctx context.Context,
-	encryptor crypto.Encryptor,
-	httpClient mcp.HTTPDoer,
+	deps IntakeDependencies,
 	baseURL, code, state, oauthError string,
 ) (redirectPath string, statusCode int, message string) {
 	db := database.DB(ctx)
@@ -241,6 +240,8 @@ func CompleteFactoryAgentResourceOAuth(
 		return redirectPath, 302, ""
 	}
 
+	encryptor := deps.Encryptor
+	httpClient := mcpHTTPClient(deps)
 	verifier, err := mcp.DecryptedResourceSecret(ctx, encryptor, db, resource, models.FactoryAgentResourceSecretCodeVerifier)
 	if err != nil || verifier == "" {
 		_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthNeedsReconnect, "the sign-in session expired", nil)
@@ -272,22 +273,23 @@ func CompleteFactoryAgentResourceOAuth(
 	}
 	_ = resource.DeleteSecret(db, models.FactoryAgentResourceSecretCodeVerifier)
 	_ = resource.ClearOAuthPending(db)
-	finishFactoryAgentResourceOAuthConnect(db, resource)
+	finishFactoryAgentResourceOAuthConnect(ctx, deps, db, resource)
 	return redirectPath, 302, ""
 }
 
-func finishFactoryAgentResourceOAuthConnect(db *gorm.DB, resource *models.FactoryAgentResource) {
+func finishFactoryAgentResourceOAuthConnect(ctx context.Context, deps IntakeDependencies, db *gorm.DB, resource *models.FactoryAgentResource) {
 	err := resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthConnected, "", resource.OAuthConnectedBy)
-	if err == nil {
+	if err != nil {
+		_ = resource.DeleteSecret(db, models.FactoryAgentResourceSecretAccessToken)
+		_ = resource.DeleteSecret(db, models.FactoryAgentResourceSecretRefreshToken)
+		message := mcp.UserFacingOAuthError(err)
+		if errors.Is(err, models.ErrFactoryAgentResourceURLTaken) {
+			message = "This MCP server is already connected."
+		}
+		_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthNeedsReconnect, message, nil)
 		return
 	}
-	_ = resource.DeleteSecret(db, models.FactoryAgentResourceSecretAccessToken)
-	_ = resource.DeleteSecret(db, models.FactoryAgentResourceSecretRefreshToken)
-	message := mcp.UserFacingOAuthError(err)
-	if errors.Is(err, models.ErrFactoryAgentResourceURLTaken) {
-		message = "This MCP server is already connected."
-	}
-	_ = resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthNeedsReconnect, message, nil)
+	applyDefaultMCPWriteTools(ctx, deps, db, resource)
 }
 
 type oauthRevocation struct {

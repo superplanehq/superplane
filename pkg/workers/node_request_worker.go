@@ -482,11 +482,17 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, workflow, node, execution)),
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
+			WithRunsCancelled(runCancellations.RecordRuns).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
 			WithFileBindCleanup(onFileBindCleanup).
 			WithRemoteImageIngest(w.encryptor, w.registry),
 		Usage:     contexts.NewUsageContext(workflow.OrganizationID, execution),
 		HostedLLM: contexts.NewHostedLLMContext(tx, w.encryptor, workflow.OrganizationID, workflow.FactoryID),
+		RunnerTasks: contexts.NewRunnerTaskContext(
+			tx,
+			w.encryptor,
+			workflow.OrganizationID,
+		),
 	}
 
 	if node.AppInstallationID != nil {

@@ -26,6 +26,7 @@ interface IntakeSettingsHostProps {
   /** GitHub integration that has access to that repository. */
   vcsIntegrationId?: string;
   initialTab?: IntakeSettingsTab;
+  page?: boolean;
   onClose: () => void;
 }
 
@@ -39,6 +40,7 @@ export function IntakeSettingsHost({
   repository,
   vcsIntegrationId,
   initialTab = "general",
+  page = false,
   onClose,
 }: IntakeSettingsHostProps) {
   const automation = useIntakeAutomationCanvas(organizationId, intake.appId);
@@ -106,12 +108,14 @@ export function IntakeSettingsHost({
               organizationId,
               factoryId,
               factoryKey,
+              automationId: intake.appId,
               onSave: agent.save,
             }
           : undefined
       }
       onClose={onClose}
       initialTab={initialTab}
+      page={page}
       fixed
     />
   );
@@ -138,6 +142,8 @@ function useIntakeSettingsActions({
         intakeId: intake.intakeId,
         settings: intakeSettingsToApi(next),
         ...datadogServiceRebind(intake, next),
+        ...linearProjectRebind(intake, next),
+        ...sentryProjectRebind(intake, next),
       });
       await automationRefetch();
     },
@@ -171,4 +177,34 @@ function datadogServiceRebind(
     return {};
   }
   return { integrationId: intake.integrationId, resourceId: service };
+}
+
+function linearProjectRebind(
+  intake: ConfiguredLineIntakeSource,
+  next: IntakeSourceSettings,
+): { integrationId?: string; resourceId?: string } {
+  if (intake.source.id !== "linear-issues") {
+    return {};
+  }
+  const projects = next.linearProjectIds.join(",");
+  const current = intake.resourceId?.trim() ?? "";
+  if (!projects || projects === current || !intake.integrationId) {
+    return {};
+  }
+  return { integrationId: intake.integrationId, resourceId: projects };
+}
+
+function sentryProjectRebind(
+  intake: ConfiguredLineIntakeSource,
+  next: IntakeSourceSettings,
+): { integrationId?: string; resourceId?: string } {
+  if (intake.source.id !== "sentry-exceptions") {
+    return {};
+  }
+  const projects = next.sentryProjectIds.join(",");
+  const current = intake.resourceId?.trim() ?? "";
+  if (!projects || projects === current || !intake.integrationId) {
+    return {};
+  }
+  return { integrationId: intake.integrationId, resourceId: projects };
 }

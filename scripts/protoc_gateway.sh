@@ -20,16 +20,13 @@ PROTO_DIR="protos"
 generate_gateway_files() {
   MODULE=$1
   FILE=$2
-  
-  # Create output directories
-  mkdir -p $GATEWAY_OUT/$MODULE
 
   # Generate gRPC-Gateway code
   protoc --proto_path $PROTO_DIR/ \
          --proto_path $PROTO_DIR/include \
-         --grpc-gateway_out=$GATEWAY_OUT/$MODULE \
+         --grpc-gateway_out=. \
          --grpc-gateway_opt=logtostderr=true \
-         --grpc-gateway_opt=paths=source_relative \
+         --grpc-gateway_opt=module=$MODULE_NAME \
          $FILE
 }
 

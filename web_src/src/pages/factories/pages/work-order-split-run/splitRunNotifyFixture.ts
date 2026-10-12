@@ -353,7 +353,6 @@ export function notifyImplementLogPhases(order: FactoriesWorkOrder): SplitRunPha
 export function withNotifyImplementLog(fixture: SplitRunFixture, order: FactoriesWorkOrder): SplitRunFixture {
   return {
     ...fixture,
-    elapsed: fixture.elapsed.replace(/\s+so far$/i, "").trim() || fixture.elapsed,
     lineStatus: "passed",
     currentPhaseId: "pr-creation-2",
     openPhaseId: "pr-creation-2",

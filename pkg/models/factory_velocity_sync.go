@@ -30,6 +30,7 @@ type FactoryVelocitySyncTarget struct {
 	OrganizationID   uuid.UUID
 	IntegrationID    uuid.UUID
 	Repository       string
+	VCSProvider      string
 	SyncedRepository string
 	SyncedAt         *time.Time
 	BackfilledFrom   *time.Time
@@ -158,6 +159,7 @@ const factoryVelocitySyncTargetColumns = `
 	f.organization_id,
 	(f.onboarding_config->>'vcs_integration_id')::uuid AS integration_id,
 	f.onboarding_config->>'app_repository' AS repository,
+	COALESCE(f.onboarding_config->>'vcs_provider', '') AS vcs_provider,
 	COALESCE(s.repository, '') AS synced_repository,
 	s.synced_at,
 	s.backfilled_from`
