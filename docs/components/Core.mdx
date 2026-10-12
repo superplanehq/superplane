@@ -619,9 +619,9 @@ Supported types:
 
 Use the Add Pull Request component to attach a pull request to a task.
 
-Choose **Add new** or **Update existing**. Add new inserts another artifact. Update existing replaces the artifact on this task with the same type and title. The first run creates the artifact when none exists.
+Choose **Add new** or **Update existing**. Add new inserts another artifact. Update existing replaces the newest unkeyed artifact on this task with the same type and title. Artifacts with a key stay unchanged. When no unkeyed match exists, Update existing creates an unkeyed artifact.
 
-Update existing needs a stable title. A changed title adds a new artifact and leaves the old one. A duplicate title updates only the newest match. Do not use Update existing for a branch. A branch has no title.
+Update existing needs a stable title. A changed title adds a new artifact and leaves the old one. A duplicate title updates only the newest unkeyed match. Do not use Update existing for a branch. A branch has no title.
 
 Markdown and link types accept a free-form `data` list of `{name, value}` entries that gets merged into the artifact's `data` map. Typed inputs take precedence over free-form entries with the same key.
 
