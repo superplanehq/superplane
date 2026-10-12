@@ -68,6 +68,37 @@ func TestSerializeWorkOrderCreator_AutomationBranchWinsOverUser(t *testing.T) {
 	assert.Equal(t, appID.String(), creator.GetAutomation().GetAppId())
 }
 
+func TestSerializeWorkOrderCreator_MissingUserOmitsName(t *testing.T) {
+	userID := uuid.New()
+	order := &models.FactoryWorkOrder{
+		ID:          uuid.New(),
+		CreatedByID: &userID,
+	}
+
+	creator := mustSerializeWorkOrder(t, nil, order, nil, nil).GetCreatedBy()
+	require.NotNil(t, creator.GetUser())
+	assert.Equal(t, userID.String(), creator.GetUser().GetId())
+	assert.Empty(t, creator.GetUser().GetName())
+}
+
+func TestSerializeWorkOrderAssignees_MissingUserOmitsName(t *testing.T) {
+	userID := uuid.New()
+
+	assignees := serializeWorkOrderAssignees([]models.FactoryWorkOrderAssignee{{UserID: userID}})
+	require.Len(t, assignees, 1)
+	assert.Equal(t, userID.String(), assignees[0].GetId())
+	assert.Empty(t, assignees[0].GetName())
+}
+
+func TestSerializeArtifactCreator_MissingUserOmitsName(t *testing.T) {
+	userID := uuid.New()
+
+	creator := serializeArtifactCreator(&models.FactoryWorkOrderArtifact{CreatedByID: &userID})
+	require.NotNil(t, creator)
+	assert.Equal(t, userID.String(), creator.GetId())
+	assert.Empty(t, creator.GetName())
+}
+
 func TestSerializeWorkOrderCreator_NoneReturnsNil(t *testing.T) {
 	order := &models.FactoryWorkOrder{ID: uuid.New()}
 	assert.Nil(t, mustSerializeWorkOrder(t, nil, order, nil, nil).GetCreatedBy())
