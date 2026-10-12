@@ -259,6 +259,7 @@ describe("RunnerTasks", () => {
     await user.type(await screen.findByLabelText("Runner ID"), "runner-terminated");
     await user.click(screen.getByRole("button", { name: "Find runner" }));
 
+    await user.hover(await screen.findByRole("button", { name: "1 tag" }));
     expect(await screen.findByText("i-123")).toBeInTheDocument();
     expect(screen.getByText("worker-a")).toBeInTheDocument();
     expect(screen.getByText("198.51.100.4")).toBeInTheDocument();

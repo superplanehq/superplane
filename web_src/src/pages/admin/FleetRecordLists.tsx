@@ -2,6 +2,7 @@ import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { type FleetRunner, type FleetTask, fetchRunner, nextCursor, previousCursor } from "./fleetAdmin";
@@ -184,9 +185,9 @@ export const RunnerList = ({
     <>
       <form onSubmit={findRunner} className="mb-3 flex items-end gap-2">
         <div className="w-full max-w-md">
-          <label htmlFor="runner-id-lookup" className="mb-1 block text-sm text-gray-700 dark:text-gray-300">
+          <Label htmlFor="runner-id-lookup" className="mb-1 block text-sm text-gray-700 dark:text-gray-300">
             Runner ID
-          </label>
+          </Label>
           <Input
             id="runner-id-lookup"
             value={runnerId}
