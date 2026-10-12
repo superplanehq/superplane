@@ -1282,6 +1282,35 @@ func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
 	assert.Equal(t, active.ID, activeAgain.ID)
 }
 
+func TestBeginPlanningWaitAndNotify_DoesNotAutoStartEndedSession(t *testing.T) {
+	r := support.Setup(t)
+	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)
+	db := database.DB(t.Context())
+	line := mustAutoStartLine(t, r, factoryModel, true)
+	mustEnableAutoStart(t, db, factoryModel, line.ID)
+	order, err := factoryModel.FindWorkOrder(db, *session.DraftWorkOrderID)
+	require.NoError(t, err)
+	require.NoError(t, session.ProposeUpdate(db, models.PlanningSessionUpdate{
+		Scores: &models.PlanningReviewScores{
+			Clarity:       models.PlanningScoreValue{Score: 3, Summary: "Outcome, scope, and done are defined."},
+			Complexity:    models.PlanningScoreValue{Score: 3, Summary: "One agent can finish this in one run."},
+			Verifiability: models.PlanningScoreValue{Score: 3, Summary: "Existing tests cover the change."},
+		},
+		Spec: "# Retry refunds\n\nStop double charges.\n",
+	}))
+	loadedSession := *session
+	require.NoError(t, session.End(db))
+
+	err = beginPlanningWaitAndNotify(db, &loadedSession)
+
+	require.ErrorIs(t, err, models.ErrFactoryPlanningSessionEnded)
+	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateDraft, reloaded.State)
+	_, err = reloaded.FindActiveLineDispatch(db)
+	require.ErrorIs(t, err, gorm.ErrRecordNotFound)
+}
+
 func TestBeginPlanningWaitAndNotify_SkipsAutoStartWithoutLine(t *testing.T) {
 	r := support.Setup(t)
 	_, session, factoryModel, _ := mustPlanningRunnerSession(t, r)

@@ -438,6 +438,11 @@ func parseOptionalActivityID(w http.ResponseWriter, raw string) (uuid.UUID, bool
 }
 
 func beginPlanningWaitAndNotify(db *gorm.DB, session *models.FactoryPlanningSession) error {
+	reloaded, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	if err != nil {
+		return err
+	}
+	*session = *reloaded
 	alreadyWaiting := session.WaitState == models.PlanningWaitPending || session.WaitState == models.PlanningWaitResolved
 	if !alreadyWaiting && tryAutoStartPlannedWorkOrder(db, session) {
 		return nil
