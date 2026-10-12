@@ -21,7 +21,7 @@ export const SEND_WORK_ORDER_TO_BACKLOG_COPY = {
 
 export const CLOSED_STATUS_DIALOG_COPY = {
   title: "Closed tasks",
-  description: "Rejected and Canceled tasks. Send a task to Backlog to work on it again.",
+  description: "Rejected, Canceled, and Archived tasks. Send a task to Backlog to work on it again.",
   empty: "No closed tasks.",
   searchEmpty: "No tasks match this search.",
   searchMore: "No matching tasks on this page.",

@@ -2,8 +2,13 @@ import type { OrgUserDisplay } from "@/lib/orgUserDisplay";
 
 import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { DRAFT_READINESS_NOTES, draftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
-import { getWorkOrderDisplayStatusMeta, type WorkOrderDisplayStatus } from "../../lib/workOrderProgress";
+import {
+  getWorkOrderDisplayStatusMeta,
+  isWorkOrderRecoveryStatus,
+  type WorkOrderDisplayStatus,
+} from "../../lib/workOrderProgress";
 import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+
 export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "stopped" | "done";
 
 /** @deprecated Use SplitRunFooterKind. Kept for fixture field name. */
@@ -86,7 +91,7 @@ export function splitRunCloseNeedsConfirm(kind: SplitRunFooterKind): boolean {
 }
 
 export function isClosedWorkOrderDisplayStatus(status?: WorkOrderDisplayStatus): boolean {
-  return status === "completed" || status === "failed" || status === "rejected" || status === "cancelled";
+  return status === "completed" || (status != null && isWorkOrderRecoveryStatus(status));
 }
 
 export function showsArchive(footer: Pick<SplitRunFooter, "kind" | "status">): boolean {
@@ -258,7 +263,7 @@ export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTo
   if (footer.kind === "failed" || footer.status === "failed") {
     return "failed";
   }
-  if (footer.kind === "stopped" || footer.status === "rejected") {
+  if (footer.kind === "stopped" || footer.status === "rejected" || footer.status === "archived") {
     return "rejected";
   }
   return "done";
@@ -288,6 +293,12 @@ function closedDecisionNote(
       ...(closer?.actor ? { actor: closer.actor } : {}),
     };
   }
+  if (status === "archived") {
+    return {
+      headline: "This task is archived",
+      text: "Send this task to Backlog to work on it again.",
+    };
+  }
   if (status === "failed") {
     return { headline: "This task is closed as failed", text: "Reopen this task to start the line again." };
   }
@@ -302,7 +313,7 @@ function closedDecisionNote(
 }
 
 function closedDecisionActions(status?: WorkOrderDisplayStatus): SplitRunFooterAction[] {
-  if (status === "failed" || status === "rejected" || status === "cancelled") {
+  if (status && isWorkOrderRecoveryStatus(status)) {
     return [SEND_TO_BACKLOG, REOPEN];
   }
   return [];

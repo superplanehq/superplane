@@ -815,7 +815,13 @@ function phasesForOrder(
 
 export const SPLIT_RUN_CLOSURE_PHASE_ID = "done-closure";
 
-const CLOSED_DISPLAY_STATUSES = new Set<WorkOrderDisplayStatus>(["completed", "rejected", "cancelled", "failed"]);
+const CLOSED_DISPLAY_STATUSES = new Set<WorkOrderDisplayStatus>([
+  "completed",
+  "rejected",
+  "cancelled",
+  "failed",
+  "archived",
+]);
 
 /**
  * The decision that closed the task, as a Done stage. Mirrors the
