@@ -315,7 +315,7 @@ export function addressingFeedbackLabelsByWorkOrder(
       (pullRequest.activities ?? []).length === 0 &&
       (pullRequest.runs ?? []).some((linked) => isActiveCanvasRun(linked.run))
     ) {
-      labels.set(workOrderId, "Addressing user feedback");
+      labels.set(workOrderId, "Addressing PR comments");
     }
   }
   return labels;
@@ -344,7 +344,7 @@ function addressingFeedbackCardLabel(
   if (activity.revision || FIXING_CHECKS_DESCRIPTION.test(text)) {
     return prFeedbackActivityLabel(activity);
   }
-  return "Addressing user feedback";
+  return "Addressing PR comments";
 }
 
 function isCustomPRActivityLabel(
