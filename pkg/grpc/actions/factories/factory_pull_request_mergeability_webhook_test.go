@@ -214,8 +214,7 @@ func TestRefreshFactoryPullRequestMergeabilitySkipsTemporarySentryReport(t *test
 			pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
 			require.NoError(t, err)
 			stubFactoryGitHub(t, &fakeFactoryGitHub{getPullErr: test.err})
-			hook := logtest.NewGlobal()
-			t.Cleanup(func() { hook.Reset() })
+			hook := captureGlobalLogEntries(t)
 			transport := bindFactoryMergeabilitySentryHub(t)
 
 			err = refreshFactoryPullRequestMergeability(t.Context(), db, IntakeDependencies{}, factory, pullRequest)
@@ -615,6 +614,22 @@ func bindFactoryMergeabilitySentryHub(t *testing.T) *memorySentryTransport {
 		hub.BindClient(previous)
 	})
 	return transport
+}
+
+func captureGlobalLogEntries(t *testing.T) *logtest.Hook {
+	t.Helper()
+	logger := log.StandardLogger()
+	previous := logger.ReplaceHooks(make(log.LevelHooks))
+	for _, hooks := range previous {
+		for _, existing := range hooks {
+			logger.AddHook(existing)
+		}
+	}
+	hook := logtest.NewGlobal()
+	t.Cleanup(func() {
+		logger.ReplaceHooks(previous)
+	})
+	return hook
 }
 
 func requireFactoryMergeabilityLookupWarning(t *testing.T, hook *logtest.Hook, factoryID, pullRequestID, repository string) {
