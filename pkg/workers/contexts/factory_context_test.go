@@ -1683,6 +1683,88 @@ func TestFactoryContext_AddWorkOrderArtifact_KeyedRefresh(t *testing.T) {
 	assert.Equal(t, 1, addedCount)
 }
 
+func TestFactoryContext_AddWorkOrderArtifact_UpdateByTitle(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Title update target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	linkRunToWorkOrder(t, r, factory, order.ID, run.ID)
+
+	other, err := factory.CreateWorkOrder(database.Conn(), "Other title target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	otherArtifact, err := other.CreateArtifact(database.Conn(), models.FactoryWorkOrderArtifactParams{
+		Type: models.FactoryWorkOrderArtifactTypeLink,
+		Data: map[string]any{
+			"url":   "https://preview.example.com/other",
+			"title": "Preview",
+		},
+	})
+	require.NoError(t, err)
+
+	var reasons []string
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).
+		WithWorkOrderUpdated(func(_, _, reason string) {
+			reasons = append(reasons, reason)
+		})
+
+	first, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		OrderID: order.ID.String(),
+		Type:    "link",
+		Data: map[string]any{
+			"url":   "https://preview.example.com/v1",
+			"title": "Preview",
+			"note":  "first",
+		},
+		Key:           "storybook-preview",
+		UpdateByTitle: true,
+	})
+	require.NoError(t, err)
+
+	second, err := ctx.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+		OrderID: order.ID.String(),
+		Type:    "link",
+		Data: map[string]any{
+			"url":   "https://preview.example.com/v2",
+			"title": "Preview",
+		},
+		Key:           "storybook-preview",
+		UpdateByTitle: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, first.ID, second.ID)
+	assert.Equal(t, "https://preview.example.com/v2", second.Data["url"])
+	_, hasNote := second.Data["note"]
+	assert.False(t, hasNote)
+
+	assert.Equal(t, []string{
+		factoryevents.EventTypeOrderArtifactAdded,
+		factoryevents.EventTypeOrderArtifactUpdated,
+	}, reasons)
+
+	artifacts, err := order.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, artifacts, 1)
+	assert.Nil(t, artifacts[0].Key)
+
+	otherArtifacts, err := other.ListArtifacts(database.Conn())
+	require.NoError(t, err)
+	require.Len(t, otherArtifacts, 1)
+	assert.Equal(t, otherArtifact.ID, otherArtifacts[0].ID)
+	assert.Equal(t, "https://preview.example.com/other", mustContextArtifactData(t, &otherArtifacts[0])["url"])
+}
+
+func mustContextArtifactData(t *testing.T, artifact *models.FactoryWorkOrderArtifact) map[string]any {
+	t.Helper()
+	var data map[string]any
+	require.NoError(t, json.Unmarshal(artifact.Data, &data))
+	return data
+}
+
 type automationPayload struct {
 	NodeID   string `json:"nodeId"`
 	NodeName string `json:"nodeName"`
