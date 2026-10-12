@@ -173,7 +173,7 @@ func Test__ListMergedPullRequests(t *testing.T) {
 	})
 
 	t.Run("until keeps fractional seconds", func(t *testing.T) {
-		until := time.Date(2026, 10, 12, 10, 5, 0, 500*int(time.Millisecond), time.UTC)
+		until := time.Now().UTC().Truncate(time.Second).Add(500 * time.Millisecond)
 		client, httpCtx := stubBitbucketClient(okResponse(`{"values": []}`))
 
 		_, _, err := client.ListMergedPullRequests("acme/widgets", from, until, 1)
@@ -193,8 +193,9 @@ func Test__ListMergedPullRequests(t *testing.T) {
 }
 
 func Test__ListMergedPullRequestsThroughBoundary(t *testing.T) {
-	from := time.Now().Add(-30 * 24 * time.Hour)
-	newer := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
+	from := now.Add(-30 * 24 * time.Hour)
+	newer := now.Truncate(time.Second)
 	boundary := newer.Add(-time.Second)
 	older := boundary.Add(-time.Second)
 	next := "https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests?page=2"

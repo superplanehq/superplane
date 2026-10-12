@@ -92,6 +92,7 @@ func TestFactoryVelocitySync_ShortBitbucketReadDoesNotFinish(t *testing.T) {
 		Repository:     "acme/app",
 	}
 	cursor := now.Add(-2 * 24 * time.Hour)
+	require.NoError(t, sync.RecordSuccess(db, target.Repository, now.Add(-time.Hour), from))
 	merged := []repositoryMerge{{
 		repository: target.Repository,
 		number:     7,
@@ -113,7 +114,7 @@ func TestFactoryVelocitySync_ShortBitbucketReadDoesNotFinish(t *testing.T) {
 
 	stored, err := models.FindFactoryVelocitySync(db, factory.ID)
 	require.NoError(t, err)
-	assert.Nil(t, stored.SyncedAt, "a short slice must not look like a finished sync")
+	assert.Nil(t, stored.SyncedAt, "a short slice must clear an earlier finished sync")
 	require.NotNil(t, stored.BackfilledFrom)
 	assert.WithinDuration(t, cursor, *stored.BackfilledFrom, time.Second)
 	assert.Equal(t, bitbucketVelocityRulesRebuilding, stored.RulesGeneration)

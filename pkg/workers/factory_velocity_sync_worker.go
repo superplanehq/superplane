@@ -419,8 +419,8 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 
 	sync.RulesGeneration = rulesGeneration
 	if !coverage.Complete {
-		// A short slice is progress, not a finished sync. SyncedAt stays put
-		// so the report stays pending and a refresh keeps waiting.
+		// A short slice is progress, not a finished sync. Clear SyncedAt so
+		// the report stays pending and a refresh keeps waiting.
 		return sync.RecordProgress(database.Conn(), target.Repository, backfilledFrom)
 	}
 	return sync.RecordSuccess(database.Conn(), target.Repository, now, backfilledFrom)
@@ -601,8 +601,9 @@ func bitbucketRebuildUntil(target models.FactoryVelocitySyncTarget, now time.Tim
 	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
 		return time.Time{}, false
 	}
-	// SyncedAt stays unset until the rebuild finishes. The cursor is
-	// BackfilledFrom, so a first sync can continue without looking finished.
+	// SyncedAt is cleared until the rebuild finishes. The cursor is
+	// BackfilledFrom, so a first sync and a later slice can continue
+	// without looking finished.
 	if !sameRepository(target) || target.BackfilledFrom == nil {
 		return time.Time{}, false
 	}

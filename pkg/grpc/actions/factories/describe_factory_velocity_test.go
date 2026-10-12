@@ -252,6 +252,7 @@ func TestDescribeFactoryVelocity_PartialSyncStaysPending(t *testing.T) {
 	))
 	sync, err := models.ClaimFactoryVelocitySync(db, factoryModel.ID, now)
 	require.NoError(t, err)
+	require.NoError(t, sync.RecordSuccess(db, "example/repo", now.Add(-time.Hour), now.Add(-60*24*time.Hour)))
 	require.NoError(t, sync.RecordProgress(db, "example/repo", now.Add(-2*24*time.Hour)))
 
 	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
