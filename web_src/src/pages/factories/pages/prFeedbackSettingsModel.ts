@@ -10,7 +10,6 @@ import type {
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
-import { WORK_ORDER_ATTENTION_LABEL } from "../lib/workOrderAttention";
 import { isActiveCanvasRun } from "../lib/workOrderPullRequest";
 
 export { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsCopy";
@@ -277,7 +276,6 @@ export function isActivePRFeedbackActivity(activity: FactoriesFactoryPullRequest
 const WAITING_ON_CHECKS_DESCRIPTION = /^Waiting for (checks|builds)\b/i;
 const CHECKS_PASSED_DESCRIPTION = /^(Checks|Builds) passed\b/i;
 const FIXING_CHECKS_DESCRIPTION = /^Fixing failed (checks|builds)\b/i;
-const ADDRESSING_BOT_FEEDBACK_LABEL = "Addressing bot feedback";
 
 /**
  * Built-in checks wait. Custom canvases also use concurrent access when they
@@ -317,7 +315,7 @@ export function addressingFeedbackLabelsByWorkOrder(
       (pullRequest.activities ?? []).length === 0 &&
       (pullRequest.runs ?? []).some((linked) => isActiveCanvasRun(linked.run))
     ) {
-      labels.set(workOrderId, addressingFeedbackLabel(undefined));
+      labels.set(workOrderId, "Addressing PR comments");
     }
   }
   return labels;
@@ -346,14 +344,7 @@ function addressingFeedbackCardLabel(
   if (activity.revision || FIXING_CHECKS_DESCRIPTION.test(text)) {
     return prFeedbackActivityLabel(activity);
   }
-  return addressingFeedbackLabel(activity.authorIsBot);
-}
-
-function addressingFeedbackLabel(authorIsBot: boolean | undefined): string {
-  if (authorIsBot) {
-    return ADDRESSING_BOT_FEEDBACK_LABEL;
-  }
-  return WORK_ORDER_ATTENTION_LABEL.feedback;
+  return "Addressing PR comments";
 }
 
 function isCustomPRActivityLabel(
