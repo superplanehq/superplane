@@ -3,12 +3,12 @@ import { isHiddenAgentLiveLogText } from "@/lib/agentRunTelemetry";
 import { agentToolDisplayText, isCommandKind } from "@/lib/agentToolLabels";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
+import { withCanceledAnalysisWait } from "./canceledAnalysisWait";
 import { parseClaudeCodeLog } from "./parseClaudeCodeLog";
 import type { SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
 
 const HIDDEN_KINDS = new Set(["setup"]);
 const TOOL_LINE = /^-> \[([^\]]+)\]/;
-const ANALYSIS_WAIT_COMMAND = "Wait for the next message";
 
 export const RUNNER_COMPONENTS = new Set([
   "runnerSuperPlane",
@@ -53,21 +53,17 @@ export function notesFromLiveLogSections(
     }
     const stepId = `${nodeId}-step-${section.index}`;
     const orderKey = section.started_at ?? undefined;
-    const note = noteFromCommandSection({
-      nodeId,
-      stepId,
-      orderKey,
-      section,
-      sections,
-      runStatus,
-    });
-    if (isCanceledAnalysisWait(section, analysisStatus, runStatus)) {
-      note.status = "cancelled";
-      if (note.promptStatus === "failed") {
-        note.promptStatus = "cancelled";
-      }
-    }
-    notes.push(note);
+    notes.push(
+      noteFromCommandSection({
+        nodeId,
+        stepId,
+        orderKey,
+        section,
+        sections,
+        runStatus,
+        analysisStatus,
+      }),
+    );
     notes.push(...notesFromSectionEvents(nodeId, stepId, orderKey, section));
     notes.push(...notesFromAgentActivities(nodeId, stepId, orderKey, section.activities ?? []));
   }
@@ -119,8 +115,9 @@ function noteFromCommandSection(input: {
   section: CommandSection;
   sections: CommandSection[];
   runStatus?: SplitRunPhaseStatus;
+  analysisStatus?: SplitRunPhaseStatus;
 }): SplitRunStreamLine {
-  const { nodeId, stepId, orderKey, section, sections, runStatus } = input;
+  const { nodeId, stepId, orderKey, section, sections, runStatus, analysisStatus } = input;
   const name = section.text.trim();
   const preview = section.preview?.trim() ?? "";
   const output = section.kind === "prompt" ? "" : visibleLogText(section.lines);
@@ -129,28 +126,33 @@ function noteFromCommandSection(input: {
   const bashScript = section.kind === "bash" ? preview : "";
   const sectionStatus = streamStatus(section.status);
   const prompt = section.kind === "prompt";
-  return {
-    id: stepId,
-    nodeId,
-    at: "",
-    note: true,
-    componentType: section.kind,
-    componentName: name || preview,
-    status: prompt
-      ? agentStepStatusFromSection({
-          kind: "prompt",
-          sectionStatus,
-          runStatus,
-          stoppedTheRun: sectionStoppedTheRun(section, sections),
-        })
-      : sectionStatus,
-    promptStatus: prompt ? sectionStatus : undefined,
-    detail: detail || undefined,
-    commandScript: bashScript || undefined,
-    commandStdout: bashScript ? output || undefined : undefined,
-    duration: commandSectionDuration(section.duration_ms),
-    ...orderKeyProps(orderKey),
-  };
+  return withCanceledAnalysisWait(
+    {
+      id: stepId,
+      nodeId,
+      at: "",
+      note: true,
+      componentType: section.kind,
+      componentName: name || preview,
+      status: prompt
+        ? agentStepStatusFromSection({
+            kind: "prompt",
+            sectionStatus,
+            runStatus,
+            stoppedTheRun: sectionStoppedTheRun(section, sections),
+          })
+        : sectionStatus,
+      promptStatus: prompt ? sectionStatus : undefined,
+      detail: detail || undefined,
+      commandScript: bashScript || undefined,
+      commandStdout: bashScript ? output || undefined : undefined,
+      duration: commandSectionDuration(section.duration_ms),
+      ...orderKeyProps(orderKey),
+    },
+    section,
+    analysisStatus,
+    runStatus,
+  );
 }
 
 function commandSectionDuration(durationMs: number | null): string | undefined {
@@ -517,20 +519,6 @@ function liveStatusNote(nodeId: string, text: string, status: SplitRunPhaseStatu
     componentName: text,
     status,
   };
-}
-
-function isCanceledAnalysisWait(
-  section: CommandSection,
-  analysisStatus?: SplitRunPhaseStatus,
-  nodeStatus?: SplitRunPhaseStatus,
-): boolean {
-  if (section.status !== "failed" || section.text.trim() !== ANALYSIS_WAIT_COMMAND) {
-    return false;
-  }
-  if (analysisStatus === "cancelled") {
-    return true;
-  }
-  return analysisStatus === "passed" && nodeStatus === "cancelled";
 }
 
 function streamStatus(status: string): SplitRunPhaseStatus {
