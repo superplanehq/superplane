@@ -253,7 +253,7 @@ func TestDescribeFactoryVelocity_PartialSyncStaysPending(t *testing.T) {
 	sync, err := models.ClaimFactoryVelocitySync(db, factoryModel.ID, now)
 	require.NoError(t, err)
 	require.NoError(t, sync.RecordSuccess(db, "example/repo", now.Add(-time.Hour), now.Add(-60*24*time.Hour)))
-	require.NoError(t, sync.RecordProgress(db, "example/repo", now.Add(-2*24*time.Hour)))
+	require.NoError(t, sync.RecordProgress(db, "example/repo", now.Add(-2*24*time.Hour), time.Time{}))
 
 	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
 		FactoryId:  factoryModel.ID.String(),
@@ -265,6 +265,31 @@ func TestDescribeFactoryVelocity_PartialSyncStaysPending(t *testing.T) {
 	assert.False(t, resp.HasPeopleCohort)
 	assert.Nil(t, resp.PeopleSyncedAt)
 	assert.Equal(t, int32(0), resp.Totals.PeopleMerged)
+}
+
+func TestDescribeFactoryVelocity_InProgressStampStaysPending(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now()
+	sync, err := models.ClaimFactoryVelocitySync(db, factoryModel.ID, now)
+	require.NoError(t, err)
+	sync.RulesGeneration = -1
+	require.NoError(t, sync.RecordProgress(db, "example/repo", now.Add(-2*24*time.Hour), now.Add(-time.Hour)))
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+		Repository: "example/repo",
+	})
+	require.NoError(t, err)
+	assert.True(t, resp.PeopleSyncPending, "a newest-slice stamp is not a finished people report")
+	assert.False(t, resp.HasPeopleCohort)
+	assert.Nil(t, resp.PeopleSyncedAt)
 }
 
 func TestDescribeFactoryVelocity_CountsSyncedPeopleMerges(t *testing.T) {

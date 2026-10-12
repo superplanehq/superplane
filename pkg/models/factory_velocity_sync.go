@@ -50,22 +50,40 @@ func (s *FactoryVelocitySync) CoversRepository(repository string) bool {
 	return strings.EqualFold(strings.TrimSpace(s.Repository), strings.TrimSpace(repository))
 }
 
+// SyncInProgress reports a bounded read that has not finished. SyncedAt may
+// still hold the time the newest pages were read. That stamp is not a
+// finished sync.
+func (s *FactoryVelocitySync) SyncInProgress() bool {
+	return s != nil && s.RulesGeneration < 0
+}
+
 // RecordProgress saves a short slice without marking the sync finished.
-// It clears SyncedAt so a partial history is not reported as complete,
-// including a rebuild that already had a finished read.
-func (s *FactoryVelocitySync) RecordProgress(tx *gorm.DB, repository string, backfilledFrom time.Time) error {
+// newestReadAt is when the newest pages were read. A zero time clears the
+// stamp. A later slice keeps the earlier stamp so the finishing read can
+// include merges made after the first slice. A negative rules generation
+// stays unfinished even when the stamp is set.
+func (s *FactoryVelocitySync) RecordProgress(tx *gorm.DB, repository string, backfilledFrom, newestReadAt time.Time) error {
 	now := time.Now()
 	s.Repository = strings.TrimSpace(repository)
 	s.BackfilledFrom = &backfilledFrom
-	s.SyncedAt = nil
 	s.Error = ""
 	s.UpdatedAt = now
+
+	var syncedAt any
+	if newestReadAt.IsZero() {
+		s.SyncedAt = nil
+		syncedAt = gorm.Expr("NULL")
+	} else {
+		readAt := newestReadAt
+		s.SyncedAt = &readAt
+		syncedAt = s.SyncedAt
+	}
 
 	return tx.Model(s).
 		Where("factory_id = ?", s.FactoryID).
 		Updates(map[string]any{
 			"repository":       s.Repository,
-			"synced_at":        gorm.Expr("NULL"),
+			"synced_at":        syncedAt,
 			"backfilled_from":  s.BackfilledFrom,
 			"rules_generation": s.RulesGeneration,
 			"error":            "",

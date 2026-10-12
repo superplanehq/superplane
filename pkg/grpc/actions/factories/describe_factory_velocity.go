@@ -226,7 +226,10 @@ func loadMergeCohort(
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return mergeCohort{}, err
 	}
-	if sync == nil || sync.SyncedAt == nil {
+	// A bounded rebuild stores the newest-slice time in SyncedAt so a later
+	// read can catch merges made after that slice. The report stays pending
+	// until that read finishes.
+	if sync == nil || sync.SyncedAt == nil || sync.SyncInProgress() {
 		return mergeCohort{pending: true}, nil
 	}
 

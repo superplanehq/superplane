@@ -114,9 +114,104 @@ func TestFactoryVelocitySync_ShortBitbucketReadDoesNotFinish(t *testing.T) {
 
 	stored, err := models.FindFactoryVelocitySync(db, factory.ID)
 	require.NoError(t, err)
-	assert.Nil(t, stored.SyncedAt, "a short slice must clear an earlier finished sync")
+	require.NotNil(t, stored.SyncedAt, "the first slice stamps when the newest pages were read")
+	assert.WithinDuration(t, now, *stored.SyncedAt, time.Second)
 	require.NotNil(t, stored.BackfilledFrom)
 	assert.WithinDuration(t, cursor, *stored.BackfilledFrom, time.Second)
 	assert.Equal(t, bitbucketVelocityRulesRebuilding, stored.RulesGeneration)
 	assert.Equal(t, target.Repository, stored.Repository)
+
+	later := now.Add(time.Minute)
+	require.NoError(t, worker.storeMerges(
+		target,
+		stored,
+		from,
+		cursor,
+		nil,
+		velocityReadCoverage{ContinueBefore: cursor.Add(-24 * time.Hour)},
+		later,
+	))
+	stored, err = models.FindFactoryVelocitySync(db, factory.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stored.SyncedAt)
+	assert.WithinDuration(t, now, *stored.SyncedAt, time.Second, "a later slice must not move the newest-page stamp forward")
+}
+
+func TestFactoryVelocitySync_FinishedOlderSliceWaitsForTheNewerWindow(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	now := time.Now()
+	from := now.Add(-60 * 24 * time.Hour)
+	sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, now)
+	require.NoError(t, err)
+	target := models.FactoryVelocitySyncTarget{
+		OrganizationID:   r.Organization.ID,
+		FactoryID:        factory.ID,
+		VCSProvider:      models.ProviderBitbucket,
+		Repository:       "acme/app",
+		SyncedRepository: "acme/app",
+	}
+	cursor := now.Add(-2 * 24 * time.Hour)
+	worker := NewFactoryVelocitySyncWorker("", nil, nil)
+	require.NoError(t, worker.storeMerges(
+		target,
+		sync,
+		from,
+		time.Time{},
+		nil,
+		velocityReadCoverage{ContinueBefore: cursor},
+		now.Add(-time.Hour),
+	))
+
+	require.NoError(t, worker.storeMerges(
+		target,
+		sync,
+		from,
+		cursor,
+		nil,
+		completeVelocityRead(),
+		now,
+	))
+
+	stored, err := models.FindFactoryVelocitySync(db, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, bitbucketVelocityRulesCatchUp, stored.RulesGeneration)
+	require.NotNil(t, stored.SyncedAt)
+	assert.WithinDuration(t, now.Add(-time.Hour), *stored.SyncedAt, time.Second,
+		"finishing the older slice must not stamp the sync as fresh")
+	assert.True(t, stored.SyncInProgress())
+
+	caught := target
+	caught.RulesGeneration = bitbucketVelocityRulesCatchUp
+	caught.SyncedAt = stored.SyncedAt
+	caught.BackfilledFrom = stored.BackfilledFrom
+	recent := repositoryMerge{
+		repository: target.Repository,
+		number:     9,
+		source:     models.FactoryVelocityMergeSourcePeople,
+		authorUUID: uuid.NewString(),
+		mergedAt:   now.Add(-time.Minute),
+	}
+	require.NoError(t, worker.storeMerges(
+		caught,
+		stored,
+		bitbucketCatchUpFrom(caught, now),
+		time.Time{},
+		[]repositoryMerge{recent},
+		completeVelocityRead(),
+		now,
+	))
+
+	stored, err = models.FindFactoryVelocitySync(db, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, bitbucketVelocityRulesGeneration, stored.RulesGeneration)
+	assert.False(t, stored.SyncInProgress())
+	require.NotNil(t, stored.SyncedAt)
+	assert.WithinDuration(t, now, *stored.SyncedAt, time.Second)
+	rows, err := models.ListFactoryVelocityRepositoryMerges(db, factory.ID, from, now.Add(time.Hour))
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, int64(9), rows[0].Number)
 }
