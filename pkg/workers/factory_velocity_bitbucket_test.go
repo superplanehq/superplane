@@ -165,8 +165,11 @@ func TestFactoryVelocitySync_FinishedOlderSliceWaitsForTheNewerWindow(t *testing
 		now.Add(-time.Hour),
 	))
 
+	rebuilding := target
+	rebuilding.RulesGeneration = bitbucketVelocityRulesRebuilding
+	rebuilding.BackfilledFrom = &cursor
 	require.NoError(t, worker.storeMerges(
-		target,
+		rebuilding,
 		sync,
 		from,
 		cursor,
@@ -214,4 +217,89 @@ func TestFactoryVelocitySync_FinishedOlderSliceWaitsForTheNewerWindow(t *testing
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, int64(9), rows[0].Number)
+}
+
+func TestFactoryVelocitySync_ShortCatchUpContinuesWithoutRereadingOlderHistory(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	now := time.Now()
+	from := now.Add(-60 * 24 * time.Hour)
+	sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, now)
+	require.NoError(t, err)
+	target := models.FactoryVelocitySyncTarget{
+		OrganizationID:   r.Organization.ID,
+		FactoryID:        factory.ID,
+		VCSProvider:      models.ProviderBitbucket,
+		Repository:       "acme/app",
+		SyncedRepository: "acme/app",
+	}
+	firstSlice := now.Add(-10 * 24 * time.Hour)
+	worker := NewFactoryVelocitySyncWorker("", nil, nil)
+	require.NoError(t, worker.storeMerges(
+		target,
+		sync,
+		from,
+		time.Time{},
+		nil,
+		velocityReadCoverage{ContinueBefore: firstSlice},
+		firstSlice,
+	))
+
+	older := repositoryMerge{
+		repository: target.Repository,
+		number:     3,
+		source:     models.FactoryVelocityMergeSourcePeople,
+		authorUUID: uuid.NewString(),
+		mergedAt:   now.Add(-20 * 24 * time.Hour),
+	}
+	rebuilding := target
+	rebuilding.RulesGeneration = bitbucketVelocityRulesRebuilding
+	rebuilding.BackfilledFrom = &firstSlice
+	require.NoError(t, worker.storeMerges(
+		rebuilding,
+		sync,
+		from,
+		firstSlice,
+		[]repositoryMerge{older},
+		completeVelocityRead(),
+		now.Add(-time.Hour),
+	))
+
+	caught := target
+	caught.RulesGeneration = bitbucketVelocityRulesCatchUp
+	caught.SyncedAt = sync.SyncedAt
+	caught.BackfilledFrom = sync.BackfilledFrom
+	cursor := now.Add(-24 * time.Hour)
+	recent := repositoryMerge{
+		repository: target.Repository,
+		number:     9,
+		source:     models.FactoryVelocityMergeSourcePeople,
+		authorUUID: uuid.NewString(),
+		mergedAt:   now.Add(-time.Hour),
+	}
+	require.NoError(t, worker.storeMerges(
+		caught,
+		sync,
+		bitbucketCatchUpFrom(caught, now),
+		time.Time{},
+		[]repositoryMerge{recent},
+		velocityReadCoverage{ContinueBefore: cursor},
+		now,
+	))
+
+	stored, err := models.FindFactoryVelocitySync(db, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, bitbucketVelocityRulesCatchingUp, stored.RulesGeneration)
+	require.NotNil(t, stored.BackfilledFrom)
+	assert.WithinDuration(t, cursor, *stored.BackfilledFrom, time.Second)
+	require.NotNil(t, stored.SyncedAt)
+	assert.WithinDuration(t, firstSlice, *stored.SyncedAt, time.Second,
+		"a short catch-up must keep the first-slice time so the next read does not shrink the window")
+	assert.True(t, stored.SyncInProgress())
+
+	rows, err := models.ListFactoryVelocityRepositoryMerges(db, factory.ID, from, now.Add(time.Hour))
+	require.NoError(t, err)
+	require.Len(t, rows, 2, "a short catch-up must not delete the older history it did not read")
 }
