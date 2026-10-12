@@ -62,6 +62,7 @@ import {
   type WorkOrdersPageQuery,
 } from "@/pages/factories/lib/workOrderListPagination";
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
+import { integrationKeys } from "./useIntegrations";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 export const factoryQueryKeys = {
@@ -276,6 +277,7 @@ export function useFactoryWorkOrdersPage(
     fetchNextPage: query.fetchNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     isFetchNextPageError: query.isFetchNextPageError,
+    totalCount: query.data?.pages[0]?.totalCount,
   };
 }
 
@@ -284,6 +286,7 @@ export type FactoryBoardColumnPage = {
   isFetchingNextPage: boolean;
   isFetchNextPageError: boolean;
   fetchNextPage: () => void;
+  totalCount?: number;
 };
 
 export type FactoryBoardWorkOrders = {
@@ -303,6 +306,7 @@ function boardColumnPage(page: ReturnType<typeof useFactoryWorkOrdersPage>): Fac
     fetchNextPage: () => {
       void page.fetchNextPage();
     },
+    totalCount: page.totalCount,
   };
 }
 
@@ -532,9 +536,11 @@ export function useSelectFactoryVcsProviderRepository(organizationId: string, fa
       if (!response.data?.factory) throw new Error("Failed to select the repository");
       return response.data.factory;
     },
-    onSuccess: (factory) => {
+    onSuccess: async (factory) => {
       queryClient.setQueryData(factoryDetailKey(organizationId, factoryId), factory);
       void queryClient.invalidateQueries({ queryKey: factoryListKey(organizationId) });
+      // Repository selection can create the connection that onboarding reads next.
+      await queryClient.invalidateQueries({ queryKey: integrationKeys.connected(organizationId) });
     },
   });
 }

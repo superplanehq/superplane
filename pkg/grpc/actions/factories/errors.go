@@ -133,6 +133,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "pull request lookup is incomplete")
 	case errors.Is(err, errFactoryGitHubNotConnected):
 		return grpcerrors.FailedPrecondition(err, "GitHub is not connected.")
+	case errors.Is(err, errFactoryBitbucketNotConnected):
+		return grpcerrors.FailedPrecondition(err, "Bitbucket is not connected.")
 	case errors.Is(err, errCannotCloseBitbucketPullRequest):
 		return grpcerrors.FailedPrecondition(err, "SuperPlane cannot close a Bitbucket pull request.")
 	case errors.Is(err, vcs.ErrNotSupported):
@@ -142,7 +144,7 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	case errors.Is(err, errWorkOrderNotClosedForBacklog):
 		return grpcerrors.FailedPrecondition(err, "Only a closed task can move to the Backlog.")
 	case errors.Is(err, errFactoryPullRequestNotGitHub):
-		return grpcerrors.FailedPrecondition(err, "Only GitHub pull requests can merge from SuperPlane.")
+		return grpcerrors.FailedPrecondition(err, "Only pull requests on the workspace Git host can merge from SuperPlane.")
 	case errors.Is(err, errFactoryPullRequestNotOpen):
 		return grpcerrors.FailedPrecondition(err, "The pull request is not open.")
 	case errors.Is(err, errFactoryPullRequestNotMergeable):

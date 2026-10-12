@@ -1,10 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_LINEAR_INTAKE,
-  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_DATADOG_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE } from "@/lib/experimentalFeatures";
 
 import {
   ADD_INTAKE_TEMPLATES,
@@ -381,7 +377,7 @@ describe("lineIntakeModel", () => {
     expect(ADD_INTAKE_TEMPLATES.filter((template) => template.soon).map((template) => template.id)).toEqual(["notion"]);
   });
 
-  it("keeps Jira live when other flagged intake sources are off", () => {
+  it("keeps Jira and Linear live when other flagged intake sources are off", () => {
     const templates = addIntakeTemplatesForOrg(() => false);
 
     expect(templates.find((template) => template.id === "github-issues")?.soon).toBeFalsy();
@@ -390,15 +386,13 @@ describe("lineIntakeModel", () => {
     expect(templates.find((template) => template.id === "sentry-exceptions")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "productive-tasks")?.soon).toBe(true);
     expect(templates.find((template) => template.id === "datadog")?.soon).toBe(true);
-    expect(templates.find((template) => template.id === "linear-issues")?.soon).toBe(true);
+    expect(templates.find((template) => template.id === "linear-issues")?.soon).toBeFalsy();
     expect(templates.find((template) => template.id === "notion")?.soon).toBe(true);
   });
 
-  it("keeps Productive.io, Datadog, and Linear live when their organization features are on", () => {
+  it("keeps Productive.io and Datadog live when their organization features are on", () => {
     const templates = addIntakeTemplatesForOrg((featureId) =>
-      [FEATURE_FACTORY_DATADOG_INTAKE, FEATURE_FACTORY_LINEAR_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE].includes(
-        featureId,
-      ),
+      [FEATURE_FACTORY_DATADOG_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE].includes(featureId),
     );
 
     expect(templates.find((template) => template.id === "dependabot-alerts")?.soon).toBeFalsy();

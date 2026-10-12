@@ -215,7 +215,7 @@ describe("provisionEventApps", () => {
     expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure", "risk-score"]);
   });
 
-  it("installs neither event app for a Bitbucket workspace", async () => {
+  it("installs pull request closure for a Bitbucket workspace", async () => {
     const installFactory = installFactoryMock();
     const listApps = vi.fn().mockResolvedValue([]);
 
@@ -228,8 +228,16 @@ describe("provisionEventApps", () => {
       listApps,
     });
 
-    expect(installFactory).not.toHaveBeenCalled();
-    expect(listApps).not.toHaveBeenCalled();
+    expect(installFactory).toHaveBeenCalledTimes(1);
+    expect(installFactory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        factoryId: "pr-closure",
+        vcsProvider: "bitbucket",
+        workspaceFactoryId: "factory-1",
+        navigateOnComplete: false,
+        startInitialRun: false,
+      }),
+    );
   });
 });
 

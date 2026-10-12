@@ -45,7 +45,7 @@ type FirstRunTicketsScreenProps = {
 };
 
 const TICKET_SCREEN_DEFAULTS = {
-  linearAvailable: false,
+  linearAvailable: true,
   linearFeatureLoading: false,
   linearChoiceBlock: null as FirstRunFlaggedChoiceBlock | null,
   continueLabel: FIRST_RUN_COPY.tickets.analyze,

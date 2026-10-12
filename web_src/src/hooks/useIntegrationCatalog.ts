@@ -115,7 +115,7 @@ function useIntegrationSurveyActive() {
   const [isActive, setIsActive] = useState(false);
 
   useEffect(() => {
-    if (!isPostHogEnabled) {
+    if (!isPostHogEnabled()) {
       return;
     }
     posthog.getSurveys((surveys) => {

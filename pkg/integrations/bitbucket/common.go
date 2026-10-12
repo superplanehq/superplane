@@ -44,6 +44,29 @@ func ensureRepoInMetadata(http core.HTTPContext, ctx core.MetadataWriter, integr
 		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
+	if integrationMetadata.AuthType == AuthTypeRepositoryAccessToken {
+		if integrationMetadata.Repository != nil && !repositoryMetadataMatches(*integrationMetadata.Repository, repository) {
+			return nil, fmt.Errorf("repository %s is not accessible to workspace", repository)
+		}
+		repo, err := client.GetRepository(repository)
+		if err != nil {
+			return nil, fmt.Errorf("repository %s is not accessible to workspace", repository)
+		}
+		// ponytail: exact-match confinement; per-repo permission checks if Bitbucket adds scoped listing
+		if integrationMetadata.Repository != nil && !repositoryMatches(*repo, integrationMetadata.Repository.FullName) {
+			return nil, fmt.Errorf("repository %s is not accessible to workspace", repository)
+		}
+
+		repoMetadata := &RepositoryMetadata{
+			UUID:     repo.UUID,
+			Name:     repo.Name,
+			FullName: repo.FullName,
+			Slug:     repo.Slug,
+		}
+
+		return repoMetadata, ctx.Set(NodeMetadata{Repository: repoMetadata})
+	}
+
 	repositories, err := client.ListRepositories(integrationMetadata.Workspace.Slug)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list repositories: %w", err)
@@ -80,6 +103,12 @@ func requireRepositoryInWorkspace(integration core.IntegrationContext, repositor
 	var metadata Metadata
 	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
 		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+	if metadata.AuthType == AuthTypeRepositoryAccessToken {
+		if metadata.Repository == nil || !repositoryMetadataMatches(*metadata.Repository, repository) {
+			return fmt.Errorf("repository %s is not accessible to workspace", repository)
+		}
+		return nil
 	}
 	configured := ""
 	if metadata.Workspace != nil {

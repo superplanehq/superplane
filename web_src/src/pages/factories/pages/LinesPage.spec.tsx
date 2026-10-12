@@ -14,7 +14,6 @@ import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLan
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
@@ -456,7 +455,8 @@ describe("LinesPage board", () => {
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
     const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
     expect(cardScore).toHaveAttribute("data-tone", "ready");
-    expect(cardScore).toHaveTextContent("Clarity5/5Confidence5");
+    expect(cardScore).toHaveTextContent("Clarity5/5Confidence");
+    expect(within(card).getByTestId("work-order-card-score-wo-review-pay-842-confidence")).not.toHaveTextContent(/\d/);
     expect(cardScore).toHaveAttribute(
       "aria-label",
       "This task is ready to start. Clarity score 5 of 5. Confidence score 5 of 5",
@@ -1210,12 +1210,12 @@ describe("LinesPage board extras", () => {
     );
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-linear-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-linear-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
     await user.click(screen.getByTestId("add-intake-template-datadog"));
-    await user.click(screen.getByTestId("add-intake-template-linear-issues"));
 
     expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("productive-intake-setup")).not.toBeInTheDocument();
@@ -1244,7 +1244,6 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Linear setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_LINEAR_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1276,7 +1275,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-jira-issues")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-jira-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-linear-issues")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);

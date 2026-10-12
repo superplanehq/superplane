@@ -29,4 +29,7 @@ export function initPostHog(win: PostHogWindow = posthogWindow()): boolean {
 initPostHog();
 
 export { posthog };
-export const isPostHogEnabled = !!(window as PostHogWindow).SUPERPLANE_POSTHOG_KEY;
+
+export function isPostHogEnabled(win: PostHogWindow = posthogWindow()): boolean {
+  return !!win.SUPERPLANE_POSTHOG_KEY;
+}

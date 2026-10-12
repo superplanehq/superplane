@@ -15,7 +15,7 @@ export type FirstRunSphereProps = {
   testId?: string;
   /** 0..1 — sphere density and brightness. */
   level: number;
-  caption: string;
+  caption?: string;
   /** Amber-highlighted prefix rendered before the caption, e.g. "Repository:". */
   captionHighlight?: string;
   leftChip?: FirstRunSphereChip;

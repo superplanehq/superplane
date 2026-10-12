@@ -169,6 +169,7 @@ func Test__FactoryRuntimeCleaner__KeepsWorkspaceAndWipesRuntime(t *testing.T) {
 	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(
 		db,
 		factoryModel.ID,
+		models.ProviderGitHub,
 		time.Now().Add(-24*time.Hour),
 		time.Now().Add(time.Hour),
 		[]models.FactoryVelocityRepositoryMerge{merge},

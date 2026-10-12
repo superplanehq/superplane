@@ -872,3 +872,21 @@ func latestTurnMessage(t *testing.T, turns []map[string]any, turn float64) strin
 	require.True(t, found, "missing turn %v", turn)
 	return message
 }
+
+func TestFormatStreamJsonLinesReportsBilledCostWithoutNewTokens(t *testing.T) {
+	output := runClaudeFormatter(t, []string{
+		`{"type":"assistant","message":{"usage":{"input_tokens":100,"output_tokens":20},"content":[{"type":"text","text":"done"}]}}`,
+		`{"type":"result","usage":{"input_tokens":100,"output_tokens":20},"total_cost_usd":0.88,"num_turns":1}`,
+		`{"type":"result","usage":{"input_tokens":100,"output_tokens":20},"total_cost_usd":0.88,"num_turns":1}`,
+	})
+
+	turns := typedLiveLogRecords(t, output, "turn")
+	last := turns[len(turns)-1]
+	usage, ok := last["usage"].(map[string]any)
+	require.True(t, ok)
+	require.Contains(t, usage, "total_cost_usd")
+	assert.InDelta(t, 0.88, usage["total_cost_usd"], 1e-9)
+	assert.Equal(t, float64(100), usage["input_tokens"])
+	assert.Equal(t, float64(20), usage["output_tokens"])
+	require.Len(t, turns, 2, "the repeated result must not count cost twice")
+}

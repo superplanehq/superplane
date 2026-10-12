@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
 
@@ -96,8 +95,7 @@ func TestCatalogGitHubRequestsFollowOnboardingGuide(t *testing.T) {
 }
 
 func TestCatalogReconcileContinuesAfterInstallationFailure(t *testing.T) {
-	registry := support.Setup(t)
-	t.Cleanup(registry.Close)
+	require.NoError(t, database.TruncateTables())
 
 	appClient, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -145,8 +143,7 @@ func TestCatalogReconcileContinuesAfterInstallationFailure(t *testing.T) {
 }
 
 func TestCatalogReconcileInstallRequestsRemovesCancelledRequests(t *testing.T) {
-	registry := support.Setup(t)
-	t.Cleanup(registry.Close)
+	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
 	cancelledAccountID := int64(301)
 	require.NoError(t, models.ReplaceVCSProviderInstallRequests(db, models.ProviderGitHub, []models.VCSProviderInstallRequest{{
@@ -171,8 +168,7 @@ func TestCatalogReconcileInstallRequestsRemovesCancelledRequests(t *testing.T) {
 }
 
 func TestCatalogReconcileInstallRequestsSkipsApprovedRequests(t *testing.T) {
-	registry := support.Setup(t)
-	t.Cleanup(registry.Close)
+	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
 	approvedAccountID := int64(2)
 	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
@@ -199,8 +195,7 @@ func TestCatalogReconcileInstallRequestsSkipsApprovedRequests(t *testing.T) {
 }
 
 func TestCatalogReconcileSavesRequestsWhenInstallationsFail(t *testing.T) {
-	registry := support.Setup(t)
-	t.Cleanup(registry.Close)
+	require.NoError(t, database.TruncateTables())
 	client, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/app/installation-requests":
@@ -221,8 +216,7 @@ func TestCatalogReconcileSavesRequestsWhenInstallationsFail(t *testing.T) {
 }
 
 func TestCatalogRemoveMissingInstallationsPreservesNewerRecords(t *testing.T) {
-	registry := support.Setup(t)
-	t.Cleanup(registry.Close)
+	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
 	cutoff := time.Now()
 
@@ -251,8 +245,7 @@ func TestCatalogRemoveMissingInstallationsPreservesNewerRecords(t *testing.T) {
 }
 
 func TestCatalogHasInstallationRequestUsesStoredInstallationWithoutRemovingRequest(t *testing.T) {
-	registry := support.Setup(t)
-	t.Cleanup(registry.Close)
+	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
 	accountID := int64(301)
 	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
@@ -279,8 +272,7 @@ func TestCatalogHasInstallationRequestUsesStoredInstallationWithoutRemovingReque
 }
 
 func TestCatalogHasInstallationRequestLoadsMissingInstallation(t *testing.T) {
-	registry := support.Setup(t)
-	t.Cleanup(registry.Close)
+	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
 	accountID := int64(301)
 	require.NoError(t, models.ReplaceVCSProviderInstallRequests(db, models.ProviderGitHub, []models.VCSProviderInstallRequest{{
@@ -315,8 +307,7 @@ func TestCatalogVerifyInstallation(t *testing.T) {
 	}
 
 	t.Run("deletes an installation that GitHub no longer has", func(t *testing.T) {
-		registry := support.Setup(t)
-		t.Cleanup(registry.Close)
+		require.NoError(t, database.TruncateTables())
 		saveInstallation(t)
 		client, _ := guideClient(t, removedInstallation)
 
@@ -328,8 +319,7 @@ func TestCatalogVerifyInstallation(t *testing.T) {
 	})
 
 	t.Run("keeps an installation that GitHub still has", func(t *testing.T) {
-		registry := support.Setup(t)
-		t.Cleanup(registry.Close)
+		require.NoError(t, database.TruncateTables())
 		saveInstallation(t)
 		client, _ := guideClient(t, func(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(`{"id":101,"account":{"id":301,"login":"acme"}}`))
@@ -343,8 +333,7 @@ func TestCatalogVerifyInstallation(t *testing.T) {
 	})
 
 	t.Run("an installation job deletes an installation that GitHub no longer has", func(t *testing.T) {
-		registry := support.Setup(t)
-		t.Cleanup(registry.Close)
+		require.NoError(t, database.TruncateTables())
 		saveInstallation(t)
 		client, _ := guideClient(t, removedInstallation)
 

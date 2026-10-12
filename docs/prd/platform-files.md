@@ -28,8 +28,9 @@ path.
    bytes.
 5. **Upload through SuperPlane.** The client sends an authenticated streaming
    `PUT /api/v1/files/{id}/content`. Do not add a client-to-GCS signed PUT.
-6. **Download with a time-limited GET.** GCS uses a V4 signed URL. The
-   filesystem provider uses an HMAC public GET. The bucket stays private.
+6. **Download with a time-limited GET.** GCS uses a V4 signed URL. S3 uses a
+   presigned GET. Azure Blob uses a user-delegation SAS. The filesystem
+   provider uses an HMAC public GET. The bucket stays private.
 7. **List, quota, and auth use Postgres.** Do not use GCS `List` as a
    directory API.
 
@@ -74,10 +75,12 @@ Interface: `Put`, `Get`, `GetRange`, `Head`, `Delete`, `SignedGetURL` in
 | --- | --- | --- |
 | `filesystem` | Dev, tests, self-host | `BLOB_STORAGE_LOCAL_PATH` |
 | `gcs` | Hosted SuperPlane | `BLOB_STORAGE_BUCKET` |
+| `s3` | AWS self-host | `BLOB_STORAGE_BUCKET`, `BLOB_STORAGE_REGION` |
+| `azure` | Azure self-host | `BLOB_STORAGE_ACCOUNT`, `BLOB_STORAGE_BUCKET` |
 
 Also set `BLOB_STORAGE_PROVIDER`. Hosted GCS uses Workload Identity or
-`BLOB_STORAGE_CREDENTIALS_FILE`. Do not use customer GCP integration
-credentials.
+`BLOB_STORAGE_CREDENTIALS_FILE`. Azure uses `DefaultAzureCredential`
+(AKS workload identity). Do not use customer cloud-integration credentials.
 
 HMAC public URLs use `BLOB_STORAGE_SIGNING_KEY` (fallback `ENCRYPTION_KEY`,
 then `JWT_SECRET`) and `BASE_URL`. See `.env.example`.

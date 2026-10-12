@@ -77,6 +77,16 @@ func TestAssetHandlerNoIndexHeader(t *testing.T) {
 			wantCache:  "public, max-age=3600",
 		},
 		{
+			name:       "service worker is the worker file, not the app page",
+			appEnv:     "production",
+			path:       "/sw.js",
+			wantStatus: http.StatusOK,
+			wantHeader: "",
+			wantBody:   "self.addEventListener",
+			wantType:   "javascript",
+			wantCache:  "no-cache",
+		},
+		{
 			name:       "pwa icon under assets is the image, not the app page",
 			appEnv:     "production",
 			path:       "/assets/pwa/icon-192.png",
@@ -97,6 +107,7 @@ func TestAssetHandlerNoIndexHeader(t *testing.T) {
 				"assets/main.js":                 &fstest.MapFile{Data: []byte("console.log('ok')")},
 				"assets/onboarding/three.min.js": &fstest.MapFile{Data: []byte("window.THREE = {}")},
 				"manifest.webmanifest":           &fstest.MapFile{Data: []byte(`{"name":"SuperPlane","display":"standalone"}`)},
+				"sw.js":                          &fstest.MapFile{Data: []byte("self.addEventListener")},
 				"assets/pwa/icon-192.png":        &fstest.MapFile{Data: []byte("png-bytes")},
 			}), "")
 

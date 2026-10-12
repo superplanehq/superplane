@@ -92,9 +92,15 @@ export function RunOverlayFrame({
   useDismissOnEscape(onDismiss);
 
   return (
-    <div className={overlayLayerClassName(fixed, fullPage)} onClick={onDismiss}>
+    <div className={cn(overlayLayerClassName(fixed, fullPage), fixed && canvas && "max-md:p-0")} onClick={onDismiss}>
       <div
-        className={cn(overlayDialogClassName(wide, canvas, fullPage), className)}
+        className={cn(
+          overlayDialogClassName(wide, canvas, fullPage),
+          fixed &&
+            canvas &&
+            "max-md:h-dvh max-md:max-h-none max-md:w-full max-md:rounded-none max-md:border-0 max-md:pt-[env(safe-area-inset-top)] max-md:pb-[env(safe-area-inset-bottom)]",
+          className,
+        )}
         data-testid={testId}
         role="dialog"
         aria-modal="true"

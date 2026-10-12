@@ -10,7 +10,7 @@ import { useWorkOrderCardActions } from "@/hooks/useWorkOrderCardActions";
 import { cn } from "@/lib/utils";
 import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { MarkdownContent } from "@/pages/app/Markdown";
-import { ArrowLeft, ChevronDown, ExternalLink } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
@@ -19,19 +19,17 @@ import { factoryHomePath, firstFactoryLineId, workOrderBoardLineIdFromSearch } f
 import { boardLineIdFromNavigationState, displayedBoardLineId } from "../lib/workOrderNumberResolution";
 import { getWorkOrderDisplayStatus, getWorkOrderDisplayStatusMeta } from "../lib/workOrderProgress";
 import { formatWorkOrderIdentifier } from "../lib/workspaceKey";
-import { PhaseGlyph } from "../pages/linePhaseGlyph";
-import type { PhaseGlyphKind } from "../lib/linePhaseRuns";
-import { OutputList, OwnerTimeCostRow } from "../pages/work-order-popup-redesign/popupShared";
-import { SplitRunCheckPills, SplitRunReview } from "../pages/work-order-split-run/SplitRunReview";
+import { OwnerTimeCostRow } from "../pages/work-order-popup-redesign/popupShared";
+import { SPLIT_RUN_ANALYZING_NOTE } from "../pages/work-order-split-run/splitRunFooter";
+import { ANALYSIS_PLANNING_COPY } from "../pages/work-order-split-run/useAnalysisPlanningSession";
+import type { IntentAnalysisChat } from "../pages/work-order-split-run/intentAnalysisChat";
+import { WorkOrderSplitRunOverview } from "../pages/work-order-split-run/WorkOrderSplitRunOverview";
 import { DRAFT_START_MODEL_AUTO } from "../pages/work-order-split-run/draftStartModel";
 import { factoryPlanningEnabled } from "../pages/planningSettingsModel";
 import {
   columnAppsFromFactoryApps,
   splitRunFixtureForWorkOrder,
-  splitRunStatusLabel,
   type SplitRunFixture,
-  type SplitRunPhase,
-  type SplitRunPhaseStatus,
 } from "../pages/work-order-split-run/splitRunMocks";
 import { useSplitRunFooterActions } from "../pages/work-order-split-run/useSplitRunFooterActions";
 import { useSplitRunFooterCloser } from "../pages/work-order-split-run/useSplitRunFooterCloser";
@@ -41,15 +39,8 @@ import { useColumnAppCheckRuns } from "../pages/work-order-split-run/useColumnAp
 import { useWorkOrderPRFeedbackLog } from "../pages/useWorkOrderPRFeedbackRunHref";
 import { MOBILE_TASK_COPY } from "./mobileCopy";
 import { MobileDraftStartModelSelect } from "./MobileDraftStartModelSelect";
-
-const PHASE_GLYPH: Record<SplitRunPhaseStatus, PhaseGlyphKind> = {
-  passed: "passed",
-  running: "running",
-  pending: "pending",
-  waiting: "waiting",
-  failed: "failed",
-  cancelled: "cancelled",
-};
+import { MobileTaskSections, PhoneTaskReview, Section } from "./MobileTaskSections";
+import { useMobileRefineChat } from "./useMobileRefineChat";
 
 function taskBackLineId(
   search: string,
@@ -122,6 +113,7 @@ export function MobileTaskDetailPage() {
 type MobileTaskModel = {
   fixture: SplitRunFixture;
   artifacts: FactoriesWorkOrderArtifact[];
+  artifactsLoading: boolean;
   pullRequests: FactoriesFactoryPullRequest[];
   canUpdate: boolean;
   lineName?: string;
@@ -133,6 +125,7 @@ type MobileTaskModel = {
   startBusy: boolean;
   actionBusy: boolean;
   columnAppRunQueries: ReturnType<typeof useColumnAppCheckRuns>["queries"];
+  footerActions: ReturnType<typeof useSplitRunFooterActions>;
   ownerEdits: Pick<
     ReturnType<typeof useSplitRunWorkOrderEdits>,
     "owner" | "assigneeIds" | "canEdit" | "ownerBusy" | "saveOwner"
@@ -151,7 +144,11 @@ function useMobileTaskModel(
   const { canAct } = usePermissions();
   const canUpdate = canAct("work_orders", "update");
   const lineName = rawLineName?.trim() || undefined;
-  const { data: artifacts = [] } = useWorkOrderArtifacts(organizationId, factoryId, orderId);
+  const { data: artifacts = [], isLoading: artifactsLoading } = useWorkOrderArtifacts(
+    organizationId,
+    factoryId,
+    orderId,
+  );
   const { data: handlers = [] } = useFactoryPRFeedbackHandlers(organizationId, factoryId);
   const { data: apps = [] } = useFactoryAutomations(organizationId, factoryId);
   const pullRequests = order.pullRequests ?? [];
@@ -198,6 +195,7 @@ function useMobileTaskModel(
   return {
     fixture,
     artifacts,
+    artifactsLoading,
     pullRequests,
     canUpdate,
     lineName,
@@ -209,6 +207,7 @@ function useMobileTaskModel(
     startBusy: cardActions.dispatchingOrderIds.has(orderId),
     actionBusy: footerActions.busy,
     columnAppRunQueries: columnAppCheckRuns.queries,
+    footerActions,
     ownerEdits,
   };
 }
@@ -228,25 +227,62 @@ function LoadedMobileTask({
   onBack: () => void;
   backDisabled?: boolean;
 }) {
-  const { organizationId, factoryId, routeSegment } = useFactoriesLayout();
-  const startLineKey = lineId || lineName || "";
-  const [draftLineKey, setDraftLineKey] = useState(startLineKey);
-  const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
-  const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
-  if (draftLineKey !== startLineKey) {
-    setDraftLineKey(startLineKey);
-    setDraftModel(DRAFT_START_MODEL_AUTO);
-  }
+  const { organizationId, factoryId, routeSegment, factory } = useFactoriesLayout();
   const model = useMobileTaskModel(order, orderId, lineId, lineName, onBack);
   const { fixture, artifacts, pullRequests } = model;
-  const activity = fixture.phases.filter((phase) => !phase.historyRun);
-  const onStart = draftStartAction(
-    fixture.footer.kind,
-    model.dispatchDraft,
-    draftModel,
-    model.planningEnabled ? draftThinking : undefined,
+  const draftStart = useMobileDraftStart(model, lineId || lineName || "");
+  const refine = useMobileRefineChat({
+    organizationId,
+    factoryId,
+    factoryKey: routeSegment,
+    factory,
+    orderId,
+    fixture,
+    artifacts,
+    canUpdate: model.canUpdate,
+    modelSelect: draftStart.modelSelect,
+  });
+  const review = (withModelSelect: boolean) => (
+    <PhoneTaskReview
+      model={model}
+      draftStart={draftStart}
+      scope={{ organizationId, factoryId, factoryKey: routeSegment, orderId, orderNumber: order.number }}
+      withModelSelect={withModelSelect}
+    />
   );
-  const showModelSelect = showsPhoneDraftModelSelect(model.planningEnabled, fixture.footer);
+  const canStopRun = Boolean(model.canUpdate && organizationId && factoryId && orderId);
+  const onStopRun = (run: { appId: string; runId: string }) => void model.footerActions.handleStopAutomation(run);
+  const onRerunStep = (phase: { stepIndex?: number | null }) =>
+    void model.footerActions.handleStop("rerun-step", {
+      kind: "failed",
+      lineName: fixture.lineName,
+      stepIndex: phase.stepIndex ?? undefined,
+    });
+  if (refine.chat) {
+    return (
+      <MobileTaskFrame onBack={onBack} backDisabled={backDisabled} scroll={false}>
+        {model.columnAppRunQueries}
+        <MobileRefineBody
+          order={order}
+          orderId={orderId}
+          model={model}
+          chat={refine.chat}
+          loadFailed={refine.loadFailed}
+          review={review(false)}
+          summary={
+            <div className="mb-5" data-testid="mobile-task-detail">
+              <MobileTaskHeader
+                order={order}
+                fixture={fixture}
+                organizationId={organizationId}
+                ownerEdits={model.ownerEdits}
+              />
+            </div>
+          }
+        />
+      </MobileTaskFrame>
+    );
+  }
 
   return (
     <MobileTaskFrame onBack={onBack} backDisabled={backDisabled}>
@@ -258,42 +294,12 @@ function LoadedMobileTask({
           organizationId={organizationId}
           ownerEdits={model.ownerEdits}
         />
-
-        <SplitRunReview
-          footer={fixture.footer}
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={routeSegment}
-          orderId={orderId}
-          orderNumber={order.number}
-          pullRequests={pullRequests}
-          canAct={model.canUpdate}
-          onStart={onStart}
-          modelSelect={
-            showModelSelect ? (
-              <MobileDraftStartModelSelect
-                organizationId={organizationId}
-                factoryId={factoryId}
-                lineName={model.lineName}
-                model={draftModel}
-                thinkingLevel={draftThinking}
-                disabled={!model.canUpdate || model.startBusy}
-                onChange={({ model: nextModel, thinkingLevel }) => {
-                  setDraftModel(nextModel);
-                  setDraftThinking(thinkingLevel);
-                }}
-              />
-            ) : undefined
-          }
-          onArchive={model.onArchive}
-          onReject={model.onReject}
-          onStop={model.onStop}
-          startBusy={model.startBusy}
-          actionBusy={model.actionBusy}
-          startDisabled={!model.canUpdate || !model.lineName}
-          compact="stacked"
-        />
-
+        {refine.sessionMissing ? (
+          <p className="text-[13px] text-muted-foreground" role="status">
+            {MOBILE_TASK_COPY.noRefinementSession}
+          </p>
+        ) : null}
+        {review(true)}
         <Section title={MOBILE_TASK_COPY.description}>
           {fixture.descriptionText?.trim() ? (
             <MarkdownContent content={fixture.descriptionText} variant="workspace" organizationId={organizationId} />
@@ -301,34 +307,114 @@ function LoadedMobileTask({
             <p className="text-[13px] text-muted-foreground">{MOBILE_TASK_COPY.noDescription}</p>
           )}
         </Section>
-
-        <Section title={MOBILE_TASK_COPY.activity}>
-          {activity.length === 0 ? (
-            <p className="text-[13px] text-muted-foreground">{MOBILE_TASK_COPY.noActivity}</p>
-          ) : (
-            <ol className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card">
-              {activity.map((phase) => (
-                <li key={phase.id}>
-                  <ActivityRow phase={phase} expandedByDefault={phase.id === fixture.currentPhaseId} />
-                </li>
-              ))}
-            </ol>
-          )}
-        </Section>
-
-        {pullRequests.length > 0 ? (
-          <Section title={MOBILE_TASK_COPY.pullRequests}>
-            <PullRequestList pullRequests={pullRequests} />
-          </Section>
-        ) : null}
-
-        {artifacts.length > 0 ? (
-          <Section title={MOBILE_TASK_COPY.files}>
-            <FileList artifacts={artifacts} />
-          </Section>
-        ) : null}
+        <MobileTaskSections
+          order={order}
+          orderId={orderId}
+          fixture={fixture}
+          artifacts={artifacts}
+          pullRequests={pullRequests}
+          factoryKey={routeSegment}
+          orderNumber={order.number ? String(order.number) : undefined}
+          canStopRun={canStopRun}
+          actionBusy={model.actionBusy}
+          onStopRun={onStopRun}
+          onRerunStep={onRerunStep}
+        />
       </article>
     </MobileTaskFrame>
+  );
+}
+
+/**
+ * Start choice for a draft. The model resets when the start line changes so
+ * Start never sends a model from another line.
+ */
+function useMobileDraftStart(model: MobileTaskModel, startLineKey: string) {
+  const { organizationId, factoryId } = useFactoriesLayout();
+  const [draftLineKey, setDraftLineKey] = useState(startLineKey);
+  const [draftModel, setDraftModel] = useState(DRAFT_START_MODEL_AUTO);
+  const [draftThinking, setDraftThinking] = useState(THINKING_LEVEL_MEDIUM);
+  if (draftLineKey !== startLineKey) {
+    setDraftLineKey(startLineKey);
+    setDraftModel(DRAFT_START_MODEL_AUTO);
+  }
+  const { fixture } = model;
+  const onStart = draftStartAction(
+    fixture.footer.kind,
+    model.dispatchDraft,
+    draftModel,
+    model.planningEnabled ? draftThinking : undefined,
+  );
+  const modelSelect = showsPhoneDraftModelSelect(model.planningEnabled, fixture.footer) ? (
+    <MobileDraftStartModelSelect
+      organizationId={organizationId}
+      factoryId={factoryId}
+      lineName={model.lineName}
+      model={draftModel}
+      thinkingLevel={draftThinking}
+      disabled={!model.canUpdate || model.startBusy}
+      onChange={({ model: nextModel, thinkingLevel }) => {
+        setDraftModel(nextModel);
+        setDraftThinking(thinkingLevel);
+      }}
+    />
+  ) : undefined;
+  return { onStart, modelSelect };
+}
+
+/**
+ * Refine chat for a Planning draft. The task header scrolls above the
+ * request in the chat log. Like the desktop popup, the chat shows the
+ * agent's live work, not the automation phase list or its log. The
+ * composer, the question form, and Start stay at the bottom of the frame,
+ * above the bottom bar.
+ */
+function MobileRefineBody({
+  order,
+  orderId,
+  model,
+  chat,
+  loadFailed,
+  review,
+  summary,
+}: {
+  order: FactoriesWorkOrder;
+  orderId: string;
+  model: MobileTaskModel;
+  chat: IntentAnalysisChat;
+  loadFailed: boolean;
+  review: ReactNode;
+  summary: ReactNode;
+}) {
+  const { organizationId, factoryId, routeSegment } = useFactoriesLayout();
+  const { fixture } = model;
+  return (
+    <>
+      {loadFailed ? (
+        <p className="shrink-0 px-4 pt-3 text-[13px] text-destructive" role="alert">
+          {ANALYSIS_PLANNING_COPY.failedLoadRefinement}
+        </p>
+      ) : null}
+      <WorkOrderSplitRunOverview
+        title={fixture.title}
+        description={fixture.descriptionText ?? ""}
+        artifacts={model.artifacts}
+        artifactsLoading={model.artifactsLoading}
+        pullRequests={model.pullRequests}
+        checks={fixture.checks}
+        isAnalyzing={fixture.footer.note?.headline === SPLIT_RUN_ANALYZING_NOTE.headline}
+        organizationId={organizationId}
+        factoryId={factoryId}
+        factoryKey={routeSegment}
+        orderId={orderId}
+        orderNumber={order.number}
+        files={order.files}
+        expandFirstCheck
+        resultFooter={review}
+        analysis={{ ...chat, leading: summary }}
+        source={fixture.source}
+      />
+    </>
   );
 }
 
@@ -390,13 +476,20 @@ function MobileTaskHeader({
   );
 }
 
+/**
+ * Back row and task body above the bottom bar. With `scroll` off the body
+ * is a fixed-height column: the refine chat scrolls its own log and keeps
+ * the composer at the bottom, also when the keyboard shrinks the shell.
+ */
 function MobileTaskFrame({
   onBack,
   backDisabled = false,
+  scroll = true,
   children,
 }: {
   onBack: () => void;
   backDisabled?: boolean;
+  scroll?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -415,121 +508,15 @@ function MobileTaskFrame({
           {MOBILE_TASK_COPY.back}
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="workspace-section-title">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-/** One automation on the line. Tap to see its steps. */
-function ActivityRow({ phase, expandedByDefault }: { phase: SplitRunPhase; expandedByDefault: boolean }) {
-  const [expanded, setExpanded] = useState(expandedByDefault);
-  const steps = phase.stream.filter((line) => !line.note);
-  const canExpand = steps.length > 0;
-
-  return (
-    <div className="flex flex-col" data-testid={`mobile-task-phase-${phase.id}`}>
-      <button
-        type="button"
-        onClick={() => canExpand && setExpanded((current) => !current)}
-        aria-expanded={canExpand ? expanded : undefined}
-        aria-label={canExpand ? (expanded ? MOBILE_TASK_COPY.hideSteps : MOBILE_TASK_COPY.showSteps) : undefined}
-        className="flex w-full items-start gap-3 px-3 py-2.5 text-left"
+      <div
+        className={cn(
+          "min-h-0 flex-1 pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]",
+          scroll ? "overflow-y-auto" : "flex flex-col overflow-hidden",
+        )}
+        data-testid="mobile-task-body"
       >
-        <PhaseGlyph kind={PHASE_GLYPH[phase.status]} className="mt-1" />
-        <span className="min-w-0 flex-1">
-          <span className="block text-[14px] font-medium text-foreground break-words">{phase.name}</span>
-          <span className="block text-[12px] text-muted-foreground">
-            {splitRunStatusLabel(phase.status)}
-            {phase.componentName ? ` · ${phase.componentName}` : ""}
-            {phase.duration ? ` · ${phase.duration}` : ""}
-          </span>
-          {phase.checks && phase.checks.length > 0 ? (
-            <span className="mt-1.5 block">
-              <SplitRunCheckPills checks={phase.checks} testId={`mobile-task-phase-checks-${phase.id}`} />
-            </span>
-          ) : null}
-        </span>
-        {canExpand ? (
-          <ChevronDown
-            className={cn("mt-1 size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")}
-            aria-hidden
-          />
-        ) : null}
-      </button>
-      {expanded && canExpand ? (
-        <ol className="flex flex-col gap-2 border-t border-border bg-muted/30 px-3 py-2.5">
-          {steps.map((line) => (
-            <li key={line.id} className="flex items-start gap-2 text-[13px]">
-              <PhaseGlyph kind={PHASE_GLYPH[line.status]} className="mt-0.5 size-3" />
-              <span className="min-w-0 flex-1 break-words">
-                <span className="text-foreground">{line.componentName}</span>
-                {line.detail ? <span className="block text-[12px] text-muted-foreground">{line.detail}</span> : null}
-              </span>
-              {line.duration ? (
-                <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">{line.duration}</span>
-              ) : null}
-            </li>
-          ))}
-        </ol>
-      ) : null}
-    </div>
-  );
-}
-
-function PullRequestList({ pullRequests }: { pullRequests: FactoriesFactoryPullRequest[] }) {
-  return (
-    <ul className="flex flex-col gap-2">
-      {pullRequests.map((pullRequest) => (
-        <li key={pullRequest.id ?? pullRequest.url}>
-          <a
-            href={pullRequest.url}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-start gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-[13px] text-foreground"
-          >
-            <span className="min-w-0 flex-1 break-words">
-              <span className="block font-medium">
-                {pullRequest.title || `Pull request #${pullRequest.number ?? ""}`}
-              </span>
-              <span className="block text-[12px] text-muted-foreground">
-                {[
-                  pullRequest.repository,
-                  pullRequest.number ? `#${pullRequest.number}` : null,
-                  pullRequestStateLabel(pullRequest),
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </span>
-            </span>
-            <ExternalLink className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          </a>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function pullRequestStateLabel(pullRequest: FactoriesFactoryPullRequest): string | null {
-  if (pullRequest.state === "STATE_MERGED") return "Merged";
-  if (pullRequest.state === "STATE_CLOSED") return "Closed";
-  if (pullRequest.state === "STATE_DRAFT") return "Draft";
-  if (pullRequest.state === "STATE_OPEN") return "Open";
-  return null;
-}
-
-function FileList({ artifacts }: { artifacts: FactoriesWorkOrderArtifact[] }) {
-  return (
-    <div className="rounded-lg border border-border bg-card px-3">
-      <OutputList artifacts={artifacts} />
+        {children}
+      </div>
     </div>
   );
 }

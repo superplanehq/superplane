@@ -10,7 +10,6 @@ export const LINEAR_INTAKE_SETUP_COPY = {
   importExistingHelper: "SuperPlane adds the 10 newest open issues from these projects.",
   importExistingHelperOff: "SuperPlane does not import existing issues.",
   wizardConnect: "Connect Linear",
-  wizardOwnApp: "Use your own Linear app",
   wizardConnecting: "Connecting...",
   wizardConnectError: "SuperPlane could not open Linear authorization.",
   wizardContinue: "Continue",

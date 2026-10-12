@@ -6,11 +6,7 @@ import linearIcon from "@/assets/icons/integrations/linear.svg";
 import notionIcon from "@/assets/icons/integrations/notion.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
-import {
-  FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_LINEAR_INTAKE,
-  FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORY_DATADOG_INTAKE, FEATURE_FACTORY_PRODUCTIVE_INTAKE } from "@/lib/experimentalFeatures";
 
 export interface AddIntakeTemplate {
   id: string;
@@ -79,7 +75,6 @@ export const ADD_INTAKE_TEMPLATES: AddIntakeTemplate[] = [
     name: "Linear issues",
     description: "Create a task when a Linear issue is added to a selected project.",
     iconSrc: linearIcon,
-    featureId: FEATURE_FACTORY_LINEAR_INTAKE,
   },
   {
     id: "notion",

@@ -15,9 +15,10 @@ type CreatePullRequestComment struct {
 }
 
 type CreatePullRequestCommentConfiguration struct {
-	Repository string `mapstructure:"repository" json:"repository"`
-	PullNumber string `mapstructure:"pullNumber" json:"pullNumber"`
-	Body       string `mapstructure:"body" json:"body"`
+	Repository      string `mapstructure:"repository" json:"repository"`
+	PullNumber      string `mapstructure:"pullNumber" json:"pullNumber"`
+	Body            string `mapstructure:"body" json:"body"`
+	ParentCommentID string `mapstructure:"parentCommentId" json:"parentCommentId"`
 }
 
 func (c *CreatePullRequestComment) Name() string {
@@ -40,6 +41,7 @@ func (c *CreatePullRequestComment) Documentation() string {
 - **Repository**: The Bitbucket repository, in workspace/repository format
 - **Pull Request ID**: The pull request number. Supports expressions.
 - **Body**: The comment text. Supports Markdown and expressions.
+- **Parent Comment ID**: Optional. Reply inside the thread of another comment. Supports expressions.
 
 ## Output
 
@@ -70,6 +72,13 @@ func (c *CreatePullRequestComment) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeText,
 			Required:    true,
 			Description: "The comment text. Supports Markdown and expressions.",
+		},
+		{
+			Name:        "parentCommentId",
+			Label:       "Parent Comment ID",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Reply inside the thread of another comment. Supports expressions.",
 		},
 	}
 }
@@ -105,7 +114,7 @@ func (c *CreatePullRequestComment) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize Bitbucket client: %w", err)
 	}
 
-	comment, err := client.CreatePullRequestComment(config.Repository, id, config.Body)
+	comment, err := client.CreatePullRequestCommentWithParent(config.Repository, id, config.Body, config.ParentCommentID)
 	if err != nil {
 		return fmt.Errorf("failed to create pull request comment: %w", err)
 	}
