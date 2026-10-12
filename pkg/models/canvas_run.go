@@ -1,6 +1,7 @@
 package models
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -914,13 +915,53 @@ func (r *CanvasRun) RequestCancellation(tx *gorm.DB, cancelledBy *uuid.UUID) (*R
 }
 
 func (r *CanvasRun) requestTermination(tx *gorm.DB, stoppedBy *uuid.UUID, requestedResult string) (*RunCancellationResult, error) {
-	result, err := r.requestRunTermination(tx, stoppedBy, requestedResult)
+	descendants, err := listDescendantRuns(tx, r.ID)
 	if err != nil {
 		return nil, err
 	}
 
+	runs := make([]*CanvasRun, 0, 1+len(descendants))
+	runs = append(runs, r)
+	for i := range descendants {
+		runs = append(runs, &descendants[i])
+	}
+	slices.SortFunc(runs, func(a, b *CanvasRun) int {
+		return bytes.Compare(a.ID[:], b.ID[:])
+	})
+
+	var result *RunCancellationResult
+	children := make([]*RunCancellationResult, 0, len(descendants))
+	for _, run := range runs {
+		requested := ""
+		if run.ID == r.ID {
+			requested = requestedResult
+		}
+		terminated, err := run.requestRunTermination(tx, stoppedBy, requested)
+		if err != nil {
+			return nil, err
+		}
+		if run.ID == r.ID {
+			result = terminated
+			continue
+		}
+		if terminated.Drain == nil {
+			continue
+		}
+		children = append(children, terminated)
+	}
+	if len(children) == 0 {
+		return result, nil
+	}
+	if result.Drain == nil {
+		result.Drain = &RunCancellationDrainResult{}
+	}
+	result.Drain.ChildRuns = append(result.Drain.ChildRuns, children...)
+	return result, nil
+}
+
+func listDescendantRuns(tx *gorm.DB, runID uuid.UUID) ([]CanvasRun, error) {
 	var descendants []CanvasRun
-	err = tx.Raw(`
+	err := tx.Raw(`
 		WITH RECURSIVE descendants AS (
 			SELECT id FROM workflow_runs WHERE parent_run_id = ?
 			UNION
@@ -928,24 +969,8 @@ func (r *CanvasRun) requestTermination(tx *gorm.DB, stoppedBy *uuid.UUID, reques
 		)
 		SELECT r.* FROM workflow_runs r JOIN descendants d ON r.id = d.id
 		WHERE r.id <> ? ORDER BY r.id
-	`, r.ID, r.ID).Scan(&descendants).Error
-	if err != nil {
-		return nil, err
-	}
-	for i := range descendants {
-		child, err := descendants[i].requestRunTermination(tx, stoppedBy, "")
-		if err != nil {
-			return nil, err
-		}
-		if child.Drain == nil {
-			continue
-		}
-		if result.Drain == nil {
-			result.Drain = &RunCancellationDrainResult{}
-		}
-		result.Drain.ChildRuns = append(result.Drain.ChildRuns, child)
-	}
-	return result, nil
+	`, runID, runID).Scan(&descendants).Error
+	return descendants, err
 }
 
 func (r *CanvasRun) requestRunTermination(tx *gorm.DB, stoppedBy *uuid.UUID, requestedResult string) (*RunCancellationResult, error) {

@@ -47,6 +47,18 @@ func (n *RunCancellationNotifier) Record(workflowID, runID uuid.UUID, drainResul
 	n.record(workflowID, runID, drainResult)
 }
 
+func (n *RunCancellationNotifier) RecordRuns(results []*models.RunCancellationResult) {
+	if n == nil {
+		return
+	}
+	for _, result := range results {
+		if result == nil || result.Run == nil || result.Drain == nil {
+			continue
+		}
+		n.record(result.Run.WorkflowID, result.Run.ID, result.Drain)
+	}
+}
+
 func (n *RunCancellationNotifier) record(workflowID, runID uuid.UUID, drainResult *models.RunCancellationDrainResult) {
 	n.Outcomes = append(n.Outcomes, RunCancellationOutcome{
 		WorkflowID:  workflowID,

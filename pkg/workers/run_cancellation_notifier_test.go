@@ -55,6 +55,28 @@ func TestRunCancellationNotifier_BindCollectsCancelledChildRuns(t *testing.T) {
 	require.NotNil(t, notifier.Outcomes[0].DrainResult)
 }
 
+func TestRunCancellationNotifier_RecordRunsKeepsDrainsForPublish(t *testing.T) {
+	runID := uuid.New()
+	workflowID := uuid.New()
+	notifier := &RunCancellationNotifier{}
+	notifier.RecordRuns([]*models.RunCancellationResult{
+		nil,
+		{Run: &models.CanvasRun{ID: uuid.New(), WorkflowID: workflowID}},
+		{
+			Run:   &models.CanvasRun{ID: runID, WorkflowID: workflowID},
+			Drain: &models.RunCancellationDrainResult{},
+		},
+	})
+
+	require.Len(t, notifier.Outcomes, 1)
+	assert.Equal(t, workflowID, notifier.Outcomes[0].WorkflowID)
+	assert.Equal(t, runID, notifier.Outcomes[0].RunID)
+	require.NotNil(t, notifier.Outcomes[0].DrainResult)
+
+	var nilNotifier *RunCancellationNotifier
+	require.NotPanics(t, func() { nilNotifier.RecordRuns(nil) })
+}
+
 func TestRunCancellationNotifier_PublishNilIsNoOp(t *testing.T) {
 	var notifier *RunCancellationNotifier
 	require.NotPanics(t, notifier.Publish)

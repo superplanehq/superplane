@@ -47,6 +47,7 @@ type FactoryContext struct {
 	// owners/creators. The node executor collects these and publishes
 	// them after the surrounding transaction commits.
 	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
+	onRunsCancelled         func([]*models.RunCancellationResult)
 	onFileBindCleanup       func(FileBindCleanup)
 
 	encryptor crypto.Encryptor
@@ -99,6 +100,11 @@ func (c *FactoryContext) WithWorkOrderNotification(
 	callback func(messages.FactoryWorkOrderNotificationMessage),
 ) *FactoryContext {
 	c.onWorkOrderNotification = callback
+	return c
+}
+
+func (c *FactoryContext) WithRunsCancelled(callback func([]*models.RunCancellationResult)) *FactoryContext {
+	c.onRunsCancelled = callback
 	return c
 }
 
@@ -590,12 +596,13 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 
 	fromState := order.State
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
-		ToState:    params.State,
-		Result:     params.Result,
-		Automation: c.automationRef(),
-		Run:        c.runRef(),
-		App:        c.appRef(),
-		SkipSame:   true,
+		ToState:         params.State,
+		Result:          params.Result,
+		Automation:      c.automationRef(),
+		Run:             c.runRef(),
+		App:             c.appRef(),
+		SkipSame:        true,
+		OnRunsCancelled: c.onRunsCancelled,
 	})
 	if err != nil {
 		return nil, false, err
