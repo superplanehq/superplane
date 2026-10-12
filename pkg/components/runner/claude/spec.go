@@ -133,6 +133,7 @@ func buildClaudeCodeBrokerTask(spec RunClaudeCodeSpec, usage string, setups []ru
 		runner.LLMUsageTaskFile(),
 		runner.TurnTelemetryTaskFile(),
 		runner.ActivityStreamTaskFile(),
+		runner.ConfirmPromptTaskFile(),
 		{Path: "run.js", Content: runScript, Mode: "0644"},
 		{Path: "prepare.sh", Content: claudePrepareScript(workdir), Mode: "0644"},
 	}
