@@ -28,12 +28,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/blob"
 	"github.com/superplanehq/superplane/pkg/blob/filesystem"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/pkg/storedfiles"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/gorm"
 )
@@ -1253,6 +1255,7 @@ func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
 		},
 		Spec: "# Retry refunds\n\nStop double charges.\n",
 	}))
+	workOrderUpdates := startWorkOrderUpdatesConsumer(t)
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
 
@@ -1268,6 +1271,9 @@ func TestBeginPlanningWaitAndNotify_AutoStartsReadyOrder(t *testing.T) {
 	updatedSession, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.PlanningSessionStateEnded, updatedSession.State)
+	assert.Equal(t, models.PlanningWaitIdle, updatedSession.WaitState)
+	assert.True(t, workOrderUpdates.HasReceivedMessage())
+	assert.False(t, workOrderUpdates.HasReceivedMessage(), "auto-start must not publish a transient waiting state")
 
 	err = beginPlanningWaitAndNotify(db, session)
 	require.Error(t, err)
@@ -1319,8 +1325,11 @@ func TestBeginPlanningWaitAndNotify_FailedAutoStartDoesNotRetry(t *testing.T) {
 		},
 		Spec: "# Retry refunds\n\nStop double charges.\n",
 	}))
+	workOrderUpdates := startWorkOrderUpdatesConsumer(t)
 
 	require.NoError(t, beginPlanningWaitAndNotify(db, session))
+	assert.True(t, workOrderUpdates.HasReceivedMessage(), "a failed auto-start must publish the waiting state")
+	assert.False(t, workOrderUpdates.HasReceivedMessage())
 
 	reloaded, err := models.FindUnscopedWorkOrder(db, order.ID)
 	require.NoError(t, err)
@@ -1360,6 +1369,16 @@ func mustEnableAutoStart(t *testing.T, db *gorm.DB, factoryModel *models.Factory
 	planning := factoryModel.Planning()
 	planning.AutoStartLineID = &lineID
 	require.NoError(t, factoryModel.UpdatePlanning(db, planning))
+}
+
+func startWorkOrderUpdatesConsumer(t *testing.T) *testconsumer.TestConsumer {
+	t.Helper()
+	amqpURL, err := config.RabbitMQURL()
+	require.NoError(t, err)
+	consumer := testconsumer.New(amqpURL, messages.FactoryWorkOrderUpdatedRoutingKey)
+	consumer.Start()
+	t.Cleanup(consumer.Stop)
+	return &consumer
 }
 
 func TestProposePlanningSpecAndNotify_PublishesOnceWhenPlanBecomesReady(t *testing.T) {
