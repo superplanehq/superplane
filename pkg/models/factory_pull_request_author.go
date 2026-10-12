@@ -39,6 +39,7 @@ func FillUnsetDiscussionAuthorFlags(tx *gorm.DB, pullRequestIDs []uuid.UUID) err
 	err := tx.
 		Where("pull_request_id IN ?", pullRequestIDs).
 		Where("author_is_bot IS NULL").
+		Where("author_flag_checked_at IS NULL").
 		Where("feedback_handler_id IS NOT NULL").
 		Find(&activities).Error
 	if err != nil {
@@ -84,7 +85,7 @@ func FillUnsetDiscussionAuthorFlags(tx *gorm.DB, pullRequestIDs []uuid.UUID) err
 	if err != nil {
 		return err
 	}
-	return saveDiscussionAuthorFlags(tx, flags)
+	return saveDiscussionAuthorFlagAttempts(tx, runIDs, flags)
 }
 
 func discussionAuthorFlagsForRuns(tx *gorm.DB, runIDs []uuid.UUID) (map[uuid.UUID]*bool, error) {
@@ -132,11 +133,14 @@ func discussionAuthorFlagsForRuns(tx *gorm.DB, runIDs []uuid.UUID) (map[uuid.UUI
 	return flags, nil
 }
 
-func saveDiscussionAuthorFlags(tx *gorm.DB, flags map[uuid.UUID]*bool) error {
+func saveDiscussionAuthorFlagAttempts(tx *gorm.DB, runIDs []uuid.UUID, flags map[uuid.UUID]*bool) error {
 	botRunIDs := make([]uuid.UUID, 0)
 	personRunIDs := make([]uuid.UUID, 0)
-	for runID, flag := range flags {
+	unknownRunIDs := make([]uuid.UUID, 0)
+	for _, runID := range runIDs {
+		flag := flags[runID]
 		if flag == nil {
+			unknownRunIDs = append(unknownRunIDs, runID)
 			continue
 		}
 		if *flag {
@@ -150,7 +154,10 @@ func saveDiscussionAuthorFlags(tx *gorm.DB, flags map[uuid.UUID]*bool) error {
 	if err := updateAuthorIsBot(tx, botRunIDs, true, now); err != nil {
 		return err
 	}
-	return updateAuthorIsBot(tx, personRunIDs, false, now)
+	if err := updateAuthorIsBot(tx, personRunIDs, false, now); err != nil {
+		return err
+	}
+	return markAuthorFlagChecked(tx, unknownRunIDs, now)
 }
 
 func updateAuthorIsBot(tx *gorm.DB, runIDs []uuid.UUID, authorIsBot bool, now time.Time) error {
@@ -161,8 +168,23 @@ func updateAuthorIsBot(tx *gorm.DB, runIDs []uuid.UUID, authorIsBot bool, now ti
 		Where("run_id IN ?", runIDs).
 		Where("author_is_bot IS NULL").
 		Updates(map[string]any{
-			"author_is_bot": authorIsBot,
-			"updated_at":    now,
+			"author_is_bot":          authorIsBot,
+			"author_flag_checked_at": now,
+			"updated_at":             now,
+		}).Error
+}
+
+func markAuthorFlagChecked(tx *gorm.DB, runIDs []uuid.UUID, now time.Time) error {
+	if len(runIDs) == 0 {
+		return nil
+	}
+	return tx.Model(&FactoryPullRequestRun{}).
+		Where("run_id IN ?", runIDs).
+		Where("author_is_bot IS NULL").
+		Where("author_flag_checked_at IS NULL").
+		Updates(map[string]any{
+			"author_flag_checked_at": now,
+			"updated_at":             now,
 		}).Error
 }
 

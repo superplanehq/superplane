@@ -421,11 +421,50 @@ func Test__FactoryPullRequestActivityAuthor(t *testing.T) {
 		require.NoError(t, err)
 		if tc.want == nil {
 			assert.Nil(t, stored.AuthorIsBot, tc.name)
+			if tc.name == "missing author" {
+				assert.NotNil(t, stored.AuthorFlagCheckedAt, tc.name)
+			}
+			if tc.name == "check activity" {
+				assert.Nil(t, stored.AuthorFlagCheckedAt, tc.name)
+			}
 			continue
 		}
 		require.NotNil(t, stored.AuthorIsBot, tc.name)
 		assert.Equal(t, *tc.want, *stored.AuthorIsBot, tc.name)
+		assert.NotNil(t, stored.AuthorFlagCheckedAt, tc.name)
 	}
+
+	missing := byDescription["missing author"]
+	require.NotNil(t, missing)
+	missingRunID := parseUUID(t, missing.GetRun().GetId())
+	rootEvent, err := models.FindRootEventForRun(db, missingRunID)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(rootEvent).Update("data", models.NewJSONValue(githubDiscussionEvent("github.prComment", "comment", "user", "Bot"))).Error)
+	updatedEvent, err := models.FindRootEventForRun(db, missingRunID)
+	require.NoError(t, err)
+	updatedFlag := models.DiscussionAuthorIsBot(updatedEvent.Data.Data())
+	require.NotNil(t, updatedFlag)
+	assert.True(t, *updatedFlag)
+
+	again, err := DescribeWorkOrder(ctx, orgID, &pb.DescribeWorkOrderRequest{
+		FactoryId: factory.ID.String(),
+		OrderId:   order.ID.String(),
+	})
+	require.NoError(t, err)
+	var reread *pb.FactoryPullRequestActivity
+	for _, pullRequest := range again.GetOrder().GetPullRequests() {
+		for _, activity := range pullRequest.GetActivities() {
+			if activity.GetDescription() == "missing author" {
+				reread = activity
+			}
+		}
+	}
+	require.NotNil(t, reread)
+	assert.Nil(t, reread.AuthorIsBot)
+	rereadStored, err := models.FindPullRequestActivityByRunID(db, missingRunID)
+	require.NoError(t, err)
+	assert.Nil(t, rereadStored.AuthorIsBot)
+	assert.NotNil(t, rereadStored.AuthorFlagCheckedAt)
 }
 
 func githubDiscussionEvent(eventType, parent, authorKey, authorType string) map[string]any {

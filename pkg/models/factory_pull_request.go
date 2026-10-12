@@ -105,21 +105,22 @@ type FactoryPullRequest struct {
 }
 
 type FactoryPullRequestRun struct {
-	PullRequestID     uuid.UUID `gorm:"primaryKey"`
-	RunID             uuid.UUID `gorm:"primaryKey"`
-	FeedbackHandlerID *uuid.UUID
-	RevisionID        *uuid.UUID
-	Access            string
-	State             string
-	Title             string
-	Description       string
-	Attempt           *int
-	AttemptLimit      *int
-	AuthorIsBot       *bool
-	AccessRequestedAt *time.Time
-	AccessGrantedAt   *time.Time
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	PullRequestID       uuid.UUID `gorm:"primaryKey"`
+	RunID               uuid.UUID `gorm:"primaryKey"`
+	FeedbackHandlerID   *uuid.UUID
+	RevisionID          *uuid.UUID
+	Access              string
+	State               string
+	Title               string
+	Description         string
+	Attempt             *int
+	AttemptLimit        *int
+	AuthorIsBot         *bool
+	AuthorFlagCheckedAt *time.Time
+	AccessRequestedAt   *time.Time
+	AccessGrantedAt     *time.Time
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 type FactoryPullRequestLinkedRun struct {
