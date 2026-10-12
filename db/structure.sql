@@ -634,6 +634,8 @@ CREATE TABLE public.factory_pull_request_runs (
     access_granted_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     title text DEFAULT ''::text NOT NULL,
+    author_is_bot boolean,
+    author_flag_checked_at timestamp with time zone,
     CONSTRAINT factory_pull_request_runs_access_valid CHECK (((access)::text = ANY ((ARRAY['concurrent'::character varying, 'waiting'::character varying, 'exclusive'::character varying, 'released'::character varying])::text[]))),
     CONSTRAINT factory_pull_request_runs_attempt_limit_positive CHECK (((attempt_limit IS NULL) OR (attempt_limit > 0))),
     CONSTRAINT factory_pull_request_runs_attempt_positive CHECK (((attempt IS NULL) OR (attempt > 0))),
@@ -5659,7 +5661,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261010003855	f
+20261012105423	f
 \.
 
 

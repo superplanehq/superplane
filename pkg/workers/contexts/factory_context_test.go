@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -2124,4 +2125,99 @@ func setupFactoryAppExecutionWithPayload(
 	require.NoError(t, database.Conn().Save(nodeExecution).Error)
 
 	return canvas, nodeExecution, run
+}
+
+func TestFactoryContext_AddPullRequestActivity_RecordsDiscussionAuthor(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	db := database.Conn()
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Feedback", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	bot := true
+	person := false
+	cases := []struct {
+		name   string
+		source string
+		event  map[string]any
+		want   *bool
+	}{
+		{
+			name:   "bot comment",
+			source: models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+			event: map[string]any{
+				"type": "github.prComment",
+				"data": map[string]any{
+					"comment": map[string]any{"user": map[string]any{"login": "greptile-apps[bot]", "type": "Bot"}},
+				},
+			},
+			want: &bot,
+		},
+		{
+			name:   "person comment",
+			source: models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+			event: map[string]any{
+				"type": "github.prComment",
+				"data": map[string]any{
+					"comment": map[string]any{"user": map[string]any{"login": "ada", "type": "User"}},
+				},
+			},
+			want: &person,
+		},
+		{
+			name:   "missing author",
+			source: models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion,
+			event: map[string]any{
+				"type": "github.prComment",
+				"data": map[string]any{"comment": map[string]any{"body": "hello"}},
+			},
+		},
+		{
+			name:   "check activity",
+			source: models.FactoryPRFeedbackHandlerSourcePullRequestChecks,
+			event: map[string]any{
+				"type": "github.prComment",
+				"data": map[string]any{
+					"comment": map[string]any{"user": map[string]any{"login": "greptile-apps[bot]", "type": "Bot"}},
+				},
+			},
+		},
+	}
+
+	for i, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			canvas, execution, _ := setupFactoryAppExecutionWithPayload(t, r, factoryModel.ID, tc.event)
+			_, err := factoryModel.CreatePRFeedbackHandler(
+				db,
+				canvas.ID,
+				models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest,
+				tc.source,
+			)
+			require.NoError(t, err)
+
+			pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+				URL: fmt.Sprintf("https://github.com/acme/app/pull/%d", 200+i),
+			})
+			require.NoError(t, err)
+
+			ctx := NewFactoryContext(db, canvas, execution)
+			_, err = ctx.AddPullRequestActivity(core.AddPullRequestActivityParams{
+				PullRequestID: pullRequest.ID.String(),
+				Description:   tc.name,
+			})
+			require.NoError(t, err)
+
+			stored, err := models.FindPullRequestActivityByRunID(db, execution.RunID)
+			require.NoError(t, err)
+			if tc.want == nil {
+				assert.Nil(t, stored.AuthorIsBot)
+				return
+			}
+			require.NotNil(t, stored.AuthorIsBot)
+			assert.Equal(t, *tc.want, *stored.AuthorIsBot)
+		})
+	}
 }

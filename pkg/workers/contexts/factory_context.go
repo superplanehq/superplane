@@ -1144,6 +1144,11 @@ func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivi
 		handlerID = &handler.ID
 	}
 
+	var authorIsBot *bool
+	if handler != nil && handler.Source == models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+		authorIsBot = models.DiscussionAuthorIsBotForRun(c.tx, c.execution.RunID)
+	}
+
 	created, err := pullRequest.CreateActivity(c.tx, models.FactoryPullRequestActivityParams{
 		RunID:             c.execution.RunID,
 		Title:             params.Title,
@@ -1151,12 +1156,18 @@ func (c *FactoryContext) AddPullRequestActivity(params core.AddPullRequestActivi
 		RevisionSHA:       params.Revision,
 		Access:            access,
 		FeedbackHandlerID: handlerID,
+		AuthorIsBot:       authorIsBot,
 	})
 	if err != nil {
 		if errors.Is(err, models.ErrFactoryPullRequestActivityDuplicate) {
 			return nil, core.ErrPullRequestActivityAlreadyActive
 		}
 		return nil, err
+	}
+	if created.Activity != nil && created.Activity.AuthorIsBot == nil && authorIsBot != nil {
+		if err := created.Activity.SetAuthorIsBot(c.tx, *authorIsBot); err != nil {
+			return nil, err
+		}
 	}
 
 	c.notifyWorkOrderUpdated(pullRequest.FactoryID, pullRequest.WorkOrderID, "pullRequest.activityAdded")

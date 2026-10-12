@@ -105,20 +105,22 @@ type FactoryPullRequest struct {
 }
 
 type FactoryPullRequestRun struct {
-	PullRequestID     uuid.UUID `gorm:"primaryKey"`
-	RunID             uuid.UUID `gorm:"primaryKey"`
-	FeedbackHandlerID *uuid.UUID
-	RevisionID        *uuid.UUID
-	Access            string
-	State             string
-	Title             string
-	Description       string
-	Attempt           *int
-	AttemptLimit      *int
-	AccessRequestedAt *time.Time
-	AccessGrantedAt   *time.Time
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	PullRequestID       uuid.UUID `gorm:"primaryKey"`
+	RunID               uuid.UUID `gorm:"primaryKey"`
+	FeedbackHandlerID   *uuid.UUID
+	RevisionID          *uuid.UUID
+	Access              string
+	State               string
+	Title               string
+	Description         string
+	Attempt             *int
+	AttemptLimit        *int
+	AuthorIsBot         *bool
+	AuthorFlagCheckedAt *time.Time
+	AccessRequestedAt   *time.Time
+	AccessGrantedAt     *time.Time
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 type FactoryPullRequestLinkedRun struct {
@@ -129,6 +131,7 @@ type FactoryPullRequestLinkedRun struct {
 	State        string
 	Attempt      *int
 	AttemptLimit *int
+	AuthorIsBot  *bool
 	Revision     *FactoryPullRequestRevision
 }
 
@@ -642,6 +645,7 @@ func ListPullRequestRuns(tx *gorm.DB, pullRequestIDs []uuid.UUID) (map[uuid.UUID
 			State:        link.State,
 			Attempt:      link.Attempt,
 			AttemptLimit: link.AttemptLimit,
+			AuthorIsBot:  link.AuthorIsBot,
 		}
 		if link.RevisionID != nil {
 			if revision, ok := revisionByID[*link.RevisionID]; ok {

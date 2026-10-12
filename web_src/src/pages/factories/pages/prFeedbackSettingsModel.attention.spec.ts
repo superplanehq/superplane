@@ -313,6 +313,110 @@ describe("activePRFeedbackWorkOrderIds", () => {
     ).toBe("Addressing user feedback");
   });
 
+  it("labels a bot discussion as Addressing bot feedback", () => {
+    expect(
+      addressingFeedbackLabelsByWorkOrder([
+        {
+          workOrderId: "wo-bot",
+          activities: [
+            {
+              access: "exclusive",
+              state: "active",
+              description: "Please fix the race in checkout.",
+              authorIsBot: true,
+              run: run({ id: "r-bot", state: "STATE_STARTED" }),
+            },
+          ],
+        },
+      ]).get("wo-bot"),
+    ).toBe("Addressing bot feedback");
+  });
+
+  it("keeps Addressing user feedback when the author is a person or missing", () => {
+    const labels = addressingFeedbackLabelsByWorkOrder([
+      {
+        workOrderId: "wo-person",
+        activities: [
+          {
+            access: "exclusive",
+            state: "active",
+            description: "Please rename this helper.",
+            authorIsBot: false,
+            run: run({ id: "r-person", state: "STATE_STARTED" }),
+          },
+        ],
+      },
+      {
+        workOrderId: "wo-unknown",
+        activities: [
+          {
+            access: "exclusive",
+            state: "active",
+            description: "Please add a test.",
+            run: run({ id: "r-unknown", state: "STATE_STARTED" }),
+          },
+        ],
+      },
+      {
+        workOrderId: "wo-fallback",
+        activities: [],
+        runs: [{ run: run({ id: "r-fallback", state: "STATE_STARTED" }) }],
+      },
+    ]);
+
+    expect(labels.get("wo-person")).toBe("Addressing user feedback");
+    expect(labels.get("wo-unknown")).toBe("Addressing user feedback");
+    expect(labels.get("wo-fallback")).toBe("Addressing user feedback");
+  });
+
+  it("does not relabel check, repair, or custom activity when the author is a bot", () => {
+    const pullRequests: FactoriesFactoryPullRequest[] = [
+      {
+        workOrderId: "wo-checks",
+        activities: [
+          {
+            access: "concurrent",
+            state: "active",
+            description: "Waiting for checks on a82fd91",
+            authorIsBot: true,
+            run: run({ id: "r-checks", state: "STATE_STARTED" }),
+          },
+        ],
+      },
+      {
+        workOrderId: "wo-repair",
+        activities: [
+          {
+            access: "exclusive",
+            state: "active",
+            description: "Fixing failed checks on a82fd91",
+            authorIsBot: true,
+            run: run({ id: "r-repair", state: "STATE_STARTED" }),
+          },
+        ],
+      },
+      {
+        workOrderId: "wo-custom",
+        activities: [
+          {
+            access: "concurrent",
+            state: "active",
+            description: "Creating an ephemeral environment",
+            authorIsBot: true,
+            run: run({ id: "r-custom", state: "STATE_STARTED" }),
+          },
+        ],
+      },
+    ];
+
+    expect(waitingOnChecksWorkOrderIds(pullRequests)).toEqual(new Set(["wo-checks"]));
+    expect(addressingFeedbackLabelsByWorkOrder(pullRequests).get("wo-repair")).toBe("Fixing failed checks on a82fd91");
+    expect(addressingFeedbackLabelsByWorkOrder(pullRequests).get("wo-custom")).toBe(
+      "Creating an ephemeral environment",
+    );
+    expect(fixesPausedWorkOrderIds(pullRequests)).toEqual(new Set());
+  });
+
   it("uses active activities when they are present", () => {
     expect(
       activePRFeedbackWorkOrderIds([

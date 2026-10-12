@@ -121,8 +121,12 @@ func loadPullRequestSerialization(
 	var runsByPullRequest map[uuid.UUID][]models.FactoryPullRequestLinkedRun
 	var revisions map[uuid.UUID]*models.FactoryPullRequestRevision
 	g.Go(func() error {
+		runTx := tx.WithContext(gctx)
+		if err := models.FillUnsetDiscussionAuthorFlags(runTx, pullRequestIDs); err != nil {
+			return err
+		}
 		var err error
-		runsByPullRequest, err = models.ListPullRequestRuns(tx.WithContext(gctx), pullRequestIDs)
+		runsByPullRequest, err = models.ListPullRequestRuns(runTx, pullRequestIDs)
 		return err
 	})
 	g.Go(func() error {
@@ -232,6 +236,9 @@ func serializePullRequestActivities(
 			TotalTokens: ledger.usage.TotalTokens,
 			CostCents:   ledger.usage.CostCents(),
 			Models:      ledger.models,
+		}
+		if linked.AuthorIsBot != nil {
+			activity.AuthorIsBot = linked.AuthorIsBot
 		}
 		if linked.Attempt != nil {
 			attempt := int32(*linked.Attempt)
