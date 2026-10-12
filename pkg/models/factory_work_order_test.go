@@ -1392,6 +1392,54 @@ func TestFactoryWorkOrder_UpsertArtifactByTypeAndTitle(t *testing.T) {
 		assert.Empty(t, artifacts)
 	})
 
+	t.Run("keeps one row when two first updates run together", func(t *testing.T) {
+		order := newOrder(t, "Concurrent title target")
+		const workers = 2
+		var wg sync.WaitGroup
+		errs := make([]error, workers)
+		ids := make([]uuid.UUID, workers)
+		createdFlags := make([]bool, workers)
+		start := make(chan struct{})
+
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				<-start
+				artifact, wasCreated, upsertErr := order.UpsertArtifactByTypeAndTitle(database.Conn(), FactoryWorkOrderArtifactParams{
+					Type: FactoryWorkOrderArtifactTypeLink,
+					Data: map[string]any{
+						"url":   fmt.Sprintf("https://preview.example.com/c%d", idx),
+						"title": "Preview",
+					},
+				})
+				errs[idx] = upsertErr
+				createdFlags[idx] = wasCreated
+				if artifact != nil {
+					ids[idx] = artifact.ID
+				}
+			}(i)
+		}
+		close(start)
+		wg.Wait()
+
+		for _, upsertErr := range errs {
+			require.NoError(t, upsertErr)
+		}
+		assert.Equal(t, ids[0], ids[1])
+		assert.NotEqual(t, createdFlags[0], createdFlags[1])
+
+		artifacts, err := order.ListArtifacts(database.Conn())
+		require.NoError(t, err)
+		require.Len(t, artifacts, 1)
+		assert.Equal(t, ids[0], artifacts[0].ID)
+		assert.Equal(t, "Preview", mustArtifactData(t, &artifacts[0])["title"])
+
+		events, err := order.ListEvents(database.Conn(), 50, nil)
+		require.NoError(t, err)
+		assert.Equal(t, 1, countEventsOfType(events, factory.EventTypeOrderArtifactAdded))
+	})
+
 	t.Run("does not replace a keyed row with the same title", func(t *testing.T) {
 		order := newOrder(t, "Keyed title target")
 		keyed, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{

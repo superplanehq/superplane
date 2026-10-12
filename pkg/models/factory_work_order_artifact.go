@@ -206,7 +206,9 @@ func (o *FactoryWorkOrder) UpsertArtifact(
 // the newest unkeyed artifact on this work order with the same type and
 // trimmed title. Rows that already have a key stay unchanged. The bool
 // is true when a new row was inserted. A blank title fails. Replacement
-// is wholesale and does not write a timeline event.
+// is wholesale and does not write a timeline event. The work order row
+// stays locked from the lookup through the write so two first updates
+// cannot both insert.
 func (o *FactoryWorkOrder) UpsertArtifactByTypeAndTitle(
 	db *gorm.DB,
 	params FactoryWorkOrderArtifactParams,
@@ -221,6 +223,10 @@ func (o *FactoryWorkOrder) UpsertArtifactByTypeAndTitle(
 		created  bool
 	)
 	err = db.Transaction(func(tx *gorm.DB) error {
+		if lockErr := lockFactoryWorkOrder(tx, o.ID); lockErr != nil {
+			return lockErr
+		}
+
 		existing, findErr := o.findNewestUnkeyedArtifactByTypeAndTitle(tx, params.Type, title)
 		if findErr == nil {
 			replaced, replaceErr := o.replaceArtifactData(tx, existing, params)
@@ -365,6 +371,11 @@ func IsValidWorkOrderArtifactType(t string) bool {
 	return false
 }
 
+type unkeyedArtifactTitle struct {
+	ID    uuid.UUID
+	Title string
+}
+
 func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTypeAndTitle(
 	tx *gorm.DB,
 	artifactType, title string,
@@ -374,10 +385,11 @@ func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTypeAndTitle(
 		return nil, fmt.Errorf("%w: artifact type is required", ErrFactoryWorkOrderArtifactInvalid)
 	}
 
-	var artifacts []FactoryWorkOrderArtifact
-	err := tx.
+	var titles []unkeyedArtifactTitle
+	err := tx.Model(&FactoryWorkOrderArtifact{}).
+		Select("id, data->>'title' AS title").
 		Where(
-			"organization_id = ? AND factory_id = ? AND work_order_id = ? AND type = ? AND key IS NULL",
+			"organization_id = ? AND factory_id = ? AND work_order_id = ? AND type = ? AND key IS NULL AND jsonb_typeof(data->'title') = 'string'",
 			o.OrganizationID,
 			o.FactoryID,
 			o.ID,
@@ -385,32 +397,51 @@ func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTypeAndTitle(
 		).
 		Order("created_at DESC").
 		Order("id DESC").
-		Find(&artifacts).
+		Find(&titles).
 		Error
 	if err != nil {
 		return nil, err
 	}
 
-	for i := range artifacts {
-		if artifactTitleMatches(artifacts[i].Data, title) {
-			return &artifacts[i], nil
+	matchID, found := newestMatchingArtifactID(titles, title)
+	if !found {
+		return nil, ErrFactoryWorkOrderArtifactNotFound
+	}
+
+	var artifact FactoryWorkOrderArtifact
+	err = tx.Where("id = ?", matchID).First(&artifact).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFactoryWorkOrderArtifactNotFound
+		}
+		return nil, err
+	}
+
+	return &artifact, nil
+}
+
+func newestMatchingArtifactID(titles []unkeyedArtifactTitle, title string) (uuid.UUID, bool) {
+	for _, candidate := range titles {
+		if strings.TrimSpace(candidate.Title) == title {
+			return candidate.ID, true
 		}
 	}
 
-	return nil, ErrFactoryWorkOrderArtifactNotFound
+	return uuid.Nil, false
 }
 
-func artifactTitleMatches(data datatypes.JSON, title string) bool {
-	if len(data) == 0 {
-		return false
+func lockFactoryWorkOrder(tx *gorm.DB, id uuid.UUID) error {
+	var locked FactoryWorkOrder
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Select("id").
+		Where("id = ?", id).
+		Take(&locked).
+		Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrFactoryWorkOrderNotFound
 	}
 
-	decoded := map[string]any{}
-	if err := json.Unmarshal(data, &decoded); err != nil {
-		return false
-	}
-
-	return extractArtifactString(decoded, "title") == title
+	return err
 }
 
 func requiredArtifactMatchTitle(data map[string]any) (string, error) {
