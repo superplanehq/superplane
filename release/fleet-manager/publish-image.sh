@@ -24,14 +24,21 @@ fi
 
 prepared_digest="$(skopeo inspect --raw "oci-archive:${OCI_ARCHIVE}" | sha256sum | awk '{print $1}')"
 prepared_digest="sha256:${prepared_digest}"
-if remote_digest="$(skopeo inspect --format '{{.Digest}}' "docker://${IMAGE}" 2>/dev/null)"; then
+inspect_error="$(mktemp)"
+trap 'rm -f "${inspect_error}"' EXIT
+if remote_digest="$(skopeo inspect --format '{{.Digest}}' "docker://${IMAGE}" 2>"${inspect_error}")"; then
   if [ "${remote_digest}" != "${prepared_digest}" ]; then
     echo "Error: ${IMAGE} already points to ${remote_digest}, not ${prepared_digest}" >&2
     exit 1
   fi
   echo "* Reusing matching image ${IMAGE}@${remote_digest}"
-else
+elif grep -Eqi 'manifest unknown' "${inspect_error}"; then
+  echo "* Publishing new image ${IMAGE}"
   skopeo copy --all "oci-archive:${OCI_ARCHIVE}" "docker://${IMAGE}"
+else
+  echo "Error: could not determine whether ${IMAGE} exists" >&2
+  cat "${inspect_error}" >&2
+  exit 1
 fi
 
 published_digest="$(skopeo inspect --format '{{.Digest}}' "docker://${IMAGE}")"

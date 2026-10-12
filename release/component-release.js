@@ -195,6 +195,51 @@ function parseJSON(response, action) {
   }
 }
 
+function nextPage(linkHeader) {
+  if (!linkHeader) {
+    return undefined;
+  }
+  for (const link of linkHeader.split(",")) {
+    const match = link.match(/<([^>]+)>;\s*rel="([^"]+)"/);
+    if (match && match[2] === "next") {
+      return match[1];
+    }
+  }
+  return undefined;
+}
+
+async function findDraftByTag({ apiURL, repository, token, tag }) {
+  let page = `/repos/${repository}/releases?per_page=100`;
+  const visitedPages = new Set();
+
+  while (page) {
+    if (visitedPages.has(page)) {
+      throw new Error("GitHub releases pagination contains a cycle");
+    }
+    visitedPages.add(page);
+
+    const response = await request({
+      apiURL,
+      method: "GET",
+      pathname: page,
+      token,
+    });
+    if (response.statusCode !== 200) {
+      throw new Error(
+        `list GitHub releases failed with HTTP ${response.statusCode}: ${response.body}`,
+      );
+    }
+    const release = parseJSON(response, "list GitHub releases").find(
+      (candidate) => candidate.tag_name === tag,
+    );
+    if (release) {
+      return release;
+    }
+    page = nextPage(response.headers.link);
+  }
+  return undefined;
+}
+
 async function findOrCreateDraft({
   apiURL,
   repository,
@@ -215,20 +260,12 @@ async function findOrCreateDraft({
   });
   let release;
   if (lookup.statusCode === 404) {
-    const listed = await request({
+    release = await findDraftByTag({
       apiURL,
-      method: "GET",
-      pathname: `/repos/${repository}/releases?per_page=100`,
+      repository,
       token,
+      tag,
     });
-    if (listed.statusCode !== 200) {
-      throw new Error(
-        `list GitHub releases failed with HTTP ${listed.statusCode}: ${listed.body}`,
-      );
-    }
-    release = parseJSON(listed, "list GitHub releases").find(
-      (candidate) => candidate.tag_name === tag,
-    );
     if (!release) {
       const payload = JSON.stringify({
         tag_name: tag,

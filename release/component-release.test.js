@@ -117,7 +117,7 @@ test("manifest verification rejects altered assets", () => {
   );
 });
 
-test("draft resumption reuses matching assets and rejects collisions", async () => {
+test("draft resumption follows pagination and rejects collisions", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "github-release-"));
   const assetName = "runner-linux-amd64.tar.gz";
   fs.writeFileSync(path.join(directory, assetName), "prepared artifact");
@@ -131,10 +131,15 @@ test("draft resumption reuses matching assets and rejects collisions", async () 
       response.end(JSON.stringify({ message: "Not Found" }));
       return;
     }
-    if (
-      request.method === "GET" &&
-      request.url.includes("/releases?per_page=100")
-    ) {
+    if (request.method === "GET" && request.url.endsWith("?per_page=100")) {
+      response.writeHead(200, {
+        "Content-Type": "application/json",
+        Link: `<${apiURL}/repos/superplanehq/superplane/releases?per_page=100&page=2>; rel="next"`,
+      });
+      response.end("[]");
+      return;
+    }
+    if (request.method === "GET" && request.url.endsWith("&page=2")) {
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(
         JSON.stringify([
