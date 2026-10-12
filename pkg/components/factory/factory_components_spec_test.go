@@ -703,6 +703,49 @@ func TestAddWorkOrderArtifact_ValidatesConfiguration(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
+
+	t.Run("requires a title to update an existing artifact", func(t *testing.T) {
+		config := map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "link",
+			"action":       "update",
+			"url":          "https://preview.example.com/pr-1",
+		}
+		err := configuration.ValidateConfiguration(fields, config)
+		if err == nil {
+			t.Fatal("expected schema error for update without title")
+		}
+		err = c.ValidateNodeConfiguration(config)
+		if err == nil {
+			t.Fatal("expected error for update without title")
+		}
+	})
+
+	t.Run("rejects a blank title for update existing", func(t *testing.T) {
+		err := c.ValidateNodeConfiguration(map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "markdown",
+			"action":       "update",
+			"title":        "   ",
+			"body":         "notes",
+		})
+		if err == nil {
+			t.Fatal("expected error for blank update title")
+		}
+	})
+
+	t.Run("rejects update existing for a branch", func(t *testing.T) {
+		err := c.ValidateNodeConfiguration(map[string]any{
+			"orderId":      "{{ order().id }}",
+			"artifactType": "branch",
+			"action":       "update",
+			"name":         "feature/refund-retry",
+			"repository":   "example/repo",
+		})
+		if err == nil {
+			t.Fatal("expected error for branch update")
+		}
+	})
 }
 
 func TestAddWorkOrderArtifact_DocumentsKeyedUpdate(t *testing.T) {
@@ -729,6 +772,44 @@ func TestAddWorkOrderArtifact_DocumentsKeyedUpdate(t *testing.T) {
 	assert.True(t, strings.Contains(artifactKey.Description, "A different task with this key fails"))
 }
 
+func TestAddWorkOrderArtifact_DocumentsUpdateChoice(t *testing.T) {
+	c := &AddWorkOrderArtifact{}
+	docs := c.Documentation()
+	assert.Contains(t, docs, "Add new")
+	assert.Contains(t, docs, "Update existing")
+	assert.Contains(t, docs, "Update existing needs a stable title")
+	assert.Contains(t, docs, "A changed title adds a new artifact")
+	assert.Contains(t, docs, "A duplicate title updates only the newest match")
+
+	fields := c.Configuration()
+	typeIndex := fieldIndex(fields, "artifactType")
+	actionIndex := fieldIndex(fields, "action")
+	require.GreaterOrEqual(t, typeIndex, 0)
+	require.Equal(t, typeIndex+1, actionIndex)
+
+	action := fields[actionIndex]
+	assert.Equal(t, "Action", action.Label)
+	assert.Equal(t, addWorkOrderArtifactActionDescription, action.Description)
+	assert.Equal(t, addWorkOrderArtifactActionAdd, action.Default)
+	assert.False(t, action.Required)
+	require.NotNil(t, action.TypeOptions)
+	require.NotNil(t, action.TypeOptions.Select)
+	require.Len(t, action.TypeOptions.Select.Options, 2)
+	assert.Equal(t, "Add new", action.TypeOptions.Select.Options[0].Label)
+	assert.Equal(t, "add", action.TypeOptions.Select.Options[0].Value)
+	assert.Equal(t, "Update existing", action.TypeOptions.Select.Options[1].Label)
+	assert.Equal(t, "update", action.TypeOptions.Select.Options[1].Value)
+	require.Len(t, action.VisibilityConditions, 1)
+	assert.Equal(t, "artifactType", action.VisibilityConditions[0].Field)
+	assert.ElementsMatch(t, []string{"markdown", "link"}, action.VisibilityConditions[0].Values)
+
+	title := fields[fieldIndex(fields, "title")]
+	assert.Contains(t, title.Description, addWorkOrderArtifactUpdateTitleHelp)
+	require.Len(t, title.RequiredConditions, 1)
+	assert.Equal(t, "action", title.RequiredConditions[0].Field)
+	assert.Equal(t, []string{"update"}, title.RequiredConditions[0].Values)
+}
+
 func TestAddWorkOrderArtifact_Execute_EmitsArtifactAdded(t *testing.T) {
 	component := &AddWorkOrderArtifact{}
 	factoryCtx := &fakeFactoryContext{
@@ -753,8 +834,70 @@ func TestAddWorkOrderArtifact_Execute_EmitsArtifactAdded(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, factoryCtx.addArtifactCalls)
 	assert.Equal(t, "storybook-preview", factoryCtx.addArtifactParams.Key)
+	assert.False(t, factoryCtx.addArtifactParams.UpdateByTitle)
 	assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
 	assert.Equal(t, "workOrder.artifactAdded", stateCtx.Type)
+}
+
+func TestAddWorkOrderArtifact_Execute_ActionChoosesIdentity(t *testing.T) {
+	component := &AddWorkOrderArtifact{}
+
+	t.Run("explicit add does not set the update flag", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":      "wo-1",
+				"artifactType": "link",
+				"action":       "add",
+				"url":          "https://preview.example.com/v1",
+				"title":        "Preview",
+				"artifactKey":  "storybook-preview",
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.False(t, factoryCtx.addArtifactParams.UpdateByTitle)
+		assert.Equal(t, "storybook-preview", factoryCtx.addArtifactParams.Key)
+	})
+
+	t.Run("blank action does not set the update flag", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":      "wo-1",
+				"artifactType": "markdown",
+				"action":       "   ",
+				"body":         "notes",
+				"artifactKey":  "note-key",
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.False(t, factoryCtx.addArtifactParams.UpdateByTitle)
+		assert.Equal(t, "note-key", factoryCtx.addArtifactParams.Key)
+	})
+
+	t.Run("update existing sets the flag and ignores the artifact key", func(t *testing.T) {
+		factoryCtx := &fakeFactoryContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"orderId":      "wo-1",
+				"artifactType": "link",
+				"action":       "update",
+				"url":          "https://preview.example.com/v2",
+				"title":        "Preview",
+				"artifactKey":  "storybook-preview",
+			},
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Factory:        factoryCtx,
+		})
+		require.NoError(t, err)
+		assert.True(t, factoryCtx.addArtifactParams.UpdateByTitle)
+		assert.Empty(t, factoryCtx.addArtifactParams.Key)
+		assert.Equal(t, "Preview", factoryCtx.addArtifactParams.Data["title"])
+	})
 }
 
 func TestResolvePrArtifactState_Precedence(t *testing.T) {
@@ -1006,4 +1149,13 @@ func fieldNames(fields []configuration.Field) []string {
 		names = append(names, field.Name)
 	}
 	return names
+}
+
+func fieldIndex(fields []configuration.Field, name string) int {
+	for i := range fields {
+		if fields[i].Name == name {
+			return i
+		}
+	}
+	return -1
 }

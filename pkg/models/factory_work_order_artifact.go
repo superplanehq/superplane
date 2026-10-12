@@ -202,6 +202,55 @@ func (o *FactoryWorkOrder) UpsertArtifact(
 	return artifact, created, nil
 }
 
+// UpsertArtifactByTypeAndTitle creates an unkeyed artifact, or replaces
+// the newest unkeyed artifact on this work order with the same type and
+// trimmed title. Rows that already have a key stay unchanged. The bool
+// is true when a new row was inserted. A blank title fails. Replacement
+// is wholesale and does not write a timeline event.
+func (o *FactoryWorkOrder) UpsertArtifactByTypeAndTitle(
+	db *gorm.DB,
+	params FactoryWorkOrderArtifactParams,
+) (*FactoryWorkOrderArtifact, bool, error) {
+	title, err := requiredArtifactMatchTitle(params.Data)
+	if err != nil {
+		return nil, false, err
+	}
+
+	var (
+		artifact *FactoryWorkOrderArtifact
+		created  bool
+	)
+	err = db.Transaction(func(tx *gorm.DB) error {
+		existing, findErr := o.findNewestUnkeyedArtifactByTypeAndTitle(tx, params.Type, title)
+		if findErr == nil {
+			replaced, replaceErr := o.replaceArtifactData(tx, existing, params)
+			if replaceErr != nil {
+				return replaceErr
+			}
+			artifact = replaced
+			return nil
+		}
+		if !errors.Is(findErr, ErrFactoryWorkOrderArtifactNotFound) {
+			return findErr
+		}
+
+		createParams := params
+		createParams.Key = ""
+		createdArtifact, createErr := o.CreateArtifact(tx, createParams)
+		if createErr != nil {
+			return createErr
+		}
+		artifact = createdArtifact
+		created = true
+		return nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+
+	return artifact, created, nil
+}
+
 // UpdateArtifactData resolves the artifact tagged with `key` under this
 // work order (the same key an earlier CreateArtifact call set via
 // FactoryWorkOrderArtifactParams.Key, typically the PR's URL), shallow-
@@ -314,6 +363,63 @@ func IsValidWorkOrderArtifactType(t string) bool {
 		return true
 	}
 	return false
+}
+
+func (o *FactoryWorkOrder) findNewestUnkeyedArtifactByTypeAndTitle(
+	tx *gorm.DB,
+	artifactType, title string,
+) (*FactoryWorkOrderArtifact, error) {
+	artifactType = strings.TrimSpace(artifactType)
+	if artifactType == "" {
+		return nil, fmt.Errorf("%w: artifact type is required", ErrFactoryWorkOrderArtifactInvalid)
+	}
+
+	var artifacts []FactoryWorkOrderArtifact
+	err := tx.
+		Where(
+			"organization_id = ? AND factory_id = ? AND work_order_id = ? AND type = ? AND key IS NULL",
+			o.OrganizationID,
+			o.FactoryID,
+			o.ID,
+			artifactType,
+		).
+		Order("created_at DESC").
+		Order("id DESC").
+		Find(&artifacts).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range artifacts {
+		if artifactTitleMatches(artifacts[i].Data, title) {
+			return &artifacts[i], nil
+		}
+	}
+
+	return nil, ErrFactoryWorkOrderArtifactNotFound
+}
+
+func artifactTitleMatches(data datatypes.JSON, title string) bool {
+	if len(data) == 0 {
+		return false
+	}
+
+	decoded := map[string]any{}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return false
+	}
+
+	return extractArtifactString(decoded, "title") == title
+}
+
+func requiredArtifactMatchTitle(data map[string]any) (string, error) {
+	title := extractArtifactString(data, "title")
+	if title == "" {
+		return "", fmt.Errorf("%w: title is required", ErrFactoryWorkOrderArtifactInvalid)
+	}
+
+	return title, nil
 }
 
 func (o *FactoryWorkOrder) replaceKeyedArtifactAfterConflict(

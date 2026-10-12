@@ -658,13 +658,23 @@ func (c *FactoryContext) AddWorkOrderArtifact(params core.AddWorkOrderArtifactPa
 		return nil, err
 	}
 
-	artifact, created, err := order.UpsertArtifact(c.tx, models.FactoryWorkOrderArtifactParams{
+	artifactParams := models.FactoryWorkOrderArtifactParams{
 		Type:       params.Type,
 		Data:       params.Data,
-		Key:        params.Key,
 		Automation: c.automationRef(),
 		Run:        c.runRef(),
-	})
+	}
+
+	var (
+		artifact *models.FactoryWorkOrderArtifact
+		created  bool
+	)
+	if params.UpdateByTitle {
+		artifact, created, err = order.UpsertArtifactByTypeAndTitle(c.tx, artifactParams)
+	} else {
+		artifactParams.Key = params.Key
+		artifact, created, err = order.UpsertArtifact(c.tx, artifactParams)
+	}
 	if err != nil {
 		return nil, err
 	}
