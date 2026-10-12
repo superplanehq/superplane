@@ -30,7 +30,7 @@ func CancelRun(ctx context.Context, db *gorm.DB, canvas *models.Canvas, runID uu
 	var publishCancelled bool
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		run, err = models.LockCanvasRunInTransaction(tx, runID)
+		run, err = models.FindUnscopedCanvasRun(tx, runID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return grpcerrors.NotFound(err, "run not found")

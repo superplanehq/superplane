@@ -493,6 +493,7 @@ func (w *NodeExecutor) executeActionNode(
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithWorkOrderNotification(onFactoryWorkOrderNotification).
+			WithRunsCancelled(runCancellations.RecordRuns).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
 			WithFileBindCleanup(onFileBindCleanup).
 			WithRemoteImageIngest(w.encryptor, w.registry),

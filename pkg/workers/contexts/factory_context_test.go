@@ -1012,6 +1012,45 @@ func TestFactoryContext_UpdateWorkOrderStatus_NoopSkipsEmit(t *testing.T) {
 	assert.Len(t, statusEvents, 2, "no-op must not record a second status.updated event")
 }
 
+func TestFactoryContext_UpdateWorkOrderStatus_CloseReportsRunCancellations(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factory, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas, nodeExecution, run := setupFactoryAppExecution(t, r, factory.ID)
+	order, err := factory.CreateWorkOrder(database.Conn(), "Status target", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	agent, err := models.CreateCanvasRunInTransaction(database.Conn(), canvas.ID, "create-work-order", models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(agent).Update("input", models.NewJSONValue(map[string]any{
+		"work_order": map[string]any{"id": order.ID.String()},
+	})).Error)
+
+	var reported []uuid.UUID
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution).WithRunsCancelled(func(results []*models.RunCancellationResult) {
+		for _, result := range results {
+			if result == nil || result.Run == nil || result.Drain == nil {
+				continue
+			}
+			reported = append(reported, result.Run.ID)
+		}
+	})
+	_, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateClosed,
+		Result:  models.FactoryWorkOrderResultRejected,
+	})
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, []uuid.UUID{agent.ID}, reported)
+	assert.NotContains(t, reported, run.ID)
+
+	agent, err = models.FindUnscopedCanvasRun(database.Conn(), agent.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, agent.State)
+}
+
 func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
