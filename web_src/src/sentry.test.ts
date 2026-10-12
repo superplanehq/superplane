@@ -5,15 +5,20 @@ import {
   Sentry,
   isIgnoredConsoleMessage,
   isMonacoCanceledEvent,
+  isMonacoClipboardDeniedEvent,
   normalizeApiRouteTemplate,
   normalizeSentryFingerprint,
 } from "./sentry";
 
-function buildEvent(value: string | undefined, filenames: string[]): Sentry.ErrorEvent {
+const USER_AGENT_PERMISSION_DENIAL =
+  "The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.";
+
+function buildEvent(value: string | undefined, filenames: string[], type?: string): Sentry.ErrorEvent {
   return {
     exception: {
       values: [
         {
+          type,
           value,
           stacktrace: {
             frames: filenames.map((filename) => ({ filename })),
@@ -105,6 +110,54 @@ describe("isMonacoCanceledEvent", () => {
     ]);
 
     expect(isMonacoCanceledEvent(event)).toBe(false);
+  });
+});
+
+describe("isMonacoClipboardDeniedEvent", () => {
+  it("drops a Safari clipboard denial whose stack mixes the editor with telemetry frames", () => {
+    const event = buildEvent(
+      USER_AGENT_PERMISSION_DENIAL,
+      [
+        "../../../../../web_src/node_modules/monaco-editor/esm/vs/platform/clipboard/browser/clipboardService.js",
+        "../../../../../web_src/node_modules/@dash0/sdk-web/dist/dash0.js",
+        "../../../../../web_src/node_modules/@sentry/browser/build/npm/esm/helpers.js",
+      ],
+      "NotAllowedError",
+    );
+
+    expect(isMonacoClipboardDeniedEvent(event)).toBe(true);
+  });
+
+  it("drops a Safari clipboard denial from a hashed monaco-editor asset", () => {
+    const event = buildEvent(
+      USER_AGENT_PERMISSION_DENIAL,
+      [
+        "https://assets.superplane.com/releases/2980385e0d934a8f0426c201cbd547dc6961b80a/assets/monaco-editor-Cai9_Aq9.js",
+      ],
+      "NotAllowedError",
+    );
+
+    expect(isMonacoClipboardDeniedEvent(event)).toBe(true);
+  });
+
+  it("keeps a permission denial whose stack has no editor frame", () => {
+    const event = buildEvent(
+      USER_AGENT_PERMISSION_DENIAL,
+      ["web_src/src/components/CopyButton.tsx"],
+      "NotAllowedError",
+    );
+
+    expect(isMonacoClipboardDeniedEvent(event)).toBe(false);
+  });
+
+  it("keeps a non-permission error from the editor", () => {
+    const event = buildEvent(
+      "Failed to read clipboard",
+      ["https://assets.superplane.com/releases/abc/assets/monaco-editor-Cai9_Aq9.js"],
+      "Error",
+    );
+
+    expect(isMonacoClipboardDeniedEvent(event)).toBe(false);
   });
 });
 
