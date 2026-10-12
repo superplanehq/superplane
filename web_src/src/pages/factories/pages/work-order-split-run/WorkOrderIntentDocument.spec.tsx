@@ -250,6 +250,10 @@ describe("WorkOrderIntentDocument", () => {
     const composer = screen.getByTestId("split-run-intent-composer");
     expect(composer).toHaveValue("Need the existing empty-state component.");
     expect(composer).toHaveClass("pt-3", "px-3", "min-h-0");
+    expect(composer).toHaveAttribute("rows", "1");
+    expect(composer.style.paddingTop).toBe("0.75rem");
+    expect(composer.style.paddingLeft).toBe("0.75rem");
+    expect(composer.style.paddingRight).toBe("0.75rem");
     expect(composer).not.toHaveClass("py-2");
     expect(composer.className).not.toContain("min-h-[4.2rem]");
     expect(screen.getByTestId("split-run-intent-composer-kbd")).toHaveTextContent(ANALYSIS_PLANNING_COPY.sendShortcut);
