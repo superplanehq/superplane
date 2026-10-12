@@ -1,7 +1,9 @@
 package factory
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -10,6 +12,14 @@ import (
 )
 
 const AddWorkOrderArtifactComponentName = "addWorkOrderArtifact"
+
+const (
+	addWorkOrderArtifactActionAdd    = "add"
+	addWorkOrderArtifactActionUpdate = "update"
+
+	addWorkOrderArtifactActionDescription = "Add new inserts another artifact. Update existing replaces the newest artifact with the same type and title and no key. Artifacts with a key stay unchanged."
+	addWorkOrderArtifactUpdateTitleHelp   = "Required. This title identifies the artifact to replace."
+)
 
 func init() {
 	registry.RegisterAction(AddWorkOrderArtifactComponentName, &AddWorkOrderArtifact{})
@@ -27,6 +37,7 @@ type ArtifactDataEntry struct {
 type AddWorkOrderArtifactConfiguration struct {
 	OrderID      string              `json:"orderId" mapstructure:"orderId"`
 	ArtifactType string              `json:"artifactType" mapstructure:"artifactType"`
+	Action       string              `json:"action" mapstructure:"action"`
 	URL          string              `json:"url" mapstructure:"url"`
 	Title        string              `json:"title" mapstructure:"title"`
 	Body         string              `json:"body" mapstructure:"body"`
@@ -59,9 +70,13 @@ Supported types:
 
 Use the Add Pull Request component to attach a pull request to a task.
 
+Choose **Add new** or **Update existing**. Add new inserts another artifact. Update existing replaces the newest unkeyed artifact on this task with the same type and title. Artifacts with a key stay unchanged. When no unkeyed match exists, Update existing creates an unkeyed artifact.
+
+Update existing needs a stable title. A changed title adds a new artifact and leaves the old one. A duplicate title updates only the newest unkeyed match. Do not use Update existing for a branch. A branch has no title.
+
 Markdown and link types accept a free-form ` + "`data`" + ` list of ` + "`{name, value}`" + ` entries that gets merged into the artifact's ` + "`data`" + ` map. Typed inputs take precedence over free-form entries with the same key.
 
-Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this task. Keys are unique per factory.
+Set ` + "`artifactKey`" + ` to tag the artifact with a queryable key so a later ` + "`findWorkOrder`" + ` (` + "`by: artifactKey`" + `) step can resolve this task. Keys are unique per factory. The artifact key applies to Add new. Update existing does not use the artifact key.
 
 If you set a key, later runs update that artifact when ` + "`orderId`" + ` identifies the task that owns it. A run that targets another task with the same key fails. The update replaces the artifact data, so values that you leave blank are cleared. The first run sets the type. A later run with a different type fails.
 
@@ -131,6 +146,23 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:                 "action",
+			Label:                "Action",
+			Description:          addWorkOrderArtifactActionDescription,
+			Type:                 configuration.FieldTypeSelect,
+			Required:             false,
+			Default:              addWorkOrderArtifactActionAdd,
+			VisibilityConditions: titledTypes,
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "Add new", Value: addWorkOrderArtifactActionAdd},
+						{Label: "Update existing", Value: addWorkOrderArtifactActionUpdate},
+					},
+				},
+			},
+		},
+		{
 			Name:                 "url",
 			Label:                "URL",
 			Description:          "Link to the branch or external resource (must be http or https). Required for links. For branches, optional: when empty, SuperPlane writes a GitHub tree URL from repository and name. Example: https://github.com/{owner}/{repo}/tree/{branch}.",
@@ -174,10 +206,13 @@ func (c *AddWorkOrderArtifact) Configuration() []configuration.Field {
 		{
 			Name:                 "title",
 			Label:                "Title",
-			Description:          "Optional artifact title — for links, this becomes the chip's label (e.g. \"Preview\")",
+			Description:          "Optional artifact title — for links, this becomes the chip's label (e.g. \"Preview\"). When Action is Update existing: " + addWorkOrderArtifactUpdateTitleHelp,
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
 			VisibilityConditions: titledTypes,
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "action", Values: []string{addWorkOrderArtifactActionUpdate}},
+			},
 		},
 		{
 			Name:        "artifactKey",
@@ -216,12 +251,18 @@ func (c *AddWorkOrderArtifact) ValidateNodeConfiguration(config map[string]any) 
 	if err := mapstructure.Decode(config, &decoded); err != nil {
 		return err
 	}
+	if err := validateUpdateExistingArtifactConfiguration(decoded); err != nil {
+		return err
+	}
 	return validateBranchArtifactConfiguration(decoded)
 }
 
 func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 	config := AddWorkOrderArtifactConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return err
+	}
+	if err := validateUpdateExistingArtifactConfiguration(config); err != nil {
 		return err
 	}
 
@@ -234,12 +275,18 @@ func (c *AddWorkOrderArtifact) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	artifact, err := ctx.Factory.AddWorkOrderArtifact(core.AddWorkOrderArtifactParams{
+	params := core.AddWorkOrderArtifactParams{
 		OrderID: config.OrderID,
 		Type:    config.ArtifactType,
 		Data:    data,
-		Key:     config.ArtifactKey,
-	})
+	}
+	if isUpdateExistingArtifactAction(config.Action) {
+		params.UpdateByTitle = true
+	} else {
+		params.Key = config.ArtifactKey
+	}
+
+	artifact, err := ctx.Factory.AddWorkOrderArtifact(params)
 	if err != nil {
 		return err
 	}
@@ -280,6 +327,23 @@ func (c *AddWorkOrderArtifact) HandleHook(ctx core.ActionHookContext) error {
 // buildArtifactData folds the free-form list into a map and layers the
 // typed inputs on top, so a user who defines both `url` and a `url`
 // row still ends up with the typed value on the wire.
+func isUpdateExistingArtifactAction(action string) bool {
+	return strings.TrimSpace(action) == addWorkOrderArtifactActionUpdate
+}
+
+func validateUpdateExistingArtifactConfiguration(config AddWorkOrderArtifactConfiguration) error {
+	if !isUpdateExistingArtifactAction(config.Action) {
+		return nil
+	}
+	if config.ArtifactType == "branch" {
+		return fmt.Errorf("update existing requires a title, and branch artifacts have no title")
+	}
+	if strings.TrimSpace(config.Title) == "" {
+		return fmt.Errorf("title is required to update an existing artifact")
+	}
+	return nil
+}
+
 func workOrderArtifactProvider(artifactType string, factory core.FactoryContext) (string, error) {
 	if artifactType != "branch" || factory == nil {
 		return "", nil
