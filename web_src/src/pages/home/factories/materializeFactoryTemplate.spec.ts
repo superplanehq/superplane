@@ -172,7 +172,6 @@ spec:
     expect(definition.integrations).toEqual(["bitbucket", "claude"]);
     expect(Object.keys(definition.componentIntegrations).sort()).toEqual([
       "bitbucket.createPullRequest",
-      "bitbucket.createPullRequestComment",
       "bitbucket.findPullRequest",
       "bitbucket.updatePullRequest",
     ]);

@@ -18,6 +18,18 @@ import (
 	"gorm.io/datatypes"
 )
 
+func Test_NodeConfigurationBuilder_EvaluatesMultilineExpression(t *testing.T) {
+	builder := &NodeConfigurationBuilder{}
+
+	got, err := builder.ResolveTemplateExpressions("{{\n1 + 1\n}}")
+	require.NoError(t, err)
+	assert.Equal(t, "2", got)
+
+	got, err = builder.ResolveTemplateExpressions("{{1 + 1}}\n\n{{2 + 2}}")
+	require.NoError(t, err)
+	assert.Equal(t, "2\n\n4", got)
+}
+
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
