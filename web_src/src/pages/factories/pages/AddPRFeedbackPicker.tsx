@@ -14,10 +14,17 @@ interface AddPRFeedbackPickerProps {
   onClose: () => void;
   onSelect: (source: PRFeedbackSource) => void;
   takenSourceIds?: readonly PRFeedbackSourceId[];
+  vcsProvider?: string;
 }
 
-export function AddPRFeedbackPicker({ open, onClose, onSelect, takenSourceIds = [] }: AddPRFeedbackPickerProps) {
-  const sources = availablePRFeedbackSources();
+export function AddPRFeedbackPicker({
+  open,
+  onClose,
+  onSelect,
+  takenSourceIds = [],
+  vcsProvider,
+}: AddPRFeedbackPickerProps) {
+  const sources = availablePRFeedbackSources(vcsProvider);
 
   return (
     <Dialog

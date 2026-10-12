@@ -18,10 +18,9 @@ import { cn } from "@/lib/utils";
 
 import { CreateWorkOrderRequestAttachButton } from "./CreateWorkOrderRequestAttachButton";
 import { HostedVideoLinkField } from "./HostedVideoLinkField";
-import { CreateWorkOrderRequestAttachments } from "./CreateWorkOrderRequestAttachments";
+import { CreateWorkOrderRequestPreviewRow } from "./CreateWorkOrderRequestAttachments";
 import { CREATE_WORK_ORDER_REQUEST_COPY } from "./createWorkOrderRequestCopy";
 import { DictateButton } from "./DictateButton";
-import { PendingWorkOrderFileChips } from "./PendingWorkOrderFileChips";
 import {
   createWorkOrderRequestImages,
   insertHostedVideoMarkdown,
@@ -339,43 +338,43 @@ function RequestDialogFooter({
 
   return (
     <InputGroup className="h-auto shrink-0 overflow-visible border-0 bg-transparent shadow-none dark:bg-transparent">
-      <InputGroupAddon align="block-end" className="items-end justify-between gap-3 overflow-visible px-3 pt-1 pb-3">
-        <div className="flex min-w-0 items-end gap-2 overflow-visible">
-          {showAttach ? (
-            <CreateWorkOrderRequestAttachButton
-              accept={WORK_ORDER_FILE_ACCEPT}
-              disabled={!canAttach}
-              onAttach={onAttach}
-            />
-          ) : null}
-          <HostedVideoLinkField disabled={isCreating} onAdd={onAddHostedVideo} />
-          {dictate}
-          {attachedImages.length > 0 ? (
-            <CreateWorkOrderRequestAttachments images={attachedImages} onRemove={onRemoveAttachment} />
-          ) : null}
-          {pendingFiles.length > 0 ? (
-            <PendingWorkOrderFileChips files={pendingFiles} onRemove={onRemoveAttachment} />
-          ) : null}
-        </div>
-        <div className="ms-auto flex items-center gap-1.5">
-          <Kbd className="hidden sm:inline-flex" data-testid="create-work-order-request-create-kbd">
-            {sendShortcut}
-          </Kbd>
-          <Button
-            type="submit"
-            size="icon"
-            className="size-8 rounded-full"
-            disabled={!canCreate}
-            aria-label={isCreating ? CREATE_WORK_ORDER_REQUEST_COPY.creating : CREATE_WORK_ORDER_REQUEST_COPY.create}
-            aria-keyshortcuts="Meta+Enter Control+Enter"
-            data-testid="create-work-order-request-create"
-          >
-            {isCreating ? (
-              <Loader2 className="size-3.5 animate-spin" aria-hidden />
-            ) : (
-              <ArrowUp className="size-3.5" aria-hidden />
-            )}
-          </Button>
+      <InputGroupAddon
+        align="block-end"
+        className="flex-col items-stretch justify-start gap-2 overflow-visible px-3 pt-1 pb-3"
+      >
+        <CreateWorkOrderRequestPreviewRow images={attachedImages} files={pendingFiles} onRemove={onRemoveAttachment} />
+        <div className="flex w-full items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            {showAttach ? (
+              <CreateWorkOrderRequestAttachButton
+                accept={WORK_ORDER_FILE_ACCEPT}
+                disabled={!canAttach}
+                onAttach={onAttach}
+              />
+            ) : null}
+            <HostedVideoLinkField disabled={isCreating} onAdd={onAddHostedVideo} />
+            {dictate}
+          </div>
+          <div className="ms-auto flex items-center gap-1.5">
+            <Kbd className="hidden sm:inline-flex" data-testid="create-work-order-request-create-kbd">
+              {sendShortcut}
+            </Kbd>
+            <Button
+              type="submit"
+              size="icon"
+              className="size-8 rounded-full"
+              disabled={!canCreate}
+              aria-label={isCreating ? CREATE_WORK_ORDER_REQUEST_COPY.creating : CREATE_WORK_ORDER_REQUEST_COPY.create}
+              aria-keyshortcuts="Meta+Enter Control+Enter"
+              data-testid="create-work-order-request-create"
+            >
+              {isCreating ? (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              ) : (
+                <ArrowUp className="size-3.5" aria-hidden />
+              )}
+            </Button>
+          </div>
         </div>
       </InputGroupAddon>
     </InputGroup>

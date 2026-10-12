@@ -451,14 +451,16 @@ func configureHostedGitHubApp(t *testing.T) {
 	t.Setenv(config.EnvGitHubAppWebhookSecret, "webhook-secret")
 }
 
-func Test__CreateInitialWorkspaceRequiresHostedGitHubApp(t *testing.T) {
-	// The development container may carry real app credentials in its
-	// environment, so the test clears them to exercise the blocked path.
+func Test__CreateInitialWorkspaceSucceedsWithoutHostedGitHubApp(t *testing.T) {
 	t.Setenv(config.EnvGitHubAppID, "")
 	t.Setenv(config.EnvGitHubAppSlug, "")
 	t.Setenv(config.EnvGitHubAppPrivateKey, "")
 	t.Setenv(config.EnvGitHubAppWebhookSecret, "")
 	r := support.Setup(t)
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		database.DB(t.Context()),
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderGitHub, "github-owner-id", "github-owner", "GitHub Owner", ""),
+	))
 
 	server, err := NewServer(
 		r.Encryptor,
@@ -482,8 +484,7 @@ func Test__CreateInitialWorkspaceRequiresHostedGitHubApp(t *testing.T) {
 	response := httptest.NewRecorder()
 	server.createInitialWorkspace(response, request)
 
-	require.Equal(t, http.StatusServiceUnavailable, response.Code)
-	assert.Contains(t, response.Body.String(), "SUPERPLANE_GITHUB_APP_")
+	require.Equal(t, http.StatusOK, response.Code)
 }
 
 func Test__CreateInitialWorkspaceSerializesRetries(t *testing.T) {

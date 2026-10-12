@@ -104,13 +104,29 @@ func TestLostRunningTaskBecomesArchivable(t *testing.T) {
 		UpdatedAt:   now,
 	}).Error)
 
+	var lostTask *models.RunnerTask
 	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
 		locked, err := models.LockRunner(tx, runner.ID)
 		if err != nil {
 			return err
 		}
-		return locked.MarkLost(tx, now.Add(-time.Minute), now)
+		lostTask, err = locked.MarkLost(tx, now.Add(-time.Minute), now)
+		return err
 	}))
+	require.NotNil(t, lostTask)
+	assert.Equal(t, task.ID, lostTask.ID)
+	assert.Equal(t, models.RunnerTaskStateLost, lostTask.State)
+	require.NotNil(t, lostTask.FinishedAt)
+	assert.Equal(t, now, *lostTask.FinishedAt)
+	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+		locked, err := models.LockRunner(tx, runner.ID)
+		if err != nil {
+			return err
+		}
+		lostTask, err = locked.MarkLost(tx, now.Add(-time.Minute), now)
+		return err
+	}))
+	assert.Nil(t, lostTask)
 
 	reloadedTask, err := models.FindRunnerTask(db, task.ID)
 	require.NoError(t, err)
@@ -159,7 +175,7 @@ func TestReusableRunnerCanCompleteSequentialTasks(t *testing.T) {
 
 	require.NoError(t, firstTask.Reserve(db, runner.ID))
 	require.NoError(t, firstTask.Start(db, runner, "test-store", now))
-	require.NoError(t, firstTask.Complete(
+	completed, err := firstTask.Complete(
 		db,
 		runner,
 		"first-completion",
@@ -168,7 +184,21 @@ func TestReusableRunnerCanCompleteSequentialTasks(t *testing.T) {
 		"",
 		false,
 		now,
-	))
+	)
+	require.NoError(t, err)
+	assert.True(t, completed)
+	completed, err = firstTask.Complete(
+		db,
+		runner,
+		"first-completion",
+		datatypes.JSON([]byte(`{}`)),
+		0,
+		"",
+		false,
+		now,
+	)
+	require.NoError(t, err)
+	assert.False(t, completed)
 
 	require.NoError(t, secondTask.Reserve(db, runner.ID))
 	assert.Equal(t, models.RunnerTaskStateReserved, secondTask.State)

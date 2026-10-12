@@ -45,8 +45,8 @@ describe("FirstRunHostScreen", () => {
     const tickets = screen.getByTestId("first-run-tickets");
     expect(tickets.closest(".dark")).toBeNull();
     expectLightMark(markIn(screen.getByRole("button", { name: /GitHub Issues/ })));
-    expectColoredMark(markIn(screen.getByRole("button", { name: /Jira/ })));
-    expectColoredMark(markIn(screen.getByRole("button", { name: /Linear/ })));
+    expectColoredMark(markIn(screen.getByRole("button", { name: /^Jira\b/ })));
+    expectColoredMark(markIn(screen.getByRole("button", { name: /^Linear\b/ })));
   });
 
   it("shows a light SuperPlane mark on the hosted model row without waiting for dark", () => {

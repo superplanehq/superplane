@@ -2,21 +2,33 @@ import React, { useCallback, useState } from "react";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import { FirstRunShell } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
+import { FleetManagerStep } from "./ownerSetup/FleetManagerStep";
 import { LicenseStep } from "./ownerSetup/LicenseStep";
+import { OWNER_SETUP_COPY } from "./ownerSetup/ownerSetupCopy";
 import { OwnerSetupPane } from "./ownerSetup/OwnerSetupPane";
 import { OwnerStep } from "./ownerSetup/OwnerStep";
+import { SmtpStep } from "./ownerSetup/SmtpStep";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { newOrganizationLandingPath } from "./newOrganizationLandingPath";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
-const OWNER_SETUP_STEPS = 2;
+const OWNER_SETUP_STEPS = 4;
 
-type OwnerSetupStep = "owner" | "license" | "survey";
+type OwnerSetupStep = "owner" | "license" | "smtp" | "fleet" | "survey";
 
 function ownerSetupStepNumber(step: OwnerSetupStep) {
   if (step === "owner") return 1;
   if (step === "license") return 2;
+  if (step === "smtp") return 3;
+  if (step === "fleet") return 4;
   return OWNER_SETUP_STEPS;
+}
+
+function ownerSetupCaption(step: OwnerSetupStep) {
+  if (step === "license") return OWNER_SETUP_COPY.pane.license;
+  if (step === "smtp") return OWNER_SETUP_COPY.pane.smtp;
+  if (step === "fleet") return OWNER_SETUP_COPY.pane.fleet;
+  return OWNER_SETUP_COPY.pane.owner;
 }
 
 function isEmailValid(email: string) {
@@ -182,13 +194,13 @@ const OwnerSetup: React.FC = () => {
     });
   };
 
-  const handleLicenseContinue = useCallback(() => {
+  const finishInstallation = useCallback(() => {
     if (pendingOrganizationSlug) {
       continueAfterOwnerSetup({ orgSlug: pendingOrganizationSlug, setActiveSurvey, setStep });
     }
   }, [pendingOrganizationSlug]);
 
-  const onEditionStep = step === "license";
+  const afterOwner = step !== "owner" && step !== "survey";
 
   return (
     <FirstRunShell
@@ -198,15 +210,15 @@ const OwnerSetup: React.FC = () => {
         step === "survey"
           ? undefined
           : {
-              stepIndex: onEditionStep ? 1 : 0,
+              stepIndex: ownerSetupStepNumber(step) - 1,
               stepCount: OWNER_SETUP_STEPS,
-              email: onEditionStep ? email : undefined,
-              onLogOut: onEditionStep ? () => (window.location.href = "/logout") : undefined,
+              email: afterOwner ? email : undefined,
+              onLogOut: afterOwner ? () => (window.location.href = "/logout") : undefined,
             }
       }
       aside={
         <OwnerSetupPane
-          caption={onEditionStep ? "Awaiting edition" : "Awaiting owner"}
+          caption={ownerSetupCaption(step)}
           step={ownerSetupStepNumber(step)}
           stepCount={OWNER_SETUP_STEPS}
         />
@@ -231,7 +243,15 @@ const OwnerSetup: React.FC = () => {
         />
       )}
 
-      {step === "license" && pendingOrganizationSlug && <LicenseStep onContinue={handleLicenseContinue} />}
+      {step === "license" && pendingOrganizationSlug && <LicenseStep onContinue={() => setStep("smtp")} />}
+
+      {step === "smtp" && pendingOrganizationSlug && (
+        <SmtpStep onContinue={() => setStep("fleet")} onSkip={() => setStep("fleet")} />
+      )}
+
+      {step === "fleet" && pendingOrganizationSlug && (
+        <FleetManagerStep onContinue={finishInstallation} onSkip={finishInstallation} />
+      )}
 
       {step === "survey" && activeSurvey && pendingOrganizationSlug && (
         <PostHogSurveyForm survey={activeSurvey} redirectTo={newOrganizationLandingPath(pendingOrganizationSlug)} />

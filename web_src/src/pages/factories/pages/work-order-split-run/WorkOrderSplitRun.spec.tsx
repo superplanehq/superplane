@@ -502,9 +502,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("popup-owner-time-cost")).not.toBeInTheDocument();
     expect(screen.queryByRole("tablist", { name: "Task views" })).not.toBeInTheDocument();
     const panel = screen.getByTestId("redesign-console-summary");
-    expect(within(panel).getByTestId("popup-edit-owner")).toHaveAccessibleName(
-      `Owner: ${SPLIT_RUN_RUNNING.owner.name}`,
-    );
+    expect(within(panel).getByTestId("task-edit-owner")).toHaveAccessibleName(`Owner: ${SPLIT_RUN_RUNNING.owner.name}`);
     expect(panel).toHaveTextContent("$0.73");
     expect(panel).toHaveTextContent("2.7k tokens");
     expect(within(panel).getByTestId("split-run-source")).toHaveTextContent("GitHub issues");
@@ -1206,6 +1204,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-stop")).not.toBeInTheDocument();
     expect(screen.queryByTestId("popup-work-order-archive-button")).not.toBeInTheDocument();
     expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("task-edit-owner")).not.toBeInTheDocument();
     expect(screen.getByTestId("redesign-console-summary")).toHaveTextContent(
       splitRunFixtureForWorkOrder(OPEN_WORK_ORDER).owner.name,
     );
@@ -1936,7 +1935,7 @@ describe("WorkOrderSplitRunPopup", () => {
     });
 
     const panel = screen.getByTestId("redesign-console-summary");
-    expect(within(panel).getByText("No owner")).toBeInTheDocument();
+    expect(within(panel).getByTestId("empty-owner-mark")).toBeInTheDocument();
     expect(within(panel).getByTestId("split-run-source")).toHaveTextContent("Igor Šarčević");
     expect(within(panel).getByText("Created manually")).toBeInTheDocument();
   });
@@ -2176,6 +2175,7 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("popup-work-order-title")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("task-edit-owner")).not.toBeInTheDocument();
     expect(screen.getByTestId("redesign-console-summary")).toHaveTextContent(SPLIT_RUN_RUNNING.owner.name);
   });
 });

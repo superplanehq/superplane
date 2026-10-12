@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +14,8 @@ import (
 )
 
 const mcpServerConfiguredStoryID = "factories-pages-settings-mcp-server--configured"
-const longMCPClientRevokeID = "superplane-mcp-client-revoke-mcp-client-codex"
+const longMCPClientID = "mcp-client-long-name"
+const longMCPClientRevokeID = "superplane-mcp-client-revoke-" + longMCPClientID
 
 type mcpClientRowLayout struct {
 	CardLeft       float64 `json:"cardLeft"`
@@ -129,11 +131,11 @@ func waitForMCPClientRowLayout(t *testing.T, page pw.Page, check func(mcpClientR
 }
 
 func readMCPClientRowLayout(page pw.Page) (mcpClientRowLayout, error) {
-	raw, err := page.Evaluate(`() => {
+	script := strings.ReplaceAll(`() => {
 		const card = document.querySelector('[data-testid="superplane-mcp-server"]');
 		const list = document.querySelector('[data-testid="superplane-mcp-clients-list"]');
-		const button = document.querySelector('[data-testid="superplane-mcp-client-revoke-mcp-client-codex"]');
-		const name = document.querySelector('[data-testid="superplane-mcp-client-name-mcp-client-codex"]');
+		const button = document.querySelector('[data-testid="superplane-mcp-client-revoke-LONG_ID"]');
+		const name = document.querySelector('[data-testid="superplane-mcp-client-name-LONG_ID"]');
 		const cursorTime = document.querySelector('[data-testid="superplane-mcp-client-time-mcp-client-cursor-leonardo"]');
 		const codexTime = document.querySelector('[data-testid="superplane-mcp-client-time-mcp-client-codex"]');
 		if (!card || !list || !button || !name || !cursorTime || !codexTime) {
@@ -157,7 +159,8 @@ func readMCPClientRowLayout(page pw.Page) (mcpClientRowLayout, error) {
 			cursorTimeLeft: cursorTime.getBoundingClientRect().left,
 			codexTimeLeft: codexTime.getBoundingClientRect().left,
 		};
-	}`)
+	}`, "LONG_ID", longMCPClientID)
+	raw, err := page.Evaluate(script)
 	if err != nil {
 		return mcpClientRowLayout{}, err
 	}

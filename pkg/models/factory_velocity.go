@@ -55,6 +55,9 @@ type FactoryVelocityMember struct {
 	// "git_hub_login", so the query alias would not bind and every member would
 	// look like they have no GitHub identity.
 	GitHubLogin string `gorm:"column:github_login"`
+	// BitbucketUUID is the normalized linked Bitbucket account UUID. Bitbucket
+	// authors match on this only, never on nicknames.
+	BitbucketUUID string `gorm:"column:bitbucket_uuid"`
 }
 
 // ListFactoryVelocityPullRequests returns every factory pull request that
@@ -158,15 +161,17 @@ WHERE p.factory_id = ?
 `
 
 // ListFactoryVelocityMembers returns the human members of an organization with
-// their GitHub identity, when they linked one.
+// their GitHub identity, when they linked one, and their Bitbucket account
+// UUID, when they linked that.
 //
 // A member can arrive at a GitHub login two ways: they linked a GitHub account
 // on purpose, or they sign in with GitHub. The link wins, because a member who
 // links an account states which author they are. Signing in with GitHub stays a
-// fallback so members who joined that way keep their attribution.
+// fallback so members who joined that way keep their attribution. Bitbucket
+// matches on the linked UUID only, never on nicknames.
 func ListFactoryVelocityMembers(tx *gorm.DB, orgID uuid.UUID) ([]FactoryVelocityMember, error) {
 	var members []FactoryVelocityMember
-	err := tx.Raw(listFactoryVelocityMembersSQL, ProviderGitHub, ProviderGitHub, orgID, UserTypeHuman).Scan(&members).Error
+	err := tx.Raw(listFactoryVelocityMembersSQL, ProviderGitHub, ProviderGitHub, ProviderBitbucket, orgID, UserTypeHuman).Scan(&members).Error
 	if err != nil {
 		return nil, err
 	}
@@ -179,11 +184,13 @@ SELECT DISTINCT ON (u.id)
 	u.name,
 	COALESCE(NULLIF(l.avatar_url, ''), p.avatar_url, '') AS avatar_url,
 	COALESCE(u.email, '') AS email,
-	COALESCE(NULLIF(l.username, ''), p.username, '') AS github_login
+	COALESCE(NULLIF(l.username, ''), p.username, '') AS github_login,
+	COALESCE(NULLIF(b.provider_id, ''), '') AS bitbucket_uuid
 FROM users u
 LEFT JOIN accounts a ON a.id = u.account_id
 LEFT JOIN account_linked_accounts l ON l.account_id = a.id AND l.provider = ?
 LEFT JOIN account_providers p ON p.account_id = a.id AND p.provider = ?
+LEFT JOIN account_linked_accounts b ON b.account_id = a.id AND b.provider = ? AND b.active = TRUE
 WHERE u.organization_id = ?
 	AND u.type = ?
 	AND u.deleted_at IS NULL

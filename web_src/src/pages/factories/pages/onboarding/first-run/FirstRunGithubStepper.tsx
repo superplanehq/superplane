@@ -10,9 +10,14 @@ export type FirstRunGithubStep = "connect" | "organization" | "repository";
 
 const STEP_ORDER: readonly FirstRunGithubStep[] = ["connect", "organization", "repository"];
 
-function stepLabel(step: FirstRunGithubStep, done: boolean, organizationName?: string): string {
-  if (step === "connect") return copy.connectGitHub;
+function stepLabel(step: FirstRunGithubStep, done: boolean, organizationName?: string, provider = "github"): string {
+  if (step === "connect") return provider === "bitbucket" ? FIRST_RUN_COPY.bitbucket.connectAction : copy.connectGitHub;
   if (step === "organization") {
+    if (provider === "bitbucket") {
+      return done && organizationName
+        ? FIRST_RUN_COPY.bitbucket.stepWorkspaceDone(organizationName)
+        : FIRST_RUN_COPY.bitbucket.stepWorkspace;
+    }
     return done && organizationName ? copy.stepOrganizationDone(organizationName) : copy.stepOrganization;
   }
   return copy.stepRepository;
@@ -43,11 +48,13 @@ function StepMark({ number, done }: { number: number; done: boolean }) {
  */
 export function FirstRunGithubStepper({
   current,
+  provider = "github",
   organizationName,
   action,
   children,
 }: {
   current: FirstRunGithubStep;
+  provider?: "github" | "bitbucket";
   /** Names the finished organization row, e.g. "Organization: acme". */
   organizationName?: string;
   /** Control on the active step header, e.g. the Connect button. */
@@ -90,7 +97,7 @@ export function FirstRunGithubStepper({
                 ) : (
                   <StepMark number={index + 1} done={done} />
                 )}
-                {stepLabel(step, done, organizationName)}
+                {stepLabel(step, done, organizationName, provider)}
               </span>
               {active ? action : null}
             </div>

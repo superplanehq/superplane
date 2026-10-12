@@ -1,3 +1,4 @@
+import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
@@ -88,6 +89,7 @@ const PUBLIC_AUTOMATION_KINDS = new Set<ColumnAutomationKind>([
 
 const PUBLIC_AUTOMATION_ICONS: Record<string, { src: string; alt: string }> = {
   github: { src: githubIcon, alt: "GitHub" },
+  bitbucket: { src: bitbucketIcon, alt: "Bitbucket" },
   dependabot: { src: dependabotIcon, alt: "Dependabot" },
   sentry: { src: sentryIcon, alt: "Sentry" },
   jira: { src: jiraIcon, alt: "Jira" },
@@ -342,6 +344,9 @@ function automationIcon(
 ): { src: string; alt: string } {
   if (source) {
     return { src: source.iconSrc, alt: source.iconAlt };
+  }
+  if (icon && PUBLIC_AUTOMATION_ICONS[icon]) {
+    return PUBLIC_AUTOMATION_ICONS[icon];
   }
   if (kind === "pr-closure") {
     return { src: PR_CLOSURE_ENTRY.iconSrc, alt: PR_CLOSURE_ENTRY.iconAlt };

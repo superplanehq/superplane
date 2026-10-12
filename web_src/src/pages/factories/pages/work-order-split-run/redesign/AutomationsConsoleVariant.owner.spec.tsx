@@ -28,14 +28,6 @@ vi.mock("@/hooks/useOrganizationData", () => ({
   }),
 }));
 
-function checkboxFor(name: string) {
-  const item = screen.getAllByRole("listitem").find((entry) => entry.textContent?.includes(name));
-  if (!item) {
-    throw new Error(`Could not find list item for ${name}`);
-  }
-  return within(item).getByRole("checkbox");
-}
-
 function OwnerEditHost({
   initialIds,
   initialOwner,
@@ -91,9 +83,8 @@ describe("AutomationsConsoleVariant owner", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("popup-edit-owner"));
-    fireEvent.click(checkboxFor("Casey Reviewer"));
-    fireEvent.click(screen.getByTestId("work-order-save-assignees"));
+    fireEvent.click(screen.getByTestId("task-edit-owner"));
+    fireEvent.click(screen.getByRole("option", { name: "Casey Reviewer" }));
 
     await waitFor(() => expect(onOwnerSave).toHaveBeenCalledWith(["user-me"]));
     expect(screen.getByRole("button", { name: "Owner: Casey Reviewer" })).toBeInTheDocument();
@@ -109,9 +100,8 @@ describe("AutomationsConsoleVariant owner", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("popup-edit-owner"));
-    fireEvent.click(checkboxFor("Leonardo DiCaprio"));
-    fireEvent.click(screen.getByTestId("work-order-save-assignees"));
+    fireEvent.click(screen.getByTestId("task-edit-owner"));
+    fireEvent.click(screen.getByRole("option", { name: "No owner" }));
 
     await waitFor(() => expect(onOwnerSave).toHaveBeenCalledWith([]));
     expect(screen.getByRole("button", { name: "Assign owner" })).toBeInTheDocument();
@@ -143,8 +133,8 @@ describe("AutomationsConsoleVariant owner", () => {
     );
 
     const panel = screen.getByTestId("redesign-console-summary");
-    expect(within(panel).queryByTestId("popup-edit-owner")).not.toBeInTheDocument();
-    expect(within(panel).getByText("No owner")).toBeInTheDocument();
+    expect(within(panel).queryByTestId("task-edit-owner")).not.toBeInTheDocument();
+    expect(within(panel).getByTestId("empty-owner-mark")).toBeInTheDocument();
     expect(within(panel).queryByText("Task Author")).not.toBeInTheDocument();
   });
 });

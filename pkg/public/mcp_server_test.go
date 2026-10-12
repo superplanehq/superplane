@@ -471,6 +471,31 @@ func TestMCPEphemeralLoopbackAuthorizeAndExchange(t *testing.T) {
 	require.NotEmpty(t, tokenBody["refresh_token"])
 }
 
+func TestMCPAuthorizeConsentDoesNotShowCodexMetadataURL(t *testing.T) {
+	r := support.Setup(t)
+	server, _, token := setupTestServer(r, t)
+	const codexID = "https://chatgpt.com/oauth/codex/example/client.json"
+	_, err := models.CreateMCPOAuthClient(database.DB(t.Context()), codexID, codexID, []string{mcpserver.CursorRedirectURIs[0]})
+	require.NoError(t, err)
+
+	query := url.Values{}
+	query.Set("client_id", codexID)
+	query.Set("redirect_uri", mcpserver.CursorRedirectURIs[0])
+	query.Set("response_type", "code")
+	query.Set("code_challenge", mcp.S256Challenge(mcpTestPKCEVerifier))
+	query.Set("code_challenge_method", "S256")
+	query.Set("state", "state-1")
+	authReq := httptest.NewRequest(http.MethodGet, "/oauth/authorize?"+query.Encode(), nil)
+	authReq.Host = "localhost:8000"
+	authReq.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	authRec := httptest.NewRecorder()
+	server.Router.ServeHTTP(authRec, authReq)
+	require.Equal(t, http.StatusOK, authRec.Code)
+	body := authRec.Body.String()
+	assert.Contains(t, body, "Choose the workspace Codex can use")
+	assert.NotContains(t, body, "Choose the workspace "+codexID)
+}
+
 func exchangeMCPCode(server *Server, code, clientID, redirectURI string) *httptest.ResponseRecorder {
 	values := url.Values{}
 	values.Set("grant_type", "authorization_code")

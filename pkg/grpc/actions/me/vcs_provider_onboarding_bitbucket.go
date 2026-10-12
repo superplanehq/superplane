@@ -46,11 +46,16 @@ func describeBitbucketOnboarding(ctx context.Context) (*pb.DescribeVCSProviderOn
 		return response, nil
 	}
 
-	repositories, err := bitbucketRepositoriesForAccount(ctx, identity.providerUserID)
+	catalog, err := bitbucketCatalogForAccount(ctx, identity.providerUserID)
 	if err != nil {
-		return nil, grpcerrors.Internal(err, "failed to list Bitbucket repositories")
+		return nil, grpcerrors.Internal(err, "failed to check Bitbucket workspace access")
 	}
-	response.Repositories = repositories
+	response.Repositories = serializeBitbucketRepositories(catalog.Repositories)
+	for _, workspace := range catalog.Workspaces {
+		response.InstalledWorkspaces = append(response.InstalledWorkspaces, &pb.VCSProviderInstalledWorkspace{
+			InstallationId: workspace.ID, ExternalId: workspace.WorkspaceUUID, Slug: workspace.WorkspaceSlug,
+		})
+	}
 	return response, nil
 }
 
@@ -65,10 +70,10 @@ func startBitbucketInstallation(ctx context.Context) (*pb.StartVCSProviderInstal
 	return &pb.StartVCSProviderInstallationResponse{Url: cfg.InstallURL}, nil
 }
 
-func bitbucketRepositoriesForAccount(ctx context.Context, accountUUID string) ([]*pb.VCSProviderRepository, error) {
+func bitbucketCatalogForAccount(ctx context.Context, accountUUID string) (bitbucket.VisibleCatalog, error) {
 	installations, err := models.ListActiveBitbucketForgeInstallations(database.DB(ctx))
 	if err != nil {
-		return nil, err
+		return bitbucket.VisibleCatalog{}, err
 	}
 	refs := make([]bitbucket.InstallationRef, 0, len(installations))
 	for _, installation := range installations {
@@ -78,10 +83,10 @@ func bitbucketRepositoriesForAccount(ctx context.Context, accountUUID string) ([
 			WorkspaceSlug: installation.WorkspaceSlug,
 		})
 	}
-	visible, err := bitbucket.CurrentDirectory().RepositoriesVisibleTo(ctx, accountUUID, refs, forgeSystemToken)
-	if err != nil {
-		return nil, err
-	}
+	return bitbucket.CurrentDirectory().CatalogVisibleTo(ctx, accountUUID, refs, forgeSystemToken)
+}
+
+func serializeBitbucketRepositories(visible []bitbucket.VisibleRepository) []*pb.VCSProviderRepository {
 	repositories := make([]*pb.VCSProviderRepository, 0, len(visible))
 	for _, repository := range visible {
 		repositories = append(repositories, &pb.VCSProviderRepository{
@@ -93,7 +98,7 @@ func bitbucketRepositoriesForAccount(ctx context.Context, accountUUID string) ([
 			ExternalId:    repository.UUID,
 		})
 	}
-	return repositories, nil
+	return repositories
 }
 
 func forgeSystemToken(installationID string) (string, error) {

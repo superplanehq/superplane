@@ -21,7 +21,7 @@ const (
 
 const (
 	PlanningSpecArtifactKey         = "spec"
-	PlanningSpecArtifactTitle       = "spec.md"
+	PlanningSpecArtifactTitle       = "plan.md"
 	PlanningSpecArtifactCanvasRunID = "canvasRunId"
 
 	// Clarity is how well the task is defined. Confidence is how likely a

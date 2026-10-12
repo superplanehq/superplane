@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -145,6 +146,15 @@ func TestFactoryWorkOrder_StatusTransitionEndsAnalysisSession(t *testing.T) {
 			})
 			require.NoError(t, err)
 
+			var automation *CanvasRun
+			if test.state == FactoryWorkOrderStateClosed {
+				automation, err = CreateCanvasRunInTransaction(db, canvas.ID, FactoryAppBacklogTriggerID, CanvasRunStateStarted, "")
+				require.NoError(t, err)
+				event := analysisWorkOrderCreatedEvent(canvas.ID, automation.ID, order.ID, true)
+				event.ID = uuid.New()
+				require.NoError(t, db.Create(event).Error)
+			}
+
 			changed, err := order.UpdateStatus(db, FactoryWorkOrderStatusUpdate{
 				ToState: test.state,
 				Result:  test.result,
@@ -160,6 +170,11 @@ func TestFactoryWorkOrder_StatusTransitionEndsAnalysisSession(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, CanvasRunStateCancelling, run.State)
 			assert.Equal(t, test.expectedRunResult, run.Result)
+			if automation != nil {
+				automation, err = FindUnscopedCanvasRun(db, automation.ID)
+				require.NoError(t, err)
+				assert.Equal(t, CanvasRunStateCancelling, automation.State)
+			}
 		})
 	}
 }
@@ -486,6 +501,10 @@ func TestFactoryPlanningSession_ProposeSpecAndConfidence(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, artifacts, 1)
 	assert.Equal(t, planningSpecArtifactKey(order.ID), *artifacts[0].Key)
+	var data map[string]any
+	require.NoError(t, json.Unmarshal(artifacts[0].Data, &data))
+	assert.Equal(t, "plan.md", data["name"])
+	assert.Equal(t, "plan.md", data["title"])
 	assert.Contains(t, string(artifacts[0].Data), "Stop double charges.")
 
 	require.NoError(t, session.ProposeSpec(db, body+"\n## Problem\n\nThe retry is missing.\n"))

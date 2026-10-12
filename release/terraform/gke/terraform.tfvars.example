@@ -54,7 +54,49 @@ letsencrypt_email = "admin@example.com"
 # -----------------------------------------------------------------------------
 
 # superplane_namespace = "superplane"
-# superplane_image_tag = "stable"  # Options: stable, beta, or specific version like v0.4
+
+# Required. The plain SHA and stable images fail CORS on your domain.
+superplane_image_tag = "<git-sha>-selfhosted"
+
+# Required unless you set superplane_chart_path. Empty installs the latest
+# published chart, which may lack GKE ACME and migrate fixes.
+superplane_chart_version = "0.0.0-<git-sha>"
+
+# Install the chart from this repository to test changes that are not published.
+# superplane_chart_path = "../../superplane-helm-chart/helm"
+
+# -----------------------------------------------------------------------------
+# Optional Variables - Blob Storage
+# -----------------------------------------------------------------------------
+
+# Store task logs and files in a GCS bucket. Runners require this.
+# enable_gcs_blob_storage = true
+# blob_bucket_name        = ""     # Default: <project_id>-superplane-blobs
+# blob_bucket_force_destroy = false
+
+# -----------------------------------------------------------------------------
+# Optional Variables - Runners
+# -----------------------------------------------------------------------------
+
+# Step 1: create the runner network and enable the runner API.
+# enable_runners = true
+
+# Step 2: after owner setup, create a personal API token and deploy Fleet Manager.
+# Do not commit the token. You can set TF_VAR_installation_admin_token instead.
+# installation_admin_token = "..."
+# fleet_manager_image_tag  = "<git-sha>"
+
+# runner_zones       = ["us-central1-a", "us-central1-b"]
+# runner_subnet_cidr = "172.20.0.0/24"
+# runner_fleets = [
+#   {
+#     id            = "e1-large-amd64"
+#     architecture  = "amd64"
+#     machine_type  = "e2-standard-4"
+#     warm_capacity = 0
+#     max_capacity  = 2
+#   }
+# ]
 
 # -----------------------------------------------------------------------------
 # Optional Variables - Network

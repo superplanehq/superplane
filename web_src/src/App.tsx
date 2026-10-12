@@ -67,7 +67,11 @@ import {
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { isPublicFactoryLinePath } from "./pages/factories/lib/publicFactoryLinePath";
 import { FactoryLineAccessGate } from "./pages/factories/pages/FactoryLineAccessGate";
-import { FactoryWorkspaceLayoutSwitch, WorkOrderDetailRouteSwitch } from "./pages/factories/mobile/MobileShellSwitch";
+import {
+  FactoryMoreRouteSwitch,
+  FactoryWorkspaceLayoutSwitch,
+  WorkOrderDetailRouteSwitch,
+} from "./pages/factories/mobile/MobileShellSwitch";
 import { WorkspaceLoadingProvider } from "./pages/factories/layout/workspaceLoading";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
@@ -161,6 +165,7 @@ function organizationScopedRouteTree() {
             <Route path="missions" element={<MissionsPage />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="velocity" element={<VelocityPage />} />
+            <Route path="more" element={<FactoryMoreRouteSwitch />} />
             <Route path="tasks">
               <Route index element={<WorkOrdersPage />} />
               <Route path="new" element={<CreateWorkOrderComposeGate />} />

@@ -262,6 +262,7 @@ func (s *adminSetupSteps) fillInOwnerDetailsAndSubmit() {
 	s.session.FillIn(q.Locator(`input[placeholder="Confirm password"]`), "Password1")
 	s.session.Click(q.Text("Continue"))
 	s.waitForSetupToComplete()
+	skipRemainingOwnerSetupSteps(s.t, s.session)
 }
 
 func (s *adminSetupSteps) waitForSetupToComplete() {

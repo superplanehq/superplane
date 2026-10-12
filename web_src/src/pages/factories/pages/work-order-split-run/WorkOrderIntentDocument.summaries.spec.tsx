@@ -406,3 +406,100 @@ describe("WorkOrderIntentDocument score evidence", () => {
     expect(screen.getByTestId("split-run-intent-document").hasAttribute("data-refine-plan-open")).toBe(false);
   });
 });
+
+describe("WorkOrderIntentDocument phone override drawer", () => {
+  const desktopWidth = window.innerWidth;
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.stubGlobal("ResizeObserver", IntentDocumentResizeObserver);
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 390 });
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+    vi.unstubAllGlobals();
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: desktopWidth });
+    resetStreamMemoryForTests();
+  });
+
+  function renderDiscouragedDraft(onStart = vi.fn()) {
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        clarity={HIGH_CLARITY}
+        confidence={{ ...HIGH_CONFIDENCE, score: 3 }}
+        resultFooter={
+          <SplitRunReview footer={splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER).footer} onStart={onStart} compact />
+        }
+        analysis={analysisChat({ view: WAITING_WITH_PLAN, modelSelect: <button type="button">Model: Auto</button> })}
+      />,
+    );
+    return onStart;
+  }
+
+  it("keeps a closed override to one line and leaves the model and Start out of the layout", () => {
+    renderDiscouragedDraft();
+
+    const implementation = screen.getByRole("region", { name: "Implementation" });
+    expect(implementation).toHaveTextContent("Starting not recommended.");
+    expect(screen.getByRole("button", { name: "Override" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Model: Auto" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("split-run-intent-settings")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("phone-override-drawer")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Review the plan before you start" })).not.toBeInTheDocument();
+  });
+
+  it("slides the readiness message open on one row with the model and Start", async () => {
+    const user = userEvent.setup();
+    const onStart = renderDiscouragedDraft();
+
+    await user.click(screen.getByRole("button", { name: "Override" }));
+
+    expect(onStart).not.toHaveBeenCalled();
+    const implementation = screen.getByRole("region", { name: "Implementation" });
+    const headline = within(implementation).getByRole("heading", { name: "Review the plan before you start" });
+    const body = within(implementation).getByText(
+      "The work is still uncertain. Add more context, or start if you accept the risk.",
+    );
+    expect(headline).toBeVisible();
+    expect(body).toBeVisible();
+    expect(headline.closest("[data-testid=split-run-intent-settings]")).toBeNull();
+    expect(body.closest("[data-testid=split-run-intent-settings]")).toBeNull();
+
+    const drawer = screen.getByTestId("phone-override-drawer");
+    expect(drawer).toHaveClass("min-w-0");
+    const panel = document.getElementById(
+      screen.getByRole("button", { name: "Hide options" }).getAttribute("aria-controls") ?? "",
+    );
+    expect(panel).toHaveClass("data-[state=open]:animate-accordion-down");
+    expect(panel).toHaveClass("motion-reduce:animate-none");
+
+    const actions = screen.getByTestId("split-run-intent-settings");
+    expect(actions).toContainElement(screen.getByRole("button", { name: "Model: Auto" }));
+    expect(actions).toContainElement(screen.getByRole("button", { name: "Start" }));
+    expect(actions.className).not.toMatch(/flex-wrap/);
+    expect(actions.className).not.toMatch(/flex-col/);
+    const start = screen.getByRole("button", { name: "Start" });
+    expect(start).not.toHaveClass("bg-primary");
+    expect(start).toHaveClass("border");
+
+    await user.click(start);
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes the drawer from the layout when options are hidden", async () => {
+    const user = userEvent.setup();
+    renderDiscouragedDraft();
+
+    await user.click(screen.getByRole("button", { name: "Override" }));
+    await user.click(screen.getByRole("button", { name: "Hide options" }));
+
+    expect(screen.queryByTestId("phone-override-drawer")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Review the plan before you start" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Override" })).toHaveAttribute("aria-expanded", "false");
+  });
+});

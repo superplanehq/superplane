@@ -17,10 +17,12 @@ RUN apk add --no-cache \
       openssl \
       py3-crcmod \
       py3-openssl \
+      py3-pip \
       python3 \
       tar \
       unzip \
       vim \
+    && pip3 install --break-system-packages --no-cache-dir --root-user-action=ignore 'azure-cli==2.77.0' \
     && curl -fsSL -o /tmp/google-cloud-cli.tar.gz https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-586.0.0-linux-x86_64.tar.gz \
     && printf '%s  /tmp/google-cloud-cli.tar.gz\n' '6c774c76793eedd501150b59da653610fbe3eaac169e822965b722de75a2f001' > /tmp/google-cloud-cli.sha256 \
     && sha256sum -c /tmp/google-cloud-cli.sha256 \
@@ -52,4 +54,5 @@ RUN apk add --no-cache \
     && gcloud version \
     && gke-gcloud-auth-plugin --version \
     && aws --version \
+    && az version \
     && eksctl version

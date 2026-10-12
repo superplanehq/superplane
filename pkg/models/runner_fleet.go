@@ -60,6 +60,35 @@ type RunnerFleet struct {
 	DeletedAt     gorm.DeletedAt
 }
 
+// MetricScope distinguishes installation fleets from organization fleets that share a slug.
+func (f *RunnerFleet) MetricScope(tx *gorm.DB) (string, error) {
+	if f.ScopeType != RunnerFleetScopeOrganization {
+		return f.ScopeType, nil
+	}
+	if f.ScopeID == nil {
+		return "", errors.New("organization fleet has no scope ID")
+	}
+	var organization Organization
+	if err := tx.Unscoped().Select("slug").First(&organization, "id = ?", *f.ScopeID).Error; err != nil {
+		return "", err
+	}
+	if organization.Slug == "" {
+		return "", errors.New("organization fleet has no organization slug")
+	}
+	return RunnerFleetMetricScope(f.ScopeType, organization.Slug), nil
+}
+
+// RunnerFleetMetricScope identifies a fleet's installation or organization scope.
+func RunnerFleetMetricScope(scopeType, organizationSlug string) string {
+	if scopeType == RunnerFleetScopeOrganization {
+		if organizationSlug == "" {
+			return ""
+		}
+		return scopeType + "/" + organizationSlug
+	}
+	return scopeType
+}
+
 // DefaultInstallationRunnerFleets is the initial fleet catalog for a new
 // installation. Providers decide how to satisfy these specifications.
 func DefaultInstallationRunnerFleets(runnerVersion string) []RunnerFleet {
@@ -268,10 +297,11 @@ type TaskListPage struct {
 }
 
 type FleetStateCount struct {
-	FleetID   uuid.UUID
-	FleetSlug string
-	State     string
-	Count     int64
+	FleetID    uuid.UUID
+	FleetSlug  string
+	FleetScope string
+	State      string
+	Count      int64
 }
 
 func (f *RunnerFleet) FindRunner(tx *gorm.DB, id uuid.UUID) (*Runner, error) {
@@ -483,14 +513,17 @@ func trimListPage[T any](rows []T, limit int) ([]T, bool) {
 
 func listCountsByFleetState(tx *gorm.DB, model any, states []string) ([]FleetStateCount, error) {
 	type fleetRow struct {
-		ID   uuid.UUID
-		Slug string
+		ID               uuid.UUID
+		Slug             string
+		ScopeType        string
+		OrganizationSlug string
 	}
 
 	var fleets []fleetRow
 	if err := tx.Model(&RunnerFleet{}).
-		Select("id", "slug").
-		Order("slug ASC, id ASC").
+		Select("runner_fleets.id, runner_fleets.slug, runner_fleets.scope_type, organizations.slug AS organization_slug").
+		Joins("LEFT JOIN organizations ON organizations.id = runner_fleets.scope_id").
+		Order("runner_fleets.slug ASC, runner_fleets.id ASC").
 		Scan(&fleets).
 		Error; err != nil {
 		return nil, err
@@ -533,10 +566,11 @@ func listCountsByFleetState(tx *gorm.DB, model any, states []string) ([]FleetSta
 	for _, fleet := range fleets {
 		for _, state := range states {
 			result = append(result, FleetStateCount{
-				FleetID:   fleet.ID,
-				FleetSlug: fleet.Slug,
-				State:     state,
-				Count:     counts[key{FleetID: fleet.ID, State: state}],
+				FleetID:    fleet.ID,
+				FleetSlug:  fleet.Slug,
+				FleetScope: RunnerFleetMetricScope(fleet.ScopeType, fleet.OrganizationSlug),
+				State:      state,
+				Count:      counts[key{FleetID: fleet.ID, State: state}],
 			})
 		}
 	}

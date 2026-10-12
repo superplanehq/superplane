@@ -7,8 +7,9 @@ managed Kubernetes clusters.
 
 | Platform | Directory | Status |
 |----------|-----------|--------|
-| Google Kubernetes Engine (GKE) | [`gke/`](./gke/) | ✅ Ready |
-| Amazon Elastic Kubernetes Service (EKS) | [`eks/`](./eks/) | ✅ Ready |
+| Google Kubernetes Engine (GKE) | [`gke/`](./gke/) | Ready |
+| Amazon Elastic Kubernetes Service (EKS) | [`eks/`](./eks/) | Ready |
+| Azure Kubernetes Service (AKS) | [`aks/`](./aks/) | Ready |
 
 ## Quick Start
 
@@ -38,21 +39,36 @@ terraform apply
 
 See [`eks/README.md`](./eks/README.md) for full instructions.
 
+### AKS (Azure)
+
+```bash
+cd aks
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars
+
+terraform init
+terraform apply
+```
+
+See [`aks/README.md`](./aks/README.md) for full instructions.
+
 ## What Gets Created
 
 Each deployment creates:
 
-- **Kubernetes cluster** (GKE or EKS)
-- **Managed PostgreSQL database** (Cloud SQL or RDS)
+- **Kubernetes cluster** (GKE, EKS, or AKS)
+- **Managed PostgreSQL database** (Cloud SQL, RDS, or Flexible Server)
 - **VPC networking** with private subnets for database
 - **Load balancer** for ingress
 - **cert-manager** for automatic SSL certificates
 - **SuperPlane** application deployment
 
+The AKS stack also creates Azure Blob storage, a runner subnet, and a Compute Gallery.
+
 ## Requirements
 
 - Terraform >= 1.5.0
-- Cloud provider CLI (gcloud or aws) authenticated
+- Cloud provider CLI (gcloud, aws, or az) authenticated
 - kubectl
 
 ## Checks
@@ -63,7 +79,7 @@ make format
 ```
 
 These targets build the utils image and run Terraform in that container.
-Validate does not call AWS or GCP.
+Validate does not call AWS, GCP, or Azure.
 
 ## Architecture
 
@@ -74,7 +90,7 @@ Validate does not call AWS or GCP.
                              │
                     ┌────────▼────────┐
                     │  Load Balancer  │
-                    │  (GCE/ALB)      │
+                    │  (GCE/ALB/Azure)│
                     └────────┬────────┘
                              │
          ┌───────────────────┼───────────────────┐
@@ -88,7 +104,8 @@ Validate does not call AWS or GCP.
                              │
                     ┌────────▼────────┐
                     │   PostgreSQL    │
-                    │ (Cloud SQL/RDS) │
+                    │ Cloud SQL/RDS/  │
+                    │ Flexible Server │
                     └─────────────────┘
 ```
 

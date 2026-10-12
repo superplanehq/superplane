@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/me"
@@ -90,7 +89,11 @@ func (s *MeService) VerifyVCSProviderInstallations(ctx context.Context, req *pb.
 type githubInstallationVerifier struct{}
 
 func (githubInstallationVerifier) VerifyInstallation(ctx context.Context, installationID int64) error {
-	catalog, err := githubapp.NewCatalog(database.DB(ctx), config.LoadGitHubHostedAppConfig())
+	cfg, err := githubapp.ResolveProcess(ctx)
+	if err != nil {
+		return err
+	}
+	catalog, err := githubapp.NewCatalog(database.DB(ctx), cfg)
 	if err != nil {
 		return err
 	}

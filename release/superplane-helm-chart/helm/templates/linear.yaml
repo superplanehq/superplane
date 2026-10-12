@@ -8,4 +8,7 @@ type: Opaque
 data:
   SUPERPLANE_LINEAR_OAUTH_CLIENT_ID: {{ .Values.linear.clientId | required ".Values.linear.clientId is required." | b64enc }}
   SUPERPLANE_LINEAR_OAUTH_CLIENT_SECRET: {{ .Values.linear.clientSecret | required ".Values.linear.clientSecret is required." | b64enc }}
+  {{- if .Values.linear.webhookSecret }}
+  SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET: {{ .Values.linear.webhookSecret | b64enc }}
+  {{- end }}
 {{- end }}

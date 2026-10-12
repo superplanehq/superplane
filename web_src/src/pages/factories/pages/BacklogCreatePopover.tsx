@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { FilePlus, Loader2, Plus, type LucideIcon } from "lucide-react";
+import { FilePlus, Loader2, Plus } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import {
@@ -15,7 +15,7 @@ import {
   type BacklogIntakeItem,
   type BacklogIntakeSource,
 } from "./backlogIntakeItems";
-import { BacklogIntakeSearchRow } from "./BacklogIntakeSearchRow";
+import { BacklogIntakeSearchRow, CreateMenuAction } from "./BacklogIntakeSearchRow";
 
 function CreateTriggerButton({
   canAdd,
@@ -278,6 +278,7 @@ function IntakeSearchPanel({
           onChange={(event) => onQueryChange(event.target.value)}
           onFocus={() => onFocusedIntakeChange(source.intakeId)}
           placeholder={searchPlaceholderForIntake(source.name)}
+          aria-label={searchPlaceholderForIntake(source.name)}
           data-testid={searchId}
           className="h-8 px-2.5 text-sm"
         />
@@ -350,40 +351,11 @@ function IntakeSearchResults({
   );
 }
 
-function CreateMenuAction({
-  testId,
-  icon: Icon,
-  title,
-  hint,
-  onClick,
-}: {
-  testId: string;
-  icon: LucideIcon;
-  title: string;
-  hint: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={title}
-      className="flex w-full items-start gap-3 rounded-md px-2.5 py-2.5 text-left hover:bg-accent"
-      data-testid={testId}
-      onClick={onClick}
-    >
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-      <span className="min-w-0">
-        <span className="block text-sm font-medium">{title}</span>
-        <span className="mt-0.5 block text-[13px] text-muted-foreground">{hint}</span>
-      </span>
-    </button>
-  );
-}
-
 type BacklogCreatePopoverProps = {
   canAdd: boolean;
   atCapacity?: boolean;
-  variant?: "icon" | "ghost";
+  variant?: "icon" | "ghost" | "mobile";
+  trigger?: ReactNode;
   sources: BacklogIntakeSource[];
   items: BacklogIntakeItem[];
   query: string;
@@ -403,6 +375,7 @@ export function BacklogCreatePopover({
   canAdd,
   atCapacity = false,
   variant = "icon",
+  trigger,
   sources,
   items,
   query,
@@ -454,6 +427,15 @@ export function BacklogCreatePopover({
   }, [open, focusedIntakeId, sources, onFocusedIntakeChange]);
 
   const Trigger = variant === "ghost" ? CreateGhostCard : CreateTriggerButton;
+  const contentProps =
+    variant === "mobile"
+      ? {
+          side: "top" as const,
+          align: "end" as const,
+          className:
+            "max-h-[60dvh] w-[calc(100vw-2rem)] overflow-y-auto p-2 [&_button]:min-h-11 [&_input]:h-11 [&_input]:text-base",
+        }
+      : { side: "right" as const, align: "start" as const, className: "w-96 p-2" };
 
   return (
     <Popover
@@ -471,16 +453,10 @@ export function BacklogCreatePopover({
     >
       <PopoverTrigger asChild>
         <span className={variant === "ghost" ? "flex w-full" : "inline-flex"}>
-          <Trigger canAdd={canAdd} atCapacity={atCapacity} open={open} />
+          {trigger ?? <Trigger canAdd={canAdd} atCapacity={atCapacity} open={open} />}
         </span>
       </PopoverTrigger>
-      <PopoverContent
-        side="right"
-        align="start"
-        className="w-96 p-2"
-        sideOffset={6}
-        data-testid="lines-backlog-create-menu"
-      >
+      <PopoverContent {...contentProps} sideOffset={6} data-testid="lines-backlog-create-menu">
         <CreateMenuAction
           testId="lines-backlog-create-manually"
           icon={FilePlus}

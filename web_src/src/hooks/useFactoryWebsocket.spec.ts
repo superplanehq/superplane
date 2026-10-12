@@ -152,6 +152,58 @@ describe("useFactoryWebsocket", () => {
     ]);
   });
 
+  it("refetches the page total when an updated task is not in the loaded pages", async () => {
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue(
+      describeResponse({ id: "order-old", title: "Edited", state: "STATE_DRAFT", checks: [] }),
+    );
+    const { queryClient, invalidateSpy } = renderFactoryWebsocket();
+    const pageKey = factoryQueryKeys.workOrdersPage("org-1", "factory-1", ["STATE_DRAFT"]);
+    queryClient.setQueryData(pageKey, {
+      pageParams: [undefined],
+      pages: [
+        {
+          orders: [{ id: "order-2", title: "Loaded", state: "STATE_DRAFT" }],
+          hasNextPage: true,
+          totalCount: 80,
+        },
+      ],
+    });
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-old" },
+    });
+
+    expect(queryClient.getQueryData<{ pages: Array<{ totalCount?: number }> }>(pageKey)?.pages[0]?.totalCount).toBe(80);
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: pageKey });
+  });
+
+  it("keeps the local total when a new task joins a fully loaded page", async () => {
+    vi.spyOn(apiClient, "factoriesDescribeWorkOrder").mockResolvedValue(
+      describeResponse({ id: "order-new", title: "New", state: "STATE_DRAFT", checks: [] }),
+    );
+    const { queryClient, invalidateSpy } = renderFactoryWebsocket();
+    const pageKey = factoryQueryKeys.workOrdersPage("org-1", "factory-1", ["STATE_DRAFT"]);
+    queryClient.setQueryData(pageKey, {
+      pageParams: [undefined],
+      pages: [
+        {
+          orders: [{ id: "order-2", title: "Loaded", state: "STATE_DRAFT" }],
+          hasNextPage: false,
+          totalCount: 1,
+        },
+      ],
+    });
+
+    await emit({
+      event: "work_order_updated",
+      payload: { factoryId: "factory-1", orderId: "order-new" },
+    });
+
+    expect(queryClient.getQueryData<{ pages: Array<{ totalCount?: number }> }>(pageKey)?.pages[0]?.totalCount).toBe(2);
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: pageKey });
+  });
+
   it("ignores an older describe that finishes after a newer one", async () => {
     let releaseOlder: (value: DescribeWorkOrderResult) => void = () => {};
     const older = new Promise<DescribeWorkOrderResult>((resolve) => {
