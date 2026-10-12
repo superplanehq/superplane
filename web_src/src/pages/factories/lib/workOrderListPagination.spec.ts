@@ -13,10 +13,14 @@ import {
 } from "./workOrderListPagination";
 
 describe("boardDoneResultsForStatuses", () => {
-  it("keeps completed and failed when the board is not narrowed to one of them", () => {
-    expect(boardDoneResultsForStatuses([])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED"]);
-    expect(boardDoneResultsForStatuses(["completed", "failed"])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED"]);
-    expect(boardDoneResultsForStatuses(["waiting"])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED"]);
+  it("keeps completed, failed, and rejected when the board is not narrowed to one Done status", () => {
+    expect(boardDoneResultsForStatuses([])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED", "RESULT_REJECTED"]);
+    expect(boardDoneResultsForStatuses(["completed", "failed"])).toEqual([
+      "RESULT_COMPLETED",
+      "RESULT_FAILED",
+      "RESULT_REJECTED",
+    ]);
+    expect(boardDoneResultsForStatuses(["waiting"])).toEqual(["RESULT_COMPLETED", "RESULT_FAILED", "RESULT_REJECTED"]);
   });
 
   it("asks only for failed tasks when Failed is the status filter", () => {
