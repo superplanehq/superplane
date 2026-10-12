@@ -17,15 +17,19 @@ export function useRestoreDefaultPrompt({
   organizationId,
   factoryId,
   automationId,
+  canLoadDefaults,
 }: {
   draft: PlanningReviewDraft;
   setDraft: Dispatch<SetStateAction<PlanningReviewDraft>>;
   organizationId?: string;
   factoryId?: string;
   automationId?: string;
+  canLoadDefaults: boolean;
 }) {
   const agentNodeId = draft.components[0]?.id;
-  const restoreEnabled = Boolean(organizationId && factoryId && automationId && agentNodeId);
+  const restoreEnabled = canLoadDefaults && Boolean(organizationId && factoryId && automationId && agentNodeId);
+  const restoreEnabledRef = useRef(restoreEnabled);
+  restoreEnabledRef.current = restoreEnabled;
   const loadRestorePrompt = useCallback(() => {
     if (!organizationId || !factoryId || !automationId || !agentNodeId) {
       return Promise.reject(new Error(RESTORE_DEFAULT_PROMPT_COPY.error));
@@ -42,9 +46,12 @@ export function useRestoreDefaultPrompt({
   restoreLoaderRef.current = onRestoreDefaultPrompt;
   const promptMatchesDefault = defaultSteps != null && agentPromptsMatchDefault(draft, defaultSteps);
   const showRestore = Boolean(onRestoreDefaultPrompt) && !restoreError && !promptMatchesDefault && defaultSteps != null;
+  const visibleRestoreError = restoreEnabled ? restoreError : undefined;
 
   useEffect(() => {
     if (!onRestoreDefaultPrompt) {
+      setRestoreError(undefined);
+      setApplyOnRetry(false);
       return;
     }
     let cancelled = false;
@@ -73,10 +80,16 @@ export function useRestoreDefaultPrompt({
     setRestoreError(undefined);
     try {
       const steps = await loadDefaultSteps(restoreLoaderRef);
+      if (!restoreEnabledRef.current) {
+        return;
+      }
       setDefaultSteps(steps);
       setApplyOnRetry(false);
       setDraft((current) => applyDefaultAgentPrompts(current, steps));
     } catch (error) {
+      if (!restoreEnabledRef.current) {
+        return;
+      }
       setApplyOnRetry(true);
       const message = rememberRestoreError(error, setDefaultSteps, setRestoreError);
       showErrorToast(message);
@@ -95,8 +108,18 @@ export function useRestoreDefaultPrompt({
     }
     setIsRestoring(true);
     void loadDefaultSteps(restoreLoaderRef)
-      .then((steps) => rememberDefaultSteps(steps, setDefaultSteps, setRestoreError))
-      .catch((error: unknown) => rememberRestoreError(error, setDefaultSteps, setRestoreError))
+      .then((steps) => {
+        if (!restoreEnabledRef.current) {
+          return;
+        }
+        rememberDefaultSteps(steps, setDefaultSteps, setRestoreError);
+      })
+      .catch((error: unknown) => {
+        if (!restoreEnabledRef.current) {
+          return;
+        }
+        rememberRestoreError(error, setDefaultSteps, setRestoreError);
+      })
       .finally(() => setIsRestoring(false));
   };
 
@@ -104,7 +127,7 @@ export function useRestoreDefaultPrompt({
     confirmOpen,
     setConfirmOpen,
     isRestoring,
-    restoreError,
+    restoreError: visibleRestoreError,
     showRestore,
     applyDefaultPrompt,
     retryRestore,

@@ -34,6 +34,10 @@ vi.mock("@/hooks/useCanvasData", () => {
   };
 });
 
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({ canAct: () => true, isLoading: false, currentUserId: "user-1" }),
+}));
+
 useInfiniteCanvasRuns.mockReturnValue({
   data: {
     pages: [

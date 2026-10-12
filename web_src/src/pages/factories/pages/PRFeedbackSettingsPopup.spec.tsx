@@ -53,6 +53,10 @@ vi.mock("@/hooks/useIntegrations", () => {
   };
 });
 
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({ canAct: () => true, isLoading: false, currentUserId: "user-1" }),
+}));
+
 vi.mock("@/ui/componentSidebar/integrationIcons", () => ({
   IntegrationIcon: ({ integrationName }: { integrationName?: string }) => (
     <span data-testid={`integration-icon-${integrationName ?? "unknown"}`} />

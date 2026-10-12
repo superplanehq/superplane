@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient } from "@tanstack/react-query";
+import type { ReactNode } from "react";
 
+import { PermissionsContext } from "@/contexts/permissionsContextState";
 import { prepareData } from "@/pages/app/workflowPageHelpers";
 
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
@@ -33,6 +35,22 @@ function implementGraph(): IntakeAutomationGraph {
   return { nodes, edges, factoryId: "factory-1" };
 }
 
+function withEditorPermissions(story: ReactNode) {
+  return (
+    <PermissionsContext.Provider
+      value={{
+        permissions: [],
+        isLoading: false,
+        canAct: () => true,
+        currentUserId: "storybook-user",
+        browserNotificationPreferences: { enabled: false, showWhileViewing: true },
+      }}
+    >
+      {story}
+    </PermissionsContext.Provider>
+  );
+}
+
 const meta = {
   title: "Factories/Components/ColumnAutomationViewPopup",
   component: ColumnAutomationViewPopup,
@@ -46,7 +64,7 @@ const meta = {
   decorators: [
     (Story) => (
       <ComponentStoryShell className="relative min-h-[720px] bg-gray-50 dark:bg-gray-950">
-        <Story />
+        {withEditorPermissions(<Story />)}
       </ComponentStoryShell>
     ),
   ],

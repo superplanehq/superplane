@@ -12,8 +12,30 @@ import { loadDefaultAgentPrompt } from "../lib/loadDefaultAgentPrompt";
 import { PlanningReviewEditor } from "./PlanningReviewEditor";
 import type { PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 
+const permissions = vi.hoisted(() => ({
+  isLoading: false,
+  allowFactoryUpdate: true,
+  allowCanvasUpdate: true,
+}));
+
 vi.mock("@/lib/toast", () => ({
   showErrorToast: vi.fn(),
+}));
+
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({
+    isLoading: permissions.isLoading,
+    currentUserId: "user-1",
+    canAct: (resource: string, action: string) => {
+      if (resource === "factories" && action === "update") {
+        return permissions.allowFactoryUpdate;
+      }
+      if (resource === "canvases" && action === "update") {
+        return permissions.allowCanvasUpdate;
+      }
+      return false;
+    },
+  }),
 }));
 
 vi.mock("../lib/loadDefaultAgentPrompt", () => ({
@@ -74,7 +96,7 @@ function implementationDraft(): PlanningReviewDraft {
   };
 }
 
-function renderEditor(
+function editorTree(
   props: {
     initialDraft?: PlanningReviewDraft;
     onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
@@ -83,7 +105,7 @@ function renderEditor(
     automationId?: string;
   } = {},
 ) {
-  return render(
+  return (
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
         <ThemeProvider>
@@ -100,8 +122,20 @@ function renderEditor(
           </TooltipProvider>
         </ThemeProvider>
       </MemoryRouter>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+}
+
+function renderEditor(
+  props: {
+    initialDraft?: PlanningReviewDraft;
+    onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
+    organizationId?: string;
+    factoryId?: string;
+    automationId?: string;
+  } = {},
+) {
+  return render(editorTree(props));
 }
 
 function defaultSteps(prompt: string): PlanningReviewStep[] {
@@ -126,6 +160,9 @@ function deferredSteps() {
 describe("PlanningReviewEditor restore default prompt", () => {
   beforeEach(() => {
     loadDefault.mockReset();
+    permissions.isLoading = false;
+    permissions.allowFactoryUpdate = true;
+    permissions.allowCanvasUpdate = true;
   });
 
   it("hides Restore default prompt when the automation id is missing", () => {
@@ -254,5 +291,100 @@ describe("PlanningReviewEditor restore default prompt", () => {
     await waitFor(() => expect(screen.getByTestId("planning-review-save")).toBeEnabled());
     await user.click(screen.getByTestId("planning-review-step-toggle-1"));
     expect(screen.getByTestId("planning-review-step-body-1")).toHaveValue(DEFAULT_PROMPT);
+  });
+});
+
+const SAVE_AGENT_PERMISSION_NOTE = "You do not have permission to update this agent.";
+
+describe("PlanningReviewEditor permissions", () => {
+  beforeEach(() => {
+    loadDefault.mockReset();
+    permissions.isLoading = false;
+    permissions.allowFactoryUpdate = true;
+    permissions.allowCanvasUpdate = true;
+  });
+
+  it("hides the restore error and Retry when factory edit rights are removed", async () => {
+    loadDefault.mockRejectedValue(new Error("Not found"));
+    const view = renderEditor();
+
+    expect(await screen.findByTestId("planning-review-restore-default-prompt-error")).toHaveTextContent("Not found");
+    expect(screen.getByTestId("planning-review-restore-default-prompt-retry")).toBeInTheDocument();
+
+    permissions.allowFactoryUpdate = false;
+    view.rerender(editorTree());
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("planning-review-restore-default-prompt-error")).not.toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("planning-review-restore-default-prompt-retry")).not.toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-step-summary-1")).toHaveTextContent("Refine Task");
+
+    permissions.allowFactoryUpdate = true;
+    view.rerender(editorTree());
+
+    expect(await screen.findByTestId("planning-review-restore-default-prompt-error")).toHaveTextContent("Not found");
+    expect(screen.getByTestId("planning-review-restore-default-prompt-retry")).toBeInTheDocument();
+  });
+
+  it("shows steps without an error when the member cannot update factories", async () => {
+    permissions.allowFactoryUpdate = false;
+    loadDefault.mockRejectedValue(new Error("Not found"));
+    renderEditor();
+
+    expect(await screen.findByTestId("planning-review-step-summary-0")).toHaveTextContent("Clone repository");
+    expect(screen.getByTestId("planning-review-step-summary-1")).toHaveTextContent("Refine Task");
+    expect(screen.queryByText("Not found")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("planning-review-restore-default-prompt-error")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("planning-review-restore-default-prompt-retry")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
+    expect(loadDefault).not.toHaveBeenCalled();
+  });
+
+  it("does not load defaults or show an error while permissions load", async () => {
+    const user = userEvent.setup();
+    permissions.isLoading = true;
+    loadDefault.mockResolvedValue(defaultSteps(DEFAULT_PROMPT));
+    const view = renderEditor();
+
+    expect(screen.getByTestId("planning-review-step-summary-0")).toHaveTextContent("Clone repository");
+    expect(loadDefault).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("planning-review-restore-default-prompt-error")).not.toBeInTheDocument();
+    await user.hover(screen.getByTestId("planning-review-save"));
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(screen.getByTestId("planning-review-save")).toBeDisabled();
+
+    permissions.isLoading = false;
+    view.rerender(editorTree());
+    expect(await screen.findByTestId("planning-review-restore-default-prompt")).toBeInTheDocument();
+    expect(loadDefault).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps Save Agent disabled with a permission note without canvas update", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    permissions.allowCanvasUpdate = false;
+    loadDefault.mockResolvedValue(defaultSteps(DEFAULT_PROMPT));
+    renderEditor({ onSave });
+
+    const save = screen.getByTestId("planning-review-save");
+    expect(save).toBeDisabled();
+    const trigger = save.closest("[data-slot='tooltip-trigger']");
+    expect(trigger).not.toBeNull();
+    await user.hover(trigger!);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(SAVE_AGENT_PERMISSION_NOTE);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("saves when the member can update canvases but cannot update factories", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    permissions.allowFactoryUpdate = false;
+    renderEditor({ onSave });
+
+    await user.click(screen.getByTestId("planning-review-save"));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalled());
+    expect(loadDefault).not.toHaveBeenCalled();
   });
 });
