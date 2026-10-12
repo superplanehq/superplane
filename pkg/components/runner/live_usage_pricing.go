@@ -13,7 +13,8 @@ type HostedUsagePricing struct {
 	MarkupBPS int            `json:"markup_bps"`
 }
 
-func liveHostedUsagePricing(tx *gorm.DB, orgID uuid.UUID, component string, configuration map[string]any) (*HostedUsagePricing, error) {
+// ResolveHostedUsagePricing returns display pricing for a hosted execution.
+func ResolveHostedUsagePricing(tx *gorm.DB, orgID uuid.UUID, component string, configuration map[string]any) (*HostedUsagePricing, error) {
 	source := configurationCredentialsSource(configuration)
 	if !IsHostedCredentials(source) && !(source == "" && component == models.SuperPlaneRunnerComponent) {
 		return nil, nil

@@ -49,6 +49,43 @@ describe("PhaseLogCard usage", () => {
     return render(<MemoryRouter>{ui}</MemoryRouter>);
   }
 
+  it.each([
+    { name: "hosted", sources: ["hosted_cost_usd", "hosted_cost_usd"], dollars: "$0.01" },
+    { name: "BYOK", sources: ["total_cost_usd", "total_cost_usd"], dollars: "$0.02" },
+    { name: "mixed", sources: ["hosted_cost_usd", "total_cost_usd"], dollars: "$0.01" },
+  ])("retains fractional cents across $name prompts", async ({ sources, dollars }) => {
+    const series = sources.map((source, index) => {
+      const telemetry = usageTelemetry(210, []);
+      return {
+        name: `Prompt ${index + 1}`,
+        telemetry: { ...telemetry, usage: { ...telemetry.usage, [source]: 0.006 } },
+      };
+    });
+    useLiveLogStreamMock.mockReturnValue({
+      ...idleLiveLogStream(vi.fn()),
+      usageSeries: series,
+    });
+    renderCard(
+      <PhaseLogCard
+        phase={{ ...PHASE, status: "running", costCents: "0", totalTokens: "0", duration: "12s" }}
+        expanded={false}
+        organizationId="org-1"
+        canvasId="canvas-1"
+        stream={[
+          line({
+            id: "agent",
+            componentName: "Agent",
+            component: "runnerClaudeCode",
+            executionId: "exec-1",
+            status: "running",
+          }),
+        ]}
+      />,
+    );
+    await screen.findByRole("button", { name: "Show usage" });
+    expect(screen.getByTestId("split-run-phase-duration-plan")).toHaveTextContent(dollars);
+  });
+
   it("shows live token counts before the phase records spend", async () => {
     const user = userEvent.setup();
     const live = usageTelemetry(210, [{ kind: "bash", text: "git status" }]);

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"testing"
@@ -22,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"go.opentelemetry.io/otel"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
@@ -87,6 +89,23 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 			runneraction.ExecutionMetadataTaskBackend:  "integrated",
 		},
 	)
+
+	t.Run("log reads do not depend on hosted pricing", func(t *testing.T) {
+		require.NoError(t, database.Conn().Model(&models.CanvasNodeExecution{}).Where("id = ?", executionID).
+			Update("configuration", datatypes.NewJSONType(map[string]any{
+				"model": "gpt-4o", "hostedProvider": "openai", "credentials": map[string]any{"source": "hosted"},
+			})).Error)
+		const callback = "test:unavailable_hosted_pricing"
+		require.NoError(t, database.Conn().Callback().Query().Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+			if tx.Statement.Table == "organization_llm_settings" || tx.Statement.Table == "installation_llm_settings" {
+				tx.AddError(errors.New("pricing settings unavailable"))
+			}
+		}))
+		t.Cleanup(func() { _ = database.Conn().Callback().Query().Remove(callback) })
+		response := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		assert.Equal(t, "first\nsecond\n", response.Body.String())
+	})
 
 	live := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
 	require.Equal(t, http.StatusOK, live.Code)

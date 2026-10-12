@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
 
@@ -53,12 +54,17 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 		writeRunnerLiveLogSessionError(w, err)
 		return
 	}
+	pricing, err := runneraction.ResolveHostedUsagePricing(database.DB(r.Context()), user.OrganizationID, access.ComponentName, access.Configuration)
+	if err != nil {
+		writeRunnerLiveLogSessionError(w, err)
+		return
+	}
 	if access.TaskBackend == core.RunnerTaskBackendIntegrated {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"backend":        "integrated",
-			"hosted_pricing": access.HostedPricing,
+			"hosted_pricing": pricing,
 			"stream_url": "/api/v1/canvases/" +
 				canvasID.String() +
 				"/node-executions/" +
@@ -82,7 +88,7 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Cache-Control", "no-store")
 	response := map[string]any{
 		"backend":        "legacy",
-		"hosted_pricing": access.HostedPricing,
+		"hosted_pricing": pricing,
 		"stream_url":     session.StreamURL,
 		"token":          session.Token,
 		"expires_at":     session.ExpiresAt,

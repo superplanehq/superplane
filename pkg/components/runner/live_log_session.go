@@ -53,7 +53,8 @@ type LiveLogSession struct {
 type LiveLogAccessContext struct {
 	BrokerTaskID  string
 	TaskBackend   string
-	HostedPricing *HostedUsagePricing
+	ComponentName string
+	Configuration map[string]any
 }
 
 func IsRunnerComponent(name string) bool {
@@ -115,14 +116,10 @@ func ResolveLiveLogAccess(orgID uuid.UUID, canvasID uuid.UUID, executionID uuid.
 		return nil, ErrLiveLogBrokerTaskMissing
 	}
 
-	pricing, err := liveHostedUsagePricing(database.Conn(), orgID, ref.Component.Name, execution.Configuration.Data())
-	if err != nil {
-		return nil, err
-	}
-
 	return &LiveLogAccessContext{
 		BrokerTaskID:  brokerTaskID,
-		HostedPricing: pricing,
+		ComponentName: ref.Component.Name,
+		Configuration: execution.Configuration.Data(),
 		TaskBackend:   TaskBackendFromExecutionMetadata(execution.Metadata.Data()),
 	}, nil
 }

@@ -914,17 +914,17 @@ function statusTimeMark(status: SplitRunPhaseStatus): ReactNode {
 function livePhaseSpend(agents: PhaseAgentUsageEntry[]): { tokens: number; cents: number } {
   let tokens = 0;
   let cents = 0;
+  let hostedMicros = 0;
   for (const agent of agents) {
     tokens += agentRunNewTokenCount(agent.telemetry);
-    const usd = agent.telemetry.usage.hosted_cost_usd ?? agent.telemetry.usage.total_cost_usd;
-    if (usd != null && Number.isFinite(usd)) {
-      cents +=
-        agent.telemetry.usage.hosted_cost_usd != null
-          ? Math.floor(Math.round(usd * 1_000_000) / 10_000)
-          : Math.round(usd * 100);
+    const { hosted_cost_usd: hostedUsd, total_cost_usd: reportedUsd } = agent.telemetry.usage;
+    if (hostedUsd != null && Number.isFinite(hostedUsd)) {
+      hostedMicros += Math.round(hostedUsd * 1_000_000);
+    } else if (reportedUsd != null && Number.isFinite(reportedUsd)) {
+      cents += Math.round(reportedUsd * 100);
     }
   }
-  return { tokens, cents };
+  return { tokens, cents: cents + Math.floor(hostedMicros / 10_000) };
 }
 
 function displayedPhaseSpend(phase: SplitRunPhase, agents: PhaseAgentUsageEntry[]): { tokens: number; cents: number } {
