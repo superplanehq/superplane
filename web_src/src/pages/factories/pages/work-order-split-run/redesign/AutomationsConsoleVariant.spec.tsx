@@ -367,6 +367,29 @@ describe("AutomationsConsoleVariant summary strip", () => {
     expect(text.indexOf("trace.log")).toBeLessThan(text.indexOf("Design doc"));
   });
 
+  it("shows a stored spec.md planning row as plan.md", () => {
+    renderConsole(SPLIT_RUN_RUNNING, {
+      artifacts: [
+        {
+          id: "art-old-plan",
+          key: "spec:11111111-1111-4111-8111-111111111111",
+          type: "TYPE_MARKDOWN",
+          data: { name: "spec.md", title: "spec.md", body: "# Old plan" },
+        },
+        {
+          id: "art-user-spec",
+          type: "TYPE_MARKDOWN",
+          data: { name: "spec.md", title: "spec.md", body: "# User file" },
+        },
+      ],
+    });
+
+    const section = screen.getByTestId("redesign-console-artifacts");
+    expect(section.textContent).toContain("plan.md");
+    expect(section.textContent).toContain("spec.md");
+    expect(section.textContent?.indexOf("plan.md")).toBeLessThan(section.textContent?.indexOf("spec.md") ?? -1);
+  });
+
   it("shows the decision note when the footer carries one", () => {
     renderConsole(
       {

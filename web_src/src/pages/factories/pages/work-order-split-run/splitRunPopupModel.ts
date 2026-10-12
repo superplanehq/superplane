@@ -4,6 +4,7 @@ import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/facto
 import {
   composeIntentDocument,
   EMPTY_INTENT_DOCUMENT,
+  isPlanningArtifactKey,
   isPlanningArtifactName,
   PLANNING_ARTIFACT_NAMES,
   selectPlanningDocument,
@@ -244,7 +245,7 @@ export function splitRunLinkedArtifacts(
   return artifacts
     .filter((artifact) => {
       const name = artifactName(artifact);
-      if (DESCRIPTION_NAMES.includes(name) || isPlanningArtifactName(name)) {
+      if (DESCRIPTION_NAMES.includes(name) || isPlanningArtifactName(name) || isPlanningArtifactKey(artifact.key)) {
         return false;
       }
       return !isOriginTicketArtifact(artifact, source);

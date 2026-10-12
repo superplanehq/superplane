@@ -17,6 +17,7 @@ import { Link } from "@/components/Link/link";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { useLiveLogStream } from "@/ui/CanvasPage/RunnerLiveLogDialog/useLiveLogStream";
 
+import { planningArtifactDisplayData } from "../../lib/intentDocument";
 import type { PhaseGlyphKind } from "../../lib/linePhaseRuns";
 import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { formatUsdCents, parseWorkOrderMetric } from "../../lib/workOrderUsage";
@@ -1360,7 +1361,7 @@ function StreamArtifact({ artifact }: { artifact: FactoriesWorkOrderArtifact }) 
       artifact={{
         id: artifact.id,
         type: artifact.type ?? "TYPE_UNSPECIFIED",
-        data: toArtifactDataRecord(artifact.data),
+        data: planningArtifactDisplayData(toArtifactDataRecord(artifact.data), artifact.key),
       }}
     />
   );

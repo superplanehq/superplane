@@ -235,6 +235,25 @@ describe("splitRunPopupModel", () => {
     expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).summary).toBe("Add a retry.");
   });
 
+  it("hides a stored spec.md planning row and keeps a user spec.md", () => {
+    const artifacts = [
+      {
+        id: "art-old-plan",
+        key: "spec:11111111-1111-4111-8111-111111111111",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "spec.md", title: "spec.md", body: "# Old plan\n\nA retry loop." },
+      },
+      {
+        id: "art-user-spec",
+        type: "TYPE_MARKDOWN" as const,
+        data: { name: "spec.md", body: "# User file" },
+      },
+    ];
+
+    expect(splitRunLinkedArtifacts(artifacts).map((artifact) => artifact.id)).toEqual(["art-user-spec"]);
+    expect(splitRunIntentDocument({ artifacts, description: "Webhook timeouts." }).title).toBe("Old plan");
+  });
+
   it("uses live artifacts for a real task and fixture artifacts in Storybook", () => {
     const fixtureArtifacts = collectSplitRunArtifacts(splitRunFixtureForWorkOrder(OPEN_WORK_ORDER));
     const liveArtifacts = [
