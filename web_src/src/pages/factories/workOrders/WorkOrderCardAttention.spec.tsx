@@ -50,7 +50,7 @@ describe("WorkOrderCard attention", () => {
     );
 
     expect(screen.getByText("Waiting for user review")).toBeInTheDocument();
-    expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
+    expect(screen.queryByText("Addressing PR comments")).not.toBeInTheDocument();
     const pill = screen.getByText("Waiting for user review").closest("span[title]");
     expect(pill).toBeInstanceOf(HTMLElement);
     if (!(pill instanceof HTMLElement)) {
@@ -76,7 +76,7 @@ describe("WorkOrderCard attention", () => {
 
     expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
     expect(screen.getByText("Waiting on status checks")).toBeInTheDocument();
-    expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
+    expect(screen.queryByText("Addressing PR comments")).not.toBeInTheDocument();
   });
 
   it("shows Status checks passed after a check wait finishes", () => {
@@ -115,7 +115,7 @@ describe("WorkOrderCard attention", () => {
     expect(screen.queryByText("Status checks passed")).not.toBeInTheDocument();
   });
 
-  it("shows Addressing user feedback when a PR-feedback run is active", () => {
+  it("shows Addressing PR comments when a PR-feedback run is active", () => {
     render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <MemoryRouter>
@@ -128,7 +128,7 @@ describe("WorkOrderCard attention", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Addressing user feedback")).toBeInTheDocument();
+    expect(screen.getByText("Addressing PR comments")).toBeInTheDocument();
     expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
   });
 });

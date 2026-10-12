@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -98,6 +99,10 @@ func toBitbucketRepositoryMerge(
 		}
 	}
 	if mergedAt.IsZero() || mergedAt.Before(from) || !mergedAt.Before(to) {
+		return vcs.MergedPullRequest{}, false, nil
+	}
+	// Keep recognized agent output, but do not count other apps as people.
+	if !agent && strings.EqualFold(pr.AuthorType, "app_user") {
 		return vcs.MergedPullRequest{}, false, nil
 	}
 

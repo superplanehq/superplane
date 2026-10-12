@@ -75,6 +75,7 @@ export function LiveAgentSteps({
           line={line}
           organizationId={organizationId}
           canvasId={phase.appId ?? ""}
+          analysisStatus={phase.status}
           spendPhaseId={phase.id}
           reportUsage={reportUsage}
           onLive={run.reportLive}
@@ -281,6 +282,7 @@ function RunnerNotes({
   line,
   organizationId,
   canvasId,
+  analysisStatus,
   spendPhaseId,
   reportUsage,
   onLive,
@@ -288,6 +290,7 @@ function RunnerNotes({
   line: SplitRunStreamLine;
   organizationId: string;
   canvasId: string;
+  analysisStatus: SplitRunPhaseStatus;
   spendPhaseId: string;
   reportUsage: boolean;
   onLive: (lineId: string, live: RunnerLive) => void;
@@ -296,6 +299,7 @@ function RunnerNotes({
     line,
     organizationId,
     canvasId,
+    analysisStatus,
   );
   useReportLiveHeaderSpend(`${spendPhaseId}:${line.id}`, spend.tokens, spend.cents);
   useReportPhaseAgentUsageSeries({
@@ -314,6 +318,7 @@ function useRunnerLiveNotes(
   line: SplitRunStreamLine,
   organizationId: string,
   canvasId: string,
+  analysisStatus: SplitRunPhaseStatus,
 ): {
   notes: SplitRunStreamLine[];
   activities: AgentActivity[];
@@ -352,9 +357,10 @@ function useRunnerLiveNotes(
         error,
         isStreaming,
         nodeStatus: line.status,
+        analysisStatus,
       }) ?? []
     );
-  }, [canStream, error, isStreaming, line.id, line.nodeId, line.status, orphanLines, sections]);
+  }, [analysisStatus, canStream, error, isStreaming, line.id, line.nodeId, line.status, orphanLines, sections]);
   const activities = useMemo(() => {
     const recorded = mergeAgentActivities(
       sections.flatMap((section) => section.activities ?? []),

@@ -507,3 +507,24 @@ func liveLogRecords(t *testing.T, output string) []map[string]any {
 	}
 	return records
 }
+
+func TestFormatCodexJsonLinesEmitsCompletedUsage(t *testing.T) {
+	output := runCodexFormatter(t, []string{
+		`{"type":"item.completed","item":{"id":"answer","type":"agent_message","text":"done"}}`,
+		`{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":30,"output_tokens":20},"total_cost_usd":0.12}`,
+	})
+	var last map[string]any
+	for _, line := range strings.Split(output, "\n") {
+		var record map[string]any
+		if json.Unmarshal([]byte(line), &record) == nil && record["type"] == "turn" {
+			last = record
+		}
+	}
+	require.NotNil(t, last)
+	usage := last["usage"].(map[string]any)
+	assert.Equal(t, float64(100), usage["input_tokens"])
+	assert.Equal(t, float64(30), usage["cache_read_input_tokens"])
+	assert.Equal(t, float64(20), usage["output_tokens"])
+	require.Contains(t, usage, "total_cost_usd")
+	assert.InDelta(t, 0.12, usage["total_cost_usd"], 1e-9)
+}

@@ -136,7 +136,7 @@ describe("WorkOrderCard pull request pill", () => {
       "href",
       "https://github.com/acme/app/commit/d8b80c2",
     );
-    expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
+    expect(screen.queryByText("Addressing PR comments")).not.toBeInTheDocument();
     expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
   });
 

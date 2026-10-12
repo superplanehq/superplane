@@ -144,6 +144,36 @@ func TestListBitbucketMergesKeepsAShortPageWalkIncomplete(t *testing.T) {
 	assert.Contains(t, err.Error(), "exceeded")
 }
 
+func TestListBitbucketMergesExcludesAppsUnlessTheyProducedAgentWork(t *testing.T) {
+	now := time.Now()
+	for _, test := range []struct {
+		name       string
+		authorType string
+		message    string
+		wantSource string
+	}{
+		{name: "human", authorType: "user", message: "Merged", wantSource: models.FactoryVelocityMergeSourcePeople},
+		{name: "missing author type", message: "Merged", wantSource: models.FactoryVelocityMergeSourcePeople},
+		{name: "Forge app", authorType: "app_user", message: "Merged"},
+		{name: "agent app", authorType: "app_user", message: "Co-authored-by: SuperPlane Agent <superplaneagent@superplane.com>", wantSource: models.FactoryVelocityMergeSourceAgent},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			client, _ := stubBitbucketVelocityClient(
+				okJSONResponse(`{"values":[{"id":42,"state":"MERGED","updated_on":"`+now.Format(time.RFC3339)+`","author":{"type":"`+test.authorType+`","display_name":"SuperPlane Mijat Tunnel"},"merge_commit":{"hash":"m42"}}]}`),
+				okJSONResponse(`{"hash":"m42","date":"`+now.Format(time.RFC3339)+`","message":"`+test.message+`"}`),
+			)
+			merges, err := listBitbucketMerges(context.Background(), client, "acme/widgets", now.Add(-time.Hour), now.Add(time.Hour))
+			require.NoError(t, err)
+			if test.wantSource == "" {
+				assert.Empty(t, merges)
+				return
+			}
+			require.Len(t, merges, 1)
+			assert.Equal(t, test.wantSource, merges[0].Source)
+		})
+	}
+}
+
 func okJSONResponse(body string) *http.Response {
 	return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(body))}
 }

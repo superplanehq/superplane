@@ -65,6 +65,7 @@ import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { MobileColumn, type ColumnPaging } from "./MobileBoardColumn";
 import { MobileBoardHeader } from "./MobileBoardHeader";
 import { MobileBoardSettings } from "./MobileBoardSettings";
+import { MobileCreateTaskButton } from "./MobileCreateTaskButton";
 import { activeColumnIndex, buildMobileBoardColumns, type MobileBoardColumn } from "./mobileBoardColumns";
 
 function phoneBoardScope(scope: WorkOrderScope): WorkOrderScope {
@@ -286,6 +287,7 @@ function MobileLineBoard(props: {
     [model.factoryIntakes],
   );
   const canConfigureFactory = canAct("factories", "update");
+  const canCreateWorkOrder = canAct("work_orders", "create");
   const lines = factory?.lines ?? [];
   const { search } = useLocation();
   const settingsOpen =
@@ -324,7 +326,6 @@ function MobileLineBoard(props: {
             }}
           />
           <MobileColumnCarousel
-            onImported={onOpenWorkOrder}
             columns={model.columns}
             cardsPending={model.cardsPending}
             laneClassName={(column) =>
@@ -342,6 +343,11 @@ function MobileLineBoard(props: {
               />
             )}
           />
+          {canCreateWorkOrder ? (
+            <div className="absolute right-4 bottom-5 z-20">
+              <MobileCreateTaskButton className="size-14 rounded-full shadow-lg" onImported={onOpenWorkOrder} />
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>
@@ -358,14 +364,12 @@ function MobileColumnCarousel({
   laneClassName,
   paging,
   renderCard,
-  onImported,
 }: {
   columns: MobileBoardColumn[];
   cardsPending: boolean;
   laneClassName: (column: MobileBoardColumn) => { className?: string; surfaceClassName?: string };
   paging: Record<MobileBoardColumn["paging"], ColumnPaging>;
   renderCard: (column: MobileBoardColumn, order: FactoriesWorkOrder) => ReactNode;
-  onImported: (order: FactoriesWorkOrder) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -411,7 +415,6 @@ function MobileColumnCarousel({
             lane={laneClassName(column)}
             paging={paging[column.paging]}
             renderCard={(order) => renderCard(column, order)}
-            onImported={onImported}
           />
         ))}
       </div>
