@@ -58,7 +58,7 @@ func TestFactoryVelocitySync_BitbucketMergesKeepTheirProvider(t *testing.T) {
 	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factory.ID, models.ProviderGitHub, from, now, []models.FactoryVelocityRepositoryMerge{githubMerge}))
 	worker := NewFactoryVelocitySyncWorker("", nil, nil)
 	merged := []repositoryMerge{{repository: target.Repository, number: 42, source: models.FactoryVelocityMergeSourcePeople, authorUUID: uuid.NewString(), mergedAt: now.Add(-time.Hour)}}
-	require.NoError(t, worker.storeMerges(target, sync, from, merged, now))
+	require.NoError(t, worker.storeMerges(target, sync, from, time.Time{}, merged, completeVelocityRead(), now))
 	rows, err := models.ListFactoryVelocityRepositoryMerges(db, factory.ID, from, now)
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
@@ -69,7 +69,7 @@ func TestFactoryVelocitySync_BitbucketMergesKeepTheirProvider(t *testing.T) {
 		}
 	}
 	assert.Equal(t, merged[0].authorUUID, bitbucketMerge.AuthorUUID)
-	require.NoError(t, worker.storeMerges(target, sync, from, nil, now))
+	require.NoError(t, worker.storeMerges(target, sync, from, time.Time{}, nil, completeVelocityRead(), now))
 	rows, err = models.ListFactoryVelocityRepositoryMerges(db, factory.ID, from, now)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)

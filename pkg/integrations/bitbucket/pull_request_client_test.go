@@ -133,7 +133,7 @@ func Test__ListMergedPullRequests(t *testing.T) {
 			 "source": {"commit": {"hash": "src8"}}, "merge_commit": {"hash": "m8"}}
 		]}`))
 
-		prs, truncated, err := client.ListMergedPullRequests("acme/widgets", from, 50)
+		prs, truncated, err := client.ListMergedPullRequests("acme/widgets", from, time.Time{}, 50)
 		require.NoError(t, err)
 		require.Len(t, prs, 1)
 		assert.Equal(t, int64(9), prs[0].ID)
@@ -150,10 +150,25 @@ func Test__ListMergedPullRequests(t *testing.T) {
 			{"id": 9, "state": "MERGED", "updated_on": "` + now.Format(time.RFC3339) + `", "author": {}, "source": {}, "merge_commit": {}}
 		], "next": "https://api.bitbucket.org/2.0/repositories/acme/widgets/pullrequests?page=2"}`))
 
-		prs, truncated, err := client.ListMergedPullRequests("acme/widgets", from, 1)
+		prs, truncated, err := client.ListMergedPullRequests("acme/widgets", from, time.Time{}, 1)
 		require.NoError(t, err)
 		require.Len(t, prs, 1)
 		assert.True(t, truncated)
+	})
+
+	t.Run("until asks for pulls older than the saved slice", func(t *testing.T) {
+		until := now.Add(-2 * time.Hour)
+		client, httpCtx := stubBitbucketClient(okResponse(`{"values": [
+			{"id": 8, "state": "MERGED", "updated_on": "` + now.Add(-time.Hour).Format(time.RFC3339) + `", "author": {}, "source": {}, "merge_commit": {}},
+			{"id": 9, "state": "MERGED", "updated_on": "` + now.Add(-3*time.Hour).Format(time.RFC3339) + `", "author": {}, "source": {}, "merge_commit": {}}
+		]}`))
+
+		prs, truncated, err := client.ListMergedPullRequests("acme/widgets", from, until, 50)
+		require.NoError(t, err)
+		require.Len(t, prs, 1)
+		assert.Equal(t, int64(9), prs[0].ID)
+		assert.False(t, truncated)
+		assert.Contains(t, httpCtx.Requests[0].URL.Query().Get("q"), "updated_on < "+until.UTC().Format(time.RFC3339))
 	})
 
 	t.Run("unparseable timestamps are skipped", func(t *testing.T) {
@@ -161,7 +176,7 @@ func Test__ListMergedPullRequests(t *testing.T) {
 			{"id": 9, "state": "MERGED", "updated_on": "not-a-time", "author": {}, "source": {}, "merge_commit": {}}
 		]}`))
 
-		prs, _, err := client.ListMergedPullRequests("acme/widgets", from, 50)
+		prs, _, err := client.ListMergedPullRequests("acme/widgets", from, time.Time{}, 50)
 		require.NoError(t, err)
 		assert.Empty(t, prs)
 	})
@@ -173,7 +188,7 @@ func Test__RateLimitedResponsesSurfaceStatus(t *testing.T) {
 		Body:       io.NopCloser(strings.NewReader(`{"error": {"message": "Rate limit exceeded"}}`)),
 	})
 
-	_, _, err := client.ListMergedPullRequests("acme/widgets", time.Now().Add(-time.Hour), 50)
+	_, _, err := client.ListMergedPullRequests("acme/widgets", time.Now().Add(-time.Hour), time.Time{}, 50)
 	require.Error(t, err)
 	var apiErr *APIError
 	require.ErrorAs(t, err, &apiErr)

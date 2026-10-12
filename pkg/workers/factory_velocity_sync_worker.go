@@ -61,9 +61,17 @@ const (
 	velocitySyncRecomputeWindow = 7 * 24 * time.Hour
 
 	// bitbucketVelocityRulesGeneration bumps when Bitbucket merge
-	// classification changes. A stored generation below this value forces one
-	// full history rebuild so older rows are not left under the previous rules.
+	// classification changes. A stored generation below this value forces a
+	// history rebuild so older rows are not left under the previous rules.
+	// The rebuild walks backward in bounded reads. It does not require the
+	// whole window in one read.
 	bitbucketVelocityRulesGeneration = 1
+
+	// bitbucketVelocityRulesRebuilding is stored while a bounded rebuild has
+	// saved one slice and must continue with pulls older than BackfilledFrom.
+	// It stays below bitbucketVelocityRulesGeneration so an incremental sync
+	// cannot mark the rebuild done.
+	bitbucketVelocityRulesRebuilding = -1
 
 	// How far past the merge window commits are read. A commit is dated when it
 	// was written, which can be well before the merge that brought it in.
@@ -214,7 +222,13 @@ func (w *FactoryVelocitySyncWorker) SyncFactory(ctx context.Context, factoryID u
 	}
 
 	now := w.now()
-	err = w.claimAndSync(ctx, *target, now.Add(-velocitySyncOnDemandGuard), velocitySyncBackfillStart(now))
+	from, until := velocitySyncBounds(*target, now)
+	// A refresh rebuilds the whole history window when no older slice is
+	// waiting. A bounded rebuild continues instead of repeating the newest pages.
+	if until.IsZero() {
+		from = velocitySyncBackfillStart(now)
+	}
+	err = w.claimAndSync(ctx, *target, now.Add(-velocitySyncOnDemandGuard), from, until)
 	if err != nil {
 		return false, err
 	}
@@ -248,8 +262,8 @@ func (w *FactoryVelocitySyncWorker) tick(ctx context.Context) {
 			defer w.semaphore.Release(1)
 
 			now := w.now()
-			from := velocitySyncWindow(target, now)
-			if err := w.claimAndSync(ctx, target, now.Add(-velocitySyncLease), from); err != nil {
+			from, until := velocitySyncBounds(target, now)
+			if err := w.claimAndSync(ctx, target, now.Add(-velocitySyncLease), from, until); err != nil {
 				w.logger.Errorf("Error syncing velocity for workspace %s: %v", target.FactoryID, err)
 			}
 		}(target)
@@ -265,6 +279,7 @@ func (w *FactoryVelocitySyncWorker) claimAndSync(
 	target models.FactoryVelocitySyncTarget,
 	claimableBefore time.Time,
 	from time.Time,
+	until time.Time,
 ) error {
 	if _, _, ok := splitOwnerRepo(target.Repository); !ok {
 		return fmt.Errorf("repository %q is not owner/name", target.Repository)
@@ -280,17 +295,24 @@ func (w *FactoryVelocitySyncWorker) claimAndSync(
 
 	now := w.now()
 	to := now.Add(time.Hour)
-	merged, err := w.listTargetMerges(ctx, target, from, to)
+	merged, coverage, err := w.listTargetMerges(ctx, target, from, to, until)
 	if err != nil {
 		w.recordSyncError(target, sync, err)
 		return nil
 	}
 
-	if err := w.storeMerges(target, sync, from, merged, now); err != nil {
+	if err := w.storeMerges(target, sync, from, until, merged, coverage, now); err != nil {
 		w.recordSyncError(target, sync, err)
 		return nil
 	}
 
+	if !coverage.Complete {
+		w.logger.Infof(
+			"Synced %d merged pull requests of %s for workspace %s; continuing before %s",
+			len(merged), target.Repository, target.FactoryID, coverage.ContinueBefore.Format(time.RFC3339),
+		)
+		return nil
+	}
 	w.logger.Infof(
 		"Synced %d merged pull requests of %s for workspace %s",
 		len(merged), target.Repository, target.FactoryID,
@@ -301,27 +323,31 @@ func (w *FactoryVelocitySyncWorker) claimAndSync(
 func (w *FactoryVelocitySyncWorker) listTargetMerges(
 	ctx context.Context,
 	target models.FactoryVelocitySyncTarget,
-	from, to time.Time,
-) ([]repositoryMerge, error) {
-	var provider vcs.Provider
+	from, to, until time.Time,
+) ([]repositoryMerge, velocityReadCoverage, error) {
 	if effectiveVelocityProvider(target) == models.ProviderBitbucket {
-		provider = &bitbucketVelocity{
+		reader := &bitbucketVelocity{
 			worker:         w,
 			organizationID: target.OrganizationID,
 			integrationID:  target.IntegrationID,
 		}
-	} else {
-		provider = vcs.Select(target.VCSProvider, &githubVelocity{
-			worker:         w,
-			organizationID: target.OrganizationID,
-			integrationID:  target.IntegrationID,
-		})
+		merged, coverage, err := reader.listMerges(ctx, target.Repository, from, to, until)
+		if err != nil {
+			return nil, velocityReadCoverage{}, err
+		}
+		return repositoryMergesFromProvider(merged), coverage, nil
 	}
+
+	provider := vcs.Select(target.VCSProvider, &githubVelocity{
+		worker:         w,
+		organizationID: target.OrganizationID,
+		integrationID:  target.IntegrationID,
+	})
 	merged, err := provider.ListMergedPullRequests(ctx, target.Repository, from, to)
 	if err != nil {
-		return nil, err
+		return nil, velocityReadCoverage{}, err
 	}
-	return repositoryMergesFromProvider(merged), nil
+	return repositoryMergesFromProvider(merged), completeVelocityRead(), nil
 }
 
 func repositoryMergesFromProvider(merged []vcs.MergedPullRequest) []repositoryMerge {
@@ -358,13 +384,15 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 	target models.FactoryVelocitySyncTarget,
 	sync *models.FactoryVelocitySync,
 	from time.Time,
+	until time.Time,
 	merged []repositoryMerge,
+	coverage velocityReadCoverage,
 	now time.Time,
 ) error {
 	repositoryChanged := target.SyncedRepository != "" && !sameRepository(target)
-	// The GitHub window ends at now, but the stored window must reach past it
-	// so a merge later today replaces the right rows on the next tick.
-	windowEnd := now.Add(time.Hour)
+	replaceFrom, replaceTo, backfilledFrom, rulesGeneration := progressAfterVelocityRead(
+		target, from, until, coverage, now, repositoryChanged,
+	)
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		if repositoryChanged {
@@ -379,14 +407,13 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 		}
 
 		rows := repositoryMergeRows(target, merged, superplane)
-		return models.ReplaceFactoryVelocityRepositoryMerges(tx, target.FactoryID, effectiveVelocityProvider(target), from, windowEnd, rows)
+		return models.ReplaceFactoryVelocityRepositoryMerges(tx, target.FactoryID, effectiveVelocityProvider(target), replaceFrom, replaceTo, rows)
 	})
 	if err != nil {
 		return fmt.Errorf("store repository merges: %w", err)
 	}
 
-	backfilledFrom := earliestBackfill(target, from, repositoryChanged)
-	sync.RulesGeneration = nextVelocityRulesGeneration(target, from, now)
+	sync.RulesGeneration = rulesGeneration
 	return sync.RecordSuccess(database.Conn(), target.Repository, now, backfilledFrom)
 }
 
@@ -513,8 +540,10 @@ func (w *FactoryVelocitySyncWorker) bitbucketClient(orgID, integrationID uuid.UU
 // velocitySyncWindow returns the earliest merge date to ask the Git host for.
 // A workspace that already covers the full history window only recomputes
 // recent days. Anything else backfills the full window. A Bitbucket workspace
-// whose stored rules generation is stale also backfills once, so a
-// classification change corrects merges older than the recompute window.
+// whose stored rules generation is stale also backfills, so a classification
+// change corrects merges older than the recompute window. A rebuild already
+// walking backward still starts at this date; velocitySyncBounds supplies the
+// upper bound of the next slice.
 func velocitySyncWindow(target models.FactoryVelocitySyncTarget, now time.Time) time.Time {
 	backfillFrom := velocitySyncBackfillStart(now)
 
@@ -533,13 +562,85 @@ func velocitySyncWindow(target models.FactoryVelocitySyncTarget, now time.Time) 
 }
 
 // bitbucketRulesNeedRebuild reports that saved Bitbucket merges were
-// classified before the current app filter. The next sync must replace the
-// full history window, not only the last seven days.
+// classified before the current app filter. The next sync must replace saved
+// history under the new rules, not only the last seven days.
 func bitbucketRulesNeedRebuild(target models.FactoryVelocitySyncTarget) bool {
 	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
 		return false
 	}
 	return target.RulesGeneration < bitbucketVelocityRulesGeneration
+}
+
+// velocitySyncBounds is the merge window to read now. A Bitbucket rebuild that
+// already saved a slice continues strictly before that slice instead of
+// repeating the newest pages.
+func velocitySyncBounds(target models.FactoryVelocitySyncTarget, now time.Time) (time.Time, time.Time) {
+	from := velocitySyncWindow(target, now)
+	until, ok := bitbucketRebuildUntil(target, now)
+	if !ok {
+		return from, time.Time{}
+	}
+	return from, until
+}
+
+// bitbucketRebuildUntil is the exclusive upper bound of the next older slice.
+// It is set only while a bounded rebuild is in progress for the current repository.
+func bitbucketRebuildUntil(target models.FactoryVelocitySyncTarget, now time.Time) (time.Time, bool) {
+	if target.RulesGeneration != bitbucketVelocityRulesRebuilding {
+		return time.Time{}, false
+	}
+	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
+		return time.Time{}, false
+	}
+	if target.SyncedAt == nil || !sameRepository(target) || target.BackfilledFrom == nil {
+		return time.Time{}, false
+	}
+	if !target.BackfilledFrom.After(velocitySyncBackfillStart(now)) {
+		return time.Time{}, false
+	}
+	return *target.BackfilledFrom, true
+}
+
+// velocityReadCoverage reports how much of a requested window one read covered.
+type velocityReadCoverage struct {
+	// Complete reports that the read reached the requested window start.
+	Complete bool
+	// ContinueBefore is the oldest instant in a short read. The next read
+	// must ask for pulls strictly older than it.
+	ContinueBefore time.Time
+}
+
+func completeVelocityRead() velocityReadCoverage {
+	return velocityReadCoverage{Complete: true}
+}
+
+// progressAfterVelocityRead decides which stored window to replace and how far
+// the workspace has now reached. A short Bitbucket read replaces only the slice
+// it covered and leaves the rebuild unfinished, so a later sync can continue
+// older history instead of failing the whole window. A continuation stops at
+// until so it does not delete the newer slice already saved.
+func progressAfterVelocityRead(
+	target models.FactoryVelocitySyncTarget,
+	requestedFrom time.Time,
+	until time.Time,
+	coverage velocityReadCoverage,
+	now time.Time,
+	repositoryChanged bool,
+) (time.Time, time.Time, time.Time, int) {
+	// The stored window ends past now so a merge later today replaces the
+	// right rows on the next tick. A continuation must stop at the slice
+	// already saved.
+	replaceTo := now.Add(time.Hour)
+	if !until.IsZero() {
+		replaceTo = until
+	}
+	if coverage.Complete || effectiveVelocityProvider(target) != models.ProviderBitbucket {
+		return requestedFrom,
+			replaceTo,
+			earliestBackfill(target, requestedFrom, repositoryChanged),
+			nextVelocityRulesGeneration(target, requestedFrom, now)
+	}
+	return coverage.ContinueBefore, replaceTo, coverage.ContinueBefore, bitbucketVelocityRulesRebuilding
 }
 
 // nextVelocityRulesGeneration records the current Bitbucket rules only after a

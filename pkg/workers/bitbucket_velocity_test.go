@@ -131,17 +131,45 @@ func TestToBitbucketRepositoryMerge(t *testing.T) {
 }
 
 func TestListBitbucketMergesKeepsAShortPageWalkIncomplete(t *testing.T) {
-	now := time.Now().Format(time.RFC3339)
-	body := `{"values":[{"id":1,"state":"MERGED","updated_on":"` + now + `","author":{},"source":{},"merge_commit":{"hash":"m1"}}],"next":"https://api.bitbucket.org/2.0/next"}`
+	updated := time.Now().UTC().Truncate(time.Second)
+	body := `{"values":[{"id":1,"state":"MERGED","updated_on":"` + updated.Format(time.RFC3339) + `","author":{},"source":{}}],"next":"https://api.bitbucket.org/2.0/next"}`
 	responses := make([]*http.Response, velocitySyncMaxPages)
 	for i := range responses {
 		responses[i] = okJSONResponse(body)
 	}
 	client, _ := stubBitbucketVelocityClient(responses...)
 
-	_, err := listBitbucketMerges(context.Background(), client, "acme/widgets", time.Now().Add(-time.Hour), time.Now().Add(time.Hour))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "exceeded")
+	merges, coverage, err := listBitbucketMerges(
+		context.Background(),
+		client,
+		"acme/widgets",
+		time.Now().Add(-60*24*time.Hour),
+		time.Now().Add(time.Hour),
+		time.Time{},
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, merges)
+	assert.False(t, coverage.Complete)
+	assert.WithinDuration(t, updated, coverage.ContinueBefore, time.Second)
+}
+
+func TestListBitbucketMergesContinuesBeforeTheSavedSlice(t *testing.T) {
+	now := time.Now().UTC()
+	until := now.Add(-2 * time.Hour)
+	client, httpCtx := stubBitbucketVelocityClient(okJSONResponse(`{"values":[{"id":7,"state":"MERGED","updated_on":"` + now.Add(-3*time.Hour).Format(time.RFC3339) + `","author":{},"source":{}}]}`))
+
+	merges, coverage, err := listBitbucketMerges(
+		context.Background(),
+		client,
+		"acme/widgets",
+		now.Add(-30*24*time.Hour),
+		now.Add(time.Hour),
+		until,
+	)
+	require.NoError(t, err)
+	require.Len(t, merges, 1)
+	assert.True(t, coverage.Complete)
+	assert.Contains(t, httpCtx.Requests[0].URL.Query().Get("q"), "updated_on < "+until.Format(time.RFC3339))
 }
 
 func TestListBitbucketMergesExcludesAppsUnlessTheyProducedAgentWork(t *testing.T) {
@@ -162,7 +190,7 @@ func TestListBitbucketMergesExcludesAppsUnlessTheyProducedAgentWork(t *testing.T
 				okJSONResponse(`{"values":[{"id":42,"state":"MERGED","updated_on":"`+now.Format(time.RFC3339)+`","author":{"type":"`+test.authorType+`","display_name":"SuperPlane Mijat Tunnel"},"merge_commit":{"hash":"m42"}}]}`),
 				okJSONResponse(`{"hash":"m42","date":"`+now.Format(time.RFC3339)+`","message":"`+test.message+`"}`),
 			)
-			merges, err := listBitbucketMerges(context.Background(), client, "acme/widgets", now.Add(-time.Hour), now.Add(time.Hour))
+			merges, _, err := listBitbucketMerges(context.Background(), client, "acme/widgets", now.Add(-time.Hour), now.Add(time.Hour), time.Time{})
 			require.NoError(t, err)
 			if test.wantSource == "" {
 				assert.Empty(t, merges)
