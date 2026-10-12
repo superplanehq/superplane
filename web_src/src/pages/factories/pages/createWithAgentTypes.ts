@@ -58,6 +58,11 @@ export type CreateWithAgentSurvey = {
 export type CreateWithAgentView = {
   repository: string;
   machineStatus: CreateWithAgentMachineStatus;
+  /**
+   * True when the agent run for this turn has finished. The chat still waits
+   * for the next user message, which starts a new run with the rewind.
+   */
+  turnEnded?: boolean;
   canvasId: string;
   canvasRunId: string;
   executionId: string;

@@ -6,9 +6,9 @@ import type { CreateWithAgentView } from "../createWithAgentTypes";
 
 export function planningHeaderSpendActive(
   footerKind: string,
-  view: Pick<CreateWithAgentView, "machineStatus" | "canvasId" | "executionId">,
+  view: Pick<CreateWithAgentView, "machineStatus" | "turnEnded" | "canvasId" | "executionId">,
 ): boolean {
-  if (footerKind !== "draft") {
+  if (footerKind !== "draft" || view.turnEnded) {
     return false;
   }
   if (view.machineStatus !== "running" && view.machineStatus !== "waiting") {
