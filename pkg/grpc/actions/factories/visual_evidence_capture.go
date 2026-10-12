@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -149,7 +148,7 @@ func enqueueVisualEvidenceCapture(
 		node := nodes[i]
 		var saved *models.CanvasNodeRequest
 		err := db.Transaction(func(tx *gorm.DB) error {
-			if err := lockVisualEvidenceCapture(tx, node.WorkflowID, pullRequest.Number); err != nil {
+			if err := models.LockVisualEvidenceCapture(tx, node.WorkflowID, pullRequest.Number); err != nil {
 				return err
 			}
 			started, err := models.CanvasHasGitHubPullRequestEvent(
@@ -252,8 +251,8 @@ func captureVisualEvidenceRequest(
 	requestID uuid.UUID,
 ) ([]models.CanvasEvent, error) {
 	db := database.DB(ctx)
-	var request models.CanvasNodeRequest
-	if err := db.First(&request, "id = ?", requestID).Error; err != nil {
+	request, err := models.FindCanvasNodeRequest(db, requestID)
+	if err != nil {
 		return nil, err
 	}
 	if request.State != models.NodeExecutionRequestStatePending {
@@ -261,45 +260,45 @@ func captureVisualEvidenceRequest(
 	}
 	spec := request.Spec.Data().VisualEvidenceCapture
 	if spec == nil {
-		if err := completeVisualEvidenceCapture(db, &request); err != nil {
+		if err := completeVisualEvidenceCapture(db, request); err != nil {
 			return nil, err
 		}
 		return nil, fmt.Errorf("visual evidence capture request %s has no pull request", request.ID)
 	}
 	organizationID, err := uuid.Parse(spec.OrganizationID)
 	if err != nil {
-		return nil, completeInvalidVisualEvidenceCapture(db, &request, err)
+		return nil, completeInvalidVisualEvidenceCapture(db, request, err)
 	}
 	factoryID, err := uuid.Parse(spec.FactoryID)
 	if err != nil {
-		return nil, completeInvalidVisualEvidenceCapture(db, &request, err)
+		return nil, completeInvalidVisualEvidenceCapture(db, request, err)
 	}
 	pullRequestID, err := uuid.Parse(spec.PullRequestID)
 	if err != nil {
-		return nil, completeInvalidVisualEvidenceCapture(db, &request, err)
+		return nil, completeInvalidVisualEvidenceCapture(db, request, err)
 	}
 
 	factory, err := models.FindFactory(db, organizationID, factoryID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, completeVisualEvidenceCapture(db, &request)
+		return nil, completeVisualEvidenceCapture(db, request)
 	}
 	if err != nil {
 		return nil, err
 	}
 	pullRequest, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequestID})
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, completeVisualEvidenceCapture(db, &request)
+		return nil, completeVisualEvidenceCapture(db, request)
 	}
 	if err != nil {
 		return nil, err
 	}
 	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub || pullRequest.State != models.FactoryPullRequestStateOpen {
-		return nil, completeVisualEvidenceCapture(db, &request)
+		return nil, completeVisualEvidenceCapture(db, request)
 	}
 
 	node, err := models.FindCanvasNode(db, request.WorkflowID, request.NodeID)
 	if errors.Is(err, gorm.ErrRecordNotFound) || (err == nil && node.State == models.CanvasNodeStateError) {
-		return nil, completeVisualEvidenceCapture(db, &request)
+		return nil, completeVisualEvidenceCapture(db, request)
 	}
 	if err != nil {
 		return nil, err
@@ -310,7 +309,7 @@ func captureVisualEvidenceRequest(
 		return nil, err
 	}
 	if started {
-		return nil, completeVisualEvidenceCapture(db, &request)
+		return nil, completeVisualEvidenceCapture(db, request)
 	}
 
 	githubPR, err := fetchVisualEvidencePullRequest(ctx, db, deps, factory, pullRequest.Repository, int(pullRequest.Number))
@@ -318,7 +317,7 @@ func captureVisualEvidenceRequest(
 		return nil, fmt.Errorf("%w: get pull request: %w", errVisualEvidenceCaptureTemporary, err)
 	}
 	if githubPR.GetDraft() || githubPR.GetState() != models.FactoryPullRequestStateOpen {
-		return nil, completeVisualEvidenceCapture(db, &request)
+		return nil, completeVisualEvidenceCapture(db, request)
 	}
 	headSHA := strings.TrimSpace(githubPR.GetHead().GetSHA())
 	baseRef := strings.TrimSpace(githubPR.GetBase().GetRef())
@@ -333,7 +332,7 @@ func captureVisualEvidenceRequest(
 	payload := visualEvidenceEventData(pullRequest, order, headSHA, baseRef, githubPR.GetBody())
 	var created []models.CanvasEvent
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := lockVisualEvidenceCapture(tx, node.WorkflowID, pullRequest.Number); err != nil {
+		if err := models.LockVisualEvidenceCapture(tx, node.WorkflowID, pullRequest.Number); err != nil {
 			return err
 		}
 		started, err := models.CanvasHasGitHubPullRequestEvent(tx, node.WorkflowID, node.NodeID, pullRequest.Repository, pullRequest.Number)
@@ -341,7 +340,7 @@ func captureVisualEvidenceRequest(
 			return err
 		}
 		if started {
-			return completeVisualEvidenceCapture(tx, &request)
+			return completeVisualEvidenceCapture(tx, request)
 		}
 		current, err := models.FindCanvasNode(tx, node.WorkflowID, node.NodeID)
 		if err != nil {
@@ -355,7 +354,7 @@ func captureVisualEvidenceRequest(
 		if len(created) == 0 {
 			return errVisualEvidenceCaptureTemporary
 		}
-		return completeVisualEvidenceCapture(tx, &request)
+		return completeVisualEvidenceCapture(tx, request)
 	})
 	if err != nil {
 		return nil, err
@@ -391,8 +390,8 @@ func scheduleVisualEvidenceCaptureRetries(db *gorm.DB, requests []models.CanvasN
 }
 
 func scheduleVisualEvidenceCaptureRetry(db *gorm.DB, requestID uuid.UUID) error {
-	var request models.CanvasNodeRequest
-	if err := db.First(&request, "id = ?", requestID).Error; err != nil {
+	request, err := models.FindCanvasNodeRequest(db, requestID)
+	if err != nil {
 		return err
 	}
 	if request.State != models.NodeExecutionRequestStatePending {
@@ -419,11 +418,6 @@ func visualEvidenceCaptureRetryDelay(attempts int) time.Duration {
 		return visualEvidenceCaptureMaxDelay
 	}
 	return delay
-}
-
-func lockVisualEvidenceCapture(tx *gorm.DB, canvasID uuid.UUID, number int64) error {
-	lockKey := canvasID.String() + ":" + strconv.FormatInt(number, 10)
-	return tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error
 }
 
 func visualEvidenceEventData(

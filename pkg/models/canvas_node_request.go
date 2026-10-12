@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -100,6 +101,20 @@ func ListNodeRequests() ([]CanvasNodeRequest, error) {
 	}
 
 	return requests, nil
+}
+
+func FindCanvasNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
+	var request CanvasNodeRequest
+	err := tx.First(&request, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
+}
+
+func LockVisualEvidenceCapture(tx *gorm.DB, canvasID uuid.UUID, number int64) error {
+	lockKey := canvasID.String() + ":" + strconv.FormatInt(number, 10)
+	return tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error
 }
 
 func FindPendingRequestForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*CanvasNodeRequest, error) {
