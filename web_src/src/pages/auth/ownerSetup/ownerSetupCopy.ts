@@ -28,10 +28,4 @@ export const OWNER_SETUP_COPY = {
     error: "SuperPlane could not prepare Fleet Manager. Try again, or skip this step.",
     retry: "Try again",
   },
-  pane: {
-    owner: "Awaiting owner",
-    license: "Awaiting edition",
-    smtp: "Awaiting email",
-    fleet: "Awaiting runners",
-  },
 } as const;

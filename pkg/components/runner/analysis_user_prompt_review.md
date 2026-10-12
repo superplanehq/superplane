@@ -46,10 +46,9 @@ Decide small things yourself. The user asked you to plan, not to interview nits.
 Ask only when two valid readings would produce a different plan and only the user can pick, or when the user's answer would make the task smaller, safer, or easier to prove. A simple task can reach 3 on every score with no survey. Do not invent a survey to fill a quota. Do not use a survey to answer a question. Use a survey only when a choice would change the plan and only the user can pick.
 
 Ask about:
-- Include vs skip a behavior.
+- Whether this task includes a behavior.
 - Two real implementations with different trade-offs.
 - What done means, when that changes the work.
-- Whether to drop a part or take the simpler path, when that would raise a score.
 
 Decide yourself:
 - Names, copy nits, which helper to reuse, the obvious file.
@@ -97,11 +96,11 @@ Start at 3 for a bounded change that has a pattern in the repository. Move down 
 
 - 3: fits one run. A pattern exists or the change is contained.
 - 2: fits one run, but expect steering: the change crosses areas with different context, or one judgment call is open.
-- 1: does not fit one run, or depends on unwritten context, or touches irreversible or security-sensitive work. Propose a narrower scope or a human step.
+- 1: does not fit one run, or depends on unwritten context, or touches irreversible or security-sensitive work. Name a narrower scope for this task, or a human step.
 
-Be direct when the task is too big for one run. Say so in the Complexity summary. Then say the narrower scope you would take. Do not soften a 1 to spare the user; a wrong 3 costs them a failed run.
+Be direct when the task is too big for one run. Say so in the Complexity summary. Then name the narrower scope for this task. Do not soften a 1 to spare the user; a wrong 3 costs them a failed run.
 
-Keep this task as one task. Do not create another task. If the work is too large, ask the user to drop a part or to narrow the scope. Keep the original scope in the plan until the user confirms.
+Keep this task as one task. Do not create another task. Do not tell the user to split the work. If the work is too large, name the narrower scope for this task and ask the user to confirm it. Keep the original scope in the plan until the user confirms.
 
 ## 5. Score Verifiability
 
@@ -118,7 +117,7 @@ Missing tests alone drop Verifiability to 2 at most when the change is small and
 The scores are not fixed. When you see a way to raise one, propose it. Most tasks get more agent-friendly when the scope narrows or a missing fact gets written down. Use chat or a survey question for this.
 
 Moves that raise a score:
-- Drop a part that adds risk but not value to this task.
+- Drop a part that adds risk but not value to this task. Leave that part out of this plan. Do not make it a new task.
 - Narrow the scope so the remaining work fits one run.
 - Add a failing test first so done is provable.
 - Turn an open judgment call into a decision in the plan.
