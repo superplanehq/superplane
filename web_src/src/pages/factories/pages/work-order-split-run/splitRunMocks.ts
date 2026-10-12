@@ -567,7 +567,7 @@ function reviewSurfaces(
   if (displayStatus === "draft") {
     return draftReviewSurface(order, checks, input);
   }
-  if (displayStatus === "completed" || displayStatus === "rejected") {
+  if (displayStatus === "completed" || displayStatus === "rejected" || displayStatus === "closed") {
     return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
   }
   if (current?.result === "RESULT_FAILED") {
@@ -815,7 +815,13 @@ function phasesForOrder(
 
 export const SPLIT_RUN_CLOSURE_PHASE_ID = "done-closure";
 
-const CLOSED_DISPLAY_STATUSES = new Set<WorkOrderDisplayStatus>(["completed", "rejected", "cancelled", "failed"]);
+const CLOSED_DISPLAY_STATUSES = new Set<WorkOrderDisplayStatus>([
+  "completed",
+  "rejected",
+  "closed",
+  "cancelled",
+  "failed",
+]);
 
 /**
  * The decision that closed the task, as a Done stage. Mirrors the

@@ -704,7 +704,7 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t 
 
 		reloaded := reload(t, factory, order.ID)
 		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
-		assert.Equal(t, models.FactoryWorkOrderResultRejected, reloaded.Result)
+		assert.Equal(t, models.FactoryWorkOrderResultPRClosed, reloaded.Result)
 
 		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{
 			Provider:   models.FactoryPullRequestProviderGitHub,

@@ -86,7 +86,7 @@ export function splitRunCloseNeedsConfirm(kind: SplitRunFooterKind): boolean {
 }
 
 export function isClosedWorkOrderDisplayStatus(status?: WorkOrderDisplayStatus): boolean {
-  return status === "completed" || status === "failed" || status === "rejected" || status === "cancelled";
+  return ["completed", "failed", "rejected", "closed", "cancelled"].includes(status ?? "");
 }
 
 export function showsArchive(footer: Pick<SplitRunFooter, "kind" | "status">): boolean {
@@ -258,7 +258,7 @@ export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTo
   if (footer.kind === "failed" || footer.status === "failed") {
     return "failed";
   }
-  if (footer.kind === "stopped" || footer.status === "rejected") {
+  if (footer.kind === "stopped" || footer.status === "rejected" || footer.status === "closed") {
     return "rejected";
   }
   return "done";
@@ -278,6 +278,9 @@ function closedDecisionNote(
   status?: WorkOrderDisplayStatus,
   closer?: { actor?: OrgUserDisplay; automationName?: string },
 ): SplitRunFooterNote {
+  if (status === "closed") {
+    return { headline: "This task is closed", text: "The pull request was closed without a merge." };
+  }
   if (status === "rejected") {
     const headline =
       closerHeadline(SPLIT_RUN_REJECTED_HEADLINE_ACTOR, closer?.actor, closer?.automationName) ||
@@ -302,7 +305,7 @@ function closedDecisionNote(
 }
 
 function closedDecisionActions(status?: WorkOrderDisplayStatus): SplitRunFooterAction[] {
-  if (status === "failed" || status === "rejected" || status === "cancelled") {
+  if (status === "failed" || status === "rejected" || status === "closed" || status === "cancelled") {
     return [SEND_TO_BACKLOG, REOPEN];
   }
   return [];
@@ -452,7 +455,7 @@ function closedFooterNote(input: FooterInput, note?: SplitRunFooterNote): SplitR
   if (input.status === "failed" || input.kind === "failed") {
     return closedDecisionNote(input.status ?? "failed");
   }
-  if (input.status === "completed" || input.status === "rejected") {
+  if (input.status === "completed" || input.status === "rejected" || input.status === "closed") {
     return closedDecisionNote(input.status, {
       actor: input.actor,
       automationName: input.automationName,
