@@ -116,13 +116,11 @@ func ClientDisplayName(tx *gorm.DB, clientID string) string {
 	if clientID == LocalClientID {
 		return LocalClientName
 	}
-	if stored, err := models.FindMCPOAuthClient(tx, clientID); err == nil {
-		name := strings.TrimSpace(stored.ClientName)
-		if name != "" {
-			return name
-		}
+	stored := ""
+	if row, err := models.FindMCPOAuthClient(tx, clientID); err == nil {
+		stored = row.ClientName
 	}
-	return models.DefaultMCPClientName
+	return mcp.ClientDisplayName(stored, clientID, models.DefaultMCPClientName)
 }
 
 func lookupClient(ctx context.Context, tx *gorm.DB, httpClient mcp.HTTPDoer, clientID string) (*Client, *OAuthError) {

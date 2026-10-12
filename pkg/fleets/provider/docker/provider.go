@@ -155,6 +155,10 @@ func (p *Provider) Create(
 	if boot.RunnerAPIURL == "" || boot.RegistrationToken == "" {
 		return provider.Resource{}, fmt.Errorf("Docker runner bootstrap is incomplete")
 	}
+	tags, err := provider.FormatRunnerTags(boot.Tags)
+	if err != nil {
+		return provider.Resource{}, fmt.Errorf("encode Docker runner tags: %w", err)
+	}
 
 	name := "superplane-runner-" + request.RunnerID
 	args := []string{
@@ -174,15 +178,15 @@ func (p *Provider) Create(
 	for _, host := range p.config.ExtraHosts {
 		args = append(args, "--add-host", host)
 	}
+	if tags != "" {
+		args = append(args, "--env", "RUNNER_TAGS="+tags)
+	}
 	args = append(
 		args,
 		p.config.Image,
 		"--url", boot.RunnerAPIURL,
 		"--registration-token", boot.RegistrationToken,
 	)
-	for key, value := range boot.Tags {
-		args = append(args, "--tag", key+"="+value)
-	}
 	output, err := p.docker.Run(ctx, args...)
 	if err != nil {
 		return provider.Resource{}, dockerError(

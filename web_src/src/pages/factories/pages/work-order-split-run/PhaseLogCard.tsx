@@ -340,6 +340,11 @@ type PhaseLogCardProps = {
   canvasId?: string;
   /** Collapse setup noise and bash in the planning session log. */
   compactSessionLog?: boolean;
+  /**
+   * Off when the host row already shows the phase name. The stream then
+   * renders on its own, and its node and step rows do not stick.
+   */
+  showHeader?: boolean;
   /** Live canvas or run details are still loading for this phase. */
   streamLoading?: boolean;
   files?: FilesFile[];
@@ -437,6 +442,7 @@ export function PhaseLogCard({
   organizationId,
   canvasId,
   compactSessionLog = false,
+  showHeader = true,
   streamLoading = false,
   files,
   onUsageOpenChange,
@@ -468,7 +474,7 @@ export function PhaseLogCard({
           canvasId={canvasId ?? phase.appId}
         />
         <div className={layout.className} data-testid={layout.expandTestId} onClick={layout.onExpandClick}>
-          {compactSessionLog ? null : (
+          {compactSessionLog || !showHeader ? null : (
             <AutomationHeader
               phase={phase}
               expanded={expanded}
@@ -497,6 +503,7 @@ export function PhaseLogCard({
               organizationId={organizationId}
               canvasId={canvasId}
               compactSessionLog={compactSessionLog}
+              stickyRows={showHeader}
               files={files}
             />
           ) : null}
@@ -514,6 +521,7 @@ function PhaseLogCardStream({
   organizationId,
   canvasId,
   compactSessionLog,
+  stickyRows,
   files,
 }: {
   phase: SplitRunPhase;
@@ -523,6 +531,7 @@ function PhaseLogCardStream({
   organizationId?: string;
   canvasId?: string;
   compactSessionLog: boolean;
+  stickyRows: boolean;
   files?: FilesFile[];
 }) {
   return (
@@ -539,7 +548,9 @@ function PhaseLogCardStream({
           onSelect={onSelectNode}
           organizationId={organizationId}
           canvasId={canvasId ?? phase.appId}
+          analysisStatus={phase.status}
           compactSessionLog={compactSessionLog}
+          stickyRows={stickyRows}
           files={files}
         />
       ))}
@@ -903,14 +914,17 @@ function statusTimeMark(status: SplitRunPhaseStatus): ReactNode {
 function livePhaseSpend(agents: PhaseAgentUsageEntry[]): { tokens: number; cents: number } {
   let tokens = 0;
   let cents = 0;
+  let hostedMicros = 0;
   for (const agent of agents) {
     tokens += agentRunNewTokenCount(agent.telemetry);
-    const usd = agent.telemetry.usage.total_cost_usd;
-    if (usd != null && Number.isFinite(usd)) {
-      cents += Math.round(usd * 100);
+    const { hosted_cost_usd: hostedUsd, total_cost_usd: reportedUsd } = agent.telemetry.usage;
+    if (hostedUsd != null && Number.isFinite(hostedUsd)) {
+      hostedMicros += Math.round(hostedUsd * 1_000_000);
+    } else if (reportedUsd != null && Number.isFinite(reportedUsd)) {
+      cents += Math.round(reportedUsd * 100);
     }
   }
-  return { tokens, cents };
+  return { tokens, cents: cents + Math.floor(hostedMicros / 10_000) };
 }
 
 function displayedPhaseSpend(phase: SplitRunPhase, agents: PhaseAgentUsageEntry[]): { tokens: number; cents: number } {
@@ -1002,7 +1016,9 @@ function StreamNode({
   onSelect,
   organizationId,
   canvasId,
+  analysisStatus,
   compactSessionLog,
+  stickyRows,
   files,
 }: {
   group: StreamNodeGroup;
@@ -1010,11 +1026,17 @@ function StreamNode({
   onSelect?: (nodeId: string) => void;
   organizationId?: string;
   canvasId?: string;
+  analysisStatus?: SplitRunPhaseStatus;
   compactSessionLog: boolean;
+  stickyRows: boolean;
   files?: FilesFile[];
 }) {
   const { line, notes, artifact, pullRequest } = group;
-  const { notes: liveNotes, usageSeries, usageLoading } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  const {
+    notes: liveNotes,
+    usageSeries,
+    usageLoading,
+  } = useRunnerNodeLiveNotes(line, organizationId, canvasId, analysisStatus);
   useReportPhaseAgentUsageSeries({
     nodeId: line.nodeId ?? line.id,
     fallbackName: line.componentName,
@@ -1033,7 +1055,7 @@ function StreamNode({
       {compactSessionLog ? null : (
         <StreamNodeHeader
           line={line}
-          hasChildren={hasChildren}
+          sticky={stickyRows && hasChildren}
           highlighted={highlighted}
           artifact={artifact}
           pullRequest={pullRequest}
@@ -1047,7 +1069,7 @@ function StreamNode({
               key={step.line.id}
               step={step}
               highlightUserTalk={compactSessionLog}
-              stickyHeader={!compactSessionLog}
+              stickyHeader={stickyRows && !compactSessionLog}
               files={files}
             />
           ))}
@@ -1059,14 +1081,14 @@ function StreamNode({
 
 function StreamNodeHeader({
   line,
-  hasChildren,
+  sticky,
   highlighted,
   artifact,
   pullRequest,
   onSelect,
 }: {
   line: SplitRunStreamLine;
-  hasChildren: boolean;
+  sticky: boolean;
   highlighted: boolean;
   artifact?: FactoriesWorkOrderArtifact;
   pullRequest?: FactoriesFactoryPullRequest;
@@ -1097,7 +1119,7 @@ function StreamNodeHeader({
         LOG_ROW_H,
         STREAM_SECTION,
         LAST_RUNNING_LINE_PULSE,
-        hasChildren && STICKY_NODE,
+        sticky && STICKY_NODE,
         highlighted && "ring-1 ring-foreground/15",
       )}
     >
@@ -1473,6 +1495,7 @@ function useRunnerNodeLiveNotes(
   line: SplitRunStreamLine,
   organizationId?: string,
   canvasId?: string,
+  analysisStatus?: SplitRunPhaseStatus,
 ): {
   notes: SplitRunStreamLine[] | undefined;
   telemetry: AgentRunTelemetry;
@@ -1506,6 +1529,7 @@ function useRunnerNodeLiveNotes(
       error,
       isStreaming,
       nodeStatus: line.status,
+      analysisStatus,
     }),
     telemetry: nextTelemetry,
     usageSeries: nextSeries,

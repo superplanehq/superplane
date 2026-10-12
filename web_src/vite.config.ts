@@ -93,6 +93,10 @@ export default defineConfig(() => {
       alias: {
         "@/canvas": path.resolve(import.meta.dirname, "src/pages/canvas"),
         "@factory-templates": path.resolve(import.meta.dirname, "../pkg/grpc/actions/factories/templates"),
+        "@runner/hosted_video_hosts.json": path.resolve(
+          import.meta.dirname,
+          "../pkg/components/runner/hosted_video_hosts.json",
+        ),
         "@": path.resolve(import.meta.dirname, "src"),
       },
     },

@@ -59,10 +59,10 @@ func (h *AssetHandler) isAssetPath(path string) bool {
 	}
 
 	// Also serve common root-level assets produced by Vite's public/ directory
-	// e.g., /favicon.ico, /robots.txt, /manifest.webmanifest
+	// e.g., /favicon.ico, /robots.txt, /manifest.webmanifest, /sw.js
 	root := strings.TrimPrefix(path, h.basePath)
 	switch root {
-	case "/favicon.ico", "/robots.txt", "/manifest.webmanifest":
+	case "/favicon.ico", "/robots.txt", "/manifest.webmanifest", "/sw.js":
 		return true
 	}
 	return false
@@ -104,6 +104,9 @@ func assetContentType(path string) string {
 // but uses a short cache for files that are referenced by a stable URL:
 // the onboarding scripts, the web app manifest, and the PWA icons.
 func assetCacheControl(path string) string {
+	if strings.HasSuffix(path, "/sw.js") {
+		return "no-cache"
+	}
 	if strings.HasSuffix(path, ".webmanifest") ||
 		strings.Contains(path, "/onboarding/") ||
 		strings.Contains(path, "/pwa/") {

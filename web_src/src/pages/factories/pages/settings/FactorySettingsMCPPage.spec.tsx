@@ -522,8 +522,8 @@ describe("FactorySettingsMCPPage", () => {
   }, 10000);
 
   it("shows the full MCP client name on hover and in the revoke dialog", async () => {
-    const longClientId = "mcp-client-codex";
-    const longClientName = "https://chatgpt.com/oauth/codex/workspace-example/client.json";
+    const longClientId = "mcp-client-long-name";
+    const longClientName = "https://example.com/oauth/clients/workspace-example/client-metadata.json";
     renderSuperplaneMcpServer([
       connectedMcpClient("mcp-client-cursor", "Cursor"),
       connectedMcpClient(longClientId, longClientName),

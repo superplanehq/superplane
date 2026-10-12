@@ -283,10 +283,11 @@ const telemetry = createTurnTelemetry({
   taskDir: process.env.SUPERPLANE_TASK_DIR,
   write: (record) => records.push(record),
 });
-telemetry.beginTurn({ input_tokens: 1, output_tokens: 2, cache_read_input_tokens: 1448, cache_creation_input_tokens: 815 });
+telemetry.beginTurn({ input_tokens: 1, output_tokens: 2, cache_read_input_tokens: 1448, cache_creation_input_tokens: 815, total_cost_usd: 0.2 });
 telemetry.beginTurn({ input_tokens: 2, output_tokens: 1, cache_read_input_tokens: 20409, cache_creation_input_tokens: 2663 });
 const result = telemetry.attachToResult({
   type: "result",
+  total_cost_usd: 0.88,
   usage: {
     input_tokens: 13,
     output_tokens: 2057,
@@ -304,6 +305,8 @@ process.stdout.write(JSON.stringify({ records, telemetry: result.telemetry }));
 	assert.Equal(t, float64(2), payload.Telemetry.Turns[1].Usage["input_tokens"])
 	assert.Equal(t, float64(20409), payload.Telemetry.Turns[1].Usage["cache_read_input_tokens"])
 	assert.Equal(t, float64(2663), payload.Telemetry.Turns[1].Usage["cache_creation_input_tokens"])
+	assert.InDelta(t, 0.88, payload.Telemetry.Usage["total_cost_usd"], 1e-9)
+	assert.InDelta(t, 0.68, payload.Telemetry.Turns[1].Usage["total_cost_usd"], 1e-9)
 	assert.Equal(t, float64(2057), payload.Telemetry.Usage["output_tokens"])
 	assert.Equal(t, float64(13), payload.Telemetry.Usage["input_tokens"])
 	lastRecord := payload.Records[len(payload.Records)-1]
@@ -311,6 +314,7 @@ process.stdout.write(JSON.stringify({ records, telemetry: result.telemetry }));
 	assert.Equal(t, float64(2), lastRecord["turn"])
 	usage, ok := lastRecord["usage"].(map[string]any)
 	require.True(t, ok)
+	assert.InDelta(t, 0.68, usage["total_cost_usd"], 1e-9)
 	assert.Equal(t, float64(2055), usage["output_tokens"])
 }
 
@@ -393,4 +397,24 @@ func runTurnTelemetryHarness(t *testing.T, taskDir, body string) turnTelemetryHa
 	var payload turnTelemetryHarnessPayload
 	require.NoError(t, json.Unmarshal(out, &payload), string(out))
 	return payload
+}
+
+func TestTurnTelemetryEmitsCostOnlyUpdates(t *testing.T) {
+	taskDir := t.TempDir()
+	writeTurnTelemetryScript(t, taskDir)
+	payload := runTurnTelemetryHarness(t, taskDir, `
+ const { createTurnTelemetry } = require(process.env.TURN_TELEMETRY_SCRIPT);
+ const records = [];
+ const telemetry = createTurnTelemetry({taskDir: process.env.SUPERPLANE_TASK_DIR, write: record => records.push(record)});
+ telemetry.beginTurn({input_tokens: 100, output_tokens: 20});
+ telemetry.mergeCurrentUsage({input_tokens: 100, output_tokens: 20, total_cost_usd: 0.12});
+ telemetry.replaceTurnUsage(1, {input_tokens: 100, output_tokens: 20, total_cost_usd: 0.15});
+ telemetry.updateCurrentUsage({input_tokens: 100, output_tokens: 20}, 0.18);
+ process.stdout.write(JSON.stringify({records, telemetry: telemetry.snapshot()}));
+ `)
+	require.Len(t, payload.Records, 4)
+	for i, cost := range []float64{0.12, 0.15, 0.18} {
+		usage := payload.Records[i+1]["usage"].(map[string]any)
+		assert.InDelta(t, cost, usage["total_cost_usd"], 1e-9)
+	}
 }

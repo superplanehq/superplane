@@ -58,6 +58,7 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	}
 
 	publishWorkOrderClosed(orgID, factory, order, &closedBy, fromState, result, wasClosed)
+	messages.PublishWorkOrderRunCancellations(db, order)
 
 	order, err = factory.FindWorkOrder(db, orderID)
 	if err != nil {

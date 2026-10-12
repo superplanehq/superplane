@@ -169,7 +169,7 @@ func closePreviousPullRequests(
 ) error {
 	for _, pullRequest := range pullRequests {
 		if pullRequest.Provider == models.FactoryPullRequestProviderBitbucket {
-			return errCannotCloseBitbucketPullRequest
+			continue
 		}
 		if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
 			return errCannotClosePullRequest

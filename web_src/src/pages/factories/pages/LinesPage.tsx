@@ -110,9 +110,9 @@ import {
   applyWorkOrderFilters,
   applyWorkOrderScope,
   applyWorkOrderSearch,
+  boardWorkOrderScopeQuery,
   buildWorkOrderListEntries,
   countWorkOrderFilters,
-  UNASSIGNED_FILTER_VALUE,
   visibleWorkOrderFilters,
   WORK_ORDER_SCOPES,
   type WorkOrderScope,
@@ -210,13 +210,13 @@ import {
   isPRFeedbackSetupAvailable,
   isPRFeedbackSettingsTab,
   prFeedbackListenTitle,
+  prFeedbackVCSIcon,
   takenPRFeedbackSourceIds,
   type PRFeedbackSource,
   type PRFeedbackSourceId,
 } from "./prFeedbackSettingsModel";
 import { isFactoryOnboardingComplete } from "./onboarding/onboardingStatus";
 import { LaneListenerList, type LaneListener } from "./LaneListenerList";
-import githubIcon from "@/assets/icons/integrations/github.svg";
 import { usePRFeedbackWorkOrderAttention, useWorkOrderPRFeedbackLog } from "./useWorkOrderPRFeedbackRunHref";
 import {
   normalizeColumnColors,
@@ -225,14 +225,18 @@ import {
   type LineBoardColumnColorId,
 } from "./lineBoardColumnColors";
 
-type LineBoardScope = Extract<WorkOrderScope, "all" | "my">;
+type LineBoardScope = Extract<WorkOrderScope, "all" | "my" | "unassigned">;
 
 const LINE_BOARD_SCOPES: ReadonlyArray<ScopePillOption<LineBoardScope>> = WORK_ORDER_SCOPES.filter(
-  (scope): scope is ScopePillOption<LineBoardScope> => scope.id === "all" || scope.id === "my",
+  (scope): scope is ScopePillOption<LineBoardScope> =>
+    scope.id === "all" || scope.id === "my" || scope.id === "unassigned",
 );
 
 function lineBoardWorkOrderScope(scope: WorkOrderScope): LineBoardScope {
-  return scope === "my" ? "my" : "all";
+  if (scope === "my" || scope === "unassigned") {
+    return scope;
+  }
+  return "all";
 }
 
 function boardWorkOrdersPageOptions(
@@ -240,12 +244,8 @@ function boardWorkOrdersPageOptions(
   lineId: string | undefined,
   currentUserId?: string,
 ): FactoryBoardWorkOrdersOptions {
-  const ownerIds = state.filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
-  const scope = lineBoardWorkOrderScope(state.scope);
   return {
-    userId: ownerIds.length === 1 ? ownerIds[0] : scope === "my" ? currentUserId : undefined,
-    unassigned: state.filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE),
-    requireUser: scope === "my" && ownerIds.length !== 1,
+    ...boardWorkOrderScopeQuery(lineBoardWorkOrderScope(state.scope), state.filters.assigneeIds, currentUserId),
     done: {
       lineId,
       results: boardDoneResultsForStatuses(state.filters.statuses),
@@ -379,12 +379,14 @@ export function LinesPage() {
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
+  const vcsProvider = factory?.onboarding?.vcsProvider;
+  const supportsReviewBots = vcsProvider !== "bitbucket";
   const catalogParameters = appRepository ? { repository: appRepository } : undefined;
   useIntegrationResources(organizationId, githubIntegrationId, "status_check", catalogParameters, {
     enabled: addPRFeedbackOpen && Boolean(githubIntegrationId),
   });
   useIntegrationResources(organizationId, githubIntegrationId, "review_bot", catalogParameters, {
-    enabled: addPRFeedbackOpen && Boolean(githubIntegrationId),
+    enabled: addPRFeedbackOpen && Boolean(githubIntegrationId) && supportsReviewBots,
   });
   const [peekHint, setPeekHint] = useState<FactoriesWorkOrder | null>(null);
   const cardActions = useWorkOrderCardActions(organizationId, factoryId);
@@ -510,6 +512,7 @@ export function LinesPage() {
         onAddIntake: () => setAddIntakeOpen(true),
       };
 
+  const verifyIcon = prFeedbackVCSIcon(vcsProvider);
   const verifyListeners: LaneListener[] = prFeedbackHandlers.flatMap((handler) => {
     if (!handler.id) {
       return [];
@@ -518,8 +521,8 @@ export function LinesPage() {
       {
         id: handler.id,
         title: prFeedbackListenTitle(handler.source),
-        iconSrc: githubIcon,
-        iconAlt: "GitHub",
+        iconSrc: verifyIcon.iconSrc,
+        iconAlt: verifyIcon.iconAlt,
         healthy: handler.healthy !== false,
         needsRepairLabel: "Needs repair",
         settingsLabel: "Open PR feedback settings",
@@ -674,6 +677,7 @@ export function LinesPage() {
         onClose={() => setAddPRFeedbackOpen(false)}
         onSelect={createPRFeedbackFromSource}
         takenSourceIds={takenPRFeedbackSources}
+        vcsProvider={vcsProvider}
       />
       {automationViewCanvasId ? (
         <ColumnAutomationViewHost
@@ -704,6 +708,7 @@ export function LinesPage() {
           factoryId={factoryId}
           factoryKey={routeSegment}
           githubIntegrationId={githubIntegrationId}
+          vcsProvider={vcsProvider}
           repository={appRepository}
           lineId={selectedLine.id}
           canUpdate={canUpdate}
@@ -782,6 +787,7 @@ export function LinesPage() {
             backlogRepository={factory?.onboarding?.backlogRepository?.trim() ?? ""}
             defaultBranch={factory?.onboarding?.defaultBranch?.trim() ?? ""}
             githubIntegrationId={githubIntegrationId}
+            vcsProvider={vcsProvider}
             showColumnAutomations={showColumnAutomations}
             showAutomationRows={showAutomationRows}
             colorView={columnColorView}
@@ -978,6 +984,7 @@ function LineDetail({
   backlogRepository,
   defaultBranch,
   githubIntegrationId,
+  vcsProvider,
   showColumnAutomations,
   showAutomationRows,
   colorView,
@@ -1008,6 +1015,7 @@ function LineDetail({
   backlogRepository: string;
   defaultBranch: string;
   githubIntegrationId: string;
+  vcsProvider?: string;
   showColumnAutomations: boolean;
   showAutomationRows: boolean;
   colorView: LineBoardColumnColorView;
@@ -1020,7 +1028,7 @@ function LineDetail({
 }) {
   const steps = line.steps ?? [];
   const fullBoard = useMemo(() => buildLinePhaseBoard(line, workOrders ?? [], apps), [line, workOrders, apps]);
-  const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard), [fullBoard]);
+  const verifyOrders = useMemo(() => collectLineVerifyOrders(fullBoard, workOrders ?? []), [fullBoard, workOrders]);
   const board = useMemo(() => visibleLineStageColumns(fullBoard, verifyOrders), [fullBoard, verifyOrders]);
   const backlogOrders = useMemo(() => collectLineBacklogOrders(workOrders ?? []), [workOrders]);
   const doneOrders = useMemo(
@@ -1049,10 +1057,11 @@ function LineDetail({
         apps,
         workOrders,
         planningEnabled,
+        vcsProvider,
       });
       return applyColumnAutomationsOverlay(base, undefined, overlay.disabledIds, overlay.removedIds);
     },
-    [apps, board, factoryIntakes, overlay, planningEnabled, prFeedbackHandlers, workOrders],
+    [apps, board, factoryIntakes, overlay, planningEnabled, prFeedbackHandlers, vcsProvider, workOrders],
   );
 
   const addAutomation = useAddColumnAutomation({
@@ -1064,6 +1073,7 @@ function LineDetail({
     backlogRepository,
     defaultBranch,
     githubIntegrationId,
+    vcsProvider,
     automationsFor: (key) => automationsFor(key, columnTitleForKey(key, board)),
   });
   const canAddColumnAutomation = showColumnAutomations && canUpdate && addAutomation.allowCustom;
@@ -1867,6 +1877,7 @@ function DoneColumn({
               order={order}
               workOrderCardContext={workOrderCardContext}
               onOpenWorkOrder={onOpenWorkOrder}
+              showMergeConfidence={false}
             />
           </li>
         ))}

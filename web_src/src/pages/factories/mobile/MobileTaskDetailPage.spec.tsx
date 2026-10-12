@@ -28,11 +28,41 @@ const useWorkOrder = vi.fn((): { data: FactoriesWorkOrder | undefined; isLoading
   isError: false,
 }));
 
-const { onDispatch, dispatchingIds, canUpdateWorkOrder, runnerModelCalls } = vi.hoisted(() => ({
+const {
+  onDispatch,
+  dispatchingIds,
+  canUpdateWorkOrder,
+  runnerModelCalls,
+  updateAssignees,
+  findPlanningSession,
+  sendPlanningMessage,
+  answerPlanningSurvey,
+  liveCanvas,
+} = vi.hoisted(() => ({
   onDispatch: vi.fn(),
   dispatchingIds: { current: new Set<string>() },
   canUpdateWorkOrder: { current: true },
   runnerModelCalls: [] as unknown[][],
+  updateAssignees: vi.fn(),
+  findPlanningSession: vi.fn(),
+  sendPlanningMessage: vi.fn(),
+  answerPlanningSurvey: vi.fn(),
+  liveCanvas: { current: undefined as unknown },
+}));
+
+vi.mock("../pages/planningSessionClient", () => ({
+  findPlanningSessionByWorkOrder: (...args: unknown[]) => findPlanningSession(...args),
+  sendPlanningSessionMessage: (...args: unknown[]) => sendPlanningMessage(...args),
+  answerPlanningSessionSurvey: (...args: unknown[]) => answerPlanningSurvey(...args),
+}));
+
+vi.mock("../pages/usePlanningSessionLiveRun", () => ({
+  usePlanningSessionLiveRun: (_organizationId: string, view: unknown) => view,
+}));
+
+vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
+  useSplitRunLiveCanvas: () =>
+    liveCanvas.current ?? { enabled: false, isError: false, isLoading: false, canvas: undefined, stream: [] },
 }));
 
 vi.mock("@/hooks/useFactoryData", () => ({
@@ -43,6 +73,8 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateWorkOrderStatus: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateWorkOrderAssignees: () => ({ mutateAsync: updateAssignees, isPending: false }),
 }));
 
 vi.mock("@/hooks/useFactoryPRFeedbackData", () => ({
@@ -75,8 +107,21 @@ vi.mock("@/hooks/useFactoryLineRunnerModels", () => ({
   },
 }));
 
+vi.mock("@/lib/toast", () => ({
+  showSuccessToast: vi.fn(),
+  showErrorToast: vi.fn(),
+}));
+
 vi.mock("@/hooks/useOrganizationData", () => ({
-  useOrganizationUsers: () => ({ data: [], isLoading: false }),
+  useOrganizationUsers: () => ({
+    data: [
+      {
+        metadata: { id: "user-1", email: "casey@example.com" },
+        spec: { displayName: "Casey Reviewer" },
+      },
+    ],
+    isLoading: false,
+  }),
 }));
 
 vi.mock("@/hooks/useFactoryIntakeData", () => ({
@@ -113,7 +158,7 @@ function renderTask(
   factory: FactoriesFactory = REFUND_FACTORY,
 ) {
   return render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ThemeProvider>
         <TooltipProvider>
           <MemoryRouter initialEntries={[entry]}>
@@ -141,14 +186,25 @@ function renderTask(
   );
 }
 
+function resetPlanningSession() {
+  findPlanningSession.mockReset();
+  findPlanningSession.mockResolvedValue(null);
+  sendPlanningMessage.mockReset();
+  answerPlanningSurvey.mockReset();
+  liveCanvas.current = undefined;
+}
+
 describe("MobileTaskDetailPage back link", () => {
   beforeEach(() => {
+    resetPlanningSession();
     useWorkOrder.mockReset();
     useWorkOrder.mockReturnValue({ data: undefined, isLoading: true, isError: false });
     onDispatch.mockReset();
     dispatchingIds.current = new Set();
     canUpdateWorkOrder.current = true;
     runnerModelCalls.length = 0;
+    updateAssignees.mockReset();
+    updateAssignees.mockResolvedValue({ assignees: [] });
   });
 
   it("returns to the clicked line when the task URL has no line id", async () => {
@@ -247,11 +303,14 @@ function renderDraft(factory: FactoriesFactory = REFUND_FACTORY, search = `?line
 
 describe("MobileTaskDetailPage model select", () => {
   beforeEach(() => {
+    resetPlanningSession();
     useWorkOrder.mockReset();
     onDispatch.mockReset();
     dispatchingIds.current = new Set();
     canUpdateWorkOrder.current = true;
     runnerModelCalls.length = 0;
+    updateAssignees.mockReset();
+    updateAssignees.mockResolvedValue({ assignees: [] });
   });
 
   it("shows a model control next to Start on a draft when planning is on", () => {

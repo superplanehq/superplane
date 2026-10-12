@@ -104,6 +104,12 @@ func TestRunnerFleetIDCanBeReusedByDifferentOrganizations(t *testing.T) {
 	require.NoError(t, firstFleet.Create(db))
 	secondFleet := newOrganizationTestRunnerFleet(secondOrganization.ID, "s1-hello")
 	require.NoError(t, secondFleet.Create(db))
+	firstScope, err := firstFleet.MetricScope(db)
+	require.NoError(t, err)
+	secondScope, err := secondFleet.MetricScope(db)
+	require.NoError(t, err)
+	assert.Equal(t, "organization/"+firstOrganization.Slug, firstScope)
+	assert.Equal(t, "organization/"+secondOrganization.Slug, secondScope)
 }
 
 func TestOrganizationRunnerFleetIDCannotConflictWithInstallationFleet(t *testing.T) {
@@ -239,6 +245,33 @@ func TestBusyRunnerCannotBeTerminated(t *testing.T) {
 	runner := &models.Runner{ID: uuid.New(), State: models.RunnerStateBusy}
 	err := runner.Terminate(database.DB(t.Context()), models.RunnerTerminationRequested)
 	assert.ErrorIs(t, err, models.ErrRunnerBusy)
+}
+
+func TestListStaleRunnersIncludesFleetMetricLabels(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	firstOrganization, err := models.CreateOrganization("First Stale Runner Organization", "")
+	require.NoError(t, err)
+	secondOrganization, err := models.CreateOrganization("Second Stale Runner Organization", "")
+	require.NoError(t, err)
+	db := database.DB(t.Context())
+
+	firstFleet := newOrganizationTestRunnerFleet(firstOrganization.ID, "shared-amd64")
+	require.NoError(t, firstFleet.Create(db))
+	secondFleet := newOrganizationTestRunnerFleet(secondOrganization.ID, "shared-amd64")
+	require.NoError(t, secondFleet.Create(db))
+
+	cutoff := time.Now().Add(-15 * time.Minute)
+	firstRunner := &models.Runner{ID: uuid.New(), FleetID: firstFleet.ID, State: models.RunnerStateBusy, LastSeenAt: &cutoff}
+	secondRunner := &models.Runner{ID: uuid.New(), FleetID: secondFleet.ID, State: models.RunnerStateIdle, LastSeenAt: &cutoff}
+	require.NoError(t, db.Create(firstRunner).Error)
+	require.NoError(t, db.Create(secondRunner).Error)
+
+	stale, err := models.ListStaleRunners(db, cutoff, 10)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []models.StaleRunner{
+		{ID: firstRunner.ID, FleetSlug: firstFleet.Slug, FleetScope: "organization/" + firstOrganization.Slug},
+		{ID: secondRunner.ID, FleetSlug: secondFleet.Slug, FleetScope: "organization/" + secondOrganization.Slug},
+	}, stale)
 }
 
 func newTestRunnerFleet() *models.RunnerFleet {

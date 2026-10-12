@@ -89,11 +89,14 @@ func TestProviderLifecycle(t *testing.T) {
 		"runner:dev",
 		"--url http://app:8000",
 		"--registration-token one-time-token",
-		"--tag fleet_manager_id=manager-a",
+		"--env RUNNER_TAGS=fleet_manager_id=manager-a",
 	} {
 		if !strings.Contains(createArgs, expected) {
 			t.Fatalf("create args %q do not contain %q", createArgs, expected)
 		}
+	}
+	if strings.Contains(createArgs, "--tag ") {
+		t.Fatalf("create args pass an unsupported flag to older runners: %q", createArgs)
 	}
 
 	if err := p.Delete(context.Background(), created); err != nil {

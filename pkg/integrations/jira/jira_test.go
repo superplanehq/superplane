@@ -47,6 +47,8 @@ func (h *raceSimulatingHTTPContext) Do(req *http.Request) (*http.Response, error
 }
 
 func Test__Jira__Sync(t *testing.T) {
+	t.Setenv("SUPERPLANE_JIRA_OAUTH_CLIENT_ID", "")
+	t.Setenv("SUPERPLANE_JIRA_OAUTH_CLIENT_SECRET", "")
 	integration := &Jira{}
 
 	t.Run("no client credentials - setup instructions with callback URL", func(t *testing.T) {
@@ -68,49 +70,8 @@ func Test__Jira__Sync(t *testing.T) {
 		assert.Contains(t, integrationContext.BrowserAction.Description, "/api/v1/integrations/")
 		assert.Contains(t, integrationContext.BrowserAction.Description, "/callback")
 
-		// Regression test: most Jira Cloud sites don't have the JSM Ops product (incidents,
-		// alerts, heartbeats) enabled at all, and Atlassian's authorize page rejects the whole
-		// request outright if the app requests scopes for a product it was never configured
-		// with - so by default (ops features off), instructions must not mention them.
-		description := integrationContext.BrowserAction.Description
-		assert.NotContains(t, description, "Jira Service Management Incident API")
-		assert.NotContains(t, description, "Jira Service Management Ops API")
-		assert.NotContains(t, description, "incident:jira-service-management")
-		assert.NotContains(t, description, "ops-alert:jira-service-management")
-		assert.NotContains(t, description, "ops-config:jira-service-management")
-	})
-
-	t.Run("no client credentials with ops features enabled - setup instructions include the extra APIs", func(t *testing.T) {
-		integrationContext := &contexts.IntegrationContext{
-			Configuration: map[string]any{"enableOpsFeatures": true},
-		}
-
-		err := integration.Sync(core.SyncContext{
-			BaseURL:       "https://sp.example.com",
-			Configuration: integrationContext.Configuration,
-			Integration:   integrationContext,
-			Logger:        newLogger(),
-		})
-
-		require.NoError(t, err)
-		require.NotNil(t, integrationContext.BrowserAction)
-
-		// Regression test: incident and ops-alert/ops-config scopes live under separate API
-		// products in the Developer Console from the (classic) "Jira Service Management API",
-		// which only ever offers servicedesk-request/servicedesk-customer/insight-object scopes -
-		// so each API product must be named and paired with only the scopes that belong to it.
-		description := integrationContext.BrowserAction.Description
-		assert.Contains(t, description, "Jira Service Management Incident API")
-		assert.Contains(t, description, "Jira Service Management Ops API")
-		assert.Contains(t, description, "read:incident:jira-service-management")
-		assert.Contains(t, description, "read:ops-alert:jira-service-management")
-		assert.Contains(t, description, "read:ops-config:jira-service-management")
-		jsmAPIIndex := strings.Index(description, "**Jira Service Management API**")
-		incidentAPIIndex := strings.Index(description, "**Jira Service Management Incident API**")
-		require.NotEqual(t, -1, jsmAPIIndex)
-		require.NotEqual(t, -1, incidentAPIIndex)
-		assert.NotContains(t, description[jsmAPIIndex:incidentAPIIndex], "incident:jira-service-management",
-			"incident scopes must not be listed under the plain Jira Service Management API")
+		assert.NotContains(t, integrationContext.BrowserAction.Description, "Service Management")
+		assert.NotContains(t, integrationContext.BrowserAction.Description, "servicedesk-request")
 	})
 
 	t.Run("missing client secret - setup instructions", func(t *testing.T) {
@@ -190,7 +151,7 @@ func Test__Jira__Sync(t *testing.T) {
 		params := actionURL.Query()
 		assert.Equal(t, "client-1", params.Get("client_id"))
 		assert.Equal(t, "code", params.Get("response_type"))
-		// Ops features are off by default - only the scopes every Jira Cloud site can grant.
+		// Authorization uses only core Jira scopes.
 		assert.Equal(t, coreScopeList, params.Get("scope"))
 		assert.NotEmpty(t, params.Get("state"))
 
@@ -201,11 +162,7 @@ func Test__Jira__Sync(t *testing.T) {
 		assert.Equal(t, *metadata.State, params.Get("state"))
 	})
 
-	// Regression test: requesting JSM Ops scopes (incidents, alerts, heartbeats) from an
-	// Atlassian app that was never configured with the matching API products makes Atlassian's
-	// authorize page reject the whole request outright - most Jira Cloud sites don't have JSM
-	// Ops at all, so those scopes are opt-in via the enableOpsFeatures config option.
-	t.Run("credentials with ops features enabled - authorize URL includes ops scopes", func(t *testing.T) {
+	t.Run("legacy Ops setting does not add Service Management scopes", func(t *testing.T) {
 		integrationContext := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"clientId":          "client-1",
@@ -227,7 +184,7 @@ func Test__Jira__Sync(t *testing.T) {
 		actionURL, parseErr := url.Parse(integrationContext.BrowserAction.URL)
 		require.NoError(t, parseErr)
 		params := actionURL.Query()
-		assert.Equal(t, coreScopeList+" "+jsmOpsScopeList, params.Get("scope"))
+		assert.Equal(t, "read:jira-work write:jira-work manage:jira-webhook read:jira-user read:issue-details:jira offline_access", params.Get("scope"))
 	})
 
 	t.Run("state is not regenerated on subsequent syncs", func(t *testing.T) {
@@ -273,9 +230,9 @@ func Test__Jira__Sync(t *testing.T) {
 		assert.NotEmpty(t, *metadata.State)
 	})
 
-	t.Run("valid access token - ready + populated projects", func(t *testing.T) {
+	t.Run("valid access token with legacy Ops setting - ready + populated projects", func(t *testing.T) {
 		integrationContext := newAuthorizedIntegration()
-		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1"}
+		integrationContext.Configuration = map[string]any{"clientId": "client-1", "clientSecret": "secret-1", "enableOpsFeatures": true}
 
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -285,10 +242,11 @@ func Test__Jira__Sync(t *testing.T) {
 		}
 
 		err := integration.Sync(core.SyncContext{
-			BaseURL:     "https://sp.example.com",
-			HTTP:        httpContext,
-			Integration: integrationContext,
-			Logger:      newLogger(),
+			BaseURL:       "https://sp.example.com",
+			HTTP:          httpContext,
+			Configuration: integrationContext.Configuration,
+			Integration:   integrationContext,
+			Logger:        newLogger(),
 		})
 
 		require.NoError(t, err)
@@ -306,103 +264,6 @@ func Test__Jira__Sync(t *testing.T) {
 		// A comfortably-valid token isn't refreshed, but the next check is still scheduled.
 		require.Len(t, integrationContext.ResyncRequests, 1)
 		assert.Len(t, httpContext.Requests, 2)
-	})
-
-	// Regression test: Atlassian has no incremental-consent mechanism, so a token granted
-	// without JSM Ops scopes never gains them on its own - turning enableOpsFeatures on for an
-	// already-connected integration must prompt a fresh authorize round trip instead of silently
-	// doing nothing, which previously left incident/alert/heartbeat actions failing forever.
-	t.Run("ops features enabled after connecting - stays ready but prompts reconnect", func(t *testing.T) {
-		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
-			OpsScopesRequested:          false,
-			IssueWebhookScopesRequested: true,
-		})
-		integrationContext.Configuration = map[string]any{
-			"clientId":          "client-1",
-			"clientSecret":      "secret-1",
-			"enableOpsFeatures": true,
-		}
-
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"id":"10000","key":"TEST","name":"Test Project"}]`))},
-			},
-		}
-
-		err := integration.Sync(core.SyncContext{
-			BaseURL:       "https://sp.example.com",
-			Configuration: integrationContext.Configuration,
-			HTTP:          httpContext,
-			Integration:   integrationContext,
-			Logger:        newLogger(),
-		})
-
-		require.NoError(t, err)
-		// The connection itself keeps working with its existing (narrower) scope in the meantime.
-		assert.Equal(t, "ready", integrationContext.State)
-
-		require.NotNil(t, integrationContext.BrowserAction)
-		actionURL, parseErr := url.Parse(integrationContext.BrowserAction.URL)
-		require.NoError(t, parseErr)
-		assert.Equal(t, coreScopeList+" "+jsmOpsScopeList, actionURL.Query().Get("scope"))
-
-		metadata, ok := integrationContext.Metadata.(Metadata)
-		require.True(t, ok)
-		// Pending records what the authorize URL asked for; Requested stays false until callback
-		// succeeds — otherwise the next Sync would clear the prompt while the token still lacks
-		// ops scopes.
-		assert.True(t, metadata.OpsScopesPending)
-		assert.False(t, metadata.OpsScopesRequested)
-	})
-
-	// Regression test: requestAuthorization used to set OpsScopesRequested when building the
-	// authorize URL. The next Sync always RemoveBrowserAction'd first, then skipped re-prompt
-	// because the flag was already true — permanently clearing the ops reconnect while the
-	// token still lacked those scopes.
-	t.Run("ops reconnect prompt survives a subsequent Sync until callback succeeds", func(t *testing.T) {
-		integrationContext := newAuthorizedIntegrationWithMetadata(Metadata{
-			OpsScopesRequested:          false,
-			IssueWebhookScopesRequested: true,
-		})
-		integrationContext.Configuration = map[string]any{
-			"clientId":          "client-1",
-			"clientSecret":      "secret-1",
-			"enableOpsFeatures": true,
-		}
-
-		syncOnce := func() {
-			httpContext := &contexts.HTTPContext{
-				Responses: []*http.Response{
-					{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
-					{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[{"id":"10000","key":"TEST","name":"Test Project"}]`))},
-				},
-			}
-			err := integration.Sync(core.SyncContext{
-				BaseURL:       "https://sp.example.com",
-				Configuration: integrationContext.Configuration,
-				HTTP:          httpContext,
-				Integration:   integrationContext,
-				Logger:        newLogger(),
-			})
-			require.NoError(t, err)
-		}
-
-		syncOnce()
-		require.NotNil(t, integrationContext.BrowserAction)
-		firstURL := integrationContext.BrowserAction.URL
-
-		syncOnce()
-		require.NotNil(t, integrationContext.BrowserAction, "ops reconnect prompt must come back after Sync clears browser actions")
-		actionURL, parseErr := url.Parse(integrationContext.BrowserAction.URL)
-		require.NoError(t, parseErr)
-		assert.Equal(t, coreScopeList+" "+jsmOpsScopeList, actionURL.Query().Get("scope"))
-		assert.NotEmpty(t, firstURL)
-
-		metadata, ok := integrationContext.Metadata.(Metadata)
-		require.True(t, ok)
-		assert.False(t, metadata.OpsScopesRequested)
-		assert.True(t, metadata.OpsScopesPending)
 	})
 
 	// Regression test: Atlassian will not deliver jira:issue_* webhooks unless the token has
@@ -622,6 +483,8 @@ func Test__Jira__Sync(t *testing.T) {
 }
 
 func Test__Jira__HandleRequest(t *testing.T) {
+	t.Setenv("SUPERPLANE_JIRA_OAUTH_CLIENT_ID", "")
+	t.Setenv("SUPERPLANE_JIRA_OAUTH_CLIENT_SECRET", "")
 	integration := &Jira{}
 
 	t.Run("non-callback path -> 404", func(t *testing.T) {
@@ -687,57 +550,6 @@ func Test__Jira__HandleRequest(t *testing.T) {
 		assert.Equal(t, "https://test.atlassian.net", metadata.SiteURL)
 		assert.Equal(t, "Test Site", metadata.SiteName)
 		assert.Nil(t, metadata.State)
-		assert.False(t, metadata.OpsScopesRequested)
-		assert.False(t, metadata.OpsScopesPending)
-		assert.True(t, metadata.IssueWebhookScopesRequested)
-	})
-
-	// Regression test: OpsScopesRequested must be committed from OpsScopesPending only after a
-	// successful callback — that is what stops the ops reconnect prompt, not building the
-	// authorize URL itself.
-	t.Run("callback with pending ops scopes commits OpsScopesRequested", func(t *testing.T) {
-		state := "expected-state"
-		integrationContext := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"clientId":     "client-1",
-				"clientSecret": "secret-1",
-			},
-			Metadata: Metadata{State: &state, OpsScopesPending: true},
-		}
-
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
-					`{"access_token":"cb-access","refresh_token":"cb-refresh","expires_in":3600}`,
-				))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(
-					`[{"id":"cloud-1","name":"Test Site","url":"https://test.atlassian.net"}]`,
-				))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"accountId":"acct-1","displayName":"Alice"}`))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`[]`))},
-			},
-		}
-
-		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/id/callback?code=auth-code&state=expected-state", nil)
-
-		integration.HandleRequest(core.HTTPRequestContext{
-			Request:        request,
-			Response:       recorder,
-			BaseURL:        "https://sp.example.com",
-			OrganizationID: "org-1",
-			HTTP:           httpContext,
-			Integration:    integrationContext,
-			Logger:         newLogger(),
-		})
-
-		assert.Equal(t, http.StatusSeeOther, recorder.Code)
-		assert.Equal(t, "ready", integrationContext.State)
-
-		metadata, ok := integrationContext.Metadata.(Metadata)
-		require.True(t, ok)
-		assert.True(t, metadata.OpsScopesRequested)
-		assert.False(t, metadata.OpsScopesPending)
 		assert.True(t, metadata.IssueWebhookScopesRequested)
 	})
 
@@ -1073,12 +885,10 @@ func Test__Jira__Definition(t *testing.T) {
 	assert.Equal(t, "jira", integration.Icon())
 
 	actions := integration.Actions()
-	assert.Len(t, actions, 18)
+	assert.Len(t, actions, 6)
 
 	triggers := integration.Triggers()
-	require.Len(t, triggers, 4)
+	require.Len(t, triggers, 2)
 	assert.Equal(t, "jira.onIssue", triggers[0].Name())
 	assert.Equal(t, "jira.onIssueComment", triggers[1].Name())
-	assert.Equal(t, "jira.onIncident", triggers[2].Name())
-	assert.Equal(t, "jira.onAlert", triggers[3].Name())
 }

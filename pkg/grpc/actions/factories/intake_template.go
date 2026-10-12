@@ -508,13 +508,13 @@ func intakeSettingsOrDefault(source string, settings intakeSettings) intakeSetti
 	return defaultIntakeSettings()
 }
 
-func intakeRefinementConfiguration(agent *intakeAgent, vcsName string) map[string]any {
+func intakeRefinementConfiguration(agent *intakeAgent, vcsName, vcsProvider string) map[string]any {
 	configuration := intakeRunnerConfiguration(agent, vcsName)
 	configuration["steps"] = []any{
 		map[string]any{
 			"name":    "Clone repository",
 			"type":    runner.AgentStepBash,
-			"command": intakeAnalysisCloneCommand(),
+			"command": intakeAnalysisCloneCommand(vcsProvider),
 		},
 		map[string]any{
 			"name":             "Refine Task",
@@ -574,17 +574,20 @@ func intakeRefinementPrompt() string {
 	return runner.PlanningSessionUserPromptMarkdown() + "\n\nTask:\n{{ root().data.workOrder }}"
 }
 
-func intakeAnalysisCloneCommand() string {
-	return strings.Join([]string{
+func intakeAnalysisCloneCommand(vcsProvider string) string {
+	lines := []string{
 		"set -euo pipefail",
 		`if [ -z "${REPO_URL:-}" ]; then`,
 		`  echo "This workspace has no repository to analyze." >&2`,
 		"  exit 1",
 		"fi",
-		`git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`,
-		"rm -rf repo",
-		cloneRepositoryCommand(),
-	}, "\n")
+	}
+	// ponytail: GitHub-only auth rewrite; Bitbucket uses the credential helper
+	if !strings.EqualFold(strings.TrimSpace(vcsProvider), models.ProviderBitbucket) {
+		lines = append(lines, `git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`)
+	}
+	lines = append(lines, "rm -rf repo", cloneRepositoryCommand())
+	return strings.Join(lines, "\n")
 }
 
 func cloneRepositoryCommand() string {

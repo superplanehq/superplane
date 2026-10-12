@@ -43,6 +43,25 @@ output "vpc_id" {
 }
 
 # -----------------------------------------------------------------------------
+# Runner Storage Outputs
+# -----------------------------------------------------------------------------
+
+output "runner_active_logs_efs_id" {
+  description = "ID of the EFS file system used for runner active logs"
+  value       = aws_efs_file_system.runner_active_logs.id
+}
+
+output "runner_active_logs_efs_access_point_id" {
+  description = "ID of the EFS access point used for runner active logs"
+  value       = aws_efs_access_point.runner_active_logs.id
+}
+
+output "blob_storage_bucket" {
+  description = "S3 bucket used for shared SuperPlane blobs"
+  value       = aws_s3_bucket.blobs.id
+}
+
+# -----------------------------------------------------------------------------
 # SuperPlane Outputs
 # -----------------------------------------------------------------------------
 
@@ -71,40 +90,5 @@ output "kubectl_config_command" {
 
 output "load_balancer_hostname_command" {
   description = "Command to get the NLB hostname for DNS configuration"
-  value       = "kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
-}
-
-# -----------------------------------------------------------------------------
-# Next Steps
-# -----------------------------------------------------------------------------
-
-output "next_steps" {
-  description = "Instructions to complete the setup"
-  value       = <<-EOT
-
-    ============================================================
-    NEXT STEPS - Configure DNS
-    ============================================================
-
-    1. Configure kubectl:
-       ${local.kubectl_command}
-
-    2. Get the Load Balancer hostname:
-       kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-
-    3. Create a CNAME record in your DNS provider:
-       - Type: CNAME
-       - Name: ${var.domain_name}
-       - Value: <hostname from step 2>
-
-    4. Wait for DNS propagation and certificate issuance (~5-10 min)
-
-    5. Access SuperPlane at: https://${var.domain_name}
-
-    ============================================================
-  EOT
-}
-
-locals {
-  kubectl_command = "aws eks update-kubeconfig --region ${var.region} --name ${var.cluster_name}"
+  value       = "kubectl get svc -n traefik traefik -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'"
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 import type { FactoriesWorkOrder } from "@/api-client";
 import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import superplaneIcon from "@/assets/superplane.svg";
+import superplaneMark from "@/assets/superplane-mark.svg";
 
 import { CREATED_MANUALLY } from "../pages/work-order-split-run/splitRunSource";
 import {
@@ -24,7 +24,7 @@ describe("workOrderCardSource", () => {
   it("returns the product logo for a manual task", () => {
     expect(workOrderCardSource(baseOrder)).toEqual({
       name: CREATED_MANUALLY,
-      iconSrc: superplaneIcon,
+      iconSrc: superplaneMark,
       iconAlt: "SuperPlane",
     });
   });
@@ -37,7 +37,7 @@ describe("workOrderCardSource", () => {
       }),
     ).toEqual({
       name: CREATED_MANUALLY,
-      iconSrc: superplaneIcon,
+      iconSrc: superplaneMark,
       iconAlt: "SuperPlane",
       creatorName: "Ada Lovelace",
     });
@@ -90,7 +90,7 @@ describe("workOrderCardSource", () => {
       }),
     ).toEqual({
       name: "Cursor",
-      iconSrc: superplaneIcon,
+      iconSrc: superplaneMark,
       iconAlt: "SuperPlane",
     });
   });
@@ -163,7 +163,7 @@ describe("workOrderCardSourceLabel", () => {
     expect(
       workOrderCardSourceLabel({
         name: CREATED_MANUALLY,
-        iconSrc: superplaneIcon,
+        iconSrc: superplaneMark,
         iconAlt: "SuperPlane",
         creatorName: "Ada Lovelace",
       }),
@@ -174,7 +174,7 @@ describe("workOrderCardSourceLabel", () => {
     expect(
       workOrderCardSourceLabel({
         name: CREATED_MANUALLY,
-        iconSrc: superplaneIcon,
+        iconSrc: superplaneMark,
         iconAlt: "SuperPlane",
       }),
     ).toBe(CREATED_MANUALLY);

@@ -44,4 +44,22 @@ describe("LicenseExpiryBanner", () => {
     renderBanner();
     expect(screen.queryByTestId("license-expiry-banner")).toBeNull();
   });
+
+  it("shows the expiry notice for a revoked license", () => {
+    accountRef.current = {
+      installation_admin: true,
+      license: { ...expiringLicense, edition: "community", state: "revoked", features: [] },
+    };
+    renderBanner();
+    expect(screen.getByTestId("license-expiry-banner")).toHaveTextContent(/expires in \d+ days/);
+  });
+
+  it("hides the expiry notice for a revoked license when the banner is disabled", () => {
+    accountRef.current = {
+      installation_admin: true,
+      license: { ...expiringLicense, state: "revoked", hide_expiry_banner: true },
+    };
+    renderBanner();
+    expect(screen.queryByTestId("license-expiry-banner")).toBeNull();
+  });
 });

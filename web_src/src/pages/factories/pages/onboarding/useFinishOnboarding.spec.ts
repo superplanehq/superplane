@@ -76,7 +76,21 @@ describe("finishOnboardingError", () => {
         hostedModelsLoading: false,
         plan: readyPlan,
       }),
-    ).toBe("Connect Bitbucket, then select both repositories.");
+    ).toBe("Connect Bitbucket before you continue.");
+  });
+
+  it("asks for repositories when GitHub is connected and a repository is missing", () => {
+    expect(
+      finishOnboardingError({
+        appRepository: "acme/web",
+        backlogRepository: null,
+        workspaceName: "Web",
+        vcsReady: true,
+        remainingCreditCents: 5000,
+        hostedModelsLoading: false,
+        plan: readyPlan,
+      }),
+    ).toBe("Select the code repository and the backlog repository.");
   });
 });
 
@@ -231,8 +245,10 @@ describe("provisionWorkspace", () => {
     );
 
     expect(createIntake).not.toHaveBeenCalled();
-    expect(listApps).not.toHaveBeenCalled();
-    expect(installFactory).toHaveBeenCalledWith(expect.objectContaining({ vcsProvider: "bitbucket" }));
+    expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["line-implementation", "pr-closure"]);
+    for (const [input] of installFactory.mock.calls) {
+      expect(input.vcsProvider).toBe("bitbucket");
+    }
   });
 
   it("does not create a comments handler during workspace setup", async () => {

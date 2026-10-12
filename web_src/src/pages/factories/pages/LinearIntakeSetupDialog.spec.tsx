@@ -44,7 +44,8 @@ vi.mock("@/hooks/useIntegrations", () => ({
 }));
 
 vi.mock("@/ui/IntegrationCreateDialog", () => ({
-  IntegrationCreateDialog: () => null,
+  IntegrationCreateDialog: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="linear-credential-dialog" /> : null,
 }));
 
 function renderDialog(onCreated = vi.fn()) {
@@ -77,16 +78,20 @@ describe("LinearIntakeSetupDialog", () => {
     expect(screen.getByTestId("linear-setup-finish")).toBeDisabled();
   });
 
-  it("creates the intake for the selected projects and labels", async () => {
+  it("creates the intake for the selected projects and every label", async () => {
     const user = userEvent.setup();
     const onCreated = vi.fn();
     renderDialog(onCreated);
 
-    await user.click(await screen.findByTestId("linear-project-project-1"));
+    expect(
+      await screen.findByRole("heading", { name: LINEAR_INTAKE_SETUP_COPY.wizardStepProject }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(LINEAR_INTAKE_SETUP_COPY.labelsLabel)).not.toBeInTheDocument();
+    expect(screen.queryByText(LINEAR_INTAKE_SETUP_COPY.labelsHelper)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.labelNew })).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("linear-project-project-1"));
     await user.click(screen.getByTestId("linear-project-project-2"));
-    await user.click(screen.getByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.labelNew }));
-    await user.type(screen.getByTestId("linear-intake-label-input"), "bug");
-    await user.click(screen.getByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.labelAdd }));
     await user.click(screen.getByTestId("linear-setup-finish"));
 
     await waitFor(() => {
@@ -95,11 +100,31 @@ describe("LinearIntakeSetupDialog", () => {
         integrationId: "integration-1",
         settings: {
           linearProjectIds: ["project-1", "project-2"],
-          linearLabels: ["bug"],
+          linearLabels: [],
         },
       });
     });
     expect(onCreated).toHaveBeenCalled();
+  });
+
+  it("shows only Connect Linear when the hosted application is available and no connection exists", async () => {
+    mocks.linearDefinition.hostedAppInstall = true;
+    mocks.connected.splice(0, mocks.connected.length);
+    renderDialog();
+
+    expect(await screen.findByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.wizardConnect })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use your own Linear app" })).not.toBeInTheDocument();
+  });
+
+  it("opens the credential dialog when the hosted Linear application is not configured", async () => {
+    mocks.linearDefinition.hostedAppInstall = false;
+    mocks.connected.splice(0, mocks.connected.length);
+    const user = userEvent.setup();
+    renderDialog();
+
+    await user.click(await screen.findByRole("button", { name: LINEAR_INTAKE_SETUP_COPY.wizardConnect }));
+
+    expect(await screen.findByTestId("linear-credential-dialog")).toBeInTheDocument();
   });
 
   it("skips the initial import when the checkbox is off", async () => {

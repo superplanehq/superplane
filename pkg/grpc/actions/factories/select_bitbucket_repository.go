@@ -46,6 +46,9 @@ func selectBitbucketFactoryRepository(
 		if err != nil {
 			return err
 		}
+		if err := rejectFactoryProviderSwitch(factory, models.ProviderBitbucket); err != nil {
+			return err
+		}
 		integration, bindErr := models.FindOrCreateBitbucketForgeIntegration(
 			tx,
 			orgID,

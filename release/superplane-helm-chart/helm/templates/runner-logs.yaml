@@ -1,0 +1,14 @@
+{{- $workers := eq (include "runner.workers.enabled" .) "true" -}}
+{{- if and (or .Values.runner.api.enabled $workers) (not .Values.runner.activeLogs.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "runner.activeLogs.claimName" . }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.runner.activeLogs.size }}
+{{- end }}

@@ -2,7 +2,7 @@
  * One verdict from the two refine scores. Clarity says how well the task is
  * defined; the user can fix a low Clarity in the chat. Confidence says how
  * likely an agent finishes the task in one run; a low Confidence is a risk the
- * user accepts or removes by splitting the work.
+ * user accepts or removes by narrowing the scope in the chat.
  */
 export type DraftReadinessTone = "analyzing" | "pending" | "blocked" | "caution" | "ready";
 
@@ -49,7 +49,7 @@ export const DRAFT_READINESS_NOTES = {
   },
   agentFit: {
     headline: "Review before you start",
-    text: "An agent may need steering. Start if you accept the risk, or split the work.",
+    text: "An agent may need steering. Start if you accept the risk, or narrow the scope in the chat.",
   },
   uncertain: {
     headline: "Review the plan before you start",

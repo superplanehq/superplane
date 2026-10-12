@@ -33,6 +33,7 @@ const (
 	StateExpired     State = "expired"
 	StateNotYetValid State = "not_yet_valid"
 	StateInvalid     State = "invalid"
+	StateRevoked     State = "revoked"
 )
 
 // Status is the safe license state. It never contains the raw license.
@@ -94,12 +95,13 @@ type snapshot struct {
 }
 
 type Service struct {
-	verifier  *Verifier
-	source    Source
-	keySync   *KeySync
-	now       func() time.Time
-	current   atomic.Pointer[snapshot]
-	refreshMu sync.Mutex
+	verifier    *Verifier
+	source      Source
+	keySync     *KeySync
+	revocations *RevocationSync
+	now         func() time.Time
+	current     atomic.Pointer[snapshot]
+	refreshMu   sync.Mutex
 }
 
 type ServiceOption func(*Service)
@@ -108,6 +110,13 @@ type ServiceOption func(*Service)
 func WithKeySync(keySync *KeySync) ServiceOption {
 	return func(s *Service) {
 		s.keySync = keySync
+	}
+}
+
+// WithRevocationSync keeps the revoked-license list current while the service runs.
+func WithRevocationSync(revocations *RevocationSync) ServiceOption {
+	return func(s *Service) {
+		s.revocations = revocations
 	}
 }
 
@@ -152,6 +161,10 @@ func (s *Service) Start(ctx context.Context) {
 		})
 	}
 
+	if s.revocations != nil {
+		s.revocations.Start(ctx)
+	}
+
 	go func() {
 		ticker := time.NewTicker(RefreshInterval)
 		defer ticker.Stop()
@@ -173,6 +186,7 @@ func (s *Service) Start(ctx context.Context) {
 // error keeps the last known state instead of removing Enterprise access.
 func (s *Service) Refresh(ctx context.Context) error {
 	s.reloadKeys(ctx)
+	s.reloadRevocations(ctx)
 
 	if err := s.reloadLicense(ctx); err != nil {
 		return err
@@ -198,6 +212,24 @@ func (s *Service) reloadKeys(ctx context.Context) bool {
 	}
 
 	return changed
+}
+
+func (s *Service) reloadRevocations(ctx context.Context) {
+	if s.revocations == nil {
+		return
+	}
+
+	if _, err := s.revocations.Reload(ctx); err != nil {
+		log.WithError(err).Warn("Licensing: cached revocation list was not loaded")
+	}
+}
+
+func (s *Service) licenseRevoked(id uuid.UUID) bool {
+	if s.revocations == nil {
+		return false
+	}
+
+	return s.revocations.Contains(id)
 }
 
 // syncKeysOnDemand downloads the key list when a license names an unknown
@@ -254,6 +286,11 @@ func (s *Service) Status() Status {
 	}
 
 	if current.license == nil {
+		return status
+	}
+
+	if s.licenseRevoked(current.license.ID) {
+		status.State = StateRevoked
 		return status
 	}
 
@@ -332,6 +369,10 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 		return s.Status(), invalid(ReasonExpired)
 	case ValidityNotYetValid:
 		return s.Status(), invalid(ReasonNotYetValid)
+	}
+
+	if s.licenseRevoked(license.ID) {
+		return s.Status(), invalid(ReasonRevoked)
 	}
 
 	if err := writable.Write(ctx, bytes.TrimSpace(raw), installedBy); err != nil {

@@ -57,6 +57,29 @@ RUN apt-get update \
   && chmod -R a+rX /ms-playwright \
   && rm -rf /var/lib/apt/lists/*
 
+# ffmpeg, ffprobe, whisper-cli, the baked Whisper model, and the pinned
+# yt-dlp binary. install-media-tools.sh installs yt-dlp from the script
+# copied beside it. Build tools are removed after the install. libgomp1
+# stays because whisper-cli links it.
+COPY release/runner/packer/aws/scripts/install-media-tools.sh release/runner/packer/aws/scripts/install-yt-dlp.sh /tmp/
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends cmake g++ make ffmpeg libgomp1 \
+  && chmod +x /tmp/install-media-tools.sh /tmp/install-yt-dlp.sh \
+  && /tmp/install-media-tools.sh \
+  && rm /tmp/install-media-tools.sh /tmp/install-yt-dlp.sh \
+  && apt-get purge -y cmake g++ make \
+  && apt-get autoremove -y --purge \
+  && command -v ffmpeg \
+  && command -v ffprobe \
+  && command -v whisper-cli \
+  && command -v yt-dlp \
+  && whisper-cli --help >/dev/null \
+  && yt-dlp --version \
+  && test -s /usr/local/share/whisper/ggml-tiny.bin \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV WHISPER_MODEL=/usr/local/share/whisper/ggml-tiny.bin
+
 COPY --from=build /runner /usr/local/bin/runner
 
 ENV HOME=/home/node

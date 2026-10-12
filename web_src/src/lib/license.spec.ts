@@ -32,6 +32,36 @@ describe("licenseExpiryWarning", () => {
     expect(licenseExpiryWarning(license, now)).toEqual({ expired: true, daysLeft: 0 });
   });
 
+  it("warns when a revoked license expires within the warning window", () => {
+    const license = {
+      edition: "community" as const,
+      features: [],
+      state: "revoked" as const,
+      expires_at: inDays(5),
+    };
+    expect(licenseExpiryWarning(license, now)).toEqual({ expired: false, daysLeft: 5 });
+  });
+
+  it("warns when a revoked license is past its expiry date", () => {
+    const license = {
+      edition: "community" as const,
+      features: [],
+      state: "revoked" as const,
+      expires_at: inDays(-2),
+    };
+    expect(licenseExpiryWarning(license, now)).toEqual({ expired: true, daysLeft: 0 });
+  });
+
+  it("returns null when a revoked license expires after the warning window", () => {
+    const license = {
+      edition: "community" as const,
+      features: [],
+      state: "revoked" as const,
+      expires_at: inDays(31),
+    };
+    expect(licenseExpiryWarning(license, now)).toBeNull();
+  });
+
   it("does not warn for a license that is not valid yet", () => {
     const license = {
       edition: "community" as const,

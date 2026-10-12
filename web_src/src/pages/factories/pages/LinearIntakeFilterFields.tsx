@@ -61,6 +61,8 @@ export function LinearIntakeFilterFields({
         <p className="workspace-body-text mt-1 text-muted-foreground">{LINEAR_INTAKE_SETUP_COPY.labelsHelper}</p>
         <div className="mt-2">
           <LinearLabelField
+            organizationId={organizationId}
+            integrationId={integrationId}
             labels={settings.linearLabels}
             onChange={(linearLabels) => onSettingsChange((current) => ({ ...current, linearLabels }))}
           />
@@ -70,7 +72,21 @@ export function LinearIntakeFilterFields({
   );
 }
 
-export function LinearLabelField({ labels, onChange }: { labels: string[]; onChange: (labels: string[]) => void }) {
+export function LinearLabelField({
+  labels,
+  onChange,
+  organizationId = "",
+  integrationId = "",
+}: {
+  labels: string[];
+  onChange: (labels: string[]) => void;
+  organizationId?: string;
+  integrationId?: string;
+}) {
+  const labelsQuery = useIntegrationResources(organizationId, integrationId, "label", { scope: "workspace" });
+  const choices = [
+    ...new Set([...(labelsQuery.data ?? []).map((resource) => resource.name ?? "").filter(Boolean), ...labels]),
+  ];
   const [draft, setDraft] = useState("");
   const [typing, setTyping] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -93,17 +109,37 @@ export function LinearLabelField({ labels, onChange }: { labels: string[]; onCha
 
   return (
     <div className="flex flex-col gap-2" data-testid="linear-intake-label-options">
-      {labels.length > 0 ? (
+      {labelsQuery.isLoading ? (
+        <p className="workspace-body-text text-muted-foreground">{LINEAR_INTAKE_SETUP_COPY.labelsLoading}</p>
+      ) : null}
+      {labelsQuery.isError ? (
+        <div className="space-y-2">
+          <p className="workspace-body-text text-destructive">{LINEAR_INTAKE_SETUP_COPY.labelsError}</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void labelsQuery.refetch()}>
+            {LINEAR_INTAKE_SETUP_COPY.wizardRetry}
+          </Button>
+        </div>
+      ) : null}
+      {!labelsQuery.isLoading && !labelsQuery.isError && choices.length === 0 ? (
+        <p className="workspace-body-text text-muted-foreground">{LINEAR_INTAKE_SETUP_COPY.labelsEmpty}</p>
+      ) : null}
+      {choices.length > 0 ? (
         <ul className="flex flex-wrap items-center gap-1.5">
-          {labels.map((label) => (
+          {choices.map((label) => (
             <li key={label}>
               <label
                 className={cn(
                   "inline-flex max-w-full cursor-pointer items-center gap-2 rounded-md border px-2 py-1 text-[13px]",
-                  "border-foreground/20 bg-accent/50 text-foreground",
+                  labels.includes(label)
+                    ? "border-foreground/20 bg-accent/50 text-foreground"
+                    : "border-border bg-card text-muted-foreground hover:border-foreground/15",
                 )}
               >
-                <Checkbox checked onChange={() => onChange(toggleIntakeLabel(labels, label))} aria-label={label} />
+                <Checkbox
+                  checked={labels.includes(label)}
+                  onChange={() => onChange(toggleIntakeLabel(labels, label))}
+                  aria-label={label}
+                />
                 <span className="min-w-0 truncate">{label}</span>
               </label>
             </li>

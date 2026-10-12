@@ -328,6 +328,14 @@ describe("applyMissionScope", () => {
     ]);
   });
 
+  it("keeps every mission when the page scope is Unassigned", () => {
+    expect(applyMissionScope(items, "unassigned", {}).map((entry) => entry.mission.name)).toEqual([
+      "Draft",
+      "Active",
+      "Done",
+    ]);
+  });
+
   it("keeps missions assigned to the current user when the page scope is My", () => {
     const mixed = [
       item("Mine", "active", "user-me"),
