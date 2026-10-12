@@ -104,6 +104,10 @@ type AddWorkOrderArtifactParams struct {
 	// first call sets the type; a later call with a different type
 	// fails. Keys are unique per factory.
 	Key string
+	// UpdateByTitle replaces the artifact on this task with the same
+	// type and title. The first call creates an unkeyed row when none
+	// exists. A blank title fails. This flag does not use Key.
+	UpdateByTitle bool
 }
 
 // ReportWorkOrderCheckParams carries one check report. Format must be
