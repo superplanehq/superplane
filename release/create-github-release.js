@@ -11,7 +11,7 @@ async function main() {
 
   if (!version || version.length < 2) {
     console.error(
-      "Usage: node release/create-github-release.js <version>\n\nExample:\n  node release/create-github-release.js v0.0.8"
+      "Usage: node release/create-github-release.js <version>\n\nExample:\n  node release/create-github-release.js v0.0.8",
     );
     process.exit(1);
   }
@@ -27,7 +27,10 @@ async function main() {
   const userAgent = "superplane-release-script";
 
   const repoRoot = path.resolve(__dirname, "..");
-  const buildRoot = path.join(repoRoot, `build/superplane-single-host-tarball-${version}`);
+  const buildRoot = path.join(
+    repoRoot,
+    `build/superplane-single-host-tarball-${version}`,
+  );
   const artifactPath = path.join(buildRoot, "superplane-single-host.tar.gz");
   const assetName = "superplane-single-host.tar.gz";
   const sbomPath = path.join(buildRoot, "superplane-sbom.json");
@@ -37,14 +40,14 @@ async function main() {
 
   if (!fs.existsSync(artifactPath)) {
     console.error(
-      `Error: ${artifactPath} does not exist. Run release/superplane-single-host-tarball/build.sh ${version} first.`
+      `Error: ${artifactPath} does not exist. Run release/superplane-single-host-tarball/build.sh ${version} first.`,
     );
     process.exit(1);
   }
 
   if (!fs.existsSync(sbomPath)) {
     console.error(
-      `Error: ${sbomPath} does not exist. Run release/generate-sbom.sh ${version} first.`
+      `Error: ${sbomPath} does not exist. Run release/generate-sbom.sh ${version} first.`,
     );
     process.exit(1);
   }
@@ -56,7 +59,7 @@ async function main() {
     target_commitish: "main",
     name: version,
     body: `Release ${version}`,
-    draft: false,
+    draft: true,
     prerelease: false,
     generate_release_notes: false,
   });
@@ -75,12 +78,12 @@ async function main() {
         "Content-Length": Buffer.byteLength(payload),
       },
     },
-    payload
+    payload,
   );
 
   if (createReleaseResponse.statusCode !== 201) {
     console.error(
-      `Error: Failed to create release (HTTP ${createReleaseResponse.statusCode}). Response:`
+      `Error: Failed to create release (HTTP ${createReleaseResponse.statusCode}). Response:`,
     );
     console.error(createReleaseResponse.body);
     process.exit(1);
@@ -135,24 +138,54 @@ async function main() {
       assetPath: cliAsset.assetPath,
     });
   }
+
+  const publishPayload = JSON.stringify({
+    draft: false,
+    make_latest: "true",
+  });
+  const publishResponse = await requestJson(
+    {
+      hostname: "api.github.com",
+      path: `/repos/${repository}/releases/${releaseId}`,
+      method: "PATCH",
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "User-Agent": userAgent,
+        "X-GitHub-Api-Version": apiVersion,
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(publishPayload),
+      },
+    },
+    publishPayload,
+  );
+  if (publishResponse.statusCode !== 200) {
+    console.error(
+      `Error: Failed to publish release (HTTP ${publishResponse.statusCode}). Response:`,
+    );
+    console.error(publishResponse.body);
+    process.exit(1);
+  }
   console.log("Done.");
 }
 
 function getCliAssets(cliAssetsDir) {
   if (!fs.existsSync(cliAssetsDir)) {
     console.error(
-      `Error: ${cliAssetsDir} does not exist. Stage CLI artifacts (superplane-cli-* and install.sh) into release/cli before creating a release.`
+      `Error: ${cliAssetsDir} does not exist. Stage CLI artifacts (superplane-cli-* and install.sh) into release/cli before creating a release.`,
     );
     process.exit(1);
   }
 
   const cliAssetPrefix = "superplane-cli-";
   const names = fs.readdirSync(cliAssetsDir);
-  const binaryAssetNames = names.filter((name) => name.startsWith(cliAssetPrefix));
+  const binaryAssetNames = names.filter((name) =>
+    name.startsWith(cliAssetPrefix),
+  );
 
   if (binaryAssetNames.length === 0) {
     console.error(
-      `Error: No CLI binary assets found in ${cliAssetsDir}. Expected files named superplane-cli-<os>-<arch>.`
+      `Error: No CLI binary assets found in ${cliAssetsDir}. Expected files named superplane-cli-<os>-<arch>.`,
     );
     process.exit(1);
   }
@@ -161,8 +194,8 @@ function getCliAssets(cliAssetsDir) {
     console.error(
       `Error: ${path.join(
         cliAssetsDir,
-        "install.sh"
-      )} does not exist. Stage the CLI installer script before creating a release.`
+        "install.sh",
+      )} does not exist. Stage the CLI installer script before creating a release.`,
     );
     process.exit(1);
   }
@@ -195,7 +228,7 @@ async function uploadAsset({
     {
       hostname: "uploads.github.com",
       path: `/repos/${repository}/releases/${releaseId}/assets?name=${encodeURIComponent(
-        assetName
+        assetName,
       )}`,
       method: "POST",
       headers: {
@@ -207,12 +240,12 @@ async function uploadAsset({
         "Content-Length": assetBuffer.length,
       },
     },
-    assetBuffer
+    assetBuffer,
   );
 
   if (uploadResponse.statusCode !== 201) {
     console.error(
-      `Error: Failed to upload asset ${assetName} (HTTP ${uploadResponse.statusCode}). Response:`
+      `Error: Failed to upload asset ${assetName} (HTTP ${uploadResponse.statusCode}). Response:`,
     );
     console.error(uploadResponse.body);
     process.exit(1);

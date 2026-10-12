@@ -44,3 +44,17 @@ func TestForwardShutdownSignalsLogsSignal(t *testing.T) {
 		t.Fatalf("missing signal name:\n%s", logs.String())
 	}
 }
+
+func TestPrintVersion(t *testing.T) {
+	previousVersion := Version
+	Version = "v1.2.3-rc.1"
+	t.Cleanup(func() { Version = previousVersion })
+
+	var output bytes.Buffer
+	if !printVersion([]string{"--version"}, &output) {
+		t.Fatal("expected --version to be handled")
+	}
+	if output.String() != "runner v1.2.3-rc.1\n" {
+		t.Fatalf("version output = %q", output.String())
+	}
+}

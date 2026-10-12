@@ -64,6 +64,7 @@ blocks:
 
         - name: Checks
           commands:
+            - make test.release
             - make check.db.structure
             - make check.db.migrations
             - make check.components.docs
@@ -192,6 +193,24 @@ after_pipeline:
           - test-results gen-pipeline-report
 
 promotions:
+  - name: Prepare Runner Release
+    pipeline_file: prepare-runner-release.yml
+    parameters:
+      env_vars:
+        - name: VERSION
+          required: true
+          default_value: VERSION_REQUIRED
+          description: Runner version in vMAJOR.MINOR.PATCH format
+
+  - name: Prepare Fleet Manager Release
+    pipeline_file: prepare-fleet-manager-release.yml
+    parameters:
+      env_vars:
+        - name: VERSION
+          required: true
+          default_value: VERSION_REQUIRED
+          description: Fleet Manager version in vMAJOR.MINOR.PATCH format
+
   - name: Publish Fleet Manager Image
     pipeline_file: release-fleet-manager-image.yml
     deployment_target: ghcr

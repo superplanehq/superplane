@@ -1,0 +1,92 @@
+version: v1.0
+name: "Publish Fleet Manager Release"
+
+queue:
+  name: component-releases
+  scope: project
+  processing: serialized
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+global_job_config:
+  env_vars:
+    - name: FLEET_MANAGER_IMAGE_REPO
+      value: ghcr.io/superplanehq/fleet-manager
+  prologue:
+    commands:
+      - checkout
+      - test "$SEMAPHORE_GIT_BRANCH" = main
+      - test "$SEMAPHORE_PIPELINE_PROMOTION" = true
+      - test "$(git rev-parse HEAD)" = "$SEMAPHORE_GIT_SHA"
+
+blocks:
+  - name: "Publish"
+    task:
+      epilogue:
+        always:
+          commands:
+            - rm -f /tmp/github-release-token /tmp/ghcr-auth.json
+      jobs:
+        - name: "Publish immutable Fleet Manager release"
+          commands:
+            - artifact pull workflow "build/fleet-manager/$VERSION"
+            - |
+              release_dir="build/fleet-manager/$VERSION"
+              (cd "$release_dir" && sha256sum --check release-manifest.sha256)
+              node release/component-release.js verify-manifest \
+                --component fleet-manager \
+                --version "$VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
+                --directory "$release_dir" \
+                --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,checksums.txt,fleet-manager.oci.tar \
+                --manifest "$release_dir/release-manifest.json"
+              (cd "$release_dir" && sha256sum --check checksums.txt)
+            - |
+              install -m 600 /dev/null /tmp/github-release-token
+              node release/github-app-token.js >/tmp/github-release-token
+            - |
+              release_dir="build/fleet-manager/$VERSION"
+              export GITHUB_TOKEN="$(cat /tmp/github-release-token)"
+              node release/component-release.js stage-github-release \
+                --component fleet-manager \
+                --version "$VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --directory "$release_dir" \
+                --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,checksums.txt \
+                --release-id-file /tmp/github-release-id
+            - sudo apt-get update
+            - sudo apt-get install -y skopeo
+            - printf '%s' "$GHCR_TOKEN" | skopeo login --authfile /tmp/ghcr-auth.json ghcr.io --username "$GHCR_USERNAME" --password-stdin
+            - |
+              export REGISTRY_AUTH_FILE=/tmp/ghcr-auth.json
+              export FLEET_MANAGER_DIGEST_OUTPUT=/tmp/fleet-manager-image-digest
+              bash release/fleet-manager/publish-image.sh \
+                "$VERSION" \
+                "build/fleet-manager/$VERSION/fleet-manager.oci.tar"
+            - |
+              export REGISTRY_AUTH_FILE=/tmp/ghcr-auth.json
+              image_digest="$(cat /tmp/fleet-manager-image-digest)"
+              bash release/fleet-manager/verify-image.sh \
+                "$FLEET_MANAGER_IMAGE_REPO:$VERSION" \
+                "$image_digest" \
+                "$VERSION" \
+                "$SEMAPHORE_GIT_SHA"
+            - |
+              export FLEET_MANAGER_IMAGE_DIGEST="$(cat /tmp/fleet-manager-image-digest)"
+              export GITHUB_TOKEN="$(cat /tmp/github-release-token)"
+              node release/component-release.js publish-github-release \
+                --release-id "$(cat /tmp/github-release-id)" \
+                --sha "$SEMAPHORE_GIT_SHA"
+            - |
+              encoded_tag="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "fleet-manager/$VERSION")"
+              bash release/verify-public-assets.sh \
+                "https://github.com/superplanehq/superplane/releases/download/$encoded_tag" \
+                "build/fleet-manager/$VERSION" \
+                fleet-manager-linux-amd64.tar.gz \
+                fleet-manager-linux-arm64.tar.gz \
+                fleet-manager.spdx.json \
+                checksums.txt
