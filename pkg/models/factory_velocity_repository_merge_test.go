@@ -325,6 +325,7 @@ func Test__FindFactoryVelocitySyncTarget(t *testing.T) {
 	// read must still find it.
 	sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, time.Now())
 	require.NoError(t, err)
+	sync.RulesGeneration = 1
 	now := time.Now()
 	require.NoError(t, sync.RecordSuccess(db, repository, now, now.Add(-60*24*time.Hour)))
 
@@ -334,6 +335,8 @@ func Test__FindFactoryVelocitySyncTarget(t *testing.T) {
 	assert.Equal(t, repository, target.Repository)
 	assert.Equal(t, integrationID, target.IntegrationID.String())
 	assert.Equal(t, repository, target.SyncedRepository)
+	assert.Equal(t, 1, target.RulesGeneration,
+		"the scheduled sync must see a completed rules rebuild and not repeat the full history read")
 
 	missing, err := models.FindFactoryVelocitySyncTarget(db, uuid.New())
 	require.NoError(t, err)
