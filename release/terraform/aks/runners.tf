@@ -73,9 +73,9 @@ resource "azurerm_shared_image" "runner_amd64" {
   resource_group_name      = azurerm_resource_group.runners.name
   location                 = azurerm_resource_group.runners.location
   os_type                  = "Linux"
-  hyper_v_generation       = "V2"
-  architecture             = "x64"
-  trusted_launch_supported = true
+  hyper_v_generation     = "V2"
+  architecture           = "x64"
+  trusted_launch_enabled = true
 
   identifier {
     publisher = "superplane"
@@ -90,9 +90,9 @@ resource "azurerm_shared_image" "runner_arm64" {
   resource_group_name      = azurerm_resource_group.runners.name
   location                 = azurerm_resource_group.runners.location
   os_type                  = "Linux"
-  hyper_v_generation       = "V2"
-  architecture             = "Arm64"
-  trusted_launch_supported = true
+  hyper_v_generation     = "V2"
+  architecture           = "Arm64"
+  trusted_launch_enabled = true
 
   identifier {
     publisher = "superplane"

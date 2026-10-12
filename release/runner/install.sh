@@ -37,6 +37,15 @@ command -v systemctl >/dev/null 2>&1 || fail "systemd is required"
 validate_environment_value "RUNNER_API_URL" "${RUNNER_API_URL}"
 validate_environment_value "RUNNER_REGISTRATION_TOKEN" "${RUNNER_REGISTRATION_TOKEN}"
 
+# Azure gallery images do not include the Ubuntu cloud user. The service
+# runs as that user, so create it before systemd starts the unit.
+if ! id ubuntu >/dev/null 2>&1; then
+  useradd --create-home --shell /bin/bash ubuntu
+fi
+if getent group docker >/dev/null 2>&1; then
+  usermod -aG docker ubuntu
+fi
+
 install -d -m 0755 /usr/local/bin
 install -m 0755 "${RUNNER_BINARY}" /usr/local/bin/superplane-runner
 
