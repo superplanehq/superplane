@@ -57,7 +57,8 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"backend": "integrated",
+			"backend":        "integrated",
+			"hosted_pricing": access.HostedPricing,
 			"stream_url": "/api/v1/canvases/" +
 				canvasID.String() +
 				"/node-executions/" +
@@ -80,10 +81,11 @@ func (s *Server) handleRunnerLiveLogSession(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	response := map[string]any{
-		"backend":    "legacy",
-		"stream_url": session.StreamURL,
-		"token":      session.Token,
-		"expires_at": session.ExpiresAt,
+		"backend":        "legacy",
+		"hosted_pricing": access.HostedPricing,
+		"stream_url":     session.StreamURL,
+		"token":          session.Token,
+		"expires_at":     session.ExpiresAt,
 	}
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
