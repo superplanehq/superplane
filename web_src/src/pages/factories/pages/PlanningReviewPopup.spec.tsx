@@ -16,6 +16,10 @@ vi.mock("@monaco-editor/react", () => ({
   ),
 }));
 
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({ canAct: () => true, isLoading: false, currentUserId: "user-1" }),
+}));
+
 function renderPopup(
   props: Omit<ComponentProps<typeof PlanningReviewPopup>, "onClose"> & { onClose?: () => void } = {},
 ) {

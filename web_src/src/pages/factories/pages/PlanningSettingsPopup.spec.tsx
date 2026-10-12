@@ -36,6 +36,10 @@ vi.mock("@/hooks/useFactoryAgentResources", () => ({
   useFactoryAgentResourceTools: vi.fn(() => ({ data: [], isLoading: false, isError: false })),
 }));
 
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => ({ canAct: () => true, isLoading: false, currentUserId: "user-1" }),
+}));
+
 function defaultAgentSlot(overrides: Partial<PlanningReviewAgentSlot> = {}): PlanningReviewAgentSlot {
   return {
     draft: PLANNING_REVIEW_DRAFT,

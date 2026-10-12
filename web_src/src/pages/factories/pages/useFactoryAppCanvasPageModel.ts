@@ -7,13 +7,7 @@ import { factoryAppViewPath, parseFactoryAppNavFrom } from "../lib/factoryPagePa
 import { useFactoryAppCanvasEditActions } from "./useFactoryAppCanvasEditActions";
 import { useFactoryAppCanvasRoute } from "./useFactoryAppCanvasRoute";
 import { useFactoryAppConfigureTitle } from "./useFactoryAppConfigureTitle";
-
-export function resolveCanUpdateFactoryAutomation(
-  permissionsLoading: boolean,
-  canAct: (resource: string, action: string) => boolean,
-) {
-  return !permissionsLoading && canAct("canvases", "update");
-}
+import { resolveCanUpdateFactoryAutomation } from "./factoryAutomationPermissions";
 
 export function useFactoryAppCanvasPageModel() {
   const route = useFactoryAppCanvasRoute();
