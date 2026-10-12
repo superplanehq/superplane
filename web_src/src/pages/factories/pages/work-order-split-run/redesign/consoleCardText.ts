@@ -1,6 +1,5 @@
 import { durationLabelMs, formatMinutesSecondsDuration, isSubSecondDurationLabel } from "@/lib/duration";
 
-import { planningArtifactDisplayData } from "../../../lib/intentDocument";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
 import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { SPLIT_RUN_CLOSURE_PHASE_ID } from "../splitRunMocks";
@@ -129,7 +128,7 @@ function plainText(markdown: string): string {
 }
 
 function artifactLabel(artifact: AutomationStage["outputs"]["artifacts"][number]): string {
-  const data = planningArtifactDisplayData(toArtifactDataRecord(artifact.data), artifact.key) ?? {};
+  const data = toArtifactDataRecord(artifact.data) ?? {};
   const label = data.name ?? data.title ?? data.filename;
   return typeof label === "string" ? label : "";
 }

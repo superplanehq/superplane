@@ -48,43 +48,6 @@ describe("analysisFirstResultDelivered", () => {
     expect(hasAnalysisScore([{ name: "Risk score", score: 3 }])).toBe(false);
   });
 
-  it("does not treat an old spec.md file as the plan", () => {
-    expect(hasAnalysisPlan([{ data: { name: "spec.md", body: "A retry loop." } }])).toBe(false);
-    expect(analysisPlanBody([{ data: { title: "spec.md", body: "A retry loop." } }])).toBeUndefined();
-  });
-
-  it("keeps the saved plan when a later file uses the same name", () => {
-    const savedKey = "spec:11111111-1111-4111-8111-111111111111";
-    expect(
-      analysisPlanBody([
-        { key: "workflow-plan", data: { name: "plan.md", body: "Workflow plan." } },
-        { key: savedKey, data: { name: "plan.md", body: "Saved plan." } },
-      ]),
-    ).toBe("Saved plan.");
-    expect(
-      analysisPlanBody([
-        { data: { name: "plan.md", body: "Workflow plan." } },
-        { key: savedKey, data: { name: "plan.md", body: "   " } },
-      ]),
-    ).toBeUndefined();
-  });
-
-  it("prefers plan.md over intent.md", () => {
-    expect(
-      analysisPlanBody([
-        { data: { name: "intent.md", body: "Old intent." } },
-        { data: { name: "spec.md", body: "User file." } },
-        { data: { name: "plan.md", body: "Current plan." } },
-      ]),
-    ).toBe("Current plan.");
-    expect(
-      analysisPlanBody([
-        { data: { name: "intent.md", body: "Old intent." } },
-        { data: { name: "spec.md", body: "User file." } },
-      ]),
-    ).toBe("Old intent.");
-  });
-
   it("accepts intent.md as the plan", () => {
     expect(hasAnalysisPlan([{ data: { title: "intent.md", body: "A retry loop." } }])).toBe(true);
     expect(analysisPlanBody([{ data: { title: "intent.md", body: "A retry loop." } }])).toBe("A retry loop.");

@@ -334,15 +334,9 @@ describe("AutomationsConsoleVariant summary strip", () => {
           createdAt: new Date(Date.now() - 180_000).toISOString(),
         },
         {
-          id: "art-description",
+          id: "art-spec",
           type: "TYPE_MARKDOWN",
-          data: { name: "description.md", title: "description.md", body: "The task." },
-          createdAt: new Date(Date.now() - 300_000).toISOString(),
-        },
-        {
-          id: "art-plan",
-          type: "TYPE_MARKDOWN",
-          data: { name: "plan.md", title: "plan.md", body: "# Plan" },
+          data: { name: "spec.md", body: "# Spec" },
           createdAt: new Date(Date.now() - 240_000).toISOString(),
         },
         {
@@ -356,13 +350,11 @@ describe("AutomationsConsoleVariant summary strip", () => {
 
     const section = screen.getByTestId("redesign-console-artifacts");
     const text = section.textContent ?? "";
-    expect(text).toContain("description.md");
-    expect(text).toContain("plan.md");
+    expect(text).toContain("spec.md");
     expect(text).toContain("report.md");
     expect(text).toContain("trace.log");
     expect(text).toContain("Design doc");
-    expect(text.indexOf("description.md")).toBeLessThan(text.indexOf("plan.md"));
-    expect(text.indexOf("plan.md")).toBeLessThan(text.indexOf("report.md"));
+    expect(text.indexOf("spec.md")).toBeLessThan(text.indexOf("report.md"));
     expect(text.indexOf("report.md")).toBeLessThan(text.indexOf("trace.log"));
     expect(text.indexOf("trace.log")).toBeLessThan(text.indexOf("Design doc"));
   });
