@@ -80,7 +80,7 @@ export function MobileColumn({
       {paging.isLoading ? <MobileColumnLoadingMore /> : null}
       {paging.hasPageError && !paging.isLoading ? <MobileColumnPageError onRetry={paging.onLoadMore} /> : null}
       {showCreate && !(showEmpty && column.key === "backlog") ? (
-        <div className="absolute right-4 bottom-5">
+        <div className="absolute right-4 bottom-5 z-20">
           <MobileCreateTaskButton className="size-14 rounded-full shadow-lg" onImported={onImported} />
         </div>
       ) : null}
