@@ -10,12 +10,11 @@ import { type ReactNode } from "react";
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../../lib/confidenceScore";
+import { planningArtifactDisplayData } from "../../../lib/intentDocument";
 import { consoleCheckList, isMergeConfidenceMetric } from "../../../lib/mergeConfidenceScore";
 import { isPlanningReviewMetric } from "../../../lib/planningReviewScore";
-import { workOrderCardPullRequestIsMergeable } from "../../../lib/workOrderCardPullRequest";
-import { splitRunDecisionTone } from "../splitRunFooter";
-import { attentionToneClassName } from "../splitRunNoteActionStyle";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
+import { workOrderCardPullRequestIsMergeable } from "../../../lib/workOrderCardPullRequest";
 import { pullRequestLabel } from "../../../lib/workOrderPullRequest";
 import { OrgUserReference, EmptyOwnerMark } from "../../../OrgUserReference";
 import { OwnerAssignTrigger } from "../../../WorkOrderAssigneesPopover";
@@ -23,6 +22,8 @@ import { WorkOrderArtifactInline } from "../../../WorkOrderArtifactInline";
 import { WorkOrderMergeableChip, WorkOrderPullRequestChip } from "../../../workOrders/WorkOrderPullRequestChip";
 import { OwnerSpendValue } from "../../work-order-popup-redesign/popupShared";
 import { useLiveHeaderSpendOverlay } from "../liveHeaderSpendContext";
+import { splitRunDecisionTone } from "../splitRunFooter";
+import { attentionToneClassName } from "../splitRunNoteActionStyle";
 import { ConsoleCheckRows } from "./consoleCheckRows";
 import type { SplitRunFixture } from "../splitRunMocks";
 import { splitRunPanelArtifacts } from "../splitRunPopupModel";
@@ -131,7 +132,11 @@ export function ConsoleSummaryPanel({
             {panel.panelArtifacts.map((artifact) => (
               <WorkOrderArtifactInline
                 key={artifact.id}
-                artifact={{ id: artifact.id, type: artifact.type ?? "", data: toArtifactDataRecord(artifact.data) }}
+                artifact={{
+                  id: artifact.id,
+                  type: artifact.type ?? "",
+                  data: planningArtifactDisplayData(toArtifactDataRecord(artifact.data), artifact.key),
+                }}
               />
             ))}
           </FramePanel>

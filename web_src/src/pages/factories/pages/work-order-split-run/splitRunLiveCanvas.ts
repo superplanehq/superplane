@@ -9,6 +9,8 @@ import type {
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import type { FactoryNodeStatus } from "@/ui/factoryNodeChrome/types";
 
+import { planningArtifactDisplayData } from "../../lib/intentDocument";
+import { toArtifactDataRecord } from "../../lib/workOrderArtifact";
 import { formatCheckScore, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import {
   canvasKeyForAutomation,
@@ -587,7 +589,7 @@ function artifactName(artifact: FactoriesWorkOrderArtifact): string | undefined 
 }
 
 function artifactLabel(artifact: FactoriesWorkOrderArtifact): string {
-  const data = artifact.data;
+  const data = planningArtifactDisplayData(toArtifactDataRecord(artifact.data), artifact.key);
   if (data && "title" in data && typeof data.title === "string" && data.title) {
     return data.title;
   }

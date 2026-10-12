@@ -1,6 +1,72 @@
+import { extractArtifactMarkdownBody, toArtifactDataRecord } from "./workOrderArtifact";
+
 export const INTENT_ARTIFACT_NAME = "intent.md";
 
-export const SPEC_ARTIFACT_NAME = "spec.md";
+export const SPEC_ARTIFACT_NAME = "plan.md";
+
+export const PLANNING_ARTIFACT_NAMES = [SPEC_ARTIFACT_NAME, INTENT_ARTIFACT_NAME] as const;
+
+const LEGACY_SPEC_ARTIFACT_NAME = "spec.md";
+
+const PLANNING_ARTIFACT_KEY = /^spec:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const PLANNING_LABEL_FIELDS = ["name", "title", "filename"] as const;
+
+export function isPlanningArtifactName(name: string): boolean {
+  return (PLANNING_ARTIFACT_NAMES as readonly string[]).includes(name);
+}
+
+export function isPlanningArtifactKey(key: string | undefined): boolean {
+  return key != null && PLANNING_ARTIFACT_KEY.test(key.trim());
+}
+
+/** Show a stored spec.md planning row as plan.md. A user file keeps its name. */
+export function planningArtifactDisplayData(
+  data: Record<string, unknown> | undefined,
+  key?: string,
+): Record<string, unknown> | undefined {
+  if (!data || !isPlanningArtifactKey(key)) {
+    return data;
+  }
+  let changed = false;
+  const next: Record<string, unknown> = { ...data };
+  for (const field of PLANNING_LABEL_FIELDS) {
+    if (next[field] !== LEGACY_SPEC_ARTIFACT_NAME) {
+      continue;
+    }
+    next[field] = SPEC_ARTIFACT_NAME;
+    changed = true;
+  }
+  return changed ? next : data;
+}
+
+type PlanningDocumentMatch = {
+  identified: boolean;
+  body: string;
+};
+
+type PlanningDocumentSource = {
+  key?: string;
+  data?: unknown;
+};
+
+export function selectPlanningDocument(artifacts?: ReadonlyArray<PlanningDocumentSource>): PlanningDocumentMatch {
+  let identified = false;
+  for (const artifact of artifacts ?? []) {
+    if (!isPlanningArtifactKey(artifact.key)) {
+      continue;
+    }
+    identified = true;
+    const body = extractArtifactMarkdownBody(toArtifactDataRecord(artifact.data))?.trim() ?? "";
+    if (body) {
+      return { identified: true, body };
+    }
+  }
+  if (identified) {
+    return { identified: true, body: "" };
+  }
+  return { identified: false, body: "" };
+}
 
 export const INTENT_DOCUMENT_TITLE = "What this work will do";
 
