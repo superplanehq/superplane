@@ -1,5 +1,6 @@
 import { Avatar } from "@/components/Avatar/avatar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { buildOrgUserDisplayMap, getUserInitials, resolveOrgUserDisplay } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
@@ -11,8 +12,6 @@ import { EmptyOwnerMark } from "./OrgUserReference";
 interface WorkOrderAssigneePickerProps {
   organizationId: string;
   selectedIds: string[];
-  /** Ids used to decide sort order (pinned to the top). Defaults to `selectedIds`. */
-  pinnedIds?: string[];
   onChange: (assigneeIds: string[]) => void;
   disabled?: boolean;
 }
@@ -20,17 +19,15 @@ interface WorkOrderAssigneePickerProps {
 export function WorkOrderAssigneePicker({
   organizationId,
   selectedIds,
-  pinnedIds,
   onChange,
   disabled = false,
 }: WorkOrderAssigneePickerProps) {
   const { data: users = [], isLoading } = useOrganizationUsers(organizationId);
-  const pinned = pinnedIds ?? selectedIds;
+  const { currentUserId } = usePermissions();
   const selectedId = selectedIds[0];
 
   const userOptions = useMemo(() => {
     const usersById = buildOrgUserDisplayMap(users);
-    const pinnedSet = new Set(pinned);
 
     return users
       .filter((user) => user.metadata?.id)
@@ -49,15 +46,15 @@ export function WorkOrderAssigneePicker({
         };
       })
       .sort((left, right) => {
-        const leftPinned = pinnedSet.has(left.id);
-        const rightPinned = pinnedSet.has(right.id);
-        if (leftPinned !== rightPinned) {
-          return leftPinned ? -1 : 1;
+        const leftIsSignedInUser = left.id === currentUserId;
+        const rightIsSignedInUser = right.id === currentUserId;
+        if (leftIsSignedInUser !== rightIsSignedInUser) {
+          return leftIsSignedInUser ? -1 : 1;
         }
 
         return left.label.localeCompare(right.label);
       });
-  }, [users, pinned]);
+  }, [currentUserId, users]);
 
   const selectUser = (userId: string) => {
     if (disabled) {

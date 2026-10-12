@@ -36,17 +36,10 @@ export function WorkOrderAssigneesPopover({
   children,
 }: WorkOrderAssigneesPopoverProps) {
   const [open, setOpen] = useState(false);
-  // Snapshot of the confirmed selection, used to keep the current owner
-  // pinned to the top of the list while the popover is open.
-  const [pinnedIds, setPinnedIds] = useState<string[]>(selectedIds);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (isSaving) {
       return;
-    }
-
-    if (nextOpen && !open) {
-      setPinnedIds(selectedIds);
     }
 
     setOpen(nextOpen);
@@ -81,7 +74,6 @@ export function WorkOrderAssigneesPopover({
         <WorkOrderAssigneePicker
           organizationId={organizationId}
           selectedIds={selectedIds}
-          pinnedIds={pinnedIds}
           onChange={(nextIds) => void handleChange(nextIds)}
           disabled={pickerDisabled}
         />
