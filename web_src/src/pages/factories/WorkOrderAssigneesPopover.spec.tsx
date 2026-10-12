@@ -1,11 +1,19 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "bun:test";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import type { SuperplaneUsersUser } from "@/api-client";
 import { WorkOrderAssigneesPopover } from "./WorkOrderAssigneesPopover";
 
+const { permissionsState } = vi.hoisted(() => ({
+  permissionsState: { currentUserId: undefined as string | undefined },
+}));
+
 vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganizationUsers: vi.fn(() => ({ data: mockUsers, isLoading: false })),
+}));
+
+vi.mock("@/contexts/usePermissions", () => ({
+  usePermissions: () => permissionsState,
 }));
 
 function buildUser(id: string, displayName: string): SuperplaneUsersUser {
@@ -18,6 +26,10 @@ function buildUser(id: string, displayName: string): SuperplaneUsersUser {
 const mockUsers: SuperplaneUsersUser[] = [buildUser("alice", "Alice Anderson"), buildUser("bob", "Bob Brown")];
 
 describe("WorkOrderAssigneesPopover", () => {
+  beforeEach(() => {
+    permissionsState.currentUserId = undefined;
+  });
+
   it("saves the person you click and closes the list", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
 
@@ -65,9 +77,11 @@ describe("WorkOrderAssigneesPopover", () => {
     expect(onSave).not.toHaveBeenCalled();
   });
 
-  it("keeps the current owner at the top of the list", () => {
+  it("puts the signed-in user first instead of the current owner", () => {
+    permissionsState.currentUserId = "bob";
+
     render(
-      <WorkOrderAssigneesPopover organizationId="org-1" selectedIds={["bob"]} onSave={vi.fn()}>
+      <WorkOrderAssigneesPopover organizationId="org-1" selectedIds={["alice"]} onSave={vi.fn()}>
         <button>Owner</button>
       </WorkOrderAssigneesPopover>,
     );
