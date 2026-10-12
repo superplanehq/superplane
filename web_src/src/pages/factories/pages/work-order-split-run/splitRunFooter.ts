@@ -8,6 +8,15 @@ import {
   type WorkOrderDisplayStatus,
 } from "../../lib/workOrderProgress";
 import type { WorkOrderStatusNotePresentation } from "../../lib/workOrderStatusNote";
+import {
+  closedDecisionNote,
+  SPLIT_RUN_COMPLETED_HEADLINE,
+  SPLIT_RUN_COMPLETED_HEADLINE_ACTOR,
+  SPLIT_RUN_COMPLETED_NOTE_TEXT,
+  SPLIT_RUN_REJECTED_HEADLINE,
+  SPLIT_RUN_REJECTED_HEADLINE_ACTOR,
+  SPLIT_RUN_REJECTED_NOTE_TEXT,
+} from "./closedDecisionNote";
 
 export type SplitRunFooterKind = "draft" | "running" | "waiting" | "failed" | "stopped" | "done";
 
@@ -193,12 +202,14 @@ export const SPLIT_RUN_STOPPED_NOTE_TEXT = "This automation did not finish. This
 export const SPLIT_RUN_STOPPED_HEADLINE = "stopped this automation";
 export const SPLIT_RUN_STOPPED_HEADLINE_UNKNOWN = "A person stopped this automation";
 
-export const SPLIT_RUN_COMPLETED_NOTE_TEXT = "The work is done. The result met the goal.";
-export const SPLIT_RUN_REJECTED_NOTE_TEXT = "The work is done. The result did not meet the goal.";
-export const SPLIT_RUN_COMPLETED_HEADLINE = "This task succeeded";
-export const SPLIT_RUN_REJECTED_HEADLINE = "This task did not succeed";
-export const SPLIT_RUN_COMPLETED_HEADLINE_ACTOR = "marked this task as successful";
-export const SPLIT_RUN_REJECTED_HEADLINE_ACTOR = "marked this task as unsuccessful";
+export {
+  SPLIT_RUN_COMPLETED_HEADLINE,
+  SPLIT_RUN_COMPLETED_HEADLINE_ACTOR,
+  SPLIT_RUN_COMPLETED_NOTE_TEXT,
+  SPLIT_RUN_REJECTED_HEADLINE,
+  SPLIT_RUN_REJECTED_HEADLINE_ACTOR,
+  SPLIT_RUN_REJECTED_NOTE_TEXT,
+};
 
 export const SPLIT_RUN_DRAFT_NOTE: SplitRunFooterNote = { ...DRAFT_READINESS_NOTES.pending };
 
@@ -267,49 +278,6 @@ export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTo
     return "rejected";
   }
   return "done";
-}
-
-function closerHeadline(verb: string, actor?: OrgUserDisplay, automationName?: string): string {
-  if (actor) {
-    return verb;
-  }
-  if (automationName) {
-    return `${automationName} ${verb}`;
-  }
-  return "";
-}
-
-function closedDecisionNote(
-  status?: WorkOrderDisplayStatus,
-  closer?: { actor?: OrgUserDisplay; automationName?: string },
-): SplitRunFooterNote {
-  if (status === "rejected") {
-    const headline =
-      closerHeadline(SPLIT_RUN_REJECTED_HEADLINE_ACTOR, closer?.actor, closer?.automationName) ||
-      SPLIT_RUN_REJECTED_HEADLINE;
-    return {
-      headline,
-      text: SPLIT_RUN_REJECTED_NOTE_TEXT,
-      ...(closer?.actor ? { actor: closer.actor } : {}),
-    };
-  }
-  if (status === "archived") {
-    return {
-      headline: "This task is archived",
-      text: "Send this task to Backlog to work on it again.",
-    };
-  }
-  if (status === "failed") {
-    return { headline: "This task is closed as failed", text: "Reopen this task to start the line again." };
-  }
-  const headline =
-    closerHeadline(SPLIT_RUN_COMPLETED_HEADLINE_ACTOR, closer?.actor, closer?.automationName) ||
-    SPLIT_RUN_COMPLETED_HEADLINE;
-  return {
-    headline,
-    text: SPLIT_RUN_COMPLETED_NOTE_TEXT,
-    ...(closer?.actor ? { actor: closer.actor } : {}),
-  };
 }
 
 function closedDecisionActions(status?: WorkOrderDisplayStatus): SplitRunFooterAction[] {
@@ -463,7 +431,7 @@ function closedFooterNote(input: FooterInput, note?: SplitRunFooterNote): SplitR
   if (input.status === "failed" || input.kind === "failed") {
     return closedDecisionNote(input.status ?? "failed");
   }
-  if (input.status === "completed" || input.status === "rejected") {
+  if (input.status === "completed" || input.status === "rejected" || input.status === "archived") {
     return closedDecisionNote(input.status, {
       actor: input.actor,
       automationName: input.automationName,

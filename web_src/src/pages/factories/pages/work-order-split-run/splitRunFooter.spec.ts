@@ -299,6 +299,11 @@ describe("buildSplitRunFooter", () => {
       headline: "PR Closure marked this task as unsuccessful",
       text: "The work is done. The result did not meet the goal.",
     });
+    expect(doneFooterForStatus("archived", { actor }).note).toMatchObject({
+      headline: "archived this task",
+      text: "Send this task to Backlog to work on it again.",
+      actor,
+    });
   });
 
   it("offers Send to backlog and Reopen on a closed failed footer", () => {

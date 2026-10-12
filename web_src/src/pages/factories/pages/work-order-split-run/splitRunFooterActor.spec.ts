@@ -67,6 +67,16 @@ describe("footerCloserFromEvents", () => {
     ).toEqual({ actor: ALEX });
   });
 
+  it("names the person who archived the task from the rejected close event", () => {
+    expect(
+      footerCloserFromEvents(
+        [statusEvent("2026-08-04T12:00:00.000Z", { userId: ALEX.id, toResult: "rejected" })],
+        "archived",
+        resolveUser,
+      ),
+    ).toEqual({ actor: ALEX });
+  });
+
   it("names the automation that closed the task when no person is set", () => {
     expect(
       footerCloserFromEvents(
