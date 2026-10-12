@@ -13,6 +13,8 @@ function splitRunOwnerFields(owner: OrgUserDisplay) {
     ownerName: owner.name,
     ownerInitials: owner.initials,
     ownerAvatarUrl: owner.avatarUrl,
+    ownerDeleted: owner.deleted,
+    ownerFormerMember: owner.formerMember,
   };
 }
 
@@ -55,7 +57,9 @@ function useSplitRunFieldState(args: {
     setDescription(args.description);
   }, [args.description]);
 
-  const { ownerId, ownerName, ownerInitials, ownerAvatarUrl } = splitRunOwnerFields(args.owner);
+  const { ownerId, ownerName, ownerInitials, ownerAvatarUrl, ownerDeleted, ownerFormerMember } = splitRunOwnerFields(
+    args.owner,
+  );
   const assigneeKey = args.assigneeIds.join("\0");
 
   useEffect(() => {
@@ -64,8 +68,10 @@ function useSplitRunFieldState(args: {
       name: ownerName,
       initials: ownerInitials,
       avatarUrl: ownerAvatarUrl,
+      deleted: ownerDeleted,
+      formerMember: ownerFormerMember,
     });
-  }, [ownerAvatarUrl, ownerId, ownerInitials, ownerName]);
+  }, [ownerAvatarUrl, ownerDeleted, ownerFormerMember, ownerId, ownerInitials, ownerName]);
 
   useEffect(() => {
     setAssigneeIds(assigneeKey === "" ? [] : assigneeKey.split("\0"));
@@ -168,6 +174,8 @@ export function useSplitRunWorkOrderEdits(args: {
             id: nextOwner.id,
             name,
             initials: getUserInitials(name) || previousOwner.initials,
+            deleted: nextOwner.deleted,
+            formerMember: nextOwner.formerMember,
           });
         } else {
           setOwner({ id: "", name: "", initials: "" });

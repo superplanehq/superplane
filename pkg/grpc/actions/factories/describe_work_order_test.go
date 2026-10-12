@@ -2,6 +2,7 @@ package factories
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -41,6 +42,44 @@ func Test__DescribeWorkOrder_AcceptsNumberAndKey(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, order.ID.String(), resp.Order.GetId())
 	})
+}
+
+func Test__DescribeWorkOrder_KeepsRemovedMemberName(t *testing.T) {
+	for _, accountDeleted := range []bool{false, true} {
+		name := "former member"
+		if accountDeleted {
+			name = "deleted account"
+		}
+		t.Run(name, func(t *testing.T) {
+			r := support.Setup(t)
+			ctx := t.Context()
+			db := database.DB(ctx)
+			member := support.CreateUser(t, r, r.Organization.ID)
+			factoryModel, err := models.CreateFactory(db, r.Organization.ID, "Removed member", "", "REM")
+			require.NoError(t, err)
+			order, err := factoryModel.CreateWorkOrder(db, "keep the name", "", &member.ID, []uuid.UUID{member.ID}, nil)
+			require.NoError(t, err)
+			if accountDeleted {
+				account, err := models.FindAccountByID(member.AccountID.String())
+				require.NoError(t, err)
+				require.NoError(t, account.SoftDelete(db, time.Now()))
+			} else {
+				require.NoError(t, member.SoftDelete(db, time.Now(), ""))
+			}
+			resp, err := DescribeWorkOrder(ctx, r.Organization.ID.String(), &pb.DescribeWorkOrderRequest{
+				FactoryId: factoryModel.ID.String(), OrderId: order.ID.String(),
+			})
+			require.NoError(t, err)
+			require.Len(t, resp.Order.GetAssignees(), 1)
+			for _, user := range []*pb.UserRef{resp.Order.GetCreatedBy().GetUser(), resp.Order.Assignees[0]} {
+				require.NotNil(t, user)
+				assert.Equal(t, member.ID.String(), user.GetId())
+				assert.Equal(t, member.Name, user.GetName())
+				assert.Equal(t, accountDeleted, user.GetDeleted())
+				assert.Equal(t, !accountDeleted, user.GetFormerMember())
+			}
+		})
+	}
 }
 
 func Test__DescribeWorkOrder_IncludesUsageBreakdown(t *testing.T) {
