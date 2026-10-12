@@ -15,6 +15,7 @@ export const AGENT_STEP_CATALOG_ID = "agent-step";
 export const CUSTOM_CATALOG_ID = "custom";
 export const PR_CLOSURE_CATALOG_ID = "pr-closure";
 export const RISK_SCORE_CATALOG_ID = "risk-score";
+export const VISUAL_EVIDENCE_CATALOG_ID = "visual-evidence";
 
 export const ANALYSIS_ENTRY: ColumnAutomationCatalogEntry = {
   id: ANALYSIS_CATALOG_ID,
@@ -76,6 +77,18 @@ export const RISK_SCORE_ENTRY: ColumnAutomationCatalogEntry = {
   unique: true,
 };
 
+export const VISUAL_EVIDENCE_ENTRY: ColumnAutomationCatalogEntry = {
+  id: VISUAL_EVIDENCE_CATALOG_ID,
+  kind: "visual-evidence",
+  name: "Visual Evidence",
+  description: "Capture screenshots or a short video when a pull request changes the user interface.",
+  trigger: "On pull request opened or updated",
+  action: "Capture screenshots or a short video",
+  iconSrc: "",
+  iconAlt: "",
+  unique: true,
+};
+
 export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
   id: PR_CLOSURE_CATALOG_ID,
   kind: "pr-closure",
@@ -126,6 +139,7 @@ export function catalogForColumn(
         };
       }),
       RISK_SCORE_ENTRY,
+      VISUAL_EVIDENCE_ENTRY,
       ...(allowCustom ? [EVENT_CUSTOM_ENTRY] : []),
     ];
   }
