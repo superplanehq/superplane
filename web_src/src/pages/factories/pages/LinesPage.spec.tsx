@@ -14,9 +14,7 @@ import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLan
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_JIRA_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
-  FEATURE_FACTORY_RISK_SCORE,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
@@ -34,6 +32,7 @@ import {
   factoryHomePath,
   factoryGitHubIntakeSetupPath,
   factoryJiraIntakeSetupPath,
+  factoryLinearIntakeSetupPath,
   factoryPlanningPath,
   factoryProductiveIntakeSetupPath,
   factoryPRFeedbackPath,
@@ -113,7 +112,7 @@ const updateFactoryLineMutateAsync = vi.fn();
 const updateLineIsPending = vi.hoisted(() => ({ value: false }));
 const idleBoardPage = () => ({ hasNextPage: false, isFetchingNextPage: false, fetchNextPage: vi.fn() });
 const useFactoryWorkOrders = vi.fn(() => ({ data: [] as FactoriesWorkOrderSummary[] }));
-const useFactoryBoardWorkOrders = vi.fn(() => ({
+const useFactoryBoardWorkOrders = vi.fn((_organizationId?: string, _factoryId?: string, _options?: unknown) => ({
   workOrders: useFactoryWorkOrders().data ?? [],
   isLoading: false,
   isPlaceholderData: false,
@@ -179,7 +178,8 @@ vi.mock("@/hooks/useFactoryData", () => ({
   }),
   useUpdateFactory: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useFactoryWorkOrders: () => useFactoryWorkOrders(),
-  useFactoryBoardWorkOrders: () => useFactoryBoardWorkOrders(),
+  useFactoryBoardWorkOrders: (organizationId: string, factoryId: string, options?: unknown) =>
+    useFactoryBoardWorkOrders(organizationId, factoryId, options),
   useFactoryAutomations: () => useFactoryAutomations(),
   useCreateFactoryLine: () => ({ mutateAsync: createFactoryLineMutateAsync, isPending: false }),
   useUpdateFactoryLine: () => ({
@@ -455,7 +455,8 @@ describe("LinesPage board", () => {
     const card = screen.getByTestId("work-order-card-wo-review-pay-842");
     const cardScore = within(card).getByTestId("work-order-card-score-wo-review-pay-842");
     expect(cardScore).toHaveAttribute("data-tone", "ready");
-    expect(cardScore).toHaveTextContent("Clarity5/5Confidence5/5");
+    expect(cardScore).toHaveTextContent("Clarity5/5Confidence");
+    expect(within(card).getByTestId("work-order-card-score-wo-review-pay-842-confidence")).not.toHaveTextContent(/\d/);
     expect(cardScore).toHaveAttribute(
       "aria-label",
       "This task is ready to start. Clarity score 5 of 5. Confidence score 5 of 5",
@@ -476,9 +477,9 @@ describe("LinesPage board", () => {
     expect(within(dialog).getByTestId("split-run-intent-document")).toBeInTheDocument();
     expect(within(dialog).getByTestId("popup-work-order-archive-button")).toBeInTheDocument();
     expect(screen.queryByTestId("review-candidate-modal")).not.toBeInTheDocument();
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842?lineId=${REFUND_LINE_PLAN_ID}`,
-    );
+    const location = screen.getByTestId("lines-test-location");
+    expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842`);
+    expect(location).not.toHaveTextContent("lineId=");
     expect(screen.getByTestId("lines-detail-page")).not.toHaveClass("animate-in");
 
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
@@ -547,9 +548,9 @@ describe("LinesPage board", () => {
 
     await user.click(screen.getByRole("button", { name: "Open Add retry handling to webhook delivery" }));
 
-    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
-      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842?lineId=${REFUND_LINE_HOTFIX_ID}`,
-    );
+    const location = screen.getByTestId("lines-test-location");
+    expect(location).toHaveTextContent(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/task/842`);
+    expect(location).not.toHaveTextContent("lineId=");
 
     await user.click(within(screen.getByTestId("work-order-split-run")).getByRole("button", { name: "Close" }));
     await waitFor(() => {
@@ -1044,12 +1045,11 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-column-automation-picker")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-discussion")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-checks")).toBeInTheDocument();
-    expect(screen.queryByTestId("add-column-automation-template-risk-score")).not.toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-risk-score")).toBeInTheDocument();
     expect(screen.queryByTestId("add-column-automation-template-custom")).not.toBeInTheDocument();
   });
 
   it("opens the risk score setup page from the Verify catalog", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1064,7 +1064,6 @@ describe("LinesPage board extras", () => {
 
   it("opens the name dialog when Verify only has custom automation left", async () => {
     enabledExperimentalFeatures.add(FEATURE_FACTORY_CUSTOM_AUTOMATIONS);
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_RISK_SCORE);
     useFactoryPRFeedbackHandlers.mockReturnValue({
       data: [
         { id: "handler-discussion", source: "SOURCE_PULL_REQUEST_DISCUSSION", healthy: true },
@@ -1203,16 +1202,18 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-dependabot-alerts")).not.toHaveTextContent(
       ADD_INTAKE_COPY.comingSoon,
     );
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).not.toHaveTextContent(
       ADD_INTAKE_COPY.comingSoon,
     );
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-linear-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-linear-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
-    await user.click(screen.getByTestId("add-intake-template-jira-issues"));
     await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
     await user.click(screen.getByTestId("add-intake-template-datadog"));
 
@@ -1242,6 +1243,26 @@ describe("LinesPage board extras", () => {
     expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
   });
 
+  it("opens guided Linear setup from the overflow menu", async () => {
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+
+    const linear = screen.getByTestId("add-intake-template-linear-issues");
+    expect(linear).toBeEnabled();
+    expect(linear).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+
+    await user.click(linear);
+
+    expect(screen.getByTestId("linear-intake-setup")).toBeInTheDocument();
+    expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+      factoryLinearIntakeSetupPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, REFUND_LINE_PLAN_ID),
+    );
+    expect(createFactoryIntakeMutateAsync).not.toHaveBeenCalled();
+  });
+
   it("opens guided Sentry setup from the overflow menu", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
@@ -1251,8 +1272,10 @@ describe("LinesPage board extras", () => {
 
     expect(screen.getByTestId("add-intake-template-github-issues")).toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-sentry-exceptions")).toBeInTheDocument();
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-linear-issues")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
@@ -1302,7 +1325,6 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Jira setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_JIRA_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1332,7 +1354,8 @@ describe("LinesPage board extras", () => {
 
     const productive = screen.getByTestId("add-intake-template-productive-tasks");
     expect(productive).toBeEnabled();
-    expect(screen.getByTestId("add-intake-template-jira-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-jira-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-jira-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(productive);
 
@@ -1460,24 +1483,28 @@ describe("LinesPage board editing", () => {
     await resetLinesBoardMocks();
   });
 
-  it("renames the board title on Enter", async () => {
-    updateFactoryLineMutateAsync.mockResolvedValueOnce({});
+  it("shows the workspace name and does not rename the line", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
-    await user.click(screen.getByTestId("lines-board-title"));
-    const input = await screen.findByTestId("lines-board-title-input");
-    await waitFor(() => expect(input).toHaveFocus());
-    await user.clear(input);
-    await user.type(input, "Refund line");
-    await user.keyboard("{Enter}");
+    const title = screen.getByTestId("workspace-page-header-title");
+    expect(title).toHaveTextContent("Semaphore");
+    expect(title).not.toHaveTextContent("Plan and Implement");
+    await user.click(title);
+    expect(screen.queryByTestId("lines-board-title-input")).not.toBeInTheDocument();
+    expect(updateFactoryLineMutateAsync).not.toHaveBeenCalled();
+  });
 
-    await waitFor(() => {
-      expect(updateFactoryLineMutateAsync).toHaveBeenCalledWith({
-        lineId: REFUND_LINE_PLAN_ID,
-        name: "Refund line",
-      });
-    });
+  it("shows an emoji workspace name as stored", () => {
+    renderLinesBoard(undefined, vi.fn(), { ...REFUND_FACTORY, name: "SuperPlane Prod 🚀" });
+
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent("SuperPlane Prod 🚀");
+  });
+
+  it("shows Workspace when the workspace name is empty", () => {
+    renderLinesBoard(undefined, vi.fn(), { ...REFUND_FACTORY, name: "   " });
+
+    expect(screen.getByTestId("workspace-page-header-title")).toHaveTextContent(/^Workspace$/);
   });
 
   it("renames a column title on Enter", async () => {
@@ -1720,7 +1747,12 @@ describe("LinesPage board editing", () => {
     const search = within(actions).getByTestId("work-orders-search-trigger");
     expect(within(actions).queryByTestId("work-orders-scope-active")).not.toBeInTheDocument();
     expect(scopeAll).toHaveTextContent("All");
-    expect(within(actions).getByTestId("work-orders-scope-my")).toHaveTextContent("My");
+    const scopeMy = within(actions).getByTestId("work-orders-scope-my");
+    const scopeUnassigned = within(actions).getByTestId("work-orders-scope-unassigned");
+    expect(scopeMy).toHaveTextContent("My");
+    expect(scopeUnassigned).toHaveTextContent("Unassigned");
+    expect(scopeAll.compareDocumentPosition(scopeMy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(scopeMy.compareDocumentPosition(scopeUnassigned) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(scopeAll.className).toMatch(/rounded-full/);
     expect(filter).toHaveAccessibleName("Filter");
     expect(filter).not.toHaveTextContent("Filter");
@@ -1773,6 +1805,53 @@ describe("LinesPage board editing", () => {
     expect(screen.getByText("Draft: rework refund telemetry")).toBeInTheDocument();
     expect(screen.getByText("Notify on status change after a reopen")).toBeInTheDocument();
     expect(window.localStorage.getItem(`sp:work-orders:scope:${PRIMARY_FACTORY_ID}`)).toBe("active");
+  });
+
+  it("keeps Unassigned pressed and requests only tasks with no owner", async () => {
+    const user = userEvent.setup();
+    const closedUnassigned: FactoriesWorkOrder = {
+      id: "wo-closed-unassigned",
+      title: "Close stale refund draft",
+      state: "STATE_CLOSED",
+      result: "RESULT_COMPLETED",
+      assignees: [],
+      lineDispatches: [{ id: "dispatch-closed", line: { id: REFUND_LINE_PLAN_ID } }],
+    };
+    useFactoryWorkOrders.mockReturnValue({
+      data: [DRAFT_WORK_ORDER, BOARD_IMPLEMENT_NOTIFY_ORDER, closedUnassigned],
+    });
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("work-orders-scope-unassigned"));
+
+    const actions = within(screen.getByTestId("lines-detail-header")).getByTestId("workspace-page-header-actions");
+    expect(within(actions).getByTestId("work-orders-scope-unassigned")).toHaveAttribute("aria-pressed", "true");
+    expect(within(actions).getByTestId("work-orders-scope-all")).toHaveAttribute("aria-pressed", "false");
+    expect(within(actions).getByTestId("work-orders-scope-my")).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Draft: rework refund telemetry")).toBeInTheDocument();
+    expect(screen.getByText("Close stale refund draft")).toBeInTheDocument();
+    expect(screen.queryByText("Notify on status change after a reopen")).not.toBeInTheDocument();
+
+    const options = useFactoryBoardWorkOrders.mock.calls.at(-1)?.[2] as { userId?: string; unassigned?: boolean };
+    expect(options.unassigned).toBe(true);
+    expect(options.userId).toBeUndefined();
+  });
+
+  it("restores a saved Unassigned choice and does not add a selected owner to the request", () => {
+    window.localStorage.setItem(`sp:work-orders:scope:${PRIMARY_FACTORY_ID}`, "unassigned");
+    window.localStorage.setItem(
+      `sp:work-orders:filters:${PRIMARY_FACTORY_ID}`,
+      JSON.stringify({ assigneeIds: ["storybook-user"] }),
+    );
+    renderLinesBoard();
+
+    const actions = within(screen.getByTestId("lines-detail-header")).getByTestId("workspace-page-header-actions");
+    expect(within(actions).getByTestId("work-orders-scope-unassigned")).toHaveAttribute("aria-pressed", "true");
+    expect(within(actions).getByTestId("work-orders-scope-all")).toHaveAttribute("aria-pressed", "false");
+
+    const options = useFactoryBoardWorkOrders.mock.calls.at(-1)?.[2] as { userId?: string; unassigned?: boolean };
+    expect(options.unassigned).toBe(true);
+    expect(options.userId).toBeUndefined();
   });
 
   it("lists Source in the filter menu from configured intakes", async () => {

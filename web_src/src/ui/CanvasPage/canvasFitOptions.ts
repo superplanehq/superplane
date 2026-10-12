@@ -26,6 +26,40 @@ export function resolveInitialCanvasFitViewOptions(lockNativeZoom: boolean) {
   return lockNativeZoom ? NATIVE_ZOOM_FIT_VIEW_OPTIONS : LIVE_CANVAS_FIT_VIEW_OPTIONS;
 }
 
+type NodeBox = {
+  position: { x: number; y: number };
+  width?: number | null;
+  height?: number | null;
+  measured?: { width?: number | null; height?: number | null };
+};
+
+/** Center every measured node at 100% zoom. Padding does not apply: zoom stays at 1. */
+export function nativeZoomViewport(
+  nodes: ReadonlyArray<NodeBox>,
+  width: number,
+  height: number,
+): { x: number; y: number; zoom: number } | null {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const node of nodes) {
+    const nodeWidth = node.measured?.width ?? node.width ?? 0;
+    const nodeHeight = node.measured?.height ?? node.height ?? 0;
+    if (!nodeWidth || !nodeHeight) continue;
+    minX = Math.min(minX, node.position.x);
+    minY = Math.min(minY, node.position.y);
+    maxX = Math.max(maxX, node.position.x + nodeWidth);
+    maxY = Math.max(maxY, node.position.y + nodeHeight);
+  }
+  if (!Number.isFinite(minX) || maxX <= minX || maxY <= minY) return null;
+  return {
+    x: width / 2 - (minX + (maxX - minX) / 2),
+    y: height / 2 - (minY + (maxY - minY) / 2),
+    zoom: 1,
+  };
+}
+
 const DEFAULT_FIT_VIEW_DURATION_MS = 500;
 
 /** Factory display and Configure enter skip the fit animation so nodes do not slide. */

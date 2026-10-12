@@ -1,0 +1,22 @@
+#!/bin/bash
+set -euxo pipefail
+
+bundle_dir=$(mktemp -d)
+trap 'rm -rf "$bundle_dir"' EXIT
+
+curl --fail --location --silent --show-error \
+  {{shellQuote .Artifact.URL}} \
+  --output "$bundle_dir/runner.tar.gz"
+echo "{{.Artifact.SHA256}}  $bundle_dir/runner.tar.gz" |
+  sha256sum --check --strict -
+
+tar \
+  --extract \
+  --gzip \
+  --file "$bundle_dir/runner.tar.gz" \
+  --directory "$bundle_dir"
+
+set +x
+RUNNER_API_URL={{shellQuote .RunnerAPIURL}} \
+RUNNER_REGISTRATION_TOKEN={{shellQuote .RegistrationToken}} \
+  "$bundle_dir/install.sh"

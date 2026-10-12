@@ -4,16 +4,20 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
-// branchTreeURL builds a browseable tree URL from a repository reference
-// and a branch name. `repository` is either `owner/repo` (GitHub.com) or
-// a repository http(s) URL (GitHub.com or GitHub Enterprise).
+// branchTreeURL builds a browseable branch URL from a repository reference
+// and a branch name. `repository` is either `owner/repo` or a repository
+// http(s) URL. `provider` is the workspace Git host. An empty provider
+// means GitHub. An owner/repo string cannot tell the hosts apart, so the
+// provider selects the host. A full URL uses its own host.
 //
 // GitHub's create-ref API does not return a browse URL. After the
 // branch exists we already have owner/repo + name, so we persist this
 // at attach time instead of waiting for a pull request.
-func branchTreeURL(repository, name string) string {
+func branchTreeURL(provider, repository, name string) string {
 	repo := strings.TrimRight(strings.TrimSpace(repository), "/")
 	branch := strings.TrimSpace(name)
 	if repo == "" || branch == "" {
@@ -23,7 +27,7 @@ func branchTreeURL(repository, name string) string {
 	if parsed := parseHTTPRepositoryURL(repo); parsed != nil {
 		// Assign the raw branch name to Path. String() encodes reserved
 		// characters. Pre-escaping here would double-encode `#` as `%2523`.
-		parsed.Path = parsed.Path + "/tree/" + branch
+		parsed.Path = parsed.Path + "/" + branchRootSegment(parsed.Host) + "/" + branch
 		return parsed.String()
 	}
 
@@ -36,7 +40,31 @@ func branchTreeURL(repository, name string) string {
 		return ""
 	}
 
+	if bitbucketProvider(provider) {
+		return "https://bitbucket.org/" + owner + "/" + rest + "/src/" + encodeBranchPath(branch)
+	}
 	return "https://github.com/" + owner + "/" + rest + "/tree/" + encodeBranchPath(branch)
+}
+
+// branchRootSegment is the path piece before the branch name.
+// Bitbucket Cloud uses /src/. GitHub and GitHub Enterprise use /tree/.
+func branchRootSegment(host string) string {
+	if bitbucketCloudHost(host) {
+		return "src"
+	}
+	return "tree"
+}
+
+func bitbucketProvider(provider string) bool {
+	return strings.EqualFold(strings.TrimSpace(provider), models.ProviderBitbucket)
+}
+
+func bitbucketCloudHost(host string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if name, _, ok := strings.Cut(host, ":"); ok {
+		host = name
+	}
+	return host == "bitbucket.org"
 }
 
 func encodeBranchPath(name string) string {
@@ -48,7 +76,7 @@ func encodeBranchPath(name string) string {
 	return strings.Join(encoded, "/")
 }
 
-func applyBranchTreeURL(config AddWorkOrderArtifactConfiguration, data map[string]any) map[string]any {
+func applyBranchTreeURL(provider string, config AddWorkOrderArtifactConfiguration, data map[string]any) map[string]any {
 	if config.ArtifactType != "branch" {
 		return data
 	}
@@ -74,7 +102,7 @@ func applyBranchTreeURL(config AddWorkOrderArtifactConfiguration, data map[strin
 		name = artifactString(data, "name")
 	}
 
-	tree := branchTreeURL(repo, name)
+	tree := branchTreeURL(provider, repo, name)
 	if tree == "" {
 		return data
 	}

@@ -1,21 +1,74 @@
 package me
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/bitbucketapp"
+	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
+	"github.com/superplanehq/superplane/pkg/integrations/bitbucket"
 	githubcommon "github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 )
 
+func TestDescribeBitbucketOnboardingIncludesInstalledWorkspacesWithoutRepositories(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv(config.EnvBitbucketForgeAppID, "ari:cloud:ecosystem::app/example")
+	t.Setenv(config.EnvBitbucketForgeInstallURL, "https://developer.atlassian.com/console/install/example")
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	const accountID = "11111111-1111-1111-1111-111111111111"
+	db := database.DB(ctx)
+	require.NoError(t, models.SaveAccountLinkedAccount(db,
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderBitbucket, accountID, "ada-bb", "", "")))
+	now := time.Now()
+	_, err := models.SaveBitbucketForgeDelivery(db, models.BitbucketForgeDelivery{
+		InstallationID: "installation-1", WorkspaceUUID: "22222222-2222-2222-2222-222222222222",
+		WorkspaceSlug: "acme", InstallerAccountID: "another-admin", SystemToken: []byte("encrypted-token"),
+		TokenExpiresAt: now.Add(time.Hour), DeliveredAt: now,
+	})
+	require.NoError(t, err)
+	bitbucketapp.SetSystemTokenSource(func(string) (string, time.Time, error) { return "system-token", now.Add(time.Hour), nil })
+	t.Cleanup(func() { bitbucketapp.SetSystemTokenSource(nil) })
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		assert.Equal(t, "Bearer system-token", request.Header.Get("Authorization"))
+		assert.Equal(t, `user.uuid="{`+accountID+`}"`, request.URL.Query().Get("q"))
+		w.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/workspaces/acme/permissions":
+			_, _ = w.Write([]byte(`{"values":[{"permission":"member","workspace":{"slug":"acme"}}]}`))
+		case "/workspaces/acme/permissions/repositories":
+			_, _ = w.Write([]byte(`{"values":[]}`))
+		default:
+			t.Errorf("unexpected Bitbucket request: %s", request.URL.Path)
+			http.NotFound(w, request)
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Cleanup(bitbucket.UseDirectory(bitbucket.Directory{BaseURL: server.URL, HTTP: server.Client()}))
+
+	response, err := DescribeVCSProviderOnboarding(ctx, models.ProviderBitbucket)
+	require.NoError(t, err)
+	assert.Empty(t, response.Repositories)
+	require.Len(t, response.InstalledWorkspaces, 1)
+	assert.Equal(t, "acme", response.InstalledWorkspaces[0].Slug)
+	assert.Equal(t, "installation-1", response.InstalledWorkspaces[0].InstallationId)
+	assert.Equal(t, "22222222-2222-2222-2222-222222222222", response.InstalledWorkspaces[0].ExternalId)
+}
+
 func TestDescribeVCSProviderOnboardingListsLinkedIdentities(t *testing.T) {
 	r := support.Setup(t)
+	setGitHubAccountConnection(t)
 	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
 
 	require.NoError(t, models.SaveAccountLinkedAccount(
@@ -39,6 +92,7 @@ func TestDescribeVCSProviderOnboardingListsLinkedIdentities(t *testing.T) {
 
 func TestSelectVCSProviderOnboardingIdentity(t *testing.T) {
 	r := support.Setup(t)
+	setGitHubAccountConnection(t)
 	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
 	db := database.Conn()
 
@@ -112,6 +166,157 @@ func TestStartVCSProviderInstallationSignsOrganizationState(t *testing.T) {
 	organizationID, err := githubcommon.VerifyHostedAppInstallState("test-webhook-secret", state)
 	require.NoError(t, err)
 	assert.Equal(t, r.Organization.ID, organizationID)
+}
+
+func TestDescribeVCSProviderOnboardingAcceptsBitbucketAccountID(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv(config.EnvBitbucketForgeAppID, "")
+	t.Setenv(config.EnvBitbucketForgeInstallURL, "")
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	const accountID = "11111111-1111-1111-1111-111111111111"
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		database.Conn(),
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderBitbucket, "{"+accountID+"}", "ada-bb", "", ""),
+	))
+
+	response, err := DescribeVCSProviderOnboarding(ctx, models.ProviderBitbucket)
+	require.NoError(t, err)
+	require.NotNil(t, response.Identity)
+	assert.Equal(t, int64(0), response.Identity.GetUserId())
+	assert.Equal(t, accountID, response.Identity.GetProviderUserId())
+	assert.Equal(t, "ada-bb", response.Identity.GetLogin())
+	assert.False(t, response.GetProviderConfigured())
+	assert.Empty(t, response.GetRepositories())
+	assert.Empty(t, response.GetPendingRequests())
+}
+
+func TestStartBitbucketInstallationReturnsDistributionLink(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv(config.EnvBitbucketForgeAppID, "ari:cloud:ecosystem::app/example")
+	t.Setenv(config.EnvBitbucketForgeInstallURL, "https://developer.atlassian.com/console/install/example")
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	require.NoError(t, models.SaveAccountLinkedAccount(
+		database.Conn(),
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderBitbucket, "11111111-1111-1111-1111-111111111111", "ada-bb", "", ""),
+	))
+
+	response, err := StartVCSProviderInstallation(ctx, models.ProviderBitbucket)
+	require.NoError(t, err)
+	assert.Equal(t, "https://developer.atlassian.com/console/install/example", response.GetUrl())
+	assert.NotContains(t, response.GetUrl(), "state=")
+}
+
+func TestRefreshBitbucketOnboardingDoesNotQueueGitHub(t *testing.T) {
+	r := support.Setup(t)
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+
+	response, err := RefreshVCSProviderOnboarding(ctx, models.ProviderBitbucket, nil)
+	require.NoError(t, err)
+	require.NotNil(t, response)
+
+	var count int64
+	require.NoError(t, database.Conn().Table("vcs_provider_reconcile_jobs").Count(&count).Error)
+	assert.Zero(t, count)
+}
+
+func TestDescribeGitHubOnboardingKeepsAccountConnectionForPublicApp(t *testing.T) {
+	r := support.Setup(t)
+	setVCSProviderGitHubAppEnvironment(t)
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 101,
+		AccountLogin:   "acme",
+		AccountType:    "Organization",
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(database.Conn(), models.ProviderGitHub, 101, []models.VCSProviderRepository{{
+		RepositoryID:  201,
+		FullName:      "acme/api",
+		DefaultBranch: "main",
+	}}))
+
+	response, err := DescribeVCSProviderOnboarding(ctx, models.ProviderGitHub)
+	require.NoError(t, err)
+	assert.True(t, response.GetProviderConfigured())
+	assert.True(t, response.GetAccountConnectionRequired())
+	assert.Empty(t, response.GetRepositories())
+}
+
+func TestDescribeGitHubOnboardingSkipsAccountConnection(t *testing.T) {
+	r := support.Setup(t)
+	saveInstallationGitHubApp(t)
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	require.NoError(t, models.UpsertVCSProviderInstallation(database.Conn(), &models.VCSProviderInstallation{
+		Provider:       models.ProviderGitHub,
+		InstallationID: 101,
+		AccountLogin:   "acme",
+		AccountType:    "Organization",
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(database.Conn(), models.ProviderGitHub, 101, []models.VCSProviderRepository{{
+		RepositoryID:  201,
+		FullName:      "acme/api",
+		DefaultBranch: "main",
+	}}))
+
+	response, err := DescribeVCSProviderOnboarding(ctx, models.ProviderGitHub)
+	require.NoError(t, err)
+	assert.True(t, response.GetProviderConfigured())
+	assert.False(t, response.GetAccountConnectionRequired())
+	assert.Nil(t, response.Identity)
+	require.Len(t, response.GetRepositories(), 1)
+	assert.Equal(t, "acme/api", response.GetRepositories()[0].GetFullName())
+	assert.Equal(t, "acme", response.GetRepositories()[0].GetAccountLogin())
+}
+
+func TestDescribeInstalledGitHubOnboardingRequiresWorkspaceMember(t *testing.T) {
+	r := support.Setup(t)
+	saveInstallationGitHubApp(t)
+	ctx := notificationSettingsContext("00000000-0000-0000-0000-000000000099", r.Organization.ID.String())
+
+	_, err := DescribeVCSProviderOnboarding(ctx, models.ProviderGitHub)
+	code, _, ok := grpcerrors.HandlerStatus(err)
+	assert.True(t, ok)
+	assert.Equal(t, codes.PermissionDenied, code)
+}
+
+func TestStartGitHubInstallationWithoutAccountConnection(t *testing.T) {
+	r := support.Setup(t)
+	saveInstallationGitHubApp(t)
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+
+	response, err := StartVCSProviderInstallation(ctx, models.ProviderGitHub)
+	require.NoError(t, err)
+	installURL, err := url.Parse(response.GetUrl())
+	require.NoError(t, err)
+	assert.Equal(t, "github.com", installURL.Host)
+	assert.NotEmpty(t, installURL.Query().Get("state"))
+}
+
+func saveInstallationGitHubApp(t *testing.T) {
+	t.Helper()
+	t.Setenv("NO_ENCRYPTION", "yes")
+	t.Setenv(githubcommon.EnvGitHubAppID, "")
+	t.Setenv(githubcommon.EnvGitHubAppSlug, "")
+	t.Setenv(githubcommon.EnvGitHubAppPrivateKey, "")
+	t.Setenv(githubcommon.EnvGitHubAppWebhookSecret, "")
+	t.Setenv("GITHUB_CLIENT_ID", "")
+	t.Setenv("GITHUB_CLIENT_SECRET", "")
+	encryptor, err := crypto.FromEnv()
+	require.NoError(t, err)
+	require.NoError(t, githubapp.Save(t.Context(), database.Conn(), encryptor, config.GitHubHostedAppConfig{
+		ID:            12345,
+		Slug:          "superplane",
+		PrivateKey:    "-----BEGIN RSA PRIVATE KEY-----\nabc\n-----END RSA PRIVATE KEY-----",
+		WebhookSecret: "test-webhook-secret",
+	}))
+}
+
+func setGitHubAccountConnection(t *testing.T) {
+	t.Helper()
+	t.Setenv("GITHUB_CLIENT_ID", "Iv1.env")
+	t.Setenv("GITHUB_CLIENT_SECRET", "env-secret")
 }
 
 func setVCSProviderGitHubAppEnvironment(t *testing.T) {

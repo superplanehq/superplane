@@ -1,4 +1,3 @@
-import { LoadingButton } from "@/components/ui/loading-button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { useState, type ReactNode } from "react";
 import { WorkOrderAssigneePicker } from "./WorkOrderAssigneePicker";
@@ -37,91 +36,106 @@ export function WorkOrderAssigneesPopover({
   children,
 }: WorkOrderAssigneesPopoverProps) {
   const [open, setOpen] = useState(false);
-  const [draftIds, setDraftIds] = useState<string[]>(selectedIds);
-  // Snapshot of the confirmed selection, used to keep assigned users pinned
-  // to the top of the list while the popover is open.
+  // Snapshot of the confirmed selection, used to keep the current owner
+  // pinned to the top of the list while the popover is open.
   const [pinnedIds, setPinnedIds] = useState<string[]>(selectedIds);
-  const isSaveMode = Boolean(onSave);
 
-  // `draftIds` is only synced from `selectedIds` when the popover opens, not
-  // on every render, so it doesn't discard pending edits.
   const handleOpenChange = (nextOpen: boolean) => {
     if (isSaving) {
       return;
     }
 
     if (nextOpen && !open) {
-      setDraftIds(selectedIds);
       setPinnedIds(selectedIds);
     }
 
     setOpen(nextOpen);
-
-    if (!nextOpen && isSaveMode) {
-      setDraftIds(selectedIds);
-    }
   };
 
-  const handleChange = (nextIds: string[]) => {
-    if (isSaveMode) {
-      setDraftIds(nextIds);
+  const handleChange = async (nextIds: string[]) => {
+    if (haveSameIds(nextIds, selectedIds)) {
+      setOpen(false);
+      return;
+    }
+
+    if (onSave) {
+      try {
+        await onSave(nextIds);
+        setOpen(false);
+      } catch {
+        // Caller shows error toast; keep popover open for retry.
+      }
       return;
     }
 
     onChange?.(nextIds);
+    setOpen(false);
   };
 
-  const handleSave = async () => {
-    if (!onSave) {
-      return;
-    }
-
-    if (haveSameIds(draftIds, selectedIds)) {
-      // No actual change; skip the request.
-      setOpen(false);
-      return;
-    }
-
-    try {
-      await onSave(draftIds);
-      setOpen(false);
-    } catch {
-      // Caller shows error toast; keep popover open for retry.
-    }
-  };
-
-  const activeIds = isSaveMode ? draftIds : selectedIds;
   const pickerDisabled = disabled || isSaving || !canEdit;
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange} modal={false}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent align={align} className="z-[70] w-72 p-3" sideOffset={8}>
-        <div className="space-y-3">
-          <WorkOrderAssigneePicker
-            organizationId={organizationId}
-            selectedIds={activeIds}
-            pinnedIds={isSaveMode ? pinnedIds : selectedIds}
-            onChange={handleChange}
-            disabled={pickerDisabled}
-            variant="popover"
-          />
-
-          {isSaveMode ? (
-            <LoadingButton
-              type="button"
-              onClick={() => void handleSave()}
-              disabled={pickerDisabled}
-              loading={isSaving}
-              loadingText="Saving..."
-              className="w-full"
-              data-testid="work-order-save-assignees"
-            >
-              Save
-            </LoadingButton>
-          ) : null}
-        </div>
+      <PopoverContent align={align} className="z-[70] w-72 overflow-hidden p-0" sideOffset={8}>
+        <WorkOrderAssigneePicker
+          organizationId={organizationId}
+          selectedIds={selectedIds}
+          pinnedIds={pinnedIds}
+          onChange={(nextIds) => void handleChange(nextIds)}
+          disabled={pickerDisabled}
+        />
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** Click target for the current owner. Opens the people list when assignment is allowed. */
+export function OwnerAssignTrigger({
+  organizationId,
+  selectedIds,
+  canAssign,
+  isSaving = false,
+  onSave,
+  align = "end",
+  label,
+  testId,
+  children,
+}: {
+  organizationId: string;
+  selectedIds: string[];
+  canAssign: boolean;
+  isSaving?: boolean;
+  onSave: (assigneeIds: string[]) => Promise<void>;
+  align?: "start" | "center" | "end";
+  label: string;
+  testId?: string;
+  children: ReactNode;
+}) {
+  if (!canAssign) {
+    return children;
+  }
+
+  return (
+    <span className="pointer-events-auto inline-flex min-w-0 max-w-full" onClick={(event) => event.stopPropagation()}>
+      <WorkOrderAssigneesPopover
+        organizationId={organizationId}
+        selectedIds={selectedIds}
+        align={align}
+        canEdit
+        isSaving={isSaving}
+        onSave={onSave}
+      >
+        <button
+          type="button"
+          className="inline-flex h-5 min-w-0 max-w-full items-center rounded-sm p-0 text-left hover:bg-muted/60 disabled:opacity-60"
+          aria-label={label}
+          data-testid={testId}
+          disabled={isSaving}
+        >
+          {children}
+        </button>
+      </WorkOrderAssigneesPopover>
+    </span>
   );
 }

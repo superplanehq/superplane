@@ -1,6 +1,7 @@
 import { AgentResourcesEditor } from "./AgentResourcesEditor";
 
 export function PlanningReviewResourcesCard({
+  appearance = "card",
   organizationId,
   factoryId,
   factoryKey,
@@ -11,6 +12,7 @@ export function PlanningReviewResourcesCard({
   onDisabledToolsChange,
   onEnabledToolsChange,
 }: {
+  appearance?: "card" | "fields";
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
@@ -32,6 +34,7 @@ export function PlanningReviewResourcesCard({
       onDisabledIdsChange={onDisabledIdsChange}
       onDisabledToolsChange={onDisabledToolsChange ?? (() => undefined)}
       onEnabledToolsChange={onEnabledToolsChange ?? (() => undefined)}
+      flat={appearance === "fields"}
     />
   );
 }

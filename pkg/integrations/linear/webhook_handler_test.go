@@ -33,10 +33,30 @@ func Test__WebhookHandler__CompareConfig(t *testing.T) {
 		assert.False(t, equal)
 	})
 
+	t.Run("the same teams match in any order", func(t *testing.T) {
+		equal, err := handler.CompareConfig(
+			WebhookConfiguration{TeamIDs: []string{"t2", "t1"}, ResourceType: IssueResourceType},
+			WebhookConfiguration{TeamID: "t1", TeamIDs: []string{"t1", "t2"}, ResourceType: IssueResourceType},
+		)
+
+		require.NoError(t, err)
+		assert.True(t, equal)
+	})
+
 	t.Run("different resource types do not match", func(t *testing.T) {
 		equal, err := handler.CompareConfig(
 			WebhookConfiguration{TeamID: "t1", ResourceType: IssueResourceType},
 			WebhookConfiguration{TeamID: "t1", ResourceType: "Comment"},
+		)
+
+		require.NoError(t, err)
+		assert.False(t, equal)
+	})
+
+	t.Run("a different delivery mode does not match", func(t *testing.T) {
+		equal, err := handler.CompareConfig(
+			WebhookConfiguration{TeamID: "t1", ResourceType: IssueResourceType, AppLevel: true},
+			WebhookConfiguration{TeamID: "t1", ResourceType: IssueResourceType},
 		)
 
 		require.NoError(t, err)
@@ -93,6 +113,29 @@ func Test__WebhookHandler__Setup(t *testing.T) {
 		})
 
 		require.ErrorContains(t, err, "Only admins can manage webhooks")
+	})
+
+	t.Run("uses the application webhook when a signing secret is set", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		integration := newAuthorizedIntegration()
+		integration.Configuration["webhookSecret"] = "app-signing-secret"
+
+		metadata, err := handler.Setup(core.WebhookHandlerContext{
+			HTTP:        httpContext,
+			Integration: integration,
+			Webhook: &contexts.WebhookContext{
+				URL:           "https://sp.test/hook",
+				Secret:        []byte(testWebhookSecret),
+				Configuration: WebhookConfiguration{TeamID: "t1", ResourceType: IssueResourceType},
+			},
+		})
+
+		require.NoError(t, err)
+		webhookMetadata, ok := metadata.(*WebhookMetadata)
+		require.True(t, ok)
+		assert.True(t, webhookMetadata.AppLevel)
+		assert.Empty(t, webhookMetadata.ID)
+		assert.Empty(t, httpContext.Requests)
 	})
 }
 

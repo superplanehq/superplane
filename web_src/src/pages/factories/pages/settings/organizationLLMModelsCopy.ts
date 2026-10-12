@@ -33,7 +33,8 @@ export const ORGANIZATION_LLM_MODELS_COPY = {
   pageTitle: "LLM Models",
   pageSubtitle: "Select the models that agents in this workspace can use.",
   modelsTitle: "Models",
-  hostedModelsHelper: "An installation admin selects the SuperPlane-hosted models.",
+  hostedModelsHelper:
+    "Choose the SuperPlane models this organization can use. An installation admin controls which models appear here. The choice applies to every workspace.",
   hostedModelsEmpty: "No SuperPlane-hosted models are available.",
   ownKeyHelper: "Agents in this workspace run with this key. Your provider bills these runs.",
   hostedBadge: "SuperPlane",

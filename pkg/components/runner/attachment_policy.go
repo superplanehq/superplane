@@ -7,6 +7,7 @@ import (
 
 const (
 	VideoMaxDurationSeconds     = 900
+	HostedVideoDownloadTimeout  = 180
 	VideoMaxFrames              = 24
 	VideoMaxFrameWidth          = 1280
 	VideoMaxFrameHeight         = 1280
@@ -22,27 +23,33 @@ const (
 
 // AttachmentAgentInstructions tell every agent CLI to read processed
 // artifacts instead of original video or audio bytes.
-const AttachmentAgentInstructions = `If $SUPERPLANE_TASK_DIR/attachments/INDEX.md exists, read that file first. Use the listed frames and transcript for any video. Use the listed transcript for any audio. Do not ingest original video or audio bytes.`
+const AttachmentAgentInstructions = `If $SUPERPLANE_TASK_DIR/attachments/INDEX.md exists, read that file first. Use the listed frames and transcript for any video. Use the listed transcript for any audio. Do not ingest original video or audio bytes. Do not fetch a hosted video page URL.`
 
 type AttachmentPolicy struct {
-	MaxDurationSeconds    int   `json:"max_duration_seconds"`
-	MaxFrames             int   `json:"max_frames"`
-	MaxFrameWidth         int   `json:"max_frame_width"`
-	MaxFrameHeight        int   `json:"max_frame_height"`
-	MaxSourcePixels       int   `json:"max_source_pixels"`
-	ProcessTimeoutSeconds int   `json:"process_timeout_seconds"`
-	DiskBudgetBytes       int64 `json:"disk_budget_bytes"`
+	MaxDurationSeconds             int   `json:"max_duration_seconds"`
+	HostedVideoMaxDurationSeconds  int   `json:"hosted_video_max_duration_seconds"`
+	HostedVideoMaxBytes            int64 `json:"hosted_video_max_bytes"`
+	HostedVideoDownloadTimeoutSecs int   `json:"hosted_video_download_timeout_seconds"`
+	MaxFrames                      int   `json:"max_frames"`
+	MaxFrameWidth                  int   `json:"max_frame_width"`
+	MaxFrameHeight                 int   `json:"max_frame_height"`
+	MaxSourcePixels                int   `json:"max_source_pixels"`
+	ProcessTimeoutSeconds          int   `json:"process_timeout_seconds"`
+	DiskBudgetBytes                int64 `json:"disk_budget_bytes"`
 }
 
 func DefaultAttachmentPolicy() AttachmentPolicy {
 	return AttachmentPolicy{
-		MaxDurationSeconds:    VideoMaxDurationSeconds,
-		MaxFrames:             VideoMaxFrames,
-		MaxFrameWidth:         VideoMaxFrameWidth,
-		MaxFrameHeight:        VideoMaxFrameHeight,
-		MaxSourcePixels:       VideoMaxSourcePixels,
-		ProcessTimeoutSeconds: VideoProcessTimeoutSeconds,
-		DiskBudgetBytes:       VideoDiskBudgetBytes,
+		MaxDurationSeconds:             VideoMaxDurationSeconds,
+		HostedVideoMaxDurationSeconds:  HostedVideoMaxDurationSeconds(),
+		HostedVideoMaxBytes:            HostedVideoMaxBytes(),
+		HostedVideoDownloadTimeoutSecs: HostedVideoDownloadTimeout,
+		MaxFrames:                      VideoMaxFrames,
+		MaxFrameWidth:                  VideoMaxFrameWidth,
+		MaxFrameHeight:                 VideoMaxFrameHeight,
+		MaxSourcePixels:                VideoMaxSourcePixels,
+		ProcessTimeoutSeconds:          VideoProcessTimeoutSeconds,
+		DiskBudgetBytes:                VideoDiskBudgetBytes,
 	}
 }
 

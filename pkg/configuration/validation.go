@@ -731,6 +731,9 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeHostedModel:
 		return validateHostedModel(value)
+
+	case FieldTypeRunnerFleet:
+		return validateRunnerFleet(value)
 	}
 
 	return nil
@@ -763,6 +766,13 @@ func validateSecret(value any) error {
 }
 
 func validateHostedModel(value any) error {
+	if _, ok := value.(string); !ok {
+		return fmt.Errorf("must be a string")
+	}
+	return nil
+}
+
+func validateRunnerFleet(value any) error {
 	if _, ok := value.(string); !ok {
 		return fmt.Errorf("must be a string")
 	}

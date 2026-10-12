@@ -3,85 +3,16 @@
 const fs = require("fs");
 const path = require("path");
 
-const ANALYSIS_PROTOCOL = fs.readFileSync(path.join(__dirname, "analysis_protocol.md"), "utf8").trim();
+const ANALYSIS_PROTOCOL_REVIEW = fs.readFileSync(path.join(__dirname, "analysis_protocol_review.md"), "utf8").trim();
 
-function envFlagDefaultTrue(env, name) {
-  const raw = String((env && env[name]) || "true")
-    .trim()
-    .toLowerCase();
-  return raw !== "false" && raw !== "0" && raw !== "no" && raw !== "off";
+function analysisProtocol() {
+  return ANALYSIS_PROTOCOL_REVIEW;
 }
 
-function planningClarityEnabled(env = process.env) {
-  return envFlagDefaultTrue(env, "SUPERPLANE_PLANNING_CLARITY");
-}
-
-function planningConfidenceEnabled(env = process.env) {
-  return envFlagDefaultTrue(env, "SUPERPLANE_PLANNING_CONFIDENCE");
-}
-
-function analysisProtocol(env = process.env) {
-  const clarity = planningClarityEnabled(env);
-  const confidence = planningConfidenceEnabled(env);
-  if (clarity && confidence) {
-    return ANALYSIS_PROTOCOL;
-  }
-  let text = ANALYSIS_PROTOCOL;
-  if (clarity && !confidence) {
-    text = text
-      .replace(
-        "Publish a Clarity score and a Confidence score when this turn updates the plan, a score would change, or the user asks to update a score. When every required score is 5, publish each required score on that plan turn.",
-        "Publish a Clarity score when this turn updates the plan, the score would change, or the user asks to update that score. When every required score is 5, publish each required score on that plan turn.",
-      )
-      .replace(
-        "Call propose_clarity and propose_confidence when this turn updates the plan, a score would change, or the user asks to update a score. Do not call them on a question turn. When every required score is 5, call each required score tool on that plan turn, even if one score did not change. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan. Otherwise an unchanged score stays on the card. On an answer turn, the last sentence says the user can ask to update the plan or the scores, or confirm a decision. On the first plan turn, include that same sentence after the finding. Do not add that sentence on a turn that already updates the plan.",
-        "Call propose_clarity when this turn updates the plan, the score would change, or the user asks to update that score. Do not call it on a question turn. When every required score is 5, call that score tool on that plan turn, even if the score did not change. Write the summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Each summary is one chip, not the plan. Otherwise an unchanged score stays on the card. On an answer turn, the last sentence says the user can ask to update the plan or the scores, or confirm a decision. On the first plan turn, include that same sentence after the finding. Do not add that sentence on a turn that already updates the plan.",
-      )
-      .replace("the spec and the scores", "the spec and the Clarity score");
-  } else if (!clarity && confidence) {
-    text = text
-      .replace(
-        "Publish a Clarity score and a Confidence score when this turn updates the plan, a score would change, or the user asks to update a score. When every required score is 5, publish each required score on that plan turn.",
-        "Publish a Confidence score when this turn updates the plan, the score would change, or the user asks to update that score. When every required score is 5, publish each required score on that plan turn.",
-      )
-      .replace(
-        "Call propose_clarity and propose_confidence when this turn updates the plan, a score would change, or the user asks to update a score. Do not call them on a question turn. When every required score is 5, call each required score tool on that plan turn, even if one score did not change. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan. Otherwise an unchanged score stays on the card. On an answer turn, the last sentence says the user can ask to update the plan or the scores, or confirm a decision. On the first plan turn, include that same sentence after the finding. Do not add that sentence on a turn that already updates the plan.",
-        "Call propose_confidence when this turn updates the plan, the score would change, or the user asks to update that score. Do not call it on a question turn. When every required score is 5, call that score tool on that plan turn, even if the score did not change. Write the summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan. Otherwise an unchanged score stays on the card. On an answer turn, the last sentence says the user can ask to update the plan or the scores, or confirm a decision. On the first plan turn, include that same sentence after the finding. Do not add that sentence on a turn that already updates the plan.",
-      )
-      .replace("the spec and the scores", "the spec and the Confidence score");
-  } else {
-    text = text
-      .replace(
-        "Publish a Clarity score and a Confidence score when this turn updates the plan, a score would change, or the user asks to update a score. When every required score is 5, publish each required score on that plan turn.",
-        "Do not publish Clarity or Confidence scores.",
-      )
-      .replace(
-        "Answer, then update the plan and publish any score that changed. If the user asks to update only a score, publish that score and do not rewrite the plan. When every required score is 5, publish each required score on that plan turn.",
-        "Answer, then update the plan.",
-      )
-      .replace(
-        "Call propose_clarity and propose_confidence when this turn updates the plan, a score would change, or the user asks to update a score. Do not call them on a question turn. When every required score is 5, call each required score tool on that plan turn, even if one score did not change. Write each summary the way the task prompt asks. Do not write a test or an acceptance check in a summary. Do not describe agent fit in the Clarity summary. Do not name missing decisions in the Confidence summary. Each summary is one chip, not the plan. Otherwise an unchanged score stays on the card. On an answer turn, the last sentence says the user can ask to update the plan or the scores, or confirm a decision. On the first plan turn, include that same sentence after the finding. Do not add that sentence on a turn that already updates the plan.\n\n",
-        "On an answer turn, the last sentence says the user can ask to update the plan or the scores, or confirm a decision. On the first plan turn, include that same sentence after the finding. Do not add that sentence on a turn that already updates the plan.\n\n",
-      )
-      .replace("the spec and the scores", "the spec");
-  }
-  if (!clarity) {
-    text = text.replace(/propose_clarity/g, "").replace(/  +/g, " ");
-  }
-  if (!confidence) {
-    text = text.replace(/propose_confidence/g, "").replace(/  +/g, " ");
-  }
-  return text.replace(/\n{3,}/g, "\n\n").trim();
-}
-
-function withoutEmbeddedAnalysisProtocol(prompt, env = process.env) {
+function withoutEmbeddedAnalysisProtocol(prompt) {
   const value = String(prompt || "");
-  const current = analysisProtocol(env);
-  if (value.includes(current)) {
-    return value.replace(current, "").trimStart();
-  }
-  if (value.includes(ANALYSIS_PROTOCOL)) {
-    return value.replace(ANALYSIS_PROTOCOL, "").trimStart();
+  if (value.includes(ANALYSIS_PROTOCOL_REVIEW)) {
+    return value.replace(ANALYSIS_PROTOCOL_REVIEW, "").trimStart();
   }
   return value;
 }
@@ -107,11 +38,9 @@ function isCompactStatusText(text) {
 }
 
 module.exports = {
-  ANALYSIS_PROTOCOL,
+  ANALYSIS_PROTOCOL_REVIEW,
   analysisProtocol,
   withoutEmbeddedAnalysisProtocol,
   withAnalysisContinuation,
   isCompactStatusText,
-  planningClarityEnabled,
-  planningConfidenceEnabled,
 };

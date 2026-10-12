@@ -18,10 +18,10 @@ while IFS= read -r import_path; do
   package_dir="./${import_path#"$module_prefix"/}"
   test_file_count="$(find "$package_dir" -maxdepth 1 -type f -name '*_test.go' | wc -l | tr -d ' ')"
   weighted_packages+=("${test_file_count}:${package_dir}")
-done < <(go list ./pkg/...)
+done < <(go list ./pkg/... ./ee/...)
 
 if [[ "${#weighted_packages[@]}" -eq 0 ]]; then
-  echo "No packages found under ./pkg, nothing to run."
+  echo "No packages found under ./pkg or ./ee, nothing to run."
   exit 0
 fi
 

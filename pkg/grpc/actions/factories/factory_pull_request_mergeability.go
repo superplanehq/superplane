@@ -70,7 +70,7 @@ func loadFactoryPullRequestForMerge(
 	if err != nil {
 		return nil, nil, err
 	}
-	if pullRequest.Provider != models.FactoryPullRequestProviderGitHub {
+	if !strings.EqualFold(pullRequest.Provider, factory.OnboardingConfigValue().EffectiveVCSProvider()) {
 		return nil, nil, errFactoryPullRequestNotGitHub
 	}
 	if pullRequest.State != models.FactoryPullRequestStateOpen {
@@ -249,14 +249,7 @@ func syncFactoryPullRequestMergeability(
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
 ) (*factoryPullRequestMergeability, error) {
-	result, err := evaluateFactoryPullRequestMergeability(ctx, db, deps, factory, pullRequest)
-	if err != nil {
-		return nil, err
-	}
-	if err := persistFactoryPullRequestMergeability(db, pullRequest, result); err != nil {
-		return nil, err
-	}
-	return result, nil
+	return readFactoryPullRequestMergeability(ctx, db, openFactoryVCS(db, deps, factory), pullRequest)
 }
 
 func mergeabilityFromCache(

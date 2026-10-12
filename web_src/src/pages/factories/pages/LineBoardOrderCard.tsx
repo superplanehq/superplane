@@ -10,6 +10,8 @@ import {
   clarityScoreFromChecks,
   confidenceScoreFromChecks,
 } from "../lib/confidenceScore";
+import { planningReviewFromChecks, planningReviewLevel } from "../lib/planningReviewScore";
+import { mergeConfidenceHeadline } from "../lib/mergeConfidenceScore";
 import { LOADING_REVEAL_CLASSNAME } from "../lib/loadingReveal";
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard, type WorkOrderCardContext } from "../workOrders/WorkOrderCard";
@@ -76,12 +78,14 @@ export function LineBoardOrderCard({
   onOpenWorkOrder,
   isAnalyzing = false,
   creditLabel,
+  showMergeConfidence = true,
 }: {
   order: FactoriesWorkOrderSummary;
   workOrderCardContext: WorkOrderCardContext;
   onOpenWorkOrder: (orderId: string, order?: FactoriesWorkOrderSummary) => void;
   isAnalyzing?: boolean;
   creditLabel?: string;
+  showMergeConfidence?: boolean;
 }) {
   return (
     <LineBoardWorkOrderCard
@@ -89,6 +93,7 @@ export function LineBoardOrderCard({
       workOrderCardContext={workOrderCardContext}
       isAnalyzing={isAnalyzing}
       creditLabel={creditLabel}
+      showMergeConfidence={showMergeConfidence}
       onOpen={() => {
         if (order.id) {
           onOpenWorkOrder(order.id, order);
@@ -104,12 +109,14 @@ export function LineBoardWorkOrderCard({
   onOpen,
   isAnalyzing = false,
   creditLabel,
+  showMergeConfidence = true,
 }: {
   order: FactoriesWorkOrderSummary;
   workOrderCardContext: WorkOrderCardContext;
   onOpen: () => void;
   isAnalyzing?: boolean;
   creditLabel?: string;
+  showMergeConfidence?: boolean;
 }) {
   const { factory } = useFactoriesLayout();
   const entry = useMemo(() => buildWorkOrderListEntry(order, factory), [factory, order]);
@@ -118,6 +125,7 @@ export function LineBoardWorkOrderCard({
   const scores = cardScores(showConfidence, order.checkScores, session, isAnalyzing, {
     showClarity: factoryShowsClarity(factory),
     showConfidence: factoryShowsConfidence(factory),
+    showMergeConfidence,
   });
 
   return (
@@ -142,13 +150,43 @@ function cardScores(
   checks: FactoriesWorkOrderCheckScore[] | undefined,
   session: FactoriesWorkOrderSummary["planningSession"],
   backlogAnalyzing: boolean,
-  visibility: { showClarity: boolean; showConfidence: boolean },
+  visibility: { showClarity: boolean; showConfidence: boolean; showMergeConfidence: boolean },
 ): Pick<
   ComponentProps<typeof WorkOrderCard>,
-  "clarityScore" | "confidenceScore" | "isAnalyzing" | "showClarity" | "showConfidenceScore"
+  | "clarityScore"
+  | "confidenceScore"
+  | "isAnalyzing"
+  | "showClarity"
+  | "showConfidenceScore"
+  | "reviewMetrics"
+  | "mergeConfidence"
 > {
+  const mergeConfidence = mergeConfidenceFields(checks, visibility.showMergeConfidence);
   if (!showConfidence) {
-    return { isAnalyzing: false, showClarity: false, showConfidenceScore: false };
+    return { isAnalyzing: false, showClarity: false, showConfidenceScore: false, ...mergeConfidence };
+  }
+  const review = planningReviewFromChecks(
+    checks?.map((check) => ({
+      id: check.key || check.name || "check",
+      key: check.key,
+      name: check.name ?? "",
+      score: check.score ?? 0,
+      maxScore: check.maxScore ?? 0,
+      level: planningReviewLevel(check.score ?? 0),
+    })),
+  );
+  if (review) {
+    // Review scoring is not optional, so the stored Confidence setting
+    // never hides review scores.
+    return {
+      clarityScore: undefined,
+      confidenceScore: review.headline.score,
+      showClarity: false,
+      showConfidenceScore: true,
+      reviewMetrics: review.metrics,
+      isAnalyzing: draftCardAgentIsWorking(session, backlogAnalyzing, review.headline.score),
+      ...mergeConfidence,
+    };
   }
   const clarityScore = visibility.showClarity ? clarityScoreFromChecks(checks) : undefined;
   const confidenceScore = visibility.showConfidence ? confidenceScoreFromChecks(checks) : undefined;
@@ -158,5 +196,16 @@ function cardScores(
     showClarity: visibility.showClarity,
     showConfidenceScore: visibility.showConfidence,
     isAnalyzing: draftCardAgentIsWorking(session, backlogAnalyzing, clarityScore ?? confidenceScore),
+    ...mergeConfidence,
   };
+}
+
+function mergeConfidenceFields(
+  checks: FactoriesWorkOrderCheckScore[] | undefined,
+  showMergeConfidence: boolean,
+): { mergeConfidence?: ReturnType<typeof mergeConfidenceHeadline> } {
+  if (!showMergeConfidence) {
+    return {};
+  }
+  return { mergeConfidence: mergeConfidenceHeadline(checks) };
 }

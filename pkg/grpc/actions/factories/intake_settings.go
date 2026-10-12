@@ -77,6 +77,8 @@ type intakeSettings struct {
 	SentryAssignedIssues bool
 	// Issue levels that still create a task. Empty means every level.
 	SentryLevels []string
+	// Projects that still create a task. Sentry exception intakes only.
+	SentryProjectIDs []string
 	// Skip Productive.io key tasks (milestones). Productive task intakes only.
 	ExcludeKeyTasks bool
 	// Severities that still create a task. Empty means every severity.
@@ -92,6 +94,11 @@ type intakeSettings struct {
 	// Environments that still create a task. Empty means every environment.
 	// Datadog intakes only.
 	DatadogEnvironments []string
+	// Projects that still create a task. Linear issue intakes only.
+	LinearProjectIDs []string
+	// Label names that still create a task. Empty means every label.
+	// Linear issue intakes only.
+	LinearLabels []string
 }
 
 var intakeSentryKnownLevels = []string{"fatal", "error", "warning", "info", "debug"}
@@ -131,6 +138,7 @@ func defaultSentryIntakeSettings() intakeSettings {
 	settings.SentryRegressedIssues = false
 	settings.SentryAssignedIssues = false
 	settings.SentryLevels = []string{}
+	settings.SentryProjectIDs = []string{}
 	return settings
 }
 
@@ -160,7 +168,8 @@ func intakeSourceHasFilterNode(source string) bool {
 		source == models.FactoryIntakeSourceSentryExceptions ||
 		source == models.FactoryIntakeSourceProductiveTasks ||
 		source == models.FactoryIntakeSourceDependabotAlerts ||
-		source == models.FactoryIntakeSourceDatadog
+		source == models.FactoryIntakeSourceDatadog ||
+		source == models.FactoryIntakeSourceLinearIssues
 }
 
 func (s intakeSettings) normalized() intakeSettings {
@@ -183,9 +192,12 @@ func (s intakeSettings) normalized() intakeSettings {
 	s.Labels = labels
 	s.JiraCompletionColumn = strings.TrimSpace(s.JiraCompletionColumn)
 	s.SentryLevels = normalizeSentryLevels(s.SentryLevels)
+	s.SentryProjectIDs = normalizeSentryProjectIDs(s.SentryProjectIDs)
 	s.DependabotSeverities = normalizeDependabotSeverities(s.DependabotSeverities)
 	s.TaskListIDs = normalizeTaskListIDs(s.TaskListIDs)
 	s.DatadogEnvironments = normalizeDatadogEnvironments(s.DatadogEnvironments)
+	s.LinearProjectIDs = normalizeLinearValues(s.LinearProjectIDs)
+	s.LinearLabels = normalizeLinearValues(s.LinearLabels)
 
 	return s
 }
@@ -265,6 +277,8 @@ func intakeFilterExpressionFor(source string, settings intakeSettings) string {
 		return intakeDependabotFilterExpression(settings)
 	case models.FactoryIntakeSourceDatadog:
 		return intakeDatadogFilterExpression(settings)
+	case models.FactoryIntakeSourceLinearIssues:
+		return intakeLinearFilterExpression(settings)
 	default:
 		return "true"
 	}
@@ -472,11 +486,16 @@ func intakeSettingsChangeTrigger(source string, current, updated intakeSettings)
 	if source == models.FactoryIntakeSourceSentryExceptions {
 		return current.SentryNewIssues != updated.SentryNewIssues ||
 			current.SentryRegressedIssues != updated.SentryRegressedIssues ||
-			current.SentryAssignedIssues != updated.SentryAssignedIssues
+			current.SentryAssignedIssues != updated.SentryAssignedIssues ||
+			!slices.Equal(current.SentryProjectIDs, updated.SentryProjectIDs)
 	}
 	if source == models.FactoryIntakeSourceDatadog {
 		return current.DatadogTriggeredAlerts != updated.DatadogTriggeredAlerts ||
 			current.DatadogRetriggeredAlerts != updated.DatadogRetriggeredAlerts
+	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		return !slices.Equal(current.LinearProjectIDs, updated.LinearProjectIDs) ||
+			!slices.Equal(current.LinearLabels, updated.LinearLabels)
 	}
 	if source == models.FactoryIntakeSourceProductiveTasks {
 		return (len(current.TaskListIDs) == 0) != (len(updated.TaskListIDs) == 0)
@@ -509,6 +528,12 @@ func intakeSettingsChangeFilters(current, updated intakeSettings) bool {
 		return true
 	}
 	if !slices.Equal(current.DatadogEnvironments, updated.DatadogEnvironments) {
+		return true
+	}
+	if !slices.Equal(current.LinearProjectIDs, updated.LinearProjectIDs) {
+		return true
+	}
+	if !slices.Equal(current.LinearLabels, updated.LinearLabels) {
 		return true
 	}
 	if !slices.Equal(current.TaskListIDs, updated.TaskListIDs) {
@@ -560,6 +585,8 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 		settings = defaultDependabotIntakeSettings()
 	case models.FactoryIntakeSourceDatadog:
 		settings = defaultDatadogIntakeSettings()
+	case models.FactoryIntakeSourceLinearIssues:
+		settings = defaultLinearIntakeSettings()
 	}
 	settings.ConfidencePct = graph.ConfidencePct
 
@@ -576,11 +603,15 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 			settings.SentryNewIssues = slices.Contains(actions, intakeSentryActionCreated)
 			settings.SentryRegressedIssues = slices.Contains(actions, intakeSentryActionUnresolved)
 			settings.SentryAssignedIssues = slices.Contains(actions, intakeSentryActionAssigned)
+			settings.SentryProjectIDs = sentryProjectIDsFromConfiguration(trigger.Configuration)
 		case models.FactoryIntakeSourceDatadog:
 			settings = datadogAlertSettingsFromTransitions(
 				configurationStrings(trigger.Configuration["alertTransitions"]),
 				settings,
 			)
+		case models.FactoryIntakeSourceLinearIssues:
+			settings.LinearProjectIDs = configurationStrings(trigger.Configuration["projects"])
+			settings.LinearLabels = linearLabelsFromConfiguration(trigger.Configuration["labels"])
 		default:
 			if source == models.FactoryIntakeSourceDependabotAlerts {
 				break
@@ -609,6 +640,10 @@ func intakeSettingsFromGraph(source string, graph intakeGraph, spec models.LiveC
 				settings.DependabotSeverities = severities
 			}
 		}
+		return settings.normalized()
+	}
+
+	if source == models.FactoryIntakeSourceLinearIssues {
 		return settings.normalized()
 	}
 
@@ -710,6 +745,7 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		serialized.SentryRegressedIssues = proto.Bool(settings.SentryRegressedIssues)
 		serialized.SentryAssignedIssues = proto.Bool(settings.SentryAssignedIssues)
 		serialized.SentryLevels = settings.SentryLevels
+		serialized.SentryProjectIds = settings.SentryProjectIDs
 	}
 	if source == models.FactoryIntakeSourceProductiveTasks {
 		serialized.ExcludeKeyTasks = proto.Bool(settings.ExcludeKeyTasks)
@@ -723,11 +759,18 @@ func serializeIntakeSettings(source string, settings intakeSettings) *pb.Factory
 		serialized.DatadogRetriggeredAlerts = proto.Bool(settings.DatadogRetriggeredAlerts)
 		serialized.DatadogEnvironments = settings.DatadogEnvironments
 	}
+	if source == models.FactoryIntakeSourceLinearIssues {
+		serialized.LinearProjectIds = settings.LinearProjectIDs
+		serialized.LinearLabels = settings.LinearLabels
+	}
 	return serialized
 }
 
 // parseIntakeSettings merges a request over what the graph already says, so a
-// caller that leaves an enum unspecified does not reset it.
+// caller that leaves an enum unspecified does not reset it. An omitted or
+// empty Sentry project list keeps the saved projects. JSON does not record
+// that a repeated field was present when the array is empty, and older
+// clients omit the field when they update other settings.
 func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Settings) intakeSettings {
 	if requested == nil {
 		return current
@@ -767,6 +810,9 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.SentryAssignedIssues = requested.GetSentryAssignedIssues()
 	}
 	updated.SentryLevels = requested.GetSentryLevels()
+	if requested.SentryProjectIds != nil {
+		updated.SentryProjectIDs = requested.SentryProjectIds
+	}
 	updated.DependabotSeverities = requested.GetDependabotSeverities()
 	if requested.ExcludeKeyTasks != nil {
 		updated.ExcludeKeyTasks = requested.GetExcludeKeyTasks()
@@ -779,6 +825,8 @@ func parseIntakeSettings(current intakeSettings, requested *pb.FactoryIntake_Set
 		updated.DatadogRetriggeredAlerts = requested.GetDatadogRetriggeredAlerts()
 	}
 	updated.DatadogEnvironments = requested.GetDatadogEnvironments()
+	updated.LinearProjectIDs = requested.GetLinearProjectIds()
+	updated.LinearLabels = requested.GetLinearLabels()
 
 	return updated.normalized()
 }
@@ -847,6 +895,16 @@ func metadataBool(value any, fallback bool) bool {
 		}
 	}
 	return fallback
+}
+
+// configurationAnyStrings stores a string list in node configuration.
+// protobuf structs reject []string, so a Go string slice fails canvas creation.
+func configurationAnyStrings(values []string) []any {
+	items := make([]any, 0, len(values))
+	for _, value := range values {
+		items = append(items, value)
+	}
+	return items
 }
 
 func configurationStrings(value any) []string {

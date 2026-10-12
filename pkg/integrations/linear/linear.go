@@ -1,6 +1,8 @@
 package linear
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,6 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -18,10 +22,15 @@ const (
 	OAuthAccessToken  = "accessToken"
 	OAuthRefreshToken = "refreshToken"
 
-	// scopeList is requested comma-separated on the authorize URL. The admin
-	// scope is needed because the On Issue trigger manages webhooks, which
-	// Linear restricts to workspace admins or OAuth tokens with admin scope.
-	scopeList = "read,write,admin"
+	// scopeWithAdmin is requested when SuperPlane creates webhooks through the
+	// API. Linear allows webhookCreate only for a workspace admin or a token
+	// with the admin scope. scopeReadWrite is enough when the Linear OAuth
+	// application sends events to SuperPlane's webhook URL.
+	scopeWithAdmin = "read,write,admin"
+	scopeReadWrite = "read,write"
+
+	// WebhookSecretConfig is the signing secret of a customer Linear OAuth application.
+	WebhookSecretConfig = "webhookSecret"
 
 	// tokenRefreshMargin is how much of the access token lifetime is left when
 	// it gets refreshed. Linear rotates refresh tokens, so only the most
@@ -53,22 +62,59 @@ type Metadata struct {
 	User                 *User   `json:"user,omitempty" mapstructure:"user,omitempty"`
 	Teams                []Team  `json:"teams" mapstructure:"teams"`
 	Organization         string  `json:"organization,omitempty" mapstructure:"organization,omitempty"`
+	OrganizationID       string  `json:"organizationId,omitempty" mapstructure:"organizationId,omitempty"`
 	URLKey               string  `json:"urlKey,omitempty" mapstructure:"urlKey,omitempty"`
 	AccessTokenExpiresAt string  `json:"accessTokenExpiresAt,omitempty" mapstructure:"accessTokenExpiresAt,omitempty"`
+	// HostedOAuth is true when this connection uses SuperPlane's Linear OAuth app.
+	HostedOAuth bool `json:"hostedOAuth,omitempty" mapstructure:"hostedOAuth,omitempty"`
+	// SetupReturnPath is a same-origin path to open after OAuth, such as the intake wizard.
+	SetupReturnPath string `json:"setupReturnPath,omitempty" mapstructure:"setupReturnPath,omitempty"`
+	// OAuthScopes is the scope list from the last authorize URL.
+	// A delivery-mode change uses it to decide when consent must be requested again.
+	OAuthScopes string `json:"oauthScopes,omitempty" mapstructure:"oauthScopes,omitempty"`
 }
 
+// errNeedsAdminAuthorization tells Sync to stop after asking the user to
+// authorize the admin scope. The connection is not ready until that consent exists.
+var errNeedsAdminAuthorization = errors.New("linear connection needs admin authorization")
+
 const installationInstructions = `
-SuperPlane connects to Linear with OAuth.
+SuperPlane connects to Linear with OAuth. The person who authorizes the connection must be a member of each private team you want to listen to.
 
-1. Click the **Connect** button with client id and secret empty to start the setup wizard.
+1. Open Linear, then **Settings**, then **Administration**, then **API**.
+2. Under **OAuth applications**, click **Create new**.
+3. Set the callback URL to the address SuperPlane shows.
+4. Set the webhook URL to the SuperPlane address plus ` + "`/api/v1/linear/webhook`" + `.
+5. Select **Issues**, **Comments**, and **Issue attachments**.
+6. Create the application.
+7. Copy the **Client ID** into the **Client ID** field.
+8. Copy the **Client Secret** into the **Client Secret** field.
+9. Copy the **Webhook signing secret** into the **Webhook signing secret** field.
+10. Click **Save**. SuperPlane opens Linear so you can authorize the connection.
 
-The connection requests the **read**, **write** and **admin** scopes. Write covers creating and editing
-issues, comments, attachments and reactions; admin is needed because the triggers register webhooks,
-which Linear restricts to workspace admins.
+You can also leave the fields empty and click **Save**. SuperPlane opens Linear's application form with the callback URL and the webhook URL filled in. Copy the **Client ID**, the **Client Secret**, and the **Webhook signing secret** into the fields above, then click **Save** again.
 
-Components act as the user who authorizes the connection, so that user needs access to the teams you
-automate. Linear also lets only a comment's own author edit it, so **Update Issue Comment** can only
-change comments that this same connection posted.
+When the webhook signing secret is set, the connection requests the **read** and **write** scopes. Write covers creating and editing issues, comments, attachments, and reactions. When the secret is empty, the connection also requests the **admin** scope so SuperPlane can create a webhook for each trigger. A workspace admin must authorize that connection.
+
+Linear lets only a comment's own author edit it, so **Update Issue Comment** can only change comments that this same connection posted.
+`
+
+const hostedInstallationInstructions = `
+Click **Connect** to authorize SuperPlane in your Linear workspace. The person who authorizes the connection must be a member of each private team you want to listen to.
+
+The connection requests the **read**, **write**, and **admin** scopes. Write covers creating and editing issues. Admin lets SuperPlane register webhooks.
+
+To use your own OAuth application instead, open the manual setup and paste its **Client ID** and **Client Secret**.
+`
+
+const hostedAppWebhookInstructions = `
+Click **Connect** to authorize SuperPlane in your Linear workspace. The person who authorizes the connection must be a member of each private team you want to listen to.
+
+The connection requests the **read** and **write** scopes. Write covers creating and editing issues.
+
+On the Linear OAuth application, set the webhook URL to the SuperPlane address plus ` + "`/api/v1/linear/webhook`" + `. Select **Issues**, **Comments**, and **Issue attachments**. Copy the webhook signing secret into ` + "`SUPERPLANE_LINEAR_OAUTH_WEBHOOK_SECRET`" + `.
+
+To use your own OAuth application instead, open the manual setup and paste its **Client ID**, **Client Secret**, and **Webhook signing secret**.
 `
 
 func (l *Linear) Name() string {
@@ -88,6 +134,12 @@ func (l *Linear) Description() string {
 }
 
 func (l *Linear) Instructions() string {
+	if UseHostedOAuth() {
+		if HostedWebhookSecret() != "" {
+			return hostedAppWebhookInstructions
+		}
+		return hostedInstallationInstructions
+	}
 	return installationInstructions
 }
 
@@ -105,6 +157,13 @@ func (l *Linear) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Sensitive:   true,
 			Description: "OAuth Client Secret from your Linear application",
+		},
+		{
+			Name:        WebhookSecretConfig,
+			Label:       "Webhook signing secret",
+			Type:        configuration.FieldTypeString,
+			Sensitive:   true,
+			Description: "Signing secret from the Linear application webhook. Leave this empty to create webhooks with the admin scope.",
 		},
 	}
 }
@@ -134,22 +193,16 @@ func (l *Linear) Triggers() []core.Trigger {
 }
 
 func (l *Linear) Sync(ctx core.SyncContext) error {
-	callbackURL := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
-
-	//
-	// Sensitive configuration values are stored encrypted, and only
-	// GetConfig decrypts them - never read the client secret from
-	// ctx.Configuration directly.
-	//
-	clientID, _ := ctx.Integration.GetConfig("clientId")
-	clientSecret, _ := ctx.Integration.GetConfig("clientSecret")
+	app := resolveOAuthApp(ctx.Integration)
+	callbackURL := oauthCallbackURL(ctx.BaseURL, ctx.Integration.ID(), app.Hosted)
 
 	//
 	// Without app credentials, guide the user through creating the OAuth app.
 	// Linear has no API for this, but its creation form accepts manifest query
-	// parameters, so the form opens fully pre-filled.
+	// parameters, so the form opens fully pre-filled. A hosted app skips this
+	// step and authorizes SuperPlane's application.
 	//
-	if len(clientID) == 0 || len(clientSecret) == 0 {
+	if !app.configured() {
 		ctx.Integration.NewBrowserAction(core.BrowserAction{
 			Description: appSetupDescription,
 			URL:         appCreateURL(ctx.BaseURL, callbackURL),
@@ -164,14 +217,14 @@ func (l *Linear) Sync(ctx core.SyncContext) error {
 	//
 	accessToken, _ := findSecret(ctx.Integration, OAuthAccessToken)
 	if accessToken == "" {
-		return l.requestAuthorization(ctx, string(clientID), callbackURL)
+		return l.requestAuthorization(ctx, app, callbackURL)
 	}
 
 	//
 	// Linear access tokens expire after 24 hours,
 	// so refresh on every scheduled resync.
 	//
-	if err := l.refreshToken(ctx, string(clientID), string(clientSecret)); err != nil {
+	if err := l.refreshToken(ctx, app.ClientID, app.ClientSecret); err != nil {
 		ctx.Logger.Errorf("Failed to refresh token: %v", err)
 		return err
 	}
@@ -179,6 +232,13 @@ func (l *Linear) Sync(ctx core.SyncContext) error {
 	if err := l.updateMetadata(ctx); err != nil {
 		ctx.Integration.Error(err.Error())
 		return nil
+	}
+
+	if err := l.reconcileWebhookDelivery(ctx); err != nil {
+		if errors.Is(err, errNeedsAdminAuthorization) {
+			return nil
+		}
+		return err
 	}
 
 	ctx.Integration.RemoveBrowserAction()
@@ -195,15 +255,18 @@ func appCreateURL(baseURL, callbackURL string) string {
 	params.Set("oauth.client_name", "SuperPlane")
 	params.Set("oauth.client_uri", baseURL)
 	params.Set("oauth.redirect_uris", callbackURL)
+	params.Set("webhook.enabled", "true")
+	params.Set("webhook.url", AppWebhookURL(baseURL))
+	for _, resourceType := range appWebhookResourceTypes {
+		params.Add("webhook.resourceTypes", resourceType)
+	}
 
 	return fmt.Sprintf("%s?%s", AppsNewURL, params.Encode())
 }
 
-func (l *Linear) requestAuthorization(ctx core.SyncContext, clientID, callbackURL string) error {
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-		ctx.Logger.Errorf("Failed to decode metadata while setting state: %v", err)
-	}
+func (l *Linear) requestAuthorization(ctx core.SyncContext, app oauthApp, callbackURL string) error {
+	metadata := readMetadata(ctx.Integration)
+	rememberSetupReturnPath(ctx, &metadata)
 
 	if metadata.State == nil {
 		state, err := crypto.Base64String(32)
@@ -211,15 +274,20 @@ func (l *Linear) requestAuthorization(ctx core.SyncContext, clientID, callbackUR
 			return fmt.Errorf("failed to generate state: %v", err)
 		}
 		metadata.State = &state
-		ctx.Integration.SetMetadata(metadata)
 	}
+	metadata.HostedOAuth = app.Hosted
+	scopes := OAuthScopes(ctx.Integration)
+	metadata.OAuthScopes = scopes
+	ctx.Integration.SetMetadata(metadata)
+
+	clientID := app.ClientID
 
 	authorizeURL := fmt.Sprintf(
 		"%s?client_id=%s&redirect_uri=%s&response_type=code&scope=%s&state=%s&prompt=consent&actor=user",
 		AuthorizeURL,
 		url.QueryEscape(clientID),
 		url.QueryEscape(callbackURL),
-		url.QueryEscape(scopeList),
+		url.QueryEscape(scopes),
 		url.QueryEscape(*metadata.State),
 	)
 
@@ -361,15 +429,160 @@ func (l *Linear) updateMetadata(ctx core.SyncContext) error {
 	// The recorded token expiration carries over, since it drives when the next
 	// sync refreshes and is unrelated to the workspace data loaded here.
 	//
+	previous := readMetadata(ctx.Integration)
+	organizationID := viewer.Organization.ID
+	if organizationID == "" {
+		organizationID = previous.OrganizationID
+	}
 	ctx.Integration.SetMetadata(Metadata{
 		User:                 viewer.User,
 		Teams:                teams,
 		Organization:         viewer.Organization.Name,
+		OrganizationID:       organizationID,
 		URLKey:               viewer.Organization.URLKey,
-		AccessTokenExpiresAt: readMetadata(ctx.Integration).AccessTokenExpiresAt,
+		AccessTokenExpiresAt: previous.AccessTokenExpiresAt,
+		HostedOAuth:          previous.HostedOAuth,
+		SetupReturnPath:      previous.SetupReturnPath,
+		OAuthScopes:          previous.OAuthScopes,
 	})
 
 	return nil
+}
+
+// reconcileWebhookDelivery rebuilds subscriptions when the signing secret
+// appears or disappears. API webhooks need the admin scope, so a connection
+// authorized with read and write must consent again before those webhooks
+// can be created.
+func (l *Linear) reconcileWebhookDelivery(ctx core.SyncContext) error {
+	wantAppLevel := AppWebhookSigningSecret(ctx.Integration) != ""
+	webhooks, err := models.ListIntegrationWebhooks(database.DB(context.Background()), ctx.Integration.ID())
+	if err != nil {
+		return fmt.Errorf("failed to list webhooks: %v", err)
+	}
+
+	var mismatched []models.Webhook
+	for i := range webhooks {
+		webhook := &webhooks[i]
+		config := WebhookConfiguration{}
+		if err := mapstructure.Decode(webhook.Configuration.Data(), &config); err != nil {
+			return fmt.Errorf("failed to decode webhook config: %v", err)
+		}
+
+		appLevel := IsAppLevelWebhook(webhook.Metadata.Data())
+		if appLevel == wantAppLevel {
+			if config.AppLevel == wantAppLevel {
+				continue
+			}
+			config.AppLevel = wantAppLevel
+			if err := webhook.UpdateConfiguration(database.DB(context.Background()), config); err != nil {
+				return fmt.Errorf("failed to update webhook configuration: %v", err)
+			}
+			continue
+		}
+		if !webhookCanChangeDeliveryMode(webhook.State) {
+			continue
+		}
+		mismatched = append(mismatched, *webhook)
+	}
+
+	if !wantAppLevel && linearNeedsAdminConsent(readMetadata(ctx.Integration).OAuthScopes, len(mismatched) > 0) {
+		if err := ctx.Integration.SetSecret(OAuthAccessToken, []byte("")); err != nil {
+			return err
+		}
+		if err := ctx.Integration.SetSecret(OAuthRefreshToken, []byte("")); err != nil {
+			return err
+		}
+		app := resolveOAuthApp(ctx.Integration)
+		callbackURL := oauthCallbackURL(ctx.BaseURL, ctx.Integration.ID(), app.Hosted)
+		if err := l.requestAuthorization(ctx, app, callbackURL); err != nil {
+			return err
+		}
+		return errNeedsAdminAuthorization
+	}
+
+	if len(mismatched) == 0 {
+		return nil
+	}
+
+	if wantAppLevel {
+		if err := deleteLinearWebhooks(ctx, mismatched); err != nil {
+			return err
+		}
+	}
+
+	changed := 0
+	for i := range mismatched {
+		webhook := &mismatched[i]
+		config := WebhookConfiguration{}
+		if err := mapstructure.Decode(webhook.Configuration.Data(), &config); err != nil {
+			return fmt.Errorf("failed to decode webhook config: %v", err)
+		}
+		config.AppLevel = wantAppLevel
+		updated, err := webhook.Reprovision(database.DB(context.Background()), config)
+		if err != nil {
+			return fmt.Errorf("failed to reprovision webhook: %v", err)
+		}
+		if updated {
+			changed++
+		}
+	}
+
+	if ctx.Logger != nil && changed > 0 {
+		ctx.Logger.Infof("Marked %d Linear webhooks for setup after a delivery mode change", changed)
+	}
+	return nil
+}
+
+func webhookCanChangeDeliveryMode(state string) bool {
+	return state == models.WebhookStateReady || state == models.WebhookStateFailed
+}
+
+// linearNeedsAdminConsent reports whether API webhooks need a new consent.
+// Recorded scopes that omit admin always need consent. Empty scopes are
+// unknown, so consent is requested only when an application webhook must
+// be converted. Existing connections then stay ready.
+func linearNeedsAdminConsent(scopes string, convertingWebhooks bool) bool {
+	if scopeIncludesAdmin(scopes) {
+		return false
+	}
+	if strings.TrimSpace(scopes) == "" {
+		return convertingWebhooks
+	}
+	return true
+}
+
+func deleteLinearWebhooks(ctx core.SyncContext, webhooks []models.Webhook) error {
+	var ids []string
+	for i := range webhooks {
+		metadata := WebhookMetadata{}
+		if err := mapstructure.Decode(webhooks[i].Metadata.Data(), &metadata); err != nil {
+			return fmt.Errorf("failed to decode webhook metadata: %v", err)
+		}
+		ids = append(ids, metadata.webhookIDs()...)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %v", err)
+	}
+
+	for _, id := range ids {
+		if err := client.DeleteWebhook(id); err != nil && !linearWebhookMissing(err) {
+			return fmt.Errorf("error deleting webhook: %v", err)
+		}
+	}
+	return nil
+}
+
+func linearWebhookMissing(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "not found")
 }
 
 func (l *Linear) HandleRequest(ctx core.HTTPRequestContext) {
@@ -378,20 +591,12 @@ func (l *Linear) HandleRequest(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	clientID, err := ctx.Integration.GetConfig("clientId")
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
+	metadata := readMetadata(ctx.Integration)
+	app := resolveOAuthApp(ctx.Integration)
+	if metadata.HostedOAuth {
+		app.Hosted = true
 	}
-
-	clientSecret, err := ctx.Integration.GetConfig("clientSecret")
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+	if !app.configured() {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -402,13 +607,14 @@ func (l *Linear) HandleRequest(ctx core.HTTPRequestContext) {
 	}
 
 	settingsURL := fmt.Sprintf("%s/%s/settings/integrations/%s", ctx.BaseURL, ctx.OrganizationID, ctx.Integration.ID())
-	redirectURI := fmt.Sprintf("%s/api/v1/integrations/%s/callback", ctx.BaseURL, ctx.Integration.ID())
+	redirectURL := callbackRedirectURL(ctx, settingsURL)
+	redirectURI := oauthCallbackURL(ctx.BaseURL, ctx.Integration.ID(), app.Hosted && metadata.HostedOAuth)
 
 	auth := NewAuth(ctx.HTTP)
-	tokenResponse, err := auth.HandleCallback(ctx.Request, string(clientID), string(clientSecret), expectedState, redirectURI)
+	tokenResponse, err := auth.HandleCallback(ctx.Request, app.ClientID, app.ClientSecret, expectedState, redirectURI)
 	if err != nil {
 		ctx.Logger.Errorf("Callback error: %v", err)
-		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 		return
 	}
 
@@ -434,14 +640,14 @@ func (l *Linear) HandleRequest(ctx core.HTTPRequestContext) {
 	}); err != nil {
 		ctx.Logger.Errorf("Callback error: failed to update metadata: %v", err)
 		ctx.Integration.Error(fmt.Sprintf("connected, but failed to load workspace data: %v", err))
-		http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+		http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 		return
 	}
 
 	ctx.Integration.RemoveBrowserAction()
 	ctx.Integration.Ready()
 
-	http.Redirect(ctx.Response, ctx.Request, settingsURL, http.StatusSeeOther)
+	http.Redirect(ctx.Response, ctx.Request, redirectURL, http.StatusSeeOther)
 }
 
 func findSecret(integration core.IntegrationContext, name string) (string, error) {

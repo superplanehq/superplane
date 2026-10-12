@@ -67,7 +67,7 @@ def main(payload):
 ` + "```" + `
 
 ## Configuration
-- **Machine type**: Runner fleet registered on the task-broker (required).
+- **Machine type**: Runner fleet available to the organization (required).
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Defaults to a Python image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
@@ -83,17 +83,7 @@ def main(payload):
 
 func (c *RunPython) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:     configurationFieldMachineType,
-			Label:    "Machine type",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: machineTypeSelectOptions,
-				},
-			},
-		},
+		MachineTypeField(configurationFieldMachineType),
 		{
 			Name:        "execution_mode",
 			Label:       "Execution mode",
@@ -308,9 +298,9 @@ func (c *RunPython) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	broker, err := NewBrokerClient(ctx.HTTP)
+	client, backend, err := NewTaskClient(ctx.HTTP, ctx.RunnerTasks)
 	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
+		return fmt.Errorf("new runner task client: %w", err)
 	}
 
 	mode := normalizeExecutionMode(spec.ExecutionMode)
@@ -333,12 +323,12 @@ func (c *RunPython) Execute(ctx core.ExecutionContext) error {
 		Labels:         OriginLabelsForTask(ctx),
 	}
 
-	taskID, err := broker.CreateTask(params)
+	taskID, err := client.CreateTask(params)
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
 
-	return afterRunnerTaskCreated(ctx, taskID)
+	return afterRunnerTaskCreated(ctx, taskID, backend)
 }
 
 func (c *RunPython) Hooks() []core.Hook {

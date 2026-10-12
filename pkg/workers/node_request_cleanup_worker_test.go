@@ -100,6 +100,21 @@ func Test__NodeRequestCleanupWorker_DeletesExpiredSentryWebhookReceipts(t *testi
 	assert.Equal(t, int64(1), countSentryReceiptsByID(t, recent))
 }
 
+func Test__NodeRequestCleanupWorker_DeletesExpiredLinearWebhookReceipts(t *testing.T) {
+	support.Setup(t)
+	now := time.Now().UTC()
+	expiredAt := now.Add(-models.LinearWebhookReceiptRetention - time.Hour)
+
+	expired := createLinearReceiptForCleanup(t, expiredAt)
+	recent := createLinearReceiptForCleanup(t, now.Add(-time.Hour))
+
+	worker := NewNodeRequestCleanupWorker()
+	worker.deleteExpiredLinearWebhookReceipts()
+
+	assert.Equal(t, int64(0), countLinearReceiptsByID(t, expired))
+	assert.Equal(t, int64(1), countLinearReceiptsByID(t, recent))
+}
+
 func Test__NodeRequestCleanupWorker_DeletesExpiredDatadogWebhookReceipts(t *testing.T) {
 	support.Setup(t)
 	now := time.Now().UTC()
@@ -113,6 +128,30 @@ func Test__NodeRequestCleanupWorker_DeletesExpiredDatadogWebhookReceipts(t *test
 
 	assert.Equal(t, int64(0), countDatadogReceiptsByID(t, expired))
 	assert.Equal(t, int64(1), countDatadogReceiptsByID(t, recent))
+}
+
+func createLinearReceiptForCleanup(t *testing.T, receivedAt time.Time) uuid.UUID {
+	t.Helper()
+
+	id, err := models.CreateLinearWebhookReceipt(database.Conn(), models.LinearWebhookReceipt{
+		ReceivedAt:     receivedAt,
+		IntegrationID:  uuid.New(),
+		OrganizationID: uuid.New(),
+		WebhookID:      uuid.New(),
+		HTTPStatus:     200,
+		Outcome:        models.LinearWebhookOutcomeAccepted,
+	})
+	require.NoError(t, err)
+	require.NoError(t, database.Conn().Model(&models.LinearWebhookReceipt{}).Where("id = ?", id).Update("received_at", receivedAt).Error)
+	return id
+}
+
+func countLinearReceiptsByID(t *testing.T, id uuid.UUID) int64 {
+	t.Helper()
+
+	var count int64
+	require.NoError(t, database.Conn().Model(&models.LinearWebhookReceipt{}).Where("id = ?", id).Count(&count).Error)
+	return count
 }
 
 func createDatadogReceiptForCleanup(t *testing.T, receivedAt time.Time) uuid.UUID {

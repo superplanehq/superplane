@@ -64,7 +64,7 @@ describe("SpendingRedesignPage", () => {
     expect(screen.getByRole("heading", { name: "Model usage" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "VM usage" })).toBeInTheDocument();
     expect(screen.getByTestId("spending-kpi-hosted")).toHaveTextContent("SuperPlane-hosted spend");
-    expect(screen.getByTestId("spending-kpi-byok")).toHaveTextContent("Your keys spend");
+    expect(screen.getByTestId("spending-kpi-byok")).toHaveTextContent("Bring your own key spend");
     expect(screen.getByTestId("spending-kpi-vm")).toHaveTextContent("VM time");
     expect(screen.getByTestId("spending-kpi-credit")).toHaveTextContent("$41.24");
     expect(screen.getByTestId("spending-period")).toHaveTextContent("Last 30 days");
@@ -166,7 +166,9 @@ describe("SpendingRedesignPage", () => {
     expect(
       within(within(models).getByTestId("spending-model-breakdown")).getByText("SuperPlane-hosted"),
     ).toBeInTheDocument();
-    expect(within(within(models).getByTestId("spending-model-breakdown")).getByText("Your keys")).toBeInTheDocument();
+    expect(
+      within(within(models).getByTestId("spending-model-breakdown")).getByText("Bring your own key"),
+    ).toBeInTheDocument();
     expect(
       within(within(models).getByTestId("spending-model-breakdown")).queryByText("claude-sonnet-4-6"),
     ).not.toBeInTheDocument();
@@ -185,29 +187,31 @@ describe("SpendingRedesignPage", () => {
     expect(screen.queryByRole("menuitemradio", { name: "Machine types" })).not.toBeInTheDocument();
   });
 
-  it("filters model usage to Your keys", async () => {
+  it("filters model usage to Bring your own key", async () => {
     const user = userEvent.setup();
     renderPage();
 
     const models = screen.getByTestId("spending-model-usage");
     await user.click(within(models).getByTestId("spending-model-filter-sources"));
-    await user.click(screen.getByRole("menuitemradio", { name: "Your keys" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Bring your own key" }));
 
-    expect(within(models).getByTestId("spending-model-filter-sources")).toHaveTextContent("Your keys");
+    expect(within(models).getByTestId("spending-model-filter-sources")).toHaveTextContent("Bring your own key");
     expect(within(within(models).getByTestId("spending-model-breakdown")).getByText("gpt-4o")).toBeInTheDocument();
     expect(
       within(within(models).getByTestId("spending-model-breakdown")).queryByText("claude-opus-4-6"),
     ).not.toBeInTheDocument();
   });
 
-  it("clears the model chart when SuperPlane-hosted is selected and spend is only Your keys", async () => {
+  it("clears the model chart when SuperPlane-hosted is selected and spend is only Bring your own key", async () => {
     const user = userEvent.setup();
     const byokReport: SpendingReport = {
       range: rangeForPreset("month", SPENDING_REDESIGN_NOW),
       totals: { costCents: 500, tokens: 2000, durationSeconds: 0, hostedCostCents: 0, byokCostCents: 500 },
       series: [{ key: "2026-09-01", label: "Sep 1", totalCents: 500, values: { byok: 500 } }],
-      seriesKeys: [{ id: "byok", label: "Your keys" }],
-      breakdown: [{ id: "byok", label: "Your keys", tokens: 2000, durationSeconds: 0, costCents: 500, share: 1 }],
+      seriesKeys: [{ id: "byok", label: "Bring your own key" }],
+      breakdown: [
+        { id: "byok", label: "Bring your own key", tokens: 2000, durationSeconds: 0, costCents: 500, share: 1 },
+      ],
     };
 
     function StaleProductionPage() {
@@ -248,10 +252,10 @@ describe("SpendingRedesignPage", () => {
     expect(within(models).getByTestId("spending-model-breakdown")).toHaveTextContent(
       "No model usage is recorded for this period.",
     );
-    expect(within(models).getByTestId("spending-model-breakdown").textContent).not.toContain("Your keys");
+    expect(within(models).getByTestId("spending-model-breakdown").textContent).not.toContain("Bring your own key");
   });
 
-  it("keeps model spend visible when Your keys is selected and the report is grouped by workspace", async () => {
+  it("keeps model spend visible when Bring your own key is selected and the report is grouped by workspace", async () => {
     const user = userEvent.setup();
     const workspaceReport: SpendingReport = {
       range: rangeForPreset("month", SPENDING_REDESIGN_NOW),
@@ -287,9 +291,9 @@ describe("SpendingRedesignPage", () => {
 
     const models = screen.getByTestId("spending-model-usage");
     await user.click(within(models).getByTestId("spending-model-filter-sources"));
-    await user.click(screen.getByRole("menuitemradio", { name: "Your keys" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "Bring your own key" }));
 
-    expect(within(models).getByTestId("spending-model-filter-sources")).toHaveTextContent("Your keys");
+    expect(within(models).getByTestId("spending-model-filter-sources")).toHaveTextContent("Bring your own key");
     expect(within(models).getByTestId("spending-model-chart")).not.toHaveTextContent(
       "No model usage is recorded for this period.",
     );

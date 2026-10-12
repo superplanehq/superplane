@@ -2,6 +2,7 @@ package pulls
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -14,8 +15,10 @@ import (
 type OnPullRequest struct{}
 
 type OnPullRequestConfiguration struct {
-	Repository string   `json:"repository" mapstructure:"repository"`
-	Actions    []string `json:"actions" mapstructure:"actions"`
+	Repository              string   `json:"repository" mapstructure:"repository"`
+	Actions                 []string `json:"actions" mapstructure:"actions"`
+	IgnoreDrafts            bool     `json:"ignoreDrafts" mapstructure:"ignoreDrafts"`
+	OnlyFactoryPullRequests bool     `json:"onlyFactoryPullRequests" mapstructure:"onlyFactoryPullRequests"`
 }
 
 func (p *OnPullRequest) Name() string {
@@ -44,6 +47,8 @@ func (p *OnPullRequest) Documentation() string {
 
 - **Repository**: Select the GitHub repository to monitor
 - **Actions**: Select which PR actions to listen for (opened, edited, closed, synchronize, etc.)
+- **Ignore draft pull requests**: Do not start a run when the pull request is a draft.
+- **Only pull requests in this factory**: Start a run only when the pull request belongs to this factory. The event then includes the factory pull request and the task.
 
 ## Event Data
 
@@ -53,6 +58,8 @@ Each PR event includes:
 - **pull_request**: Complete PR information including title, body, state, labels
 - **repository**: Repository information
 - **sender**: User who triggered the event
+- **pullRequest**: The factory pull request. Present only when **Only pull requests in this factory** is on and the pull request belongs to this factory.
+- **workOrder**: The task for that pull request. Present in the same case.
 
 ## Webhook Setup
 
@@ -114,6 +121,22 @@ func (p *OnPullRequest) Configuration() []configuration.Field {
 					},
 				},
 			},
+		},
+		{
+			Name:        "ignoreDrafts",
+			Label:       "Ignore draft pull requests",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Do not start a run when the pull request is a draft.",
+		},
+		{
+			Name:        "onlyFactoryPullRequests",
+			Label:       "Only pull requests in this factory",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Start a run only when the pull request belongs to this factory.",
 		},
 	}
 }
@@ -195,8 +218,19 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 		return http.StatusOK, nil, nil
 	}
 
-	err = ctx.Events.Emit("github.pullRequest", data)
+	if config.IgnoreDrafts && pullRequestIsDraft(data) {
+		ctx.Logger.Info("Ignoring event - pull request is a draft")
+		return http.StatusOK, nil, nil
+	}
 
+	if config.OnlyFactoryPullRequests {
+		matched, code, matchErr := matchFactoryPullRequest(ctx, data)
+		if matchErr != nil || !matched {
+			return code, nil, matchErr
+		}
+	}
+
+	err = ctx.Events.Emit("github.pullRequest", data)
 	if err != nil {
 		ctx.Logger.Errorf("Failed to emit event: %v", err)
 		return http.StatusInternalServerError, nil, fmt.Errorf("error emitting event: %v", err)
@@ -205,6 +239,59 @@ func (p *OnPullRequest) HandleWebhook(ctx core.WebhookRequestContext) (int, *cor
 	return http.StatusOK, nil, nil
 }
 
+func matchFactoryPullRequest(ctx core.WebhookRequestContext, data map[string]any) (bool, int, error) {
+	if ctx.Factory == nil {
+		return false, http.StatusInternalServerError, errors.New("app is not owned by a factory")
+	}
+
+	lookup, ok := factoryPullRequestLookup(data)
+	if !ok {
+		ctx.Logger.Info("Ignoring event - pull request identity is incomplete")
+		return false, http.StatusOK, nil
+	}
+
+	match, err := ctx.Factory.FindPullRequest(lookup)
+	if err != nil {
+		if errors.Is(err, core.ErrPullRequestNotFound) {
+			ctx.Logger.Info("Ignoring event - pull request is not in this factory")
+			return false, http.StatusOK, nil
+		}
+		return false, http.StatusInternalServerError, err
+	}
+
+	data["pullRequest"] = match.PullRequest
+	data["workOrder"] = match.WorkOrder
+	return true, http.StatusOK, nil
+}
+
+func factoryPullRequestLookup(event map[string]any) (core.FindPullRequestParams, bool) {
+	repository, _ := event["repository"].(map[string]any)
+	fullName, _ := repository["full_name"].(string)
+	pullRequest, _ := event["pull_request"].(map[string]any)
+	number, ok := int64FromJSON(pullRequest["number"])
+	pageURL, _ := pullRequest["html_url"].(string)
+	if fullName == "" || !ok || number <= 0 {
+		return core.FindPullRequestParams{}, false
+	}
+
+	return core.FindPullRequestParams{
+		Provider:   "github",
+		Repository: fullName,
+		Number:     number,
+		URL:        pageURL,
+	}, true
+}
+
 func (p *OnPullRequest) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func pullRequestIsDraft(data map[string]any) bool {
+	pullRequest, ok := data["pull_request"].(map[string]any)
+	if !ok {
+		return false
+	}
+
+	draft, ok := pullRequest["draft"].(bool)
+	return ok && draft
 }

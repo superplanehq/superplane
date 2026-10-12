@@ -51,6 +51,7 @@ export {
   DiscussionPRFeedbackSetupPage,
   GitHubIntakeSetupPage,
   JiraIntakeSetupPage,
+  LinearIntakeSetupPage,
   ProductiveIntakeSetupPage,
   PlanningSetupPage,
   RiskScoreSetupPage,

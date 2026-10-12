@@ -13,9 +13,9 @@ import {
   OPEN_WORK_ORDER_PULL_REQUESTS,
 } from "../../__fixtures__/factoryPageFixtureVariants";
 import { HOUR_AGO, REVIEWER_USER } from "../../__fixtures__/factoryPageResponses";
-import issueIntakeYaml from "@factory-templates/issue-intake.canvas.yaml?raw";
-import implementationYaml from "@factory-templates/line-implementation.canvas.yaml?raw";
-import prClosureYaml from "@factory-templates/pr-closure.canvas.yaml?raw";
+import issueIntakeYaml from "@factory-templates/github/issue-intake.canvas.yaml?raw";
+import implementationYaml from "@factory-templates/github/line-implementation.canvas.yaml?raw";
+import prClosureYaml from "@factory-templates/github/pr-closure.canvas.yaml?raw";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import slackIcon from "@/assets/icons/integrations/slack.svg";
 import { DESCRIPTION_ARTIFACT } from "../work-order-popup-redesign/workOrderPopupMocks";
@@ -618,7 +618,7 @@ function artifactForNode(
   if (nodeId === "add-branch-artifact") {
     return OPEN_WORK_ORDER_ARTIFACTS.find((artifact) => artifact.id === "art-branch-1");
   }
-  if (nodeId === "find-work-order" || nodeId === "find-pull-request") {
+  if (nodeId === "find-work-order" || nodeId === "find-pull-request" || nodeId === "on-pr-closed") {
     return MERGE_SCREENSHOT;
   }
   if (nodeId === "complete-work-order") {

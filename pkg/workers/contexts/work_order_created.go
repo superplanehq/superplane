@@ -188,17 +188,16 @@ func workOrderRefinementEnabled(tx *gorm.DB, order *models.FactoryWorkOrder) boo
 func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (string, string, string) {
 	repository := strings.TrimSpace(stringValue(order.Repository))
 	defaultBranch := strings.TrimSpace(stringValue(order.DefaultBranch))
-	if repository == "" || defaultBranch == "" {
-		factoryModel, err := models.FindFactory(tx, order.OrganizationID, order.FactoryID)
-		if err == nil {
-			config := factoryModel.OnboardingConfigValue()
-			if repository == "" {
-				repository = strings.TrimSpace(config.AppRepository)
-			}
-			if defaultBranch == "" {
-				defaultBranch = strings.TrimSpace(config.DefaultBranch)
-			}
-		}
+	repositoryFromOrder := repository != ""
+	config := models.FactoryOnboardingConfig{}
+	if factoryModel, err := models.FindFactory(tx, order.OrganizationID, order.FactoryID); err == nil {
+		config = factoryModel.OnboardingConfigValue()
+	}
+	if repository == "" {
+		repository = strings.TrimSpace(config.AppRepository)
+	}
+	if defaultBranch == "" {
+		defaultBranch = strings.TrimSpace(config.DefaultBranch)
 	}
 	if repository == "" {
 		return "", "", ""
@@ -206,7 +205,22 @@ func workOrderCreatedRepository(tx *gorm.DB, order *models.FactoryWorkOrder) (st
 	if defaultBranch == "" {
 		defaultBranch = "main"
 	}
-	return repository, githubRepositoryURL(repository), defaultBranch
+	provider := config.EffectiveVCSProvider()
+	if repositoryFromOrder {
+		provider = orderRepositoryProvider(order)
+	}
+	return repository, models.VCSRepositoryCloneURL(provider, repository), defaultBranch
+}
+
+// orderRepositoryProvider returns the Git host saved with the work order.
+// A row created before that host was stored stays on GitHub.
+func orderRepositoryProvider(order *models.FactoryWorkOrder) string {
+	if order != nil && order.VCSProvider != nil {
+		if provider := strings.TrimSpace(*order.VCSProvider); provider != "" {
+			return provider
+		}
+	}
+	return models.ProviderGitHub
 }
 
 func onWorkOrderNodeID(spec models.LiveCanvasSpec) string {

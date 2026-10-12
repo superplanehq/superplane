@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
 
 const (
@@ -89,7 +90,7 @@ func (s *Server) adminListPolarWebhooks(w http.ResponseWriter, r *http.Request) 
 		Limit:     limit,
 	})
 	if err != nil {
-		writePolarAdminError(w, err, "Failed to load Polar webhook deliveries")
+		writePolarAdminError(w, r, err, "Failed to load Polar webhook deliveries")
 		return
 	}
 
@@ -119,7 +120,7 @@ func (s *Server) adminListPolarWebhookEndpoints(w http.ResponseWriter, r *http.R
 
 	endpoints, err := polar.NewClientFromEnv().ListWebhookEndpoints(r.Context())
 	if err != nil {
-		writePolarAdminError(w, err, "Failed to load Polar webhook endpoints")
+		writePolarAdminError(w, r, err, "Failed to load Polar webhook endpoints")
 		return
 	}
 
@@ -154,7 +155,7 @@ func (s *Server) adminRedeliverPolarWebhook(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := polar.NewClientFromEnv().RedeliverWebhookEvent(r.Context(), eventID); err != nil {
-		writePolarAdminError(w, err, "Failed to redeliver Polar webhook event")
+		writePolarAdminError(w, r, err, "Failed to redeliver Polar webhook event")
 		return
 	}
 
@@ -208,19 +209,27 @@ func parseSucceededQuery(raw string) (*bool, error) {
 	return &parsed, nil
 }
 
-func writePolarAdminError(w http.ResponseWriter, err error, fallback string) {
+func writePolarAdminError(w http.ResponseWriter, r *http.Request, err error, fallback string) {
 	switch {
 	case polar.IsUnauthorized(err):
+		recordPolarAdminServerError(r, err)
 		http.Error(w, "Polar rejected the access token. Add webhooks:read and webhooks:write scopes.", http.StatusBadGateway)
 	case polar.IsUnsupportedAPIVersion(err):
+		recordPolarAdminServerError(r, err)
 		log.WithError(err).Error(fallback)
 		http.Error(w, "Polar does not support API version "+polar.APIVersion()+". Upgrade the pinned Polar API version.", http.StatusBadGateway)
 	case polar.IsNotFound(err):
 		http.Error(w, "Polar webhook event was not found.", http.StatusNotFound)
 	case polar.IsRateLimited(err):
+		recordPolarAdminServerError(r, err)
 		http.Error(w, "Polar rate-limited the request. Try again later.", http.StatusBadGateway)
 	default:
+		recordPolarAdminServerError(r, err)
 		log.WithError(err).Error(fallback)
 		http.Error(w, fallback, http.StatusBadGateway)
 	}
+}
+
+func recordPolarAdminServerError(r *http.Request, err error) {
+	middleware.SetServerError(r.Context(), err, nil)
 }

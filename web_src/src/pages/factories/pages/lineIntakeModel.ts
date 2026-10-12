@@ -9,6 +9,7 @@ import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import linearIcon from "@/assets/icons/integrations/linear.svg";
 import pagerdutyIcon from "@/assets/icons/integrations/pagerduty.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
@@ -32,7 +33,12 @@ import {
 } from "../lib/confidenceScore";
 import type { WorkOrderCheckPresentation } from "../lib/workOrderChecks";
 import type { WorkOrderStatusNotePresentation } from "../lib/workOrderStatusNote";
-import { intakeSettingsFromApi, type IntakeSourceSettings } from "./intakeSourceSettingsModel";
+import {
+  intakeSettingsFromApi,
+  linearProjectIdsFromResource,
+  sentryProjectIdsFromResource,
+  type IntakeSourceSettings,
+} from "./intakeSourceSettingsModel";
 import { intakeCanvasForSource } from "./lineIntakeCanvas";
 import type { SplitRunCanvasModel } from "./work-order-split-run/splitRunCanvases";
 import type { SplitRunFixture, SplitRunPhase, SplitRunStreamLine } from "./work-order-split-run/splitRunMocks";
@@ -53,7 +59,8 @@ export type LineIntakeSourceId =
   | "sentry-exceptions"
   | "pagerduty-incidents"
   | "productive-tasks"
-  | "datadog";
+  | "datadog"
+  | "linear-issues";
 
 export type LineIntakeListenKind = "webhook" | "poll";
 
@@ -226,6 +233,26 @@ export const LINE_INTAKE_SOURCES: LineIntakeSource[] = [
       label: "Create a task in Backlog",
     },
   },
+  {
+    id: "linear-issues",
+    name: "Linear issues",
+    description: "Create a task when a Linear issue is added to a selected project.",
+    iconSrc: linearIcon,
+    iconAlt: "Linear",
+    tabLabel: "Linear",
+    listen: {
+      kind: "webhook",
+      label: "On Linear issue",
+    },
+    evaluate: {
+      label: "Create a task",
+      rule: "A matching Linear issue becomes a task in Backlog. SuperPlane scores it there.",
+    },
+    accept: {
+      destination: "backlog",
+      label: "Create a task in Backlog",
+    },
+  },
 ];
 
 export function lineIntakeSourceById(id: string): LineIntakeSource | undefined {
@@ -282,6 +309,7 @@ const LINE_INTAKE_SOURCE_ID_BY_API_SOURCE: Record<string, LineIntakeSourceId> = 
   SOURCE_PAGERDUTY_INCIDENTS: "pagerduty-incidents",
   SOURCE_PRODUCTIVE_TASKS: "productive-tasks",
   SOURCE_DATADOG: "datadog",
+  SOURCE_LINEAR_ISSUES: "linear-issues",
 };
 
 const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesFactoryIntakeSource> = {
@@ -292,35 +320,57 @@ const API_SOURCE_BY_LINE_INTAKE_SOURCE_ID: Record<LineIntakeSourceId, FactoriesF
   "pagerduty-incidents": "SOURCE_PAGERDUTY_INCIDENTS",
   "productive-tasks": "SOURCE_PRODUCTIVE_TASKS",
   datadog: "SOURCE_DATADOG",
+  "linear-issues": "SOURCE_LINEAR_ISSUES",
 };
 
 export function apiIntakeSource(sourceId: LineIntakeSourceId): FactoriesFactoryIntakeSource {
   return API_SOURCE_BY_LINE_INTAKE_SOURCE_ID[sourceId];
 }
 
+function intakeDisplayName(name: string | undefined, sourceName: string): string {
+  return name?.trim() || sourceName;
+}
+
+function intakeTextFields(intake: FactoriesFactoryIntake) {
+  return {
+    intakeId: intake.id?.trim(),
+    appId: intake.canvasId?.trim() ?? "",
+    datadogService: intake.resourceId?.trim() ?? "",
+    integrationId: intake.integrationId?.trim() || undefined,
+    resourceId: intake.resourceId?.trim() || undefined,
+  };
+}
+
 export function intakeSourcesFromFactoryIntakes(intakes: FactoriesFactoryIntake[]): ConfiguredLineIntakeSource[] {
   return intakes.flatMap((intake) => {
-    const intakeId = intake.id?.trim();
+    const textFields = intakeTextFields(intake);
     const source = lineIntakeSourceForApiSource(intake.source);
-    if (!intakeId || !source) {
+    if (!textFields.intakeId || !source) {
       return [];
     }
 
-    const name = intake.name?.trim() || source.name;
+    const name = intakeDisplayName(intake.name, source.name);
+    const settings = intakeSettingsFromApi(name, intake.settings);
+    if (source.id === "linear-issues" && settings.linearProjectIds.length === 0) {
+      settings.linearProjectIds = linearProjectIdsFromResource(intake.resourceId);
+    }
+    if (source.id === "sentry-exceptions" && settings.sentryProjectIds.length === 0) {
+      settings.sentryProjectIds = sentryProjectIdsFromResource(intake.resourceId);
+    }
     return [
       {
-        intakeId,
-        appId: intake.canvasId?.trim() ?? "",
+        intakeId: textFields.intakeId,
+        appId: textFields.appId,
         healthy: intake.healthy !== false,
         paused: intake.paused === true,
         settings: {
-          ...intakeSettingsFromApi(name, intake.settings),
-          datadogService: intake.resourceId?.trim() ?? "",
+          ...settings,
+          datadogService: textFields.datadogService,
         },
         source: { ...source, name },
         health: intake.health,
-        integrationId: intake.integrationId?.trim() || undefined,
-        resourceId: intake.resourceId?.trim() || undefined,
+        integrationId: textFields.integrationId,
+        resourceId: textFields.resourceId,
       },
     ];
   });

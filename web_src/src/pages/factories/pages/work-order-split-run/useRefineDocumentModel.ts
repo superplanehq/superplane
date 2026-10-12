@@ -4,12 +4,12 @@ import type { FactoriesWorkOrderArtifact } from "@/api-client";
 
 import { analysisPlanBody, hasAnalysisPlan } from "../../lib/analysisOutcome";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
-import type { ComposerScore } from "./ComposerPlanControls";
+import type { ComposerScore } from "./PlanningReview";
 import { latestPlanScore } from "./latestPlanScore";
 import { usePlanChipStatus } from "./planChipStatus";
 import { useRefineLayoutPreference } from "./refineLayoutPreference";
 import { splitRunIntentDocument } from "./splitRunPopupModel";
-import type { IntentAnalysisChat } from "./WorkOrderIntentRequest";
+import type { IntentAnalysisChat } from "./intentAnalysisChat";
 import {
   DEFAULT_INTENT_LEFT_PERCENT,
   DEFAULT_REFINE_INTENT_LEFT_PERCENT,
@@ -24,6 +24,7 @@ function refineClarity(analysis: IntentAnalysisChat | undefined, clarity?: WorkO
   return {
     score: liveScore ?? clarity?.score,
     summary: clarity?.summary?.trim(),
+    maxScore: clarity?.maxScore,
   };
 }
 
@@ -31,6 +32,7 @@ function refineConfidence(confidence?: WorkOrderCheckPresentation): ComposerScor
   return {
     score: confidence?.score,
     summary: confidence?.summary?.trim(),
+    maxScore: confidence?.maxScore,
   };
 }
 
@@ -51,6 +53,7 @@ export function useRefineDocumentModel({
   artifacts,
   clarity,
   confidence,
+  reviewMetrics,
   isAnalyzing,
   resultFooter,
   analysis,
@@ -62,6 +65,7 @@ export function useRefineDocumentModel({
   artifacts: FactoriesWorkOrderArtifact[];
   clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
+  reviewMetrics?: WorkOrderCheckPresentation[];
   isAnalyzing: boolean;
   resultFooter?: ReactNode;
   analysis?: IntentAnalysisChat;
@@ -81,10 +85,12 @@ export function useRefineDocumentModel({
   const panes = refinePaneLayout(refineOpen, planPaneOpen, split.percent);
   const planStatus = usePlanChipStatus(analysisPlanBody(artifacts), planOpenedHere && planPaneOpen);
 
+  const document = splitRunIntentDocument({ artifacts, description, skipDescriptionFallback });
+
   return {
     refineOpen,
     split,
-    document: splitRunIntentDocument({ artifacts, description, skipDescriptionFallback }),
+    document,
     sessionTitle: title.trim() || SESSION_TITLE_FALLBACK,
     ...panes,
     showClosedDecision: refineOpen && resultFooter != null,
@@ -92,10 +98,12 @@ export function useRefineDocumentModel({
       analysis,
       planPaneOpen,
       hasPlan,
+      planTitle: document.title,
       layout,
       planStatus,
       clarity: refineClarity(analysis, clarity),
       confidence: refineConfidence(confidence),
+      reviewMetrics,
       isAnalyzing,
       onOpenPlan: () => setPlanOpenedHere(true),
     }),
@@ -106,26 +114,33 @@ function bindRefineChat({
   analysis,
   planPaneOpen,
   hasPlan,
+  planTitle,
   layout,
   planStatus,
   clarity,
   confidence,
+  reviewMetrics,
   isAnalyzing,
   onOpenPlan,
 }: {
   analysis?: IntentAnalysisChat;
   planPaneOpen: boolean;
   hasPlan: boolean;
+  planTitle: string;
   layout: ReturnType<typeof useRefineLayoutPreference>;
   planStatus: ReturnType<typeof usePlanChipStatus>;
   clarity: ComposerScore;
   confidence: ComposerScore;
+  reviewMetrics?: WorkOrderCheckPresentation[];
   isAnalyzing: boolean;
   onOpenPlan: () => void;
 }): IntentAnalysisChat | undefined {
   if (!analysis) {
     return undefined;
   }
+  // Review scoring is not optional: when review scores exist, the stored
+  // Confidence setting never hides the derived headline.
+  const hasReview = Boolean(reviewMetrics && reviewMetrics.length > 0);
   return {
     ...analysis,
     planPaneOpen,
@@ -134,8 +149,12 @@ function bindRefineChat({
       layout.togglePlan();
     },
     canTogglePlan: hasPlan,
+    planTitle,
     clarity,
     confidence,
+    reviewMetrics,
+    showClarity: hasReview ? false : analysis.showClarity,
+    showConfidence: hasReview ? true : analysis.showConfidence,
     planStatus,
     isAnalyzing,
   };

@@ -53,6 +53,10 @@ type FactoryContext interface {
 	FindPullRequest(params FindPullRequestParams) (*PullRequestMatch, error)
 	AddPullRequestActivity(params AddPullRequestActivityParams) (*PullRequestActivityResult, error)
 	UpdatePullRequestActivity(params UpdatePullRequestActivityParams) (*PullRequestActivityResult, error)
+	// VCSProvider returns the workspace Git host from factory onboarding.
+	// An empty value means GitHub. A caller that has no factory gets an
+	// empty value and keeps GitHub branch links.
+	VCSProvider() (string, error)
 }
 
 type WorkOrderParams struct {
@@ -100,6 +104,11 @@ type AddWorkOrderArtifactParams struct {
 	// first call sets the type; a later call with a different type
 	// fails. Keys are unique per factory.
 	Key string
+	// UpdateByTitle replaces the newest unkeyed artifact on this task
+	// with the same type and title. Keyed rows stay unchanged. The
+	// first call creates an unkeyed row when none exists. A blank
+	// title fails. This flag does not use Key.
+	UpdateByTitle bool
 }
 
 // ReportWorkOrderCheckParams carries one check report. Format must be

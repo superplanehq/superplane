@@ -5,11 +5,9 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useBYOKLLMModels, useSwitchFactoryModelSource } from "@/hooks/useLLMModelAllowlists";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useSelectableLLMModels } from "@/hooks/useSelectableLLMModels";
 import { FEATURE_ORGANIZATION_BYOK, FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER } from "@/lib/experimentalFeatures";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
-import { SELECTABLE_LLM_SOURCE_HOSTED } from "@/lib/selectableLLMModels";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
@@ -52,7 +50,6 @@ export function FactorySettingsOrganizationLLMModelsPage() {
   });
   const byokLoading = providers.some((provider) => byokQueries[provider].isLoading);
 
-  const hosted = useSelectableLLMModels(organizationId, { factoryId, sources: [SELECTABLE_LLM_SOURCE_HOSTED] });
   const source = workspaceModelSource(factory.onboarding?.agentHarness, connected.length > 0);
   const currentProvider = resolveCurrentProvider(factory.onboarding, connected, byokQueries);
   const [dialog, setDialog] = useState<LLMModelsSwitchDialog>(null);
@@ -104,9 +101,6 @@ export function FactorySettingsOrganizationLLMModelsPage() {
           <ModelSourceBody
             source={source}
             switchedNotice={switchedNotice}
-            hostedModels={hosted.data ?? []}
-            hostedLoading={hosted.isLoading}
-            hostedError={Boolean(hosted.isError)}
             providers={providers}
             currentProvider={currentProvider}
             organizationId={organizationId}

@@ -44,10 +44,20 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
+vi.mock("./useBitbucketOnboarding", () => ({
+  useBitbucketOnboarding: () => ({
+    data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },
+    isPending: false,
+    error: null,
+    startInstallation: { mutateAsync: vi.fn() },
+  }),
+}));
+
 vi.mock("./useGitHubOnboarding", () => ({
   useGitHubOnboarding: () => ({
     data: {
-      appConfigured: true,
+      providerConfigured: true,
+      accountConnectionRequired: true,
       identity: { userId: "42", login: "octocat" },
       repositories: [{ repositoryId: "201", installationId: "101", fullName: "acme/api", defaultBranch: "main" }],
       pendingRequests: [],
@@ -58,6 +68,7 @@ vi.mock("./useGitHubOnboarding", () => ({
     startInstallation: { mutateAsync: vi.fn() },
     configureInstallation: { mutateAsync: vi.fn() },
   }),
+  useGitHubInstallationChecks: vi.fn(),
 }));
 
 const navigateSpy = vi.fn();
@@ -103,6 +114,9 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
+    bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
     saving: false,
@@ -119,6 +133,13 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     jiraProjectsLoading: false,
     jiraProjectsError: false,
     retryJiraProjects: vi.fn(),
+    linearIntegrationId: "",
+    linearProjectIds: [],
+    toggleLinearProject: vi.fn(),
+    linearProjects: [],
+    linearProjectsLoading: false,
+    linearProjectsError: false,
+    retryLinearProjects: vi.fn(),
     ...overrides,
   };
 }
@@ -154,6 +175,7 @@ describe("FirstRunSetup chrome", () => {
     factories = [factory];
     accountOrganizations = [{ id: "org-1", name: "Acme" }];
     navigateSpy.mockClear();
+    localStorage.clear();
   });
 
   it("shows the workspace switch when another workspace exists", () => {
@@ -243,7 +265,14 @@ describe("FirstRunSetup chrome", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText(FIRST_RUN_COPY.sphere.captionSetup)).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-logo")).toBeInTheDocument();
+    const art = screen.getByTestId("first-run-art-pane");
+    expect(art).toHaveAttribute("data-art-mode", "school");
+    expect(art).toHaveAttribute("data-art-background", "#87ae9d");
+    expect(art).toHaveAttribute("data-art-arrow-color", "#eeede9");
+    expect(art).toHaveAttribute("data-art-count", "");
+    expect(screen.getByTestId("first-run-art-stage")).toContainElement(screen.getByTestId("first-run-signed-in"));
   });
 
   it("shows the model source before the backlog for a bring-your-own-key organization", async () => {

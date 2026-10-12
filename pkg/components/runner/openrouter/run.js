@@ -196,6 +196,20 @@ function artifactEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
 }
 
+function mergeConfidenceEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
+}
+
+function superplaneMCPScript(taskDir, env = process.env, planning = planningEnabled(env)) {
+  if (planning) {
+    return path.join(taskDir, "planning_session_mcp.js");
+  }
+  if (mergeConfidenceEnabled(env)) {
+    return path.join(taskDir, "merge_confidence_mcp.js");
+  }
+  return path.join(taskDir, "task_artifact_mcp.js");
+}
+
 function planningSystemPrompt(env = process.env) {
   return planningAnalysisEnabled(env) ? loadAnalysisProtocol(env) : "";
 }
@@ -482,17 +496,11 @@ function buildOpenCodeConfig({
       }
     }
   }
-  if ((planning || artifactEnabled(env)) && taskDir) {
+  if ((planning || artifactEnabled(env) || mergeConfidenceEnabled(env)) && taskDir) {
     config.mcp = {
       superplane: {
         type: "local",
-        command: [
-          "node",
-          path.join(
-            taskDir,
-            planning ? "planning_session_mcp.js" : "task_artifact_mcp.js",
-          ),
-        ],
+        command: ["node", superplaneMCPScript(taskDir, env, planning)],
         enabled: true,
       },
     };

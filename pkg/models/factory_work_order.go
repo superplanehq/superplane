@@ -77,6 +77,7 @@ type FactoryWorkOrder struct {
 	OriginLabel     *string
 	Repository      *string
 	DefaultBranch   *string
+	VCSProvider     *string // Git host saved with the repository. Empty means a legacy GitHub row.
 	AutoStartLineID *uuid.UUID
 	MCPClientID     *string
 	MCPClientName   *string
@@ -200,13 +201,14 @@ func (FactoryWorkOrderAssignee) TableName() string {
 // shared status FSM. Actor / Automation / Run + App are optional attribution
 // fields that populate the emitted `order.status.updated` event.
 type FactoryWorkOrderStatusUpdate struct {
-	ToState    string
-	Result     string
-	Actor      *uuid.UUID
-	Automation *factory.AutomationRef
-	Run        *factory.RunRef
-	App        *factory.AppRef
-	SkipSame   bool // when true, no-op transitions to the current state succeed silently
+	ToState         string
+	Result          string
+	Actor           *uuid.UUID
+	Automation      *factory.AutomationRef
+	Run             *factory.RunRef
+	App             *factory.AppRef
+	SkipSame        bool // when true, no-op transitions to the current state succeed silently
+	OnRunsCancelled func([]*RunCancellationResult)
 }
 
 // NOTE: this is only OK to be used in the workers.
@@ -435,6 +437,9 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		// queue; a queued dispatch has no run to finish it later.
 		if toState == FactoryWorkOrderStateClosed {
 			if err := o.dropQueuedLineWork(tx); err != nil {
+				return err
+			}
+			if err := o.cancelRuns(tx, update); err != nil {
 				return err
 			}
 		}
@@ -668,11 +673,11 @@ func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID
 
 	now := time.Now()
 	assignees := make([]FactoryWorkOrderAssignee, 0, len(assigneeIDs))
-	for _, assigneeID := range assigneeIDs {
+	for i, assigneeID := range assigneeIDs {
 		assignees = append(assignees, FactoryWorkOrderAssignee{
 			WorkOrderID: o.ID,
 			UserID:      assigneeID,
-			CreatedAt:   now,
+			CreatedAt:   now.Add(time.Duration(i) * time.Millisecond),
 		})
 	}
 

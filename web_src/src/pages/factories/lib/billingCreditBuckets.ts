@@ -1,5 +1,5 @@
 import { isWelcomeCreditExpired, parseWelcomeCreditExpiresAt } from "./hostedCreditEmpty";
-import { CREDIT_GRANT_KIND_ADMIN } from "./hostedCreditGrants";
+import { CREDIT_GRANT_KIND_ADMIN, CREDIT_GRANT_KIND_ADMIN_ADJUSTMENT } from "./hostedCreditGrants";
 import { BILLING_INCLUDED_USAGE_CENTS, billingUsagePercentUsed } from "./billingPlans";
 import { formatUsdCents, parseWorkOrderMetric } from "./workOrderUsage";
 
@@ -53,7 +53,7 @@ const BILLING_BUCKET_SPEND_ORDER_NAME: Record<BillingCreditBucketKey, string> = 
 
 export function adminCreditGrantCents(grants: Array<{ kind?: string; amountCents?: string | number }>): number {
   return grants.reduce((sum, grant) => {
-    if (grant.kind !== CREDIT_GRANT_KIND_ADMIN) {
+    if (grant.kind !== CREDIT_GRANT_KIND_ADMIN && grant.kind !== CREDIT_GRANT_KIND_ADMIN_ADJUSTMENT) {
       return sum;
     }
     return sum + parseWorkOrderMetric(grant.amountCents);

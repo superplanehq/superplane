@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
 
 import { DATADOG_WEBHOOKS_HELP } from "./datadogWebhookReceipts";
+import { LINEAR_WEBHOOKS_HELP } from "./linearWebhookReceipts";
 import { SENTRY_WEBHOOKS_EMPTY, SENTRY_WEBHOOKS_HELP } from "./sentryWebhookReceipts";
 import { Webhooks } from "./Webhooks";
 
@@ -33,6 +34,7 @@ describe("Webhooks", () => {
     expect(screen.getByRole("heading", { name: "Webhooks" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Sentry" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Datadog" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Linear" })).toBeInTheDocument();
     expect(await screen.findByText(SENTRY_WEBHOOKS_HELP)).toBeInTheDocument();
     expect(await screen.findByText(SENTRY_WEBHOOKS_EMPTY)).toBeInTheDocument();
     expect(screen.queryByText(DATADOG_WEBHOOKS_HELP)).not.toBeInTheDocument();
@@ -85,5 +87,54 @@ describe("Webhooks", () => {
 
     await userEvent.click(screen.getByRole("tab", { name: "Sentry" }));
     expect(await screen.findByText(SENTRY_WEBHOOKS_EMPTY)).toBeInTheDocument();
+  });
+
+  it("shows Linear calls on the Linear tab", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (input: string) => {
+      if (input.includes("/admin/api/linear/webhooks")) {
+        return {
+          ok: true,
+          json: async () => ({
+            items: [
+              {
+                id: "receipt-linear-1",
+                received_at: "2026-09-29T11:14:00Z",
+                integration_id: "integration-linear-1",
+                organization_id: "org-1",
+                webhook_id: "webhook-1",
+                event_type: "Issue",
+                action: "create",
+                issue_identifier: "ENG-142",
+                issue_id: "2174add1-f7c8-44e3-bbf3-2d60b5ea8bc9",
+                team_key: "ENG",
+                workspace_key: "acme",
+                http_status: 200,
+                outcome: "accepted",
+                subscription_count: 1,
+                task_ids: ["6f1c2a40-1b2e-4c3d-9a8b-0e1f2a3b4c5d"],
+              },
+            ],
+            total: 1,
+            page: 1,
+            limit: 50,
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({ items: [], total: 0, page: 1, limit: 50 }),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPage("/admin/webhooks?service=linear");
+
+    expect(await screen.findByText(LINEAR_WEBHOOKS_HELP)).toBeInTheDocument();
+    expect(await screen.findByText("ENG-142")).toBeInTheDocument();
+    expect(screen.getByText("Accepted")).toBeInTheDocument();
+    expect(screen.getByText("ENG")).toBeInTheDocument();
+    expect(screen.getByText("acme")).toBeInTheDocument();
+    expect(screen.getByText("6f1c2a40-1b2e-4c3d-9a8b-0e1f2a3b4c5d")).toBeInTheDocument();
+    expect(screen.queryByText("secret-description")).not.toBeInTheDocument();
   });
 });

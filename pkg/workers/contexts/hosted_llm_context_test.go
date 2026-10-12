@@ -110,3 +110,45 @@ func Test__HostedLLMContext__ResolveLeavesAnthropicManagementKeyEmpty(t *testing
 	assert.Equal(t, "sk-ant", access.APIKey)
 	assert.Empty(t, access.ManagementKey)
 }
+
+func Test__HostedLLMContext__DefaultModelUsesAnAllowedModelWhenInstallationDefaultIsExcluded(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	t.Cleanup(func() {
+		_ = db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationHostedModelAllowlist{})
+		_ = db.Where("provider = ?", models.UsageProviderAnthropic).Delete(&models.HostedLLMProvider{})
+		_, _ = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+			WelcomeGrantCents:   models.DefaultWelcomeGrantCents,
+			MarkupBPS:           models.DefaultMarkupBPS,
+			WarningThresholdBPS: models.DefaultWarningThresholdBPS,
+		})
+	})
+
+	_, err := models.UpsertHostedLLMProvider(db, models.HostedLLMProvider{
+		Provider:      models.UsageProviderAnthropic,
+		Enabled:       true,
+		APIKey:        []byte("test-hosted-key"),
+		AllowedModels: datatypes.JSONSlice[string]{"claude-sonnet-4-6", "claude-opus-4-6"},
+	})
+	require.NoError(t, err)
+	_, err = models.UpdateInstallationLLMSettings(db, models.InstallationLLMSettings{
+		WelcomeGrantCents:     models.DefaultWelcomeGrantCents,
+		MarkupBPS:             models.DefaultMarkupBPS,
+		WarningThresholdBPS:   models.DefaultWarningThresholdBPS,
+		DefaultHostedProvider: stringPointer("anthropic"),
+		DefaultHostedModel:    stringPointer("claude-sonnet-4-6"),
+	})
+	require.NoError(t, err)
+	_, err = models.UpsertOrganizationHostedModelAllowlist(db, r.Organization.ID, models.UsageProviderAnthropic, datatypes.JSONSlice[string]{"claude-opus-4-6"})
+	require.NoError(t, err)
+
+	hosted := NewHostedLLMContext(db, r.Encryptor, r.Organization.ID, nil)
+	model, err := hosted.DefaultModel()
+	require.NoError(t, err)
+	assert.Equal(t, "anthropic", model.Provider)
+	assert.Equal(t, "claude-opus-4-6", model.Model)
+}
+
+func stringPointer(value string) *string {
+	return &value
+}

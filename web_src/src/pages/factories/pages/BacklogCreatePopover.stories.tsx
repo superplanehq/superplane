@@ -1,8 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 
+import datadogIcon from "@/assets/icons/integrations/datadog.svg";
+import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import linearIcon from "@/assets/icons/integrations/linear.svg";
 import productiveIcon from "@/assets/icons/integrations/productive.svg";
+import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { BacklogCreatePopover } from "./BacklogCreatePopover";
@@ -22,6 +26,38 @@ const PRODUCTIVE_SOURCE: BacklogIntakeSource = {
   iconSrc: productiveIcon,
   iconAlt: "Productive",
   tabLabel: "Productive",
+};
+
+const LINEAR_SOURCE: BacklogIntakeSource = {
+  intakeId: "intake-linear",
+  name: "Linear issues",
+  iconSrc: linearIcon,
+  iconAlt: "Linear",
+  tabLabel: "Linear",
+};
+
+const DEPENDABOT_SOURCE: BacklogIntakeSource = {
+  intakeId: "intake-dependabot",
+  name: "Dependabot alerts",
+  iconSrc: dependabotIcon,
+  iconAlt: "Dependabot",
+  tabLabel: "Dependabot",
+};
+
+const DATADOG_SOURCE: BacklogIntakeSource = {
+  intakeId: "intake-datadog",
+  name: "Datadog errors",
+  iconSrc: datadogIcon,
+  iconAlt: "Datadog",
+  tabLabel: "Datadog",
+};
+
+const SENTRY_SOURCE: BacklogIntakeSource = {
+  intakeId: "intake-sentry",
+  name: "Sentry exceptions",
+  iconSrc: sentryIcon,
+  iconAlt: "Sentry",
+  tabLabel: "Sentry",
 };
 
 const GITHUB_ITEMS: BacklogIntakeItem[] = [
@@ -141,5 +177,15 @@ export const TwoSources: Story = {
   name: "Two sources",
   render: () => (
     <CreateMenuStory sources={[GITHUB_SOURCE, PRODUCTIVE_SOURCE]} catalog={[...GITHUB_ITEMS, ...PRODUCTIVE_ITEMS]} />
+  ),
+};
+
+export const FourSources: Story = {
+  name: "Four sources",
+  render: () => (
+    <CreateMenuStory
+      sources={[LINEAR_SOURCE, DEPENDABOT_SOURCE, DATADOG_SOURCE, SENTRY_SOURCE]}
+      catalog={GITHUB_ITEMS.map((item) => ({ ...item, intakeId: LINEAR_SOURCE.intakeId }))}
+    />
   ),
 };

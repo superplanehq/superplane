@@ -11,6 +11,7 @@ import {
   rerunStartStepIndex,
   splitRunCloseNeedsConfirm,
   splitRunDecisionTone,
+  splitRunFooterScores,
   showsArchive,
   SPLIT_RUN_STOP_CHOICES,
 } from "./splitRunFooter";
@@ -106,6 +107,29 @@ describe("buildSplitRunFooter", () => {
     expect(splitRunDecisionTone(footer)).toBe("draft-ready");
   });
 
+  it("invites Start when every review score is 3", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 3, confidenceScore: 3, scoreMax: 3 });
+
+    expect(footer.note?.headline).toBe("This task is ready to start");
+    expect(footer.scoreMax).toBe(3);
+    expect(splitRunFooterScores(footer)).toEqual({ clarity: 3, confidence: 3, scoreMax: 3 });
+    expect(splitRunDecisionTone(footer)).toBe("draft-ready");
+  });
+
+  it("warns before Start when a review score is 2", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 3, confidenceScore: 2, scoreMax: 3 });
+
+    expect(footer.note?.headline).toBe("Review the plan before you start");
+    expect(splitRunDecisionTone(footer)).toBe("draft-caution");
+  });
+
+  it("blocks a review task when Clarity is 1", () => {
+    const footer = buildSplitRunFooter({ kind: "draft", clarityScore: 1, confidenceScore: 3, scoreMax: 3 });
+
+    expect(footer.note?.headline).toBe("This task is not ready to start");
+    expect(splitRunDecisionTone(footer)).toBe("draft-blocked");
+  });
+
   it("scores an intake draft on Confidence alone", () => {
     expect(buildSplitRunFooter({ kind: "draft", confidenceScore: 5 }).note?.headline).toBe(
       "This task is ready to start",
@@ -123,11 +147,11 @@ describe("buildSplitRunFooter", () => {
   it("keeps no close actions on a running order", () => {
     const footer = buildSplitRunFooter({
       kind: "running",
-      note: { key: "running-step", headline: "Implement is running", text: "The log shows live progress." },
+      note: { key: "running-step", headline: "Implementation in progress", text: "The log shows live progress." },
     });
 
     expect(footer.sentence).toBe("This task is running.");
-    expect(footer.note?.headline).toBe("Implement is running");
+    expect(footer.note?.headline).toBe("Implementation in progress");
     expect(footer.run).toBeUndefined();
     expect(footer.actions).toEqual([]);
     expect(splitRunCloseNeedsConfirm("running")).toBe(true);

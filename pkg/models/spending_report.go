@@ -26,9 +26,9 @@ const (
 	spendingOtherSeriesID = "other"
 
 	spendingFundingSourceHostedLabel = "SuperPlane-hosted"
-	spendingFundingSourceBYOKLabel   = "Your keys"
+	spendingFundingSourceBYOKLabel   = "Bring your own key"
 
-	// Blank or unknown funding_source values count as Your keys, matching the KPI split.
+	// Blank or unknown funding_source values count as bring your own key, matching the KPI split.
 	spendingFundingSourceGroupExpr = "CASE WHEN workspace_usage_events.funding_source = '" + UsageFundingSourceHosted + "' THEN '" + UsageFundingSourceHosted + "' ELSE '" + UsageFundingSourceBYOK + "' END"
 )
 

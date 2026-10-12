@@ -100,31 +100,9 @@ const BASE_ALLOWED_TOOLS = "Bash,Read,Edit,Write";
 // MCP tools. Edit/Write are intentionally excluded so the agent cannot make
 // changes while drafting a task.
 const PLANNING_READONLY_TOOLS = "Read,Bash";
-const ANALYSIS_BASE_ALLOWED_TOOLS = [
-  "mcp__superplane__propose_spec",
-  "mcp__superplane__survey",
-  "mcp__superplane__inspect_attachment",
-];
 
-function analysisAllowedTools(env = process.env) {
-  const tools = [...ANALYSIS_BASE_ALLOWED_TOOLS];
-  const protocol = loadAnalysisProtocolModule();
-  const clarityEnabled =
-    typeof protocol.planningClarityEnabled === "function"
-      ? protocol.planningClarityEnabled(env)
-      : true;
-  const confidenceEnabled =
-    typeof protocol.planningConfidenceEnabled === "function"
-      ? protocol.planningConfidenceEnabled(env)
-      : true;
-  if (clarityEnabled) {
-    tools.splice(1, 0, "mcp__superplane__propose_clarity");
-  }
-  if (confidenceEnabled) {
-    const insertAt = tools.indexOf("mcp__superplane__propose_clarity") + 1;
-    tools.splice(insertAt > 0 ? insertAt : 1, 0, "mcp__superplane__propose_confidence");
-  }
-  return tools;
+function analysisAllowedTools() {
+  return ["mcp__superplane__propose_update", "mcp__superplane__inspect_attachment"];
 }
 const ARTIFACT_ALLOWED_TOOLS = [
   "mcp__superplane__inspect_screenshot",
@@ -154,6 +132,14 @@ function allowedClaudeTools(env = process.env) {
       "mcp__superplane",
       ...workspaceAllow,
       ...analysisAllowedTools(env),
+    ].join(",");
+  }
+  if (mergeConfidenceMCPEnabled(env)) {
+    return [
+      BASE_ALLOWED_TOOLS,
+      "mcp__superplane",
+      ...workspaceAllow,
+      "mcp__superplane__report_merge_check",
     ].join(",");
   }
   if (artifactMCPEnabled(env)) {
@@ -200,7 +186,7 @@ function claudePermissionMode(env = process.env) {
 }
 
 function mcpToolsEnabled(env = process.env) {
-  return planningMCPEnabled(env) || artifactMCPEnabled(env);
+  return planningMCPEnabled(env) || artifactMCPEnabled(env) || mergeConfidenceMCPEnabled(env);
 }
 
 function planningMCPEnabled(env = process.env) {
@@ -214,13 +200,18 @@ function artifactMCPEnabled(env = process.env) {
   return envFlag(env, "SUPERPLANE_ARTIFACT_TOKEN");
 }
 
+function mergeConfidenceMCPEnabled(env = process.env) {
+  return envFlag(env, "SUPERPLANE_MERGE_CONFIDENCE_TOKEN");
+}
+
 function artifactMCPPath(taskDir, env = process.env) {
-  return path.join(
-    taskDir,
-    planningMCPEnabled(env)
-      ? "planning_session_mcp.js"
-      : "task_artifact_mcp.js",
-  );
+  if (planningMCPEnabled(env)) {
+    return path.join(taskDir, "planning_session_mcp.js");
+  }
+  if (mergeConfidenceMCPEnabled(env)) {
+    return path.join(taskDir, "merge_confidence_mcp.js");
+  }
+  return path.join(taskDir, "task_artifact_mcp.js");
 }
 
 function configureArtifactOutput(taskDir, env = process.env) {

@@ -50,7 +50,7 @@ export function factoryHomePath(organizationId: string, factoryKey: string, line
   return factoryDetailPath(organizationId, factoryKey);
 }
 
-const WORKSPACE_PAGES_TO_KEEP = ["/settings", "/velocity", "/overview", "/missions", "/wiki"];
+const WORKSPACE_PAGES_TO_KEEP = ["/more", "/settings", "/velocity", "/overview", "/missions", "/wiki"];
 const WORKSPACE_LIST_PAGES_TO_KEEP = ["/work-orders", "/automations"];
 
 function workspacePageToKeep(pathnameRest: string): boolean {
@@ -382,6 +382,31 @@ export function factoryDatadogIntakeSetupPath(organizationId: string, factoryKey
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/datadog`;
 }
 
+/** Connection created in this Linear OAuth round trip. The Linear callback appends it. */
+export const LINEAR_INTAKE_INTEGRATION_SEARCH_PARAM = "linearIntegrationId";
+
+/** Dedicated setup page for Linear issue intake. */
+export function factoryLinearIntakeSetupPath(
+  organizationId: string,
+  factoryKey: string,
+  lineId: string,
+  options?: { integrationId?: string },
+) {
+  const path = `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/linear`;
+  const integrationId = options?.integrationId?.trim();
+  if (!integrationId) {
+    return path;
+  }
+  const params = new URLSearchParams();
+  params.set(LINEAR_INTAKE_INTEGRATION_SEARCH_PARAM, integrationId);
+  return `${path}?${params.toString()}`;
+}
+
+export function linearIntakeIntegrationIdFromSearch(search: string): string {
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  return new URLSearchParams(query).get(LINEAR_INTAKE_INTEGRATION_SEARCH_PARAM)?.trim() ?? "";
+}
+
 /** Dedicated setup page for Dependabot alert intake. */
 export function factoryDependabotIntakeSetupPath(organizationId: string, factoryKey: string, lineId: string) {
   return `${factoryLineDetailPath(organizationId, factoryKey, lineId)}/setup/dependabot`;
@@ -616,4 +641,9 @@ export function factoryWikiPath(organizationId: string, factoryKey: string) {
 
 export function factoryVelocityPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/velocity`;
+}
+
+export function factoryMorePath(organizationId: string, factoryKey: string, lineId?: string) {
+  const path = `${factoryDetailPath(organizationId, factoryKey)}/more`;
+  return lineId ? `${path}?lineId=${encodeURIComponent(lineId)}` : path;
 }

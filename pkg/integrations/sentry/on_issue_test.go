@@ -132,6 +132,85 @@ func Test__OnIssue__OnIntegrationMessage(t *testing.T) {
 	assert.Equal(t, issue, payload["data"].(map[string]any)["issue"])
 }
 
+func Test__OnIssue__OnIntegrationMessage__ProjectsList(t *testing.T) {
+	issue := func(slug string) WebhookMessage {
+		return WebhookMessage{
+			Resource: "issue",
+			Action:   "created",
+			Data: map[string]any{
+				"issue": map[string]any{
+					"id":      "123",
+					"project": map[string]any{"slug": slug},
+				},
+			},
+		}
+	}
+
+	t.Run("emits only for a project in the list", func(t *testing.T) {
+		trigger := &OnIssue{}
+		eventCtx := &contexts.EventContext{}
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Message: issue("growth"),
+			Configuration: map[string]any{
+				"project":  "",
+				"projects": []any{"payments", "growth"},
+				"actions":  []string{"created"},
+			},
+			Events: eventCtx,
+			Logger: logrus.NewEntry(logrus.New()),
+		})
+		require.NoError(t, err)
+		require.Len(t, eventCtx.Payloads, 1)
+	})
+
+	t.Run("drops an issue from another project", func(t *testing.T) {
+		trigger := &OnIssue{}
+		eventCtx := &contexts.EventContext{}
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Message: issue("billing"),
+			Configuration: map[string]any{
+				"project":  "payments",
+				"projects": []any{"payments", "growth"},
+				"actions":  []string{"created"},
+			},
+			Events: eventCtx,
+			Logger: logrus.NewEntry(logrus.New()),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, eventCtx.Payloads)
+	})
+
+	t.Run("an empty list still honors the single project", func(t *testing.T) {
+		trigger := &OnIssue{}
+		eventCtx := &contexts.EventContext{}
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Message: issue("billing"),
+			Configuration: map[string]any{
+				"project":  "payments",
+				"projects": []any{},
+				"actions":  []string{"created"},
+			},
+			Events: eventCtx,
+			Logger: logrus.NewEntry(logrus.New()),
+		})
+		require.NoError(t, err)
+		assert.Empty(t, eventCtx.Payloads)
+
+		allowed := &contexts.EventContext{}
+		err = trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Message: issue("payments"),
+			Configuration: map[string]any{
+				"project": "payments",
+				"actions": []string{"created"},
+			},
+			Events: allowed,
+			Logger: logrus.NewEntry(logrus.New()),
+		})
+		require.NoError(t, err)
+		require.Len(t, allowed.Payloads, 1)
+	})
+}
+
 func Test__OnIssue__OnIntegrationMessage__EmptyActionsEmitNothing(t *testing.T) {
 	trigger := &OnIssue{}
 	eventCtx := &contexts.EventContext{}

@@ -201,6 +201,18 @@ service Me {
       tags: "Me";
     };
   }
+
+  rpc VerifyVCSProviderInstallations(VerifyVCSProviderInstallationsRequest) returns (VerifyVCSProviderInstallationsResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/me/vcs/{provider}/installations:verify"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Verify VCS provider installations";
+      description: "Checks with the VCS provider that the installations the user can see still exist, and removes the installations that were uninstalled";
+      tags: "Me";
+    };
+  }
 }
 
 message MeRequest {
@@ -218,6 +230,8 @@ message DescribeVCSProviderOnboardingRequest {
 message VCSProviderIdentity {
   int64 user_id = 1;
   string login = 2;
+  // Bitbucket account UUID. GitHub leaves this empty and uses user_id.
+  string provider_user_id = 3;
 }
 
 message VCSProviderRepository {
@@ -228,6 +242,8 @@ message VCSProviderRepository {
   string default_branch = 5;
   string account_login = 6;
   string account_type = 7;
+  // Bitbucket repository UUID. GitHub leaves this empty and uses repository_id.
+  string external_id = 8;
 }
 
 message VCSProviderInstallRequest {
@@ -237,6 +253,12 @@ message VCSProviderInstallRequest {
   google.protobuf.Timestamp requested_at = 4;
 }
 
+message VCSProviderInstalledWorkspace {
+ string installation_id = 1;
+ string external_id = 2;
+ string slug = 3;
+}
+
 message DescribeVCSProviderOnboardingResponse {
   bool provider_configured = 1;
   optional VCSProviderIdentity identity = 2;
@@ -244,6 +266,13 @@ message DescribeVCSProviderOnboardingResponse {
   repeated VCSProviderInstallRequest pending_requests = 4;
   bool synchronizing = 5;
   repeated VCSProviderIdentity identities = 6;
+  // Forge distribution link for Bitbucket. Empty for GitHub.
+  string install_url = 7;
+  // Bitbucket installations accessible to the linked account, even without repositories.
+  repeated VCSProviderInstalledWorkspace installed_workspaces = 8;
+  // True when Sign in with GitHub can start. A self-hosted GitHub App leaves
+  // this false and continues to organization selection.
+  bool account_connection_required = 9;
 }
 
 message SelectVCSProviderOnboardingIdentityRequest {
@@ -276,6 +305,12 @@ message RefreshVCSProviderOnboardingRequest {
 }
 
 message RefreshVCSProviderOnboardingResponse {}
+
+message VerifyVCSProviderInstallationsRequest {
+  string provider = 1;
+}
+
+message VerifyVCSProviderInstallationsResponse {}
 
 message BrowserNotificationPreferences {
   bool enabled = 1;

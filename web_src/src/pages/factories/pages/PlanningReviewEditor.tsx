@@ -1,11 +1,23 @@
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/ui/alertDialog";
 import { Workflow } from "lucide-react";
 import { useState } from "react";
 
+import { RESTORE_DEFAULT_PROMPT_COPY } from "../lib/defaultAgentPrompt";
 import { PlanningReviewForm } from "./PlanningReviewForm";
 import { PLANNING_REVIEW_DRAFT, singleAgentDraft, type PlanningReviewDraft } from "./planningReviewMockup";
 import { PopupBody } from "./work-order-popup-redesign/popupShared";
+import { useRestoreDefaultPrompt } from "./useRestoreDefaultPrompt";
 
 function AutomationNote({ href }: { href?: string }) {
   return (
@@ -36,6 +48,7 @@ export type PlanningReviewAgentSlot = {
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
+  automationId?: string;
   onSave?: (draft: PlanningReviewDraft) => void | Promise<void>;
   showVisualEvidenceSetting?: boolean;
 };
@@ -48,6 +61,7 @@ export function PlanningReviewEditor({
   organizationId,
   factoryId,
   factoryKey,
+  automationId,
   automationHref,
   isLoading = false,
   showAutomationNote = true,
@@ -60,6 +74,7 @@ export function PlanningReviewEditor({
   organizationId?: string;
   factoryId?: string;
   factoryKey?: string;
+  automationId?: string;
   automationHref?: string;
   isLoading?: boolean;
   showAutomationNote?: boolean;
@@ -68,9 +83,19 @@ export function PlanningReviewEditor({
 }) {
   const [draft, setDraft] = useState(() => singleAgentDraft(initialDraft));
   const [isSaving, setIsSaving] = useState(false);
-  const saveDisabled = isLoading || isSaving || draft.components.length === 0;
+  const restore = useRestoreDefaultPrompt({
+    draft,
+    setDraft,
+    organizationId,
+    factoryId,
+    automationId,
+  });
+  const saveDisabled = isLoading || isSaving || restore.isRestoring || draft.components.length === 0;
 
   const handleSave = async () => {
+    if (restore.isRestoring) {
+      return;
+    }
     if (!onSave) {
       onCancel?.();
       return;
@@ -103,6 +128,11 @@ export function PlanningReviewEditor({
             factoryId={factoryId}
             factoryKey={factoryKey}
             showVisualEvidenceSetting={showVisualEvidenceSetting}
+            onRestoreDefaultPrompt={restore.showRestore ? () => restore.setConfirmOpen(true) : undefined}
+            restoreDefaultPromptDisabled={restore.isRestoring}
+            restoreError={restore.restoreError}
+            onRetryRestore={restore.restoreError ? restore.retryRestore : undefined}
+            restoreRetryDisabled={restore.isRestoring}
           />
         </PopupBody>
       )}
@@ -123,6 +153,38 @@ export function PlanningReviewEditor({
           {isSaving ? "Saving…" : "Save Agent"}
         </Button>
       </footer>
+      <RestoreDefaultPromptDialog
+        open={restore.confirmOpen}
+        onOpenChange={restore.setConfirmOpen}
+        onConfirm={() => void restore.applyDefaultPrompt()}
+      />
     </div>
+  );
+}
+
+function RestoreDefaultPromptDialog({
+  open,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent data-testid="planning-review-restore-default-prompt-dialog">
+        <AlertDialogHeader>
+          <AlertDialogTitle>{RESTORE_DEFAULT_PROMPT_COPY.confirmTitle}</AlertDialogTitle>
+          <AlertDialogDescription>{RESTORE_DEFAULT_PROMPT_COPY.confirmDescription}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel data-testid="planning-review-restore-default-prompt-cancel">Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm} data-testid="planning-review-restore-default-prompt-confirm">
+            {RESTORE_DEFAULT_PROMPT_COPY.confirmAction}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

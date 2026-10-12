@@ -189,6 +189,41 @@ describe("CanvasPage auto-focus toggle", () => {
     expect(viewportRef.current).toEqual(initialViewport);
   });
 
+  it("does not pan the viewport when a focus request sets fit to false", async () => {
+    const hasFitToViewRef = { current: true };
+    const node = {
+      id: "node-1",
+      position: { x: 0, y: 0 },
+      data: { label: "Trigger", state: "pending", type: "component" },
+    };
+    getNodesMock.mockReturnValue([node]);
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={[node]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          hasFitToViewRef={hasFitToViewRef}
+          focusRequest={{ nodeId: "node-1", requestId: 7, targetMode: "live", fit: false }}
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      reactFlowPropsRef.current?.onInit?.({ setViewport: setViewportMock });
+    });
+
+    await waitFor(() => {
+      expect(selectedRunNodes().some((entry) => entry.id === "node-1" && entry.selected)).toBe(true);
+    });
+    expect(fitViewMock).not.toHaveBeenCalled();
+  });
+
   it("skips fitView for run participant fit requests when auto-focus is disabled and consumes the nonce", () => {
     vi.useFakeTimers();
     try {

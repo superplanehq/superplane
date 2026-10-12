@@ -39,6 +39,7 @@ func Test__ListWorkOrders_PagesByUpdatedAt(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, page.Orders, 2)
 	assert.True(t, page.HasNextPage)
+	assert.Equal(t, uint32(3), page.TotalCount)
 	assert.Equal(t, third.ID.String(), page.Orders[0].GetId())
 	assert.Equal(t, second.ID.String(), page.Orders[1].GetId())
 
@@ -50,6 +51,7 @@ func Test__ListWorkOrders_PagesByUpdatedAt(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, next.Orders, 1)
 	assert.False(t, next.HasNextPage)
+	assert.Equal(t, uint32(3), next.TotalCount)
 	assert.Equal(t, first.ID.String(), next.Orders[0].GetId())
 }
 

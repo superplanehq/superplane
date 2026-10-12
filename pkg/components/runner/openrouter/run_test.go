@@ -163,7 +163,7 @@ func TestBuildOpenCodeConfigWritesAnalysisInstructions(t *testing.T) {
 }
 
 func TestBuildOpenCodeConfigKeepsProtocolAtInstructionPriority(t *testing.T) {
-	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol_review.md"))
 	require.NoError(t, err)
 	config := jsBuildConfigWithPrompt(t, "/task", map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
@@ -236,6 +236,18 @@ func TestBuildOpenCodeConfigReadsWorkspaceMCPFromTaskDir(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "remote", deepwiki["type"])
 	assert.Equal(t, "https://mcp.deepwiki.com/mcp", deepwiki["url"])
+}
+
+func TestBuildOpenCodeConfigAddsMergeConfidenceMCP(t *testing.T) {
+	config := jsBuildConfig(t, "/task", map[string]string{
+		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "token",
+	})
+	mcp, _ := config["mcp"].(map[string]any)
+	superplane, _ := mcp["superplane"].(map[string]any)
+	command, _ := superplane["command"].([]any)
+
+	assert.Equal(t, []any{"node", "/task/merge_confidence_mcp.js"}, command)
+	assert.Equal(t, true, superplane["enabled"])
 }
 
 func TestBuildOpenCodeConfigAddsArtifactMCPOutsidePlanning(t *testing.T) {

@@ -27,15 +27,20 @@ func Test__FindPlanningSessionByWorkOrder__ReturnsAnalysisSession(t *testing.T) 
 	order, err := factoryModel.CreateWorkOrder(db, "Retry refunds", "Stop double charges.", &r.User, nil, nil)
 	require.NoError(t, err)
 
-	legacyCanvas, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "planning", "start")
-	_, err = factoryModel.StartPlanningSession(db, models.StartPlanningSessionParams{
-		CreatedByUserID: r.User,
-		Repository:      "acme/payments",
-		CanvasID:        legacyCanvas.ID,
-		Entrypoint:      entrypoint,
-		WorkOrderID:     order.ID,
-	})
-	require.NoError(t, err)
+	now := time.Now()
+	require.NoError(t, db.Create(&models.FactoryPlanningSession{
+		ID:               uuid.New(),
+		OrganizationID:   r.Organization.ID,
+		FactoryID:        factoryModel.ID,
+		CreatedByUserID:  &r.User,
+		Repository:       "acme/payments",
+		Kind:             models.PlanningSessionKindTaskCreation,
+		State:            models.PlanningSessionStateRunning,
+		DraftWorkOrderID: &order.ID,
+		HeartbeatAt:      now,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}).Error)
 
 	_, err = FindPlanningSessionByWorkOrder(ctx, r.Organization.ID.String(), &pb.FindPlanningSessionByWorkOrderRequest{
 		FactoryId:   factoryModel.ID.String(),

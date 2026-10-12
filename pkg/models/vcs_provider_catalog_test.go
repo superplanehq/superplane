@@ -317,6 +317,39 @@ func TestVCSProviderRepositorySyncReenqueueKeepsUrgency(t *testing.T) {
 	assert.WithinDuration(t, now, job.RunAt, time.Millisecond)
 }
 
+func TestVCSProviderRepositorySyncReenqueueDuringRunKeepsUrgency(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{Provider: ProviderGitHub, InstallationID: 101}))
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/api"},
+	}))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(
+		db,
+		ProviderGitHub,
+		201,
+		now.Add(-time.Second),
+		VCSProviderRepositorySyncPriorityInteractive,
+	))
+	job, err := ClaimVCSProviderRepositorySync(db, ProviderGitHub, now, now.Add(-time.Minute))
+	require.NoError(t, err)
+	require.NotNil(t, job)
+
+	require.NoError(t, EnqueueVCSProviderRepositorySync(
+		db,
+		ProviderGitHub,
+		201,
+		now,
+		VCSProviderRepositorySyncPriorityBackground,
+	))
+
+	var running VCSProviderRepositorySyncJob
+	require.NoError(t, db.First(&running, "provider = ? AND repository_id = ?", ProviderGitHub, 201).Error)
+	assert.Equal(t, VCSProviderRepositorySyncPriorityInteractive, running.Priority)
+}
+
 func TestVCSProviderRepositorySyncDelayedRefreshMovesUnlockedJobLater(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
@@ -429,6 +462,96 @@ func TestVCSProviderCatalogSynchronizingIncludesRequestedOrganizationJobs(t *tes
 	assert.False(t, synchronizing)
 }
 
+// After an organization installs the App on a new GitHub organization, the
+// install job finishes in about a second. The collaborator sync of its
+// repositories runs much longer, and the user is not a collaborator yet.
+func TestVCSProviderCatalogSynchronizingFollowsRequestedInstallationAfterItsJob(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+	organizationID := uuid.New()
+	require.NoError(t, EnqueueVCSProviderInstallationReconciliation(db, ProviderGitHub, 101, organizationID, now.Add(-time.Second)))
+	job, err := ClaimVCSProviderInstallationReconciliation(db, ProviderGitHub, now, now.Add(-time.Minute))
+	require.NoError(t, err)
+	require.NotNil(t, job)
+	require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{
+		Provider:       ProviderGitHub,
+		InstallationID: 101,
+		AccountLogin:   "acme",
+		AccountType:    "Organization",
+	}))
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/api"},
+	}))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 201, now, VCSProviderRepositorySyncPriorityInteractive))
+	require.NoError(t, CompleteVCSProviderInstallationReconciliation(db, ProviderGitHub, 101, *job.LockedAt))
+
+	synchronizing, err := VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, organizationID)
+	require.NoError(t, err)
+	assert.True(t, synchronizing)
+
+	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, uuid.New())
+	require.NoError(t, err)
+	assert.False(t, synchronizing)
+
+	require.NoError(t, db.Model(&VCSProviderInstallationReconcileRequester{}).
+		Where("installation_id = ?", 101).
+		Update("created_at", now.Add(-24*time.Hour)).Error)
+	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, organizationID)
+	require.NoError(t, err)
+	assert.True(t, synchronizing)
+
+	require.NoError(t, db.Where("repository_id = ?", 201).Delete(&VCSProviderRepositorySyncJob{}).Error)
+	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 201, now, VCSProviderRepositorySyncPriorityBackground))
+	synchronizing, err = VCSProviderCatalogSynchronizing(db, ProviderGitHub, 42, organizationID)
+	require.NoError(t, err)
+	assert.False(t, synchronizing)
+}
+
+func TestDeleteFinishedVCSProviderInstallationRequesters(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	db := database.Conn()
+	now := time.Now()
+	finishedOrganizationID := uuid.New()
+	syncingOrganizationID := uuid.New()
+	newOrganizationID := uuid.New()
+	for installationID, organizationID := range map[int64]uuid.UUID{
+		101: finishedOrganizationID,
+		102: syncingOrganizationID,
+		103: newOrganizationID,
+	} {
+		require.NoError(t, EnqueueVCSProviderInstallationReconciliation(db, ProviderGitHub, installationID, organizationID, now))
+	}
+	require.NoError(t, db.Where("provider = ?", ProviderGitHub).Delete(&VCSProviderInstallationReconcileJob{}).Error)
+	for installationID, login := range map[int64]string{101: "done", 102: "acme"} {
+		require.NoError(t, UpsertVCSProviderInstallation(db, &VCSProviderInstallation{
+			Provider:       ProviderGitHub,
+			InstallationID: installationID,
+			AccountLogin:   login,
+			AccountType:    "Organization",
+		}))
+	}
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 101, []VCSProviderRepository{
+		{RepositoryID: 201, FullName: "done/api"},
+	}))
+	require.NoError(t, ReplaceVCSProviderRepositories(db, ProviderGitHub, 102, []VCSProviderRepository{
+		{RepositoryID: 202, FullName: "acme/api"},
+	}))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 201, now, VCSProviderRepositorySyncPriorityBackground))
+	require.NoError(t, EnqueueVCSProviderRepositorySync(db, ProviderGitHub, 202, now, VCSProviderRepositorySyncPriorityInteractive))
+	require.NoError(t, db.Model(&VCSProviderInstallationReconcileRequester{}).
+		Where("installation_id IN ?", []int64{101, 102}).
+		Update("created_at", now.Add(-time.Hour)).Error)
+
+	require.NoError(t, DeleteFinishedVCSProviderInstallationRequesters(db, ProviderGitHub, now.Add(-time.Minute)))
+
+	var requesters []VCSProviderInstallationReconcileRequester
+	require.NoError(t, db.Order("installation_id").Find(&requesters).Error)
+	require.Len(t, requesters, 2)
+	assert.Equal(t, syncingOrganizationID, requesters[0].OrganizationID)
+	assert.Equal(t, newOrganizationID, requesters[1].OrganizationID)
+}
+
 func TestVCSProviderCatalogSynchronizingIncludesRelevantInstallationJobs(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	db := database.Conn()
@@ -486,7 +609,7 @@ func TestVCSProviderInstallationReconciliationJobClaim(t *testing.T) {
 	))
 	var requesterCount int64
 	require.NoError(t, db.Model(&VCSProviderInstallationReconcileRequester{}).Count(&requesterCount).Error)
-	assert.Zero(t, requesterCount)
+	assert.Equal(t, int64(1), requesterCount)
 }
 
 func TestVCSProviderReconciliationJobClaim(t *testing.T) {

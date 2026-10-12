@@ -2,7 +2,6 @@ package runner
 
 import (
 	"github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -14,14 +13,13 @@ const (
 	MaxExecutionTimeoutSecondsRequest = maxExecutionTimeoutSecondsRequest
 )
 
-func MachineTypeOptions() []configuration.FieldOption {
-	return machineTypeSelectOptions
-}
-
 func IntPtr(v int) *int { return intPtr(v) }
 
-func AfterRunnerTaskCreated(ctx core.ExecutionContext, taskID string) error {
-	return afterRunnerTaskCreated(ctx, taskID)
+func AfterRunnerTaskCreated(
+	ctx core.ExecutionContext,
+	taskID, backend string,
+) error {
+	return afterRunnerTaskCreated(ctx, taskID, backend)
 }
 
 func PollBrokerTask(ctx core.ActionHookContext, finishedEventType string) error {

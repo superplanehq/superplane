@@ -86,9 +86,9 @@ function ExpandableCommand({
     }
     setOverflows(node.scrollWidth > node.clientWidth + 1);
   }, [overflows, script]);
-  const canExpand = overflows || Boolean(output || exitLabel);
+  const canExpand = overflows || Boolean(output || stdout || exitLabel);
   if (!canExpand) {
-    const row = (
+    return (
       <CommandRow
         headline={headline}
         failed={failed}
@@ -98,15 +98,6 @@ function ExpandableCommand({
         duration={duration}
         lineRef={lineRef}
       />
-    );
-    if (!stdout) {
-      return row;
-    }
-    return (
-      <div className="px-1 py-0.5">
-        {row}
-        <CommandStdout text={stdout} />
-      </div>
     );
   }
   return (
@@ -153,15 +144,11 @@ function CommandDetails({
   status: string;
 }) {
   if (!open) {
-    return stdout ? <CommandStdout text={stdout} /> : null;
+    return null;
   }
   return (
     <div className="mt-1 border-l border-border/60 py-1 pl-2">
-      {output ? (
-        <pre className="overflow-x-auto font-mono text-[12px] leading-5 whitespace-pre text-destructive [tab-size:2]">
-          {output}
-        </pre>
-      ) : null}
+      {output ? <FailedCommandOutput text={output} /> : null}
       <pre
         className={cn(
           "overflow-x-auto font-mono text-[12px] leading-5 whitespace-pre text-foreground/90 [tab-size:2]",
@@ -177,17 +164,14 @@ function CommandDetails({
   );
 }
 
+const COMMAND_OUTPUT_CLASSNAME = "font-mono text-[12px] leading-5 whitespace-pre-wrap break-words [tab-size:2]";
+
+function FailedCommandOutput({ text }: { text: string }) {
+  return <pre className={cn(COMMAND_OUTPUT_CLASSNAME, "text-destructive")}>{text}</pre>;
+}
+
 function CommandStdout({ text, className }: { text: string; className?: string }) {
-  return (
-    <pre
-      className={cn(
-        "max-h-32 overflow-auto font-mono text-[12px] leading-5 whitespace-pre-wrap break-words text-muted-foreground [tab-size:2]",
-        className,
-      )}
-    >
-      {text}
-    </pre>
-  );
+  return <pre className={cn(COMMAND_OUTPUT_CLASSNAME, "text-muted-foreground", className)}>{text}</pre>;
 }
 
 type CommandRowProps = {

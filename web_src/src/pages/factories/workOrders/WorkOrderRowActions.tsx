@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { useOrgUserLookup } from "@/hooks/useOrgUserLookup";
 import { Forward } from "lucide-react";
 import { DispatchWorkOrderPopover } from "../DispatchWorkOrderPopover";
-import { OrgUserReference } from "../OrgUserReference";
+import { OrgUserReference, EmptyOwnerMark } from "../OrgUserReference";
+import { OwnerAssignTrigger } from "../WorkOrderAssigneesPopover";
 import type { WorkOrderListEntry } from "../lib/workOrderListModel";
 
-/** Actions callable from list and table rows. Cards do not change the owner. */
+/** Actions callable from list and table rows, and from the owner on a card. */
 export interface WorkOrderRowCallbacks {
   onDispatch: (orderId: string, input: { lineName: string }) => Promise<void>;
   onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
@@ -16,23 +17,39 @@ export interface WorkOrderRowCallbacks {
 interface CardOwnerMarkProps {
   entry: WorkOrderListEntry;
   organizationId: string;
-}
-
-/** Visible given name on a card. The full name stays on the title. */
-function ownerGivenName(fullName: string): string {
-  const givenName = fullName.trim().split(/\s+/)[0];
-  return givenName || fullName;
+  canAssign: boolean;
+  isAssigneesSaving: boolean;
+  onAssigneesSave: (orderId: string, assigneeIds: string[]) => Promise<void>;
 }
 
 /**
- * Display-only owner given name and avatar for cards. The name sits left
- * of the avatar. The owner cannot be changed here.
+ * Owner avatar for cards in the top-right corner.
+ * Clicking the avatar opens the people list when assignment is allowed.
  */
-export function CardOwnerMark({ entry, organizationId }: CardOwnerMarkProps) {
+export function CardOwnerMark({
+  entry,
+  organizationId,
+  canAssign,
+  isAssigneesSaving,
+  onAssigneesSave,
+}: CardOwnerMarkProps) {
   const { resolveUser } = useOrgUserLookup(organizationId);
   const owner = entry.order.assignees?.[0] as { id?: string; name?: string; avatarUrl?: string } | undefined;
-  if (!owner) {
-    return null;
+  if (!owner?.id) {
+    return (
+      <OwnerAssignTrigger
+        organizationId={organizationId}
+        selectedIds={[]}
+        canAssign={canAssign}
+        isSaving={isAssigneesSaving}
+        onSave={(assigneeIds) => onAssigneesSave(entry.id, assigneeIds)}
+        label="Assign owner"
+      >
+        <span className="inline-flex" data-testid={`work-order-row-assignees-${entry.id}`}>
+          <EmptyOwnerMark />
+        </span>
+      </OwnerAssignTrigger>
+    );
   }
 
   const display = resolveUser(owner.id, owner.name);
@@ -42,17 +59,27 @@ export function CardOwnerMark({ entry, organizationId }: CardOwnerMarkProps) {
   }
   const shown = owner.avatarUrl && !display.avatarUrl ? { ...display, avatarUrl: owner.avatarUrl } : display;
 
-  return (
+  const mark = (
     <span
-      className="inline-flex min-w-0 items-center gap-1.5"
+      className="inline-flex shrink-0 items-center justify-center"
       data-testid={`work-order-row-assignees-${entry.id}`}
       title={ownerName}
     >
-      <span className="truncate text-[11px] leading-4 text-muted-foreground">{ownerGivenName(ownerName)}</span>
-      <span className="inline-flex size-5 shrink-0 items-center justify-center">
-        <OrgUserReference display={shown} size="xs" showName={false} className="rounded-full leading-none" />
-      </span>
+      <OrgUserReference display={shown} size="xs" showName={false} className="rounded-full leading-none" />
     </span>
+  );
+
+  return (
+    <OwnerAssignTrigger
+      organizationId={organizationId}
+      selectedIds={[owner.id]}
+      canAssign={canAssign}
+      isSaving={isAssigneesSaving}
+      onSave={(assigneeIds) => onAssigneesSave(entry.id, assigneeIds)}
+      label={`Owner: ${ownerName}`}
+    >
+      {mark}
+    </OwnerAssignTrigger>
   );
 }
 
@@ -65,22 +92,42 @@ interface AssigneeGroupProps {
   size?: "sm" | "md";
 }
 
-/**
- * Single owner avatar. The owner cannot be changed here.
- */
-export function AssigneeGroup({ entry, organizationId, size = "sm" }: AssigneeGroupProps) {
+/** Single owner avatar. Clicking it opens the people list when assignment is allowed. */
+export function AssigneeGroup({
+  entry,
+  organizationId,
+  canAssign,
+  isAssigneesSaving,
+  onAssigneesSave,
+  size = "sm",
+}: AssigneeGroupProps) {
   const { resolveUser } = useOrgUserLookup(organizationId);
   const owner = entry.order.assignees?.[0];
-  if (!owner) {
-    return null;
+  if (!owner?.id) {
+    const mark = (
+      <span className="inline-flex items-center" data-testid={`work-order-row-assignees-${entry.id}`}>
+        <EmptyOwnerMark className="ring-2 ring-background" />
+      </span>
+    );
+    if (!canAssign) {
+      return <span className="pointer-events-none inline-flex">{mark}</span>;
+    }
+    return (
+      <OwnerAssignTrigger
+        organizationId={organizationId}
+        selectedIds={[]}
+        canAssign
+        isSaving={isAssigneesSaving}
+        onSave={(assigneeIds) => onAssigneesSave(entry.id, assigneeIds)}
+        label="Assign owner"
+      >
+        {mark}
+      </OwnerAssignTrigger>
+    );
   }
 
-  return (
-    <span
-      className="pointer-events-none inline-flex items-center"
-      data-testid={`work-order-row-assignees-${entry.id}`}
-      title={owner.name}
-    >
+  const mark = (
+    <span className="inline-flex items-center" data-testid={`work-order-row-assignees-${entry.id}`} title={owner.name}>
       <OrgUserReference
         display={resolveUser(owner.id, owner.name)}
         size={size}
@@ -88,6 +135,23 @@ export function AssigneeGroup({ entry, organizationId, size = "sm" }: AssigneeGr
         className="rounded-full ring-2 ring-background"
       />
     </span>
+  );
+
+  if (!canAssign) {
+    return <span className="pointer-events-none inline-flex">{mark}</span>;
+  }
+
+  return (
+    <OwnerAssignTrigger
+      organizationId={organizationId}
+      selectedIds={[owner.id]}
+      canAssign
+      isSaving={isAssigneesSaving}
+      onSave={(assigneeIds) => onAssigneesSave(entry.id, assigneeIds)}
+      label={`Owner: ${owner.name ?? "owner"}`}
+    >
+      {mark}
+    </OwnerAssignTrigger>
   );
 }
 

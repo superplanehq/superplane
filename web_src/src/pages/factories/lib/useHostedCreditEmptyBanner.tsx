@@ -31,7 +31,11 @@ function hostedCreditChromeState(
   };
 }
 
-export function useHostedCreditChrome(organizationId: string, factoryKey: string): { headerKicker?: ReactNode } {
+export function useHostedCreditChrome(
+  organizationId: string,
+  factoryKey: string,
+  options?: { compact?: boolean },
+): { headerKicker?: ReactNode } {
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const billing = useOrganizationBilling(organizationId);
   const { kind, remainingCreditCents, welcomeCreditExpiresAt, billingEnabled } = hostedCreditChromeState(
@@ -52,6 +56,7 @@ export function useHostedCreditChrome(organizationId: string, factoryKey: string
         welcomeCreditExpiresAt={welcomeCreditExpiresAt}
         remainingCreditCents={remainingCreditCents}
         canAddCredit={billingEnabled}
+        compact={options?.compact}
       />
     ),
   };

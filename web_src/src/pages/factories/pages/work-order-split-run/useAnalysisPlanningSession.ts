@@ -31,6 +31,7 @@ export const ANALYSIS_PLANNING_COPY = {
   stopped: "This analysis has stopped.",
   failedSend: "The message did not send. Try again.",
   failedLoad: "The analysis session did not load. Try again.",
+  failedLoadRefinement: "The refinement session did not load. Refresh the page to try again.",
 };
 
 type AnalysisPlanningSessionArgs = {

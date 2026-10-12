@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Format-check and validate the install stacks next to this directory.
-# Does not call AWS or GCP. terraform init only downloads providers.
+# Does not call AWS, GCP, or Azure. terraform init only downloads providers.
 
 set -euo pipefail
 
@@ -17,7 +17,7 @@ export TF_IN_AUTOMATION=1
 echo "==> terraform fmt"
 terraform fmt -check -recursive -diff .
 
-for dir in gke eks; do
+for dir in gke eks aks; do
   echo "==> terraform validate ${dir}"
   terraform -chdir="$dir" init -backend=false -input=false -no-color
   terraform -chdir="$dir" validate -no-color

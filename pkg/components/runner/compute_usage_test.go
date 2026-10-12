@@ -155,3 +155,26 @@ func TestRecordRunnerComputeUsagePrefersStoredFleetKV(t *testing.T) {
 	require.Len(t, recorder.computes, 1)
 	assert.Equal(t, MachineTypeE1LargeAMD64, recorder.computes[0].FleetID)
 }
+
+func TestRecordRunnerComputeUsageUsesIntegratedFleetWhenKVMissing(t *testing.T) {
+	t.Setenv("TASK_BROKER_FLEET_ID", "local")
+	t.Setenv("TASK_BROKER_BASE_URL", "http://localhost:8091")
+
+	claimed := time.Now()
+	finished := claimed.Add(time.Second)
+	state := &kvState{kv: map[string]string{
+		executionKVTaskBackend: core.RunnerTaskBackendIntegrated,
+	}}
+	recorder := &recordingComputeUsage{}
+	RecordRunnerComputeUsage(recorder, nil, state, map[string]any{
+		"machine_type": "aws-large-amd64",
+	}, &Task{
+		ID:         "task-7",
+		Status:     "succeeded",
+		ClaimedAt:  &claimed,
+		FinishedAt: &finished,
+	})
+
+	require.Len(t, recorder.computes, 1)
+	assert.Equal(t, "aws-large-amd64", recorder.computes[0].FleetID)
+}

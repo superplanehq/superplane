@@ -24,9 +24,25 @@ import { AccountSecurityRedesignPage } from "./account-profile-redesign/AccountS
 import { DeleteAccountDangerZone } from "./DeleteAccountDangerZone";
 import { useAccountSettingsAuthResults } from "./useAccountSettingsAuthResults";
 
-function linkedGitHubAccounts(linkedAccounts: AccountLinkedAccount[] | undefined) {
+function removeLinkedProvider(
+  provider: "github" | "bitbucket",
+  providerId: string,
+  refreshAccount: () => Promise<void>,
+) {
+  const service = provider === "github" ? "GitHub" : "Bitbucket";
+  void disconnectLinkedAccount(provider, providerId)
+    .then(async () => {
+      await refreshAccount();
+      showSuccessToast(`${service} link removed.`);
+    })
+    .catch((error) => {
+      showErrorToast(getApiErrorMessage(error, `Failed to remove the ${service} link.`));
+    });
+}
+
+function linkedAccountsFor(linkedAccounts: AccountLinkedAccount[] | undefined, provider: "github" | "bitbucket") {
   return (linkedAccounts ?? [])
-    .filter((account) => account.provider === "github" && account.provider_id && account.username.trim())
+    .filter((account) => account.provider === provider && account.provider_id && account.username.trim())
     .map((account) => ({ providerId: account.provider_id, username: account.username.trim() }));
 }
 
@@ -95,20 +111,12 @@ export function FactorySettingsAccountProfilePage() {
         }}
         associatedAccounts={
           <AccountProfileAssociatedAccountsCard
-            githubAccounts={linkedGitHubAccounts(account.linked_accounts)}
-            onLinkGithub={() => {
-              window.location.assign(linkedAccountConnectHref("github", redirectPath));
-            }}
-            onRemoveGithub={(providerId) => {
-              void disconnectLinkedAccount("github", providerId)
-                .then(async () => {
-                  await refreshAccount();
-                  showSuccessToast("GitHub link removed.");
-                })
-                .catch((error) => {
-                  showErrorToast(getApiErrorMessage(error, "Failed to remove the GitHub link."));
-                });
-            }}
+            githubAccounts={linkedAccountsFor(account.linked_accounts, "github")}
+            bitbucketAccounts={linkedAccountsFor(account.linked_accounts, "bitbucket")}
+            onLinkGithub={() => window.location.assign(linkedAccountConnectHref("github", redirectPath))}
+            onRemoveGithub={(providerId) => removeLinkedProvider("github", providerId, refreshAccount)}
+            onLinkBitbucket={() => window.location.assign(linkedAccountConnectHref("bitbucket", redirectPath))}
+            onRemoveBitbucket={(providerId) => removeLinkedProvider("bitbucket", providerId, refreshAccount)}
           />
         }
         security={

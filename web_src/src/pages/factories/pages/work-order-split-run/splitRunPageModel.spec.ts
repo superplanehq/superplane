@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { DRAFT_WORK_ORDER, OPEN_WORK_ORDER, RUNNING_WORK_ORDER } from "../../__fixtures__/factoryPageResponses";
-import { SPLIT_RUN_RUNNING } from "./splitRunMocks";
+import { columnAppCheckRunsToDescribe, SPLIT_RUN_RUNNING } from "./splitRunMocks";
 import {
   fixtureForSplitRunPage,
   phaseForSplitRunCanvas,
@@ -115,6 +115,59 @@ describe("fixtureForSplitRunPage", () => {
         person: expect.objectContaining({ avatarUrl: "https://example.com/avatar.jpg" }),
       }),
     );
+  });
+
+  it("keeps a newly linked check when the task list has not caught up", () => {
+    const pullRequests = [
+      {
+        number: "12",
+        runs: [
+          {
+            totalTokens: "46200",
+            costCents: "45",
+            models: ["anthropic/claude-sonnet-4-6"],
+            run: {
+              id: "run-merge",
+              canvasId: "app-merge",
+              state: "STATE_FINISHED" as const,
+              result: "RESULT_FAILED" as const,
+              createdAt: "2026-08-26T11:00:00Z",
+              finishedAt: "2026-08-26T11:18:08Z",
+            },
+          },
+        ],
+      },
+    ];
+    const checks = [
+      {
+        id: "check-merge",
+        key: "merge-confidence",
+        name: "Merge confidence",
+        score: 4,
+        maxScore: 5,
+        level: "LEVEL_POSITIVE" as const,
+        automation: { appId: "app-merge", appName: "Merge confidence" },
+        runId: "run-merge",
+        updatedAt: "2026-08-26T11:10:00Z",
+      },
+    ];
+    const columnApps = [{ id: "app-merge", name: "Merge confidence", columnKey: "verify" }];
+
+    expect(columnAppCheckRunsToDescribe(columnApps, checks, pullRequests)).toEqual([]);
+
+    const fixture = fixtureForSplitRunPage({ ...OPEN_WORK_ORDER, pullRequests: [] }, checks, null, {
+      columnApps,
+      pullRequests,
+      columnAppRuns: { runsById: new Map(), loadingIds: new Set() },
+    });
+
+    expect(fixture?.phases.find((phase) => phase.id === "column-app-run-merge")).toMatchObject({
+      status: "failed",
+      duration: "18m 8s",
+      costCents: "45",
+      totalTokens: "46200",
+      model: "anthropic/claude-sonnet-4-6",
+    });
   });
 });
 

@@ -60,6 +60,12 @@ describe("isIgnoredConsoleMessage", () => {
 });
 
 describe("isMonacoCanceledEvent", () => {
+  it("ignores a Canceled rejection whose frames come from an app monaco-editor asset", () => {
+    const event = buildEvent("Canceled", ["https://app.superplane.com/assets/monaco-editor-a1b2c3d4.js"]);
+
+    expect(isMonacoCanceledEvent(event)).toBe(true);
+  });
+
   it("ignores a Canceled rejection whose frames all come from monaco-editor", () => {
     const event = buildEvent("Canceled", [
       "https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/esm/vs/base/common/async.js",

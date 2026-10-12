@@ -23,6 +23,7 @@ import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 interface PRFeedbackSettingsPopupProps {
   organizationId?: string;
   githubIntegrationId?: string;
+  vcsProvider?: string;
   settings: PRFeedbackDraftSettings;
   healthy: boolean;
   automationGraph?: IntakeAutomationGraph;
@@ -46,6 +47,7 @@ interface PRFeedbackSettingsPopupProps {
 export function PRFeedbackSettingsPopup({
   organizationId,
   githubIntegrationId,
+  vcsProvider,
   settings,
   healthy,
   automationGraph,
@@ -130,6 +132,7 @@ export function PRFeedbackSettingsPopup({
           organizationId={agent.organizationId}
           factoryId={agent.factoryId}
           factoryKey={agent.factoryKey}
+          automationId={agent.automationId}
           isLoading={agent.isLoading}
           showAutomationNote={false}
           showCancel={false}
@@ -139,6 +142,7 @@ export function PRFeedbackSettingsPopup({
         <PRFeedbackGeneralTab
           organizationId={organizationId}
           githubIntegrationId={githubIntegrationId}
+          vcsProvider={vcsProvider}
           draft={draft}
           healthy={healthy}
           confirmDelete={confirmDelete}
@@ -159,6 +163,7 @@ export function PRFeedbackSettingsPopup({
 function PRFeedbackGeneralTab({
   organizationId,
   githubIntegrationId,
+  vcsProvider,
   draft,
   healthy,
   confirmDelete,
@@ -173,6 +178,7 @@ function PRFeedbackGeneralTab({
 }: {
   organizationId?: string;
   githubIntegrationId?: string;
+  vcsProvider?: string;
   draft: PRFeedbackDraftSettings;
   healthy: boolean;
   confirmDelete: boolean;
@@ -203,6 +209,7 @@ function PRFeedbackGeneralTab({
             <PRFeedbackDiscussionFields
               organizationId={organizationId}
               githubIntegrationId={githubIntegrationId}
+              vcsProvider={vcsProvider}
               draft={draft}
               onUpdate={onUpdate}
             />

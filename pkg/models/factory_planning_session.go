@@ -7,16 +7,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/core"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 const (
-	PlanningCanvasName        = "Create with an Agent"
-	PlanningCanvasDescription = "Starts the machine when you create a task with an agent."
-
 	PlanningSessionStateRunning = "running"
 	PlanningSessionStateEnded   = "ended"
 
@@ -47,7 +43,6 @@ var (
 	ErrFactoryPlanningSessionNotFound = errors.New("planning session not found")
 	ErrFactoryPlanningSessionEnded    = errors.New("planning session has ended")
 	ErrFactoryPlanningSessionNoDraft  = errors.New("planning session has no draft")
-	ErrFactoryPlanningSessionBusy     = errors.New("too many Create with an Agent sessions are running")
 	ErrFactoryPlanningWaitIdle        = errors.New("planning session is not waiting")
 )
 
@@ -71,14 +66,6 @@ type PlanningWaitResult struct {
 	Text         string `json:"text,omitempty"`
 	WorkOrderID  string `json:"work_order_id,omitempty"`
 	WorkOrderKey string `json:"work_order_key,omitempty"`
-}
-
-type StartPlanningSessionParams struct {
-	CreatedByUserID uuid.UUID
-	Repository      string
-	CanvasID        uuid.UUID
-	Entrypoint      string
-	WorkOrderID     uuid.UUID
 }
 
 type FactoryPlanningSession struct {
@@ -170,89 +157,6 @@ func ListAnalysisPlanningSessionsForWorkOrders(tx *gorm.DB, workOrderIDs []uuid.
 	return sessionsByOrder, nil
 }
 
-func (f *Factory) StartPlanningSession(tx *gorm.DB, params StartPlanningSessionParams) (*FactoryPlanningSession, error) {
-	repository := strings.TrimSpace(params.Repository)
-	if repository == "" || params.CreatedByUserID == uuid.Nil || params.CanvasID == uuid.Nil || strings.TrimSpace(params.Entrypoint) == "" {
-		return nil, ErrFactoryPlanningSessionInvalid
-	}
-
-	node, err := FindCanvasNode(tx, params.CanvasID, params.Entrypoint)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("%w: entrypoint not found", ErrFactoryPlanningSessionInvalid)
-		}
-		return nil, err
-	}
-	if node.Ref.Data().Trigger == nil || node.Ref.Data().Trigger.Name != "onRun" {
-		return nil, fmt.Errorf("%w: entrypoint must be onRun", ErrFactoryPlanningSessionInvalid)
-	}
-
-	refine, err := f.planningRefineWorkOrder(tx, params.WorkOrderID)
-	if err != nil {
-		return nil, err
-	}
-
-	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, params.CanvasID)
-	if err != nil {
-		return nil, err
-	}
-
-	now := time.Now()
-	run := NewPlanningSessionRun(params.CanvasID, liveVersion.ID, params.Entrypoint, f, repository, "", refine)
-	if err := tx.Create(run).Error; err != nil {
-		return nil, err
-	}
-
-	canvasID := params.CanvasID
-	createdByUserID := params.CreatedByUserID
-	session := &FactoryPlanningSession{
-		ID:              uuid.New(),
-		OrganizationID:  f.OrganizationID,
-		FactoryID:       f.ID,
-		CreatedByUserID: &createdByUserID,
-		Repository:      repository,
-		Kind:            PlanningSessionKindTaskCreation,
-		State:           PlanningSessionStateRunning,
-		CanvasID:        &canvasID,
-		CanvasRunID:     &run.ID,
-		HeartbeatAt:     now,
-		CreatedAt:       now,
-		UpdatedAt:       now,
-	}
-	if err := tx.Create(session).Error; err != nil {
-		return nil, err
-	}
-	if refine != nil {
-		if err := session.attachRefineDraft(tx, refine); err != nil {
-			return nil, err
-		}
-	}
-	return session, nil
-}
-
-func NewPlanningSessionRun(
-	canvasID, versionID uuid.UUID,
-	entrypoint string,
-	factoryModel *Factory,
-	repository, modelKey string,
-	refine *FactoryWorkOrder,
-) *CanvasRun {
-	now := time.Now()
-	return &CanvasRun{
-		ID:         uuid.New(),
-		WorkflowID: canvasID,
-		NodeID:     entrypoint,
-		VersionID:  versionID,
-		Callbacks: datatypes.JSONSlice[core.RunCallback]{
-			{When: core.RunCallbackWhenPending, On: core.RunCallbackOnEntry, Hook: "onMessage"},
-		},
-		Input:     NewJSONValue(planningSessionRunInput(factoryModel, repository, modelKey, refine)),
-		State:     CanvasRunStatePending,
-		CreatedAt: &now,
-		UpdatedAt: &now,
-	}
-}
-
 func (s *FactoryPlanningSession) AttachAgentRun(tx *gorm.DB, runID uuid.UUID, modelKey string) error {
 	if err := s.guardOpen(); err != nil {
 		return err
@@ -276,20 +180,6 @@ func (s *FactoryPlanningSession) AttachAgentRun(tx *gorm.DB, runID uuid.UUID, mo
 	}).Error
 }
 
-func (s *FactoryPlanningSession) RefineWorkOrder(tx *gorm.DB, factoryModel *Factory) (*FactoryWorkOrder, error) {
-	if s.DraftWorkOrderID == nil {
-		return nil, nil
-	}
-	order, err := factoryModel.FindWorkOrder(tx, *s.DraftWorkOrderID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return order, nil
-}
-
 func (f *Factory) planningRefineWorkOrder(tx *gorm.DB, workOrderID uuid.UUID) (*FactoryWorkOrder, error) {
 	if workOrderID == uuid.Nil {
 		return nil, nil
@@ -302,39 +192,6 @@ func (f *Factory) planningRefineWorkOrder(tx *gorm.DB, workOrderID uuid.UUID) (*
 		return nil, fmt.Errorf("%w: work order is not a draft", ErrFactoryPlanningSessionInvalid)
 	}
 	return order, nil
-}
-
-func planningSessionRunInput(factoryModel *Factory, repository, modelKey string, refine *FactoryWorkOrder) map[string]any {
-	planning := map[string]any{
-		"factory_id":         factoryModel.ID.String(),
-		"repository":         repository,
-		"refine_key":         "",
-		"refine_title":       "",
-		"refine_description": "",
-	}
-	if refine != nil {
-		planning["refine_key"] = factoryModel.WorkOrderKey(refine.Number)
-		planning["refine_title"] = refine.Title
-		planning["refine_description"] = refine.Description
-	}
-	if key := strings.TrimSpace(modelKey); key != "" {
-		planning["selectable_model_key"] = key
-	}
-	return map[string]any{"planning_session": planning}
-}
-
-func CountOpenPlanningSessions(tx *gorm.DB, organizationID, factoryID uuid.UUID) (int64, error) {
-	var count int64
-	err := tx.Model(&FactoryPlanningSession{}).
-		Where(
-			"organization_id = ? AND factory_id = ? AND state <> ? AND kind = ?",
-			organizationID,
-			factoryID,
-			PlanningSessionStateEnded,
-			PlanningSessionKindTaskCreation,
-		).
-		Count(&count).Error
-	return count, err
 }
 
 func FindPlanningSession(tx *gorm.DB, organizationID, factoryID, id uuid.UUID) (*FactoryPlanningSession, error) {
@@ -392,15 +249,6 @@ func ListStaleOpenPlanningSessions(tx *gorm.DB, now time.Time, limit int) ([]Fac
 		Limit(limit).
 		Find(&sessions).Error
 	return sessions, err
-}
-
-func FindPlanningCanvas(tx *gorm.DB, organizationID, factoryID uuid.UUID) (*Canvas, error) {
-	var canvas Canvas
-	err := tx.Where("organization_id = ? AND factory_id = ? AND name = ?", organizationID, factoryID, PlanningCanvasName).First(&canvas).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, gorm.ErrRecordNotFound
-	}
-	return &canvas, err
 }
 
 func (s *FactoryPlanningSession) Heartbeat(tx *gorm.DB) error {
@@ -539,10 +387,6 @@ func (s *FactoryPlanningSession) setDraft(draft PlanningSessionDraft) {
 		return
 	}
 	s.DraftWorkOrderID = nil
-}
-
-func (s *FactoryPlanningSession) clearDraft() {
-	s.setDraft(PlanningSessionDraft{})
 }
 
 func (s *FactoryPlanningSession) resolveWait(result PlanningWaitResult) {

@@ -230,7 +230,7 @@ describe("buildSpendingReport", () => {
     expect(report.seriesKeys[0].label).toBe("claude-sonnet-4-6");
   });
 
-  it("groups model spend by SuperPlane-hosted and Your keys", () => {
+  it("groups model spend by SuperPlane-hosted and Bring your own key", () => {
     const report = buildSpendingReport({
       events: ledger,
       range: rangeForPreset("week", NOW),
@@ -240,8 +240,8 @@ describe("buildSpendingReport", () => {
       usageKind: "model",
     });
     expect(report.breakdown.map((row) => row.id)).toEqual(["hosted", "byok"]);
-    expect(report.breakdown.map((row) => row.label)).toEqual(["SuperPlane-hosted", "Your keys"]);
-    expect(report.seriesKeys.map((item) => item.label)).toEqual(["SuperPlane-hosted", "Your keys"]);
+    expect(report.breakdown.map((row) => row.label)).toEqual(["SuperPlane-hosted", "Bring your own key"]);
+    expect(report.seriesKeys.map((item) => item.label)).toEqual(["SuperPlane-hosted", "Bring your own key"]);
   });
 });
 
@@ -251,11 +251,13 @@ describe("narrowSpendingReport", () => {
     range,
     totals: { costCents: 500, tokens: 2000, durationSeconds: 0, hostedCostCents: 0, byokCostCents: 500 },
     series: [{ key: "2026-09-01", label: "Sep 1", totalCents: 500, values: { byok: 500 } }],
-    seriesKeys: [{ id: "byok", label: "Your keys" }],
-    breakdown: [{ id: "byok", label: "Your keys", tokens: 2000, durationSeconds: 0, costCents: 500, share: 1 }],
+    seriesKeys: [{ id: "byok", label: "Bring your own key" }],
+    breakdown: [
+      { id: "byok", label: "Bring your own key", tokens: 2000, durationSeconds: 0, costCents: 500, share: 1 },
+    ],
   };
 
-  it("clears SuperPlane-hosted when the report only has Your keys", () => {
+  it("clears SuperPlane-hosted when the report only has Bring your own key", () => {
     const narrowed = narrowSpendingReport(
       byokOnlyReport,
       { ...EMPTY_SPENDING_FILTERS, fundingSource: "hosted" },
@@ -267,7 +269,7 @@ describe("narrowSpendingReport", () => {
     expect(narrowed.series[0]?.values).toEqual({});
   });
 
-  it("keeps Your keys when that source is selected", () => {
+  it("keeps Bring your own key when that source is selected", () => {
     const narrowed = narrowSpendingReport(
       byokOnlyReport,
       { ...EMPTY_SPENDING_FILTERS, fundingSource: "byok" },
@@ -293,7 +295,7 @@ describe("narrowSpendingReport", () => {
     expect(narrowed).toBe(workspaceReport);
   });
 
-  it("keeps workspace rows when Your keys is selected but the report is not grouped by source", () => {
+  it("keeps workspace rows when Bring your own key is selected but the report is not grouped by source", () => {
     const workspaceReport: SpendingReport = {
       ...byokOnlyReport,
       seriesKeys: [{ id: "ws-refunds", label: "Semaphore" }],

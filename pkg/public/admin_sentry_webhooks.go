@@ -51,7 +51,12 @@ func (s *Server) adminListSentryWebhooks(w http.ResponseWriter, r *http.Request)
 		limit = maxSentryWebhookLimit
 	}
 
-	receipts, total, err := models.ListSentryWebhookReceipts(database.DB(r.Context()), limit, (page-1)*limit)
+	receipts, total, err := models.ListSentryWebhookReceipts(
+		database.DB(r.Context()),
+		limit,
+		(page-1)*limit,
+		r.URL.Query().Get("project"),
+	)
 	if err != nil {
 		http.Error(w, "Failed to load Sentry webhooks", http.StatusInternalServerError)
 		return

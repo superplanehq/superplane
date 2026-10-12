@@ -14,7 +14,7 @@ const (
 	executionKVAnalysisSession = "analysis_session"
 )
 
-func storeRunnerFleetKV(ctx core.ExecutionContext, machineType string) error {
+func storeRunnerFleetKV(ctx core.ExecutionContext, machineType, backend string) error {
 	machineType = strings.TrimSpace(machineType)
 	if machineType == "" {
 		machineType = configurationMachineType(ctx.Configuration)
@@ -23,11 +23,18 @@ func storeRunnerFleetKV(ctx core.ExecutionContext, machineType string) error {
 		return err
 	}
 
-	fleetID, err := resolveBrokerFleetID(machineType)
+	fleetID, err := runnerFleetID(machineType, backend)
 	if err != nil {
 		fleetID = machineType
 	}
 	return ctx.ExecutionState.SetKV(executionKVFleetID, fleetID)
+}
+
+func runnerFleetID(machineType, backend string) (string, error) {
+	if normalizeTaskBackend(backend) == core.RunnerTaskBackendIntegrated {
+		return requireMachineType(machineType)
+	}
+	return resolveBrokerFleetID(machineType)
 }
 
 func RecordRunnerComputeUsage(
@@ -77,6 +84,9 @@ func resolveComputeMachineType(state core.ExecutionStateContext, configuration a
 func resolveComputeFleetID(state core.ExecutionStateContext, machineType string) string {
 	if fleetID := executionKV(state, executionKVFleetID); fleetID != "" {
 		return fleetID
+	}
+	if taskBackendFromState(state) == core.RunnerTaskBackendIntegrated {
+		return machineType
 	}
 	fleetID, err := resolveBrokerFleetID(machineType)
 	if err != nil {

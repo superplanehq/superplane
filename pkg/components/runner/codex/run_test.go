@@ -50,6 +50,26 @@ func TestCodexExecArgsUsesDangerousBypassOutsidePlanning(t *testing.T) {
 	assert.NotContains(t, strings.Join(args, " "), "mcp_servers")
 }
 
+func TestCodexExecArgsAddsMergeConfidenceMCP(t *testing.T) {
+	args := codexExecArgsFromScript(t, map[string]string{
+		"SUPERPLANE_MERGE_CONFIDENCE_TOKEN": "token",
+	}, "gpt-5", "/task/merge_confidence_mcp.js")
+
+	joined := strings.Join(args, " ")
+	assert.Contains(t, args, "--dangerously-bypass-approvals-and-sandbox")
+	assert.Contains(t, joined, `mcp_servers.superplane.command="node"`)
+	assert.Contains(t, joined, `mcp_servers.superplane.args=["/task/merge_confidence_mcp.js"]`)
+}
+
+func TestCodexSuperplaneMCPScriptUsesMergeConfidence(t *testing.T) {
+	script, err := filepath.Abs("run.js")
+	require.NoError(t, err)
+	cmd := exec.Command("node", "-e", `const { superplaneMCPScript } = require(process.argv[1]); process.stdout.write(superplaneMCPScript("/task", { SUPERPLANE_MERGE_CONFIDENCE_TOKEN: "token" }));`, script)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Equal(t, "/task/merge_confidence_mcp.js", string(out))
+}
+
 func TestCodexExecArgsAddsArtifactMCPOutsidePlanning(t *testing.T) {
 	args := codexExecArgsFromScript(t, map[string]string{
 		"SUPERPLANE_ARTIFACT_TOKEN": "artifact-token",
@@ -212,15 +232,17 @@ func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
 
 	joined := strings.Join(args, " ")
 	assert.Contains(t, joined, "developer_instructions=")
-	assert.Contains(t, joined, "propose_spec")
-	assert.Contains(t, joined, "propose_clarity")
-	assert.Contains(t, joined, "propose_confidence")
+	assert.Contains(t, joined, "propose_update")
+	assert.Contains(t, joined, "Do not call propose_spec, propose_clarity, propose_confidence, or survey")
+	assert.NotContains(t, joined, "Call propose_spec")
+	assert.NotContains(t, joined, "Call propose_clarity")
+	assert.NotContains(t, joined, "Call propose_confidence")
 	assert.NotContains(t, joined, "propose_plan")
 	assert.Contains(t, joined, "Use only the analysis tools")
 }
 
 func TestCodexExecArgsKeepsProtocolAtDeveloperPriority(t *testing.T) {
-	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol_review.md"))
 	require.NoError(t, err)
 	args := codexExecArgsFromScriptWithPrompt(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",

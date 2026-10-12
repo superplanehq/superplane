@@ -1,4 +1,0 @@
-# Packer build outputs
-manifest.json
-*.pkrvars.hcl
-.packer_cache/

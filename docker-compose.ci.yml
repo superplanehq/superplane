@@ -20,6 +20,7 @@ services:
     # Compose service DNS from docker-compose.dev.yml. Set these in CI env
     # only when a job talks to a real task-broker.
     environment:
+      CI: ${CI:-}
       TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-}
       TASK_BROKER_PUBLIC_URL: ${TASK_BROKER_PUBLIC_URL:-}
       TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}

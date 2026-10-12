@@ -24,6 +24,8 @@ import {
   type IntakeSettingsTab,
 } from "./intakeSourceSettingsModel";
 import { JIRA_COMPLETION_COLUMN_COPY } from "./jiraCompletionColumnCopy";
+import { LINEAR_INTAKE_SETUP_COPY } from "./linearIntakeSetupCopy";
+import { SENTRY_INTAKE_SETUP_COPY } from "./sentryIntakeSetupCopy";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 import type { PlanningReviewAgentSlot } from "./PlanningReviewEditor";
@@ -140,6 +142,7 @@ function renderPopup(
     runHrefFor?: (runId: string) => string;
     agent?: PlanningReviewAgentSlot;
     initialTab?: IntakeSettingsTab;
+    page?: boolean;
     labelOptions?: string[];
     labelOptionsLoading?: boolean;
     sourceId?: LineIntakeSourceId;
@@ -185,6 +188,7 @@ function renderPopup(
               agent={props.agent}
               onClose={props.onClose ?? vi.fn()}
               initialTab={props.initialTab}
+              page={props.page}
               fixed={false}
             />
           </TooltipProvider>
@@ -223,6 +227,22 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-source-automation")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the intake form and save action on a page without a dialog", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    const onClose = vi.fn();
+    renderPopup({ page: true, onSave, onClose });
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Intake GitHub issues" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
+    await user.click(screen.getByRole("checkbox", { name: "A closed issue is re-opened" }));
+    await user.click(screen.getByTestId("intake-source-settings-save"));
+
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ reopenedIssues: false })));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -397,6 +417,7 @@ describe("IntakeSourceSettingsPopup", () => {
     "jira-issues",
     "productive-tasks",
     "datadog",
+    "linear-issues",
   ] as const)("hides connection, project, and pause controls for a %s intake", (sourceId) => {
     renderPopup({ sourceId });
 
@@ -412,6 +433,7 @@ describe("IntakeSourceSettingsPopup", () => {
     "jira-issues",
     "productive-tasks",
     "datadog",
+    "linear-issues",
   ] as const)("deletes a %s intake after confirmation", async (sourceId) => {
     const onDelete = vi.fn();
     const user = userEvent.setup();
@@ -471,5 +493,37 @@ describe("IntakeSourceSettingsPopup", () => {
         jiraCompletionColumn: "QA",
       }),
     );
+  });
+
+  it("does not save a Linear intake with no project", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "linear-issues",
+      settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Linear issues", linearProjectIds: [] },
+      onSave,
+    });
+
+    expect(screen.getByText(LINEAR_INTAKE_SETUP_COPY.projectsRequired)).toBeInTheDocument();
+    const save = screen.getByTestId("intake-source-settings-save");
+    expect(save).toBeDisabled();
+    await user.click(save);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it("does not save a Sentry intake with no project", async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    renderPopup({
+      sourceId: "sentry-exceptions",
+      settings: { ...DEFAULT_SENTRY_INTAKE_SETTINGS, sentryProjectIds: [] },
+      onSave,
+    });
+
+    expect(screen.getByText(SENTRY_INTAKE_SETUP_COPY.projectsRequired)).toBeInTheDocument();
+    const save = screen.getByTestId("intake-source-settings-save");
+    expect(save).toBeDisabled();
+    await user.click(save);
+    expect(onSave).not.toHaveBeenCalled();
   });
 });

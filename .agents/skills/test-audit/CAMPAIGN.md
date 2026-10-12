@@ -2,17 +2,17 @@
 
 Campaign mode prunes one subsystem's whole test surface in one PR: a Go
 package such as `pkg/workers`, a UI mapper such as
-`web_src/src/pages/app/mappers/github`, or a runner area such as
-`runner/task-broker`. The value bar, retention bar, candidate evidence, and
-validation in [SKILL.md](SKILL.md) apply to every lane. This file adds the
-order of work and the lessons of a full campaign.
+`web_src/src/pages/app/mappers/github`, or an integrated runner area such as
+`pkg/runners/protocol`. The value bar, retention bar, candidate evidence, and
+validation in [SKILL.md](SKILL.md) apply to every lane. This file adds the order
+of work and the lessons of a full campaign.
 Each step ends on its completion criterion; do not start the next step early.
 
 ## 1. Baseline
 
 Record the subsystem's test and support line counts and every test file's
 pass/fail state at a pinned `main` SHA. Keep baseline failures in their own
-list: in a workers, mapper, or task-broker campaign, treat those failures as
+list: in a workers, mapper, or runner protocol campaign, treat those failures as
 possible product bugs, not stale tests, until proven otherwise.
 
 Done when every in-scope test file has a recorded baseline result.
@@ -22,9 +22,9 @@ Done when every in-scope test file has a recorded baseline result.
 Split the surface into **lanes** along production owner boundaries, not file
 prefixes. For `pkg/workers` these might be routing, retention, cleanup, and
 stream handling. For a UI mapper they might be status, payload, empty state,
-and error mapping. For `runner/task-broker` they might be dispatch, lease,
-and persistence. Include the subsystem's cases at shared core boundaries and
-its end-to-end and live-proof harness tests.
+and error mapping. For `pkg/runners` they might be registration, protocol,
+execution, and log upload. Include the subsystem's cases at shared core
+boundaries and its end-to-end and live-proof harness tests.
 
 Done when every test file and QA scenario the subsystem owns belongs to exactly
 one lane.
@@ -75,10 +75,9 @@ mistakes this campaign actually found.
 
 Validate each lane with the smallest owner suite from [SKILL.md](SKILL.md):
 `make test PKG_TEST_PACKAGES=...` for Go, `make check.test.ui FILES=...` for
-UI, `$(MAKE) -C runner test` for runner, and `E2E_TEST_PACKAGES=... make
-test.e2e` (or `make test.e2e.single FILE=... LINE=...`) for end-to-end.
-Then format, run `git diff --check`, and run the matching lint and
-build checks from
+UI, and `E2E_TEST_PACKAGES=... make test.e2e` (or `make test.e2e.single
+FILE=... LINE=...`) for end-to-end. Then format, run `git diff --check`, and run
+the matching lint and build checks from
 [pre-pipeline-review](../pre-pipeline-review/SKILL.md).
 
 Done when every lane plan is applied and each lane's keepers pass.

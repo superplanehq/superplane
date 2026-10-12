@@ -3,17 +3,21 @@ import { cloneElement, isValidElement, type PointerEvent, type ReactElement, typ
 import type { FactoriesWorkOrderArtifact, FilesFile } from "@/api-client";
 import { useRevealAfterPending } from "@/hooks/useRevealAfterPending";
 import { cn } from "@/lib/utils";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/ui/skeleton";
 
 import { liveDraftReadiness, type DraftReadinessTone } from "../../lib/draftReadiness";
 import { INTENT_DOCUMENT_TITLE, type IntentDocument } from "../../lib/intentDocument";
 import { LOADING_REVEAL_CLASSNAME } from "../../lib/loadingReveal";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
+import { hasPendingPlanningQuestions } from "./planningReviewState";
 import { useRefineDocumentModel } from "./useRefineDocumentModel";
 import { WorkOrderIntentConfidenceFooter } from "./WorkOrderIntentConfidenceFooter";
 import { IntentDocumentSkeleton } from "./IntentDocumentSkeleton";
 import { WorkOrderIntentPlan } from "./WorkOrderIntentPlan";
-import { WorkOrderIntentRequest, type IntentAnalysisChat } from "./WorkOrderIntentRequest";
+import type { IntentAnalysisChat } from "./intentAnalysisChat";
+import { WorkOrderIntentRequest } from "./WorkOrderIntentRequest";
 import type { SplitRunSource } from "./splitRunSource";
 
 const REQUEST_PANE_BASE_CLASS = "flex min-h-0 min-w-0 w-full flex-1 flex-col";
@@ -21,11 +25,11 @@ const REQUEST_PANE_SPLIT_CLASS =
   "flex min-h-0 min-w-0 w-full flex-1 flex-col border-b border-border lg:w-[var(--intent-left)] lg:min-w-[14rem] lg:flex-none lg:border-r lg:border-b-0";
 const REFINE_SPLIT_EASE = "lg:duration-300 lg:ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:lg:transition-none";
 
-export type { IntentAnalysisChat } from "./WorkOrderIntentRequest";
+export type { IntentAnalysisChat } from "./intentAnalysisChat";
 
 /**
- * Description-tab reading pane. Refine chat starts as one column. A sticky
- * plan control opens the spec on the right. After Start, the left pane shows
+ * Description-tab reading pane. Refine chat starts as one column. A
+ * plan card opens the spec on the right. After Start, the left pane shows
  * source context. The summary stays on the right.
  */
 type WorkOrderIntentDocumentProps = {
@@ -34,6 +38,7 @@ type WorkOrderIntentDocumentProps = {
   artifacts: FactoriesWorkOrderArtifact[];
   clarity?: WorkOrderCheckPresentation;
   confidence?: WorkOrderCheckPresentation;
+  reviewMetrics?: WorkOrderCheckPresentation[];
   isAnalyzing?: boolean;
   files?: FilesFile[];
   resultAfterBody?: ReactNode;
@@ -51,6 +56,7 @@ export function WorkOrderIntentDocument({
   artifacts,
   clarity,
   confidence,
+  reviewMetrics,
   isAnalyzing = false,
   files,
   resultAfterBody,
@@ -79,6 +85,7 @@ export function WorkOrderIntentDocument({
     artifacts,
     clarity,
     confidence,
+    reviewMetrics,
     isAnalyzing,
     resultFooter,
     analysis,
@@ -126,6 +133,7 @@ export function WorkOrderIntentDocument({
             contextSidebar={contextSidebar}
             isResizing={split.isResizing}
             onResize={split.startResize}
+            onClosePlan={analysisChat?.onTogglePlan}
           />
         ) : null}
       </div>
@@ -133,30 +141,40 @@ export function WorkOrderIntentDocument({
   );
 }
 
-/**
- * The strip verdict and the Start weight read the same scores, so the button
- * agrees with the headline above it.
- */
+/** Start stays available, but questions and plan updates take priority. */
+function planningReadiness(analysis: IntentAnalysisChat) {
+  return liveDraftReadiness({
+    clarity: analysis.showClarity !== false ? analysis.clarity?.score : undefined,
+    confidence: analysis.showConfidence !== false ? analysis.confidence?.score : undefined,
+    scoreMax: analysis.confidence?.maxScore,
+    isAnalyzing:
+      analysis.isAnalyzing || analysis.view.machineStatus === "starting" || analysis.view.machineStatus === "running",
+  });
+}
+
 function withClosedDecision(
   analysisChat: IntentAnalysisChat | undefined,
   showClosedDecision: boolean,
-  resultFooter?: ReactNode,
+  resultFooter: ReactNode,
 ): IntentAnalysisChat | undefined {
   if (!analysisChat) {
     return undefined;
   }
   if (!showClosedDecision) {
-    return { ...analysisChat, closedDecision: undefined, modelSelect: undefined };
+    return { ...analysisChat, closedDecision: undefined, modelSelect: undefined, readinessNote: undefined };
   }
-  const startTone = analysisChat.creditVerdict
-    ? "blocked"
-    : liveDraftReadiness({
-        clarity: analysisChat.clarity?.score,
-        confidence: analysisChat.confidence?.score,
-        isAnalyzing: analysisChat.isAnalyzing,
-      }).tone;
+  const readiness = planningReadiness(analysisChat);
+  const startTone = analysisChat.creditVerdict ? "blocked" : readiness.tone;
+  const startDiscouraged = !analysisChat.creditVerdict && (startTone === "caution" || startTone === "blocked");
   return {
     ...analysisChat,
+    startDiscouraged,
+    readinessNote: startDiscouraged ? { headline: readiness.headline, text: readiness.text } : undefined,
+    prioritizeImplementation:
+      Boolean(analysisChat.canTogglePlan) &&
+      readiness.tone === "ready" &&
+      analysisChat.view.machineStatus === "waiting" &&
+      !hasPendingPlanningQuestions(analysisChat.view),
     closedDecision: <ClosedPlanActions resultFooter={resultFooter} startTone={startTone} />,
   };
 }
@@ -169,6 +187,7 @@ function requestPaneClassName(refineOpen: boolean, showPlanPane: boolean, isResi
     REQUEST_PANE_BASE_CLASS,
     "border-b border-border lg:w-[var(--intent-left)] lg:flex-none lg:border-r lg:border-b-0",
     showPlanPane && "lg:min-w-[14rem]",
+    showPlanPane && "max-lg:hidden",
     !isResizing && `lg:transition-[width] ${REFINE_SPLIT_EASE}`,
   );
 }
@@ -259,6 +278,7 @@ function IntentSpecColumn({
   contextSidebar,
   isResizing,
   onResize,
+  onClosePlan,
 }: {
   title: string;
   document: IntentDocument;
@@ -278,6 +298,7 @@ function IntentSpecColumn({
   contextSidebar?: ReactNode;
   isResizing: boolean;
   onResize: (event: PointerEvent<HTMLDivElement>) => void;
+  onClosePlan?: () => void;
 }) {
   const pending = intentSpecPending(streamReady, isAnalyzing);
   const reveal = useRevealAfterPending(pending);
@@ -303,6 +324,7 @@ function IntentSpecColumn({
         planWidth={planWidth}
         animateSplit={animateSplit}
         contextSidebar={contextSidebar}
+        onClosePlan={onClosePlan}
       />
     </>
   );
@@ -368,6 +390,7 @@ function IntentSpecResult({
   planWidth,
   animateSplit,
   contextSidebar,
+  onClosePlan,
 }: {
   title: string;
   document: IntentDocument;
@@ -387,6 +410,7 @@ function IntentSpecResult({
   planWidth?: string;
   animateSplit: boolean;
   contextSidebar?: ReactNode;
+  onClosePlan?: () => void;
 }) {
   return (
     <div
@@ -398,6 +422,14 @@ function IntentSpecResult({
       aria-hidden={collapsed || undefined}
       inert={collapsed || undefined}
     >
+      {refineOpen && onClosePlan ? (
+        <div className="shrink-0 px-5 pt-3 lg:hidden">
+          <Button type="button" variant="ghost" size="sm" onClick={onClosePlan}>
+            <ArrowLeft aria-hidden className="size-4" />
+            Back to conversation
+          </Button>
+        </div>
+      ) : null}
       <header className="flex shrink-0 items-start justify-between gap-3 px-5 pt-5 pb-2">
         <h2 className="min-h-6 min-w-0 text-[17px] leading-6 font-semibold tracking-tight text-foreground">
           {showSkeleton ? (

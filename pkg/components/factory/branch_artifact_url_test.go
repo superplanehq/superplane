@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func TestBranchTreeURL(t *testing.T) {
@@ -13,18 +15,53 @@ func TestBranchTreeURL(t *testing.T) {
 
 	cases := []struct {
 		name       string
+		provider   string
 		repository string
 		branch     string
 		want       string
 	}{
 		{
-			name:       "owner/repo on GitHub.com",
+			name:       "empty provider uses GitHub",
+			repository: "example/repo",
+			branch:     "feature/refund-retry",
+			want:       "https://github.com/example/repo/tree/feature/refund-retry",
+		},
+		{
+			name:       "GitHub owner/repo",
+			provider:   "github",
+			repository: "example/repo",
+			branch:     "feature/refund-retry",
+			want:       "https://github.com/example/repo/tree/feature/refund-retry",
+		},
+		{
+			name:       "Bitbucket workspace/repo",
+			provider:   "bitbucket",
+			repository: "acme/app",
+			branch:     "feature/refund-retry",
+			want:       "https://bitbucket.org/acme/app/src/feature/refund-retry",
+		},
+		{
+			name:       "unknown provider keeps GitHub owner/repo",
+			provider:   "gitlab",
 			repository: "example/repo",
 			branch:     "feature/refund-retry",
 			want:       "https://github.com/example/repo/tree/feature/refund-retry",
 		},
 		{
 			name:       "repository https URL",
+			repository: "https://github.com/example/repo",
+			branch:     "hotfix",
+			want:       "https://github.com/example/repo/tree/hotfix",
+		},
+		{
+			name:       "full bitbucket.org URL uses src",
+			repository: "https://bitbucket.org/acme/app",
+			branch:     "feature/refund-retry",
+			want:       "https://bitbucket.org/acme/app/src/feature/refund-retry",
+		},
+		{
+			name:       "full github.com URL keeps tree when the provider is Bitbucket",
+			provider:   "bitbucket",
 			repository: "https://github.com/example/repo",
 			branch:     "hotfix",
 			want:       "https://github.com/example/repo/tree/hotfix",
@@ -82,9 +119,28 @@ func TestBranchTreeURL(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tc.want, branchTreeURL(tc.repository, tc.branch))
+			assert.Equal(t, tc.want, branchTreeURL(tc.provider, tc.repository, tc.branch))
 		})
 	}
+}
+
+func TestAddWorkOrderArtifact_Execute_WritesBitbucketBranchURL(t *testing.T) {
+	component := &AddWorkOrderArtifact{}
+	factoryCtx := &fakeFactoryContext{vcsProvider: "bitbucket"}
+	stateCtx := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"orderId":      "wo-1",
+			"artifactType": "branch",
+			"name":         "feature/refund-retry",
+			"repository":   "acme/app",
+		},
+		ExecutionState: stateCtx,
+		Factory:        factoryCtx,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "https://bitbucket.org/acme/app/src/feature/refund-retry", factoryCtx.addArtifactParams.Data["url"])
 }
 
 func TestBuildArtifactData_WritesBranchTreeURLFromRepository(t *testing.T) {
@@ -162,7 +218,7 @@ func TestBuildArtifactData_DropsUnparseableRepositoryURLWithCredentials(t *testi
 		ArtifactType: "branch",
 		Name:         "hotfix",
 		Repository:   "https://oauth2:token@",
-	})
+	}, "")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "branch artifact requires a url or a repository")
@@ -187,7 +243,7 @@ func TestBuildArtifactData_RejectsBranchWithoutReachableURL(t *testing.T) {
 	_, err := buildArtifactData(AddWorkOrderArtifactConfiguration{
 		ArtifactType: "branch",
 		Name:         "feature/refund-retry",
-	})
+	}, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "branch artifact requires a url or a repository")
 }

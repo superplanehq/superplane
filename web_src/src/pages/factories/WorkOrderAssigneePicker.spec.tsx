@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "bun:test";
 
 import type { SuperplaneUsersUser } from "@/api-client";
@@ -29,23 +29,17 @@ function renderPicker(overrides: Partial<Parameters<typeof WorkOrderAssigneePick
 }
 
 function renderedNames() {
-  return screen.getAllByRole("listitem").map((item) => item.textContent?.trim());
-}
-
-function checkboxFor(name: string) {
-  const item = screen.getAllByRole("listitem").find((el) => el.textContent?.includes(name));
-  if (!item) {
-    throw new Error(`Could not find list item for ${name}`);
-  }
-  return within(item).getByRole("checkbox");
+  return screen
+    .getAllByRole("option")
+    .map((item) => item.textContent ?? "")
+    .filter((name) => !name.includes("No owner"));
 }
 
 describe("WorkOrderAssigneePicker", () => {
   it("sorts users alphabetically when nobody is assigned", () => {
     renderPicker();
 
-    const names = renderedNames();
-    expect(names).toEqual([
+    expect(renderedNames()).toEqual([
       expect.stringContaining("Alice Anderson"),
       expect.stringContaining("Bob Brown"),
       expect.stringContaining("Carol Clark"),
@@ -56,8 +50,7 @@ describe("WorkOrderAssigneePicker", () => {
   it("pins currently-assigned users to the top regardless of alphabetical order", () => {
     renderPicker({ selectedIds: ["dan", "bob"], pinnedIds: ["dan", "bob"] });
 
-    const names = renderedNames();
-    expect(names).toEqual([
+    expect(renderedNames()).toEqual([
       expect.stringContaining("Bob Brown"),
       expect.stringContaining("Dan Davis"),
       expect.stringContaining("Alice Anderson"),
@@ -68,8 +61,7 @@ describe("WorkOrderAssigneePicker", () => {
   it("falls back to selectedIds for pinning when pinnedIds is not provided", () => {
     renderPicker({ selectedIds: ["carol"] });
 
-    const names = renderedNames();
-    expect(names[0]).toContain("Carol Clark");
+    expect(renderedNames()[0]).toContain("Carol Clark");
   });
 
   it("keeps the pinned order stable while the live selection changes mid-session", () => {
@@ -84,7 +76,6 @@ describe("WorkOrderAssigneePicker", () => {
 
     expect(renderedNames()[0]).toContain("Bob Brown");
 
-    // selectedIds changes but pinnedIds stays the same; order must not change.
     rerender(
       <WorkOrderAssigneePicker
         organizationId="org-1"
@@ -94,8 +85,7 @@ describe("WorkOrderAssigneePicker", () => {
       />,
     );
 
-    const names = renderedNames();
-    expect(names).toEqual([
+    expect(renderedNames()).toEqual([
       expect.stringContaining("Bob Brown"),
       expect.stringContaining("Dan Davis"),
       expect.stringContaining("Alice Anderson"),
@@ -103,10 +93,19 @@ describe("WorkOrderAssigneePicker", () => {
     ]);
   });
 
-  it("clears the owner when the selected person is unchecked", () => {
+  it("filters the list from the search field", () => {
+    renderPicker();
+
+    fireEvent.change(screen.getByPlaceholderText("Search people"), { target: { value: "dan" } });
+
+    expect(screen.getByRole("option", { name: "Dan Davis" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Alice Anderson" })).not.toBeInTheDocument();
+  });
+
+  it("clears the owner from the No owner row", () => {
     const { onChange } = renderPicker({ selectedIds: ["alice"] });
 
-    fireEvent.click(checkboxFor("Alice Anderson"));
+    fireEvent.click(screen.getByRole("option", { name: "No owner" }));
 
     expect(onChange).toHaveBeenCalledWith([]);
   });
@@ -114,7 +113,7 @@ describe("WorkOrderAssigneePicker", () => {
   it("replaces the current owner when another person is selected", () => {
     const { onChange } = renderPicker({ selectedIds: ["alice"] });
 
-    fireEvent.click(checkboxFor("Bob Brown"));
+    fireEvent.click(screen.getByRole("option", { name: "Bob Brown" }));
 
     expect(onChange).toHaveBeenCalledWith(["bob"]);
     expect(onChange).not.toHaveBeenCalledWith(["alice", "bob"]);

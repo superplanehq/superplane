@@ -14,6 +14,7 @@ import {
   EMPTY_WORK_ORDER_FILTERS,
   MANUAL_FILTER_VALUE,
   UNASSIGNED_FILTER_VALUE,
+  applyWorkOrderFilters,
   buildWorkOrderListEntries,
 } from "./workOrderListModel";
 
@@ -106,6 +107,49 @@ describe("buildSourceFilterOptions", () => {
       { value: "sentry-exceptions", label: "Sentry exceptions" },
       { value: MANUAL_FILTER_VALUE, label: "Created manually" },
     ]);
+  });
+
+  it("labels Dependabot alerts and matches only that source", () => {
+    const dependabotHref =
+      "https://github.com/acme/payments/security/dependabot?q=is:open+package:vitest+ecosystem:npm";
+    const entries = buildWorkOrderListEntries(
+      [
+        order({
+          id: "wo-dependabot",
+          title: "Fix Dependabot alerts for vitest (npm)",
+          origin: { url: dependabotHref, label: "Dependabot: vitest" },
+        }),
+        order({
+          id: "wo-issue",
+          title: "Fix Dependabot alerts for vitest (npm)",
+          origin: { url: "https://github.com/acme/payments/issues/12", label: "Dependabot: vitest" },
+        }),
+      ],
+      factory,
+    );
+
+    expect(buildSourceFilterOptions([{ id: "dep-1", source: "SOURCE_DEPENDABOT_ALERTS" }], entries)).toEqual([
+      { value: "dependabot-alerts", label: "Dependabot alerts" },
+      { value: "github-issues", label: "GitHub issues" },
+      { value: MANUAL_FILTER_VALUE, label: "Created manually" },
+    ]);
+
+    const chips = buildWorkOrderFilterChips(
+      { ...EMPTY_WORK_ORDER_FILTERS, sourceIds: ["dependabot-alerts"] },
+      { lines: [], sources: [], assignees: [] },
+    );
+    expect(chips.map((chip) => chip.label)).toEqual(["Source is Dependabot alerts"]);
+
+    expect(
+      applyWorkOrderFilters(entries, { ...EMPTY_WORK_ORDER_FILTERS, sourceIds: ["dependabot-alerts"] }).map(
+        (entry) => entry.id,
+      ),
+    ).toEqual(["wo-dependabot"]);
+    expect(
+      applyWorkOrderFilters(entries, { ...EMPTY_WORK_ORDER_FILTERS, sourceIds: ["github-issues"] }).map(
+        (entry) => entry.id,
+      ),
+    ).toEqual(["wo-issue"]);
   });
 });
 

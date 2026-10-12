@@ -15,6 +15,7 @@ import {
 } from "./intakeSourceSettingsModel";
 import { DependabotIntakeFilterFields } from "./DependabotIntakeFilterFields";
 import { DatadogIntakeFilterFields } from "./DatadogIntakeFilterFields";
+import { LinearIntakeFilterFields } from "./LinearIntakeFilterFields";
 import { GitHubIntakeFilterFields } from "./GitHubIntakeFilterFields";
 import { JiraIntakeFilterFields } from "./JiraIntakeFilterFields";
 import { ProductiveIntakeFilterFields } from "./ProductiveIntakeFilterFields";
@@ -53,6 +54,7 @@ interface IntakeSourceSettingsPopupProps {
   agent?: PlanningReviewAgentSlot;
   onClose: () => void;
   fixed?: boolean;
+  page?: boolean;
   initialTab?: IntakeSettingsTab;
 }
 
@@ -80,6 +82,7 @@ export function IntakeSourceSettingsPopup({
   agent,
   onClose,
   fixed = true,
+  page = false,
   initialTab = "general",
 }: IntakeSourceSettingsPopupProps) {
   const tabs = intakeSettingsTabs(Boolean(agent));
@@ -98,8 +101,8 @@ export function IntakeSourceSettingsPopup({
     }
   }, [tab, hasAgent]);
 
-  return (
-    <PopupShell testId="intake-source-settings" canvas fixed={fixed} onDismiss={onClose}>
+  const content = (
+    <>
       <PopupHeader
         title={`Intake ${settings.name}`}
         onClose={onClose}
@@ -154,6 +157,24 @@ export function IntakeSourceSettingsPopup({
         onSave={onSave}
         onClose={onClose}
       />
+    </>
+  );
+
+  if (page) {
+    return (
+      <section
+        className="flex h-full min-h-0 flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)] dark:bg-gray-900"
+        data-testid="intake-source-settings"
+        aria-label={`Intake ${settings.name}`}
+      >
+        {content}
+      </section>
+    );
+  }
+
+  return (
+    <PopupShell testId="intake-source-settings" canvas fixed={fixed} onDismiss={onClose}>
+      {content}
     </PopupShell>
   );
 }
@@ -251,6 +272,7 @@ function IntakeSettingsTabPanel({
         organizationId={agent.organizationId}
         factoryId={agent.factoryId}
         factoryKey={agent.factoryKey}
+        automationId={agent.automationId}
         isLoading={agent.isLoading}
         showAutomationNote={false}
         showCancel={false}
@@ -330,7 +352,13 @@ function IntakeGeneralTab({
             integrationId={integrationId}
             projectId={resourceId}
           />
-          <SentryIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
+          <SentryIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
+          />
           <DependabotIntakeFilterFields sourceId={sourceId} settings={draft} onSettingsChange={onDraftChange} />
           <ProductiveIntakeFilterFields
             sourceId={sourceId}
@@ -347,6 +375,13 @@ function IntakeGeneralTab({
             organizationId={organizationId}
             integrationId={integrationId}
             resourceId={resourceId}
+          />
+          <LinearIntakeFilterFields
+            sourceId={sourceId}
+            settings={draft}
+            onSettingsChange={onDraftChange}
+            organizationId={organizationId}
+            integrationId={integrationId}
           />
         </div>
       </div>

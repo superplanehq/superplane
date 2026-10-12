@@ -144,7 +144,13 @@ func (s *TestSession) resetDatabase() {
         END LOOP;
     END$$;`
 
-	if err := database.Conn().Exec(sql).Error; err != nil {
+	err := database.RetryOnDeadlock(5, func() error {
+		return database.Conn().Exec(sql).Error
+	}, func(attempt int) {
+		s.t.Logf("reset database deadlock, retry %d", attempt)
+		time.Sleep(time.Duration(attempt) * 200 * time.Millisecond)
+	})
+	if err != nil {
 		s.t.Fatalf("reset database: %v", err)
 	}
 }

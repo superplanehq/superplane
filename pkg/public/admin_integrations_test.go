@@ -131,6 +131,44 @@ func TestAdminListOrgIntegrations(t *testing.T) {
 		assert.Equal(t, name+"-a%_b", page.Items[0].InstallationName)
 	})
 
+	t.Run("returns a Linear connection without tokens or actor details", func(t *testing.T) {
+		linearIntegration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "linear", "Acme Linear", nil)
+		require.NoError(t, err)
+		require.NoError(t, database.Conn().Model(linearIntegration).Updates(map[string]any{
+			"state": models.IntegrationStateReady,
+			"metadata": datatypes.NewJSONType(map[string]any{
+				"organization":         "Acme",
+				"urlKey":               "acme",
+				"hostedOAuth":          true,
+				"state":                "csrf-state-value",
+				"accessTokenExpiresAt": "2026-10-02T00:00:00Z",
+				"user":                 map[string]any{"email": "ada@example.com", "name": "Ada Lovelace"},
+			}),
+		}).Error)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/integrations?search=Acme%20Linear",
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code)
+		assert.NotContains(t, response.Body.String(), "csrf-state-value")
+		assert.NotContains(t, response.Body.String(), "ada@example.com")
+		assert.NotContains(t, response.Body.String(), "accessToken")
+
+		var body struct {
+			Items []adminIntegration `json:"items"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		require.Len(t, body.Items, 1)
+		assert.Equal(t, "linear", body.Items[0].AppName)
+		assert.Equal(t, "Acme Linear", body.Items[0].InstallationName)
+		assert.Equal(t, models.IntegrationStateReady, body.Items[0].State)
+		assert.Equal(t, "Acme", body.Items[0].Details["external_organization"])
+		assert.Equal(t, "acme", body.Items[0].Details["workspace_key"])
+		assert.Equal(t, "true", body.Items[0].Details["hosted_app"])
+	})
+
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "GET",

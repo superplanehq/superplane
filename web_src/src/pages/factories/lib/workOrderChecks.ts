@@ -83,8 +83,8 @@ const CONFIDENCE_BAND_LABEL: Record<ConfidenceBand, (typeof LEVEL_LABEL)[WorkOrd
 };
 
 /**
- * Words for a merge-confidence result. "Healthy" does not say whether drift is
- * small or whether the change met the performance practices.
+ * Words for a merge-confidence or planning-review result. "Healthy" does not
+ * say whether drift is small or whether the task is clear.
  */
 const CHECK_RESULT_LABEL: Record<string, Record<WorkOrderCheckLevel, string>> = {
   "risk-review": { positive: "Low", neutral: "Moderate", caution: "Moderate", critical: "High" },
@@ -92,6 +92,10 @@ const CHECK_RESULT_LABEL: Record<string, Record<WorkOrderCheckLevel, string>> = 
   "security-review": { positive: "Met", neutral: "Partial", caution: "Partial", critical: "Missed" },
   "drift-review": { positive: "Close", neutral: "Moderate", caution: "Moderate", critical: "Far" },
   "reversibility-review": { positive: "Easy", neutral: "Partial", caution: "Partial", critical: "Hard" },
+  clarity: { positive: "Clear", neutral: "Partial", caution: "Partial", critical: "Unclear" },
+  complexity: { positive: "Easy", neutral: "Moderate", caution: "Moderate", critical: "Hard" },
+  risk: { positive: "Low", neutral: "Moderate", caution: "Moderate", critical: "High" },
+  verifiability: { positive: "Provable", neutral: "Partial", caution: "Partial", critical: "Unproven" },
 };
 
 const CHECK_RESULT_KEY_BY_NAME: Record<string, string> = {
@@ -102,6 +106,10 @@ const CHECK_RESULT_KEY_BY_NAME: Record<string, string> = {
   Drift: "drift-review",
   "Drift from Specification": "drift-review",
   Reversibility: "reversibility-review",
+  Clarity: "clarity",
+  Complexity: "complexity",
+  Risk: "risk",
+  Verifiability: "verifiability",
 };
 
 const CHECK_DISPLAY_NAME_BY_KEY: Record<string, string> = {
@@ -119,13 +127,16 @@ export function workOrderCheckDisplayName(check: { key?: string; name?: string }
   return check.name ?? "";
 }
 
-/** Clarity and Confidence use High / Medium / Low. Other checks use a result word. */
+/** Clarity score and Confidence score use High / Medium / Low. Other checks use a result word. */
 export function workOrderCheckStatus(
   check: Pick<WorkOrderCheckPresentation, "name" | "score" | "level"> & { key?: string },
 ) {
   const base = isScoreCheckName(check.name)
     ? CONFIDENCE_BAND_LABEL[confidenceBandForScore(check.score)]
     : LEVEL_LABEL[check.level];
+  if (isScoreCheckName(check.name)) {
+    return base;
+  }
   const key = check.key ?? CHECK_RESULT_KEY_BY_NAME[check.name];
   const label = key ? CHECK_RESULT_LABEL[key]?.[check.level] : undefined;
   return label ? { ...base, label } : base;

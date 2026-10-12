@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -33,6 +34,55 @@ func TestBillableSeconds(t *testing.T) {
 			assert.Equal(t, tc.expected, billableSeconds(tc.duration))
 		})
 	}
+}
+
+func TestIntegratedRunnerTaskRecordsSelectedFleetUsage(t *testing.T) {
+	t.Setenv("TASK_BROKER_FLEET_ID", "local")
+	t.Setenv("TASK_BROKER_BASE_URL", "http://localhost:8091")
+
+	started := time.Now()
+	finished := started.Add(1500 * time.Millisecond)
+	exitCode := 0
+	tasks := &fakeRunnerTaskContext{
+		task: &core.RunnerTask{
+			ID:         "task-integrated",
+			State:      "succeeded",
+			ExitCode:   &exitCode,
+			StartedAt:  &started,
+			FinishedAt: &finished,
+		},
+	}
+	state := &contexts.ExecutionStateContext{}
+	scheduled := &contexts.RequestContext{}
+	configuration := map[string]any{"machine_type": "aws-large-amd64"}
+	require.NoError(t, afterRunnerTaskCreated(core.ExecutionContext{
+		OrganizationID: "organization-1",
+		Configuration:  configuration,
+		ExecutionState: state,
+		Requests:       scheduled,
+	}, tasks.task.ID, core.RunnerTaskBackendIntegrated))
+	assert.Equal(t, "aws-large-amd64", state.KVs[executionKVMachineType])
+	assert.Equal(t, "aws-large-amd64", state.KVs[executionKVFleetID])
+
+	recorder := &recordingUsage{}
+	require.NoError(t, pollBrokerTask(core.ActionHookContext{
+		Configuration:  configuration,
+		Parameters:     scheduled.Params,
+		ExecutionState: state,
+		Requests:       &contexts.RequestContext{},
+		RunnerTasks:    tasks,
+		Usage:          recorder,
+	}, "runnerRunBash.finished"))
+
+	require.Len(t, recorder.computes, 1)
+	assert.Equal(t, "aws-large-amd64", recorder.computes[0].MachineType)
+	assert.Equal(t, "aws-large-amd64", recorder.computes[0].FleetID)
+	assert.Equal(t, int64(2), recorder.computes[0].DurationSeconds)
+	assert.Equal(
+		t,
+		models.UsageIdempotencyKeyRunner+":compute:task-integrated",
+		recorder.computes[0].IdempotencyKey,
+	)
 }
 
 func TestPollBrokerTaskRecordsUsageWhenSuperPlaneAlreadyFinished(t *testing.T) {

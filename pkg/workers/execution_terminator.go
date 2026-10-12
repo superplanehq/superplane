@@ -259,6 +259,7 @@ func (w *ExecutionTerminator) cancelComponent(
 		Runs:           runCancellations.Bind(contexts.NewRunExecutionContext(tx, canvas, node, execution)),
 		Usage:          contexts.NewUsageContext(orgUUID, execution),
 		HostedLLM:      contexts.NewHostedLLMContext(tx, w.encryptor, orgUUID, canvas.FactoryID),
+		RunnerTasks:    contexts.NewRunnerTaskContext(tx, w.encryptor, orgUUID),
 	}
 
 	if node.AppInstallationID != nil {

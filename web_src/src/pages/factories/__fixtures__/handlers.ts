@@ -1031,7 +1031,7 @@ function listWorkOrdersFixture(
   fixture: FactoriesFixture,
   orders: FactoriesWorkOrder[],
   url: URL,
-): { orders: FactoriesWorkOrder[]; hasNextPage: boolean } {
+): { orders: FactoriesWorkOrder[]; hasNextPage: boolean; totalCount?: number } {
   const states = url.searchParams.getAll("states");
   const results = url.searchParams.getAll("results");
   const userId = url.searchParams.get("userId");
@@ -1079,10 +1079,11 @@ function listWorkOrdersFixture(
     }
     return (right.id ?? "").localeCompare(left.id ?? "");
   });
+  const totalCount = filtered.length;
   if (beforeId) {
     const cursor = filtered.find((order) => order.id === beforeId);
     if (!cursor) {
-      return { orders: [], hasNextPage: false };
+      return { orders: [], hasNextPage: false, totalCount };
     }
     const cursorTime = Date.parse(cursor.updatedAt ?? cursor.createdAt ?? "") || 0;
     filtered = filtered.filter((order) => {
@@ -1096,6 +1097,7 @@ function listWorkOrdersFixture(
   return {
     orders: filtered.slice(0, limit).map((order) => orderWithListChecks(fixture, order)),
     hasNextPage: filtered.length > limit,
+    totalCount,
   };
 }
 
@@ -1256,6 +1258,22 @@ function hostedLlmModelsRoute(): FactoriesRoute {
   return {
     pattern: re("/api/v1/organizations/([^/]+)/hosted-llm-models"),
     resolve: (_match, _method, _body, url) => ({ json: storybookHostedLlmModels(url.searchParams.get("provider")) }),
+  };
+}
+
+function organizationHostedModelsRoute(fixture: FactoriesFixture): FactoriesRoute {
+  const candidates = storybookSelectableLlmModels({})
+    .filter((model) => model.source.id === "hosted")
+    .map((model) => ({ key: model.key, label: model.label, provider: model.provider.id }));
+  return {
+    pattern: re("/api/v1/organizations/([^/]+)/hosted-models"),
+    resolve: (_match, method, body) => {
+      if (method === "PUT") {
+        fixture.hostedSelectedKeys = stringArrayOrEmpty(((body ?? {}) as { allowedModels?: unknown }).allowedModels);
+      }
+      const selected = candidates.filter((model) => fixture.hostedSelectedKeys?.includes(model.key) ?? true);
+      return { json: { candidates, selected } };
+    },
   };
 }
 
@@ -1452,6 +1470,7 @@ function githubOnboardingRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   const onboarding = (): MeDescribeVcsProviderOnboardingResponse =>
     fixture.githubOnboarding ?? {
       providerConfigured: true,
+      accountConnectionRequired: true,
       repositories: [],
       pendingRequests: [],
       synchronizing: false,
@@ -1514,6 +1533,7 @@ function buildRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     organizationSpendingReportRoute(fixture),
     organizationCreditGrantsRoute(fixture),
     hostedLlmModelsRoute(),
+    organizationHostedModelsRoute(fixture),
     selectableLlmModelsRoute(fixture),
     byokModelsRoute(fixture),
     hostedCreditProductsRoute(fixture),

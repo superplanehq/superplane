@@ -50,6 +50,7 @@ type ExecutionContext struct {
 	Factory        FactoryContext
 	Usage          UsageRecorder
 	HostedLLM      HostedLLMContext
+	RunnerTasks    RunnerTaskContext
 }
 
 type AppExecutionContext interface {

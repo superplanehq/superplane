@@ -46,6 +46,8 @@ func DescribeRun(ctx context.Context, db *gorm.DB, canvas *models.Canvas, runID 
 		return nil, err
 	}
 
+	AttachCanvasRunUsage(db, []*pb.CanvasRun{serializedRun})
+
 	return &pb.DescribeRunResponse{
 		Run: serializedRun,
 	}, nil

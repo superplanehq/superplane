@@ -1,0 +1,56 @@
+version: v1.0
+name: "Build and Push Fleet Manager Image"
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+global_job_config:
+  env_vars:
+    - name: DOCKER_BUILDKIT
+      value: "1"
+    - name: FLEET_MANAGER_IMAGE_REPO
+      value: "ghcr.io/superplanehq/fleet-manager"
+
+  secrets:
+    - name: ghcr-push-token
+
+  prologue:
+    commands:
+      - checkout
+      - test -n "$SEMAPHORE_GIT_SHA"
+      - test "$(git rev-parse HEAD)" = "$SEMAPHORE_GIT_SHA"
+      - echo "$GHCR_PUSH_TOKEN" | docker login ghcr.io -u superplanehq --password-stdin
+
+blocks:
+  - name: "amd64 Image"
+    dependencies: []
+    task:
+      jobs:
+        - name: "Build"
+          commands:
+            - bash release/fleet-manager/build.sh "$SEMAPHORE_GIT_SHA" "amd64"
+
+  - name: "arm64 Image"
+    dependencies: []
+    task:
+      agent:
+        machine:
+          type: r1-standard-4
+          os_image: ubuntu2404
+
+      jobs:
+        - name: "Build"
+          commands:
+            - bash release/fleet-manager/build.sh "$SEMAPHORE_GIT_SHA" "arm64"
+
+  - name: "Build Multi-Platform Manifest"
+    dependencies: ["amd64 Image", "arm64 Image"]
+    task:
+      jobs:
+        - name: "Create, Push, and Inspect Manifest"
+          commands:
+            - docker manifest create "$FLEET_MANAGER_IMAGE_REPO:$SEMAPHORE_GIT_SHA" "$FLEET_MANAGER_IMAGE_REPO:$SEMAPHORE_GIT_SHA-amd64" "$FLEET_MANAGER_IMAGE_REPO:$SEMAPHORE_GIT_SHA-arm64"
+            - docker manifest push "$FLEET_MANAGER_IMAGE_REPO:$SEMAPHORE_GIT_SHA"
+            - docker buildx imagetools inspect "$FLEET_MANAGER_IMAGE_REPO:$SEMAPHORE_GIT_SHA"
