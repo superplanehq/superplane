@@ -500,13 +500,13 @@ describe("scope + filter + search + ordering", () => {
   it("ordering=status follows the display status order", () => {
     const mixed = buildWorkOrderListEntries(
       [
-        order({ id: "done", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
+        order({ id: "closed", state: "STATE_CLOSED", result: "RESULT_PR_CLOSED" }),
         order({ id: "draft", state: "STATE_DRAFT" }),
         order({ id: "waiting" }),
       ],
       factory,
     );
-    expect(applyWorkOrderOrdering(mixed, "status").map((e) => e.id)).toEqual(["draft", "waiting", "done"]);
+    expect(applyWorkOrderOrdering(mixed, "status").map((e) => e.id)).toEqual(["draft", "waiting", "closed"]);
   });
 
   it("ordering=spend puts the most expensive order first", () => {

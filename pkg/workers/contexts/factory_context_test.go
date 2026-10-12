@@ -1048,6 +1048,37 @@ func TestFactoryContext_UpdateWorkOrderStatus_CloseAttributesAutomation(t *testi
 	assert.Equal(t, nodeExecution.NodeID, closedAutomation.NodeID)
 }
 
+func TestFactoryContext_UpdateWorkOrderStatus_RejectedStaysVisible(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	factoryModel, err := models.CreateFactory(database.Conn(), r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	canvas, nodeExecution, _ := setupFactoryAppExecution(t, r, factoryModel.ID)
+	order, err := factoryModel.CreateWorkOrder(database.Conn(), "Automation rejection", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = order.UpdateStatus(database.Conn(), models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+	})
+	require.NoError(t, err)
+
+	ctx := NewFactoryContext(database.Conn(), canvas, nodeExecution)
+	updated, changed, err := ctx.UpdateWorkOrderStatus(core.UpdateWorkOrderStatusParams{
+		OrderID: order.ID.String(),
+		State:   models.FactoryWorkOrderStateClosed,
+		Result:  models.FactoryWorkOrderResultRejected,
+	})
+	require.NoError(t, err)
+	assert.True(t, changed)
+	assert.Equal(t, models.FactoryWorkOrderResultManualRejected, updated.Result)
+
+	reloaded, err := factoryModel.FindWorkOrder(database.Conn(), order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderResultManualRejected, reloaded.Result)
+	assert.False(t, reloaded.IsArchived())
+}
+
 // orderId is required and explicit at the FactoryContext level too — there
 // is no implicit fallback to "the work order driving the current run".
 // That behavior now lives entirely in the `{{ order().id }}` default on the

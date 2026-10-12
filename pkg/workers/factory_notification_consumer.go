@@ -150,6 +150,9 @@ func (c *FactoryNotificationConsumer) process(db *gorm.DB, message messages.Fact
 	if err != nil {
 		return false, err
 	}
+	if order.IsArchived() {
+		return false, nil
+	}
 
 	plan, err := c.resolveRecipients(db, orgID, factoryID, order, message)
 	if err != nil {

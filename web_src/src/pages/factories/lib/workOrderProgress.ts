@@ -112,6 +112,7 @@ export const WORK_ORDER_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = [
   "completed",
   "failed",
   "rejected",
+  "closed",
   "cancelled",
 ];
 
