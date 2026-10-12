@@ -1,3 +1,6 @@
+import { useBoardColorThemeName } from "../lib/boardColorThemeContext";
+import type { BoardPaletteRole } from "../lib/boardColorThemes";
+import type { LineBoardColumnColorView } from "../lib/lineBoardColumnColorViewPreference";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef, type ReactNode } from "react";
 import { ClickToRename } from "../layout/ClickToRename";
@@ -61,6 +64,8 @@ export function WorkOrderKanbanBoard({ children, testId }: WorkOrderKanbanBoardP
 }
 
 interface WorkOrderBoardLaneProps {
+  paletteRole?: BoardPaletteRole;
+  paletteView?: LineBoardColumnColorView;
   title: string;
   count: number;
   /** Replaces the body while the lane holds nothing. */
@@ -119,6 +124,8 @@ function LaneBody({
 }
 
 export function WorkOrderBoardLane({
+  paletteRole,
+  paletteView,
   title,
   count,
   emptyDescription,
@@ -137,10 +144,14 @@ export function WorkOrderBoardLane({
   testId,
   children,
 }: WorkOrderBoardLaneProps) {
+  const boardTheme = useBoardColorThemeName();
   const groupedHeader = Boolean(subheader);
 
   return (
     <section
+      data-board-theme={boardTheme}
+      data-board-role={paletteRole}
+      data-board-color-view={paletteView}
       aria-label={label ?? title}
       className={cn(
         "flex min-h-0 flex-col self-stretch overflow-hidden rounded-lg border border-border/70",

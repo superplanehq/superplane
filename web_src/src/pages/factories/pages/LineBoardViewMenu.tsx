@@ -1,3 +1,5 @@
+import { useBoardColorTheme } from "../lib/boardColorThemeContext";
+import { BOARD_COLOR_THEMES } from "../lib/boardColorThemes";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -46,6 +48,7 @@ export function LineBoardViewMenu({
   colorView: LineBoardColumnColorView;
   onColorViewChange: (view: LineBoardColumnColorView) => void;
 }) {
+  const boardTheme = useBoardColorTheme();
   const showAutomationView = Boolean(view && onViewChange);
 
   return (
@@ -80,6 +83,15 @@ export function LineBoardViewMenu({
           options={COLOR_VIEW_OPTIONS}
           onValueChange={onColorViewChange}
         />
+        {boardTheme ? (
+          <ViewOptionSub
+            label="Color theme"
+            testId="lines-board-view-theme"
+            value={boardTheme.theme}
+            options={BOARD_COLOR_THEMES.map((option) => ({ ...option, testId: `lines-board-theme-${option.id}` }))}
+            onValueChange={boardTheme.setTheme}
+          />
+        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

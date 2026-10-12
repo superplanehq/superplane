@@ -1,3 +1,6 @@
+import { useBoardColorTheme } from "../lib/boardColorThemeContext";
+import { boardPaletteRole } from "../lib/boardColorThemes";
+import type { LineBoardColumnColorView } from "../lib/lineBoardColumnColorViewPreference";
 import type { FactoriesWorkOrder } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Button } from "@/components/ui/button";
@@ -17,6 +20,7 @@ export type ColumnPaging = {
 };
 
 export function MobileColumn({
+  colorView,
   column,
   hidden,
   cardsPending,
@@ -24,6 +28,7 @@ export function MobileColumn({
   paging,
   renderCard,
 }: {
+  colorView: LineBoardColumnColorView;
   column: MobileBoardColumn;
   hidden: boolean;
   cardsPending: boolean;
@@ -31,12 +36,16 @@ export function MobileColumn({
   paging: ColumnPaging;
   renderCard: (order: FactoriesWorkOrder) => ReactNode;
 }) {
+  const boardTheme = useBoardColorTheme();
   const listRef = useRef<HTMLUListElement>(null);
   const loadIfVisible = useVisibleColumnLoadMore(listRef, hidden, column.cards.length, paging);
   const showEmpty = !cardsPending && column.cards.length === 0 && !paging.hasMore;
 
   return (
     <section
+      data-board-theme={boardTheme?.theme}
+      data-board-role={boardPaletteRole(column.key)}
+      data-board-color-view={colorView}
       aria-label={column.title}
       aria-hidden={hidden || undefined}
       inert={hidden || undefined}

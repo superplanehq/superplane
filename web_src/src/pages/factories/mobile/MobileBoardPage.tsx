@@ -1,3 +1,4 @@
+import { BoardColorThemeProvider } from "../lib/BoardColorThemeProvider";
 import type {
   FactoriesFactoryIntake,
   FactoriesFactoryLine,
@@ -27,7 +28,10 @@ import { Navigate, useNavigate, useParams } from "react-router";
 
 import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
+import {
+  useLineBoardColumnColorViewPreference,
+  type LineBoardColumnColorView,
+} from "../lib/lineBoardColumnColorViewPreference";
 import {
   factoryHomePath,
   factoryIntakePath,
@@ -96,23 +100,25 @@ export function MobileBoardPage() {
   }
 
   return (
-    <MobileLineBoard
-      organizationId={organizationId}
-      factoryId={factoryId}
-      routeSegment={routeSegment}
-      line={selectedLine}
-      lineId={selectedLine.id}
-      canUpdateWorkOrders={canAct("work_orders", "update")}
-      currentUserId={currentUserId}
-      onOpenWorkOrder={(order) => {
-        const number = canonicalWorkOrderNumber(order);
-        if (number) {
-          navigate(workOrderDetailPath(organizationId, routeSegment, number), {
-            state: { peekOrder: order, lineId: selectedLine.id },
-          });
-        }
-      }}
-    />
+    <BoardColorThemeProvider boardKey={JSON.stringify([organizationId, factoryId, selectedLine.id])}>
+      <MobileLineBoard
+        organizationId={organizationId}
+        factoryId={factoryId}
+        routeSegment={routeSegment}
+        line={selectedLine}
+        lineId={selectedLine.id}
+        canUpdateWorkOrders={canAct("work_orders", "update")}
+        currentUserId={currentUserId}
+        onOpenWorkOrder={(order) => {
+          const number = canonicalWorkOrderNumber(order);
+          if (number) {
+            navigate(workOrderDetailPath(organizationId, routeSegment, number), {
+              state: { peekOrder: order, lineId: selectedLine.id },
+            });
+          }
+        }}
+      />
+    </BoardColorThemeProvider>
   );
 }
 
@@ -309,6 +315,7 @@ function MobileLineBoard(props: {
         canManageClosedStatus={canConfigureFactory}
       />
       <MobileColumnCarousel
+        colorView={colorView}
         columns={model.columns}
         cardsPending={model.cardsPending}
         laneClassName={(column) =>
@@ -334,6 +341,7 @@ function MobileLineBoard(props: {
  * on its own. Tabs above mirror the swipe position and jump on tap.
  */
 function MobileColumnCarousel({
+  colorView,
   columns,
   cardsPending,
   laneClassName,
@@ -342,6 +350,7 @@ function MobileColumnCarousel({
 }: {
   columns: MobileBoardColumn[];
   cardsPending: boolean;
+  colorView: LineBoardColumnColorView;
   laneClassName: (column: MobileBoardColumn) => { className?: string; surfaceClassName?: string };
   paging: Record<MobileBoardColumn["paging"], ColumnPaging>;
   renderCard: (column: MobileBoardColumn, order: FactoriesWorkOrder) => ReactNode;
@@ -388,6 +397,7 @@ function MobileColumnCarousel({
             hidden={index !== activeIndex}
             cardsPending={cardsPending}
             lane={laneClassName(column)}
+            colorView={colorView}
             paging={paging[column.paging]}
             renderCard={(order) => renderCard(column, order)}
           />

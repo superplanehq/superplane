@@ -123,6 +123,8 @@ export function BacklogColumn({
   return (
     <>
       <WorkOrderBoardLane
+        paletteRole="backlog"
+        paletteView={colorView}
         title={title}
         label={title}
         canRename={canRename}

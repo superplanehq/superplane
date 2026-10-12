@@ -1,0 +1,753 @@
+/* Colors from the five App Palette frames in Figma. */
+[data-board-theme="flow"][data-board-color-view="vivid"][data-board-role="backlog"] {
+  --board-body: #98a2ad;
+  --board-header: #98a2ad;
+  --board-border: rgba(152, 162, 173, 0.5);
+  --board-text: #17212b;
+}
+[data-board-theme="flow"][data-board-color-view="vivid"][data-board-role="implement"] {
+  --board-body: #14767a;
+  --board-header: #14767a;
+  --board-border: rgba(20, 118, 122, 0.5);
+  --board-text: #ffffff;
+}
+[data-board-theme="flow"][data-board-color-view="vivid"][data-board-role="verify"] {
+  --board-body: #c99a16;
+  --board-header: #c99a16;
+  --board-border: rgba(201, 154, 22, 0.5);
+  --board-text: #17212b;
+}
+[data-board-theme="flow"][data-board-color-view="vivid"][data-board-role="done"] {
+  --board-body: #3c946e;
+  --board-header: #3c946e;
+  --board-border: rgba(60, 148, 110, 0.5);
+  --board-text: #ffffff;
+}
+[data-board-theme="flow"][data-board-color-view="dim"][data-board-role="backlog"] {
+  --board-body: #f8f9fa;
+  --board-header: #f4f5f6;
+  --board-border: rgba(152, 162, 173, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="flow"][data-board-color-view="dim"][data-board-role="implement"] {
+  --board-body: #f0f6f6;
+  --board-header: #e5f0f0;
+  --board-border: rgba(20, 118, 122, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="flow"][data-board-color-view="dim"][data-board-role="verify"] {
+  --board-body: #fbf8f0;
+  --board-header: #f9f4e5;
+  --board-border: rgba(201, 154, 22, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="flow"][data-board-color-view="dim"][data-board-role="done"] {
+  --board-body: #f2f8f6;
+  --board-header: #eaf3ef;
+  --board-border: rgba(60, 148, 110, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="flow"][data-board-color-view="borders"][data-board-role="backlog"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(152, 162, 173, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="flow"][data-board-color-view="borders"][data-board-role="implement"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(20, 118, 122, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="flow"][data-board-color-view="borders"][data-board-role="verify"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(201, 154, 22, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="flow"][data-board-color-view="borders"][data-board-role="done"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(60, 148, 110, 0.72);
+  --board-text: #25313b;
+}
+.dark [data-board-theme="flow"][data-board-color-view="vivid"][data-board-role="backlog"] {
+  --board-body: #4c5356;
+  --board-header: #5d6469;
+  --board-border: rgba(170, 180, 192, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="flow"][data-board-color-view="vivid"][data-board-role="implement"] {
+  --board-body: #254e4e;
+  --board-header: #2e5e5f;
+  --board-border: rgba(63, 166, 170, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="flow"][data-board-color-view="vivid"][data-board-role="verify"] {
+  --board-body: #5f5327;
+  --board-header: #74652e;
+  --board-border: rgba(224, 181, 59, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="flow"][data-board-color-view="vivid"][data-board-role="done"] {
+  --board-body: #325443;
+  --board-header: #3d6651;
+  --board-border: rgba(99, 184, 139, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="flow"][data-board-color-view="dim"][data-board-role="backlog"] {
+  --board-body: #292e2f;
+  --board-header: #3a4142;
+  --board-border: rgba(170, 180, 192, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="flow"][data-board-color-view="dim"][data-board-role="implement"] {
+  --board-body: #1c2d2c;
+  --board-header: #263e3d;
+  --board-border: rgba(63, 166, 170, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="flow"][data-board-color-view="dim"][data-board-role="verify"] {
+  --board-body: #2f2e1f;
+  --board-header: #444128;
+  --board-border: rgba(224, 181, 59, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="flow"][data-board-color-view="dim"][data-board-role="done"] {
+  --board-body: #202f28;
+  --board-header: #2d4238;
+  --board-border: rgba(99, 184, 139, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="flow"][data-board-color-view="borders"][data-board-role="backlog"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(170, 180, 192, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="flow"][data-board-color-view="borders"][data-board-role="implement"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(63, 166, 170, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="flow"][data-board-color-view="borders"][data-board-role="verify"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(224, 181, 59, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="flow"][data-board-color-view="borders"][data-board-role="done"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(99, 184, 139, 0.56);
+  --board-text: #e7ecea;
+}
+[data-board-theme="quiet"][data-board-color-view="vivid"][data-board-role="backlog"] {
+  --board-body: #969ea8;
+  --board-header: #969ea8;
+  --board-border: rgba(150, 158, 168, 0.5);
+  --board-text: #17212b;
+}
+[data-board-theme="quiet"][data-board-color-view="vivid"][data-board-role="implement"] {
+  --board-body: #567c96;
+  --board-header: #567c96;
+  --board-border: rgba(86, 124, 150, 0.5);
+  --board-text: #ffffff;
+}
+[data-board-theme="quiet"][data-board-color-view="vivid"][data-board-role="verify"] {
+  --board-body: #b88959;
+  --board-header: #b88959;
+  --board-border: rgba(184, 137, 89, 0.5);
+  --board-text: #ffffff;
+}
+[data-board-theme="quiet"][data-board-color-view="vivid"][data-board-role="done"] {
+  --board-body: #668f7a;
+  --board-header: #668f7a;
+  --board-border: rgba(102, 143, 122, 0.5);
+  --board-text: #ffffff;
+}
+[data-board-theme="quiet"][data-board-color-view="dim"][data-board-role="backlog"] {
+  --board-body: #f9fafa;
+  --board-header: #f5f6f7;
+  --board-border: rgba(150, 158, 168, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="quiet"][data-board-color-view="dim"][data-board-role="implement"] {
+  --board-body: #f6f8f9;
+  --board-header: #eff3f5;
+  --board-border: rgba(86, 124, 150, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="quiet"][data-board-color-view="dim"][data-board-role="verify"] {
+  --board-body: #fbf9f6;
+  --board-header: #f8f4ef;
+  --board-border: rgba(184, 137, 89, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="quiet"][data-board-color-view="dim"][data-board-role="done"] {
+  --board-body: #f7f9f8;
+  --board-header: #f0f4f2;
+  --board-border: rgba(102, 143, 122, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="quiet"][data-board-color-view="borders"][data-board-role="backlog"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(150, 158, 168, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="quiet"][data-board-color-view="borders"][data-board-role="implement"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(86, 124, 150, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="quiet"][data-board-color-view="borders"][data-board-role="verify"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(184, 137, 89, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="quiet"][data-board-color-view="borders"][data-board-role="done"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(102, 143, 122, 0.72);
+  --board-text: #25313b;
+}
+.dark [data-board-theme="quiet"][data-board-color-view="vivid"][data-board-role="backlog"] {
+  --board-body: #4a5053;
+  --board-header: #5b6266;
+  --board-border: rgba(173, 182, 192, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="quiet"][data-board-color-view="vivid"][data-board-role="implement"] {
+  --board-body: #384a51;
+  --board-header: #455a63;
+  --board-border: rgba(120, 162, 187, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="quiet"][data-board-color-view="vivid"][data-board-role="verify"] {
+  --board-body: #57493a;
+  --board-header: #6b5947;
+  --board-border: rgba(211, 160, 119, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="quiet"][data-board-color-view="vivid"][data-board-role="done"] {
+  --board-body: #3d4f46;
+  --board-header: #4b6156;
+  --board-border: rgba(135, 178, 154, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="quiet"][data-board-color-view="dim"][data-board-role="backlog"] {
+  --board-body: #282d2d;
+  --board-header: #394040;
+  --board-border: rgba(173, 182, 192, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="quiet"][data-board-color-view="dim"][data-board-role="implement"] {
+  --board-body: #222b2d;
+  --board-header: #303c3f;
+  --board-border: rgba(120, 162, 187, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="quiet"][data-board-color-view="dim"][data-board-role="verify"] {
+  --board-body: #2c2b25;
+  --board-header: #403c33;
+  --board-border: rgba(211, 160, 119, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="quiet"][data-board-color-view="dim"][data-board-role="done"] {
+  --board-body: #232d29;
+  --board-header: #333f39;
+  --board-border: rgba(135, 178, 154, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="quiet"][data-board-color-view="borders"][data-board-role="backlog"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(173, 182, 192, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="quiet"][data-board-color-view="borders"][data-board-role="implement"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(120, 162, 187, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="quiet"][data-board-color-view="borders"][data-board-role="verify"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(211, 160, 119, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="quiet"][data-board-color-view="borders"][data-board-role="done"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(135, 178, 154, 0.56);
+  --board-text: #e7ecea;
+}
+[data-board-theme="clear"][data-board-color-view="vivid"][data-board-role="backlog"] {
+  --board-body: #98a2b0;
+  --board-header: #98a2b0;
+  --board-border: rgba(152, 162, 176, 0.5);
+  --board-text: #17212b;
+}
+[data-board-theme="clear"][data-board-color-view="vivid"][data-board-role="implement"] {
+  --board-body: #5e8fd3;
+  --board-header: #5e8fd3;
+  --board-border: rgba(94, 143, 211, 0.5);
+  --board-text: #ffffff;
+}
+[data-board-theme="clear"][data-board-color-view="vivid"][data-board-role="verify"] {
+  --board-body: #d0a640;
+  --board-header: #d0a640;
+  --board-border: rgba(208, 166, 64, 0.5);
+  --board-text: #17212b;
+}
+[data-board-theme="clear"][data-board-color-view="vivid"][data-board-role="done"] {
+  --board-body: #5aa37a;
+  --board-header: #5aa37a;
+  --board-border: rgba(90, 163, 122, 0.5);
+  --board-text: #ffffff;
+}
+[data-board-theme="clear"][data-board-color-view="dim"][data-board-role="backlog"] {
+  --board-body: #f9fafb;
+  --board-header: #f5f6f7;
+  --board-border: rgba(152, 162, 176, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="clear"][data-board-color-view="dim"][data-board-role="implement"] {
+  --board-body: #f6f9fd;
+  --board-header: #f0f4fb;
+  --board-border: rgba(94, 143, 211, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="clear"][data-board-color-view="dim"][data-board-role="verify"] {
+  --board-body: #fcfaf4;
+  --board-header: #fbf7ed;
+  --board-border: rgba(208, 166, 64, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="clear"][data-board-color-view="dim"][data-board-role="done"] {
+  --board-body: #f6faf8;
+  --board-header: #eff6f2;
+  --board-border: rgba(90, 163, 122, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="clear"][data-board-color-view="borders"][data-board-role="backlog"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(152, 162, 176, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="clear"][data-board-color-view="borders"][data-board-role="implement"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(94, 143, 211, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="clear"][data-board-color-view="borders"][data-board-role="verify"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(208, 166, 64, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="clear"][data-board-color-view="borders"][data-board-role="done"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(90, 163, 122, 0.72);
+  --board-text: #25313b;
+}
+.dark [data-board-theme="clear"][data-board-color-view="vivid"][data-board-role="backlog"] {
+  --board-body: #4c5357;
+  --board-header: #5d6569;
+  --board-border: rgba(174, 184, 197, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="clear"][data-board-color-view="vivid"][data-board-role="implement"] {
+  --board-body: #394d61;
+  --board-header: #465d76;
+  --board-border: rgba(120, 167, 227, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="clear"][data-board-color-view="vivid"][data-board-role="verify"] {
+  --board-body: #5d5331;
+  --board-header: #72663c;
+  --board-border: rgba(222, 186, 91, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="clear"][data-board-color-view="vivid"][data-board-role="done"] {
+  --board-body: #385344;
+  --board-header: #456653;
+  --board-border: rgba(118, 186, 145, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="clear"][data-board-color-view="dim"][data-board-role="backlog"] {
+  --board-body: #292f2f;
+  --board-header: #3b4243;
+  --board-border: rgba(174, 184, 197, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="clear"][data-board-color-view="dim"][data-board-role="implement"] {
+  --board-body: #232d33;
+  --board-header: #313f48;
+  --board-border: rgba(120, 167, 227, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="clear"][data-board-color-view="dim"][data-board-role="verify"] {
+  --board-body: #2f2f23;
+  --board-header: #44422e;
+  --board-border: rgba(222, 186, 91, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="clear"][data-board-color-view="dim"][data-board-role="done"] {
+  --board-body: #222f29;
+  --board-header: #304239;
+  --board-border: rgba(118, 186, 145, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="clear"][data-board-color-view="borders"][data-board-role="backlog"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(174, 184, 197, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="clear"][data-board-color-view="borders"][data-board-role="implement"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(120, 167, 227, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="clear"][data-board-color-view="borders"][data-board-role="verify"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(222, 186, 91, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="clear"][data-board-color-view="borders"][data-board-role="done"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(118, 186, 145, 0.56);
+  --board-text: #e7ecea;
+}
+[data-board-theme="pastel"][data-board-color-view="vivid"][data-board-role="backlog"] {
+  --board-body: #a7b0bc;
+  --board-header: #a7b0bc;
+  --board-border: rgba(167, 176, 188, 0.5);
+  --board-text: #17212b;
+}
+[data-board-theme="pastel"][data-board-color-view="vivid"][data-board-role="implement"] {
+  --board-body: #8bd;
+  --board-header: #8bd;
+  --board-border: rgba(136, 187, 221, 0.5);
+  --board-text: #17212b;
+}
+[data-board-theme="pastel"][data-board-color-view="vivid"][data-board-role="verify"] {
+  --board-body: #e8b27f;
+  --board-header: #e8b27f;
+  --board-border: rgba(232, 178, 127, 0.5);
+  --board-text: #17212b;
+}
+[data-board-theme="pastel"][data-board-color-view="vivid"][data-board-role="done"] {
+  --board-body: #8ac9b0;
+  --board-header: #8ac9b0;
+  --board-border: rgba(138, 201, 176, 0.5);
+  --board-text: #17212b;
+}
+[data-board-theme="pastel"][data-board-color-view="dim"][data-board-role="backlog"] {
+  --board-body: #f8f9fa;
+  --board-header: #f4f5f6;
+  --board-border: rgba(167, 176, 188, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="pastel"][data-board-color-view="dim"][data-board-role="implement"] {
+  --board-body: #f6fafc;
+  --board-header: #f0f6fb;
+  --board-border: rgba(136, 187, 221, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="pastel"][data-board-color-view="dim"][data-board-role="verify"] {
+  --board-body: #fdf9f5;
+  --board-header: #fcf5ee;
+  --board-border: rgba(232, 178, 127, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="pastel"][data-board-color-view="dim"][data-board-role="done"] {
+  --board-body: #f6fbf9;
+  --board-header: #f0f8f5;
+  --board-border: rgba(138, 201, 176, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="pastel"][data-board-color-view="borders"][data-board-role="backlog"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(167, 176, 188, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="pastel"][data-board-color-view="borders"][data-board-role="implement"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(136, 187, 221, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="pastel"][data-board-color-view="borders"][data-board-role="verify"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(232, 178, 127, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="pastel"][data-board-color-view="borders"][data-board-role="done"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(138, 201, 176, 0.72);
+  --board-text: #25313b;
+}
+.dark [data-board-theme="pastel"][data-board-color-view="vivid"][data-board-role="backlog"] {
+  --board-body: #52595d;
+  --board-header: #646b6f;
+  --board-border: rgba(179, 189, 200, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="pastel"][data-board-color-view="vivid"][data-board-role="implement"] {
+  --board-body: #3c535f;
+  --board-header: #486473;
+  --board-border: rgba(120, 173, 207, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="pastel"][data-board-color-view="vivid"][data-board-role="verify"] {
+  --board-body: #604d3b;
+  --board-header: #745c46;
+  --board-border: rgba(214, 156, 110, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="pastel"][data-board-color-view="vivid"][data-board-role="done"] {
+  --board-body: #3c584e;
+  --board-header: #496a5e;
+  --board-border: rgba(121, 185, 161, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="pastel"][data-board-color-view="dim"][data-board-role="backlog"] {
+  --board-body: #2b3131;
+  --board-header: #3f4646;
+  --board-border: rgba(179, 189, 200, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="pastel"][data-board-color-view="dim"][data-board-role="implement"] {
+  --board-body: #242f32;
+  --board-header: #324248;
+  --board-border: rgba(120, 173, 207, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="pastel"][data-board-color-view="dim"][data-board-role="verify"] {
+  --board-body: #302d26;
+  --board-header: #463f34;
+  --board-border: rgba(214, 156, 110, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="pastel"][data-board-color-view="dim"][data-board-role="done"] {
+  --board-body: #24302c;
+  --board-header: #33453e;
+  --board-border: rgba(121, 185, 161, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="pastel"][data-board-color-view="borders"][data-board-role="backlog"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(179, 189, 200, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="pastel"][data-board-color-view="borders"][data-board-role="implement"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(120, 173, 207, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="pastel"][data-board-color-view="borders"][data-board-role="verify"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(214, 156, 110, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="pastel"][data-board-color-view="borders"][data-board-role="done"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(121, 185, 161, 0.56);
+  --board-text: #e7ecea;
+}
+[data-board-theme="spectrum"][data-board-color-view="vivid"][data-board-role="backlog"] {
+  --board-body: #8f99a6;
+  --board-header: #8f99a6;
+  --board-border: rgba(143, 153, 166, 0.5);
+  --board-text: #17212b;
+}
+[data-board-theme="spectrum"][data-board-color-view="vivid"][data-board-role="implement"] {
+  --board-body: #3f87d1;
+  --board-header: #3f87d1;
+  --board-border: rgba(63, 135, 209, 0.5);
+  --board-text: #ffffff;
+}
+[data-board-theme="spectrum"][data-board-color-view="vivid"][data-board-role="verify"] {
+  --board-body: #7a5ac5;
+  --board-header: #7a5ac5;
+  --board-border: rgba(122, 90, 197, 0.5);
+  --board-text: #ffffff;
+}
+[data-board-theme="spectrum"][data-board-color-view="vivid"][data-board-role="done"] {
+  --board-body: #1798a8;
+  --board-header: #1798a8;
+  --board-border: rgba(23, 152, 168, 0.5);
+  --board-text: #ffffff;
+}
+[data-board-theme="spectrum"][data-board-color-view="dim"][data-board-role="backlog"] {
+  --board-body: #f8f8f9;
+  --board-header: #f2f3f5;
+  --board-border: rgba(143, 153, 166, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="spectrum"][data-board-color-view="dim"][data-board-role="implement"] {
+  --board-body: #f3f7fc;
+  --board-header: #e9f1fa;
+  --board-border: rgba(63, 135, 209, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="spectrum"][data-board-color-view="dim"][data-board-role="verify"] {
+  --board-body: #f6f4fb;
+  --board-header: #f0ecf8;
+  --board-border: rgba(122, 90, 197, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="spectrum"][data-board-color-view="dim"][data-board-role="done"] {
+  --board-body: #f0f8f9;
+  --board-header: #e4f3f5;
+  --board-border: rgba(23, 152, 168, 0.24);
+  --board-text: #25313b;
+}
+[data-board-theme="spectrum"][data-board-color-view="borders"][data-board-role="backlog"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(143, 153, 166, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="spectrum"][data-board-color-view="borders"][data-board-role="implement"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(63, 135, 209, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="spectrum"][data-board-color-view="borders"][data-board-role="verify"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(122, 90, 197, 0.72);
+  --board-text: #25313b;
+}
+[data-board-theme="spectrum"][data-board-color-view="borders"][data-board-role="done"] {
+  --board-body: #ffffff;
+  --board-header: #ffffff;
+  --board-border: rgba(23, 152, 168, 0.72);
+  --board-text: #25313b;
+}
+.dark [data-board-theme="spectrum"][data-board-color-view="vivid"][data-board-role="backlog"] {
+  --board-body: #50575c;
+  --board-header: #60696e;
+  --board-border: rgba(169, 180, 193, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="spectrum"][data-board-color-view="vivid"][data-board-role="implement"] {
+  --board-body: #345169;
+  --board-header: #3f627e;
+  --board-border: rgba(98, 165, 228, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="spectrum"][data-board-color-view="vivid"][data-board-role="verify"] {
+  --board-body: #4a4267;
+  --board-header: #594f7b;
+  --board-border: rgba(154, 125, 221, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="spectrum"][data-board-color-view="vivid"][data-board-role="done"] {
+  --board-body: #2b5a5e;
+  --board-header: #336c71;
+  --board-border: rgba(73, 186, 199, 0.34);
+  --board-text: #f2f5f4;
+}
+.dark [data-board-theme="spectrum"][data-board-color-view="dim"][data-board-role="backlog"] {
+  --board-body: #2a3031;
+  --board-header: #3d4445;
+  --board-border: rgba(169, 180, 193, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="spectrum"][data-board-color-view="dim"][data-board-role="implement"] {
+  --board-body: #212e35;
+  --board-header: #2e414c;
+  --board-border: rgba(98, 165, 228, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="spectrum"][data-board-color-view="dim"][data-board-role="verify"] {
+  --board-body: #282934;
+  --board-header: #3a384b;
+  --board-border: rgba(154, 125, 221, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="spectrum"][data-board-color-view="dim"][data-board-role="done"] {
+  --board-body: #1e3131;
+  --board-header: #294546;
+  --board-border: rgba(73, 186, 199, 0.27);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="spectrum"][data-board-color-view="borders"][data-board-role="backlog"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(169, 180, 193, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="spectrum"][data-board-color-view="borders"][data-board-role="implement"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(98, 165, 228, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="spectrum"][data-board-color-view="borders"][data-board-role="verify"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(154, 125, 221, 0.56);
+  --board-text: #e7ecea;
+}
+.dark [data-board-theme="spectrum"][data-board-color-view="borders"][data-board-role="done"] {
+  --board-body: #171c1b;
+  --board-header: #202624;
+  --board-border: rgba(73, 186, 199, 0.56);
+  --board-text: #e7ecea;
+}
+
+[data-board-theme]:not([data-board-theme="default"])[data-board-color-view]:not(
+    [data-board-color-view="off"]
+  )[data-board-role] {
+  background-color: var(--board-body);
+  border-color: var(--board-border);
+}
+[data-board-theme]:not([data-board-theme="default"])[data-board-color-view]:not(
+    [data-board-color-view="off"]
+  )[data-board-role]
+  > header {
+  background-color: var(--board-header);
+  border-color: var(--board-border);
+  color: var(--board-text);
+}
+[data-board-theme]:not([data-board-theme="default"])[data-board-color-view]:not(
+    [data-board-color-view="off"]
+  )[data-board-role]
+  > header
+  .text-muted-foreground {
+  color: var(--board-text);
+}
+
+[data-board-theme]:not([data-board-theme="default"])[data-board-color-view]:not(
+    [data-board-color-view="off"]
+  )[data-board-role]
+  > header
+  .workspace-section-title {
+  color: var(--board-text);
+}
+
+[data-board-theme]:not([data-board-theme="default"])[data-board-color-view]:not([data-board-color-view="off"])[data-board-role] > header .text-foreground { color: var(--board-text); }

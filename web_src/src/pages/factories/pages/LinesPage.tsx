@@ -1,3 +1,4 @@
+import { BoardColorThemeProvider } from "../lib/BoardColorThemeProvider";
 import type {
   FactoriesFactory,
   FactoriesFactoryIntake,
@@ -647,186 +648,188 @@ export function LinesPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
-      {settingsIntake ? (
-        <IntakeSettingsHost
-          key={settingsIntake.intakeId}
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={routeSegment}
-          lineId={selectedLine.id}
-          intake={settingsIntake}
-          repository={factory?.onboarding?.backlogRepository}
-          vcsIntegrationId={factory?.onboarding?.vcsIntegrationId}
-          initialTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
-          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
-        />
-      ) : null}
-      <AddIntakePicker
-        open={addIntakeOpen}
-        onClose={() => setAddIntakeOpen(false)}
-        onSelect={createIntakeFromTemplate}
-        templates={addIntakeTemplates}
-        takenSourceIds={takenIntakeSourceIds}
-      />
-      <AddPRFeedbackPicker
-        open={addPRFeedbackOpen}
-        onClose={() => setAddPRFeedbackOpen(false)}
-        onSelect={createPRFeedbackFromSource}
-        takenSourceIds={takenPRFeedbackSources}
-      />
-      {automationViewCanvasId ? (
-        <ColumnAutomationViewHost
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={routeSegment}
-          lineId={selectedLine.id}
-          canvasId={automationViewCanvasId}
-          title={viewedAutomation?.name?.trim() || "Automation"}
-          onClose={closeAutomationView}
-          onDelete={canDeleteViewedCustom ? deleteViewedCustomAutomation : undefined}
-          deletePending={deleteAutomation.isPending}
-        />
-      ) : null}
-      {planningOpen ? (
-        <PlanningSettingsHost
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={routeSegment}
-          lineId={selectedLine.id}
-          initialTab={isPlanningSettingsTab(planningSettingsTab) ? planningSettingsTab : "general"}
-          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
-        />
-      ) : null}
-      {prFeedbackOpen ? (
-        <PRFeedbackSettingsHost
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={routeSegment}
-          githubIntegrationId={githubIntegrationId}
-          repository={appRepository}
-          lineId={selectedLine.id}
-          canUpdate={canUpdate}
-          handlerId={prFeedbackHandlerId}
-          initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
-          onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
-        />
-      ) : null}
-      <div className={factoryKanbanPageClassName}>
-        <div className="shrink-0">
-          <LineDetailHeader
-            organizationId={organizationId}
-            factoryId={factoryId}
-            line={selectedLine}
-            workOrders={workOrders}
-            factory={factory}
-            state={listState}
-            canUpdate={canUpdate}
-            hostedCreditHeaderKicker={hostedCreditHeaderKicker}
-            nextStepsRestore={
-              nextStepsCollapsed && nextStepBanner ? (
-                <WorkspaceNextStepsHeaderBadge
-                  progress={workspaceNextStepsProgressCopy(nextStepBanner.doneCount, nextStepBanner.totalCount)}
-                  title={nextStepBanner.badgeLabel}
-                  onOpen={nextStepDeferral.restore}
-                />
-              ) : undefined
-            }
-            intakes={factoryIntakes}
-            automationView={canChooseAutomationView ? columnAutomationView : undefined}
-            onAutomationViewChange={canChooseAutomationView ? setColumnAutomationView : undefined}
-            colorView={columnColorView}
-            onColorViewChange={setColumnColorView}
-          />
-          <NextStepsPanel
-            steps={nextSteps}
-            collapsed={nextStepsCollapsed}
-            onContinue={(step) =>
-              runWorkspaceNextStepAction(step.action, {
-                openPRFeedbackSetup: (sourceId) => {
-                  const href = prFeedbackSetupHref(organizationId, routeSegment, selectedLine.id, sourceId);
-                  if (href) {
-                    navigate(href);
-                  }
-                },
-              })
-            }
-            onDefer={() => {
-              if (nextStepBanner) {
-                nextStepDeferral.defer(nextStepBanner.activeStep.id);
-              }
-            }}
-          />
-        </div>
-        <div className={factoryWorkOrdersBodyClassName}>
-          <LineDetail
+    <BoardColorThemeProvider boardKey={JSON.stringify([organizationId, factoryId, selectedLine.id])}>
+      <div className="flex h-full min-h-0 min-w-0 w-full" data-testid="lines-detail-page">
+        {settingsIntake ? (
+          <IntakeSettingsHost
+            key={settingsIntake.intakeId}
             organizationId={organizationId}
             factoryId={factoryId}
             factoryKey={routeSegment}
-            line={selectedLine}
-            apps={factoryApps}
-            workOrders={visibleWorkOrders}
-            cardsPending={Boolean(isPlaceholderData)}
-            canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
-            canUpdate={canUpdate}
-            onCreateWorkOrder={openCreateWorkOrder}
-            intakePanel={intakePanel}
-            onAddIntake={canUpdate ? () => setAddIntakeOpen(true) : undefined}
-            verifyListeners={showColumnAutomations ? [] : verifyListeners}
-            onAddPRFeedback={
-              showColumnAutomations ? undefined : canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined
-            }
-            factoryIntakes={factoryIntakes}
-            prFeedbackHandlers={prFeedbackHandlers}
-            appRepository={appRepository}
-            backlogRepository={factory?.onboarding?.backlogRepository?.trim() ?? ""}
-            defaultBranch={factory?.onboarding?.defaultBranch?.trim() ?? ""}
-            githubIntegrationId={githubIntegrationId}
-            showColumnAutomations={showColumnAutomations}
-            showAutomationRows={showAutomationRows}
-            colorView={columnColorView}
-            columnPaging={{
-              backlog: {
-                hasMore: !isPlaceholderData && backlogPage.hasNextPage,
-                isLoading: backlogPage.isFetchingNextPage,
-                onLoadMore: backlogPage.fetchNextPage,
-              },
-              open: {
-                hasMore: !isPlaceholderData && openPage.hasNextPage,
-                isLoading: openPage.isFetchingNextPage,
-                onLoadMore: openPage.fetchNextPage,
-              },
-              done: {
-                hasMore: !isPlaceholderData && donePage.hasNextPage,
-                isLoading: donePage.isFetchingNextPage,
-                onLoadMore: donePage.fetchNextPage,
-              },
-            }}
-            workOrderCardContext={{
-              organizationId,
-              factoryId,
-              factoryKey: routeSegment,
-              factoryLines: lines,
-              canDispatch: canUpdateWorkOrders,
-              preferredLineName: selectedLine.name,
-              canAssign: canUpdateWorkOrders,
-              addressingFeedbackOrderIds,
-              addressingFeedbackLabels,
-              waitingOnChecksOrderIds,
-              checksPassedOrderIds,
-              checksPassedLabels,
-              fixesPausedOrderIds,
-              pullRequests,
-              ...cardActions,
-            }}
-            peekOrder={peekOrder ?? undefined}
-            onOpenWorkOrder={openWorkOrder}
-            onClosePeek={closePeek}
-            planningEnabled={factory?.planning?.enabled !== false}
+            lineId={selectedLine.id}
+            intake={settingsIntake}
+            repository={factory?.onboarding?.backlogRepository}
+            vcsIntegrationId={factory?.onboarding?.vcsIntegrationId}
+            initialTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
+            onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
           />
+        ) : null}
+        <AddIntakePicker
+          open={addIntakeOpen}
+          onClose={() => setAddIntakeOpen(false)}
+          onSelect={createIntakeFromTemplate}
+          templates={addIntakeTemplates}
+          takenSourceIds={takenIntakeSourceIds}
+        />
+        <AddPRFeedbackPicker
+          open={addPRFeedbackOpen}
+          onClose={() => setAddPRFeedbackOpen(false)}
+          onSelect={createPRFeedbackFromSource}
+          takenSourceIds={takenPRFeedbackSources}
+        />
+        {automationViewCanvasId ? (
+          <ColumnAutomationViewHost
+            organizationId={organizationId}
+            factoryId={factoryId}
+            factoryKey={routeSegment}
+            lineId={selectedLine.id}
+            canvasId={automationViewCanvasId}
+            title={viewedAutomation?.name?.trim() || "Automation"}
+            onClose={closeAutomationView}
+            onDelete={canDeleteViewedCustom ? deleteViewedCustomAutomation : undefined}
+            deletePending={deleteAutomation.isPending}
+          />
+        ) : null}
+        {planningOpen ? (
+          <PlanningSettingsHost
+            organizationId={organizationId}
+            factoryId={factoryId}
+            factoryKey={routeSegment}
+            lineId={selectedLine.id}
+            initialTab={isPlanningSettingsTab(planningSettingsTab) ? planningSettingsTab : "general"}
+            onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
+          />
+        ) : null}
+        {prFeedbackOpen ? (
+          <PRFeedbackSettingsHost
+            organizationId={organizationId}
+            factoryId={factoryId}
+            factoryKey={routeSegment}
+            githubIntegrationId={githubIntegrationId}
+            repository={appRepository}
+            lineId={selectedLine.id}
+            canUpdate={canUpdate}
+            handlerId={prFeedbackHandlerId}
+            initialTab={isPRFeedbackSettingsTab(prFeedbackSettingsTab) ? prFeedbackSettingsTab : "general"}
+            onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
+          />
+        ) : null}
+        <div className={factoryKanbanPageClassName}>
+          <div className="shrink-0">
+            <LineDetailHeader
+              organizationId={organizationId}
+              factoryId={factoryId}
+              line={selectedLine}
+              workOrders={workOrders}
+              factory={factory}
+              state={listState}
+              canUpdate={canUpdate}
+              hostedCreditHeaderKicker={hostedCreditHeaderKicker}
+              nextStepsRestore={
+                nextStepsCollapsed && nextStepBanner ? (
+                  <WorkspaceNextStepsHeaderBadge
+                    progress={workspaceNextStepsProgressCopy(nextStepBanner.doneCount, nextStepBanner.totalCount)}
+                    title={nextStepBanner.badgeLabel}
+                    onOpen={nextStepDeferral.restore}
+                  />
+                ) : undefined
+              }
+              intakes={factoryIntakes}
+              automationView={canChooseAutomationView ? columnAutomationView : undefined}
+              onAutomationViewChange={canChooseAutomationView ? setColumnAutomationView : undefined}
+              colorView={columnColorView}
+              onColorViewChange={setColumnColorView}
+            />
+            <NextStepsPanel
+              steps={nextSteps}
+              collapsed={nextStepsCollapsed}
+              onContinue={(step) =>
+                runWorkspaceNextStepAction(step.action, {
+                  openPRFeedbackSetup: (sourceId) => {
+                    const href = prFeedbackSetupHref(organizationId, routeSegment, selectedLine.id, sourceId);
+                    if (href) {
+                      navigate(href);
+                    }
+                  },
+                })
+              }
+              onDefer={() => {
+                if (nextStepBanner) {
+                  nextStepDeferral.defer(nextStepBanner.activeStep.id);
+                }
+              }}
+            />
+          </div>
+          <div className={factoryWorkOrdersBodyClassName}>
+            <LineDetail
+              organizationId={organizationId}
+              factoryId={factoryId}
+              factoryKey={routeSegment}
+              line={selectedLine}
+              apps={factoryApps}
+              workOrders={visibleWorkOrders}
+              cardsPending={Boolean(isPlaceholderData)}
+              canCreateWorkOrder={canCreateWorkOrder || permissionsLoading}
+              canUpdate={canUpdate}
+              onCreateWorkOrder={openCreateWorkOrder}
+              intakePanel={intakePanel}
+              onAddIntake={canUpdate ? () => setAddIntakeOpen(true) : undefined}
+              verifyListeners={showColumnAutomations ? [] : verifyListeners}
+              onAddPRFeedback={
+                showColumnAutomations ? undefined : canAddPRFeedback ? () => setAddPRFeedbackOpen(true) : undefined
+              }
+              factoryIntakes={factoryIntakes}
+              prFeedbackHandlers={prFeedbackHandlers}
+              appRepository={appRepository}
+              backlogRepository={factory?.onboarding?.backlogRepository?.trim() ?? ""}
+              defaultBranch={factory?.onboarding?.defaultBranch?.trim() ?? ""}
+              githubIntegrationId={githubIntegrationId}
+              showColumnAutomations={showColumnAutomations}
+              showAutomationRows={showAutomationRows}
+              colorView={columnColorView}
+              columnPaging={{
+                backlog: {
+                  hasMore: !isPlaceholderData && backlogPage.hasNextPage,
+                  isLoading: backlogPage.isFetchingNextPage,
+                  onLoadMore: backlogPage.fetchNextPage,
+                },
+                open: {
+                  hasMore: !isPlaceholderData && openPage.hasNextPage,
+                  isLoading: openPage.isFetchingNextPage,
+                  onLoadMore: openPage.fetchNextPage,
+                },
+                done: {
+                  hasMore: !isPlaceholderData && donePage.hasNextPage,
+                  isLoading: donePage.isFetchingNextPage,
+                  onLoadMore: donePage.fetchNextPage,
+                },
+              }}
+              workOrderCardContext={{
+                organizationId,
+                factoryId,
+                factoryKey: routeSegment,
+                factoryLines: lines,
+                canDispatch: canUpdateWorkOrders,
+                preferredLineName: selectedLine.name,
+                canAssign: canUpdateWorkOrders,
+                addressingFeedbackOrderIds,
+                addressingFeedbackLabels,
+                waitingOnChecksOrderIds,
+                checksPassedOrderIds,
+                checksPassedLabels,
+                fixesPausedOrderIds,
+                pullRequests,
+                ...cardActions,
+              }}
+              peekOrder={peekOrder ?? undefined}
+              onOpenWorkOrder={openWorkOrder}
+              onClosePeek={closePeek}
+              planningEnabled={factory?.planning?.enabled !== false}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </BoardColorThemeProvider>
   );
 }
 
@@ -1694,6 +1697,8 @@ function VerifyColumn({
       canRename={canRename}
       onRename={onRename}
       titleTestId="lines-column-title-verify"
+      paletteRole="verify"
+      paletteView={colorView}
       count={orders.length}
       tone="neutral"
       surfaceClassName={lane.surfaceClassName}
@@ -1816,6 +1821,8 @@ function DoneColumn({
       canRename={canRename}
       onRename={onRename}
       titleTestId="lines-column-title-done"
+      paletteRole="done"
+      paletteView={colorView}
       count={orders.length}
       tone="done"
       surfaceClassName={lane.surfaceClassName}
@@ -1952,6 +1959,8 @@ function PhaseColumn({
       <WorkOrderBoardLane
         title={title}
         label={`${title} phase`}
+        paletteRole="implement"
+        paletteView={colorView}
         count={totalRuns}
         tone={PHASE_LANE_TONE[glyph]}
         surfaceClassName={lane.surfaceClassName}
