@@ -1,11 +1,10 @@
 import React, { useCallback, useState } from "react";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import { FirstRunShell } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
+import type { FirstRunSphereProps } from "@/pages/factories/pages/onboarding/first-run/FirstRunSpherePane";
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
 import { FleetManagerStep } from "./ownerSetup/FleetManagerStep";
 import { LicenseStep } from "./ownerSetup/LicenseStep";
-import { OWNER_SETUP_COPY } from "./ownerSetup/ownerSetupCopy";
-import { OwnerSetupPane } from "./ownerSetup/OwnerSetupPane";
 import { OwnerStep } from "./ownerSetup/OwnerStep";
 import { SmtpStep } from "./ownerSetup/SmtpStep";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
@@ -13,6 +12,15 @@ import { newOrganizationLandingPath } from "./newOrganizationLandingPath";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
 const OWNER_SETUP_STEPS = 4;
+const OWNER_SETUP_PREVIEW: FirstRunSphereProps = {
+  level: 0,
+  art: {
+    mode: "globe",
+    background: "#b09532",
+    arrowColor: "#eeede9",
+    count: 400,
+  },
+};
 
 type OwnerSetupStep = "owner" | "license" | "smtp" | "fleet" | "survey";
 
@@ -22,13 +30,6 @@ function ownerSetupStepNumber(step: OwnerSetupStep) {
   if (step === "smtp") return 3;
   if (step === "fleet") return 4;
   return OWNER_SETUP_STEPS;
-}
-
-function ownerSetupCaption(step: OwnerSetupStep) {
-  if (step === "license") return OWNER_SETUP_COPY.pane.license;
-  if (step === "smtp") return OWNER_SETUP_COPY.pane.smtp;
-  if (step === "fleet") return OWNER_SETUP_COPY.pane.fleet;
-  return OWNER_SETUP_COPY.pane.owner;
 }
 
 function isEmailValid(email: string) {
@@ -206,6 +207,8 @@ const OwnerSetup: React.FC = () => {
     <FirstRunShell
       testId="owner-setup"
       contentSpacing="compact"
+      visual="preview"
+      sphere={OWNER_SETUP_PREVIEW}
       chrome={
         step === "survey"
           ? undefined
@@ -215,13 +218,6 @@ const OwnerSetup: React.FC = () => {
               email: afterOwner ? email : undefined,
               onLogOut: afterOwner ? () => (window.location.href = "/logout") : undefined,
             }
-      }
-      aside={
-        <OwnerSetupPane
-          caption={ownerSetupCaption(step)}
-          step={ownerSetupStepNumber(step)}
-          stepCount={OWNER_SETUP_STEPS}
-        />
       }
     >
       {step === "owner" && (

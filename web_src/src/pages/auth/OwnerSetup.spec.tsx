@@ -21,6 +21,25 @@ vi.mock("@/posthog", () => ({
   posthog: { getActiveMatchingSurveys: vi.fn() },
 }));
 
+const ONBOARDING_LABELS = ["Discover", "Awaiting code", "Verify", "01 Plan", "02 Build", "03 Check", "04 Review"];
+
+function expectOwnerSetupPreview() {
+  const root = screen.getByTestId("owner-setup");
+  expect(root).toHaveAttribute("data-visual", "preview");
+  expect(screen.getByTestId("first-run-logo")).toHaveAttribute("alt", "SuperPlane");
+  expect(root.querySelector("canvas")).toBeNull();
+  expect(screen.queryByTestId("owner-setup-pane")).not.toBeInTheDocument();
+  expect(screen.queryByTestId("first-run-art-pill")).not.toBeInTheDocument();
+  const pane = screen.getByTestId("first-run-art-pane");
+  expect(pane).toHaveAttribute("data-art-mode", "globe");
+  expect(pane).toHaveAttribute("data-art-background", "#b09532");
+  expect(pane).toHaveAttribute("data-art-arrow-color", "#eeede9");
+  expect(pane).toHaveAttribute("data-art-count", "400");
+  for (const label of ONBOARDING_LABELS) {
+    expect(screen.queryByText(label)).not.toBeInTheDocument();
+  }
+}
+
 describe("OwnerSetup", () => {
   const originalLocation = window.location;
 
@@ -34,6 +53,19 @@ describe("OwnerSetup", () => {
   afterEach(() => {
     Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
     vi.unstubAllGlobals();
+  });
+
+  it("shows the gold arrow preview without onboarding labels", () => {
+    render(
+      <MemoryRouter>
+        <OwnerSetup />
+      </MemoryRouter>,
+    );
+
+    expectOwnerSetupPreview();
+    expect(screen.queryByTestId("first-run-signed-in")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-log-out")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Create the owner account" })).toBeInTheDocument();
   });
 
   it("reaches workspace setup when SMTP and Fleet Manager are skipped", async () => {
@@ -65,6 +97,9 @@ describe("OwnerSetup", () => {
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(await screen.findByTestId("owner-setup-license-skip")).toBeInTheDocument();
+    expectOwnerSetupPreview();
+    expect(screen.getByTestId("first-run-signed-in")).toHaveTextContent("ada@example.com");
+    expect(screen.getByTestId("first-run-log-out")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("owner-setup-license-skip"));
 
     expect(await screen.findByTestId("owner-setup-smtp")).toBeInTheDocument();
