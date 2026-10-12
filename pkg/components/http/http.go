@@ -1124,8 +1124,18 @@ func (e *HTTP) handleRetryRequest(ctx core.ActionHookContext) error {
 	// If we should not retry anymore, fail here.
 	//
 	if metadata.Retry.Attempts >= metadata.Retry.MaxAttempts {
-		if err != nil {
-			return e.processResponse(ctx.Metadata, ctx.ExecutionState, resp, spec)
+		//
+		// No response received (transport error, timeout, DNS): emit a failure
+		// without dereferencing the nil response, mirroring executeRequestWithoutRetry.
+		//
+		if err != nil || resp == nil {
+			return ctx.ExecutionState.Emit(
+				FailureOutputChannel,
+				"http.request.failed",
+				[]any{map[string]any{
+					"error": fmt.Sprintf("error executing request: %v", err),
+				}},
+			)
 		}
 
 		return e.handleRequestFailure(ctx.Metadata, ctx.ExecutionState, resp, err)

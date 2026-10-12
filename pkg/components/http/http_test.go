@@ -1084,3 +1084,54 @@ func TestHTTP__CalculateNextRetryDelay(t *testing.T) {
 	assert.Equal(t, 5*time.Second, h.calculateNextRetryDelay(RetryStrategyFixed, 2, 5))
 	assert.Equal(t, 20*time.Second, h.calculateNextRetryDelay(RetryStrategyExponential, 2, 5))
 }
+
+func TestHTTP__HandleHook__RetryRequest_ExhaustedWithNetworkError(t *testing.T) {
+	h := &HTTP{}
+	stateCtx := &contexts.ExecutionStateContext{}
+	metadataCtx := &contexts.MetadataContext{}
+
+	// retryConfig has maxAttempts=3, so the endpoint is down for the whole
+	// window: Execute (attempt 1) + 3 hook calls, all transport errors, drives
+	// the retry loop to exhaustion with no response ever received.
+	httpCtx := &sequenceHTTPClient{errors: []error{
+		errors.New("connection refused"),
+		errors.New("connection refused"),
+		errors.New("connection refused"),
+		errors.New("connection refused"),
+	}}
+
+	execCtx := core.ExecutionContext{
+		Logger:         log.NewEntry(log.StandardLogger()),
+		Configuration:  retryConfig("https://api.example.com"),
+		ExecutionState: stateCtx,
+		Metadata:       metadataCtx,
+		Requests:       &contexts.RequestContext{},
+		HTTP:           httpCtx,
+	}
+
+	require.NoError(t, h.Execute(execCtx))
+
+	// Drive the retry hook to exhaustion. The final call exhausts retries on a
+	// transport error: today it panics; it must emit a failure instead.
+	for i := 0; i < 3; i++ {
+		actionCtx := core.ActionHookContext{
+			Logger:         log.NewEntry(log.StandardLogger()),
+			Name:           "retryRequest",
+			Configuration:  execCtx.Configuration,
+			ExecutionState: stateCtx,
+			Metadata:       metadataCtx,
+			Requests:       &contexts.RequestContext{},
+			HTTP:           httpCtx,
+		}
+		require.NotPanics(t, func() {
+			require.NoError(t, h.HandleHook(actionCtx))
+		})
+	}
+
+	assert.Equal(t, FailureOutputChannel, stateCtx.Channel)
+	assert.Equal(t, "http.request.failed", stateCtx.Type)
+
+	metadata := decodeMetadata(t, metadataCtx)
+	require.NotNil(t, metadata.Retry)
+	assert.Equal(t, 3, metadata.Retry.MaxAttempts)
+}
