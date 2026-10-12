@@ -1,17 +1,69 @@
 package bitbucket
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/core"
 	contexts "github.com/superplanehq/superplane/test/support/contexts"
 )
+
+func TestForgeCommentFetchesContentBeforeMentionFilter(t *testing.T) {
+	bitbucketapp.SetSystemTokenSource(func(string) (string, time.Time, error) { return "token", time.Now().Add(time.Hour), nil })
+	t.Cleanup(func() { bitbucketapp.SetSystemTokenSource(nil) })
+	for _, test := range []struct {
+		name                 string
+		status               int
+		response             string
+		wantCode, wantEvents int
+	}{
+		{"mention", http.StatusOK, `{"id":7,"content":{"raw":"@superplaneagent fix conflicts"},"user":{"nickname":"ada"},"inline":{"path":"README.md","to":3}}`, http.StatusOK, 1},
+		{"no mention", http.StatusOK, `{"id":7,"content":{"raw":"looks good"}}`, http.StatusOK, 0},
+		{"allowed bot", http.StatusOK, `{"id":7,"content":{"raw":"Fix this race"},"user":{"type":"app_user","display_name":"open-code-review[bot]"}}`, http.StatusOK, 1},
+		{"other bot", http.StatusOK, `{"id":7,"content":{"raw":"@superplaneagent fix this"},"user":{"type":"app_user","display_name":"other[bot]"}}`, http.StatusOK, 0},
+		{"fetch failure", http.StatusServiceUnavailable, `{}`, http.StatusInternalServerError, 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			payload := ForgePullRequestPayload("avi:bitbucket:created:pullrequest-comment", time.Now().Format(time.RFC3339), "{repo}", "acme/widgets", map[string]any{"id": 2}, nil)
+			payload["comment"] = map[string]any{"id": 7}
+			body, err := json.Marshal(payload)
+			require.NoError(t, err)
+			headers := http.Header{}
+			headers.Set("X-Event-Key", ForgeEventKey("avi:bitbucket:created:pullrequest-comment"))
+			headers.Set("X-Hub-Signature", "sha256="+signBitbucketPayload("secret", body))
+			httpContext := &contexts.HTTPContext{Responses: []*http.Response{{StatusCode: test.status, Body: io.NopCloser(strings.NewReader(test.response))}}}
+			events := &contexts.EventContext{}
+			code, _, err := (&OnPullRequestComment{}).HandleWebhook(core.WebhookRequestContext{
+				Body: body, Headers: headers, Webhook: &contexts.NodeWebhookContext{Secret: "secret"}, HTTP: httpContext,
+				Integration:   &contexts.IntegrationContext{Metadata: map[string]any{"authType": AuthTypeForgeApp, "forgeInstallationId": "installation"}},
+				Configuration: map[string]any{"repository": "acme/widgets", "contentFilter": "@superplaneagent", "allowedBots": []string{"open-code-review"}, "ignoreBots": true}, Events: events,
+			})
+			assert.Equal(t, test.wantCode, code)
+			assert.Equal(t, test.wantEvents, events.Count())
+			if test.wantCode == http.StatusInternalServerError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, httpContext.Requests, 1)
+			assert.Equal(t, "/2.0/repositories/acme/widgets/pullrequests/2/comments/7", httpContext.Requests[0].URL.Path)
+			if test.name == "mention" {
+				comment := events.Payloads[0].Data.(map[string]any)["comment"].(map[string]any)
+				assert.Equal(t, "@superplaneagent fix conflicts", comment["body"])
+				assert.Equal(t, "ada", comment["nickname"])
+				assert.Equal(t, "README.md", comment["path"])
+			}
+		})
+	}
+}
 
 func pullRequestCommentFixture(t *testing.T) []byte {
 	t.Helper()
