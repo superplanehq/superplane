@@ -15,12 +15,18 @@ fi
 VERSION="$1"
 S3_BUCKET_URI="${2%/}"
 
-semver_pattern='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$'
 git_sha_pattern='^sha:[0-9a-f]{40}$'
-if [[ ! "${VERSION}" =~ ${semver_pattern} ]] &&
-  [[ ! "${VERSION}" =~ ${git_sha_pattern} ]]; then
+is_git_sha_release=false
+if [[ "${VERSION}" == v* ]]; then
+  if ! node "$(dirname "${BASH_SOURCE[0]}")/../component-release.js" \
+    validate-version "${VERSION}" >/dev/null; then
+    exit 1
+  fi
+elif [[ ! "${VERSION}" =~ ${git_sha_pattern} ]]; then
   echo "Error: version must be v<semantic-version> or sha:<40-character-lowercase-git-sha>" >&2
   exit 1
+else
+  is_git_sha_release=true
 fi
 
 if [[ ! "${S3_BUCKET_URI}" =~ ^s3://[^/]+$ ]]; then
@@ -33,23 +39,20 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 OUTPUT_DIR="${RUNNER_RELEASE_OUTPUT_DIR:-${REPO_ROOT}/build/runner/${VERSION}}"
 DESTINATION="${S3_BUCKET_URI}/runner/${VERSION}"
 ARCHIVES=(runner-linux-amd64.tar.gz runner-linux-arm64.tar.gz)
+SBOM=runner.spdx.json
 
 # shellcheck source=../lib/image-build-prerequisites.sh
 source "${REPO_ROOT}/release/lib/image-build-prerequisites.sh"
 
 require_command aws "Install and authenticate the AWS CLI."
 
-is_git_sha_release=false
-if [[ "${VERSION}" =~ ${git_sha_pattern} ]]; then
-  is_git_sha_release=true
-  put_object_skeleton="$(aws s3api put-object --generate-cli-skeleton input)"
-  if [[ "${put_object_skeleton}" != *'"IfNoneMatch"'* ]]; then
-    echo "Error: AWS CLI must support s3api put-object --if-none-match for SHA releases" >&2
-    exit 1
-  fi
-  bucket="${S3_BUCKET_URI#s3://}"
-  prefix="runner/${VERSION}/"
+put_object_skeleton="$(aws s3api put-object --generate-cli-skeleton input)"
+if [[ "${put_object_skeleton}" != *'"IfNoneMatch"'* ]]; then
+  echo "Error: AWS CLI must support s3api put-object --if-none-match" >&2
+  exit 1
 fi
+bucket="${S3_BUCKET_URI#s3://}"
+prefix="runner/${VERSION}/"
 
 sha256_file() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -109,53 +112,48 @@ upload_artifact() {
   local object_name="$2"
   local content_type="$3"
 
-  if [ "${is_git_sha_release}" = "true" ]; then
-    local key="${prefix}${object_name}"
-    local local_checksum
-    local put_error
-    local status
-    local_checksum="$(sha256_file "${source_path}")"
+  local key="${prefix}${object_name}"
+  local local_checksum
+  local put_error
+  local status
+  local_checksum="$(sha256_file "${source_path}")"
 
-    if object_exists "${key}"; then
-      existing_object_matches "${source_path}" "${key}" "${local_checksum}"
-      return
-    else
-      status=$?
-      if [ "${status}" -ne 1 ]; then
-        return "${status}"
-      fi
+  if object_exists "${key}"; then
+    existing_object_matches "${source_path}" "${key}" "${local_checksum}"
+    return
+  else
+    status=$?
+    if [ "${status}" -ne 1 ]; then
+      return "${status}"
     fi
-
-    if put_error="$(
-      aws s3api put-object \
-        --bucket "${bucket}" \
-        --key "${key}" \
-        --body "${source_path}" \
-        --content-type "${content_type}" \
-        --cache-control "public,max-age=31536000,immutable" \
-        --metadata "sha256=${local_checksum}" \
-        --if-none-match "*" \
-        2>&1
-    )"; then
-      return
-    fi
-    if object_exists "${key}" &&
-      existing_object_matches "${source_path}" "${key}" "${local_checksum}"; then
-      return
-    fi
-    echo "${put_error}" >&2
-    return 1
   fi
 
-  aws s3 cp \
-    "${source_path}" \
-    "${DESTINATION}/${object_name}" \
-    --content-type "${content_type}" \
-    --cache-control "public,max-age=31536000,immutable" \
-    --only-show-errors
+  if put_error="$(
+    aws s3api put-object \
+      --bucket "${bucket}" \
+      --key "${key}" \
+      --body "${source_path}" \
+      --content-type "${content_type}" \
+      --cache-control "public,max-age=31536000,immutable" \
+      --metadata "sha256=${local_checksum}" \
+      --if-none-match "*" \
+      2>&1
+  )"; then
+    return
+  fi
+  if object_exists "${key}" &&
+    existing_object_matches "${source_path}" "${key}" "${local_checksum}"; then
+    return
+  fi
+  echo "${put_error}" >&2
+  return 1
 }
 
-for artifact in "${ARCHIVES[@]}" checksums.txt; do
+required_artifacts=("${ARCHIVES[@]}" checksums.txt)
+if [ "${is_git_sha_release}" = "false" ]; then
+  required_artifacts+=("${SBOM}")
+fi
+for artifact in "${required_artifacts[@]}"; do
   if [ ! -f "${OUTPUT_DIR}/${artifact}" ]; then
     echo "Error: ${OUTPUT_DIR}/${artifact} does not exist." >&2
     echo "Run release/runner/build.sh ${VERSION} first." >&2
@@ -189,6 +187,11 @@ for archive in "${ARCHIVES[@]}"; do
   echo "* Uploading ${archive}"
   upload_artifact "${OUTPUT_DIR}/${archive}" "${archive}" "application/gzip"
 done
+
+if [ "${is_git_sha_release}" = "false" ]; then
+  echo "* Uploading ${SBOM}"
+  upload_artifact "${OUTPUT_DIR}/${SBOM}" "${SBOM}" "application/spdx+json"
+fi
 
 echo "* Uploading checksums.txt"
 upload_artifact "${OUTPUT_DIR}/checksums.txt" "checksums.txt" "text/plain"

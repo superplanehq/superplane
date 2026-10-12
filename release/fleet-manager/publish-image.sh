@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [ "$#" -ne 2 ]; then
+  echo "Usage: release/fleet-manager/publish-image.sh <version> <oci-archive>" >&2
+  exit 1
+fi
+
+VERSION="$1"
+OCI_ARCHIVE="$2"
+IMAGE_REPOSITORY="${FLEET_MANAGER_IMAGE_REPO:-ghcr.io/superplanehq/fleet-manager}"
+IMAGE="${IMAGE_REPOSITORY}:${VERSION}"
+
+node "$(dirname "$0")/../component-release.js" validate-version "${VERSION}" >/dev/null
+if [ ! -f "${OCI_ARCHIVE}" ]; then
+  echo "Error: OCI archive does not exist: ${OCI_ARCHIVE}" >&2
+  exit 1
+fi
+if ! command -v skopeo >/dev/null 2>&1; then
+  echo "Error: skopeo is required to publish the prepared OCI archive" >&2
+  exit 1
+fi
+
+prepared_digest="$(skopeo inspect --raw "oci-archive:${OCI_ARCHIVE}" | sha256sum | awk '{print $1}')"
+prepared_digest="sha256:${prepared_digest}"
+if remote_digest="$(skopeo inspect --format '{{.Digest}}' "docker://${IMAGE}" 2>/dev/null)"; then
+  if [ "${remote_digest}" != "${prepared_digest}" ]; then
+    echo "Error: ${IMAGE} already points to ${remote_digest}, not ${prepared_digest}" >&2
+    exit 1
+  fi
+  echo "* Reusing matching image ${IMAGE}@${remote_digest}"
+else
+  skopeo copy --all "oci-archive:${OCI_ARCHIVE}" "docker://${IMAGE}"
+fi
+
+published_digest="$(skopeo inspect --format '{{.Digest}}' "docker://${IMAGE}")"
+if [ "${published_digest}" != "${prepared_digest}" ]; then
+  echo "Error: published digest ${published_digest} does not match ${prepared_digest}" >&2
+  exit 1
+fi
+if [ -n "${FLEET_MANAGER_DIGEST_OUTPUT:-}" ]; then
+  printf '%s\n' "${published_digest}" >"${FLEET_MANAGER_DIGEST_OUTPUT}"
+fi
+printf '%s\n' "${published_digest}"

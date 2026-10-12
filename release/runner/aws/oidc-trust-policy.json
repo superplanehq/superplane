@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::<AWS_ACCOUNT_ID>:oidc-provider/superplanehq.semaphoreci.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "superplanehq.semaphoreci.com:aud": "https://superplanehq.semaphoreci.com",
+          "superplanehq.semaphoreci.com:sub": "org:superplanehq:project:93209523-9d0d-4366-8f48-587a1b282e02:repo:superplane:ref_type:branch:ref:refs/heads/main"
+        }
+      }
+    }
+  ]
+}
