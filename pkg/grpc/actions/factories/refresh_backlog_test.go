@@ -131,7 +131,7 @@ func TestRefreshBacklog(t *testing.T) {
 			reloaded, err := factory.FindWorkOrder(database.DB(t.Context()), order.ID)
 			require.NoError(t, err)
 			assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
-			assert.Equal(t, models.FactoryWorkOrderResultRejected, reloaded.Result)
+			assert.Equal(t, models.FactoryWorkOrderResultArchived, reloaded.Result)
 		}
 		reloaded, err := factory.FindWorkOrder(database.DB(t.Context()), openOrder.ID)
 		require.NoError(t, err)
@@ -232,7 +232,7 @@ func TestRefreshBacklog(t *testing.T) {
 		reloaded, err := factory.FindWorkOrder(database.DB(t.Context()), resolved.ID)
 		require.NoError(t, err)
 		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
-		assert.Equal(t, models.FactoryWorkOrderResultRejected, reloaded.Result)
+		assert.Equal(t, models.FactoryWorkOrderResultArchived, reloaded.Result)
 
 		reloaded, err = factory.FindWorkOrder(database.DB(t.Context()), open.ID)
 		require.NoError(t, err)

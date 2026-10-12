@@ -114,6 +114,9 @@ func (c *FactoryNotificationConsumer) Consume(delivery tackle.Delivery) error {
 // individual recipients are logged and do not abort the batch — retrying
 // the whole message would duplicate the emails that already went out.
 func (c *FactoryNotificationConsumer) process(db *gorm.DB, message messages.FactoryWorkOrderNotificationMessage) (bool, error) {
+	if message.Result == models.FactoryWorkOrderResultArchived {
+		return false, nil
+	}
 	orgID, err := uuid.Parse(message.OrganizationID)
 	if err != nil {
 		log.Warnf("Skipping work order notification with invalid organization id %q", message.OrganizationID)
@@ -484,6 +487,12 @@ func statusChangeDescription(message messages.FactoryWorkOrderNotificationMessag
 	case models.FactoryWorkOrderStateDraft:
 		return "moved back to draft"
 	case models.FactoryWorkOrderStateClosed:
+		if message.Result == models.FactoryWorkOrderResultManualRejected {
+			return "rejected"
+		}
+		if message.Result == models.FactoryWorkOrderResultPRClosed {
+			return "closed the pull request for"
+		}
 		if message.Result != "" {
 			return fmt.Sprintf("closed as %s", message.Result)
 		}

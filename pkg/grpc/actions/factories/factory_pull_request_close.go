@@ -153,7 +153,7 @@ func closeFactoryWorkOrderForPullRequest(
 	outcome := &factoryPullRequestCloseResult{
 		order:     order,
 		fromState: order.State,
-		result:    models.FactoryWorkOrderResultRejected,
+		result:    models.FactoryWorkOrderResultPRClosed,
 	}
 	if merged {
 		outcome.result = models.FactoryWorkOrderResultCompleted

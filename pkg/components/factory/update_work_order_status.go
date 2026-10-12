@@ -36,7 +36,7 @@ func (c *UpdateWorkOrderStatus) Description() string {
 }
 
 func (c *UpdateWorkOrderStatus) Documentation() string {
-	return `The Update Task Status component transitions a task through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open any of completed / rejected / failed is valid, from draft only rejected is valid (an unopened task never ran).
+	return `The Update Task Status component transitions a task through the lifecycle: draft → open → closed, plus open ↔ draft (back to draft), closed → open (reopen), and draft → closed (abandon before dispatch). When closing, a result must be provided; from open completed / rejected / failed / pr_closed / archived is valid, from draft rejected / archived is valid. A task whose pull request closes without a merge uses pr_closed. Archived tasks are hidden from the UI.
 
 ` + "`orderId`" + ` explicitly targets the task — it defaults to ` + "`{{ order().id }}`" + `, the task driving the current run, which only resolves when the flow was dispatched from a factory line. In a flow triggered by an external event such as ` + "`github.onPullRequest`" + `, replace it with ` + "`{{ previous().data.workOrder.id }}`" + ` after a ` + "`findWorkOrder`" + ` step. This component can only be used in factory-owned apps.`
 }
@@ -112,6 +112,7 @@ func (c *UpdateWorkOrderStatus) Configuration() []configuration.Field {
 						{Label: "Completed", Value: "completed"},
 						{Label: "Rejected", Value: "rejected"},
 						{Label: "Failed", Value: "failed"},
+						{Label: "Closed", Value: "pr_closed"},
 					},
 				},
 			},
