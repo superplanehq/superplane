@@ -57,4 +57,26 @@ describe("FactorySettingsRepositoryPage", () => {
     expect(await within(settings).findByRole("option", { name: /acme\/api/i })).toBeInTheDocument();
     expect(within(settings).queryByRole("option", { name: /acme\/web/i })).not.toBeInTheDocument();
   }, 10000);
+
+  it("lists integration repositories when catalog IDs are unset zero strings", async () => {
+    // The API serializes unset int64 IDs as "0". A Bitbucket workspace without
+    // catalog bindings must still list its integration repositories.
+    const fixture = factoriesFixtureWithSetupAnswers({
+      ...SETUP_ANSWERS.agent,
+      vcsProvider: "bitbucket",
+      appRepositoryId: "0",
+      backlogRepositoryId: "0",
+    });
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/repository`}
+        factoriesFixture={fixture}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+      />,
+    );
+
+    const settings = await screen.findByTestId("factory-settings-repository", {}, { timeout: 8000 });
+    expect(await within(settings).findByRole("option", { name: /acme\/api/i })).toBeInTheDocument();
+    expect(within(settings).getByRole("option", { name: /acme\/web/i })).toBeInTheDocument();
+  }, 10000);
 });
