@@ -23,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func TestRunnerArtifactUploadAndPublicDownload(t *testing.T) {
@@ -233,6 +234,81 @@ func TestRunnerArtifactUploadFromPRDiscussion(t *testing.T) {
 
 	require.NoError(t, db.Model(handler).Update("source", models.FactoryPRFeedbackHandlerSourcePullRequestChecks).Error)
 	_, err = runneraction.ResolveArtifactRunContext(db, run.ID)
+	assert.ErrorIs(t, err, runneraction.ErrArtifactRunScopeNotFound)
+}
+
+func TestRunnerArtifactUploadFromVisualEvidence(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factoryModel.CreateWorkOrder(db, "Show checkout", "Show the checkout state", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		Provider:   models.FactoryPullRequestProviderGitHub,
+		Repository: "acme/app",
+		Number:     42,
+		URL:        "https://github.com/acme/app/pull/42",
+		Title:      "Show checkout",
+		State:      models.FactoryPullRequestStateOpen,
+	})
+	require.NoError(t, err)
+
+	const nodeID = "on-pr-visual-evidence"
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: nodeID,
+		Name:   "On Pull Request",
+		Type:   models.NodeTypeTrigger,
+		Metadata: datatypes.NewJSONType(models.FactoryAppTemplateMetadata(
+			models.FactoryAppTemplateVisualEvidenceID,
+			1,
+		)),
+	}}, nil)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factoryModel.ID).Error)
+	rootEvent := support.EmitCanvasEventForNodeWithData(t, canvas.ID, nodeID, "default", nil, map[string]any{
+		"type": "github.pullRequest",
+		"data": map[string]any{
+			"repository":   map[string]any{"full_name": "acme/app"},
+			"pull_request": map[string]any{"number": 42},
+		},
+	})
+	run, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, rootEvent)
+	require.NoError(t, err)
+	nodeExecution := createExecutionForCanvasRun(t, run, rootEvent.ID, nodeID)
+
+	runContext, err := runneraction.ResolveArtifactRunContext(db, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, order.ID, runContext.WorkOrderID)
+	assert.Nil(t, runContext.LineExecution)
+
+	t.Setenv("JWT_SECRET", "test")
+	environment := runneraction.AttachArtifactUploadEnv(core.ExecutionContext{
+		ID:         nodeExecution.ID,
+		RunID:      run.ID,
+		WorkflowID: canvas.ID.String(),
+		NodeID:     nodeID,
+		BaseURL:    "http://files.test",
+	}, nil, 60, true)
+	assert.True(t, runneraction.HasArtifactUploadToken(environment))
+
+	otherCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{
+		NodeID: nodeID,
+		Name:   "On Pull Request",
+		Type:   models.NodeTypeTrigger,
+	}}, nil)
+	require.NoError(t, db.Model(otherCanvas).Update("factory_id", factoryModel.ID).Error)
+	otherEvent := support.EmitCanvasEventForNodeWithData(t, otherCanvas.ID, nodeID, "default", nil, map[string]any{
+		"data": map[string]any{
+			"repository":   map[string]any{"full_name": "acme/app"},
+			"pull_request": map[string]any{"number": 42},
+		},
+	})
+	otherRun, err := models.FindOrCreateCanvasRunForRootEventInTransaction(db, otherEvent)
+	require.NoError(t, err)
+	createExecutionForCanvasRun(t, otherRun, otherEvent.ID, nodeID)
+	_, err = runneraction.ResolveArtifactRunContext(db, otherRun.ID)
 	assert.ErrorIs(t, err, runneraction.ErrArtifactRunScopeNotFound)
 }
 

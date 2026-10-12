@@ -71,7 +71,24 @@ export function useAddColumnAutomation(args: {
       return;
     }
     if (entry.kind === "pr-closure") {
-      await installBundledCanvas(args, installFactory, queryClient, closePicker);
+      const provider = factoryVCSProvider(args.vcsProvider);
+      const host = provider === "bitbucket" ? "Bitbucket" : "GitHub";
+      await installBundledCanvas(args, installFactory, queryClient, closePicker, {
+        factoryId: "pr-closure",
+        missingIntegrationMessage: `Connect ${host} in workspace setup before you add pull request closure.`,
+      });
+      return;
+    }
+    if (entry.kind === "visual-evidence") {
+      if (factoryVCSProvider(args.vcsProvider) !== "github") {
+        showErrorToast("Visual evidence is available for GitHub only.");
+        return;
+      }
+      await installBundledCanvas(args, installFactory, queryClient, closePicker, {
+        factoryId: "visual-evidence",
+        provider: "github",
+        missingIntegrationMessage: "Connect GitHub in workspace setup before you add visual evidence.",
+      });
       return;
     }
     if (entry.kind === "risk-score") {
@@ -166,21 +183,21 @@ async function installBundledCanvas(
   installFactory: ReturnType<typeof useInstallFactory>["installFactory"],
   queryClient: ReturnType<typeof useQueryClient>,
   close: () => void,
+  template: { factoryId: string; missingIntegrationMessage: string; provider?: "github" | "bitbucket" },
 ) {
-  const provider = factoryVCSProvider(args.vcsProvider);
-  const missingIntegrationMessage = `Connect ${provider === "bitbucket" ? "Bitbucket" : "GitHub"} in workspace setup before you add pull request closure.`;
+  const provider = template.provider ?? factoryVCSProvider(args.vcsProvider);
   if (!args.githubIntegrationId) {
-    showErrorToast(missingIntegrationMessage);
+    showErrorToast(template.missingIntegrationMessage);
     return;
   }
   const vcsInstallationName = await installationName(args.organizationId, args.githubIntegrationId);
   if (!vcsInstallationName) {
-    showErrorToast(missingIntegrationMessage);
+    showErrorToast(template.missingIntegrationMessage);
     return;
   }
   try {
     const installed = await installFactory({
-      factoryId: "pr-closure",
+      factoryId: template.factoryId,
       vcsProvider: provider,
       workspaceFactoryId: args.factoryId,
       integrations: { [provider]: { id: args.githubIntegrationId, name: vcsInstallationName, ready: true } },

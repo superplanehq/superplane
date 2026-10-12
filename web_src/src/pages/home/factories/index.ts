@@ -46,13 +46,11 @@ function lineAppComponentIntegrations(provider: FactoryVCSProvider): Record<stri
   if (provider === "bitbucket") {
     return {
       "bitbucket.createPullRequest": "bitbucket",
-      "bitbucket.createPullRequestComment": "bitbucket",
       "bitbucket.findPullRequest": "bitbucket",
       "bitbucket.updatePullRequest": "bitbucket",
     };
   }
   return {
-    "github.createIssueComment": "github",
     "github.createPullRequest": "github",
   };
 }
@@ -165,6 +163,18 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     title: "Merge confidence",
     description: "Score a pull request when it opens or updates.",
     triggerNodeId: "on-pr-risk",
+  }),
+  "visual-evidence": buildOnboardingApp({
+    id: "visual-evidence",
+    title: "Visual Evidence",
+    description: "Capture screenshots or a short video when a pull request changes the user interface.",
+    integrations: ["github"],
+    componentIntegrations: {
+      "github.getIssue": "github",
+      "github.updatePullRequest": "github",
+      "github.onPullRequest": "github",
+    },
+    entrypointNodeId: "on-pr-visual-evidence",
   }),
 };
 

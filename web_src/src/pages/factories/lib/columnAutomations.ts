@@ -18,6 +18,8 @@ import {
   PR_CLOSURE_ENTRY,
   RISK_SCORE_CATALOG_ID,
   RISK_SCORE_ENTRY,
+  VISUAL_EVIDENCE_CATALOG_ID,
+  VISUAL_EVIDENCE_ENTRY,
   prFeedbackSentence,
 } from "./columnAutomationCatalog";
 import {
@@ -42,7 +44,8 @@ export type ColumnAutomationKind =
   | "pr-discussion"
   | "pr-checks"
   | "pr-closure"
-  | "risk-score";
+  | "risk-score"
+  | "visual-evidence";
 
 export type ColumnAutomationHealth = "healthy" | "needs-repair" | "disabled";
 
@@ -151,10 +154,14 @@ function automationsForColumn(
   }
   if (key === "verify") {
     const riskScore = riskScoreAutomation(input.apps ?? [], workOrders);
-    const skip = new Set(riskScore.flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])));
+    const visualEvidence = visualEvidenceAutomation(input.apps ?? [], workOrders);
+    const skip = new Set(
+      [...riskScore, ...visualEvidence].flatMap((automation) => (automation.canvasId ? [automation.canvasId] : [])),
+    );
     return [
       ...prFeedbackAutomations(input.prFeedbackHandlers ?? [], workOrders, input.vcsProvider),
       ...riskScore,
+      ...visualEvidence,
       ...customColumnAutomations(input.apps ?? [], "verify", workOrders, skip),
     ];
   }
@@ -309,6 +316,14 @@ function isRiskScoreApp(app: { name?: string; columnKey?: string }): boolean {
   );
 }
 
+function isVisualEvidenceApp(app: { name?: string; columnKey?: string }): boolean {
+  if (app.columnKey !== "verify") {
+    return false;
+  }
+  const name = app.name?.trim() ?? "";
+  return name === VISUAL_EVIDENCE_ENTRY.name || /^Visual Evidence \(\d+\)$/.test(name);
+}
+
 function riskScoreAutomation(
   apps: Array<{ id?: string; name?: string; columnKey?: string }>,
   workOrders: FactoriesWorkOrder[],
@@ -330,6 +345,33 @@ function riskScoreAutomation(
         health: "healthy" as const,
         runningCount: runningCountForApp(id, workOrders),
         catalogId: RISK_SCORE_CATALOG_ID,
+        canvasId: id,
+      },
+    ];
+  });
+}
+
+function visualEvidenceAutomation(
+  apps: Array<{ id?: string; name?: string; columnKey?: string }>,
+  workOrders: FactoriesWorkOrder[],
+): ColumnAutomation[] {
+  return apps.flatMap((app) => {
+    const id = app.id?.trim();
+    if (!id || !isVisualEvidenceApp(app)) {
+      return [];
+    }
+    return [
+      {
+        id: `visual-evidence-${id}`,
+        kind: "visual-evidence" as const,
+        name: app.name?.trim() || VISUAL_EVIDENCE_ENTRY.name,
+        trigger: VISUAL_EVIDENCE_ENTRY.trigger,
+        action: VISUAL_EVIDENCE_ENTRY.action,
+        iconSrc: VISUAL_EVIDENCE_ENTRY.iconSrc,
+        iconAlt: VISUAL_EVIDENCE_ENTRY.iconAlt,
+        health: "healthy" as const,
+        runningCount: runningCountForApp(id, workOrders),
+        catalogId: VISUAL_EVIDENCE_CATALOG_ID,
         canvasId: id,
       },
     ];
@@ -432,6 +474,18 @@ export function columnAutomationOpenPath(
     return undefined;
   }
   return factoryColumnAutomationViewPath(args.organizationId, args.factoryKey, args.lineId, automation.canvasId);
+}
+
+const SPLIT_CONFIG_NODE_IDS = new Set(["on-pr-risk", "on-pr-visual-evidence"]);
+
+/** Merge confidence and visual evidence open the split node settings panel. */
+export function columnAutomationUsesSplitConfig(nodeIds: Iterable<string | undefined>): boolean {
+  for (const id of nodeIds) {
+    if (id && SPLIT_CONFIG_NODE_IDS.has(id)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export type ColumnAutomationViewTab = "general" | "agent" | "automation";

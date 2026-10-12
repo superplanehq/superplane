@@ -389,6 +389,13 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 			recorded.factoryID,
 			recorded.pullRequestID,
 		)
+		factoryactions.StartVisualEvidenceCapture(
+			context.Background(),
+			w.factoryIntakeDeps(),
+			recorded.organizationID,
+			recorded.factoryID,
+			recorded.pullRequestID,
+		)
 	}
 
 	for _, notification := range pendingWorkOrderNotifications {
