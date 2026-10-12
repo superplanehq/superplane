@@ -78,6 +78,9 @@ apt-get install -qy --no-install-recommends \
   docker-compose-plugin \
   gh
 systemctl enable docker
+if ! id ubuntu >/dev/null 2>&1; then
+  useradd --create-home --shell /bin/bash ubuntu
+fi
 usermod -aG docker ubuntu
 
 curl --fail --location --silent --show-error \
