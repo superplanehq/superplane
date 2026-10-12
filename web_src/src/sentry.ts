@@ -43,6 +43,23 @@ export function isMonacoCanceledEvent(event: Sentry.ErrorEvent): boolean {
   );
 }
 
+const USER_AGENT_PERMISSION_DENIAL =
+  "The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.";
+
+// True when Safari denies a speculative clipboard write inside monaco-editor.
+// The editor logs that denial, and captureConsoleIntegration forwards it as an
+// application error. A permission denial from app code has no editor frame and
+// still reports.
+export function isMonacoClipboardDeniedEvent(event: Sentry.ErrorEvent): boolean {
+  const exception = event.exception?.values?.[0];
+  if (exception?.type !== "NotAllowedError" || exception.value !== USER_AGENT_PERMISSION_DENIAL) {
+    return false;
+  }
+
+  const frames = exception.stacktrace?.frames ?? [];
+  return frames.some((frame) => frame.filename?.includes("monaco-editor"));
+}
+
 // Matches a UUID (with or without dashes normalized) anywhere in a path
 // segment, so a UUID organization ID normalizes the same way as a slug.
 const UUID_SEGMENT = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
@@ -153,6 +170,10 @@ if (dsn) {
       }
 
       if (isMonacoCanceledEvent(event)) {
+        return null;
+      }
+
+      if (isMonacoClipboardDeniedEvent(event)) {
         return null;
       }
 
