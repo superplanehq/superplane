@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 
 import { ColumnAutomationFooterSlotProvider } from "./columnAutomationFooterSlot";
 
+import { columnAutomationUsesSplitConfig } from "../lib/columnAutomationHeadline";
 import {
   COLUMN_AUTOMATIONS_COPY,
   columnAutomationViewTabs,
@@ -278,8 +279,8 @@ export function ColumnAutomationViewHost({
 }) {
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
-  const isRiskScoreCanvas = automation.graph?.specNodes?.some((node) => node.id === "on-pr-risk") ?? false;
-  if (isRiskScoreCanvas) {
+  const usesSplitConfig = columnAutomationUsesSplitConfig(automation.graph?.specNodes?.map((node) => node.id) ?? []);
+  if (usesSplitConfig) {
     return (
       <MergeConfidenceConfigModal
         title={automation.name?.trim() || title}
