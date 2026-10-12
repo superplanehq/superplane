@@ -78,10 +78,10 @@ describe("WorkOrderAssigneesPopover", () => {
   });
 
   it("puts the signed-in user first instead of the current owner", () => {
-    permissionsState.currentUserId = "alice";
+    permissionsState.currentUserId = "bob";
 
     render(
-      <WorkOrderAssigneesPopover organizationId="org-1" selectedIds={["bob"]} onSave={vi.fn()}>
+      <WorkOrderAssigneesPopover organizationId="org-1" selectedIds={["alice"]} onSave={vi.fn()}>
         <button>Owner</button>
       </WorkOrderAssigneesPopover>,
     );
@@ -90,8 +90,8 @@ describe("WorkOrderAssigneesPopover", () => {
 
     const items = screen.getAllByRole("option").map((item) => item.textContent ?? "");
     expect(items[0]).toContain("No owner");
-    expect(items[1]).toContain("Alice Anderson");
-    expect(items[2]).toContain("Bob Brown");
+    expect(items[1]).toContain("Bob Brown");
+    expect(items[2]).toContain("Alice Anderson");
   });
 
   it("stays open when saving fails", async () => {
