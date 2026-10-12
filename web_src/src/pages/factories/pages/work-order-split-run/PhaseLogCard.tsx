@@ -548,6 +548,7 @@ function PhaseLogCardStream({
           onSelect={onSelectNode}
           organizationId={organizationId}
           canvasId={canvasId ?? phase.appId}
+          analysisStatus={phase.status}
           compactSessionLog={compactSessionLog}
           stickyRows={stickyRows}
           files={files}
@@ -1012,6 +1013,7 @@ function StreamNode({
   onSelect,
   organizationId,
   canvasId,
+  analysisStatus,
   compactSessionLog,
   stickyRows,
   files,
@@ -1021,12 +1023,17 @@ function StreamNode({
   onSelect?: (nodeId: string) => void;
   organizationId?: string;
   canvasId?: string;
+  analysisStatus?: SplitRunPhaseStatus;
   compactSessionLog: boolean;
   stickyRows: boolean;
   files?: FilesFile[];
 }) {
   const { line, notes, artifact, pullRequest } = group;
-  const { notes: liveNotes, usageSeries, usageLoading } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  const {
+    notes: liveNotes,
+    usageSeries,
+    usageLoading,
+  } = useRunnerNodeLiveNotes(line, organizationId, canvasId, analysisStatus);
   useReportPhaseAgentUsageSeries({
     nodeId: line.nodeId ?? line.id,
     fallbackName: line.componentName,
@@ -1485,6 +1492,7 @@ function useRunnerNodeLiveNotes(
   line: SplitRunStreamLine,
   organizationId?: string,
   canvasId?: string,
+  analysisStatus?: SplitRunPhaseStatus,
 ): {
   notes: SplitRunStreamLine[] | undefined;
   telemetry: AgentRunTelemetry;
@@ -1518,6 +1526,7 @@ function useRunnerNodeLiveNotes(
       error,
       isStreaming,
       nodeStatus: line.status,
+      analysisStatus,
     }),
     telemetry: nextTelemetry,
     usageSeries: nextSeries,

@@ -3,6 +3,7 @@ import { isHiddenAgentLiveLogText } from "@/lib/agentRunTelemetry";
 import { agentToolDisplayText, isCommandKind } from "@/lib/agentToolLabels";
 import { formatMinutesSecondsDuration } from "@/lib/duration";
 import type { CommandSection } from "@/ui/CanvasPage/RunnerLiveLogDialog/types";
+import { withCanceledAnalysisWait } from "./canceledAnalysisWait";
 import { parseClaudeCodeLog } from "./parseClaudeCodeLog";
 import type { SplitRunPhaseStatus, SplitRunStreamLine } from "./splitRunMocks";
 
@@ -38,6 +39,7 @@ export function notesFromLiveLogSections(
   nodeId: string,
   sections: CommandSection[],
   runStatus?: SplitRunPhaseStatus,
+  analysisStatus?: SplitRunPhaseStatus,
 ): SplitRunStreamLine[] {
   const notes: SplitRunStreamLine[] = [];
   for (const section of sections) {
@@ -59,6 +61,7 @@ export function notesFromLiveLogSections(
         section,
         sections,
         runStatus,
+        analysisStatus,
       }),
     );
     notes.push(...notesFromSectionEvents(nodeId, stepId, orderKey, section));
@@ -112,8 +115,9 @@ function noteFromCommandSection(input: {
   section: CommandSection;
   sections: CommandSection[];
   runStatus?: SplitRunPhaseStatus;
+  analysisStatus?: SplitRunPhaseStatus;
 }): SplitRunStreamLine {
-  const { nodeId, stepId, orderKey, section, sections, runStatus } = input;
+  const { nodeId, stepId, orderKey, section, sections, runStatus, analysisStatus } = input;
   const name = section.text.trim();
   const preview = section.preview?.trim() ?? "";
   const output = section.kind === "prompt" ? "" : visibleLogText(section.lines);
@@ -122,28 +126,33 @@ function noteFromCommandSection(input: {
   const bashScript = section.kind === "bash" ? preview : "";
   const sectionStatus = streamStatus(section.status);
   const prompt = section.kind === "prompt";
-  return {
-    id: stepId,
-    nodeId,
-    at: "",
-    note: true,
-    componentType: section.kind,
-    componentName: name || preview,
-    status: prompt
-      ? agentStepStatusFromSection({
-          kind: "prompt",
-          sectionStatus,
-          runStatus,
-          stoppedTheRun: sectionStoppedTheRun(section, sections),
-        })
-      : sectionStatus,
-    promptStatus: prompt ? sectionStatus : undefined,
-    detail: detail || undefined,
-    commandScript: bashScript || undefined,
-    commandStdout: bashScript ? output || undefined : undefined,
-    duration: commandSectionDuration(section.duration_ms),
-    ...orderKeyProps(orderKey),
-  };
+  return withCanceledAnalysisWait(
+    {
+      id: stepId,
+      nodeId,
+      at: "",
+      note: true,
+      componentType: section.kind,
+      componentName: name || preview,
+      status: prompt
+        ? agentStepStatusFromSection({
+            kind: "prompt",
+            sectionStatus,
+            runStatus,
+            stoppedTheRun: sectionStoppedTheRun(section, sections),
+          })
+        : sectionStatus,
+      promptStatus: prompt ? sectionStatus : undefined,
+      detail: detail || undefined,
+      commandScript: bashScript || undefined,
+      commandStdout: bashScript ? output || undefined : undefined,
+      duration: commandSectionDuration(section.duration_ms),
+      ...orderKeyProps(orderKey),
+    },
+    section,
+    analysisStatus,
+    runStatus,
+  );
 }
 
 function commandSectionDuration(durationMs: number | null): string | undefined {
@@ -460,9 +469,10 @@ export function notesForLiveStream(input: {
   error: string | null;
   isStreaming: boolean;
   nodeStatus: SplitRunPhaseStatus;
+  analysisStatus?: SplitRunPhaseStatus;
 }): SplitRunStreamLine[] | undefined {
   if (input.sections.length > 0) {
-    const notes = notesFromLiveLogSections(input.nodeId, input.sections, input.nodeStatus);
+    const notes = notesFromLiveLogSections(input.nodeId, input.sections, input.nodeStatus, input.analysisStatus);
     if (notes.length > 0) {
       return notes;
     }
@@ -512,11 +522,8 @@ function liveStatusNote(nodeId: string, text: string, status: SplitRunPhaseStatu
 }
 
 function streamStatus(status: string): SplitRunPhaseStatus {
-  if (status === "failed") {
-    return "failed";
-  }
-  if (status === "running") {
-    return "running";
+  if (status === "failed" || status === "running" || status === "cancelled") {
+    return status;
   }
   return "passed";
 }
