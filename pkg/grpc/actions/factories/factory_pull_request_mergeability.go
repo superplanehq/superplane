@@ -157,8 +157,15 @@ func recoverFactoryPullRequestMergeability(
 	if !isRecoverableGitHubMergeabilityError(ctx, err) {
 		return nil, err
 	}
-	recordFactoryPullRequestMergeabilityError(ctx, factory.ID.String(), result.PullRequest.ID.String(), result.PullRequest.Repository, err)
-	result.canRetry = isRetryableGitHubMergeabilityError(err)
+	factoryID := factory.ID.String()
+	pullRequestID := result.PullRequest.ID.String()
+	repository := result.PullRequest.Repository
+	logFactoryPullRequestMergeabilityLookupFailure(factoryID, pullRequestID, repository, err)
+	retryable := isRetryableGitHubMergeabilityError(err)
+	if !retryable {
+		captureFactoryPullRequestMergeabilityException(ctx, factoryID, pullRequestID, repository, err)
+	}
+	result.canRetry = retryable
 	return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE, mergeBlockedUnavailable), nil
 }
 
