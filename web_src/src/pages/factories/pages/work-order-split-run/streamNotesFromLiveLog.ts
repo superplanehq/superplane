@@ -63,6 +63,9 @@ export function notesFromLiveLogSections(
     });
     if (isCanceledAnalysisWait(section, analysisStatus, runStatus)) {
       note.status = "cancelled";
+      if (note.promptStatus === "failed") {
+        note.promptStatus = "cancelled";
+      }
     }
     notes.push(note);
     notes.push(...notesFromSectionEvents(nodeId, stepId, orderKey, section));

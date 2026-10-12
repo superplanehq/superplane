@@ -23,7 +23,7 @@ describe("notesForLiveStream analysis wait", () => {
   it("marks a failed wait canceled when Start passes the analysis", () => {
     const notes = notesForLiveStream({
       nodeId: "agent",
-      sections: [commandSection({ text: "Wait for the next message" })],
+      sections: [commandSection({ text: "Wait for the next message", kind: "prompt" })],
       error: null,
       isStreaming: false,
       nodeStatus: "cancelled",
@@ -35,6 +35,7 @@ describe("notesForLiveStream analysis wait", () => {
         componentName: "Wait for the next message",
         detail: "Wait for the next user message",
         status: "cancelled",
+        promptStatus: "cancelled",
       }),
     );
   });
