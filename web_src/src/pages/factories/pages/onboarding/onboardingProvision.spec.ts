@@ -200,7 +200,7 @@ describe("provisionEventApps", () => {
     expect(installFactory.mock.calls.map(([input]) => input.factoryId)).toEqual(["pr-closure"]);
   });
 
-  it("installs both event apps next to an app with an unrelated name", async () => {
+  it("installs event apps next to an app with an unrelated name", async () => {
     const installFactory = installFactoryMock();
     const listApps = vi.fn().mockResolvedValue([{ id: "app-1", name: "Backlog" }]);
 
