@@ -2,18 +2,20 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	flag "github.com/spf13/pflag"
 	"github.com/superplanehq/superplane/pkg/runners/agent"
+	"github.com/superplanehq/superplane/pkg/runners/hosttags"
 	"github.com/superplanehq/superplane/pkg/runners/protocol"
 )
 
@@ -27,6 +29,12 @@ func main() {
 }
 
 func run() error {
+	var tags map[string]string
+	if err := registerRunnerTagFlags(flag.CommandLine, &tags); err != nil {
+		return err
+	}
+	tagsFromEC2 := flag.Bool("tags-from-ec2-metadata", envBool("RUNNER_TAGS_FROM_EC2_METADATA", false), "add EC2 instance details as runner tags")
+	tagsFromGCP := flag.Bool("tags-from-gcp-metadata", envBool("RUNNER_TAGS_FROM_GCP_METADATA", false), "add Google Cloud instance details as runner tags")
 	defaultWorkDirectory, err := agent.ResolveTaskWorkDir()
 	if err != nil {
 		return err
@@ -85,6 +93,33 @@ func run() error {
 			"--registration-token or RUNNER_REGISTRATION_TOKEN is required",
 		)
 	}
+	if *tagsFromEC2 {
+		cloudTags, err := hosttags.FromEC2(context.Background())
+		if err != nil {
+			slog.Warn("EC2 tags unavailable", slog.Any("error", err))
+		}
+		for key, value := range cloudTags {
+			if _, exists := tags[key]; !exists {
+				tags[key] = value
+			}
+		}
+	}
+	if *tagsFromGCP {
+		cloudTags, err := hosttags.FromGCP(context.Background())
+		if err != nil {
+			slog.Warn("Google Cloud tags unavailable", slog.Any("error", err))
+		}
+		for key, value := range cloudTags {
+			if _, exists := tags[key]; !exists {
+				tags[key] = value
+			}
+		}
+	}
+	details, err := registrationDetails(tags)
+	if err != nil {
+		return err
+	}
+	details.Version = Version
 
 	startupContext, stopStartup := signal.NotifyContext(
 		context.Background(),
@@ -100,7 +135,7 @@ func run() error {
 		httpClient,
 		*apiURL,
 		*registrationToken,
-		Version,
+		details,
 	)
 	cancelRegistration()
 	if err != nil {
@@ -135,6 +170,40 @@ func run() error {
 	)
 	runner := &agent.Agent{HTTP: httpClient, Config: config}
 	return runner.Run(context.Background())
+}
+
+func registerRunnerTagFlags(flags *flag.FlagSet, tags *map[string]string) error {
+	flags.StringToStringVar(tags, "tags", map[string]string{}, "runner tags in comma-separated key=value form")
+	value := flags.Lookup("tags").Value
+	flags.Var(value, "tag", "runner tag in key=value form (repeatable)")
+	if configured := strings.TrimSpace(os.Getenv("RUNNER_TAGS")); configured != "" {
+		if err := value.Set(configured); err != nil {
+			return fmt.Errorf("parse RUNNER_TAGS: %w", err)
+		}
+	}
+	return nil
+}
+
+func registrationDetails(tags map[string]string) (protocol.RegistrationDetails, error) {
+	for _, reserved := range []string{"os", "arch", "hostname", "ip"} {
+		if _, exists := tags[reserved]; exists {
+			return protocol.RegistrationDetails{}, fmt.Errorf("runner tag %q is reserved", reserved)
+		}
+	}
+	hostname, err := os.Hostname()
+	if err != nil {
+		return protocol.RegistrationDetails{}, fmt.Errorf("read runner hostname: %w", err)
+	}
+	if strings.TrimSpace(hostname) == "" {
+		return protocol.RegistrationDetails{}, fmt.Errorf("runner hostname is empty")
+	}
+	mergedTags := make(map[string]string, len(tags))
+	for key, value := range tags {
+		mergedTags[key] = value
+	}
+	return protocol.RegistrationDetails{
+		OS: runtime.GOOS, Arch: runtime.GOARCH, Hostname: hostname, Tags: mergedTags,
+	}, nil
 }
 
 func forwardShutdownSignals(

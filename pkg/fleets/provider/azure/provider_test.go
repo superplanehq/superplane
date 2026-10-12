@@ -296,6 +296,7 @@ func TestBuildBootstrapDownloadsPublicArtifact(t *testing.T) {
 		FleetID:           "fleet-a",
 		RunnerAPIURL:      "https://superplane.example",
 		RegistrationToken: "short-lived-registration-token",
+		Tags:              map[string]string{"fleet_manager_id": "manager-a"},
 		Artifact: artifact.Artifact{
 			URL:    "https://downloads.example/runner/v1.2.3/runner-linux-amd64.tar.gz",
 			SHA256: strings.Repeat("a", 64),
@@ -313,6 +314,7 @@ func TestBuildBootstrapDownloadsPublicArtifact(t *testing.T) {
 		"set +x",
 		`RUNNER_API_URL='https://superplane.example' \`,
 		`RUNNER_REGISTRATION_TOKEN='short-lived-registration-token' \`,
+		`RUNNER_TAGS='fleet_manager_id=manager-a' \`,
 		`"$bundle_dir/install.sh"`,
 	} {
 		if !strings.Contains(body, expected) {

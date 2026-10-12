@@ -22,6 +22,7 @@ var userDataTemplate = template.Must(template.New("userdata").Funcs(template.Fun
 type userData struct {
 	provider.RunnerBootstrap
 	CloudWatchAgentConfig string
+	Tags                  string
 }
 
 type cloudWatchAgentConfig struct {
@@ -72,6 +73,11 @@ func buildUserData(
 	}
 
 	templateData := userData{RunnerBootstrap: request}
+	tags, err := provider.FormatRunnerTags(request.Tags)
+	if err != nil {
+		return nil, fmt.Errorf("encode runner tags: %w", err)
+	}
+	templateData.Tags = tags
 	if cloudWatchLogGroup != "" {
 		config := cloudWatchAgentConfig{
 			Agent: cloudWatchAgentSettings{Region: cloudWatchRegion},
