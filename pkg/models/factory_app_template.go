@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	FactoryAppTemplateMetadataKey = "factoryTemplate"
-	FactoryAppTemplateBacklogID   = "backlog"
-	FactoryAppBacklogTriggerID    = "trigger"
+	FactoryAppTemplateMetadataKey      = "factoryTemplate"
+	FactoryAppTemplateBacklogID        = "backlog"
+	FactoryAppTemplateVisualEvidenceID = "visual-evidence"
+	FactoryAppBacklogTriggerID         = "trigger"
 )
 
 // FactoryAppTemplateMetadata returns the persisted marker for a generated

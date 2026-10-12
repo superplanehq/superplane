@@ -2,6 +2,8 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,7 +14,8 @@ import (
 )
 
 const (
-	NodeRequestTypeInvokeAction = "invoke-action"
+	NodeRequestTypeInvokeAction          = "invoke-action"
+	NodeRequestTypeVisualEvidenceCapture = "visual-evidence-capture"
 
 	NodeExecutionRequestStatePending   = "pending"
 	NodeExecutionRequestStateCompleted = "completed"
@@ -36,7 +39,15 @@ func (r *CanvasNodeRequest) TableName() string {
 }
 
 type NodeExecutionRequestSpec struct {
-	InvokeAction *InvokeAction `json:"invoke_action,omitempty"`
+	InvokeAction          *InvokeAction                 `json:"invoke_action,omitempty"`
+	VisualEvidenceCapture *VisualEvidenceCaptureRequest `json:"visual_evidence_capture,omitempty"`
+}
+
+type VisualEvidenceCaptureRequest struct {
+	OrganizationID string `json:"organization_id"`
+	FactoryID      string `json:"factory_id"`
+	PullRequestID  string `json:"pull_request_id"`
+	Attempts       int    `json:"attempts,omitempty"`
 }
 
 type InvokeAction struct {
@@ -92,6 +103,20 @@ func ListNodeRequests() ([]CanvasNodeRequest, error) {
 	return requests, nil
 }
 
+func FindCanvasNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
+	var request CanvasNodeRequest
+	err := tx.First(&request, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
+}
+
+func LockVisualEvidenceCapture(tx *gorm.DB, canvasID uuid.UUID, number int64) error {
+	lockKey := canvasID.String() + ":" + strconv.FormatInt(number, 10)
+	return tx.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error
+}
+
 func FindPendingRequestForNode(tx *gorm.DB, workflowID uuid.UUID, nodeID string) (*CanvasNodeRequest, error) {
 	var request CanvasNodeRequest
 
@@ -115,6 +140,77 @@ func (r *CanvasNodeRequest) Complete(tx *gorm.DB) error {
 		Update("state", NodeExecutionRequestStateCompleted).
 		Update("updated_at", time.Now()).
 		Error
+}
+
+func (r *CanvasNodeRequest) Reschedule(tx *gorm.DB, runAt time.Time) error {
+	now := time.Now()
+	r.RunAt = runAt
+	r.UpdatedAt = now
+	return tx.Model(r).Updates(map[string]any{
+		"run_at":     runAt,
+		"updated_at": now,
+		"spec":       r.Spec,
+	}).Error
+}
+
+func (c *CanvasNode) CreateVisualEvidenceCaptureRequest(
+	tx *gorm.DB,
+	capture VisualEvidenceCaptureRequest,
+	runAt time.Time,
+) (*CanvasNodeRequest, error) {
+	now := time.Now()
+	request := &CanvasNodeRequest{
+		ID:         uuid.New(),
+		WorkflowID: c.WorkflowID,
+		NodeID:     c.NodeID,
+		State:      NodeExecutionRequestStatePending,
+		Type:       NodeRequestTypeVisualEvidenceCapture,
+		Spec: datatypes.NewJSONType(NodeExecutionRequestSpec{
+			VisualEvidenceCapture: &capture,
+		}),
+		RunAt:     runAt,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	if err := tx.Create(request).Error; err != nil {
+		return nil, err
+	}
+	return request, nil
+}
+
+func FindPendingVisualEvidenceCaptureRequest(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	nodeID string,
+	pullRequestID uuid.UUID,
+) (*CanvasNodeRequest, error) {
+	var request CanvasNodeRequest
+	err := tx.
+		Where("workflow_id = ?", canvasID).
+		Where("node_id = ?", nodeID).
+		Where("type = ?", NodeRequestTypeVisualEvidenceCapture).
+		Where("state = ?", NodeExecutionRequestStatePending).
+		Where("spec->'visual_evidence_capture'->>'pull_request_id' = ?", pullRequestID.String()).
+		First(&request).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
+}
+
+func ClaimDueVisualEvidenceCaptureRequest(tx *gorm.DB, id uuid.UUID, leaseUntil time.Time) (*CanvasNodeRequest, error) {
+	request, err := LockNodeRequest(tx, id)
+	if err != nil {
+		return nil, err
+	}
+	if request.Type != NodeRequestTypeVisualEvidenceCapture {
+		return nil, fmt.Errorf("node request %s is not a visual evidence capture", id)
+	}
+	if err := request.Reschedule(tx, leaseUntil); err != nil {
+		return nil, err
+	}
+	return request, nil
 }
 
 func CompletePendingExecutionActionRequests(tx *gorm.DB, executionID uuid.UUID, actionName string, parameters map[string]any) error {
