@@ -427,7 +427,7 @@ describe("FirstRunSetup Bitbucket", () => {
     );
   });
 
-  it("shows the checking status while a second installation is in flight", async () => {
+  it("shows the checking spinner while a second installation is in flight", async () => {
     render(
       <FirstRunBitbucketForgeScreen
         phase="choose"
@@ -442,6 +442,7 @@ describe("FirstRunSetup Bitbucket", () => {
     );
 
     expect(screen.getByRole("status")).toHaveTextContent("Checking for the new workspace…");
+    expect(screen.getByRole("status").querySelector("svg")).toHaveClass("animate-spin");
     expect(screen.getByRole("option", { name: /acme-team\/api/ })).toBeInTheDocument();
   });
 
