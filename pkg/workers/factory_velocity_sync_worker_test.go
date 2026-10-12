@@ -291,6 +291,46 @@ func Test__ProgressAfterVelocityRead__ShortCatchUpDoesNotRestartTheOlderHistory(
 		"the last catch-up slice must finish instead of starting the newer window again")
 }
 
+func Test__ProgressAfterVelocityRead__ShortFullRefreshKeepsTheOriginalStart(t *testing.T) {
+	now := time.Now()
+	windowStart := now.AddDate(0, 0, -velocitySyncBackfillDays-1)
+	syncedAt := now.Add(-time.Hour)
+	cursor := now.Add(-15 * 24 * time.Hour)
+	target := models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		SyncedAt:         &syncedAt,
+		BackfilledFrom:   &windowStart,
+		RulesGeneration:  bitbucketVelocityRulesGeneration,
+	}
+
+	_, _, backfilledFrom, generation := progressAfterVelocityRead(
+		target,
+		velocitySyncBackfillStart(now),
+		time.Time{},
+		velocityReadCoverage{ContinueBefore: cursor},
+		now,
+		false,
+	)
+
+	assert.Equal(t, cursor, backfilledFrom)
+	assert.Equal(t, bitbucketVelocityRulesRebuilding, generation,
+		"a short full refresh must not switch to the seven-day catch-up")
+
+	target.RulesGeneration = generation
+	target.BackfilledFrom = &backfilledFrom
+	from, until := velocityRefreshBounds(target, now)
+	assert.WithinDuration(t, velocitySyncBackfillStart(now), from, time.Second,
+		"the next refresh must keep the original start, not the last seven days")
+	assert.Equal(t, cursor, until, "the next refresh must continue strictly before the saved cursor")
+	assert.True(t, until.After(from), "the remaining history must still be inside the next read")
+
+	scheduledFrom, scheduledUntil := velocitySyncBounds(target, now)
+	assert.Equal(t, from, scheduledFrom, "a later scheduled sync must not shrink the unfinished refresh")
+	assert.Equal(t, until, scheduledUntil)
+}
+
 func Test__ProgressAfterVelocityRead__ShortRecomputeDoesNotRestartTheOlderHistory(t *testing.T) {
 	now := time.Now()
 	windowStart := now.AddDate(0, 0, -velocitySyncBackfillDays-1)

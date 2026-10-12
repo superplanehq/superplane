@@ -736,7 +736,7 @@ func progressAfterVelocityRead(
 	}
 	if !coverage.Complete && effectiveVelocityProvider(target) == models.ProviderBitbucket {
 		generation := bitbucketVelocityRulesRebuilding
-		if bitbucketShortReadContinuesCatchUp(target, now) {
+		if bitbucketShortReadContinuesCatchUp(target, requestedFrom, now) {
 			generation = bitbucketVelocityRulesCatchingUp
 		}
 		return coverage.ContinueBefore, replaceTo, coverage.ContinueBefore, generation
@@ -793,10 +793,19 @@ func bitbucketCatchUpState(generation int) bool {
 // bitbucketShortReadContinuesCatchUp reports that a short Bitbucket read must
 // keep walking the newer window. The older history is already saved. A rebuild
 // cursor would make the next sync read that history again, then repeat this
-// window.
-func bitbucketShortReadContinuesCatchUp(target models.FactoryVelocitySyncTarget, now time.Time) bool {
+// window. The shortcut is only for a recent-window read. A full refresh must
+// keep its original start across short reads, or the next read would start at
+// seven days and finish before the saved cursor.
+func bitbucketShortReadContinuesCatchUp(
+	target models.FactoryVelocitySyncTarget,
+	requestedFrom time.Time,
+	now time.Time,
+) bool {
 	if bitbucketCatchUpPending(target) {
 		return true
+	}
+	if requestedFrom.Before(now.Add(-velocitySyncRecomputeWindow)) {
+		return false
 	}
 	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
 		return false
