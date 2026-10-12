@@ -11,8 +11,10 @@ import "./posthog.ts";
 import { ErrorPage } from "./components/ErrorPage.tsx";
 
 import { initGoogleTagManager } from "./lib/googleTagManager";
+import { registerServiceWorker } from "./lib/registerServiceWorker";
 
 initGoogleTagManager();
+registerServiceWorker();
 
 // Setup the API interceptor to handle 401 responses
 setupApiInterceptor();
