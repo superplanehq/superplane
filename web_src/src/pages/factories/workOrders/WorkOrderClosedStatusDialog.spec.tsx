@@ -20,17 +20,26 @@ describe("WorkOrderClosedStatusDialog", () => {
     useFactoryWorkOrdersPage.mockReset();
   });
 
-  it("loads Rejected and Canceled together and shows a status badge on each row", async () => {
+  it("labels an archived task and a rejected line task, and keeps Send to backlog", async () => {
     const user = userEvent.setup();
     useFactoryWorkOrdersPage.mockReturnValue({
       orders: [
         {
-          id: "wo-rejected",
+          id: "wo-archived",
           number: "107",
           title: "Archive stale invoice matcher",
           key: "RF-107",
           state: "STATE_CLOSED",
           result: "RESULT_REJECTED",
+        },
+        {
+          id: "wo-rejected",
+          number: "109",
+          title: "Reject the refund plan",
+          key: "RF-109",
+          state: "STATE_CLOSED",
+          result: "RESULT_REJECTED",
+          lineDispatches: [{ id: "d-rejected", state: "STATE_FINISHED", result: "RESULT_FAILED" }],
         },
         {
           id: "wo-cancelled",
@@ -66,10 +75,13 @@ describe("WorkOrderClosedStatusDialog", () => {
       results: ["RESULT_REJECTED"],
       lineId: "line-1",
     });
-    expect(screen.getByTestId("work-order-closed-status-dialog")).toHaveTextContent("Rejected and Canceled tasks.");
+    expect(screen.getByTestId("work-order-closed-status-dialog")).toHaveTextContent(
+      "Rejected, Canceled, and Archived tasks.",
+    );
+    expect(screen.getByTestId("work-order-status-badge-archived")).toHaveTextContent("Archived");
     expect(screen.getByTestId("work-order-status-badge-rejected")).toHaveTextContent("Rejected");
     expect(screen.getByTestId("work-order-status-badge-cancelled")).toHaveTextContent("Canceled");
-    await user.click(screen.getByTestId("send-to-backlog-wo-rejected"));
+    await user.click(screen.getByTestId("send-to-backlog-wo-archived"));
     expect(screen.getByTestId("send-work-order-to-backlog-form")).toBeInTheDocument();
   });
 

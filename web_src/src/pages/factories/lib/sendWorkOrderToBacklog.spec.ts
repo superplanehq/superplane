@@ -70,6 +70,20 @@ describe("closedStatusTaskMatchesSearch", () => {
     expect(closedStatusTaskMatchesSearch(failed, "RF", "rf-106")).toBe(true);
     expect(closedStatusTaskMatchesSearch(failed, "RF", "failed")).toBe(true);
     expect(closedStatusTaskMatchesSearch(failed, "RF", "rejected")).toBe(false);
+    expect(
+      closedStatusTaskMatchesSearch(
+        {
+          id: "wo-archived",
+          number: "107",
+          title: "Archive stale invoice matcher",
+          key: "RF-107",
+          result: "RESULT_REJECTED",
+          state: "STATE_CLOSED",
+        },
+        "RF",
+        "archived",
+      ),
+    ).toBe(true);
   });
 });
 

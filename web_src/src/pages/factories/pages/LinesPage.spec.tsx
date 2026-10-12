@@ -1786,7 +1786,7 @@ describe("LinesPage board editing", () => {
 
     expect(await screen.findByTestId("work-order-closed-status-dialog")).toBeInTheDocument();
     expect(
-      screen.getByText("Rejected and Canceled tasks. Send a task to Backlog to work on it again."),
+      screen.getByText("Rejected, Canceled, and Archived tasks. Send a task to Backlog to work on it again."),
     ).toBeInTheDocument();
     expect(screen.getByText("No closed tasks.")).toBeInTheDocument();
   });

@@ -131,12 +131,31 @@ describe("getWorkOrderDisplayStatus", () => {
     ).toBe("waiting");
   });
 
-  it.each([
-    ["RESULT_COMPLETED", "completed"] as const,
-    ["RESULT_FAILED", "failed"] as const,
-    ["RESULT_REJECTED", "rejected"] as const,
-  ])("closed orders with %s map to %s", (result, expected) => {
-    expect(getWorkOrderDisplayStatus(order({ state: "STATE_CLOSED", result }))).toBe(expected);
+  it.each([["RESULT_COMPLETED", "completed"] as const, ["RESULT_FAILED", "failed"] as const])(
+    "closed orders with %s map to %s",
+    (result, expected) => {
+      expect(getWorkOrderDisplayStatus(order({ state: "STATE_CLOSED", result }))).toBe(expected);
+    },
+  );
+
+  it("maps a closed rejected task with no line dispatch to Archived", () => {
+    expect(getWorkOrderDisplayStatus(order({ state: "STATE_CLOSED", result: "RESULT_REJECTED" }))).toBe("archived");
+    expect(getWorkOrderDisplayStatusMeta("archived").label).toBe("Archived");
+    expect(getWorkOrderDisplayStatusMeta("archived").className).toBe(
+      getWorkOrderDisplayStatusMeta("rejected").className,
+    );
+  });
+
+  it("keeps Rejected when a rejected task already ran on a line", () => {
+    expect(
+      getWorkOrderDisplayStatus(
+        order({
+          state: "STATE_CLOSED",
+          result: "RESULT_REJECTED",
+          lineDispatches: [{ id: "d1", state: "STATE_FINISHED", result: "RESULT_FAILED" }],
+        }),
+      ),
+    ).toBe("rejected");
   });
 
   it("maps a canceled line dispatch to Canceled when the order is not completed", () => {
@@ -161,7 +180,13 @@ describe("filterWorkOrdersByStatus", () => {
     lineDispatches: activeDispatch(),
   });
   const closedCompleted = order({ state: "STATE_CLOSED", result: "RESULT_COMPLETED", id: "wo-completed" });
-  const closedRejected = order({ state: "STATE_CLOSED", result: "RESULT_REJECTED", id: "wo-rejected" });
+  const closedRejected = order({
+    state: "STATE_CLOSED",
+    result: "RESULT_REJECTED",
+    id: "wo-rejected",
+    lineDispatches: [{ id: "d-rejected", state: "STATE_FINISHED", result: "RESULT_FAILED" }],
+  });
+  const closedArchived = order({ state: "STATE_CLOSED", result: "RESULT_REJECTED", id: "wo-archived" });
   const closedCancelled = order({
     state: "STATE_CLOSED",
     result: "RESULT_UNSPECIFIED",
@@ -170,7 +195,7 @@ describe("filterWorkOrdersByStatus", () => {
   });
   const closedFailed = order({ state: "STATE_CLOSED", result: "RESULT_FAILED", id: "wo-failed" });
 
-  const all = [draft, waiting, running, closedCompleted, closedRejected, closedCancelled, closedFailed];
+  const all = [draft, waiting, running, closedCompleted, closedRejected, closedArchived, closedCancelled, closedFailed];
 
   it("`active` returns every non-closed order", () => {
     expect(idsFilteredBy(all, "active")).toEqual([draft.id, waiting.id, running.id]);
@@ -187,6 +212,7 @@ describe("filterWorkOrdersByStatus", () => {
     expect(idsFilteredBy(all, "completed")).toEqual([closedCompleted.id]);
     expect(idsFilteredBy(all, "failed")).toEqual([closedFailed.id]);
     expect(idsFilteredBy(all, "rejected")).toEqual([closedRejected.id]);
+    expect(idsFilteredBy(all, "archived")).toEqual([closedArchived.id]);
     expect(idsFilteredBy(all, "cancelled")).toEqual([closedCancelled.id]);
   });
 
@@ -197,6 +223,18 @@ describe("filterWorkOrdersByStatus", () => {
 });
 
 describe("groupWorkOrdersByLane", () => {
+  it("keeps an archived draft off every board lane", () => {
+    const orders = [
+      order({ id: "d", state: "STATE_DRAFT" }),
+      order({ id: "archived", state: "STATE_CLOSED", result: "RESULT_REJECTED" }),
+    ];
+
+    const grouped = groupWorkOrdersByLane(orders);
+    const ids = grouped.flatMap((entry) => entry.orders.map((item) => item.id));
+
+    expect(ids).toEqual(["d"]);
+  });
+
   it("splits orders across the four board lanes", () => {
     const orders = [
       order({ id: "d", state: "STATE_DRAFT" }),

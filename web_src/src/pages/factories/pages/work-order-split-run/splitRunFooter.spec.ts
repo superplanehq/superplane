@@ -264,6 +264,17 @@ describe("buildSplitRunFooter", () => {
         REOPEN,
       ],
     });
+    expect(doneFooterForStatus("archived")).toMatchObject({
+      sentence: "A person archived this task.",
+      note: {
+        headline: "This task is archived",
+        text: "Send this task to Backlog to work on it again.",
+      },
+      actions: [
+        { id: "send-to-backlog", kind: "send-to-backlog", label: "Send to backlog", emphasis: "quiet" },
+        REOPEN,
+      ],
+    });
     expect(doneFooterForStatus("failed")).toMatchObject({
       sentence: "Closed as failed. Line execution did not pass.",
       note: {
@@ -433,5 +444,6 @@ describe("showsArchive", () => {
     expect(showsArchive({ kind: "waiting", status: "running" })).toBe(false);
     expect(showsArchive({ kind: "done", status: "completed" })).toBe(false);
     expect(showsArchive({ kind: "done", status: "rejected" })).toBe(false);
+    expect(showsArchive({ kind: "done", status: "archived" })).toBe(false);
   });
 });

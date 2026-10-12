@@ -13,11 +13,15 @@ function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
   });
 }
 
+function hasLineDispatch(order: FactoriesWorkOrder): boolean {
+  return (order.lineDispatches ?? []).length > 0;
+}
+
 /**
  * Display vocabulary for the Tasks workspace: Draft, Running, Waiting,
- * Completed, Failed, Rejected, Canceled. The idle-open key stays `waiting` so
- * stored filters keep working. Persisted state + result columns in the
- * database stay unchanged; this file is the single mapping layer.
+ * Completed, Failed, Rejected, Canceled, Archived. The idle-open key stays
+ * `waiting` so stored filters keep working. Persisted state + result columns
+ * in the database stay unchanged; this file is the single mapping layer.
  */
 export type WorkOrderDisplayStatus =
   | "draft"
@@ -26,7 +30,14 @@ export type WorkOrderDisplayStatus =
   | "completed"
   | "failed"
   | "rejected"
-  | "cancelled";
+  | "cancelled"
+  | "archived";
+
+const FAILED_BADGE = {
+  className:
+    "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]",
+  dotClassName: "bg-[color:var(--status-failed-dot)]",
+} as const;
 
 const DISPLAY_STATUS_META: Record<
   WorkOrderDisplayStatus,
@@ -74,17 +85,13 @@ const DISPLAY_STATUS_META: Record<
     label: "Failed",
     filterLabel: "Failed",
     summary: "Closed as failed. Line execution did not pass.",
-    className:
-      "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]",
-    dotClassName: "bg-[color:var(--status-failed-dot)]",
+    ...FAILED_BADGE,
   },
   rejected: {
     label: "Rejected",
     filterLabel: "Rejected",
     summary: "A person rejected this task.",
-    className:
-      "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]",
-    dotClassName: "bg-[color:var(--status-failed-dot)]",
+    ...FAILED_BADGE,
   },
   cancelled: {
     label: "Canceled",
@@ -93,6 +100,12 @@ const DISPLAY_STATUS_META: Record<
     className:
       "border-[color:var(--status-cancelled-border)] bg-[color:var(--status-cancelled-bg)] text-[color:var(--status-cancelled-fg)]",
     dotClassName: "bg-[color:var(--status-cancelled-dot)]",
+  },
+  archived: {
+    label: "Archived",
+    filterLabel: "Archived",
+    summary: "A person archived this task.",
+    ...FAILED_BADGE,
   },
 };
 
@@ -104,9 +117,10 @@ export const WORK_ORDER_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = [
   "failed",
   "rejected",
   "cancelled",
+  "archived",
 ];
 
-/** Statuses that stay on the board. Rejected and Canceled open the closed-tasks dialog. */
+/** Statuses that stay on the board. Rejected, Canceled, and Archived open Closed tasks. */
 export const WORK_ORDER_BOARD_FILTER_STATUSES: WorkOrderDisplayStatus[] = [
   "draft",
   "running",
@@ -115,13 +129,15 @@ export const WORK_ORDER_BOARD_FILTER_STATUSES: WorkOrderDisplayStatus[] = [
   "failed",
 ];
 
-export const WORK_ORDER_DIALOG_STATUSES: WorkOrderDisplayStatus[] = ["rejected", "cancelled"];
+export const WORK_ORDER_DIALOG_STATUSES: WorkOrderDisplayStatus[] = ["rejected", "cancelled", "archived"];
 
-export function isWorkOrderDialogStatus(status: string): status is "rejected" | "cancelled" {
-  return status === "rejected" || status === "cancelled";
+const DIALOG_STATUS_SET = new Set<string>(WORK_ORDER_DIALOG_STATUSES);
+
+export function isWorkOrderDialogStatus(status: string): status is "rejected" | "cancelled" | "archived" {
+  return DIALOG_STATUS_SET.has(status);
 }
 
-export function isWorkOrderRecoveryStatus(status: string): status is "failed" | "rejected" | "cancelled" {
+export function isWorkOrderRecoveryStatus(status: string): status is "failed" | "rejected" | "cancelled" | "archived" {
   return status === "failed" || isWorkOrderDialogStatus(status);
 }
 
@@ -187,6 +203,9 @@ export function getWorkOrderDisplayKey(order: FactoriesWorkOrder, factoryKey?: s
 export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderDisplayStatus {
   if (order.state === "STATE_CLOSED") {
     if (order.result === "RESULT_REJECTED") {
+      if (!hasLineDispatch(order)) {
+        return "archived";
+      }
       return "rejected";
     }
     if (order.result === "RESULT_FAILED") {
