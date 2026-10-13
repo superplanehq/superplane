@@ -52,6 +52,34 @@ describe("WorkOrderIntentTranscript", () => {
     vi.unstubAllGlobals();
   });
 
+  it.each([
+    { role: "agent" as const, origin: undefined, testId: "split-run-intent-agent-message" },
+    { role: "user" as const, origin: undefined, testId: "split-run-intent-user-note" },
+    { role: "user" as const, origin: "survey" as const, testId: "split-run-intent-survey-answer" },
+  ])("shows only the time while hovering $role $origin messages", async ({ role, origin, testId }) => {
+    const user = userEvent.setup();
+    const createdAtMs = new Date(2026, 9, 13, 14, 25, 36).getTime();
+    renderTranscript([{ id: "message", kind: "text", role, origin, text: "Keep the current scope.", createdAtMs }]);
+
+    const time = screen.getByText("14:25");
+    expect(time).toHaveAttribute("dateTime", new Date(createdAtMs).toISOString());
+    expect(time).not.toBeVisible();
+    await user.hover(screen.getByTestId(testId));
+    expect(time).toBeVisible();
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    await user.unhover(screen.getByTestId(testId));
+    expect(time).not.toBeVisible();
+  });
+
+  it.each([undefined, Number.NaN, Number.POSITIVE_INFINITY])(
+    "omits an unavailable hover timestamp %s",
+    (createdAtMs) => {
+      renderTranscript([{ id: "message", kind: "text", role: "agent", text: "Still readable.", createdAtMs }]);
+      expect(screen.getByText("Still readable.")).toBeInTheDocument();
+      expect(document.querySelector("time")).toBeNull();
+    },
+  );
+
   it("does not restream the last agent line after a user reply", () => {
     renderTranscript(
       [
