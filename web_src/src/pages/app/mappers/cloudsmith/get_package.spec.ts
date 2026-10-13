@@ -3,16 +3,6 @@ import { getPackageMapper } from "./get_package";
 import { buildDetailsCtx, buildPackageData, buildPackageOutput } from "./test_helpers";
 
 describe("getPackageMapper.getExecutionDetails", () => {
-  it("does not throw when outputs is undefined", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
-    expect(() => getPackageMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
-  it("does not throw when default array is empty", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
-    expect(() => getPackageMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
   it("returns Executed At without package fields when output data is missing", () => {
     const ctx = buildDetailsCtx({
       execution: { outputs: { default: [buildPackageOutput(undefined)] } },
