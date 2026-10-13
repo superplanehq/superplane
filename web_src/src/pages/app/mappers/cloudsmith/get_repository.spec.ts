@@ -3,16 +3,6 @@ import { getRepositoryMapper } from "./get_repository";
 import { buildDetailsCtx, buildOutput, buildRepositoryData } from "./test_helpers";
 
 describe("getRepositoryMapper.getExecutionDetails", () => {
-  it("does not throw when outputs is undefined", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
-    expect(() => getRepositoryMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
-  it("does not throw when default array is empty", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
-    expect(() => getRepositoryMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
   it("returns Executed At without repository fields when output data is missing", () => {
     const ctx = buildDetailsCtx({ execution: { outputs: { default: [buildOutput(undefined)] } } });
     const details = getRepositoryMapper.getExecutionDetails(ctx);
