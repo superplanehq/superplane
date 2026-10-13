@@ -63,20 +63,22 @@ function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen | 
   return null;
 }
 
-// GitHub setup callbacks return without a step. Saved progress or a confirmed
-// GitHub connection must not send the user back to the welcome screen.
+// A GitHub return can omit the step. Saved progress or that return must not
+// open the welcome screen. A connection saved for the account does not choose
+// the opening screen.
 function resumeFirstRunScreen(args: {
   savedStep: WizardStepId;
   githubPending: boolean;
-  githubReady: boolean;
+  githubReturned: boolean;
 }): FirstRunScreen {
   if (args.savedStep !== "vcs") return SCREEN_FOR_STEP[args.savedStep];
   if (args.githubPending) return "connect";
-  return args.githubReady ? "choose" : "welcome";
+  if (args.githubReturned) return "choose";
+  return "welcome";
 }
 
-// A GitHub identity from sign-in is not enough. The repository screen opens
-// only after the user connects GitHub for this workspace.
+// A linked GitHub identity opens repository selection. Sign-in stores that
+// identity, so a later workspace does not ask the person to connect again.
 function screenWithGitHubConnection(
   screen: FirstRunScreen,
   github: {
@@ -148,7 +150,7 @@ function useFirstRunNavigation(
   model: OnboardingPageModel,
   agentGate: OnboardingAgentGate,
   connection: GitHubConnectionState,
-  githubReady: boolean,
+  github: { ready: boolean; returned: boolean },
   bitbucket: { available: boolean; loading: boolean },
 ) {
   const [searchParams] = useSearchParams();
@@ -163,7 +165,7 @@ function useFirstRunNavigation(
     resumeFirstRunScreen({
       savedStep: model.openSection,
       githubPending: connection.onboarding.isPending,
-      githubReady,
+      githubReturned: github.returned,
     });
 
   useEffect(() => {
@@ -178,7 +180,7 @@ function useFirstRunNavigation(
     {
       pending: connection.onboarding.isPending,
       identity: Boolean(connection.identity),
-      ready: githubReady,
+      ready: github.ready,
       stayOnConnect,
       appConfigured: connection.appConfigured,
       accountConnectionRequired: connection.accountConnectionRequired,
@@ -371,7 +373,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
   const { organizationId, factoryId } = useFactoriesLayout();
   const setupFinished = model.provisionedDestination != null;
   const blocking = useFirstRunBlockingAction();
-  const { connection, githubReady, installScope, checkingGitHub } = useFirstRunGitHub({
+  const { connection, githubReady, githubReturned, installScope, checkingGitHub } = useFirstRunGitHub({
     organizationId,
     factoryId,
     setupFinished,
@@ -388,7 +390,13 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bringYourOwnKey: model.bringYourOwnKey,
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
-  const navigation = useFirstRunNavigation(model, agentGate, connection, githubReady, bitbucket);
+  const navigation = useFirstRunNavigation(
+    model,
+    agentGate,
+    connection,
+    { ready: githubReady, returned: githubReturned },
+    bitbucket,
+  );
   const commands = useFirstRunCommands({
     model,
     agentGate,
