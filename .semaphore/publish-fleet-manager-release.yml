@@ -32,7 +32,7 @@ blocks:
       epilogue:
         always:
           commands:
-            - rm -f /tmp/ghcr-auth.json
+            - rm -rf -- /tmp/ghcr-auth
       jobs:
         - name: "Publish immutable Fleet Manager release"
           commands:
@@ -60,16 +60,16 @@ blocks:
                 --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,checksums.txt \
                 --release-id-file /tmp/github-release-id
             - docker pull "$SKOPEO_CONTAINER_IMAGE"
-            - touch /tmp/ghcr-auth.json
-            - printf '%s' "$GHCR_PUSH_TOKEN" | REGISTRY_AUTH_FILE=/tmp/ghcr-auth.json bash release/fleet-manager/run-skopeo.sh login ghcr.io --username superplanehq --password-stdin
+            - mkdir -m 700 /tmp/ghcr-auth
+            - printf '%s' "$GHCR_PUSH_TOKEN" | REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json bash release/fleet-manager/run-skopeo.sh login ghcr.io --username superplanehq --password-stdin
             - |
-              export REGISTRY_AUTH_FILE=/tmp/ghcr-auth.json
+              export REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json
               export FLEET_MANAGER_DIGEST_OUTPUT=/tmp/fleet-manager-image-digest
               bash release/fleet-manager/publish-image.sh \
                 "$RELEASE_VERSION" \
                 "build/fleet-manager/$RELEASE_VERSION/fleet-manager.oci.tar"
             - |
-              export REGISTRY_AUTH_FILE=/tmp/ghcr-auth.json
+              export REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json
               image_digest="$(cat /tmp/fleet-manager-image-digest)"
               bash release/fleet-manager/verify-image.sh \
                 "$FLEET_MANAGER_IMAGE_REPO:$RELEASE_VERSION" \
