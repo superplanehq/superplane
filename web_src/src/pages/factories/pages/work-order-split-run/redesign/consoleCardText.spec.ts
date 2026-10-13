@@ -135,6 +135,42 @@ describe("runMetaLine", () => {
     expect(runMetaLine(finished, [finished], timing, now)).toBe("2m");
     expect(runMetaLine(live, [finished, live], timing, now)).toBe("3m");
   });
+
+  it("adds each agent working interval and skips the wait between them", () => {
+    const now = Date.parse("2026-10-13T12:00:00.000Z");
+    const finished = { ...runningStage("implement"), status: "passed" as const, duration: "42m" };
+    const live = { ...finished, id: "live", status: "running" as const, duration: "40m" };
+    const timing = new Map([
+      [finished.id, { completedWorkMs: 5 * 60 * 1000, workEndedAt: "2026-10-13T11:43:00.000Z" }],
+      [live.id, { workStartedAt: "2026-10-13T11:59:00.000Z", completedWorkMs: 2 * 60 * 1000 }],
+    ]);
+
+    expect(runMetaLine(finished, [finished], timing, now)).toBe("5m");
+    expect(runMetaLine(live, [live], timing, now)).toBe("3m");
+    expect(runMetaLine(live, [finished, live], timing, now)).toBe("8m");
+  });
+
+  it("adds each open agent execution to the header timer", () => {
+    const now = Date.parse("2026-10-13T12:00:00.000Z");
+    const live = { ...runningStage("implement"), status: "running" as const, duration: "40m" };
+
+    expect(
+      runMetaLine(
+        live,
+        [live],
+        new Map([
+          [
+            live.id,
+            {
+              workStartedAt: "2026-10-13T11:58:00.000Z",
+              openStartedAt: ["2026-10-13T11:58:00.000Z", "2026-10-13T11:59:00.000Z"],
+            },
+          ],
+        ]),
+        now,
+      ),
+    ).toBe("3m");
+  });
 });
 
 describe("consoleHeaderStatus", () => {

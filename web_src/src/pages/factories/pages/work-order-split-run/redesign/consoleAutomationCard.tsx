@@ -223,6 +223,16 @@ function phaseForStop(
   return runId ? phases.find((phase) => phase.id === runId) : undefined;
 }
 
+function sameOpenStarts(previous: string[] | undefined, next: string[] | undefined): boolean {
+  if (previous === next) {
+    return true;
+  }
+  if (!previous || !next || previous.length !== next.length) {
+    return false;
+  }
+  return previous.every((value, index) => value === next[index]);
+}
+
 function useAgentQueueReports() {
   const [timing, setTiming] = useState<ReadonlyMap<string, ConsoleRunTiming>>(() => new Map());
   const report = useCallback((id: string, next: ConsoleRunTiming) => {
@@ -231,7 +241,9 @@ function useAgentQueueReports() {
       if (
         previous?.queued === next.queued &&
         previous?.workStartedAt === next.workStartedAt &&
-        previous?.workEndedAt === next.workEndedAt
+        previous?.workEndedAt === next.workEndedAt &&
+        previous?.completedWorkMs === next.completedWorkMs &&
+        sameOpenStarts(previous?.openStartedAt, next.openStartedAt)
       ) {
         return current;
       }
@@ -265,12 +277,14 @@ function AgentQueueProbe({
   const queued = Boolean(live.agentQueue?.queued);
   const workStartedAt = live.agentQueue?.workStartedAt;
   const workEndedAt = live.agentQueue?.workEndedAt;
+  const completedWorkMs = live.agentQueue?.completedWorkMs;
+  const openStartedAt = live.agentQueue?.openStartedAt;
   useEffect(() => {
     if (!live.agentQueue) {
       return;
     }
-    onQueue(phase.id, { queued, workStartedAt, workEndedAt });
-  }, [live.agentQueue, onQueue, phase.id, queued, workEndedAt, workStartedAt]);
+    onQueue(phase.id, { queued, workStartedAt, workEndedAt, completedWorkMs, openStartedAt });
+  }, [completedWorkMs, live.agentQueue, onQueue, openStartedAt, phase.id, queued, workEndedAt, workStartedAt]);
   return null;
 }
 

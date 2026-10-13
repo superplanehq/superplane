@@ -12,6 +12,8 @@ export type ConsoleRunTiming = {
   queued?: boolean;
   workStartedAt?: string;
   workEndedAt?: string;
+  completedWorkMs?: number;
+  openStartedAt?: string[];
 };
 
 export function consoleHeaderStatus(
@@ -130,15 +132,60 @@ export function runMetaLine(
 }
 
 function durationLabelForRun(run: AutomationStage, timing: ConsoleRunTiming | undefined, now: number): string {
-  const start = Date.parse(timing?.workStartedAt ?? "");
-  if (Number.isFinite(start)) {
-    const ended = Date.parse(timing?.workEndedAt ?? "");
-    const end = Number.isFinite(ended) ? ended : run.status === "running" ? now : Number.NaN;
-    if (Number.isFinite(end)) {
-      return formatMinutesSecondsDuration(Math.max(0, end - start)) || "<1s";
-    }
+  const worked = workedMs(run, timing, now);
+  if (worked === undefined) {
+    return run.duration ?? "";
   }
-  return run.duration ?? "";
+  return formatMinutesSecondsDuration(worked) || "<1s";
+}
+
+function workedMs(run: AutomationStage, timing: ConsoleRunTiming | undefined, now: number): number | undefined {
+  const completed = timing?.completedWorkMs ?? 0;
+  const open = openWorkMs(timing, run.status, now);
+  if (open !== undefined) {
+    return open + completed;
+  }
+  const closed = closedWindowMs(timing);
+  if (closed !== undefined) {
+    return closed + completed;
+  }
+  return completed > 0 ? completed : undefined;
+}
+
+function openWorkMs(
+  timing: ConsoleRunTiming | undefined,
+  status: AutomationStage["status"],
+  now: number,
+): number | undefined {
+  const starts = liveOpenStarts(timing);
+  if (starts.length === 0 || status !== "running") {
+    return undefined;
+  }
+  return starts.reduce((sum, value) => sum + elapsedMs(value, now), 0);
+}
+
+function closedWindowMs(timing: ConsoleRunTiming | undefined): number | undefined {
+  const start = Date.parse(timing?.workStartedAt ?? "");
+  const ended = Date.parse(timing?.workEndedAt ?? "");
+  if (!Number.isFinite(start) || !Number.isFinite(ended)) {
+    return undefined;
+  }
+  return Math.max(0, ended - start);
+}
+
+function elapsedMs(value: string, now: number): number {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? Math.max(0, now - parsed) : 0;
+}
+
+function liveOpenStarts(timing: ConsoleRunTiming | undefined): string[] {
+  if (timing?.workEndedAt) {
+    return [];
+  }
+  if (timing?.openStartedAt && timing.openStartedAt.length > 0) {
+    return timing.openStartedAt;
+  }
+  return timing?.workStartedAt ? [timing.workStartedAt] : [];
 }
 
 /**
