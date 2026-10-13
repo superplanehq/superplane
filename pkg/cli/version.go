@@ -3,16 +3,22 @@ package cli
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
+	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // Version is set at build time via -ldflags.
 // Defaults to "dev" for development builds.
 var Version = "dev"
+
+// updateCheckInterval is the minimum time between two update checks.
+const updateCheckInterval = 24 * time.Hour
 
 var updateCheckResult <-chan *updateInfo
 
@@ -46,9 +52,15 @@ func init() {
 }
 
 // StartUpdateCheck begins an async check for a newer CLI version.
-// It is a no-op for dev builds.
-func StartUpdateCheck() {
+// It is a no-op for dev builds, and for runs where a check already happened
+// within updateCheckInterval. args is the raw command line, used to resolve
+// the configuration file that holds the last-checked timestamp.
+func StartUpdateCheck(args []string) {
 	if isDevBuild() {
+		return
+	}
+
+	if !updateCheckDue(updateCheckConfigFile(args), time.Now()) {
 		return
 	}
 
@@ -100,12 +112,95 @@ func ShouldStartUpdateCheck(args []string) bool {
 	return false
 }
 
+// updateCheckConfigFile resolves the CLI configuration file the same way
+// initConfig does. It parses --config out of the raw arguments instead of
+// reading the cobra flag, because the update check runs before cobra has
+// parsed anything.
+func updateCheckConfigFile(args []string) string {
+	for i, arg := range args {
+		if arg == "--config" && i+1 < len(args) {
+			return args[i+1]
+		}
+
+		if value, found := strings.CutPrefix(arg, "--config="); found {
+			return value
+		}
+	}
+
+	home, err := homedir.Dir()
+	if err != nil {
+		return ""
+	}
+
+	return filepath.Join(home, ".superplane.yaml")
+}
+
+// lastUpdateCheck reads the timestamp of the previous update check. It uses a
+// dedicated viper instance rather than the global one: the global instance is
+// populated by initConfig, which cobra only runs once the command executes,
+// and that happens after this check.
+func lastUpdateCheck(configFile string) (time.Time, bool) {
+	if configFile == "" {
+		return time.Time{}, false
+	}
+
+	v := viper.New()
+	v.SetConfigFile(configFile)
+	v.SetConfigType("yaml")
+
+	if err := v.ReadInConfig(); err != nil {
+		return time.Time{}, false
+	}
+
+	raw := strings.TrimSpace(v.GetString(ConfigKeyLastUpdateCheck))
+	if raw == "" {
+		return time.Time{}, false
+	}
+
+	parsed, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Time{}, false
+	}
+
+	return parsed, true
+}
+
+// updateCheckDue reports whether a new update check is allowed. A missing,
+// unreadable, or malformed timestamp counts as due, and so does one dated in
+// the future, so a bad value can never suppress update checks permanently.
+func updateCheckDue(configFile string, now time.Time) bool {
+	last, ok := lastUpdateCheck(configFile)
+	if !ok {
+		return true
+	}
+
+	if last.After(now) {
+		return true
+	}
+
+	return now.Sub(last) >= updateCheckInterval
+}
+
+// recordUpdateCheck stores the time of the current check. It runs after the
+// command has executed, so the global viper instance holds the configuration
+// that initConfig loaded. Failing to persist the timestamp is not worth
+// failing the command the user actually asked for.
+func recordUpdateCheck(now time.Time) {
+	viper.Set(ConfigKeyLastUpdateCheck, now.UTC().Format(time.RFC3339))
+	_ = WriteConfig()
+}
+
 // PrintUpdateNotice prints an upgrade notice to stderr if a newer version
 // is available. It waits at most 1 second for the background check to finish.
 func PrintUpdateNotice() {
 	if updateCheckResult == nil {
 		return
 	}
+
+	// Record the attempt whatever its outcome. A check that failed or ran out
+	// of time still cost the user a request, and retrying it on the very next
+	// command is what made the CLI feel slow in the first place.
+	recordUpdateCheck(time.Now())
 
 	var info *updateInfo
 	select {
