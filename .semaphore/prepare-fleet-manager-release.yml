@@ -35,6 +35,11 @@ blocks:
             - bash release/fleet-manager/build-release.sh "$VERSION" "$SEMAPHORE_GIT_SHA"
             - |
               release_dir="build/fleet-manager/$VERSION"
+              node release/component-release.js generate-release-notes \
+                --component fleet-manager \
+                --version "$VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --output "$release_dir/release-notes.md"
               node release/component-release.js create-manifest \
                 --component fleet-manager \
                 --version "$VERSION" \
