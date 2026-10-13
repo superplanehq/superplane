@@ -96,8 +96,24 @@ func applyGitHubPullRequestClosed(
 ) (*factoryPullRequestCloseResult, error) {
 	var outcome *factoryPullRequestCloseResult
 	err := db.Transaction(func(tx *gorm.DB) error {
+		order, err := factory.FindWorkOrder(tx, pullRequest.WorkOrderID)
+		if err != nil {
+			return err
+		}
+		if err := order.LockForStatusChange(tx); err != nil {
+			return err
+		}
+		if err := pullRequest.LockForUpdate(tx); err != nil {
+			return err
+		}
+		// A reject or archive already recorded this close. A later reopen must
+		// survive the webhook for that same close.
+		alreadyClosed := !merged && pullRequest.State == models.FactoryPullRequestStateClosed
 		if err := stampFactoryPullRequestClosed(tx, pullRequest, merged, mergedAt, closedAt); err != nil {
 			return err
+		}
+		if alreadyClosed {
+			return nil
 		}
 		closed, err := closeFactoryWorkOrderForPullRequest(tx, factory, pullRequest, merged, automation)
 		if err != nil {

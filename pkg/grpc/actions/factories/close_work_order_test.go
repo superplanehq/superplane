@@ -3,10 +3,13 @@ package factories
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -288,6 +291,139 @@ func TestCloseWorkOrder_NoOpenPullRequestClosesAsToday(t *testing.T) {
 	reloaded, err := factory.FindWorkOrder(db, order.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.FactoryWorkOrderResultManualRejected, reloaded.Result)
+}
+
+func TestCloseWorkOrder_ReopenBeforePullRequestCloseLeavesPullRequestOpen(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factory := closeWorkOrderFactory(t, r)
+	order := openWorkOrder(t, db, factory, r.User, "Reopen before pull request close")
+	createWorkOrderPullRequest(t, db, order, "https://github.com/acme/app/pull/42", models.FactoryPullRequestStateOpen)
+
+	stale := *order
+	_, err := order.Close(db, models.FactoryWorkOrderResultManualRejected, &r.User)
+	require.NoError(t, err)
+	stale.State = models.FactoryWorkOrderStateClosed
+	stale.Result = models.FactoryWorkOrderResultManualRejected
+	_, err = order.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{
+		ToState: models.FactoryWorkOrderStateOpen,
+		Actor:   &r.User,
+	})
+	require.NoError(t, err)
+
+	api := &fakeFactoryGitHub{}
+	useCloseWorkOrderGitHub(t, api, nil)
+	require.NoError(t, closePullRequestsForRejectedWorkOrder(ctx, db, IntakeDependencies{}, factory, &stale))
+	assert.Equal(t, 0, api.editCalls)
+
+	reloaded, err := factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+	assert.Empty(t, reloaded.Result)
+	assertPullRequestStates(t, db, order.ID, map[int64]string{
+		42: models.FactoryPullRequestStateOpen,
+	})
+}
+
+func TestCloseWorkOrder_ReopenDuringPullRequestCloseStaysOpen(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	factory := closeWorkOrderFactory(t, r)
+	order := openWorkOrder(t, db, factory, r.User, "Reopen during pull request close")
+	createWorkOrderPullRequest(t, db, order, "https://github.com/acme/app/pull/42", models.FactoryPullRequestStateOpen)
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		r.Organization.ID,
+		"github",
+		support.RandomName("github"),
+		map[string]any{},
+	)
+	require.NoError(t, err)
+
+	gitEntered := make(chan struct{})
+	releaseGit := make(chan struct{})
+	var once sync.Once
+	api := &fakeFactoryGitHub{
+		onEdit: func() {
+			once.Do(func() { close(gitEntered) })
+			<-releaseGit
+		},
+	}
+	useCloseWorkOrderGitHub(t, api, nil)
+
+	closeDone := make(chan error, 1)
+	go func() {
+		_, closeErr := CloseWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.CloseWorkOrderRequest{
+			FactoryId: factory.ID.String(),
+			OrderId:   order.ID.String(),
+			Result:    pb.WorkOrder_RESULT_REJECTED,
+		})
+		closeDone <- closeErr
+	}()
+
+	select {
+	case <-gitEntered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("pull request close did not start")
+	}
+
+	reopenDone := make(chan error, 1)
+	go func() {
+		_, reopenErr := UpdateWorkOrderStatus(ctx, r.Organization.ID.String(), &pb.UpdateWorkOrderStatusRequest{
+			FactoryId: factory.ID.String(),
+			OrderId:   order.ID.String(),
+			State:     pb.WorkOrder_STATE_OPEN,
+		})
+		reopenDone <- reopenErr
+	}()
+
+	require.Eventually(t, func() bool {
+		waiting, waitErr := factoryWorkOrderLockWaiting(db, order.ID)
+		return waitErr == nil && waiting
+	}, 2*time.Second, 20*time.Millisecond)
+
+	close(releaseGit)
+	require.NoError(t, <-closeDone)
+	require.NoError(t, <-reopenDone)
+
+	RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
+		t.Context(),
+		IntakeDependencies{},
+		&models.Webhook{AppInstallationID: &integration.ID},
+		"pull_request",
+		[]byte(fmt.Sprintf(`{
+			"action": "closed",
+			"repository": {"full_name": "acme/app"},
+			"sender": {"login": "alex", "html_url": "https://github.com/alex", "name": "Alex Rivera"},
+			"pull_request": {"number": 42, "merged": false, "merged_at": null, "closed_at": %q}
+		}`, time.Now().UTC().Format(time.RFC3339))),
+	)
+
+	reloaded, err := factory.FindWorkOrder(db, order.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+	assert.Empty(t, reloaded.Result)
+	assert.Equal(t, 1, api.editCalls)
+	assertPullRequestStates(t, db, order.ID, map[int64]string{
+		42: models.FactoryPullRequestStateClosed,
+	})
+}
+
+func factoryWorkOrderLockWaiting(db *gorm.DB, id uuid.UUID) (bool, error) {
+	var waiting int
+	err := db.Raw(`
+		SELECT COUNT(*)
+		FROM pg_locks
+		WHERE locktype = 'advisory'
+		  AND NOT granted
+		  AND objsubid = 1
+		  AND (
+		    ('x' || lpad(to_hex(classid::bigint), 8, '0') || lpad(to_hex(objid::bigint), 8, '0'))::bit(64)::bigint
+		  ) = hashtextextended(?, 0)
+	`, models.FactoryWorkOrderLockKey(id)).Scan(&waiting).Error
+	return waiting > 0, err
 }
 
 func closeWorkOrderFactory(t *testing.T, r *support.ResourceRegistry) *models.Factory {

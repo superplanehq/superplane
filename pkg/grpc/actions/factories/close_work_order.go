@@ -136,7 +136,20 @@ func closePullRequestsForRejectedWorkOrder(
 	factory *models.Factory,
 	order *models.FactoryWorkOrder,
 ) error {
-	if !workOrderResultClosesPullRequests(order.Result) {
+	if order == nil {
+		return nil
+	}
+	release, err := holdFactoryWorkOrderLock(ctx, order.ID)
+	if err != nil {
+		return err
+	}
+	defer release()
+
+	current, err := factory.FindWorkOrder(db, order.ID)
+	if err != nil {
+		return err
+	}
+	if !workOrderResultClosesPullRequests(current.Result) {
 		return nil
 	}
 
@@ -149,6 +162,26 @@ func closePullRequestsForRejectedWorkOrder(
 		return nil
 	}
 	return closePreviousPullRequests(ctx, db, deps, factory, closeable)
+}
+
+func holdFactoryWorkOrderLock(ctx context.Context, id uuid.UUID) (func(), error) {
+	sqlDB, err := database.Conn().DB()
+	if err != nil {
+		return nil, err
+	}
+	conn, err := sqlDB.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	key := models.FactoryWorkOrderLockKey(id)
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock(hashtextextended($1, 0))", key); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	return func() {
+		_, _ = conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock(hashtextextended($1, 0))", key)
+		_ = conn.Close()
+	}, nil
 }
 
 func workOrderResultClosesPullRequests(result string) bool {
