@@ -38,7 +38,7 @@ describe("PlanningSessionSurveyForm", () => {
     expect(screen.queryByText("What is the priority?")).not.toBeInTheDocument();
     expect(screen.getByText("2 of 2")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers })).toBeDisabled();
-    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).not.toHaveClass("bg-primary");
 
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.previousQuestion }));
 
@@ -99,6 +99,26 @@ describe("PlanningSessionSurveyForm", () => {
     expect(oneFile).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers })).toBeDisabled();
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("renders Skip as a quiet action until a single question is answered", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(
+      <PlanningSessionSurveyForm
+        survey={{ questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }] }}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    const skip = screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey });
+    expect(skip).not.toHaveClass("bg-primary");
+    expect(skip).toHaveClass("text-muted-foreground");
+
+    await user.click(screen.getByRole("button", { name: /High/ }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers })).toHaveClass("bg-primary");
   });
 
   it("hides page controls when there is one question", () => {
