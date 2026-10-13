@@ -633,6 +633,9 @@ func FactoryWorkOrderLockKey(id uuid.UUID) string {
 	return "factory-work-order:" + id.String()
 }
 
+// LockForStatusChange takes the advisory lock before the row lock.
+// Callers must not hold the row lock first. A close holds this same
+// advisory lock, then updates the task. The opposite order deadlocks.
 func (o *FactoryWorkOrder) LockForStatusChange(tx *gorm.DB) error {
 	if o == nil || o.ID == uuid.Nil {
 		return ErrFactoryWorkOrderNotFound

@@ -125,6 +125,76 @@ func applyGitHubPullRequestClosed(
 	return outcome, err
 }
 
+func reopenFactoryPullRequestsFromGitHub(
+	db *gorm.DB,
+	integration *models.Integration,
+	payload githubMergeabilityWebhookPayload,
+) {
+	if payload.PullRequest == nil || payload.PullRequest.Number <= 0 {
+		return
+	}
+
+	pullRequests, err := models.ListGitHubFactoryPullRequestsForWebhook(
+		db,
+		integration.OrganizationID,
+		payload.Repository.FullName,
+		[]int64{payload.PullRequest.Number},
+	)
+	if err != nil {
+		log.WithError(err).Warn("factory mergeability: failed to list pull requests for reopened GitHub event")
+		return
+	}
+
+	factoriesByID := map[string]*models.Factory{}
+	for i := range pullRequests {
+		pullRequest := &pullRequests[i]
+		if pullRequest.State != models.FactoryPullRequestStateClosed {
+			continue
+		}
+		factory := factoriesByID[pullRequest.FactoryID.String()]
+		if factory == nil {
+			loaded, findErr := models.FindFactory(db, pullRequest.OrganizationID, pullRequest.FactoryID)
+			if findErr != nil {
+				log.WithError(findErr).Warnf("factory mergeability: factory %s not found", pullRequest.FactoryID)
+				continue
+			}
+			factory = loaded
+			factoriesByID[factory.ID.String()] = factory
+		}
+		if err := reopenFactoryPullRequest(db, factory, pullRequest, payload.PullRequest.Draft); err != nil {
+			log.WithError(err).Warnf("factory mergeability: failed to reopen pull request %s", pullRequest.ID)
+		}
+	}
+}
+
+func reopenFactoryPullRequest(
+	db *gorm.DB,
+	factory *models.Factory,
+	pullRequest *models.FactoryPullRequest,
+	draft bool,
+) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		order, err := factory.FindWorkOrder(tx, pullRequest.WorkOrderID)
+		if err != nil {
+			return err
+		}
+		if err := order.LockForStatusChange(tx); err != nil {
+			return err
+		}
+		if err := pullRequest.LockForUpdate(tx); err != nil {
+			return err
+		}
+		if pullRequest.State != models.FactoryPullRequestStateClosed {
+			return nil
+		}
+		state := models.FactoryPullRequestStateOpen
+		if draft {
+			state = models.FactoryPullRequestStateDraft
+		}
+		return pullRequest.Update(tx, models.FactoryPullRequestPatch{State: &state})
+	})
+}
+
 func stampFactoryPullRequestClosed(
 	tx *gorm.DB,
 	pullRequest *models.FactoryPullRequest,
@@ -162,7 +232,7 @@ func closeFactoryWorkOrderForPullRequest(
 	if err != nil {
 		return nil, err
 	}
-	if err := order.LockForUpdate(tx); err != nil {
+	if err := order.LockForStatusChange(tx); err != nil {
 		return nil, err
 	}
 

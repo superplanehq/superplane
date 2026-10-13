@@ -26,6 +26,35 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestCloseWorkOrder_LockQueriesUseTheReservedConnection(t *testing.T) {
+	ctx := context.Background()
+	id := uuid.New()
+	err := withFactoryWorkOrderLock(ctx, id, func(locked *gorm.DB) error {
+		var queryPID int
+		if err := locked.Raw("SELECT pg_backend_pid()").Scan(&queryPID).Error; err != nil {
+			return err
+		}
+		var lockPID int
+		if err := locked.Raw(`
+			SELECT l.pid
+			FROM pg_locks l
+			WHERE l.locktype = 'advisory'
+			  AND l.granted
+			  AND l.objsubid = 1
+			  AND (
+			    ('x' || lpad(to_hex(l.classid::bigint), 8, '0') || lpad(to_hex(l.objid::bigint), 8, '0'))::bit(64)::bigint
+			  ) = hashtextextended(?, 0)
+		`, models.FactoryWorkOrderLockKey(id)).Scan(&lockPID).Error; err != nil {
+			return err
+		}
+		if queryPID == 0 || queryPID != lockPID {
+			return fmt.Errorf("locked query pid %d does not match lock pid %d", queryPID, lockPID)
+		}
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 func TestCloseWorkOrder_ClosesOpenAndDraftPullRequests(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -314,7 +343,7 @@ func TestCloseWorkOrder_ReopenBeforePullRequestCloseLeavesPullRequestOpen(t *tes
 
 	api := &fakeFactoryGitHub{}
 	useCloseWorkOrderGitHub(t, api, nil)
-	require.NoError(t, closePullRequestsForRejectedWorkOrder(ctx, db, IntakeDependencies{}, factory, &stale))
+	require.NoError(t, closePullRequestsForRejectedWorkOrder(ctx, IntakeDependencies{}, factory, &stale))
 	assert.Equal(t, 0, api.editCalls)
 
 	reloaded, err := factory.FindWorkOrder(db, order.ID)

@@ -924,6 +924,9 @@ func pullRequestLifecycleStamps(
 			closedAt = &stamp
 		}
 	}
+	if state == FactoryPullRequestStateOpen || state == FactoryPullRequestStateDraft {
+		closedAt = nil
+	}
 
 	return mergedAt, closedAt
 }

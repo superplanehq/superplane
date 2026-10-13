@@ -192,7 +192,7 @@ func assertNoActiveAutomationLocked(tx *gorm.DB, factory *models.Factory, pullRe
 	if err != nil {
 		return err
 	}
-	if err := order.LockForUpdate(tx); err != nil {
+	if err := order.LockForStatusChange(tx); err != nil {
 		return err
 	}
 	if err := pullRequest.LockForUpdate(tx); err != nil {

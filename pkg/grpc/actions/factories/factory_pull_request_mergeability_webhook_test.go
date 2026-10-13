@@ -770,6 +770,36 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t 
 		assert.Equal(t, "pr-review", notes[0].Key)
 	})
 
+	t.Run("closes the task after the pull request is reopened and closed again", func(t *testing.T) {
+		factory, order, webhook := setupOpenOrder(t, "acme/app", 67)
+		grouped, err := models.ListPullRequestsByWorkOrderIDs(db, []uuid.UUID{order.ID})
+		require.NoError(t, err)
+		require.Len(t, grouped[order.ID], 1)
+		closedAt := time.Now()
+		require.NoError(t, stampFactoryPullRequestClosed(db, &grouped[order.ID][0], false, nil, &closedAt))
+
+		deliver(webhook, []byte(`{
+			"action": "reopened",
+			"repository": {"full_name": "acme/app"},
+			"pull_request": {"number": 67, "draft": false}
+		}`))
+
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: "acme/app",
+			Number:     67,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryPullRequestStateOpen, stored.State)
+		assert.Nil(t, stored.ClosedAt)
+
+		deliver(webhook, closedPayload("acme/app", 67, false))
+
+		reloaded := reload(t, factory, order.ID)
+		assert.Equal(t, models.FactoryWorkOrderStateClosed, reloaded.State)
+		assert.Equal(t, models.FactoryWorkOrderResultPRClosed, reloaded.Result)
+	})
+
 	t.Run("does not close a reopened task when this app already closed the pull request", func(t *testing.T) {
 		factory, order, webhook := setupOpenOrder(t, "acme/app", 66)
 		grouped, err := models.ListPullRequestsByWorkOrderIDs(db, []uuid.UUID{order.ID})

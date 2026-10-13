@@ -62,6 +62,10 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 		closeFactoryWorkOrdersFromGitHubPullRequestClosed(db, integration, payload)
 		return
 	}
+	if isGitHubPullRequestReopenedEvent(eventType, payload) {
+		reopenFactoryPullRequestsFromGitHub(db, integration, payload)
+		return
+	}
 
 	_, numbers, sha := githubMergeabilityWebhookRefFromPayload(payload)
 	pullRequests, err := models.ListOpenGitHubFactoryPullRequestsForWebhook(
@@ -258,6 +262,7 @@ type githubMergeabilityWebhookPayload struct {
 		Merged   bool               `json:"merged"`
 		MergedAt string             `json:"merged_at"`
 		ClosedAt string             `json:"closed_at"`
+		Draft    bool               `json:"draft"`
 		MergedBy *githubWebhookUser `json:"merged_by"`
 		Head     struct {
 			SHA string `json:"sha"`
@@ -479,6 +484,12 @@ func VerifyGitHubFactoryMergeabilitySignature(
 func isGitHubPullRequestClosedEvent(eventType string, payload githubMergeabilityWebhookPayload) bool {
 	return strings.EqualFold(strings.TrimSpace(eventType), "pull_request") &&
 		strings.EqualFold(strings.TrimSpace(payload.Action), "closed") &&
+		payload.PullRequest != nil
+}
+
+func isGitHubPullRequestReopenedEvent(eventType string, payload githubMergeabilityWebhookPayload) bool {
+	return strings.EqualFold(strings.TrimSpace(eventType), "pull_request") &&
+		strings.EqualFold(strings.TrimSpace(payload.Action), "reopened") &&
 		payload.PullRequest != nil
 }
 
