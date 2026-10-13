@@ -44,6 +44,7 @@ import { IntegrationDetailsRoute } from "./components/IntegrationDetailsRoute";
 import { IntegrationSetup } from "./components/IntegrationSetup";
 import { IntegrationSetupReturn } from "./components/IntegrationSetupReturn";
 import { ThemePreferenceControl } from "@/components/ThemePreferenceControl";
+import { SecretsCount } from "./components/SecretsCount";
 
 function settingsSidebarNavLinkClass(active: boolean) {
   return cn(
@@ -67,6 +68,9 @@ export function OrganizationSettings() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const isIntegrationSetupRoute = Boolean(
     matchPath({ path: "/:organizationId/settings/integrations/:integrationName/setup", end: true }, location.pathname),
+  );
+  const isSecretsListRoute = Boolean(
+    matchPath({ path: "/:organizationId/settings/secrets", end: true }, location.pathname),
   );
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
@@ -394,9 +398,14 @@ export function OrganizationSettings() {
           )}
         >
           <div className="pt-10 pb-8">
-            <h1 className={cn("!text-2xl font-medium text-gray-900", appDarkModeClasses.textPrimary)}>
-              {activeMeta.title}
-            </h1>
+            <div className="flex items-baseline gap-2">
+              <h1 className={cn("!text-2xl font-medium text-gray-900", appDarkModeClasses.textPrimary)}>
+                {activeMeta.title}
+              </h1>
+              {isSecretsListRoute && canAct("secrets", "read") ? (
+                <SecretsCount organizationId={organizationId} />
+              ) : null}
+            </div>
             <p className={cn("mt-2 text-sm text-gray-800", appDarkModeClasses.textSecondary)}>
               {activeMeta.description}
             </p>

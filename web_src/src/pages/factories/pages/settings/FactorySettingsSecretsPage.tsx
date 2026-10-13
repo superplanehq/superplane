@@ -127,6 +127,11 @@ function FactorySettingsSecretsList() {
       <FactorySettingsPageFrame
         title="Secrets"
         subtitle={`Store credentials for ${organizationName} integrations. SuperPlane hides values after you save.`}
+        headingAdornment={
+          <span className="text-[13px] tabular-nums text-muted-foreground" data-testid="factory-settings-secrets-count">
+            {secrets.length}
+          </span>
+        }
         actions={renderCreateButton("secrets-create-btn")}
       >
         <FactorySettingsCard data-testid="factory-settings-secrets-list">

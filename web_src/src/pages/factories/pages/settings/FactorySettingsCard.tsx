@@ -24,6 +24,7 @@ function settingsCardHeaderClassName(attachedList: boolean, hasBody: boolean, ha
 export function FactorySettingsPageFrame({
   title,
   subtitle,
+  headingAdornment,
   actions,
   children,
   wide = false,
@@ -34,6 +35,8 @@ export function FactorySettingsPageFrame({
 }: {
   title: string;
   subtitle?: ReactNode;
+  /** Inline element next to the title, such as a count. Not shown with a back link. */
+  headingAdornment?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
   /** Use the wide column for tables that do not fit the form measure. */
@@ -70,7 +73,13 @@ export function FactorySettingsPageFrame({
           backTestId={backTestId}
         />
       ) : (
-        <WorkspacePageHeader className={headerClassName} title={title} subtitle={subtitle} actions={actions} />
+        <WorkspacePageHeader
+          className={headerClassName}
+          title={title}
+          subtitle={subtitle}
+          leading={headingAdornment}
+          actions={actions}
+        />
       )}
       <div className={cn(bodyClassName, "flex flex-col gap-5")}>{children}</div>
     </>

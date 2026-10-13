@@ -18,6 +18,7 @@ const deleteSecretMutateAsync = vi.fn();
 const updateNameMutateAsync = vi.fn();
 
 let secrets: SuperplaneSecretsSecret[] = [];
+let secretsLoading = false;
 
 const SETTINGS_PATHS = {
   apiKeys: "/org-1/workspaces/RF/settings/organization/api-keys",
@@ -62,7 +63,7 @@ vi.mock("@/hooks/useOrganizationData", () => ({
 }));
 
 vi.mock("@/hooks/useSecrets", () => ({
-  useSecrets: () => ({ data: secrets, isLoading: false }),
+  useSecrets: () => ({ data: secretsLoading ? undefined : secrets, isLoading: secretsLoading }),
   useSecret: (_domainId: string, _domainType: string, secretId: string) => ({
     data: secrets.find((secret) => secret.metadata?.id === secretId) ?? null,
     isLoading: false,
@@ -120,6 +121,7 @@ function renderPage(path: string) {
 describe("FactorySettingsSecretsPage - add key", () => {
   beforeEach(() => {
     secrets = [SECRET_WITH_FOO];
+    secretsLoading = false;
     setKeyMutateAsync.mockReset();
     deleteKeyMutateAsync.mockReset();
     deleteSecretMutateAsync.mockReset();
@@ -183,5 +185,54 @@ describe("FactorySettingsSecretsPage - add key", () => {
     expect(showErrorToast).toHaveBeenCalledWith("Key already exists");
     expect(setKeyMutateAsync).not.toHaveBeenCalled();
     expect(showSuccessToast).not.toHaveBeenCalled();
+  });
+});
+
+function namedSecret(id: string, name: string): SuperplaneSecretsSecret {
+  return { ...SECRET_WITH_FOO, metadata: { ...SECRET_WITH_FOO.metadata, id, name } };
+}
+
+describe("FactorySettingsSecretsPage - secret count", () => {
+  const listPath = "/org-1/workspaces/RF/settings/organization/secrets";
+
+  beforeEach(() => {
+    secretsLoading = false;
+    secrets = [
+      namedSecret("secret-1", "deploy-secret"),
+      namedSecret("secret-2", "github-token"),
+      namedSecret("secret-3", "slack-webhook"),
+    ];
+  });
+
+  it("shows the total number of secrets next to the heading", () => {
+    renderPage(listPath);
+
+    expect(screen.getByTestId("factory-settings-secrets-count").textContent).toBe("3");
+  });
+
+  it("shows 0 when there are no secrets", () => {
+    secrets = [];
+    renderPage(listPath);
+
+    expect(screen.getByTestId("factory-settings-secrets-empty")).toBeDefined();
+    expect(screen.getByTestId("factory-settings-secrets-count").textContent).toBe("0");
+  });
+
+  it("keeps the total when a search filters the list", async () => {
+    const user = userEvent.setup();
+    renderPage(listPath);
+
+    await user.type(screen.getByTestId("factory-settings-secrets-search"), "github");
+
+    expect(screen.getAllByTestId("secrets-secret-link")).toHaveLength(1);
+    expect(screen.getByTestId("factory-settings-secrets-count").textContent).toBe("3");
+  });
+
+  it("hides the count while secrets load", () => {
+    secretsLoading = true;
+    renderPage(listPath);
+
+    expect(screen.getByText("Loading secrets…")).toBeDefined();
+    expect(screen.queryByTestId("factory-settings-secrets-count")).toBeNull();
   });
 });

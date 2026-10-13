@@ -41,6 +41,16 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 }));
 
 vi.mock("./General", () => ({ General: () => null }));
+vi.mock("./Secrets", () => ({ Secrets: () => <div data-testid="secrets-body" /> }));
+vi.mock("./SecretDetail", () => ({ SecretDetail: () => <div data-testid="secret-detail-body" /> }));
+
+vi.mock("@/hooks/useSecrets", () => ({
+  useSecrets: () => ({
+    data: [{ metadata: { id: "s-1" } }, { metadata: { id: "s-2" } }],
+    isLoading: false,
+    isError: false,
+  }),
+}));
 
 import { OrganizationSettings } from "./index";
 
@@ -81,5 +91,27 @@ describe("OrganizationSettings members column", () => {
     const bodyClassName = settingsColumnClassName(screen.getByRole("heading", { name: "Settings" }));
     expect(bodyClassName).toContain("max-w-3xl");
     expect(bodyClassName).not.toContain("max-w-6xl");
+  });
+});
+
+describe("OrganizationSettings secrets count", () => {
+  it("shows the secret count next to the Secrets heading", () => {
+    renderSettings("/org-1/settings/secrets");
+
+    expect(screen.getByRole("heading", { name: "Secrets" })).toBeDefined();
+    expect(screen.getByTestId("secrets-count").textContent).toBe("2");
+  });
+
+  it("does not show the count on a secret detail page", () => {
+    renderSettings("/org-1/settings/secrets/s-1");
+
+    expect(screen.getByTestId("secret-detail-body")).toBeDefined();
+    expect(screen.queryByTestId("secrets-count")).toBeNull();
+  });
+
+  it("does not show the count on other settings sections", () => {
+    renderSettings("/org-1/settings/members");
+
+    expect(screen.queryByTestId("secrets-count")).toBeNull();
   });
 });
