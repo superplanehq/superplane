@@ -15,6 +15,8 @@ global_job_config:
   env_vars:
     - name: FLEET_MANAGER_IMAGE_REPO
       value: ghcr.io/superplanehq/fleet-manager
+    - name: SKOPEO_CONTAINER_IMAGE
+      value: quay.io/skopeo/stable@sha256:97772f3c64fd2fba720b2bafaf37239dc44d8b1c625c8383c64044832efe9ed9
   prologue:
     commands:
       - checkout
@@ -57,9 +59,9 @@ blocks:
                 --directory "$release_dir" \
                 --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,checksums.txt \
                 --release-id-file /tmp/github-release-id
-            - sudo apt-get update
-            - sudo apt-get install -y skopeo
-            - printf '%s' "$GHCR_PUSH_TOKEN" | skopeo login --authfile /tmp/ghcr-auth.json ghcr.io --username superplanehq --password-stdin
+            - docker pull "$SKOPEO_CONTAINER_IMAGE"
+            - touch /tmp/ghcr-auth.json
+            - printf '%s' "$GHCR_PUSH_TOKEN" | REGISTRY_AUTH_FILE=/tmp/ghcr-auth.json bash release/fleet-manager/run-skopeo.sh login ghcr.io --username superplanehq --password-stdin
             - |
               export REGISTRY_AUTH_FILE=/tmp/ghcr-auth.json
               export FLEET_MANAGER_DIGEST_OUTPUT=/tmp/fleet-manager-image-digest
