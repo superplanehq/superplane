@@ -45,7 +45,7 @@ const SCORE_LABEL: Record<ScoreKind, { short: string; name: string }> = {
 
 const NUMBER_TONE: Record<ConfidenceBand, string> = {
   High: "text-success",
-  Medium: "text-warning",
+  Medium: "text-amber-700 dark:text-amber-400",
   Low: "text-destructive",
 };
 

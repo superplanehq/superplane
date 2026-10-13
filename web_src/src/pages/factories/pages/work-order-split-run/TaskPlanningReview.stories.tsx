@@ -46,32 +46,32 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const LowConfidenceQuestions: Story = {
-  name: "Confidence 2/3 — pending questions and plan",
+  name: "Caution (yellow) · 2/3 — pending questions and plan",
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "questions" },
 };
 
 export const LowConfidenceQuestionsWithoutPlan: Story = {
-  name: "Confidence 2/3 — pending questions, no plan",
+  name: "Caution (yellow) · 2/3 — pending questions, no plan",
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "questions", hasPlan: false },
 };
 
 export const LowConfidenceSummary: Story = {
-  name: "Confidence 2/3 — summary and plan",
+  name: "Caution (yellow) · 2/3 — summary and plan",
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "message" },
 };
 
 export const ReadyPlan: Story = {
-  name: "Confidence 3/3 — ready plan",
+  name: "Ready (green) · 3/3 — ready plan",
   args: { scores: { clarity: 3, complexity: 3, verifiability: 3 }, response: "ready" },
 };
 
 export const ModerateComplexityQuestions: Story = {
-  name: "Confidence 2/3 — complexity needs review",
+  name: "Caution (yellow) · 2/3 — complexity needs review",
   args: { scores: { clarity: 3, complexity: 2, verifiability: 3 }, response: "questions" },
 };
 
 export const LowClarityQuestions: Story = {
-  name: "Confidence 1/3 — unclear company choice",
+  name: "Critical (red) · 1/3 — unclear company choice",
   args: { scores: { clarity: 1, complexity: 3, verifiability: 2 }, response: "questions" },
 };
 

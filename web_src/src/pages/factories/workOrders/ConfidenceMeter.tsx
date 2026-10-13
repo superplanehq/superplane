@@ -16,7 +16,7 @@ import "./confidence-analyzing.css";
 
 const FILLED_TONE: Record<ConfidenceBand, string> = {
   High: "bg-emerald-500",
-  Medium: "bg-orange-500",
+  Medium: "bg-warning",
   Low: "bg-red-500",
 };
 

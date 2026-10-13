@@ -1,17 +1,21 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 
-import { EyeOff, FileText } from "lucide-react";
+import { CircleCheck, CircleMinus, CircleX, EyeOff, FileText, TriangleAlert } from "lucide-react";
 
 import { Link } from "@/components/Link/link";
 import { Frame, FramePanel } from "@/components/reui/frame";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverAnchor, PopoverContent } from "@/ui/popover";
 
 import { ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
 import { ReadinessDot } from "../../workOrders/ReadinessMark";
-import { workOrderCheckStatus, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
+import {
+  workOrderCheckStatus,
+  type WorkOrderCheckLevel,
+  type WorkOrderCheckPresentation,
+} from "../../lib/workOrderChecks";
 import { ScoreEvidenceRow, type ScoreEvidenceDrawer, type ScoreEvidenceValue } from "../../workOrders/ScoreEvidence";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { PlanChipStatus } from "./planChipStatus";
@@ -55,6 +59,7 @@ export function PlanningReview({
   const analyzing = isAnalyzing && !creditVerdict;
   const drawerMetrics = reviewMetrics?.length ? reviewMetrics : undefined;
   const drawer = useConfidenceDrawer();
+  const confidenceAnchor = useRef<HTMLDivElement>(null);
   return (
     <Frame
       dense
@@ -63,13 +68,6 @@ export function PlanningReview({
       aria-label={canTogglePlan ? "Plan" : "Planning assessment"}
       data-testid="split-run-intent-status-card"
     >
-      {drawerMetrics && drawer.control.open ? (
-        <ReviewMetricsDrawer
-          id={drawer.control.controlsId}
-          metrics={drawerMetrics}
-          onHoverChange={drawer.onHoverChange}
-        />
-      ) : null}
       <FramePanel
         fit
         className="flex flex-wrap items-center gap-3 px-3.5 py-3"
@@ -84,15 +82,30 @@ export function PlanningReview({
           className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-4"
           data-testid="split-run-intent-composer-chips"
         >
-          <ScoreEvidenceRow
-            clarity={clarity}
-            confidence={confidence}
-            showClarity={showClarity}
-            showConfidence={showConfidence}
-            isAnalyzing={analyzing}
-            confidenceDrawer={drawerMetrics ? drawer.control : undefined}
-            testIds={SCORE_TEST_IDS}
-          />
+          <Popover open={drawer.control.open} onOpenChange={drawer.onOpenChange}>
+            <PopoverAnchor asChild>
+              <div ref={confidenceAnchor} className="inline-flex">
+                <ScoreEvidenceRow
+                  clarity={clarity}
+                  confidence={confidence}
+                  showClarity={showClarity}
+                  showConfidence={showConfidence}
+                  isAnalyzing={analyzing}
+                  confidenceDrawer={drawerMetrics ? drawer.control : undefined}
+                  testIds={SCORE_TEST_IDS}
+                />
+              </div>
+            </PopoverAnchor>
+            {drawerMetrics ? (
+              <ReviewMetricsPopover
+                id={drawer.control.controlsId}
+                metrics={drawerMetrics}
+                confidence={confidence}
+                anchor={confidenceAnchor}
+                onHoverChange={drawer.onHoverChange}
+              />
+            ) : null}
+          </Popover>
           {canTogglePlan ? (
             <PlanToggle open={open} isAnalyzing={analyzing} planStatus={planStatus} onToggle={onToggle} />
           ) : null}
@@ -108,7 +121,11 @@ const DRAWER_CLOSE_DELAY_MS = 120;
  * Hover peeks the drawer, click pins it, Escape closes it. The close
  * delay lets the pointer cross the gap between the chip and the drawer.
  */
-function useConfidenceDrawer(): { control: ScoreEvidenceDrawer; onHoverChange: (hovering: boolean) => void } {
+function useConfidenceDrawer(): {
+  control: ScoreEvidenceDrawer;
+  onHoverChange: (hovering: boolean) => void;
+  onOpenChange: (open: boolean) => void;
+} {
   const controlsId = useId();
   const [pinned, setPinned] = useState(false);
   const [hovering, setHovering] = useState(false);
@@ -134,6 +151,15 @@ function useConfidenceDrawer(): { control: ScoreEvidenceDrawer; onHoverChange: (
     });
   };
 
+  const onOpenChange = (next: boolean) => {
+    if (next) {
+      return;
+    }
+    clearTimeout(closeTimer.current);
+    setPinned(false);
+    setHovering(false);
+  };
+
   useEffect(() => () => clearTimeout(closeTimer.current), []);
 
   useEffect(() => {
@@ -151,86 +177,83 @@ function useConfidenceDrawer(): { control: ScoreEvidenceDrawer; onHoverChange: (
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open]);
 
-  return { control: { open, pinned, controlsId, onHoverChange, onToggle }, onHoverChange };
+  return { control: { open, pinned, controlsId, onHoverChange, onToggle }, onHoverChange, onOpenChange };
 }
 
 /**
- * The three review checks in a drawer above the plan card: a list row per
- * check with its name, a verdict badge, and the agent's one-line reason
- * below. The drawer floats, so it never moves the card or the composer.
+ * The review checks stay close to the confidence score. The popover can move
+ * when the score sits near a viewport edge.
  */
-function ReviewMetricsDrawer({
+function ReviewMetricsPopover({
   id,
   metrics,
+  confidence,
+  anchor,
   onHoverChange,
 }: {
   id: string;
   metrics: WorkOrderCheckPresentation[];
+  confidence?: ComposerScore;
+  anchor: RefObject<HTMLDivElement | null>;
   onHoverChange: (hovering: boolean) => void;
 }) {
-  const { ref, side } = useDrawerSide();
+  const score = confidence?.score ?? Math.min(...metrics.map((metric) => metric.score));
+  const maxScore = confidence?.maxScore ?? metrics[0].maxScore;
   return (
-    <div
-      ref={ref}
+    <PopoverContent
       id={id}
       role="group"
       aria-label="Confidence checks"
       data-testid="split-run-intent-review-metrics"
-      data-side={side}
-      className={cn(
-        "sp-confidence-drawer absolute inset-x-0 z-[60] grid grid-cols-3 divide-x divide-border overflow-hidden rounded-lg border border-border bg-popover shadow-md",
-        side === "above" ? "bottom-full mb-2" : "top-full mt-2",
-      )}
+      side="bottom"
+      align="end"
+      sideOffset={8}
+      collisionPadding={12}
+      className="z-[80] w-[min(27rem,calc(100vw-2rem))] overflow-hidden rounded-xl p-0 shadow-lg"
+      onOpenAutoFocus={(event) => event.preventDefault()}
+      onInteractOutside={(event) => {
+        if (event.target instanceof Node && anchor.current?.contains(event.target)) {
+          event.preventDefault();
+        }
+      }}
       onMouseEnter={() => onHoverChange(true)}
       onMouseLeave={() => onHoverChange(false)}
     >
-      {metrics.map((metric) => (
-        <ReviewMetricCell key={metric.key ?? metric.id} metric={metric} />
-      ))}
-    </div>
+      <div className="border-b border-border/70 px-4 py-3">
+        <p className="text-[13px] font-semibold text-foreground">
+          Confidence {score}/{maxScore}
+        </p>
+        <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">The lowest check sets the score.</p>
+      </div>
+      <div className="divide-y divide-border/60 px-4">
+        {metrics.map((metric) => (
+          <ReviewMetricRow key={metric.key ?? metric.id} metric={metric} />
+        ))}
+      </div>
+    </PopoverContent>
   );
 }
 
-/**
- * The drawer prefers the space above the plan card. When the card sits near
- * the top of its scroll area, the drawer would get clipped there, so it
- * opens below the card instead. Measured once per open, before first paint.
- */
-function useDrawerSide() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [side, setSide] = useState<"above" | "below">("above");
-  useLayoutEffect(() => {
-    const node = ref.current;
-    if (!node) {
-      return;
-    }
-    if (node.getBoundingClientRect().top < clippingAncestorTop(node)) {
-      setSide("below");
-    }
-  }, []);
-  return { ref, side };
-}
+const REVIEW_STATUS_ICON: Record<WorkOrderCheckLevel, { Icon: typeof CircleCheck; className: string }> = {
+  positive: { Icon: CircleCheck, className: "fill-emerald-600 stroke-white" },
+  neutral: { Icon: CircleMinus, className: "fill-slate-500 stroke-white" },
+  caution: { Icon: TriangleAlert, className: "fill-amber-500 stroke-white" },
+  critical: { Icon: CircleX, className: "fill-red-600 stroke-white" },
+};
 
-function clippingAncestorTop(node: HTMLElement): number {
-  for (let parent = node.parentElement; parent; parent = parent.parentElement) {
-    if (window.getComputedStyle(parent).overflowY !== "visible") {
-      return parent.getBoundingClientRect().top;
-    }
-  }
-  return 0;
-}
-
-function ReviewMetricCell({ metric }: { metric: WorkOrderCheckPresentation }) {
+function ReviewMetricRow({ metric }: { metric: WorkOrderCheckPresentation }) {
   const status = workOrderCheckStatus(metric);
+  const { Icon, className } = REVIEW_STATUS_ICON[metric.level];
   return (
-    <div className="sp-review-metric min-w-0 px-4 py-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-[13px] leading-5 font-medium text-foreground">{metric.name}</span>
-        <Badge variant="outline" className={cn("shrink-0 border", status.badgeClassName)}>
-          {status.label}
-        </Badge>
+    <div className="flex min-w-0 gap-2.5 py-3">
+      <Icon className={cn("mt-0.5 size-4 shrink-0", className)} aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[13px] font-medium text-foreground">{metric.name}</span>
+          <span className={cn("shrink-0 text-[12px] font-medium", status.className)}>{status.label}</span>
+        </div>
+        {metric.summary ? <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{metric.summary}</p> : null}
       </div>
-      {metric.summary ? <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{metric.summary}</p> : null}
     </div>
   );
 }
