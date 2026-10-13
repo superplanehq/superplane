@@ -22,6 +22,7 @@ import {
 import { factorySettingsNarrowSectionBodyClassName } from "../factoryPageLayoutStyles";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
 import { CrossRepoContextCard } from "./WorkspaceCrossRepoSection";
+import { WorkspaceDefaultModelSection } from "./WorkspaceDefaultModelSection";
 import { WorkspaceSetupStepsSection } from "./WorkspaceSetupStepsSection";
 
 const meta = {
@@ -74,7 +75,7 @@ export const Configured: Story = {
     }),
 };
 
-/** Bash commands in the setup-steps field. The Agent page starts empty. */
+/** Bash commands in the setup-steps field. The Agent page does not show this field. */
 export const SetupSteps: Story = {
   render: () => (
     <div className="min-h-screen bg-sidebar dark:bg-background">
@@ -85,7 +86,25 @@ export const SetupSteps: Story = {
   ),
 };
 
-/** Extra repositories in the cross-repo list. The Agent page starts empty. */
+/** Model choices for the Storybook preview. The Agent page does not show this field. */
+const previewModels = [
+  { value: "claude-sonnet", label: "Claude Sonnet" },
+  { value: "claude-opus", label: "Claude Opus" },
+  { value: "gpt-5", label: "GPT-5" },
+];
+
+/** Default model field. The Agent page does not show this field. */
+export const DefaultModel: Story = {
+  render: () => (
+    <div className="min-h-screen bg-sidebar dark:bg-background">
+      <div className={cn(factorySettingsNarrowSectionBodyClassName, "pt-14")}>
+        <WorkspaceDefaultModelSection canUpdate models={previewModels} />
+      </div>
+    </div>
+  ),
+};
+
+/** Extra repositories in the cross-repo list. The Agent page does not show this list. */
 export const CrossRepoContext: Story = {
   render: () => (
     <div className="min-h-screen bg-sidebar dark:bg-background">

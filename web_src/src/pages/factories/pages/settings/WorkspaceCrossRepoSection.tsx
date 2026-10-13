@@ -4,71 +4,14 @@ import { X } from "lucide-react";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { getApiErrorMessage } from "@/lib/errors";
-import { showErrorToast } from "@/lib/toast";
 
-import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { FirstRunMissingAccessLine } from "../onboarding/first-run/FirstRunMissingAccessLine";
 import { IntegrationChoiceIcon, RepositoryPicker } from "../onboarding/onboardingSteps";
 import type { VcsHostId } from "../onboarding/onboardingFixtures";
-import { navigateGitHubWindow, openGitHubWindow } from "../onboarding/useFirstRunGitHub";
-import { useBitbucketOnboarding } from "../onboarding/useBitbucketOnboarding";
-import { useGitHubOnboarding } from "../onboarding/useGitHubOnboarding";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsCard } from "./FactorySettingsCard";
-import { useWorkspaceRepositoryChoices } from "./useWorkspaceRepositoryChoices";
 
 /** Visual only. Chosen repositories stay in this list and are not saved. */
-export function WorkspaceCrossRepoSection({ canUpdate }: { canUpdate: boolean }) {
-  const { organizationId, factory } = useFactoriesLayout();
-  const choices = useWorkspaceRepositoryChoices(organizationId, factory);
-  const access = useOpenRepositoryAccess(organizationId, choices.bitbucket);
-
-  return (
-    <CrossRepoContextCard
-      canUpdate={canUpdate}
-      host={choices.host}
-      bitbucket={choices.bitbucket}
-      connected={Boolean(choices.integrationId)}
-      loading={choices.isLoading}
-      error={choices.isError}
-      catalog={choices.repositories}
-      granting={access.opening}
-      onGrantAccess={access.open}
-    />
-  );
-}
-
-function useOpenRepositoryAccess(organizationId: string, bitbucket: boolean) {
-  const github = useGitHubOnboarding(organizationId, { poll: false });
-  const bitbucketOnboarding = useBitbucketOnboarding(organizationId, { poll: false });
-  const [opening, setOpening] = useState(false);
-  const start = bitbucket ? bitbucketOnboarding.startInstallation : github.startInstallation;
-
-  const open = () => {
-    if (opening) return;
-    setOpening(true);
-    const popup = openGitHubWindow();
-    start
-      .mutateAsync()
-      .then((url) => navigateGitHubWindow(popup, url))
-      .catch((error: unknown) => {
-        popup?.close();
-        showErrorToast(
-          getApiErrorMessage(
-            error,
-            bitbucket
-              ? AGENT_RESOURCES_COPY.crossRepoOpenBitbucketError
-              : AGENT_RESOURCES_COPY.crossRepoOpenGitHubError,
-          ),
-        );
-      })
-      .finally(() => setOpening(false));
-  };
-
-  return { opening, open };
-}
-
 export function CrossRepoContextCard({
   canUpdate,
   host,
@@ -173,9 +116,7 @@ export function CrossRepoContextCard({
               disabled={!canUpdate || !onGrantAccess}
               loading={granting}
               loadingText={
-                bitbucket
-                  ? AGENT_RESOURCES_COPY.crossRepoOpeningBitbucket
-                  : AGENT_RESOURCES_COPY.crossRepoOpeningGitHub
+                bitbucket ? AGENT_RESOURCES_COPY.crossRepoOpeningBitbucket : AGENT_RESOURCES_COPY.crossRepoOpeningGitHub
               }
               onClick={() => onGrantAccess?.()}
             />

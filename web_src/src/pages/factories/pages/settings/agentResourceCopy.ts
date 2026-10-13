@@ -45,8 +45,6 @@ export const AGENT_RESOURCES_COPY = {
   crossRepoGrantBitbucket: "Install on another workspace",
   crossRepoOpeningGitHub: "Opening GitHub…",
   crossRepoOpeningBitbucket: "Opening Bitbucket…",
-  crossRepoOpenGitHubError: "We could not open GitHub. Try again.",
-  crossRepoOpenBitbucketError: "We could not open Bitbucket. Try again.",
   configure: "Configure",
   backToMcpServers: "Back to Agent",
   backToAgent: "Back to Agent",
