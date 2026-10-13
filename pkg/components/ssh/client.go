@@ -168,10 +168,10 @@ func (c *Client) ExecuteScript(command string, stdin io.Reader, timeout time.Dur
 	}
 
 	if timeout > 0 {
-		go func() {
-			time.Sleep(timeout)
+		timer := time.AfterFunc(timeout, func() {
 			_ = session.Close()
-		}()
+		})
+		defer timer.Stop()
 	}
 
 	err = session.Run(command)
