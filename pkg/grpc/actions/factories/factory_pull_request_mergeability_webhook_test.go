@@ -551,6 +551,106 @@ func mergeableFactoryGitHub(headSHA string) *fakeFactoryGitHub {
 	}
 }
 
+func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ReopenedRefreshesMergeability(t *testing.T) {
+	const headSHA = "abc123def456"
+	const repository = "acme/app"
+
+	setupClosedPullRequest := func(t *testing.T, r *support.ResourceRegistry, db *gorm.DB, number int64) (*models.Factory, *models.FactoryPullRequest, *models.Webhook) {
+		t.Helper()
+		factory, pullRequest := createOpenGitHubFactoryPullRequest(t, db, r, repository, number)
+		require.NoError(t, pullRequest.SetMergeability(db, models.FactoryPullRequestMergeabilitySnapshot{
+			Mergeable:      false,
+			BlockedReason:  "CONFLICTING",
+			BlockedMessage: "The pull request has conflicts.",
+			HeadSHA:        headSHA,
+		}))
+		closedAt := time.Now()
+		require.NoError(t, stampFactoryPullRequestClosed(db, pullRequest, false, nil, &closedAt))
+		integration, err := models.CreateIntegration(
+			uuid.New(),
+			r.Organization.ID,
+			"github",
+			support.RandomName("github"),
+			map[string]any{},
+		)
+		require.NoError(t, err)
+		return factory, pullRequest, &models.Webhook{AppInstallationID: &integration.ID}
+	}
+
+	deliverReopened := func(webhook *models.Webhook, number int64) {
+		RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
+			t.Context(),
+			IntakeDependencies{},
+			webhook,
+			"pull_request",
+			[]byte(fmt.Sprintf(`{
+				"action": "reopened",
+				"repository": {"full_name": %q},
+				"pull_request": {"number": %d, "draft": false, "head": {"sha": %q}}
+			}`, repository, number, headSHA)),
+		)
+	}
+
+	t.Run("clears a conflict that was fixed while the pull request was closed", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.DB(t.Context())
+		factory, pullRequest, webhook := setupClosedPullRequest(t, r, db, 201)
+		stubFactoryGitHub(t, mergeableFactoryGitHub(headSHA))
+
+		var published []string
+		original := publishFactoryWorkOrderUpdated
+		publishFactoryWorkOrderUpdated = func(_, orderID, reason string) error {
+			published = append(published, orderID+":"+reason)
+			return nil
+		}
+		t.Cleanup(func() { publishFactoryWorkOrderUpdated = original })
+
+		deliverReopened(webhook, 201)
+
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryPullRequestStateOpen, stored.State)
+		assert.Nil(t, stored.ClosedAt)
+		assert.True(t, stored.Mergeable)
+		assert.Empty(t, stored.MergeBlockedReason)
+		assert.Equal(t, headSHA, stored.MergeableHeadSHA)
+		assert.Contains(t, published, pullRequest.WorkOrderID.String()+":"+factoryevents.EventTypeOrderPullRequestUpdated)
+	})
+
+	t.Run("publishes the reopen when mergeability does not change", func(t *testing.T) {
+		r := support.Setup(t)
+		db := database.DB(t.Context())
+		factory, pullRequest, webhook := setupClosedPullRequest(t, r, db, 202)
+		stubFactoryGitHub(t, &fakeFactoryGitHub{
+			pullRequest: &github.PullRequest{
+				Mergeable:      github.Ptr(false),
+				MergeableState: github.Ptr("dirty"),
+				Draft:          github.Ptr(false),
+				Head:           &github.PullRequestBranch{SHA: github.Ptr(headSHA)},
+			},
+		})
+
+		published := 0
+		original := publishFactoryWorkOrderUpdated
+		publishFactoryWorkOrderUpdated = func(_, orderID, reason string) error {
+			if orderID == pullRequest.WorkOrderID.String() && reason == factoryevents.EventTypeOrderPullRequestUpdated {
+				published++
+			}
+			return nil
+		}
+		t.Cleanup(func() { publishFactoryWorkOrderUpdated = original })
+
+		deliverReopened(webhook, 202)
+
+		stored, err := factory.FindPullRequest(db, models.FactoryPullRequestLookup{ID: pullRequest.ID})
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryPullRequestStateOpen, stored.State)
+		assert.False(t, stored.Mergeable)
+		assert.Equal(t, "CONFLICTING", stored.MergeBlockedReason)
+		assert.Equal(t, 1, published)
+	})
+}
+
 func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())

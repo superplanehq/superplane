@@ -129,9 +129,9 @@ func reopenFactoryPullRequestsFromGitHub(
 	db *gorm.DB,
 	integration *models.Integration,
 	payload githubMergeabilityWebhookPayload,
-) {
+) []models.FactoryPullRequest {
 	if payload.PullRequest == nil || payload.PullRequest.Number <= 0 {
-		return
+		return nil
 	}
 
 	pullRequests, err := models.ListGitHubFactoryPullRequestsForWebhook(
@@ -142,9 +142,10 @@ func reopenFactoryPullRequestsFromGitHub(
 	)
 	if err != nil {
 		log.WithError(err).Warn("factory mergeability: failed to list pull requests for reopened GitHub event")
-		return
+		return nil
 	}
 
+	var reopened []models.FactoryPullRequest
 	factoriesByID := map[string]*models.Factory{}
 	for i := range pullRequests {
 		pullRequest := &pullRequests[i]
@@ -161,10 +162,17 @@ func reopenFactoryPullRequestsFromGitHub(
 			factory = loaded
 			factoriesByID[factory.ID.String()] = factory
 		}
-		if err := reopenFactoryPullRequest(db, factory, pullRequest, payload.PullRequest.Draft); err != nil {
+		changed, err := reopenFactoryPullRequest(db, factory, pullRequest, payload.PullRequest.Draft)
+		if err != nil {
 			log.WithError(err).Warnf("factory mergeability: failed to reopen pull request %s", pullRequest.ID)
+			continue
 		}
+		if !changed {
+			continue
+		}
+		reopened = append(reopened, *pullRequest)
 	}
+	return reopened
 }
 
 func reopenFactoryPullRequest(
@@ -172,8 +180,9 @@ func reopenFactoryPullRequest(
 	factory *models.Factory,
 	pullRequest *models.FactoryPullRequest,
 	draft bool,
-) error {
-	return db.Transaction(func(tx *gorm.DB) error {
+) (bool, error) {
+	changed := false
+	err := db.Transaction(func(tx *gorm.DB) error {
 		order, err := factory.FindWorkOrder(tx, pullRequest.WorkOrderID)
 		if err != nil {
 			return err
@@ -191,8 +200,16 @@ func reopenFactoryPullRequest(
 		if draft {
 			state = models.FactoryPullRequestStateDraft
 		}
-		return pullRequest.Update(tx, models.FactoryPullRequestPatch{State: &state})
+		if err := pullRequest.Update(tx, models.FactoryPullRequestPatch{State: &state}); err != nil {
+			return err
+		}
+		changed = true
+		return nil
 	})
+	if err != nil {
+		return false, err
+	}
+	return changed, nil
 }
 
 func stampFactoryPullRequestClosed(

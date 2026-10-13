@@ -62,9 +62,10 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 		closeFactoryWorkOrdersFromGitHubPullRequestClosed(db, integration, payload)
 		return
 	}
+
+	var reopened []models.FactoryPullRequest
 	if isGitHubPullRequestReopenedEvent(eventType, payload) {
-		reopenFactoryPullRequestsFromGitHub(db, integration, payload)
-		return
+		reopened = reopenFactoryPullRequestsFromGitHub(db, integration, payload)
 	}
 
 	_, numbers, sha := githubMergeabilityWebhookRefFromPayload(payload)
@@ -77,13 +78,12 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 	)
 	if err != nil {
 		log.WithError(err).Warn("factory mergeability: failed to list pull requests for GitHub event")
-		return
-	}
-	if len(pullRequests) == 0 {
+		publishReopenedFactoryPullRequests(reopened, nil)
 		return
 	}
 
 	factoriesByID := map[string]*models.Factory{}
+	published := map[string]struct{}{}
 	for i := range pullRequests {
 		pullRequest := &pullRequests[i]
 		factory := factoriesByID[pullRequest.FactoryID.String()]
@@ -96,8 +96,36 @@ func RefreshFactoryPullRequestMergeabilityFromGitHubEvent(
 			factory = loaded
 			factoriesByID[factory.ID.String()] = factory
 		}
+		before := storedFactoryPullRequestMergeability(pullRequest)
 		if err := refreshFactoryPullRequestMergeabilityWithRetry(ctx, db, deps, factory, pullRequest); err != nil {
 			log.WithError(err).Warnf("factory mergeability: failed to refresh pull request %s", pullRequest.ID)
+			continue
+		}
+		if storedFactoryPullRequestMergeability(pullRequest) != before {
+			published[pullRequest.WorkOrderID.String()] = struct{}{}
+		}
+	}
+	publishReopenedFactoryPullRequests(reopened, published)
+}
+
+func publishReopenedFactoryPullRequests(reopened []models.FactoryPullRequest, alreadyPublished map[string]struct{}) {
+	seen := map[string]struct{}{}
+	for i := range reopened {
+		pullRequest := &reopened[i]
+		orderID := pullRequest.WorkOrderID.String()
+		if _, ok := alreadyPublished[orderID]; ok {
+			continue
+		}
+		if _, ok := seen[orderID]; ok {
+			continue
+		}
+		seen[orderID] = struct{}{}
+		if err := publishFactoryWorkOrderUpdated(
+			pullRequest.FactoryID.String(),
+			orderID,
+			factoryevents.EventTypeOrderPullRequestUpdated,
+		); err != nil {
+			log.WithError(err).Warnf("factory mergeability: failed to publish reopen for order %s", orderID)
 		}
 	}
 }
