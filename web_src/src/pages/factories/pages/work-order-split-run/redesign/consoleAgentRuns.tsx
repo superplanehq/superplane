@@ -98,8 +98,10 @@ function SingleRun({
   reportUsage: boolean;
 }) {
   const title = plainRunTitle(run.name);
+  const queued = useQueuedAgentRun(organizationId, phase, run.status);
   return (
     <div className="space-y-2">
+      {queued ? <QueuedRunMark /> : null}
       {title && title !== automationName ? (
         <MarkdownContent
           content={run.name}
@@ -140,6 +142,7 @@ function AgentRunRow({
 }) {
   const title = plainRunTitle(run.name);
   const clock = formatClock(run.startedAt);
+  const queued = useQueuedAgentRun(organizationId, phase, run.status);
   return (
     <Collapsible defaultOpen={defaultOpen} className="group py-1.5 first:pt-0 last:pb-0">
       <div className="relative flex items-center gap-1.5 py-1">
@@ -150,7 +153,7 @@ function AgentRunRow({
             aria-hidden
           />
           {clock ? <span className={cn(META_TEXT_CLASSNAME, "shrink-0 tabular-nums")}>{clock}</span> : null}
-          <StaticStatusGlyph status={run.status} />
+          {queued ? <QueuedRunMark /> : <StaticStatusGlyph status={run.status} />}
           <MarkdownContent
             content={run.name}
             variant="workspace"
@@ -171,6 +174,24 @@ function AgentRunRow({
         />
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+function useQueuedAgentRun(
+  organizationId: string | undefined,
+  phase: SplitRunPhase | undefined,
+  status: SplitRunPhaseStatus,
+): boolean {
+  const live = useSplitRunLiveCanvas(organizationId, status === "running" ? phase : undefined);
+  return status === "running" && Boolean(live.agentQueue?.queued);
+}
+
+function QueuedRunMark() {
+  return (
+    <>
+      <StaticStatusGlyph status="queued" />
+      <span className="shrink-0 text-[12px] font-medium text-muted-foreground">Queued</span>
+    </>
   );
 }
 

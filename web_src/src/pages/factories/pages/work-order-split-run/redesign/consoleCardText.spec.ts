@@ -4,6 +4,9 @@ import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { SPLIT_RUN_RUNNING } from "../splitRunMocks";
 import { stagesFromFixture, type AutomationStage } from "./automationsViewModel";
 import {
+  consoleCanStop,
+  consoleHeaderStatus,
+  consoleStopRunId,
   outputCountLabel,
   runFooterLine,
   runFooterSpendLabel,
@@ -96,6 +99,99 @@ describe("runMetaLine", () => {
     const earlier = { ...latest, id: "r1", status: "passed" as const, duration: "10m" };
 
     expect(runMetaLine(latest, [earlier, latest])).toBe("12m");
+  });
+
+  it("excludes a queued run from the header timer", () => {
+    const working = { ...runningStage("implement"), id: "working", status: "running" as const, duration: "3m 12s" };
+    const queued = { ...working, id: "queued", duration: "83m 51s" };
+
+    expect(runMetaLine(working, [queued, working], new Map([["queued", { queued: true }]]))).toBe("3m 12s");
+  });
+
+  it("does not grow a timer when every live run is queued", () => {
+    const queued = { ...runningStage("implement"), status: "running" as const, duration: "83m 51s" };
+
+    expect(runMetaLine(queued, [queued], new Map([[queued.id, { queued: true }]]))).toBe("");
+  });
+
+  it("counts working time from the agent execution, not the run start", () => {
+    const now = Date.parse("2026-10-13T12:00:00.000Z");
+    const working = { ...runningStage("implement"), status: "running" as const, duration: "83m 51s" };
+
+    expect(
+      runMetaLine(working, [working], new Map([[working.id, { workStartedAt: "2026-10-13T11:58:00.000Z" }]]), now),
+    ).toBe("2m");
+  });
+
+  it("keeps finished working time instead of the full run duration", () => {
+    const now = Date.parse("2026-10-13T12:00:00.000Z");
+    const finished = { ...runningStage("implement"), status: "passed" as const, duration: "42m" };
+    const live = { ...finished, id: "live", status: "running" as const, duration: "40m" };
+    const timing = new Map([
+      [finished.id, { workStartedAt: "2026-10-13T11:58:00.000Z", workEndedAt: "2026-10-13T12:00:00.000Z" }],
+      [live.id, { workStartedAt: "2026-10-13T11:59:00.000Z" }],
+    ]);
+
+    expect(runMetaLine(finished, [finished], timing, now)).toBe("2m");
+    expect(runMetaLine(live, [finished, live], timing, now)).toBe("3m");
+  });
+});
+
+describe("consoleHeaderStatus", () => {
+  it("keeps the header running when one agent is working", () => {
+    expect(
+      consoleHeaderStatus(
+        [
+          { id: "queued", status: "running" },
+          { id: "working", status: "running" },
+        ],
+        new Set(["queued"]),
+      ),
+    ).toBe("running");
+  });
+
+  it("shows queued when every live run is waiting for an agent slot", () => {
+    expect(consoleHeaderStatus([{ id: "queued", status: "running" }], new Set(["queued"]))).toBe("queued");
+  });
+
+  it("leaves an exclusive-access wait labeled waiting", () => {
+    expect(consoleHeaderStatus([{ id: "access", status: "waiting" }], new Set(["access"]))).toBe("waiting");
+  });
+
+  it("keeps an exclusive-access wait labeled waiting when another agent is queued", () => {
+    expect(
+      consoleHeaderStatus(
+        [
+          { id: "access", status: "waiting" },
+          { id: "queued", status: "running" },
+        ],
+        new Set(["queued"]),
+      ),
+    ).toBe("waiting");
+  });
+});
+
+describe("consoleStopRunId", () => {
+  it("cancels the working run on a mixed card and the queued run when none is working", () => {
+    const runs = [
+      { id: "queued", status: "running" as const },
+      { id: "working", status: "running" as const },
+    ];
+
+    expect(consoleStopRunId(runs, new Set(["queued"]))).toBe("working");
+    expect(consoleStopRunId([runs[0]], new Set(["queued"]))).toBe("queued");
+  });
+});
+
+describe("consoleCanStop", () => {
+  it("keeps Stop for a queued agent on an exclusive-access wait card", () => {
+    const runs = [
+      { id: "access", status: "waiting" as const },
+      { id: "queued", status: "running" as const },
+    ];
+
+    expect(consoleCanStop("waiting", runs, new Set(["queued"]))).toBe(true);
+    expect(consoleCanStop("waiting", [runs[0]], new Set(["access"]))).toBe(false);
   });
 });
 
