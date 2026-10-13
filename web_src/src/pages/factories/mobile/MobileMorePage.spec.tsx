@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { ThemeProvider } from "@/contexts/ThemeProvider";
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP } from "@/lib/experimentalFeatures";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import {
@@ -91,26 +91,23 @@ describe("MobileMorePage", () => {
   beforeEach(() => {
     permissionsLoading = false;
     canUpdateFactories = true;
+    enabledFeatures = new Set([FEATURE_WORKSPACE_AGENT]);
+  });
+
+  it("opens Agent when the user can update factories and SuperPlane Agent is on", () => {
+    renderMore();
+
+    expect(screen.getByRole("link", { name: "Agent" })).toHaveAttribute(
+      "href",
+      factoryAgentPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT),
+    );
+  });
+
+  it("hides Agent when only MCP is on", () => {
     enabledFeatures = new Set([FEATURE_WORKSPACE_MCP]);
-  });
-
-  it("opens Agent when the user can update factories and MCP is on", () => {
     renderMore();
 
-    expect(screen.getByRole("link", { name: "Agent" })).toHaveAttribute(
-      "href",
-      factoryAgentPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT),
-    );
-  });
-
-  it("opens Agent when only skills is on", () => {
-    enabledFeatures = new Set([FEATURE_WORKSPACE_SKILLS]);
-    renderMore();
-
-    expect(screen.getByRole("link", { name: "Agent" })).toHaveAttribute(
-      "href",
-      factoryAgentPath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT),
-    );
+    expect(screen.queryByRole("link", { name: "Agent" })).not.toBeInTheDocument();
   });
 
   it("hides Agent while permissions load", () => {
@@ -127,7 +124,7 @@ describe("MobileMorePage", () => {
     expect(screen.queryByRole("link", { name: "Agent" })).not.toBeInTheDocument();
   });
 
-  it("hides Agent when both workspace features are off", () => {
+  it("hides Agent when SuperPlane Agent is off", () => {
     enabledFeatures = new Set();
     renderMore();
 

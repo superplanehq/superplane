@@ -8,7 +8,7 @@ import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useTheme } from "@/contexts/useTheme";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_AGENT } from "@/lib/experimentalFeatures";
 import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useFactoryAutomations } from "@/hooks/useFactoryData";
@@ -75,8 +75,7 @@ export function MobileMorePage() {
   const showAgent = isWorkspaceAgentNavVisible({
     permissionsLoading,
     canUpdateFactories: canAct("factories", "update"),
-    workspaceMcpEnabled: has(FEATURE_WORKSPACE_MCP),
-    workspaceSkillsEnabled: has(FEATURE_WORKSPACE_SKILLS),
+    workspaceAgentEnabled: has(FEATURE_WORKSPACE_AGENT),
   });
   const { data: organization } = useOrganization(organizationId);
   const { preference, setPreference } = useTheme();

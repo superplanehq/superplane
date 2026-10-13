@@ -6,6 +6,7 @@ import { client } from "@/api-client/client.gen";
 import type { FactoriesFactoryMcpClient } from "@/api-client";
 import {
   FEATURE_SUPERPLANE_MCP_SERVER,
+  FEATURE_WORKSPACE_AGENT,
   FEATURE_WORKSPACE_MCP,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
@@ -27,7 +28,7 @@ const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 const settingsAgentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
 const superplaneMcpServerPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/superplane-mcp-server`;
 const mcpConfigurePath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
-const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
+const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
 
 function connectedMcpClient(id: string, clientName: string): FactoriesFactoryMcpClient {
   return {
@@ -76,8 +77,25 @@ describe("FactorySettingsMCPPage", () => {
     );
   }, 10000);
 
-  it("shows the Agent rail icon when a workspace feature is on and keeps MCP Server", async () => {
-    for (const features of [mcpAndSkills, [FEATURE_WORKSPACE_MCP], [FEATURE_WORKSPACE_SKILLS]]) {
+  it("shows the Agent rail icon when SuperPlane Agent is on and keeps MCP Server", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={[FEATURE_WORKSPACE_AGENT]}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-agent")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factories-nav-agent")).toHaveAttribute("aria-label", "Agent");
+    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-superplane-mcp-server")).toHaveTextContent(
+      "MCP Server",
+    );
+  }, 10000);
+
+  it("hides the Agent rail icon when only MCP or skills is on", async () => {
+    for (const features of [[FEATURE_WORKSPACE_MCP], [FEATURE_WORKSPACE_SKILLS]]) {
       const view = render(
         <FactoriesHarness
           pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
@@ -86,12 +104,8 @@ describe("FactorySettingsMCPPage", () => {
         />,
       );
 
-      const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-      expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-agent")).not.toBeInTheDocument();
-      expect(screen.getByTestId("factories-nav-agent")).toHaveAttribute("aria-label", "Agent");
-      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-superplane-mcp-server")).toHaveTextContent(
-        "MCP Server",
-      );
+      await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(screen.queryByTestId("factories-nav-agent")).not.toBeInTheDocument();
       view.unmount();
     }
   }, 10000);
@@ -110,7 +124,7 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent-resources`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -124,7 +138,7 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={`${settingsAgentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -137,7 +151,7 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent-resources?tab=skills`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -149,7 +163,7 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={agentPath}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -169,7 +183,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -191,7 +205,7 @@ describe("FactorySettingsMCPPage", () => {
             [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE, OAUTH_NOT_CONNECTED_RESOURCE],
           },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -221,7 +235,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -238,7 +252,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [OAUTH_NOT_CONNECTED_RESOURCE] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -255,7 +269,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -279,7 +293,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [sentryResource] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -305,7 +319,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [sentryResource] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -330,7 +344,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [customSentry] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -350,7 +364,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -381,7 +395,7 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={agentPath}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 

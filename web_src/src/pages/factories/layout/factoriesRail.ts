@@ -27,18 +27,16 @@ export function isAgentPath(pathname: string): boolean {
 export function isWorkspaceAgentNavVisible({
   permissionsLoading,
   canUpdateFactories,
-  workspaceMcpEnabled,
-  workspaceSkillsEnabled,
+  workspaceAgentEnabled,
 }: {
   permissionsLoading: boolean;
   canUpdateFactories: boolean;
-  workspaceMcpEnabled: boolean;
-  workspaceSkillsEnabled: boolean;
+  workspaceAgentEnabled: boolean;
 }): boolean {
   if (permissionsLoading || !canUpdateFactories) {
     return false;
   }
-  return workspaceMcpEnabled || workspaceSkillsEnabled;
+  return workspaceAgentEnabled;
 }
 
 /** One or two letters from a display name, for the icon rail. */

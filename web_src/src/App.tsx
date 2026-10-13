@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
-import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "./lib/experimentalFeatures";
+import { FEATURE_FACTORIES, FEATURE_WORKSPACE_AGENT } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
@@ -170,7 +170,7 @@ function organizationScopedRouteTree() {
               path="agent"
               element={
                 <RequirePermission resource="factories" action="update">
-                  <RequireExperimentalFeature anyOf={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}>
+                  <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_AGENT}>
                     <FactorySettingsAgentPage />
                   </RequireExperimentalFeature>
                 </RequirePermission>

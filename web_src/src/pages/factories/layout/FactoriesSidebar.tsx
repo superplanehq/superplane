@@ -5,7 +5,7 @@ import { useOrganization } from "@/hooks/useOrganizationData";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_AGENT } from "@/lib/experimentalFeatures";
 import { useNavigate, useParams } from "react-router";
 import { firstFactoryLineId, newFactoryPath } from "../lib/factoryPagePaths";
 import { organizationPlanLabel } from "../lib/hostedCreditEmpty";
@@ -62,8 +62,7 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         showAgent={isWorkspaceAgentNavVisible({
           permissionsLoading,
           canUpdateFactories: canAct("factories", "update"),
-          workspaceMcpEnabled: has(FEATURE_WORKSPACE_MCP),
-          workspaceSkillsEnabled: has(FEATURE_WORKSPACE_SKILLS),
+          workspaceAgentEnabled: has(FEATURE_WORKSPACE_AGENT),
         })}
       />
       <div className="flex-1" />

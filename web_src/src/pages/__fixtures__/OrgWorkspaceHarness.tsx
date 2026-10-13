@@ -16,7 +16,7 @@ import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { ThemeContext } from "@/contexts/themeContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { agentChatKeys } from "@/hooks/useAgentChats";
-import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORIES, FEATURE_WORKSPACE_AGENT } from "@/lib/experimentalFeatures";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { AppPage } from "@/pages/app";
 import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
@@ -317,7 +317,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
                 path="agent"
                 element={
                   <RequirePermission resource="factories" action="update">
-                    <RequireExperimentalFeature anyOf={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}>
+                    <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_AGENT}>
                       <FactorySettingsAgentPage />
                     </RequireExperimentalFeature>
                   </RequirePermission>

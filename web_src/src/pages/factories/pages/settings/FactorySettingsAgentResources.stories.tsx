@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { INLINE_SKILL, UI_UX_PRO_MAX_SKILL } from "../../__fixtures__/agentResourceFixtures";
@@ -28,7 +28,7 @@ function skillsHarness(pathSuffix: string, resources: (typeof INLINE_SKILL)[]) {
   return (
     <FactoriesHarness
       pathSuffix={pathSuffix}
-      experimentalFeatures={[FEATURE_WORKSPACE_SKILLS]}
+      experimentalFeatures={[FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
         agentResourcesByFactoryId: {
