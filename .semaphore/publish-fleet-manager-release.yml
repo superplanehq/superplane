@@ -34,13 +34,13 @@ blocks:
       jobs:
         - name: "Publish immutable Fleet Manager release"
           commands:
-            - artifact pull workflow "build/fleet-manager/$VERSION"
+            - artifact pull workflow "build/fleet-manager/$RELEASE_VERSION"
             - |
-              release_dir="build/fleet-manager/$VERSION"
+              release_dir="build/fleet-manager/$RELEASE_VERSION"
               (cd "$release_dir" && sha256sum --check release-manifest.sha256)
               node release/component-release.js verify-manifest \
                 --component fleet-manager \
-                --version "$VERSION" \
+                --version "$RELEASE_VERSION" \
                 --sha "$SEMAPHORE_GIT_SHA" \
                 --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
                 --directory "$release_dir" \
@@ -49,10 +49,10 @@ blocks:
               (cd "$release_dir" && sha256sum --check checksums.txt)
               test -n "${GITHUB_TOKEN:-}"
             - |
-              release_dir="build/fleet-manager/$VERSION"
+              release_dir="build/fleet-manager/$RELEASE_VERSION"
               node release/component-release.js stage-github-release \
                 --component fleet-manager \
-                --version "$VERSION" \
+                --version "$RELEASE_VERSION" \
                 --sha "$SEMAPHORE_GIT_SHA" \
                 --directory "$release_dir" \
                 --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,checksums.txt \
@@ -64,18 +64,18 @@ blocks:
               export REGISTRY_AUTH_FILE=/tmp/ghcr-auth.json
               export FLEET_MANAGER_DIGEST_OUTPUT=/tmp/fleet-manager-image-digest
               bash release/fleet-manager/publish-image.sh \
-                "$VERSION" \
-                "build/fleet-manager/$VERSION/fleet-manager.oci.tar"
+                "$RELEASE_VERSION" \
+                "build/fleet-manager/$RELEASE_VERSION/fleet-manager.oci.tar"
             - |
               export REGISTRY_AUTH_FILE=/tmp/ghcr-auth.json
               image_digest="$(cat /tmp/fleet-manager-image-digest)"
               bash release/fleet-manager/verify-image.sh \
-                "$FLEET_MANAGER_IMAGE_REPO:$VERSION" \
+                "$FLEET_MANAGER_IMAGE_REPO:$RELEASE_VERSION" \
                 "$image_digest" \
-                "$VERSION" \
+                "$RELEASE_VERSION" \
                 "$SEMAPHORE_GIT_SHA"
             - |
-              release_dir="build/fleet-manager/$VERSION"
+              release_dir="build/fleet-manager/$RELEASE_VERSION"
               release_notes_args=()
               if [ -f "$release_dir/release-notes.md" ]; then
                 release_notes_args=(--release-notes "$release_dir/release-notes.md")
@@ -84,14 +84,14 @@ blocks:
               node release/component-release.js publish-github-release \
                 --release-id "$(cat /tmp/github-release-id)" \
                 --component fleet-manager \
-                --version "$VERSION" \
+                --version "$RELEASE_VERSION" \
                 --sha "$SEMAPHORE_GIT_SHA" \
                 "${release_notes_args[@]}"
             - |
-              encoded_tag="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "fleet-manager/$VERSION")"
+              encoded_tag="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "fleet-manager/$RELEASE_VERSION")"
               bash release/verify-public-assets.sh \
                 "https://github.com/superplanehq/superplane/releases/download/$encoded_tag" \
-                "build/fleet-manager/$VERSION" \
+                "build/fleet-manager/$RELEASE_VERSION" \
                 fleet-manager-linux-amd64.tar.gz \
                 fleet-manager-linux-arm64.tar.gz \
                 fleet-manager.spdx.json \
