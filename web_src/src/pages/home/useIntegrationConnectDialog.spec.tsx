@@ -103,8 +103,10 @@ describe("useIntegrationConnectDialog", () => {
       ],
       refetch: vi.fn(),
       isLoading: false,
-    } as ReturnType<typeof useConnectedIntegrations>);
-    vi.mocked(useAvailableIntegrations).mockReturnValue({ data: [] } as ReturnType<typeof useAvailableIntegrations>);
+    } as unknown as ReturnType<typeof useConnectedIntegrations>);
+    vi.mocked(useAvailableIntegrations).mockReturnValue({
+      data: [],
+    } as unknown as ReturnType<typeof useAvailableIntegrations>);
     vi.mocked(useCreateIntegration).mockReturnValue({
       mutateAsync: vi.fn(),
     } as unknown as ReturnType<typeof useCreateIntegration>);
