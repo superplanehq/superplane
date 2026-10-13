@@ -278,7 +278,7 @@ func TestDescribeFactoryVelocity_InProgressStampStaysPending(t *testing.T) {
 	now := time.Now()
 	sync, err := models.ClaimFactoryVelocitySync(db, factoryModel.ID, now)
 	require.NoError(t, err)
-	sync.RulesGeneration = -1
+	sync.SyncState = models.FactoryVelocitySyncStateBackfilling
 	require.NoError(t, sync.RecordProgress(db, "example/repo", now.Add(-2*24*time.Hour), now.Add(-time.Hour)))
 
 	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{

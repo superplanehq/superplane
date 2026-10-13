@@ -8,6 +8,16 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	FactoryVelocitySyncStateIdle = 0
+	// Backfilling continues older history before BackfilledFrom.
+	FactoryVelocitySyncStateBackfilling = -1
+	// CatchUp reads newer merges after the older history is saved.
+	FactoryVelocitySyncStateCatchUp = -2
+	// CatchingUp continues a newer-window read before BackfilledFrom.
+	FactoryVelocitySyncStateCatchingUp = -3
+)
+
 // FactoryVelocitySync records how far a workspace's repository sync has
 // reached. Repository is the repository the stored pull requests belong to, so
 // a workspace that changes its app repository restarts the backfill.
@@ -16,12 +26,11 @@ type FactoryVelocitySync struct {
 	Repository     string
 	SyncedAt       *time.Time
 	BackfilledFrom *time.Time
-	// RulesGeneration records which classification rules produced the stored
-	// merges. The sync worker bumps it after a full rebuild.
-	RulesGeneration int
-	Error           string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	// SyncState records which batch read must continue.
+	SyncState int
+	Error     string
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // FactoryVelocitySyncTarget is a workspace the sync worker must visit, together
@@ -37,7 +46,7 @@ type FactoryVelocitySyncTarget struct {
 	SyncedRepository string
 	SyncedAt         *time.Time
 	BackfilledFrom   *time.Time
-	RulesGeneration  int
+	SyncState        int
 }
 
 func (FactoryVelocitySync) TableName() string {
@@ -54,13 +63,13 @@ func (s *FactoryVelocitySync) CoversRepository(repository string) bool {
 // still hold the time the newest pages were read. That stamp is not a
 // finished sync.
 func (s *FactoryVelocitySync) SyncInProgress() bool {
-	return s != nil && s.RulesGeneration < 0
+	return s != nil && s.SyncState != FactoryVelocitySyncStateIdle
 }
 
 // RecordProgress saves a short slice without marking the sync finished.
 // newestReadAt is when the newest pages were read. A zero time clears the
 // stamp. A later slice keeps the earlier stamp so the finishing read can
-// include merges made after the first slice. A negative rules generation
+// include merges made after the first slice. An active sync state
 // stays unfinished even when the stamp is set.
 func (s *FactoryVelocitySync) RecordProgress(tx *gorm.DB, repository string, backfilledFrom, newestReadAt time.Time) error {
 	now := time.Now()
@@ -82,12 +91,12 @@ func (s *FactoryVelocitySync) RecordProgress(tx *gorm.DB, repository string, bac
 	return tx.Model(s).
 		Where("factory_id = ?", s.FactoryID).
 		Updates(map[string]any{
-			"repository":       s.Repository,
-			"synced_at":        syncedAt,
-			"backfilled_from":  s.BackfilledFrom,
-			"rules_generation": s.RulesGeneration,
-			"error":            "",
-			"updated_at":       now,
+			"repository":      s.Repository,
+			"synced_at":       syncedAt,
+			"backfilled_from": s.BackfilledFrom,
+			"sync_state":      s.SyncState,
+			"error":           "",
+			"updated_at":      now,
 		}).Error
 }
 
@@ -103,12 +112,12 @@ func (s *FactoryVelocitySync) RecordSuccess(tx *gorm.DB, repository string, sync
 	return tx.Model(s).
 		Where("factory_id = ?", s.FactoryID).
 		Updates(map[string]any{
-			"repository":       s.Repository,
-			"synced_at":        s.SyncedAt,
-			"backfilled_from":  s.BackfilledFrom,
-			"rules_generation": s.RulesGeneration,
-			"error":            "",
-			"updated_at":       now,
+			"repository":      s.Repository,
+			"synced_at":       s.SyncedAt,
+			"backfilled_from": s.BackfilledFrom,
+			"sync_state":      s.SyncState,
+			"error":           "",
+			"updated_at":      now,
 		}).Error
 }
 
@@ -209,7 +218,7 @@ const factoryVelocitySyncTargetColumns = `
 	COALESCE(s.repository, '') AS synced_repository,
 	s.synced_at,
 	s.backfilled_from,
-	COALESCE(s.rules_generation, 0) AS rules_generation`
+	COALESCE(s.sync_state, 0) AS sync_state`
 
 // ClaimFactoryVelocitySync takes ownership of a workspace's sync for the length
 // of the lease, and returns nil when another worker holds it.
@@ -250,5 +259,5 @@ const claimFactoryVelocitySyncSQL = `
 UPDATE factory_velocity_syncs
 SET updated_at = ?
 WHERE factory_id = ? AND updated_at < ?
-RETURNING factory_id, repository, synced_at, backfilled_from, rules_generation, error, created_at, updated_at
+RETURNING factory_id, repository, synced_at, backfilled_from, sync_state, error, created_at, updated_at
 `

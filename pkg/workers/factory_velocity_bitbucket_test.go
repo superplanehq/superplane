@@ -119,7 +119,7 @@ func TestFactoryVelocitySync_ShortBitbucketReadDoesNotFinish(t *testing.T) {
 	assert.WithinDuration(t, now, *stored.SyncedAt, time.Second)
 	require.NotNil(t, stored.BackfilledFrom)
 	assert.WithinDuration(t, cursor, *stored.BackfilledFrom, time.Second)
-	assert.Equal(t, bitbucketVelocityRulesRebuilding, stored.RulesGeneration)
+	assert.Equal(t, models.FactoryVelocitySyncStateBackfilling, stored.SyncState)
 	assert.Equal(t, target.Repository, stored.Repository)
 
 	later := now.Add(time.Minute)
@@ -169,7 +169,7 @@ func TestFactoryVelocitySync_FinishedOlderSliceWaitsForTheNewerWindow(t *testing
 	))
 
 	rebuilding := target
-	rebuilding.RulesGeneration = bitbucketVelocityRulesRebuilding
+	rebuilding.SyncState = models.FactoryVelocitySyncStateBackfilling
 	rebuilding.BackfilledFrom = &cursor
 	require.NoError(t, worker.storeMerges(
 		rebuilding,
@@ -184,14 +184,14 @@ func TestFactoryVelocitySync_FinishedOlderSliceWaitsForTheNewerWindow(t *testing
 
 	stored, err := models.FindFactoryVelocitySync(db, factory.ID)
 	require.NoError(t, err)
-	assert.Equal(t, bitbucketVelocityRulesCatchUp, stored.RulesGeneration)
+	assert.Equal(t, models.FactoryVelocitySyncStateCatchUp, stored.SyncState)
 	require.NotNil(t, stored.SyncedAt)
 	assert.WithinDuration(t, now.Add(-time.Hour), *stored.SyncedAt, time.Second,
 		"finishing the older slice must not stamp the sync as fresh")
 	assert.True(t, stored.SyncInProgress())
 
 	caught := target
-	caught.RulesGeneration = bitbucketVelocityRulesCatchUp
+	caught.SyncState = models.FactoryVelocitySyncStateCatchUp
 	caught.SyncedAt = stored.SyncedAt
 	caught.BackfilledFrom = stored.BackfilledFrom
 	recent := repositoryMerge{
@@ -214,7 +214,7 @@ func TestFactoryVelocitySync_FinishedOlderSliceWaitsForTheNewerWindow(t *testing
 
 	stored, err = models.FindFactoryVelocitySync(db, factory.ID)
 	require.NoError(t, err)
-	assert.Equal(t, bitbucketVelocityRulesGeneration, stored.RulesGeneration)
+	assert.Equal(t, models.FactoryVelocitySyncStateIdle, stored.SyncState)
 	assert.False(t, stored.SyncInProgress())
 	require.NotNil(t, stored.SyncedAt)
 	assert.WithinDuration(t, now, *stored.SyncedAt, time.Second)
@@ -261,7 +261,7 @@ func TestFactoryVelocitySync_ShortCatchUpContinuesWithoutRereadingOlderHistory(t
 		mergedAt:   now.Add(-20 * 24 * time.Hour),
 	}
 	rebuilding := target
-	rebuilding.RulesGeneration = bitbucketVelocityRulesRebuilding
+	rebuilding.SyncState = models.FactoryVelocitySyncStateBackfilling
 	rebuilding.BackfilledFrom = &firstSlice
 	require.NoError(t, worker.storeMerges(
 		rebuilding,
@@ -275,7 +275,7 @@ func TestFactoryVelocitySync_ShortCatchUpContinuesWithoutRereadingOlderHistory(t
 	))
 
 	caught := target
-	caught.RulesGeneration = bitbucketVelocityRulesCatchUp
+	caught.SyncState = models.FactoryVelocitySyncStateCatchUp
 	caught.SyncedAt = sync.SyncedAt
 	caught.BackfilledFrom = sync.BackfilledFrom
 	cursor := now.Add(-24 * time.Hour)
@@ -299,7 +299,7 @@ func TestFactoryVelocitySync_ShortCatchUpContinuesWithoutRereadingOlderHistory(t
 
 	stored, err := models.FindFactoryVelocitySync(db, factory.ID)
 	require.NoError(t, err)
-	assert.Equal(t, bitbucketVelocityRulesCatchingUp, stored.RulesGeneration)
+	assert.Equal(t, models.FactoryVelocitySyncStateCatchingUp, stored.SyncState)
 	require.NotNil(t, stored.BackfilledFrom)
 	assert.WithinDuration(t, cursor, *stored.BackfilledFrom, time.Second)
 	require.NotNil(t, stored.SyncedAt)
@@ -322,7 +322,7 @@ func TestFactoryVelocitySync_ShortRecomputeKeepsTheOriginalWindowStart(t *testin
 	sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, now)
 	require.NoError(t, err)
 	require.NoError(t, sync.RecordSuccess(db, "acme/app", now.Add(-time.Hour), history))
-	sync.RulesGeneration = bitbucketVelocityRulesGeneration
+	sync.SyncState = models.FactoryVelocitySyncStateIdle
 	target := models.FactoryVelocitySyncTarget{
 		OrganizationID:   r.Organization.ID,
 		FactoryID:        factory.ID,
@@ -331,7 +331,7 @@ func TestFactoryVelocitySync_ShortRecomputeKeepsTheOriginalWindowStart(t *testin
 		SyncedRepository: "acme/app",
 		SyncedAt:         sync.SyncedAt,
 		BackfilledFrom:   sync.BackfilledFrom,
-		RulesGeneration:  bitbucketVelocityRulesGeneration,
+		SyncState:        models.FactoryVelocitySyncStateIdle,
 	}
 	windowStart := now.Add(-velocitySyncRecomputeWindow)
 	cursor := now.Add(-5 * 24 * time.Hour)
@@ -357,7 +357,7 @@ func TestFactoryVelocitySync_ShortRecomputeKeepsTheOriginalWindowStart(t *testin
 
 	later := now.Add(24 * time.Hour)
 	resumed := target
-	resumed.RulesGeneration = stored.RulesGeneration
+	resumed.SyncState = stored.SyncState
 	resumed.SyncedAt = stored.SyncedAt
 	resumed.BackfilledFrom = stored.BackfilledFrom
 	from, until := velocitySyncBounds(resumed, later)

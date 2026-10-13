@@ -64,32 +64,6 @@ const (
 	// its merge was first seen.
 	velocitySyncRecomputeWindow = 7 * 24 * time.Hour
 
-	// bitbucketVelocityRulesGeneration bumps when Bitbucket merge
-	// classification changes. A stored generation below this value forces a
-	// history rebuild so older rows are not left under the previous rules.
-	// The rebuild walks backward in bounded reads. It does not require the
-	// whole window in one read.
-	bitbucketVelocityRulesGeneration = 1
-
-	// bitbucketVelocityRulesRebuilding is stored while a bounded rebuild has
-	// saved one slice and must continue with pulls older than BackfilledFrom.
-	// It stays below bitbucketVelocityRulesGeneration so an incremental sync
-	// cannot mark the rebuild done.
-	bitbucketVelocityRulesRebuilding = -1
-
-	// bitbucketVelocityRulesCatchUp is stored after the older history is saved
-	// and before the newer window is read again. The last slice of a rebuild
-	// only reads pulls older than the previous cursor. Marking that slice
-	// finished would hide merges made after the first slice.
-	bitbucketVelocityRulesCatchUp = -2
-
-	// bitbucketVelocityRulesCatchingUp is stored while that newer window has
-	// saved one slice and must continue with pulls older than BackfilledFrom.
-	// The older history is already saved. Switching back to a rebuild would
-	// read it again, then repeat the same window, so a busy repository would
-	// never finish.
-	bitbucketVelocityRulesCatchingUp = -3
-
 	// How far past the merge window commits are read. A commit is dated when it
 	// was written, which can be well before the merge that brought it in.
 	velocitySyncCommitDateSlack = 14 * 24 * time.Hour
@@ -413,7 +387,7 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 	requestedAt time.Time,
 ) error {
 	repositoryChanged := target.SyncedRepository != "" && !sameRepository(target)
-	replaceFrom, replaceTo, backfilledFrom, rulesGeneration := progressAfterVelocityRead(
+	replaceFrom, replaceTo, backfilledFrom, syncState := progressAfterVelocityRead(
 		target, from, until, coverage, now, repositoryChanged, requestedAt,
 	)
 
@@ -437,18 +411,14 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 	}
 
 	newestReadAt := preservedNewestSliceReadAt(sync, now)
-	if rulesGeneration == bitbucketVelocityRulesCatchingUp {
-		// The cursor is BackfilledFrom. SyncedAt keeps the original window
-		// start so a later retry does not move that start forward.
+	if syncState == models.FactoryVelocitySyncStateCatchingUp {
+		// Keep the original window start so a retry cannot move it forward.
 		newestReadAt = bitbucketCatchUpWindowStart(sync, from)
 	}
-	sync.RulesGeneration = rulesGeneration
-	if !coverage.Complete || rulesGeneration == bitbucketVelocityRulesCatchUp {
-		// A short slice, or the last older slice of a rebuild, is not a
-		// finished sync. A rebuild keeps the newest-slice time so the
-		// catch-up can start there. A short newer window keeps its original
-		// start instead. The report stays pending while rules generation is
-		// negative.
+	sync.SyncState = syncState
+	if !coverage.Complete || syncState == models.FactoryVelocitySyncStateCatchUp {
+		// A rebuild keeps the newest-slice time; a catch-up keeps its window
+		// start. Neither is a finished sync until all slices are saved.
 		return sync.RecordProgress(database.Conn(), target.Repository, backfilledFrom, newestReadAt)
 	}
 	return sync.RecordSuccess(database.Conn(), target.Repository, now, backfilledFrom)
@@ -459,10 +429,10 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 // that has no stamp yet, because it started before the stamp existed, leaves
 // it unset so the catch-up uses the recompute window.
 func preservedNewestSliceReadAt(sync *models.FactoryVelocitySync, now time.Time) time.Time {
-	if sync.RulesGeneration < 0 && sync.SyncedAt != nil {
+	if sync.SyncInProgress() && sync.SyncedAt != nil {
 		return *sync.SyncedAt
 	}
-	if sync.RulesGeneration < 0 {
+	if sync.SyncInProgress() {
 		return time.Time{}
 	}
 	return now
@@ -478,7 +448,7 @@ func (w *FactoryVelocitySyncWorker) catchUpBitbucketNewerWindow(
 ) error {
 	now := w.now()
 	caught := target
-	caught.RulesGeneration = bitbucketVelocityRulesCatchUp
+	caught.SyncState = models.FactoryVelocitySyncStateCatchUp
 	caught.SyncedAt = sync.SyncedAt
 	caught.BackfilledFrom = sync.BackfilledFrom
 	if sync.Repository != "" {
@@ -626,13 +596,8 @@ func (w *FactoryVelocitySyncWorker) bitbucketClient(orgID, integrationID uuid.UU
 	return client, nil
 }
 
-// velocitySyncWindow returns the earliest merge date to ask the Git host for.
-// A workspace that already covers the full history window only recomputes
-// recent days. Anything else backfills the full window. A Bitbucket workspace
-// whose stored rules generation is stale also backfills, so a classification
-// change corrects merges older than the recompute window. A rebuild already
-// walking backward still starts at this date; velocitySyncBounds supplies the
-// upper bound of the next slice.
+// velocitySyncWindow backfills incomplete history and recomputes recent days
+// once the stored history is complete. Bounds keep batch reads at their cursor.
 func velocitySyncWindow(target models.FactoryVelocitySyncTarget, now time.Time) time.Time {
 	backfillFrom := velocitySyncBackfillStart(now)
 
@@ -647,20 +612,7 @@ func velocitySyncWindow(target models.FactoryVelocitySyncTarget, now time.Time) 
 	if target.BackfilledFrom == nil || target.BackfilledFrom.After(backfillFrom) {
 		return backfillFrom
 	}
-	if bitbucketRulesNeedRebuild(target) {
-		return backfillFrom
-	}
 	return now.Add(-velocitySyncRecomputeWindow)
-}
-
-// bitbucketRulesNeedRebuild reports that saved Bitbucket merges were
-// classified before the current app filter. The next sync must replace saved
-// history under the new rules, not only the last seven days.
-func bitbucketRulesNeedRebuild(target models.FactoryVelocitySyncTarget) bool {
-	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
-		return false
-	}
-	return target.RulesGeneration < bitbucketVelocityRulesGeneration
 }
 
 // velocitySyncBounds is the merge window to read now. A Bitbucket rebuild that
@@ -694,7 +646,7 @@ func velocityRefreshBounds(target models.FactoryVelocitySyncTarget, now time.Tim
 // bitbucketRebuildUntil is the exclusive upper bound of the next older slice.
 // It is set only while a bounded rebuild is in progress for the current repository.
 func bitbucketRebuildUntil(target models.FactoryVelocitySyncTarget, now time.Time) (time.Time, bool) {
-	if target.RulesGeneration != bitbucketVelocityRulesRebuilding {
+	if target.SyncState != models.FactoryVelocitySyncStateBackfilling {
 		return time.Time{}, false
 	}
 	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
@@ -747,39 +699,22 @@ func progressAfterVelocityRead(
 		replaceTo = until
 	}
 	if !coverage.Complete && effectiveVelocityProvider(target) == models.ProviderBitbucket {
-		generation := bitbucketVelocityRulesRebuilding
+		state := models.FactoryVelocitySyncStateBackfilling
 		if bitbucketShortReadContinuesCatchUp(target, requestedFrom, requestedAt) {
-			generation = bitbucketVelocityRulesCatchingUp
+			state = models.FactoryVelocitySyncStateCatchingUp
 		}
-		return coverage.ContinueBefore, replaceTo, coverage.ContinueBefore, generation
+		return coverage.ContinueBefore, replaceTo, coverage.ContinueBefore, state
 	}
 	if bitbucketContinuationNeedsCatchUp(target, until, coverage) {
 		return requestedFrom,
 			replaceTo,
 			earliestBackfill(target, requestedFrom, repositoryChanged),
-			bitbucketVelocityRulesCatchUp
+			models.FactoryVelocitySyncStateCatchUp
 	}
 	return requestedFrom,
 		replaceTo,
 		backfillAfterVelocityRead(target, requestedFrom, now, repositoryChanged),
-		nextVelocityRulesGeneration(target, requestedFrom, now)
-}
-
-// nextVelocityRulesGeneration records the current Bitbucket rules after a sync
-// that replaced the full history window, or after the newer-window catch-up
-// that follows that replacement. An incremental sync must not mark the rebuild
-// done.
-func nextVelocityRulesGeneration(target models.FactoryVelocitySyncTarget, from, now time.Time) int {
-	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
-		return target.RulesGeneration
-	}
-	if bitbucketCatchUpState(target.RulesGeneration) {
-		return bitbucketVelocityRulesGeneration
-	}
-	if from.After(velocitySyncBackfillStart(now)) {
-		return target.RulesGeneration
-	}
-	return bitbucketVelocityRulesGeneration
+		models.FactoryVelocitySyncStateIdle
 }
 
 // bitbucketContinuationNeedsCatchUp reports that this read finished the older
@@ -792,14 +727,14 @@ func bitbucketContinuationNeedsCatchUp(
 	coverage velocityReadCoverage,
 ) bool {
 	return effectiveVelocityProvider(target) == models.ProviderBitbucket &&
-		target.RulesGeneration == bitbucketVelocityRulesRebuilding &&
+		target.SyncState == models.FactoryVelocitySyncStateBackfilling &&
 		!until.IsZero() &&
 		coverage.Complete
 }
 
 // bitbucketCatchUpState reports a newer-window read that has not finished.
-func bitbucketCatchUpState(generation int) bool {
-	return generation == bitbucketVelocityRulesCatchUp || generation == bitbucketVelocityRulesCatchingUp
+func bitbucketCatchUpState(state int) bool {
+	return state == models.FactoryVelocitySyncStateCatchUp || state == models.FactoryVelocitySyncStateCatchingUp
 }
 
 // bitbucketShortReadContinuesCatchUp reports that a short Bitbucket read must
@@ -826,7 +761,7 @@ func bitbucketShortReadContinuesCatchUp(
 	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
 		return false
 	}
-	if target.RulesGeneration < bitbucketVelocityRulesGeneration || !sameRepository(target) {
+	if target.SyncState != models.FactoryVelocitySyncStateIdle || !sameRepository(target) {
 		return false
 	}
 	if target.SyncedAt == nil || target.BackfilledFrom == nil {
@@ -841,7 +776,7 @@ func bitbucketCatchUpPending(target models.FactoryVelocitySyncTarget) bool {
 	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
 		return false
 	}
-	if !bitbucketCatchUpState(target.RulesGeneration) {
+	if !bitbucketCatchUpState(target.SyncState) {
 		return false
 	}
 	return sameRepository(target)
@@ -855,7 +790,7 @@ func bitbucketCatchUpUntil(target models.FactoryVelocitySyncTarget) (time.Time, 
 	if effectiveVelocityProvider(target) != models.ProviderBitbucket {
 		return time.Time{}, false
 	}
-	if target.RulesGeneration != bitbucketVelocityRulesCatchingUp {
+	if target.SyncState != models.FactoryVelocitySyncStateCatchingUp {
 		return time.Time{}, false
 	}
 	if !sameRepository(target) || target.BackfilledFrom == nil {
@@ -904,7 +839,7 @@ func bitbucketCatchUpFrom(target models.FactoryVelocitySyncTarget, now time.Time
 // newer window. The cursor stays in BackfilledFrom. A later slice keeps the
 // start already saved, so the clock cannot move it forward.
 func bitbucketCatchUpWindowStart(sync *models.FactoryVelocitySync, requestedFrom time.Time) time.Time {
-	if sync.RulesGeneration == bitbucketVelocityRulesCatchingUp && sync.SyncedAt != nil {
+	if sync.SyncState == models.FactoryVelocitySyncStateCatchingUp && sync.SyncedAt != nil {
 		return *sync.SyncedAt
 	}
 	return requestedFrom
@@ -915,7 +850,7 @@ func bitbucketCatchUpWindowStart(sync *models.FactoryVelocitySync, requestedFrom
 // stamp newer than the recompute window is the newest-slice time, not that
 // start, so a retry must not treat it as the window.
 func savedBitbucketCatchUpFrom(target models.FactoryVelocitySyncTarget, now time.Time) (time.Time, bool) {
-	if target.RulesGeneration != bitbucketVelocityRulesCatchingUp || target.SyncedAt == nil {
+	if target.SyncState != models.FactoryVelocitySyncStateCatchingUp || target.SyncedAt == nil {
 		return time.Time{}, false
 	}
 	if target.SyncedAt.After(now.Add(-velocitySyncRecomputeWindow)) {
