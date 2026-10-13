@@ -1,6 +1,7 @@
 import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
 import githubIcon from "@/assets/icons/integrations/github.svg";
+import type { MetadataItem } from "@/ui/metadataList";
 import type { TriggerProps } from "@/ui/trigger";
 import type { BaseNodeMetadata, Comment, Issue } from "./types";
 import { buildGithubSubtitle } from "./utils";
@@ -46,46 +47,56 @@ export const onPRCommentTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const metadata = node.metadata as unknown as BaseNodeMetadata;
-    const configuration = node.configuration as unknown as OnPRCommentConfiguration;
-    const metadataItems = [];
-
-    if (metadata?.repository?.name) {
-      metadataItems.push({
-        icon: "book",
-        label: metadata.repository.name,
-      });
-    }
-
-    if (configuration?.contentFilter) {
-      metadataItems.push({
-        icon: "funnel",
-        label: `Filter: ${configuration.contentFilter}`,
-      });
-    }
-
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: githubIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: prCommentMetadata(node),
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnPRCommentEventData;
-      const prNumber = eventData?.issue?.number || "";
-      const title = eventData?.issue?.title || "PR Comment";
-
-      props.lastEventData = {
-        title: `#${prNumber} - ${title}`,
-        subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, lastEvent.createdAt),
-        receivedAt: new Date(lastEvent.createdAt),
-        state: "triggered",
-        eventId: lastEvent.id,
-      };
+      props.lastEventData = prCommentLastEvent(lastEvent);
     }
 
     return props;
   },
 };
+
+function prCommentMetadata(node: TriggerRendererContext["node"]): MetadataItem[] {
+  const metadata = node.metadata as unknown as BaseNodeMetadata;
+  const configuration = node.configuration as unknown as OnPRCommentConfiguration;
+  const metadataItems: MetadataItem[] = [];
+
+  if (metadata?.repository?.name) {
+    metadataItems.push({
+      icon: "book",
+      label: metadata.repository.name,
+    });
+  }
+
+  if (configuration?.contentFilter) {
+    metadataItems.push({
+      icon: "funnel",
+      label: `Filter: ${configuration.contentFilter}`,
+    });
+  }
+
+  return metadataItems;
+}
+
+function prCommentLastEvent(
+  lastEvent: NonNullable<TriggerRendererContext["lastEvent"]>,
+): NonNullable<TriggerProps["lastEventData"]> {
+  const eventData = lastEvent.data as OnPRCommentEventData;
+  const prNumber = eventData?.issue?.number || "";
+  const title = eventData?.issue?.title || "PR Comment";
+
+  return {
+    title: `#${prNumber} - ${title}`,
+    subtitle: buildGithubSubtitle(`By ${eventData?.comment?.user?.login || "unknown"}`, lastEvent.createdAt),
+    receivedAt: new Date(lastEvent.createdAt),
+    state: "triggered",
+    eventId: lastEvent.id,
+  };
+}
