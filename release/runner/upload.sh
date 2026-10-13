@@ -4,10 +4,9 @@ set -euo pipefail
 IFS=$'\n\t'
 
 if [ "${1-}" = "" ] || [ "${2-}" = "" ]; then
-  echo "Usage: release/runner/upload.sh <release-id> <s3-bucket-uri>"
+  echo "Usage: release/runner/upload.sh <sha-release-id> <s3-bucket-uri>"
   echo ""
-  echo "Examples:"
-  echo "  release/runner/upload.sh v0.0.1 s3://superplanehq-releases"
+  echo "Example:"
   echo "  release/runner/upload.sh sha:<40-character-git-sha> s3://superplanehq-releases"
   exit 1
 fi
@@ -16,17 +15,10 @@ VERSION="$1"
 S3_BUCKET_URI="${2%/}"
 
 git_sha_pattern='^sha:[0-9a-f]{40}$'
-is_git_sha_release=false
-if [[ "${VERSION}" == v* ]]; then
-  if ! node "$(dirname "${BASH_SOURCE[0]}")/../component-release.js" \
-    validate-version "${VERSION}" >/dev/null; then
-    exit 1
-  fi
-elif [[ ! "${VERSION}" =~ ${git_sha_pattern} ]]; then
-  echo "Error: version must be v<semantic-version> or sha:<40-character-lowercase-git-sha>" >&2
+if [[ ! "${VERSION}" =~ ${git_sha_pattern} ]]; then
+  echo "Error: S3 uploads only support SHA development releases" >&2
+  echo "Use sha:<40-character-lowercase-git-sha>. Publish versioned releases on GitHub." >&2
   exit 1
-else
-  is_git_sha_release=true
 fi
 
 if [[ ! "${S3_BUCKET_URI}" =~ ^s3://[^/]+$ ]]; then
@@ -39,7 +31,6 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 OUTPUT_DIR="${RUNNER_RELEASE_OUTPUT_DIR:-${REPO_ROOT}/build/runner/${VERSION}}"
 DESTINATION="${S3_BUCKET_URI}/runner/${VERSION}"
 ARCHIVES=(runner-linux-amd64.tar.gz runner-linux-arm64.tar.gz)
-SBOM=runner.spdx.json
 
 # shellcheck source=../lib/image-build-prerequisites.sh
 source "${REPO_ROOT}/release/lib/image-build-prerequisites.sh"
@@ -150,9 +141,6 @@ upload_artifact() {
 }
 
 required_artifacts=("${ARCHIVES[@]}" checksums.txt)
-if [ "${is_git_sha_release}" = "false" ]; then
-  required_artifacts+=("${SBOM}")
-fi
 for artifact in "${required_artifacts[@]}"; do
   if [ ! -f "${OUTPUT_DIR}/${artifact}" ]; then
     echo "Error: ${OUTPUT_DIR}/${artifact} does not exist." >&2
@@ -171,15 +159,13 @@ echo "* Verifying runner release checksums"
   fi
 )
 
-if [ "${is_git_sha_release}" = "true" ]; then
-  if object_exists "${prefix}checksums.txt"; then
-    echo "Error: immutable runner release ${DESTINATION}/ is already complete" >&2
-    exit 1
-  else
-    status=$?
-    if [ "${status}" -ne 1 ]; then
-      exit "${status}"
-    fi
+if object_exists "${prefix}checksums.txt"; then
+  echo "Error: immutable runner release ${DESTINATION}/ is already complete" >&2
+  exit 1
+else
+  status=$?
+  if [ "${status}" -ne 1 ]; then
+    exit "${status}"
   fi
 fi
 
@@ -187,11 +173,6 @@ for archive in "${ARCHIVES[@]}"; do
   echo "* Uploading ${archive}"
   upload_artifact "${OUTPUT_DIR}/${archive}" "${archive}" "application/gzip"
 done
-
-if [ "${is_git_sha_release}" = "false" ]; then
-  echo "* Uploading ${SBOM}"
-  upload_artifact "${OUTPUT_DIR}/${SBOM}" "${SBOM}" "application/spdx+json"
-fi
 
 echo "* Uploading checksums.txt"
 upload_artifact "${OUTPUT_DIR}/checksums.txt" "checksums.txt" "text/plain"
