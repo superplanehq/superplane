@@ -378,6 +378,73 @@ func Test__SumUsageForWorkOrdersByKind__ReportsNothingForNoOrders(t *testing.T) 
 	assert.Empty(t, sums)
 }
 
+func Test__SummarizeUsageByLocalDay__UsesExactBoundsAcrossDST(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	loc, err := time.LoadLocation("America/New_York")
+	require.NoError(t, err)
+	// 2026-03-08 is the US spring-forward. Local midnight on the 9th is 04:00 UTC,
+	// so 03:30 UTC is still 8 March locally and already 9 March in UTC.
+	mar7 := time.Date(2026, 3, 7, 0, 0, 0, 0, loc)
+	mar8 := time.Date(2026, 3, 8, 0, 0, 0, 0, loc)
+	mar9 := time.Date(2026, 3, 9, 0, 0, 0, 0, loc)
+	mar10 := time.Date(2026, 3, 10, 0, 0, 0, 0, loc)
+	bounds := []time.Time{mar7, mar8, mar9, mar10}
+
+	insertUsageAt(t, factory, models.UsageKindModel, time.Date(2026, 3, 9, 3, 30, 0, 0, time.UTC), 15_000, 5)
+	insertUsageAt(t, factory, models.UsageKindCompute, time.Date(2026, 3, 9, 4, 0, 1, 0, time.UTC), 25_000, 0)
+	insertUsageAt(t, factory, models.UsageKindModel, mar10, 90_000, 9)
+	insertUsageAt(t, factory, models.UsageKindModel, mar7.Add(-time.Second), 80_000, 8)
+
+	days, err := models.SummarizeUsageByLocalDay(db, models.UsageReportFilter{
+		OrganizationID: factory.OrganizationID,
+		FactoryID:      &factory.ID,
+	}, bounds)
+	require.NoError(t, err)
+	require.Len(t, days, 3)
+
+	assert.Equal(t, int64(15_000), days[1].Model.CostMicros, "23:30 local on the short day stays on 8 March")
+	assert.Equal(t, int64(5), days[1].Model.TotalTokens)
+	assert.Zero(t, days[1].Compute.CostMicros)
+	assert.Equal(t, int64(25_000), days[2].Compute.CostMicros, "just after local midnight lands on 9 March")
+	assert.Equal(t, int64(60), days[2].Compute.DurationSeconds)
+	assert.Zero(t, days[0].Total().CostMicros)
+	assert.Zero(t, days[2].Model.CostMicros, "an event at the exclusive end is ignored")
+}
+
+func insertUsageAt(t *testing.T, factory *models.Factory, kind string, at time.Time, micros, tokens int64) {
+	t.Helper()
+	event := models.WorkspaceUsageEvent{
+		ID:               uuid.New(),
+		OrganizationID:   factory.OrganizationID,
+		FactoryID:        &factory.ID,
+		CanvasRunID:      uuid.New(),
+		NodeExecutionID:  uuid.New(),
+		NodeID:           "prompt",
+		Provider:         models.UsageProviderAnthropic,
+		Model:            "claude-sonnet-4-6",
+		UsageKind:        kind,
+		TotalTokens:      tokens,
+		CostMicros:       micros,
+		FundingSource:    models.UsageFundingSourceBYOK,
+		Currency:         "usd",
+		PriceBookVersion: "test",
+		IdempotencyKey:   uuid.NewString(),
+		OccurredAt:       at,
+	}
+	if kind == models.UsageKindCompute {
+		event.Provider = models.UsageProviderRunner
+		event.Model = "e1-large-amd64"
+		event.MachineType = "e1-large-amd64"
+		event.DurationSeconds = 60
+		event.FundingSource = models.UsageFundingSourceHosted
+	}
+	require.NoError(t, database.DB(t.Context()).Create(&event).Error)
+}
+
 func Test__RecordUsage__SameIdempotencyKeyRecordsOnce(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
