@@ -156,6 +156,19 @@ describe("WorkOrderCard source icon", () => {
     expect(icon).toHaveAttribute("aria-label", "Cursor");
   });
 
+  it("keeps the SuperPlane mark for an unknown MCP client", () => {
+    renderCard({
+      ...baseOrder,
+      mcpClient: { id: "superplane-local", name: "OpenCode" },
+    });
+
+    const icon = screen.getByTestId("work-order-card-source-wo-1");
+    expect(icon.tagName).toBe("SPAN");
+    expect(icon.querySelector("img")).toHaveAttribute("src", superplaneMark);
+    expect(icon.querySelector("img")?.className).toContain("dark:invert");
+    expect(icon).toHaveAttribute("aria-label", "OpenCode");
+  });
+
   it("names the creator on a manual source mark", () => {
     renderCard({
       ...baseOrder,

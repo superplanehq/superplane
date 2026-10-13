@@ -95,6 +95,19 @@ describe("workOrderCardSource", () => {
       iconAlt: "Cursor",
     });
   });
+
+  it("keeps the SuperPlane mark for an unknown MCP client", () => {
+    expect(
+      workOrderCardSource({
+        ...baseOrder,
+        mcpClient: { id: "superplane-local", name: "Codex" },
+      }),
+    ).toEqual({
+      name: "Codex",
+      iconSrc: superplaneMark,
+      iconAlt: "SuperPlane",
+    });
+  });
 });
 
 describe("workOrderListSource", () => {
