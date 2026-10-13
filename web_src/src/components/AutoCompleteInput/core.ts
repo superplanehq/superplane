@@ -1074,6 +1074,9 @@ function getIdentifierPrefix(left: string): string {
 
 type DotContext = { baseExpr: string; memberPrefix: string; operator: "." | "?."; isFunctionCall?: boolean };
 
+const DOLLAR_DOT_PATTERN = /(\$.+?)(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/;
+const FUNCTION_DOT_PATTERN = /((?:[a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\))(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/;
+
 function detectDotContext(left: string): DotContext | null {
   if (left.endsWith(" ")) {
     return null;
@@ -1083,39 +1086,40 @@ function detectDotContext(left: string): DotContext | null {
   const expr = tail.trim();
   if (!expr) return null;
 
-  // Match expressions starting with $ (e.g., $["key"].prop)
-  const dollarMatch = expr.match(/(\$.+?)(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
+  const dollarMatch = expr.match(DOLLAR_DOT_PATTERN);
   if (dollarMatch) {
-    let baseExpr = (dollarMatch[1] ?? "").trim();
-    const operator = (dollarMatch[2] === "?." ? "?." : ".") as "." | "?.";
-    const memberPrefix = (dollarMatch[3] ?? "").trim();
-    if (!baseExpr) return null;
-
-    if (baseExpr.includes("$")) {
-      baseExpr = "$" + baseExpr.split("$").at(-1);
-    }
-
-    if (/^\d+(\.\d+)?$/.test(baseExpr)) return null;
-    return { baseExpr, memberPrefix, operator };
+    return matchDollarDotContext(dollarMatch);
   }
 
-  // Match function calls (e.g., now(), date("2024-01-01"), duration("1h"))
-  const funcMatch = expr.match(/((?:[a-zA-Z_][a-zA-Z0-9_]*)\s*\([^)]*\))(\?\.|\.)\s*([$A-Za-z_][$A-Za-z0-9_]*)?$/);
-  if (funcMatch) {
-    let funcName = extractTailExpressionWithParens(funcMatch[1]);
-    funcName = extractSpecialFunctionCall(funcName);
-    const operator = (funcMatch[2] === "?." ? "?." : ".") as "." | "?.";
-    const memberPrefix = (funcMatch[3] ?? "").trim();
-    if (!funcName) return null;
-    return { baseExpr: funcName, memberPrefix, operator, isFunctionCall: true };
+  const functionMatch = expr.match(FUNCTION_DOT_PATTERN);
+  if (functionMatch) {
+    return matchFunctionDotContext(functionMatch);
   }
 
-  const tailCtx = findTailDotContext(expr);
-  if (tailCtx) {
-    return tailCtx;
+  return findTailDotContext(expr);
+}
+
+function matchDollarDotContext(dollarMatch: RegExpMatchArray): DotContext | null {
+  let baseExpr = (dollarMatch[1] ?? "").trim();
+  const operator = (dollarMatch[2] === "?." ? "?." : ".") as "." | "?.";
+  const memberPrefix = (dollarMatch[3] ?? "").trim();
+  if (!baseExpr) return null;
+
+  if (baseExpr.includes("$")) {
+    baseExpr = "$" + baseExpr.split("$").at(-1);
   }
 
-  return null;
+  if (/^\d+(\.\d+)?$/.test(baseExpr)) return null;
+  return { baseExpr, memberPrefix, operator };
+}
+
+function matchFunctionDotContext(funcMatch: RegExpMatchArray): DotContext | null {
+  let funcName = extractTailExpressionWithParens(funcMatch[1]);
+  funcName = extractSpecialFunctionCall(funcName);
+  const operator = (funcMatch[2] === "?." ? "?." : ".") as "." | "?.";
+  const memberPrefix = (funcMatch[3] ?? "").trim();
+  if (!funcName) return null;
+  return { baseExpr: funcName, memberPrefix, operator, isFunctionCall: true };
 }
 
 type BracketKeyContext = { quote: "'" | '"'; partialKey: string };
