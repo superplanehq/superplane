@@ -20,7 +20,7 @@ import { posthog } from "@/posthog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import {
   ArrowRightLeft,
-  Brain,
+  Cpu,
   Bug,
   ChevronRight,
   CreditCard,
@@ -99,7 +99,7 @@ export function MobileMorePage() {
       {headerKicker ? <div className="flex flex-wrap items-center gap-2">{headerKicker}</div> : null}
       <div className={GROUP_CLASS}>
         {showAgent ? (
-          <MoreLink href={factoryAgentPath(organizationId, routeSegment)} icon={<Brain />}>
+          <MoreLink href={factoryAgentPath(organizationId, routeSegment)} icon={<Cpu />}>
             Agent
           </MoreLink>
         ) : null}
