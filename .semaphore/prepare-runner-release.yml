@@ -50,7 +50,8 @@ blocks:
                 --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
                 --output "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum release-manifest.json >release-manifest.sha256)
-              artifact push workflow "$release_dir"
+              bash release/component-release-artifact.sh \
+                push runner "$RELEASE_VERSION" "$release_dir"
 
 promotions:
   - name: Publish Runner Release
