@@ -173,8 +173,8 @@ function SuperPlaneMCPClientsTable({
           <table className="w-full table-fixed text-left" data-testid="superplane-mcp-clients-list">
             <caption className="sr-only">{SUPERPLANE_MCP_SERVER_COPY.clientsTableLabel}</caption>
             <colgroup>
-              <col style={{ width: "7rem" }} />
               <col />
+              <col style={{ width: "9rem" }} />
               <col style={{ width: "8.5rem" }} />
               <col style={{ width: "5.5rem" }} />
             </colgroup>

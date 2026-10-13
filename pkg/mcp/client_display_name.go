@@ -5,20 +5,23 @@ import (
 	"strings"
 )
 
-const CodexClientName = "Codex"
+const (
+	CodexClientName    = "Codex"
+	OpenCodeClientName = "OpenCode"
+)
 
 // ClientDisplayName returns the label shown for an MCP OAuth client.
-// A stored name that is not a Codex metadata URL wins.
-// Codex is used when that stored name is empty or is a Codex metadata URL
-// and the client id is a Codex metadata URL.
+// A stored name that is not a known metadata URL wins.
+// A known client label is used when that stored name is empty or is a
+// metadata URL and the client id is a metadata URL for that client.
 // Otherwise fallback is returned.
 func ClientDisplayName(storedName, clientID, fallback string) string {
 	stored := strings.TrimSpace(storedName)
-	if stored != "" && !isCodexMetadataURL(stored) {
+	if stored != "" && metadataClientName(stored) == "" {
 		return stored
 	}
-	if isCodexMetadataURL(clientID) {
-		return CodexClientName
+	if name := metadataClientName(clientID); name != "" {
+		return name
 	}
 	if stored != "" {
 		return stored
@@ -26,16 +29,21 @@ func ClientDisplayName(storedName, clientID, fallback string) string {
 	return strings.TrimSpace(fallback)
 }
 
-func isCodexMetadataURL(raw string) bool {
+func metadataClientName(raw string) string {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || !strings.EqualFold(parsed.Scheme, "https") {
-		return false
-	}
-	switch strings.ToLower(parsed.Hostname()) {
-	case "chatgpt.com", "www.chatgpt.com":
-	default:
-		return false
+		return ""
 	}
 	path := parsed.Path
-	return path == "/oauth/codex" || strings.HasPrefix(path, "/oauth/codex/")
+	switch strings.ToLower(parsed.Hostname()) {
+	case "chatgpt.com", "www.chatgpt.com":
+		if path == "/oauth/codex" || strings.HasPrefix(path, "/oauth/codex/") {
+			return CodexClientName
+		}
+	case "opencode.ai", "www.opencode.ai":
+		if path == "/oauth/opencode" || strings.HasPrefix(path, "/oauth/opencode/") {
+			return OpenCodeClientName
+		}
+	}
+	return ""
 }
