@@ -200,7 +200,11 @@ function ReviewMetricRow({ metric }: { metric: WorkOrderCheckPresentation }) {
   const { Icon, className } = REVIEW_STATUS_ICON[metric.level];
   return (
     <div className="flex min-w-0 gap-2.5 py-3">
-      <Icon className={cn("mt-0.5 size-4 shrink-0", className)} role="img" aria-label={status.label} />
+      <Icon
+        className={cn("mt-0.5 size-4 shrink-0 dark:[&>:first-child]:stroke-transparent", className)}
+        role="img"
+        aria-label={status.label}
+      />
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-medium text-foreground">{metric.name}</p>
         {metric.summary ? <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{metric.summary}</p> : null}
