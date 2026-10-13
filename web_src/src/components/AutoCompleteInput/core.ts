@@ -1086,21 +1086,20 @@ function detectDotContext(left: string): DotContext | null {
   const expr = tail.trim();
   if (!expr) return null;
 
-  if (DOLLAR_DOT_PATTERN.test(expr)) {
-    return matchDollarDotContext(expr);
+  const dollarMatch = expr.match(DOLLAR_DOT_PATTERN);
+  if (dollarMatch) {
+    return matchDollarDotContext(dollarMatch);
   }
 
-  if (FUNCTION_DOT_PATTERN.test(expr)) {
-    return matchFunctionDotContext(expr);
+  const functionMatch = expr.match(FUNCTION_DOT_PATTERN);
+  if (functionMatch) {
+    return matchFunctionDotContext(functionMatch);
   }
 
   return findTailDotContext(expr);
 }
 
-function matchDollarDotContext(expr: string): DotContext | null {
-  const dollarMatch = expr.match(DOLLAR_DOT_PATTERN);
-  if (!dollarMatch) return null;
-
+function matchDollarDotContext(dollarMatch: RegExpMatchArray): DotContext | null {
   let baseExpr = (dollarMatch[1] ?? "").trim();
   const operator = (dollarMatch[2] === "?." ? "?." : ".") as "." | "?.";
   const memberPrefix = (dollarMatch[3] ?? "").trim();
@@ -1114,10 +1113,7 @@ function matchDollarDotContext(expr: string): DotContext | null {
   return { baseExpr, memberPrefix, operator };
 }
 
-function matchFunctionDotContext(expr: string): DotContext | null {
-  const funcMatch = expr.match(FUNCTION_DOT_PATTERN);
-  if (!funcMatch) return null;
-
+function matchFunctionDotContext(funcMatch: RegExpMatchArray): DotContext | null {
   let funcName = extractTailExpressionWithParens(funcMatch[1]);
   funcName = extractSpecialFunctionCall(funcName);
   const operator = (funcMatch[2] === "?." ? "?." : ".") as "." | "?.";
