@@ -279,7 +279,7 @@ describe("FactoriesHarness workspace setup", () => {
     expect(screen.queryByTestId("first-run-github-continue")).not.toBeInTheDocument();
   }, 15000);
 
-  it("asks the user to connect GitHub when the identity only comes from sign-in", async () => {
+  it("opens repository selection when GitHub is already linked", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
@@ -295,8 +295,8 @@ describe("FactoriesHarness workspace setup", () => {
       within(await screen.findByTestId("first-run-host-github", {}, { timeout: 8000 })).getByRole("button"),
     );
 
-    expect(await screen.findByTestId("first-run-connect-github", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("first-run-choose", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
   }, 15000);
 
   it("skips installation when initial onboarding already has repository access", async () => {
