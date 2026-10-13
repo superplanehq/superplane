@@ -26,7 +26,6 @@ blocks:
   - name: "Publish"
     task:
       secrets:
-        - name: component-release-token
         - name: ghcr-push-token
       epilogue:
         always:
@@ -48,10 +47,9 @@ blocks:
                 --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,checksums.txt,fleet-manager.oci.tar \
                 --manifest "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum --check checksums.txt)
-              test -n "${GITHUB_RELEASE_TOKEN:-}"
+              test -n "${GITHUB_TOKEN:-}"
             - |
               release_dir="build/fleet-manager/$VERSION"
-              export GITHUB_TOKEN="$GITHUB_RELEASE_TOKEN"
               node release/component-release.js stage-github-release \
                 --component fleet-manager \
                 --version "$VERSION" \
@@ -83,7 +81,6 @@ blocks:
                 release_notes_args=(--release-notes "$release_dir/release-notes.md")
               fi
               export FLEET_MANAGER_IMAGE_DIGEST="$(cat /tmp/fleet-manager-image-digest)"
-              export GITHUB_TOKEN="$GITHUB_RELEASE_TOKEN"
               node release/component-release.js publish-github-release \
                 --release-id "$(cat /tmp/github-release-id)" \
                 --component fleet-manager \

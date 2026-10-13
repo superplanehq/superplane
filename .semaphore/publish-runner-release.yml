@@ -22,8 +22,6 @@ global_job_config:
 blocks:
   - name: "Publish"
     task:
-      secrets:
-        - name: component-release-token
       jobs:
         - name: "Publish immutable Runner release"
           commands:
@@ -40,10 +38,9 @@ blocks:
                 --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
                 --manifest "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum --check checksums.txt)
-              test -n "${GITHUB_RELEASE_TOKEN:-}"
+              test -n "${GITHUB_TOKEN:-}"
             - |
               release_dir="build/runner/$VERSION"
-              export GITHUB_TOKEN="$GITHUB_RELEASE_TOKEN"
               node release/component-release.js stage-github-release \
                 --component runner \
                 --version "$VERSION" \
@@ -57,7 +54,6 @@ blocks:
               if [ -f "$release_dir/release-notes.md" ]; then
                 release_notes_args=(--release-notes "$release_dir/release-notes.md")
               fi
-              export GITHUB_TOKEN="$GITHUB_RELEASE_TOKEN"
               node release/component-release.js publish-github-release \
                 --release-id "$(cat /tmp/github-release-id)" \
                 --component runner \
