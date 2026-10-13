@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
 import { cn } from "@/lib/utils";
 
-import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
+import { factoryAgentSkillEditorPath } from "../../lib/factoryPagePaths";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsCard } from "./FactorySettingsCard";
 import { skillDisplayTitle } from "./skillFrontmatter";
@@ -26,10 +26,7 @@ export function WorkspaceSkillsSection({
   const navigate = useNavigate();
   const skills = useFactoryAgentResources(organizationId, factoryId, "KIND_SKILL");
 
-  const editorPath = (resourceId?: string) => {
-    const base = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "skills");
-    return resourceId ? `${base}/${resourceId}` : `${base}/new`;
-  };
+  const editorPath = (resourceId?: string) => factoryAgentSkillEditorPath(organizationId, factoryKey, resourceId);
 
   const addSkillAction = (
     <PermissionTooltip allowed={canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission}>

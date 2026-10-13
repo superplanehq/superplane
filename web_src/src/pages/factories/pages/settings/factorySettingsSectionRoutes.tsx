@@ -2,12 +2,7 @@ import { Navigate, Route } from "react-router";
 
 import { RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { RequireExperimentalFeature } from "@/components/RequireExperimentalFeature";
-import {
-  FEATURE_ORGANIZATION_BYOK,
-  FEATURE_SUPERPLANE_MCP_SERVER,
-  FEATURE_WORKSPACE_MCP,
-  FEATURE_WORKSPACE_SKILLS,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_ORGANIZATION_BYOK, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
 import {
   FactorySettingsAccountNotificationsPage,
   FactorySettingsAccountProfilePage,
@@ -15,9 +10,7 @@ import {
   FactorySettingsGeneralPage,
   FactorySettingsConnectPage,
   FactorySettingsMCPPage,
-  FactorySettingsMCPConnectionPage,
   FactorySettingsSkillsPage,
-  FactorySettingsSkillEditorPage,
   FactorySettingsRepositoryPage,
   OrganizationSettingsOverviewPage,
 } from "@/pages/factories";
@@ -41,7 +34,9 @@ import {
   AccountLinkedAccountsRedirect,
   LegacyFactorySettingsRedirect,
   OrganizationUsageRedirect,
+  WorkspaceAgentMcpConnectionRedirect,
   WorkspaceAgentSettingsRedirect,
+  WorkspaceAgentSkillRedirect,
   WorkspaceAutomationsSettingsRedirect,
   WorkspaceSpendingRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
@@ -101,13 +96,7 @@ export const factorySettingsSectionRoutes = [
   <Route
     key="factory-settings-workspace-mcp-connection"
     path="workspace/mcp/:resourceId"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_MCP}>
-          <FactorySettingsMCPConnectionPage />
-        </RequireExperimentalFeature>
-      </RequirePermission>
-    }
+    element={<WorkspaceAgentMcpConnectionRedirect />}
   />,
   <Route
     key="factory-settings-workspace-mcp-legacy"
@@ -138,24 +127,12 @@ export const factorySettingsSectionRoutes = [
   <Route
     key="factory-settings-workspace-skills-new"
     path="workspace/skills/new"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_SKILLS}>
-          <FactorySettingsSkillEditorPage />
-        </RequireExperimentalFeature>
-      </RequirePermission>
-    }
+    element={<WorkspaceAgentSkillRedirect />}
   />,
   <Route
     key="factory-settings-workspace-skills-edit"
     path="workspace/skills/:resourceId"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_SKILLS}>
-          <FactorySettingsSkillEditorPage />
-        </RequireExperimentalFeature>
-      </RequirePermission>
-    }
+    element={<WorkspaceAgentSkillRedirect />}
   />,
   <Route
     key="factory-settings-workspace-skills-legacy"

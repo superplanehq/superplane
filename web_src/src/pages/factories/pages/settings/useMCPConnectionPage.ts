@@ -11,12 +11,12 @@ import {
   useUpdateFactoryAgentResource,
 } from "@/hooks/useFactoryAgentResources";
 import { useCreateSecret } from "@/hooks/useSecrets";
+import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { factoryAgentPath, factoryRouteSegment } from "../../lib/factoryPagePaths";
 import type { AgentResourceConnectionDraft } from "./AgentResourceConnectionDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { catalogEntryForResource, type MCPCatalogEntry } from "./mcpCatalog";
 import { mcpConnectionDisplayName } from "./mcpConnectionDisplay";
-import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import {
   confirmMCPDelete,
   disconnectMCPResource,
@@ -41,7 +41,7 @@ function useMCPMutations(organizationId: string, factoryId: string) {
 
 export function useMCPConnectionPage() {
   const { resourceId = "" } = useParams<{ resourceId: string }>();
-  const { organizationId, factoryId, factory } = useFactorySettingsLayout();
+  const { organizationId, factoryId, factory } = useFactoriesLayout();
   const factoryKey = factoryRouteSegment(factory);
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canUpdate = canAct("factories", "update") && !permissionsLoading;

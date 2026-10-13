@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
-import { FEATURE_FACTORIES, FEATURE_WORKSPACE_AGENT } from "./lib/experimentalFeatures";
+import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
@@ -23,6 +23,7 @@ import { ThemeProvider } from "./contexts/ThemeProvider";
 import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequirePermission } from "./components/PermissionGate";
+import { agentSectionRoute } from "./pages/factories/pages/settings/agentSectionRoutes";
 import { isFactoryAppConfigureMode } from "./pages/factories/lib/factoryAppCanvasCopy";
 import { Login } from "./pages/auth/Login";
 import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
@@ -38,7 +39,6 @@ import {
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
-  FactorySettingsAgentPage,
   FactorySettingsLayout,
   LegacyFactoryAppRedirect,
   LegacyFactoryAppSplitRunRedirect,
@@ -166,16 +166,7 @@ function organizationScopedRouteTree() {
             <Route path="missions" element={<MissionsPage />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="velocity" element={<VelocityPage />} />
-            <Route
-              path="agent"
-              element={
-                <RequirePermission resource="factories" action="update">
-                  <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_AGENT}>
-                    <FactorySettingsAgentPage />
-                  </RequireExperimentalFeature>
-                </RequirePermission>
-              }
-            />
+            {agentSectionRoute}
             <Route path="more" element={<FactoryMoreRouteSwitch />} />
             <Route path="tasks">
               <Route index element={<WorkOrdersPage />} />

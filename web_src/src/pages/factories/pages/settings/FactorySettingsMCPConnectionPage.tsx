@@ -21,7 +21,7 @@ import { useMCPConnectionPage } from "./useMCPConnectionPage";
 import { useMCPDisabledTools } from "./useMCPDisabledTools";
 export function FactorySettingsMCPConnectionPage() {
   const page = useMCPConnectionPage();
-  usePageTitle([page.displayName, AGENT_RESOURCES_COPY.agentTitle, "Settings", page.factory.name ?? "Workspace"]);
+  usePageTitle([page.displayName, AGENT_RESOURCES_COPY.agentTitle, page.factory?.name ?? "Workspace"]);
 
   const backProps = {
     backHref: page.listPath,

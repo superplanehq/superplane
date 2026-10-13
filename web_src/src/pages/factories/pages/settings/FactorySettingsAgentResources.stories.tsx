@@ -52,5 +52,5 @@ export const GitHubSkill: Story = {
 };
 
 export const EditorNew: Story = {
-  render: () => skillsHarness(`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/skills/new`, [INLINE_SKILL]),
+  render: () => skillsHarness(`${agentPath}/skills/new`, [INLINE_SKILL]),
 };
