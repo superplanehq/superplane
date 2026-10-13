@@ -19,7 +19,7 @@ import { showErrorToast, showInfoToast, showSuccessToast } from "@/lib/toast";
 
 import type { AgentResourceConnectionDraft } from "./AgentResourceConnectionDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
-import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
+import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import {
   catalogEntryForResource,
   catalogEntryIsConnected,
@@ -63,7 +63,7 @@ function useMCPMutations(organizationId: string, factoryId: string) {
 }
 
 export function useMCPPage() {
-  const { organizationId, factoryId, factory } = useFactorySettingsLayout();
+  const { organizationId, factoryId, factory } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canUpdate = canAct("factories", "update") && !permissionsLoading;
   const { has } = useExperimentalFeature(organizationId);
