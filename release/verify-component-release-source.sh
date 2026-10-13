@@ -45,7 +45,7 @@ if [ -n "${worktree_changes}" ]; then
   exit 1
 fi
 
-git -C "${REPO_ROOT}" fetch --quiet origin main
+git -C "${REPO_ROOT}" fetch --quiet --tags origin main
 if ! git -C "${REPO_ROOT}" merge-base --is-ancestor \
   "${SEMAPHORE_GIT_SHA}" origin/main; then
   echo "Error: ${SEMAPHORE_GIT_SHA} is no longer reachable from origin/main" >&2

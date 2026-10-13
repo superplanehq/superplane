@@ -28,33 +28,15 @@ Add these values to both targets:
 Give the GitHub App `Metadata: read` and `Contents: write` permissions only.
 Install it only on `superplanehq/superplane`.
 
-Add `RUNNER_RELEASE_AWS_ROLE_ARN` to `runner-releases`. This value is the ARN of
-the role that trusts Semaphore OIDC.
+The Fleet Manager publish pipeline uses the existing `ghcr-push-token` project
+secret. The secret provides `GHCR_PUSH_TOKEN`. Do not add GHCR credentials to
+the `fleet-manager-releases` deployment target. Remove `GHCR_USERNAME` and
+`GHCR_TOKEN` from that target if they are present.
 
-Add `GHCR_USERNAME` and `GHCR_TOKEN` to `fleet-manager-releases`. Limit this
-token to `write:packages`. Do not grant `delete:packages`. Limit package access
-to `fleet-manager`.
-
-## AWS configuration
-
-Create an AWS OIDC provider for `https://superplanehq.semaphoreci.com`. Use the
-same URL as the audience. Create the Runner release role with these templates:
-
-- [OIDC trust policy](runner/aws/oidc-trust-policy.json)
-- [role policy](runner/aws/role-policy.json)
-
-Replace `<AWS_ACCOUNT_ID>` before you apply the trust policy. Do not add list,
-delete, ACL, or bucket administration permissions.
-
-Merge the statements in
-[bucket-policy-statements.json](runner/aws/bucket-policy-statements.json) into
-the existing `superplanehq-releases` bucket policy. Keep the existing public
-`s3:GetObject` access. Do not add public `s3:ListBucket` access.
-
-Enable bucket versioning. Configure an AWS CloudTrail data event selector for
-write events on `arn:aws:s3:::superplanehq-releases/runner/`. Send the trail to
-the central audit log destination. Confirm that the destination has retention
-and access controls that meet the organization policy.
+Runner version releases publish only to GitHub Releases. SHA development
+artifacts can continue to use their existing storage path. Do not add AWS
+credentials to the `runner-releases` deployment target. Remove
+`RUNNER_RELEASE_AWS_ROLE_ARN` from that target if it is present.
 
 ## GitHub configuration
 
@@ -66,8 +48,15 @@ Before the first component release:
 3. Give bypass access only to the release GitHub App.
 4. Enable immutable releases for the repository.
 
-The application release script creates a draft, uploads all assets, and then
+The component release script creates a draft, uploads all assets, and then
 publishes the release. This order is compatible with immutable releases.
+
+Stable releases include notes that `git-cliff` generates from `cliff.toml`.
+The preparation pipeline limits the notes to the selected component and stores
+their checksum in the release manifest. Release candidates do not include
+generated notes. A stable component release becomes the latest release for the
+repository. A release candidate does not become the latest release. GitHub has
+one latest release for the repository, not one latest release per component.
 
 ## First release
 
@@ -79,7 +68,7 @@ Confirm the following results:
 
 - The component tag points to the selected source SHA.
 - GitHub marks the release as immutable.
-- Runner objects and GitHub Runner assets have identical checksums.
+- GitHub contains all Runner assets from the preparation manifest.
 - The Fleet Manager tag resolves to the digest in the GitHub release body.
 - The Fleet Manager image contains `linux/amd64` and `linux/arm64` images.
 

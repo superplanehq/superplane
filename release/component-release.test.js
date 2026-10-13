@@ -11,6 +11,7 @@ const {
   componentTag,
   createManifest,
   parseVersion,
+  publishGitHubRelease,
   stageGitHubRelease,
   verifyManifest,
 } = require("./component-release");
@@ -67,6 +68,10 @@ test("manifest verification rejects altered assets", () => {
   );
   fs.writeFileSync(path.join(directory, "runner-linux-amd64.tar.gz"), "amd64");
   fs.writeFileSync(path.join(directory, "checksums.txt"), "checksums");
+  fs.writeFileSync(
+    path.join(directory, "release-notes.md"),
+    "## runner/v1.2.3\n",
+  );
 
   const manifest = createManifest({
     component: "runner",
@@ -114,6 +119,67 @@ test("manifest verification rejects altered assets", () => {
         assetNames: ["runner-linux-amd64.tar.gz"],
       }),
     /filenames/,
+  );
+});
+
+test("manifest binds stable notes and excludes them from prereleases", () => {
+  const stableDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "stable-release-notes-"),
+  );
+  fs.writeFileSync(path.join(stableDirectory, "checksums.txt"), "checksums");
+  fs.writeFileSync(
+    path.join(stableDirectory, "release-notes.md"),
+    "## runner/v1.2.3\n",
+  );
+  const manifest = createManifest({
+    component: "runner",
+    version: "v1.2.3",
+    sha: "a".repeat(40),
+    workflowID: "workflow-1",
+    pipelineID: "pipeline-1",
+    directory: stableDirectory,
+    assetNames: ["checksums.txt"],
+  });
+  fs.writeFileSync(
+    path.join(stableDirectory, "release-notes.md"),
+    "altered notes\n",
+  );
+  assert.throws(
+    () =>
+      verifyManifest(manifest, {
+        component: "runner",
+        version: "v1.2.3",
+        sha: "a".repeat(40),
+        workflowID: "workflow-1",
+        directory: stableDirectory,
+        assetNames: ["checksums.txt"],
+      }),
+    /release notes checksum/,
+  );
+
+  const prereleaseDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "prerelease-notes-"),
+  );
+  fs.writeFileSync(
+    path.join(prereleaseDirectory, "checksums.txt"),
+    "checksums",
+  );
+  fs.writeFileSync(
+    path.join(prereleaseDirectory, "release-notes.md"),
+    "notes must not exist\n",
+  );
+  assert.throws(
+    () =>
+      createManifest({
+        component: "runner",
+        version: "v1.2.3-rc.1",
+        sha: "a".repeat(40),
+        workflowID: "workflow-1",
+        pipelineID: "pipeline-1",
+        directory: prereleaseDirectory,
+        assetNames: ["checksums.txt"],
+      }),
+    /release candidates must not include/,
   );
 });
 
@@ -202,4 +268,101 @@ test("draft resumption follows pagination and rejects collisions", async () => {
   } finally {
     server.close();
   }
+});
+
+test("stable releases include cliff notes and become latest", async () => {
+  let payload;
+  const server = http.createServer((request, response) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => {
+      payload = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ id: 42 }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+
+  try {
+    await publishGitHubRelease({
+      apiURL: `http://127.0.0.1:${address.port}`,
+      repository: "superplanehq/superplane",
+      token: "test-token",
+      releaseID: "42",
+      component: "runner",
+      version: "v1.2.3",
+      sha: "a".repeat(40),
+      releaseNotes: "## Runner changes\n\n- Add a release workflow.",
+    });
+  } finally {
+    server.close();
+  }
+
+  assert.deepEqual(payload, {
+    draft: false,
+    prerelease: false,
+    make_latest: "true",
+    body: `${"Source commit: "}${"a".repeat(40)}\n\n## Runner changes\n\n- Add a release workflow.`,
+  });
+});
+
+test("release candidates omit cliff notes and do not become latest", async () => {
+  let payload;
+  const server = http.createServer((request, response) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => {
+      payload = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ id: 43 }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+
+  try {
+    await publishGitHubRelease({
+      apiURL: `http://127.0.0.1:${address.port}`,
+      repository: "superplanehq/superplane",
+      token: "test-token",
+      releaseID: "43",
+      component: "runner",
+      version: "v1.2.3-rc.1",
+      sha: "b".repeat(40),
+    });
+  } finally {
+    server.close();
+  }
+
+  assert.deepEqual(payload, {
+    draft: false,
+    prerelease: true,
+    make_latest: "false",
+    body: `${"Source commit: "}${"b".repeat(40)}`,
+  });
+});
+
+test("release notes match the release type", async () => {
+  const common = {
+    apiURL: "http://127.0.0.1:1",
+    repository: "superplanehq/superplane",
+    token: "test-token",
+    releaseID: "42",
+    component: "runner",
+    sha: "a".repeat(40),
+  };
+
+  await assert.rejects(
+    publishGitHubRelease({ ...common, version: "v1.2.3" }),
+    /stable releases require git-cliff release notes/,
+  );
+  await assert.rejects(
+    publishGitHubRelease({
+      ...common,
+      version: "v1.2.3-rc.1",
+      releaseNotes: "These notes must not be published.",
+    }),
+    /release candidates must not include git-cliff release notes/,
+  );
 });
