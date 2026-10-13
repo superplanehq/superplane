@@ -74,6 +74,6 @@ export function useSplitRunLiveCanvas(
     canvas,
     stream,
     rootEventId: runQuery.data?.run?.rootEvent?.id,
-    ...(agentQueue ? { agentQueue } : {}),
+    agentQueue,
   };
 }
