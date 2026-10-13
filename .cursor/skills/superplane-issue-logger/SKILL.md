@@ -7,7 +7,7 @@ description: When researching, classifying, drafting, or logging general SuperPl
 
 Use this skill when a user describes an improvement, bug, or request in natural language. You will: (1) research and understand it in SuperPlane context, (2) classify issue type, (3) propose title and body in `tmp/pm_logger`, and (4) optionally create the issue on GitHub with correct labels.
 
-Reference: [docs/contributing/](docs/contributing/) (issue-tracking, quality, pull-requests, etc.), [https://docs.superplane.com/](https://docs.superplane.com/) when relevant.
+Reference: [docs/contributing/](../../../docs/contributing/) (issue-tracking, quality, pull-requests, etc.), [https://docs.superplane.com/](https://docs.superplane.com/) when relevant.
 
 ---
 
@@ -33,7 +33,7 @@ Map the user's description to exactly one of:
 - **Bug vs papercut**: If it breaks a flow or blocks usage → **bug**. If it's annoying or inconsistent but workable → **papercut**.
 - **Enhancement vs feature**: Improves something that already exists → **enhancement**. Adds net-new capability → **feature**.
 
-Align with [issue-tracking](docs/contributing/issue-tracking.md) (Bugs, Papercuts, Enhancements views on the SuperPlane Board).
+Align with [issue-tracking](../../../docs/contributing/issue-tracking.md) (Bugs, Papercuts, Enhancements views on the SuperPlane Board).
 
 ---
 
