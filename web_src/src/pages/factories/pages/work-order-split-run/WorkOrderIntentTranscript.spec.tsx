@@ -43,6 +43,12 @@ function expectAvatarBeforeGivenName(container: HTMLElement, avatarName: string,
   expect(avatar.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 }
 
+function expectAvatarBeforeAnswer(pick: HTMLElement, avatarName: string, answer: string) {
+  const avatar = within(pick).getByRole("img", { name: avatarName });
+  const answerText = within(pick).getByText(answer);
+  expect(avatar.compareDocumentPosition(answerText) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+}
+
 describe("WorkOrderIntentTranscript", () => {
   beforeEach(() => {
     vi.stubGlobal("ResizeObserver", MockResizeObserver);
@@ -118,17 +124,24 @@ describe("WorkOrderIntentTranscript", () => {
     ]);
 
     const answer = screen.getByTestId("split-run-intent-survey-answer");
-    expect(answer).toHaveTextContent(CREATE_WITH_AGENT_COPY.answeredBy);
-    expect(answer).toHaveTextContent("Ada");
-    expectAvatarBeforeGivenName(answer, "Ada Lovelace", "Ada");
+    expect(within(answer).queryByText("Answered by")).not.toBeInTheDocument();
+    expect(within(answer).queryByText("Ada")).not.toBeInTheDocument();
     expect(answer).toHaveTextContent("What should the agent build?");
     expect(answer).toHaveTextContent("Custom styled modal");
     expect(answer).toHaveTextContent("How is the work done?");
     expect(answer).toHaveTextContent("Reviewer approves by taste");
     const picks = within(answer).getAllByTestId("split-run-intent-survey-pick");
-    expect(picks.map((pick) => pick.textContent)).toEqual(["Custom styled modal", "Reviewer approves by taste"]);
+    expect(within(picks[0]).queryByText("What should the agent build?")).not.toBeInTheDocument();
+    expect(within(picks[1]).queryByText("How is the work done?")).not.toBeInTheDocument();
+    expectAvatarBeforeAnswer(picks[0], "Ada Lovelace", "Custom styled modal");
+    expectAvatarBeforeAnswer(picks[1], "Ada Lovelace", "Reviewer approves by taste");
+    expect(
+      within(answer).getByText("What should the agent build?").compareDocumentPosition(picks[0]) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     for (const pick of picks) {
       expect(pick).toHaveClass("sp-chat-outgoing");
+      expect(pick.querySelector("[title='Ada Lovelace']")).not.toBeNull();
     }
     expect(answer).toHaveClass("items-end");
     expect(answer.parentElement).toHaveClass("justify-end", "pt-2.5", "pb-2.5");
@@ -193,8 +206,66 @@ describe("WorkOrderIntentTranscript", () => {
 
     const notes = screen.getAllByTestId("split-run-intent-user-note");
     expect(notes[0]).toHaveTextContent("Ada");
-    expect(screen.getByTestId("split-run-intent-survey-answer")).not.toHaveTextContent("Ada");
+    const survey = screen.getByTestId("split-run-intent-survey-answer");
+    expect(within(survey).queryByText("Ada")).not.toBeInTheDocument();
+    expect(within(survey).queryByText("Answered by")).not.toBeInTheDocument();
+    expectAvatarBeforeAnswer(within(survey).getByTestId("split-run-intent-survey-pick"), "Ada Lovelace", "One file");
     expect(notes[1]).toHaveTextContent("Ada");
+  });
+
+  it("shows a survey pick without an avatar when the sender cannot be resolved", () => {
+    renderTranscript([
+      {
+        id: "user-1",
+        kind: "text",
+        role: "user",
+        origin: "survey",
+        userId: "user-missing",
+        text: "What should the agent build? Custom styled modal",
+      },
+    ]);
+
+    const pick = screen.getByTestId("split-run-intent-survey-pick");
+    expect(pick).toHaveTextContent("Custom styled modal");
+    expect(within(pick).queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.queryByText("Answered by")).not.toBeInTheDocument();
+  });
+
+  it("shows the sender avatar in a survey answer that is plain text", () => {
+    renderTranscript([
+      {
+        id: "user-1",
+        kind: "text",
+        role: "user",
+        origin: "survey",
+        userId: "user-ada",
+        text: "Add separate lists per animal.",
+      },
+    ]);
+
+    expectAvatarBeforeAnswer(
+      screen.getByTestId("split-run-intent-survey-pick"),
+      "Ada Lovelace",
+      "Add separate lists per animal.",
+    );
+  });
+
+  it("does not show an avatar on a skipped survey answer", () => {
+    renderTranscript([
+      {
+        id: "user-1",
+        kind: "text",
+        role: "user",
+        origin: "survey",
+        userId: "user-ada",
+        text: "What should the agent build? Custom styled modal\nHow is the work done? skipped",
+      },
+    ]);
+
+    const answer = screen.getByTestId("split-run-intent-survey-answer");
+    const skipped = within(answer).getByText(CREATE_WITH_AGENT_COPY.surveyAnswerSkipped);
+    expect(within(skipped).queryByRole("img")).not.toBeInTheDocument();
+    expect(within(answer).getByTestId("split-run-intent-survey-pick")).toHaveTextContent("Custom styled modal");
   });
 
   it("omits the sender header when the message has no user id", () => {
