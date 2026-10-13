@@ -58,7 +58,7 @@ OIDC_KEYS_CONTAINER_PATH="/app/oidc-keys"
 
 mkdir -p "${OIDC_KEYS_HOST_PATH}"
 
-if [[ -z "$(find "${OIDC_KEYS_HOST_PATH}" -maxdepth 1 -type f -print -quit)" ]]; then
+if [[ -z "$(find -L "${OIDC_KEYS_HOST_PATH}" -maxdepth 1 -type f -print -quit)" ]]; then
   if ! command -v openssl >/dev/null 2>&1; then
     echo "openssl is required to generate OIDC keys."
     exit 1
@@ -173,7 +173,7 @@ docker compose -f "${SCRIPT_DIR}/docker-compose.yml" run --rm --no-deps --user r
     set -euo pipefail
     umask 077
     if [[ -z "$(find /app/oidc-keys -maxdepth 1 -type f -print -quit)" ]]; then
-      find /app/oidc-import -maxdepth 1 -type f -exec cp {} /app/oidc-keys/ \;
+      find -L /app/oidc-import -maxdepth 1 -type f -exec cp -L {} /app/oidc-keys/ \;
     fi
     chown -R nobody:nogroup /app/oidc-keys
     chmod 700 /app/oidc-keys
