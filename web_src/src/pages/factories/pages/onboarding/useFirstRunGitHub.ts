@@ -58,8 +58,8 @@ function useRepositoryErrorToast(error: unknown, reportErrors: boolean) {
 }
 
 /**
- * GitHub access for this person in this workspace. A GitHub identity is ready
- * only after the person connects GitHub here.
+ * GitHub access for this person. A linked identity is ready only after the
+ * person connects GitHub. That connection is reused for later workspaces.
  */
 export function useFirstRunGitHub(args: {
   organizationId: string;
@@ -72,7 +72,7 @@ export function useFirstRunGitHub(args: {
   useRepositoryErrorToast(connection.onboarding.error, !setupFinished);
   const { account } = useAccount();
   const accountId = account?.id ?? "";
-  const githubConnected = useOnboardingGitHubConnect({ accountId, factoryId, connectedBefore });
+  const githubConnect = useOnboardingGitHubConnect({ accountId, factoryId, connectedBefore });
   const installScope = { accountId, factoryId };
   const checkingGitHub = useGitHubInstallReturn(
     installScope,
@@ -82,8 +82,9 @@ export function useFirstRunGitHub(args: {
   return {
     connection,
     githubReady: connection.accountConnectionRequired
-      ? Boolean(connection.identity) && githubConnected
+      ? Boolean(connection.identity) && githubConnect.connected
       : connection.appConfigured,
+    githubReturned: githubConnect.returned,
     installScope,
     checkingGitHub,
   };
