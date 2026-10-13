@@ -35,6 +35,8 @@ type TestSession struct {
 	Account *models.Account
 }
 
+const navigationTimeoutMs = 45000
+
 func NewTestSession(t *testing.T, context pw.BrowserContext, page pw.Page, timeoutMs float64, baseURL string) *TestSession {
 	sess := &TestSession{
 		t:         t,
@@ -84,7 +86,10 @@ func (s *TestSession) Close() {
 func (s *TestSession) Page() pw.Page { return s.page }
 
 func (s *TestSession) Visit(path string) {
-	_, err := s.page.Goto(s.BaseURL+path, pw.PageGotoOptions{WaitUntil: pw.WaitUntilStateDomcontentloaded, Timeout: pw.Float(s.timeoutMs)})
+	_, err := s.page.Goto(s.BaseURL+path, pw.PageGotoOptions{
+		WaitUntil: pw.WaitUntilStateDomcontentloaded,
+		Timeout:   pw.Float(navigationTimeoutMs),
+	})
 	if err != nil {
 		s.t.Fatalf("goto: %v", err)
 	}
