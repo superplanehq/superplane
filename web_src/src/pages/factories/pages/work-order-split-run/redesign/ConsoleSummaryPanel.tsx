@@ -12,7 +12,7 @@ import type { FactoriesFactoryPullRequest, FactoriesWorkOrderArtifact } from "@/
 import { CONFIDENCE_CHECK_KEY, CONFIDENCE_CHECK_NAME, isScoreCheckName } from "../../../lib/confidenceScore";
 import { consoleCheckList, isMergeConfidenceMetric } from "../../../lib/mergeConfidenceScore";
 import { isPlanningReviewMetric } from "../../../lib/planningReviewScore";
-import { workOrderCardPullRequestIsMergeable } from "../../../lib/workOrderCardPullRequest";
+import { workOrderCardPullRequestShowsMergeable } from "../../../lib/workOrderCardPullRequest";
 import { splitRunDecisionTone } from "../splitRunFooter";
 import { attentionToneClassName } from "../splitRunNoteActionStyle";
 import { toArtifactDataRecord } from "../../../lib/workOrderArtifact";
@@ -106,7 +106,11 @@ export function ConsoleSummaryPanel({
               {panel.panelPullRequests.length === 1 ? "Pull request" : "Pull requests"}
             </span>
             {panel.panelPullRequests.map((pullRequest, index) => (
-              <PanelPullRequest key={pullRequest.id ?? pullRequest.url ?? index} pullRequest={pullRequest} />
+              <PanelPullRequest
+                key={pullRequest.id ?? pullRequest.url ?? index}
+                pullRequest={pullRequest}
+                checks={fixture.checks}
+              />
             ))}
           </FramePanel>
         ) : null}
@@ -365,7 +369,13 @@ function PanelSource({ source, ownerId }: { source?: SplitRunSource; ownerId?: s
  * One pull request, first-class: the title links to the provider, the
  * chips below carry state and mergeability, as on the board card.
  */
-function PanelPullRequest({ pullRequest }: { pullRequest: FactoriesFactoryPullRequest }) {
+function PanelPullRequest({
+  pullRequest,
+  checks,
+}: {
+  pullRequest: FactoriesFactoryPullRequest;
+  checks: SplitRunFixture["checks"];
+}) {
   const href = safeExternalUrl(pullRequest.url);
   const title = pullRequest.title?.trim() || pullRequestLabel(pullRequest);
   return (
@@ -384,7 +394,7 @@ function PanelPullRequest({ pullRequest }: { pullRequest: FactoriesFactoryPullRe
       )}
       <div className="flex flex-wrap items-center gap-1.5">
         <WorkOrderPullRequestChip pullRequest={pullRequest} />
-        {workOrderCardPullRequestIsMergeable(pullRequest) ? <WorkOrderMergeableChip /> : null}
+        {workOrderCardPullRequestShowsMergeable(pullRequest, checks) ? <WorkOrderMergeableChip /> : null}
       </div>
     </div>
   );

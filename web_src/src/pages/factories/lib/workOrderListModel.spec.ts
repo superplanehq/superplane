@@ -1,14 +1,5 @@
 import { describe, expect, it } from "bun:test";
 
-import type {
-  FactoriesFactory,
-  FactoriesFactoryPullRequest,
-  FactoriesLineRef,
-  FactoriesWorkOrder,
-  FactoriesWorkOrderExecution,
-  FactoriesWorkOrderLineDispatch,
-} from "@/api-client";
-
 import {
   EMPTY_WORK_ORDER_FILTERS,
   MANUAL_FILTER_VALUE,
@@ -26,67 +17,11 @@ import {
   visibleWorkOrderFilters,
   WORK_ORDER_SCOPES,
 } from "./workOrderListModel";
-import { isActiveWorkOrderExecution } from "./workOrderExecutions";
-
-const factory: FactoriesFactory = { id: "f", name: "Refunds", key: "RF" };
-
-/** Fixture-only shape: a step execution plus which line it ran on, before
- * it's grouped into a dispatch by `order()` below. */
-type TestExecution = FactoriesWorkOrderExecution & { line?: FactoriesLineRef };
-
-interface OrderOverrides extends Omit<Partial<FactoriesWorkOrder>, "lineDispatches"> {
-  /** Convenience: a flat execution list, grouped into one dispatch per
-   * distinct line so most test cases don't need to hand-build dispatches. */
-  executions?: TestExecution[];
-}
-
-function order(overrides: OrderOverrides = {}): FactoriesWorkOrder {
-  const { executions, ...rest } = overrides;
-  return {
-    id: overrides.id ?? "wo-1",
-    title: "Order title",
-    state: "STATE_OPEN",
-    result: "RESULT_UNSPECIFIED",
-    createdAt: "2024-06-01T00:00:00Z",
-    updatedAt: "2024-06-02T00:00:00Z",
-    lineDispatches: executions ? dispatchesFromExecutions(executions) : [],
-    ...rest,
-  };
-}
-
-function pullRequest(
-  workOrderId: string,
-  overrides: Partial<FactoriesFactoryPullRequest> = {},
-): FactoriesFactoryPullRequest {
-  return {
-    id: `pr-${workOrderId}`,
-    workOrderId,
-    number: "12",
-    url: `https://github.com/acme/payments/pull/12`,
-    title: "Ship refund retries",
-    state: "STATE_OPEN",
-    ...overrides,
-  };
-}
-
-function dispatchesFromExecutions(executions: TestExecution[]): FactoriesWorkOrderLineDispatch[] {
-  const byLineId = new Map<string, FactoriesWorkOrderLineDispatch>();
-  for (const { line, ...execution } of executions) {
-    const lineId = line?.id ?? "unknown";
-    const dispatch = byLineId.get(lineId);
-    if (dispatch) {
-      dispatch.stepExecutions = [...(dispatch.stepExecutions ?? []), execution];
-      continue;
-    }
-    byLineId.set(lineId, {
-      id: `dispatch-${lineId}`,
-      line,
-      state: isActiveWorkOrderExecution(execution) ? "STATE_ACTIVE" : "STATE_FINISHED",
-      stepExecutions: [execution],
-    });
-  }
-  return [...byLineId.values()];
-}
+import {
+  workOrderListFactory as factory,
+  workOrderListOrder as order,
+  workOrderListPullRequest as pullRequest,
+} from "./workOrderListModel.spec.fixtures";
 
 describe("buildWorkOrderListEntry", () => {
   it("derives the display key, status, and searchable haystack", () => {
@@ -478,6 +413,43 @@ describe("scope + filter + search + ordering", () => {
     expect(
       countWorkOrderFilters(visibleWorkOrderFilters({ ...EMPTY_WORK_ORDER_FILTERS, labels: ["mergeable"] }, true)),
     ).toBe(1);
+  });
+
+  it("Mergeable filter drops a card when a merge confidence check is critical", () => {
+    const withScores = buildWorkOrderListEntries(
+      [
+        order({
+          id: "critical-risk",
+          pullRequests: [pullRequest("critical-risk", { mergeable: true })],
+          checkScores: [{ key: "risk-review", name: "Blast radius", score: 4, maxScore: 5 }],
+        }),
+        order({
+          id: "caution",
+          pullRequests: [pullRequest("caution", { mergeable: true })],
+          checkScores: [
+            { key: "risk-review", name: "Blast radius", score: 3, maxScore: 5 },
+            { key: "security-review", name: "Security", score: 3, maxScore: 5 },
+            { key: "planning-review", name: "Planning", score: 1, maxScore: 5 },
+          ],
+        }),
+        order({
+          id: "unscored",
+          pullRequests: [pullRequest("unscored", { mergeable: true })],
+          checkScores: [{ key: "drift-review", name: "Drift" }],
+        }),
+      ],
+      factory,
+    );
+
+    expect(
+      applyWorkOrderFilters(
+        withScores,
+        { ...EMPTY_WORK_ORDER_FILTERS, labels: ["mergeable"] },
+        {
+          showPullRequestMerge: true,
+        },
+      ).map((entry) => entry.id),
+    ).toEqual(["caution", "unscored"]);
   });
 
   it("search matches on title, description, line, and assignee names", () => {
