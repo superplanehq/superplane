@@ -105,6 +105,12 @@ describe("AppCanvasNodeFieldRenderer", () => {
   it("shows only matching nodes for the selected app", async () => {
     render(<ControlledRenderer allValues={{ app: "canvas_target" }} />);
 
+    expect(mockUseCanvas).toHaveBeenCalledWith(
+      "org-1",
+      "canvas_target",
+      expect.objectContaining({ staleTime: Number.POSITIVE_INFINITY }),
+    );
+
     await userEvent.click(screen.getByRole("combobox"));
     expect(screen.getByText("On Run")).toBeInTheDocument();
     expect(screen.queryByText("On Broadcast")).not.toBeInTheDocument();

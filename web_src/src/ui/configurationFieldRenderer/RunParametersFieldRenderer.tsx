@@ -63,6 +63,9 @@ export function RunParametersFieldRenderer({
     error,
   } = useCanvas(organizationId, appId ?? "", {
     enabled: Boolean(appId),
+    // Keep this in sync with the node picker: the cached canvas can include
+    // uncommitted edits that are not present in the live API response yet.
+    staleTime: Number.POSITIVE_INFINITY,
   });
 
   const targetNode = useMemo(() => findTargetNode(canvas?.spec?.nodes, nodeId), [canvas?.spec?.nodes, nodeId]);
