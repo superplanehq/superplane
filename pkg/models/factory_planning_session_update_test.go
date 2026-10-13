@@ -52,6 +52,37 @@ func TestFactoryPlanningSession_ProposeUpdateWritesScoresSpecAndSurvey(t *testin
 	assert.Equal(t, "Which service?", session.CurrentSurvey().Questions[0].Prompt)
 }
 
+func TestFactoryPlanningSession_ProposeUpdateWritesScoresAndSpecWhenWorkspaceIsHidden(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	org, userID, factoryModel := setupFactoryWithUser(t, "plan-update-hidden-workspace")
+	db := database.DB(t.Context())
+	require.NoError(t, factoryModel.UpdatePlanning(db, FactoryPlanning{Enabled: true, Confidence: true}))
+	canvas := createAnalysisCanvas(t, org.ID, factoryModel.ID, userID)
+	order, session := mustAnalysisOrder(t, db, factoryModel, canvas.ID, userID, nil)
+	require.NoError(t, factoryModel.SoftDelete(db))
+
+	err := session.ProposeUpdate(db, PlanningSessionUpdate{
+		Scores: reviewScores(3, 2, 1),
+		Spec:   "# Retry refunds\n\nStop double charges.\n",
+	})
+	require.NoError(t, err)
+
+	checks, err := order.ListChecks(db)
+	require.NoError(t, err)
+	require.Len(t, checks, 3)
+	byKey := map[string]FactoryWorkOrderCheck{}
+	for _, check := range checks {
+		byKey[check.Key] = check
+	}
+	assert.Equal(t, 3.0, byKey[PlanningClarityCheckKey].Score)
+	assert.Equal(t, 2.0, byKey[PlanningComplexityCheckKey].Score)
+	assert.Equal(t, 1.0, byKey[PlanningVerifiabilityCheckKey].Score)
+
+	spec, err := planningSpecBody(db, order)
+	require.NoError(t, err)
+	assert.Contains(t, spec, "Stop double charges.")
+}
+
 func TestFactoryPlanningSession_ProposeUpdateStoresJSONEncodedSpecAsMarkdown(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	org, userID, factoryModel := setupFactoryWithUser(t, "plan-update-encoded-spec")
