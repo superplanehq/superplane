@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_WORKSPACE_AGENT,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
+} from "@/lib/experimentalFeatures";
 import { OAUTH_CONNECTED_RESOURCE, OAUTH_NOT_CONNECTED_RESOURCE } from "../../__fixtures__/agentResourceFixtures";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
@@ -19,8 +23,8 @@ import {
 } from "./agentResourceCopy";
 import type { FactoriesFixture } from "../../__fixtures__/factoryPageResponses";
 
-const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
-const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
+const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
 
 function emptyAgentResourcesFixture(): FactoriesFixture {
   return {
@@ -49,7 +53,7 @@ describe("FactorySettingsMCPPage catalog", () => {
       <FactoriesHarness
         pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -71,7 +75,7 @@ describe("FactorySettingsMCPPage catalog", () => {
       <FactoriesHarness
         pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -95,7 +99,7 @@ describe("FactorySettingsMCPPage catalog", () => {
       <FactoriesHarness
         pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -128,7 +132,7 @@ describe("FactorySettingsMCPPage catalog", () => {
       <FactoriesHarness
         pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -163,7 +167,7 @@ describe("FactorySettingsMCPPage catalog", () => {
       <FactoriesHarness
         pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -190,7 +194,7 @@ describe("FactorySettingsMCPPage catalog", () => {
       <FactoriesHarness
         pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -217,7 +221,7 @@ describe("FactorySettingsMCPPage catalog", () => {
       <FactoriesHarness
         pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={emptyAgentResourcesFixture()}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -255,7 +259,7 @@ describe("FactorySettingsMCPPage catalog", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [datadogResource] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -272,7 +276,7 @@ describe("FactorySettingsMCPPage catalog", () => {
       <FactoriesHarness
         pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -294,7 +298,7 @@ describe("FactorySettingsMCPPage catalog", () => {
       <FactoriesHarness
         pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={emptyAgentResourcesFixture()}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -315,7 +319,7 @@ describe("FactorySettingsMCPPage catalog", () => {
       <FactoriesHarness
         pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={emptyAgentResourcesFixture()}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -338,7 +342,7 @@ describe("FactorySettingsMCPPage catalog", () => {
       <FactoriesHarness
         pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={emptyAgentResourcesFixture()}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -357,7 +361,7 @@ describe("FactorySettingsMCPPage catalog", () => {
       <FactoriesHarness
         pathSuffix={`${agentPath}?dialog=add`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -388,7 +392,7 @@ describe("FactorySettingsMCPPage catalog", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [sentryResource] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -418,7 +422,7 @@ describe("FactorySettingsMCPPage catalog", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [sentryResource] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 

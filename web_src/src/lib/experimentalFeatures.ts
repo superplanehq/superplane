@@ -16,6 +16,9 @@ export const FEATURE_FACTORY_DATADOG_INTAKE = "factory_datadog_intake";
 /** Organization experimental feature: Bitbucket as a workspace Git host. */
 export const FEATURE_FACTORY_BITBUCKET = "factory_bitbucket";
 
+/** Organization experimental feature: SuperPlane Agent page. */
+export const FEATURE_WORKSPACE_AGENT = "workspace_agent";
+
 /** Organization experimental feature: workspace MCP servers. */
 export const FEATURE_WORKSPACE_MCP = "workspace_mcp";
 

@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAccount } from "@/contexts/useAccount";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useTheme } from "@/contexts/useTheme";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_WORKSPACE_AGENT } from "@/lib/experimentalFeatures";
 import { useFactoryIntakes } from "@/hooks/useFactoryIntakeData";
 import { useFactoryPRFeedbackHandlers } from "@/hooks/useFactoryPRFeedbackData";
 import { useFactoryAutomations } from "@/hooks/useFactoryData";
@@ -15,14 +18,25 @@ import { isThemePreference } from "@/lib/themePreference";
 import type { FeedbackCategory } from "@/lib/submitFeedback";
 import { posthog } from "@/posthog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { ArrowRightLeft, Bug, ChevronRight, CreditCard, LogOut, MessageSquare, Settings, Shield } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Brain,
+  Bug,
+  ChevronRight,
+  CreditCard,
+  LogOut,
+  MessageSquare,
+  Settings,
+  Shield,
+} from "lucide-react";
 import type { FactoriesFactoryLine } from "@/api-client";
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
-import { initialsForName } from "../layout/factoriesRail";
+import { initialsForName, isWorkspaceAgentNavVisible } from "../layout/factoriesRail";
 import {
+  factoryAgentPath,
   factorySettingsPath,
   factorySettingsSectionPath,
   firstFactoryLineId,
@@ -56,6 +70,13 @@ const GROUP_CLASS = "overflow-hidden rounded-lg border border-border bg-card div
 export function MobileMorePage() {
   const { organizationId, routeSegment, factory } = useFactoriesLayout();
   const { account } = useAccount();
+  const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { has } = useExperimentalFeature(organizationId);
+  const showAgent = isWorkspaceAgentNavVisible({
+    permissionsLoading,
+    canUpdateFactories: canAct("factories", "update"),
+    workspaceAgentEnabled: has(FEATURE_WORKSPACE_AGENT),
+  });
   const { data: organization } = useOrganization(organizationId);
   const { preference, setPreference } = useTheme();
   const appearanceId = useId();
@@ -77,6 +98,11 @@ export function MobileMorePage() {
       />
       {headerKicker ? <div className="flex flex-wrap items-center gap-2">{headerKicker}</div> : null}
       <div className={GROUP_CLASS}>
+        {showAgent ? (
+          <MoreLink href={factoryAgentPath(organizationId, routeSegment)} icon={<Brain />}>
+            Agent
+          </MoreLink>
+        ) : null}
         <MoreLink href={factorySettingsPath(organizationId, routeSegment)} icon={<Settings />}>
           Settings
         </MoreLink>

@@ -1,9 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   FEATURE_SUPERPLANE_MCP_SERVER,
+  FEATURE_WORKSPACE_AGENT,
   FEATURE_WORKSPACE_MCP,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
+import { cn } from "@/lib/utils";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
@@ -17,7 +19,10 @@ import {
   PRIMARY_FACTORY_KEY,
   type FactoriesFixture,
 } from "../../__fixtures__/factoryPageResponses";
+import { factorySettingsNarrowSectionBodyClassName } from "../factoryPageLayoutStyles";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
+import { CrossRepoContextCard } from "./WorkspaceCrossRepoSection";
+import { WorkspaceSetupStepsSection } from "./WorkspaceSetupStepsSection";
 
 const meta = {
   title: "Factories/Pages/Settings/Agent",
@@ -29,9 +34,14 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 
-const agentExperimentalFeatures = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS, FEATURE_SUPERPLANE_MCP_SERVER];
+const agentExperimentalFeatures = [
+  FEATURE_WORKSPACE_AGENT,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
+  FEATURE_SUPERPLANE_MCP_SERVER,
+];
 
 function agentHarness(fixture: FactoriesFixture) {
   return (
@@ -62,6 +72,34 @@ export const Configured: Story = {
         [PRIMARY_FACTORY_ID]: [...CONFIGURED_MCP_RESOURCES, ...CONFIGURED_SKILLS],
       },
     }),
+};
+
+/** Bash commands in the setup-steps field. The Agent page starts empty. */
+export const SetupSteps: Story = {
+  render: () => (
+    <div className="min-h-screen bg-sidebar dark:bg-background">
+      <div className={cn(factorySettingsNarrowSectionBodyClassName, "pt-14")}>
+        <WorkspaceSetupStepsSection canUpdate commands={"npm ci\ngo mod download"} />
+      </div>
+    </div>
+  ),
+};
+
+/** Extra repositories in the cross-repo list. The Agent page starts empty. */
+export const CrossRepoContext: Story = {
+  render: () => (
+    <div className="min-h-screen bg-sidebar dark:bg-background">
+      <div className={cn(factorySettingsNarrowSectionBodyClassName, "pt-14")}>
+        <CrossRepoContextCard
+          canUpdate
+          host="github"
+          connected
+          catalog={["superplanehq/suss", "superplanehq/runner", "superplanehq/superplane"]}
+          initial={["superplanehq/suss", "superplanehq/runner"]}
+        />
+      </div>
+    </div>
+  ),
 };
 
 /** Outbound MCP list request fails. */
