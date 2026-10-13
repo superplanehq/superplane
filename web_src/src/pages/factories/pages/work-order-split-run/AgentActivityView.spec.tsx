@@ -26,11 +26,35 @@ describe("AgentActivityView", () => {
     expect(screen.getByText("Inspecting the retry path.")).toBeInTheDocument();
   });
 
+  it.each([
+    { durationMs: 8_000, label: "Thought briefly" },
+    { durationMs: 45_000, label: "Thought for 45 seconds" },
+  ])("keeps $label expanded until the active turn ends", ({ durationMs, label }) => {
+    const item = {
+      type: "content" as const,
+      id: "reasoning-1",
+      kind: "reasoning" as const,
+      text: "Inspecting the retry path.",
+      status: "running" as const,
+      truncated: false,
+    };
+    const { rerender } = render(<AgentActivityView live activity={activityWith(item)} />);
+    expect(screen.getByText(item.text)).toBeInTheDocument();
+
+    const completed = { ...item, status: "passed" as const, durationMs };
+    rerender(<AgentActivityView live activity={activityWith(completed)} />);
+    expect(screen.getByRole("button", { name: label })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(item.text)).toBeInTheDocument();
+
+    rerender(<AgentActivityView activity={activityWith(completed)} />);
+    expect(screen.getByRole("button", { name: label })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(item.text)).not.toBeInTheDocument();
+  });
+
   it("collapses completed reasoning behind a thought summary", async () => {
     const user = userEvent.setup();
     render(
       <AgentActivityView
-        live
         activity={activityWith({
           type: "content",
           id: "reasoning-1",
