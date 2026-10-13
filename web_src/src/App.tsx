@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
-import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
+import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
@@ -38,6 +38,7 @@ import {
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
+  FactorySettingsAgentPage,
   FactorySettingsLayout,
   LegacyFactoryAppRedirect,
   LegacyFactoryAppSplitRunRedirect,
@@ -165,6 +166,16 @@ function organizationScopedRouteTree() {
             <Route path="missions" element={<MissionsPage />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="velocity" element={<VelocityPage />} />
+            <Route
+              path="agent"
+              element={
+                <RequirePermission resource="factories" action="update">
+                  <RequireExperimentalFeature anyOf={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}>
+                    <FactorySettingsAgentPage />
+                  </RequireExperimentalFeature>
+                </RequirePermission>
+              }
+            />
             <Route path="more" element={<FactoryMoreRouteSwitch />} />
             <Route path="tasks">
               <Route index element={<WorkOrdersPage />} />

@@ -22,7 +22,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 
 function skillsHarness(pathSuffix: string, resources: (typeof INLINE_SKILL)[]) {
   return (

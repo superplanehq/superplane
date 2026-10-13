@@ -19,7 +19,7 @@ import {
 } from "./agentResourceCopy";
 import type { FactoriesFixture } from "../../__fixtures__/factoryPageResponses";
 
-const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
 
 function emptyAgentResourcesFixture(): FactoriesFixture {

@@ -50,7 +50,7 @@ export function factoryHomePath(organizationId: string, factoryKey: string, line
   return factoryDetailPath(organizationId, factoryKey);
 }
 
-const WORKSPACE_PAGES_TO_KEEP = ["/more", "/settings", "/velocity", "/overview", "/missions", "/wiki"];
+const WORKSPACE_PAGES_TO_KEEP = ["/more", "/settings", "/velocity", "/agent", "/overview", "/missions", "/wiki"];
 const WORKSPACE_LIST_PAGES_TO_KEEP = ["/work-orders", "/automations"];
 
 function workspacePageToKeep(pathnameRest: string): boolean {
@@ -61,9 +61,9 @@ function workspacePageToKeep(pathnameRest: string): boolean {
 }
 
 /**
- * Path after a workspace switch. Keeps settings, Velocity, and other pages
- * that exist in every workspace. A line board, task, or app URL opens the
- * new workspace home — those identifiers belong to one workspace.
+ * Path after a workspace switch. Keeps settings, Agent, Velocity, and other
+ * pages that exist in every workspace. A line board, task, or app URL opens
+ * the new workspace home — those identifiers belong to one workspace.
  */
 export function pathAfterWorkspaceSwitch({
   pathname,
@@ -641,6 +641,10 @@ export function factoryWikiPath(organizationId: string, factoryKey: string) {
 
 export function factoryVelocityPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/velocity`;
+}
+
+export function factoryAgentPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/agent`;
 }
 
 export function factoryMorePath(organizationId: string, factoryKey: string, lineId?: string) {

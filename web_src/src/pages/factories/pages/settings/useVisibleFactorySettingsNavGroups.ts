@@ -1,17 +1,9 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
-import {
-  FEATURE_ORGANIZATION_BYOK,
-  FEATURE_SUPERPLANE_MCP_SERVER,
-  FEATURE_WORKSPACE_MCP,
-  FEATURE_WORKSPACE_SKILLS,
-} from "@/lib/experimentalFeatures";
+import { FEATURE_ORGANIZATION_BYOK, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
 
 import { type FactorySettingsNavGroup, filterFactorySettingsNavGroupsByPermission } from "./settingsNavItems";
 import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
-
-/** Nav item id for Agent settings (MCP servers and skills). */
-const WORKSPACE_AGENT_NAV_ITEM_ID = "workspace-agent";
 
 /** Nav item id for the SuperPlane MCP Server (inbound MCP clients). */
 const WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID = "workspace-superplane-mcp-server";
@@ -29,9 +21,6 @@ function visibleFactorySettingsNavGroups(
   hasExperimentalFeature: (featureId: string) => boolean,
 ): FactorySettingsNavGroup[] {
   const hiddenNavItemIds = new Set<string>();
-  if (!hasExperimentalFeature(FEATURE_WORKSPACE_MCP) && !hasExperimentalFeature(FEATURE_WORKSPACE_SKILLS)) {
-    hiddenNavItemIds.add(WORKSPACE_AGENT_NAV_ITEM_ID);
-  }
   if (!hasExperimentalFeature(FEATURE_SUPERPLANE_MCP_SERVER)) {
     hiddenNavItemIds.add(WORKSPACE_SUPERPLANE_MCP_SERVER_NAV_ITEM_ID);
   }

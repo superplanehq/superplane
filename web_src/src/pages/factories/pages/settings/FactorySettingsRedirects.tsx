@@ -2,6 +2,7 @@ import { useAccount } from "@/contexts/useAccount";
 import { useFactories } from "@/hooks/useFactoryData";
 import {
   automationsPath,
+  factoryAgentPath,
   factoryRouteSegment,
   factorySettingsSectionPath,
   factorySettingsWorkspaceGeneralPath,
@@ -112,6 +113,18 @@ export function WorkspaceAutomationsSettingsRedirect() {
   }
 
   return <Navigate to={`${automationsPath(organizationId, factoryKey)}${location.search}`} replace />;
+}
+
+/** Old `/settings/workspace/agent` URLs. Send the user to the workspace Agent page. */
+export function WorkspaceAgentSettingsRedirect() {
+  const { organizationId, factoryKey } = useParams<{ organizationId: string; factoryKey: string }>();
+  const location = useLocation();
+
+  if (!organizationId || !factoryKey) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Navigate to={`${factoryAgentPath(organizationId, factoryKey)}${location.search}`} replace />;
 }
 
 export function LegacyFactoryOrganizationSettingsRedirect() {

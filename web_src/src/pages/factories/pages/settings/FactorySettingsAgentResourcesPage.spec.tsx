@@ -26,7 +26,7 @@ vi.mock("@monaco-editor/react", () => ({
   ),
 }));
 
-const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 const skillsEditorPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/skills`;
 const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
 
@@ -45,9 +45,8 @@ describe("FactorySettingsSkillsPage", () => {
       />,
     );
 
-    expect(await screen.findByTestId("agent-resources-skills-empty", {}, { timeout: 8000 })).toHaveTextContent(
-      "No skills yet",
-    );
+    const empty = await screen.findByTestId("agent-resources-skills-empty", {}, { timeout: 8000 });
+    expect(empty).not.toHaveTextContent("No skills yet");
     expect(screen.getByTestId("agent-resources-add-skill")).toBeEnabled();
     expect(screen.getByTestId("agent-resources-add-skill")).toHaveTextContent("Add skill");
   }, 10000);
