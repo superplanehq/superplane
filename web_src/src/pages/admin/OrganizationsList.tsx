@@ -24,7 +24,7 @@ const PAGE_SIZE = ORGANIZATION_PAGE_SIZE;
 interface OrganizationsTableProps {
   organizations: AdminOrganization[];
   pinned: boolean;
-  pendingPinID: string | null;
+  pendingPinIDs: ReadonlySet<string>;
   sortBy: SortField;
   sortDirection: SortDirection;
   onSort: (field: SortField) => void;
@@ -39,15 +39,31 @@ function pinActionLabel(pinned: boolean): string {
   return pinned ? "Unpin organization" : "Pin organization";
 }
 
+const ORGANIZATION_COLUMN_LABELS = ["Name", "Automations", "Tasks", "Done Tasks", "Members", "Credits", "Created"];
+
 function OrganizationTableHeader({
+  sortable,
   sortBy,
   sortDirection,
   onSort,
 }: {
+  sortable: boolean;
   sortBy: SortField;
   sortDirection: SortDirection;
   onSort: (field: SortField) => void;
 }) {
+  if (!sortable) {
+    return (
+      <tr className="border-b border-slate-100 dark:border-gray-700/70">
+        {ORGANIZATION_COLUMN_LABELS.map((label) => (
+          <th key={label} className="px-4 py-2.5 text-left font-medium text-gray-500 dark:text-gray-400">
+            {label}
+          </th>
+        ))}
+      </tr>
+    );
+  }
+
   return (
     <tr className="border-b border-slate-100 dark:border-gray-700/70">
       <SortableHeader label="Name" field="name" currentSort={sortBy} currentDirection={sortDirection} onSort={onSort} />
@@ -189,7 +205,7 @@ function OrganizationRow({
 function OrganizationsTable({
   organizations,
   pinned,
-  pendingPinID,
+  pendingPinIDs,
   sortBy,
   sortDirection,
   onSort,
@@ -199,7 +215,7 @@ function OrganizationsTable({
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 overflow-hidden dark:bg-gray-900 dark:outline-gray-700/70">
       <table className="w-full text-sm">
         <thead>
-          <OrganizationTableHeader sortBy={sortBy} sortDirection={sortDirection} onSort={onSort} />
+          <OrganizationTableHeader sortable={!pinned} sortBy={sortBy} sortDirection={sortDirection} onSort={onSort} />
         </thead>
         <tbody>
           {organizations.map((organization) => (
@@ -207,7 +223,7 @@ function OrganizationsTable({
               key={organization.id}
               organization={organization}
               pinned={pinned}
-              pending={pendingPinID === organization.id}
+              pending={pendingPinIDs.has(organization.id)}
               onTogglePin={onTogglePin}
             />
           ))}
@@ -220,7 +236,7 @@ function OrganizationsTable({
 function OrganizationTables({
   organizations,
   pinnedOrganizations,
-  pendingPinID,
+  pendingPinIDs,
   sortBy,
   sortDirection,
   onSort,
@@ -231,7 +247,7 @@ function OrganizationTables({
 }: {
   organizations: AdminOrganization[];
   pinnedOrganizations: AdminOrganization[];
-  pendingPinID: string | null;
+  pendingPinIDs: ReadonlySet<string>;
   sortBy: SortField;
   sortDirection: SortDirection;
   onSort: (field: SortField) => void;
@@ -254,7 +270,7 @@ function OrganizationTables({
           <OrganizationsTable
             organizations={pinnedOrganizations}
             pinned
-            pendingPinID={pendingPinID}
+            pendingPinIDs={pendingPinIDs}
             sortBy={sortBy}
             sortDirection={sortDirection}
             onSort={onSort}
@@ -266,7 +282,7 @@ function OrganizationTables({
         <OrganizationsTable
           organizations={organizations}
           pinned={false}
-          pendingPinID={pendingPinID}
+          pendingPinIDs={pendingPinIDs}
           sortBy={sortBy}
           sortDirection={sortDirection}
           onSort={onSort}
@@ -302,6 +318,14 @@ const OrganizationsList: React.FC = () => {
         placeholder="Search by name or ID..."
       />
       {list.pinError ? <Text className="mb-3 text-sm text-red-600 dark:text-red-400">{list.pinError}</Text> : null}
+      {list.listError ? (
+        <div className="mb-3 flex flex-col items-start gap-2" role="alert">
+          <Text className="text-sm text-red-600 dark:text-red-400">{list.listError}</Text>
+          <Button type="button" variant="outline" size="sm" onClick={list.retryList}>
+            Try again
+          </Button>
+        </div>
+      ) : null}
       {!hasOrganizations ? (
         <div className="text-center py-12">
           <Text className="text-gray-500 dark:text-gray-400">
@@ -312,7 +336,7 @@ const OrganizationsList: React.FC = () => {
         <OrganizationTables
           organizations={list.organizations}
           pinnedOrganizations={list.pinnedOrganizations}
-          pendingPinID={list.pendingPinID}
+          pendingPinIDs={list.pendingPinIDs}
           sortBy={list.sortBy}
           sortDirection={list.sortDirection}
           onSort={list.handleSort}

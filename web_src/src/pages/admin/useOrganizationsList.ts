@@ -65,6 +65,10 @@ function organizationListResponse(data: {
   };
 }
 
+const LIST_REFRESH_ERROR = "Could not refresh the organization list.";
+
+type ListLoadResult = "applied" | "failed" | "stale";
+
 async function requestOrganizationList(
   searchTerm: string,
   pageOffset: number,
@@ -92,8 +96,7 @@ export function useOrganizationsList() {
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<OrganizationSortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [pinError, setPinError] = useState<string | null>(null);
-  const [pendingPinID, setPendingPinID] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
   const listRequestID = useRef(0);
   const appliedFilterKeyRef = useRef(listFilterKey("", "created_at", "desc"));
   const listQueryRef = useRef<OrganizationListQuery>({ search, offset, sortBy, sortDirection });
@@ -118,23 +121,32 @@ export function useOrganizationsList() {
       sort: OrganizationSortField,
       direction: SortDirection,
       correctPage = true,
-    ) => {
+    ): Promise<ListLoadResult> => {
       const requestID = ++listRequestID.current;
       setLoading(true);
       try {
         const list = await requestOrganizationList(searchTerm, pageOffset, sort, direction);
-        if (requestID !== listRequestID.current || !list) {
-          return;
+        if (requestID !== listRequestID.current) {
+          return "stale";
+        }
+        if (!list) {
+          return "failed";
         }
         const nextOffset = pageOffsetForTotal(pageOffset, list.total);
         if (shouldLoadPage(correctPage, pageOffset, nextOffset, list.total)) {
-          await fetchOrganizations(searchTerm, nextOffset, sort, direction, false);
-          return;
+          return fetchOrganizations(searchTerm, nextOffset, sort, direction, false);
         }
         if (requestID !== listRequestID.current) {
-          return;
+          return "stale";
         }
+        setListError(null);
         applyList(list, nextOffset);
+        return "applied";
+      } catch {
+        if (requestID !== listRequestID.current) {
+          return "stale";
+        }
+        return "failed";
       } finally {
         if (requestID === listRequestID.current) {
           setLoading(false);
@@ -153,6 +165,8 @@ export function useOrganizationsList() {
     return () => clearTimeout(timeout);
   }, [search, sortBy, sortDirection, fetchOrganizations]);
 
+  const pinActions = useOrganizationPinActions(listQueryRef, fetchOrganizations, setListError);
+
   const handleSort = (field: OrganizationSortField) => {
     if (field === sortBy) {
       setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -160,27 +174,6 @@ export function useOrganizationsList() {
     }
     setSortBy(field);
     setSortDirection(field === "name" ? "asc" : "desc");
-  };
-
-  const togglePin = async (organization: AdminOrganization, pinned: boolean) => {
-    setPinError(null);
-    setPendingPinID(organization.id);
-    try {
-      const response = await fetch(`/admin/api/organizations/${organization.id}/pin`, {
-        method: pinned ? "DELETE" : "PUT",
-        credentials: "include",
-      });
-      if (!response.ok) {
-        setPinError(pinned ? "Could not unpin this organization." : "Could not pin this organization.");
-        return;
-      }
-      const query = listQueryRef.current;
-      await fetchOrganizations(query.search, query.offset, query.sortBy, query.sortDirection);
-    } catch {
-      setPinError(pinned ? "Could not unpin this organization." : "Could not pin this organization.");
-    } finally {
-      setPendingPinID(null);
-    }
   };
 
   const changePage = (pageOffset: number) => {
@@ -199,14 +192,80 @@ export function useOrganizationsList() {
     loading,
     sortBy,
     sortDirection,
-    pinError,
-    pendingPinID,
+    pinError: pinActions.pinError,
+    listError,
+    pendingPinIDs: pinActions.pendingPinIDs,
     handleSort,
-    togglePin,
+    togglePin: pinActions.togglePin,
+    retryList: pinActions.retryList,
     changePage,
   };
 }
 
 function shouldLoadPage(correctPage: boolean, pageOffset: number, nextOffset: number, total: number): boolean {
   return correctPage && nextOffset !== pageOffset && total > 0;
+}
+
+function useOrganizationPinActions(
+  listQueryRef: { current: OrganizationListQuery },
+  fetchOrganizations: (
+    searchTerm: string,
+    pageOffset: number,
+    sort: OrganizationSortField,
+    direction: SortDirection,
+  ) => Promise<ListLoadResult>,
+  setListError: (message: string | null) => void,
+) {
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pendingPinIDs, setPendingPinIDs] = useState<ReadonlySet<string>>(() => new Set());
+  const pendingPinIDsRef = useRef(pendingPinIDs);
+
+  const setPendingPin = (organizationID: string, pending: boolean) => {
+    const next = new Set(pendingPinIDsRef.current);
+    if (pending) {
+      next.add(organizationID);
+    } else {
+      next.delete(organizationID);
+    }
+    pendingPinIDsRef.current = next;
+    setPendingPinIDs(next);
+  };
+
+  const togglePin = async (organization: AdminOrganization, pinned: boolean) => {
+    if (pendingPinIDsRef.current.has(organization.id)) {
+      return;
+    }
+    setPendingPin(organization.id, true);
+    setPinError(null);
+    try {
+      const response = await fetch(`/admin/api/organizations/${organization.id}/pin`, {
+        method: pinned ? "DELETE" : "PUT",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        setPinError(pinned ? "Could not unpin this organization." : "Could not pin this organization.");
+        return;
+      }
+      const query = listQueryRef.current;
+      const result = await fetchOrganizations(query.search, query.offset, query.sortBy, query.sortDirection);
+      if (result === "failed") {
+        setListError(LIST_REFRESH_ERROR);
+      }
+    } catch {
+      setPinError(pinned ? "Could not unpin this organization." : "Could not pin this organization.");
+    } finally {
+      setPendingPin(organization.id, false);
+    }
+  };
+
+  const retryList = () => {
+    const query = listQueryRef.current;
+    void fetchOrganizations(query.search, query.offset, query.sortBy, query.sortDirection).then((result) => {
+      if (result === "failed") {
+        setListError(LIST_REFRESH_ERROR);
+      }
+    });
+  };
+
+  return { pinError, pendingPinIDs, togglePin, retryList };
 }

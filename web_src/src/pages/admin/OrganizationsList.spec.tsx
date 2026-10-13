@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
@@ -101,6 +101,10 @@ describe("OrganizationsList", () => {
     expect(screen.getByRole("button", { name: "Unpin organization" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pin organization" })).toBeInTheDocument();
     expect(screen.getByText("4 organizations across this installation")).toBeInTheDocument();
+    const pinnedSection = screen.getByRole("region", { name: "Pinned" });
+    expect(within(pinnedSection).getByRole("columnheader", { name: "Name" })).not.toHaveAttribute("aria-sort");
+    expect(within(pinnedSection).queryByRole("button", { name: "Name" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Name" })).toBeInTheDocument();
   });
 
   it("does not open the organization when the pin control is clicked", async () => {
@@ -231,6 +235,111 @@ describe("OrganizationsList", () => {
     });
     expect(screen.getByRole("link", { name: "Beta Org" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Acme" })).not.toBeInTheDocument();
+  });
+
+  it("keeps each organization pin disabled until its own request finishes", async () => {
+    const user = userEvent.setup();
+    const releases = new Map<string, (response: Response) => void>();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pin") && init?.method === "PUT") {
+        const organizationID = url.split("/").at(-2) ?? "";
+        return new Promise<Response>((resolve) => {
+          releases.set(organizationID, resolve);
+        });
+      }
+      return jsonResponse({
+        items: [organization("org-1", "Acme"), organization("org-2", "Beta")],
+        pinned: [],
+        total: 2,
+        match_total: 2,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <MemoryRouter>
+        <OrganizationsList />
+      </MemoryRouter>,
+    );
+
+    const [acmePin, betaPin] = await screen.findAllByRole("button", { name: "Pin organization" });
+    await user.click(acmePin);
+    await user.click(betaPin);
+
+    await waitFor(() => {
+      expect(releases.has("org-1")).toBe(true);
+      expect(releases.has("org-2")).toBe(true);
+    });
+    expect(acmePin).toBeDisabled();
+    expect(betaPin).toBeDisabled();
+
+    releases.get("org-2")?.(jsonResponse({ pinned: true }));
+
+    await waitFor(() => {
+      const pins = screen.getAllByRole("button", { name: "Pin organization" });
+      expect(pins[0]).toBeDisabled();
+      expect(pins[1]).toBeEnabled();
+    });
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "PUT")).toHaveLength(2);
+
+    releases.get("org-1")?.(jsonResponse({ pinned: true }));
+    await waitFor(() => {
+      expect(screen.getAllByRole("button", { name: "Pin organization" }).every((button) => !button.disabled)).toBe(
+        true,
+      );
+    });
+  });
+
+  it("asks to retry when a saved pin cannot refresh the list", async () => {
+    const user = userEvent.setup();
+    let failNextList = false;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/pin") && init?.method === "PUT") {
+        failNextList = true;
+        return jsonResponse({ pinned: true });
+      }
+      if (failNextList) {
+        failNextList = false;
+        return jsonResponse({}, 500);
+      }
+      return jsonResponse({
+        items: [organization("org-1", "Acme")],
+        pinned: [],
+        total: 1,
+        match_total: 1,
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <MemoryRouter>
+        <OrganizationsList />
+      </MemoryRouter>,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Pin organization" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not refresh the organization list.");
+    expect(screen.getByRole("button", { name: "Pin organization" })).toBeEnabled();
+
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/pin") && init?.method === "PUT") {
+        return jsonResponse({ pinned: true });
+      }
+      return jsonResponse({
+        items: [],
+        pinned: [organization("org-1", "Acme")],
+        total: 0,
+        match_total: 1,
+      });
+    });
+    await user.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByRole("heading", { name: "Pinned" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unpin organization" })).toBeInTheDocument();
   });
 
   it("shows remaining hosted credit and sorts by that amount", async () => {
