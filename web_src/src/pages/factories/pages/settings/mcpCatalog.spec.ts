@@ -26,6 +26,7 @@ describe("MCP_CATALOG", () => {
       "linear",
       "notion",
       "figma",
+      "mobbin",
       "slack",
       "circleci",
       "semaphore",
@@ -113,11 +114,23 @@ describe("MCP_CATALOG", () => {
     });
   });
 
+  it("prefills Mobbin OAuth and a sign-in instruction", () => {
+    const mobbin = MCP_CATALOG.find((entry) => entry.id === "mobbin");
+    expect(catalogConnectionDefaults(mobbin)).toEqual({
+      name: "mobbin",
+      url: "https://api.mobbin.com/mcp",
+      auth: "AUTH_OAUTH",
+      instruction: AGENT_RESOURCES_COPY.mobbinInstruction,
+    });
+    expect(AGENT_RESOURCES_COPY.mobbinInstruction).toBe("Sign in with Mobbin.");
+  });
+
   it("omits defaults for a custom MCP server", () => {
     expect(catalogConnectionDefaults(undefined)).toBeUndefined();
   });
 
   it("matches a saved server to a catalog entry by URL and auth", () => {
+    expect(catalogEntryForResource({ url: "https://api.mobbin.com/mcp", auth: "AUTH_OAUTH" })?.id).toBe("mobbin");
     expect(catalogEntryForResource({ url: "https://mcp.sentry.dev/mcp", auth: "AUTH_OAUTH" })?.id).toBe("sentry");
     expect(catalogEntryForResource({ url: "https://mcp.datadoghq.com/v1/mcp", auth: "AUTH_OAUTH" })?.id).toBe(
       "datadog",
@@ -223,6 +236,7 @@ describe("filterMCPCatalog", () => {
   });
 
   it("matches label, name, id, or category", () => {
+    expect(filterMCPCatalog(MCP_CATALOG, "mobbin").map((entry) => entry.id)).toEqual(["mobbin"]);
     expect(filterMCPCatalog(MCP_CATALOG, "GitHub").map((entry) => entry.id)).toEqual(["github"]);
     expect(filterMCPCatalog(MCP_CATALOG, "linear").map((entry) => entry.id)).toEqual(["linear"]);
     expect(filterMCPCatalog(MCP_CATALOG, "sema").map((entry) => entry.id)).toEqual(["semaphore"]);
@@ -259,7 +273,10 @@ describe("groupMCPCatalog", () => {
       "Linear",
     ]);
     expect(groups.find((group) => group.id === "docs")?.entries.map((entry) => entry.label)).toEqual(["Notion"]);
-    expect(groups.find((group) => group.id === "design")?.entries.map((entry) => entry.label)).toEqual(["Figma"]);
+    expect(groups.find((group) => group.id === "design")?.entries.map((entry) => entry.label)).toEqual([
+      "Figma",
+      "Mobbin",
+    ]);
     expect(groups.find((group) => group.id === "chat")?.entries.map((entry) => entry.label)).toEqual(["Slack"]);
     expect(groups.find((group) => group.id === "cicd")?.entries.map((entry) => entry.label)).toEqual([
       "CircleCI",
