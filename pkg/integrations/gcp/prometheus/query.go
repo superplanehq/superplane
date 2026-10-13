@@ -8,6 +8,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 type Query struct{}
@@ -115,7 +116,7 @@ func (q *Query) Execute(ctx core.ExecutionContext) error {
 
 	payload, err := runQuery(client, instantQueryURL(client.ProjectID(), query))
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to query managed prometheus", err))
+		return ctx.ExecutionState.Fail("error", gcpcommon.APIErrorMessage(err, "failed to query managed prometheus", roleHintRead))
 	}
 
 	return ctx.ExecutionState.Emit(

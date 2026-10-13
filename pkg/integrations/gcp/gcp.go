@@ -30,33 +30,6 @@ import (
 
 func init() {
 	registry.RegisterIntegrationWithWebhookHandler("gcp", &GCP{}, &WebhookHandler{})
-	compute.SetClientFactory(func(ctx core.ExecutionContext) (compute.Client, error) {
-		return gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
-	})
-	cloudbuild.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudbuild.Client, error) {
-		return gcpcommon.NewClient(httpCtx, integration)
-	})
-	cloudfunctions.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudfunctions.Client, error) {
-		return gcpcommon.NewClient(httpCtx, integration)
-	})
-	artifactregistry.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (artifactregistry.Client, error) {
-		return gcpcommon.NewClient(httpCtx, integration)
-	})
-	clouddns.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (clouddns.Client, error) {
-		return gcpcommon.NewClient(httpCtx, integration)
-	})
-	cloudsql.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (cloudsql.Client, error) {
-		return gcpcommon.NewClient(httpCtx, integration)
-	})
-	storage.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (storage.Client, error) {
-		return gcpcommon.NewClient(httpCtx, integration)
-	})
-	monitoring.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (monitoring.Client, error) {
-		return gcpcommon.NewClient(httpCtx, integration)
-	})
-	gcpprometheus.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (gcpprometheus.Client, error) {
-		return gcpcommon.NewClient(httpCtx, integration)
-	})
 }
 
 type GCP struct{}
@@ -305,16 +278,9 @@ func (g *GCP) syncWIF(ctx core.SyncContext, config Configuration) error {
 		return fmt.Errorf("connection failed. Ensure the 'Cloud Resource Manager API' is enabled and the federated identity has 'Viewer' (or equivalent) on the project: %w", err)
 	}
 
-	if err := g.configurePubSub(ctx, client, &metadata); err != nil {
-		return fmt.Errorf("failed to configure Pub/Sub event bus: %w", err)
+	if err := g.finishSetup(ctx, client, metadata); err != nil {
+		return err
 	}
-	if err := g.configureCloudBuild(ctx, client, &metadata); err != nil {
-		ctx.Logger.Warnf("failed to configure Cloud Build subscription: %v", err)
-	}
-	if err := g.configureArtifactRegistry(ctx, client, &metadata); err != nil {
-		ctx.Logger.Warnf("failed to configure Artifact Registry subscription: %v", err)
-	}
-	ctx.Integration.SetMetadata(metadata)
 
 	if err := ctx.Integration.ScheduleResync(refreshAfter); err != nil {
 		ctx.Logger.Warnf("could not schedule GCP WIF resync: %v", err)
@@ -354,6 +320,17 @@ func (g *GCP) syncServiceAccountKey(ctx core.SyncContext, config Configuration) 
 		return fmt.Errorf("connection failed. Ensure the 'Cloud Resource Manager API' is enabled on your project and the service account has 'Viewer' permissions: %w", err)
 	}
 
+	if err := g.finishSetup(ctx, client, metadata); err != nil {
+		return err
+	}
+
+	ctx.Integration.Ready()
+	return nil
+}
+
+// finishSetup configures the Pub/Sub event bus and best-effort Cloud Build
+// and Artifact Registry subscriptions, then persists the updated metadata.
+func (g *GCP) finishSetup(ctx core.SyncContext, client *gcpcommon.Client, metadata gcpcommon.Metadata) error {
 	if err := g.configurePubSub(ctx, client, &metadata); err != nil {
 		return fmt.Errorf("failed to configure Pub/Sub event bus: %w", err)
 	}
@@ -364,8 +341,6 @@ func (g *GCP) syncServiceAccountKey(ctx core.SyncContext, config Configuration) 
 		ctx.Logger.Warnf("failed to configure Artifact Registry subscription: %v", err)
 	}
 	ctx.Integration.SetMetadata(metadata)
-
-	ctx.Integration.Ready()
 	return nil
 }
 
@@ -412,12 +387,8 @@ func (g *GCP) configurePubSub(ctx core.SyncContext, client *gcpcommon.Client, me
 	projectID := client.ProjectID()
 	reqCtx := context.Background()
 
-	enabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "pubsub.googleapis.com")
-	if err != nil {
-		return fmt.Errorf("check Pub/Sub API: %w", err)
-	}
-	if !enabled {
-		return fmt.Errorf("Pub/Sub API is not enabled in project %s. Enable it at https://console.cloud.google.com/apis/library/pubsub.googleapis.com?project=%s", projectID, projectID)
+	if err := ensureAPI(reqCtx, client, projectID, "pubsub.googleapis.com", "Pub/Sub"); err != nil {
+		return err
 	}
 
 	secret, err := g.eventsSecret(ctx.Integration)
@@ -471,28 +442,11 @@ func (g *GCP) ensureCloudBuildSetup(
 		return gcppubsub.UpdatePushEndpoint(reqCtx, client, projectID, metadata.CloudBuildSubscription, pushEndpoint)
 	}
 
-	enabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "pubsub.googleapis.com")
-	if err != nil {
-		return fmt.Errorf("check Pub/Sub API: %w", err)
+	if err := ensureAPI(reqCtx, client, projectID, "pubsub.googleapis.com", "Pub/Sub"); err != nil {
+		return err
 	}
-	if !enabled {
-		return fmt.Errorf(
-			"Pub/Sub API is not enabled in project %s. Enable it at https://console.cloud.google.com/apis/library/pubsub.googleapis.com?project=%s",
-			projectID,
-			projectID,
-		)
-	}
-
-	enabled, err = gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "cloudbuild.googleapis.com")
-	if err != nil {
-		return fmt.Errorf("check Cloud Build API: %w", err)
-	}
-	if !enabled {
-		return fmt.Errorf(
-			"Cloud Build API is not enabled in project %s. Enable it at https://console.cloud.google.com/apis/library/cloudbuild.googleapis.com?project=%s",
-			projectID,
-			projectID,
-		)
+	if err := ensureAPI(reqCtx, client, projectID, "cloudbuild.googleapis.com", "Cloud Build"); err != nil {
+		return err
 	}
 
 	secret, err := g.cloudBuildSecret(integration)
@@ -605,28 +559,11 @@ func (g *GCP) bootstrapArtifactRegistrySubscriptions(
 	metadata *gcpcommon.Metadata,
 	projectID string,
 ) error {
-	enabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "pubsub.googleapis.com")
-	if err != nil {
-		return fmt.Errorf("check Pub/Sub API: %w", err)
+	if err := ensureAPI(reqCtx, client, projectID, "pubsub.googleapis.com", "Pub/Sub"); err != nil {
+		return err
 	}
-	if !enabled {
-		return fmt.Errorf(
-			"Pub/Sub API is not enabled in project %s. Enable it at https://console.cloud.google.com/apis/library/pubsub.googleapis.com?project=%s",
-			projectID,
-			projectID,
-		)
-	}
-
-	enabled, err = gcppubsub.IsAPIEnabled(reqCtx, client, projectID, "artifactregistry.googleapis.com")
-	if err != nil {
-		return fmt.Errorf("check Artifact Registry API: %w", err)
-	}
-	if !enabled {
-		return fmt.Errorf(
-			"Artifact Registry API is not enabled in project %s. Enable it at https://console.cloud.google.com/apis/library/artifactregistry.googleapis.com?project=%s",
-			projectID,
-			projectID,
-		)
+	if err := ensureAPI(reqCtx, client, projectID, "artifactregistry.googleapis.com", "Artifact Registry"); err != nil {
+		return err
 	}
 
 	sanitized := sanitizeID(integration.ID().String())
@@ -688,26 +625,7 @@ func (g *GCP) createContainerAnalysisSubscription(
 }
 
 func (g *GCP) cloudBuildSecret(integration core.IntegrationContext) (string, error) {
-	secrets, err := integration.GetSecrets()
-	if err != nil {
-		return "", err
-	}
-
-	for _, s := range secrets {
-		if s.Name == CloudBuildSecretName {
-			return string(s.Value), nil
-		}
-	}
-
-	secret, err := crypto.Base64String(32)
-	if err != nil {
-		return "", fmt.Errorf("generate random secret: %w", err)
-	}
-
-	if err := integration.SetSecret(CloudBuildSecretName, []byte(secret)); err != nil {
-		return "", fmt.Errorf("store cloud build secret: %w", err)
-	}
-	return secret, nil
+	return g.getOrCreateSecret(integration, CloudBuildSecretName)
 }
 
 func (g *GCP) artifactPushSecret(integration core.IntegrationContext) (string, error) {
@@ -742,26 +660,20 @@ func (g *GCP) getOrCreateSecret(integration core.IntegrationContext, secretName 
 }
 
 func (g *GCP) eventsSecret(integration core.IntegrationContext) (string, error) {
-	secrets, err := integration.GetSecrets()
+	return g.getOrCreateSecret(integration, PubSubSecretName)
+}
+
+// ensureAPI verifies that a Google API is enabled in the project, returning
+// an actionable error with the API's console URL when it is not.
+func ensureAPI(reqCtx context.Context, client *gcpcommon.Client, projectID, service, label string) error {
+	enabled, err := gcppubsub.IsAPIEnabled(reqCtx, client, projectID, service)
 	if err != nil {
-		return "", err
+		return fmt.Errorf("check %s API: %w", label, err)
 	}
-
-	for _, s := range secrets {
-		if s.Name == PubSubSecretName {
-			return string(s.Value), nil
-		}
+	if !enabled {
+		return fmt.Errorf("%s API is not enabled in project %s. Enable it at https://console.cloud.google.com/apis/library/%s?project=%s", label, projectID, service, projectID)
 	}
-
-	secret, err := crypto.Base64String(32)
-	if err != nil {
-		return "", fmt.Errorf("generate random secret: %w", err)
-	}
-
-	if err := integration.SetSecret(PubSubSecretName, []byte(secret)); err != nil {
-		return "", fmt.Errorf("store events secret: %w", err)
-	}
-	return secret, nil
+	return nil
 }
 
 func sanitizeID(s string) string {
@@ -791,10 +703,19 @@ func (g *GCP) Cleanup(ctx core.IntegrationCleanupContext) error {
 	}
 
 	reqCtx := context.Background()
-	if m.PubSubSubscription != "" {
-		if err := gcppubsub.DeleteSubscription(reqCtx, client, m.ProjectID, m.PubSubSubscription); err != nil {
+	subscriptions := []struct{ label, id string }{
+		{"Pub/Sub subscription", m.PubSubSubscription},
+		{"Cloud Build subscription", m.CloudBuildSubscription},
+		{"Artifact Registry push subscription", m.ArtifactPushSubscription},
+		{"Container Analysis subscription", m.ContainerAnalysisSubscription},
+	}
+	for _, sub := range subscriptions {
+		if sub.id == "" {
+			continue
+		}
+		if err := gcppubsub.DeleteSubscription(reqCtx, client, m.ProjectID, sub.id); err != nil {
 			if !gcpcommon.IsNotFoundError(err) {
-				ctx.Logger.Warnf("failed to delete Pub/Sub subscription %s: %v", m.PubSubSubscription, err)
+				ctx.Logger.Warnf("failed to delete %s %s: %v", sub.label, sub.id, err)
 			}
 		}
 	}
@@ -802,27 +723,6 @@ func (g *GCP) Cleanup(ctx core.IntegrationCleanupContext) error {
 		if err := gcppubsub.DeleteTopic(reqCtx, client, m.ProjectID, m.PubSubTopic); err != nil {
 			if !gcpcommon.IsNotFoundError(err) {
 				ctx.Logger.Warnf("failed to delete Pub/Sub topic %s: %v", m.PubSubTopic, err)
-			}
-		}
-	}
-	if m.CloudBuildSubscription != "" {
-		if err := gcppubsub.DeleteSubscription(reqCtx, client, m.ProjectID, m.CloudBuildSubscription); err != nil {
-			if !gcpcommon.IsNotFoundError(err) {
-				ctx.Logger.Warnf("failed to delete Cloud Build subscription %s: %v", m.CloudBuildSubscription, err)
-			}
-		}
-	}
-	if m.ArtifactPushSubscription != "" {
-		if err := gcppubsub.DeleteSubscription(reqCtx, client, m.ProjectID, m.ArtifactPushSubscription); err != nil {
-			if !gcpcommon.IsNotFoundError(err) {
-				ctx.Logger.Warnf("failed to delete Artifact Registry push subscription %s: %v", m.ArtifactPushSubscription, err)
-			}
-		}
-	}
-	if m.ContainerAnalysisSubscription != "" {
-		if err := gcppubsub.DeleteSubscription(reqCtx, client, m.ProjectID, m.ContainerAnalysisSubscription); err != nil {
-			if !gcpcommon.IsNotFoundError(err) {
-				ctx.Logger.Warnf("failed to delete Container Analysis subscription %s: %v", m.ContainerAnalysisSubscription, err)
 			}
 		}
 	}
@@ -891,25 +791,19 @@ func (g *GCP) handleEnsurePubSubOnMessage(ctx core.IntegrationHookContext) error
 }
 
 func (g *GCP) handleEnsureCloudBuild(ctx core.IntegrationHookContext) error {
-	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create GCP client: %w", err)
-	}
-
-	var metadata gcpcommon.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	if err := g.ensureCloudBuildSetup(context.Background(), client, ctx.Integration, ctx.WebhooksBaseURL, &metadata); err != nil {
-		return err
-	}
-
-	ctx.Integration.SetMetadata(metadata)
-	return nil
+	return g.ensureSubscriptionSetup(ctx, g.ensureCloudBuildSetup)
 }
 
 func (g *GCP) handleEnsureArtifactRegistry(ctx core.IntegrationHookContext) error {
+	return g.ensureSubscriptionSetup(ctx, g.ensureArtifactRegistrySetup)
+}
+
+// ensureSubscriptionSetup creates the client, runs the given subscription
+// setup step against the current metadata, and persists the result.
+func (g *GCP) ensureSubscriptionSetup(
+	ctx core.IntegrationHookContext,
+	setup func(reqCtx context.Context, client *gcpcommon.Client, integration core.IntegrationContext, webhooksBaseURL string, metadata *gcpcommon.Metadata) error,
+) error {
 	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to create GCP client: %w", err)
@@ -920,7 +814,7 @@ func (g *GCP) handleEnsureArtifactRegistry(ctx core.IntegrationHookContext) erro
 		return fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 
-	if err := g.ensureArtifactRegistrySetup(context.Background(), client, ctx.Integration, ctx.WebhooksBaseURL, &metadata); err != nil {
+	if err := setup(context.Background(), client, ctx.Integration, ctx.WebhooksBaseURL, &metadata); err != nil {
 		return err
 	}
 
@@ -1121,7 +1015,22 @@ type logEntry struct {
 	InsertID     string               `json:"insertId"`
 }
 
-func (g *GCP) handleEvent(ctx core.HTTPRequestContext) {
+// handlePush authenticates a Pub/Sub push request against the named secret,
+// decodes the push envelope, and fans the event out to matching
+// subscriptions. It preserves the endpoint contract: 400 for a missing token,
+// missing required parameter, or malformed envelope; 500 for secret storage
+// errors; 403 on a token mismatch; and 200 (with a log line) for undecodable
+// message data, since Pub/Sub treats non-2xx as redelivery. sendModifier
+// completes "error sending <modifier>message to subscription" in logs.
+func (g *GCP) handlePush(
+	ctx core.HTTPRequestContext,
+	secretName string,
+	requireParam func(*http.Request) bool,
+	decodeWarn string,
+	decode func(pushMsg pubsubPushMessage, decoded []byte) (event any, ok bool),
+	applies func(subscription core.IntegrationSubscriptionContext, event any) bool,
+	sendModifier string,
+) {
 	token := ctx.Request.URL.Query().Get("token")
 	if token == "" {
 		ctx.Response.WriteHeader(http.StatusBadRequest)
@@ -1136,7 +1045,7 @@ func (g *GCP) handleEvent(ctx core.HTTPRequestContext) {
 
 	var secret string
 	for _, s := range secrets {
-		if s.Name == PubSubSecretName {
+		if s.Name == secretName {
 			secret = string(s.Value)
 			break
 		}
@@ -1144,6 +1053,11 @@ func (g *GCP) handleEvent(ctx core.HTTPRequestContext) {
 
 	if token != secret {
 		ctx.Response.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	if requireParam != nil && !requireParam(ctx.Request) {
+		ctx.Response.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
@@ -1161,29 +1075,15 @@ func (g *GCP) handleEvent(ctx core.HTTPRequestContext) {
 
 	decoded, err := base64Decode(pushMsg.Message.Data)
 	if err != nil {
-		ctx.Logger.Warnf("failed to decode Pub/Sub message data: %v", err)
+		ctx.Logger.Warnf("%s: %v", decodeWarn, err)
 		ctx.Response.WriteHeader(http.StatusOK)
 		return
 	}
 
-	var entry logEntry
-	if err := json.Unmarshal(decoded, &entry); err != nil {
-		ctx.Logger.Warnf("failed to parse log entry: %v", err)
+	event, ok := decode(pushMsg, decoded)
+	if !ok {
 		ctx.Response.WriteHeader(http.StatusOK)
 		return
-	}
-
-	var rawData map[string]any
-	_ = json.Unmarshal(decoded, &rawData)
-
-	event := AuditLogEvent{
-		ServiceName:  entry.ProtoPayload.ServiceName,
-		MethodName:   strings.TrimSpace(entry.ProtoPayload.MethodName),
-		ResourceName: entry.ProtoPayload.ResourceName,
-		LogName:      entry.LogName,
-		Timestamp:    entry.Timestamp,
-		InsertID:     entry.InsertID,
-		Data:         rawData,
 	}
 
 	subscriptions, err := ctx.Integration.ListSubscriptions()
@@ -1194,16 +1094,44 @@ func (g *GCP) handleEvent(ctx core.HTTPRequestContext) {
 	}
 
 	for _, subscription := range subscriptions {
-		if !g.subscriptionApplies(subscription, event) {
+		if !applies(subscription, event) {
 			continue
 		}
-
 		if err := subscription.SendMessage(event); err != nil {
-			ctx.Logger.Errorf("error sending message to subscription: %v", err)
+			ctx.Logger.Errorf("error sending %smessage to subscription: %v", sendModifier, err)
 		}
 	}
 
 	ctx.Response.WriteHeader(http.StatusOK)
+}
+
+func (g *GCP) handleEvent(ctx core.HTTPRequestContext) {
+	g.handlePush(ctx, PubSubSecretName, nil, "failed to decode Pub/Sub message data",
+		func(_ pubsubPushMessage, decoded []byte) (any, bool) {
+			var entry logEntry
+			if err := json.Unmarshal(decoded, &entry); err != nil {
+				ctx.Logger.Warnf("failed to parse log entry: %v", err)
+				return nil, false
+			}
+
+			var rawData map[string]any
+			_ = json.Unmarshal(decoded, &rawData)
+
+			return AuditLogEvent{
+				ServiceName:  entry.ProtoPayload.ServiceName,
+				MethodName:   strings.TrimSpace(entry.ProtoPayload.MethodName),
+				ResourceName: entry.ProtoPayload.ResourceName,
+				LogName:      entry.LogName,
+				Timestamp:    entry.Timestamp,
+				InsertID:     entry.InsertID,
+				Data:         rawData,
+			}, true
+		},
+		func(subscription core.IntegrationSubscriptionContext, event any) bool {
+			auditEvent, ok := event.(AuditLogEvent)
+			return ok && g.subscriptionApplies(subscription, auditEvent)
+		},
+		"")
 }
 
 func (g *GCP) subscriptionApplies(subscription core.IntegrationSubscriptionContext, event AuditLogEvent) bool {
@@ -1224,330 +1152,88 @@ func (g *GCP) subscriptionApplies(subscription core.IntegrationSubscriptionConte
 }
 
 func (g *GCP) handleCloudBuildEvent(ctx core.HTTPRequestContext) {
-	token := ctx.Request.URL.Query().Get("token")
-	if token == "" {
-		ctx.Response.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	secrets, err := ctx.Integration.GetSecrets()
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var secret string
-	for _, s := range secrets {
-		if s.Name == CloudBuildSecretName {
-			secret = string(s.Value)
-			break
-		}
-	}
-
-	if token != secret {
-		ctx.Response.WriteHeader(http.StatusForbidden)
-		return
-	}
-
-	body, err := io.ReadAll(ctx.Request.Body)
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var pushMsg pubsubPushMessage
-	if err := json.Unmarshal(body, &pushMsg); err != nil {
-		ctx.Response.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	decoded, err := base64Decode(pushMsg.Message.Data)
-	if err != nil {
-		ctx.Logger.Warnf("failed to decode Cloud Build Pub/Sub message data: %v", err)
-		ctx.Response.WriteHeader(http.StatusOK)
-		return
-	}
-
-	var build map[string]any
-	if err := json.Unmarshal(decoded, &build); err != nil {
-		ctx.Logger.Warnf("failed to parse Cloud Build notification: %v", err)
-		ctx.Response.WriteHeader(http.StatusOK)
-		return
-	}
-
-	subscriptions, err := ctx.Integration.ListSubscriptions()
-	if err != nil {
-		ctx.Logger.Errorf("error listing subscriptions: %v", err)
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	for _, subscription := range subscriptions {
-		if !g.cloudBuildSubscriptionApplies(subscription) {
-			continue
-		}
-
-		if err := subscription.SendMessage(build); err != nil {
-			ctx.Logger.Errorf("error sending cloud build message to subscription: %v", err)
-		}
-	}
-
-	ctx.Response.WriteHeader(http.StatusOK)
+	g.handlePush(ctx, CloudBuildSecretName, nil, "failed to decode Cloud Build Pub/Sub message data",
+		func(_ pubsubPushMessage, decoded []byte) (any, bool) {
+			var build map[string]any
+			if err := json.Unmarshal(decoded, &build); err != nil {
+				ctx.Logger.Warnf("failed to parse Cloud Build notification: %v", err)
+				return nil, false
+			}
+			return build, true
+		},
+		func(subscription core.IntegrationSubscriptionContext, _ any) bool {
+			return subscriptionOfType(subscription, cloudbuild.SubscriptionType)
+		},
+		"cloud build ")
 }
 
-func (g *GCP) cloudBuildSubscriptionApplies(subscription core.IntegrationSubscriptionContext) bool {
+// subscriptionOfType reports whether the subscription's configuration type
+// matches the given subscription type.
+func subscriptionOfType(subscription core.IntegrationSubscriptionContext, subscriptionType string) bool {
 	var pattern struct {
 		Type string `mapstructure:"type"`
 	}
 	if err := mapstructure.Decode(subscription.Configuration(), &pattern); err != nil {
 		return false
 	}
-	return pattern.Type == cloudbuild.SubscriptionType
+	return pattern.Type == subscriptionType
 }
 
 func (g *GCP) handleArtifactPushEvent(ctx core.HTTPRequestContext) {
-	token := ctx.Request.URL.Query().Get("token")
-	if token == "" {
-		ctx.Response.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	secrets, err := ctx.Integration.GetSecrets()
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var secret string
-	for _, s := range secrets {
-		if s.Name == ArtifactPushSecretName {
-			secret = string(s.Value)
-			break
-		}
-	}
-
-	if token != secret {
-		ctx.Response.WriteHeader(http.StatusForbidden)
-		return
-	}
-
-	body, err := io.ReadAll(ctx.Request.Body)
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var pushMsg pubsubPushMessage
-	if err := json.Unmarshal(body, &pushMsg); err != nil {
-		ctx.Response.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	decoded, err := base64Decode(pushMsg.Message.Data)
-	if err != nil {
-		ctx.Logger.Warnf("failed to decode Artifact Registry Pub/Sub message data: %v", err)
-		ctx.Response.WriteHeader(http.StatusOK)
-		return
-	}
-
-	var event map[string]any
-	if err := json.Unmarshal(decoded, &event); err != nil {
-		ctx.Logger.Warnf("failed to parse Artifact Registry push event: %v", err)
-		ctx.Response.WriteHeader(http.StatusOK)
-		return
-	}
-
-	subscriptions, err := ctx.Integration.ListSubscriptions()
-	if err != nil {
-		ctx.Logger.Errorf("error listing subscriptions: %v", err)
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	for _, subscription := range subscriptions {
-		if !g.artifactPushSubscriptionApplies(subscription) {
-			continue
-		}
-		if err := subscription.SendMessage(event); err != nil {
-			ctx.Logger.Errorf("error sending artifact push message to subscription: %v", err)
-		}
-	}
-
-	ctx.Response.WriteHeader(http.StatusOK)
-}
-
-func (g *GCP) artifactPushSubscriptionApplies(subscription core.IntegrationSubscriptionContext) bool {
-	var pattern struct {
-		Type string `mapstructure:"type"`
-	}
-	if err := mapstructure.Decode(subscription.Configuration(), &pattern); err != nil {
-		return false
-	}
-	return pattern.Type == artifactregistry.ArtifactPushSubscriptionType
+	g.handlePush(ctx, ArtifactPushSecretName, nil, "failed to decode Artifact Registry Pub/Sub message data",
+		func(_ pubsubPushMessage, decoded []byte) (any, bool) {
+			var event map[string]any
+			if err := json.Unmarshal(decoded, &event); err != nil {
+				ctx.Logger.Warnf("failed to parse Artifact Registry push event: %v", err)
+				return nil, false
+			}
+			return event, true
+		},
+		func(subscription core.IntegrationSubscriptionContext, _ any) bool {
+			return subscriptionOfType(subscription, artifactregistry.ArtifactPushSubscriptionType)
+		},
+		"artifact push ")
 }
 
 func (g *GCP) handleArtifactAnalysisEvent(ctx core.HTTPRequestContext) {
-	token := ctx.Request.URL.Query().Get("token")
-	if token == "" {
-		ctx.Response.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	secrets, err := ctx.Integration.GetSecrets()
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var secret string
-	for _, s := range secrets {
-		if s.Name == ContainerAnalysisSecretName {
-			secret = string(s.Value)
-			break
-		}
-	}
-
-	if token != secret {
-		ctx.Response.WriteHeader(http.StatusForbidden)
-		return
-	}
-
-	body, err := io.ReadAll(ctx.Request.Body)
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var pushMsg pubsubPushMessage
-	if err := json.Unmarshal(body, &pushMsg); err != nil {
-		ctx.Response.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	decoded, err := base64Decode(pushMsg.Message.Data)
-	if err != nil {
-		ctx.Logger.Warnf("failed to decode Container Analysis Pub/Sub message data: %v", err)
-		ctx.Response.WriteHeader(http.StatusOK)
-		return
-	}
-
-	var occurrence map[string]any
-	if err := json.Unmarshal(decoded, &occurrence); err != nil {
-		ctx.Logger.Warnf("failed to parse Container Analysis occurrence: %v", err)
-		ctx.Response.WriteHeader(http.StatusOK)
-		return
-	}
-
-	subscriptions, err := ctx.Integration.ListSubscriptions()
-	if err != nil {
-		ctx.Logger.Errorf("error listing subscriptions: %v", err)
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	for _, subscription := range subscriptions {
-		if !g.containerAnalysisSubscriptionApplies(subscription) {
-			continue
-		}
-		if err := subscription.SendMessage(occurrence); err != nil {
-			ctx.Logger.Errorf("error sending container analysis message to subscription: %v", err)
-		}
-	}
-
-	ctx.Response.WriteHeader(http.StatusOK)
-}
-
-func (g *GCP) containerAnalysisSubscriptionApplies(subscription core.IntegrationSubscriptionContext) bool {
-	var pattern struct {
-		Type string `mapstructure:"type"`
-	}
-	if err := mapstructure.Decode(subscription.Configuration(), &pattern); err != nil {
-		return false
-	}
-	return pattern.Type == artifactregistry.ArtifactAnalysisSubscriptionType
+	g.handlePush(ctx, ContainerAnalysisSecretName, nil, "failed to decode Container Analysis Pub/Sub message data",
+		func(_ pubsubPushMessage, decoded []byte) (any, bool) {
+			var occurrence map[string]any
+			if err := json.Unmarshal(decoded, &occurrence); err != nil {
+				ctx.Logger.Warnf("failed to parse Container Analysis occurrence: %v", err)
+				return nil, false
+			}
+			return occurrence, true
+		},
+		func(subscription core.IntegrationSubscriptionContext, _ any) bool {
+			return subscriptionOfType(subscription, artifactregistry.ArtifactAnalysisSubscriptionType)
+		},
+		"container analysis ")
 }
 
 func (g *GCP) handlePubSubEvent(ctx core.HTTPRequestContext) {
-	token := ctx.Request.URL.Query().Get("token")
-	if token == "" {
-		ctx.Response.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	secrets, err := ctx.Integration.GetSecrets()
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var secret string
-	for _, s := range secrets {
-		if s.Name == PubSubSecretName {
-			secret = string(s.Value)
-			break
-		}
-	}
-
-	if token != secret {
-		ctx.Response.WriteHeader(http.StatusForbidden)
-		return
-	}
-
 	gcpSubName := ctx.Request.URL.Query().Get("gcpSubName")
-	if gcpSubName == "" {
-		ctx.Response.WriteHeader(http.StatusBadRequest)
-		return
-	}
+	g.handlePush(ctx, PubSubSecretName,
+		func(r *http.Request) bool { return r.URL.Query().Get("gcpSubName") != "" },
+		"failed to decode Pub/Sub user message data",
+		func(pushMsg pubsubPushMessage, decoded []byte) (any, bool) {
+			var msgData any
+			if err := json.Unmarshal(decoded, &msgData); err != nil {
+				// Non-JSON payloads: deliver as raw string
+				msgData = string(decoded)
+			}
 
-	body, err := io.ReadAll(ctx.Request.Body)
-	if err != nil {
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var pushMsg pubsubPushMessage
-	if err := json.Unmarshal(body, &pushMsg); err != nil {
-		ctx.Response.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	decoded, err := base64Decode(pushMsg.Message.Data)
-	if err != nil {
-		ctx.Logger.Warnf("failed to decode Pub/Sub user message data: %v", err)
-		ctx.Response.WriteHeader(http.StatusOK)
-		return
-	}
-
-	var msgData any
-	if err := json.Unmarshal(decoded, &msgData); err != nil {
-		// Non-JSON payloads: deliver as raw string
-		msgData = string(decoded)
-	}
-
-	message := map[string]any{
-		"messageId":   pushMsg.Message.MessageID,
-		"publishTime": pushMsg.Message.PublishTime,
-		"data":        msgData,
-		"attributes":  pushMsg.Message.Attributes,
-	}
-
-	subscriptions, err := ctx.Integration.ListSubscriptions()
-	if err != nil {
-		ctx.Logger.Errorf("error listing subscriptions: %v", err)
-		ctx.Response.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	for _, subscription := range subscriptions {
-		if !g.pubsubOnMessageSubscriptionApplies(subscription, gcpSubName) {
-			continue
-		}
-		if err := subscription.SendMessage(message); err != nil {
-			ctx.Logger.Errorf("error sending pub/sub message to subscription: %v", err)
-		}
-	}
-
-	ctx.Response.WriteHeader(http.StatusOK)
+			return map[string]any{
+				"messageId":   pushMsg.Message.MessageID,
+				"publishTime": pushMsg.Message.PublishTime,
+				"data":        msgData,
+				"attributes":  pushMsg.Message.Attributes,
+			}, true
+		},
+		func(subscription core.IntegrationSubscriptionContext, event any) bool {
+			return g.pubsubOnMessageSubscriptionApplies(subscription, gcpSubName)
+		},
+		"pub/sub ")
 }
 
 func (g *GCP) pubsubOnMessageSubscriptionApplies(subscription core.IntegrationSubscriptionContext, gcpSubName string) bool {

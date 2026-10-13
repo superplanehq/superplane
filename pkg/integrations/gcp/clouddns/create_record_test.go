@@ -101,7 +101,7 @@ func TestCreateRecord_Setup(t *testing.T) {
 
 func TestCreateRecord_Execute(t *testing.T) {
 	t.Run("emits output when change is done immediately", func(t *testing.T) {
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				postURL: func(_ context.Context, _ string, _ any) ([]byte, error) {
@@ -112,7 +112,7 @@ func TestCreateRecord_Execute(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := (&CreateRecord{}).Execute(core.ExecutionContext{
@@ -141,7 +141,7 @@ func TestCreateRecord_Execute(t *testing.T) {
 	})
 
 	t.Run("schedules poll when change is pending", func(t *testing.T) {
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				postURL: func(_ context.Context, _ string, _ any) ([]byte, error) {
@@ -152,7 +152,7 @@ func TestCreateRecord_Execute(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		meta := &testcontexts.MetadataContext{}
 		requests := &testcontexts.RequestContext{}
@@ -177,7 +177,7 @@ func TestCreateRecord_Execute(t *testing.T) {
 	})
 
 	t.Run("fails when change status is unexpected", func(t *testing.T) {
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				postURL: func(_ context.Context, _ string, _ any) ([]byte, error) {
@@ -188,7 +188,7 @@ func TestCreateRecord_Execute(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		requests := &testcontexts.RequestContext{}
@@ -214,7 +214,7 @@ func TestCreateRecord_Execute(t *testing.T) {
 
 	t.Run("normalizes record name to add trailing dot", func(t *testing.T) {
 		var capturedBody any
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				postURL: func(_ context.Context, _ string, body any) ([]byte, error) {
@@ -222,7 +222,7 @@ func TestCreateRecord_Execute(t *testing.T) {
 					return json.Marshal(map[string]any{"id": "1", "status": "done"})
 				},
 			}, nil
-		})
+		}
 
 		err := (&CreateRecord{}).Execute(core.ExecutionContext{
 			Configuration: map[string]any{

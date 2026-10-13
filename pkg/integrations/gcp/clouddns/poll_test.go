@@ -24,7 +24,7 @@ func TestPollChangeUntilDone(t *testing.T) {
 	})
 
 	t.Run("schedules another poll when change is pending", func(t *testing.T) {
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				getURL: func(_ context.Context, _ string) ([]byte, error) {
@@ -35,7 +35,7 @@ func TestPollChangeUntilDone(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		requests := &testcontexts.RequestContext{}
@@ -58,7 +58,7 @@ func TestPollChangeUntilDone(t *testing.T) {
 	})
 
 	t.Run("emits output when change is done", func(t *testing.T) {
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				getURL: func(_ context.Context, _ string) ([]byte, error) {
@@ -69,7 +69,7 @@ func TestPollChangeUntilDone(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := pollChangeUntilDone(core.ActionHookContext{
@@ -97,7 +97,7 @@ func TestPollChangeUntilDone(t *testing.T) {
 	})
 
 	t.Run("fails when change status is unexpected", func(t *testing.T) {
-		SetClientFactory(func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
+		newClient = func(_ core.HTTPContext, _ core.IntegrationContext) (Client, error) {
 			return &mockClient{
 				projectID: "my-project",
 				getURL: func(_ context.Context, _ string) ([]byte, error) {
@@ -108,7 +108,7 @@ func TestPollChangeUntilDone(t *testing.T) {
 					})
 				},
 			}, nil
-		})
+		}
 
 		state := &testcontexts.ExecutionStateContext{KVs: map[string]string{}}
 		requests := &testcontexts.RequestContext{}

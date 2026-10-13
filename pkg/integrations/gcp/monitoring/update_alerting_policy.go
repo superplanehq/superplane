@@ -12,6 +12,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 type UpdateAlertingPolicy struct{}
@@ -359,7 +360,7 @@ func (u *UpdateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 
 	body, err := client.PatchURL(context.Background(), endpoint, policy)
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to update alerting policy", roleHintWrite, err))
+		return ctx.ExecutionState.Fail("error", gcpcommon.APIErrorMessage(err, "failed to update alerting policy", roleHintWrite))
 	}
 
 	var updated alertPolicy

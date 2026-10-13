@@ -12,6 +12,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 // roleHintChannelEditor is the IAM role needed to create/delete the webhook
@@ -191,7 +192,7 @@ func (t *OnAlert) Cleanup(ctx core.TriggerContext) error {
 	}
 	_, err = client.DeleteURL(context.Background(), fmt.Sprintf("%s/%s", monitoringBaseURL, metadata.NotificationChannel))
 	if err != nil {
-		return fmt.Errorf("%s", apiErrorMessage("failed to delete notification channel", roleHintChannelEditor, err))
+		return fmt.Errorf("%s", gcpcommon.APIErrorMessage(err, "failed to delete notification channel", roleHintChannelEditor))
 	}
 	return nil
 }
@@ -299,7 +300,7 @@ func createWebhookChannel(client Client, webhookURL, secret string) (string, err
 		body,
 	)
 	if err != nil {
-		return "", fmt.Errorf("%s", apiErrorMessage("failed to create notification channel", roleHintChannelEditor, err))
+		return "", fmt.Errorf("%s", gcpcommon.APIErrorMessage(err, "failed to create notification channel", roleHintChannelEditor))
 	}
 	var created struct {
 		Name string `json:"name"`
@@ -327,7 +328,7 @@ func updateWebhookChannel(client Client, channelName, webhookURL, secret string)
 	}
 	url := fmt.Sprintf("%s/%s?updateMask=labels.url,labels.username,labels.password", monitoringBaseURL, channelName)
 	if _, err := client.PatchURL(context.Background(), url, body); err != nil {
-		return fmt.Errorf("%s", apiErrorMessage("failed to update notification channel", roleHintChannelEditor, err))
+		return fmt.Errorf("%s", gcpcommon.APIErrorMessage(err, "failed to update notification channel", roleHintChannelEditor))
 	}
 	return nil
 }

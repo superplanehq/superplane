@@ -84,7 +84,7 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 				return nil, assert.AnError
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		require.NoError(t, c.Execute(core.ExecutionContext{
@@ -139,7 +139,7 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 				return nil, assert.AnError
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		require.NoError(t, c.Execute(core.ExecutionContext{
@@ -180,7 +180,7 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		require.NoError(t, c.Execute(core.ExecutionContext{
@@ -223,7 +223,7 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		require.NoError(t, c.Execute(core.ExecutionContext{
@@ -262,7 +262,7 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		require.NoError(t, c.Execute(core.ExecutionContext{
@@ -306,7 +306,7 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		require.NoError(t, c.Execute(core.ExecutionContext{
@@ -350,7 +350,7 @@ func Test__DeleteLoadBalancer__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		require.NoError(t, d.Execute(core.ExecutionContext{
@@ -377,7 +377,7 @@ func Test__DeleteLoadBalancer__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		require.NoError(t, d.Execute(core.ExecutionContext{
@@ -408,7 +408,7 @@ func Test__DeleteLoadBalancer__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		require.NoError(t, d.Execute(core.ExecutionContext{
@@ -448,7 +448,7 @@ func Test__DeleteLoadBalancer__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		require.NoError(t, d.Execute(core.ExecutionContext{
@@ -480,7 +480,7 @@ func Test__DeleteLoadBalancer__Execute(t *testing.T) {
 				return opDone("op"), nil
 			},
 		}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		require.NoError(t, d.Execute(core.ExecutionContext{
@@ -495,7 +495,7 @@ func Test__DeleteLoadBalancer__Execute(t *testing.T) {
 
 	t.Run("rejects a cross-project load balancer", func(t *testing.T) {
 		mc := &mockStaticIPClient{projectID: "my-project"}
-		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+		newClient = func(ctx core.ExecutionContext) (Client, error) { return mc, nil }
 		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		require.NoError(t, d.Execute(core.ExecutionContext{
 			Configuration:  map[string]any{"loadBalancer": "https://www.googleapis.com/compute/v1/projects/other/regions/us-central1/forwardingRules/x"},

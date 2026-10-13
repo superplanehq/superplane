@@ -9,6 +9,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 // locationOptions lists the most common Cloud Storage locations: the three
@@ -265,7 +266,7 @@ func (c *CreateBucket) Execute(ctx core.ExecutionContext) error {
 
 	bucket, err := createBucket(context.Background(), client, client.ProjectID(), body)
 	if err != nil {
-		return ctx.ExecutionState.Fail("error", apiErrorMessage("failed to create bucket", err, roleHintAdmin))
+		return ctx.ExecutionState.Fail("error", gcpcommon.APIErrorMessage(err, "failed to create bucket", roleHintAdmin))
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, bucketPayloadType, []any{bucketPayload(bucket)})

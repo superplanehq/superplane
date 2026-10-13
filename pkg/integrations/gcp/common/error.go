@@ -49,3 +49,14 @@ func IsNotFoundError(err error) bool {
 	}
 	return false
 }
+
+// APIErrorMessage formats an API error for execution state output. On a 403
+// it appends the IAM role hint, since a missing role is the most common cause
+// of failed GCP API calls from the integration.
+func APIErrorMessage(err error, action, roleHint string) string {
+	var apiErr *GCPAPIError
+	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusForbidden {
+		return fmt.Sprintf("%s: %v — ensure the integration's service account has the %s IAM role", action, err, roleHint)
+	}
+	return fmt.Sprintf("%s: %v", action, err)
+}
