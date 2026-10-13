@@ -1,6 +1,8 @@
 import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
 
@@ -11,8 +13,14 @@ import {
   confidenceBandForScore,
   type ConfidenceBand,
 } from "../lib/confidenceScore";
+import { workOrderCheckStatus, type WorkOrderCheckPresentation } from "../lib/workOrderChecks";
 import { SCORE_KINDS, scoreSummaryText, type ScoreKind, type ScoreSummaryValue } from "../lib/scoreSummary";
-import { CONFIDENCE_ANALYZING_LABEL, CONFIDENCE_ANALYZING_TOOLTIP, ConfidenceMeter } from "./ConfidenceMeter";
+import {
+  CheckStatusBars,
+  CONFIDENCE_ANALYZING_LABEL,
+  CONFIDENCE_ANALYZING_TOOLTIP,
+  ConfidenceMeter,
+} from "./ConfidenceMeter";
 
 const ITEM_CLASS = "inline-flex h-7 items-center gap-1.5 px-1.5 text-[12px] leading-none";
 
@@ -25,16 +33,13 @@ export type ScoreEvidenceValue = ScoreSummaryValue & {
 };
 
 /**
- * External control for the confidence drawer. The chip reports hover and
- * click; the owner renders the drawer wherever it belongs (for example
- * above the plan card).
+ * External control for inline confidence checks in the plan card.
  */
-export type ScoreEvidenceDrawer = {
+export type ScoreEvidenceDetails = {
   open: boolean;
-  pinned: boolean;
   controlsId: string;
-  onHoverChange: (hovering: boolean) => void;
   onToggle: () => void;
+  checks: readonly WorkOrderCheckPresentation[];
 };
 
 const SCORE_LABEL: Record<ScoreKind, { short: string; name: string }> = {
@@ -44,14 +49,13 @@ const SCORE_LABEL: Record<ScoreKind, { short: string; name: string }> = {
 
 const NUMBER_TONE: Record<ConfidenceBand, string> = {
   High: "text-success",
-  Medium: "text-warning",
+  Medium: "text-amber-700 dark:text-amber-400",
   Low: "text-destructive",
 };
 
 /**
- * Two labeled score items: name, five bars, number. Hover peeks the summary,
- * click pins it. The refine strip, the draft footer, and previews share this
- * row so the scores read the same everywhere.
+ * Two labeled score items: name, bars, number. The plan card can show
+ * confidence checks inline; other surfaces keep the existing score summary.
  */
 export function ScoreEvidenceRow({
   clarity,
@@ -59,7 +63,7 @@ export function ScoreEvidenceRow({
   isAnalyzing = false,
   showClarity = true,
   showConfidence = true,
-  confidenceDrawer,
+  confidenceDetails,
   testIds,
   className,
 }: {
@@ -68,8 +72,8 @@ export function ScoreEvidenceRow({
   isAnalyzing?: boolean;
   showClarity?: boolean;
   showConfidence?: boolean;
-  /** Hands the confidence chip over to an owner-rendered drawer. */
-  confidenceDrawer?: ScoreEvidenceDrawer;
+  /** Hands the confidence chip over to inline checks in the plan card. */
+  confidenceDetails?: ScoreEvidenceDetails;
   testIds?: Partial<Record<ScoreKind, string>>;
   className?: string;
 }) {
@@ -93,7 +97,7 @@ export function ScoreEvidenceRow({
             value={values[kind]}
             isAnalyzing={isAnalyzing}
             testId={testIds?.[kind]}
-            drawer={kind === "confidence" ? confidenceDrawer : undefined}
+            details={kind === "confidence" ? confidenceDetails : undefined}
           />
         );
       })}
@@ -106,13 +110,13 @@ export function ScoreEvidence({
   value,
   isAnalyzing = false,
   testId,
-  drawer,
+  details,
 }: {
   kind: ScoreKind;
   value?: ScoreEvidenceValue;
   isAnalyzing?: boolean;
   testId?: string;
-  drawer?: ScoreEvidenceDrawer;
+  details?: ScoreEvidenceDetails;
 }) {
   const label = SCORE_LABEL[kind];
   const score = value?.score;
@@ -141,7 +145,12 @@ export function ScoreEvidence({
   }
 
   const max = value?.maxScore || CONFIDENCE_SCORE_MAX;
+  if (details) {
+    return <ScoreEvidenceDetailsChip testId={testId} details={details} />;
+  }
+
   const chipLabel = `${label.short} ${score}/${max}`;
+
   const content = (
     <>
       <ScoreEvidenceLabel>{label.short}</ScoreEvidenceLabel>
@@ -157,14 +166,6 @@ export function ScoreEvidence({
     </>
   );
 
-  if (drawer) {
-    return (
-      <ScoreEvidenceDrawerChip label={chipLabel} testId={testId} drawer={drawer}>
-        {content}
-      </ScoreEvidenceDrawerChip>
-    );
-  }
-
   return (
     <ScoreEvidenceCard name={label.name} body={summary} label={chipLabel} testId={testId}>
       {content}
@@ -173,41 +174,38 @@ export function ScoreEvidence({
 }
 
 /**
- * The chip for an owner-rendered drawer. Hover peeks the drawer, click
- * pins it; the owner holds the state and renders the drawer itself.
+ * The plan card score is a disclosure control with an explicit action.
  */
-function ScoreEvidenceDrawerChip({
-  label,
-  testId,
-  drawer,
-  children,
-}: {
-  label: string;
-  testId?: string;
-  drawer: ScoreEvidenceDrawer;
-  children: ReactNode;
-}) {
+function ScoreEvidenceDetailsChip({ testId, details }: { testId?: string; details: ScoreEvidenceDetails }) {
+  const checkLabels = details.checks.map((check) => `${check.name} ${workOrderCheckStatus(check).label.toLowerCase()}`);
   return (
-    <button
+    <Button
       type="button"
-      aria-label={label}
-      aria-expanded={drawer.open}
-      aria-pressed={drawer.pinned}
-      aria-controls={drawer.open ? drawer.controlsId : undefined}
+      variant="ghost"
+      size="sm"
+      aria-label={`Confidence checks: ${checkLabels.join("; ")}. ${details.open ? "Hide checks" : "Show checks"}`}
+      aria-expanded={details.open}
+      aria-controls={details.open ? details.controlsId : undefined}
       data-testid={testId}
-      data-state={drawer.open ? "open" : "closed"}
-      className={cn(ITEM_CLASS, CHIP_BUTTON_CLASS, drawer.pinned && "bg-muted/70")}
-      onMouseEnter={() => drawer.onHoverChange(true)}
-      onMouseLeave={() => drawer.onHoverChange(false)}
-      onFocus={() => drawer.onHoverChange(true)}
-      onBlur={() => drawer.onHoverChange(false)}
+      data-state={details.open ? "open" : "closed"}
+      className={cn(
+        CHIP_BUTTON_CLASS,
+        "group h-auto min-h-6 min-w-0 shrink flex-wrap justify-start gap-x-2 gap-y-0.5 whitespace-normal px-2 py-0.5 text-left",
+      )}
       onClick={(event) => {
         event.preventDefault();
-        drawer.onToggle();
+        details.onToggle();
       }}
     >
-      {children}
-    </button>
+      <span className="inline-flex items-center gap-1.5 text-[12px] leading-4 font-medium text-muted-foreground">
+        Confidence
+        <CheckStatusBars checks={details.checks} testId={testId ? `${testId}-meter` : undefined} />
+      </span>
+      <span className="inline-flex items-center gap-1 border-l border-border/70 pl-2 text-[11px] font-medium text-muted-foreground group-hover:text-foreground group-focus-visible:text-foreground">
+        {details.open ? "Hide checks" : "Show checks"}
+        <ChevronDown className={cn("size-3 transition-transform", details.open && "rotate-180")} aria-hidden="true" />
+      </span>
+    </Button>
   );
 }
 
