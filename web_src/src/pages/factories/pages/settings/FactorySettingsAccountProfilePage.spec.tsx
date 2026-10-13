@@ -61,9 +61,14 @@ describe("FactorySettingsAccountProfilePage associated accounts", () => {
   it("shows Associated accounts for GitHub PR credit", () => {
     renderPage();
 
-    expect(screen.getByTestId("account-redesign-associated-accounts")).toBeInTheDocument();
+    expect(screen.getByTestId("account-redesign-associated-accounts")).toHaveTextContent(
+      "Link accounts from other services. Each account has its own use. This does not change how you sign in.",
+    );
     expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent(
-      "Velocity uses this GitHub account to credit your pull requests.",
+      "Velocity uses your GitHub account to credit your pull requests.",
+    );
+    expect(screen.getByTestId("account-redesign-associated-bitbucket")).toHaveTextContent(
+      "SuperPlane uses this Bitbucket account to find repositories you can open.",
     );
     expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Link Bitbucket" })).toBeInTheDocument();

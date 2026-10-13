@@ -127,17 +127,26 @@ describe("AccountProfileRedesignPlayground", () => {
     const user = userEvent.setup();
     renderPlayground();
 
+    expect(screen.getByTestId("account-redesign-associated-accounts")).toHaveTextContent(
+      "Link accounts from other services. Each account has its own use. This does not change how you sign in.",
+    );
     expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent(
-      "Velocity uses this GitHub account to credit your pull requests.",
+      "Velocity uses your GitHub account to credit your pull requests.",
     );
 
     await user.click(screen.getByRole("button", { name: "Link GitHub" }));
-    expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent("Linked as ada-lovelace");
+    expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent(
+      "Linked as ada-lovelace. Velocity uses this account to credit your pull requests.",
+    );
 
     await user.click(
       within(screen.getByTestId("account-redesign-associated-github")).getByRole("button", { name: "Remove" }),
     );
-    expect(screen.getByText(/Velocity reports will no longer credit pull requests/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Velocity reports will no longer credit pull requests from this GitHub account. Your sign-in methods do not change.",
+      ),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Remove account" }));
 
     expect(screen.getByRole("button", { name: "Link GitHub" })).toBeInTheDocument();
@@ -165,6 +174,34 @@ describe("AccountProfileRedesignPlayground", () => {
     await user.click(within(secondAccount).getByRole("button", { name: "Remove" }));
     await user.click(screen.getByRole("button", { name: "Remove account" }));
     expect(onRemoveGithub).toHaveBeenCalledWith("202");
+  });
+
+  it("states repository access for a linked Bitbucket account", async () => {
+    const user = userEvent.setup();
+    render(
+      <AccountProfileAssociatedAccountsCard
+        githubAccounts={[]}
+        bitbucketAccounts={[{ providerId: "bb-1", username: "ada-bitbucket" }]}
+        onLinkGithub={vi.fn()}
+        onRemoveGithub={vi.fn()}
+        onLinkBitbucket={vi.fn()}
+        onRemoveBitbucket={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("account-redesign-associated-bitbucket")).toHaveTextContent(
+      "Linked as ada-bitbucket. SuperPlane uses this account to find repositories you can open.",
+    );
+
+    await user.click(
+      within(screen.getByTestId("account-redesign-associated-bitbucket")).getByRole("button", { name: "Remove" }),
+    );
+    expect(
+      screen.getByText(
+        "SuperPlane will no longer use this Bitbucket account to find repositories you can open. Your sign-in methods do not change.",
+      ),
+    ).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).queryByText(/pull request/i)).not.toBeInTheDocument();
   });
 
   it("turns task emails off and hides events", async () => {
