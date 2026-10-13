@@ -7,7 +7,7 @@ This guide explains how to add custom behaviors to workflow components by follow
 The component system is organized in the following directory structure:
 
 ```
-web_src/src/pages/workflowv2/mappers/
+web_src/src/pages/app/mappers/
 ├── index.ts                    # Main registry file - all registrations happen here
 ├── types.ts                    # TypeScript interfaces for all customization types
 ├── stateRegistry.ts            # Default state registry and fallback state logic
@@ -35,10 +35,10 @@ web_src/src/pages/workflowv2/mappers/
 
 ## Registry Types
 
-The main registry file `web_src/src/pages/workflowv2/mappers/index.ts` manages 6 types of customizations:
+The main registry file `web_src/src/pages/app/mappers/index.ts` manages 6 types of customizations:
 
 ### 1. Component Base Mappers (`componentBaseMappers`)
-**Location:** `web_src/src/pages/workflowv2/mappers/index.ts` lines 35-44
+**Location:** `web_src/src/pages/app/mappers/index.ts` lines 35-44
 **Purpose:** Maps component rendering logic and properties.
 **Current registrations:** noop, if, http, semaphore, timeGate, filter, wait, approval
 
@@ -56,7 +56,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
 ```
 
 ### 2. Trigger Renderers (`triggerRenderers`)
-**Location:** `web_src/src/pages/workflowv2/mappers/index.ts` lines 30-33
+**Location:** `web_src/src/pages/app/mappers/index.ts` lines 30-33
 **Purpose:** Handles how triggers are displayed and behave.
 **Current registrations:** github, schedule
 
@@ -68,7 +68,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
 ```
 
 ### 4. Event State Registries (`eventStateRegistries`)
-**Location:** `web_src/src/pages/workflowv2/mappers/index.ts` lines 60-62
+**Location:** `web_src/src/pages/app/mappers/index.ts` lines 60-62
 **Purpose:** Custom state logic and visual styling for different component states.
 **Current registrations:** approval
 
@@ -79,7 +79,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
 ```
 
 ### 5. Custom Field Renderers (`customFieldRenderers`)
-**Location:** `web_src/src/pages/workflowv2/mappers/index.ts` lines 64-67
+**Location:** `web_src/src/pages/app/mappers/index.ts` lines 64-67
 **Purpose:** Renders additional UI elements in component settings.
 **Current registrations:** schedule, wait
 
@@ -91,7 +91,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 ```
 
 ### 6. App-specific Registries
-**Location:** `web_src/src/pages/workflowv2/mappers/index.ts` lines 46-54
+**Location:** `web_src/src/pages/app/mappers/index.ts` lines 46-54
 **Purpose:** For components that belong to specific applications (like semaphore.*, github.*)
 **Current app registrations:** semaphore, github
 
@@ -111,11 +111,11 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
 
 ### Example 1: Creating a Custom State Registry (Approval Component)
 
-**Primary file:** `web_src/src/pages/workflowv2/mappers/approval.ts`
+**Primary file:** `web_src/src/pages/app/mappers/approval.ts`
 **State map definition:** Lines 37-69
 **State function definition:** Lines 74-102
 **State registry creation:** Lines 107-110
-**Registration location:** `web_src/src/pages/workflowv2/mappers/index.ts` lines 60-62
+**Registration location:** `web_src/src/pages/app/mappers/index.ts` lines 60-62
 
 The approval component demonstrates custom state logic:
 
@@ -182,7 +182,7 @@ export const APPROVAL_STATE_REGISTRY: EventStateRegistry = {
 
 #### 4. Register in Main Registry
 
-In `web_src/src/pages/workflowv2/mappers/index.ts:60-62`:
+In `web_src/src/pages/app/mappers/index.ts:60-62`:
 
 ```typescript
 const eventStateRegistries: Record<string, EventStateRegistry> = {
@@ -192,10 +192,10 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
 
 ### Example 2: Creating a Custom Field Renderer (Wait Component)
 
-**Primary file:** `web_src/src/pages/workflowv2/mappers/wait.tsx`
+**Primary file:** `web_src/src/pages/app/mappers/wait/index.tsx`
 **Custom field renderer definition:** Lines 242-294
-**Registration location:** `web_src/src/pages/workflowv2/mappers/index.ts` lines 64-67
-**Import statement location:** `web_src/src/pages/workflowv2/mappers/index.ts` line 22
+**Registration location:** `web_src/src/pages/app/mappers/index.ts` lines 64-67
+**Import statement location:** `web_src/src/pages/app/mappers/index.ts` line 22
 
 The wait component shows custom UI in the settings panel:
 
@@ -246,7 +246,7 @@ Example expressions:
 
 #### 2. Register in Main Registry
 
-In `web_src/src/pages/workflowv2/mappers/index.ts:64-67`:
+In `web_src/src/pages/app/mappers/index.ts:64-67`:
 
 ```typescript
 const customFieldRenderers: Record<string, CustomFieldRenderer> = {
@@ -261,11 +261,11 @@ To create a new component with custom behaviors:
 
 ### 1. Create Component File
 
-**Location:** `web_src/src/pages/workflowv2/mappers/mycomponent.ts`
+**Location:** `web_src/src/pages/app/mappers/mycomponent.ts`
 **Required imports:** From `./types` and any UI components you need
 **Follow naming convention:** File name should match component type name
 
-Create `web_src/src/pages/workflowv2/mappers/mycomponent.ts`:
+Create `web_src/src/pages/app/mappers/mycomponent.ts`:
 
 ```typescript
 import {
@@ -337,12 +337,12 @@ export const myComponentCustomFieldRenderer: CustomFieldRenderer = {
 
 ### 2. Register in Main Registry
 
-**File to modify:** `web_src/src/pages/workflowv2/mappers/index.ts`
+**File to modify:** `web_src/src/pages/app/mappers/index.ts`
 **Add import statements:** Near the top of the file with other imports
 **Add to registries:** In the appropriate registry objects (lines 35-67)
 **Follow existing patterns:** Look at how other components are registered
 
-In `web_src/src/pages/workflowv2/mappers/index.ts`, add imports and register:
+In `web_src/src/pages/app/mappers/index.ts`, add imports and register:
 
 ```typescript
 import {
@@ -379,10 +379,10 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 ## Helper Functions
 
-The registry provides several helper functions in `web_src/src/pages/workflowv2/mappers/index.ts`:
+The registry provides several helper functions in `web_src/src/pages/app/mappers/index.ts`:
 
 **Location of helper functions:** Lines 73-147
-**Default fallbacks:** Defined in `web_src/src/pages/workflowv2/mappers/stateRegistry.ts` and `web_src/src/pages/workflowv2/mappers/default.ts`
+**Default fallbacks:** Defined in `web_src/src/pages/app/mappers/stateRegistry.ts` and `web_src/src/pages/app/mappers/default.ts`
 
 Available helper functions:
 - `getTriggerRenderer(name)`: Lines 73-87 - Get trigger renderer with app support
@@ -437,7 +437,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 
 ### 3. Update Component Mappers
 
-**Files:** Various mapper files (e.g., `web_src/src/pages/workflowv2/mappers/approval.ts`)
+**Files:** Various mapper files (e.g., `web_src/src/pages/app/mappers/approval.ts`)
 **Update the `props` method** in your component's mapper to include the new prop:
 
 ```typescript
@@ -491,7 +491,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
 ```
 
 #### Step 3: Update Mapper
-**Location:** `web_src/src/pages/workflowv2/mappers/approval.ts:120-138`
+**Location:** `web_src/src/pages/app/mappers/approval.ts:120-138`
 ```typescript
 export const approvalMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -512,12 +512,12 @@ export const approvalMapper: ComponentBaseMapper = {
 
 For designers who need to quickly locate files:
 
-- **Main registry:** `web_src/src/pages/workflowv2/mappers/index.ts`
-- **Type definitions:** `web_src/src/pages/workflowv2/mappers/types.ts`
+- **Main registry:** `web_src/src/pages/app/mappers/index.ts`
+- **Type definitions:** `web_src/src/pages/app/mappers/types.ts`
 - **ComponentBase UI:** `web_src/src/ui/componentBase/index.tsx`
 - **ComponentBaseProps interface:** `web_src/src/ui/componentBase/index.tsx` (lines 187-212)
-- **Default state logic:** `web_src/src/pages/workflowv2/mappers/stateRegistry.ts`
-- **Example custom states:** `web_src/src/pages/workflowv2/mappers/approval.ts` (lines 37-110)
-- **Example custom field:** `web_src/src/pages/workflowv2/mappers/wait.tsx` (lines 242-294)
-- **Example data builder:** `web_src/src/pages/workflowv2/mappers/approval.ts` (lines 257-398)
-- **App-specific example:** `web_src/src/pages/workflowv2/mappers/semaphore/index.ts`
+- **Default state logic:** `web_src/src/pages/app/mappers/stateRegistry.ts`
+- **Example custom states:** `web_src/src/pages/app/mappers/approval.ts` (lines 37-110)
+- **Example custom field:** `web_src/src/pages/app/mappers/wait/index.tsx` (lines 242-294)
+- **Example data builder:** `web_src/src/pages/app/mappers/approval.ts` (lines 257-398)
+- **App-specific example:** `web_src/src/pages/app/mappers/semaphore/index.ts`
