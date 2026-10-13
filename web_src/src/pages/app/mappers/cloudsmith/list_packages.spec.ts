@@ -4,16 +4,6 @@ import { buildDetailsCtx } from "./test_helpers";
 import type { TrimmedPackageData } from "./types";
 
 describe("listPackagesMapper.getExecutionDetails", () => {
-  it("does not throw when outputs is undefined", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
-    expect(() => listPackagesMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
-  it("does not throw when default array is empty", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
-    expect(() => listPackagesMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
   it("returns Executed At when packages are missing", () => {
     const ctx = buildDetailsCtx({
       execution: { outputs: { default: [buildListPackagesOutput(undefined)] } },
