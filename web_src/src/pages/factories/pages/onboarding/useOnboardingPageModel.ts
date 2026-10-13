@@ -383,13 +383,11 @@ export function useOnboardingPageModel(args: {
     const requestedStep = searchParams.get("step");
     return isWizardStepId(requestedStep) ? requestedStep : initialWizardStep(onboarding);
   });
+  const onboardingPath = args.onboardingEntryPath ?? factorySetupPath(args.organizationId, args.factoryKey);
   const connect = useIntegrationConnectDialog({
     organizationId: args.organizationId,
     // Return to this step after the provider round trip.
-    returnTo: onboardingStepPath(
-      args.onboardingEntryPath ?? factorySetupPath(args.organizationId, args.factoryKey),
-      openSection,
-    ),
+    returnTo: onboardingStepPath(onboardingPath, openSection),
     integrationNames: [...ONBOARDING_CONNECTION_NAMES],
     selections: integrations.selections,
     onSelectionsChange: integrations.setSelections,
@@ -419,7 +417,8 @@ export function useOnboardingPageModel(args: {
     const existing = selectReadyIntegrationInstance(connectedIntegrations, integrations.selections, "customLlm");
     if (existing) {
       integrations.setSelections(existing);
-      return true;
+      // True means the browser left this page. A saved connection stays here.
+      return false;
     }
     setCustomProviderDialogOpen(true);
     return false;

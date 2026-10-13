@@ -94,7 +94,13 @@ vi.mock("./AgentStep", () => ({
 }));
 
 function setupState(): OnboardingSetupApi {
-  const { result } = renderHook(() => useOnboardingSetupState("Payments Service", { simulateDiscovery: false }));
+  const { result } = renderHook(() =>
+    useOnboardingSetupState("Payments Service", {
+      simulateDiscovery: false,
+      connected: new Set(["github"]),
+      initial: { vcsHost: "github" },
+    }),
+  );
   return result.current;
 }
 
@@ -312,6 +318,10 @@ describe("FirstRunSetup chrome", () => {
 
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /GitHub Issues/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /^Jira/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /^Linear/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
   });
 
   it("shows provider keys when the organization chooses its own key", async () => {
@@ -354,6 +364,7 @@ describe("FirstRunSetup chrome", () => {
       hostedModelsAvailable: true,
       bringYourOwnKey: true,
       agentCredentialChoice: "hosted",
+      setup: { ...setupState(), issuesChoice: "vcs" },
     });
 
     renderSetup(model);
@@ -368,7 +379,7 @@ describe("FirstRunSetup chrome", () => {
       hostedAgentReady: true,
       hostedModelsAvailable: true,
       openSection: "repo",
-      setup: withRepository(),
+      setup: { ...withRepository(), issuesChoice: "vcs" },
     });
 
     renderSetup(model, "/org-1/workspaces/PAY/setup?step=repo");

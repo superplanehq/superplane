@@ -116,7 +116,7 @@ export const FIRST_RUN_COPY = {
     githubIssues: "GitHub Issues",
     jira: "Jira",
     linear: "Linear",
-    githubIssuesHelper: "Issues on this repository. No extra setup.",
+    githubIssuesHelper: "Scan issues from GitHub.",
     jiraHelper: "Connect Jira and choose a project.",
     jiraProjectHeading: "Choose a Jira project",
     linearHelper: "Connect Linear and choose projects.",

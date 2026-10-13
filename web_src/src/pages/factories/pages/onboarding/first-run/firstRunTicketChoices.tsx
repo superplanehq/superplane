@@ -8,8 +8,10 @@ import type { FirstRunTicketSource } from "./firstRunTypes";
 type TicketProject = { id?: string; name?: string };
 
 export function FirstRunTicketChoices({
+  githubAvailable,
   ticketSource,
   saving,
+  githubConnected,
   jiraConnected,
   jiraProjects,
   jiraProjectsLoading,
@@ -23,6 +25,7 @@ export function FirstRunTicketChoices({
   linearProjectsError,
   linearProjectIds,
   onSelectTicketSource,
+  onConnectGitHub,
   onConnectJira,
   onSelectJiraProject,
   onRetryJiraProjects,
@@ -30,8 +33,10 @@ export function FirstRunTicketChoices({
   onToggleLinearProject,
   onRetryLinearProjects,
 }: {
+  githubAvailable: boolean;
   ticketSource: FirstRunTicketSource | null;
   saving: boolean;
+  githubConnected: boolean;
   jiraConnected: boolean;
   jiraProjects: TicketProject[];
   jiraProjectsLoading: boolean;
@@ -45,6 +50,7 @@ export function FirstRunTicketChoices({
   linearProjectsError: boolean;
   linearProjectIds: string[];
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
+  onConnectGitHub?: () => void;
   onConnectJira?: () => void;
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
@@ -56,14 +62,19 @@ export function FirstRunTicketChoices({
   return (
     <FirstRunPanel>
       <div className="space-y-3">
-        <ConnectOptionRow
-          icon={<IntegrationChoiceIcon name="github" />}
-          title={copy.githubIssues}
-          detail={copy.githubIssuesHelper}
-          selected={ticketSource === "github-issues"}
-          disabled={saving}
-          onSelect={() => onSelectTicketSource("github-issues")}
-        />
+        {githubAvailable && (
+          <ConnectOptionRow
+            icon={<IntegrationChoiceIcon name="github" />}
+            title={copy.githubIssues}
+            detail={copy.githubIssuesHelper}
+            connectLabel="GitHub"
+            connected={githubConnected}
+            onConnect={onConnectGitHub}
+            selected={ticketSource === "github-issues"}
+            disabled={saving}
+            onSelect={() => onSelectTicketSource("github-issues")}
+          />
+        )}
         <ConnectOptionRow
           icon={<IntegrationChoiceIcon name="jira" />}
           title={copy.jira}
