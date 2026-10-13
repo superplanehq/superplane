@@ -432,6 +432,17 @@ describe("agentRunnerQueue", () => {
         }),
       ),
     ).toEqual({ queued: false, workStartedAt: "2026-10-13T11:10:00.000Z" });
+    expect(
+      agentRunnerQueue(
+        agentCanvas(),
+        startedRun({
+          executions: [
+            { nodeId: "trigger", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+            { nodeId: "agent", state: "STATE_STARTED", createdAt: "2026-10-13T11:10:00.000Z" },
+          ],
+        }),
+      ).workEndedAt,
+    ).toBeUndefined();
   });
 
   it("does not treat a pending agent execution as queued", () => {
@@ -470,5 +481,53 @@ describe("agentRunnerQueue", () => {
 
   it("does not mark a finished run queued", () => {
     expect(agentRunnerQueue(agentCanvas(), startedRun({ state: "STATE_FINISHED" })).queued).toBe(false);
+  });
+
+  it("keeps the agent working interval after the execution finishes", () => {
+    expect(
+      agentRunnerQueue(
+        agentCanvas(),
+        startedRun({
+          queueItems: [],
+          executions: [
+            {
+              nodeId: "agent",
+              state: "STATE_FINISHED",
+              createdAt: "2026-10-13T11:10:00.000Z",
+              updatedAt: "2026-10-13T11:12:00.000Z",
+            },
+          ],
+        }),
+      ),
+    ).toEqual({
+      queued: false,
+      workStartedAt: "2026-10-13T11:10:00.000Z",
+      workEndedAt: "2026-10-13T11:12:00.000Z",
+    });
+  });
+
+  it("keeps the agent working interval after the run finishes", () => {
+    expect(
+      agentRunnerQueue(
+        agentCanvas(),
+        startedRun({
+          state: "STATE_FINISHED",
+          finishedAt: "2026-10-13T12:00:00.000Z",
+          queueItems: [],
+          executions: [
+            {
+              nodeId: "agent",
+              state: "STATE_FINISHED",
+              createdAt: "2026-10-13T11:10:00.000Z",
+              updatedAt: "2026-10-13T11:12:00.000Z",
+            },
+          ],
+        }),
+      ),
+    ).toEqual({
+      queued: false,
+      workStartedAt: "2026-10-13T11:10:00.000Z",
+      workEndedAt: "2026-10-13T11:12:00.000Z",
+    });
   });
 });

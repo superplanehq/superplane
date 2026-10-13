@@ -8,6 +8,7 @@ import { type SplitRunPhase, type SplitRunPhaseStatus } from "../splitRunMocks";
 import { useSplitRunLiveCanvas } from "../useSplitRunLiveCanvas";
 import { AutomationCardBody } from "./AutomationCardBody";
 import {
+  consoleCanStop,
   consoleHeaderStatus,
   consoleStopRunId,
   runMetaLine,
@@ -57,7 +58,8 @@ export function ConsoleAutomationCard({
   const phaseStatus = shownPhaseStatus(shownStatus);
   const shownPhase = phase && phaseStatus !== phase.status ? { ...phase, status: phaseStatus } : phase;
   const live = isLiveAutomationStatus(shownStatus);
-  const ticking = headerStatus === "running" && [...timing.values()].some((entry) => entry.workStartedAt);
+  const ticking =
+    headerStatus === "running" && [...timing.values()].some((entry) => entry.workStartedAt && !entry.workEndedAt);
   const now = useTickingNow(ticking);
   const [open, setOpen] = useState(live || expandIdle);
   const closedByUser = useRef(false);
@@ -81,7 +83,11 @@ export function ConsoleAutomationCard({
   };
   const stopPhase = phaseForStop(phases, automation.runs, queuedIds) ?? shownPhase;
   const stopRun =
-    canStopRun && onStopRun && canStopStatus(shownStatus) && stopPhase?.appId && stopPhase.runId
+    canStopRun &&
+    onStopRun &&
+    consoleCanStop(shownStatus, automation.runs, queuedIds) &&
+    stopPhase?.appId &&
+    stopPhase.runId
       ? () => {
           stopping.request();
           onStopRun({ appId: stopPhase.appId ?? "", runId: stopPhase.runId ?? "" });
@@ -100,7 +106,7 @@ export function ConsoleAutomationCard({
       className="[--frame-radius:var(--radius-lg)]"
       data-testid={`redesign-console-automation-${automation.id}`}
     >
-      {runningPhases(phases, automation).map((entry) => (
+      {probedPhases(phases, automation, timing).map((entry) => (
         <AgentQueueProbe key={entry.id} organizationId={organizationId} phase={entry} onQueue={report} />
       ))}
       <Collapsible open={open} onOpenChange={handleOpenChange} className="group/collapsible">
@@ -190,15 +196,22 @@ function shownPhaseStatus(status: ConsoleDisplayStatus): SplitRunPhaseStatus {
   return status === "queued" ? "running" : status;
 }
 
-function canStopStatus(status: ConsoleDisplayStatus): boolean {
-  return status === "running" || status === "queued";
-}
-
-function runningPhases(phases: SplitRunPhase[], automation: ConsoleAutomation): SplitRunPhase[] {
+function probedPhases(
+  phases: SplitRunPhase[],
+  automation: ConsoleAutomation,
+  timing: ReadonlyMap<string, ConsoleRunTiming>,
+): SplitRunPhase[] {
   const runIds = new Set(automation.runs.map((run) => run.id));
-  return phases.filter(
-    (phase) => runIds.has(phase.id) && phase.status === "running" && Boolean(phase.appId) && Boolean(phase.runId),
-  );
+  return phases.filter((phase) => {
+    if (!runIds.has(phase.id) || !phase.appId || !phase.runId) {
+      return false;
+    }
+    if (phase.status === "running") {
+      return true;
+    }
+    const known = timing.get(phase.id);
+    return Boolean(known?.workStartedAt && !known.workEndedAt);
+  });
 }
 
 function phaseForStop(
@@ -215,7 +228,11 @@ function useAgentQueueReports() {
   const report = useCallback((id: string, next: ConsoleRunTiming) => {
     setTiming((current) => {
       const previous = current.get(id);
-      if (previous?.queued === next.queued && previous?.workStartedAt === next.workStartedAt) {
+      if (
+        previous?.queued === next.queued &&
+        previous?.workStartedAt === next.workStartedAt &&
+        previous?.workEndedAt === next.workEndedAt
+      ) {
         return current;
       }
       const copy = new Map(current);
@@ -247,15 +264,13 @@ function AgentQueueProbe({
   const live = useSplitRunLiveCanvas(organizationId, phase);
   const queued = Boolean(live.agentQueue?.queued);
   const workStartedAt = live.agentQueue?.workStartedAt;
+  const workEndedAt = live.agentQueue?.workEndedAt;
   useEffect(() => {
     if (!live.agentQueue) {
       return;
     }
-    onQueue(phase.id, { queued, workStartedAt });
-  }, [live.agentQueue, onQueue, phase.id, queued, workStartedAt]);
-  useEffect(() => {
-    return () => onQueue(phase.id, { queued: false });
-  }, [onQueue, phase.id]);
+    onQueue(phase.id, { queued, workStartedAt, workEndedAt });
+  }, [live.agentQueue, onQueue, phase.id, queued, workEndedAt, workStartedAt]);
   return null;
 }
 

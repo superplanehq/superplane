@@ -4,6 +4,7 @@ import { formatWorkOrderDateTime } from "../../../lib/workOrderDateTime";
 import { SPLIT_RUN_RUNNING } from "../splitRunMocks";
 import { stagesFromFixture, type AutomationStage } from "./automationsViewModel";
 import {
+  consoleCanStop,
   consoleHeaderStatus,
   consoleStopRunId,
   outputCountLabel,
@@ -121,6 +122,19 @@ describe("runMetaLine", () => {
       runMetaLine(working, [working], new Map([[working.id, { workStartedAt: "2026-10-13T11:58:00.000Z" }]]), now),
     ).toBe("2m");
   });
+
+  it("keeps finished working time instead of the full run duration", () => {
+    const now = Date.parse("2026-10-13T12:00:00.000Z");
+    const finished = { ...runningStage("implement"), status: "passed" as const, duration: "42m" };
+    const live = { ...finished, id: "live", status: "running" as const, duration: "40m" };
+    const timing = new Map([
+      [finished.id, { workStartedAt: "2026-10-13T11:58:00.000Z", workEndedAt: "2026-10-13T12:00:00.000Z" }],
+      [live.id, { workStartedAt: "2026-10-13T11:59:00.000Z" }],
+    ]);
+
+    expect(runMetaLine(finished, [finished], timing, now)).toBe("2m");
+    expect(runMetaLine(live, [finished, live], timing, now)).toBe("3m");
+  });
 });
 
 describe("consoleHeaderStatus", () => {
@@ -143,6 +157,18 @@ describe("consoleHeaderStatus", () => {
   it("leaves an exclusive-access wait labeled waiting", () => {
     expect(consoleHeaderStatus([{ id: "access", status: "waiting" }], new Set(["access"]))).toBe("waiting");
   });
+
+  it("keeps an exclusive-access wait labeled waiting when another agent is queued", () => {
+    expect(
+      consoleHeaderStatus(
+        [
+          { id: "access", status: "waiting" },
+          { id: "queued", status: "running" },
+        ],
+        new Set(["queued"]),
+      ),
+    ).toBe("waiting");
+  });
 });
 
 describe("consoleStopRunId", () => {
@@ -154,6 +180,18 @@ describe("consoleStopRunId", () => {
 
     expect(consoleStopRunId(runs, new Set(["queued"]))).toBe("working");
     expect(consoleStopRunId([runs[0]], new Set(["queued"]))).toBe("queued");
+  });
+});
+
+describe("consoleCanStop", () => {
+  it("keeps Stop for a queued agent on an exclusive-access wait card", () => {
+    const runs = [
+      { id: "access", status: "waiting" as const },
+      { id: "queued", status: "running" as const },
+    ];
+
+    expect(consoleCanStop("waiting", runs, new Set(["queued"]))).toBe(true);
+    expect(consoleCanStop("waiting", [runs[0]], new Set(["access"]))).toBe(false);
   });
 });
 

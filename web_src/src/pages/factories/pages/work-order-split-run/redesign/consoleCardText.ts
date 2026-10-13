@@ -11,6 +11,7 @@ export type ConsoleDisplayStatus = SplitRunPhaseStatus | "queued";
 export type ConsoleRunTiming = {
   queued?: boolean;
   workStartedAt?: string;
+  workEndedAt?: string;
 };
 
 export function consoleHeaderStatus(
@@ -39,6 +40,17 @@ export function consoleStopRunId(
     return working.id;
   }
   return runs.find((run) => run.status === "running" && queuedRunIds.has(run.id))?.id;
+}
+
+export function consoleCanStop(
+  status: ConsoleDisplayStatus,
+  runs: Array<Pick<AutomationStage, "id" | "status">>,
+  queuedRunIds: ReadonlySet<string>,
+): boolean {
+  if (status === "running" || status === "queued") {
+    return true;
+  }
+  return status === "waiting" && Boolean(consoleStopRunId(runs, queuedRunIds));
 }
 
 /**
@@ -118,14 +130,15 @@ export function runMetaLine(
 }
 
 function durationLabelForRun(run: AutomationStage, timing: ConsoleRunTiming | undefined, now: number): string {
-  if (run.status !== "running" || !timing?.workStartedAt) {
-    return run.duration ?? "";
+  const start = Date.parse(timing?.workStartedAt ?? "");
+  if (Number.isFinite(start)) {
+    const ended = Date.parse(timing?.workEndedAt ?? "");
+    const end = Number.isFinite(ended) ? ended : run.status === "running" ? now : Number.NaN;
+    if (Number.isFinite(end)) {
+      return formatMinutesSecondsDuration(Math.max(0, end - start)) || "<1s";
+    }
   }
-  const start = Date.parse(timing.workStartedAt);
-  if (!Number.isFinite(start)) {
-    return run.duration ?? "";
-  }
-  return formatMinutesSecondsDuration(Math.max(0, now - start)) || "<1s";
+  return run.duration ?? "";
 }
 
 /**
