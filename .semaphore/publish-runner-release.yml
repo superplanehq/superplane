@@ -1,0 +1,90 @@
+version: v1.0
+name: "Publish Runner Release"
+
+queue:
+  name: component-releases
+  scope: project
+  processing: serialized
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+      - test "$SEMAPHORE_GIT_BRANCH" = main
+      - test "$SEMAPHORE_PIPELINE_PROMOTION" = true
+      - test "$(git rev-parse HEAD)" = "$SEMAPHORE_GIT_SHA"
+
+blocks:
+  - name: "Publish"
+    task:
+      epilogue:
+        always:
+          commands:
+            - rm -f /tmp/github-release-token /tmp/semaphore-oidc-token
+      jobs:
+        - name: "Publish immutable Runner release"
+          commands:
+            - artifact pull workflow "build/runner/$VERSION"
+            - |
+              release_dir="build/runner/$VERSION"
+              (cd "$release_dir" && sha256sum --check release-manifest.sha256)
+              node release/component-release.js verify-manifest \
+                --component runner \
+                --version "$VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
+                --directory "$release_dir" \
+                --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
+                --manifest "$release_dir/release-manifest.json"
+              (cd "$release_dir" && sha256sum --check checksums.txt)
+            - |
+              install -m 600 /dev/null /tmp/github-release-token
+              node release/github-app-token.js >/tmp/github-release-token
+            - |
+              release_dir="build/runner/$VERSION"
+              export GITHUB_TOKEN="$(cat /tmp/github-release-token)"
+              node release/component-release.js stage-github-release \
+                --component runner \
+                --version "$VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --directory "$release_dir" \
+                --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
+                --release-id-file /tmp/github-release-id
+            - |
+              test -n "$RUNNER_RELEASE_AWS_ROLE_ARN"
+              install -m 600 /dev/null /tmp/semaphore-oidc-token
+              printf '%s' "$SEMAPHORE_OIDC_TOKEN" >/tmp/semaphore-oidc-token
+              export AWS_ROLE_ARN="$RUNNER_RELEASE_AWS_ROLE_ARN"
+              export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/semaphore-oidc-token
+              export AWS_ROLE_SESSION_NAME="runner-release-$SEMAPHORE_JOB_ID"
+              export AWS_REGION="${AWS_REGION:-us-east-1}"
+              bash release/runner/upload.sh "$VERSION" s3://superplanehq-releases
+              rm -f /tmp/semaphore-oidc-token
+            - |
+              release_dir="build/runner/$VERSION"
+              bash release/verify-public-assets.sh \
+                "https://superplanehq-releases.s3.amazonaws.com/runner/$VERSION" \
+                "$release_dir" \
+                runner-linux-amd64.tar.gz \
+                runner-linux-arm64.tar.gz \
+                runner.spdx.json \
+                checksums.txt
+            - |
+              export GITHUB_TOKEN="$(cat /tmp/github-release-token)"
+              node release/component-release.js publish-github-release \
+                --release-id "$(cat /tmp/github-release-id)" \
+                --sha "$SEMAPHORE_GIT_SHA"
+            - |
+              encoded_tag="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "runner/$VERSION")"
+              bash release/verify-public-assets.sh \
+                "https://github.com/superplanehq/superplane/releases/download/$encoded_tag" \
+                "build/runner/$VERSION" \
+                runner-linux-amd64.tar.gz \
+                runner-linux-arm64.tar.gz \
+                runner.spdx.json \
+                checksums.txt

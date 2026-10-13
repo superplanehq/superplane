@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [ "$1" = "s3api" ] && [ "$2" = "put-object" ] && [ "$3" = "--generate-cli-skeleton" ]; then
+  printf '{"IfNoneMatch":""}\n'
+  exit 0
+fi
+
+value_after() {
+  local wanted="$1"
+  shift
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "$wanted" ]; then
+      printf '%s\n' "$2"
+      return
+    fi
+    shift
+  done
+  return 1
+}
+
+if [ "$1" = "s3api" ] && [ "$2" = "head-object" ]; then
+  key="$(value_after --key "${@:3}")"
+  if [ -f "${FAKE_S3_ROOT}/${key}" ]; then
+    printf '{}\n'
+    exit 0
+  fi
+  printf 'An error occurred (404) when calling HeadObject\n' >&2
+  exit 255
+fi
+
+if [ "$1" = "s3api" ] && [ "$2" = "put-object" ]; then
+  key="$(value_after --key "${@:3}")"
+  body="$(value_after --body "${@:3}")"
+  if [[ " $* " != *' --if-none-match * '* ]]; then
+    printf 'missing --if-none-match\n' >&2
+    exit 2
+  fi
+  printf '%s\n' "${key}" >>"${FAKE_S3_LOG}"
+  destination="${FAKE_S3_ROOT}/${key}"
+  mkdir -p "$(dirname "${destination}")"
+  if [ -e "${destination}" ]; then
+    printf 'PreconditionFailed\n' >&2
+    exit 255
+  fi
+  cp "${body}" "${destination}"
+  printf '{}\n'
+  exit 0
+fi
+
+if [ "$1" = "s3" ] && [ "$2" = "cp" ] && [ "$4" = "-" ]; then
+  key="${3#s3://*/}"
+  cat "${FAKE_S3_ROOT}/${key}"
+  exit 0
+fi
+
+printf 'unexpected aws invocation: %s\n' "$*" >&2
+exit 2

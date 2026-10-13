@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -22,10 +23,21 @@ import (
 var Version = "dev"
 
 func main() {
+	if printVersion(os.Args[1:], os.Stdout) {
+		return
+	}
 	if err := run(); err != nil {
 		slog.Error("runner stopped", slog.Any("error", err))
 		os.Exit(1)
 	}
+}
+
+func printVersion(args []string, output io.Writer) bool {
+	if len(args) != 1 || args[0] != "--version" {
+		return false
+	}
+	fmt.Fprintf(output, "runner %s\n", Version)
+	return true
 }
 
 func run() error {

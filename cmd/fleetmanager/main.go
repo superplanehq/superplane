@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -29,7 +30,12 @@ const (
 	defaultConfigPath     = "/etc/superplane/fleet-manager.yaml"
 )
 
+var Version = "dev"
+
 func main() {
+	if printVersion(os.Args[1:], os.Stdout) {
+		return
+	}
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	configPath := os.Getenv(configPathEnvironment)
 	if configPath == "" {
@@ -168,6 +174,14 @@ func main() {
 	)
 	<-ctx.Done()
 	log.Info("Fleet Manager stopped")
+}
+
+func printVersion(args []string, output io.Writer) bool {
+	if len(args) != 1 || args[0] != "--version" {
+		return false
+	}
+	fmt.Fprintf(output, "fleet-manager %s\n", Version)
+	return true
 }
 
 func newEC2Client(config aws.Config, region string) *ec2.Client {
