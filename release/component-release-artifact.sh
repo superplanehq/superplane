@@ -64,6 +64,18 @@ pull_bundle() {
 
   artifact pull workflow "${BUNDLE_NAME}"
 
+  listing_dir="$(mktemp -d)"
+  trap 'rm -rf "${listing_dir}"' EXIT
+
+  if ! tar -tzf "${BUNDLE_PATH}" >"${listing_dir}/paths"; then
+    echo "Error: release bundle is not a valid gzip archive" >&2
+    exit 1
+  fi
+  if ! tar -tvzf "${BUNDLE_PATH}" >"${listing_dir}/entries"; then
+    echo "Error: release bundle metadata cannot be read" >&2
+    exit 1
+  fi
+
   while IFS= read -r entry; do
     case "${entry}" in
       "${VERSION}" | "${VERSION}/" | "${VERSION}/"*)
@@ -77,7 +89,7 @@ pull_bundle() {
         exit 1
         ;;
     esac
-  done < <(tar -tzf "${BUNDLE_PATH}")
+  done <"${listing_dir}/paths"
 
   while IFS= read -r entry; do
     case "${entry:0:1}" in
@@ -87,7 +99,7 @@ pull_bundle() {
         exit 1
         ;;
     esac
-  done < <(tar -tvzf "${BUNDLE_PATH}")
+  done <"${listing_dir}/entries"
 
   mkdir -p "${RELEASE_PARENT}"
   tar -C "${RELEASE_PARENT}" -xzf "${BUNDLE_PATH}"

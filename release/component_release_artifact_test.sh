@@ -52,4 +52,19 @@ if bash "${REPO_ROOT}/release/component-release-artifact.sh" \
 fi
 test ! -e "${MALICIOUS_RELEASE_DIR}"
 
+CORRUPT_WORK_DIR="${TEST_DIR}/corrupt-work"
+CORRUPT_VERSION="v0.1.0-rc.3"
+CORRUPT_RELEASE_DIR="${CORRUPT_WORK_DIR}/build/runner/${CORRUPT_VERSION}"
+mkdir -p "${CORRUPT_WORK_DIR}/build/runner"
+printf 'not a gzip archive\n' >\
+  "${ARTIFACT_TEST_STORE}/runner-${CORRUPT_VERSION}.tar.gz"
+
+cd "${CORRUPT_WORK_DIR}"
+if bash "${REPO_ROOT}/release/component-release-artifact.sh" \
+  pull runner "${CORRUPT_VERSION}" "${CORRUPT_RELEASE_DIR}"; then
+  echo "Error: corrupt release bundle was accepted" >&2
+  exit 1
+fi
+test ! -e "${CORRUPT_RELEASE_DIR}"
+
 echo "Component release artifact tests passed."
