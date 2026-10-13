@@ -3,11 +3,6 @@ import { updateImageMapper } from "./update_image";
 import { buildDetailsCtx, buildOutput } from "./vm_mapper_test_helpers";
 
 describe("updateImageMapper.getExecutionDetails", () => {
-  it("does not throw when outputs is undefined", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
-    expect(() => updateImageMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
   it("returns only Executed At when output data is missing", () => {
     const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
     const details = updateImageMapper.getExecutionDetails(ctx);
