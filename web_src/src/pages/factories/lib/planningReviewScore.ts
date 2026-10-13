@@ -87,11 +87,6 @@ export function planningReviewLevel(score: number): WorkOrderCheckLevel {
   return "critical";
 }
 
-/** At the top score there is nothing to fix, so the chip shows the summary instead of the per-check drawer. */
-export function planningReviewAtMax(metrics: Pick<WorkOrderCheckPresentation, "score">[]): boolean {
-  return metrics.length > 0 && metrics.every((metric) => metric.score >= PLANNING_REVIEW_SCORE_MAX);
-}
-
 export function planningReviewFromChecks(checks: WorkOrderCheckPresentation[] | undefined): {
   headline: WorkOrderCheckPresentation;
   metrics: PlanningReviewMetric[];
