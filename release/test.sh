@@ -6,11 +6,14 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${REPO_ROOT}"
 
 node --test release/component-release.test.js
+bash release/component_release_artifact_test.sh
 bash release/runner/upload_test.sh
 bash release/fleet-manager/publish_image_test.sh
 
 bash -n \
   release/generate-component-sbom.sh \
+  release/component-release-artifact.sh \
+  release/component_release_artifact_test.sh \
   release/verify-component-release-source.sh \
   release/verify-public-assets.sh \
   release/runner/build.sh \

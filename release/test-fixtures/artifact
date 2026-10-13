@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [ "$#" -ne 3 ] || [ "$2" != "workflow" ]; then
+  echo "Usage: artifact <push|pull> workflow <path>" >&2
+  exit 1
+fi
+
+ACTION="$1"
+SOURCE="$3"
+NAME="$(basename "${SOURCE}")"
+STORED_PATH="${ARTIFACT_TEST_STORE:?}/${NAME}"
+
+case "${ACTION}" in
+  push)
+    if [ -e "${STORED_PATH}" ]; then
+      echo "Error: ${NAME} already exists" >&2
+      exit 1
+    fi
+    mkdir -p "${ARTIFACT_TEST_STORE}"
+    cp "${SOURCE}" "${STORED_PATH}"
+    ;;
+  pull)
+    cp "${STORED_PATH}" "${SOURCE}"
+    ;;
+  *)
+    echo "Error: unsupported artifact action ${ACTION}" >&2
+    exit 1
+    ;;
+esac
