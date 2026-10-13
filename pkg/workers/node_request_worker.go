@@ -511,6 +511,7 @@ func (w *NodeRequestWorker) invokeExecutionComponentHook(
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithRunsCancelled(runCancellations.RecordRuns).
+			WithRunCancellationDeferred(runCancellations.RecordDeferred).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
 			WithFileBindCleanup(onFileBindCleanup).
 			WithRemoteImageIngest(w.encryptor, w.registry),
