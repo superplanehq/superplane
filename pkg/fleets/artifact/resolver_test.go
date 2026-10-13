@@ -46,6 +46,34 @@ func TestResolveReadsVersionedReleaseChecksum(t *testing.T) {
 	}
 }
 
+func TestResolveReadsGitHubComponentReleaseChecksum(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.RequestURI != "/releases/download/runner%2Fv1.2.3/checksums.txt" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(
+			"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  runner-linux-amd64.tar.gz\n",
+		))
+	}))
+	defer server.Close()
+
+	resolver, err := NewResolver(
+		server.URL+"/releases/download/runner%2F{version}",
+		server.Client(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resolved, err := resolver.Resolve(context.Background(), "v1.2.3", "linux", "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved.URL != server.URL+"/releases/download/runner%2Fv1.2.3/runner-linux-amd64.tar.gz" {
+		t.Fatalf("artifact URL = %q", resolved.URL)
+	}
+}
+
 func TestResolveRejectsMutableVersion(t *testing.T) {
 	resolver, err := NewResolver("https://downloads.example/runner", http.DefaultClient)
 	if err != nil {
@@ -121,5 +149,14 @@ func TestNewResolverRejectsMutableReleaseURL(t *testing.T) {
 		http.DefaultClient,
 	); err == nil {
 		t.Fatal("expected mutable release URL to fail")
+	}
+}
+
+func TestNewResolverRejectsMultipleVersionPlaceholders(t *testing.T) {
+	if _, err := NewResolver(
+		"https://downloads.example/{version}/runner/{version}",
+		http.DefaultClient,
+	); err == nil {
+		t.Fatal("expected multiple version placeholders to fail")
 	}
 }
