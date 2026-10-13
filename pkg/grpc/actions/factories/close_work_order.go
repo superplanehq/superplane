@@ -60,9 +60,12 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		logger.WithError(err).Error("close work order failed")
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
+	deferredRunIDs := append([]uuid.UUID(nil), order.DeferredRunCancellationIDs...)
+	if len(deferredRunIDs) > 0 {
+		logger.Warn("close deferred run cancellation because the planning run lock was busy")
+	}
 
-	publishWorkOrderClosed(orgID, factory, order, &closedBy, fromState, result, wasClosed)
-	messages.PublishWorkOrderRunCancellations(db, order)
+	scheduleWorkOrderCloseEffects(ctx, orgID, factory, order, &closedBy, fromState, result, wasClosed, deferredRunIDs)
 
 	order, err = factory.FindWorkOrder(db, orderID)
 	if err != nil {
@@ -77,6 +80,35 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 	return &pb.CloseWorkOrderResponse{
 		Order: serialized,
 	}, nil
+}
+
+func scheduleWorkOrderCloseEffects(
+	ctx context.Context,
+	orgID uuid.UUID,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+	closedBy *uuid.UUID,
+	fromState string,
+	result string,
+	wasClosed bool,
+	deferredRunIDs []uuid.UUID,
+) {
+	ids := append([]uuid.UUID(nil), deferredRunIDs...)
+	detached := context.WithoutCancel(ctx)
+	go func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				logging.WithWorkOrder(logging.ForFactory(*factory), *order).
+					Errorf("close work order effects failed: %v", recovered)
+			}
+		}()
+		publishWorkOrderClosed(orgID, factory, order, closedBy, fromState, result, wasClosed)
+		db := database.DB(detached)
+		messages.PublishWorkOrderRunCancellations(db, order)
+		if len(ids) > 0 {
+			messages.PublishDeferredWorkOrderRunCancellations(db, closedBy, ids, uuid.Nil)
+		}
+	}()
 }
 
 func publishWorkOrderClosed(
