@@ -172,6 +172,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Add a custom model provider with a URL, token, and API type",
             },
             {
+              id: "workspace_agent",
+              label: "SuperPlane Agent",
+              description: "Show the SuperPlane Agent page",
+            },
+            {
               id: "workspace_mcp",
               label: "Workspace MCP",
               description: "Add MCP servers for workspace agents",

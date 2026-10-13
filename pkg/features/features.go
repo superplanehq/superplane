@@ -53,6 +53,10 @@ const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider
 // Done, and phase columns until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
 
+// FeatureWorkspaceAgent gates the SuperPlane Agent page until it is ready
+// for general use.
+const FeatureWorkspaceAgent = "workspace_agent"
+
 // FeatureWorkspaceMCP gates workspace MCP settings, MCP APIs, and MCP attach.
 const FeatureWorkspaceMCP = "workspace_mcp"
 
@@ -89,6 +93,7 @@ var registry = []Feature{
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
+	{ID: FeatureWorkspaceAgent, Label: "SuperPlane Agent", Description: "Show the SuperPlane Agent page"},
 	{ID: FeatureWorkspaceMCP, Label: "Workspace MCP", Description: "Add MCP servers for workspace agents"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
 	{ID: FeatureNewRunners, Label: "New Runners", Description: "Run tasks with the integrated SuperPlane runner architecture", Released: released()},

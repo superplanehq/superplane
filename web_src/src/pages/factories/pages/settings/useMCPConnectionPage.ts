@@ -11,7 +11,7 @@ import {
   useUpdateFactoryAgentResource,
 } from "@/hooks/useFactoryAgentResources";
 import { useCreateSecret } from "@/hooks/useSecrets";
-import { factoryRouteSegment, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
+import { factoryAgentPath, factoryRouteSegment } from "../../lib/factoryPagePaths";
 import type { AgentResourceConnectionDraft } from "./AgentResourceConnectionDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { catalogEntryForResource, type MCPCatalogEntry } from "./mcpCatalog";
@@ -53,7 +53,7 @@ export function useMCPConnectionPage() {
   const [catalogEntry, setCatalogEntry] = useState<MCPCatalogEntry | undefined>();
   const [pendingDelete, setPendingDelete] = useState(false);
 
-  const listPath = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "agent");
+  const listPath = factoryAgentPath(organizationId, factoryKey);
 
   const openEdit = () => {
     if (!resource) {
