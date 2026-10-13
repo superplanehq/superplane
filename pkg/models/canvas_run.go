@@ -585,6 +585,32 @@ func LockCanvasRunInTransaction(tx *gorm.DB, runID uuid.UUID) (*CanvasRun, error
 	return &run, nil
 }
 
+var ErrCanvasRunLockBusy = errors.New("canvas run lock is busy")
+
+func lockCanvasRunForCancellation(tx *gorm.DB, runID uuid.UUID) (*CanvasRun, error) {
+	var run CanvasRun
+	err := tx.
+		Clauses(clause.Locking{Strength: lockingForUpdateNoKey, Options: "SKIP LOCKED"}).
+		Where("id = ?", runID).
+		First(&run).
+		Error
+	if err == nil {
+		return &run, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	var count int64
+	if countErr := tx.Model(&CanvasRun{}).Where("id = ?", runID).Count(&count).Error; countErr != nil {
+		return nil, countErr
+	}
+	if count == 0 {
+		return nil, gorm.ErrRecordNotFound
+	}
+	return nil, ErrCanvasRunLockBusy
+}
+
 type OpenCanvasRunWork struct {
 	HasActiveExecutions bool
 	HasQueueItems       bool
@@ -903,6 +929,7 @@ type RunCancellationResult struct {
 	Run             *CanvasRun
 	Drain           *RunCancellationDrainResult
 	NewlyCancelling bool
+	Deferred        bool
 }
 
 // RequestCompletion stops unfinished work while preserving a successful run result.
@@ -940,8 +967,22 @@ func (r *CanvasRun) requestTermination(tx *gorm.DB, stoppedBy *uuid.UUID, reques
 		if err != nil {
 			return nil, err
 		}
+		if terminated != nil && terminated.Deferred {
+			if result == nil {
+				result = &RunCancellationResult{Run: r}
+			}
+			result.Deferred = true
+			if run.ID == r.ID {
+				result.Run = terminated.Run
+			}
+			continue
+		}
 		if run.ID == r.ID {
+			deferred := result != nil && result.Deferred
 			result = terminated
+			if deferred && result != nil {
+				result.Deferred = true
+			}
 			continue
 		}
 		if terminated.Drain == nil {
@@ -974,8 +1015,11 @@ func listDescendantRuns(tx *gorm.DB, runID uuid.UUID) ([]CanvasRun, error) {
 }
 
 func (r *CanvasRun) requestRunTermination(tx *gorm.DB, stoppedBy *uuid.UUID, requestedResult string) (*RunCancellationResult, error) {
-	locked, err := LockCanvasRunInTransaction(tx, r.ID)
+	locked, err := r.lockRunForTermination(tx, requestedResult)
 	if err != nil {
+		if errors.Is(err, ErrCanvasRunLockBusy) {
+			return &RunCancellationResult{Run: r, Deferred: true}, nil
+		}
 		return nil, err
 	}
 	*r = *locked
@@ -1006,6 +1050,13 @@ func (r *CanvasRun) requestRunTermination(tx *gorm.DB, stoppedBy *uuid.UUID, req
 		return nil, err
 	}
 	return result, nil
+}
+
+func (r *CanvasRun) lockRunForTermination(tx *gorm.DB, requestedResult string) (*CanvasRun, error) {
+	if requestedResult == CanvasRunResultPassed {
+		return LockCanvasRunInTransaction(tx, r.ID)
+	}
+	return lockCanvasRunForCancellation(tx, r.ID)
 }
 
 func (r *CanvasRun) setRequestedResult(tx *gorm.DB, requestedResult string) error {

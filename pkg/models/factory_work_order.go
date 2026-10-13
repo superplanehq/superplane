@@ -88,9 +88,10 @@ type FactoryWorkOrder struct {
 	MCPClientName   *string
 	// StatusNote is the jsonb array of current-wait announcements (see
 	// FactoryWorkOrderStatusNote). Cleared on every state transition.
-	StatusNote datatypes.JSON
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	StatusNote              datatypes.JSON
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	RunCancellationDeferred bool `gorm:"-"`
 
 	CreatedBy *User                      `gorm:"foreignKey:CreatedByID"`
 	Assignees []FactoryWorkOrderAssignee `gorm:"foreignKey:WorkOrderID"`
@@ -206,14 +207,15 @@ func (FactoryWorkOrderAssignee) TableName() string {
 // shared status FSM. Actor / Automation / Run + App are optional attribution
 // fields that populate the emitted `order.status.updated` event.
 type FactoryWorkOrderStatusUpdate struct {
-	ToState         string
-	Result          string
-	Actor           *uuid.UUID
-	Automation      *factory.AutomationRef
-	Run             *factory.RunRef
-	App             *factory.AppRef
-	SkipSame        bool // when true, no-op transitions to the current state succeed silently
-	OnRunsCancelled func([]*RunCancellationResult)
+	ToState                   string
+	Result                    string
+	Actor                     *uuid.UUID
+	Automation                *factory.AutomationRef
+	Run                       *factory.RunRef
+	App                       *factory.AppRef
+	SkipSame                  bool // when true, no-op transitions to the current state succeed silently
+	OnRunsCancelled           func([]*RunCancellationResult)
+	OnRunCancellationDeferred func()
 }
 
 // NOTE: this is only OK to be used in the workers.
@@ -520,8 +522,14 @@ func (o *FactoryWorkOrder) endAnalysisSessionForTransition(tx *gorm.DB, actor *u
 		return err
 	}
 
-	_, err = run.RequestCancellation(tx, actor)
-	return err
+	result, err := run.RequestCancellation(tx, actor)
+	if err != nil {
+		return err
+	}
+	if result != nil && result.Deferred {
+		o.RunCancellationDeferred = true
+	}
+	return nil
 }
 
 // loadSourceRunRefs resolves the originating canvas run + app for an order

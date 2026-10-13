@@ -67,6 +67,7 @@ func UpdateWorkOrderStatus(
 	var order *models.FactoryWorkOrder
 	var fromState string
 	var changed bool
+	var deferred bool
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -84,7 +85,11 @@ func UpdateWorkOrderStatus(
 			Result:  result,
 			Actor:   &actor,
 		})
-		return err
+		if err != nil {
+			return err
+		}
+		deferred = order.RunCancellationDeferred
+		return nil
 	})
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update work order status")
@@ -100,7 +105,9 @@ func UpdateWorkOrderStatus(
 		return nil, factoryErrorToStatus(err, "failed to update work order status")
 	}
 
-	if err := messages.PublishFactoryWorkOrderUpdated(
+	if changed && toState == models.FactoryWorkOrderStateClosed {
+		scheduleWorkOrderCloseEffects(ctx, orgID, factory, order, &actor, fromState, result, false, deferred)
+	} else if err := messages.PublishFactoryWorkOrderUpdated(
 		factory.ID.String(),
 		order.ID.String(),
 		factoryevents.EventTypeOrderStatusUpdated,
@@ -108,10 +115,7 @@ func UpdateWorkOrderStatus(
 		log.WithError(err).Warnf("Failed to publish factory work order updated for order %s", order.ID)
 	}
 
-	if changed {
-		if toState == models.FactoryWorkOrderStateClosed {
-			messages.PublishWorkOrderRunCancellations(db, order)
-		}
+	if changed && toState != models.FactoryWorkOrderStateClosed {
 		notification := messages.FactoryWorkOrderNotificationMessage{
 			OrganizationID: orgID.String(),
 			FactoryID:      factory.ID.String(),

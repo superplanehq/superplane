@@ -3,6 +3,7 @@ package workers
 import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
@@ -19,6 +20,7 @@ type RunCancellationOutcome struct {
 // so callers can publish RabbitMQ messages after the transaction commits.
 type RunCancellationNotifier struct {
 	Outcomes []RunCancellationOutcome
+	deferred []uuid.UUID
 }
 
 func (n *RunCancellationNotifier) Bind(ctx *contexts.RunExecutionContext) *contexts.RunExecutionContext {
@@ -41,6 +43,32 @@ func (n *RunCancellationNotifier) Publish() {
 			log.Errorf("failed to publish run state RabbitMQ message: %v", err)
 		}
 	}
+	for _, orderID := range n.deferred {
+		orderID := orderID
+		go finishDeferredWorkOrderCancellation(orderID)
+	}
+}
+
+func (n *RunCancellationNotifier) RecordDeferred(orderID uuid.UUID) {
+	if n == nil || orderID == uuid.Nil {
+		return
+	}
+	n.deferred = append(n.deferred, orderID)
+}
+
+func finishDeferredWorkOrderCancellation(orderID uuid.UUID) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			log.Errorf("deferred work order cancellation failed: %v", recovered)
+		}
+	}()
+	order, err := models.FindUnscopedWorkOrder(database.Conn(), orderID)
+	if err != nil {
+		log.WithError(err).Errorf("failed to load work order %s for deferred cancellation", orderID)
+		return
+	}
+	messages.PublishDeferredWorkOrderRunCancellations(database.Conn(), order, nil)
+	messages.PublishWorkOrderRunCancellations(database.Conn(), order)
 }
 
 func (n *RunCancellationNotifier) Record(workflowID, runID uuid.UUID, drainResult *models.RunCancellationDrainResult) {
