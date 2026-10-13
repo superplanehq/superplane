@@ -25,10 +25,13 @@ global_job_config:
 blocks:
   - name: "Publish"
     task:
+      secrets:
+        - name: component-release-token
+        - name: ghcr-push-token
       epilogue:
         always:
           commands:
-            - rm -f /tmp/github-release-token /tmp/ghcr-auth.json
+            - rm -f /tmp/ghcr-auth.json
       jobs:
         - name: "Publish immutable Fleet Manager release"
           commands:
@@ -45,12 +48,10 @@ blocks:
                 --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,checksums.txt,fleet-manager.oci.tar \
                 --manifest "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum --check checksums.txt)
-            - |
-              install -m 600 /dev/null /tmp/github-release-token
-              node release/github-app-token.js >/tmp/github-release-token
+              test -n "${GITHUB_RELEASE_TOKEN:-}"
             - |
               release_dir="build/fleet-manager/$VERSION"
-              export GITHUB_TOKEN="$(cat /tmp/github-release-token)"
+              export GITHUB_TOKEN="$GITHUB_RELEASE_TOKEN"
               node release/component-release.js stage-github-release \
                 --component fleet-manager \
                 --version "$VERSION" \
@@ -60,7 +61,7 @@ blocks:
                 --release-id-file /tmp/github-release-id
             - sudo apt-get update
             - sudo apt-get install -y skopeo
-            - printf '%s' "$GHCR_TOKEN" | skopeo login --authfile /tmp/ghcr-auth.json ghcr.io --username "$GHCR_USERNAME" --password-stdin
+            - printf '%s' "$GHCR_PUSH_TOKEN" | skopeo login --authfile /tmp/ghcr-auth.json ghcr.io --username superplanehq --password-stdin
             - |
               export REGISTRY_AUTH_FILE=/tmp/ghcr-auth.json
               export FLEET_MANAGER_DIGEST_OUTPUT=/tmp/fleet-manager-image-digest
@@ -76,11 +77,19 @@ blocks:
                 "$VERSION" \
                 "$SEMAPHORE_GIT_SHA"
             - |
+              release_dir="build/fleet-manager/$VERSION"
+              release_notes_args=()
+              if [ -f "$release_dir/release-notes.md" ]; then
+                release_notes_args=(--release-notes "$release_dir/release-notes.md")
+              fi
               export FLEET_MANAGER_IMAGE_DIGEST="$(cat /tmp/fleet-manager-image-digest)"
-              export GITHUB_TOKEN="$(cat /tmp/github-release-token)"
+              export GITHUB_TOKEN="$GITHUB_RELEASE_TOKEN"
               node release/component-release.js publish-github-release \
                 --release-id "$(cat /tmp/github-release-id)" \
-                --sha "$SEMAPHORE_GIT_SHA"
+                --component fleet-manager \
+                --version "$VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                "${release_notes_args[@]}"
             - |
               encoded_tag="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "fleet-manager/$VERSION")"
               bash release/verify-public-assets.sh \

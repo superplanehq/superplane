@@ -8,6 +8,7 @@ const DEFAULT_ICON_SIZE = 16;
 /** Monochrome SVG logos that need inversion on dark surfaces. */
 const INTEGRATION_LOGO_INVERT_IN_DARK = new Set([
   "github",
+  "mobbin",
   "notion",
   "openrouter",
   "prisma",

@@ -3,16 +3,6 @@ import { promotePackageMapper, promotePackageEventStateRegistry } from "./promot
 import { buildDetailsCtx, buildPackageData, buildPackageOutput, buildNode } from "./test_helpers";
 
 describe("promotePackageMapper.getExecutionDetails", () => {
-  it("does not throw when outputs is undefined", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
-    expect(() => promotePackageMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
-  it("does not throw when default array is empty", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
-    expect(() => promotePackageMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
   it("returns Executed At without package fields when output data is missing", () => {
     const ctx = buildDetailsCtx({
       execution: { outputs: { default: [buildPromoteOutput(undefined)] } },

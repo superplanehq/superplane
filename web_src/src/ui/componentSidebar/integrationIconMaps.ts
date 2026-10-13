@@ -30,6 +30,7 @@ import gitlabIcon from "@/assets/icons/integrations/gitlab.svg";
 import grafanaIcon from "@/assets/icons/integrations/grafana.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import linearIcon from "@/assets/icons/integrations/linear.svg";
+import mobbinIcon from "@/assets/icons/integrations/mobbin.svg";
 import mongodbIcon from "@/assets/icons/integrations/mongodb.svg";
 import neonIcon from "@/assets/icons/integrations/neon.svg";
 import octopusIcon from "@/assets/icons/integrations/octopus.svg";
@@ -104,6 +105,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   grafana: grafanaIcon,
   jira: jiraIcon,
   linear: linearIcon,
+  mobbin: mobbinIcon,
   mongodb: mongodbIcon,
   neon: neonIcon,
   octopus: octopusIcon,
