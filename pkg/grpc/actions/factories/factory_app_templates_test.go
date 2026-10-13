@@ -322,6 +322,10 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 
 	agent := findYAMLNode(t, canvas, "capture-visual-evidence")
 	assert.Equal(t, "Capture Visual Evidence", agent.Name)
+	require.NotNil(t, agent.Concurrency)
+	require.NotNil(t, agent.Concurrency.Max)
+	assert.Equal(t, 5, *agent.Concurrency.Max)
+	assert.Empty(t, agent.Concurrency.Key)
 	assert.Equal(t, true, agent.Configuration["includeVisualEvidence"])
 	assert.Equal(t, float64(1800), agent.Configuration["executionTimeoutSeconds"])
 	assert.Equal(t, map[string]any{
@@ -346,6 +350,7 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 	assert.NotContains(t, emit, "branch:")
 
 	hasEvidence := findYAMLNode(t, canvas, "has-visual-evidence")
+	assert.Nil(t, hasEvidence.Concurrency)
 	assert.Equal(
 		t,
 		`($["Capture Visual Evidence"].data.result.visualEvidence.status == "captured" || $["Capture Visual Evidence"].data.result.visualEvidence.status == "partial") && len($["Capture Visual Evidence"].data.result.visualEvidence.artifacts) > 0`,
@@ -354,12 +359,14 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "capture-visual-evidence", TargetID: "has-visual-evidence", Channel: "passed"})
 
 	read := findYAMLNode(t, canvas, "read-pr-description")
+	assert.Nil(t, read.Concurrency)
 	assert.Equal(t, "github.getIssue", read.Component)
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, read.Integration)
 	assert.Equal(t, "{{ root().data.pull_request.number }}", read.Configuration["issueNumber"])
 	assert.Contains(t, canvas.Spec.Edges, yaml.Edge{SourceID: "has-visual-evidence", TargetID: "read-pr-description", Channel: "true"})
 
 	update := findYAMLNode(t, canvas, "update-pr-description")
+	assert.Nil(t, update.Concurrency)
 	assert.Equal(t, "github.updatePullRequest", update.Component)
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, update.Integration)
 	assert.Equal(t, "{{ root().data.repository.full_name }}", update.Configuration["repository"])

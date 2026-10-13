@@ -74,6 +74,15 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
+	t.Run("known id returns workspace agent feature", func(t *testing.T) {
+		f, ok := Get(FeatureWorkspaceAgent)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureWorkspaceAgent, f.ID)
+		assert.Equal(t, "SuperPlane Agent", f.Label)
+		assert.Equal(t, "Show the SuperPlane Agent page", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("known id returns workspace MCP feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceMCP)
 		assert.True(t, ok)
@@ -172,6 +181,7 @@ func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
+	assert.True(t, Exists(FeatureWorkspaceAgent))
 	assert.True(t, Exists(FeatureWorkspaceMCP))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
@@ -186,42 +196,6 @@ func Test__Exists(t *testing.T) {
 	assert.False(t, Exists("factory_linear_intake"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
-}
-
-func Test__All_omitsRetiredSentryIntakeFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_sentry_intake", feature.ID)
-	}
-}
-
-func Test__All_omitsRetiredDependabotIntakeFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_dependabot_intake", feature.ID)
-	}
-}
-
-func Test__All_omitsRetiredJiraIntakeFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_jira_intake", feature.ID)
-	}
-}
-
-func Test__All_omitsRetiredLinearIntakeFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_linear_intake", feature.ID)
-	}
-}
-
-func Test__All_omitsRetiredMergeConfidenceFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_risk_score", feature.ID)
-	}
-}
-
-func Test__All_omitsRetiredTaskConsoleFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_task_console", feature.ID)
-	}
 }
 
 func Test__All_isCopy(t *testing.T) {

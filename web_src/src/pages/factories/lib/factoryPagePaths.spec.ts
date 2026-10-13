@@ -97,6 +97,17 @@ describe("pathAfterWorkspaceSwitch", () => {
     ).toBe("/org-1/workspaces/ao-a1b2c3d4/velocity");
   });
 
+  it("keeps Agent", () => {
+    expect(
+      pathAfterWorkspaceSwitch({
+        pathname: "/org-1/workspaces/rf-p8n3wrcd/agent",
+        organizationId: "org-1",
+        currentFactoryKey: currentSegment,
+        nextFactory,
+      }),
+    ).toBe("/org-1/workspaces/ao-a1b2c3d4/agent");
+  });
+
   it("opens the new workspace board from a line that belongs to the previous workspace", () => {
     expect(
       pathAfterWorkspaceSwitch({

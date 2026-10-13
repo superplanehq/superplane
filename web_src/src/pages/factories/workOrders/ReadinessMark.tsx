@@ -12,7 +12,7 @@ import {
   type ConfidenceBand,
 } from "../lib/confidenceScore";
 import { DRAFT_READINESS_SHORT_LABEL, draftReadiness, type DraftReadinessTone } from "../lib/draftReadiness";
-import { PLANNING_REVIEW_SCORE_MAX, planningReviewAtMax, planningReviewLevel } from "../lib/planningReviewScore";
+import { PLANNING_REVIEW_SCORE_MAX, planningReviewLevel } from "../lib/planningReviewScore";
 import { mergeConfidenceCheckLevel, type MergeConfidenceCardCheck } from "../lib/mergeConfidenceScore";
 import { workOrderCheckDisplayName, workOrderCheckStatus, type WorkOrderCheckLevel } from "../lib/workOrderChecks";
 import { ConfidenceMeter } from "./ConfidenceMeter";
@@ -103,7 +103,7 @@ export function CardScoreBadges({
     showClarity: hasReview ? false : showClarity,
     showConfidence,
   });
-  const breakdownMetrics = reviewBreakdown(reviewMetrics);
+  const breakdownMetrics = reviewMetrics?.length ? reviewMetrics : undefined;
   const metricSpeech = (breakdownMetrics ?? []).map((metric) => {
     const status = reviewMetricStatus(metric);
     return `${metric.name} ${status.label}`;
@@ -287,17 +287,6 @@ function mergeMeterBars(score: number, maxScore: number): number {
     return MERGE_METER_BARS - 1;
   }
   return score <= 0 ? 0 : 1;
-}
-
-/**
- * At the top score the verdict already says it all, so the tooltip
- * skips the per-check breakdown.
- */
-function reviewBreakdown<Metric extends { score: number }>(reviewMetrics?: Metric[]): Metric[] | undefined {
-  if (!reviewMetrics || reviewMetrics.length === 0 || planningReviewAtMax(reviewMetrics)) {
-    return undefined;
-  }
-  return reviewMetrics;
 }
 
 function reviewMetricStatus(metric: { key: string; name: string; score: number; level?: WorkOrderCheckLevel }) {

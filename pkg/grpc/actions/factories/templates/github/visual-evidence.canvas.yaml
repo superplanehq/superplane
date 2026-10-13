@@ -38,6 +38,8 @@ spec:
       name: Capture Visual Evidence
       type: TYPE_ACTION
       component: runnerClaudeCode
+      concurrency:
+        max: 5
       configuration:
         executionTimeoutSeconds: 1800
         includeVisualEvidence: true
