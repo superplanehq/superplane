@@ -119,8 +119,9 @@ func (p *Provider) List(
 }
 
 type bootstrap struct {
-	RunnerAPIURL      string `json:"runner_api_url"`
-	RegistrationToken string `json:"registration_token"`
+	RunnerAPIURL      string            `json:"runner_api_url"`
+	RegistrationToken string            `json:"registration_token"`
+	Tags              map[string]string `json:"tags,omitempty"`
 }
 
 func (p *Provider) BuildBootstrap(
@@ -133,6 +134,7 @@ func (p *Provider) BuildBootstrap(
 	return json.Marshal(bootstrap{
 		RunnerAPIURL:      runnerAPIURL,
 		RegistrationToken: request.RegistrationToken,
+		Tags:              request.Tags,
 	})
 }
 
@@ -153,6 +155,10 @@ func (p *Provider) Create(
 	if boot.RunnerAPIURL == "" || boot.RegistrationToken == "" {
 		return provider.Resource{}, fmt.Errorf("Docker runner bootstrap is incomplete")
 	}
+	tags, err := provider.FormatRunnerTags(boot.Tags)
+	if err != nil {
+		return provider.Resource{}, fmt.Errorf("encode Docker runner tags: %w", err)
+	}
 
 	name := "superplane-runner-" + request.RunnerID
 	args := []string{
@@ -171,6 +177,9 @@ func (p *Provider) Create(
 	}
 	for _, host := range p.config.ExtraHosts {
 		args = append(args, "--add-host", host)
+	}
+	if tags != "" {
+		args = append(args, "--env", "RUNNER_TAGS="+tags)
 	}
 	args = append(
 		args,

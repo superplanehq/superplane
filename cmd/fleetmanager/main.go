@@ -138,6 +138,7 @@ func main() {
 			resourceProvider,
 			reconcile.Config{
 				FleetID:         fleet.ID,
+				FleetManagerID:  config.ID,
 				WarmCapacity:    fleet.WarmCapacity,
 				MaxCapacity:     fleet.MaxCapacity,
 				OperatingSystem: "linux",
