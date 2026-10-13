@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/bitbucketapp"
@@ -123,8 +124,8 @@ type Workspace struct {
 }
 
 func (c *Client) GetWorkspace(workspaceSlug string) (*Workspace, error) {
-	url := fmt.Sprintf("%s/workspaces/%s", baseURL, workspaceSlug)
-	req, err := http.NewRequest("GET", url, nil)
+	apiURL := fmt.Sprintf("%s/workspaces/%s", baseURL, url.PathEscape(workspaceSlug))
+	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -172,11 +173,11 @@ func (c *Client) GetRepository(repository string) (*Repository, error) {
 }
 
 func (c *Client) ListRepositories(workspace string) ([]Repository, error) {
-	url := fmt.Sprintf("%s/repositories/%s?pagelen=100", baseURL, workspace)
+	apiURL := fmt.Sprintf("%s/repositories/%s?pagelen=100", baseURL, url.PathEscape(workspace))
 	repositories := []Repository{}
 
-	for url != "" {
-		req, err := http.NewRequest("GET", url, nil)
+	for apiURL != "" {
+		req, err := http.NewRequest("GET", apiURL, nil)
 		if err != nil {
 			return nil, fmt.Errorf("error creating request: %w", err)
 		}
@@ -206,7 +207,7 @@ func (c *Client) ListRepositories(workspace string) ([]Repository, error) {
 		}
 
 		repositories = append(repositories, repoResponse.Values...)
-		url = repoResponse.Next
+		apiURL = repoResponse.Next
 	}
 
 	return repositories, nil
@@ -227,7 +228,7 @@ type BitbucketHookResponse struct {
 }
 
 func (c *Client) CreateWebhook(workspace, repoSlug, webhookURL, secret string, events []string) (*BitbucketHookResponse, error) {
-	url := fmt.Sprintf("%s/repositories/%s/%s/hooks", baseURL, workspace, repoSlug)
+	apiURL := fmt.Sprintf("%s/repositories/%s/%s/hooks", baseURL, url.PathEscape(workspace), url.PathEscape(repoSlug))
 
 	hookReq := BitbucketHookRequest{
 		Description: "SuperPlane",
@@ -242,7 +243,7 @@ func (c *Client) CreateWebhook(workspace, repoSlug, webhookURL, secret string, e
 		return nil, fmt.Errorf("error marshaling webhook request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+	req, err := http.NewRequest("POST", apiURL, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -337,9 +338,9 @@ func decodeHookResponse(body []byte) (*BitbucketHookResponse, error) {
 }
 
 func (c *Client) DeleteWebhook(workspace, repoSlug, webhookUID string) error {
-	url := fmt.Sprintf("%s/repositories/%s/%s/hooks/%s", baseURL, workspace, repoSlug, webhookUID)
+	apiURL := fmt.Sprintf("%s/repositories/%s/%s/hooks/%s", baseURL, url.PathEscape(workspace), url.PathEscape(repoSlug), url.PathEscape(webhookUID))
 
-	req, err := http.NewRequest("DELETE", url, nil)
+	req, err := http.NewRequest("DELETE", apiURL, nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
