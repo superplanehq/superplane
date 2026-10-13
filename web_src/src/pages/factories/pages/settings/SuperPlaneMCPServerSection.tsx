@@ -169,7 +169,7 @@ function SuperPlaneMCPClientsTable({
           {SUPERPLANE_MCP_SERVER_COPY.clientsSearchEmpty}
         </p>
       ) : (
-        <div className="min-w-0 overflow-x-auto">
+        <div className="min-w-0 overflow-x-auto" data-testid="superplane-mcp-clients-scroll">
           <table className="w-full min-w-[35rem] table-fixed text-left" data-testid="superplane-mcp-clients-list">
             <caption className="sr-only">{SUPERPLANE_MCP_SERVER_COPY.clientsTableLabel}</caption>
             <colgroup>
