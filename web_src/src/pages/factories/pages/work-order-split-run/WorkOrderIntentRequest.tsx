@@ -351,7 +351,10 @@ function AnalysisComposerField({
           keyboardRef={skillKeyboardRef}
         />
       ) : null}
-      <InputGroup className="h-auto overflow-visible rounded-xl" data-testid="split-run-intent-composer-card">
+      <InputGroup
+        className="h-auto overflow-visible rounded-xl border-border bg-background shadow-none has-[[data-slot=input-group-control]:focus]:ring-0"
+        data-testid="split-run-intent-composer-card"
+      >
         <InputGroupTextarea
           ref={textareaRef}
           id="split-run-intent-composer"
