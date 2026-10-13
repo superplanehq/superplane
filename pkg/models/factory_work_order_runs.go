@@ -2,8 +2,10 @@ package models
 
 import (
 	"bytes"
+	"errors"
 	"slices"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -69,6 +71,12 @@ func (o *FactoryWorkOrder) cancelRuns(tx *gorm.DB, update FactoryWorkOrderStatus
 		if err != nil {
 			return err
 		}
+		if result != nil && result.Deferred {
+			o.RunCancellationDeferred = true
+			if update.OnRunCancellationDeferred != nil {
+				update.OnRunCancellationDeferred()
+			}
+		}
 		if result == nil || result.Drain == nil {
 			continue
 		}
@@ -78,4 +86,53 @@ func (o *FactoryWorkOrder) cancelRuns(tx *gorm.DB, update FactoryWorkOrderStatus
 		update.OnRunsCancelled(results)
 	}
 	return nil
+}
+
+func (o *FactoryWorkOrder) FinishDeferredRunCancellations(db *gorm.DB, actor *uuid.UUID) ([]*RunCancellationResult, bool, error) {
+	var results []*RunCancellationResult
+	deferred := false
+	err := db.Transaction(func(tx *gorm.DB) error {
+		deferred = false
+		return o.cancelRuns(tx, FactoryWorkOrderStatusUpdate{
+			Actor: actor,
+			OnRunsCancelled: func(cancelled []*RunCancellationResult) {
+				results = append(results, cancelled...)
+			},
+			OnRunCancellationDeferred: func() {
+				deferred = true
+			},
+		})
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	return results, deferred, nil
+}
+
+func StopAnalysisRunForClosedWorkOrder(tx *gorm.DB, run *CanvasRun) (*RunCancellationResult, error) {
+	if run == nil || run.State == CanvasRunStateFinished || run.State == CanvasRunStateCancelling {
+		return nil, nil
+	}
+	session, err := FindPlanningSessionByRun(tx, run.ID)
+	if errors.Is(err, ErrFactoryPlanningSessionNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if session.DraftWorkOrderID == nil {
+		return nil, nil
+	}
+	var order FactoryWorkOrder
+	err = tx.Select("state").Where("id = ?", *session.DraftWorkOrderID).First(&order).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if order.State != FactoryWorkOrderStateClosed {
+		return nil, nil
+	}
+	return run.RequestCancellation(tx, nil)
 }

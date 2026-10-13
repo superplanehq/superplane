@@ -46,9 +46,10 @@ type FactoryContext struct {
 	// notification payload for mutations that should email work order
 	// owners/creators. The node executor collects these and publishes
 	// them after the surrounding transaction commits.
-	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
-	onRunsCancelled         func([]*models.RunCancellationResult)
-	onFileBindCleanup       func(FileBindCleanup)
+	onWorkOrderNotification   func(messages.FactoryWorkOrderNotificationMessage)
+	onRunsCancelled           func([]*models.RunCancellationResult)
+	onRunCancellationDeferred func(orderID uuid.UUID)
+	onFileBindCleanup         func(FileBindCleanup)
 
 	encryptor crypto.Encryptor
 	registry  *registry.Registry
@@ -105,6 +106,11 @@ func (c *FactoryContext) WithWorkOrderNotification(
 
 func (c *FactoryContext) WithRunsCancelled(callback func([]*models.RunCancellationResult)) *FactoryContext {
 	c.onRunsCancelled = callback
+	return c
+}
+
+func (c *FactoryContext) WithRunCancellationDeferred(callback func(orderID uuid.UUID)) *FactoryContext {
+	c.onRunCancellationDeferred = callback
 	return c
 }
 
@@ -609,6 +615,11 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 		App:             c.appRef(),
 		SkipSame:        true,
 		OnRunsCancelled: c.onRunsCancelled,
+		OnRunCancellationDeferred: func() {
+			if c.onRunCancellationDeferred != nil {
+				c.onRunCancellationDeferred(order.ID)
+			}
+		},
 	})
 	if err != nil {
 		return nil, false, err

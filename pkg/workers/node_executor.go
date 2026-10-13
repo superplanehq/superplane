@@ -501,6 +501,7 @@ func (w *NodeExecutor) executeActionNode(
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithWorkOrderNotification(onFactoryWorkOrderNotification).
 			WithRunsCancelled(runCancellations.RecordRuns).
+			WithRunCancellationDeferred(runCancellations.RecordDeferred).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
 			WithFileBindCleanup(onFileBindCleanup).
 			WithRemoteImageIngest(w.encryptor, w.registry),
