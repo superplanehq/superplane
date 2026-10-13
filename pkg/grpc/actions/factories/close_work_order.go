@@ -12,9 +12,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	factoryevents "github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
+	"gorm.io/gorm"
 )
 
-func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWorkOrderRequest) (*pb.CloseWorkOrderResponse, error) {
+func CloseWorkOrder(
+	ctx context.Context,
+	deps IntakeDependencies,
+	organizationID string,
+	req *pb.CloseWorkOrderRequest,
+) (*pb.CloseWorkOrderResponse, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to close work order")
@@ -63,6 +69,11 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 
 	publishWorkOrderClosed(orgID, factory, order, &closedBy, fromState, result, wasClosed)
 	messages.PublishWorkOrderRunCancellations(db, order)
+
+	if err := closePullRequestsForRejectedWorkOrder(ctx, db, deps, factory, order); err != nil {
+		logger.WithError(err).Error("close work order pull requests failed")
+		return nil, factoryErrorToStatus(err, "failed to close work order")
+	}
 
 	order, err = factory.FindWorkOrder(db, orderID)
 	if err != nil {
@@ -115,5 +126,71 @@ func publishWorkOrderClosed(
 	}
 	if err := notification.Publish(); err != nil {
 		logger.WithError(err).Warnf("Failed to publish work order notification for order %s", order.ID)
+	}
+}
+
+func closePullRequestsForRejectedWorkOrder(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	order *models.FactoryWorkOrder,
+) error {
+	if order == nil {
+		return nil
+	}
+	release, err := holdFactoryWorkOrderLock(ctx, order.ID)
+	if err != nil {
+		return err
+	}
+	defer release()
+
+	current, err := factory.FindWorkOrder(db, order.ID)
+	if err != nil {
+		return err
+	}
+	if !workOrderResultClosesPullRequests(current.Result) {
+		return nil
+	}
+
+	grouped, err := models.ListPullRequestsByWorkOrderIDs(db, []uuid.UUID{order.ID})
+	if err != nil {
+		return err
+	}
+	closeable := closeablePullRequests(grouped[order.ID])
+	if len(closeable) == 0 {
+		return nil
+	}
+	return closePreviousPullRequests(ctx, db, deps, factory, closeable)
+}
+
+func holdFactoryWorkOrderLock(ctx context.Context, id uuid.UUID) (func(), error) {
+	sqlDB, err := database.Conn().DB()
+	if err != nil {
+		return nil, err
+	}
+	conn, err := sqlDB.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	key := models.FactoryWorkOrderLockKey(id)
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock(hashtextextended($1, 0))", key); err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	return func() {
+		_, _ = conn.ExecContext(context.Background(), "SELECT pg_advisory_unlock(hashtextextended($1, 0))", key)
+		_ = conn.Close()
+	}, nil
+}
+
+func workOrderResultClosesPullRequests(result string) bool {
+	switch result {
+	case models.FactoryWorkOrderResultRejected,
+		models.FactoryWorkOrderResultManualRejected,
+		models.FactoryWorkOrderResultArchived:
+		return true
+	default:
+		return false
 	}
 }

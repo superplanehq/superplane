@@ -769,4 +769,19 @@ func TestRefreshFactoryPullRequestMergeabilityFromGitHubEvent_ClosesWorkOrder(t 
 		require.Len(t, notes, 1)
 		assert.Equal(t, "pr-review", notes[0].Key)
 	})
+
+	t.Run("does not close a reopened task when this app already closed the pull request", func(t *testing.T) {
+		factory, order, webhook := setupOpenOrder(t, "acme/app", 66)
+		grouped, err := models.ListPullRequestsByWorkOrderIDs(db, []uuid.UUID{order.ID})
+		require.NoError(t, err)
+		require.Len(t, grouped[order.ID], 1)
+		closedAt := time.Now()
+		require.NoError(t, stampFactoryPullRequestClosed(db, &grouped[order.ID][0], false, nil, &closedAt))
+
+		deliver(webhook, closedPayload("acme/app", 66, false))
+
+		reloaded := reload(t, factory, order.ID)
+		assert.Equal(t, models.FactoryWorkOrderStateOpen, reloaded.State)
+		assert.Empty(t, reloaded.Result)
+	})
 }
