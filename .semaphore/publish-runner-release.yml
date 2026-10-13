@@ -25,7 +25,7 @@ blocks:
       epilogue:
         always:
           commands:
-            - rm -f /tmp/github-release-token /tmp/semaphore-oidc-token
+            - rm -f /tmp/github-release-token
       jobs:
         - name: "Publish immutable Runner release"
           commands:
@@ -56,29 +56,18 @@ blocks:
                 --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
                 --release-id-file /tmp/github-release-id
             - |
-              test -n "$RUNNER_RELEASE_AWS_ROLE_ARN"
-              install -m 600 /dev/null /tmp/semaphore-oidc-token
-              printf '%s' "$SEMAPHORE_OIDC_TOKEN" >/tmp/semaphore-oidc-token
-              export AWS_ROLE_ARN="$RUNNER_RELEASE_AWS_ROLE_ARN"
-              export AWS_WEB_IDENTITY_TOKEN_FILE=/tmp/semaphore-oidc-token
-              export AWS_ROLE_SESSION_NAME="runner-release-$SEMAPHORE_JOB_ID"
-              export AWS_REGION="${AWS_REGION:-us-east-1}"
-              bash release/runner/upload.sh "$VERSION" s3://superplanehq-releases
-              rm -f /tmp/semaphore-oidc-token
-            - |
               release_dir="build/runner/$VERSION"
-              bash release/verify-public-assets.sh \
-                "https://superplanehq-releases.s3.amazonaws.com/runner/$VERSION" \
-                "$release_dir" \
-                runner-linux-amd64.tar.gz \
-                runner-linux-arm64.tar.gz \
-                runner.spdx.json \
-                checksums.txt
-            - |
+              release_notes_args=()
+              if [ -f "$release_dir/release-notes.md" ]; then
+                release_notes_args=(--release-notes "$release_dir/release-notes.md")
+              fi
               export GITHUB_TOKEN="$(cat /tmp/github-release-token)"
               node release/component-release.js publish-github-release \
                 --release-id "$(cat /tmp/github-release-id)" \
-                --sha "$SEMAPHORE_GIT_SHA"
+                --component runner \
+                --version "$VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                "${release_notes_args[@]}"
             - |
               encoded_tag="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "runner/$VERSION")"
               bash release/verify-public-assets.sh \
