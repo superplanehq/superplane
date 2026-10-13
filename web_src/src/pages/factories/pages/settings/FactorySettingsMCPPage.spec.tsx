@@ -153,8 +153,11 @@ describe("FactorySettingsMCPPage", () => {
       />,
     );
 
-    expect(await screen.findByTestId("workspace-page-header-title", {}, { timeout: 8000 })).toHaveTextContent("Agent");
-    expect(await screen.findByTestId("agent-resources-connections-empty")).toHaveTextContent("No MCP servers yet");
+    expect(await screen.findByTestId("workspace-page-header-title", {}, { timeout: 8000 })).toHaveTextContent(
+      "SuperPlane Agent",
+    );
+    const empty = await screen.findByTestId("agent-resources-connections-empty");
+    expect(empty).not.toHaveTextContent("No MCP servers yet");
     expect(screen.getByTestId("agent-resources-add-connection")).toHaveTextContent("Connect");
   }, 10000);
 

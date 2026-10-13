@@ -45,9 +45,8 @@ describe("FactorySettingsSkillsPage", () => {
       />,
     );
 
-    expect(await screen.findByTestId("agent-resources-skills-empty", {}, { timeout: 8000 })).toHaveTextContent(
-      "No skills yet",
-    );
+    const empty = await screen.findByTestId("agent-resources-skills-empty", {}, { timeout: 8000 });
+    expect(empty).not.toHaveTextContent("No skills yet");
     expect(screen.getByTestId("agent-resources-add-skill")).toBeEnabled();
     expect(screen.getByTestId("agent-resources-add-skill")).toHaveTextContent("Add skill");
   }, 10000);

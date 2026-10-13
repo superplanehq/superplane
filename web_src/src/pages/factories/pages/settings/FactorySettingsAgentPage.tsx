@@ -1,5 +1,3 @@
-import { Plug } from "lucide-react";
-
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -7,7 +5,6 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { AgentResourceConnectionDialog } from "./AgentResourceConnectionDialog";
-import { AgentSettingsSectionEmpty } from "./AgentSettingsSectionEmpty";
 import { factoryRouteSegment, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
@@ -15,6 +12,9 @@ import { MCPAddPicker } from "./MCPAddPicker";
 import { MCPCatalogSetupDialog } from "./MCPCatalogSetupDialog";
 import { MCPServerList } from "./MCPServerList";
 import { useMCPPage } from "./useMCPPage";
+import { WorkspaceCrossRepoSection } from "./WorkspaceCrossRepoSection";
+import { WorkspaceDefaultModelSection } from "./WorkspaceDefaultModelSection";
+import { WorkspaceSetupStepsSection } from "./WorkspaceSetupStepsSection";
 import { WorkspaceSkillsSection } from "./WorkspaceSkillsSection";
 
 export function FactorySettingsAgentPage() {
@@ -25,45 +25,49 @@ export function FactorySettingsAgentPage() {
   usePageTitle([AGENT_RESOURCES_COPY.agentTitle, page.factory?.name ?? "Workspace"]);
 
   return (
-    <FactorySettingsPageFrame
-      narrow
-      title={AGENT_RESOURCES_COPY.agentTitle}
-      subtitle={AGENT_RESOURCES_COPY.agentPageSubtitle}
-    >
-      <div className="flex flex-col gap-5" data-testid="factory-settings-agent">
-        {showMcp ? <WorkspaceMCPServers page={page} /> : null}
-        {showSkills ? (
-          <WorkspaceSkillsSection
-            organizationId={page.organizationId}
-            factoryId={page.factoryId}
-            factoryKey={factoryRouteSegment(page.factory)}
-            canUpdate={page.canUpdate}
-          />
-        ) : null}
-      </div>
-      <MCPAddPicker
-        open={page.addPickerOpen}
-        onClose={() => page.setAddPickerOpen(false)}
-        onSelect={page.openCatalogEntry}
-      />
-      <MCPCatalogSetupDialog
-        open={page.catalogSetupOpen}
-        entry={page.catalogEntry}
-        resource={page.editResource}
-        isSaving={page.isSaving}
-        onClose={page.closeCatalogSetup}
-        onSignIn={page.startCatalogOAuth}
-        onSaveToken={page.saveCatalogToken}
-      />
-      <AgentResourceConnectionDialog
-        open={page.connectionOpen}
-        organizationId={page.organizationId}
-        resource={page.editResource}
-        isSaving={page.isSaving}
-        onClose={page.closeConnection}
-        onSave={page.saveConnection}
-      />
-    </FactorySettingsPageFrame>
+    <div className="min-h-full bg-sidebar dark:bg-background">
+      <FactorySettingsPageFrame
+        narrow
+        title={AGENT_RESOURCES_COPY.agentTitle}
+      >
+        <div className="flex flex-col gap-5" data-testid="factory-settings-agent">
+          <WorkspaceDefaultModelSection canUpdate={page.canUpdate} />
+          <WorkspaceSetupStepsSection canUpdate={page.canUpdate} />
+          <WorkspaceCrossRepoSection canUpdate={page.canUpdate} />
+          {showMcp ? <WorkspaceMCPServers page={page} /> : null}
+          {showSkills ? (
+            <WorkspaceSkillsSection
+              organizationId={page.organizationId}
+              factoryId={page.factoryId}
+              factoryKey={factoryRouteSegment(page.factory)}
+              canUpdate={page.canUpdate}
+            />
+          ) : null}
+        </div>
+        <MCPAddPicker
+          open={page.addPickerOpen}
+          onClose={() => page.setAddPickerOpen(false)}
+          onSelect={page.openCatalogEntry}
+        />
+        <MCPCatalogSetupDialog
+          open={page.catalogSetupOpen}
+          entry={page.catalogEntry}
+          resource={page.editResource}
+          isSaving={page.isSaving}
+          onClose={page.closeCatalogSetup}
+          onSignIn={page.startCatalogOAuth}
+          onSaveToken={page.saveCatalogToken}
+        />
+        <AgentResourceConnectionDialog
+          open={page.connectionOpen}
+          organizationId={page.organizationId}
+          resource={page.editResource}
+          isSaving={page.isSaving}
+          onClose={page.closeConnection}
+          onSave={page.saveConnection}
+        />
+      </FactorySettingsPageFrame>
+    </div>
   );
 }
 
@@ -103,13 +107,7 @@ function WorkspaceMCPServers({ page }: { page: ReturnType<typeof useMCPPage> }) 
         description={AGENT_RESOURCES_COPY.mcpConnectionsSectionDescription}
         action={addConnectionAction}
         data-testid="agent-resources-connections-empty"
-      >
-        <AgentSettingsSectionEmpty
-          icon={Plug}
-          title={AGENT_RESOURCES_COPY.emptyConnectionsTitle}
-          description={AGENT_RESOURCES_COPY.emptyConnectionsBody}
-        />
-      </FactorySettingsCard>
+      />
     );
   }
 

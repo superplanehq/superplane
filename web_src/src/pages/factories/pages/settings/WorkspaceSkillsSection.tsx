@@ -8,7 +8,6 @@ import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
 import { cn } from "@/lib/utils";
 
 import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
-import { AgentSettingsSectionEmpty } from "./AgentSettingsSectionEmpty";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsCard } from "./FactorySettingsCard";
 import { skillDisplayTitle } from "./skillFrontmatter";
@@ -58,13 +57,7 @@ export function WorkspaceSkillsSection({
           description={AGENT_RESOURCES_COPY.skillsHelper}
           action={addSkillAction}
           data-testid="agent-resources-skills-empty"
-        >
-          <AgentSettingsSectionEmpty
-            icon={BookOpen}
-            title={AGENT_RESOURCES_COPY.emptySkillsTitle}
-            description={AGENT_RESOURCES_COPY.emptySkillsBody}
-          />
-        </FactorySettingsCard>
+        />
       ) : (
         <FactorySettingsCard
           title={AGENT_RESOURCES_COPY.skillsTitle}
