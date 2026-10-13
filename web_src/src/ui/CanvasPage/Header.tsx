@@ -196,33 +196,74 @@ function PageHeader({
         </div>
       </div>
       <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-        {inEditSession ? (
-          <div className="flex items-center">
-            {activeDraftBranchLabel ? (
-              <span
-                className="hidden text-[13px] font-medium text-slate-600 sm:inline dark:text-gray-400"
-                data-testid="active-draft-branch-chip"
-              >
-                Editing: {activeDraftBranchLabel}
-                {activeDraftBranchShortSha ? ` @ ${activeDraftBranchShortSha}` : ""}
-              </span>
-            ) : null}
-            <EditModeTopHeaderActions
-              onExitEditMode={onExitEditMode}
-              exitEditModeDisabled={exitEditModeDisabled}
-              exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-            />
-          </div>
-        ) : null}
-        {!inEditSession && onEnterEditMode ? (
-          <LiveModeTopHeaderActions
-            onEnterEditMode={onEnterEditMode}
-            enterEditModeDisabled={enterEditModeDisabled}
-            enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-          />
-        ) : null}
+        <PageHeaderSessionActions
+          inEditSession={inEditSession}
+          activeDraftBranchLabel={activeDraftBranchLabel}
+          activeDraftBranchShortSha={activeDraftBranchShortSha}
+          onExitEditMode={onExitEditMode}
+          exitEditModeDisabled={exitEditModeDisabled}
+          exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+          onEnterEditMode={onEnterEditMode}
+          enterEditModeDisabled={enterEditModeDisabled}
+          enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+        />
       </div>
     </div>
+  );
+}
+
+function PageHeaderSessionActions({
+  inEditSession,
+  activeDraftBranchLabel,
+  activeDraftBranchShortSha,
+  onExitEditMode,
+  exitEditModeDisabled,
+  exitEditModeDisabledTooltip,
+  onEnterEditMode,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
+}: {
+  inEditSession: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
+  onExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
+  onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
+}) {
+  if (inEditSession) {
+    return (
+      <div className="flex items-center">
+        {activeDraftBranchLabel ? (
+          <span
+            className="hidden text-[13px] font-medium text-slate-600 sm:inline dark:text-gray-400"
+            data-testid="active-draft-branch-chip"
+          >
+            Editing: {activeDraftBranchLabel}
+            {activeDraftBranchShortSha ? ` @ ${activeDraftBranchShortSha}` : ""}
+          </span>
+        ) : null}
+        <EditModeTopHeaderActions
+          onExitEditMode={onExitEditMode}
+          exitEditModeDisabled={exitEditModeDisabled}
+          exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+        />
+      </div>
+    );
+  }
+
+  if (!onEnterEditMode) {
+    return null;
+  }
+
+  return (
+    <LiveModeTopHeaderActions
+      onEnterEditMode={onEnterEditMode}
+      enterEditModeDisabled={enterEditModeDisabled}
+      enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+    />
   );
 }
 
