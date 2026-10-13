@@ -6,11 +6,27 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const telegramAPIBase = "https://api.telegram.org/bot"
+
+const (
+	// requestTimeout bounds a single Telegram Bot API call. http.DefaultClient
+	// has no timeout, so without this a stalled connection blocks the worker
+	// running the component forever.
+	requestTimeout = 30 * time.Second
+
+	// maxResponseSize bounds how much of a response we buffer in memory. Bot API
+	// responses are far smaller than this, so the cap only guards against a
+	// runaway response.
+	maxResponseSize = 4 * 1024 * 1024 // 4MB
+)
+
+// httpClient is shared by all requests so connections are reused across calls.
+var httpClient = &http.Client{Timeout: requestTimeout}
 
 type Client struct {
 	BotToken string
@@ -205,15 +221,19 @@ func (c *Client) doRequest(method, endpoint string, body io.Reader) ([]byte, err
 
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	responseBody, err := io.ReadAll(resp.Body)
+	responseBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if len(responseBody) > maxResponseSize {
+		return nil, fmt.Errorf("response too large: exceeds maximum size of %d bytes", maxResponseSize)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
