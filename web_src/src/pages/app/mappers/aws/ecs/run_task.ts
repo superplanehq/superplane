@@ -49,7 +49,6 @@ export const runTaskMapper: ComponentBaseMapper = {
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const data = outputs?.default?.[0]?.data as RunTaskOutput | undefined;
-    const firstTask = data?.tasks?.[0];
     const timestamp = context.execution.updatedAt
       ? new Date(context.execution.updatedAt).toLocaleString()
       : context.execution.createdAt
@@ -59,21 +58,7 @@ export const runTaskMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {
       "Started At": timestamp,
     };
-    if (data) {
-      details["Tasks Started"] = String(data.tasks?.length ?? 0);
-      if (data.failures?.length) {
-        details["Failures"] = String(data.failures.length);
-      }
-      if (firstTask) {
-        details["Task ARN"] = stringOrDash(firstTask.taskArn);
-        details["Last Status"] = stringOrDash(firstTask.lastStatus);
-        const region = firstTask.clusterArn?.split(":")[2] ?? "";
-        const cluster = firstTask.clusterArn?.split("/").pop() ?? "";
-        if (region && cluster && firstTask.taskArn) {
-          details["ECS Console"] = ecsConsoleUrl(region, cluster, undefined, firstTask.taskArn);
-        }
-      }
-    }
+    addRunTaskOutputDetails(details, data);
     return details;
   },
 
@@ -81,6 +66,29 @@ export const runTaskMapper: ComponentBaseMapper = {
     return ecsSubtitle(context);
   },
 };
+
+function addRunTaskOutputDetails(details: Record<string, string>, data: RunTaskOutput | undefined): void {
+  if (!data) {
+    return;
+  }
+
+  const firstTask = data.tasks?.[0];
+  details["Tasks Started"] = String(data.tasks?.length ?? 0);
+  if (data.failures?.length) {
+    details["Failures"] = String(data.failures.length);
+  }
+  if (!firstTask) {
+    return;
+  }
+
+  details["Task ARN"] = stringOrDash(firstTask.taskArn);
+  details["Last Status"] = stringOrDash(firstTask.lastStatus);
+  const region = firstTask.clusterArn?.split(":")[2] ?? "";
+  const cluster = firstTask.clusterArn?.split("/").pop() ?? "";
+  if (region && cluster && firstTask.taskArn) {
+    details["ECS Console"] = ecsConsoleUrl(region, cluster, undefined, firstTask.taskArn);
+  }
+}
 
 function runTaskMetadataList(node: NodeInfo): MetadataItem[] {
   const config = node.configuration as RunTaskConfiguration | undefined;

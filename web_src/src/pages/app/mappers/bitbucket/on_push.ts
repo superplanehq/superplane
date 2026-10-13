@@ -114,7 +114,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
 
     return {
       Branch: firstChange?.new?.name || "",
-      Commit: firstChange?.new?.target?.message?.trim() || "",
+      Commit: commitMessageFromChange(firstChange),
       SHA: firstChange?.new?.target?.hash || "",
       Author: eventData?.actor?.display_name || "",
     };
