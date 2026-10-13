@@ -223,6 +223,7 @@ function TicketsScreenHost({
   const finishing = flow.blockingAction === "finishing-setup" || (flow.ticketsFinishSetup && saving);
   return (
     <FirstRunTicketsScreen
+      githubAvailable={flow.vcsHost !== "bitbucket"}
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
@@ -230,6 +231,8 @@ function TicketsScreenHost({
       continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
       savingLabel={finishing ? FIRST_RUN_COPY.finish.saving : FIRST_RUN_COPY.tickets.saving}
+      githubConnected={model.setup.connected.has("github")}
+      onConnectGitHub={() => void flow.connectGitHubIssues()}
       jiraConnected={model.setup.connected.has("jira")}
       jiraProjects={model.jiraProjects}
       jiraProjectsLoading={model.jiraProjectsLoading}

@@ -24,6 +24,8 @@ type FirstRunTicketsScreenProps = {
   /** True while this screen provisions the workspace, on the last screen. */
   saving?: boolean;
   savingLabel?: string;
+  githubConnected?: boolean;
+  githubAvailable?: boolean;
   jiraConnected?: boolean;
   jiraProjects?: FirstRunJiraProject[];
   jiraProjectsLoading?: boolean;
@@ -36,6 +38,7 @@ type FirstRunTicketsScreenProps = {
   linearProjectIds?: string[];
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onAnalyzeTickets: () => void;
+  onConnectGitHub?: () => void;
   onConnectJira?: () => void;
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
@@ -52,6 +55,8 @@ const TICKET_SCREEN_DEFAULTS = {
   continuePending: false,
   saving: false,
   savingLabel: FIRST_RUN_COPY.finish.saving,
+  githubConnected: false,
+  githubAvailable: true,
   jiraConnected: false,
   jiraProjects: [] as FirstRunJiraProject[],
   jiraProjectsLoading: false,
@@ -66,6 +71,7 @@ const TICKET_SCREEN_DEFAULTS = {
 
 function ticketScanAllowed(args: {
   ticketSource: FirstRunTicketSource | null;
+  githubConnected: boolean;
   jiraConnected: boolean;
   jiraProjectId: string;
   linearAvailable: boolean;
@@ -82,6 +88,7 @@ function ticketScanAllowed(args: {
     !linearSelectionBlocked &&
     canAnalyzeTicketSource({
       ticketSource: args.ticketSource,
+      githubConnected: args.githubConnected,
       jiraConnected: args.jiraConnected,
       jiraProjectId: args.jiraProjectId,
       linearConnected: args.linearConnected,
@@ -116,6 +123,8 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
     continuePending,
     saving,
     savingLabel,
+    githubConnected,
+    githubAvailable,
     jiraConnected,
     jiraProjects,
     jiraProjectsLoading,
@@ -128,6 +137,7 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
     linearProjectIds,
     onSelectTicketSource,
     onAnalyzeTickets,
+    onConnectGitHub,
     onConnectJira,
     onSelectJiraProject,
     onRetryJiraProjects,
@@ -138,6 +148,7 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
   const copy = FIRST_RUN_COPY.tickets;
   const canAnalyze = ticketScanAllowed({
     ticketSource,
+    githubConnected,
     jiraConnected,
     jiraProjectId,
     linearAvailable,
@@ -157,8 +168,10 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
 
       <div className="mt-8 space-y-4">
         <FirstRunTicketChoices
+          githubAvailable={githubAvailable}
           ticketSource={ticketSource}
           saving={saving}
+          githubConnected={githubConnected}
           jiraConnected={jiraConnected}
           jiraProjects={jiraProjects}
           jiraProjectsLoading={jiraProjectsLoading}
@@ -172,6 +185,7 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
           linearProjectsError={linearProjectsError}
           linearProjectIds={linearProjectIds}
           onSelectTicketSource={onSelectTicketSource}
+          onConnectGitHub={onConnectGitHub}
           onConnectJira={onConnectJira}
           onSelectJiraProject={onSelectJiraProject}
           onRetryJiraProjects={onRetryJiraProjects}

@@ -36,6 +36,7 @@ describe("FirstRunTicketsScreen", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="github-issues"
+        githubConnected
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={onAnalyzeTickets}
       />,
@@ -55,6 +56,7 @@ describe("FirstRunTicketsScreen", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="github-issues"
+        githubConnected
         onSelectTicketSource={onSelectTicketSource}
         onAnalyzeTickets={vi.fn()}
         onConnectJira={onConnectJira}
@@ -250,6 +252,7 @@ describe("FirstRunTicketsScreen", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="github-issues"
+        githubConnected
         saving
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={vi.fn()}
@@ -289,6 +292,7 @@ describe("FirstRunTicketsScreen", () => {
     render(
       <FirstRunTicketsScreen
         ticketSource="github-issues"
+        githubConnected
         continueLabel={FIRST_RUN_COPY.tickets.continue}
         onSelectTicketSource={vi.fn()}
         onAnalyzeTickets={vi.fn()}
