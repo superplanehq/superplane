@@ -57,7 +57,7 @@ describe("FactoriesSidebarNav", () => {
     expect(links).toEqual(["factories-nav-board", "factories-nav-agent", "factories-nav-velocity"]);
     expect(agentLink).toHaveAttribute("aria-label", "Agent");
     expect(agentLink).toHaveAttribute("href", factoryAgentPath(org, key));
-    expect(agentLink.querySelector(".lucide-brain")).toBeInTheDocument();
+    expect(agentLink.querySelector(".lucide-cpu")).toBeInTheDocument();
   });
 
   it("marks the Board icon current on the line board", () => {

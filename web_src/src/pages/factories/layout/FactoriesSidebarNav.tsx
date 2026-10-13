@@ -1,5 +1,6 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Brain, ChartLine, Home } from "lucide-react";
+import { ChartLine, Cpu, Home } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { factoryAgentPath, factoryHomePath, factoryVelocityPath } from "../lib/factoryPagePaths";
@@ -33,16 +34,22 @@ function RailNavLink({
   isCurrent: boolean;
 }) {
   return (
-    <Link
-      to={to}
-      aria-label={label}
-      title={label}
-      aria-current={isCurrent ? "page" : undefined}
-      data-testid={testId}
-      className={railLinkClassName(isCurrent)}
-    >
-      <Icon className="size-3.5" aria-hidden />
-    </Link>
+    <Tooltip delayDuration={350}>
+      <TooltipTrigger asChild>
+        <Link
+          to={to}
+          aria-label={label}
+          aria-current={isCurrent ? "page" : undefined}
+          data-testid={testId}
+          className={railLinkClassName(isCurrent)}
+        >
+          <Icon className="size-3.5" aria-hidden />
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="right" sideOffset={6}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -75,7 +82,7 @@ export function FactoriesSidebarNav({
         <RailNavLink
           to={agentHref}
           label="Agent"
-          Icon={Brain}
+          Icon={Cpu}
           testId="factories-nav-agent"
           isCurrent={isAgentPath(pathname)}
         />
