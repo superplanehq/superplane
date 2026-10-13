@@ -20,11 +20,7 @@ function baseRender(overrides: Partial<WidgetBoardRender> = {}): WidgetBoardRend
   return {
     kind: "board",
     groupBy: "status",
-    lanes: [
-      { value: "Todo" },
-      { value: "In Progress", label: "In progress", color: "blue" },
-      { value: "Done", color: "green" },
-    ],
+    lanes: [{ value: "Todo" }, { value: "In Progress", label: "In progress" }, { value: "Done" }],
     card: { titleField: "title" },
     ...overrides,
   };
@@ -203,6 +199,45 @@ describe("WidgetBoard card fields", () => {
     const link = within(cards[0]).getByRole("link");
     expect(link.getAttribute("href")).toBe("https://example.test/1");
     expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.textContent).toBe("URL https://example.test/1");
+  });
+
+  it("places duration left and relative timestamp right on the meta row without an Updated label", () => {
+    renderBoard({
+      rows: [
+        {
+          id: "row-1",
+          title: "Ship board",
+          status: "Todo",
+          pr: 42,
+          prUrl: "https://example.test/pr/42",
+          durationMs: 75_000,
+          updatedAt: "2026-03-29T10:00:00.000Z",
+          cost: 1.2,
+        },
+      ],
+      render: baseRender({
+        card: {
+          titleField: "title",
+          fields: [
+            { field: "pr", format: "link", href: "{{ prUrl }}", label: "PR" },
+            { field: "durationMs", format: "duration", label: "Elapsed" },
+            { field: "updatedAt", format: "relative", label: "Updated" },
+            { field: "cost", format: "number", label: "Cost" },
+          ],
+        },
+      }),
+    });
+    const card = screen.getAllByTestId("widget-board-card")[0];
+    const header = within(card).getByTestId("board-card-header-fields");
+    const meta = within(card).getByTestId("board-card-meta-fields");
+    expect(within(header).getByRole("link").textContent).toBe("PR 42");
+    expect(meta.className).toContain("justify-between");
+    expect(within(meta).getAllByTestId("board-card-field")).toHaveLength(2);
+    expect(within(meta).queryByText("Elapsed")).toBeNull();
+    expect(within(meta).queryByText("Updated")).toBeNull();
+    expect(within(card).getByText("Cost")).toBeTruthy();
+    expect(card.textContent?.indexOf("PR 42")).toBeLessThan(card.textContent!.indexOf("Ship board"));
   });
 });
 

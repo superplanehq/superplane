@@ -383,32 +383,12 @@ export interface WidgetScorecardRender {
   changeCaption?: string;
 }
 
-/**
- * Palette accepted by `WidgetBoardLane.color`. Kept intentionally small
- * (neutral + status-family tones); YAML stays stable across future
- * Tailwind refactors thanks to `BOARD_LANE_STYLE` in `widget/boardLaneStyles.ts`.
- */
-export type WidgetBoardLaneColor = "neutral" | "gray" | "blue" | "green" | "yellow" | "orange" | "red" | "purple";
-
-export const WIDGET_BOARD_LANE_COLORS: WidgetBoardLaneColor[] = [
-  "neutral",
-  "gray",
-  "blue",
-  "green",
-  "yellow",
-  "orange",
-  "red",
-  "purple",
-];
-
 /** One lane in a `WidgetBoardRender.lanes` list. */
 export interface WidgetBoardLane {
   /** Value to match against `groupBy` (case-insensitive, trimmed). Required. */
   value: string;
   /** Optional lane header label; defaults to `value`. */
   label?: string;
-  /** Optional lane color from the {@link WidgetBoardLaneColor} palette. */
-  color?: WidgetBoardLaneColor;
 }
 
 /** Card configuration for a board panel. */

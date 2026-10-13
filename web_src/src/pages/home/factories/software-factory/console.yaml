@@ -82,17 +82,13 @@ spec:
           groupBy: status
           kind: board
           lanes:
-            - color: blue
-              label: In progress
+            - label: In progress
               value: in_progress
-            - color: yellow
-              label: Human review
+            - label: Human review
               value: human_review
-            - color: red
-              label: Failed
+            - label: Failed
               value: failed
-            - color: green
-              label: Done
+            - label: Done
               value: done
           otherLane: false
           sort:
