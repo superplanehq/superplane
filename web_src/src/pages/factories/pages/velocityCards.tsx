@@ -200,7 +200,7 @@ export function SummaryCard({
         <Metric
           label="Cost per task"
           value={formatUsd(totals.costPerTask)}
-          tooltip="Tracked model spend"
+          tooltip="Ledger spend per closed task"
           change={
             comparison?.costPerTask === undefined
               ? undefined
