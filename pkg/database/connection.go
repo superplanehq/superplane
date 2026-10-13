@@ -49,7 +49,7 @@ func dbPoolSize() int {
 	poolSize := os.Getenv("DB_POOL_SIZE")
 
 	size, err := strconv.Atoi(poolSize)
-	if err != nil {
+	if err != nil || size <= 0 {
 		return 5
 	}
 
