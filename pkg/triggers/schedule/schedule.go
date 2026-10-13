@@ -723,28 +723,54 @@ func nextWeeksTrigger(interval int, weekDays []string, hour int, minute int, now
 
 	// Find next occurrence of any of the specified weekdays
 	validWeekdays := make(map[time.Weekday]bool)
+	var parsedWeekdays []time.Weekday
 	for _, dayStr := range weekDays {
 		weekday, err := parseWeekday(dayStr)
 		if err != nil {
 			return nil, err
 		}
-		validWeekdays[weekday] = true
-	}
-
-	nextIntervalStart := nowInTZ.AddDate(0, 0, interval*7)
-
-	// start the search on Sunday of the next week
-	nextIntervalStart.Add(-time.Duration(nextIntervalStart.Weekday()) * time.Hour)
-	for i := 0; i < 7; i++ {
-		checkDate := nextIntervalStart.AddDate(0, 0, i)
-		if validWeekdays[checkDate.Weekday()] {
-			candidateTime := time.Date(checkDate.Year(), checkDate.Month(), checkDate.Day(), hour, minute, 0, 0, checkDate.Location())
-			utcResult := candidateTime.UTC()
-			return &utcResult, nil
+		if !validWeekdays[weekday] {
+			validWeekdays[weekday] = true
+			parsedWeekdays = append(parsedWeekdays, weekday)
 		}
 	}
 
-	return nil, fmt.Errorf("no valid weekday found")
+	if len(parsedWeekdays) == 0 {
+		return nil, fmt.Errorf("no valid weekday specified")
+	}
+
+	// Get start of the current week (Sunday at 00:00:00)
+	currentWeekSunday := nowInTZ.AddDate(0, 0, -int(nowInTZ.Weekday()))
+	currentWeekSunday = time.Date(currentWeekSunday.Year(), currentWeekSunday.Month(), currentWeekSunday.Day(), 0, 0, 0, 0, currentWeekSunday.Location())
+
+	var nextTrigger *time.Time
+
+	for _, weekday := range parsedWeekdays {
+		// Calculate the candidate time in the current week (Week 0)
+		candidateTime := currentWeekSunday.AddDate(0, 0, int(weekday))
+		candidateTime = time.Date(candidateTime.Year(), candidateTime.Month(), candidateTime.Day(), hour, minute, 0, 0, candidateTime.Location())
+
+		var occurrence time.Time
+		if candidateTime.After(nowInTZ) {
+			// If it's in the future of the current week, next occurrence is this week (0 weeks added)
+			occurrence = candidateTime
+		} else {
+			// Otherwise, it is in a future week (interval weeks added)
+			occurrence = candidateTime.AddDate(0, 0, interval*7)
+		}
+
+		if nextTrigger == nil || occurrence.Before(*nextTrigger) {
+			temp := occurrence
+			nextTrigger = &temp
+		}
+	}
+
+	if nextTrigger == nil {
+		return nil, fmt.Errorf("no valid weekday found")
+	}
+
+	utcResult := nextTrigger.UTC()
+	return &utcResult, nil
 }
 
 func nextMonthsTrigger(interval int, dayOfMonth int, hour int, minute int, now time.Time) (*time.Time, error) {

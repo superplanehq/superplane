@@ -145,7 +145,43 @@ func TestGetNextTrigger(t *testing.T) {
 				Minute:        intPtr(30),
 			},
 			now:        mustParseTime("2025-01-06T10:00:00Z"), // Monday
-			expectNext: mustParseTime("2025-01-17T15:30:00Z"), // Friday of next week
+			expectNext: mustParseTime("2025-01-10T15:30:00Z"), // Friday of current week
+		},
+		{
+			name: "weeks configuration with multiple weekdays - same week run",
+			config: Configuration{
+				Type:          TypeWeeks,
+				WeeksInterval: intPtr(1),
+				WeekDays:      []string{"monday", "wednesday"},
+				Hour:          intPtr(9),
+				Minute:        intPtr(0),
+			},
+			now:        mustParseTime("2025-01-06T10:00:00Z"), // Monday 10 AM UTC
+			expectNext: mustParseTime("2025-01-08T09:00:00Z"), // Wednesday of current week at 9 AM UTC
+		},
+		{
+			name: "weeks configuration with multiple weekdays - next week run",
+			config: Configuration{
+				Type:          TypeWeeks,
+				WeeksInterval: intPtr(1),
+				WeekDays:      []string{"monday", "wednesday"},
+				Hour:          intPtr(9),
+				Minute:        intPtr(0),
+			},
+			now:        mustParseTime("2025-01-08T10:00:00Z"), // Wednesday 10 AM UTC
+			expectNext: mustParseTime("2025-01-13T09:00:00Z"), // Monday of next week at 9 AM UTC
+		},
+		{
+			name: "weeks configuration with multiple weekdays and interval > 1",
+			config: Configuration{
+				Type:          TypeWeeks,
+				WeeksInterval: intPtr(2),
+				WeekDays:      []string{"monday", "wednesday"},
+				Hour:          intPtr(9),
+				Minute:        intPtr(0),
+			},
+			now:        mustParseTime("2025-01-08T10:00:00Z"), // Wednesday 10 AM UTC of Week 0
+			expectNext: mustParseTime("2025-01-20T09:00:00Z"), // Monday of Week 2 at 9 AM UTC
 		},
 		{
 			name: "months configuration",
@@ -387,7 +423,7 @@ func TestTimezoneHandling(t *testing.T) {
 				Timezone:      stringPtr("-8"), // GMT-8 (PST)
 			},
 			now:        mustParseTime("2025-01-06T16:00:00Z"), // Monday 8 AM PST (4 PM UTC)
-			expectNext: mustParseTime("2025-01-13T17:00:00Z"), // Monday 9 AM PST (5 PM UTC) of the next week
+			expectNext: mustParseTime("2025-01-06T17:00:00Z"), // Monday 9 AM PST (5 PM UTC) of the current week
 		},
 		{
 			name: "month schedule in GMT+9 timezone (JST)",
