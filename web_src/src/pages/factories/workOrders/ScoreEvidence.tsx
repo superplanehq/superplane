@@ -1,4 +1,5 @@
 import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
+import { Info } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -196,7 +197,7 @@ function ScoreEvidenceDrawerChip({
       aria-controls={drawer.open ? drawer.controlsId : undefined}
       data-testid={testId}
       data-state={drawer.open ? "open" : "closed"}
-      className={cn(ITEM_CLASS, CHIP_BUTTON_CLASS, drawer.pinned && "bg-muted/70")}
+      className={cn(ITEM_CLASS, CHIP_BUTTON_CLASS, "group", drawer.pinned && "bg-muted/70")}
       onMouseEnter={() => drawer.onHoverChange(true)}
       onMouseLeave={() => drawer.onHoverChange(false)}
       onFocus={() => drawer.onHoverChange(true)}
@@ -207,6 +208,10 @@ function ScoreEvidenceDrawerChip({
       }}
     >
       {children}
+      <Info
+        className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground group-focus-visible:text-foreground"
+        aria-hidden="true"
+      />
     </button>
   );
 }
