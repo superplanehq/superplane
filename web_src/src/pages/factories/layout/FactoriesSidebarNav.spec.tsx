@@ -4,10 +4,10 @@ import { describe, expect, it } from "bun:test";
 
 import { TooltipProvider } from "@/ui/tooltip";
 import { FACTORIES_ORGANIZATION_ID, REFUND_FACTORY, REFUND_LINE_PLAN_ID } from "../__fixtures__/factoryPageResponses";
-import { factoryHomePath, factoryVelocityPath } from "../lib/factoryPagePaths";
+import { factoryAgentPath, factoryHomePath, factoryVelocityPath } from "../lib/factoryPagePaths";
 import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
 
-function renderNav(path: string) {
+function renderNav(path: string, { showAgent = false }: { showAgent?: boolean } = {}) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <TooltipProvider>
@@ -15,6 +15,7 @@ function renderNav(path: string) {
           organizationId={FACTORIES_ORGANIZATION_ID}
           factoryKey={REFUND_FACTORY.key!}
           lineId={REFUND_LINE_PLAN_ID}
+          showAgent={showAgent}
         />
       </TooltipProvider>
     </MemoryRouter>,
@@ -42,6 +43,21 @@ describe("FactoriesSidebarNav", () => {
     );
     expect(screen.getByTestId("factories-nav-board").querySelector(".lucide-house")).toBeInTheDocument();
     expect(screen.getByTestId("factories-nav-velocity").querySelector(".lucide-chart-line")).toBeInTheDocument();
+    expect(screen.queryByTestId("factories-nav-agent")).not.toBeInTheDocument();
+  });
+
+  it("places Agent between Board and Velocity", () => {
+    renderNav(`/${org}/workspaces/${key}/lines/${REFUND_LINE_PLAN_ID}`, { showAgent: true });
+
+    const links = [...screen.getByTestId("factories-sidebar-nav").querySelectorAll("a")].map((node) =>
+      node.getAttribute("data-testid"),
+    );
+    const agentLink = screen.getByTestId("factories-nav-agent");
+
+    expect(links).toEqual(["factories-nav-board", "factories-nav-agent", "factories-nav-velocity"]);
+    expect(agentLink).toHaveAttribute("aria-label", "Agent");
+    expect(agentLink).toHaveAttribute("href", factoryAgentPath(org, key));
+    expect(agentLink.querySelector(".lucide-brain")).toBeInTheDocument();
   });
 
   it("marks the Board icon current on the line board", () => {
@@ -72,5 +88,19 @@ describe("FactoriesSidebarNav", () => {
     renderNav(`/${org}/workspaces/${key}/velocity`);
 
     expect(screen.getByTestId("factories-nav-velocity")).toHaveAttribute("aria-current", "page");
+  });
+
+  it("marks the Agent icon current on the agent page", () => {
+    renderNav(`/${org}/workspaces/${key}/agent`, { showAgent: true });
+
+    expect(screen.getByTestId("factories-nav-agent")).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("factories-nav-board")).not.toHaveAttribute("aria-current");
+    expect(screen.getByTestId("factories-nav-velocity")).not.toHaveAttribute("aria-current");
+  });
+
+  it("does not mark Agent current on agent-resources", () => {
+    renderNav(`/${org}/workspaces/${key}/settings/workspace/agent-resources`, { showAgent: true });
+
+    expect(screen.getByTestId("factories-nav-agent")).not.toHaveAttribute("aria-current");
   });
 });

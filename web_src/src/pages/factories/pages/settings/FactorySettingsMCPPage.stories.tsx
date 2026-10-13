@@ -29,7 +29,7 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 
 const agentExperimentalFeatures = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS, FEATURE_SUPERPLANE_MCP_SERVER];
 
