@@ -23,4 +23,3 @@ bash -n \
   release/fleet-manager/verify-image.sh
 
 node --check release/component-release.js
-node --check release/github-app-token.js

@@ -33,8 +33,15 @@ their short-lived registration token.
 The local Compose service waits for owner setup and manages a development
 token automatically. It does not require `INSTALLATION_ADMIN_TOKEN`.
 
-AWS fleets require `runnerReleaseBaseUrl`. Fleet Manager selects a release
-from this layout:
+Cloud fleets require `runnerReleaseBaseUrl`. For versioned Runner releases, use
+the GitHub Releases URL template:
+
+```text
+https://github.com/superplanehq/superplane/releases/download/runner%2F{version}
+```
+
+Fleet Manager replaces `{version}` with the fleet's exact Runner version. A
+base URL without the placeholder continues to use this layout:
 
 ```text
 <runnerReleaseBaseUrl>/<release-id>/runner-linux-amd64.tar.gz
