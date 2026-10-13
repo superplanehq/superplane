@@ -58,14 +58,13 @@ func ListUsers(
 		return nil, grpcerrors.NotFound(err, "role not found")
 	}
 
-	//
-	// For each role, get all users for it
-	//
+	usersByRole, err := authService.GetOrgUsersByRoles(ctx, domainID, roleNames)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to get users for roles")
+	}
+
 	for _, roleDef := range roleDefinitions {
-		userIDs, err := authService.GetOrgUsersForRole(ctx, roleDef.Name, domainID)
-		if err != nil {
-			continue
-		}
+		userIDs := usersByRole[roleDef.Name]
 
 		roleMetadata := roleMetadataMap[roleDef.Name]
 		roleAssignment := &pb.RoleAssignment{
