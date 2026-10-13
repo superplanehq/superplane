@@ -142,14 +142,18 @@ export const WAIT_STATE_MAP: EventStateMap = {
   },
 };
 
+function isWaitExecutionError(execution: ExecutionInfo): boolean {
+  return (
+    Boolean(execution.resultMessage) &&
+    (execution.resultReason === "RESULT_REASON_ERROR" ||
+      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
+  );
+}
+
 export const waitStateFunction: StateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
-  if (
-    execution.resultMessage &&
-    (execution.resultReason === "RESULT_REASON_ERROR" ||
-      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
-  ) {
+  if (isWaitExecutionError(execution)) {
     return "error";
   }
 
