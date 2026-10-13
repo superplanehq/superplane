@@ -178,7 +178,7 @@ describe("WorkOrderIntentDocument score evidence", () => {
     );
   });
 
-  it("shows the plan title and keeps both scores as evidence", () => {
+  it("uses the plan title as the open action and keeps both scores as evidence", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument
         {...INTENT_DOC}
@@ -192,8 +192,8 @@ describe("WorkOrderIntentDocument score evidence", () => {
     const card = screen.getByTestId("split-run-intent-status-card");
     expect(card).toHaveAttribute("data-slot", "frame");
     const verdict = within(card).getByTestId("split-run-intent-verdict");
-    expect(verdict).toHaveTextContent("Clearer empty state");
-    expect(verdict).toHaveTextContent("Draft plan");
+    expect(within(verdict).getByRole("button", { name: "Open plan" })).toHaveTextContent("Clearer empty state");
+    expect(verdict).not.toHaveTextContent("Draft plan");
     const clarity = within(card).getByTestId("split-run-intent-composer-score");
     const confidence = within(card).getByTestId("split-run-intent-composer-confidence");
     expect(clarity).toHaveAccessibleName("Clarity 4/5");
@@ -224,7 +224,7 @@ describe("WorkOrderIntentDocument score evidence", () => {
 
     const card = screen.getByTestId("split-run-intent-status-card");
     const verdict = within(card).getByTestId("split-run-intent-verdict");
-    expect(within(verdict).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(verdict).getByRole("button", { name: "Open plan" })).toBeInTheDocument();
     const settings = screen.getByRole("region", { name: "Implementation" });
     const plan = within(card).getByRole("button", { name: "Open plan" });
     const model = within(settings).getByRole("button", { name: "Model: Auto" });
