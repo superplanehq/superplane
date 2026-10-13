@@ -51,16 +51,16 @@ chmod +x "${TEST_DIRECTORY}/bin/docker"
 
 export TEST_DOCKER_LOG="${TEST_DIRECTORY}/docker.log"
 export TEST_DOCKER_STDIN="${TEST_DIRECTORY}/docker.stdin"
-export REGISTRY_AUTH_FILE="${TEST_DIRECTORY}/auth.json"
+export REGISTRY_AUTH_FILE="${TEST_DIRECTORY}/auth/auth.json"
 export SKOPEO_CONTAINER_IMAGE="quay.io/skopeo/stable@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-touch "${REGISTRY_AUTH_FILE}"
+mkdir "$(dirname "${REGISTRY_AUTH_FILE}")"
 printf 'test-token' | PATH="${TEST_DIRECTORY}/bin:${PATH}" \
   bash "${REPO_ROOT}/release/fleet-manager/run-skopeo.sh" \
     login example.com --username release-user --password-stdin
 
 grep -Fx -- "--interactive" "${TEST_DOCKER_LOG}" >/dev/null
 grep -Fx -- "${PWD}:${PWD}:ro" "${TEST_DOCKER_LOG}" >/dev/null
-grep -Fx -- "${REGISTRY_AUTH_FILE}:${REGISTRY_AUTH_FILE}" "${TEST_DOCKER_LOG}" >/dev/null
+grep -Fx -- "$(dirname "${REGISTRY_AUTH_FILE}"):$(dirname "${REGISTRY_AUTH_FILE}")" "${TEST_DOCKER_LOG}" >/dev/null
 grep -Fx -- "${SKOPEO_CONTAINER_IMAGE}" "${TEST_DOCKER_LOG}" >/dev/null
 grep -Fx -- "login" "${TEST_DOCKER_LOG}" >/dev/null
 grep -Fx -- "--password-stdin" "${TEST_DOCKER_LOG}" >/dev/null
