@@ -55,11 +55,10 @@ fi
 echo ""
 OIDC_KEYS_HOST_PATH="${PWD}/oidc"
 OIDC_KEYS_CONTAINER_PATH="/app/oidc-keys"
-OIDC_KEYS_GID="$(id -g)"
 
 mkdir -p "${OIDC_KEYS_HOST_PATH}"
 
-if [[ -z "$(find "${OIDC_KEYS_HOST_PATH}" -type f 2>/dev/null | head -n 1)" ]]; then
+if [[ -z "$(find "${OIDC_KEYS_HOST_PATH}" -maxdepth 1 -type f -print -quit)" ]]; then
   if ! command -v openssl >/dev/null 2>&1; then
     echo "openssl is required to generate OIDC keys."
     exit 1
@@ -75,10 +74,8 @@ if [[ -z "$(find "${OIDC_KEYS_HOST_PATH}" -type f 2>/dev/null | head -n 1)" ]]; 
   rm -f "${openssl_err_file}"
 fi
 
-chgrp "${OIDC_KEYS_GID}" "${OIDC_KEYS_HOST_PATH}"
-chmod 750 "${OIDC_KEYS_HOST_PATH}"
-find "${OIDC_KEYS_HOST_PATH}" -type f -exec chgrp "${OIDC_KEYS_GID}" {} +
-find "${OIDC_KEYS_HOST_PATH}" -type f -exec chmod 640 {} +
+chmod 700 "${OIDC_KEYS_HOST_PATH}"
+find "${OIDC_KEYS_HOST_PATH}" -type f -exec chmod 600 {} +
 
 echo ""
 echo "Writing ${ENV_FILE}..."
@@ -166,12 +163,22 @@ echo "Configuration written to ${ENV_FILE}."
 echo ""
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]:-$0}")"
-export OIDC_KEYS_HOST_PATH
-export OIDC_KEYS_CONTAINER_PATH
-export OIDC_KEYS_GID
 
 echo "Pulling Docker images (this may take a while)..."
 docker compose -f "${SCRIPT_DIR}/docker-compose.yml" pull --quiet
+
+echo "Preparing OIDC keys..."
+docker compose -f "${SCRIPT_DIR}/docker-compose.yml" run --rm --no-deps --user root \
+  --volume "${OIDC_KEYS_HOST_PATH}:/app/oidc-import:ro" --entrypoint /bin/bash app -c '
+    set -euo pipefail
+    umask 077
+    if [[ -z "$(find /app/oidc-keys -maxdepth 1 -type f -print -quit)" ]]; then
+      find /app/oidc-import -maxdepth 1 -type f -exec cp {} /app/oidc-keys/ \;
+    fi
+    chown -R nobody:nogroup /app/oidc-keys
+    chmod 700 /app/oidc-keys
+    find /app/oidc-keys -type f -exec chmod 600 {} +
+  '
 
 echo "Running docker compose up --wait --detach..."
 docker compose -f "${SCRIPT_DIR}/docker-compose.yml" up --wait --detach

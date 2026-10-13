@@ -9,10 +9,8 @@ services:
         condition: service_healthy
     env_file:
       - superplane.env
-    group_add:
-      - ${OIDC_KEYS_GID}
     volumes:
-      - ${OIDC_KEYS_HOST_PATH:-./oidc}:${OIDC_KEYS_CONTAINER_PATH:-/app/oidc-keys}
+      - oidc-keys:/app/oidc-keys
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/health || exit 1"]
       interval: 10s
@@ -64,6 +62,8 @@ services:
       retries: 10
 
 volumes:
+  oidc-keys:
+    driver: local
   postgres-data:
     driver: local
   caddy-data:
