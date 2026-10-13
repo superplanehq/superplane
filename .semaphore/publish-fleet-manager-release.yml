@@ -34,7 +34,7 @@ blocks:
       jobs:
         - name: "Publish immutable Fleet Manager release"
           commands:
-            - artifact pull workflow "build/fleet-manager/$RELEASE_VERSION"
+            - bash release/component-release-artifact.sh pull fleet-manager "$RELEASE_VERSION" "build/fleet-manager/$RELEASE_VERSION"
             - |
               release_dir="build/fleet-manager/$RELEASE_VERSION"
               (cd "$release_dir" && sha256sum --check release-manifest.sha256)

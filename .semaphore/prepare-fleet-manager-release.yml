@@ -50,7 +50,8 @@ blocks:
                 --assets fleet-manager-linux-amd64.tar.gz,fleet-manager-linux-arm64.tar.gz,fleet-manager.spdx.json,checksums.txt,fleet-manager.oci.tar \
                 --output "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum release-manifest.json >release-manifest.sha256)
-              artifact push workflow "$release_dir"
+              bash release/component-release-artifact.sh \
+                push fleet-manager "$RELEASE_VERSION" "$release_dir"
 
 promotions:
   - name: Publish Fleet Manager Release

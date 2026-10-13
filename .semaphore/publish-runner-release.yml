@@ -25,7 +25,7 @@ blocks:
       jobs:
         - name: "Publish immutable Runner release"
           commands:
-            - artifact pull workflow "build/runner/$RELEASE_VERSION"
+            - bash release/component-release-artifact.sh pull runner "$RELEASE_VERSION" "build/runner/$RELEASE_VERSION"
             - |
               release_dir="build/runner/$RELEASE_VERSION"
               (cd "$release_dir" && sha256sum --check release-manifest.sha256)
