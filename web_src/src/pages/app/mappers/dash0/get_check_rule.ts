@@ -58,12 +58,7 @@ export const getCheckRuleMapper: ComponentBaseMapper = {
       details["Expression"] = expr.length > 100 ? expr.substring(0, 100) + "..." : expr;
     }
 
-    if (responseData.thresholds) {
-      const parts: string[] = [];
-      if (responseData.thresholds.degraded != null) parts.push(`Degraded: ${responseData.thresholds.degraded}`);
-      if (responseData.thresholds.critical != null) parts.push(`Critical: ${responseData.thresholds.critical}`);
-      if (parts.length > 0) details["Thresholds"] = parts.join(", ");
-    }
+    addCheckRuleThresholds(details, responseData);
 
     if (responseData.interval) details["Interval"] = String(responseData.interval);
     if (responseData.for) details["For"] = String(responseData.for);
@@ -85,6 +80,23 @@ export const getCheckRuleMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function addCheckRuleThresholds(details: Record<string, string>, responseData: CheckRulePayload) {
+  if (!responseData.thresholds) {
+    return;
+  }
+
+  const parts: string[] = [];
+  if (responseData.thresholds.degraded != null) {
+    parts.push(`Degraded: ${responseData.thresholds.degraded}`);
+  }
+  if (responseData.thresholds.critical != null) {
+    parts.push(`Critical: ${responseData.thresholds.critical}`);
+  }
+  if (parts.length > 0) {
+    details["Thresholds"] = parts.join(", ");
+  }
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
