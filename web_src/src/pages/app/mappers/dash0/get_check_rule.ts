@@ -47,32 +47,7 @@ export const getCheckRuleMapper: ComponentBaseMapper = {
       return { Response: "No data returned" };
     }
 
-    const details: Record<string, string> = {};
-
-    if (payload?.timestamp) details["Fetched At"] = new Date(payload.timestamp).toLocaleString();
-    if (responseData.name) details["Name"] = String(responseData.name);
-    if (responseData.id) details["ID"] = String(responseData.id);
-
-    if (responseData.expression) {
-      const expr = String(responseData.expression);
-      details["Expression"] = expr.length > 100 ? expr.substring(0, 100) + "..." : expr;
-    }
-
-    addCheckRuleThresholds(details, responseData);
-
-    if (responseData.interval) details["Interval"] = String(responseData.interval);
-    if (responseData.for) details["For"] = String(responseData.for);
-    if (responseData.keepFiringFor) details["Keep Firing For"] = String(responseData.keepFiringFor);
-    if (responseData.enabled != null) details["Enabled"] = responseData.enabled ? "Yes" : "No";
-
-    if (responseData.labels && Object.keys(responseData.labels).length > 0) {
-      const labels = Object.entries(responseData.labels)
-        .map(([k, v]) => `${k}=${v}`)
-        .join(", ");
-      details["Labels"] = labels;
-    }
-
-    return details;
+    return detailsFromFetchedCheckRule(payload, responseData);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -80,6 +55,38 @@ export const getCheckRuleMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function detailsFromFetchedCheckRule(payload: OutputPayload, responseData: CheckRulePayload): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (payload?.timestamp) {
+    details["Fetched At"] = new Date(payload.timestamp).toLocaleString();
+  }
+
+  addCheckRuleFieldDetails(details, responseData);
+  return details;
+}
+
+function addCheckRuleFieldDetails(details: Record<string, string>, responseData: CheckRulePayload) {
+  if (responseData.name) details["Name"] = String(responseData.name);
+  if (responseData.id) details["ID"] = String(responseData.id);
+  if (responseData.expression) {
+    details["Expression"] = truncatedExpression(String(responseData.expression));
+  }
+
+  addCheckRuleThresholds(details, responseData);
+
+  if (responseData.interval) details["Interval"] = String(responseData.interval);
+  if (responseData.for) details["For"] = String(responseData.for);
+  if (responseData.keepFiringFor) details["Keep Firing For"] = String(responseData.keepFiringFor);
+  if (responseData.enabled != null) details["Enabled"] = responseData.enabled ? "Yes" : "No";
+
+  addCheckRuleLabels(details, responseData);
+}
+
+function truncatedExpression(expression: string): string {
+  return expression.length > 100 ? expression.substring(0, 100) + "..." : expression;
+}
 
 function addCheckRuleThresholds(details: Record<string, string>, responseData: CheckRulePayload) {
   if (!responseData.thresholds) {
@@ -96,6 +103,16 @@ function addCheckRuleThresholds(details: Record<string, string>, responseData: C
   if (parts.length > 0) {
     details["Thresholds"] = parts.join(", ");
   }
+}
+
+function addCheckRuleLabels(details: Record<string, string>, responseData: CheckRulePayload) {
+  if (!responseData.labels || Object.keys(responseData.labels).length === 0) {
+    return;
+  }
+
+  details["Labels"] = Object.entries(responseData.labels)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(", ");
 }
 
 function metadataList(node: NodeInfo): MetadataItem[] {

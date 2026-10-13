@@ -155,6 +155,34 @@ function addCloudBuildSummaryFields(details: Record<string, string>, build?: Clo
   addDetail(details, "Log URL", build?.logUrl);
 }
 
+function addCloudBuildIdentityFields(details: Record<string, string>, build: CloudBuildData) {
+  addDetail(details, "Build ID", build.id);
+  addDetail(details, "Build Name", build.name);
+  addDetail(details, "Project", build.projectId);
+  addDetail(details, "Status", build.status);
+  addDetail(details, "Trigger ID", build.buildTriggerId);
+  addDateDetail(details, "Created At", build.createTime);
+  addDateDetail(details, "Started At", build.startTime);
+  addDateDetail(details, "Finished At", build.finishTime);
+  addDetail(details, "Log URL", build.logUrl);
+}
+
+function addCloudBuildSourceFields(details: Record<string, string>, build: CloudBuildData) {
+  addDetail(details, "Source", formatSource(build.source?.gitSource));
+  addDetail(details, "Resolved Source", formatSource(build.sourceProvenance?.resolvedGitSource));
+  addDetail(details, "Service Account", build.serviceAccount);
+  addDetail(details, "Logging", build.options?.logging);
+  addDetail(details, "Dynamic Substitutions", formatBoolean(build.options?.dynamicSubstitutions));
+  addDetail(details, "Substitution Option", build.options?.substitutionOption);
+  addDetail(details, "Queue TTL", build.queueTtl);
+  addDetail(details, "Timeout", build.timeout);
+  addDetail(details, "Tags", build.tags?.join(", "));
+  addDetail(details, "Steps", formatSteps(build.steps));
+  addDetail(details, "Results", formatResults(build.results));
+  addDetail(details, "Substitutions", formatSubstitutions(build.substitutions));
+  addDetail(details, "Timing Phases", formatTiming(build.timing));
+}
+
 export function buildCloudBuildDetails({
   build,
   receivedAt,
@@ -175,28 +203,8 @@ export function buildCloudBuildDetails({
     return details;
   }
 
-  addDetail(details, "Build ID", build.id);
-  addDetail(details, "Build Name", build.name);
-  addDetail(details, "Project", build.projectId);
-  addDetail(details, "Status", build.status);
-  addDetail(details, "Trigger ID", build.buildTriggerId);
-  addDateDetail(details, "Created At", build.createTime);
-  addDateDetail(details, "Started At", build.startTime);
-  addDateDetail(details, "Finished At", build.finishTime);
-  addDetail(details, "Log URL", build.logUrl);
-  addDetail(details, "Source", formatSource(build.source?.gitSource));
-  addDetail(details, "Resolved Source", formatSource(build.sourceProvenance?.resolvedGitSource));
-  addDetail(details, "Service Account", build.serviceAccount);
-  addDetail(details, "Logging", build.options?.logging);
-  addDetail(details, "Dynamic Substitutions", formatBoolean(build.options?.dynamicSubstitutions));
-  addDetail(details, "Substitution Option", build.options?.substitutionOption);
-  addDetail(details, "Queue TTL", build.queueTtl);
-  addDetail(details, "Timeout", build.timeout);
-  addDetail(details, "Tags", build.tags?.join(", "));
-  addDetail(details, "Steps", formatSteps(build.steps));
-  addDetail(details, "Results", formatResults(build.results));
-  addDetail(details, "Substitutions", formatSubstitutions(build.substitutions));
-  addDetail(details, "Timing Phases", formatTiming(build.timing));
+  addCloudBuildIdentityFields(details, build);
+  addCloudBuildSourceFields(details, build);
 
   return details;
 }
