@@ -21,6 +21,10 @@ interface OnPRReviewCommentEventData {
   };
 }
 
+function reviewCommentAuthor(eventData: OnPRReviewCommentEventData | undefined): string {
+  return eventData?.comment?.user?.login || eventData?.review?.user?.login || "unknown";
+}
+
 /**
  * Renderer for the "github.onPRReviewComment" trigger
  */
@@ -35,7 +39,7 @@ export const onPRReviewCommentTriggerRenderer: TriggerRenderer = {
         ? `#${prNumber} - PR Review`
         : `#${prNumber} - PR Review Comment`;
 
-    const author = eventData?.comment?.user?.login || eventData?.review?.user?.login || "unknown";
+    const author = reviewCommentAuthor(eventData);
 
     return {
       title,

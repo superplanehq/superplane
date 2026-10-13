@@ -65,21 +65,7 @@ export const createImageMapper: ComponentBaseMapper = {
       };
     }
 
-    return {
-      "Instance ID": stringOrDash(configuration?.instanceId),
-      "Image ID": stringOrDash(output.image?.imageId),
-      Name: stringOrDash(output.image?.name),
-      Description: stringOrDash(output.image?.description),
-      State: stringOrDash(output.image?.state),
-      "Creation Date": stringOrDash(output.image?.creationDate),
-      Architecture: stringOrDash(output.image?.architecture),
-      "Image Type": stringOrDash(output.image?.imageType),
-      "Root Device Type": stringOrDash(output.image?.rootDeviceType),
-      "Root Device Name": stringOrDash(output.image?.rootDeviceName),
-      "Virtualization Type": stringOrDash(output.image?.virtualizationType),
-      Hypervisor: stringOrDash(output.image?.hypervisor),
-      "Owner ID": stringOrDash(output.image?.ownerId),
-    };
+    return createImageDetails(configuration, output);
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -90,6 +76,24 @@ export const createImageMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function createImageDetails(configuration: Configuration | undefined, output: Output): Record<string, string> {
+  return {
+    "Instance ID": stringOrDash(configuration?.instanceId),
+    "Image ID": stringOrDash(output.image?.imageId),
+    Name: stringOrDash(output.image?.name),
+    Description: stringOrDash(output.image?.description),
+    State: stringOrDash(output.image?.state),
+    "Creation Date": stringOrDash(output.image?.creationDate),
+    Architecture: stringOrDash(output.image?.architecture),
+    "Image Type": stringOrDash(output.image?.imageType),
+    "Root Device Type": stringOrDash(output.image?.rootDeviceType),
+    "Root Device Name": stringOrDash(output.image?.rootDeviceName),
+    "Virtualization Type": stringOrDash(output.image?.virtualizationType),
+    Hypervisor: stringOrDash(output.image?.hypervisor),
+    "Owner ID": stringOrDash(output.image?.ownerId),
+  };
+}
 
 function createImageMetadata(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
