@@ -55,7 +55,7 @@ blocks:
 promotions:
   - name: Publish Fleet Manager Release
     pipeline_file: publish-fleet-manager-release.yml
-    deployment_target: fleet-manager-releases
+    deployment_target: release
     parameters:
       env_vars:
         - name: VERSION
