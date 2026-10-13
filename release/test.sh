@@ -22,6 +22,7 @@ bash -n \
   release/fleet-manager/build-release.sh \
   release/fleet-manager/publish-image.sh \
   release/fleet-manager/publish_image_test.sh \
+  release/fleet-manager/run-skopeo.sh \
   release/fleet-manager/verify-oci-archive.sh \
   release/fleet-manager/verify-image.sh
 
