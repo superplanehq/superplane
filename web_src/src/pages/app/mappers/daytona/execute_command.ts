@@ -34,10 +34,7 @@ export const executeCommandStateFunction: StateFunction = (execution) => {
     return "failed";
   }
 
-  const payload =
-    (outputs?.success?.[0]?.data as ExecuteCommandOutput | undefined) ??
-    (outputs?.failed?.[0]?.data as ExecuteCommandOutput | undefined) ??
-    (outputs?.default?.[0]?.data as ExecuteCommandOutput | undefined);
+  const payload = executeCommandPayload(outputs);
 
   if (typeof payload?.exitCode === "number" && payload.exitCode !== 0) {
     return "failed";
@@ -45,6 +42,16 @@ export const executeCommandStateFunction: StateFunction = (execution) => {
 
   return "executed";
 };
+
+function executeCommandPayload(
+  outputs: { success?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] } | undefined,
+): ExecuteCommandOutput | undefined {
+  return (
+    (outputs?.success?.[0]?.data as ExecuteCommandOutput | undefined) ??
+    (outputs?.failed?.[0]?.data as ExecuteCommandOutput | undefined) ??
+    (outputs?.default?.[0]?.data as ExecuteCommandOutput | undefined)
+  );
+}
 
 export const EXECUTE_COMMAND_STATE_REGISTRY: EventStateRegistry = {
   stateMap: EXECUTE_COMMAND_STATE_MAP,
