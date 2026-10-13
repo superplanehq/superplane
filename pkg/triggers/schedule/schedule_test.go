@@ -74,6 +74,24 @@ func TestNextMinutesTrigger(t *testing.T) {
 	}
 }
 
+func TestNextWeeksTriggerIncludesWeekdaysBeforeSetupDay(t *testing.T) {
+	now := time.Now().UTC()
+	daysUntilWednesday := (int(time.Wednesday) - int(now.Weekday()) + 7) % 7
+	setupDay := now.AddDate(0, 0, daysUntilWednesday)
+	setupTime := time.Date(setupDay.Year(), setupDay.Month(), setupDay.Day(), 10, 0, 0, 0, time.UTC)
+	expectedDay := setupTime.AddDate(0, 0, 5)
+	expected := time.Date(expectedDay.Year(), expectedDay.Month(), expectedDay.Day(), 15, 30, 0, 0, time.UTC)
+
+	result, err := nextWeeksTrigger(1, []string{WeekDayMonday}, 15, 30, setupTime)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !result.Equal(expected) {
+		t.Errorf("expected next trigger at %v, got %v", expected, *result)
+	}
+}
+
 func TestGetNextTrigger(t *testing.T) {
 	tests := []struct {
 		name           string
