@@ -13,6 +13,30 @@ import (
 	"github.com/superplanehq/superplane/test/support/logger"
 )
 
+func Test__GitHub__SetupProvider__FirstStep(t *testing.T) {
+	step := (&SetupProvider{}).FirstStep(core.SetupStepContext{})
+
+	assert.Equal(t, SetupStepSelectOwner, step.Name)
+	assert.Equal(t, "Select the GitHub user account or organization", step.Label)
+	require.Len(t, step.Inputs, 2)
+
+	ownerType := step.Inputs[0]
+	assert.Equal(t, common.PropertyOwnerType, ownerType.Name)
+	assert.Equal(t, "GitHub owner type", ownerType.Label)
+	require.NotNil(t, ownerType.TypeOptions)
+	require.NotNil(t, ownerType.TypeOptions.Select)
+	require.Len(t, ownerType.TypeOptions.Select.Options, 2)
+	assert.Equal(t, "GitHub user account", ownerType.TypeOptions.Select.Options[0].Label)
+	assert.Equal(t, common.OwnerTypeUser, ownerType.TypeOptions.Select.Options[0].Value)
+	assert.Equal(t, "GitHub organization", ownerType.TypeOptions.Select.Options[1].Label)
+	assert.Equal(t, common.OwnerTypeOrganization, ownerType.TypeOptions.Select.Options[1].Value)
+
+	owner := step.Inputs[1]
+	assert.Equal(t, common.PropertyOwner, owner.Name)
+	assert.Equal(t, "GitHub username or organization name", owner.Label)
+	assert.Contains(t, owner.Description, "not your SuperPlane organization")
+}
+
 func Test__GitHub__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 	g := &SetupProvider{}
 	log := logger.DiscardLogger()
