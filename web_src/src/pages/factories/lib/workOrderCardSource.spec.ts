@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import type { FactoriesWorkOrder } from "@/api-client";
+import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 import superplaneMark from "@/assets/superplane-mark.svg";
@@ -82,7 +83,7 @@ describe("workOrderCardSource", () => {
     });
   });
 
-  it("returns the MCP client name for a handed-off task", () => {
+  it("returns the Cursor logo for a Cursor MCP card", () => {
     expect(
       workOrderCardSource({
         ...baseOrder,
@@ -90,8 +91,8 @@ describe("workOrderCardSource", () => {
       }),
     ).toEqual({
       name: "Cursor",
-      iconSrc: superplaneMark,
-      iconAlt: "SuperPlane",
+      iconSrc: cursorIcon,
+      iconAlt: "Cursor",
     });
   });
 });
