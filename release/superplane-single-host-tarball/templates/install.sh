@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+umask 077
 
 BLUE="\033[0;34m"
 LBLUE="\033[1;34m"
@@ -54,6 +55,7 @@ fi
 echo ""
 OIDC_KEYS_HOST_PATH="${PWD}/oidc"
 OIDC_KEYS_CONTAINER_PATH="/app/oidc-keys"
+OIDC_KEYS_GID="$(id -g)"
 
 mkdir -p "${OIDC_KEYS_HOST_PATH}"
 
@@ -71,8 +73,12 @@ if [[ -z "$(find "${OIDC_KEYS_HOST_PATH}" -type f 2>/dev/null | head -n 1)" ]]; 
     exit 1
   fi
   rm -f "${openssl_err_file}"
-  chmod 644 "${oidc_key_file}"
 fi
+
+chgrp "${OIDC_KEYS_GID}" "${OIDC_KEYS_HOST_PATH}"
+chmod 750 "${OIDC_KEYS_HOST_PATH}"
+find "${OIDC_KEYS_HOST_PATH}" -type f -exec chgrp "${OIDC_KEYS_GID}" {} +
+find "${OIDC_KEYS_HOST_PATH}" -type f -exec chmod 640 {} +
 
 echo ""
 echo "Writing ${ENV_FILE}..."
@@ -162,6 +168,7 @@ echo ""
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]:-$0}")"
 export OIDC_KEYS_HOST_PATH
 export OIDC_KEYS_CONTAINER_PATH
+export OIDC_KEYS_GID
 
 echo "Pulling Docker images (this may take a while)..."
 docker compose -f "${SCRIPT_DIR}/docker-compose.yml" pull --quiet
