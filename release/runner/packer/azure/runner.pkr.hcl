@@ -163,6 +163,11 @@ build {
   }
 
   provisioner "shell" {
+    script          = "${path.root}/../aws/scripts/install-yt-dlp.sh"
+    execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
+  }
+
+  provisioner "shell" {
     execute_command = "chmod +x {{ .Path }}; {{ .Vars }} sudo -E sh '{{ .Path }}'"
     inline = [
       "/usr/sbin/waagent -force -deprovision+user && export HISTSIZE=0 && sync",
