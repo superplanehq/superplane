@@ -311,3 +311,73 @@ func TestFactoryVelocitySync_ShortCatchUpContinuesWithoutRereadingOlderHistory(t
 	require.NoError(t, err)
 	require.Len(t, rows, 2, "a short catch-up must not delete the older history it did not read")
 }
+
+func TestFactoryVelocitySync_ShortRecomputeKeepsTheOriginalWindowStart(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	now := time.Now()
+	history := now.AddDate(0, 0, -velocitySyncBackfillDays-1)
+	sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, now)
+	require.NoError(t, err)
+	require.NoError(t, sync.RecordSuccess(db, "acme/app", now.Add(-time.Hour), history))
+	sync.RulesGeneration = bitbucketVelocityRulesGeneration
+	target := models.FactoryVelocitySyncTarget{
+		OrganizationID:   r.Organization.ID,
+		FactoryID:        factory.ID,
+		VCSProvider:      models.ProviderBitbucket,
+		Repository:       "acme/app",
+		SyncedRepository: "acme/app",
+		SyncedAt:         sync.SyncedAt,
+		BackfilledFrom:   sync.BackfilledFrom,
+		RulesGeneration:  bitbucketVelocityRulesGeneration,
+	}
+	windowStart := now.Add(-velocitySyncRecomputeWindow)
+	cursor := now.Add(-5 * 24 * time.Hour)
+	worker := NewFactoryVelocitySyncWorker("", nil, nil)
+	require.NoError(t, worker.storeMerges(
+		target,
+		sync,
+		windowStart,
+		time.Time{},
+		nil,
+		velocityReadCoverage{ContinueBefore: cursor},
+		now,
+		now,
+	))
+
+	stored, err := models.FindFactoryVelocitySync(db, factory.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stored.SyncedAt)
+	assert.WithinDuration(t, windowStart, *stored.SyncedAt, time.Second,
+		"a short seven-day read must save the window start, not the retry clock")
+	require.NotNil(t, stored.BackfilledFrom)
+	assert.WithinDuration(t, cursor, *stored.BackfilledFrom, time.Second)
+
+	later := now.Add(24 * time.Hour)
+	resumed := target
+	resumed.RulesGeneration = stored.RulesGeneration
+	resumed.SyncedAt = stored.SyncedAt
+	resumed.BackfilledFrom = stored.BackfilledFrom
+	from, until := velocitySyncBounds(resumed, later)
+	assert.WithinDuration(t, windowStart, from, time.Second,
+		"a retry must not skip the unread day at the start of the window")
+	assert.WithinDuration(t, cursor, until, time.Second)
+
+	require.NoError(t, worker.storeMerges(
+		resumed,
+		stored,
+		later.Add(-velocitySyncRecomputeWindow),
+		cursor,
+		nil,
+		velocityReadCoverage{ContinueBefore: cursor.Add(-24 * time.Hour)},
+		later,
+		later,
+	))
+	stored, err = models.FindFactoryVelocitySync(db, factory.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stored.SyncedAt)
+	assert.WithinDuration(t, windowStart, *stored.SyncedAt, time.Second,
+		"a later slice must keep the original window start")
+}

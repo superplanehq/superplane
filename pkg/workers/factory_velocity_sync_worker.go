@@ -437,11 +437,17 @@ func (w *FactoryVelocitySyncWorker) storeMerges(
 	}
 
 	newestReadAt := preservedNewestSliceReadAt(sync, now)
+	if rulesGeneration == bitbucketVelocityRulesCatchingUp {
+		// The cursor is BackfilledFrom. SyncedAt keeps the original window
+		// start so a later retry does not move that start forward.
+		newestReadAt = bitbucketCatchUpWindowStart(sync, from)
+	}
 	sync.RulesGeneration = rulesGeneration
 	if !coverage.Complete || rulesGeneration == bitbucketVelocityRulesCatchUp {
 		// A short slice, or the last older slice of a rebuild, is not a
-		// finished sync. Keep the newest-slice time so the catch-up can
-		// start there. The report stays pending while rules generation is
+		// finished sync. A rebuild keeps the newest-slice time so the
+		// catch-up can start there. A short newer window keeps its original
+		// start instead. The report stays pending while rules generation is
 		// negative.
 		return sync.RecordProgress(database.Conn(), target.Repository, backfilledFrom, newestReadAt)
 	}
@@ -880,12 +886,45 @@ func backfillAfterVelocityRead(
 
 // bitbucketCatchUpFrom is the start of the newer window. It reaches back at
 // least as far as the newest slice, and at least the recompute window, so a
-// long rebuild does not drop merges made after that slice.
+// long rebuild does not drop merges made after that slice. A catch-up that
+// already saved a slice keeps that original start. Recomputing it from now
+// would skip the unread day at the start of the window.
 func bitbucketCatchUpFrom(target models.FactoryVelocitySyncTarget, now time.Time) time.Time {
+	if saved, ok := savedBitbucketCatchUpFrom(target, now); ok {
+		return clampBitbucketCatchUpFrom(saved, now)
+	}
 	from := now.Add(-velocitySyncRecomputeWindow)
 	if target.SyncedAt != nil && target.SyncedAt.Before(from) {
 		from = *target.SyncedAt
 	}
+	return clampBitbucketCatchUpFrom(from, now)
+}
+
+// bitbucketCatchUpWindowStart is the original start to store for an unfinished
+// newer window. The cursor stays in BackfilledFrom. A later slice keeps the
+// start already saved, so the clock cannot move it forward.
+func bitbucketCatchUpWindowStart(sync *models.FactoryVelocitySync, requestedFrom time.Time) time.Time {
+	if sync.RulesGeneration == bitbucketVelocityRulesCatchingUp && sync.SyncedAt != nil {
+		return *sync.SyncedAt
+	}
+	return requestedFrom
+}
+
+// savedBitbucketCatchUpFrom is the window start stored while a newer-window
+// read is still walking backward. It is unset on the first catch-up read. A
+// stamp newer than the recompute window is the newest-slice time, not that
+// start, so a retry must not treat it as the window.
+func savedBitbucketCatchUpFrom(target models.FactoryVelocitySyncTarget, now time.Time) (time.Time, bool) {
+	if target.RulesGeneration != bitbucketVelocityRulesCatchingUp || target.SyncedAt == nil {
+		return time.Time{}, false
+	}
+	if target.SyncedAt.After(now.Add(-velocitySyncRecomputeWindow)) {
+		return time.Time{}, false
+	}
+	return *target.SyncedAt, true
+}
+
+func clampBitbucketCatchUpFrom(from, now time.Time) time.Time {
 	backfillFrom := velocitySyncBackfillStart(now)
 	if from.Before(backfillFrom) {
 		return backfillFrom
