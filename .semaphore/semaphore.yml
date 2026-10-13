@@ -197,18 +197,18 @@ promotions:
     pipeline_file: prepare-runner-release.yml
     parameters:
       env_vars:
-        - name: VERSION
+        - name: RELEASE_VERSION
           required: true
-          default_value: VERSION_REQUIRED
+          default_value: RELEASE_VERSION_REQUIRED
           description: Runner version in vMAJOR.MINOR.PATCH format
 
   - name: Prepare Fleet Manager Release
     pipeline_file: prepare-fleet-manager-release.yml
     parameters:
       env_vars:
-        - name: VERSION
+        - name: RELEASE_VERSION
           required: true
-          default_value: VERSION_REQUIRED
+          default_value: RELEASE_VERSION_REQUIRED
           description: Fleet Manager version in vMAJOR.MINOR.PATCH format
 
   - name: Publish Fleet Manager Image

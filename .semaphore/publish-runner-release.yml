@@ -25,13 +25,13 @@ blocks:
       jobs:
         - name: "Publish immutable Runner release"
           commands:
-            - artifact pull workflow "build/runner/$VERSION"
+            - artifact pull workflow "build/runner/$RELEASE_VERSION"
             - |
-              release_dir="build/runner/$VERSION"
+              release_dir="build/runner/$RELEASE_VERSION"
               (cd "$release_dir" && sha256sum --check release-manifest.sha256)
               node release/component-release.js verify-manifest \
                 --component runner \
-                --version "$VERSION" \
+                --version "$RELEASE_VERSION" \
                 --sha "$SEMAPHORE_GIT_SHA" \
                 --workflow-id "$SEMAPHORE_WORKFLOW_ID" \
                 --directory "$release_dir" \
@@ -40,16 +40,16 @@ blocks:
               (cd "$release_dir" && sha256sum --check checksums.txt)
               test -n "${GITHUB_TOKEN:-}"
             - |
-              release_dir="build/runner/$VERSION"
+              release_dir="build/runner/$RELEASE_VERSION"
               node release/component-release.js stage-github-release \
                 --component runner \
-                --version "$VERSION" \
+                --version "$RELEASE_VERSION" \
                 --sha "$SEMAPHORE_GIT_SHA" \
                 --directory "$release_dir" \
                 --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
                 --release-id-file /tmp/github-release-id
             - |
-              release_dir="build/runner/$VERSION"
+              release_dir="build/runner/$RELEASE_VERSION"
               release_notes_args=()
               if [ -f "$release_dir/release-notes.md" ]; then
                 release_notes_args=(--release-notes "$release_dir/release-notes.md")
@@ -57,14 +57,14 @@ blocks:
               node release/component-release.js publish-github-release \
                 --release-id "$(cat /tmp/github-release-id)" \
                 --component runner \
-                --version "$VERSION" \
+                --version "$RELEASE_VERSION" \
                 --sha "$SEMAPHORE_GIT_SHA" \
                 "${release_notes_args[@]}"
             - |
-              encoded_tag="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "runner/$VERSION")"
+              encoded_tag="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "runner/$RELEASE_VERSION")"
               bash release/verify-public-assets.sh \
                 "https://github.com/superplanehq/superplane/releases/download/$encoded_tag" \
-                "build/runner/$VERSION" \
+                "build/runner/$RELEASE_VERSION" \
                 runner-linux-amd64.tar.gz \
                 runner-linux-arm64.tar.gz \
                 runner.spdx.json \
