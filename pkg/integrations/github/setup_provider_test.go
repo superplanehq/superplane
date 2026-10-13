@@ -161,6 +161,13 @@ func Test__GitHub__SetupProvider__OnPropertyUpdate(t *testing.T) {
 	assert.Contains(t, err.Error(), "no property updates are supported")
 }
 
+func Test__GitHub__SetupProvider__FirstStep(t *testing.T) {
+	step := (&SetupProvider{}).FirstStep(core.SetupStepContext{})
+
+	require.Len(t, step.Inputs, 2)
+	assert.Equal(t, "GitHub user account or organization name", step.Inputs[1].Label)
+}
+
 func Test__GitHub__SetupProvider__OnSecretUpdate(t *testing.T) {
 	g := &SetupProvider{}
 	log := logger.DiscardLogger()
