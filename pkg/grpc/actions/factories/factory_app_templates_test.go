@@ -371,6 +371,7 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 	assert.Equal(t, &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}, update.Integration)
 	assert.Equal(t, "{{ root().data.repository.full_name }}", update.Configuration["repository"])
 	assert.Equal(t, "{{ root().data.pull_request.number }}", update.Configuration["pullNumber"])
+	assert.Equal(t, "{{ root().data.pull_request.head.sha }}", update.Configuration["expectedHeadSHA"])
 	body, ok := update.Configuration["body"].(string)
 	require.True(t, ok)
 	assert.Contains(t, body, "## Visual evidence")
@@ -382,6 +383,7 @@ func TestMaterializeVisualEvidenceKeepsCaptureFlag(t *testing.T) {
 	assert.Contains(t, result.consoleYAML, "This app is not a factory line step.")
 	assert.Contains(t, result.consoleYAML, "The first capture starts when")
 	assert.Contains(t, result.consoleYAML, "bottom of the pull request description")
+	assert.Contains(t, result.consoleYAML, "An older capture does not.")
 	assert.NotContains(t, result.consoleYAML, "posts one comment")
 	assert.NotContains(t, result.consoleYAML, "closed pull")
 

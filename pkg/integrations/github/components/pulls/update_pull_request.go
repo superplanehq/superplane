@@ -21,14 +21,15 @@ const (
 type UpdatePullRequest struct{}
 
 type UpdatePullRequestConfiguration struct {
-	Repository string    `mapstructure:"repository" json:"repository"`
-	PullNumber any       `mapstructure:"pullNumber" json:"pullNumber"`
-	Title      *string   `mapstructure:"title" json:"title"`
-	Body       *string   `mapstructure:"body" json:"body"`
-	State      *string   `mapstructure:"state" json:"state"`
-	Base       *string   `mapstructure:"base" json:"base"`
-	Assignees  *[]string `mapstructure:"assignees" json:"assignees"`
-	Labels     *[]string `mapstructure:"labels" json:"labels"`
+	Repository      string    `mapstructure:"repository" json:"repository"`
+	PullNumber      any       `mapstructure:"pullNumber" json:"pullNumber"`
+	ExpectedHeadSHA *string   `mapstructure:"expectedHeadSHA" json:"expectedHeadSHA"`
+	Title           *string   `mapstructure:"title" json:"title"`
+	Body            *string   `mapstructure:"body" json:"body"`
+	State           *string   `mapstructure:"state" json:"state"`
+	Base            *string   `mapstructure:"base" json:"base"`
+	Assignees       *[]string `mapstructure:"assignees" json:"assignees"`
+	Labels          *[]string `mapstructure:"labels" json:"labels"`
 }
 
 func (c *UpdatePullRequest) Name() string {
@@ -52,11 +53,13 @@ func (c *UpdatePullRequest) Documentation() string {
 - **Open/close automation**: Close a pull request when it is superseded, or reopen one automatically
 - **Retargeting**: Change the base branch a pull request merges into
 - **Label and assignee management**: Replace a pull request's labels or assignees from a workflow
+- **Stale-result protection**: Skip the update when the pull request head is no longer the captured commit
 
 ## Configuration
 
 - **Repository**: Select the GitHub repository containing the pull request
 - **Pull Request Number**: Pull request number to update. Supports expressions.
+- **Expected Head Commit**: Optional. When set, the component reads the pull request immediately before the update. If the head commit is different, the update is skipped.
 - **Title**, **Body**, **State**, **Base Branch**, **Replace Assignees**, **Replace Labels**: each field has its own toggle. Only toggled-on fields are changed; toggled-off fields are left untouched on the pull request.
 
 At least one field must be toggled on.
@@ -103,6 +106,15 @@ func (c *UpdatePullRequest) Configuration() []configuration.Field {
 			Required:    true,
 			Placeholder: "42 or {{event.data.pull_request.number}}",
 			Description: "Pull request number to update. Supports expressions.",
+		},
+		{
+			Name:        "expectedHeadSHA",
+			Label:       "Expected Head Commit",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Togglable:   true,
+			Placeholder: "{{event.data.pull_request.head.sha}}",
+			Description: "Skip this update when the pull request head is a different commit.",
 		},
 		{
 			Name:        "title",
@@ -233,6 +245,14 @@ func (c *UpdatePullRequest) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
 
+	skip, err := pullRequestHeadMoved(client, repository, pullNumber, config.ExpectedHeadSHA)
+	if err != nil {
+		return err
+	}
+	if skip {
+		return ctx.ExecutionState.Pass()
+	}
+
 	editPullRequest := func(update *github.PullRequest) error {
 		if _, _, err := client.EditPullRequest(context.Background(), repository, pullNumber, update); err != nil {
 			return fmt.Errorf("failed to update pull request: %w", explainGitHubError(err))
@@ -358,9 +378,14 @@ func validateUpdatePullRequestConfiguration(config UpdatePullRequestConfiguratio
 		return errors.New("pull request number is required")
 	}
 
+	if config.ExpectedHeadSHA != nil && strings.TrimSpace(*config.ExpectedHeadSHA) == "" {
+		return errors.New("expected head commit cannot be empty")
+	}
+
 	// Unlike body, an empty title or base is never a valid "clear" instruction:
 	// GitHub rejects an empty pull request title outright, and an empty base
 	// branch cannot resolve to a real branch to retarget onto.
+
 	if config.Title != nil && strings.TrimSpace(*config.Title) == "" {
 		return errors.New("title cannot be empty")
 	}
@@ -400,6 +425,29 @@ func validateAtLeastOneUpdateField(config UpdatePullRequestConfiguration) error 
 	}
 
 	return errors.New("at least one of title, body, state, base, assignees, or labels is required")
+}
+
+func pullRequestHeadMoved(client *common.Client, repository string, pullNumber int, expected *string) (bool, error) {
+	if expected == nil {
+		return false, nil
+	}
+
+	captured := strings.TrimSpace(*expected)
+	if captured == "" {
+		return false, errors.New("expected head commit cannot be empty")
+	}
+
+	pullRequest, _, err := client.GetPullRequest(context.Background(), repository, pullNumber)
+	if err != nil {
+		return false, fmt.Errorf("failed to get pull request: %w", explainGitHubError(err))
+	}
+
+	head := strings.TrimSpace(pullRequest.GetHead().GetSHA())
+	if head == "" {
+		return false, errors.New("pull request has no head commit")
+	}
+
+	return head != captured, nil
 }
 
 func hasPullRequestFields(config UpdatePullRequestConfiguration) bool {

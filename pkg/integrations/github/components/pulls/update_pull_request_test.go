@@ -120,6 +120,21 @@ func Test__UpdatePullRequest__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "base branch cannot be empty")
 	})
 
+	t.Run("expected head commit toggled on with an empty value is rejected", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Integration: &contexts.IntegrationContext{},
+			Metadata:    &contexts.MetadataContext{},
+			Configuration: map[string]any{
+				"repository":      "hello",
+				"pullNumber":      "42",
+				"title":           "Updated title",
+				"expectedHeadSHA": "",
+			},
+		})
+
+		require.ErrorContains(t, err, "expected head commit cannot be empty")
+	})
+
 	t.Run("no field toggled on is rejected", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration: &contexts.IntegrationContext{},
@@ -747,4 +762,98 @@ func Test__UpdatePullRequest__Execute(t *testing.T) {
 		require.ErrorContains(t, err, "failed to get pull request")
 		require.ErrorContains(t, err, "Not Found")
 	})
+
+	t.Run("skips the update when the head commit no longer matches", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				pullRequestHeadResponse("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			HTTP:           httpCtx,
+			ExecutionState: executionState,
+			Configuration: map[string]any{
+				"repository":      "hello",
+				"pullNumber":      "42",
+				"title":           "Updated title",
+				"body":            "stale evidence",
+				"expectedHeadSHA": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.Equal(t, "/repos/testhq/hello/pulls/42", httpCtx.Requests[0].URL.Path)
+		assert.True(t, executionState.Passed)
+		assert.Empty(t, executionState.Payloads)
+	})
+
+	t.Run("updates when the head commit still matches", func(t *testing.T) {
+		executionState := &contexts.ExecutionStateContext{}
+		head := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				pullRequestHeadResponse(head),
+				updatedPullRequestResponse(),
+				updatedPullRequestResponse(),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			HTTP:           httpCtx,
+			ExecutionState: executionState,
+			Configuration: map[string]any{
+				"repository":      "hello",
+				"pullNumber":      "42",
+				"body":            "current evidence",
+				"expectedHeadSHA": head,
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 3)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.Equal(t, http.MethodPatch, httpCtx.Requests[1].Method)
+		assert.Equal(t, "current evidence", readJSONBody(t, httpCtx.Requests[1])["body"])
+		assert.Equal(t, "github.pullRequest", executionState.Type)
+	})
+
+	t.Run("does not update when the head check cannot read the pull request", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusNotFound, `{"message": "Not Found"}`),
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Integration:    mocks.IntegrationContextForNewSetupFlow(),
+			HTTP:           httpCtx,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Configuration: map[string]any{
+				"repository":      "hello",
+				"pullNumber":      "42",
+				"body":            "current evidence",
+				"expectedHeadSHA": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			},
+		})
+
+		require.ErrorContains(t, err, "failed to get pull request")
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+	})
+}
+
+func pullRequestHeadResponse(sha string) *http.Response {
+	return mocks.GitHubResponse(http.StatusOK, `{
+		"id": 1234567890,
+		"number": 42,
+		"title": "Current title",
+		"state": "open",
+		"head": {"sha": "`+sha+`"}
+	}`)
 }

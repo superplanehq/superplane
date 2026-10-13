@@ -18,7 +18,7 @@ spec:
           >
           > When the change has screenshots or a short video, the app adds
           > them to the bottom of the pull request description.
-          > A later run replaces that section.
+          > A later commit replaces that section. An older capture does not.
   layout:
     - i: about
       x: 0
