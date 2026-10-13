@@ -235,7 +235,7 @@ export const DraftAnalyzingWithScore: Story = {
 
 /** Refine finished with a mid Confidence: the card says Review. */
 export const DraftScoredPair: Story = {
-  name: "Draft with Clarity and Confidence (Review)",
+  name: "Planning checks — needs review",
   args: {
     entry: buildWorkOrderListEntry(
       waitingOrder({
@@ -249,14 +249,18 @@ export const DraftScoredPair: Story = {
       factory,
     ),
     pullRequests: [],
-    clarityScore: 5,
-    confidenceScore: 3,
+    confidenceScore: 2,
+    reviewMetrics: [
+      { key: "clarity", name: "Clarity", score: 3 },
+      { key: "complexity", name: "Complexity", score: 2 },
+      { key: "verifiability", name: "Verifiability", score: 3 },
+    ],
   },
 };
 
 /** Both scores high: the card says Ready. */
 export const DraftScoredReady: Story = {
-  name: "Draft ready to start",
+  name: "Planning checks — ready",
   args: {
     entry: buildWorkOrderListEntry(
       waitingOrder({
@@ -270,14 +274,18 @@ export const DraftScoredReady: Story = {
       factory,
     ),
     pullRequests: [],
-    clarityScore: 5,
-    confidenceScore: 4,
+    confidenceScore: 3,
+    reviewMetrics: [
+      { key: "clarity", name: "Clarity", score: 3 },
+      { key: "complexity", name: "Complexity", score: 3 },
+      { key: "verifiability", name: "Verifiability", score: 3 },
+    ],
   },
 };
 
 /** Low Clarity: the card says Not ready. */
 export const DraftScoredBlocked: Story = {
-  name: "Draft not ready",
+  name: "Planning checks — critical",
   args: {
     entry: buildWorkOrderListEntry(
       waitingOrder({
@@ -291,14 +299,18 @@ export const DraftScoredBlocked: Story = {
       factory,
     ),
     pullRequests: [],
-    clarityScore: 2,
-    confidenceScore: 4,
+    confidenceScore: 1,
+    reviewMetrics: [
+      { key: "clarity", name: "Clarity", score: 1 },
+      { key: "complexity", name: "Complexity", score: 3 },
+      { key: "verifiability", name: "Verifiability", score: 2 },
+    ],
   },
 };
 
 /** Intake only: the verdict uses Confidence alone until a refine session scores Clarity. */
 export const DraftScoredIntakeOnly: Story = {
-  name: "Draft with Confidence only",
+  name: "Legacy draft with Confidence only",
   args: {
     entry: buildWorkOrderListEntry(
       waitingOrder({

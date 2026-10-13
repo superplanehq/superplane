@@ -21,6 +21,8 @@ import { WorkOrderOverviewMissionSlotContext } from "../sidebar/workOrderOvervie
 import { BacklogIntakeItemsProvider } from "../pages/BacklogIntakeItemsContext";
 
 interface FactoriesHarnessProps {
+  /** App mode uses shipped pages and flags. Preview mode includes design experiments. */
+  mode?: "app" | "preview";
   /** Path under the org. Defaults to `workspaces` (list page). */
   pathSuffix?: string;
   /** Fixture backing the factories API. Defaults to the populated Semaphore dataset. */
@@ -68,6 +70,7 @@ const PREVIEW_FLAGS: FactoryPreviewFlags = {
  * `OrgWorkspaceHarness` shell so links between Home → Workspaces → App work.
  */
 export function FactoriesHarness({
+  mode = "preview",
   pathSuffix = "workspaces",
   factoriesFixture = defaultFactoriesFixture,
   appFixture = defaultFactoryAppFixture,
@@ -105,18 +108,24 @@ export function FactoriesHarness({
       openAgentSidebar={openAgentSidebar}
       orgIntegrations={orgIntegrations}
       pageOverrides={
-        enableOnboarding
-          ? {
-              wiki: DefaultWikiWireframe,
-              overview: StorybookOverviewPage,
-              onboarding: OnboardingPage,
-              workOrders: MissionsWorkOrdersPage,
-              ...pageOverrides,
-            }
-          : { wiki: DefaultWikiWireframe, workOrders: MissionsWorkOrdersPage, ...pageOverrides }
+        mode === "app"
+          ? pageOverrides
+          : enableOnboarding
+            ? {
+                wiki: DefaultWikiWireframe,
+                overview: StorybookOverviewPage,
+                onboarding: OnboardingPage,
+                workOrders: MissionsWorkOrdersPage,
+                ...pageOverrides,
+              }
+            : { wiki: DefaultWikiWireframe, workOrders: MissionsWorkOrdersPage, ...pageOverrides }
       }
     />
   );
+
+  if (mode === "app") {
+    return harness;
+  }
 
   const withMissions = (
     <FactoryPreviewFlagsContext.Provider value={{ ...PREVIEW_FLAGS, ...previewFlags }}>

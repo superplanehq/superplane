@@ -11,7 +11,7 @@ import {
   PRIMARY_FACTORY_KEY,
   REFUND_FACTORY_LINES,
 } from "../__fixtures__/factoryPageResponses";
-import { fiveStepLineFactoriesFixture, lineMetricsFactoriesFixture } from "../__fixtures__/lineMetricsFactoriesFixture";
+import { fiveStepLineFactoriesFixture } from "../__fixtures__/lineMetricsFactoriesFixture";
 import {
   githubAndSentryIntakeFactoriesFixture,
   noIntakeFactoriesFixture,
@@ -31,16 +31,20 @@ import {
   columnAutomationsNeedsRepairFixture,
   columnAutomationsSeveralIntakesFixture,
 } from "../__fixtures__/columnAutomationsFixture";
+import { boardConfidenceFixture } from "../__fixtures__/boardConfidenceFixture";
 import { LinesPage } from "./LinesPage";
 
 /**
- * Line board is the workspace home: phase columns fill the pane. Cards open
+ * Board is the workspace home: phase columns fill the pane. Cards open
  * the work-order popup.
  */
 const meta = {
-  title: "Factories/Pages/Lines",
+  title: "Factories/Pages/Board",
   component: LinesPage,
-  parameters: { layout: "fullscreen" },
+  parameters: {
+    layout: "fullscreen",
+    docs: { description: { component: "The app board with fixture API responses and shipped UI defaults." } },
+  },
 } satisfies Meta<typeof LinesPage>;
 
 export default meta;
@@ -48,13 +52,14 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Populated: Story = {
-  name: "Line board",
+  name: "Board",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
-        factoriesFixture={lineMetricsFactoriesFixture}
+        factoriesFixture={boardConfidenceFixture}
       />
     );
   },
@@ -64,8 +69,9 @@ export const AcmeOnboardingEmpty: Story = {
   name: "Acme onboarding — empty board",
   render: () => (
     <FactoriesHarness
+      mode="app"
       pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}`}
-      factoriesFixture={lineMetricsFactoriesFixture}
+      factoriesFixture={boardConfidenceFixture}
       appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP, ACME_ONBOARDING_FACTORY_ID)}
     />
   ),
@@ -75,34 +81,37 @@ export const AcmeOnboardingIntake: Story = {
   name: "Acme onboarding — intake settings",
   render: () => (
     <FactoriesHarness
+      mode="app"
       pathSuffix={`workspaces/${ACME_ONBOARDING_FACTORY_KEY}/lines/${ACME_ONBOARDING_LINE_ID}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`}
-      factoriesFixture={lineMetricsFactoriesFixture}
+      factoriesFixture={boardConfidenceFixture}
       appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP, ACME_ONBOARDING_FACTORY_ID)}
     />
   ),
 };
 
 export const LineBoardIntakeSettings: Story = {
-  name: "Line board — intake settings",
+  name: "Board — intake settings",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}`}
-        factoriesFixture={lineMetricsFactoriesFixture}
+        factoriesFixture={boardConfidenceFixture}
       />
     );
   },
 };
 
 export const LineBoardIntakeAutomation: Story = {
-  name: "Line board — intake automation",
+  name: "Board — intake automation",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?intake=1&intakeId=${GITHUB_ISSUES_INTAKE_ID}&settings=automation`}
-        factoriesFixture={lineMetricsFactoriesFixture}
+        factoriesFixture={boardConfidenceFixture}
         appFixture={refundLineCanvasFixture(GITHUB_ISSUES_INTAKE_APP)}
       />
     );
@@ -110,11 +119,12 @@ export const LineBoardIntakeAutomation: Story = {
 };
 
 export const LineBoardGithubAndSentry: Story = {
-  name: "Line board — GitHub and Sentry listeners",
+  name: "Board — GitHub and Sentry listeners",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
         factoriesFixture={githubAndSentryIntakeFactoriesFixture}
       />
@@ -128,6 +138,7 @@ export const SentryIntakeSetup: Story = {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}/setup/sentry`}
         factoriesFixture={githubAndSentryIntakeFactoriesFixture}
         orgIntegrations={SENTRY_SETUP_INTEGRATIONS}
@@ -142,6 +153,7 @@ export const JiraIntakeSetup: Story = {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}/setup/jira`}
         factoriesFixture={githubAndSentryIntakeFactoriesFixture}
         orgIntegrations={JIRA_SETUP_INTEGRATIONS}
@@ -151,11 +163,12 @@ export const JiraIntakeSetup: Story = {
 };
 
 export const LineBoardSeveralIntakes: Story = {
-  name: "Line board — several intakes",
+  name: "Board — several intakes",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
         factoriesFixture={severalIntakeFactoriesFixture}
       />
@@ -164,11 +177,12 @@ export const LineBoardSeveralIntakes: Story = {
 };
 
 export const LineBoardNoIntakes: Story = {
-  name: "Line board — no intakes",
+  name: "Board — no intakes",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
         factoriesFixture={noIntakeFactoriesFixture}
       />
@@ -176,26 +190,13 @@ export const LineBoardNoIntakes: Story = {
   },
 };
 
-export const LineBoardIntakeBannersLegacy: Story = {
-  name: "Line board — intake banners (legacy)",
-  render: () => {
-    const line = REFUND_FACTORY_LINES[0];
-    return (
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
-        factoriesFixture={githubAndSentryIntakeFactoriesFixture}
-        previewFlags={{ addIntakeControl: true, columnAutomations: false }}
-      />
-    );
-  },
-};
-
 export const LineBoardColumnAutomations: Story = {
-  name: "Line board — column automations",
+  name: "Board — column automations",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
         factoriesFixture={columnAutomationsFixture}
       />
@@ -204,11 +205,12 @@ export const LineBoardColumnAutomations: Story = {
 };
 
 export const LineBoardBacklogAutomationsOpen: Story = {
-  name: "Line board — Backlog automations open",
+  name: "Board — Backlog automations open",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
         factoriesFixture={columnAutomationsFixture}
       />
@@ -217,11 +219,12 @@ export const LineBoardBacklogAutomationsOpen: Story = {
 };
 
 export const LineBoardVerifyAutomationsOpen: Story = {
-  name: "Line board — Verify automations open",
+  name: "Board — Verify automations open",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=verify`}
         factoriesFixture={columnAutomationsFixture}
       />
@@ -230,11 +233,12 @@ export const LineBoardVerifyAutomationsOpen: Story = {
 };
 
 export const LineBoardDoneAutomationsOpen: Story = {
-  name: "Line board — Done automations open",
+  name: "Board — Done automations open",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=done`}
         factoriesFixture={columnAutomationsFixture}
       />
@@ -243,11 +247,12 @@ export const LineBoardDoneAutomationsOpen: Story = {
 };
 
 export const LineBoardAutomationView: Story = {
-  name: "Line board — automation view popup",
+  name: "Board — automation view popup",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automationView=app-refund-implementer`}
         factoriesFixture={columnAutomationsFixture}
         appFixture={refundLineCanvasFixture()}
@@ -257,11 +262,12 @@ export const LineBoardAutomationView: Story = {
 };
 
 export const LineBoardSeveralBacklogAutomations: Story = {
-  name: "Line board — several backlog automations",
+  name: "Board — several backlog automations",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
         factoriesFixture={columnAutomationsSeveralIntakesFixture}
       />
@@ -270,11 +276,12 @@ export const LineBoardSeveralBacklogAutomations: Story = {
 };
 
 export const LineBoardAutomationsNeedsRepair: Story = {
-  name: "Line board — needs repair",
+  name: "Board — needs repair",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=backlog`}
         factoriesFixture={columnAutomationsNeedsRepairFixture}
       />
@@ -283,11 +290,12 @@ export const LineBoardAutomationsNeedsRepair: Story = {
 };
 
 export const LineBoardEmptyPhaseAutomations: Story = {
-  name: "Line board — empty phase automations",
+  name: "Board — empty phase automations",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}?automations=phase-3`}
         factoriesFixture={columnAutomationsEmptyPhaseFixture}
       />
@@ -296,11 +304,12 @@ export const LineBoardEmptyPhaseAutomations: Story = {
 };
 
 export const LineDetailFivePhases: Story = {
-  name: "Line detail — five phases",
+  name: "Board — five phases",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
         factoriesFixture={fiveStepLineFactoriesFixture}
       />
@@ -310,13 +319,14 @@ export const LineDetailFivePhases: Story = {
 
 /** Welcome credit is empty. The board shows the trial chip next to the title. */
 export const LineBoardHostedCreditEmpty: Story = {
-  name: "Line board — hosted credit empty",
+  name: "Board — hosted credit empty",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
-        factoriesFixture={{ ...lineMetricsFactoriesFixture, organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT }}
+        factoriesFixture={{ ...boardConfidenceFixture, organizationWorkspaceUsage: SPENT_CREDIT_USAGE_REPORT }}
       />
     );
   },
@@ -324,14 +334,15 @@ export const LineBoardHostedCreditEmpty: Story = {
 
 /** Purchased hosted credit remains at or below $20. The amber chip shows the balance next to the title. */
 export const LineBoardHostedCreditLow: Story = {
-  name: "Line board — hosted credit low",
+  name: "Board — hosted credit low",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
         factoriesFixture={{
-          ...lineMetricsFactoriesFixture,
+          ...boardConfidenceFixture,
           organizationWorkspaceUsage: LOW_CREDIT_USAGE_REPORT,
           organizationBilling: BUSINESS_ORGANIZATION_BILLING,
         }}
@@ -342,14 +353,15 @@ export const LineBoardHostedCreditLow: Story = {
 
 /** The organization has no plan. The amber chip sits next to the line title. */
 export const LineBoardNoPlan: Story = {
-  name: "Line board — no plan",
+  name: "Board — no plan",
   render: () => {
     const line = REFUND_FACTORY_LINES[0];
     return (
       <FactoriesHarness
+        mode="app"
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/lines/${line.id}`}
         factoriesFixture={{
-          ...lineMetricsFactoriesFixture,
+          ...boardConfidenceFixture,
           organizationWorkspaceUsage: LAPSED_TOPUP_USAGE_REPORT,
           organizationBilling: LAPSED_ORGANIZATION_BILLING,
         }}
