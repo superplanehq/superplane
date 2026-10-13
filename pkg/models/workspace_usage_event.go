@@ -2,7 +2,6 @@ package models
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -844,8 +843,9 @@ func spendingScopedQuery(tx *gorm.DB, filter UsageReportFilter, joinWorkOrders b
 // plus the exclusive end of the last day. An event before the first start, or
 // at or after the last end, is ignored.
 //
-// Days are the exact instants in bounds, not a SQL time zone. time.Local has
-// no IANA name, and a daylight-saving day is not 24 hours.
+// The database groups by those exact instants. It does not load each event,
+// and it does not use a SQL time zone. time.Local has no IANA name, and a
+// daylight-saving day is not 24 hours.
 //
 // A kind other than compute counts as model spend, so the two bands add up to
 // the filtered ledger.
@@ -866,9 +866,11 @@ func SummarizeUsageByLocalDay(tx *gorm.DB, filter UsageReportFilter, bounds []ti
 		scoped.Until = bounds[len(bounds)-1]
 	}
 
-	var rows []usageOccurredRow
+	dayIndex := usageLocalDayIndexExpr(bounds)
+	var rows []usageDaySumRow
 	err := spendingScopedQuery(tx, scoped, false).
-		Select("occurred_at, usage_kind, total_tokens, duration_seconds, cost_micros").
+		Select(dayIndex + " AS day_index, usage_kind, " + usageSumSelect).
+		Group("day_index, usage_kind").
 		Scan(&rows).Error
 	if err != nil {
 		return nil, err
@@ -876,8 +878,7 @@ func SummarizeUsageByLocalDay(tx *gorm.DB, filter UsageReportFilter, bounds []ti
 
 	result := make([]UsageSplit, days)
 	for _, row := range rows {
-		idx := usageLocalDayIndex(bounds, row.OccurredAt)
-		if idx < 0 {
+		if row.DayIndex < 0 || row.DayIndex >= days {
 			continue
 		}
 		totals := UsageTotals{
@@ -886,20 +887,42 @@ func SummarizeUsageByLocalDay(tx *gorm.DB, filter UsageReportFilter, bounds []ti
 			CostMicros:      row.CostMicros,
 		}
 		if row.UsageKind == UsageKindCompute {
-			result[idx].Compute = result[idx].Compute.Add(totals)
+			result[row.DayIndex].Compute = result[row.DayIndex].Compute.Add(totals)
 		} else {
-			result[idx].Model = result[idx].Model.Add(totals)
+			result[row.DayIndex].Model = result[row.DayIndex].Model.Add(totals)
 		}
 	}
 	return result, nil
 }
 
-type usageOccurredRow struct {
-	OccurredAt      time.Time
+type usageDaySumRow struct {
+	DayIndex        int
 	UsageKind       string
 	TotalTokens     int64
 	DurationSeconds int64
 	CostMicros      int64
+}
+
+// usageLocalDayIndexExpr assigns each event to a bound by instant. The last
+// bound is the exclusive end, so an event there is -1 and is not a day.
+func usageLocalDayIndexExpr(bounds []time.Time) string {
+	var expr strings.Builder
+	expr.WriteString("CASE")
+	for i := 0; i < len(bounds)-1; i++ {
+		fmt.Fprintf(
+			&expr,
+			" WHEN workspace_usage_events.occurred_at >= %s AND workspace_usage_events.occurred_at < %s THEN %d",
+			sqlTimestamptz(bounds[i]),
+			sqlTimestamptz(bounds[i+1]),
+			i,
+		)
+	}
+	expr.WriteString(" ELSE -1 END")
+	return expr.String()
+}
+
+func sqlTimestamptz(at time.Time) string {
+	return "'" + at.UTC().Format(time.RFC3339Nano) + "'::timestamptz"
 }
 
 func validateUsageDayBounds(bounds []time.Time) error {
@@ -909,18 +932,6 @@ func validateUsageDayBounds(bounds []time.Time) error {
 		}
 	}
 	return nil
-}
-
-// usageLocalDayIndex returns the day whose start is the last bound that is
-// not after at. The last bound is the exclusive end, not a day start.
-func usageLocalDayIndex(bounds []time.Time, at time.Time) int {
-	idx := sort.Search(len(bounds), func(i int) bool {
-		return bounds[i].After(at)
-	}) - 1
-	if idx < 0 || idx >= len(bounds)-1 {
-		return -1
-	}
-	return idx
 }
 
 func modelUsageReportQuery(tx *gorm.DB, filter UsageReportFilter) *gorm.DB {
