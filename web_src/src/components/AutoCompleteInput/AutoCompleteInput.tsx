@@ -167,6 +167,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     }>({ top: 0, left: 0 });
     const [previewMode, setPreviewMode] = useState(false);
     const dropdownWidth = 350;
+    const dropdownHeight = 300;
     const previousWordLength = useRef<number>(0);
     const previousInputValue = useRef<string>(value);
     const highlightedIndexRef = useRef(highlightedIndex);
@@ -1003,6 +1004,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         calculateDropdownPosition({
           cursor,
           viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          dropdownHeight,
           dropdownWidth,
           valuePreviewWidth,
           showValuePreview,
