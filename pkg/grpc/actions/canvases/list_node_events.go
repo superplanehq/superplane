@@ -16,10 +16,12 @@ func ListNodeEvents(ctx context.Context, db *gorm.DB, canvas *models.Canvas, nod
 	//
 	// List and count events
 	//
-	events, err := models.ListCanvasEvents(db, canvas.ID, nodeID, int(limit), beforeTime)
+	events, err := models.ListCanvasEvents(db, canvas.ID, nodeID, int(limit)+1, beforeTime)
 	if err != nil {
 		return nil, err
 	}
+
+	events, hasNext := trimPage(events, int(limit))
 
 	totalCount, err := models.CountCanvasEvents(db, canvas.ID, nodeID)
 	if err != nil {
@@ -34,7 +36,7 @@ func ListNodeEvents(ctx context.Context, db *gorm.DB, canvas *models.Canvas, nod
 	return &pb.ListNodeEventsResponse{
 		Events:        serialized,
 		TotalCount:    uint32(totalCount),
-		HasNextPage:   hasNextPage(len(events), int(limit), totalCount),
+		HasNextPage:   hasNext,
 		LastTimestamp: getLastEventTimestamp(events),
 	}, nil
 }
