@@ -285,9 +285,9 @@ describe("OrganizationsList", () => {
 
     releases.get("org-1")?.(jsonResponse({ pinned: true }));
     await waitFor(() => {
-      expect(screen.getAllByRole("button", { name: "Pin organization" }).every((button) => !button.disabled)).toBe(
-        true,
-      );
+      screen.getAllByRole("button", { name: "Pin organization" }).forEach((button) => {
+        expect(button).toBeEnabled();
+      });
     });
   });
 
