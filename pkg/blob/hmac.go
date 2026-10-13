@@ -24,13 +24,11 @@ const (
 )
 
 func SigningKey() ([]byte, error) {
-	for _, name := range []string{"BLOB_STORAGE_SIGNING_KEY", "ENCRYPTION_KEY", "JWT_SECRET"} {
-		value := strings.TrimSpace(os.Getenv(name))
-		if value != "" {
-			return []byte(value), nil
-		}
+	value := strings.TrimSpace(os.Getenv("BLOB_STORAGE_SIGNING_KEY"))
+	if value == "" {
+		return nil, fmt.Errorf("BLOB_STORAGE_SIGNING_KEY is not set")
 	}
-	return nil, fmt.Errorf("BLOB_STORAGE_SIGNING_KEY is not set")
+	return []byte(value), nil
 }
 
 func PublicBaseURL() string {

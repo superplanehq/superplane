@@ -82,8 +82,8 @@ Also set `BLOB_STORAGE_PROVIDER`. Hosted GCS uses Workload Identity or
 `BLOB_STORAGE_CREDENTIALS_FILE`. Azure uses `DefaultAzureCredential`
 (AKS workload identity). Do not use customer cloud-integration credentials.
 
-HMAC public URLs use `BLOB_STORAGE_SIGNING_KEY` (fallback `ENCRYPTION_KEY`,
-then `JWT_SECRET`) and `BASE_URL`. See `.env.example`.
+Filesystem storage requires `BLOB_STORAGE_SIGNING_KEY` to sign public file URLs.
+These URLs also use `BASE_URL`. See `.env.example`.
 
 ### Catalog
 
