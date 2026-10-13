@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
-import { factorySettingsSectionPath } from "../lib/factoryPagePaths";
+import { factoryAgentPath } from "../lib/factoryPagePaths";
 import { ConnectionStatusDot } from "./settings/ConnectionStatusDot";
 import { connectionIsEstablished } from "./settings/agentResourceDisplay";
 import { AGENT_RESOURCES_COPY } from "./settings/agentResourceCopy";
@@ -114,7 +114,7 @@ function MCPAutomationSection({
   flat: boolean;
 }) {
   const connections = useFactoryAgentResources(organizationId, factoryId, "KIND_MCP_SERVER");
-  const settingsHref = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "agent");
+  const settingsHref = factoryAgentPath(organizationId, factoryKey);
   const resources = connections.data ?? [];
   return (
     <section className={resourceSectionClass(flat, compact)}>
@@ -274,7 +274,7 @@ function SkillsAutomationSection({
   flat: boolean;
 }) {
   const skills = useFactoryAgentResources(organizationId, factoryId, "KIND_SKILL");
-  const settingsHref = factorySettingsSectionPath(organizationId, factoryKey, "workspace", "agent");
+  const settingsHref = factoryAgentPath(organizationId, factoryKey);
   const resources = skills.data ?? [];
   return (
     <section className={resourceSectionClass(flat, compact)}>

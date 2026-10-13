@@ -4,10 +4,13 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useOrganization } from "@/hooks/useOrganizationData";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { FEATURE_WORKSPACE_AGENT } from "@/lib/experimentalFeatures";
 import { useNavigate, useParams } from "react-router";
 import { firstFactoryLineId, newFactoryPath } from "../lib/factoryPagePaths";
 import { organizationPlanLabel } from "../lib/hostedCreditEmpty";
 import { FactoriesSidebarNav } from "./FactoriesSidebarNav";
+import { isWorkspaceAgentNavVisible } from "./factoriesRail";
 import { SidebarUserMenu } from "./SidebarUserMenu";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
@@ -23,12 +26,13 @@ interface FactoriesSidebarProps {
 
 /**
  * Icon rail shared by the workspace shell and workspace settings.
- * Board and Velocity stay on the rail. Workspace settings open from the switcher.
+ * Board, Agent, and Velocity stay on the rail. Workspace settings open from the switcher.
  */
 export function FactoriesSidebar({ organizationId, factoryKey, factory, factories }: FactoriesSidebarProps) {
   const navigate = useNavigate();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const { has } = useExperimentalFeature(organizationId);
   const { data: organization } = useOrganization(organizationId);
   const { lineId: routeLineId } = useParams<{ lineId?: string }>();
   const spend = useOrganizationWorkspaceUsage(organizationId);
@@ -55,6 +59,11 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
         organizationId={organizationId}
         factoryKey={factoryKey}
         lineId={routeLineId ?? firstFactoryLineId(factory)}
+        showAgent={isWorkspaceAgentNavVisible({
+          permissionsLoading,
+          canUpdateFactories: canAct("factories", "update"),
+          workspaceAgentEnabled: has(FEATURE_WORKSPACE_AGENT),
+        })}
       />
       <div className="flex-1" />
       <SidebarUserMenu
@@ -71,7 +80,7 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
 
 /**
  * Same rail as the member workspace. The initials open workspace info only.
- * Velocity stays hidden. A signed-in visitor still gets the user menu.
+ * Agent and Velocity stay hidden. A signed-in visitor still gets the user menu.
  */
 export function PublicFactoriesSidebar({
   organizationId,
@@ -104,6 +113,7 @@ export function PublicFactoriesSidebar({
         organizationId={organizationId}
         factoryKey={factoryKey}
         lineId={lineId}
+        showAgent={false}
         showVelocity={false}
       />
       <div className="flex-1" />

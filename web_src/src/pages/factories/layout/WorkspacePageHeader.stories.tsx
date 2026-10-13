@@ -230,6 +230,7 @@ export const AlignedWithSidebar: Story = {
           organizationId={FACTORIES_ORGANIZATION_ID}
           factoryKey={REFUND_FACTORY.key!}
           lineId={REFUND_LINE_PLAN_ID}
+          showAgent
         />
       </aside>
       <div className="min-w-0 flex-1">

@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+
 import { FactoriesHarness } from "../__fixtures__/FactoriesHarness";
 import {
   defaultFactoriesFixture,
@@ -41,6 +43,7 @@ export const More: Story = {
   render: () => (
     <FactoriesHarness
       enableOnboarding={false}
+      experimentalFeatures={[FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}
       pathSuffix={`workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/more?lineId=${REFUND_LINE_PLAN_ID}`}
     />
   ),

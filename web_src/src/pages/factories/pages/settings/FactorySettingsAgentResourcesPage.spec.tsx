@@ -3,7 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
-import { FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_WORKSPACE_AGENT,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
+} from "@/lib/experimentalFeatures";
 import { INLINE_SKILL, UI_UX_PRO_MAX_SKILL } from "../../__fixtures__/agentResourceFixtures";
 
 const DISABLED_SKILL = {
@@ -26,9 +30,9 @@ vi.mock("@monaco-editor/react", () => ({
   ),
 }));
 
-const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 const skillsEditorPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/skills`;
-const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
+const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
 
 describe("FactorySettingsSkillsPage", () => {
   beforeAll(() => {
@@ -41,13 +45,12 @@ describe("FactorySettingsSkillsPage", () => {
       <FactoriesHarness
         pathSuffix={agentPath}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
-    expect(await screen.findByTestId("agent-resources-skills-empty", {}, { timeout: 8000 })).toHaveTextContent(
-      "No skills yet",
-    );
+    const empty = await screen.findByTestId("agent-resources-skills-empty", {}, { timeout: 8000 });
+    expect(empty).not.toHaveTextContent("No skills yet");
     expect(screen.getByTestId("agent-resources-add-skill")).toBeEnabled();
     expect(screen.getByTestId("agent-resources-add-skill")).toHaveTextContent("Add skill");
   }, 10000);
@@ -57,7 +60,7 @@ describe("FactorySettingsSkillsPage", () => {
       <FactoriesHarness
         pathSuffix={`${skillsEditorPath}/new`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -73,7 +76,7 @@ describe("FactorySettingsSkillsPage", () => {
       <FactoriesHarness
         pathSuffix={`${skillsEditorPath}/new`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -87,7 +90,7 @@ describe("FactorySettingsSkillsPage", () => {
       <FactoriesHarness
         pathSuffix={`${skillsEditorPath}/new`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -105,7 +108,7 @@ describe("FactorySettingsSkillsPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [INLINE_SKILL] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -124,7 +127,7 @@ describe("FactorySettingsSkillsPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [INLINE_SKILL] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -142,7 +145,7 @@ describe("FactorySettingsSkillsPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [DISABLED_SKILL] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -160,7 +163,7 @@ describe("FactorySettingsSkillsPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [UI_UX_PRO_MAX_SKILL] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 

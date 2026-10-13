@@ -82,7 +82,7 @@ export function FactorySettingsCard({
   titleClassName?: string;
   description?: ReactNode;
   action?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
   /** List rows sit directly under the header with a top border, like integration instances. */
   attachedList?: boolean;
@@ -91,6 +91,7 @@ export function FactorySettingsCard({
 }) {
   const sectionId = id ?? testId;
   const showHeader = Boolean(title || description || action);
+  const hasBody = children != null && children !== false;
   return (
     <section
       id={sectionId}
@@ -101,7 +102,7 @@ export function FactorySettingsCard({
         <div
           className={cn(
             "flex flex-wrap justify-between gap-3",
-            attachedList ? "pb-2" : "mb-3",
+            attachedList ? "pb-2" : hasBody && "mb-3",
             action ? "items-start" : "items-center",
           )}
         >
@@ -120,7 +121,7 @@ export function FactorySettingsCard({
           {action}
         </div>
       ) : null}
-      {children}
+      {hasBody ? children : null}
     </section>
   );
 }
