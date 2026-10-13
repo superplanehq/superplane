@@ -641,8 +641,9 @@ func (r *CanvasRun) CalculateResult(tx *gorm.DB) (string, error) {
 	}
 
 	var result struct {
-		HasFailed    bool
-		HasCancelled bool
+		HasFailed                bool
+		HasCancelled             bool
+		HasUnconsumedFailedEvent bool
 	}
 
 	err := tx.Raw(`
@@ -658,18 +659,33 @@ func (r *CanvasRun) CalculateResult(tx *gorm.DB) (string, error) {
 				FROM workflow_node_executions
 				WHERE run_id = ?
 				AND result = ?
-			) AS has_cancelled
+			) AS has_cancelled,
+			EXISTS (
+				SELECT 1
+				FROM workflow_events
+				WHERE run_id = ?
+				AND channel = ?
+				AND NOT EXISTS (
+					SELECT 1
+					FROM workflow_node_executions
+					WHERE run_id = ?
+					AND event_id = workflow_events.id
+				)
+			) AS has_unconsumed_failed_event
 	`,
 		r.ID,
 		CanvasNodeExecutionResultFailed,
 		r.ID,
 		CanvasNodeExecutionResultCancelled,
+		r.ID,
+		core.FailedOutputChannel,
+		r.ID,
 	).Scan(&result).Error
 	if err != nil {
 		return "", err
 	}
 
-	if result.HasFailed {
+	if result.HasFailed || result.HasUnconsumedFailedEvent {
 		return CanvasRunResultFailed, nil
 	}
 
