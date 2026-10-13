@@ -27,6 +27,7 @@ export function draftStripAnalysis(args: DraftStripAnalysisArgs, modelSelect: Re
   const billingHref = creditBillingHref(args.organizationId, args.factoryKey);
   return {
     ...args.analysis,
+    requestCreatedAt: args.fixture.phases.find((phase) => phase.id === "backlog")?.startedAt,
     modelSelect,
     showClarity: factoryShowsClarity(args.factory),
     showConfidence: factoryShowsConfidence(args.factory),

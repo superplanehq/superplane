@@ -11,6 +11,7 @@ import type { ComposerCreditVerdict } from "./splitRunFooter";
 
 export type IntentAnalysisChat = {
   organizationId: string;
+  requestCreatedAt?: string;
   factoryId?: string;
   view: CreateWithAgentView;
   composer: string;

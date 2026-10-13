@@ -13,6 +13,7 @@ import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOver
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 import { parsePlanningSurveyReply } from "../planningSessionSurvey";
+import { ChatMessageTimestamp } from "./ChatMessageTimestamp";
 import { AgentActivityView } from "./AgentActivityView";
 import type { AgentActivity } from "./agentActivity";
 import {
@@ -72,17 +73,19 @@ export function WorkOrderIntentTranscript({
         return (
           <div key={message.id}>
             {activity ? <AgentActivityView activity={activity} /> : null}
-            <TranscriptMessage
-              message={message}
-              resolveUser={resolveUser}
-              streaming={
-                newAgentMessageIDs.has(message.id) || (streaming && last?.role === "agent" && message.id === last.id)
-              }
-              files={files}
-              adjacentUserAbove={visible[index - 1]?.role === "user"}
-              adjacentUserBelow={visible[index + 1]?.role === "user"}
-              sameSenderAbove={sameUserSender(visible[index - 1], message)}
-            />
+            <ChatMessageTimestamp createdAt={message.createdAtMs} align={message.role === "user" ? "end" : "start"}>
+              <TranscriptMessage
+                message={message}
+                resolveUser={resolveUser}
+                streaming={
+                  newAgentMessageIDs.has(message.id) || (streaming && last?.role === "agent" && message.id === last.id)
+                }
+                files={files}
+                adjacentUserAbove={visible[index - 1]?.role === "user"}
+                adjacentUserBelow={visible[index + 1]?.role === "user"}
+                sameSenderAbove={sameUserSender(visible[index - 1], message)}
+              />
+            </ChatMessageTimestamp>
           </div>
         );
       })}

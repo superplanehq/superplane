@@ -50,6 +50,18 @@ type Story = StoryObj<typeof meta>;
 
 export const Running: Story = { args: { activity: runningActivity, live: true } };
 
+export const ThoughtCompletedWhileRunning: Story = {
+  args: {
+    live: true,
+    activity: {
+      ...runningActivity,
+      items: runningActivity.items.map((item) =>
+        item.type === "content" ? { ...item, status: "passed", durationMs: 45_000 } : item,
+      ),
+    },
+  },
+};
+
 export const Completed: Story = {
   args: {
     activity: {
