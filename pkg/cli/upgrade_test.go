@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,50 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestFetchLatestReleaseFollowsPagesToStableApplicationRelease(t *testing.T) {
+	requestCount := 0
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "application/vnd.github+json", r.Header.Get("Accept"))
+
+		var releases []map[string]any
+		if r.URL.Query().Get("page") == "2" {
+			releases = []map[string]any{
+				{
+					"tag_name": "v0.17.0",
+					"assets": []map[string]string{
+						{
+							"name":                 "superplane-cli-linux-amd64",
+							"browser_download_url": "https://example.com/superplane-cli-linux-amd64",
+						},
+					},
+				},
+			}
+		} else {
+			releases = []map[string]any{
+				{"tag_name": "runner/v1.2.3"},
+				{"tag_name": "fleet-manager/v1.2.3"},
+				{"tag_name": "v0.18.0-rc.1", "prerelease": true},
+			}
+			w.Header().Set("Link", fmt.Sprintf(`<%s?page=2>; rel="next"`, server.URL))
+		}
+		require.NoError(t, json.NewEncoder(w).Encode(releases))
+	}))
+	t.Cleanup(server.Close)
+
+	originalURL := releasesURL
+	releasesURL = server.URL
+	t.Cleanup(func() { releasesURL = originalURL })
+
+	release, err := fetchLatestRelease()
+	require.NoError(t, err)
+	require.Equal(t, "v0.17.0", release.TagName)
+	require.Len(t, release.Assets, 1)
+	require.Equal(t, 2, requestCount)
+}
 
 func TestCLIAssetName(t *testing.T) {
 	require.Equal(t, "superplane-cli-darwin-arm64", cliAssetName("darwin", "arm64"))
