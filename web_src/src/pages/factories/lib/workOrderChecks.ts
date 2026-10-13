@@ -17,6 +17,7 @@ export interface WorkOrderCheckPresentation {
   /** Short human name, e.g. "Risk score" or "Code quality". */
   name: string;
   score: number;
+  scoreSupplied?: boolean;
   maxScore: number;
   /** "percent" renders `82%`; "boolean" renders `Pass`/`Fail`;
    * "fraction" (default) renders `65/100`. */
@@ -193,6 +194,7 @@ export function presentWorkOrderCheck(check: FactoriesWorkOrderCheck): WorkOrder
     key: emptyToUndefined(check.key),
     name: workOrderCheckDisplayName({ key: emptyToUndefined(check.key), name: check.name ?? "" }),
     score: check.score ?? 0,
+    scoreSupplied: check.score != null,
     maxScore: check.maxScore ?? 0,
     format: presentCheckFormat(check.format),
     level: presentCheckLevel(check.level),
