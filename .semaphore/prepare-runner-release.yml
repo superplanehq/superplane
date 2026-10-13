@@ -35,6 +35,11 @@ blocks:
             - bash release/runner/build.sh "$VERSION"
             - |
               release_dir="build/runner/$VERSION"
+              node release/component-release.js generate-release-notes \
+                --component runner \
+                --version "$VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --output "$release_dir/release-notes.md"
               node release/component-release.js create-manifest \
                 --component runner \
                 --version "$VERSION" \
