@@ -1,11 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  planningReviewAtMax,
-  planningReviewFromChecks,
-  planningReviewHeadline,
-  planningReviewLevel,
-} from "./planningReviewScore";
+import { planningReviewFromChecks, planningReviewHeadline, planningReviewLevel } from "./planningReviewScore";
 import type { WorkOrderCheckPresentation } from "./workOrderChecks";
 
 function check(
@@ -81,13 +76,5 @@ describe("planningReviewLevel", () => {
     expect(planningReviewLevel(3)).toBe("positive");
     expect(planningReviewLevel(2)).toBe("caution");
     expect(planningReviewLevel(1)).toBe("critical");
-  });
-});
-
-describe("planningReviewAtMax", () => {
-  it("is true only when every sub-parameter sits at 3", () => {
-    expect(planningReviewAtMax([{ score: 3 }, { score: 3 }, { score: 3 }])).toBe(true);
-    expect(planningReviewAtMax([{ score: 3 }, { score: 2 }, { score: 3 }])).toBe(false);
-    expect(planningReviewAtMax([])).toBe(false);
   });
 });

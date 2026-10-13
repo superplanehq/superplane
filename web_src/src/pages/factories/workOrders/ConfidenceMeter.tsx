@@ -11,13 +11,21 @@ import {
   confidenceBandForScore,
   type ConfidenceBand,
 } from "../lib/confidenceScore";
+import type { WorkOrderCheckLevel } from "../lib/workOrderChecks";
 
 import "./confidence-analyzing.css";
 
 const FILLED_TONE: Record<ConfidenceBand, string> = {
   High: "bg-emerald-500",
-  Medium: "bg-orange-500",
+  Medium: "bg-warning",
   Low: "bg-red-500",
+};
+
+const CHECK_TONE: Record<WorkOrderCheckLevel, string> = {
+  positive: "bg-emerald-500",
+  neutral: "bg-slate-400",
+  caution: "bg-amber-500",
+  critical: "bg-red-500",
 };
 
 type MeterSize = "sm" | "lg";
@@ -39,6 +47,25 @@ function MeterBars({ value, max, size }: { value: number; max: number; size: Met
         />
       ))}
     </>
+  );
+}
+
+/** One filled bar per check, ordered like the details below it. */
+export function CheckStatusBars({
+  checks,
+  className,
+  testId,
+}: {
+  checks: readonly { id: string; level: WorkOrderCheckLevel }[];
+  className?: string;
+  testId?: string;
+}) {
+  return (
+    <span aria-hidden="true" data-testid={testId} className={cn("inline-flex items-center gap-0.5", className)}>
+      {checks.map((check) => (
+        <span key={check.id} className={cn("sp-meter-bar", BAR_CLASS.sm, CHECK_TONE[check.level])} />
+      ))}
+    </span>
   );
 }
 
