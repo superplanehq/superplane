@@ -2,7 +2,7 @@
   "id": "aks",
   "superplaneUrl": "https://superplane.example",
   "installationAdminToken": "replace-with-personal-api-token",
-  "runnerReleaseBaseUrl": "https://downloads.example/runner",
+  "runnerReleaseBaseUrl": "https://github.com/superplanehq/superplane/releases/download/runner%2F{version}",
   "reconcileIntervalSeconds": 15,
   "requestTimeoutSeconds": 90,
   "fleets": [
