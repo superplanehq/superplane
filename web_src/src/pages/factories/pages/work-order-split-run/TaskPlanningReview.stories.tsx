@@ -46,36 +46,36 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const LowConfidenceQuestions: Story = {
-  name: "Confidence 2 — pending questions and plan",
-  args: { confidence: 2, response: "questions" },
+  name: "Two checks need review · questions and plan",
+  args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "questions" },
 };
 
 export const LowConfidenceQuestionsWithoutPlan: Story = {
-  name: "Confidence 2 — pending questions, no plan",
-  args: { confidence: 2, response: "questions", hasPlan: false },
+  name: "Two checks need review · questions, no plan",
+  args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "questions", hasPlan: false },
 };
 
 export const LowConfidenceSummary: Story = {
-  name: "Confidence 2 — summary and plan",
-  args: { confidence: 2, response: "message" },
+  name: "Two checks need review · summary and plan",
+  args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "message" },
 };
 
 export const ReadyPlan: Story = {
-  name: "Confidence 4 — ready plan",
-  args: { confidence: 4, response: "ready" },
+  name: "All checks ready · ready plan",
+  args: { scores: { clarity: 3, complexity: 3, verifiability: 3 }, response: "ready" },
 };
 
-export const HighConfidenceQuestions: Story = {
-  name: "Confidence 4 — pending questions",
-  args: { confidence: 4, response: "questions" },
+export const ModerateComplexityQuestions: Story = {
+  name: "Complexity needs review · questions",
+  args: { scores: { clarity: 3, complexity: 2, verifiability: 3 }, response: "questions" },
 };
 
 export const LowClarityQuestions: Story = {
-  name: "Clarity 2, confidence 4 — pending questions",
-  args: { confidence: 4, clarity: 2, response: "questions" },
+  name: "Clarity critical · unclear company choice",
+  args: { scores: { clarity: 1, complexity: 3, verifiability: 2 }, response: "questions" },
 };
 
 export const UpdatingPlan: Story = {
   name: "Updating a plan with previous scores",
-  args: { confidence: 2, response: "updating" },
+  args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "updating" },
 };
