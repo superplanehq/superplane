@@ -187,11 +187,11 @@ export const approvalMapper: ComponentBaseMapper = {
       details["Finished at"] = new Date(context.execution.updatedAt).toLocaleString();
     }
 
-    if (!metadata) {
+    if (!metadata?.records) {
       return details;
     }
 
-    return withApprovals(details, metadata!);
+    return withApprovals(details, metadata);
   },
 };
 
