@@ -228,7 +228,7 @@ func archiveDraftWorkOrderIfCurrent(
 			return nil
 		}
 
-		archivedOrder, err = current.Close(tx, models.FactoryWorkOrderResultRejected, &archivedBy)
+		archivedOrder, err = current.Close(tx, models.FactoryWorkOrderResultArchived, &archivedBy)
 		if errors.Is(err, models.ErrFactoryWorkOrderInvalidState) {
 			archivedOrder = nil
 			return nil
@@ -248,7 +248,7 @@ func archiveDraftWorkOrderIfCurrent(
 		archivedOrder,
 		&archivedBy,
 		models.FactoryWorkOrderStateDraft,
-		models.FactoryWorkOrderResultRejected,
+		models.FactoryWorkOrderResultArchived,
 		false,
 	)
 	return true, false

@@ -137,11 +137,10 @@ export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): Fact
 }
 
 /**
- * Completed and failed work that belongs on this line, plus open work still on
+ * Completed, failed, and rejected work that belongs on this line, plus open work still on
  * a Done or PR-closure step. Order follows the caller's list.
  * Do not re-sort by updated_at — assignee saves bump updated_at and would
- * jump cards on every render. Rejected and canceled tasks stay off this
- * column. Find them from Status in Filter.
+ * jump cards on every render. Archived tasks stay off this column.
  */
 export function collectLineDoneOrders(
   workOrders: FactoriesWorkOrder[],
@@ -151,11 +150,11 @@ export function collectLineDoneOrders(
   const doneById = new Map<string, FactoriesWorkOrder>();
 
   for (const order of workOrders) {
-    if (!order.id || !belongsToLineBoard(order, line.id)) {
+    if (!order.id || order.result === "RESULT_ARCHIVED" || !belongsToLineBoard(order, line.id)) {
       continue;
     }
     const status = getWorkOrderDisplayStatus(order);
-    if (status === "completed" || status === "failed") {
+    if (["completed", "failed", "rejected", "closed"].includes(status)) {
       doneById.set(order.id, order);
     }
   }

@@ -500,13 +500,13 @@ describe("scope + filter + search + ordering", () => {
   it("ordering=status follows the display status order", () => {
     const mixed = buildWorkOrderListEntries(
       [
-        order({ id: "done", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
+        order({ id: "closed", state: "STATE_CLOSED", result: "RESULT_PR_CLOSED" }),
         order({ id: "draft", state: "STATE_DRAFT" }),
         order({ id: "waiting" }),
       ],
       factory,
     );
-    expect(applyWorkOrderOrdering(mixed, "status").map((e) => e.id)).toEqual(["draft", "waiting", "done"]);
+    expect(applyWorkOrderOrdering(mixed, "status").map((e) => e.id)).toEqual(["draft", "waiting", "closed"]);
   });
 
   it("ordering=spend puts the most expensive order first", () => {
@@ -543,15 +543,16 @@ describe("groupWorkOrderEntriesByLane", () => {
           order({ id: "waiting" }),
           order({ id: "completed", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
           order({ id: "failed", state: "STATE_CLOSED", result: "RESULT_FAILED" }),
-          order({ id: "cancelled", state: "STATE_CLOSED", result: "RESULT_REJECTED" }),
+          order({ id: "rejected", state: "STATE_CLOSED", result: "RESULT_REJECTED" }),
+          order({ id: "closed", state: "STATE_CLOSED", result: "RESULT_PR_CLOSED" }),
+          order({ id: "archived", state: "STATE_CLOSED", result: "RESULT_ARCHIVED" }),
         ],
         factory,
       ),
     );
 
     expect(grouped.get("backlog")?.map((entry) => entry.id)).toEqual(["draft"]);
-    expect(grouped.get("running")).toEqual([]);
     expect(grouped.get("review")?.map((entry) => entry.id)).toEqual(["waiting"]);
-    expect(grouped.get("done")?.map((entry) => entry.id)).toEqual(["completed", "failed"]);
+    expect(grouped.get("done")?.map((entry) => entry.id)).toEqual(["completed", "failed", "rejected", "closed"]);
   });
 });

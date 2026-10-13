@@ -36,7 +36,6 @@ interface WorkOrdersHeaderProps {
   hostedCreditHeaderKicker?: ReactNode;
   brokenIntegrationsBanner?: ReactNode;
   showPullRequestMerge?: boolean;
-  onOpenStatusDialog?: () => void;
 }
 
 /**
@@ -57,7 +56,6 @@ export function WorkOrdersHeader({
   hostedCreditHeaderKicker,
   brokenIntegrationsBanner,
   showPullRequestMerge = false,
-  onOpenStatusDialog,
 }: WorkOrdersHeaderProps) {
   const searchRef = useWorkOrdersHeaderShortcuts(state);
   const lineOptions = buildLineFilterOptions(factoryLines);
@@ -85,7 +83,6 @@ export function WorkOrdersHeader({
             sourceOptions={sourceOptions}
             assigneeOptions={assigneeOptions}
             showPullRequestMerge={showPullRequestMerge}
-            onOpenStatusDialog={onOpenStatusDialog}
           />
           <SearchField
             inputRef={searchRef}

@@ -942,10 +942,14 @@ func serializeWorkOrderResult(result string) pb.WorkOrder_Result {
 	switch result {
 	case models.FactoryWorkOrderResultCompleted:
 		return pb.WorkOrder_RESULT_COMPLETED
-	case models.FactoryWorkOrderResultRejected:
+	case models.FactoryWorkOrderResultRejected, models.FactoryWorkOrderResultManualRejected:
 		return pb.WorkOrder_RESULT_REJECTED
 	case models.FactoryWorkOrderResultFailed:
 		return pb.WorkOrder_RESULT_FAILED
+	case models.FactoryWorkOrderResultArchived:
+		return pb.WorkOrder_RESULT_ARCHIVED
+	case models.FactoryWorkOrderResultPRClosed:
+		return pb.WorkOrder_RESULT_PR_CLOSED
 	default:
 		return pb.WorkOrder_RESULT_UNSPECIFIED
 	}

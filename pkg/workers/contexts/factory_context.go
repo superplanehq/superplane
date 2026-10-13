@@ -595,9 +595,15 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	}
 
 	fromState := order.State
+	// Legacy archives share the rejected result. A new automation rejection
+	// must stay visible in Done, so store it as a manual rejection.
+	result := params.Result
+	if params.State == models.FactoryWorkOrderStateClosed && result == models.FactoryWorkOrderResultRejected {
+		result = models.FactoryWorkOrderResultManualRejected
+	}
 	changed, err := order.UpdateStatus(c.tx, models.FactoryWorkOrderStatusUpdate{
 		ToState:         params.State,
-		Result:          params.Result,
+		Result:          result,
 		Automation:      c.automationRef(),
 		Run:             c.runRef(),
 		App:             c.appRef(),

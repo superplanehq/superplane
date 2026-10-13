@@ -1802,6 +1802,8 @@ message WorkOrder {
     RESULT_COMPLETED = 1;
     RESULT_REJECTED = 2;
     RESULT_FAILED = 3;
+    RESULT_ARCHIVED = 4;
+    RESULT_PR_CLOSED = 5;
   }
 
   string id = 1;

@@ -33,7 +33,7 @@ func Test__workOrderEmailDisplayStatus(t *testing.T) {
 		State:  models.FactoryWorkOrderStateClosed,
 		Result: models.FactoryWorkOrderResultFailed,
 	}, nil))
-	assert.Equal(t, "cancelled", workOrderEmailDisplayStatus(&models.FactoryWorkOrder{
+	assert.Equal(t, "rejected", workOrderEmailDisplayStatus(&models.FactoryWorkOrder{
 		State:  models.FactoryWorkOrderStateClosed,
 		Result: models.FactoryWorkOrderResultRejected,
 	}, nil))
