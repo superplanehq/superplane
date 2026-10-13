@@ -1,5 +1,5 @@
 import { useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "@/hooks/useFactoryData";
-import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { showErrorToast } from "@/lib/toast";
 import { useCallback, useState } from "react";
 
 const NO_ORDERS: ReadonlySet<string> = new Set();
@@ -23,7 +23,6 @@ export function useWorkOrderCardActions(organizationId: string, factoryId: strin
           model: input.model,
           thinkingLevel: input.thinkingLevel,
         });
-        showSuccessToast(`Dispatched to ${input.lineName}.`);
       } catch {
         showErrorToast("Failed to dispatch task.");
       } finally {
