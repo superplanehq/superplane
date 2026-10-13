@@ -383,13 +383,11 @@ export function useOnboardingPageModel(args: {
     const requestedStep = searchParams.get("step");
     return isWizardStepId(requestedStep) ? requestedStep : initialWizardStep(onboarding);
   });
+  const onboardingPath = args.onboardingEntryPath ?? factorySetupPath(args.organizationId, args.factoryKey);
   const connect = useIntegrationConnectDialog({
     organizationId: args.organizationId,
     // Return to this step after the provider round trip.
-    returnTo: onboardingStepPath(
-      args.onboardingEntryPath ?? factorySetupPath(args.organizationId, args.factoryKey),
-      openSection,
-    ),
+    returnTo: onboardingStepPath(onboardingPath, openSection),
     integrationNames: [...ONBOARDING_CONNECTION_NAMES],
     selections: integrations.selections,
     onSelectionsChange: integrations.setSelections,

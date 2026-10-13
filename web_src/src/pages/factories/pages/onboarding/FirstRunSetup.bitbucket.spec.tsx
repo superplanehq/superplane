@@ -427,7 +427,7 @@ describe("FirstRunSetup Bitbucket", () => {
     );
   });
 
-  it("shows the checking status while a second installation is in flight", async () => {
+  it("shows the checking spinner while a second installation is in flight", async () => {
     render(
       <FirstRunBitbucketForgeScreen
         phase="choose"
@@ -442,6 +442,7 @@ describe("FirstRunSetup Bitbucket", () => {
     );
 
     expect(screen.getByRole("status")).toHaveTextContent("Checking for the new workspace…");
+    expect(screen.getByRole("status").querySelector("svg")).toHaveClass("animate-spin");
     expect(screen.getByRole("option", { name: /acme-team\/api/ })).toBeInTheDocument();
   });
 
@@ -491,12 +492,14 @@ describe("FirstRunSetup Bitbucket", () => {
     expect(requestConnect).not.toHaveBeenCalled();
   });
 
-  it("saves the chosen Bitbucket repository and opens the ticket screen", async () => {
+  it("offers only Jira and Linear for a Bitbucket backlog", async () => {
     const user = userEvent.setup();
     const selectBitbucketRepository = vi.fn().mockResolvedValue(true);
+    const requestConnect = vi.fn().mockResolvedValue(true);
     renderSetup(new Set<IntegrationId>(["bitbucket"]), {
       bitbucketIntegrationId: "bitbucket-1",
       selectBitbucketRepository,
+      requestConnect,
     });
 
     await chooseBitbucket(user);
@@ -506,6 +509,12 @@ describe("FirstRunSetup Bitbucket", () => {
     await waitFor(() => expect(selectBitbucketRepository).toHaveBeenCalledWith("acme-team/api"));
     expect(resources.calls).toContainEqual({ integrationId: "bitbucket-1", type: "repository", enabled: true });
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /GitHub Issues/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Connect GitHub" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Jira/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Linear/ })).toBeInTheDocument();
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
+    expect(requestConnect).not.toHaveBeenCalled();
   });
 
   it("returns from the Bitbucket repository screen to the host screen", async () => {
