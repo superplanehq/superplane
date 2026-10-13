@@ -55,7 +55,7 @@ blocks:
 promotions:
   - name: Publish Runner Release
     pipeline_file: publish-runner-release.yml
-    deployment_target: runner-releases
+    deployment_target: release
     parameters:
       env_vars:
         - name: VERSION
