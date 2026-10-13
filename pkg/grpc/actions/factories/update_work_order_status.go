@@ -67,7 +67,7 @@ func UpdateWorkOrderStatus(
 	var order *models.FactoryWorkOrder
 	var fromState string
 	var changed bool
-	var deferred bool
+	var deferredRunIDs []uuid.UUID
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err := models.FindFactory(tx, orgID, factoryID)
 		if err != nil {
@@ -88,7 +88,7 @@ func UpdateWorkOrderStatus(
 		if err != nil {
 			return err
 		}
-		deferred = order.RunCancellationDeferred
+		deferredRunIDs = append([]uuid.UUID(nil), order.DeferredRunCancellationIDs...)
 		return nil
 	})
 	if err != nil {
@@ -106,7 +106,7 @@ func UpdateWorkOrderStatus(
 	}
 
 	if changed && toState == models.FactoryWorkOrderStateClosed {
-		scheduleWorkOrderCloseEffects(ctx, orgID, factory, order, &actor, fromState, result, false, deferred)
+		scheduleWorkOrderCloseEffects(ctx, orgID, factory, order, &actor, fromState, result, false, deferredRunIDs)
 	} else if err := messages.PublishFactoryWorkOrderUpdated(
 		factory.ID.String(),
 		order.ID.String(),

@@ -371,14 +371,14 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 
 	var finalized bool
 	var skippedAsFinished bool
-	var stopDrain *models.RunCancellationDrainResult
+	var stopResult *models.RunCancellationResult
 	var nextFactoryLineRuns []factoryLinePendingRun
 	var factoryOrderUpdates []factoryWorkOrderUpdate
 	var mergeabilityRefresh *factoryPullRequestMergeabilityRefresh
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		var skipReason string
 		var err error
-		finalized, skipReason, stopDrain, err = w.maybeFinalizeRun(tx, runID, trigger, eventCollector, executionCollector)
+		finalized, skipReason, stopResult, err = w.maybeFinalizeRun(tx, runID, trigger, eventCollector, executionCollector)
 		if skipReason != "" {
 			outcome = executorOutcomeSkipped
 			reason = skipReason
@@ -421,11 +421,15 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 		rollUpFactoryUsageBestEffort(logger, database.Conn(), runID)
 	}
 
-	if stopDrain != nil {
-		messages.PublishRunCancellationDrain(workflowID, stopDrain)
+	if stopResult != nil && stopResult.Drain != nil {
+		messages.PublishRunCancellationDrain(workflowID, stopResult.Drain)
 		if err := messages.NewCanvasRunMessage(workflowID.String(), runID.String()).Publish(); err != nil {
 			w.logger.WithError(err).Warnf("Failed to publish run cancellation for run %s", runID)
 		}
+	}
+	if stopResult != nil && len(stopResult.DeferredRunIDs) > 0 {
+		ids := append([]uuid.UUID(nil), stopResult.DeferredRunIDs...)
+		go messages.PublishDeferredWorkOrderRunCancellations(database.Conn(), nil, ids, uuid.Nil)
 	}
 
 	if !finalized {
@@ -485,7 +489,7 @@ func (w *RunFinalizer) finalizeRun(workflowID, runID uuid.UUID, trigger string) 
 	return nil
 }
 
-func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string, eventCollector func([]models.CanvasEvent), executionCollector func([]models.CanvasNodeExecution)) (bool, string, *models.RunCancellationDrainResult, error) {
+func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger string, eventCollector func([]models.CanvasEvent), executionCollector func([]models.CanvasNodeExecution)) (bool, string, *models.RunCancellationResult, error) {
 	run, err := models.LockCanvasRunInTransaction(tx, runID)
 	if err != nil {
 		return false, "", nil, err
@@ -495,12 +499,12 @@ func (w *RunFinalizer) maybeFinalizeRun(tx *gorm.DB, runID uuid.UUID, trigger st
 		return false, runFinalizerReasonAlreadyFinished, nil, nil
 	}
 
-	stopped, err := models.StopAnalysisRunForClosedWorkOrder(tx, run)
+	stopped, err := models.StopRunForClosedPlanningOrder(tx, run)
 	if err != nil {
 		return false, "", nil, err
 	}
-	if stopped != nil && stopped.Drain != nil {
-		return false, "", stopped.Drain, nil
+	if stopped != nil && (stopped.Drain != nil || stopped.Deferred) {
+		return false, "", stopped, nil
 	}
 
 	openWork, err := run.FindOpenWork(tx)

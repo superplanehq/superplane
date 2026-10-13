@@ -88,10 +88,11 @@ type FactoryWorkOrder struct {
 	MCPClientName   *string
 	// StatusNote is the jsonb array of current-wait announcements (see
 	// FactoryWorkOrderStatusNote). Cleared on every state transition.
-	StatusNote              datatypes.JSON
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
-	RunCancellationDeferred bool `gorm:"-"`
+	StatusNote                 datatypes.JSON
+	CreatedAt                  time.Time
+	UpdatedAt                  time.Time
+	RunCancellationDeferred    bool        `gorm:"-"`
+	DeferredRunCancellationIDs []uuid.UUID `gorm:"-"`
 
 	CreatedBy *User                      `gorm:"foreignKey:CreatedByID"`
 	Assignees []FactoryWorkOrderAssignee `gorm:"foreignKey:WorkOrderID"`
@@ -207,15 +208,14 @@ func (FactoryWorkOrderAssignee) TableName() string {
 // shared status FSM. Actor / Automation / Run + App are optional attribution
 // fields that populate the emitted `order.status.updated` event.
 type FactoryWorkOrderStatusUpdate struct {
-	ToState                   string
-	Result                    string
-	Actor                     *uuid.UUID
-	Automation                *factory.AutomationRef
-	Run                       *factory.RunRef
-	App                       *factory.AppRef
-	SkipSame                  bool // when true, no-op transitions to the current state succeed silently
-	OnRunsCancelled           func([]*RunCancellationResult)
-	OnRunCancellationDeferred func()
+	ToState         string
+	Result          string
+	Actor           *uuid.UUID
+	Automation      *factory.AutomationRef
+	Run             *factory.RunRef
+	App             *factory.AppRef
+	SkipSame        bool // when true, no-op transitions to the current state succeed silently
+	OnRunsCancelled func([]*RunCancellationResult)
 }
 
 // NOTE: this is only OK to be used in the workers.
@@ -435,7 +435,7 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 		}
 
 		if fromState == FactoryWorkOrderStateDraft {
-			if err := o.endAnalysisSessionForTransition(tx, update.Actor, toState); err != nil {
+			if err := o.endAnalysisSessionForTransition(tx, update); err != nil {
 				return err
 			}
 		}
@@ -491,7 +491,7 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 	return true, nil
 }
 
-func (o *FactoryWorkOrder) endAnalysisSessionForTransition(tx *gorm.DB, actor *uuid.UUID, toState string) error {
+func (o *FactoryWorkOrder) endAnalysisSessionForTransition(tx *gorm.DB, update FactoryWorkOrderStatusUpdate) error {
 	var session FactoryPlanningSession
 	err := tx.
 		Where("organization_id = ? AND factory_id = ? AND draft_work_order_id = ?", o.OrganizationID, o.FactoryID, o.ID).
@@ -517,18 +517,20 @@ func (o *FactoryWorkOrder) endAnalysisSessionForTransition(tx *gorm.DB, actor *u
 	if err != nil {
 		return err
 	}
-	if toState == FactoryWorkOrderStateOpen {
-		_, err = run.RequestCompletion(tx, actor)
+	if update.ToState == FactoryWorkOrderStateOpen {
+		_, err = run.RequestCompletion(tx, update.Actor)
 		return err
 	}
 
-	result, err := run.RequestCancellation(tx, actor)
+	excluded := uuid.Nil
+	if update.Run != nil {
+		excluded = update.Run.ID
+	}
+	result, err := run.requestCancellationSkippingBusyLock(tx, update.Actor, excluded)
 	if err != nil {
 		return err
 	}
-	if result != nil && result.Deferred {
-		o.RunCancellationDeferred = true
-	}
+	o.noteDeferredCancellation(result, update)
 	return nil
 }
 

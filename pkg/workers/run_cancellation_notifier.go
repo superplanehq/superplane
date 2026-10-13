@@ -20,7 +20,13 @@ type RunCancellationOutcome struct {
 // so callers can publish RabbitMQ messages after the transaction commits.
 type RunCancellationNotifier struct {
 	Outcomes []RunCancellationOutcome
-	deferred []uuid.UUID
+	deferred []deferredWorkOrderCancellation
+}
+
+type deferredWorkOrderCancellation struct {
+	orderID  uuid.UUID
+	runIDs   []uuid.UUID
+	excluded uuid.UUID
 }
 
 func (n *RunCancellationNotifier) Bind(ctx *contexts.RunExecutionContext) *contexts.RunExecutionContext {
@@ -43,31 +49,35 @@ func (n *RunCancellationNotifier) Publish() {
 			log.Errorf("failed to publish run state RabbitMQ message: %v", err)
 		}
 	}
-	for _, orderID := range n.deferred {
-		orderID := orderID
-		go finishDeferredWorkOrderCancellation(orderID)
+	for _, item := range n.deferred {
+		item := item
+		go finishDeferredWorkOrderCancellation(item)
 	}
 }
 
-func (n *RunCancellationNotifier) RecordDeferred(orderID uuid.UUID) {
-	if n == nil || orderID == uuid.Nil {
+func (n *RunCancellationNotifier) RecordDeferred(orderID uuid.UUID, runIDs []uuid.UUID, excluded uuid.UUID) {
+	if n == nil || orderID == uuid.Nil || len(runIDs) == 0 {
 		return
 	}
-	n.deferred = append(n.deferred, orderID)
+	n.deferred = append(n.deferred, deferredWorkOrderCancellation{
+		orderID:  orderID,
+		runIDs:   append([]uuid.UUID(nil), runIDs...),
+		excluded: excluded,
+	})
 }
 
-func finishDeferredWorkOrderCancellation(orderID uuid.UUID) {
+func finishDeferredWorkOrderCancellation(item deferredWorkOrderCancellation) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			log.Errorf("deferred work order cancellation failed: %v", recovered)
 		}
 	}()
-	order, err := models.FindUnscopedWorkOrder(database.Conn(), orderID)
+	order, err := models.FindUnscopedWorkOrder(database.Conn(), item.orderID)
 	if err != nil {
-		log.WithError(err).Errorf("failed to load work order %s for deferred cancellation", orderID)
+		log.WithError(err).Errorf("failed to load work order %s for deferred cancellation", item.orderID)
 		return
 	}
-	messages.PublishDeferredWorkOrderRunCancellations(database.Conn(), order, nil)
+	messages.PublishDeferredWorkOrderRunCancellations(database.Conn(), nil, item.runIDs, item.excluded)
 	messages.PublishWorkOrderRunCancellations(database.Conn(), order)
 }
 

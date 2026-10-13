@@ -48,7 +48,7 @@ type FactoryContext struct {
 	// them after the surrounding transaction commits.
 	onWorkOrderNotification   func(messages.FactoryWorkOrderNotificationMessage)
 	onRunsCancelled           func([]*models.RunCancellationResult)
-	onRunCancellationDeferred func(orderID uuid.UUID)
+	onRunCancellationDeferred func(orderID uuid.UUID, runIDs []uuid.UUID, excludedRunID uuid.UUID)
 	onFileBindCleanup         func(FileBindCleanup)
 
 	encryptor crypto.Encryptor
@@ -109,7 +109,7 @@ func (c *FactoryContext) WithRunsCancelled(callback func([]*models.RunCancellati
 	return c
 }
 
-func (c *FactoryContext) WithRunCancellationDeferred(callback func(orderID uuid.UUID)) *FactoryContext {
+func (c *FactoryContext) WithRunCancellationDeferred(callback func(orderID uuid.UUID, runIDs []uuid.UUID, excludedRunID uuid.UUID)) *FactoryContext {
 	c.onRunCancellationDeferred = callback
 	return c
 }
@@ -615,14 +615,16 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 		App:             c.appRef(),
 		SkipSame:        true,
 		OnRunsCancelled: c.onRunsCancelled,
-		OnRunCancellationDeferred: func() {
-			if c.onRunCancellationDeferred != nil {
-				c.onRunCancellationDeferred(order.ID)
-			}
-		},
 	})
 	if err != nil {
 		return nil, false, err
+	}
+	if c.onRunCancellationDeferred != nil && len(order.DeferredRunCancellationIDs) > 0 {
+		excluded := uuid.Nil
+		if ref := c.runRef(); ref != nil {
+			excluded = ref.ID
+		}
+		c.onRunCancellationDeferred(order.ID, append([]uuid.UUID(nil), order.DeferredRunCancellationIDs...), excluded)
 	}
 
 	// A SkipSame no-op leaves the row untouched — skipping the fan-out
