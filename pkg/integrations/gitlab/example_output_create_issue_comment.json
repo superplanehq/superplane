@@ -15,7 +15,10 @@
     "system": false,
     "noteable_id": 1,
     "noteable_iid": 1,
-    "noteable_type": "Issue"
+    "noteable_type": "Issue",
+    "resolvable": false,
+    "confidential": false,
+    "internal": false
   },
   "timestamp": "2023-01-01T10:00:00.000Z",
   "type": "gitlab.createIssueComment"
