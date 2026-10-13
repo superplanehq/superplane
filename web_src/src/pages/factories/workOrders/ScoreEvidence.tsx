@@ -2,6 +2,7 @@ import { useState, type ComponentPropsWithRef, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
 
@@ -178,8 +179,10 @@ export function ScoreEvidence({
 function ScoreEvidenceDetailsChip({ testId, details }: { testId?: string; details: ScoreEvidenceDetails }) {
   const checkLabels = details.checks.map((check) => `${check.name} ${workOrderCheckStatus(check).label.toLowerCase()}`);
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="sm"
       aria-label={`Confidence checks: ${checkLabels.join("; ")}. ${details.open ? "Hide checks" : "Show checks"}`}
       aria-expanded={details.open}
       aria-controls={details.open ? details.controlsId : undefined}
@@ -187,7 +190,7 @@ function ScoreEvidenceDetailsChip({ testId, details }: { testId?: string; detail
       data-state={details.open ? "open" : "closed"}
       className={cn(
         CHIP_BUTTON_CLASS,
-        "group inline-flex min-h-6 flex-wrap items-center gap-x-2 gap-y-0.5 px-2 py-0.5 text-left",
+        "group h-auto min-h-6 min-w-0 shrink flex-wrap justify-start gap-x-2 gap-y-0.5 whitespace-normal px-2 py-0.5 text-left",
       )}
       onClick={(event) => {
         event.preventDefault();
@@ -202,7 +205,7 @@ function ScoreEvidenceDetailsChip({ testId, details }: { testId?: string; detail
         {details.open ? "Hide checks" : "Show checks"}
         <ChevronDown className={cn("size-3 transition-transform", details.open && "rotate-180")} aria-hidden="true" />
       </span>
-    </button>
+    </Button>
   );
 }
 
