@@ -43,7 +43,7 @@ for architecture in "${ARCHITECTURES[@]}"; do
   docker buildx build \
     --platform "linux/${architecture}" \
     --progress=plain \
-    --provenance=mode=max \
+    --provenance=false \
     --build-arg "FLEET_MANAGER_VERSION=${VERSION}" \
     --build-arg "SOURCE_REVISION=${GIT_SHA}" \
     --target runtime \
