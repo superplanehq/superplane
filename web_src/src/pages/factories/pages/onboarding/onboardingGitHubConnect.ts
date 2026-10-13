@@ -81,9 +81,9 @@ export function githubConnectReturnPath(path: string): string {
 }
 
 /**
- * GitHub sign-in links a GitHub identity to the account. Workspace setup must
- * not use that identity until the user connects GitHub. A completed connection
- * belongs to the account, so a later workspace can reuse it.
+ * Records the GitHub connect redirect in this browser. Repository selection
+ * uses the linked GitHub identity from the server, so this record does not
+ * decide whether GitHub is connected.
  *
  * A connection saved before that change is stored per workspace. Any of those
  * records for this account still counts.

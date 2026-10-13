@@ -273,28 +273,17 @@ describe("FirstRunSetup GitHub catalog", () => {
     }
   });
 
-  it("asks the user to connect GitHub when the identity only comes from sign-in", async () => {
-    const user = userEvent.setup();
-    const previousAssign = window.location.assign.bind(window.location);
-    const assign = vi.fn();
-    window.location.assign = assign;
+  it("opens repository selection when GitHub is already linked", () => {
     github.data.identity = { userId: "9", login: "octocat" };
     github.data.repositories = [
       { repositoryId: "77", installationId: "101", fullName: "acme/api", defaultBranch: "main" },
     ];
 
-    try {
-      renderSetup(pageModel(), "/org-1/workspaces/PAY/setup?step=repo");
+    renderSetup(pageModel(), "/org-1/workspaces/PAY/setup?step=repo");
 
-      expect(screen.getByTestId("first-run-connect")).toBeInTheDocument();
-      expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
-
-      await user.click(screen.getByTestId("first-run-connect-github"));
-      expect(assign).toHaveBeenCalled();
-      expect(readOnboardingGitHubConnect("account-1", "factory-1")).toBe(false);
-    } finally {
-      window.location.assign = previousAssign;
-    }
+    expect(screen.getByTestId("first-run-choose")).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect")).not.toBeInTheDocument();
+    expect(readOnboardingGitHubConnect("account-1", "factory-1")).toBe(false);
   });
 
   it("saves the GitHub connection when GitHub returns after a successful connection", async () => {
@@ -320,7 +309,6 @@ describe("FirstRunSetup GitHub catalog", () => {
 
   it("does not use a GitHub connection that another person saved in this browser", () => {
     writeOnboardingGitHubConnect("account-2");
-    github.data.identity = { userId: "9", login: "octocat" };
 
     renderSetup(pageModel(), "/org-1/workspaces/PAY/setup?step=repo");
 

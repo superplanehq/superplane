@@ -77,8 +77,8 @@ function resumeFirstRunScreen(args: {
   return "welcome";
 }
 
-// A GitHub identity from sign-in is not enough. The repository screen opens
-// after the user connects GitHub. That connection belongs to the account.
+// A linked GitHub identity opens repository selection. Sign-in stores that
+// identity, so a later workspace does not ask the person to connect again.
 function screenWithGitHubConnection(
   screen: FirstRunScreen,
   github: {

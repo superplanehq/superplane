@@ -58,8 +58,9 @@ function useRepositoryErrorToast(error: unknown, reportErrors: boolean) {
 }
 
 /**
- * GitHub access for this person. A linked identity is ready only after the
- * person connects GitHub. That connection is reused for later workspaces.
+ * GitHub access for this person. A linked GitHub identity is the connection,
+ * including one saved during sign-in. Later workspaces reuse it without
+ * asking the person to connect GitHub again.
  */
 export function useFirstRunGitHub(args: {
   organizationId: string;
@@ -81,9 +82,7 @@ export function useFirstRunGitHub(args: {
   );
   return {
     connection,
-    githubReady: connection.accountConnectionRequired
-      ? Boolean(connection.identity) && githubConnect.connected
-      : connection.appConfigured,
+    githubReady: connection.accountConnectionRequired ? Boolean(connection.identity) : connection.appConfigured,
     githubReturned: githubConnect.returned,
     installScope,
     checkingGitHub,
