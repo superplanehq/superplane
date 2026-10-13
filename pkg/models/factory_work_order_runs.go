@@ -54,6 +54,87 @@ func (o *FactoryWorkOrder) ListRuns(tx *gorm.DB) ([]CanvasRun, error) {
 	return runs, err
 }
 
+func FinishDeferredRunCancellations(db *gorm.DB, actor *uuid.UUID, runIDs []uuid.UUID, excluded uuid.UUID) ([]*RunCancellationResult, []uuid.UUID, error) {
+	pending := uniqueRunIDs(runIDs, excluded)
+	if len(pending) == 0 {
+		return nil, nil, nil
+	}
+	slices.SortFunc(pending, func(a, b uuid.UUID) int {
+		return bytes.Compare(a[:], b[:])
+	})
+
+	var results []*RunCancellationResult
+	var remaining []uuid.UUID
+	err := db.Transaction(func(tx *gorm.DB) error {
+		results = nil
+		remaining = nil
+		for _, runID := range pending {
+			run, err := FindUnscopedCanvasRun(tx, runID)
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if run.State == CanvasRunStateFinished || run.State == CanvasRunStateCancelling {
+				continue
+			}
+			result, err := run.requestRunTermination(tx, actor, "", true)
+			if err != nil {
+				return err
+			}
+			if result != nil && result.Deferred {
+				remaining = append(remaining, runID)
+				continue
+			}
+			if result != nil && result.Drain != nil {
+				results = append(results, result)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return results, remaining, nil
+}
+
+func StopRunForClosedPlanningOrder(tx *gorm.DB, run *CanvasRun) (*RunCancellationResult, error) {
+	if run == nil {
+		return nil, nil
+	}
+	loaded, err := FindUnscopedCanvasRun(tx, run.ID)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if loaded.State == CanvasRunStateFinished || loaded.State == CanvasRunStateCancelling {
+		return nil, nil
+	}
+	orderID, err := closedPlanningOrderID(tx, loaded)
+	if err != nil || orderID == uuid.Nil {
+		return nil, err
+	}
+	excluded, err := runExcludedByWorkOrderClose(tx, orderID)
+	if err != nil {
+		return nil, err
+	}
+	if excluded == loaded.ID {
+		return nil, nil
+	}
+	result, err := loaded.requestCancellationSkippingBusyLock(tx, nil, excluded)
+	if err != nil || result == nil || excluded == uuid.Nil {
+		return result, err
+	}
+	result.DeferredRunIDs = slices.DeleteFunc(result.DeferredRunIDs, func(id uuid.UUID) bool {
+		return id == excluded
+	})
+	result.Deferred = len(result.DeferredRunIDs) > 0
+	return result, nil
+}
+
 func (o *FactoryWorkOrder) cancelRuns(tx *gorm.DB, update FactoryWorkOrderStatusUpdate) error {
 	runs, err := o.ListRuns(tx)
 	if err != nil {
@@ -104,51 +185,6 @@ func (o *FactoryWorkOrder) noteDeferredCancellation(result *RunCancellationResul
 	}
 }
 
-func FinishDeferredRunCancellations(db *gorm.DB, actor *uuid.UUID, runIDs []uuid.UUID, excluded uuid.UUID) ([]*RunCancellationResult, []uuid.UUID, error) {
-	pending := uniqueRunIDs(runIDs, excluded)
-	if len(pending) == 0 {
-		return nil, nil, nil
-	}
-	slices.SortFunc(pending, func(a, b uuid.UUID) int {
-		return bytes.Compare(a[:], b[:])
-	})
-
-	var results []*RunCancellationResult
-	var remaining []uuid.UUID
-	err := db.Transaction(func(tx *gorm.DB) error {
-		results = nil
-		remaining = nil
-		for _, runID := range pending {
-			run, err := FindUnscopedCanvasRun(tx, runID)
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				continue
-			}
-			if err != nil {
-				return err
-			}
-			if run.State == CanvasRunStateFinished || run.State == CanvasRunStateCancelling {
-				continue
-			}
-			result, err := run.requestRunTermination(tx, actor, "", true)
-			if err != nil {
-				return err
-			}
-			if result != nil && result.Deferred {
-				remaining = append(remaining, runID)
-				continue
-			}
-			if result != nil && result.Drain != nil {
-				results = append(results, result)
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, nil, err
-	}
-	return results, remaining, nil
-}
-
 func uniqueRunIDs(runIDs []uuid.UUID, excluded uuid.UUID) []uuid.UUID {
 	pending := make([]uuid.UUID, 0, len(runIDs))
 	for _, runID := range runIDs {
@@ -161,42 +197,6 @@ func uniqueRunIDs(runIDs []uuid.UUID, excluded uuid.UUID) []uuid.UUID {
 }
 
 const closedPlanningOrderAncestorLimit = 32
-
-func StopRunForClosedPlanningOrder(tx *gorm.DB, run *CanvasRun) (*RunCancellationResult, error) {
-	if run == nil {
-		return nil, nil
-	}
-	loaded, err := FindUnscopedCanvasRun(tx, run.ID)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if loaded.State == CanvasRunStateFinished || loaded.State == CanvasRunStateCancelling {
-		return nil, nil
-	}
-	orderID, err := closedPlanningOrderID(tx, loaded)
-	if err != nil || orderID == uuid.Nil {
-		return nil, err
-	}
-	excluded, err := runExcludedByWorkOrderClose(tx, orderID)
-	if err != nil {
-		return nil, err
-	}
-	if excluded == loaded.ID {
-		return nil, nil
-	}
-	result, err := loaded.requestCancellationSkippingBusyLock(tx, nil, excluded)
-	if err != nil || result == nil || excluded == uuid.Nil {
-		return result, err
-	}
-	result.DeferredRunIDs = slices.DeleteFunc(result.DeferredRunIDs, func(id uuid.UUID) bool {
-		return id == excluded
-	})
-	result.Deferred = len(result.DeferredRunIDs) > 0
-	return result, nil
-}
 
 func closedPlanningOrderID(tx *gorm.DB, run *CanvasRun) (uuid.UUID, error) {
 	current := run
