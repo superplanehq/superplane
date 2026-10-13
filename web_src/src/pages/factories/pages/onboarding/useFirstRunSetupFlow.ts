@@ -10,7 +10,6 @@ import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import type { FirstRunTicketSource } from "./first-run/firstRunTypes";
 import {
   canAnalyzeTicketSource,
-  DEFAULT_TICKET_SOURCE,
   issuesChoiceForTicketSource,
   ticketSourceFromIssuesChoice,
 } from "./first-run/firstRunTicketSource";
@@ -42,7 +41,6 @@ import type { useOnboardingPageModel } from "./useOnboardingPageModel";
 
 export type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 export type FirstRunScreen = "welcome" | "host" | "connect" | "choose" | "tickets" | "agent";
-export { DEFAULT_TICKET_SOURCE };
 const SCREEN_FOR_STEP: Record<WizardStepId, FirstRunScreen> = {
   vcs: "connect",
   repo: "choose",
@@ -215,13 +213,14 @@ function waitForBrowserPaint(): Promise<void> {
 }
 
 function selectedIssuesChoice(model: OnboardingPageModel): IssuesChoiceId | null {
-  const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice);
+  const ticketSource = ticketSourceFromIssuesChoice(model.setup.issuesChoice, model.setup.vcsHost);
   const issuesChoice = issuesChoiceForTicketSource(ticketSource);
   if (issuesChoice === "linear" && (model.linearProjectsLoading || model.linearProjectsError)) return null;
   if (
     !issuesChoice ||
     !canAnalyzeTicketSource({
       ticketSource,
+      githubConnected: model.setup.connected.has("github"),
       jiraConnected: model.setup.connected.has("jira"),
       jiraProjectId: model.jiraProjectId,
       linearConnected: model.setup.connected.has("linear"),
@@ -327,6 +326,13 @@ function useFirstRunCommands(args: {
         throw error;
       }
     });
+  const connectGitHubIssues = () =>
+    blocking.runUntilNavigation("opening-github", async () => {
+      model.setup.setIssuesChoice("vcs");
+      if (!(await model.saveIssues("vcs"))) return false;
+      await waitForBrowserPaint();
+      return model.requestConnect("github");
+    });
   const connectIssueTracker = (source: "jira" | "linear") =>
     blocking.runUntilNavigation(source === "jira" ? "connecting-jira" : "connecting-linear", async () => {
       model.setup.setIssuesChoice(source);
@@ -348,6 +354,7 @@ function useFirstRunCommands(args: {
     chooseVcsHost,
     connectBitbucket,
     connectGitHub,
+    connectGitHubIssues,
     createGitHubApp,
     connectJira: () => connectIssueTracker("jira"),
     connectLinear: () => connectIssueTracker("linear"),
@@ -418,7 +425,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     credentialChoice: model.agentCredentialChoice,
     selectCredentialChoice: model.setAgentCredentialChoice,
     agentGatePending: agentGate === "pending",
-    ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice),
+    ticketSource: ticketSourceFromIssuesChoice(model.setup.issuesChoice, model.setup.vcsHost),
     repositories: connection.repositories.map((repository) => repository.fullName).filter(Boolean) as string[],
     repositoryCatalog: connection.repositories as MeVcsProviderRepository[],
     repositoriesLoading: connection.onboarding.isPending,
