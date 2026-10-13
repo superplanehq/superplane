@@ -114,11 +114,13 @@ export function ConsoleAutomationCard({
           automation={automation}
           shownStatus={shownStatus}
           shownPhase={shownPhase}
-          timer={runMetaLine(latest, automation.runs, timing, now)}
+          timer={shownStatus === "queued" ? "" : runMetaLine(latest, automation.runs, timing, now)}
+          queueSummary={mixedQueueSummary(automation.runs, queuedIds)}
         />
         <CollapsibleContent>
           <FramePanel className="space-y-3">
             <AutomationCardBody
+              queued={shownStatus === "queued"}
               automation={automation}
               phase={shownPhase}
               phases={phases.map((entry) => (entry.id === latest.id && shownPhase ? shownPhase : entry))}
@@ -141,11 +143,13 @@ function ConsoleCardHeader({
   shownStatus,
   shownPhase,
   timer,
+  queueSummary,
 }: {
   automation: ConsoleAutomation;
   shownStatus: ConsoleDisplayStatus;
   shownPhase?: SplitRunPhase;
   timer: string;
+  queueSummary: string;
 }) {
   return (
     <FrameHeader
@@ -161,7 +165,11 @@ function ConsoleCardHeader({
         <span className="shrink-0 text-[13px] font-medium text-muted-foreground">Queued</span>
       ) : null}
       <span className="shrink-0 text-[13px] font-medium text-foreground">{automation.name}</span>
-      <StepOutputCounts stage={automation.latest} phase={shownPhase} runs={automation.runs} />
+      {queueSummary ? (
+        <span className={META_TEXT_CLASSNAME}>{queueSummary}</span>
+      ) : (
+        <StepOutputCounts stage={automation.latest} phase={shownPhase} runs={automation.runs} />
+      )}
       <span className={cn(META_TEXT_CLASSNAME, "ml-auto px-1.5 tabular-nums")}>{timer}</span>
       <ChevronRight
         className="size-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
@@ -299,4 +307,11 @@ function useTickingNow(active: boolean): number {
     return () => window.clearInterval(id);
   }, [active]);
   return now;
+}
+
+function mixedQueueSummary(runs: ConsoleAutomation["runs"], queuedIds: ReadonlySet<string>): string {
+  const active = runs.filter((run) => run.status === "running");
+  const queued = active.filter((run) => queuedIds.has(run.id)).length;
+  const running = active.length - queued;
+  return running > 0 && queued > 0 ? `${running} running · ${queued} queued` : "";
 }

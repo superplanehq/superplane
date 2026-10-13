@@ -111,14 +111,18 @@ function SingleRun({
           className={RUN_TITLE_MARKDOWN}
         />
       ) : null}
-      <RunDetails
-        run={run}
-        phase={phase}
-        organizationId={organizationId}
-        factoryKey={factoryKey}
-        orderNumber={orderNumber}
-        reportUsage={reportUsage}
-      />
+      {queued ? (
+        <QueueWaitNote />
+      ) : (
+        <RunDetails
+          run={run}
+          phase={phase}
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          orderNumber={orderNumber}
+          reportUsage={reportUsage}
+        />
+      )}
     </div>
   );
 }
@@ -164,14 +168,18 @@ function AgentRunRow({
         </div>
       </div>
       <CollapsibleContent className="space-y-3 py-2 pl-5">
-        <RunDetails
-          run={run}
-          phase={phase}
-          organizationId={organizationId}
-          factoryKey={factoryKey}
-          orderNumber={orderNumber}
-          reportUsage={reportUsage}
-        />
+        {queued ? (
+          <QueueWaitNote />
+        ) : (
+          <RunDetails
+            run={run}
+            phase={phase}
+            organizationId={organizationId}
+            factoryKey={factoryKey}
+            orderNumber={orderNumber}
+            reportUsage={reportUsage}
+          />
+        )}
       </CollapsibleContent>
     </Collapsible>
   );
@@ -193,6 +201,10 @@ function QueuedRunMark() {
       <span className="shrink-0 text-[12px] font-medium text-muted-foreground">Queued</span>
     </>
   );
+}
+
+function QueueWaitNote() {
+  return <p className="text-[12.5px] text-muted-foreground">Waiting for an available agent slot.</p>;
 }
 
 function RunDetails({

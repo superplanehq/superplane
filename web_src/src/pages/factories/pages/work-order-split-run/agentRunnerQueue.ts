@@ -1,7 +1,7 @@
 import type { CanvasesCanvas, CanvasesCanvasRun } from "@/api-client";
 import { isAgentHarnessComponent } from "@/lib/agentRunnerSteps";
 
-const ACTIVE_AGENT_STATES = new Set(["STATE_PENDING", "STATE_STARTED", "STATE_CANCELLING"]);
+const ACTIVE_AGENT_STATES = new Set(["STATE_STARTED", "STATE_CANCELLING"]);
 const WORKING_AGENT_STATES = new Set(["STATE_STARTED", "STATE_CANCELLING"]);
 const WORK_START_STATES = new Set(["STATE_STARTED", "STATE_CANCELLING", "STATE_FINISHED"]);
 
@@ -25,7 +25,11 @@ export function agentRunnerQueue(
   if (run.state !== "STATE_STARTED") {
     return { queued: false, ...timing };
   }
-  if (agentIds.size === 0 || !hasAgentQueueItem(run, agentIds) || hasActiveAgentExecution(run, agentIds)) {
+  if (
+    agentIds.size === 0 ||
+    !(hasAgentQueueItem(run, agentIds) || hasPendingAgentExecution(run, agentIds)) ||
+    hasActiveAgentExecution(run, agentIds)
+  ) {
     return { queued: false, ...timing };
   }
   return { queued: true, ...timing };
@@ -47,6 +51,12 @@ function agentNodeIds(canvas: CanvasesCanvas | undefined): Set<string> {
 
 function hasAgentQueueItem(run: CanvasesCanvasRun, agentIds: Set<string>): boolean {
   return (run.queueItems ?? []).some((item) => Boolean(item.nodeId && agentIds.has(item.nodeId)));
+}
+
+function hasPendingAgentExecution(run: CanvasesCanvasRun, agentIds: Set<string>): boolean {
+  return (run.executions ?? []).some(
+    (execution) => isAgentExecution(execution, agentIds) && execution.state === "STATE_PENDING",
+  );
 }
 
 function hasActiveAgentExecution(run: CanvasesCanvasRun, agentIds: Set<string>): boolean {

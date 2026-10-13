@@ -70,15 +70,16 @@ describe("agentRunnerQueue", () => {
     ).toBeUndefined();
   });
 
-  it("does not treat a pending agent execution as queued", () => {
+  it("shows a pending agent execution as queued before it starts", () => {
     expect(
       agentRunnerQueue(
         agentCanvas(),
         startedRun({
+          queueItems: [],
           executions: [{ nodeId: "agent", state: "STATE_PENDING", createdAt: "2026-10-13T11:10:00.000Z" }],
         }),
       ),
-    ).toEqual({ queued: false });
+    ).toEqual({ queued: true });
   });
 
   it("does not treat a cancelling agent execution as queued", () => {
