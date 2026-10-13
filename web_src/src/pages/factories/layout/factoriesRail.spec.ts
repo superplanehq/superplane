@@ -16,6 +16,8 @@ describe("initialsForName", () => {
 describe("isAgentPath", () => {
   it("matches only the workspace Agent page", () => {
     expect(isAgentPath("/org/workspaces/rf/agent")).toBe(true);
+    expect(isAgentPath("/org/workspaces/rf/agent/mcp/resource-1")).toBe(true);
+    expect(isAgentPath("/org/workspaces/rf/agent/skills/new")).toBe(true);
     expect(isAgentPath("/agent/workspaces/rf-p8n3wrcd/agent")).toBe(true);
     expect(isAgentPath("/org/workspaces/rf/settings/workspace/agent-resources")).toBe(false);
     expect(isAgentPath("/org/workspaces/rf/settings/workspace/mcp/resource-1")).toBe(false);
