@@ -6,7 +6,13 @@ import type { SplitRunPhaseStatus } from "../splitRunMocks";
 
 /** Small glyph components shared by the Automations tab redesign variants. */
 
-export function StageStatusGlyph({ status, className }: { status: SplitRunPhaseStatus; className?: string }) {
+export function StageStatusGlyph({
+  status,
+  className,
+}: {
+  status: SplitRunPhaseStatus | "queued";
+  className?: string;
+}) {
   return <PhaseGlyph kind={status} className={className} />;
 }
 
@@ -14,7 +20,13 @@ export function StageStatusGlyph({ status, className }: { status: SplitRunPhaseS
  * Status without motion. A running run reads as a steady dot: the card
  * header glyph is the one spinner on the console.
  */
-export function StaticStatusGlyph({ status, className }: { status: SplitRunPhaseStatus; className?: string }) {
+export function StaticStatusGlyph({
+  status,
+  className,
+}: {
+  status: SplitRunPhaseStatus | "queued";
+  className?: string;
+}) {
   if (status === "running") {
     return (
       <span
