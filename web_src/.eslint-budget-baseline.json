@@ -1,14 +1,14 @@
 {
-  "maxAllowedTotalIssues": 295,
+  "maxAllowedTotalIssues": 288,
   "maxAllowedByRule": {
-    "complexity": 150,
+    "complexity": 145,
     "max-lines-per-function": 68,
-    "max-statements": 52,
+    "max-statements": 50,
     "max-lines": 25
   },
   "maxAllowedMetricMaximumByRule": {
     "max-lines": 3518,
     "complexity": 197
   },
-  "updatedAt": "2026-10-13T15:24:37.572Z"
+  "updatedAt": "2026-10-13T17:30:23.677Z"
 }
