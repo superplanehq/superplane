@@ -193,16 +193,20 @@ describe("VelocityPage shell", () => {
     expect(await screen.findByRole("tooltip")).toHaveTextContent("4 tasks closed without a merge");
   });
 
-  it("spreads tracked spend over the tasks that closed", () => {
+  it("divides ledger spend by the tasks that closed", async () => {
     resetState();
     velocityHookState.data = populatedResponse();
+    const user = userEvent.setup();
 
     renderShell();
 
     const summary = screen.getByTestId("velocity-summary");
     expect(summary).toHaveTextContent("Cost per task");
-    // $42.00 of spend over 16 closed tasks.
+    // Ledger total of $42.00 over 16 closed tasks.
     expect(summary).toHaveTextContent("$2.63");
+
+    await user.hover(screen.getByRole("button", { name: "About Cost per task" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Ledger spend per closed task");
   });
 
   it("compares against the previous window when it holds output", () => {
@@ -485,7 +489,7 @@ describe("VelocityPage shell", () => {
     expect(metricColorDot(waiting)).toHaveStyle({ backgroundColor: VELOCITY_TIME_COLORS.waiting });
   });
 
-  it("reports tracked spend split between tokens and compute", () => {
+  it("reports tracked spend split between tokens and compute", async () => {
     resetState();
     velocityHookState.data = populatedResponse();
 
@@ -496,5 +500,13 @@ describe("VelocityPage shell", () => {
     expect(cost).toHaveTextContent("$42.00");
     expect(cost).toHaveTextContent("Tokens");
     expect(cost).toHaveTextContent("Compute");
+    expect(cost).toHaveTextContent("Spend by the day it occurred, split between tokens and compute.");
+    expect(cost).not.toHaveTextContent("tasks that closed");
+
+    const user = userEvent.setup();
+    await user.click(within(cost).getByRole("tab", { name: "Cumulative" }));
+    expect(cost).toHaveTextContent(
+      "Spend by the day it occurred, added up over the period, split between tokens and compute.",
+    );
   });
 });
