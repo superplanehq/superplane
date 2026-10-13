@@ -13,7 +13,7 @@ import (
 
 const (
 	PassedOutputChannel     = "passed"
-	FailedOutputChannel     = "failed"
+	FailedOutputChannel     = core.FailedOutputChannel
 	RunnerFinishedEventType = "runner.finished"
 
 	pollInterval   = 2 * time.Minute
