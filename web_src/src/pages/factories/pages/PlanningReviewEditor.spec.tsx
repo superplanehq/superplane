@@ -167,18 +167,21 @@ describe("PlanningReviewEditor restore default prompt", () => {
 
   it("hides a failed background default prompt lookup", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
-    loadDefault.mockRejectedValue(new Error("Not found"));
-    renderEditor();
+    try {
+      loadDefault.mockRejectedValue(new Error("Not found"));
+      renderEditor();
 
-    await waitFor(() => expect(loadDefault).toHaveBeenCalled());
-    await waitFor(() => expect(warn).toHaveBeenCalled());
+      await waitFor(() => expect(loadDefault).toHaveBeenCalled());
+      await waitFor(() => expect(warn).toHaveBeenCalled());
 
-    expect(screen.queryByTestId("planning-review-restore-default-prompt-error")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("planning-review-restore-default-prompt-retry")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
-    expect(screen.getByTestId("planning-review-step-summary-0")).toHaveTextContent("Clone repository");
-    expect(screen.getByTestId("planning-review-step-summary-1")).toHaveTextContent("Refine Task");
-    warn.mockRestore();
+      expect(screen.queryByTestId("planning-review-restore-default-prompt-error")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("planning-review-restore-default-prompt-retry")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("planning-review-restore-default-prompt")).not.toBeInTheDocument();
+      expect(screen.getByTestId("planning-review-step-summary-0")).toHaveTextContent("Clone repository");
+      expect(screen.getByTestId("planning-review-step-summary-1")).toHaveTextContent("Refine Task");
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("hides Restore default prompt when the prompt already matches", async () => {
