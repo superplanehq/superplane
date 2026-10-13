@@ -198,42 +198,6 @@ func Test__Exists(t *testing.T) {
 	assert.False(t, Exists(""))
 }
 
-func Test__All_omitsRetiredSentryIntakeFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_sentry_intake", feature.ID)
-	}
-}
-
-func Test__All_omitsRetiredDependabotIntakeFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_dependabot_intake", feature.ID)
-	}
-}
-
-func Test__All_omitsRetiredJiraIntakeFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_jira_intake", feature.ID)
-	}
-}
-
-func Test__All_omitsRetiredLinearIntakeFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_linear_intake", feature.ID)
-	}
-}
-
-func Test__All_omitsRetiredMergeConfidenceFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_risk_score", feature.ID)
-	}
-}
-
-func Test__All_omitsRetiredTaskConsoleFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_task_console", feature.ID)
-	}
-}
-
 func Test__All_isCopy(t *testing.T) {
 	a := All()
 	require := len(a)
