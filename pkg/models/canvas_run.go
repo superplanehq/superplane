@@ -669,7 +669,13 @@ func (r *CanvasRun) CalculateResult(tx *gorm.DB) (string, error) {
 					SELECT 1
 					FROM workflow_node_executions
 					WHERE run_id = ?
-					AND event_id = workflow_events.id
+					AND (
+						event_id = workflow_events.id
+						OR (
+							jsonb_typeof(metadata->'eventIDs') = 'array'
+							AND metadata->'eventIDs' @> to_jsonb(workflow_events.id::text)
+						)
+					)
 				)
 			) AS has_unconsumed_failed_event
 	`,

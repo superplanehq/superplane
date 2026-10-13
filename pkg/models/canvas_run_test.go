@@ -327,14 +327,15 @@ func Test__CanvasRun__RequestCompletion__DoesNotOverrideCancellationRequest(t *t
 
 func Test__CanvasRun__CalculateResult__UnconsumedFailedChannelFailsRun(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
-	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+	db := database.DB(t.Context())
+	require.NoError(t, db.Model(execution).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
 		"result":     models.CanvasNodeExecutionResultPassed,
 		"updated_at": time.Now(),
 	}).Error)
 
 	cancelled := createExecutionForRun(t, run, execution.RootEventID, "node-2")
-	require.NoError(t, database.Conn().Model(cancelled).Updates(map[string]any{
+	require.NoError(t, db.Model(cancelled).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
 		"result":     models.CanvasNodeExecutionResultCancelled,
 		"updated_at": time.Now(),
@@ -342,14 +343,15 @@ func Test__CanvasRun__CalculateResult__UnconsumedFailedChannelFailsRun(t *testin
 
 	support.EmitCanvasEventForNode(t, run.WorkflowID, execution.NodeID, runner.FailedOutputChannel, &execution.ID)
 
-	result, err := run.CalculateResult(database.DB(t.Context()))
+	result, err := run.CalculateResult(db)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunResultFailed, result)
 }
 
 func Test__CanvasRun__CalculateResult__ConsumedFailedChannelPassesWhenHandlerPasses(t *testing.T) {
 	run, execution := setupRunWithExecution(t)
-	require.NoError(t, database.Conn().Model(execution).Updates(map[string]any{
+	db := database.DB(t.Context())
+	require.NoError(t, db.Model(execution).Updates(map[string]any{
 		"state":      models.CanvasNodeExecutionStateFinished,
 		"result":     models.CanvasNodeExecutionResultPassed,
 		"updated_at": time.Now(),
@@ -357,14 +359,46 @@ func Test__CanvasRun__CalculateResult__ConsumedFailedChannelPassesWhenHandlerPas
 
 	failedEvent := support.EmitCanvasEventForNode(t, run.WorkflowID, execution.NodeID, runner.FailedOutputChannel, &execution.ID)
 	handler := createExecutionForRun(t, run, execution.RootEventID, "node-2")
-	require.NoError(t, database.Conn().Model(handler).Updates(map[string]any{
+	require.NoError(t, db.Model(handler).Updates(map[string]any{
 		"event_id":   failedEvent.ID,
 		"state":      models.CanvasNodeExecutionStateFinished,
 		"result":     models.CanvasNodeExecutionResultPassed,
 		"updated_at": time.Now(),
 	}).Error)
 
-	result, err := run.CalculateResult(database.DB(t.Context()))
+	result, err := run.CalculateResult(db)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultPassed, result)
+}
+
+func Test__CanvasRun__CalculateResult__FailedChannelHandledBySharedExecutionPasses(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+	require.NoError(t, db.Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultPassed,
+		"updated_at": time.Now(),
+	}).Error)
+
+	passedEvent := support.EmitCanvasEventForNode(t, run.WorkflowID, execution.NodeID, "default", &execution.ID)
+	firstFailed := support.EmitCanvasEventForNode(t, run.WorkflowID, execution.NodeID, runner.FailedOutputChannel, &execution.ID)
+	secondFailed := support.EmitCanvasEventForNode(t, run.WorkflowID, execution.NodeID, runner.FailedOutputChannel, &execution.ID)
+	shared := createExecutionForRun(t, run, execution.RootEventID, "node-2")
+	require.NoError(t, db.Model(shared).Updates(map[string]any{
+		"event_id": passedEvent.ID,
+		"state":    models.CanvasNodeExecutionStateFinished,
+		"result":   models.CanvasNodeExecutionResultPassed,
+		"metadata": datatypes.NewJSONType(map[string]any{
+			"eventIDs": []string{
+				passedEvent.ID.String(),
+				firstFailed.ID.String(),
+				secondFailed.ID.String(),
+			},
+		}),
+		"updated_at": time.Now(),
+	}).Error)
+
+	result, err := run.CalculateResult(db)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunResultPassed, result)
 }
