@@ -46,32 +46,32 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const LowConfidenceQuestions: Story = {
-  name: "Caution (yellow) · 2/3 — pending questions and plan",
+  name: "Two checks need review · questions and plan",
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "questions" },
 };
 
 export const LowConfidenceQuestionsWithoutPlan: Story = {
-  name: "Caution (yellow) · 2/3 — pending questions, no plan",
+  name: "Two checks need review · questions, no plan",
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "questions", hasPlan: false },
 };
 
 export const LowConfidenceSummary: Story = {
-  name: "Caution (yellow) · 2/3 — summary and plan",
+  name: "Two checks need review · summary and plan",
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "message" },
 };
 
 export const ReadyPlan: Story = {
-  name: "Ready (green) · 3/3 — ready plan",
+  name: "All checks ready · ready plan",
   args: { scores: { clarity: 3, complexity: 3, verifiability: 3 }, response: "ready" },
 };
 
 export const ModerateComplexityQuestions: Story = {
-  name: "Caution (yellow) · 2/3 — complexity needs review",
+  name: "Complexity needs review · questions",
   args: { scores: { clarity: 3, complexity: 2, verifiability: 3 }, response: "questions" },
 };
 
 export const LowClarityQuestions: Story = {
-  name: "Critical (red) · 1/3 — unclear company choice",
+  name: "Clarity critical · unclear company choice",
   args: { scores: { clarity: 1, complexity: 3, verifiability: 2 }, response: "questions" },
 };
 

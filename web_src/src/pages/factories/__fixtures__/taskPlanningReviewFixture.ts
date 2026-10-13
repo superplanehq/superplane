@@ -50,7 +50,8 @@ function reviewCheck(
   };
 }
 
-const TITLE = "Add customer logos to the homepage";
+const TASK_TITLE = "Review repository stars for company logos";
+const PLAN_TITLE = "Add customer logos to the homepage";
 const DESCRIPTION =
   "Review the repository stars and suggest companies for the homepage. Rank recognizable brands and teams with at least 10 people.";
 
@@ -62,7 +63,7 @@ function planArtifact(response: TaskPlanningReviewOptions["response"]): Factorie
       name: SPEC_ARTIFACT_NAME,
       title: SPEC_ARTIFACT_NAME,
       body: [
-        `# ${TITLE}`,
+        `# ${PLAN_TITLE}`,
         "",
         "## Executive summary",
         "",
@@ -129,7 +130,7 @@ export function taskPlanningReviewFixture({
     workOrdersByFactoryId: {
       ...fixture.workOrdersByFactoryId,
       [PRIMARY_FACTORY_ID]: fixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID].map((order) =>
-        order.id === orderId ? { ...order, title: TITLE, description: DESCRIPTION } : order,
+        order.id === orderId ? { ...order, title: TASK_TITLE, description: DESCRIPTION } : order,
       ),
     },
     checksByOrderId: {
@@ -147,7 +148,7 @@ export function taskPlanningReviewFixture({
     planningSessionsByWorkOrderId: {
       [orderId]: {
         ...session,
-        draft: { ...session.draft, title: TITLE, description: DESCRIPTION },
+        draft: { ...session.draft, title: TASK_TITLE, description: DESCRIPTION },
         waitState: response === "updating" ? "" : "pending",
         messages: [
           { id: "plan-score", role: "plan", text: JSON.stringify({ score: confidence }), createdAt: scoreAt },

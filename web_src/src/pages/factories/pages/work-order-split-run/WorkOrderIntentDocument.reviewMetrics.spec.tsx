@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -54,7 +54,7 @@ describe("WorkOrderIntentDocument review metrics", () => {
     resetStreamMemoryForTests();
   });
 
-  it("reveals review checks on hover and pins them on click", async () => {
+  it("shows review checks for a 2/3 score until the user hides them", async () => {
     const user = userEvent.setup();
     renderIntentDocument(
       <WorkOrderIntentDocument
@@ -76,46 +76,43 @@ describe("WorkOrderIntentDocument review metrics", () => {
     );
 
     const confidence = screen.getByTestId("split-run-intent-composer-confidence");
-    expect(confidence).toHaveAccessibleName("Confidence 2/3");
-    expect(
-      within(confidence).getByTestId("split-run-intent-composer-confidence-meter").querySelectorAll(".sp-meter-bar"),
-    ).toHaveLength(3);
-    expect(screen.queryByTestId("split-run-intent-review-metrics")).not.toBeInTheDocument();
+    expect(confidence).toHaveAccessibleName(
+      "Confidence checks: Clarity clear; Complexity moderate; Verifiability provable. Hide checks",
+    );
+    expect(confidence).not.toHaveTextContent("2/3");
+    const bars = within(confidence)
+      .getByTestId("split-run-intent-composer-confidence-meter")
+      .querySelectorAll(".sp-meter-bar");
+    expect(bars).toHaveLength(3);
+    expect(bars[0]).toHaveClass("bg-emerald-500");
+    expect(bars[1]).toHaveClass("bg-amber-500");
+    expect(bars[2]).toHaveClass("bg-emerald-500");
+    const metrics = screen.getByTestId("split-run-intent-review-metrics");
+    expect(metrics).toBeVisible();
+    expect(screen.getByTestId("split-run-intent-status-card")).toContainElement(metrics);
     expect(screen.queryByTestId("split-run-intent-composer-confidence-copy")).not.toBeInTheDocument();
 
-    await user.hover(confidence);
-    const metrics = await screen.findByTestId("split-run-intent-review-metrics");
-    expect(metrics).toBeVisible();
-    expect(metrics).toHaveTextContent("Confidence 2/3");
-    expect(metrics).toHaveTextContent("The lowest check sets the score.");
+    expect(metrics).toHaveAccessibleName("Confidence checks");
+    expect(metrics).toHaveTextContent("Complexity needs review.");
     expect(metrics).toHaveTextContent("Clarity");
-    expect(metrics).toHaveTextContent("Clear");
     expect(metrics).toHaveTextContent("Complexity");
-    expect(metrics).toHaveTextContent("Moderate");
     expect(metrics).toHaveTextContent("Verifiability");
-    expect(metrics).toHaveTextContent("Provable");
+    expect(metrics).not.toHaveTextContent("Moderate");
+    expect(within(metrics).getByRole("img", { name: "Moderate" })).toBeInTheDocument();
     expect(metrics).toHaveTextContent("The gap is specific and verifiable.");
     expect(metrics).toHaveTextContent("The work crosses a few layers.");
     expect(metrics).toHaveTextContent("Existing tests cover the change.");
     expect(screen.queryByTestId("split-run-intent-composer-confidence-copy")).not.toBeInTheDocument();
     expect(confidence).toHaveAttribute("aria-expanded", "true");
-    expect(confidence).toHaveAttribute("aria-pressed", "false");
 
-    await user.unhover(confidence);
-    await waitFor(() => {
-      expect(confidence).toHaveAttribute("aria-expanded", "false");
-    });
+    await user.click(confidence);
+    expect(confidence).toHaveAttribute("aria-expanded", "false");
+    expect(confidence).toHaveTextContent("Show checks");
     expect(screen.queryByTestId("split-run-intent-review-metrics")).not.toBeInTheDocument();
 
     await user.click(confidence);
-    expect(confidence).toHaveAttribute("aria-pressed", "true");
     expect(confidence).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByTestId("split-run-intent-review-metrics")).toBeVisible();
-    await user.unhover(confidence);
-    expect(screen.getByTestId("split-run-intent-review-metrics")).toBeVisible();
-
-    await user.click(confidence);
-    expect(confidence).toHaveAttribute("aria-pressed", "false");
   });
 
   it("shows all review checks at 3/3", async () => {
@@ -140,17 +137,24 @@ describe("WorkOrderIntentDocument review metrics", () => {
     );
 
     const confidence = screen.getByTestId("split-run-intent-composer-confidence");
-    expect(confidence).toHaveAccessibleName("Confidence 3/3");
+    expect(confidence).toHaveAccessibleName(
+      "Confidence checks: Clarity clear; Complexity easy; Verifiability provable. Show checks",
+    );
+    expect(confidence).not.toHaveTextContent("3/3");
 
-    await user.hover(confidence);
-    const metrics = await screen.findByTestId("split-run-intent-review-metrics");
-    expect(metrics).toHaveTextContent("Confidence 3/3");
+    expect(confidence).toHaveTextContent("Show checks");
+    expect(confidence).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("split-run-intent-review-metrics")).not.toBeInTheDocument();
+
+    await user.click(confidence);
+    const metrics = screen.getByTestId("split-run-intent-review-metrics");
+    expect(metrics).toHaveAccessibleName("Confidence checks");
+    expect(metrics).not.toHaveTextContent("The lowest check sets the score.");
     expect(metrics).toHaveTextContent("Clarity");
-    expect(metrics).toHaveTextContent("Clear");
     expect(metrics).toHaveTextContent("Complexity");
-    expect(metrics).toHaveTextContent("Easy");
     expect(metrics).toHaveTextContent("Verifiability");
-    expect(metrics).toHaveTextContent("Provable");
+    expect(metrics).not.toHaveTextContent("Easy");
+    expect(within(metrics).getByRole("img", { name: "Easy" })).toBeInTheDocument();
     expect(screen.queryByTestId("split-run-intent-composer-confidence-copy")).not.toBeInTheDocument();
   });
 });
