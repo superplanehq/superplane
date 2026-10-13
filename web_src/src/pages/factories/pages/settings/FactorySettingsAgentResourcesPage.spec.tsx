@@ -64,6 +64,8 @@ describe("FactorySettingsSkillsPage", () => {
     expect(screen.getByTestId("agent-resource-skill-name")).toBeInTheDocument();
     expect(screen.getByTestId("agent-resource-skill-command")).toHaveValue("/");
     expect(screen.getByTestId("agent-resource-skill-markdown")).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factories-nav-agent")).toHaveAttribute("aria-current", "page");
   }, 10000);
 
   it("recommends a slash command from the skill name", async () => {
@@ -111,7 +113,10 @@ describe("FactorySettingsSkillsPage", () => {
     expect(await screen.findByTestId("agent-resources-skills-list", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByText("Review copy")).toBeInTheDocument();
     expect(screen.queryByText("Review UI copy.")).not.toBeInTheDocument();
-    expect(screen.getByTestId(`agent-resource-configure-${INLINE_SKILL.id}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`agent-resource-configure-${INLINE_SKILL.id}`)).toHaveAttribute(
+      "href",
+      expect.stringContaining(`/agent/skills/${INLINE_SKILL.id}`),
+    );
   }, 10000);
 
   it("opens edit when the skill name is clicked", async () => {
