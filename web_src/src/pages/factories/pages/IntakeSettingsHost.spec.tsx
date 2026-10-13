@@ -11,6 +11,8 @@ import { unmockedSrc } from "@/test/unmockedModule";
 import {
   connectedJiraIntake,
   DATADOG_INTAKE,
+  DEPENDABOT_INTAKE,
+  DEPENDABOT_INTAKE_CANVAS,
   GITHUB_INTAKE_CANVAS,
   PRODUCTIVE_INTAKE,
   renderHost,
@@ -83,7 +85,13 @@ describe("IntakeSettingsHost", () => {
       isError: false,
       refetch: vi.fn().mockResolvedValue(undefined),
     });
-    useTriggers.mockReturnValue({ data: [{ name: "github.onIssue", label: "On Issue" }], isLoading: false });
+    useTriggers.mockReturnValue({
+      data: [
+        { name: "github.onIssue", label: "On Issue" },
+        { name: "github.onDependabotAlert", label: "On Dependabot Alert" },
+      ],
+      isLoading: false,
+    });
     useComponents.mockReturnValue({
       data: [
         { name: "if", label: "If" },
@@ -197,6 +205,7 @@ describe("IntakeSettingsHost", () => {
     expect(within(dialog).queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
     expect(within(dialog).queryByTestId("intake-source-settings-pause")).not.toBeInTheDocument();
     expect(within(dialog).getByTestId("intake-source-settings-delete")).toHaveTextContent(INTAKE_SETTINGS_COPY.delete);
+    expect(screen.queryByTestId("merge-confidence-config")).not.toBeInTheDocument();
   });
 
   it("shows the automation of the intake canvas from the Automation tab", async () => {
@@ -407,6 +416,134 @@ describe("IntakeSettingsHost", () => {
 
     const dialog = screen.getByTestId("intake-delete-dialog");
     expect(within(dialog).getByTestId("intake-delete-error")).toHaveTextContent("delete failed");
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("opens Dependabot intake in the split config panel", async () => {
+    useCanvas.mockReturnValue({
+      data: DEPENDABOT_INTAKE_CANVAS,
+      isPending: false,
+      isError: false,
+      refetch: vi.fn().mockResolvedValue(undefined),
+    });
+    const user = userEvent.setup();
+    renderHost({ intake: DEPENDABOT_INTAKE, repository: "superplanehq/superplane" });
+
+    const dialog = screen.getByTestId("merge-confidence-config");
+    expect(screen.queryByTestId("intake-source-settings")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Dependabot alerts" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
+    expect(within(dialog).getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
+    expect(
+      within(dialog)
+        .getAllByRole("tab")
+        .map((tab) => tab.textContent),
+    ).toEqual(["Automation", "Runs"]);
+    const form = within(dialog).getByTestId("merge-confidence-config-form");
+    expect(within(form).getByRole("heading", { name: "On Dependabot Alert" })).toBeInTheDocument();
+    expect(within(form).getByText("Repository")).toBeInTheDocument();
+    expect(within(form).getByText("superplanehq/superplane")).toBeInTheDocument();
+    expect(within(form).getByText("Create a task for these severities:")).toBeInTheDocument();
+    expect(within(form).getByRole("checkbox", { name: "Critical" })).toBeChecked();
+    expect(within(form).getByRole("checkbox", { name: "Low" })).toBeChecked();
+    expect(within(dialog).queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
+
+    await user.click(within(dialog).getByTestId("merge-confidence-config-tab-runs"));
+
+    expect(within(dialog).getByTestId("factory-automation-runs-sidebar")).toBeInTheDocument();
+  });
+
+  it("saves Dependabot severities through intake settings", async () => {
+    useCanvas.mockReturnValue({
+      data: DEPENDABOT_INTAKE_CANVAS,
+      isPending: false,
+      isError: false,
+      refetch: vi.fn().mockResolvedValue(undefined),
+    });
+    const user = userEvent.setup();
+    const view = renderHost({ intake: DEPENDABOT_INTAKE, repository: "superplanehq/superplane" });
+
+    await user.click(screen.getByRole("checkbox", { name: "Low" }));
+    await user.click(screen.getByTestId("dependabot-intake-config-save"));
+
+    expect(updateIntake).toHaveBeenCalledWith({
+      intakeId: "intake-dependabot",
+      settings: expect.objectContaining({
+        dependabotSeverities: ["critical", "high", "medium"],
+      }),
+    });
+
+    view.unmount();
+    renderHost({
+      intake: {
+        ...DEPENDABOT_INTAKE,
+        settings: {
+          ...DEPENDABOT_INTAKE.settings,
+          dependabotSeverities: ["critical", "high", "medium"],
+        },
+      },
+      repository: "superplanehq/superplane",
+    });
+
+    expect(screen.getByRole("checkbox", { name: "Low" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Critical" })).toBeChecked();
+  });
+
+  it("shows a Dependabot save error in the settings panel", async () => {
+    useCanvas.mockReturnValue({
+      data: DEPENDABOT_INTAKE_CANVAS,
+      isPending: false,
+      isError: false,
+      refetch: vi.fn().mockResolvedValue(undefined),
+    });
+    updateIntake.mockRejectedValue(new Error("save failed"));
+    const user = userEvent.setup();
+    renderHost({ intake: DEPENDABOT_INTAKE });
+
+    await user.click(screen.getByTestId("dependabot-intake-config-save"));
+
+    expect(screen.getByTestId("dependabot-intake-config-save-error")).toHaveTextContent("save failed");
+  });
+
+  it("deletes a Dependabot intake from the actions menu", async () => {
+    useCanvas.mockReturnValue({
+      data: DEPENDABOT_INTAKE_CANVAS,
+      isPending: false,
+      isError: false,
+      refetch: vi.fn().mockResolvedValue(undefined),
+    });
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderHost({ intake: DEPENDABOT_INTAKE, onClose });
+
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(screen.getByRole("menuitem", { name: INTAKE_SETTINGS_COPY.delete }));
+    expect(screen.getByRole("alertdialog", { name: INTAKE_SETTINGS_COPY.deleteTitle })).toHaveTextContent(
+      INTAKE_SETTINGS_COPY.deleteDescription,
+    );
+    await user.click(screen.getByRole("button", { name: INTAKE_SETTINGS_COPY.deleteConfirm }));
+
+    expect(deleteIntake).toHaveBeenCalledWith("intake-dependabot");
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a Dependabot delete error in the confirmation dialog", async () => {
+    useCanvas.mockReturnValue({
+      data: DEPENDABOT_INTAKE_CANVAS,
+      isPending: false,
+      isError: false,
+      refetch: vi.fn().mockResolvedValue(undefined),
+    });
+    deleteIntake.mockRejectedValue(new Error("delete failed"));
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderHost({ intake: DEPENDABOT_INTAKE, onClose });
+
+    await user.click(screen.getByRole("button", { name: "More actions" }));
+    await user.click(screen.getByRole("menuitem", { name: INTAKE_SETTINGS_COPY.delete }));
+    await user.click(screen.getByRole("button", { name: INTAKE_SETTINGS_COPY.deleteConfirm }));
+
+    expect(screen.getByTestId("merge-confidence-config-delete-error")).toHaveTextContent("delete failed");
     expect(onClose).not.toHaveBeenCalled();
   });
 });

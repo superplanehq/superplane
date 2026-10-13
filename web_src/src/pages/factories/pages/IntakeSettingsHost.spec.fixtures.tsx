@@ -72,6 +72,37 @@ export const PRODUCTIVE_INTAKE: ConfiguredLineIntakeSource = {
   source: lineIntakeSourceById("productive-tasks")!,
 };
 
+export const DEPENDABOT_INTAKE: ConfiguredLineIntakeSource = {
+  intakeId: "intake-dependabot",
+  appId: "app-dependabot-intake",
+  healthy: true,
+  paused: false,
+  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Dependabot alerts", dependabotSeverities: [] },
+  source: lineIntakeSourceById("dependabot-alerts")!,
+};
+
+export const DEPENDABOT_INTAKE_CANVAS = {
+  metadata: { id: "app-dependabot-intake", name: "Dependabot alerts", factoryId: "factory-1" },
+  spec: {
+    nodes: [
+      {
+        id: "dependabot-alerts-trigger",
+        name: "On Dependabot Alert",
+        type: "TYPE_TRIGGER",
+        component: "github.onDependabotAlert",
+        configuration: { repository: "superplanehq/superplane", actions: ["created"] },
+      },
+      {
+        id: "dependabot-alerts-create",
+        name: "Create Task",
+        type: "TYPE_ACTION",
+        component: "createWorkOrder",
+      },
+    ],
+    edges: [{ channel: "default", sourceId: "dependabot-alerts-trigger", targetId: "dependabot-alerts-create" }],
+  },
+};
+
 export const DATADOG_INTAKE: ConfiguredLineIntakeSource = {
   intakeId: "intake-datadog",
   appId: "app-datadog-intake",
@@ -95,6 +126,7 @@ export function connectedJiraIntake(overrides: Partial<ConfiguredLineIntakeSourc
 export function renderHost(
   props: {
     intake?: ConfiguredLineIntakeSource;
+    repository?: string;
     initialTab?: IntakeSettingsTab;
     onClose?: () => void;
     path?: string;
@@ -111,6 +143,7 @@ export function renderHost(
               factoryKey="RF"
               lineId="line-plan"
               intake={props.intake ?? GITHUB_INTAKE}
+              repository={props.repository}
               initialTab={props.initialTab}
               onClose={props.onClose ?? vi.fn()}
             />
