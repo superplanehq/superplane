@@ -81,7 +81,7 @@ export function PlanningReview({
           <PlanningHeading title={title} hasPlan={canTogglePlan} analyzing={analyzing} />
         )}
         <div
-          className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2"
+          className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-4"
           data-testid="split-run-intent-composer-chips"
         >
           <ScoreEvidenceRow
