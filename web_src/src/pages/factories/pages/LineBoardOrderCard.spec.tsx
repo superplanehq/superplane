@@ -154,7 +154,7 @@ describe("LineBoardOrderCard", () => {
     });
 
     const chip = screen.getByRole("img", {
-      name: "Merge confidence. Blast radius Low. Drift from Specification Close",
+      name: "Merge confidence. Blast radius: Passed. Drift from Specification: Passed",
     });
     expect(chip).toHaveTextContent("Confidence");
     expect(chip).not.toHaveTextContent(/\d/);
@@ -174,7 +174,7 @@ describe("LineBoardOrderCard", () => {
     });
 
     expect(
-      screen.getByRole("img", { name: "Merge confidence. Blast radius Moderate. Performance Met" }),
+      screen.getByRole("img", { name: "Merge confidence. Blast radius: Needs review. Performance: Passed" }),
     ).not.toHaveTextContent("Merge");
   });
 
@@ -274,7 +274,9 @@ describe("LineBoardOrderCard", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("img", { name: "Merge confidence. Reversibility Easy" })).toHaveTextContent("Confidence");
+    expect(screen.getByRole("img", { name: "Merge confidence. Reversibility: Passed" })).toHaveTextContent(
+      "Confidence",
+    );
     expect(screen.queryByText("Clarity")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-card-score-wo-hidden-planning")).not.toBeInTheDocument();
   });

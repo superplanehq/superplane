@@ -44,6 +44,21 @@ function planningChecks(orderId: string, scores: [number, number, number]): Fact
   ].map((check) => boardCheck(orderId, { ...check, maxScore: 3, level: planningReviewLevel(check.score) }));
 }
 
+const READY_SUMMARIES: Record<string, string> = {
+  "risk-review": "The change is limited to refund retries. Other payment flows are unchanged.",
+  "performance-review": "Retries reuse the existing lookup. No extra database queries are added.",
+  "security-review": "Authorization and secret handling are unchanged.",
+  "drift-review": "The implementation covers the approved plan, including delayed retries.",
+  "reversibility-review": "Revert the pull request to restore the previous behavior. No data migration is required.",
+};
+
+const REVIEW_SUMMARIES: Record<string, string> = {
+  ...READY_SUMMARIES,
+  "performance-review": "The retry lookup has not been measured under sustained load.",
+  "security-review": "The retry endpoint accepts requests without checking workspace membership.",
+  "drift-review": "The plan requires delayed retries, but the implementation only handles immediate retries.",
+};
+
 function mergeChecks(orderId: string, scores: [number, number, number, number, number]): FactoriesWorkOrderCheck[] {
   return [
     { key: "risk-review", name: "Blast radius", score: scores[0] },
@@ -51,9 +66,13 @@ function mergeChecks(orderId: string, scores: [number, number, number, number, n
     { key: "security-review", name: "Security", score: scores[2] },
     { key: "drift-review", name: "Plan drift", score: scores[3] },
     { key: "reversibility-review", name: "Reversibility", score: scores[4] },
-  ].map((check) =>
-    boardCheck(orderId, { ...check, maxScore: 5, level: mergeConfidenceCheckLevel(check.key, check.score) }),
-  );
+  ].map((check) => {
+    const level = mergeConfidenceCheckLevel(check.key, check.score);
+    return {
+      ...boardCheck(orderId, { ...check, maxScore: 5, level }),
+      summary: (level === "positive" ? READY_SUMMARIES : REVIEW_SUMMARIES)[check.key],
+    };
+  });
 }
 
 const planningChecksByOrderId = {
