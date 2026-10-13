@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
+import claudeIcon from "@/assets/icons/integrations/claude.svg";
+import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
+import superplaneIcon from "@/assets/superplane.svg";
 
 import { PRIMARY_FACTORY_ID, STORYBOOK_ME_USER_ID } from "../../__fixtures__/factoryPageIds";
 import {
@@ -306,7 +309,7 @@ describe("splitRunSourceForOrder", () => {
     );
   });
 
-  it("names the MCP client when the task has an MCP source", () => {
+  it("uses the Cursor logo for a Cursor MCP client", () => {
     const source = splitRunSourceForOrder({
       ...DRAFT_WORK_ORDER,
       mcpClient: { id: "superplane-local", name: "Cursor" },
@@ -315,10 +318,43 @@ describe("splitRunSourceForOrder", () => {
       expect.objectContaining({
         kind: "mcp",
         name: "Cursor",
-        iconAlt: "SuperPlane",
+        iconSrc: cursorIcon,
+        iconAlt: "Cursor",
       }),
     );
     expect(addedByForSource(source)).toEqual({ kind: "mcp", name: "Cursor" });
+  });
+
+  it("uses the Claude logo for a Claude Code MCP client", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        mcpClient: { id: "superplane-local", name: "Claude Code" },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "mcp",
+        name: "Claude Code",
+        iconSrc: claudeIcon,
+        iconAlt: "Claude",
+      }),
+    );
+  });
+
+  it("keeps the SuperPlane mark for an unknown MCP client", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        mcpClient: { id: "superplane-local", name: "Codex" },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "mcp",
+        name: "Codex",
+        iconSrc: superplaneIcon,
+        iconAlt: "SuperPlane",
+      }),
+    );
   });
 
   it("resolves the source person's avatar from the org members list when one is available", () => {

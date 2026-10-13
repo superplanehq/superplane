@@ -1,5 +1,6 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import superplaneMark from "@/assets/superplane-mark.svg";
+import superplaneIcon from "@/assets/superplane.svg";
 
 import {
   CREATED_MANUALLY,
@@ -30,7 +31,7 @@ export function workOrderCardSource(order: FactoriesWorkOrder): WorkOrderCardSou
   if (source.kind === "mcp") {
     return {
       name: source.name,
-      iconSrc: superplaneMark,
+      iconSrc: source.iconSrc === superplaneIcon ? superplaneMark : source.iconSrc,
       iconAlt: source.iconAlt,
     };
   }
