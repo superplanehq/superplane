@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
+umask 077
 
 BLUE="\033[0;34m"
 LBLUE="\033[1;34m"
@@ -54,25 +55,37 @@ fi
 echo ""
 OIDC_KEYS_HOST_PATH="${PWD}/oidc"
 OIDC_KEYS_CONTAINER_PATH="/app/oidc-keys"
+OIDC_KEY_FILE="${OIDC_KEYS_HOST_PATH}/private.pem"
 
+if [[ -L "${OIDC_KEYS_HOST_PATH}" ]]; then
+  echo "OIDC key directory must not be a symbolic link."
+  exit 1
+fi
 mkdir -p "${OIDC_KEYS_HOST_PATH}"
+chmod 700 "${OIDC_KEYS_HOST_PATH}"
 
-if [[ -z "$(find "${OIDC_KEYS_HOST_PATH}" -type f 2>/dev/null | head -n 1)" ]]; then
+if [[ -L "${OIDC_KEY_FILE}" || ( -e "${OIDC_KEY_FILE}" && ! -f "${OIDC_KEY_FILE}" ) ]]; then
+  echo "OIDC key path must be a regular file."
+  exit 1
+fi
+
+if [[ ! -f "${OIDC_KEY_FILE}" ]]; then
   if ! command -v openssl >/dev/null 2>&1; then
     echo "openssl is required to generate OIDC keys."
     exit 1
   fi
 
-  oidc_key_file="${OIDC_KEYS_HOST_PATH}/$(date -u +%s).pem"
   openssl_err_file="$(mktemp)"
-  if ! openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out "${oidc_key_file}" 2>"${openssl_err_file}"; then
+  if ! openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:4096 -out "${OIDC_KEY_FILE}" 2>"${openssl_err_file}"; then
     cat "${openssl_err_file}"
     rm -f "${openssl_err_file}"
+    rm -f "${OIDC_KEY_FILE}"
     exit 1
   fi
   rm -f "${openssl_err_file}"
-  chmod 644 "${oidc_key_file}"
 fi
+
+chmod 600 "${OIDC_KEY_FILE}"
 
 echo ""
 echo "Writing ${ENV_FILE}..."
@@ -160,11 +173,20 @@ echo "Configuration written to ${ENV_FILE}."
 echo ""
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]:-$0}")"
-export OIDC_KEYS_HOST_PATH
-export OIDC_KEYS_CONTAINER_PATH
 
 echo "Pulling Docker images (this may take a while)..."
 docker compose -f "${SCRIPT_DIR}/docker-compose.yml" pull --quiet
+
+echo "Preparing OIDC keys..."
+docker compose -f "${SCRIPT_DIR}/docker-compose.yml" run --rm --no-deps --user root \
+  --volume "${OIDC_KEYS_HOST_PATH}:/app/oidc-import:ro" --entrypoint /bin/bash app -c '
+    set -euo pipefail
+    umask 077
+    cp /app/oidc-import/private.pem /app/oidc-keys/private.pem
+    chown nobody:nogroup /app/oidc-keys /app/oidc-keys/private.pem
+    chmod 700 /app/oidc-keys
+    chmod 600 /app/oidc-keys/private.pem
+  '
 
 echo "Running docker compose up --wait --detach..."
 docker compose -f "${SCRIPT_DIR}/docker-compose.yml" up --wait --detach
