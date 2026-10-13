@@ -128,6 +128,7 @@ export function JsonPayload({
     <JsonView
       value={(value ?? {}) as object}
       collapsed={collapsed}
+      shortenTextAfterLength={collapsed === false ? 0 : undefined}
       style={jsonViewStyle}
       className={jsonViewClassName}
       displayObjectSize={false}
