@@ -16,7 +16,7 @@ import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { ThemeContext } from "@/contexts/themeContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { agentChatKeys } from "@/hooks/useAgentChats";
-import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORIES, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { AppPage } from "@/pages/app";
 import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
@@ -41,6 +41,7 @@ import {
   LegacyFactoryAppRedirect,
   LegacyFactoryAppSplitRunRedirect,
   FactoryLineEditPage,
+  FactorySettingsAgentPage,
   FactorySettingsLayout,
   LegacyWorkOrderDetailRedirect,
   LegacyWorkOrderPermalinkRedirect,
@@ -312,6 +313,16 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               <Route path="missions/:missionId" element={<MissionDetailPage />} />
               <Route path="wiki" element={<WikiRoutePage />} />
               <Route path="velocity" element={<VelocityRoutePage />} />
+              <Route
+                path="agent"
+                element={
+                  <RequirePermission resource="factories" action="update">
+                    <RequireExperimentalFeature anyOf={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}>
+                      <FactorySettingsAgentPage />
+                    </RequireExperimentalFeature>
+                  </RequirePermission>
+                }
+              />
               <Route path="more" element={<FactoryMoreRouteSwitch />} />
               <Route path="tasks">
                 <Route index element={<WorkOrdersRoutePage />} />

@@ -22,7 +22,7 @@ export function FactorySettingsAgentPage() {
   const { has } = useExperimentalFeature(page.organizationId);
   const showSkills = has(FEATURE_WORKSPACE_SKILLS);
   const showMcp = page.showAgentMCP;
-  usePageTitle([AGENT_RESOURCES_COPY.agentTitle, "Settings", page.factory.name ?? "Workspace"]);
+  usePageTitle([AGENT_RESOURCES_COPY.agentTitle, page.factory?.name ?? "Workspace"]);
 
   return (
     <FactorySettingsPageFrame
