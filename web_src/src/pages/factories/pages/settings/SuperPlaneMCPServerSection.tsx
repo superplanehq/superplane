@@ -169,12 +169,12 @@ function SuperPlaneMCPClientsTable({
           {SUPERPLANE_MCP_SERVER_COPY.clientsSearchEmpty}
         </p>
       ) : (
-        <div className="min-w-0">
-          <table className="w-full table-fixed text-left" data-testid="superplane-mcp-clients-list">
+        <div className="min-w-0 overflow-x-auto">
+          <table className="w-full min-w-[35rem] table-fixed text-left" data-testid="superplane-mcp-clients-list">
             <caption className="sr-only">{SUPERPLANE_MCP_SERVER_COPY.clientsTableLabel}</caption>
             <colgroup>
-              <col style={{ width: "7rem" }} />
               <col />
+              <col style={{ width: "9rem" }} />
               <col style={{ width: "8.5rem" }} />
               <col style={{ width: "5.5rem" }} />
             </colgroup>

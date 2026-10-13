@@ -63,6 +63,30 @@ func TestClientDisplayName(t *testing.T) {
 			want:     "kept",
 		},
 		{
+			name:     "opencode metadata client id",
+			clientID: "https://opencode.ai/oauth/opencode/client-metadata.json",
+			fallback: "https://opencode.ai/oauth/opencode/client-metadata.json",
+			want:     OpenCodeClientName,
+		},
+		{
+			name:       "stored opencode url does not win",
+			storedName: "https://www.opencode.ai/oauth/opencode/client",
+			clientID:   " HTTPS://opencode.ai/oauth/opencode/client-metadata.json ",
+			fallback:   "https://opencode.ai/oauth/opencode/client-metadata.json",
+			want:       OpenCodeClientName,
+		},
+		{
+			name:     "exact opencode path",
+			clientID: "https://opencode.ai/oauth/opencode",
+			want:     OpenCodeClientName,
+		},
+		{
+			name:     "opencode lookalike path stays unchanged",
+			clientID: "https://opencode.ai/oauth/opencode-evil",
+			fallback: "https://opencode.ai/oauth/opencode-evil",
+			want:     "https://opencode.ai/oauth/opencode-evil",
+		},
+		{
 			name:     "unrelated https client id stays unchanged",
 			clientID: "https://example.com/oauth/client",
 			fallback: "https://example.com/oauth/client",
