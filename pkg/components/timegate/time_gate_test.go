@@ -1,6 +1,7 @@
 package timegate
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -187,4 +188,144 @@ func TestGetDayString(t *testing.T) {
 func timeOnDate(base time.Time, dayOffset int, hour int, minute int) time.Time {
 	date := base.AddDate(0, 0, dayOffset)
 	return time.Date(date.Year(), date.Month(), date.Day(), hour, minute, 0, 0, base.Location())
+}
+
+// deferringSpec builds a configuration whose only active day is tomorrow, so
+// the gate always defers regardless of the wall-clock time the test runs at.
+func deferringSpec(base time.Time) map[string]any {
+	return map[string]any{
+		"days":      []string{getDayString(base.AddDate(0, 0, 1).Weekday())},
+		"timeRange": "09:00-17:00",
+		"timezone":  "0",
+	}
+}
+
+func TestTimeGate_TimeReached_ForwardsGatedEvent(t *testing.T) {
+	tg := &TimeGate{}
+	data := map[string]any{"deployment": map[string]any{"sha": "abc123"}}
+
+	metadata := &contexts.MetadataContext{}
+	state := &contexts.ExecutionStateContext{}
+
+	err := tg.Execute(core.ExecutionContext{
+		Data:           data,
+		Configuration:  deferringSpec(time.Now().UTC()),
+		Metadata:       metadata,
+		Requests:       &contexts.RequestContext{},
+		ExecutionState: state,
+	})
+	assert.NoError(t, err)
+	assert.False(t, state.Finished, "gate must defer, not emit immediately")
+
+	err = tg.HandleHook(core.ActionHookContext{
+		Name:           "timeReached",
+		ExecutionState: state,
+		Metadata:       metadata,
+	})
+	assert.NoError(t, err)
+	assert.True(t, state.Finished)
+	assert.Len(t, state.Payloads, 1)
+
+	payload := state.Payloads[0].(map[string]any)
+	assert.Equal(t, data, payload["data"])
+}
+
+func TestTimeGate_PushThrough_ForwardsGatedEvent(t *testing.T) {
+	tg := &TimeGate{}
+	data := map[string]any{"deployment": map[string]any{"sha": "abc123"}}
+
+	metadata := &contexts.MetadataContext{}
+	state := &contexts.ExecutionStateContext{}
+
+	err := tg.Execute(core.ExecutionContext{
+		Data:           data,
+		Configuration:  deferringSpec(time.Now().UTC()),
+		Metadata:       metadata,
+		Requests:       &contexts.RequestContext{},
+		ExecutionState: state,
+	})
+	assert.NoError(t, err)
+	assert.False(t, state.Finished, "gate must defer, not emit immediately")
+
+	err = tg.HandleHook(core.ActionHookContext{
+		Name:           "pushThrough",
+		ExecutionState: state,
+		Metadata:       metadata,
+		Auth: &contexts.AuthContext{
+			User: &core.User{ID: "123", Name: "Test User", Email: "test@example.com"},
+		},
+	})
+	assert.NoError(t, err)
+	assert.True(t, state.Finished)
+	assert.Len(t, state.Payloads, 1)
+
+	payload := state.Payloads[0].(map[string]any)
+	assert.Equal(t, data, payload["data"])
+}
+
+// jsonMetadataContext mimics the production metadata context, which round-trips
+// metadata through JSON before handing it back to the component.
+type jsonMetadataContext struct {
+	stored map[string]any
+}
+
+func (m *jsonMetadataContext) Get() any {
+	return m.stored
+}
+
+func (m *jsonMetadataContext) Set(metadata any) error {
+	encoded, err := json.Marshal(metadata)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(encoded, &m.stored)
+}
+
+func TestTimeGate_ForwardsGatedEventStoredAsJSON(t *testing.T) {
+	tg := &TimeGate{}
+	data := map[string]any{
+		"repository": "superplanehq/superplane",
+		"commits":    []any{map[string]any{"sha": "abc123"}},
+	}
+
+	metadata := &jsonMetadataContext{}
+	state := &contexts.ExecutionStateContext{}
+
+	err := tg.Execute(core.ExecutionContext{
+		Data:           data,
+		Configuration:  deferringSpec(time.Now().UTC()),
+		Metadata:       metadata,
+		Requests:       &contexts.RequestContext{},
+		ExecutionState: state,
+	})
+	assert.NoError(t, err)
+	assert.False(t, state.Finished, "gate must defer, not emit immediately")
+
+	err = tg.HandleHook(core.ActionHookContext{
+		Name:           "timeReached",
+		ExecutionState: state,
+		Metadata:       metadata,
+	})
+	assert.NoError(t, err)
+	assert.Len(t, state.Payloads, 1)
+
+	payload := state.Payloads[0].(map[string]any)
+	assert.Equal(t, data, payload["data"])
+}
+
+func TestTimeGate_EmitsEmptyObjectWhenNoEventStored(t *testing.T) {
+	tg := &TimeGate{}
+	state := &contexts.ExecutionStateContext{}
+
+	err := tg.HandleHook(core.ActionHookContext{
+		Name:           "timeReached",
+		ExecutionState: state,
+		Metadata:       &contexts.MetadataContext{},
+	})
+	assert.NoError(t, err)
+	assert.Len(t, state.Payloads, 1)
+
+	payload := state.Payloads[0].(map[string]any)
+	assert.Equal(t, map[string]any{}, payload["data"])
 }
