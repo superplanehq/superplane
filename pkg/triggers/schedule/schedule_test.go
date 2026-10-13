@@ -74,6 +74,180 @@ func TestNextMinutesTrigger(t *testing.T) {
 	}
 }
 
+func TestNextWeeksTrigger(t *testing.T) {
+	tests := []struct {
+		name        string
+		interval    int
+		weekDays    []string
+		now         time.Time
+		expectNext  time.Time
+		expectError bool
+	}{
+		{
+			// 2025-01-08 is a Wednesday; the current week started on Sunday 2025-01-05.
+			name:       "same-day occurrence still ahead fires today",
+			interval:   1,
+			weekDays:   []string{"wednesday"},
+			now:        mustParseTime("2025-01-08T08:00:00Z"),
+			expectNext: mustParseTime("2025-01-08T09:00:00Z"),
+		},
+		{
+			name:       "multi-day config fires on the next configured day of the current week",
+			interval:   1,
+			weekDays:   []string{"monday", "wednesday", "friday"},
+			now:        mustParseTime("2025-01-08T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-10T09:00:00Z"),
+		},
+		{
+			name:       "configured day already passed this week jumps a full interval",
+			interval:   1,
+			weekDays:   []string{"monday"},
+			now:        mustParseTime("2025-01-08T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-13T09:00:00Z"),
+		},
+		{
+			name:       "exact boundary does not re-fire the same slot",
+			interval:   1,
+			weekDays:   []string{"wednesday"},
+			now:        mustParseTime("2025-01-08T09:00:00Z"),
+			expectNext: mustParseTime("2025-01-15T09:00:00Z"),
+		},
+		{
+			name:       "sunday is the first day of the week",
+			interval:   1,
+			weekDays:   []string{"sunday"},
+			now:        mustParseTime("2025-01-08T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-12T09:00:00Z"),
+		},
+		{
+			name:       "interval 2 keeps the remaining days of the active week",
+			interval:   2,
+			weekDays:   []string{"friday"},
+			now:        mustParseTime("2025-01-08T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-10T09:00:00Z"),
+		},
+		{
+			// Week of Jan 5 exhausted; the next active week starts Sunday 2025-01-19.
+			name:       "interval 2 skips the off week once the active week is exhausted",
+			interval:   2,
+			weekDays:   []string{"monday"},
+			now:        mustParseTime("2025-01-08T10:00:00Z"),
+			expectNext: mustParseTime("2025-01-20T09:00:00Z"),
+		},
+		{
+			name:        "interval below the supported range",
+			interval:    0,
+			weekDays:    []string{"monday"},
+			now:         mustParseTime("2025-01-08T10:00:00Z"),
+			expectError: true,
+		},
+		{
+			name:        "interval above the supported range",
+			interval:    53,
+			weekDays:    []string{"monday"},
+			now:         mustParseTime("2025-01-08T10:00:00Z"),
+			expectError: true,
+		},
+		{
+			name:        "invalid weekday",
+			interval:    1,
+			weekDays:    []string{"someday"},
+			now:         mustParseTime("2025-01-08T10:00:00Z"),
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := nextWeeksTrigger(tt.interval, tt.weekDays, 9, 0, tt.now)
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if !result.Equal(tt.expectNext) {
+				t.Errorf("expected next trigger at %v, got %v", tt.expectNext, *result)
+			}
+		})
+	}
+}
+
+func TestWeeksScheduleFiresOnEveryConfiguredDay(t *testing.T) {
+	tests := []struct {
+		name        string
+		interval    int
+		weekDays    []string
+		start       time.Time
+		expectFires []time.Time
+	}{
+		{
+			name:     "three days per week all fire",
+			interval: 1,
+			weekDays: []string{"monday", "wednesday", "friday"},
+			start:    mustParseTime("2025-01-08T10:00:00Z"), // Wednesday
+			expectFires: []time.Time{
+				mustParseTime("2025-01-10T09:00:00Z"), // Friday
+				mustParseTime("2025-01-13T09:00:00Z"), // Monday
+				mustParseTime("2025-01-15T09:00:00Z"), // Wednesday
+				mustParseTime("2025-01-17T09:00:00Z"), // Friday
+				mustParseTime("2025-01-20T09:00:00Z"), // Monday
+				mustParseTime("2025-01-22T09:00:00Z"), // Wednesday
+			},
+		},
+		{
+			name:     "weekend days both fire across the sunday week boundary",
+			interval: 1,
+			weekDays: []string{"saturday", "sunday"},
+			start:    mustParseTime("2025-01-07T10:00:00Z"), // Tuesday
+			expectFires: []time.Time{
+				mustParseTime("2025-01-11T09:00:00Z"), // Saturday
+				mustParseTime("2025-01-12T09:00:00Z"), // Sunday
+				mustParseTime("2025-01-18T09:00:00Z"), // Saturday
+				mustParseTime("2025-01-19T09:00:00Z"), // Sunday
+			},
+		},
+		{
+			name:     "interval 2 fires every configured day of every other week",
+			interval: 2,
+			weekDays: []string{"monday", "friday"},
+			start:    mustParseTime("2025-01-06T10:00:00Z"), // Monday, after the 09:00 slot
+			expectFires: []time.Time{
+				mustParseTime("2025-01-10T09:00:00Z"), // Friday of the active week
+				mustParseTime("2025-01-20T09:00:00Z"), // Monday, one off week skipped
+				mustParseTime("2025-01-24T09:00:00Z"), // Friday
+				mustParseTime("2025-02-03T09:00:00Z"), // Monday, one off week skipped
+				mustParseTime("2025-02-07T09:00:00Z"), // Friday
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate the fire/re-arm loop: emitEvent re-arms by asking for the
+			// next trigger from the moment it just fired.
+			now := tt.start
+			for i, expected := range tt.expectFires {
+				next, err := nextWeeksTrigger(tt.interval, tt.weekDays, 9, 0, now)
+				if err != nil {
+					t.Fatalf("unexpected error on fire %d: %v", i+1, err)
+				}
+				if !next.Equal(expected) {
+					t.Fatalf("fire %d: expected %v, got %v", i+1, expected, *next)
+				}
+				now = *next
+			}
+		})
+	}
+}
+
 func TestGetNextTrigger(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -145,7 +319,7 @@ func TestGetNextTrigger(t *testing.T) {
 				Minute:        intPtr(30),
 			},
 			now:        mustParseTime("2025-01-06T10:00:00Z"), // Monday
-			expectNext: mustParseTime("2025-01-17T15:30:00Z"), // Friday of next week
+			expectNext: mustParseTime("2025-01-10T15:30:00Z"), // Friday of the current week
 		},
 		{
 			name: "months configuration",
@@ -387,7 +561,7 @@ func TestTimezoneHandling(t *testing.T) {
 				Timezone:      stringPtr("-8"), // GMT-8 (PST)
 			},
 			now:        mustParseTime("2025-01-06T16:00:00Z"), // Monday 8 AM PST (4 PM UTC)
-			expectNext: mustParseTime("2025-01-13T17:00:00Z"), // Monday 9 AM PST (5 PM UTC) of the next week
+			expectNext: mustParseTime("2025-01-06T17:00:00Z"), // Monday 9 AM PST (5 PM UTC) later the same day
 		},
 		{
 			name: "month schedule in GMT+9 timezone (JST)",
