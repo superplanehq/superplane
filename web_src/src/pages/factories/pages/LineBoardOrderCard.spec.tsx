@@ -153,13 +153,16 @@ describe("LineBoardOrderCard", () => {
       ],
     });
 
-    const chip = screen.getByRole("img", { name: "Merge confidence 5 of 5" });
+    const chip = screen.getByRole("img", {
+      name: "Merge confidence. Blast radius Low. Drift from Specification Close",
+    });
     expect(chip).toHaveTextContent("Confidence");
     expect(chip).not.toHaveTextContent(/\d/);
     expect(screen.queryByText("Blast radius")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-card-merge-wo-verify-meter").children).toHaveLength(2);
   });
 
-  it("shows the weakest flipped merge confidence check", () => {
+  it("orders the available merge checks and reports each result", () => {
     renderCard({
       ...draft,
       id: "wo-verify",
@@ -170,7 +173,9 @@ describe("LineBoardOrderCard", () => {
       ],
     });
 
-    expect(screen.getByRole("img", { name: "Merge confidence 3 of 5" })).not.toHaveTextContent("Merge");
+    expect(
+      screen.getByRole("img", { name: "Merge confidence. Blast radius Moderate. Performance Met" }),
+    ).not.toHaveTextContent("Merge");
   });
 
   it("hides the merge chip when no merge confidence check exists", () => {
@@ -269,7 +274,7 @@ describe("LineBoardOrderCard", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("img", { name: "Merge confidence 4 of 5" })).toHaveTextContent("Confidence");
+    expect(screen.getByRole("img", { name: "Merge confidence. Reversibility Easy" })).toHaveTextContent("Confidence");
     expect(screen.queryByText("Clarity")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-card-score-wo-hidden-planning")).not.toBeInTheDocument();
   });

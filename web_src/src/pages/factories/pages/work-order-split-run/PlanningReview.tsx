@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 
-import { ChevronRight, CircleCheck, CircleMinus, CircleX, FileText, TriangleAlert } from "lucide-react";
+import { ChevronRight, FileText } from "lucide-react";
 
 import { Link } from "@/components/Link/link";
 import { Frame, FramePanel } from "@/components/reui/frame";
@@ -9,12 +9,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 
 import { ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
+import { CheckStatusIcon } from "../../workOrders/CheckStatusIcon";
 import { ReadinessDot } from "../../workOrders/ReadinessMark";
-import {
-  workOrderCheckStatus,
-  type WorkOrderCheckLevel,
-  type WorkOrderCheckPresentation,
-} from "../../lib/workOrderChecks";
+import { workOrderCheckStatus, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { ScoreEvidenceRow, type ScoreEvidenceDetails, type ScoreEvidenceValue } from "../../workOrders/ScoreEvidence";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { PlanChipStatus } from "./planChipStatus";
@@ -188,19 +185,11 @@ function reviewAttentionSummary(metrics: WorkOrderCheckPresentation[]): string |
   return `${names.length} checks need review.`;
 }
 
-const REVIEW_STATUS_ICON: Record<WorkOrderCheckLevel, { Icon: typeof CircleCheck; className: string }> = {
-  positive: { Icon: CircleCheck, className: "fill-emerald-600 stroke-white" },
-  neutral: { Icon: CircleMinus, className: "fill-slate-500 stroke-white" },
-  caution: { Icon: TriangleAlert, className: "fill-amber-500 stroke-white" },
-  critical: { Icon: CircleX, className: "fill-red-600 stroke-white" },
-};
-
 function ReviewMetricRow({ metric }: { metric: WorkOrderCheckPresentation }) {
   const status = workOrderCheckStatus(metric);
-  const { Icon, className } = REVIEW_STATUS_ICON[metric.level];
   return (
     <div className="flex min-w-0 gap-2.5 py-3">
-      <Icon className={cn("mt-0.5 size-4 shrink-0", className)} role="img" aria-label={status.label} />
+      <CheckStatusIcon level={metric.level} label={status.label} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <p className="text-[13px] font-medium text-foreground">{metric.name}</p>
         {metric.summary ? <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{metric.summary}</p> : null}
