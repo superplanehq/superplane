@@ -101,7 +101,6 @@ function SingleRun({
   const queued = useQueuedAgentRun(organizationId, phase, run.status);
   return (
     <div className="space-y-2">
-      {queued ? <QueuedRunMark /> : null}
       {title && title !== automationName ? (
         <MarkdownContent
           content={run.name}
@@ -111,18 +110,15 @@ function SingleRun({
           className={RUN_TITLE_MARKDOWN}
         />
       ) : null}
-      {queued ? (
-        <QueueWaitNote />
-      ) : (
-        <RunDetails
-          run={run}
-          phase={phase}
-          organizationId={organizationId}
-          factoryKey={factoryKey}
-          orderNumber={orderNumber}
-          reportUsage={reportUsage}
-        />
-      )}
+      <QueuedRunDetails
+        queued={queued}
+        run={run}
+        phase={phase}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+        reportUsage={reportUsage}
+      />
     </div>
   );
 }
@@ -168,18 +164,15 @@ function AgentRunRow({
         </div>
       </div>
       <CollapsibleContent className="space-y-3 py-2 pl-5">
-        {queued ? (
-          <QueueWaitNote />
-        ) : (
-          <RunDetails
-            run={run}
-            phase={phase}
-            organizationId={organizationId}
-            factoryKey={factoryKey}
-            orderNumber={orderNumber}
-            reportUsage={reportUsage}
-          />
-        )}
+        <QueuedRunDetails
+          queued={queued}
+          run={run}
+          phase={phase}
+          organizationId={organizationId}
+          factoryKey={factoryKey}
+          orderNumber={orderNumber}
+          reportUsage={reportUsage}
+        />
       </CollapsibleContent>
     </Collapsible>
   );
@@ -205,6 +198,38 @@ function QueuedRunMark() {
 
 function QueueWaitNote() {
   return <p className="text-[12.5px] text-muted-foreground">Waiting for an available agent slot.</p>;
+}
+
+function QueuedRunDetails({
+  queued,
+  run,
+  phase,
+  organizationId,
+  factoryKey,
+  orderNumber,
+  reportUsage,
+}: {
+  queued: boolean;
+  run: AutomationStage;
+  phase?: SplitRunPhase;
+  organizationId?: string;
+  factoryKey?: string;
+  orderNumber?: string;
+  reportUsage: boolean;
+}) {
+  return (
+    <>
+      {queued ? <QueueWaitNote /> : null}
+      <RunDetails
+        run={run}
+        phase={phase}
+        organizationId={organizationId}
+        factoryKey={factoryKey}
+        orderNumber={orderNumber}
+        reportUsage={reportUsage}
+      />
+    </>
+  );
 }
 
 function RunDetails({

@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, mock } from "bun:test";
 import type { SplitRunPhase } from "../splitRunMocks";
 import type { AutomationStage } from "./automationsViewModel";
+import * as canvasData from "@/hooks/useCanvasData";
 
 const useSplitRunLiveCanvas = mock(() => ({
   enabled: false,
@@ -12,7 +14,16 @@ const useSplitRunLiveCanvas = mock(() => ({
   stream: [],
   rootEventId: undefined,
 }));
+const useEventExecutions = mock(() => ({
+  data: undefined as { executions?: unknown } | undefined,
+  isError: false,
+  isLoading: false,
+}));
 mock.module("../useSplitRunLiveCanvas", () => ({ useSplitRunLiveCanvas }));
+mock.module("@/hooks/useCanvasData", () => ({
+  ...canvasData,
+  useEventExecutions,
+}));
 function captureRun(id: string, status: AutomationStage["status"] = "running"): AutomationStage {
   return {
     id,
@@ -93,6 +104,84 @@ describe("queued automation card", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onStopRun).toHaveBeenCalledWith({ appId: phase.appId, runId: phase.runId });
+  });
+
+  it("keeps a repair description and check page beside the queue message", async () => {
+    useSplitRunLiveCanvas.mockImplementation(() => ({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: {
+        nodes: [{ id: "wait-checks", component: "github.waitForPullRequestChecks" }],
+      },
+      stream: [],
+      rootEventId: "event-root",
+      agentQueue: { queued: true },
+    }));
+    useEventExecutions.mockReturnValue({
+      data: {
+        executions: [
+          {
+            nodeId: "wait-checks",
+            state: "STATE_FINISHED",
+            metadata: {
+              selectedChecks: [
+                {
+                  name: "build",
+                  description: "CI",
+                  status: "completed",
+                  conclusion: "failure",
+                  detailsUrl: "https://example.com/build",
+                  summary: "The build failed on Semaphore 2.0.",
+                },
+              ],
+            },
+          },
+        ],
+      },
+      isError: false,
+      isLoading: false,
+    });
+    const run = {
+      ...captureRun("repair"),
+      name: "Fixing failed checks on abc",
+      description: "Repair the failed build.",
+      checks: [
+        {
+          id: "build",
+          name: "Build",
+          score: 0,
+          maxScore: 1,
+          format: "boolean" as const,
+          level: "critical" as const,
+          summary: "The build failed.",
+        },
+      ],
+    };
+    const phase = { ...checksPhase(), id: run.id, status: run.status };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <ConsoleAutomationCard
+          automation={{ id: "checks", name: "Fix pull request checks", latest: run, runs: [run] }}
+          phase={phase}
+          phases={[phase]}
+          organizationId="org-1"
+          expandIdle={false}
+          canStopRun
+          actionBusy={false}
+          onStopRun={() => {}}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument());
+    expect(screen.getByText("Waiting for an available agent slot.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "build: CI" })).toHaveAttribute("href", "https://example.com/build");
+    expect(screen.getByText("Repair the failed build.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: /Checks/ }));
+    expect(screen.getByText("Build")).toBeInTheDocument();
+    expect(screen.getByText("The build failed.")).toBeInTheDocument();
   });
 });
 
