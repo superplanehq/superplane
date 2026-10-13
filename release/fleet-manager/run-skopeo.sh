@@ -14,6 +14,7 @@ fi
 docker_args=(
   run
   --rm
+  --interactive
   --volume "${PWD}:${PWD}:ro"
   --workdir "${PWD}"
 )
