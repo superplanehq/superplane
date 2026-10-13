@@ -708,7 +708,8 @@ CREATE TABLE public.factory_velocity_syncs (
     backfilled_from timestamp with time zone,
     error text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    sync_state integer DEFAULT 0 NOT NULL
 );
 
 
@@ -5664,7 +5665,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261012191226	f
+20261013085910	f
 \.
 
 
