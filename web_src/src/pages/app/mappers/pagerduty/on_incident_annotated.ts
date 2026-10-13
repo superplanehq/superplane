@@ -2,6 +2,7 @@ import { getBackgroundColorClass } from "@/lib/colors";
 import type React from "react";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import type { MetadataItem } from "@/ui/metadataList";
 import type { TriggerProps } from "@/ui/trigger";
 import pdIcon from "@/assets/icons/integrations/pagerduty.svg";
 import type { Agent, ResourceRef } from "./types";
@@ -62,45 +63,15 @@ export const onIncidentAnnotatedTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
-    const metadata = node.metadata as unknown as OnIncidentAnnotatedMetadata;
-    const configuration = node.configuration as { contentFilter?: string } | undefined;
-    const metadataItems = [];
-
-    if (metadata?.service?.name) {
-      metadataItems.push({
-        icon: "bell",
-        label: metadata.service.name,
-      });
-    }
-
-    if (configuration?.contentFilter) {
-      metadataItems.push({
-        icon: "funnel",
-        label: `Filter: ${configuration.contentFilter}`,
-      });
-    }
-
     const props: TriggerProps = {
       title: node.name!,
       iconSrc: pdIcon,
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: annotatedIncidentMetadata(node),
     };
 
     if (lastEvent) {
-      const eventData = lastEvent?.data as OnIncidentAnnotatedEventData;
-      const incident = eventData?.incident;
-      const agent = eventData?.agent;
-      const contentParts = [agent?.summary, "added note"].filter(Boolean).join(" ");
-      const subtitle = buildSubtitle(contentParts, lastEvent?.createdAt);
-
-      props.lastEventData = {
-        title: `${incident?.id || ""} - ${incident?.title || ""}`,
-        subtitle,
-        receivedAt: new Date(lastEvent?.createdAt || ""),
-        state: "triggered",
-        eventId: lastEvent?.id,
-      };
+      props.lastEventData = annotatedIncidentLastEvent(lastEvent);
     }
 
     return props;
@@ -119,6 +90,45 @@ function buildSubtitle(content: string, createdAt?: string): string | React.Reac
   return content;
 }
 
+function annotatedIncidentMetadata(node: TriggerRendererContext["node"]): MetadataItem[] {
+  const metadata = node.metadata as unknown as OnIncidentAnnotatedMetadata;
+  const configuration = node.configuration as { contentFilter?: string } | undefined;
+  const metadataItems: MetadataItem[] = [];
+
+  if (metadata?.service?.name) {
+    metadataItems.push({
+      icon: "bell",
+      label: metadata.service.name,
+    });
+  }
+
+  if (configuration?.contentFilter) {
+    metadataItems.push({
+      icon: "funnel",
+      label: `Filter: ${configuration.contentFilter}`,
+    });
+  }
+
+  return metadataItems;
+}
+
+function annotatedIncidentLastEvent(
+  lastEvent: NonNullable<TriggerRendererContext["lastEvent"]>,
+): NonNullable<TriggerProps["lastEventData"]> {
+  const eventData = lastEvent.data as OnIncidentAnnotatedEventData;
+  const incident = eventData?.incident;
+  const agent = eventData?.agent;
+  const contentParts = [agent?.summary, "added note"].filter(Boolean).join(" ");
+
+  return {
+    title: `${incident?.id || ""} - ${incident?.title || ""}`,
+    subtitle: buildSubtitle(contentParts, lastEvent.createdAt),
+    receivedAt: new Date(lastEvent.createdAt),
+    state: "triggered",
+    eventId: lastEvent.id,
+  };
+}
+
 /**
  * Get details specifically for annotated incidents.
  * This shows the note content prominently and only includes fields that are present.
@@ -130,17 +140,24 @@ function getDetailsForAnnotatedIncident(
 ): Record<string, string> {
   const details: Record<string, string> = {};
 
-  // Show annotation content first (most important for this event type)
+  assignAnnotatedNoteFields(details, annotation, agent);
+  assignAnnotatedIncidentFields(details, incident);
+  assignAnnotatedIncidentContext(details, incident);
+
+  return details;
+}
+
+function assignAnnotatedNoteFields(details: Record<string, string>, annotation?: Annotation, agent?: Agent) {
   if (annotation?.content) {
     details["Note Content"] = annotation.content;
   }
 
-  // Agent who added the note
   if (agent?.summary) {
     details["Added By"] = agent.summary;
   }
+}
 
-  // Incident details - only add if present
+function assignAnnotatedIncidentFields(details: Record<string, string>, incident?: AnnotatedIncident) {
   if (incident?.id) {
     details["Incident ID"] = incident.id;
   }
@@ -156,15 +173,9 @@ function getDetailsForAnnotatedIncident(
   if (incident?.html_url) {
     details["Incident URL"] = incident.html_url;
   }
-
-  // Service info
   if (incident?.service?.summary) {
     details["Service"] = incident.service.summary;
   }
-
-  assignAnnotatedIncidentContext(details, incident);
-
-  return details;
 }
 
 function assignAnnotatedIncidentContext(details: Record<string, string>, incident?: AnnotatedIncident) {
