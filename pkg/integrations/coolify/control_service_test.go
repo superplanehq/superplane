@@ -68,6 +68,7 @@ func Test__Coolify_ControlService__Execute(t *testing.T) {
 		assert.Equal(t, "Service starting.", data["message"])
 
 		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
 		assert.Equal(t, "https://coolify.example.com/api/v1/services/svc1/start", httpCtx.Requests[0].URL.String())
 	})
 }

@@ -77,7 +77,7 @@ func Test__Coolify_ControlApplication__Execute(t *testing.T) {
 		assert.Equal(t, "Application restarting.", data["message"])
 
 		require.Len(t, httpCtx.Requests, 1)
-		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
 		assert.Equal(t, "https://coolify.example.com/api/v1/applications/abc123/restart", httpCtx.Requests[0].URL.String())
 	})
 

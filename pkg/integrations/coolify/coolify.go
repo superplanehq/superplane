@@ -47,7 +47,7 @@ func (c *Coolify) Instructions() string {
 **Setup steps:**
 
 1. **Base URL:** Use your Coolify instance URL (for example ` + "`https://coolify.example.com`" + ` for self-hosted, or ` + "`https://app.coolify.io`" + ` for Coolify Cloud).
-2. **API Token:** In Coolify, go to **Keys & Tokens → API tokens**, click **Create new token**, give it a name, select the required permissions (read + write), and copy the generated token.
+2. **API Token:** In Coolify, go to **Keys & Tokens → API tokens**, click **Create new token**, give it a name, select the **read** and **deploy** permissions (deploying and controlling applications/services requires ` + "`deploy`" + `, not ` + "`write`" + `), and copy the generated token.
 3. The API token is **team-scoped** — SuperPlane will see all applications and services available to that team.
 `
 }
@@ -67,7 +67,7 @@ func (c *Coolify) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Sensitive:   true,
-			Description: "Coolify API token (Keys & Tokens → API tokens) with read and write permissions",
+			Description: "Coolify API token (Keys & Tokens → API tokens) with read and deploy permissions",
 		},
 	}
 }
