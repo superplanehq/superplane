@@ -469,4 +469,62 @@ describe("MergeConfidenceConfigModal", () => {
 
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
+
+  it("renders a custom body for the selected trigger and keeps other steps", async () => {
+    const user = userEvent.setup();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <ThemeProvider>
+            <TooltipProvider>
+              <MergeConfidenceConfigModal
+                title="Merge confidence"
+                graph={confidenceGraph()}
+                canvasId="merge-confidence"
+                onClose={vi.fn()}
+                onSaveNode={vi.fn()}
+                renderNodeBody={(node) =>
+                  node.id === "on-pr-risk" ? <p data-testid="custom-trigger-body">Custom trigger settings</p> : null
+                }
+              />
+            </TooltipProvider>
+          </ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    const form = screen.getByTestId("merge-confidence-config-form");
+    expect(within(form).getByTestId("custom-trigger-body")).toBeInTheDocument();
+    expect(within(form).queryByText("Start a run when:")).not.toBeInTheDocument();
+
+    await user.click(screen.getByText("Assess Merge Confidence"));
+
+    expect(screen.queryByTestId("custom-trigger-body")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("merge-confidence-config-form")).getByText("Model")).toBeInTheDocument();
+  });
+
+  it("hides the Runs tab when the caller has no runs source", () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <ThemeProvider>
+            <TooltipProvider>
+              <MergeConfidenceConfigModal
+                title="Merge confidence"
+                graph={confidenceGraph()}
+                onClose={vi.fn()}
+                onSaveNode={vi.fn()}
+                showRunsTab={false}
+              />
+            </TooltipProvider>
+          </ThemeProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Automation"]);
+    expect(screen.queryByTestId("merge-confidence-config-tab-runs")).not.toBeInTheDocument();
+  });
 });

@@ -83,6 +83,7 @@ export function NodeConfigPanel({
   factoryId,
   factoryKey,
   widthPercent = 50,
+  body,
   onClose,
   onSave,
 }: {
@@ -91,6 +92,7 @@ export function NodeConfigPanel({
   factoryId?: string;
   factoryKey?: string;
   widthPercent?: number;
+  body?: ReactNode;
   onClose: () => void;
   onSave: (update: NodeConfigurationUpdate) => Promise<void> | void;
 }) {
@@ -124,52 +126,53 @@ export function NodeConfigPanel({
           </Tooltip>
         </header>
         <div className="flex min-h-0 flex-1 flex-col">
-          {catalog.loading ? (
-            <p className="workspace-body-text px-10 py-6 text-muted-foreground">{NODE_CONFIG_COPY.loading}</p>
-          ) : isAgentHarnessComponent(node.component) ? (
-            <AgentRunnerSettings
-              node={node}
-              organizationId={organizationId}
-              factoryId={factoryId}
-              factoryKey={factoryKey}
-              onSave={onSave}
-            />
-          ) : (
-            <SettingsTab
-              layout="fill"
-              chrome={settings.chrome}
-              booleanControl={settings.booleanControl}
-              fieldGroups={settings.fieldGroups}
-              hiddenFieldNames={settings.hiddenFieldNames}
-              leadingContent={settings.leadingContent}
-              trailingContent={settings.trailingContent}
-              mode="edit"
-              nodeId={node.id}
-              nodeName={catalog.nodeName}
-              nodeLabel={catalog.definition?.label}
-              blockName={catalog.componentName}
-              configuration={settings.configuration}
-              configurationFields={settings.configurationFields}
-              integrationName={catalog.integrationName}
-              integrationRef={node.integration}
-              integrationDefinition={integrationDefinitionFields(catalog.integrationDefinition)}
-              integrations={catalog.integrations}
-              domainId={organizationId}
-              onOpenCreateIntegrationDialog={() => setConnectOpen(true)}
-              showConcurrency={catalog.showConcurrency}
-              concurrency={node.concurrency}
-              concurrencyMaxOnly={catalog.concurrencyMaxOnly}
-              onSave={(configuration, name, integration, concurrency) =>
-                onSave({
-                  nodeId: node.id ?? "",
-                  name,
-                  configuration,
-                  integration,
-                  concurrency,
-                })
-              }
-            />
-          )}
+          {body ??
+            (catalog.loading ? (
+              <p className="workspace-body-text px-10 py-6 text-muted-foreground">{NODE_CONFIG_COPY.loading}</p>
+            ) : isAgentHarnessComponent(node.component) ? (
+              <AgentRunnerSettings
+                node={node}
+                organizationId={organizationId}
+                factoryId={factoryId}
+                factoryKey={factoryKey}
+                onSave={onSave}
+              />
+            ) : (
+              <SettingsTab
+                layout="fill"
+                chrome={settings.chrome}
+                booleanControl={settings.booleanControl}
+                fieldGroups={settings.fieldGroups}
+                hiddenFieldNames={settings.hiddenFieldNames}
+                leadingContent={settings.leadingContent}
+                trailingContent={settings.trailingContent}
+                mode="edit"
+                nodeId={node.id}
+                nodeName={catalog.nodeName}
+                nodeLabel={catalog.definition?.label}
+                blockName={catalog.componentName}
+                configuration={settings.configuration}
+                configurationFields={settings.configurationFields}
+                integrationName={catalog.integrationName}
+                integrationRef={node.integration}
+                integrationDefinition={integrationDefinitionFields(catalog.integrationDefinition)}
+                integrations={catalog.integrations}
+                domainId={organizationId}
+                onOpenCreateIntegrationDialog={() => setConnectOpen(true)}
+                showConcurrency={catalog.showConcurrency}
+                concurrency={node.concurrency}
+                concurrencyMaxOnly={catalog.concurrencyMaxOnly}
+                onSave={(configuration, name, integration, concurrency) =>
+                  onSave({
+                    nodeId: node.id ?? "",
+                    name,
+                    configuration,
+                    integration,
+                    concurrency,
+                  })
+                }
+              />
+            ))}
         </div>
       </aside>
       {organizationId && catalog.integrationDefinition ? (
@@ -288,7 +291,7 @@ function simplifiedTriggerSettings(
     booleanControl: "checkbox" as const,
     fieldGroups,
     hiddenFieldNames,
-    leadingContent: repositoryLine(repositoryDisplay(configuration.repository)),
+    leadingContent: <NodeConfigRepositoryLine value={configuration.repository} />,
     trailingContent,
     configuration,
     configurationFields: fields,
@@ -323,9 +326,10 @@ function PlaceholderFilter({ label }: { label: string }) {
   );
 }
 
-function repositoryLine(label: string | undefined) {
+export function NodeConfigRepositoryLine({ value }: { value: unknown }) {
+  const label = repositoryDisplay(value);
   if (!label) {
-    return undefined;
+    return null;
   }
   return (
     <div className="flex flex-col gap-1.5">
