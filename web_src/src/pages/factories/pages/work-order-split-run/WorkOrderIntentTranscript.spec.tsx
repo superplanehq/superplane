@@ -263,9 +263,20 @@ describe("WorkOrderIntentTranscript", () => {
     ]);
 
     const answer = screen.getByTestId("split-run-intent-survey-answer");
-    const skipped = within(answer).getByText(CREATE_WITH_AGENT_COPY.surveyAnswerSkipped);
-    expect(within(skipped).queryByRole("img")).not.toBeInTheDocument();
-    expect(within(answer).getByTestId("split-run-intent-survey-pick")).toHaveTextContent("Custom styled modal");
+    const questions = within(answer).getAllByRole("listitem");
+    const skippedQuestion = questions.find((question) =>
+      within(question).queryByText(CREATE_WITH_AGENT_COPY.surveyAnswerSkipped),
+    );
+    const answeredQuestion = questions.find((question) => within(question).queryByText("Custom styled modal"));
+    if (!skippedQuestion || !answeredQuestion) {
+      throw new Error("expected a skipped question and an answered question");
+    }
+    expect(within(skippedQuestion).queryByRole("img")).not.toBeInTheDocument();
+    expectAvatarBeforeAnswer(
+      within(answeredQuestion).getByTestId("split-run-intent-survey-pick"),
+      "Ada Lovelace",
+      "Custom styled modal",
+    );
   });
 
   it("omits the sender header when the message has no user id", () => {
