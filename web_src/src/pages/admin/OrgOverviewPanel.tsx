@@ -2,10 +2,9 @@ import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Building } from "lucide-react";
-import { useEffect, useState } from "react";
 import { formatDate } from "./formatDate";
 
-interface OrganizationOverview {
+export interface OrganizationOverview {
   id: string;
   name: string;
   slug: string;
@@ -16,6 +15,7 @@ interface OrganizationOverview {
   member_count: number;
   created_at?: string;
   updated_at?: string;
+  pinned?: boolean;
 }
 
 function displayText(value: string): string {
@@ -34,45 +34,17 @@ function OverviewField({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function OrgOverviewPanel({ orgId }: { orgId: string }) {
-  const [organization, setOrganization] = useState<OrganizationOverview | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [reloadToken, setReloadToken] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`/admin/api/organizations/${orgId}`, { credentials: "include" });
-        if (!response.ok) {
-          throw new Error("Could not load this organization.");
-        }
-        const data: OrganizationOverview = await response.json();
-        if (!cancelled) {
-          setOrganization(data);
-        }
-      } catch {
-        if (!cancelled) {
-          setOrganization(null);
-          setError("Could not load this organization.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [orgId, reloadToken]);
-
+export function OrgOverviewPanel({
+  organization,
+  loading,
+  error,
+  onRetry,
+}: {
+  organization: OrganizationOverview | null;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
   return (
     <div className="mb-8">
       <div className="flex items-center gap-2 mb-3">
@@ -86,13 +58,7 @@ export function OrgOverviewPanel({ orgId }: { orgId: string }) {
       ) : error ? (
         <div>
           <Text className="text-red-600 text-sm dark:text-red-400">{error}</Text>
-          <Button
-            type="button"
-            className="mt-4"
-            variant="outline"
-            size="sm"
-            onClick={() => setReloadToken((token) => token + 1)}
-          >
+          <Button type="button" className="mt-4" variant="outline" size="sm" onClick={onRetry}>
             Try again
           </Button>
         </div>
