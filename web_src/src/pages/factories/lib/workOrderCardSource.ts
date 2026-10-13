@@ -30,7 +30,7 @@ export function workOrderCardSource(order: FactoriesWorkOrder): WorkOrderCardSou
   if (source.kind === "mcp") {
     return {
       name: source.name,
-      iconSrc: superplaneMark,
+      iconSrc: source.iconSrc,
       iconAlt: source.iconAlt,
     };
   }
