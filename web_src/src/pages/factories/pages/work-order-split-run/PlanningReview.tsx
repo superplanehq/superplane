@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 
 import { ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
 import { ReadinessDot } from "../../workOrders/ReadinessMark";
-import { planningReviewAtMax } from "../../lib/planningReviewScore";
 import { workOrderCheckStatus, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { ScoreEvidenceRow, type ScoreEvidenceDrawer, type ScoreEvidenceValue } from "../../workOrders/ScoreEvidence";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
@@ -54,7 +53,7 @@ export function PlanningReview({
   creditVerdict?: ComposerCreditVerdict;
 }) {
   const analyzing = isAnalyzing && !creditVerdict;
-  const drawerMetrics = drawerMetricsFor(reviewMetrics);
+  const drawerMetrics = reviewMetrics?.length ? reviewMetrics : undefined;
   const drawer = useConfidenceDrawer();
   return (
     <Frame
@@ -101,17 +100,6 @@ export function PlanningReview({
       </FramePanel>
     </Frame>
   );
-}
-
-/**
- * At 3/3 there is nothing to fix, so the chip shows the summary hover
- * card instead of the per-check drawer.
- */
-function drawerMetricsFor(metrics?: WorkOrderCheckPresentation[]): WorkOrderCheckPresentation[] | undefined {
-  if (!metrics || metrics.length === 0 || planningReviewAtMax(metrics)) {
-    return undefined;
-  }
-  return metrics;
 }
 
 const DRAWER_CLOSE_DELAY_MS = 120;

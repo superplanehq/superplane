@@ -157,7 +157,7 @@ describe("CardScoreBadges", () => {
     expect(tip).not.toHaveTextContent("Partial");
   });
 
-  it("skips the per-check breakdown when every review score is 3", async () => {
+  it("shows the per-check breakdown when every review score is 3", async () => {
     const user = userEvent.setup();
     render(
       <CardScoreBadges
@@ -178,8 +178,12 @@ describe("CardScoreBadges", () => {
     await user.hover(screen.getByTestId("badges"));
     const tip = await screen.findByRole("tooltip");
     expect(tip).toHaveTextContent("This task is ready to start");
-    expect(tip).not.toHaveTextContent("Clear");
-    expect(tip).not.toHaveTextContent("Provable");
+    expect(tip).toHaveTextContent("Clarity");
+    expect(tip).toHaveTextContent("Clear");
+    expect(tip).toHaveTextContent("Complexity");
+    expect(tip).toHaveTextContent("Easy");
+    expect(tip).toHaveTextContent("Verifiability");
+    expect(tip).toHaveTextContent("Provable");
   });
 
   it("keeps the verdict headline in the tooltip", async () => {

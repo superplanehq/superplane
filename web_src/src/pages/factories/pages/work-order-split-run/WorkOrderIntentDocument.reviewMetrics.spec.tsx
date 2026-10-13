@@ -117,7 +117,7 @@ describe("WorkOrderIntentDocument review metrics", () => {
     expect(confidence).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("shows the summary card instead of the review drawer at 3/3", async () => {
+  it("shows all review checks at 3/3", async () => {
     const user = userEvent.setup();
     renderIntentDocument(
       <WorkOrderIntentDocument
@@ -142,9 +142,13 @@ describe("WorkOrderIntentDocument review metrics", () => {
     expect(confidence).toHaveAccessibleName("Confidence 3/3");
 
     await user.hover(confidence);
-    expect(await screen.findByTestId("split-run-intent-composer-confidence-copy")).toHaveTextContent(
-      "The gap is specific and verifiable.",
-    );
-    expect(screen.queryByTestId("split-run-intent-review-metrics")).not.toBeInTheDocument();
+    const metrics = await screen.findByTestId("split-run-intent-review-metrics");
+    expect(metrics).toHaveTextContent("Clarity");
+    expect(metrics).toHaveTextContent("Clear");
+    expect(metrics).toHaveTextContent("Complexity");
+    expect(metrics).toHaveTextContent("Easy");
+    expect(metrics).toHaveTextContent("Verifiability");
+    expect(metrics).toHaveTextContent("Provable");
+    expect(screen.queryByTestId("split-run-intent-composer-confidence-copy")).not.toBeInTheDocument();
   });
 });
