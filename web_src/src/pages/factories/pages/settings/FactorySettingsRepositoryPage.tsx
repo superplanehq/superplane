@@ -1,46 +1,31 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { usePermissions } from "@/contexts/usePermissions";
-import { useIntegrationResources, resolveGithubDefaultBranch } from "@/hooks/useIntegrations";
+import { resolveGithubDefaultBranch } from "@/hooks/useIntegrations";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { RepositoryPicker } from "../onboarding/onboardingSteps";
-import { useGitHubOnboarding } from "../onboarding/useGitHubOnboarding";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import { useFactoryRepository } from "./useFactoryRepository";
-
-/**
- * The API serializes int64 repository IDs as strings with EmitUnpopulated,
- * so an unset ID arrives as "0", which is truthy in JavaScript. Only a
- * non-zero ID means the workspace uses the version-control catalog.
- */
-function hasCatalogRepositoryId(id: string | null | undefined): boolean {
-  return Boolean(id && id !== "0");
-}
+import { useWorkspaceRepositoryChoices } from "./useWorkspaceRepositoryChoices";
 
 export function FactorySettingsRepositoryPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const integrationId = factory.onboarding?.vcsIntegrationId ?? "";
-  const bitbucket = factory.onboarding?.vcsProvider === "bitbucket";
-  const resources = useIntegrationResources(organizationId, integrationId, "repository");
-  const githubOnboarding = useGitHubOnboarding(organizationId, { poll: false });
-  const usesCatalogRepository =
-    hasCatalogRepositoryId(factory.onboarding?.appRepositoryId) ||
-    hasCatalogRepositoryId(factory.onboarding?.backlogRepositoryId);
-  const catalogRepositories = githubOnboarding.data?.repositories;
-  const repositories = useMemo(() => {
-    const names = usesCatalogRepository
-      ? (catalogRepositories ?? []).map((repository) => repository.fullName ?? "")
-      : (resources.data ?? []).map((resource) => resource.name ?? resource.id ?? "");
-    return names
-      .filter((repository): repository is string => Boolean(repository))
-      .sort((left, right) => left.localeCompare(right));
-  }, [catalogRepositories, resources.data, usesCatalogRepository]);
+  const {
+    integrationId,
+    bitbucket,
+    host,
+    repositories,
+    isLoading,
+    isError,
+    catalogRepositories,
+    usesCatalogRepository,
+  } = useWorkspaceRepositoryChoices(organizationId, factory);
   const [repository, setRepository] = useState(factory.onboarding?.appRepository ?? "");
   const [isResolvingDefaultBranch, setIsResolvingDefaultBranch] = useState(false);
   const updateRepository = useFactoryRepository(organizationId, factoryId);
@@ -82,16 +67,11 @@ export function FactorySettingsRepositoryPage() {
           : "Connect GitHub during workspace setup before you select a repository."}
       </p>
     );
-  } else if ((usesCatalogRepository ? githubOnboarding.isPending : resources.isLoading) && repositories.length === 0) {
+  } else if (isLoading) {
     repositoryContent = <p className="text-[13px] text-muted-foreground">Loading repositories...</p>;
   } else {
     repositoryContent = (
-      <RepositoryPicker
-        host={bitbucket ? "bitbucket" : "github"}
-        repos={repositories}
-        selectedRepo={repository || null}
-        onSelect={setRepository}
-      />
+      <RepositoryPicker host={host} repos={repositories} selectedRepo={repository || null} onSelect={setRepository} />
     );
   }
 
@@ -109,7 +89,7 @@ export function FactorySettingsRepositoryPage() {
         data-testid="factory-settings-repository"
       >
         {repositoryContent}
-        {(usesCatalogRepository ? githubOnboarding.isError : resources.isError) && repositories.length === 0 ? (
+        {isError ? (
           <p className="mt-3 text-[13px] text-destructive">We could not load repositories. Try again.</p>
         ) : null}
         <div className="mt-4 flex items-center justify-between gap-4 border-t border-border pt-4">

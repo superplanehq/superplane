@@ -1,14 +1,16 @@
 import { cn } from "@/lib/utils";
-import { ChartLine, Home } from "lucide-react";
+import { Brain, ChartLine, Home } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
-import { factoryHomePath, factoryVelocityPath } from "../lib/factoryPagePaths";
-import { factoriesRailControlClassName, isBoardPath, isVelocityPath } from "./factoriesRail";
+import { factoryAgentPath, factoryHomePath, factoryVelocityPath } from "../lib/factoryPagePaths";
+import { factoriesRailControlClassName, isAgentPath, isBoardPath, isVelocityPath } from "./factoriesRail";
 
 interface FactoriesSidebarNavProps {
   organizationId: string;
   factoryKey: string;
   lineId?: string;
+  /** Public board keeps the home icon and hides Agent. */
+  showAgent?: boolean;
   /** Public board keeps the home icon and hides Velocity. */
   showVelocity?: boolean;
 }
@@ -45,17 +47,19 @@ function RailNavLink({
 }
 
 /**
- * Icon rail under the workspace switcher: the line board and Velocity.
+ * Icon rail under the workspace switcher: the line board, Agent, and Velocity.
  * Workspace settings open from the workspace switcher.
  */
 export function FactoriesSidebarNav({
   organizationId,
   factoryKey,
   lineId,
+  showAgent = false,
   showVelocity = true,
 }: FactoriesSidebarNavProps) {
   const { pathname } = useLocation();
   const boardHref = factoryHomePath(organizationId, factoryKey, lineId);
+  const agentHref = factoryAgentPath(organizationId, factoryKey);
   const velocityHref = factoryVelocityPath(organizationId, factoryKey);
 
   return (
@@ -67,6 +71,15 @@ export function FactoriesSidebarNav({
         testId="factories-nav-board"
         isCurrent={isBoardPath(pathname)}
       />
+      {showAgent ? (
+        <RailNavLink
+          to={agentHref}
+          label="Agent"
+          Icon={Brain}
+          testId="factories-nav-agent"
+          isCurrent={isAgentPath(pathname)}
+        />
+      ) : null}
       {showVelocity ? (
         <RailNavLink
           to={velocityHref}
