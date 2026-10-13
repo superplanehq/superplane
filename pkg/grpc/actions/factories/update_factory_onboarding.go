@@ -37,6 +37,10 @@ func UpdateFactoryOnboarding(
 	setOnboardingVCSProvider(db, orgID, &patch)
 	provider := onboardingPatchVCSProvider(patch)
 
+	if err := rejectVCSProviderChange(factory, patch); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
+	}
+
 	if req.Complete != nil && *req.Complete {
 		config, configErr := factory.OnboardingConfigAfter(patch)
 		if configErr != nil {
@@ -172,6 +176,26 @@ func onboardingPatchVCSProvider(patch models.FactoryOnboardingPatch) string {
 	return strings.TrimSpace(*patch.VCSProvider)
 }
 
+// rejectVCSProviderChange locks the provider at the first saved VCS binding.
+// Clearing the integration keeps the lock; switching hosts is rejected.
+func rejectVCSProviderChange(factory *models.Factory, patch models.FactoryOnboardingPatch) error {
+	if patch.VCSProvider == nil {
+		return nil
+	}
+	next := strings.TrimSpace(*patch.VCSProvider)
+	if next == "" {
+		return nil
+	}
+	current := factory.OnboardingConfigValue()
+	if strings.TrimSpace(current.VCSIntegrationID) == "" && strings.TrimSpace(current.VCSProvider) == "" {
+		return nil
+	}
+	if !strings.EqualFold(next, current.EffectiveVCSProvider()) {
+		return invalidArgument("version control provider cannot be changed")
+	}
+	return nil
+}
+
 func requireBitbucketWorkspace(db *gorm.DB, organizationID uuid.UUID, provider string) error {
 	if provider != models.ProviderBitbucket {
 		return nil
@@ -192,8 +216,7 @@ func setOnboardingVCSProvider(db *gorm.DB, organizationID uuid.UUID, patch *mode
 	}
 	integrationID := strings.TrimSpace(*patch.VCSIntegrationID)
 	if integrationID == "" {
-		empty := ""
-		patch.VCSProvider = &empty
+		// ponytail: clearing the integration keeps the provider lock
 		return
 	}
 	id, err := uuid.Parse(integrationID)

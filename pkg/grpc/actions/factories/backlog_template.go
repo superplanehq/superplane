@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components/factory"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/yaml"
@@ -101,10 +100,10 @@ func createBacklogCanvas(
 	}
 
 	canvasDoc := buildBacklogCanvas(backlogCanvasRequest{
-		Name:           name,
-		Agent:          resolveIntakeAgent(db, factoryModel),
-		VCSName:        resolveVCSInstallationName(db, factoryModel),
-		PlanningReview: organizationPlanningReviewEnabled(db, factoryModel.OrganizationID),
+		Name:        name,
+		Agent:       resolveIntakeAgent(db, factoryModel),
+		VCSName:     resolveVCSInstallationName(db, factoryModel),
+		VCSProvider: factoryVCSProviderOrDefault(factoryModel),
 	})
 
 	nodes, edges, err := canvasDoc.Parse(deps.Registry, factoryModel.OrganizationID.String())
@@ -152,26 +151,10 @@ func createBacklogCanvas(
 }
 
 type backlogCanvasRequest struct {
-	Name    string
-	Agent   *intakeAgent
-	VCSName string
-	// PlanningReview selects the 1 through 3 prompt pack for organizations
-	// on the task planning review flow.
-	PlanningReview bool
-}
-
-// organizationPlanningReviewEnabled reports whether the organization runs the
-// task planning review flow, which scores three sub-parameters from 1
-// through 3. A nil transaction or a lookup error keeps the legacy prompt.
-func organizationPlanningReviewEnabled(tx *gorm.DB, organizationID uuid.UUID) bool {
-	if tx == nil || organizationID == uuid.Nil {
-		return false
-	}
-	org, err := models.FindOrganizationByIDInTransaction(tx, organizationID.String())
-	if err != nil {
-		return false
-	}
-	return org.HasExperimentalFeature(features.FeatureTaskPlanningReview)
+	Name        string
+	Agent       *intakeAgent
+	VCSName     string
+	VCSProvider string
 }
 
 func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
@@ -218,7 +201,7 @@ func buildBacklogCanvas(request backlogCanvasRequest) *yaml.Canvas {
 					Name:          "Refine Task",
 					Type:          yaml.NodeTypeAction,
 					Component:     request.Agent.component(),
-					Configuration: intakeRefinementConfiguration(request.Agent, request.VCSName, request.PlanningReview),
+					Configuration: intakeRefinementConfiguration(request.Agent, request.VCSName, request.VCSProvider),
 					Concurrency:   intakeConcurrency(),
 					Position:      yaml.Position{X: 160, Y: 440},
 				},

@@ -44,10 +44,20 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
 
+vi.mock("./useBitbucketOnboarding", () => ({
+  useBitbucketOnboarding: () => ({
+    data: { providerConfigured: false, identity: undefined, repositories: [], installUrl: "" },
+    isPending: false,
+    error: null,
+    startInstallation: { mutateAsync: vi.fn() },
+  }),
+}));
+
 vi.mock("./useGitHubOnboarding", () => ({
   useGitHubOnboarding: () => ({
     data: {
-      appConfigured: true,
+      providerConfigured: true,
+      accountConnectionRequired: true,
       identity: { userId: "42", login: "octocat" },
       repositories: [{ repositoryId: "201", installationId: "101", fullName: "acme/api", defaultBranch: "main" }],
       pendingRequests: [],
@@ -84,7 +94,13 @@ vi.mock("./AgentStep", () => ({
 }));
 
 function setupState(): OnboardingSetupApi {
-  const { result } = renderHook(() => useOnboardingSetupState("Payments Service", { simulateDiscovery: false }));
+  const { result } = renderHook(() =>
+    useOnboardingSetupState("Payments Service", {
+      simulateDiscovery: false,
+      connected: new Set(["github"]),
+      initial: { vcsHost: "github" },
+    }),
+  );
   return result.current;
 }
 
@@ -105,6 +121,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     requestConnect: vi.fn(),
     selectCatalogRepository: vi.fn().mockResolvedValue(true),
     selectBitbucketRepository: vi.fn().mockResolvedValue(true),
+    selectBitbucketForgeRepository: vi.fn().mockResolvedValue(true),
     bitbucketIntegrationId: "",
     integrationDialogs: <></>,
     canConfigureWorkspace: true,
@@ -301,6 +318,10 @@ describe("FirstRunSetup chrome", () => {
 
     expect(await screen.findByTestId("first-run-tickets")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: FIRST_RUN_COPY.tickets.analyze })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /GitHub Issues/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /^Jira/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /^Linear/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
   });
 
   it("shows provider keys when the organization chooses its own key", async () => {
@@ -343,6 +364,7 @@ describe("FirstRunSetup chrome", () => {
       hostedModelsAvailable: true,
       bringYourOwnKey: true,
       agentCredentialChoice: "hosted",
+      setup: { ...setupState(), issuesChoice: "vcs" },
     });
 
     renderSetup(model);
@@ -357,7 +379,7 @@ describe("FirstRunSetup chrome", () => {
       hostedAgentReady: true,
       hostedModelsAvailable: true,
       openSection: "repo",
-      setup: withRepository(),
+      setup: { ...withRepository(), issuesChoice: "vcs" },
     });
 
     renderSetup(model, "/org-1/workspaces/PAY/setup?step=repo");

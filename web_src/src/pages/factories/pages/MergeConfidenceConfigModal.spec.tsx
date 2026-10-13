@@ -11,6 +11,7 @@ import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
+import { mergeConfidenceAvailableIntegrations } from "./MergeConfidenceConfigModal.spec.fixtures";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
@@ -57,73 +58,7 @@ vi.mock("@/hooks/useIntegrations", () => {
   return {
     ...actual,
     useAvailableIntegrations: () => ({
-      data: [
-        {
-          name: "github",
-          label: "GitHub",
-          capabilities: [
-            {
-              type: "TYPE_TRIGGER",
-              name: "github.onPullRequest",
-              label: "On Pull Request",
-              configuration: [
-                { name: "customName", label: "Run title", type: "string" },
-                { name: "repository", label: "Repository", type: "string", required: true },
-                {
-                  name: "actions",
-                  label: "Actions",
-                  type: "multi-select",
-                  typeOptions: {
-                    multiSelect: {
-                      options: [
-                        { label: "Labeled", value: "labeled" },
-                        { label: "Assigned", value: "assigned" },
-                      ],
-                    },
-                  },
-                },
-                {
-                  name: "ignoreDrafts",
-                  label: "Ignore draft pull requests",
-                  type: "boolean",
-                  description: "Do not start a run when the pull request is a draft.",
-                },
-                {
-                  name: "onlyFactoryPullRequests",
-                  label: "Only pull requests in this factory",
-                  type: "boolean",
-                  description: "Start a run only when the pull request belongs to this factory.",
-                },
-              ],
-            },
-            {
-              type: "TYPE_TRIGGER",
-              name: "github.onIssue",
-              label: "On Issue",
-              configuration: [
-                { name: "customName", label: "Run title", type: "string" },
-                { name: "repository", label: "Repository", type: "string", required: true },
-                {
-                  name: "actions",
-                  label: "Actions",
-                  type: "multi-select",
-                  typeOptions: {
-                    multiSelect: {
-                      options: [
-                        { label: "Opened", value: "opened" },
-                        { label: "Edited", value: "edited" },
-                        { label: "Reopened", value: "reopened" },
-                        { label: "Labeled", value: "labeled" },
-                        { label: "Closed", value: "closed" },
-                      ],
-                    },
-                  },
-                },
-              ],
-            },
-          ],
-        },
-      ],
+      data: mergeConfidenceAvailableIntegrations,
       isLoading: false,
     }),
     useConnectedIntegrations: () => ({ data: [], isLoading: false }),
@@ -426,6 +361,9 @@ describe("MergeConfidenceConfigModal", () => {
     expect(within(form).getByText("Filters")).toBeInTheDocument();
     expect(within(form).getByRole("checkbox", { name: "Issue has one of these labels" })).toBeDisabled();
     expect(within(form).getByRole("checkbox", { name: "Author is a repository collaborator" })).toBeDisabled();
+    expect(within(form).queryByText("Label filter")).not.toBeInTheDocument();
+    expect(within(form).queryByText("Assignment")).not.toBeInTheDocument();
+    expect(within(form).queryByRole("button", { name: "Add Label" })).not.toBeInTheDocument();
     expect(within(form).getByRole("checkbox", { name: "A new issue is opened" })).toBeChecked();
     expect(within(form).getByRole("checkbox", { name: "A closed issue is re-opened" })).not.toBeChecked();
     expect(

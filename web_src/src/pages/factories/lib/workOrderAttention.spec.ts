@@ -136,7 +136,7 @@ describe("getWorkOrderAttentionReason", () => {
     expect(WORK_ORDER_ATTENTION_LABEL.checksPassed).toBe("Status checks passed");
   });
 
-  it("labels an active PR-feedback run as Addressing user feedback", () => {
+  it("labels an active PR-feedback run as Addressing PR comments", () => {
     expect(
       getWorkOrderAttentionReason(
         order({
@@ -151,7 +151,7 @@ describe("getWorkOrderAttentionReason", () => {
         { addressingFeedback: true },
       ),
     ).toBe("feedback");
-    expect(WORK_ORDER_ATTENTION_LABEL.feedback).toBe("Addressing user feedback");
+    expect(WORK_ORDER_ATTENTION_LABEL.feedback).toBe("Addressing PR comments");
   });
 
   it("labels a cancelled latest step as Stopped", () => {

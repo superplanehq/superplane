@@ -21,7 +21,6 @@ export function FactorySettingsConnectPage() {
 
   return (
     <FactorySettingsPageFrame
-      narrow
       title={AGENT_RESOURCES_COPY.superplaneMcpServerTitle}
       subtitle={AGENT_RESOURCES_COPY.superplaneMcpServerPageSubtitle}
       actions={

@@ -119,7 +119,6 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 	})
 
 	t.Run("risk score install attaches the canvas to Verify", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
 		factoryModel := newFactory(t)
 		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Risk score"))
 
@@ -145,8 +144,56 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		assert.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
 	})
 
+	t.Run("visual evidence install attaches Verify and keeps capture enabled", func(t *testing.T) {
+		factoryModel := newFactory(t)
+		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, "Visual Evidence")
+
+		response, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
+			FactoryId:  factoryModel.ID.String(),
+			TemplateId: "visual-evidence",
+			AppId:      canvas.ID.String(),
+			InstallParams: map[string]string{
+				"appRepository": "acme/app",
+				"defaultBranch": "main",
+			},
+			Integrations: []*pb.FactoryAppTemplateIntegration{{
+				Type: "github",
+				Id:   "github-1",
+				Name: "acme-github",
+			}},
+			Agent: &pb.FactoryAppTemplateAgent{
+				Component:                 "runnerClaudeCode",
+				Model:                     "claude-sonnet-4-6",
+				CredentialSource:          "integration",
+				CredentialIntegrationName: "acme-claude",
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "visual-evidence", response.GetTemplateId())
+
+		materialized, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+		require.NoError(t, err)
+		_, _, err = materialized.Parse(r.Registry, orgID)
+		require.NoError(t, err)
+		trigger := findYAMLNode(t, materialized, "on-pr-visual-evidence")
+		description := findYAMLNode(t, materialized, "update-pr-description")
+		agent := findYAMLNode(t, materialized, "capture-visual-evidence")
+		github := &yaml.IntegrationRef{ID: "github-1", Name: "acme-github"}
+		assert.Equal(t, github, trigger.Integration)
+		assert.Equal(t, github, description.Integration)
+		assert.Equal(t, true, agent.Configuration["includeVisualEvidence"])
+		assert.Equal(t, map[string]any{
+			"source":      "integration",
+			"integration": map[string]any{"name": "acme-claude"},
+		}, agent.Configuration["credentials"])
+
+		reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.ColumnKey)
+		assert.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
+	})
+
 	t.Run("risk score install uses the workspace SuperPlane agent", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
 		enableInstanceSuperPlaneDefault(t)
 		factoryModel := newFactory(t)
 		harness := models.FactoryOnboardingAgentHarnessSuperPlane
@@ -179,7 +226,6 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 	})
 
 	t.Run("risk score install keeps an explicit agent", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
 		enableInstanceSuperPlaneDefault(t)
 		factoryModel := newFactory(t)
 		harness := models.FactoryOnboardingAgentHarnessSuperPlane
@@ -211,19 +257,33 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		}, agent.Configuration["credentials"])
 	})
 
-	t.Run("risk score install is rejected when the feature is off", func(t *testing.T) {
-		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryRiskScore))
+	t.Run("risk score install fills the default checks", func(t *testing.T) {
 		factoryModel := newFactory(t)
 		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Risk score"))
 
-		_, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
+		response, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
 			FactoryId:  factoryModel.ID.String(),
 			TemplateId: "risk-score",
 			AppId:      canvas.ID.String(),
+			InstallParams: map[string]string{
+				"appRepository": "acme/app",
+				"defaultBranch": "main",
+			},
 		})
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
+		require.NoError(t, err)
+
+		materialized, err := yaml.CanvasFromYAML([]byte(response.GetCanvasYaml()))
+		require.NoError(t, err)
+		agent := findYAMLNode(t, materialized, "assess-risk")
+		for _, name := range []string{"Blast radius", "Performance", "Security", "Drift from Specification", "Reversibility"} {
+			implementationStep(t, agent, name)
+		}
+		assert.Contains(t, agentPrompt(t, agent), "Additive database changes = 3 (medium).")
+
+		reloaded, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, canvas.ID)
+		require.NoError(t, err)
+		require.NotNil(t, reloaded.ColumnKey)
+		assert.Equal(t, models.CanvasColumnKeyVerify, *reloaded.ColumnKey)
 	})
 
 	t.Run("a GitHub app resets with its saved provider after the workspace uses Bitbucket", func(t *testing.T) {

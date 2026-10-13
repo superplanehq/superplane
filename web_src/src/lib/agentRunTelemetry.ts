@@ -7,6 +7,7 @@ export type AgentTurnUsage = {
   cache_creation_input_tokens: number;
   reasoning_tokens: number;
   total_cost_usd?: number;
+  hosted_cost_usd?: number;
 };
 
 export type AgentTurnTool = {
@@ -80,6 +81,9 @@ export function normalizeAgentTurnUsage(raw: unknown): AgentTurnUsage {
   if (src.total_cost_usd != null && Number.isFinite(Number(src.total_cost_usd))) {
     usage.total_cost_usd = Number(src.total_cost_usd);
   }
+  if (src.hosted_cost_usd != null && Number.isFinite(Number(src.hosted_cost_usd))) {
+    usage.hosted_cost_usd = Number(src.hosted_cost_usd);
+  }
   return usage;
 }
 
@@ -103,6 +107,9 @@ function addUsage(total: AgentTurnUsage, delta: AgentTurnUsage): AgentTurnUsage 
   };
   if (total.total_cost_usd != null || delta.total_cost_usd != null) {
     next.total_cost_usd = (total.total_cost_usd ?? 0) + (delta.total_cost_usd ?? 0);
+  }
+  if (total.hosted_cost_usd != null || delta.hosted_cost_usd != null) {
+    next.hosted_cost_usd = (total.hosted_cost_usd ?? 0) + (delta.hosted_cost_usd ?? 0);
   }
   return next;
 }
@@ -345,6 +352,9 @@ export function usageDelta(current: AgentTurnUsage, previous?: AgentTurnUsage): 
   };
   if (current.total_cost_usd != null) {
     delta.total_cost_usd = Math.max(0, current.total_cost_usd - (previous.total_cost_usd ?? 0));
+  }
+  if (current.hosted_cost_usd != null) {
+    delta.hosted_cost_usd = Math.max(0, current.hosted_cost_usd - (previous.hosted_cost_usd ?? 0));
   }
   return delta;
 }

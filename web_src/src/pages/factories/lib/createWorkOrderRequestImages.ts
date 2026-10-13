@@ -1,5 +1,6 @@
 import { isSupportedImageFile, MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+import { appendHostedVideoMarkdown, parseHostedVideoUrl, type HostedVideo } from "@/lib/hostedVideo";
 import {
   isInlineWorkOrderAudio,
   isInlineWorkOrderVideo,
@@ -18,6 +19,7 @@ export interface CreateWorkOrderRequestImage {
   src: string;
   isVideo?: boolean;
   isAudio?: boolean;
+  hostedVideo?: HostedVideo;
 }
 
 export function isVisualUploadedWorkOrderFile(file: {
@@ -49,13 +51,15 @@ export function createWorkOrderRequestImages(
     if (!src) {
       continue;
     }
+    const hostedVideo = parseHostedVideoUrl(rawSrc) ?? parseHostedVideoUrl(src);
     seen.add(rawSrc);
     images.push({
       id: parseWorkOrderFileId(rawSrc) ?? rawSrc,
       alt,
       src,
-      isVideo: isWorkOrderVideoSource({ src, alt }),
-      isAudio: isWorkOrderAudioSource({ src, alt }),
+      isVideo: hostedVideo ? false : isWorkOrderVideoSource({ src, alt }),
+      isAudio: hostedVideo ? false : isWorkOrderAudioSource({ src, alt }),
+      hostedVideo: hostedVideo ?? undefined,
     });
   }
   return images;
@@ -134,6 +138,20 @@ export function appendUploadedWorkOrderImages(description: string, files: Upload
       : `[${markdownFileLabel(file.filename)}](${file.ref})`,
   );
   return [description.trimEnd(), ...blocks].filter((part) => part.length > 0).join("\n\n");
+}
+
+export function insertHostedVideoMarkdown(
+  markdown: string,
+  video: HostedVideo,
+  attached: UploadedWorkOrderFile[] = [],
+): string | null {
+  if (markdown.includes(video.pageUrl)) {
+    return markdown;
+  }
+  if (countCreateWorkOrderRequestImages(markdown, attached) >= MAX_IMAGE_ATTACHMENTS) {
+    return null;
+  }
+  return appendHostedVideoMarkdown(markdown, video);
 }
 
 export function removeCreateWorkOrderRequestMarkdownImage(markdown: string, id: string): string {

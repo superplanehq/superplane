@@ -3,26 +3,49 @@ import { useRef, useState, type ClipboardEvent } from "react";
 import type { FilesFile } from "@/api-client";
 import { isSupportedImageFile, MAX_IMAGE_ATTACHMENTS } from "@/components/AgentSidebar/useImageAttachments";
 import type { UploadedWorkOrderFile } from "@/hooks/useWorkOrderFileUpload";
+import type { HostedVideo } from "@/lib/hostedVideo";
 import { showErrorToast } from "@/lib/toast";
 import { revokeWorkOrderFilePreviewUrl } from "@/lib/workOrderFiles";
 
 import {
   countCreateWorkOrderRequestImages,
+  insertHostedVideoMarkdown,
   mergeCreateWorkOrderRequestImages,
   selectCreateWorkOrderRequestUploads,
 } from "../../lib/createWorkOrderRequestImages";
+import type { IntentAnalysisChat } from "./intentAnalysisChat";
+
+export function addAnalysisHostedVideo(
+  analysis: IntentAnalysisChat,
+  pending: UploadedWorkOrderFile[],
+  video: HostedVideo,
+): boolean {
+  const next = insertHostedVideoMarkdown(analysis.composer ?? "", video, pending);
+  if (next == null) {
+    showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images, videos, or audio files.`);
+    return false;
+  }
+  if (next !== analysis.composer) {
+    analysis.onComposerChange(next);
+  }
+  return true;
+}
 
 export function useAnalysisComposerImages({
   disabled,
   onUploadFiles,
+  markdown = "",
 }: {
   disabled: boolean;
   onUploadFiles?: (files: FileList | File[]) => Promise<UploadedWorkOrderFile[]>;
+  markdown?: string;
 }) {
   const [pending, setPending] = useState<UploadedWorkOrderFile[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedWorkOrderFile[]>([]);
   const pendingRef = useRef(pending);
   pendingRef.current = pending;
+  const markdownRef = useRef(markdown);
+  markdownRef.current = markdown;
 
   const attach = async (files: FileList | File[]) => {
     if (!onUploadFiles || disabled) {
@@ -30,7 +53,7 @@ export function useAnalysisComposerImages({
     }
     const selected = selectCreateWorkOrderRequestUploads(
       files,
-      countCreateWorkOrderRequestImages("", pendingRef.current),
+      countCreateWorkOrderRequestImages(markdownRef.current, pendingRef.current),
     );
     if (selected.rejectedCount > 0) {
       showErrorToast(`Attachments are limited to ${MAX_IMAGE_ATTACHMENTS} images, videos, or audio files.`);

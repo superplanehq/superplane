@@ -285,6 +285,35 @@ func Test__FactoryNotificationConsumer(t *testing.T) {
 		assert.ElementsMatch(t, []string{owner.GetEmail(), creator.GetEmail()}, recipients)
 	})
 
+	t.Run("archived task suppresses a queued note and browser alert", func(t *testing.T) {
+		archived, err := factoryModel.CreateWorkOrder(db, "Archived task", "", &creator.ID, []uuid.UUID{owner.ID}, nil)
+		require.NoError(t, err)
+		_, err = archived.Close(db, models.FactoryWorkOrderResultArchived, &creator.ID)
+		require.NoError(t, err)
+
+		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeAll,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+		enableNotifications(t, creator.ID, models.UserNotificationSettingsParams{
+			WorkspaceScope:        models.NotificationWorkspaceScopeAll,
+			BrowserWorkspaceScope: models.NotificationWorkspaceScopeAll,
+		})
+
+		emailService := services.NewNoopEmailService()
+		consumer, published := capturingConsumer(newConsumer(emailService))
+		consume(t, consumer, messages.FactoryWorkOrderNotificationMessage{
+			OrganizationID:     r.Organization.ID.String(),
+			FactoryID:          factoryModel.ID.String(),
+			OrderID:            archived.ID.String(),
+			EventType:          factoryevents.EventTypeOrderStatusNoteUpdated,
+			StatusNoteHeadline: "Still waiting",
+		})
+
+		assert.Empty(t, emailService.SentWorkOrderNotificationEmails())
+		assert.Empty(t, *published)
+	})
+
 	t.Run("status note notifies owners and creator", func(t *testing.T) {
 		enableNotifications(t, owner.ID, models.UserNotificationSettingsParams{
 			WorkspaceScope: models.NotificationWorkspaceScopeAll,

@@ -6,6 +6,7 @@ import { useConnectedIntegrations, useIntegrationResources } from "@/hooks/useIn
 import { organizationIntegrationsPath } from "@/lib/integrationSettingsPaths";
 import { sortConnectedIntegrationsByType } from "@/lib/sortConnectedIntegrations";
 import { cn } from "@/lib/utils";
+import { factoryVCSProvider } from "@/pages/home/factories";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { Check } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -138,15 +139,18 @@ export function PRFeedbackDiscussionFields({
   githubIntegrationId,
   draft,
   onUpdate,
+  vcsProvider,
 }: {
   organizationId?: string;
   githubIntegrationId?: string;
   draft: PRFeedbackDraftSettings;
   onUpdate: <K extends keyof PRFeedbackDraftSettings>(key: K, value: PRFeedbackDraftSettings[K]) => void;
+  vcsProvider?: string;
 }) {
+  const supportsReviewBots = factoryVCSProvider(vcsProvider) !== "bitbucket";
   const mentionRequired = draft.mention.trim().length > 0;
   const [botMode, setBotMode] = useState<DiscussionBotMode>(() => discussionBotModeFromDraft(draft));
-  const catalogEnabled = Boolean(organizationId && githubIntegrationId);
+  const catalogEnabled = Boolean(organizationId && githubIntegrationId) && supportsReviewBots;
   const catalogParameters = draft.repository.trim() ? { repository: draft.repository.trim() } : undefined;
   const catalogQuery = useIntegrationResources(
     organizationId ?? "",
@@ -155,7 +159,7 @@ export function PRFeedbackDiscussionFields({
     catalogParameters,
     { enabled: catalogEnabled && botMode === "address" },
   );
-  const catalog = catalogReviewBots(catalogQuery.data ?? []);
+  const catalog = catalogReviewBots(supportsReviewBots ? (catalogQuery.data ?? []) : []);
 
   const setBotModeAndDraft = (mode: DiscussionBotMode) => {
     setBotMode(mode);

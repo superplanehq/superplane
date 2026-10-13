@@ -108,12 +108,11 @@ func planningReadyPlanArtifact(
 	if !ok {
 		return nil, false, nil
 	}
-	factoryModel, err := models.FindFactory(tx, session.OrganizationID, session.FactoryID)
+	order, err := models.FindPlanningWorkOrder(tx, session.OrganizationID, session.FactoryID, orderID)
 	if err != nil {
-		return nil, false, err
-	}
-	order, err := factoryModel.FindWorkOrder(tx, orderID)
-	if err != nil {
+		if errors.Is(err, models.ErrFactoryWorkOrderNotFound) {
+			return nil, false, nil
+		}
 		return nil, false, err
 	}
 	artifact, err := order.FindArtifactByKey(tx, planningSpecArtifactKey(orderID))

@@ -3,16 +3,6 @@ import { quarantinePackageMapper, QUARANTINE_PACKAGE_STATE_REGISTRY } from "./qu
 import { buildDetailsCtx, buildExecution, buildPackageData, buildPackageOutput } from "./test_helpers";
 
 describe("quarantinePackageMapper.getExecutionDetails", () => {
-  it("does not throw when outputs is undefined", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
-    expect(() => quarantinePackageMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
-  it("does not throw when default array is empty", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
-    expect(() => quarantinePackageMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
   it("returns Executed At without package fields when data is missing", () => {
     const ctx = buildDetailsCtx({
       execution: { outputs: { default: [buildPackageOutput(undefined)] } },

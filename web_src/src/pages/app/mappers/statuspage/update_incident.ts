@@ -85,72 +85,81 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
+interface UpdateIncidentConfiguration {
+  incidentType?: string;
+  statusRealtime?: string;
+  statusScheduled?: string;
+  body?: string;
+  impactOverride?: string;
+  components?: Array<{ componentId?: string; status?: string }>;
+}
+
 function updateIncidentSpecs(node: NodeInfo): ComponentBaseSpec[] {
-  const configuration = node.configuration as {
-    incidentType?: string;
-    statusRealtime?: string;
-    statusScheduled?: string;
-    body?: string;
-    impactOverride?: string;
-    components?: Array<{ componentId?: string; status?: string }>;
-  };
-  const values: ComponentBaseSpec["values"] = [];
-
-  const typeLabel = configuration?.incidentType === "scheduled" ? "Scheduled" : "Realtime";
-  values.push({
-    badges: [
-      { label: "Type:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-      { label: typeLabel, bgColor: "bg-gray-100", textColor: "text-gray-800" },
-    ],
-  });
-
-  const status = configuration?.statusRealtime || configuration?.statusScheduled;
-  if (status) {
-    values.push({
-      badges: [
-        { label: "Status:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: status, bgColor: "bg-gray-100", textColor: "text-gray-800" },
-      ],
-    });
-  }
-
-  if (configuration?.body) {
-    const bodyPreview = truncateForDisplay(configuration.body, 50);
-    values.push({
-      badges: [
-        { label: "Body:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: bodyPreview, bgColor: "bg-gray-100", textColor: "text-gray-800" },
-      ],
-    });
-  }
-  if (configuration?.impactOverride) {
-    values.push({
-      badges: [
-        { label: "Impact:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: configuration.impactOverride, bgColor: "bg-gray-100", textColor: "text-gray-800" },
-      ],
-    });
-  }
-  if (configuration?.components && configuration.components.length > 0) {
-    const nodeMetadata = node.metadata as StatuspageNodeMetadata | undefined;
-    const componentLabel =
-      nodeMetadata?.componentNames && nodeMetadata.componentNames.length > 0
-        ? nodeMetadata.componentNames.join(", ")
-        : `${configuration.components.length} component(s)`;
-    values.push({
-      badges: [
-        { label: "Components:", bgColor: "bg-gray-100", textColor: "text-gray-700" },
-        { label: truncateForDisplay(componentLabel, 60), bgColor: "bg-gray-100", textColor: "text-gray-800" },
-      ],
-    });
-  }
-
   return [
     {
       title: "option",
       tooltipTitle: "Configuration options",
       iconSlug: "settings",
-      values,
+      values: updateIncidentSpecValues(node),
     },
   ];
+}
+
+function updateIncidentSpecValues(node: NodeInfo): ComponentBaseSpec["values"] {
+  const configuration = node.configuration as UpdateIncidentConfiguration | undefined;
+  const values: NonNullable<ComponentBaseSpec["values"]> = [];
+
+  pushSpecBadge(values, "Type:", incidentTypeLabel(configuration?.incidentType));
+  pushSpecBadge(values, "Status:", incidentStatusLabel(configuration));
+  pushSpecBadge(values, "Body:", incidentBodyLabel(configuration));
+  pushSpecBadge(values, "Impact:", configuration?.impactOverride);
+  pushSpecBadge(values, "Components:", incidentComponentLabel(node, configuration));
+
+  return values;
+}
+
+function incidentTypeLabel(incidentType?: string): string {
+  return incidentType === "scheduled" ? "Scheduled" : "Realtime";
+}
+
+function incidentStatusLabel(configuration: UpdateIncidentConfiguration | undefined): string | undefined {
+  return configuration?.statusRealtime || configuration?.statusScheduled;
+}
+
+function incidentBodyLabel(configuration: UpdateIncidentConfiguration | undefined): string | undefined {
+  if (!configuration?.body) {
+    return undefined;
+  }
+
+  return truncateForDisplay(configuration.body, 50);
+}
+
+function incidentComponentLabel(
+  node: NodeInfo,
+  configuration: UpdateIncidentConfiguration | undefined,
+): string | undefined {
+  if (!configuration?.components || configuration.components.length === 0) {
+    return undefined;
+  }
+
+  const nodeMetadata = node.metadata as StatuspageNodeMetadata | undefined;
+  const componentLabel =
+    nodeMetadata?.componentNames && nodeMetadata.componentNames.length > 0
+      ? nodeMetadata.componentNames.join(", ")
+      : `${configuration.components.length} component(s)`;
+
+  return truncateForDisplay(componentLabel, 60);
+}
+
+function pushSpecBadge(values: NonNullable<ComponentBaseSpec["values"]>, label: string, value?: string) {
+  if (!value) {
+    return;
+  }
+
+  values.push({
+    badges: [
+      { label, bgColor: "bg-gray-100", textColor: "text-gray-700" },
+      { label: value, bgColor: "bg-gray-100", textColor: "text-gray-800" },
+    ],
+  });
 }

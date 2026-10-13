@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -26,31 +26,35 @@ func SelectFactoryVCSProviderRepository(
 		return nil, factoryErrorToStatus(err, "failed to select VCS repository")
 	}
 	provider := strings.ToLower(strings.TrimSpace(req.GetProvider()))
+	if provider == models.ProviderBitbucket {
+		return selectBitbucketFactoryRepository(ctx, orgID, organizationID, req)
+	}
 	if provider != models.ProviderGitHub {
 		return nil, grpcerrors.InvalidArgument(nil, "VCS provider is not supported")
 	}
 	if req.GetRepositoryId() <= 0 {
 		return nil, grpcerrors.InvalidArgument(nil, "repository id is required")
 	}
-	app := config.LoadGitHubHostedAppConfig()
+	app, err := githubapp.ResolveProcess(ctx)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to load public GitHub App")
+	}
 	if !app.Enabled() {
 		return nil, grpcerrors.FailedPrecondition(nil, "public GitHub App is not configured")
 	}
 
 	db := database.DB(ctx)
-	providerUserID, err := factoryVCSProviderUserID(ctx, db, organizationID, provider)
-	if err != nil {
-		return nil, err
-	}
-
 	var factory *models.Factory
 	err = db.Transaction(func(tx *gorm.DB) error {
 		factory, err = findFactory(tx, orgID, req.GetId())
 		if err != nil {
 			return err
 		}
+		if err := rejectFactoryProviderSwitch(factory, provider); err != nil {
+			return err
+		}
 
-		repository, findErr := models.FindAccessibleVCSProviderRepository(tx, provider, providerUserID, req.GetRepositoryId())
+		repository, findErr := findGitHubCatalogRepository(ctx, tx, organizationID, req.GetRepositoryId())
 		if errors.Is(findErr, gorm.ErrRecordNotFound) {
 			return grpcerrors.PermissionDenied(findErr, "VCS repository is not accessible")
 		}
@@ -102,6 +106,56 @@ func SelectFactoryVCSProviderRepository(
 		return nil, factoryErrorToStatus(err, "failed to select VCS repository")
 	}
 	return &pb.SelectFactoryVCSProviderRepositoryResponse{Factory: serialized}, nil
+}
+
+func findGitHubCatalogRepository(
+	ctx context.Context,
+	tx *gorm.DB,
+	organizationID string,
+	repositoryID int64,
+) (*models.AccessibleVCSProviderRepository, error) {
+	if !githubapp.AccountConnectionRequired(ctx) {
+		if err := requireFactoryOrganizationMember(ctx, tx, organizationID); err != nil {
+			return nil, err
+		}
+		return models.FindInstalledVCSProviderRepository(tx, models.ProviderGitHub, repositoryID)
+	}
+	providerUserID, err := factoryVCSProviderUserID(ctx, tx, organizationID, models.ProviderGitHub)
+	if err != nil {
+		return nil, err
+	}
+	return models.FindAccessibleVCSProviderRepository(tx, models.ProviderGitHub, providerUserID, repositoryID)
+}
+
+func findGitHubCatalogRepositoryByName(
+	ctx context.Context,
+	tx *gorm.DB,
+	organizationID string,
+	fullName string,
+) (*models.AccessibleVCSProviderRepository, error) {
+	if !githubapp.AccountConnectionRequired(ctx) {
+		if err := requireFactoryOrganizationMember(ctx, tx, organizationID); err != nil {
+			return nil, err
+		}
+		return models.FindInstalledVCSProviderRepositoryByName(tx, models.ProviderGitHub, fullName)
+	}
+	providerUserID, err := factoryVCSProviderUserID(ctx, tx, organizationID, models.ProviderGitHub)
+	if err != nil {
+		return nil, err
+	}
+	return models.FindAccessibleVCSProviderRepositoryByName(tx, models.ProviderGitHub, providerUserID, fullName)
+}
+
+func requireFactoryOrganizationMember(ctx context.Context, db *gorm.DB, organizationID string) error {
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return grpcerrors.Unauthenticated(nil, "user not authenticated")
+	}
+	_, err := models.FindActiveUserByIDInTransaction(db, organizationID, userID)
+	if err != nil {
+		return factoryErrorToStatus(err, "failed to load user")
+	}
+	return nil
 }
 
 func factoryVCSProviderUserID(ctx context.Context, db *gorm.DB, organizationID, provider string) (int64, error) {
@@ -157,6 +211,23 @@ func syncFactoryVCSProviderBindings(
 		if err := models.SyncVCSProviderBindingRepositories(tx, integrationID, provider); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// rejectFactoryProviderSwitch locks the provider at the first saved VCS
+// binding. Clearing and rebinding across hosts is rejected.
+func rejectFactoryProviderSwitch(factory *models.Factory, provider string) error {
+	provider = strings.TrimSpace(provider)
+	if provider == "" {
+		return grpcerrors.InvalidArgument(nil, "VCS provider is not supported")
+	}
+	current := factory.OnboardingConfigValue()
+	if strings.TrimSpace(current.VCSIntegrationID) == "" && strings.TrimSpace(current.VCSProvider) == "" {
+		return nil
+	}
+	if !strings.EqualFold(provider, current.EffectiveVCSProvider()) {
+		return grpcerrors.InvalidArgument(nil, "version control provider cannot be changed")
 	}
 	return nil
 }

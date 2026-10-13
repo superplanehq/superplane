@@ -225,6 +225,18 @@ function whenAllowed<T>(allowed: boolean, value: T): T | undefined {
   return allowed ? value : undefined;
 }
 
+function duplicateNodeBaseName(node: ComponentsNode): string {
+  const trimmedName = node.name?.trim();
+  if (trimmedName) return trimmedName;
+  if ((node.type === "TYPE_TRIGGER" || node.type === "TYPE_ACTION") && node.component) return node.component;
+  return "node";
+}
+
+function offsetDuplicateNodePosition(position: ComponentsNode["position"]) {
+  const offset = 50;
+  return { x: (position?.x || 0) + offset, y: (position?.y || 0) + offset };
+}
+
 /** Factory apps keep nodes always expanded — omit collapse toggle. */
 function resolveFactoryAwareToggleView(
   isReadOnly: boolean,
@@ -2897,25 +2909,14 @@ export function AppPage({
         if (!nodeToDuplicate) return { workflow, changed: false };
 
         const existingNodeNames = (workflow.spec?.nodes || []).map((node) => node.name || "").filter(Boolean);
-        let baseName = nodeToDuplicate.name?.trim() || "";
-        if (!baseName) {
-          baseName =
-            (nodeToDuplicate.type === "TYPE_TRIGGER" || nodeToDuplicate.type === "TYPE_ACTION") &&
-            nodeToDuplicate.component
-              ? nodeToDuplicate.component
-              : "node";
-        }
-
+        const baseName = duplicateNodeBaseName(nodeToDuplicate);
         const uniqueNodeName = generateUniqueNodeName(baseName, existingNodeNames);
         const newNodeId = generateNodeId(baseName, uniqueNodeName);
         const duplicateNode: ComponentsNode = {
           ...nodeToDuplicate,
           id: newNodeId,
           name: uniqueNodeName,
-          position: {
-            x: (nodeToDuplicate.position?.x || 0) + 50,
-            y: (nodeToDuplicate.position?.y || 0) + 50,
-          },
+          position: offsetDuplicateNodePosition(nodeToDuplicate.position),
           isCollapsed: false,
         };
 

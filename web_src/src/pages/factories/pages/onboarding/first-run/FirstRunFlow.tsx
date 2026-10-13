@@ -111,9 +111,9 @@ export function FirstRunFlow({
     return (
       <FirstRunTicketsScreen
         ticketSource={ticketSource}
+        githubConnected
         chrome={chromeFor(3, () => setScreen("choose"))}
         sphere={repositorySphereFor(selectedRepository)}
-        jiraAvailable
         jiraConnected={jiraConnected}
         jiraProjects={STORY_JIRA_PROJECTS}
         jiraProjectId={jiraProjectId}
@@ -124,7 +124,7 @@ export function FirstRunFlow({
         }}
         onSelectJiraProject={setJiraProjectId}
         onAnalyzeTickets={() => {
-          if (!canAnalyzeTicketSource({ ticketSource, jiraConnected, jiraProjectId })) return;
+          if (!canAnalyzeTicketSource({ ticketSource, githubConnected: true, jiraConnected, jiraProjectId })) return;
           setProgress({ total: 12, scored: 0, ready: 0, stageIndex: 1 });
           setScreen("analysis");
         }}

@@ -1,5 +1,5 @@
 import { CLARITY_CHECK_KEY, CONFIDENCE_CHECK_KEY, isScoreCheckName } from "./confidenceScore";
-import { INTENT_ARTIFACT_NAME, SPEC_ARTIFACT_NAME } from "./intentDocument";
+import { isPlanningArtifactName, PLANNING_ARTIFACT_NAMES } from "./intentDocument";
 import {
   extractArtifactMarkdownBody,
   extractArtifactName,
@@ -18,11 +18,19 @@ export function hasAnalysisScore(checks?: Array<{ name?: string; key?: string; s
 }
 
 export function analysisPlanBody(artifacts?: Array<{ data?: unknown }>): string | undefined {
+  const bodies = new Map<string, string>();
   for (const artifact of artifacts ?? []) {
     const data = toArtifactDataRecord(artifact.data);
     const name = extractArtifactName(data) ?? extractArtifactTitle(data) ?? "";
     const body = extractArtifactMarkdownBody(data)?.trim() ?? "";
-    if ((name === SPEC_ARTIFACT_NAME || name === INTENT_ARTIFACT_NAME) && body.length > 0) {
+    if (!isPlanningArtifactName(name) || body.length === 0 || bodies.has(name)) {
+      continue;
+    }
+    bodies.set(name, body);
+  }
+  for (const name of PLANNING_ARTIFACT_NAMES) {
+    const body = bodies.get(name);
+    if (body) {
       return body;
     }
   }

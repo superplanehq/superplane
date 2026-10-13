@@ -221,6 +221,13 @@ func HandOffWorkOrder(
 				factory.ID,
 				trackedPR.ID,
 			)
+			StartVisualEvidenceCapture(
+				ctx,
+				deps,
+				factory.OrganizationID,
+				factory.ID,
+				trackedPR.ID,
+			)
 		}
 		if err := messages.PublishFactoryWorkOrderUpdated(
 			factory.ID.String(),

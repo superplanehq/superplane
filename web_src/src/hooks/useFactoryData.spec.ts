@@ -5,21 +5,61 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { clearBacklogAnalysisPending, pendingBacklogAnalysisIds } from "@/pages/factories/lib/backlogAnalysis";
 
-const { factoriesCreateWorkOrder } = vi.hoisted(() => ({
-  factoriesCreateWorkOrder: vi.fn(),
-}));
+const { factoriesCreateWorkOrder, factoriesSelectFactoryVcsProviderRepository, organizationsListIntegrations } =
+  vi.hoisted(() => ({
+    factoriesCreateWorkOrder: vi.fn(),
+    factoriesSelectFactoryVcsProviderRepository: vi.fn(),
+    organizationsListIntegrations: vi.fn(),
+  }));
 
 vi.mock("@/api-client", () => ({
   factoriesCreateWorkOrder,
+  factoriesSelectFactoryVcsProviderRepository,
+  organizationsListIntegrations,
 }));
 
-import { mergeFactoryBoardWorkOrders, useCreateWorkOrder } from "./useFactoryData";
+import {
+  mergeFactoryBoardWorkOrders,
+  useCreateWorkOrder,
+  useSelectFactoryVcsProviderRepository,
+} from "./useFactoryData";
+import { useConnectedIntegrations } from "./useIntegrations";
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return createElement(QueryClientProvider, { client: queryClient }, children);
   };
 }
+
+describe("useSelectFactoryVcsProviderRepository", () => {
+  it("refreshes connections created by repository selection before the save completes", async () => {
+    const integration = {
+      metadata: { id: "bitbucket-1", name: "acme-bitbucket", integrationName: "bitbucket" },
+      status: { state: "ready" },
+    };
+    organizationsListIntegrations.mockResolvedValueOnce({ data: { integrations: [] } });
+    organizationsListIntegrations.mockResolvedValue({ data: { integrations: [integration] } });
+    factoriesSelectFactoryVcsProviderRepository.mockResolvedValue({
+      data: { factory: { id: "factory-1", onboarding: { vcsIntegrationId: "bitbucket-1" } } },
+    });
+    const queryClient = new QueryClient();
+    const { result } = renderHook(
+      () => ({
+        connections: useConnectedIntegrations("org-1"),
+        selectRepository: useSelectFactoryVcsProviderRepository("org-1", "factory-1", "bitbucket"),
+      }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await waitFor(() => expect(result.current.connections.isSuccess).toBe(true));
+    expect(result.current.connections.data).toEqual([]);
+
+    await act(async () => {
+      await result.current.selectRepository.mutateAsync({ repository: "acme/api" });
+      expect(queryClient.getQueryData(["integrations", "connected", "org-1"])).toEqual([integration]);
+    });
+  });
+});
 
 describe("mergeFactoryBoardWorkOrders", () => {
   it("keeps one row when backlog, open, and done share an id", () => {

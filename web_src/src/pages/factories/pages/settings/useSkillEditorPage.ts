@@ -11,9 +11,9 @@ import {
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 
-import { factoryRouteSegment, factorySettingsSectionPath } from "../../lib/factoryPagePaths";
+import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
+import { factoryAgentPath, factoryRouteSegment } from "../../lib/factoryPagePaths";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
-import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import { sanitizeSkillCommandName, setSkillFrontmatterFields, skillDisplayTitle } from "./skillFrontmatter";
 
 const NAME_PATTERN = /^[a-z][a-z0-9-]{0,62}$/;
@@ -45,7 +45,7 @@ export function validateSkillName(name: string): string {
 export function useSkillEditorPage() {
   const { resourceId } = useParams<{ resourceId?: string }>();
   const isCreate = !resourceId || resourceId === "new";
-  const { organizationId, factoryId, factory } = useFactorySettingsLayout();
+  const { organizationId, factoryId, factory } = useFactoriesLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canUpdate = canAct("factories", "update") && !permissionsLoading;
   const navigate = useNavigate();
@@ -62,7 +62,7 @@ export function useSkillEditorPage() {
   const [nameError, setNameError] = useState("");
   const [markdownError, setMarkdownError] = useState("");
   const [pendingDelete, setPendingDelete] = useState(false);
-  const listPath = factorySettingsSectionPath(organizationId, factoryRouteSegment(factory), "workspace", "agent");
+  const listPath = factoryAgentPath(organizationId, factoryRouteSegment(factory));
   const nextDraftKey = isCreate ? "new" : (resource?.id ?? "");
 
   useEffect(() => {

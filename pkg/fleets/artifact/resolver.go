@@ -15,6 +15,7 @@ import (
 )
 
 const maxChecksumsBytes = 1 << 20
+const versionPlaceholder = "{version}"
 
 var exactVersionPattern = regexp.MustCompile(
 	`^(?:sha:[0-9a-f]{40}|v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?)$`,
@@ -38,10 +39,14 @@ type Resolver struct {
 
 func NewResolver(baseURL string, httpClient *http.Client) (*Resolver, error) {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
-	if err := validatePublicURL(baseURL); err != nil {
+	if strings.Count(baseURL, versionPlaceholder) > 1 {
+		return nil, fmt.Errorf("runner release base URL must contain at most one %s placeholder", versionPlaceholder)
+	}
+	validationURL := strings.Replace(baseURL, versionPlaceholder, "v0.0.0", 1)
+	if err := validatePublicURL(validationURL); err != nil {
 		return nil, fmt.Errorf("runner release base URL: %w", err)
 	}
-	parsed, err := url.Parse(baseURL)
+	parsed, err := url.Parse(validationURL)
 	if err != nil {
 		return nil, fmt.Errorf("runner release base URL: %w", err)
 	}
@@ -101,7 +106,7 @@ func (r *Resolver) resolve(
 	ctx context.Context,
 	version, operatingSystem, architecture, filename string,
 ) (Artifact, error) {
-	releaseURL := r.baseURL + "/" + url.PathEscape(version)
+	releaseURL := r.releaseURL(version)
 	checksum, err := r.readChecksum(
 		ctx,
 		releaseURL+"/checksums.txt",
@@ -124,6 +129,14 @@ func (r *Resolver) resolve(
 		URL:             releaseURL + "/" + filename,
 		SHA256:          checksum,
 	}, nil
+}
+
+func (r *Resolver) releaseURL(version string) string {
+	escapedVersion := url.PathEscape(version)
+	if strings.Contains(r.baseURL, versionPlaceholder) {
+		return strings.Replace(r.baseURL, versionPlaceholder, escapedVersion, 1)
+	}
+	return r.baseURL + "/" + escapedVersion
 }
 
 func (r *Resolver) readChecksum(

@@ -6,6 +6,7 @@ import { client } from "@/api-client/client.gen";
 import type { FactoriesFactoryMcpClient } from "@/api-client";
 import {
   FEATURE_SUPERPLANE_MCP_SERVER,
+  FEATURE_WORKSPACE_AGENT,
   FEATURE_WORKSPACE_MCP,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
@@ -23,10 +24,11 @@ import {
   STORYBOOK_ME_USER_NAME,
 } from "../../__fixtures__/factoryPageResponses";
 
-const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
+const settingsAgentPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent`;
 const superplaneMcpServerPath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/superplane-mcp-server`;
 const mcpConfigurePath = `workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/mcp`;
-const mcpAndSkills = [FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
+const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
 
 function connectedMcpClient(id: string, clientName: string): FactoriesFactoryMcpClient {
   return {
@@ -59,7 +61,7 @@ describe("FactorySettingsMCPPage", () => {
     Element.prototype.scrollIntoView ??= vi.fn();
   });
 
-  it("hides Agent nav and shows MCP Server when workspace features are off", async () => {
+  it("hides Agent from settings and the rail when workspace features are off", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
@@ -69,61 +71,47 @@ describe("FactorySettingsMCPPage", () => {
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
     expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-agent")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-nav-agent")).not.toBeInTheDocument();
     expect(within(sidebar).getByTestId("factory-settings-nav-workspace-superplane-mcp-server")).toHaveTextContent(
       "MCP Server",
     );
   }, 10000);
 
-  it("shows the nav items when both features are on", async () => {
+  it("shows the Agent rail icon when SuperPlane Agent is on and keeps MCP Server", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={[FEATURE_WORKSPACE_AGENT]}
       />,
     );
 
     const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-agent")).toHaveTextContent("Agent");
+    expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-agent")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factories-nav-agent")).toHaveAttribute("aria-label", "Agent");
     expect(within(sidebar).getByTestId("factory-settings-nav-workspace-superplane-mcp-server")).toHaveTextContent(
       "MCP Server",
     );
   }, 10000);
 
-  it("shows only MCP nav when only workspace_mcp is on", async () => {
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
-        factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_WORKSPACE_MCP]}
-      />,
-    );
+  it("hides the Agent rail icon when only MCP or skills is on", async () => {
+    for (const features of [[FEATURE_WORKSPACE_MCP], [FEATURE_WORKSPACE_SKILLS]]) {
+      const view = render(
+        <FactoriesHarness
+          pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
+          factoriesFixture={defaultFactoriesFixture}
+          experimentalFeatures={features}
+        />,
+      );
 
-    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-agent")).toHaveTextContent("Agent");
-    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-superplane-mcp-server")).toHaveTextContent(
-      "MCP Server",
-    );
+      await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+      expect(screen.queryByTestId("factories-nav-agent")).not.toBeInTheDocument();
+      view.unmount();
+    }
   }, 10000);
 
-  it("shows only Skills nav when only workspace_skills is on", async () => {
-    render(
-      <FactoriesHarness
-        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/general`}
-        factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={[FEATURE_WORKSPACE_SKILLS]}
-      />,
-    );
-
-    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
-    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-agent")).toHaveTextContent("Agent");
-    expect(within(sidebar).getByTestId("factory-settings-nav-workspace-superplane-mcp-server")).toHaveTextContent(
-      "MCP Server",
-    );
-  }, 10000);
-
-  it("redirects away from the route when the feature is off", async () => {
-    render(<FactoriesHarness pathSuffix={agentPath} factoriesFixture={defaultFactoriesFixture} />);
+  it("redirects away from the settings Agent address when the feature is off", async () => {
+    render(<FactoriesHarness pathSuffix={settingsAgentPath} factoriesFixture={defaultFactoriesFixture} />);
 
     await waitFor(() => {
       expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
@@ -136,11 +124,26 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent-resources`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
     expect(await screen.findByTestId("factory-settings-agent", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factories-nav-agent")).toHaveAttribute("aria-current", "page");
+  }, 10000);
+
+  it("redirects the settings Agent address and keeps the add dialog query", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`${settingsAgentPath}?dialog=add`}
+        factoriesFixture={defaultFactoriesFixture}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    expect(await screen.findByTestId("mcp-add-picker", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
   }, 10000);
 
   it("redirects the legacy skills tab to Skills", async () => {
@@ -148,7 +151,7 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/agent-resources?tab=skills`}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -160,13 +163,19 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={agentPath}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
-    expect(await screen.findByTestId("workspace-page-header-title", {}, { timeout: 8000 })).toHaveTextContent("Agent");
-    expect(await screen.findByTestId("agent-resources-connections-empty")).toHaveTextContent("No MCP servers yet");
+    expect(await screen.findByTestId("workspace-page-header-title", {}, { timeout: 8000 })).toHaveTextContent(
+      "SuperPlane Agent",
+    );
+    const empty = await screen.findByTestId("agent-resources-connections-empty");
+    expect(empty).not.toHaveTextContent("No MCP servers yet");
     expect(screen.getByTestId("agent-resources-add-connection")).toHaveTextContent("Connect");
+    expect(screen.queryByTestId("agent-default-model")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-setup-steps")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-cross-repo")).not.toBeInTheDocument();
   }, 10000);
 
   it("lists a header MCP server with a connected status", async () => {
@@ -177,7 +186,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -186,7 +195,7 @@ describe("FactorySettingsMCPPage", () => {
     expect(screen.getByTestId(`agent-resource-status-${HEADER_MCP_RESOURCE.id}`)).toHaveTextContent("Connected");
     expect(screen.getByTestId(`agent-resource-tools-${HEADER_MCP_RESOURCE.id}`)).toHaveTextContent("2/2 tools");
     expect(screen.queryByText("Header")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Configure")).toBeInTheDocument();
+    expect(screen.getByLabelText("Configure")).toHaveAttribute("href", expect.stringContaining("/agent/mcp/"));
   }, 10000);
 
   it("renders each server as its own compact card", async () => {
@@ -199,7 +208,7 @@ describe("FactorySettingsMCPPage", () => {
             [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE, OAUTH_NOT_CONNECTED_RESOURCE],
           },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -229,13 +238,15 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
     expect(await screen.findByTestId("mcp-connection-tools", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(await screen.findByTestId("mcp-tools-list")).toHaveTextContent("search");
     expect(screen.queryByText("Search the catalog.")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factories-nav-agent")).toHaveAttribute("aria-current", "page");
   }, 10000);
 
   it("hides tools when sign-in is not connected", async () => {
@@ -246,7 +257,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [OAUTH_NOT_CONNECTED_RESOURCE] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -263,7 +274,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -287,7 +298,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [sentryResource] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -313,7 +324,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [sentryResource] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -338,7 +349,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [customSentry] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -358,7 +369,7 @@ describe("FactorySettingsMCPPage", () => {
           ...defaultFactoriesFixture,
           agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [HEADER_MCP_RESOURCE] },
         }}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -381,6 +392,7 @@ describe("FactorySettingsMCPPage", () => {
       "MCP Server",
     );
     expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-agent")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factories-nav-agent")).not.toBeInTheDocument();
   }, 10000);
 
   it("hides inbound MCP on the Agent page", async () => {
@@ -388,7 +400,7 @@ describe("FactorySettingsMCPPage", () => {
       <FactoriesHarness
         pathSuffix={agentPath}
         factoriesFixture={defaultFactoriesFixture}
-        experimentalFeatures={mcpAndSkills}
+        experimentalFeatures={agentPageFeatures}
       />,
     );
 
@@ -522,8 +534,8 @@ describe("FactorySettingsMCPPage", () => {
   }, 10000);
 
   it("shows the full MCP client name on hover and in the revoke dialog", async () => {
-    const longClientId = "mcp-client-codex";
-    const longClientName = "https://chatgpt.com/oauth/codex/workspace-example/client.json";
+    const longClientId = "mcp-client-long-name";
+    const longClientName = "https://example.com/oauth/clients/workspace-example/client-metadata.json";
     renderSuperplaneMcpServer([
       connectedMcpClient("mcp-client-cursor", "Cursor"),
       connectedMcpClient(longClientId, longClientName),

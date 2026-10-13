@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,6 +111,21 @@ func TestRunnerTaskLogCompactorFinalizesTaskLogs(t *testing.T) {
 	assert.Nil(t, cleanedLifecycle.CleanupAfter)
 	_, err = activeStore.ReadAfter(t.Context(), task.ID, "")
 	assert.ErrorIs(t, err, runnerlogs.ErrNotFound)
+}
+
+func TestRunnerTaskLogCompactorMeasuresUncompressedSize(t *testing.T) {
+	provider, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	compactor := NewRunnerTaskLogCompactor(provider, nil, "test", time.Second, time.Minute)
+
+	content := strings.Repeat("line\n", 200)
+	size, err := compactor.writeFinalObject(t.Context(), "test-log", strings.NewReader(content))
+	require.NoError(t, err)
+	assert.Equal(t, int64(len(content)), size)
+
+	object, err := provider.Head(t.Context(), "test-log")
+	require.NoError(t, err)
+	assert.Less(t, object.Size, size)
 }
 
 func TestRunnerTaskLogCompactorArchivesTaskWithoutChunks(t *testing.T) {

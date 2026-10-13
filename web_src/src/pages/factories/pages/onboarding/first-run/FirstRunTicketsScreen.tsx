@@ -15,15 +15,6 @@ type FirstRunTicketsScreenProps = {
   ticketSource: FirstRunTicketSource | null;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
-  /** True when the organization has the Jira intake feature. Shows Jira as coming soon when false and the lookup is done. */
-  jiraAvailable?: boolean;
-  /** True while the feature lookup has not finished. The row does not show Coming soon. */
-  jiraFeatureLoading?: boolean;
-  /**
-   * A saved Jira choice cannot continue until the feature lookup confirms Jira.
-   * The notice explains the block.
-   */
-  jiraChoiceBlock?: FirstRunFlaggedChoiceBlock | null;
   linearAvailable?: boolean;
   linearFeatureLoading?: boolean;
   linearChoiceBlock?: FirstRunFlaggedChoiceBlock | null;
@@ -33,6 +24,8 @@ type FirstRunTicketsScreenProps = {
   /** True while this screen provisions the workspace, on the last screen. */
   saving?: boolean;
   savingLabel?: string;
+  githubConnected?: boolean;
+  githubAvailable?: boolean;
   jiraConnected?: boolean;
   jiraProjects?: FirstRunJiraProject[];
   jiraProjectsLoading?: boolean;
@@ -45,6 +38,7 @@ type FirstRunTicketsScreenProps = {
   linearProjectIds?: string[];
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
   onAnalyzeTickets: () => void;
+  onConnectGitHub?: () => void;
   onConnectJira?: () => void;
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
@@ -54,16 +48,15 @@ type FirstRunTicketsScreenProps = {
 };
 
 const TICKET_SCREEN_DEFAULTS = {
-  jiraAvailable: false,
-  jiraFeatureLoading: false,
-  jiraChoiceBlock: null as FirstRunFlaggedChoiceBlock | null,
-  linearAvailable: false,
+  linearAvailable: true,
   linearFeatureLoading: false,
   linearChoiceBlock: null as FirstRunFlaggedChoiceBlock | null,
   continueLabel: FIRST_RUN_COPY.tickets.analyze,
   continuePending: false,
   saving: false,
   savingLabel: FIRST_RUN_COPY.finish.saving,
+  githubConnected: false,
+  githubAvailable: true,
   jiraConnected: false,
   jiraProjects: [] as FirstRunJiraProject[],
   jiraProjectsLoading: false,
@@ -78,8 +71,7 @@ const TICKET_SCREEN_DEFAULTS = {
 
 function ticketScanAllowed(args: {
   ticketSource: FirstRunTicketSource | null;
-  jiraAvailable: boolean;
-  jiraChoiceBlock: FirstRunFlaggedChoiceBlock | null;
+  githubConnected: boolean;
   jiraConnected: boolean;
   jiraProjectId: string;
   linearAvailable: boolean;
@@ -89,15 +81,14 @@ function ticketScanAllowed(args: {
   linearProjectsLoading: boolean;
   linearProjectsError: boolean;
 }): boolean {
-  const jiraSelectionBlocked = Boolean(args.jiraChoiceBlock) || (args.ticketSource === "jira" && !args.jiraAvailable);
   const linearSelectionBlocked =
     Boolean(args.linearChoiceBlock) || (args.ticketSource === "linear" && !args.linearAvailable);
   if (args.ticketSource === "linear" && (args.linearProjectsLoading || args.linearProjectsError)) return false;
   return (
-    !jiraSelectionBlocked &&
     !linearSelectionBlocked &&
     canAnalyzeTicketSource({
       ticketSource: args.ticketSource,
+      githubConnected: args.githubConnected,
       jiraConnected: args.jiraConnected,
       jiraProjectId: args.jiraProjectId,
       linearConnected: args.linearConnected,
@@ -125,9 +116,6 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
     ticketSource,
     chrome,
     sphere,
-    jiraAvailable,
-    jiraFeatureLoading,
-    jiraChoiceBlock,
     linearAvailable,
     linearFeatureLoading,
     linearChoiceBlock,
@@ -135,6 +123,8 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
     continuePending,
     saving,
     savingLabel,
+    githubConnected,
+    githubAvailable,
     jiraConnected,
     jiraProjects,
     jiraProjectsLoading,
@@ -147,6 +137,7 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
     linearProjectIds,
     onSelectTicketSource,
     onAnalyzeTickets,
+    onConnectGitHub,
     onConnectJira,
     onSelectJiraProject,
     onRetryJiraProjects,
@@ -157,8 +148,7 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
   const copy = FIRST_RUN_COPY.tickets;
   const canAnalyze = ticketScanAllowed({
     ticketSource,
-    jiraAvailable,
-    jiraChoiceBlock,
+    githubConnected,
     jiraConnected,
     jiraProjectId,
     linearAvailable,
@@ -178,10 +168,10 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
 
       <div className="mt-8 space-y-4">
         <FirstRunTicketChoices
+          githubAvailable={githubAvailable}
           ticketSource={ticketSource}
           saving={saving}
-          jiraAvailable={jiraAvailable}
-          jiraFeatureLoading={jiraFeatureLoading}
+          githubConnected={githubConnected}
           jiraConnected={jiraConnected}
           jiraProjects={jiraProjects}
           jiraProjectsLoading={jiraProjectsLoading}
@@ -195,18 +185,13 @@ export function FirstRunTicketsScreen(props: FirstRunTicketsScreenProps) {
           linearProjectsError={linearProjectsError}
           linearProjectIds={linearProjectIds}
           onSelectTicketSource={onSelectTicketSource}
+          onConnectGitHub={onConnectGitHub}
           onConnectJira={onConnectJira}
           onSelectJiraProject={onSelectJiraProject}
           onRetryJiraProjects={onRetryJiraProjects}
           onConnectLinear={onConnectLinear}
           onToggleLinearProject={onToggleLinearProject}
           onRetryLinearProjects={onRetryLinearProjects}
-        />
-        <FirstRunChoiceNotice
-          block={jiraChoiceBlock}
-          loading={copy.jiraLookupLoading}
-          failed={copy.jiraLookupFailed}
-          testId="first-run-jira-choice-notice"
         />
         <FirstRunChoiceNotice
           block={linearChoiceBlock}

@@ -133,6 +133,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "pull request lookup is incomplete")
 	case errors.Is(err, errFactoryGitHubNotConnected):
 		return grpcerrors.FailedPrecondition(err, "GitHub is not connected.")
+	case errors.Is(err, errFactoryBitbucketNotConnected):
+		return grpcerrors.FailedPrecondition(err, "Bitbucket is not connected.")
 	case errors.Is(err, errCannotCloseBitbucketPullRequest):
 		return grpcerrors.FailedPrecondition(err, "SuperPlane cannot close a Bitbucket pull request.")
 	case errors.Is(err, vcs.ErrNotSupported):
@@ -142,7 +144,7 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 	case errors.Is(err, errWorkOrderNotClosedForBacklog):
 		return grpcerrors.FailedPrecondition(err, "Only a closed task can move to the Backlog.")
 	case errors.Is(err, errFactoryPullRequestNotGitHub):
-		return grpcerrors.FailedPrecondition(err, "Only GitHub pull requests can merge from SuperPlane.")
+		return grpcerrors.FailedPrecondition(err, "Only pull requests on the workspace Git host can merge from SuperPlane.")
 	case errors.Is(err, errFactoryPullRequestNotOpen):
 		return grpcerrors.FailedPrecondition(err, "The pull request is not open.")
 	case errors.Is(err, errFactoryPullRequestNotMergeable):
@@ -223,8 +225,6 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "This canvas belongs to a factory intake, line, backlog, or PR feedback handler.")
 	case errors.Is(err, errFactoryPullRequestMergeDisabled):
 		return grpcerrors.FailedPrecondition(err, "Pull request merge is not enabled for this organization.")
-	case errors.Is(err, errRiskScoreDisabled):
-		return grpcerrors.FailedPrecondition(err, "Merge confidence is not enabled for this organization.")
 	case errors.Is(err, errFactoryBitbucketDisabled):
 		return grpcerrors.FailedPrecondition(err, "Bitbucket workspaces are not enabled for this organization.")
 	case errors.Is(err, errWorkspaceMCPDisabled):
@@ -251,7 +251,6 @@ var errFactoryAgentResourceNotConnected = errors.New("connect this MCP server fi
 var errListMCPTools = errors.New("could not list MCP tools")
 var errMCPConnectionChanged = errors.New("mcp connection changed before tool defaults were saved")
 var errFactoryPullRequestMergeDisabled = errors.New("pull request merge is not enabled")
-var errRiskScoreDisabled = errors.New("risk score is not enabled")
 var errFactoryBitbucketDisabled = errors.New("bitbucket workspaces are not enabled")
 var errWorkspaceMCPDisabled = errors.New("workspace MCP is not enabled")
 var errWorkspaceSkillsDisabled = errors.New("workspace skills are not enabled")

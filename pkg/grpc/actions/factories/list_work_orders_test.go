@@ -6,11 +6,74 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
 )
+
+func Test__WorkOrderVisibility_ArchivesStayHiddenAndRejectionsStayVisible(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(t.Context(), r.User.String())
+	db := database.DB(ctx)
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Task visibility", "", "TV")
+	require.NoError(t, err)
+
+	for _, result := range []pb.WorkOrder_Result{pb.WorkOrder_RESULT_ARCHIVED, pb.WorkOrder_RESULT_REJECTED} {
+		order, err := factory.CreateWorkOrder(db, result.String(), "", &r.User, nil, nil)
+		require.NoError(t, err)
+		closed, err := CloseWorkOrder(ctx, r.Organization.ID.String(), &pb.CloseWorkOrderRequest{
+			FactoryId: factory.ID.String(), OrderId: order.ID.String(), Result: result,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, result, closed.Order.Result)
+		_, err = DescribeWorkOrder(ctx, r.Organization.ID.String(), &pb.DescribeWorkOrderRequest{
+			FactoryId: factory.ID.String(), OrderId: order.ID.String(),
+		})
+		if result == pb.WorkOrder_RESULT_ARCHIVED {
+			assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
+		} else {
+			require.NoError(t, err)
+		}
+	}
+
+	legacy, err := factory.CreateWorkOrder(db, "Legacy archive", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = legacy.Close(db, models.FactoryWorkOrderResultRejected, &r.User)
+	require.NoError(t, err)
+	_, err = DescribeWorkOrder(ctx, r.Organization.ID.String(), &pb.DescribeWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: legacy.ID.String(),
+	})
+	assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
+	line, err := factory.CreateLine(db, "legacy", nil)
+	require.NoError(t, err)
+	support.CreateFactoryLineDispatch(t, r.Organization.ID, factory.ID, legacy.ID, line.ID, line.Name, nil)
+	_, err = DescribeWorkOrder(ctx, r.Organization.ID.String(), &pb.DescribeWorkOrderRequest{
+		FactoryId: factory.ID.String(), OrderId: legacy.ID.String(),
+	})
+	assert.Equal(t, codes.NotFound, grpcerrors.Code(err))
+
+	prClosed, err := factory.CreateWorkOrder(db, "Closed PR", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = prClosed.UpdateStatus(db, models.FactoryWorkOrderStatusUpdate{ToState: models.FactoryWorkOrderStateOpen})
+	require.NoError(t, err)
+	_, err = prClosed.Close(db, models.FactoryWorkOrderResultPRClosed, nil)
+	require.NoError(t, err)
+
+	for _, results := range [][]pb.WorkOrder_Result{nil, {pb.WorkOrder_RESULT_REJECTED, pb.WorkOrder_RESULT_PR_CLOSED}} {
+		page, err := ListWorkOrders(ctx, r.Organization.ID.String(), &pb.ListWorkOrdersRequest{
+			FactoryId: factory.ID.String(), Results: results,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, uint32(2), page.TotalCount)
+		require.Len(t, page.Orders, 2)
+		assert.ElementsMatch(t, []pb.WorkOrder_Result{pb.WorkOrder_RESULT_REJECTED, pb.WorkOrder_RESULT_PR_CLOSED},
+			[]pb.WorkOrder_Result{page.Orders[0].Result, page.Orders[1].Result})
+	}
+}
 
 func Test__ListWorkOrders_PagesByUpdatedAt(t *testing.T) {
 	r := support.Setup(t)
@@ -39,6 +102,7 @@ func Test__ListWorkOrders_PagesByUpdatedAt(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, page.Orders, 2)
 	assert.True(t, page.HasNextPage)
+	assert.Equal(t, uint32(3), page.TotalCount)
 	assert.Equal(t, third.ID.String(), page.Orders[0].GetId())
 	assert.Equal(t, second.ID.String(), page.Orders[1].GetId())
 
@@ -50,6 +114,7 @@ func Test__ListWorkOrders_PagesByUpdatedAt(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, next.Orders, 1)
 	assert.False(t, next.HasNextPage)
+	assert.Equal(t, uint32(3), next.TotalCount)
 	assert.Equal(t, first.ID.String(), next.Orders[0].GetId())
 }
 

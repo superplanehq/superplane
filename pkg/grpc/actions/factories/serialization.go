@@ -123,19 +123,20 @@ func serializeFactoryWithLineMetrics(
 func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 	config := factory.OnboardingConfigValue()
 	onboarding := &pb.FactoryOnboarding{
-		VcsIntegrationId:    config.VCSIntegrationID,
-		AgentIntegrationId:  config.AgentIntegrationID,
-		AppRepository:       config.AppRepository,
-		AppRepositoryId:     config.AppRepositoryID,
-		BacklogRepository:   config.BacklogRepository,
-		BacklogRepositoryId: config.BacklogRepositoryID,
-		DefaultBranch:       config.DefaultBranch,
-		IssuesSource:        serializeFactoryOnboardingIssuesSource(config.IssuesSource),
-		AgentHarness:        serializeFactoryOnboardingAgentHarness(config.AgentHarness),
-		ProvisionedAppId:    config.ProvisionedAppID,
-		ProvisionedLineId:   config.ProvisionedLineID,
-		Initial:             factory.IsInitialOnboarding(),
-		VcsProvider:         config.VCSProvider,
+		VcsIntegrationId:        config.VCSIntegrationID,
+		AgentIntegrationId:      config.AgentIntegrationID,
+		AppRepository:           config.AppRepository,
+		AppRepositoryId:         config.AppRepositoryID,
+		AppRepositoryExternalId: config.AppRepositoryExternalID,
+		BacklogRepository:       config.BacklogRepository,
+		BacklogRepositoryId:     config.BacklogRepositoryID,
+		DefaultBranch:           config.DefaultBranch,
+		IssuesSource:            serializeFactoryOnboardingIssuesSource(config.IssuesSource),
+		AgentHarness:            serializeFactoryOnboardingAgentHarness(config.AgentHarness),
+		ProvisionedAppId:        config.ProvisionedAppID,
+		ProvisionedLineId:       config.ProvisionedLineID,
+		Initial:                 factory.IsInitialOnboarding(),
+		VcsProvider:             config.VCSProvider,
 	}
 	if factory.OnboardingCompletedAt != nil {
 		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)
@@ -721,16 +722,13 @@ func serializeWorkOrderCreator(
 		return nil
 	}
 
-	name := order.CreatedByID.String()
-	if order.CreatedBy != nil {
-		name = order.CreatedBy.Name
-	}
-
 	return &pb.WorkOrderCreator{
 		Kind: &pb.WorkOrderCreator_User{
 			User: &pb.UserRef{
-				Id:   order.CreatedByID.String(),
-				Name: name,
+				Id:           order.CreatedByID.String(),
+				Name:         loadedMemberName(order.CreatedBy),
+				Deleted:      loadedMemberDeleted(order.CreatedBy),
+				FormerMember: loadedMemberFormer(order.CreatedBy),
 			},
 		},
 	}
@@ -944,10 +942,14 @@ func serializeWorkOrderResult(result string) pb.WorkOrder_Result {
 	switch result {
 	case models.FactoryWorkOrderResultCompleted:
 		return pb.WorkOrder_RESULT_COMPLETED
-	case models.FactoryWorkOrderResultRejected:
+	case models.FactoryWorkOrderResultRejected, models.FactoryWorkOrderResultManualRejected:
 		return pb.WorkOrder_RESULT_REJECTED
 	case models.FactoryWorkOrderResultFailed:
 		return pb.WorkOrder_RESULT_FAILED
+	case models.FactoryWorkOrderResultArchived:
+		return pb.WorkOrder_RESULT_ARCHIVED
+	case models.FactoryWorkOrderResultPRClosed:
+		return pb.WorkOrder_RESULT_PR_CLOSED
 	default:
 		return pb.WorkOrder_RESULT_UNSPECIFIED
 	}
@@ -956,14 +958,27 @@ func serializeWorkOrderResult(result string) pb.WorkOrder_Result {
 func serializeWorkOrderAssignees(assignees []models.FactoryWorkOrderAssignee) []*pb.UserRef {
 	result := make([]*pb.UserRef, 0, len(assignees))
 	for _, assignee := range assignees {
-		name := assignee.UserID.String()
-		if assignee.User != nil {
-			name = assignee.User.Name
-		}
 		result = append(result, &pb.UserRef{
-			Id:   assignee.UserID.String(),
-			Name: name,
+			Id:           assignee.UserID.String(),
+			Name:         loadedMemberName(assignee.User),
+			Deleted:      loadedMemberDeleted(assignee.User),
+			FormerMember: loadedMemberFormer(assignee.User),
 		})
 	}
 	return result
+}
+
+func loadedMemberName(user *models.User) string {
+	if user == nil {
+		return ""
+	}
+	return user.Name
+}
+
+func loadedMemberDeleted(user *models.User) bool {
+	return user != nil && user.Account != nil && user.Account.DeletedAt.Valid
+}
+
+func loadedMemberFormer(user *models.User) bool {
+	return user != nil && user.DeletedAt.Valid && !loadedMemberDeleted(user)
 }

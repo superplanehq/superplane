@@ -24,222 +24,51 @@ const PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0
 const GIF_BYTES = Buffer.from([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x00]);
 const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0x00]);
 
-test("analysis protocol omits a disabled score tool", () => {
-  const clarityOnly = analysisProtocol({ SUPERPLANE_PLANNING_CONFIDENCE: "false" });
-  assert.match(clarityOnly, /propose_clarity/);
-  assert.doesNotMatch(clarityOnly, /propose_confidence/);
-  assert.match(clarityOnly, /Publish a Clarity score on the first message/);
-  assert.doesNotMatch(clarityOnly, /only one score/);
-  assert.match(clarityOnly, /The first message is a plan turn/);
-  assert.match(clarityOnly, /If no score is published yet, this turn is a plan turn/);
-  assert.doesNotMatch(clarityOnly, /question turn/);
-  assert.match(clarityOnly, /When every required score is 5, publish each required score on that plan turn/);
-  assert.match(clarityOnly, /ask to update the plan or the scores, or confirm a decision/);
-  assert.doesNotMatch(clarityOnly, /Confidence summary/);
-  assert.doesNotMatch(clarityOnly, / {2,}/);
-
-  const confidenceOnly = analysisProtocol({ SUPERPLANE_PLANNING_CLARITY: "false" });
-  assert.match(confidenceOnly, /propose_confidence/);
-  assert.doesNotMatch(confidenceOnly, /propose_clarity/);
-  assert.match(confidenceOnly, /Publish a Confidence score on the first message/);
-  assert.doesNotMatch(confidenceOnly, /only one score/);
-  assert.match(confidenceOnly, /An unclear draft is still a plan turn/);
-  assert.doesNotMatch(confidenceOnly, /question turn/);
-  assert.match(confidenceOnly, /When every required score is 5, publish each required score on that plan turn/);
-  assert.match(confidenceOnly, /ask to update the plan or the scores, or confirm a decision/);
-  assert.doesNotMatch(confidenceOnly, /Clarity summary/);
-  assert.doesNotMatch(confidenceOnly, / {2,}/);
-
-  const neither = analysisProtocol({
-    SUPERPLANE_PLANNING_CLARITY: "false",
-    SUPERPLANE_PLANNING_CONFIDENCE: "false",
-  });
-  assert.doesNotMatch(neither, /propose_clarity/);
-  assert.doesNotMatch(neither, /propose_confidence/);
-  assert.match(neither, /Do not publish Clarity or Confidence scores/);
-  assert.match(neither, /ask to update the plan or the scores, or confirm a decision/);
-  assert.match(neither, /call propose_spec before survey when you write a plan/);
-  assert.doesNotMatch(neither, /required score tools/);
-  assert.doesNotMatch(neither, /a score would change/);
-  assert.doesNotMatch(neither, /required score is 5/);
-  assert.doesNotMatch(neither, /If no score is published yet/);
-  assert.doesNotMatch(neither, /question turn/);
-  assert.doesNotMatch(neither, /Clarity summary/);
-  assert.doesNotMatch(neither, / {2,}/);
-});
-
-test("planningTools uses propose_update when review is on", () => {
-  const { planningTools } = require("./planning_session_mcp");
-  assert.deepEqual(
-    planningTools({ SUPERPLANE_PLANNING_REVIEW: "true" }).map((tool) => tool.name),
-    ["propose_update", "inspect_attachment"],
-  );
-});
-
-test("analysis protocol uses the review wiring when the flag is on", () => {
-  const review = analysisProtocol({ SUPERPLANE_PLANNING_REVIEW: "true" });
+test("analysis protocol always uses the review contract", () => {
+  const review = analysisProtocol();
   assert.match(review, /propose_update/);
   assert.doesNotMatch(review, /Call propose_clarity/);
   assert.doesNotMatch(review, /Call propose_confidence/);
   assert.match(review, /Do not call propose_spec, propose_clarity, propose_confidence, or survey/);
-  assert.match(review, /weakest sub-parameter/);
-  assert.match(review, /name only the weakest/);
   assert.match(review, /integer from 1 through 3/);
   assert.match(review, /Do not use that scale or its thresholds/);
+
+  const ignored = analysisProtocol({
+    SUPERPLANE_PLANNING_CLARITY: "false",
+    SUPERPLANE_PLANNING_CONFIDENCE: "false",
+    SUPERPLANE_PLANNING_REVIEW: "false",
+  });
+  assert.equal(ignored, review);
 });
 
-test("planningTools omits disabled score tools", () => {
+test("planningTools always exposes propose_update", () => {
   const { planningTools } = require("./planning_session_mcp");
   assert.deepEqual(
-    planningTools({ SUPERPLANE_PLANNING_CLARITY: "false" }).map((tool) => tool.name),
-    ["propose_spec", "propose_confidence", "survey", "inspect_attachment"],
-  );
-  assert.deepEqual(
-    planningTools({ SUPERPLANE_PLANNING_CONFIDENCE: "false" }).map((tool) => tool.name),
-    ["propose_spec", "propose_clarity", "survey", "inspect_attachment"],
+    planningTools().map((tool) => tool.name),
+    ["propose_update", "inspect_attachment"],
   );
   assert.deepEqual(
     planningTools({
       SUPERPLANE_PLANNING_CLARITY: "false",
       SUPERPLANE_PLANNING_CONFIDENCE: "false",
+      SUPERPLANE_PLANNING_REVIEW: "false",
     }).map((tool) => tool.name),
-    ["propose_spec", "survey", "inspect_attachment"],
+    ["propose_update", "inspect_attachment"],
   );
 });
 
 test("analysis protocol covers publish tools and hides chat dumps", () => {
   const pack = analysisProtocol();
-  assert.match(pack, /propose_spec/);
-  assert.match(pack, /propose_clarity/);
-  assert.match(pack, /propose_confidence/);
-  assert.match(pack, /A question can raise Clarity or Confidence/);
-  assert.doesNotMatch(pack, /Do not ask a question to raise Confidence/);
-  assert.doesNotMatch(pack, /propose_plan/);
-  assert.match(pack, /The task prompt owns the judgment/);
+  assert.match(pack, /propose_update/);
+  assert.match(pack, /weakest sub-parameter/);
+  assert.match(pack, /The task prompt owns the judgment|When the two seem to disagree on judgment, the task prompt wins/);
   assert.match(pack, /Use only the analysis tools/);
-  assert.match(pack, /Do not paste the specification/);
-  assert.match(pack, /call survey with 2 to 4 options/);
-  assert.match(
-    pack,
-    /\{"questions":\[\{"prompt":"Your question","options":\["First option","Second option"\]\}\]\}/,
-  );
-  assert.match(pack, /Do not use XML tags/);
-  assert.match(pack, /If the survey tool is unavailable or fails, do not put the questions in chat/);
-  assert.match(pack, /You may update the score without rewriting the specification/);
-  assert.match(pack, /this is a continuation/);
-  assert.match(pack, /does not publish the specification or the score/);
-  assert.match(pack, /only after those calls/);
-  assert.match(pack, /Do not leave a written plan unpublished/);
-  assert.doesNotMatch(pack, /create_task/);
+  assert.match(pack, /Do not paste the published plan/);
   assert.match(pack, /inspect_attachment/);
-  assert.match(pack, /Do not curl a signed URL/);
   assert.match(pack, /Do not use OCR/);
-  assert.doesNotMatch(pack, /Never create a task the user did not confirm/);
-  assert.doesNotMatch(pack, /narrow the specification to the part that stays/);
   assert.doesNotMatch(pack, /Call propose_spec when the task prompt says/);
-  assert.match(pack, /ask to update the plan or the scores, or confirm a decision/);
-  assert.match(pack, /Do not call the spec tool or a score tool/);
-  assert.match(pack, /The first message is a plan turn/);
-  assert.match(pack, /An unclear draft is still a plan turn/);
-  assert.match(pack, /publish each required score first/);
-  assert.match(pack, /Do not call them on an answer turn/);
-  assert.match(pack, /If the user asks to update only one score, call that score tool only/);
-  assert.doesNotMatch(pack, /on each plan turn/);
-  assert.doesNotMatch(pack, /question turn/);
-  assert.match(pack, /Do not add that sentence on a turn that already updates the plan/);
-  assert.match(pack, /Do not name files/);
-  assert.match(pack, /name one only when that name is the direct answer/);
-  assert.match(pack, /When every required score is 5, publish each required score on that plan turn/);
-  assert.match(pack, /Answer the questions in this session/);
-  assert.match(pack, /Do not describe agent fit/);
-  assert.match(pack, /Do not write a test or an acceptance check/);
-  assert.match(pack, /Do not add an Open questions section/);
   assert.doesNotMatch(pack, /Talk like a colleague/);
   assert.doesNotMatch(pack, /## Proposed outcome/);
-  assert.doesNotMatch(pack, /## 1\. Research/);
-  assert.doesNotMatch(pack, /Why not start/);
-  assert.doesNotMatch(pack, /you must ask/);
-  assert.doesNotMatch(pack, /## Executive summary/);
-  assert.doesNotMatch(pack, /check copy/);
-  assert.doesNotMatch(pack, /\/tmp\/spec\.md/);
-});
-
-test("analysis user prompt covers tone, score rules, and plan shape", () => {
-  const pack = fs.readFileSync(path.join(__dirname, "analysis_user_prompt.md"), "utf8");
-  assert.match(pack, /Talk like a colleague/);
-  assert.match(pack, /## 1\. Research/);
-  assert.match(pack, /## 2\. Decide or ask/);
-  assert.match(pack, /## 3\. Score Clarity/);
-  assert.match(pack, /## 4\. Score Confidence/);
-  assert.match(pack, /## 5\. Write the plan/);
-  assert.match(pack, /how well the task is defined/);
-  assert.doesNotMatch(pack, /how likely implementation is to succeed/);
-  assert.match(pack, /why Clarity is not 5/);
-  assert.match(pack, /how likely a coding agent finishes this task in one run/);
-  assert.match(pack, /### Calibration/);
-  assert.match(pack, /Start at 4 for a bounded change that has a pattern in the repository/);
-  assert.match(pack, /### Raise Confidence through refinement/);
-  assert.match(pack, /Narrow the scope so the remaining work fits one run/);
-  assert.match(pack, /Be direct when the task is too big or too complex for one run/);
-  assert.doesNotMatch(pack, /### Split the task/);
-  assert.doesNotMatch(pack, /create_task/);
-  assert.match(pack, /Keep this task as one task/);
-  assert.match(pack, /Do not create another task/);
-  assert.match(pack, /Keep the original scope in the plan until the user confirms/);
-  assert.doesNotMatch(pack, /Drop the screens from this task/);
-  assert.match(pack, /Do not use contractions/);
-  assert.doesNotMatch(pack, /Contractions are fine/);
-  assert.doesNotMatch(pack, /### A part of a split/);
-  assert.doesNotMatch(pack, /that boundary is decided/);
-  assert.doesNotMatch(pack, /Do not lower Confidence because it is not in the repository yet/);
-  assert.doesNotMatch(pack, /Score only the work this task owns/);
-  assert.doesNotMatch(pack, /Do not push Confidence to 5/);
-  assert.doesNotMatch(pack, /Do not ask a survey question to raise it/);
-  assert.match(pack, /Confidence is provisional/);
-  assert.strictEqual(pack.match(/Do not repeat the number in the summary/g)?.length, 2);
-  assert.doesNotMatch(pack, /Good: Clarity is \d because/);
-  assert.doesNotMatch(pack, /Good: Confidence is \d because/);
-  assert.match(pack, /Blast radius/);
-  assert.match(pack, /Skip Risks only when Clarity is 5 and Confidence is 4 or higher/);
-  assert.doesNotMatch(pack, /how suitable the work is for an agent/);
-  assert.match(pack, /## Answer turn/);
-  assert.match(pack, /## Plan turn/);
-  assert.match(pack, /The first message is a plan turn/);
-  assert.match(pack, /The first message is not an answer turn/);
-  assert.match(pack, /An unclear draft is still a plan turn/);
-  assert.match(pack, /Publish Clarity on the first plan turn, even when you ask a question/);
-  assert.match(pack, /If the user asks to update only Clarity, do not publish Confidence/);
-  assert.doesNotMatch(pack, /when the user has not asked a question/);
-  assert.doesNotMatch(pack, /question turn/);
-  assert.match(pack, /which file, type, test, command, or API owns a behavior, name it/);
-  assert.match(pack, /When every required score is 5, publish each required score on that plan turn/);
-  assert.match(pack, /do not rewrite the plan/);
-  assert.match(pack, /ask to update the plan or the scores, or confirm a decision/);
-  assert.match(pack, /Do not use a survey to answer a question/);
-  assert.match(pack, /leave the plan unchanged/);
-  assert.doesNotMatch(pack, /five steps/);
-  assert.doesNotMatch(pack, /2 to 4 short sentences/);
-  assert.doesNotMatch(pack, /Every turn follows/);
-  assert.match(pack, /Keep each option under 12 words/);
-  assert.match(pack, /If Clarity is 1 or 2/);
-  assert.match(pack, /do not have enough Clarity to write a plan/);
-  assert.match(pack, /Keep asking until Clarity is 5/);
-  assert.match(pack, /Clarity 3 and 4/);
-  assert.match(pack, /Review it and start if you are happy/);
-  assert.match(pack, /A simple task can reach 5 with no survey/);
-  assert.match(pack, /Do not invent a survey to fill a quota/);
-  assert.match(pack, /## Proposed outcome/);
-  assert.match(pack, /## Constraints/);
-  assert.match(pack, /## Scope/);
-  assert.match(pack, /Do not repeat the goal/);
-  assert.doesNotMatch(pack, /propose_spec/);
-  assert.doesNotMatch(pack, /in chat, survey, or the Clarity summary/);
-  assert.doesNotMatch(pack, /Do not describe agent fit/);
-  assert.doesNotMatch(pack, /Do not add an Open questions section/);
-  assert.doesNotMatch(pack, /## Executive summary/);
-  assert.doesNotMatch(pack, /## Files and seams/);
-  assert.doesNotMatch(pack, /at least five/);
-  assert.doesNotMatch(pack, /Key architecture decisions/);
 });
 
 test("review user prompt scores three sub-parameters on the 1 through 3 scale", () => {
@@ -507,44 +336,11 @@ test("lists planning tools over newline-delimited JSON-RPC", async () => {
   const tools = replies[1].result.tools;
   assert.deepEqual(
     tools.map((tool) => tool.name),
-    ["propose_spec", "propose_clarity", "propose_confidence", "survey", "inspect_attachment"],
+    ["propose_update", "inspect_attachment"],
   );
-  const [spec, clarity, confidence, survey, inspectTool] = tools;
-  assert.deepEqual(spec.inputSchema.required, ["body"]);
-  assert.match(spec.description, /Do not leave a written plan unpublished/);
-  assert.match(clarity.description, /how well the task is defined/);
-  assert.match(clarity.description, /on the first message and on a plan turn that also asks a question/);
-  assert.match(clarity.description, /If the user asks to update only the other score, do not call this tool/);
-  assert.match(clarity.description, /When every required score is 5/);
-  assert.match(clarity.description, /Do not call it on an answer turn/);
-  assert.match(clarity.description, /Call it before survey/);
-  assert.match(clarity.description, /An unchanged score stays on the card/);
-  assert.doesNotMatch(clarity.description, /every turn/);
-  assert.doesNotMatch(clarity.description, /question turn/);
-  assert.match(clarity.description, /without propose_spec/);
-  assert.match(clarity.inputSchema.properties.summary.description, /Follow the task prompt/);
-  assert.match(confidence.description, /how likely a coding agent completes this task in one run/);
-  assert.match(confidence.description, /on the first message and on a plan turn that also asks a question/);
-  assert.match(confidence.description, /If the user asks to update only the other score, do not call this tool/);
-  assert.match(confidence.description, /When every required score is 5/);
-  assert.match(confidence.description, /Do not call it on an answer turn/);
-  assert.match(confidence.description, /Call it before survey/);
-  assert.match(confidence.description, /An unchanged score stays on the card/);
-  assert.doesNotMatch(confidence.description, /every turn/);
-  assert.doesNotMatch(confidence.description, /question turn/);
-  assert.match(confidence.description, /without propose_spec/);
-  assert.deepEqual(confidence.inputSchema.required, ["score", "summary"]);
-  assert.match(survey.description, /short everyday options/);
-  assert.match(survey.description, /task prompt says to ask/);
-  assert.match(survey.description, /before this call/);
-  assert.match(survey.inputSchema.properties.questions.description, /JSON array/);
-  assert.equal(survey.inputSchema.additionalProperties, undefined);
-  assert.equal(survey.inputSchema.properties.questions.items.additionalProperties, undefined);
-  assert.equal(
-    survey.inputSchema.properties.questions.items.properties.options.minItems,
-    undefined,
-  );
-  assert.doesNotMatch(clarity.description, /check copy/);
+  const [updateTool, inspectTool] = tools;
+  assert.match(updateTool.description, /clarity, complexity, and verifiability/);
+  assert.match(updateTool.description, /1 through 3/);
   assert.deepEqual(inspectTool.inputSchema.required, ["path"]);
   assert.match(inspectTool.description, /user image/);
   assert.match(inspectTool.description, /Do not use OCR/);
@@ -562,7 +358,7 @@ test("lists planning tools over Content-Length JSON-RPC", async () => {
   ]);
   assert.deepEqual(
     replies[1].result.tools.map((tool) => tool.name),
-    ["propose_spec", "propose_clarity", "propose_confidence", "survey", "inspect_attachment"],
+    ["propose_update", "inspect_attachment"],
   );
 });
 

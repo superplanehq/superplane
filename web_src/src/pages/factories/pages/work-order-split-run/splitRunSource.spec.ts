@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
+import claudeIcon from "@/assets/icons/integrations/claude.svg";
+import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
+import superplaneIcon from "@/assets/superplane.svg";
 
 import { PRIMARY_FACTORY_ID, STORYBOOK_ME_USER_ID } from "../../__fixtures__/factoryPageIds";
 import {
@@ -41,6 +44,10 @@ describe("sourceTicketLabel", () => {
 
   it("uses the issue key for Jira project issue links", () => {
     expect(sourceTicketLabel("https://acme.atlassian.net/jira/software/projects/DEV/issues/DEV-3")).toBe("DEV-3");
+  });
+
+  it("uses owner/repo#number for Bitbucket pull requests", () => {
+    expect(sourceTicketLabel("https://bitbucket.org/acme/widgets/pull-requests/42")).toBe("acme/widgets#42");
   });
 });
 
@@ -89,6 +96,25 @@ describe("splitRunSourceForOrder", () => {
         name: "GitHub issues",
         ticket: { label: "acme/payments#12", href: "https://github.com/acme/payments/issues/12" },
         addedBy: { kind: "imported", personName: "Leonardo DiCaprio" },
+      }),
+    );
+  });
+
+  it("uses the Bitbucket pull request instead of GitHub issues for bitbucket.org origins", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        origin: {
+          url: "https://bitbucket.org/acme/widgets/pull-requests/42",
+          label: "acme/widgets#42",
+        },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "intake",
+        name: "Bitbucket pull requests",
+        iconAlt: "Bitbucket",
+        ticket: { label: "acme/widgets#42", href: "https://bitbucket.org/acme/widgets/pull-requests/42" },
       }),
     );
   });
@@ -283,7 +309,7 @@ describe("splitRunSourceForOrder", () => {
     );
   });
 
-  it("names the MCP client when the task has an MCP source", () => {
+  it("uses the Cursor logo for a Cursor MCP client", () => {
     const source = splitRunSourceForOrder({
       ...DRAFT_WORK_ORDER,
       mcpClient: { id: "superplane-local", name: "Cursor" },
@@ -292,10 +318,43 @@ describe("splitRunSourceForOrder", () => {
       expect.objectContaining({
         kind: "mcp",
         name: "Cursor",
-        iconAlt: "SuperPlane",
+        iconSrc: cursorIcon,
+        iconAlt: "Cursor",
       }),
     );
     expect(addedByForSource(source)).toEqual({ kind: "mcp", name: "Cursor" });
+  });
+
+  it("uses the Claude logo for a Claude Code MCP client", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        mcpClient: { id: "superplane-local", name: "Claude Code" },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "mcp",
+        name: "Claude Code",
+        iconSrc: claudeIcon,
+        iconAlt: "Claude",
+      }),
+    );
+  });
+
+  it("keeps the SuperPlane mark for an unknown MCP client", () => {
+    expect(
+      splitRunSourceForOrder({
+        ...DRAFT_WORK_ORDER,
+        mcpClient: { id: "superplane-local", name: "Codex" },
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        kind: "mcp",
+        name: "Codex",
+        iconSrc: superplaneIcon,
+        iconAlt: "SuperPlane",
+      }),
+    );
   });
 
   it("resolves the source person's avatar from the org members list when one is available", () => {
@@ -355,12 +414,12 @@ describe("splitRunSourceForOrder", () => {
 });
 
 describe("splitRunLinkedArtifacts", () => {
-  it("keeps plan.md and drops the origin ticket from Artifacts", () => {
+  it("hides plan.md and drops the origin ticket from Artifacts", () => {
     const fixture = splitRunFixtureForWorkOrder(REVIEW_CANDIDATE_WORK_ORDERS[0]);
     const artifacts = collectSplitRunArtifacts(fixture);
     const linked = splitRunLinkedArtifacts(artifacts, fixture.source);
 
-    expect(linked.some((artifact) => artifact.id?.endsWith("-plan"))).toBe(true);
+    expect(linked.some((artifact) => artifact.id?.endsWith("-plan"))).toBe(false);
     expect(linked.some((artifact) => artifact.id?.endsWith("-issue-link"))).toBe(false);
     expect(linked.some((artifact) => artifact.id?.endsWith("-details"))).toBe(false);
   });

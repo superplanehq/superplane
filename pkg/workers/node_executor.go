@@ -389,6 +389,13 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 			recorded.factoryID,
 			recorded.pullRequestID,
 		)
+		factoryactions.StartVisualEvidenceCapture(
+			context.Background(),
+			w.factoryIntakeDeps(),
+			recorded.organizationID,
+			recorded.factoryID,
+			recorded.pullRequestID,
+		)
 	}
 
 	for _, notification := range pendingWorkOrderNotifications {
@@ -493,6 +500,7 @@ func (w *NodeExecutor) executeActionNode(
 		Factory: contexts.NewFactoryContext(tx, workflow, execution).
 			WithWorkOrderUpdated(onFactoryWorkOrderUpdated).
 			WithWorkOrderNotification(onFactoryWorkOrderNotification).
+			WithRunsCancelled(runCancellations.RecordRuns).
 			WithGitHubPullRequestRecorded(onGitHubPullRequestRecorded).
 			WithFileBindCleanup(onFileBindCleanup).
 			WithRemoteImageIngest(w.encryptor, w.registry),

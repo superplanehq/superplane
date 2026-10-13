@@ -1,8 +1,11 @@
 id: local
 superplaneUrl: http://app:8000
 installationAdminToken: ""
-reconcileIntervalSeconds: 2
-requestTimeoutSeconds: 60
+reconciliation:
+  pollTimeout: 30s
+  errorRetryInterval: 2s
+http:
+  requestTimeout: 60s
 fleets:
   - id: e1-large-amd64
     provider: docker

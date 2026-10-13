@@ -49,4 +49,6 @@ tar \
 set +x
 RUNNER_API_URL={{shellQuote .RunnerAPIURL}} \
 RUNNER_REGISTRATION_TOKEN={{shellQuote .RegistrationToken}} \
+RUNNER_TAGS={{shellQuote .Tags}} \
+RUNNER_TAGS_FROM_EC2_METADATA=true \
   "$bundle_dir/install.sh"

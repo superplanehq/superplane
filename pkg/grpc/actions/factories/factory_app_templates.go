@@ -67,10 +67,9 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		canvasFile:       "templates/github/line-implementation.canvas.yaml",
 		consoleFile:      "templates/github/line-app.console.yaml",
 		componentIntegrations: map[string]string{
-			"github.createIssueComment": "github",
-			"github.createPullRequest":  "github",
-			"github.findPullRequest":    "github",
-			"github.updatePullRequest":  "github",
+			"github.createPullRequest": "github",
+			"github.findPullRequest":   "github",
+			"github.updatePullRequest": "github",
 		},
 	}),
 	{id: "line-implementation", provider: models.ProviderBitbucket}: bitbucketFactoryTemplate(factoryAppTemplate{
@@ -79,10 +78,9 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		canvasFile:       "templates/bitbucket/line-implementation.canvas.yaml",
 		consoleFile:      "templates/bitbucket/line-app.console.yaml",
 		componentIntegrations: map[string]string{
-			"bitbucket.createPullRequest":        "bitbucket",
-			"bitbucket.createPullRequestComment": "bitbucket",
-			"bitbucket.findPullRequest":          "bitbucket",
-			"bitbucket.updatePullRequest":        "bitbucket",
+			"bitbucket.createPullRequest": "bitbucket",
+			"bitbucket.findPullRequest":   "bitbucket",
+			"bitbucket.updatePullRequest": "bitbucket",
 		},
 	}),
 	{id: "pr-closure", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
@@ -94,6 +92,15 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 			"github.createIssueComment": "github",
 			"github.onPullRequest":      "github",
 			"github.updateIssue":        "github",
+		},
+	}),
+	{id: "pr-closure", provider: models.ProviderBitbucket}: bitbucketFactoryTemplate(factoryAppTemplate{
+		id:               "pr-closure",
+		entrypointNodeID: "on-pr-closed",
+		canvasFile:       "templates/bitbucket/pr-closure.canvas.yaml",
+		consoleFile:      "templates/bitbucket/event-app.console.yaml",
+		componentIntegrations: map[string]string{
+			"bitbucket.onPullRequest": "bitbucket",
 		},
 	}),
 	{id: "issue-intake", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
@@ -113,6 +120,28 @@ var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
 		columnKey:        models.CanvasColumnKeyVerify,
 		componentIntegrations: map[string]string{
 			"github.onPullRequest": "github",
+		},
+	}),
+	{id: "visual-evidence", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
+		id:               "visual-evidence",
+		entrypointNodeID: "on-pr-visual-evidence",
+		canvasFile:       "templates/github/visual-evidence.canvas.yaml",
+		consoleFile:      "templates/github/visual-evidence.console.yaml",
+		columnKey:        models.CanvasColumnKeyVerify,
+		componentIntegrations: map[string]string{
+			"github.getIssue":          "github",
+			"github.updatePullRequest": "github",
+			"github.onPullRequest":     "github",
+		},
+	}),
+	{id: "risk-score", provider: models.ProviderBitbucket}: bitbucketFactoryTemplate(factoryAppTemplate{
+		id:               "risk-score",
+		entrypointNodeID: "on-pr-risk",
+		canvasFile:       "templates/bitbucket/risk-score.canvas.yaml",
+		consoleFile:      "templates/bitbucket/risk-score.console.yaml",
+		columnKey:        models.CanvasColumnKeyVerify,
+		componentIntegrations: map[string]string{
+			"bitbucket.onPullRequest": "bitbucket",
 		},
 	}),
 }
@@ -323,7 +352,9 @@ func wireFactoryTemplate(canvas *yaml.Canvas, template factoryAppTemplate, input
 		}
 		rewriteFactoryIntegrationNames(node.Configuration, input.integrations)
 		rewriteFactoryAgent(node, input.agent)
-		applyFactoryVisualEvidence(node, input.includeVisualEvidence)
+		if template.id == "line-implementation" {
+			applyFactoryVisualEvidence(node, input.includeVisualEvidence)
+		}
 		if node.Component == "runApp" && configString(node.Configuration, "app") == input.appID {
 			node.Metadata = maps.Clone(node.Metadata)
 			if node.Metadata == nil {
@@ -744,10 +775,10 @@ func materializeBacklogDefaults(
 	version *models.CanvasVersion,
 ) (*materializedFactoryTemplate, error) {
 	defaults := buildBacklogCanvas(backlogCanvasRequest{
-		Name:           canvas.Name,
-		Agent:          resetFactoryIntakeAgent(tx, factory, version.Nodes),
-		VCSName:        resolveVCSInstallationName(tx, factory),
-		PlanningReview: organizationPlanningReviewEnabled(tx, canvas.OrganizationID),
+		Name:        canvas.Name,
+		Agent:       resetFactoryIntakeAgent(tx, factory, version.Nodes),
+		VCSName:     resolveVCSInstallationName(tx, factory),
+		VCSProvider: factoryVCSProviderOrDefault(factory),
 	})
 	defaults.Metadata.ID = canvas.ID.String()
 	for i := range defaults.Spec.Nodes {
@@ -826,6 +857,7 @@ func materializePRFeedbackDefaults(
 		RunnerIntegrationNames: settings.RunnerIntegrationNames,
 		Binding:                resolvePRFeedbackBinding(tx, factory, settings.Repository),
 		Agent:                  resetFactoryIntakeAgent(tx, factory, version.Nodes),
+		VCSProvider:            factoryVCSProviderOrDefault(factory),
 	}
 
 	templateID := prFeedbackDiscussionTemplateID

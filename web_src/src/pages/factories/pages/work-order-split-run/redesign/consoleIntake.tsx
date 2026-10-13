@@ -27,7 +27,7 @@ import type { ColumnTiming } from "./columnTiming";
 import { ColumnTimingMeta } from "./consoleColumnTiming";
 
 function intakeSourceIcon(source?: SplitRunSource): { src: string; alt: string } {
-  if (source?.kind === "intake") {
+  if (source?.kind === "intake" || source?.kind === "mcp") {
     return { src: source.iconSrc, alt: source.iconAlt };
   }
   return { src: superplaneIcon, alt: "SuperPlane" };

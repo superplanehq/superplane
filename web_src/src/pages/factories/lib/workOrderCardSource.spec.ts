@@ -1,9 +1,10 @@
 import { describe, expect, it } from "bun:test";
 
 import type { FactoriesWorkOrder } from "@/api-client";
+import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
-import superplaneIcon from "@/assets/superplane.svg";
+import superplaneMark from "@/assets/superplane-mark.svg";
 
 import { CREATED_MANUALLY } from "../pages/work-order-split-run/splitRunSource";
 import {
@@ -24,7 +25,7 @@ describe("workOrderCardSource", () => {
   it("returns the product logo for a manual task", () => {
     expect(workOrderCardSource(baseOrder)).toEqual({
       name: CREATED_MANUALLY,
-      iconSrc: superplaneIcon,
+      iconSrc: superplaneMark,
       iconAlt: "SuperPlane",
     });
   });
@@ -37,7 +38,7 @@ describe("workOrderCardSource", () => {
       }),
     ).toEqual({
       name: CREATED_MANUALLY,
-      iconSrc: superplaneIcon,
+      iconSrc: superplaneMark,
       iconAlt: "SuperPlane",
       creatorName: "Ada Lovelace",
     });
@@ -82,7 +83,7 @@ describe("workOrderCardSource", () => {
     });
   });
 
-  it("returns the MCP client name for a handed-off task", () => {
+  it("returns the Cursor logo for a Cursor MCP card", () => {
     expect(
       workOrderCardSource({
         ...baseOrder,
@@ -90,7 +91,20 @@ describe("workOrderCardSource", () => {
       }),
     ).toEqual({
       name: "Cursor",
-      iconSrc: superplaneIcon,
+      iconSrc: cursorIcon,
+      iconAlt: "Cursor",
+    });
+  });
+
+  it("keeps the SuperPlane mark for an unknown MCP client", () => {
+    expect(
+      workOrderCardSource({
+        ...baseOrder,
+        mcpClient: { id: "superplane-local", name: "Codex" },
+      }),
+    ).toEqual({
+      name: "Codex",
+      iconSrc: superplaneMark,
       iconAlt: "SuperPlane",
     });
   });
@@ -163,7 +177,7 @@ describe("workOrderCardSourceLabel", () => {
     expect(
       workOrderCardSourceLabel({
         name: CREATED_MANUALLY,
-        iconSrc: superplaneIcon,
+        iconSrc: superplaneMark,
         iconAlt: "SuperPlane",
         creatorName: "Ada Lovelace",
       }),
@@ -174,7 +188,7 @@ describe("workOrderCardSourceLabel", () => {
     expect(
       workOrderCardSourceLabel({
         name: CREATED_MANUALLY,
-        iconSrc: superplaneIcon,
+        iconSrc: superplaneMark,
         iconAlt: "SuperPlane",
       }),
     ).toBe(CREATED_MANUALLY);

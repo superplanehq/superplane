@@ -243,6 +243,8 @@ func licenseReasonMessage(reason licensing.Reason) string {
 		return "The license has expired."
 	case licensing.ReasonNotYetValid:
 		return "The license is not valid yet."
+	case licensing.ReasonRevoked:
+		return "This license was revoked."
 	default:
 		return "The license could not be read."
 	}

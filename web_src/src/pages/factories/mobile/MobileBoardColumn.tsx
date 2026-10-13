@@ -1,8 +1,9 @@
 import type { FactoriesWorkOrder } from "@/api-client";
 import { useAutoLoadMoreOnScroll } from "@/components/CanvasToolSidebar/useAutoLoadMoreOnScroll";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/contexts/usePermissions";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Inbox, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 
 import { LineBoardColumnCardList } from "../pages/LineBoardOrderCard";
@@ -31,6 +32,8 @@ export function MobileColumn({
   paging: ColumnPaging;
   renderCard: (order: FactoriesWorkOrder) => ReactNode;
 }) {
+  const { canAct } = usePermissions();
+  const showCreateHint = column.key === "backlog" && canAct("work_orders", "create");
   const listRef = useRef<HTMLUListElement>(null);
   const loadIfVisible = useVisibleColumnLoadMore(listRef, hidden, column.cards.length, paging);
   const showEmpty = !cardsPending && column.cards.length === 0 && !paging.hasMore;
@@ -44,14 +47,16 @@ export function MobileColumn({
       className={cn("flex h-full w-full shrink-0 snap-start flex-col p-3", lane.className, lane.surfaceClassName)}
     >
       {showEmpty ? (
-        <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-[13px] text-muted-foreground">
-          {column.emptyDescription}
-        </p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-4 pb-12 text-center">
+          <Inbox className="mb-2 size-12 text-muted-foreground/60" strokeWidth={1.25} aria-hidden />
+          <h2 className="text-lg font-semibold">{column.emptyDescription}</h2>
+          {showCreateHint ? <p className="text-sm text-muted-foreground">Create a task to start work.</p> : null}
+        </div>
       ) : (
         <LineBoardColumnCardList
           ref={listRef}
           pending={cardsPending}
-          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 [scrollbar-width:none]"
+          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-24 [scrollbar-width:none]"
           testId={`mobile-board-column-scroll-${column.key}`}
           onScroll={loadIfVisible}
         >

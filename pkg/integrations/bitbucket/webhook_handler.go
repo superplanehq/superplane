@@ -1,6 +1,7 @@
 package bitbucket
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -14,7 +15,9 @@ type WebhookConfiguration struct {
 }
 
 type BitbucketWebhook struct {
-	UUID string `json:"uuid"`
+	UUID               string `json:"uuid"`
+	RepositoryUUID     string `json:"repositoryUUID,omitempty"`
+	RepositoryFullName string `json:"repositoryFullName,omitempty"`
 }
 
 type BitbucketWebhookHandler struct{}
@@ -49,7 +52,34 @@ func (h *BitbucketWebhookHandler) CompareConfig(a, b any) (bool, error) {
 }
 
 func (h *BitbucketWebhookHandler) Merge(current, requested any) (any, bool, error) {
-	return current, false, nil
+	currentConfig := WebhookConfiguration{}
+	if err := mapstructure.Decode(current, &currentConfig); err != nil {
+		return nil, false, err
+	}
+	requestedConfig := WebhookConfiguration{}
+	if err := mapstructure.Decode(requested, &requestedConfig); err != nil {
+		return nil, false, err
+	}
+
+	// Webhooks are per repository. A different repository never merges.
+	if currentConfig.RepositorySlug != requestedConfig.RepositorySlug {
+		return current, false, nil
+	}
+
+	// ponytail: union event types so one repository webhook serves every
+	// trigger; re-provision updates that remote hook with the union
+	merged := WebhookConfiguration{
+		EventTypes:     slices.Clone(currentConfig.EventTypes),
+		RepositorySlug: currentConfig.RepositorySlug,
+	}
+	changed := false
+	for _, event := range requestedConfig.EventTypes {
+		if !slices.Contains(merged.EventTypes, event) {
+			merged.EventTypes = append(merged.EventTypes, event)
+			changed = true
+		}
+	}
+	return merged, changed, nil
 }
 
 func (h *BitbucketWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, error) {
@@ -74,9 +104,54 @@ func (h *BitbucketWebhookHandler) Setup(ctx core.WebhookHandlerContext) (any, er
 		return nil, fmt.Errorf("repository is required")
 	}
 
+	if metadata.AuthType == AuthTypeForgeApp {
+		for _, event := range config.EventTypes {
+			switch event {
+			case pullRequestEventCreated, pullRequestEventUpdated, pullRequestEventFulfilled, pullRequestEventRejected,
+				waitBuildsStatusCreated, waitBuildsStatusUpdated, pullRequestCommentCreated:
+			default:
+				return nil, fmt.Errorf("Bitbucket Forge does not support event %q", event)
+			}
+		}
+		repo, err := client.GetRepository(metadata.Workspace.Slug + "/" + config.RepositorySlug)
+		if err != nil {
+			return nil, fmt.Errorf("error resolving Forge webhook repository: %w", err)
+		}
+		if repo.UUID == "" || repo.FullName == "" {
+			return nil, fmt.Errorf("missing Forge webhook repository identity")
+		}
+		return &BitbucketWebhook{RepositoryUUID: repo.UUID, RepositoryFullName: repo.FullName}, nil
+	}
+
 	secret, err := ctx.Webhook.GetSecret()
 	if err != nil {
 		return nil, fmt.Errorf("error getting webhook secret: %w", err)
+	}
+
+	existing := BitbucketWebhook{}
+	if raw := ctx.Webhook.GetMetadata(); raw != nil {
+		if err := mapstructure.Decode(raw, &existing); err != nil {
+			return nil, fmt.Errorf("failed to decode webhook metadata: %w", err)
+		}
+	}
+	if existing.UUID != "" {
+		hook, err := client.UpdateWebhook(
+			metadata.Workspace.Slug,
+			config.RepositorySlug,
+			existing.UUID,
+			ctx.Webhook.GetURL(),
+			string(secret),
+			config.EventTypes,
+		)
+		if err == nil {
+			if hook.UUID == "" {
+				hook.UUID = existing.UUID
+			}
+			return &BitbucketWebhook{UUID: hook.UUID}, nil
+		}
+		if !errors.Is(err, errBitbucketWebhookNotFound) {
+			return nil, fmt.Errorf("error updating webhook: %w", err)
+		}
 	}
 
 	hook, err := client.CreateWebhook(
@@ -99,6 +174,9 @@ func (h *BitbucketWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error 
 	err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata)
 	if err != nil {
 		return fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+	if metadata.AuthType == AuthTypeForgeApp {
+		return nil
 	}
 
 	client, err := NewClient(metadata.AuthType, ctx.HTTP, ctx.Integration)

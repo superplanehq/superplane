@@ -39,4 +39,26 @@ describe("cron", () => {
   it("returns null for invalid cron field counts", () => {
     expect(getNextCronExecution("* * *", new Date("2026-03-29T10:04:30.000Z"))).toBeNull();
   });
+
+  it("finds the next execution for a stepped range", () => {
+    const fromTime = new Date(2026, 2, 29, 10, 4, 30);
+    const nextExecution = getNextCronExecution("0 10 2-10/3 * *", fromTime);
+
+    expect(nextExecution).not.toBeNull();
+    expect(nextExecution?.getMonth()).toBe(3);
+    expect(nextExecution?.getDate()).toBe(2);
+    expect(nextExecution?.getHours()).toBe(10);
+    expect(nextExecution?.getMinutes()).toBe(0);
+  });
+
+  it("finds the next execution for a step that starts at one value", () => {
+    const fromTime = new Date(2026, 2, 29, 10, 4, 30);
+    const nextExecution = getNextCronExecution("0 9 5/2 * *", fromTime);
+
+    expect(nextExecution).not.toBeNull();
+    expect(nextExecution?.getMonth()).toBe(2);
+    expect(nextExecution?.getDate()).toBe(31);
+    expect(nextExecution?.getHours()).toBe(9);
+    expect(nextExecution?.getMinutes()).toBe(0);
+  });
 });

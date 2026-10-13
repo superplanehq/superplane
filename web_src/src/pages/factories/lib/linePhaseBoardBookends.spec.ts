@@ -51,7 +51,7 @@ function closedOrder(id: string, updatedAt: string, lineId?: string): FactoriesW
 }
 
 describe("collectLineDoneOrders", () => {
-  it("returns closed tasks for this line, newest first", () => {
+  it("returns closed tasks for this line in source-list order", () => {
     const closedOld = closedOrder("wo-closed-old", "2026-08-11T10:00:00.000Z", "line-1");
     const closedNew = closedOrder("wo-closed-new", "2026-08-11T14:00:00.000Z", "line-1");
     const closedOtherLine = closedOrder("wo-other-line", "2026-08-11T16:00:00.000Z", "line-other");
@@ -76,7 +76,7 @@ describe("collectLineDoneOrders", () => {
 
     const done = collectLineDoneOrders([closedOld, draft, open, closedNew, closedOtherLine, closedNoLine], LINE);
 
-    expect(done.map((entry) => entry.id)).toEqual(["wo-no-line", "wo-closed-new", "wo-closed-old"]);
+    expect(done.map((entry) => entry.id)).toEqual(["wo-closed-old", "wo-closed-new", "wo-no-line"]);
   });
 
   it("keeps open work that is still on a Done step after the stage column is dropped", () => {

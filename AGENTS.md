@@ -103,9 +103,9 @@ Run these three steps once, in order:
    setup and creates its local development token. Use `make dev.server.fg` for
    foreground logs.
 
-Factory workspace onboarding needs a public SuperPlane GitHub App on a
-stable tunnel. Without `SUPERPLANE_GITHUB_APP_*` in `.env`, local factory
-onboarding is blocked. Factory Sentry intake uses a public SuperPlane
+Factory workspace onboarding needs a GitHub App on a
+stable tunnel. Cloud holds `SUPERPLANE_GITHUB_APP_*`. Self-host and local
+development can create a private GitHub App from workspace Connect. Factory Sentry intake uses a public SuperPlane
 Sentry app. Without `SUPERPLANE_SENTRY_APP_*` in `.env`, SuperPlane asks
 for a personal token. See
 [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
@@ -115,7 +115,7 @@ runner API and Docker Fleet Manager. Set `TASK_BROKER_*` in `.env` only while
 testing legacy or remote broker routing (see `.env.example`).
 
 The local worker image includes Claude Code, Codex, OpenCode, git, `gh`,
-`jq`, ffmpeg, ffprobe, whisper-cli, and the Whisper tiny model. Factory
+`jq`, ffmpeg, ffprobe, whisper-cli, yt-dlp, and the Whisper tiny model. Factory
 line apps run on that worker. Do not install those CLIs on the host.
 Connect GitHub and Claude integrations in the organization before you
 dispatch a factory line. Factory nodes use those integrations, not `.env`
@@ -123,7 +123,7 @@ dispatch a factory line. Factory nodes use those integrations, not `.env`
 dev.server`. OpenCode must be on the runner `PATH` for Run OpenRouter Agent.
 SuperPlane does not download OpenCode in the prompt prepare step.
 Video and audio task files need ffmpeg, ffprobe, whisper-cli, and the baked
-Whisper model. Missing media tools fail the setup step. Do not download
+Whisper model. Hosted video links also need the pinned yt-dlp. Missing media tools fail the setup step. Do not download
 models during a task.
 
 Local hosted OpenRouter is optional. Set `SUPERPLANE_DEV_HOSTED_OPENROUTER`

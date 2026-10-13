@@ -1,7 +1,6 @@
 import type {
   FactoriesFactoryIntake,
   FactoriesFactoryLine,
-  FactoriesFactoryPrFeedbackHandler,
   FactoriesWorkOrder,
   FactoriesWorkOrderSummary,
 } from "@/api-client";
@@ -23,21 +22,23 @@ import { FEATURE_FACTORY_PULL_REQUEST_MERGE } from "@/lib/experimentalFeatures";
 import { getOrgUserDisplayFromUser } from "@/lib/orgUserDisplay";
 import { cn } from "@/lib/utils";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Navigate, useNavigate, useParams } from "react-router";
+import { Navigate, useLocation, useNavigate, useParams } from "react-router";
 
 import { backlogAnalysisCreditLabels } from "../lib/backlogAnalysis";
 import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
 import { useLineBoardColumnColorViewPreference } from "../lib/lineBoardColumnColorViewPreference";
 import {
   factoryHomePath,
-  factoryIntakePath,
   factoryLineDetailPath,
-  factoryPRFeedbackPath,
+  intakeIdFromSearch,
+  isIntakeSearchOpen,
+  isPRFeedbackSearchOpen,
+  isPlanningSearchOpen,
+  columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
   workOrderDetailPath,
 } from "../lib/factoryPagePaths";
 import { boardDoneResultsForStatuses, uniqueWorkOrdersById } from "../lib/workOrderListPagination";
-import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { useWorkOrderListState, type WorkOrderListState } from "../lib/useWorkOrderListState";
 import { useWorkOrdersHeaderShortcuts } from "../lib/useWorkOrdersHeaderShortcuts";
 import {
@@ -49,8 +50,9 @@ import {
   applyWorkOrderFilters,
   applyWorkOrderScope,
   applyWorkOrderSearch,
+  boardWorkOrderScopeQuery,
   buildWorkOrderListEntries,
-  UNASSIGNED_FILTER_VALUE,
+  type WorkOrderScope,
 } from "../lib/workOrderListModel";
 import { canonicalWorkOrderNumber } from "../lib/workOrderNumberResolution";
 import { pullRequestsFromWorkOrders } from "../lib/workOrderPullRequest";
@@ -63,19 +65,24 @@ import type { WorkOrderCardContext } from "../workOrders/WorkOrderCard";
 import { MobileColumn, type ColumnPaging } from "./MobileBoardColumn";
 import { MobileBoardHeader } from "./MobileBoardHeader";
 import { MobileBoardSettings } from "./MobileBoardSettings";
+import { MobileCreateTaskButton } from "./MobileCreateTaskButton";
 import { activeColumnIndex, buildMobileBoardColumns, type MobileBoardColumn } from "./mobileBoardColumns";
+
+function phoneBoardScope(scope: WorkOrderScope): WorkOrderScope {
+  if (scope === "my" || scope === "unassigned") {
+    return scope;
+  }
+  return "all";
+}
 
 function boardQueryOptions(
   state: WorkOrderListState,
   lineId: string,
   currentUserId?: string,
 ): FactoryBoardWorkOrdersOptions {
-  const ownerIds = state.filters.assigneeIds.filter((id) => id !== UNASSIGNED_FILTER_VALUE);
-  const mine = state.scope === "my";
+  const scope = phoneBoardScope(state.scope);
   return {
-    userId: ownerIds.length === 1 ? ownerIds[0] : mine ? currentUserId : undefined,
-    unassigned: state.filters.assigneeIds.includes(UNASSIGNED_FILTER_VALUE),
-    requireUser: mine && ownerIds.length !== 1,
+    ...boardWorkOrderScopeQuery(scope, state.filters.assigneeIds, currentUserId),
     done: { lineId, results: boardDoneResultsForStatuses(state.filters.statuses) },
   };
 }
@@ -125,7 +132,7 @@ type MobileBoardModel = {
   sourceOptions: WorkOrderFilterOption[];
   assigneeOptions: WorkOrderFilterOption[];
   factoryIntakes: FactoriesFactoryIntake[];
-  prFeedbackHandlers: FactoriesFactoryPrFeedbackHandler[];
+  apps: Array<{ id?: string; name?: string }>;
   workOrderCardContext: WorkOrderCardContext;
   analyzingOrderIds: Set<string>;
   creditFailureLabels: ReadonlyMap<string, string>;
@@ -182,7 +189,7 @@ function useMobileBoardModel({
     const visibleIds = new Set(
       applyWorkOrderSearch(
         applyWorkOrderFilters(
-          applyWorkOrderScope(entries, listState.scope === "my" ? "my" : "all", currentUserId),
+          applyWorkOrderScope(entries, phoneBoardScope(listState.scope), currentUserId),
           { ...listState.filters, lineIds: [] },
           { showPullRequestMerge },
         ),
@@ -192,9 +199,22 @@ function useMobileBoardModel({
     return uniqueWorkOrdersById(workOrders.filter((order) => order.id && visibleIds.has(order.id)));
   }, [currentUserId, entries, listState.filters, listState.scope, listState.search, showPullRequestMerge, workOrders]);
 
+  const hasClientFilter =
+    Boolean(listState.search.trim()) || listState.filterCount - listState.filters.lineIds.length > 0;
+
+  const totalCounts = useMemo(() => {
+    if (hasClientFilter) {
+      return undefined;
+    }
+    return {
+      backlog: backlog.totalCount,
+      done: done.totalCount,
+    };
+  }, [backlog.totalCount, done.totalCount, hasClientFilter]);
+
   const columns = useMemo(
-    () => buildMobileBoardColumns(line, visibleWorkOrders, apps),
-    [apps, line, visibleWorkOrders],
+    () => buildMobileBoardColumns(line, visibleWorkOrders, apps, totalCounts),
+    [apps, line, totalCounts, visibleWorkOrders],
   );
   const sourceOptions = useMemo(() => buildSourceFilterOptions(factoryIntakes, entries), [entries, factoryIntakes]);
   const assigneeOptions = useMemo(
@@ -226,7 +246,7 @@ function useMobileBoardModel({
     sourceOptions,
     assigneeOptions,
     factoryIntakes,
-    prFeedbackHandlers,
+    apps,
     workOrderCardContext: {
       organizationId,
       factoryId,
@@ -260,18 +280,25 @@ function MobileLineBoard(props: {
   const { canAct } = usePermissions();
   const model = useMobileBoardModel(props);
   const searchRef = useWorkOrdersHeaderShortcuts(model.listState);
-  const { view: colorView, setView: setColorView } = useLineBoardColumnColorViewPreference();
-  const { headerKicker } = useHostedCreditChrome(organizationId, routeSegment, { compact: true });
+  const { view: colorView } = useLineBoardColumnColorViewPreference();
   const columnColors = useMemo(() => normalizeColumnColors(line.columnColors), [line.columnColors]);
   const configuredIntakes = useMemo(
     () => intakeSourcesFromFactoryIntakes(model.factoryIntakes),
     [model.factoryIntakes],
   );
   const canConfigureFactory = canAct("factories", "update");
+  const canCreateWorkOrder = canAct("work_orders", "create");
   const lines = factory?.lines ?? [];
+  const { search } = useLocation();
+  const settingsOpen =
+    (isIntakeSearchOpen(search) &&
+      configuredIntakes.some((intake) => intake.intakeId === intakeIdFromSearch(search))) ||
+    isPRFeedbackSearchOpen(search) ||
+    isPlanningSearchOpen(search) ||
+    Boolean(columnAutomationViewCanvasIdFromSearch(search));
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-testid="mobile-board-page">
+    <div className="relative flex h-full min-h-0 flex-col" data-testid="mobile-board-page">
       <MobileBoardSettings
         organizationId={organizationId}
         factoryId={factoryId}
@@ -280,51 +307,49 @@ function MobileLineBoard(props: {
         intakes={configuredIntakes}
         canUpdate={canConfigureFactory}
         onboarding={factory?.onboarding}
+        apps={model.apps}
       />
-      <MobileBoardHeader
-        state={model.listState}
-        searchRef={searchRef}
-        creditKicker={headerKicker}
-        sourceOptions={model.sourceOptions}
-        assigneeOptions={model.assigneeOptions}
-        showPullRequestMerge={model.showPullRequestMerge}
-        colorView={colorView}
-        onColorViewChange={setColorView}
-        intakes={configuredIntakes}
-        prFeedbackHandlers={model.prFeedbackHandlers}
-        onOpenIntake={(intake) => navigate(factoryIntakePath(organizationId, routeSegment, lineId, intake.intakeId))}
-        onOpenPRFeedback={(handlerId) =>
-          navigate(factoryPRFeedbackPath(organizationId, routeSegment, lineId, undefined, handlerId))
-        }
-        lines={lines}
-        lineId={lineId}
-        onSelectLine={(nextLineId) => {
-          if (nextLineId !== lineId) {
-            navigate(factoryLineDetailPath(organizationId, routeSegment, nextLineId));
-          }
-        }}
-        organizationId={organizationId}
-        factoryId={factoryId}
-        factoryKey={routeSegment}
-        canManageClosedStatus={canConfigureFactory}
-      />
-      <MobileColumnCarousel
-        columns={model.columns}
-        cardsPending={model.cardsPending}
-        laneClassName={(column) =>
-          lineBoardColumnLaneProps(columnColors[column.key] ?? null, colorView, { mutedFallback: true })
-        }
-        paging={model.paging}
-        renderCard={(column, order) => (
-          <LineBoardWorkOrderCard
-            order={order}
-            workOrderCardContext={model.workOrderCardContext}
-            onOpen={() => onOpenWorkOrder(order)}
-            isAnalyzing={column.key === "backlog" && Boolean(order.id && model.analyzingOrderIds.has(order.id))}
-            creditLabel={order.id ? model.creditFailureLabels.get(order.id) : undefined}
+      {!settingsOpen ? (
+        <>
+          <MobileBoardHeader
+            state={model.listState}
+            searchRef={searchRef}
+            sourceOptions={model.sourceOptions}
+            assigneeOptions={model.assigneeOptions}
+            showPullRequestMerge={model.showPullRequestMerge}
+            lines={lines}
+            lineId={lineId}
+            onSelectLine={(nextLineId) => {
+              if (nextLineId !== lineId) {
+                navigate(factoryLineDetailPath(organizationId, routeSegment, nextLineId));
+              }
+            }}
           />
-        )}
-      />
+          <MobileColumnCarousel
+            columns={model.columns}
+            cardsPending={model.cardsPending}
+            laneClassName={(column) =>
+              lineBoardColumnLaneProps(columnColors[column.key] ?? null, colorView, { mutedFallback: true })
+            }
+            paging={model.paging}
+            renderCard={(column, order) => (
+              <LineBoardWorkOrderCard
+                order={order}
+                workOrderCardContext={model.workOrderCardContext}
+                onOpen={() => onOpenWorkOrder(order)}
+                isAnalyzing={column.key === "backlog" && Boolean(order.id && model.analyzingOrderIds.has(order.id))}
+                creditLabel={order.id ? model.creditFailureLabels.get(order.id) : undefined}
+                showMergeConfidence={column.key !== "done"}
+              />
+            )}
+          />
+          {canCreateWorkOrder ? (
+            <div className="absolute right-4 bottom-5 z-20">
+              <MobileCreateTaskButton className="size-14 rounded-full shadow-lg" onImported={onOpenWorkOrder} />
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -415,7 +440,7 @@ function MobileColumnTabs({
     <div
       role="tablist"
       aria-label="Board columns"
-      className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-2 [scrollbar-width:none]"
+      className="flex shrink-0 gap-1 overflow-x-auto border-b border-border px-4 [scrollbar-width:none]"
       data-testid="mobile-board-tabs"
     >
       {columns.map((column, index) => {
@@ -432,13 +457,15 @@ function MobileColumnTabs({
             onClick={() => onSelect(index)}
             data-testid={`mobile-board-tab-${column.key}`}
             className={cn(
-              "flex h-10 shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-[13px] font-medium tracking-[-0.01em] transition-colors",
+              "flex h-12 shrink-0 items-center gap-1.5 border-b-2 px-2.5 text-[13px] font-medium tracking-[-0.01em] transition-colors",
               active ? "border-foreground text-foreground" : "border-transparent text-muted-foreground",
             )}
           >
             {column.glyph ? <PhaseGlyph kind={column.glyph} className="size-3" /> : null}
             <span className="truncate">{column.title}</span>
-            <span className="tabular-nums text-[12px] text-muted-foreground">{column.cards.length}</span>
+            <span className="tabular-nums text-[12px] text-muted-foreground">
+              {column.totalCount ?? column.cards.length}
+            </span>
           </button>
         );
       })}

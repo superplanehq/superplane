@@ -15,14 +15,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Chat with a Claude-powered agent against the canvas", f.Description)
 	})
 
-	t.Run("known id returns factory jira intake feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryJiraIntake)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryJiraIntake, f.ID)
-		assert.Equal(t, "Factory Jira Intake", f.Label)
-		assert.Equal(t, "Add Jira intake from the Backlog column menu", f.Description)
-	})
-
 	t.Run("known id returns factory productive intake feature", func(t *testing.T) {
 		f, ok := Get(FeatureFactoryProductiveIntake)
 		assert.True(t, ok)
@@ -37,15 +29,6 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, FeatureFactoryDatadogIntake, f.ID)
 		assert.Equal(t, "Factory Datadog Intake", f.Label)
 		assert.Equal(t, "Add Datadog intake from the Backlog column menu", f.Description)
-	})
-
-	t.Run("known id returns factory linear intake feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryLinearIntake)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryLinearIntake, f.ID)
-		assert.Equal(t, "Factory Linear Intake", f.Label)
-		assert.Equal(t, "Add Linear intake from the Backlog column menu", f.Description)
-		assert.Nil(t, f.Released)
 	})
 
 	t.Run("known id returns bitbucket workspaces feature", func(t *testing.T) {
@@ -91,6 +74,15 @@ func Test__Get(t *testing.T) {
 		assert.Nil(t, f.Released)
 	})
 
+	t.Run("known id returns workspace agent feature", func(t *testing.T) {
+		f, ok := Get(FeatureWorkspaceAgent)
+		assert.True(t, ok)
+		assert.Equal(t, FeatureWorkspaceAgent, f.ID)
+		assert.Equal(t, "SuperPlane Agent", f.Label)
+		assert.Equal(t, "Show the SuperPlane Agent page", f.Description)
+		assert.Nil(t, f.Released)
+	})
+
 	t.Run("known id returns workspace MCP feature", func(t *testing.T) {
 		f, ok := Get(FeatureWorkspaceMCP)
 		assert.True(t, ok)
@@ -107,13 +99,10 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, "Add skills for workspace agents", f.Description)
 	})
 
-	t.Run("known id returns factory risk score feature", func(t *testing.T) {
-		f, ok := Get(FeatureFactoryRiskScore)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureFactoryRiskScore, f.ID)
-		assert.Equal(t, "Factory Merge Confidence", f.Label)
-		assert.Equal(t, "Add a merge confidence automation to the Verify column", f.Description)
-		assert.Nil(t, f.Released)
+	t.Run("retired merge confidence flag is absent", func(t *testing.T) {
+		feature, ok := Get("factory_risk_score")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
 	})
 
 	t.Run("known id returns pull request merge feature", func(t *testing.T) {
@@ -134,13 +123,10 @@ func Test__Get(t *testing.T) {
 		assert.True(t, IsReleased(FeatureSuperPlaneMCPServer))
 	})
 
-	t.Run("known id returns mobile board feature", func(t *testing.T) {
-		f, ok := Get(FeatureMobileFactoryBoard)
-		assert.True(t, ok)
-		assert.Equal(t, FeatureMobileFactoryBoard, f.ID)
-		assert.Equal(t, "Mobile Board", f.Label)
-		assert.Equal(t, "Show the mobile workspace shell on phone-width screens", f.Description)
-		assert.Nil(t, f.Released)
+	t.Run("retired mobile board flag is absent", func(t *testing.T) {
+		feature, ok := Get("mobile_factory_board")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
 	})
 
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {
@@ -166,6 +152,18 @@ func Test__Get(t *testing.T) {
 		assert.Equal(t, Feature{}, feature)
 	})
 
+	t.Run("retired jira intake flag is absent", func(t *testing.T) {
+		feature, ok := Get("factory_jira_intake")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
+	})
+
+	t.Run("retired linear intake flag is absent", func(t *testing.T) {
+		feature, ok := Get("factory_linear_intake")
+		assert.False(t, ok)
+		assert.Equal(t, Feature{}, feature)
+	})
+
 	t.Run("retired task console flag is absent", func(t *testing.T) {
 		feature, ok := Get("factory_task_console")
 		assert.False(t, ok)
@@ -176,45 +174,28 @@ func Test__Get(t *testing.T) {
 func Test__Exists(t *testing.T) {
 	assert.True(t, Exists(FeatureClaudeManagedAgents))
 	assert.True(t, Exists(FeatureFactories))
-	assert.True(t, Exists(FeatureFactoryJiraIntake))
 	assert.True(t, Exists(FeatureFactoryProductiveIntake))
 	assert.True(t, Exists(FeatureFactoryDatadogIntake))
-	assert.True(t, Exists(FeatureFactoryLinearIntake))
 	assert.True(t, Exists(FeatureFactoryBitbucket))
 	assert.True(t, Exists(FeatureWorkspaceModels))
 	assert.True(t, Exists(FeatureOrganizationBYOK))
 	assert.True(t, Exists(FeatureOrganizationBYOKCustomProvider))
 	assert.True(t, Exists(FeatureFactoryCustomAutomations))
+	assert.True(t, Exists(FeatureWorkspaceAgent))
 	assert.True(t, Exists(FeatureWorkspaceMCP))
 	assert.True(t, Exists(FeatureWorkspaceSkills))
 	assert.True(t, Exists(FeatureFactoryPullRequestMerge))
-	assert.True(t, Exists(FeatureFactoryRiskScore))
 	assert.True(t, Exists(FeatureSuperPlaneMCPServer))
-	assert.True(t, Exists(FeatureMobileFactoryBoard))
+	assert.False(t, Exists("mobile_factory_board"))
+	assert.False(t, Exists("factory_risk_score"))
 	assert.False(t, Exists("factory_visual_evidence"))
 	assert.False(t, Exists("factory_task_console"))
 	assert.False(t, Exists("factory_sentry_intake"))
 	assert.False(t, Exists("factory_dependabot_intake"))
+	assert.False(t, Exists("factory_jira_intake"))
+	assert.False(t, Exists("factory_linear_intake"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
-}
-
-func Test__All_omitsRetiredSentryIntakeFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_sentry_intake", feature.ID)
-	}
-}
-
-func Test__All_omitsRetiredDependabotIntakeFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_dependabot_intake", feature.ID)
-	}
-}
-
-func Test__All_omitsRetiredTaskConsoleFlag(t *testing.T) {
-	for _, feature := range All() {
-		assert.NotEqual(t, "factory_task_console", feature.ID)
-	}
 }
 
 func Test__All_isCopy(t *testing.T) {

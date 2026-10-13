@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
-import { FEATURE_FACTORIES, FEATURE_FACTORY_RISK_SCORE } from "./lib/experimentalFeatures";
+import { FEATURE_FACTORIES } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
@@ -23,6 +23,7 @@ import { ThemeProvider } from "./contexts/ThemeProvider";
 import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequirePermission } from "./components/PermissionGate";
+import { agentSectionRoute } from "./pages/factories/pages/settings/agentSectionRoutes";
 import { isFactoryAppConfigureMode } from "./pages/factories/lib/factoryAppCanvasCopy";
 import { Login } from "./pages/auth/Login";
 import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
@@ -67,7 +68,11 @@ import {
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { isPublicFactoryLinePath } from "./pages/factories/lib/publicFactoryLinePath";
 import { FactoryLineAccessGate } from "./pages/factories/pages/FactoryLineAccessGate";
-import { FactoryWorkspaceLayoutSwitch, WorkOrderDetailRouteSwitch } from "./pages/factories/mobile/MobileShellSwitch";
+import {
+  FactoryMoreRouteSwitch,
+  FactoryWorkspaceLayoutSwitch,
+  WorkOrderDetailRouteSwitch,
+} from "./pages/factories/mobile/MobileShellSwitch";
 import { WorkspaceLoadingProvider } from "./pages/factories/layout/workspaceLoading";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
@@ -161,6 +166,8 @@ function organizationScopedRouteTree() {
             <Route path="missions" element={<MissionsPage />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="velocity" element={<VelocityPage />} />
+            {agentSectionRoute}
+            <Route path="more" element={<FactoryMoreRouteSwitch />} />
             <Route path="tasks">
               <Route index element={<WorkOrdersPage />} />
               <Route path="new" element={<CreateWorkOrderComposeGate />} />
@@ -176,14 +183,7 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
-              <Route
-                path=":lineId/setup/risk-score"
-                element={
-                  <RequireExperimentalFeature featureId={FEATURE_FACTORY_RISK_SCORE}>
-                    <RiskScoreSetupPage />
-                  </RequireExperimentalFeature>
-                }
-              />
+              <Route path=":lineId/setup/risk-score" element={<RiskScoreSetupPage />} />
               <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
               <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
               <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />

@@ -61,6 +61,16 @@ const ISSUE_FIELD_GROUPS = [
   { label: NODE_CONFIG_COPY.startRunWhen, fieldNames: [PULL_REQUEST_ACTIONS_FIELD] },
 ] as const;
 
+const ISSUE_TRIGGER_FILTER_FIELDS = [
+  "labels",
+  "labelFilterMode",
+  "assignment",
+  "authorsWithAccess",
+  "superplaneLabelAdded",
+] as const;
+
+const ISSUE_HIDDEN_FIELDS = [...SIMPLIFIED_HIDDEN_FIELDS, ...ISSUE_TRIGGER_FILTER_FIELDS] as const;
+
 type CatalogEntry = {
   name?: string;
   label?: string;
@@ -251,6 +261,7 @@ function nodeSettingsProps(node: SuperplaneComponentsNode, definition: CatalogEn
       presentIssueFields(fields, configuration),
       ISSUE_FIELD_GROUPS,
       issueFilterPlaceholders(),
+      ISSUE_HIDDEN_FIELDS,
     );
   }
   return {
@@ -270,12 +281,13 @@ function simplifiedTriggerSettings(
   fields: ConfigurationField[],
   fieldGroups: readonly { label: string; fieldNames: readonly string[] }[],
   trailingContent?: ReactNode,
+  hiddenFieldNames: readonly string[] = SIMPLIFIED_HIDDEN_FIELDS,
 ) {
   return {
     chrome: "fields" as const,
     booleanControl: "checkbox" as const,
     fieldGroups,
-    hiddenFieldNames: SIMPLIFIED_HIDDEN_FIELDS,
+    hiddenFieldNames,
     leadingContent: repositoryLine(repositoryDisplay(configuration.repository)),
     trailingContent,
     configuration,
@@ -283,7 +295,7 @@ function simplifiedTriggerSettings(
   };
 }
 
-/** The issue trigger cannot store these filters yet. */
+/** GitHub intake still filters with canvas nodes. Keep the trigger filter fields off this panel. */
 function issueFilterPlaceholders() {
   return (
     <fieldset className="min-w-0">
