@@ -16,7 +16,7 @@ import { PermissionsProvider } from "@/contexts/PermissionsProvider";
 import { ThemeContext } from "@/contexts/themeContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { agentChatKeys } from "@/hooks/useAgentChats";
-import { FEATURE_FACTORIES, FEATURE_WORKSPACE_AGENT } from "@/lib/experimentalFeatures";
+import { FEATURE_FACTORIES } from "@/lib/experimentalFeatures";
 import { setAgentSuggestions } from "@/lib/agentSuggestionsContext";
 import { AppPage } from "@/pages/app";
 import { STORYBOOK_AGENT_MESSAGES_UPDATED_EVENT } from "@/pages/app/__fixtures__/agentChatResponses";
@@ -41,7 +41,6 @@ import {
   LegacyFactoryAppRedirect,
   LegacyFactoryAppSplitRunRedirect,
   FactoryLineEditPage,
-  FactorySettingsAgentPage,
   FactorySettingsLayout,
   LegacyWorkOrderDetailRedirect,
   LegacyWorkOrderPermalinkRedirect,
@@ -61,6 +60,7 @@ import {
   LegacyFactorySettingsRedirect,
   LegacyOrganizationSettingsRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
+import { agentSectionRoute } from "@/pages/factories/pages/settings/agentSectionRoutes";
 import { factorySettingsSectionRoutes } from "@/pages/factories/pages/settings/factorySettingsSectionRoutes";
 import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
@@ -313,16 +313,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               <Route path="missions/:missionId" element={<MissionDetailPage />} />
               <Route path="wiki" element={<WikiRoutePage />} />
               <Route path="velocity" element={<VelocityRoutePage />} />
-              <Route
-                path="agent"
-                element={
-                  <RequirePermission resource="factories" action="update">
-                    <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_AGENT}>
-                      <FactorySettingsAgentPage />
-                    </RequireExperimentalFeature>
-                  </RequirePermission>
-                }
-              />
+              {agentSectionRoute}
               <Route path="more" element={<FactoryMoreRouteSwitch />} />
               <Route path="tasks">
                 <Route index element={<WorkOrdersRoutePage />} />

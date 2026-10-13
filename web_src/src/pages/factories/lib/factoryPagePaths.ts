@@ -647,6 +647,18 @@ export function factoryAgentPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/agent`;
 }
 
+export function factoryAgentMcpConnectionPath(organizationId: string, factoryKey: string, resourceId: string) {
+  return `${factoryAgentPath(organizationId, factoryKey)}/mcp/${resourceId}`;
+}
+
+/** Skill editor. Omit `resourceId` (or pass `new`) for the create page. */
+export function factoryAgentSkillEditorPath(organizationId: string, factoryKey: string, resourceId?: string) {
+  if (!resourceId || resourceId === "new") {
+    return `${factoryAgentPath(organizationId, factoryKey)}/skills/new`;
+  }
+  return `${factoryAgentPath(organizationId, factoryKey)}/skills/${resourceId}`;
+}
+
 export function factoryMorePath(organizationId: string, factoryKey: string, lineId?: string) {
   const path = `${factoryDetailPath(organizationId, factoryKey)}/more`;
   return lineId ? `${path}?lineId=${encodeURIComponent(lineId)}` : path;
