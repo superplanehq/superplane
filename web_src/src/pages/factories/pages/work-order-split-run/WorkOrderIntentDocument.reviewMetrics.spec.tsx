@@ -86,6 +86,8 @@ describe("WorkOrderIntentDocument review metrics", () => {
     await user.hover(confidence);
     const metrics = await screen.findByTestId("split-run-intent-review-metrics");
     expect(metrics).toBeVisible();
+    expect(metrics).toHaveTextContent("Confidence 2/3");
+    expect(metrics).toHaveTextContent("The lowest check sets the score.");
     expect(metrics).toHaveTextContent("Clarity");
     expect(metrics).toHaveTextContent("Clear");
     expect(metrics).toHaveTextContent("Complexity");
@@ -95,7 +97,6 @@ describe("WorkOrderIntentDocument review metrics", () => {
     expect(metrics).toHaveTextContent("The gap is specific and verifiable.");
     expect(metrics).toHaveTextContent("The work crosses a few layers.");
     expect(metrics).toHaveTextContent("Existing tests cover the change.");
-    expect(metrics).not.toHaveTextContent("/3");
     expect(screen.queryByTestId("split-run-intent-composer-confidence-copy")).not.toBeInTheDocument();
     expect(confidence).toHaveAttribute("aria-expanded", "true");
     expect(confidence).toHaveAttribute("aria-pressed", "false");
@@ -143,6 +144,7 @@ describe("WorkOrderIntentDocument review metrics", () => {
 
     await user.hover(confidence);
     const metrics = await screen.findByTestId("split-run-intent-review-metrics");
+    expect(metrics).toHaveTextContent("Confidence 3/3");
     expect(metrics).toHaveTextContent("Clarity");
     expect(metrics).toHaveTextContent("Clear");
     expect(metrics).toHaveTextContent("Complexity");
