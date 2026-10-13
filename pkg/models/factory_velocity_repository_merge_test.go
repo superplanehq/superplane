@@ -325,8 +325,9 @@ func Test__FindFactoryVelocitySyncTarget(t *testing.T) {
 	// read must still find it.
 	sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, time.Now())
 	require.NoError(t, err)
+	sync.SyncState = models.FactoryVelocitySyncStateCatchUp
 	now := time.Now()
-	require.NoError(t, sync.RecordSuccess(db, repository, now, now.Add(-60*24*time.Hour)))
+	require.NoError(t, sync.RecordProgress(db, repository, now.Add(-60*24*time.Hour), now))
 
 	target, err := models.FindFactoryVelocitySyncTarget(db, factory.ID)
 	require.NoError(t, err)
@@ -334,6 +335,8 @@ func Test__FindFactoryVelocitySyncTarget(t *testing.T) {
 	assert.Equal(t, repository, target.Repository)
 	assert.Equal(t, integrationID, target.IntegrationID.String())
 	assert.Equal(t, repository, target.SyncedRepository)
+	assert.Equal(t, models.FactoryVelocitySyncStateCatchUp, target.SyncState,
+		"the scheduled sync must resume the pending catch-up")
 
 	missing, err := models.FindFactoryVelocitySyncTarget(db, uuid.New())
 	require.NoError(t, err)
