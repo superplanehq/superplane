@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
@@ -74,7 +74,7 @@ describe("WorkOrderCard merge confidence", () => {
       ],
     });
 
-    const chip = screen.getByRole("img", { name: /Merge confidence.*Blast radius Low.*Security Missed/ });
+    const chip = screen.getByRole("img", { name: /Merge confidence.*Blast radius: Passed.*Security: Needs attention/ });
     expect(chip).toHaveTextContent("Confidence");
     expect(chip).not.toHaveTextContent("Merge");
     expect(chip).not.toHaveTextContent(/\d/);
@@ -98,9 +98,10 @@ describe("WorkOrderCard merge confidence", () => {
     expect(popup).toHaveAttribute("data-side", "right");
     expect(popup).toHaveTextContent("Merge confidence");
     expect(popup).toHaveTextContent("Blast radius");
-    expect(popup).toHaveTextContent("Low");
+    expect(within(popup).getAllByRole("img", { name: "Passed" })).toHaveLength(2);
     expect(popup).toHaveTextContent("Security");
-    expect(popup).toHaveTextContent("Missed");
+    expect(within(popup).getAllByRole("img", { name: "Needs attention" })).toHaveLength(2);
+    expect(popup).not.toHaveTextContent(/Low|Missed|Partial|Easy/);
     expect(popup).not.toHaveTextContent("4/5");
   });
 
