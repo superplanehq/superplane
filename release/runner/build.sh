@@ -93,7 +93,7 @@ for architecture in "${ARCHITECTURES[@]}"; do
     docker buildx build \
       --platform "linux/${architecture}" \
       --progress=plain \
-      --provenance=mode=max \
+      --provenance=false \
       --build-arg "RUNNER_VERSION=${VERSION}" \
       --target runtime \
       --load \
