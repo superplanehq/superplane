@@ -12,7 +12,7 @@ Any contributions to SuperPlane must only contain code that can legally be
 contributed to SuperPlane, and which the SuperPlane project can distribute
 under its license.
 
-Prior to contributing to SuperPlane please read the [Developer's Certificate of Origin](/docs/legal/developer_certificate_of_origin.txt)
+Prior to contributing to SuperPlane please read the [Developer's Certificate of Origin](../legal/developer_certificate_of_origin.txt)
 and sign-off all commits with the `--signoff` option provided by `git commit`.
 
 For example:
@@ -44,12 +44,12 @@ To automatically append the sign-off line to every commit made via the VS Code
 interface, you can enable a setting:
 
 1. Open VS Code Settings (Code > Settings on macOS, or File > Preferences > Settings on Linux/Windows)
-2. Search for git.enableCommitSigning or git signoff.
-3. Check the box for "Git: Enable Commit Signing".
+2. Search for `git.alwaysSignOff`.
+3. Check the box for "Git: Always Sign Off".
 
-This setting automatically appends the -s or --signoff flag to the git commit
-command when you commit via the VS Code UI, achieving the same result as running
-git commit -s in the terminal.
+This setting appends a `Signed-off-by` trailer when you commit from the VS Code
+UI. It is the DCO sign-off. Do not confuse it with "Git: Enable Commit Signing",
+which enables GPG or SSH commit signatures.
 
 ### Automatic verification of DCO
 
