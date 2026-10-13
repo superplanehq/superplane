@@ -20,12 +20,13 @@ docker_args=(
 )
 
 if [ -n "${REGISTRY_AUTH_FILE:-}" ]; then
-  if [ ! -f "${REGISTRY_AUTH_FILE}" ]; then
-    echo "Error: registry auth file does not exist: ${REGISTRY_AUTH_FILE}" >&2
+  auth_directory="$(dirname "${REGISTRY_AUTH_FILE}")"
+  if [ ! -d "${auth_directory}" ]; then
+    echo "Error: registry auth directory does not exist: ${auth_directory}" >&2
     exit 1
   fi
   docker_args+=(
-    --volume "${REGISTRY_AUTH_FILE}:${REGISTRY_AUTH_FILE}"
+    --volume "${auth_directory}:${auth_directory}"
     --env "REGISTRY_AUTH_FILE=${REGISTRY_AUTH_FILE}"
   )
 fi
