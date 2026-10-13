@@ -82,8 +82,8 @@ func TestMCPClientRevokeStaysInsideNarrowCard(t *testing.T) {
 		return mcpClientRevokeInsideCard(layout)
 	})
 	require.Less(t, narrow.ScrollWidth, 480.0)
-	require.GreaterOrEqual(t, narrow.ListWidth, 35*16-1)
-	require.GreaterOrEqual(t, narrow.PersonWidth, 12*16-8)
+	require.GreaterOrEqual(t, narrow.ListWidth, float64(35*16-1))
+	require.GreaterOrEqual(t, narrow.PersonWidth, float64(12*16-8))
 	require.True(t, narrow.ButtonHit)
 	require.True(t, narrow.NameTruncated)
 
