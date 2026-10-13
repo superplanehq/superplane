@@ -14,9 +14,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	runnerlogs "github.com/superplanehq/superplane/pkg/runners/logs"
+	"github.com/superplanehq/superplane/pkg/telemetry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -87,6 +89,13 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+	var fleetScope string
+	if telemetry.MetricsEnabled() {
+		fleetScope, err = fleet.MetricScope(database.DB(r.Context()))
+		if err != nil {
+			log.WithError(err).WithField("fleet_id", fleet.Slug).Warn("Failed to find runner fleet metric scope")
+		}
+	}
 
 	connectionID := uuid.New()
 	if err := authenticatedRunner.OpenConnection(database.DB(r.Context()), connectionID, time.Now()); err != nil {
@@ -109,6 +118,8 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 		authenticatedRunner,
 		connectionID,
 		hello.CurrentTaskID,
+		fleet.Slug,
+		fleetScope,
 	); err != nil {
 		s.writeConnectionError(connection, err, "")
 		return
@@ -148,6 +159,8 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 					authenticatedRunner,
 					connectionID,
 					"",
+					fleet.Slug,
+					fleetScope,
 				); err != nil {
 					s.writeConnectionError(connection, err, "")
 					return
@@ -192,6 +205,8 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 				authenticatedRunner,
 				connectionID,
 				complete,
+				fleet.Slug,
+				fleetScope,
 			); err != nil {
 				s.writeConnectionError(connection, err, complete.RequestID)
 				continue
@@ -212,6 +227,8 @@ func (s *Server) connectRunner(w http.ResponseWriter, r *http.Request) {
 				authenticatedRunner,
 				connectionID,
 				"",
+				fleet.Slug,
+				fleetScope,
 			); err != nil {
 				s.writeConnectionError(connection, err, "")
 				return
@@ -288,12 +305,14 @@ func (s *Server) reconcileRunnerConnection(
 	runner *models.Runner,
 	connectionID uuid.UUID,
 	reportedTaskID string,
+	fleetSlug, fleetScope string,
 ) error {
 	var task *models.RunnerTask
 	var shouldSendTask bool
 	var shouldStartTask bool
 	var shouldShutdown bool
 	var shouldCancel bool
+	var reservedTask *models.RunnerTask
 
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		current, err := models.FindRunner(tx, runner.ID)
@@ -362,6 +381,7 @@ func (s *Server) reconcileRunnerConnection(
 			if err != nil {
 				return err
 			}
+			reservedTask = task
 		default:
 			return activeErr
 		}
@@ -370,6 +390,9 @@ func (s *Server) reconcileRunnerConnection(
 	})
 	if err != nil {
 		return err
+	}
+	if reservedTask != nil {
+		telemetry.RecordRunnerTaskQueueDuration(ctx, reservedTask, fleetSlug, fleetScope)
 	}
 
 	if shouldStartTask {
@@ -450,6 +473,7 @@ func (s *Server) completeRunnerTask(
 	runner *models.Runner,
 	connectionID uuid.UUID,
 	complete completeMessage,
+	fleetSlug, fleetScope string,
 ) error {
 	if _, err := uuid.Parse(complete.RequestID); err != nil {
 		return errInvalidRunnerMessage
@@ -467,7 +491,8 @@ func (s *Server) completeRunnerTask(
 		return errInvalidRunnerMessage
 	}
 
-	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+	var completedTask *models.RunnerTask
+	err = database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		currentRunner, err := models.FindRunner(tx, runner.ID)
 		if err != nil {
 			return err
@@ -480,7 +505,7 @@ func (s *Server) completeRunnerTask(
 		if err != nil {
 			return err
 		}
-		if err := task.Complete(
+		completedNow, err := task.Complete(
 			tx,
 			currentRunner,
 			hash,
@@ -489,12 +514,20 @@ func (s *Server) completeRunnerTask(
 			complete.Error,
 			complete.Canceled,
 			time.Now(),
-		); err != nil {
+		)
+		if err != nil {
 			return err
+		}
+		if completedNow {
+			completedTask = task
 		}
 		*runner = *currentRunner
 		return nil
 	})
+	if err == nil && completedTask != nil {
+		telemetry.RecordRunnerTaskExecutionDuration(ctx, completedTask, fleetSlug, fleetScope)
+	}
+	return err
 }
 
 func completionHash(complete completeMessage) (string, error) {

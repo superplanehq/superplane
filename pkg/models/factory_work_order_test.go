@@ -1138,6 +1138,352 @@ func TestFactoryWorkOrder_UpsertArtifact(t *testing.T) {
 	})
 }
 
+func TestFactoryWorkOrder_UpsertArtifactByTypeAndTitle(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	_, userID, factoryModel := setupFactoryWithUser(t, "upsert-by-title")
+	db := database.Conn()
+
+	newOrder := func(t *testing.T, title string) *FactoryWorkOrder {
+		t.Helper()
+		order, err := factoryModel.CreateWorkOrder(db, title, "", &userID, nil, nil)
+		require.NoError(t, err)
+		return order
+	}
+
+	t.Run("creates then replaces the same row and clears a dropped field", func(t *testing.T) {
+		order := newOrder(t, "Replace target")
+		created, wasCreated, err := order.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/v1",
+				"title": "Preview",
+				"note":  "first",
+			},
+			Key: "ignored-on-create",
+		})
+		require.NoError(t, err)
+		assert.True(t, wasCreated)
+		assert.Nil(t, created.Key)
+
+		updated, wasCreated, err := order.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/v2",
+				"title": "Preview",
+			},
+			Key: "ignored-on-replace",
+		})
+		require.NoError(t, err)
+		assert.False(t, wasCreated)
+		assert.Equal(t, created.ID, updated.ID)
+		assert.Nil(t, updated.Key)
+
+		data := mustArtifactData(t, updated)
+		assert.Equal(t, "https://preview.example.com/v2", data["url"])
+		assert.Equal(t, "Preview", data["title"])
+		_, hasNote := data["note"]
+		assert.False(t, hasNote)
+
+		artifacts, err := order.ListArtifacts(db)
+		require.NoError(t, err)
+		require.Len(t, artifacts, 1)
+
+		events, err := order.ListEvents(db, 50, nil)
+		require.NoError(t, err)
+		assert.Equal(t, 1, countEventsOfType(events, factory.EventTypeOrderArtifactAdded))
+	})
+
+	t.Run("gives another task its own row", func(t *testing.T) {
+		order := newOrder(t, "Title update target")
+		_, _, err := order.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/v1",
+				"title": "Preview",
+			},
+		})
+		require.NoError(t, err)
+
+		other := newOrder(t, "Other title target")
+		otherArtifact, wasCreated, err := other.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/other",
+				"title": "Preview",
+			},
+		})
+		require.NoError(t, err)
+		assert.True(t, wasCreated)
+
+		updated, wasCreated, err := order.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/v3",
+				"title": "Preview",
+			},
+		})
+		require.NoError(t, err)
+		assert.False(t, wasCreated)
+		assert.NotEqual(t, otherArtifact.ID, updated.ID)
+
+		persisted, err := other.ListArtifacts(db)
+		require.NoError(t, err)
+		require.Len(t, persisted, 1)
+		assert.Equal(t, "https://preview.example.com/other", mustArtifactData(t, &persisted[0])["url"])
+	})
+
+	t.Run("does not replace a different type with the same title", func(t *testing.T) {
+		order := newOrder(t, "Type target")
+		note, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeMarkdown,
+			Data: map[string]any{
+				"title": "Preview",
+				"body":  "keep this note",
+			},
+		})
+		require.NoError(t, err)
+
+		link, wasCreated, err := order.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/typed",
+				"title": "Preview",
+			},
+		})
+		require.NoError(t, err)
+		assert.True(t, wasCreated)
+		assert.NotEqual(t, note.ID, link.ID)
+
+		artifacts, err := order.ListArtifacts(db)
+		require.NoError(t, err)
+		persisted := findArtifactByID(t, artifacts, note.ID)
+		assert.Equal(t, "keep this note", mustArtifactData(t, persisted)["body"])
+	})
+
+	t.Run("updates only the newest unkeyed match", func(t *testing.T) {
+		order := newOrder(t, "Newest target")
+		older, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/older",
+				"title": "Release",
+			},
+		})
+		require.NoError(t, err)
+		newer, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/newer",
+				"title": "Release",
+			},
+		})
+		require.NoError(t, err)
+
+		base := time.Now().Add(-2 * time.Hour)
+		require.NoError(t, db.Model(older).Update("created_at", base).Error)
+		require.NoError(t, db.Model(newer).Update("created_at", base.Add(time.Minute)).Error)
+
+		updated, wasCreated, err := order.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/newest",
+				"title": "Release",
+			},
+		})
+		require.NoError(t, err)
+		assert.False(t, wasCreated)
+		assert.Equal(t, newer.ID, updated.ID)
+
+		artifacts, err := order.ListArtifacts(db)
+		require.NoError(t, err)
+		assert.Equal(t, "https://preview.example.com/older", mustArtifactData(t, findArtifactByID(t, artifacts, older.ID))["url"])
+		assert.Equal(t, "https://preview.example.com/newest", mustArtifactData(t, findArtifactByID(t, artifacts, newer.ID))["url"])
+	})
+
+	t.Run("breaks a created_at tie by id descending", func(t *testing.T) {
+		order := newOrder(t, "Tie target")
+		first, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/tie-a",
+				"title": "Tie",
+			},
+		})
+		require.NoError(t, err)
+		second, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/tie-b",
+				"title": "Tie",
+			},
+		})
+		require.NoError(t, err)
+
+		sameTime := time.Now().Add(-time.Hour).UTC().Truncate(time.Microsecond)
+		require.NoError(t, db.Model(first).Update("created_at", sameTime).Error)
+		require.NoError(t, db.Model(second).Update("created_at", sameTime).Error)
+
+		want := first.ID
+		if second.ID.String() > first.ID.String() {
+			want = second.ID
+		}
+
+		updated, wasCreated, err := order.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/tie-newest",
+				"title": "Tie",
+			},
+		})
+		require.NoError(t, err)
+		assert.False(t, wasCreated)
+		assert.Equal(t, want, updated.ID)
+	})
+
+	t.Run("matches a trimmed title and keeps case distinct", func(t *testing.T) {
+		order := newOrder(t, "Trim target")
+		padded, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeMarkdown,
+			Data: map[string]any{
+				"title": "  Notes  ",
+				"body":  "padded",
+			},
+		})
+		require.NoError(t, err)
+
+		updated, wasCreated, err := order.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeMarkdown,
+			Data: map[string]any{
+				"title": "Notes",
+				"body":  "trimmed match",
+			},
+		})
+		require.NoError(t, err)
+		assert.False(t, wasCreated)
+		assert.Equal(t, padded.ID, updated.ID)
+
+		otherCase, wasCreated, err := order.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeMarkdown,
+			Data: map[string]any{
+				"title": "notes",
+				"body":  "different case",
+			},
+		})
+		require.NoError(t, err)
+		assert.True(t, wasCreated)
+		assert.NotEqual(t, padded.ID, otherCase.ID)
+	})
+
+	t.Run("rejects a blank title", func(t *testing.T) {
+		order := newOrder(t, "Blank title target")
+		_, _, err := order.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/blank",
+				"title": "   ",
+			},
+		})
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrFactoryWorkOrderArtifactInvalid)
+
+		artifacts, err := order.ListArtifacts(db)
+		require.NoError(t, err)
+		assert.Empty(t, artifacts)
+	})
+
+	t.Run("keeps one row when two first updates run together", func(t *testing.T) {
+		order := newOrder(t, "Concurrent title target")
+		const workers = 2
+		var wg sync.WaitGroup
+		errs := make([]error, workers)
+		ids := make([]uuid.UUID, workers)
+		createdFlags := make([]bool, workers)
+		start := make(chan struct{})
+
+		for i := 0; i < workers; i++ {
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				<-start
+				artifact, wasCreated, upsertErr := order.UpsertArtifactByTypeAndTitle(database.Conn(), FactoryWorkOrderArtifactParams{
+					Type: FactoryWorkOrderArtifactTypeLink,
+					Data: map[string]any{
+						"url":   fmt.Sprintf("https://preview.example.com/c%d", idx),
+						"title": "Preview",
+					},
+				})
+				errs[idx] = upsertErr
+				createdFlags[idx] = wasCreated
+				if artifact != nil {
+					ids[idx] = artifact.ID
+				}
+			}(i)
+		}
+		close(start)
+		wg.Wait()
+
+		for _, upsertErr := range errs {
+			require.NoError(t, upsertErr)
+		}
+		assert.Equal(t, ids[0], ids[1])
+		assert.NotEqual(t, createdFlags[0], createdFlags[1])
+
+		artifacts, err := order.ListArtifacts(database.Conn())
+		require.NoError(t, err)
+		require.Len(t, artifacts, 1)
+		assert.Equal(t, ids[0], artifacts[0].ID)
+		assert.Equal(t, "Preview", mustArtifactData(t, &artifacts[0])["title"])
+
+		events, err := order.ListEvents(database.Conn(), 50, nil)
+		require.NoError(t, err)
+		assert.Equal(t, 1, countEventsOfType(events, factory.EventTypeOrderArtifactAdded))
+	})
+
+	t.Run("does not replace a keyed row with the same title", func(t *testing.T) {
+		order := newOrder(t, "Keyed title target")
+		keyed, err := order.CreateArtifact(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/keyed",
+				"title": "Spec",
+			},
+			Key: "planning-spec",
+		})
+		require.NoError(t, err)
+
+		created, wasCreated, err := order.UpsertArtifactByTypeAndTitle(db, FactoryWorkOrderArtifactParams{
+			Type: FactoryWorkOrderArtifactTypeLink,
+			Data: map[string]any{
+				"url":   "https://preview.example.com/unkeyed",
+				"title": "Spec",
+			},
+		})
+		require.NoError(t, err)
+		assert.True(t, wasCreated)
+		assert.NotEqual(t, keyed.ID, created.ID)
+		assert.Nil(t, created.Key)
+
+		persisted, err := order.FindArtifactByKey(db, "planning-spec")
+		require.NoError(t, err)
+		assert.Equal(t, keyed.ID, persisted.ID)
+		require.NotNil(t, persisted.Key)
+		assert.Equal(t, "planning-spec", *persisted.Key)
+		assert.Equal(t, "https://preview.example.com/keyed", mustArtifactData(t, persisted)["url"])
+	})
+}
+
+func findArtifactByID(t *testing.T, artifacts []FactoryWorkOrderArtifact, id uuid.UUID) *FactoryWorkOrderArtifact {
+	t.Helper()
+	for i := range artifacts {
+		if artifacts[i].ID == id {
+			return &artifacts[i]
+		}
+	}
+	t.Fatalf("artifact %s not found", id)
+	return nil
+}
+
 func TestFactoryWorkOrder_UpdateArtifactData(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

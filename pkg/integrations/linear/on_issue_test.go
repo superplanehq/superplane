@@ -158,6 +158,26 @@ func Test__OnIssue__HandleWebhook__IgnoresOtherResourceTypes(t *testing.T) {
 	assert.Zero(t, events.Count())
 }
 
+func Test__OnIssue__HandleWebhook__AcceptsApplicationWebhookSignature(t *testing.T) {
+	trigger := &OnIssue{}
+	events := &contexts.EventContext{}
+
+	ctx := signedRequest(t, issueEvent("create", nil), map[string]any{"team": "t1", "actions": []string{"create"}}, events)
+	ctx.Webhook = &contexts.NodeWebhookContext{Secret: "subscription-secret"}
+	ctx.Integration = &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"clientId":      testClientID,
+			"clientSecret":  testClientSecret,
+			"webhookSecret": testWebhookSecret,
+		},
+	}
+
+	code, _, err := trigger.HandleWebhook(ctx)
+	assert.Equal(t, http.StatusOK, code)
+	require.NoError(t, err)
+	assert.Equal(t, 1, events.Count())
+}
+
 func Test__OnIssue__HandleWebhook__InvalidSignature(t *testing.T) {
 	trigger := &OnIssue{}
 	events := &contexts.EventContext{}

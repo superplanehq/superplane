@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams, useSearchParams } from "react-router";
 import { appPath, appSettingsPath } from "./lib/appPaths";
-import { FEATURE_FACTORIES, FEATURE_FACTORY_RISK_SCORE } from "./lib/experimentalFeatures";
+import { FEATURE_FACTORIES, FEATURE_WORKSPACE_AGENT } from "./lib/experimentalFeatures";
 import { usePersistOrganizationLastLocation } from "./hooks/usePersistOrganizationLastLocation";
 import { UserNotificationsListener } from "./hooks/useUserNotificationsWebsocket";
 import { resolveOrganizationUidRedirect } from "./lib/organizationPath";
@@ -38,6 +38,7 @@ import {
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
   FactoryLineEditPage,
+  FactorySettingsAgentPage,
   FactorySettingsLayout,
   LegacyFactoryAppRedirect,
   LegacyFactoryAppSplitRunRedirect,
@@ -67,7 +68,11 @@ import {
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { isPublicFactoryLinePath } from "./pages/factories/lib/publicFactoryLinePath";
 import { FactoryLineAccessGate } from "./pages/factories/pages/FactoryLineAccessGate";
-import { FactoryWorkspaceLayoutSwitch, WorkOrderDetailRouteSwitch } from "./pages/factories/mobile/MobileShellSwitch";
+import {
+  FactoryMoreRouteSwitch,
+  FactoryWorkspaceLayoutSwitch,
+  WorkOrderDetailRouteSwitch,
+} from "./pages/factories/mobile/MobileShellSwitch";
 import { WorkspaceLoadingProvider } from "./pages/factories/layout/workspaceLoading";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
@@ -89,11 +94,13 @@ import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
 import OrganizationDetailAdmin from "./pages/admin/OrganizationDetail";
 import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
+import InstallationLicenseAdmin from "./pages/admin/InstallationLicense";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
 import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
 import { Webhooks as WebhooksAdmin } from "./pages/admin/Webhooks";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
 import ImpersonationBanner from "./components/ImpersonationBanner";
+import LicenseExpiryBanner from "./components/LicenseExpiryBanner";
 import { usePageObservability } from "./hooks/usePageObservability";
 
 // Create a client
@@ -159,6 +166,17 @@ function organizationScopedRouteTree() {
             <Route path="missions" element={<MissionsPage />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="velocity" element={<VelocityPage />} />
+            <Route
+              path="agent"
+              element={
+                <RequirePermission resource="factories" action="update">
+                  <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_AGENT}>
+                    <FactorySettingsAgentPage />
+                  </RequireExperimentalFeature>
+                </RequirePermission>
+              }
+            />
+            <Route path="more" element={<FactoryMoreRouteSwitch />} />
             <Route path="tasks">
               <Route index element={<WorkOrdersPage />} />
               <Route path="new" element={<CreateWorkOrderComposeGate />} />
@@ -174,14 +192,7 @@ function organizationScopedRouteTree() {
               <Route path=":lineId/edit" element={<FactoryLineEditPageGate />} />
               <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
               <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />
-              <Route
-                path=":lineId/setup/risk-score"
-                element={
-                  <RequireExperimentalFeature featureId={FEATURE_FACTORY_RISK_SCORE}>
-                    <RiskScoreSetupPage />
-                  </RequireExperimentalFeature>
-                }
-              />
+              <Route path=":lineId/setup/risk-score" element={<RiskScoreSetupPage />} />
               <Route path=":lineId/setup/planning" element={<PlanningSetupPage />} />
               <Route path=":lineId/setup/github" element={<GitHubIntakeSetupPage />} />
               <Route path=":lineId/setup/sentry" element={<SentryIntakeSetupPage />} />
@@ -254,7 +265,9 @@ function AppRouter() {
       <PageObservabilityScope />
       <div className="flex h-dvh flex-col overflow-hidden">
         <ImpersonationBanner />
-        <div className="relative flex-1 overflow-auto">
+        <LicenseExpiryBanner />
+        {/* Phone shells read this region so a fixed shell stays below app banners. */}
+        <div className="relative flex-1 overflow-auto" data-app-content-region="">
           <SetupGuard>
             <GlobalCommandPalette />
             <Routes>
@@ -267,6 +280,7 @@ function AppRouter() {
                 <Route index element={<OrganizationsListAdmin />} />
                 <Route path="accounts" element={<AccountsListAdmin />} />
                 <Route path="settings" element={<InstallationSettingsAdmin />} />
+                <Route path="license" element={<InstallationLicenseAdmin />} />
                 <Route path="price-books" element={<PriceBooksAdmin />} />
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
                 <Route path="polar-webhooks" element={<PolarWebhooksAdmin />} />

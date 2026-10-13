@@ -23,7 +23,9 @@ import (
 	agenttools "github.com/superplanehq/superplane/pkg/agents/agent_tools"
 	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/bitbucketapp"
 	"github.com/superplanehq/superplane/pkg/blob"
+	blobazure "github.com/superplanehq/superplane/pkg/blob/azure"
 	blobfilesystem "github.com/superplanehq/superplane/pkg/blob/filesystem"
 	"github.com/superplanehq/superplane/pkg/blob/gcs"
 	s3blob "github.com/superplanehq/superplane/pkg/blob/s3"
@@ -154,6 +156,38 @@ func buildAgentService(authService authorization.Authorization) (agents.Provider
 	return provider, service
 }
 
+// Cloud has the GitHub App in the process environment at boot. A self-hosted
+// installation stores the app after the first workspace setup, so this waits
+// until that app exists and then starts the catalog worker.
+func startGitHubAppCatalogWorker(ctx context.Context) {
+	loggedWait := false
+	for {
+		cfg, err := githubapp.ResolveProcess(ctx)
+		switch {
+		case err != nil:
+			log.WithError(err).Error("Failed to load the GitHub App for the catalog")
+		case cfg.Enabled():
+			catalog, catalogErr := githubapp.NewCatalog(database.Conn(), cfg)
+			if catalogErr != nil {
+				log.WithError(catalogErr).Error("Failed to initialize the GitHub App catalog")
+				break
+			}
+			log.Println("Starting GitHub App Catalog Worker")
+			workers.NewVCSProviderCatalogWorker(models.ProviderGitHub, catalog).Start(ctx)
+			return
+		case !loggedWait:
+			log.Println("GitHub App catalog waits until the app is configured")
+			loggedWait = true
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(15 * time.Second):
+		}
+	}
+}
+
 func startWorkers(
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
@@ -199,16 +233,7 @@ func startWorkers(
 		panic(err)
 	}
 
-	githubAppConfig := config.LoadGitHubHostedAppConfig()
-	if githubAppConfig.Enabled() {
-		catalog, err := githubapp.NewCatalog(database.Conn(), githubAppConfig)
-		if err != nil {
-			log.WithError(err).Error("Failed to initialize the GitHub App catalog")
-		} else {
-			log.Println("Starting GitHub App Catalog Worker")
-			go workers.NewVCSProviderCatalogWorker(models.ProviderGitHub, catalog).Start(context.Background())
-		}
-	}
+	go startGitHubAppCatalogWorker(context.Background())
 
 	if os.Getenv("START_CONSUMERS") == "yes" {
 		startEmailConsumers(rabbitMQURL, encryptor, baseURL)
@@ -733,6 +758,10 @@ func Start() {
 		encryptorInstance = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
 	}
 
+	bitbucketapp.SetSystemTokenSource(func(installationID string) (string, time.Time, error) {
+		return bitbucketapp.LoadSystemToken(context.Background(), database.Conn(), encryptorInstance, installationID, time.Now())
+	})
+
 	if err := llm.SeedDevHostedOpenRouterFromEnv(context.Background(), database.Conn(), encryptorInstance); err != nil {
 		log.WithError(err).Error("development hosted OpenRouter seed skipped")
 	}
@@ -900,7 +929,13 @@ func startLicenseService(encryptor crypto.Encryptor) *licensing.Service {
 	}
 
 	keySync := licensing.NewKeySync(keys, licensing.DatabaseKeyListCache{}, keysURL)
-	service := licensing.NewService(licensing.NewVerifier(keys), source, licensing.WithKeySync(keySync))
+	revocations := licensing.NewRevocationSync(keys.Roots(), licensing.DatabaseRevocationListCache{}, licensing.RevocationsURL(keysURL))
+	service := licensing.NewService(
+		licensing.NewVerifier(keys),
+		source,
+		licensing.WithKeySync(keySync),
+		licensing.WithRevocationSync(revocations),
+	)
 	service.Start(context.Background())
 	return service
 }
@@ -938,6 +973,9 @@ func newBlobProvider() (blob.Provider, error) {
 	case blob.ProviderS3:
 		log.Println("Creating S3 blob storage provider")
 		return s3blob.NewProvider()
+	case blob.ProviderAzure:
+		log.Println("Creating Azure blob storage provider")
+		return blobazure.NewProvider()
 	case blob.ProviderFilesystem:
 		log.Println("Creating filesystem blob storage provider")
 		return blobfilesystem.NewProvider()

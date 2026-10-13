@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { experimentalFeaturesKeys } from "@/hooks/useExperimentalFeatures";
 import { organizationKeys } from "@/hooks/useOrganizationData";
-import { FEATURE_TASK_PLANNING_REVIEW } from "@/lib/experimentalFeatures";
 import { TooltipProvider } from "@/ui/tooltip";
 
 import { analysisChat, HIGH_CONFIDENCE, INTENT } from "./WorkOrderIntentDocument.testHelpers";
@@ -15,22 +14,18 @@ vi.mock("@/hooks/useOrgUserLookup", () => ({
   useOrgUserLookup: () => ({ resolveUser: () => null, isLoading: false }),
 }));
 
-describe("Task planning organization flag", () => {
-  it("uses the current organization's flag and restores the original UI when it is disabled", () => {
+describe("Task planning review", () => {
+  it("shows the review popup when the organization has no experimental features", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
-    client.setQueryData(experimentalFeaturesKeys.registry(), {
-      features: [{ id: FEATURE_TASK_PLANNING_REVIEW, released: false }],
-    });
-    client.setQueryData(organizationKeys.details("enabled-org"), {
-      spec: { enabledExperimentalFeatures: [FEATURE_TASK_PLANNING_REVIEW] },
-    });
-    client.setQueryData(organizationKeys.details("original-org"), { spec: { enabledExperimentalFeatures: [] } });
-    const overview = (organizationId: string) => (
+    client.setQueryData(experimentalFeaturesKeys.registry(), { features: [] });
+    client.setQueryData(organizationKeys.details("plain-org"), { spec: { enabledExperimentalFeatures: [] } });
+
+    render(
       <QueryClientProvider client={client}>
         <MemoryRouter>
           <TooltipProvider>
             <WorkOrderSplitRunOverview
-              organizationId={organizationId}
+              organizationId="plain-org"
               title="Review a task"
               description="Add a clearer empty state."
               artifacts={[INTENT]}
@@ -40,21 +35,11 @@ describe("Task planning organization flag", () => {
             />
           </TooltipProvider>
         </MemoryRouter>
-      </QueryClientProvider>
+      </QueryClientProvider>,
     );
-    const { rerender } = render(overview("original-org"));
-    expect(screen.getByRole("button", { name: /^Plan$/ })).toBeVisible();
-    expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toBeVisible();
-    expect(screen.queryByRole("region", { name: "Implementation" })).not.toBeInTheDocument();
 
-    rerender(overview("enabled-org"));
     expect(screen.getByRole("button", { name: "Open plan" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Suggest changes" })).toBeVisible();
     expect(screen.getByRole("region", { name: "Implementation" })).toBeVisible();
-
-    rerender(overview("original-org"));
-    expect(screen.getByRole("button", { name: /^Plan$/ })).toBeVisible();
-    expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toBeVisible();
-    expect(screen.queryByRole("region", { name: "Implementation" })).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import type { FactoriesWorkOrder } from "@/api-client";
+import superplaneMark from "@/assets/superplane-mark.svg";
 import superplaneIcon from "@/assets/superplane.svg";
 
 import {
@@ -22,7 +23,7 @@ export function workOrderCardSource(order: FactoriesWorkOrder): WorkOrderCardSou
     const creatorName = order.createdBy?.user?.name?.trim();
     return {
       name: CREATED_MANUALLY,
-      iconSrc: superplaneIcon,
+      iconSrc: superplaneMark,
       iconAlt: "SuperPlane",
       ...(creatorName ? { creatorName } : {}),
     };
@@ -30,7 +31,7 @@ export function workOrderCardSource(order: FactoriesWorkOrder): WorkOrderCardSou
   if (source.kind === "mcp") {
     return {
       name: source.name,
-      iconSrc: source.iconSrc,
+      iconSrc: source.iconSrc === superplaneIcon ? superplaneMark : source.iconSrc,
       iconAlt: source.iconAlt,
     };
   }

@@ -54,12 +54,12 @@ export const PhaseCatalog: Story = {
 
 export const VerifyCatalog: Story = {
   name: "Verify catalog",
-  render: () => (
-    <OpenPicker
-      catalog={catalogForColumn("verify", { allowCustom: true, allowRiskScore: true })}
-      takenIds={["discussion"]}
-    />
-  ),
+  render: () => <OpenPicker catalog={catalogForColumn("verify", { allowCustom: true })} takenIds={["discussion"]} />,
+};
+
+export const BitbucketVerifyCatalog: Story = {
+  name: "Bitbucket Verify catalog",
+  render: () => <OpenPicker catalog={catalogForColumn("verify", { allowCustom: true, vcsProvider: "bitbucket" })} />,
 };
 
 export const DoneCatalog: Story = {

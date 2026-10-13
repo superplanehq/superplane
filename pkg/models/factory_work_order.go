@@ -20,9 +20,12 @@ const (
 	FactoryWorkOrderStateOpen   = "open"
 	FactoryWorkOrderStateClosed = "closed"
 
-	FactoryWorkOrderResultCompleted = "completed"
-	FactoryWorkOrderResultRejected  = "rejected"
-	FactoryWorkOrderResultFailed    = "failed"
+	FactoryWorkOrderResultCompleted      = "completed"
+	FactoryWorkOrderResultRejected       = "rejected"
+	FactoryWorkOrderResultFailed         = "failed"
+	FactoryWorkOrderResultArchived       = "archived"
+	FactoryWorkOrderResultPRClosed       = "pr_closed"
+	FactoryWorkOrderResultManualRejected = "manual_rejected"
 
 	DefaultMCPClientName = "MCP client"
 )
@@ -39,21 +42,23 @@ var (
 		FactoryWorkOrderStateClosed,
 	}
 
-	// Allowed close results per source state. A draft was never dispatched,
-	// so it can only be `rejected` (abandoned). Open orders may terminate
-	// with any of the three results depending on outcome.
+	// Draft tasks can be rejected or archived. Open tasks can also complete,
+	// fail, or close with their pull request.
 	factoryWorkOrderCloseResultsByFromState = map[string][]string{
-		FactoryWorkOrderStateDraft: {FactoryWorkOrderResultRejected},
+		FactoryWorkOrderStateDraft: {FactoryWorkOrderResultRejected, FactoryWorkOrderResultManualRejected, FactoryWorkOrderResultArchived},
 		FactoryWorkOrderStateOpen: {
 			FactoryWorkOrderResultCompleted,
 			FactoryWorkOrderResultRejected,
+			FactoryWorkOrderResultManualRejected,
 			FactoryWorkOrderResultFailed,
+			FactoryWorkOrderResultArchived,
+			FactoryWorkOrderResultPRClosed,
 		},
 	}
 
 	// Allowed transitions. `open → draft` is "back to draft"; `closed →
 	// open` is reopen; `closed → draft` is send to backlog; `draft → closed`
-	// is "abandon before dispatch" (rejected only). See TransitionOnDispatch
+	// is reject or archive before dispatch. See TransitionOnDispatch
 	// for the draft → open promotion.
 	factoryWorkOrderAllowedTransitions = map[string][]string{
 		FactoryWorkOrderStateDraft:  {FactoryWorkOrderStateOpen, FactoryWorkOrderStateClosed},
@@ -77,6 +82,7 @@ type FactoryWorkOrder struct {
 	OriginLabel     *string
 	Repository      *string
 	DefaultBranch   *string
+	VCSProvider     *string // Git host saved with the repository. Empty means a legacy GitHub row.
 	AutoStartLineID *uuid.UUID
 	MCPClientID     *string
 	MCPClientName   *string
@@ -200,13 +206,14 @@ func (FactoryWorkOrderAssignee) TableName() string {
 // shared status FSM. Actor / Automation / Run + App are optional attribution
 // fields that populate the emitted `order.status.updated` event.
 type FactoryWorkOrderStatusUpdate struct {
-	ToState    string
-	Result     string
-	Actor      *uuid.UUID
-	Automation *factory.AutomationRef
-	Run        *factory.RunRef
-	App        *factory.AppRef
-	SkipSame   bool // when true, no-op transitions to the current state succeed silently
+	ToState         string
+	Result          string
+	Actor           *uuid.UUID
+	Automation      *factory.AutomationRef
+	Run             *factory.RunRef
+	App             *factory.AppRef
+	SkipSame        bool // when true, no-op transitions to the current state succeed silently
+	OnRunsCancelled func([]*RunCancellationResult)
 }
 
 // NOTE: this is only OK to be used in the workers.
@@ -437,6 +444,9 @@ func (o *FactoryWorkOrder) UpdateStatus(db *gorm.DB, update FactoryWorkOrderStat
 			if err := o.dropQueuedLineWork(tx); err != nil {
 				return err
 			}
+			if err := o.cancelRuns(tx, update); err != nil {
+				return err
+			}
 		}
 
 		if fromState == FactoryWorkOrderStateDraft && toState == FactoryWorkOrderStateOpen && update.Actor != nil {
@@ -528,6 +538,11 @@ func (o *FactoryWorkOrder) loadSourceRunRefs(tx *gorm.DB) (*factory.RunRef, *fac
 		runRef.Result = &result
 	}
 	return runRef, &factory.AppRef{ID: run.WorkflowID}, nil
+}
+
+// shortcut: legacy rejected records may be archives; classify them before making them visible.
+func (o *FactoryWorkOrder) IsArchived() bool {
+	return o.State == FactoryWorkOrderStateClosed && (o.Result == FactoryWorkOrderResultArchived || o.Result == FactoryWorkOrderResultRejected)
 }
 
 // Close is kept for backwards compatibility with existing handlers. New code
@@ -668,11 +683,11 @@ func (o *FactoryWorkOrder) ReplaceAssignees(tx *gorm.DB, assigneeIDs []uuid.UUID
 
 	now := time.Now()
 	assignees := make([]FactoryWorkOrderAssignee, 0, len(assigneeIDs))
-	for _, assigneeID := range assigneeIDs {
+	for i, assigneeID := range assigneeIDs {
 		assignees = append(assignees, FactoryWorkOrderAssignee{
 			WorkOrderID: o.ID,
 			UserID:      assigneeID,
-			CreatedAt:   now,
+			CreatedAt:   now.Add(time.Duration(i) * time.Millisecond),
 		})
 	}
 

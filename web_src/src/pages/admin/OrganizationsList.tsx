@@ -1,6 +1,7 @@
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
+import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
 import { Building, CircleCheck, ClipboardList, Palette, Pin, PinOff, User } from "lucide-react";
 import React from "react";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
@@ -74,6 +75,13 @@ function OrganizationTableHeader({
       <SortableHeader
         label="Members"
         field="member_count"
+        currentSort={sortBy}
+        currentDirection={sortDirection}
+        onSort={onSort}
+      />
+      <SortableHeader
+        label="Credits"
+        field="remaining_credit_cents"
         currentSort={sortBy}
         currentDirection={sortDirection}
         onSort={onSort}
@@ -167,6 +175,9 @@ function OrganizationRow({
           <User size={13} />
           {organization.member_count}
         </span>
+      </td>
+      <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap dark:text-gray-400">
+        {formatUsdCents(organization.remaining_credit_cents ?? 0)}
       </td>
       <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap dark:text-gray-500">
         {formatDate(organization.created_at)}

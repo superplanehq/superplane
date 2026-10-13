@@ -211,7 +211,7 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 	})
 }
 
-func Test__ResolveGitHubInstallationName(t *testing.T) {
+func Test__ResolveVCSInstallationName(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
 
@@ -231,8 +231,8 @@ func Test__ResolveGitHubInstallationName(t *testing.T) {
 			VCSIntegrationID: &chosenID,
 		}))
 
-		assert.Equal(t, integrationName(t, organization.ID, chosenID), resolveGitHubInstallationName(db, factory))
-		assert.NotEqual(t, integrationName(t, organization.ID, firstID), resolveGitHubInstallationName(db, factory))
+		assert.Equal(t, integrationName(t, organization.ID, chosenID), resolveVCSInstallationName(db, factory))
+		assert.NotEqual(t, integrationName(t, organization.ID, firstID), resolveVCSInstallationName(db, factory))
 	})
 
 	t.Run("falls back to a ready GitHub install when setup has no VCS", func(t *testing.T) {
@@ -240,7 +240,7 @@ func Test__ResolveGitHubInstallationName(t *testing.T) {
 		factory := newFactoryIn(t, organization.ID)
 		githubID := createReadyOnboardingIntegration(t, organization.ID, "github")
 
-		assert.Equal(t, integrationName(t, organization.ID, githubID), resolveGitHubInstallationName(db, factory))
+		assert.Equal(t, integrationName(t, organization.ID, githubID), resolveVCSInstallationName(db, factory))
 	})
 
 	t.Run("does not use another GitHub install when the workspace VCS is not ready", func(t *testing.T) {
@@ -260,8 +260,22 @@ func Test__ResolveGitHubInstallationName(t *testing.T) {
 			VCSIntegrationID: &vcsID,
 		}))
 
-		assert.Equal(t, intakeGitHubAppName, resolveGitHubInstallationName(db, factory))
-		assert.NotEqual(t, integrationName(t, organization.ID, otherID), resolveGitHubInstallationName(db, factory))
+		assert.Equal(t, intakeGitHubAppName, resolveVCSInstallationName(db, factory))
+		assert.NotEqual(t, integrationName(t, organization.ID, otherID), resolveVCSInstallationName(db, factory))
+	})
+
+	t.Run("uses the Bitbucket installation for a Bitbucket workspace", func(t *testing.T) {
+		organization := support.CreateOrganization(t, r, r.User)
+		factory := newFactoryIn(t, organization.ID)
+		createReadyOnboardingIntegration(t, organization.ID, "github")
+		bitbucketID := createReadyOnboardingIntegration(t, organization.ID, "bitbucket")
+		provider := models.ProviderBitbucket
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			VCSIntegrationID: &bitbucketID,
+			VCSProvider:      &provider,
+		}))
+
+		assert.Equal(t, integrationName(t, organization.ID, bitbucketID), resolveVCSInstallationName(db, factory))
 	})
 }
 

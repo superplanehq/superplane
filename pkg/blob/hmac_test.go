@@ -80,6 +80,11 @@ func TestFileIDFromSignedURLReadsHMACAndGCSPaths(t *testing.T) {
 	id, ok = FileIDFromSignedURL(pathStyle)
 	require.True(t, ok)
 	assert.Equal(t, fileID, id)
+
+	azureURL := "https://superplanefiles.blob.core.windows.net/superplane/install/orgs/org/workspaces/ws/tasks/" + workOrderID.String() + "/" + fileID.String() + "?sv=2024-11-04&sp_file=1"
+	id, ok = FileIDFromSignedURL(azureURL)
+	require.True(t, ok)
+	assert.Equal(t, fileID, id)
 }
 
 func TestRewriteSignedFileURLsRestoresRefsAndDropsUnknown(t *testing.T) {

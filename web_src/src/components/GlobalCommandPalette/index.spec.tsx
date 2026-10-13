@@ -319,17 +319,21 @@ describe("GlobalCommandPalette", () => {
     expect(await screen.findByText("No results found.")).toBeInTheDocument();
   });
 
-  it("closes with CMD+K while the command input is focused", async () => {
+  it("does not open or close with Cmd+K or Ctrl+K", async () => {
     renderPalette();
+
+    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+
+    expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
 
     openPalette();
     const input = await screen.findByPlaceholderText("Find apps, integrations, and commands...");
     input.focus();
     fireEvent.keyDown(input, { key: "k", metaKey: true });
+    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
 
-    await waitFor(() => {
-      expect(screen.queryByPlaceholderText("Find apps, integrations, and commands...")).not.toBeInTheDocument();
-    });
+    expect(screen.getByPlaceholderText("Find apps, integrations, and commands...")).toBeInTheDocument();
   });
 
   it("does not open before the account is available", () => {

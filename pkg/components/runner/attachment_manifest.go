@@ -92,7 +92,7 @@ func ResolveTaskAttachments(input AgentBrokerTaskInput) []TaskAttachment {
 func HasVideoAttachment(attachments []TaskAttachment) bool {
 	for _, attachment := range attachments {
 		switch attachmentKind(attachment) {
-		case "video", "audio":
+		case "video", "audio", HostedVideoKind:
 			return true
 		}
 	}
@@ -120,6 +120,9 @@ func uniqueTaskAttachments(attachments []TaskAttachment) []TaskAttachment {
 }
 
 func attachmentKind(attachment TaskAttachment) string {
+	if attachment.Kind != "" {
+		return attachment.Kind
+	}
 	if models.IsInlineAudioContentType(attachment.ContentType) || looksLikeAudioName(attachment.Filename) {
 		return "audio"
 	}

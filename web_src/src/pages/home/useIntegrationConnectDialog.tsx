@@ -187,7 +187,8 @@ export function useIntegrationConnectDialog({
     const existingSelection = selectReadyIntegrationInstance(connected, selections, integrationName);
     if (existingSelection) {
       onSelectionsChange(existingSelection);
-      return true;
+      // True means the browser left this page. A saved connection stays here.
+      return false;
     }
     if (integrationName === "github" && githubConnect.privateApp) {
       requestPrivateGitHubConnect();
@@ -273,6 +274,8 @@ export function useIntegrationConnectDialog({
     connectionsLoading,
     /** Refetches the connected list, for screens that must not show a stale cache. */
     refetchConnections: refetch,
+    /** Keeps a just-created instance selected until the connection list includes it. */
+    rememberPreferredInstance,
     requestConnect,
     requestPrivateGitHubConnect,
     offersPrivateGitHubAppSetup: githubConnect.privateApp,

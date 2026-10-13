@@ -1,14 +1,5 @@
 import { describe, expect, it } from "bun:test";
 
-import type {
-  FactoriesFactory,
-  FactoriesFactoryPullRequest,
-  FactoriesLineRef,
-  FactoriesWorkOrder,
-  FactoriesWorkOrderExecution,
-  FactoriesWorkOrderLineDispatch,
-} from "@/api-client";
-
 import {
   EMPTY_WORK_ORDER_FILTERS,
   MANUAL_FILTER_VALUE,
@@ -17,6 +8,7 @@ import {
   applyWorkOrderOrdering,
   applyWorkOrderScope,
   applyWorkOrderSearch,
+  boardWorkOrderScopeQuery,
   buildWorkOrderListEntries,
   buildWorkOrderListEntry,
   groupWorkOrderEntriesByLane,
@@ -25,67 +17,11 @@ import {
   visibleWorkOrderFilters,
   WORK_ORDER_SCOPES,
 } from "./workOrderListModel";
-import { isActiveWorkOrderExecution } from "./workOrderExecutions";
-
-const factory: FactoriesFactory = { id: "f", name: "Refunds", key: "RF" };
-
-/** Fixture-only shape: a step execution plus which line it ran on, before
- * it's grouped into a dispatch by `order()` below. */
-type TestExecution = FactoriesWorkOrderExecution & { line?: FactoriesLineRef };
-
-interface OrderOverrides extends Omit<Partial<FactoriesWorkOrder>, "lineDispatches"> {
-  /** Convenience: a flat execution list, grouped into one dispatch per
-   * distinct line so most test cases don't need to hand-build dispatches. */
-  executions?: TestExecution[];
-}
-
-function order(overrides: OrderOverrides = {}): FactoriesWorkOrder {
-  const { executions, ...rest } = overrides;
-  return {
-    id: overrides.id ?? "wo-1",
-    title: "Order title",
-    state: "STATE_OPEN",
-    result: "RESULT_UNSPECIFIED",
-    createdAt: "2024-06-01T00:00:00Z",
-    updatedAt: "2024-06-02T00:00:00Z",
-    lineDispatches: executions ? dispatchesFromExecutions(executions) : [],
-    ...rest,
-  };
-}
-
-function pullRequest(
-  workOrderId: string,
-  overrides: Partial<FactoriesFactoryPullRequest> = {},
-): FactoriesFactoryPullRequest {
-  return {
-    id: `pr-${workOrderId}`,
-    workOrderId,
-    number: "12",
-    url: `https://github.com/acme/payments/pull/12`,
-    title: "Ship refund retries",
-    state: "STATE_OPEN",
-    ...overrides,
-  };
-}
-
-function dispatchesFromExecutions(executions: TestExecution[]): FactoriesWorkOrderLineDispatch[] {
-  const byLineId = new Map<string, FactoriesWorkOrderLineDispatch>();
-  for (const { line, ...execution } of executions) {
-    const lineId = line?.id ?? "unknown";
-    const dispatch = byLineId.get(lineId);
-    if (dispatch) {
-      dispatch.stepExecutions = [...(dispatch.stepExecutions ?? []), execution];
-      continue;
-    }
-    byLineId.set(lineId, {
-      id: `dispatch-${lineId}`,
-      line,
-      state: isActiveWorkOrderExecution(execution) ? "STATE_ACTIVE" : "STATE_FINISHED",
-      stepExecutions: [execution],
-    });
-  }
-  return [...byLineId.values()];
-}
+import {
+  workOrderListFactory as factory,
+  workOrderListOrder as order,
+  workOrderListPullRequest as pullRequest,
+} from "./workOrderListModel.spec.fixtures";
 
 describe("buildWorkOrderListEntry", () => {
   it("derives the display key, status, and searchable haystack", () => {
@@ -315,6 +251,8 @@ describe("scope + filter + search + ordering", () => {
     expect(WORK_ORDER_SCOPES.find((scope) => scope.id === "my")?.tooltip).toBe(
       "Tasks you created or started. SuperPlane assigns those to you.",
     );
+    expect(WORK_ORDER_SCOPES.map((scope) => scope.id)).toEqual(["all", "active", "my", "unassigned"]);
+    expect(WORK_ORDER_SCOPES.at(-1)).toMatchObject({ label: "Unassigned", tooltip: "Tasks with no owner." });
   });
 
   it("scope=my keeps orders assigned to the current user or created by them", () => {
@@ -334,6 +272,25 @@ describe("scope + filter + search + ordering", () => {
 
   it("scope=all keeps everything", () => {
     expect(applyWorkOrderScope(entries, "all")).toHaveLength(7);
+  });
+
+  it("scope=unassigned keeps tasks with no owner, including closed tasks and creators", () => {
+    const createdByMe = order({
+      id: "created-1",
+      assignees: [],
+      createdBy: { user: { id: "me", name: "You" } },
+      updatedAt: "2024-06-04T00:00:00Z",
+    });
+    const withCreated = buildWorkOrderListEntries([meAssigned, createdByMe, others, closed], factory);
+    expect(applyWorkOrderScope(withCreated, "unassigned", "me").map((entry) => entry.id)).toEqual(["created-1", "c-1"]);
+  });
+
+  it("requests only tasks with no owner and does not add a selected owner", () => {
+    expect(boardWorkOrderScopeQuery("unassigned", ["alex"], "me")).toEqual({
+      userId: undefined,
+      unassigned: true,
+      requireUser: false,
+    });
   });
 
   it("status filter narrows down to the selected display statuses", () => {
@@ -458,6 +415,43 @@ describe("scope + filter + search + ordering", () => {
     ).toBe(1);
   });
 
+  it("Mergeable filter drops a card when a merge confidence check is critical", () => {
+    const withScores = buildWorkOrderListEntries(
+      [
+        order({
+          id: "critical-risk",
+          pullRequests: [pullRequest("critical-risk", { mergeable: true })],
+          checkScores: [{ key: "risk-review", name: "Blast radius", score: 4, maxScore: 5 }],
+        }),
+        order({
+          id: "caution",
+          pullRequests: [pullRequest("caution", { mergeable: true })],
+          checkScores: [
+            { key: "risk-review", name: "Blast radius", score: 3, maxScore: 5 },
+            { key: "security-review", name: "Security", score: 3, maxScore: 5 },
+            { key: "planning-review", name: "Planning", score: 1, maxScore: 5 },
+          ],
+        }),
+        order({
+          id: "unscored",
+          pullRequests: [pullRequest("unscored", { mergeable: true })],
+          checkScores: [{ key: "drift-review", name: "Drift" }],
+        }),
+      ],
+      factory,
+    );
+
+    expect(
+      applyWorkOrderFilters(
+        withScores,
+        { ...EMPTY_WORK_ORDER_FILTERS, labels: ["mergeable"] },
+        {
+          showPullRequestMerge: true,
+        },
+      ).map((entry) => entry.id),
+    ).toEqual(["caution", "unscored"]);
+  });
+
   it("search matches on title, description, line, and assignee names", () => {
     const alex = applyWorkOrderSearch(entries, "alex").map((e) => e.id);
     expect(alex).toEqual(["o-1"]);
@@ -478,13 +472,13 @@ describe("scope + filter + search + ordering", () => {
   it("ordering=status follows the display status order", () => {
     const mixed = buildWorkOrderListEntries(
       [
-        order({ id: "done", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
+        order({ id: "closed", state: "STATE_CLOSED", result: "RESULT_PR_CLOSED" }),
         order({ id: "draft", state: "STATE_DRAFT" }),
         order({ id: "waiting" }),
       ],
       factory,
     );
-    expect(applyWorkOrderOrdering(mixed, "status").map((e) => e.id)).toEqual(["draft", "waiting", "done"]);
+    expect(applyWorkOrderOrdering(mixed, "status").map((e) => e.id)).toEqual(["draft", "waiting", "closed"]);
   });
 
   it("ordering=spend puts the most expensive order first", () => {
@@ -521,15 +515,16 @@ describe("groupWorkOrderEntriesByLane", () => {
           order({ id: "waiting" }),
           order({ id: "completed", state: "STATE_CLOSED", result: "RESULT_COMPLETED" }),
           order({ id: "failed", state: "STATE_CLOSED", result: "RESULT_FAILED" }),
-          order({ id: "cancelled", state: "STATE_CLOSED", result: "RESULT_REJECTED" }),
+          order({ id: "rejected", state: "STATE_CLOSED", result: "RESULT_REJECTED" }),
+          order({ id: "closed", state: "STATE_CLOSED", result: "RESULT_PR_CLOSED" }),
+          order({ id: "archived", state: "STATE_CLOSED", result: "RESULT_ARCHIVED" }),
         ],
         factory,
       ),
     );
 
     expect(grouped.get("backlog")?.map((entry) => entry.id)).toEqual(["draft"]);
-    expect(grouped.get("running")).toEqual([]);
     expect(grouped.get("review")?.map((entry) => entry.id)).toEqual(["waiting"]);
-    expect(grouped.get("done")?.map((entry) => entry.id)).toEqual(["completed", "failed"]);
+    expect(grouped.get("done")?.map((entry) => entry.id)).toEqual(["completed", "failed", "rejected", "closed"]);
   });
 });

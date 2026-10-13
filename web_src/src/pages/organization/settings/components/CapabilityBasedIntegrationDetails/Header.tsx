@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { CopyButton } from "@/ui/CopyButton";
 import { useIntegrationsBasePath } from "@/lib/integrationSettingsPaths";
+import { GitHubAppInstallationLink } from "@/pages/organization/settings/GitHubAppInstallationLink";
 import { ArrowLeft, Plug, Trash2 } from "lucide-react";
 import { Link } from "react-router";
 
@@ -59,6 +60,7 @@ export function Header({
         ) : null}
       </div>
       <div className="ml-auto flex items-center gap-2">
+        <GitHubAppInstallationLink integration={integration} />
         <Plug
           className={`h-5 w-5 ${
             integrationStatus === "ready"

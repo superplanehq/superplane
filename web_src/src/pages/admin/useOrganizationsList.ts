@@ -9,6 +9,7 @@ export interface AdminOrganization {
   task_count: number;
   done_task_count: number;
   member_count: number;
+  remaining_credit_cents?: number;
   created_at?: string;
 }
 
@@ -18,6 +19,7 @@ export type OrganizationSortField =
   | "done_task_count"
   | "member_count"
   | "name"
+  | "remaining_credit_cents"
   | "task_count";
 
 export const ORGANIZATION_PAGE_SIZE = 50;

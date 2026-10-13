@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/telemetry"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
@@ -378,8 +379,18 @@ func (s *Server) adminListOrganizations(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	items := serializeAdminOrganizations(ctx, organizations)
-	pinned := serializeAdminOrganizations(ctx, pinnedOrganizations)
+	items, err := serializeAdminOrganizations(ctx, organizations)
+	if err != nil {
+		log.Errorf("admin: failed to load remaining credit: %v", err)
+		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
+		return
+	}
+	pinned, err := serializeAdminOrganizations(ctx, pinnedOrganizations)
+	if err != nil {
+		log.Errorf("admin: failed to load remaining credit: %v", err)
+		http.Error(w, "Failed to list organizations", http.StatusInternalServerError)
+		return
+	}
 	for i := range pinned {
 		pinned[i].Pinned = true
 	}
@@ -425,7 +436,14 @@ func (s *Server) adminGetOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	item := serializeAdminOrganization(*organization)
+	remaining, err := remainingCreditCentsByOrganization(r.Context(), []uuid.UUID{organization.ID})
+	if err != nil {
+		log.Errorf("admin: failed to load remaining credit for organization %s: %v", orgID, err)
+		http.Error(w, "Failed to load organization", http.StatusInternalServerError)
+		return
+	}
+
+	item := serializeAdminOrganization(*organization, remaining[organization.ID])
 	item.Pinned = pinned
 	respondJSON(w, item)
 }
@@ -1006,17 +1024,18 @@ func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *ht
 }
 
 type adminOrgItem struct {
-	ID            string  `json:"id"`
-	Name          string  `json:"name"`
-	Slug          string  `json:"slug"`
-	Description   string  `json:"description"`
-	CanvasCount   int64   `json:"canvas_count"`
-	TaskCount     int64   `json:"task_count"`
-	DoneTaskCount int64   `json:"done_task_count"`
-	MemberCount   int64   `json:"member_count"`
-	CreatedAt     *string `json:"created_at,omitempty"`
-	UpdatedAt     *string `json:"updated_at,omitempty"`
-	Pinned        bool    `json:"pinned"`
+	ID                   string  `json:"id"`
+	Name                 string  `json:"name"`
+	Slug                 string  `json:"slug"`
+	Description          string  `json:"description"`
+	CanvasCount          int64   `json:"canvas_count"`
+	TaskCount            int64   `json:"task_count"`
+	DoneTaskCount        int64   `json:"done_task_count"`
+	MemberCount          int64   `json:"member_count"`
+	RemainingCreditCents int64   `json:"remaining_credit_cents"`
+	CreatedAt            *string `json:"created_at,omitempty"`
+	UpdatedAt            *string `json:"updated_at,omitempty"`
+	Pinned               bool    `json:"pinned"`
 }
 
 type adminOrganizationListResponse struct {
@@ -1039,33 +1058,75 @@ func listUnpinnedOrganizations(ctx context.Context, search string, limit, offset
 	return models.ListUnpinnedOrganizations(database.DB(ctx), search, limit, offset, sortBy, sortDirection, excludeIDs)
 }
 
-func serializeAdminOrganizations(ctx context.Context, organizations []models.OrganizationWithCounts) []adminOrgItem {
-	var err error
+func serializeAdminOrganizations(ctx context.Context, organizations []models.OrganizationWithCounts) (items []adminOrgItem, err error) {
 	ctx, done := telemetry.Span(ctx, "organizations.serialize")
 	defer done(&err)
 
-	items := make([]adminOrgItem, 0, len(organizations))
+	remaining, err := adminOrganizationRemainingCents(ctx, organizations)
+	if err != nil {
+		return nil, err
+	}
+
+	items = make([]adminOrgItem, 0, len(organizations))
 	for _, org := range organizations {
-		items = append(items, serializeAdminOrganization(org))
+		items = append(items, serializeAdminOrganization(org, remaining[org.ID]))
 	}
 
 	if span := trace.SpanFromContext(ctx); span.IsRecording() {
 		span.SetAttributes(attribute.Int("organizations.count", len(items)))
 	}
 
-	return items
+	return items, nil
 }
 
-func serializeAdminOrganization(org models.OrganizationWithCounts) adminOrgItem {
+func adminOrganizationRemainingCents(ctx context.Context, organizations []models.OrganizationWithCounts) (map[uuid.UUID]int64, error) {
+	cents := make(map[uuid.UUID]int64, len(organizations))
+	missing := make([]uuid.UUID, 0)
+	for _, org := range organizations {
+		if org.RemainingCreditMicros == nil {
+			missing = append(missing, org.ID)
+			continue
+		}
+		cents[org.ID] = pricebook.MicrosToCents(*org.RemainingCreditMicros)
+	}
+	if len(missing) == 0 {
+		return cents, nil
+	}
+
+	calculated, err := remainingCreditCentsByOrganization(ctx, missing)
+	if err != nil {
+		return nil, err
+	}
+	for id, value := range calculated {
+		cents[id] = value
+	}
+	return cents, nil
+}
+
+func remainingCreditCentsByOrganization(ctx context.Context, organizationIDs []uuid.UUID) (map[uuid.UUID]int64, error) {
+	micros, err := models.RemainingHostedCreditMicros(database.DB(ctx), organizationIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	cents := make(map[uuid.UUID]int64, len(organizationIDs))
+	for _, id := range organizationIDs {
+		cents[id] = pricebook.MicrosToCents(micros[id])
+	}
+	return cents, nil
+}
+
+func serializeAdminOrganization(org models.OrganizationWithCounts, remainingCreditCents int64) adminOrgItem {
 	item := adminOrgItem{
-		ID:            org.ID.String(),
-		Name:          org.Name,
-		Slug:          org.Slug,
-		Description:   org.Description,
-		CanvasCount:   org.CanvasCount,
-		TaskCount:     org.TaskCount,
-		DoneTaskCount: org.DoneTaskCount,
-		MemberCount:   org.MemberCount,
+		ID:                   org.ID.String(),
+		Name:                 org.Name,
+		Slug:                 org.Slug,
+		Description:          org.Description,
+		CanvasCount:          org.CanvasCount,
+		TaskCount:            org.TaskCount,
+		DoneTaskCount:        org.DoneTaskCount,
+		MemberCount:          org.MemberCount,
+		RemainingCreditCents: remainingCreditCents,
 	}
 
 	if org.CreatedAt != nil {

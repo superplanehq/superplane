@@ -54,16 +54,19 @@ func DescribeFactoryPullRequestMergeability(
 }
 
 func recordFactoryPullRequestMergeabilityError(ctx context.Context, factoryID, pullRequestID, repository string, err error) {
-	tags := map[string]string{
-		"factory_id":      factoryID,
-		"pull_request_id": pullRequestID,
-		"repository":      repository,
-	}
+	logFactoryPullRequestMergeabilityLookupFailure(factoryID, pullRequestID, repository, err)
+	captureFactoryPullRequestMergeabilityException(ctx, factoryID, pullRequestID, repository, err)
+}
+
+func logFactoryPullRequestMergeabilityLookupFailure(factoryID, pullRequestID, repository string, err error) {
 	log.WithError(err).WithFields(log.Fields{
 		"factory_id":      factoryID,
 		"pull_request_id": pullRequestID,
 		"repository":      repository,
 	}).Warn("factory pull request mergeability lookup failed")
+}
+
+func captureFactoryPullRequestMergeabilityException(ctx context.Context, factoryID, pullRequestID, repository string, err error) {
 	hub := sentry.GetHubFromContext(ctx)
 	if hub == nil {
 		hub = sentry.CurrentHub()
@@ -72,7 +75,11 @@ func recordFactoryPullRequestMergeabilityError(ctx context.Context, factoryID, p
 		return
 	}
 	hub.WithScope(func(scope *sentry.Scope) {
-		scope.SetTags(tags)
+		scope.SetTags(map[string]string{
+			"factory_id":      factoryID,
+			"pull_request_id": pullRequestID,
+			"repository":      repository,
+		})
 		hub.CaptureException(err)
 	})
 }

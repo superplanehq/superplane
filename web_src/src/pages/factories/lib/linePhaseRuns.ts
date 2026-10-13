@@ -127,17 +127,20 @@ export function lineBoardEndsWithDoneStep(columns: LinePhaseColumn[]): boolean {
 }
 
 /**
- * Draft tasks. A draft that already ran on a line still belongs
- * here. Newest updated drafts come first.
+ * Draft tasks. A draft that already ran on a line still belongs here.
+ * Order follows the caller's list (the backlog ListWorkOrders page).
+ * Do not re-sort by updated_at here — assignee saves bump updated_at and
+ * would jump cards on every render.
  */
 export function collectLineBacklogOrders(workOrders: FactoriesWorkOrder[]): FactoriesWorkOrder[] {
-  return workOrders.filter(isLineBacklogOrder).sort(compareOrdersNewestFirst);
+  return workOrders.filter(isLineBacklogOrder);
 }
 
 /**
- * Completed and failed work that belongs on this line, plus open work still on
- * a Done or PR-closure step. Newest orders come first. Rejected and canceled
- * tasks stay off this column. Find them from Status in Filter.
+ * Completed, failed, and rejected work that belongs on this line, plus open work still on
+ * a Done or PR-closure step. Order follows the caller's list.
+ * Do not re-sort by updated_at — assignee saves bump updated_at and would
+ * jump cards on every render. Archived tasks stay off this column.
  */
 export function collectLineDoneOrders(
   workOrders: FactoriesWorkOrder[],
@@ -147,11 +150,11 @@ export function collectLineDoneOrders(
   const doneById = new Map<string, FactoriesWorkOrder>();
 
   for (const order of workOrders) {
-    if (!order.id || !belongsToLineBoard(order, line.id)) {
+    if (!order.id || order.result === "RESULT_ARCHIVED" || !belongsToLineBoard(order, line.id)) {
       continue;
     }
     const status = getWorkOrderDisplayStatus(order);
-    if (status === "completed" || status === "failed") {
+    if (["completed", "failed", "rejected", "closed"].includes(status)) {
       doneById.set(order.id, order);
     }
   }
@@ -171,11 +174,18 @@ export function collectLineDoneOrders(
     }
   }
 
-  return [...doneById.values()].sort(compareOrdersNewestFirst);
+  return ordersInSourceListOrder(workOrders, doneById);
 }
 
-/** Open work that waits for review after the last stage passed. Newest first. */
-export function collectLineVerifyOrders(board: LinePhaseColumn[]): FactoriesWorkOrder[] {
+/**
+ * Open work that waits for review after the last stage passed.
+ * Order follows the board source list. Do not re-sort by updated_at —
+ * assignee saves bump updated_at and would jump cards on every render.
+ */
+export function collectLineVerifyOrders(
+  board: LinePhaseColumn[],
+  sourceOrders: FactoriesWorkOrder[],
+): FactoriesWorkOrder[] {
   const lastStage = lineStageColumns(board).at(-1);
   if (!lastStage) {
     return [];
@@ -189,7 +199,33 @@ export function collectLineVerifyOrders(board: LinePhaseColumn[]): FactoriesWork
     verifyById.set(run.order.id, run.order);
   }
 
-  return [...verifyById.values()].sort(compareOrdersNewestFirst);
+  return ordersInSourceListOrder(sourceOrders, verifyById);
+}
+
+/**
+ * Keeps column membership, but emits cards in the list the board already
+ * shows. Members that are only on the phase board stay at the end.
+ */
+function ordersInSourceListOrder(
+  sourceOrders: FactoriesWorkOrder[],
+  membersById: Map<string, FactoriesWorkOrder>,
+): FactoriesWorkOrder[] {
+  const ordered: FactoriesWorkOrder[] = [];
+  const seen = new Set<string>();
+  for (const order of sourceOrders) {
+    if (!order.id || seen.has(order.id) || !membersById.has(order.id)) {
+      continue;
+    }
+    ordered.push(order);
+    seen.add(order.id);
+  }
+  for (const [id, order] of membersById) {
+    if (seen.has(id)) {
+      continue;
+    }
+    ordered.push(order);
+  }
+  return ordered;
 }
 
 function isWaitingAfterPassedStage(run: LinePhaseRunCard): boolean {
@@ -275,15 +311,6 @@ export function belongsToLineBoard(order: FactoriesWorkOrder, lineId: string | u
     return true;
   }
   return dispatches.some((dispatch) => dispatch.line?.id === lineId);
-}
-
-function compareOrdersNewestFirst(left: FactoriesWorkOrder, right: FactoriesWorkOrder): number {
-  const leftTime = Date.parse(left.updatedAt ?? left.createdAt ?? "") || 0;
-  const rightTime = Date.parse(right.updatedAt ?? right.createdAt ?? "") || 0;
-  if (leftTime !== rightTime) {
-    return rightTime - leftTime;
-  }
-  return (right.id ?? "").localeCompare(left.id ?? "");
 }
 
 /** Board-level status for a phase column header. */

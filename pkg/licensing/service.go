@@ -22,6 +22,9 @@ const RefreshInterval = 30 * time.Second
 // that comes from SUPERPLANE_LICENSE_PATH.
 var ErrManagedByFile = errors.New("the license is managed by the installation configuration")
 
+// ErrKeySyncUnavailable is returned when the service does not manage keys.
+var ErrKeySyncUnavailable = errors.New("license key updates are not available")
+
 type State string
 
 const (
@@ -30,6 +33,7 @@ const (
 	StateExpired     State = "expired"
 	StateNotYetValid State = "not_yet_valid"
 	StateInvalid     State = "invalid"
+	StateRevoked     State = "revoked"
 )
 
 // Status is the safe license state. It never contains the raw license.
@@ -91,12 +95,13 @@ type snapshot struct {
 }
 
 type Service struct {
-	verifier  *Verifier
-	source    Source
-	keySync   *KeySync
-	now       func() time.Time
-	current   atomic.Pointer[snapshot]
-	refreshMu sync.Mutex
+	verifier    *Verifier
+	source      Source
+	keySync     *KeySync
+	revocations *RevocationSync
+	now         func() time.Time
+	current     atomic.Pointer[snapshot]
+	refreshMu   sync.Mutex
 }
 
 type ServiceOption func(*Service)
@@ -105,6 +110,13 @@ type ServiceOption func(*Service)
 func WithKeySync(keySync *KeySync) ServiceOption {
 	return func(s *Service) {
 		s.keySync = keySync
+	}
+}
+
+// WithRevocationSync keeps the revoked-license list current while the service runs.
+func WithRevocationSync(revocations *RevocationSync) ServiceOption {
+	return func(s *Service) {
+		s.revocations = revocations
 	}
 }
 
@@ -149,6 +161,10 @@ func (s *Service) Start(ctx context.Context) {
 		})
 	}
 
+	if s.revocations != nil {
+		s.revocations.Start(ctx)
+	}
+
 	go func() {
 		ticker := time.NewTicker(RefreshInterval)
 		defer ticker.Stop()
@@ -170,6 +186,7 @@ func (s *Service) Start(ctx context.Context) {
 // error keeps the last known state instead of removing Enterprise access.
 func (s *Service) Refresh(ctx context.Context) error {
 	s.reloadKeys(ctx)
+	s.reloadRevocations(ctx)
 
 	if err := s.reloadLicense(ctx); err != nil {
 		return err
@@ -195,6 +212,24 @@ func (s *Service) reloadKeys(ctx context.Context) bool {
 	}
 
 	return changed
+}
+
+func (s *Service) reloadRevocations(ctx context.Context) {
+	if s.revocations == nil {
+		return
+	}
+
+	if _, err := s.revocations.Reload(ctx); err != nil {
+		log.WithError(err).Warn("Licensing: cached revocation list was not loaded")
+	}
+}
+
+func (s *Service) licenseRevoked(id uuid.UUID) bool {
+	if s.revocations == nil {
+		return false
+	}
+
+	return s.revocations.Contains(id)
 }
 
 // syncKeysOnDemand downloads the key list when a license names an unknown
@@ -254,6 +289,11 @@ func (s *Service) Status() Status {
 		return status
 	}
 
+	if s.licenseRevoked(current.license.ID) {
+		status.State = StateRevoked
+		return status
+	}
+
 	switch current.license.ValidityAt(s.now()) {
 	case ValidityActive:
 		status.State = StateActive
@@ -269,6 +309,34 @@ func (s *Service) Status() Status {
 
 func (s *Service) IsEntitled(feature Feature) bool {
 	return s.Status().IsEntitled(feature)
+}
+
+// TrustedKeys reports the trusted key list. It returns false when the service
+// does not sync keys.
+func (s *Service) TrustedKeys() (KeySyncStatus, bool) {
+	if s.keySync == nil {
+		return KeySyncStatus{}, false
+	}
+
+	return s.keySync.Status(), true
+}
+
+// InstallKeyList trusts a key list that an administrator uploads and then
+// reloads the license, which may use a key from the list.
+func (s *Service) InstallKeyList(ctx context.Context, raw []byte) error {
+	if s.keySync == nil {
+		return ErrKeySyncUnavailable
+	}
+
+	if _, err := s.keySync.Install(ctx, raw); err != nil {
+		return err
+	}
+
+	if err := s.Refresh(ctx); err != nil {
+		log.WithError(err).Warn("Licensing: license refresh after a key list upload failed")
+	}
+
+	return nil
 }
 
 // Install verifies a license and stores it. It accepts only a license that is
@@ -301,6 +369,10 @@ func (s *Service) Install(ctx context.Context, raw []byte, installedBy uuid.UUID
 		return s.Status(), invalid(ReasonExpired)
 	case ValidityNotYetValid:
 		return s.Status(), invalid(ReasonNotYetValid)
+	}
+
+	if s.licenseRevoked(license.ID) {
+		return s.Status(), invalid(ReasonRevoked)
 	}
 
 	if err := writable.Write(ctx, bytes.TrimSpace(raw), installedBy); err != nil {

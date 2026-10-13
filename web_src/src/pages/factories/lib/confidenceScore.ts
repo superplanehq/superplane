@@ -46,15 +46,17 @@ export function confidenceScoreFromPercent(percent: number): number {
 
 export type ConfidenceBand = "High" | "Medium" | "Low";
 
-export function clampConfidenceScore(score: number): number {
-  return Math.min(CONFIDENCE_SCORE_MAX, Math.max(0, Math.round(score)));
+export function clampConfidenceScore(score: number, max: number = CONFIDENCE_SCORE_MAX): number {
+  return Math.min(max, Math.max(0, Math.round(score)));
 }
 
-export function confidenceBandForScore(score: number): ConfidenceBand {
-  if (score >= 4) {
+/** Legacy 1–5 scores band at 4/3. The 1–3 review scores band at 3/2. */
+export function confidenceBandForScore(score: number, max: number = CONFIDENCE_SCORE_MAX): ConfidenceBand {
+  const high = max <= 3 ? max : 4;
+  if (score >= high) {
     return "High";
   }
-  if (score >= 3) {
+  if (score >= high - 1) {
     return "Medium";
   }
   return "Low";

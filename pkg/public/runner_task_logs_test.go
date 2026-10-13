@@ -3,6 +3,8 @@ package public
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"errors"
 	"io"
 	"net/http"
 	"testing"
@@ -21,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"go.opentelemetry.io/otel"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
@@ -86,6 +89,23 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 			runneraction.ExecutionMetadataTaskBackend:  "integrated",
 		},
 	)
+
+	t.Run("log reads do not depend on hosted pricing", func(t *testing.T) {
+		require.NoError(t, database.Conn().Model(&models.CanvasNodeExecution{}).Where("id = ?", executionID).
+			Update("configuration", datatypes.NewJSONType(map[string]any{
+				"model": "gpt-4o", "hostedProvider": "openai", "credentials": map[string]any{"source": "hosted"},
+			})).Error)
+		const callback = "test:unavailable_hosted_pricing"
+		require.NoError(t, database.Conn().Callback().Query().Before("gorm:query").Register(callback, func(tx *gorm.DB) {
+			if tx.Statement.Table == "organization_llm_settings" || tx.Statement.Table == "installation_llm_settings" {
+				tx.AddError(errors.New("pricing settings unavailable"))
+			}
+		}))
+		t.Cleanup(func() { _ = database.Conn().Callback().Query().Remove(callback) })
+		response := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		assert.Equal(t, "first\nsecond\n", response.Body.String())
+	})
 
 	live := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
 	require.Equal(t, http.StatusOK, live.Code)
@@ -165,4 +185,99 @@ func TestHandleRunnerTaskLogsReadsLiveAndFinalLogs(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, gzipReader.Close())
 	assert.Equal(t, "final\n", string(content))
+
+	const signedURL = "https://storage.example/logs"
+	blob.SetCurrent(signingBlobProvider{Provider: provider, signedURL: signedURL})
+	signed := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+	require.Equal(t, http.StatusNoContent, signed.Code)
+	assert.Equal(t, signedURL, signed.Header().Get(runnerlogs.HeaderURL))
+	assert.Equal(t, models.RunnerTaskLogStateArchived, signed.Header().Get(runnerlogs.HeaderState))
+	assert.Equal(t, finalCursor, signed.Header().Get(runnerlogs.HeaderCursor))
+	assert.Empty(t, signed.Body.String())
+}
+
+func TestHandleRunnerTaskLogsWaitsUntilTheTaskStarts(t *testing.T) {
+	resource := support.Setup(t)
+	defer resource.Close()
+	server, signer := mustRunnerLiveLogServer(t, resource)
+	provider, err := filesystem.New(t.TempDir())
+	require.NoError(t, err)
+	previousProvider := blob.Current()
+	blob.SetCurrent(provider)
+	t.Cleanup(func() { blob.SetCurrent(previousProvider) })
+
+	fleet := models.RunnerFleet{
+		ID:            uuid.New(),
+		Slug:          "task-log-not-ready",
+		ScopeType:     models.RunnerFleetScopeInstallation,
+		Enabled:       true,
+		Spec:          datatypes.NewJSONType(models.RunnerFleetSpec{}),
+		RunnerVersion: "0.1.0",
+	}
+	require.NoError(t, fleet.Create(database.Conn()))
+
+	queued := createRunnerTaskForLogTest(t, resource, fleet.ID, models.RunnerTaskStateQueued)
+	canvasID, executionID := createCanvasWithComponentExecution(
+		t,
+		resource,
+		runneraction.ComponentName,
+		"runner-logs-queued",
+		map[string]any{
+			runneraction.ExecutionMetadataBrokerTaskID: queued.ID.String(),
+			runneraction.ExecutionMetadataTaskBackend:  "integrated",
+		},
+	)
+
+	waiting := runnerTaskLogsGET(t, server, signer, resource, canvasID, executionID, "")
+	require.Equal(t, http.StatusNotFound, waiting.Code)
+	assert.Equal(t, "no-store", waiting.Header().Get("Cache-Control"))
+	assert.Equal(t, runneraction.LiveLogSessionNotReadyErrorCode, waiting.Header().Get(runneraction.LiveLogErrorCodeHeader))
+	assert.Contains(t, waiting.Body.String(), "Logs are not available for this execution yet")
+
+	finished := createRunnerTaskForLogTest(t, resource, fleet.ID, models.RunnerTaskStateSucceeded)
+	finishedCanvasID, finishedExecutionID := createCanvasWithComponentExecution(
+		t,
+		resource,
+		runneraction.ComponentName,
+		"runner-logs-finished",
+		map[string]any{
+			runneraction.ExecutionMetadataBrokerTaskID: finished.ID.String(),
+			runneraction.ExecutionMetadataTaskBackend:  "integrated",
+		},
+	)
+	missing := runnerTaskLogsGET(t, server, signer, resource, finishedCanvasID, finishedExecutionID, "")
+	require.Equal(t, http.StatusNotFound, missing.Code)
+	assert.Empty(t, missing.Header().Get(runneraction.LiveLogErrorCodeHeader))
+	assert.Contains(t, missing.Body.String(), "Task logs not found")
+}
+
+func createRunnerTaskForLogTest(
+	t *testing.T,
+	resource *support.ResourceRegistry,
+	fleetID uuid.UUID,
+	state string,
+) models.RunnerTask {
+	t.Helper()
+	task := models.RunnerTask{
+		ID:                uuid.New(),
+		OrganizationID:    resource.Organization.ID,
+		FleetID:           fleetID,
+		Backend:           models.RunnerTaskBackendIntegrated,
+		State:             state,
+		PayloadCiphertext: []byte("{}"),
+		QueuedAt:          time.Now(),
+		CreatedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
+	}
+	require.NoError(t, database.Conn().Create(&task).Error)
+	return task
+}
+
+type signingBlobProvider struct {
+	blob.Provider
+	signedURL string
+}
+
+func (p signingBlobProvider) SignedGetURL(context.Context, string, time.Duration) (string, error) {
+	return p.signedURL, nil
 }

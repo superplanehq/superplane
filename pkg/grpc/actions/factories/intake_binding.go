@@ -266,7 +266,7 @@ func resolveLinearIntakeBinding(
 			ID:   integration.ID.String(),
 			Name: integration.InstallationName,
 		},
-		Configuration: map[string]any{"projects": projectIDs},
+		Configuration: map[string]any{"projects": configurationAnyStrings(projectIDs)},
 		Installation:  integration,
 	}, nil
 }

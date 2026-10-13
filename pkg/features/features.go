@@ -24,10 +24,6 @@ const FeatureFactories = "factories"
 // still uses the legacy IntegrationCreateDialog path.
 const FeatureNewIntegrationSetupFlow = "new_integration_setup_flow"
 
-// FeatureFactoryJiraIntake gates the manual "Add intake" entry for Jira
-// in the Backlog column menu until the flow is generally available.
-const FeatureFactoryJiraIntake = "factory_jira_intake"
-
 // FeatureFactoryProductiveIntake gates the manual "Add intake" entry for
 // Productive.io in the Backlog column menu until the flow is generally
 // available.
@@ -37,9 +33,9 @@ const FeatureFactoryProductiveIntake = "factory_productive_intake"
 // Backlog column menu until the flow is generally available.
 const FeatureFactoryDatadogIntake = "factory_datadog_intake"
 
-// FeatureFactoryLinearIntake gates Linear issue intake from the Backlog
-// column menu until the flow is generally available.
-const FeatureFactoryLinearIntake = "factory_linear_intake"
+// FeatureFactoryBitbucket gates Bitbucket as a workspace Git host until the
+// flow is generally available.
+const FeatureFactoryBitbucket = "factory_bitbucket"
 
 // FeatureWorkspaceModels gates the in-progress workspace Models settings
 // page until it is ready for general use.
@@ -57,6 +53,10 @@ const FeatureOrganizationBYOKCustomProvider = "organization_byok_custom_provider
 // Done, and phase columns until the flow is generally available.
 const FeatureFactoryCustomAutomations = "factory_custom_automations"
 
+// FeatureWorkspaceAgent gates the SuperPlane Agent page until it is ready
+// for general use.
+const FeatureWorkspaceAgent = "workspace_agent"
+
 // FeatureWorkspaceMCP gates workspace MCP settings, MCP APIs, and MCP attach.
 const FeatureWorkspaceMCP = "workspace_mcp"
 
@@ -72,22 +72,10 @@ const FeatureNewRunners = "new_runners"
 // available.
 const FeatureFactoryPullRequestMerge = "factory_pull_request_merge"
 
-// FeatureFactoryRiskScore gates the merge confidence automation on the Verify
-// column until the flow is generally available.
-const FeatureFactoryRiskScore = "factory_risk_score"
-
-// FeatureSuperPlaneMCPServer gates the public workspace MCP server.
-// Organizations with this flag can authorize Cursor and other MCP clients
-// against one workspace. Without it, POST /mcp returns 404.
+// FeatureSuperPlaneMCPServer is released. Every organization can authorize
+// Cursor and other MCP clients against one workspace. The factories flag
+// still applies.
 const FeatureSuperPlaneMCPServer = "superplane_mcp_server"
-
-// FeatureMobileFactoryBoard gates the mobile-first workspace shell: a
-// one-column-at-a-time line board with a bottom action bar and a full-screen
-// task view on phone-width screens. Desktop screens keep the standard shell.
-const FeatureMobileFactoryBoard = "mobile_factory_board"
-
-// FeatureTaskPlanningReview enables the new task planning UI per organization.
-const FeatureTaskPlanningReview = "task_planning_review"
 
 func released() *bool {
 	v := true
@@ -95,25 +83,22 @@ func released() *bool {
 }
 
 var registry = []Feature{
-	{ID: FeatureTaskPlanningReview, Label: "Task Planning Review", Description: "Show the new plan card, focused questions, and implementation controls"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
-	{ID: FeatureFactoryJiraIntake, Label: "Factory Jira Intake", Description: "Add Jira intake from the Backlog column menu"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
-	{ID: FeatureFactoryLinearIntake, Label: "Factory Linear Intake", Description: "Add Linear intake from the Backlog column menu"},
+	{ID: FeatureFactoryBitbucket, Label: "Bitbucket Workspaces", Description: "Connect a Bitbucket workspace and open pull requests from Implement"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},
 	{ID: FeatureOrganizationBYOK, Label: "Organization BYOK", Description: "Show the organization LLM Models settings page"},
 	{ID: FeatureOrganizationBYOKCustomProvider, Label: "Organization BYOK Custom Provider", Description: "Add a custom model provider with a URL, token, and API type"},
 	{ID: FeatureFactoryCustomAutomations, Label: "Custom Automations", Description: "Add a blank custom automation to a board column"},
+	{ID: FeatureWorkspaceAgent, Label: "SuperPlane Agent", Description: "Show the SuperPlane Agent page"},
 	{ID: FeatureWorkspaceMCP, Label: "Workspace MCP", Description: "Add MCP servers for workspace agents"},
 	{ID: FeatureWorkspaceSkills, Label: "Workspace Skills", Description: "Add skills for workspace agents"},
-	{ID: FeatureNewRunners, Label: "New Runners", Description: "Run tasks with the integrated SuperPlane runner architecture"},
+	{ID: FeatureNewRunners, Label: "New Runners", Description: "Run tasks with the integrated SuperPlane runner architecture", Released: released()},
 	{ID: FeatureFactoryPullRequestMerge, Label: "Pull Request Merge", Description: "Show the Mergeable chip on task cards and the Merge button on pull request review"},
-	{ID: FeatureFactoryRiskScore, Label: "Factory Merge Confidence", Description: "Add a merge confidence automation to the Verify column"},
-	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization"},
-	{ID: FeatureMobileFactoryBoard, Label: "Mobile Board", Description: "Show the mobile workspace shell on phone-width screens"},
+	{ID: FeatureSuperPlaneMCPServer, Label: "MCP Server", Description: "Allow Cursor and other MCP clients to connect to workspaces in this organization", Released: released()},
 }
 
 func All() []Feature {

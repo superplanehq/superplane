@@ -230,6 +230,16 @@ export const MCP_CATALOG: MCPCatalogEntry[] = [
     instruction: AGENT_RESOURCES_COPY.figmaInstruction,
   },
   {
+    id: "mobbin",
+    name: "mobbin",
+    label: "Mobbin",
+    icon: "mobbin",
+    category: "design",
+    url: "https://api.mobbin.com/mcp",
+    auth: "AUTH_OAUTH",
+    instruction: AGENT_RESOURCES_COPY.mobbinInstruction,
+  },
+  {
     id: "slack",
     name: "slack",
     label: "Slack",

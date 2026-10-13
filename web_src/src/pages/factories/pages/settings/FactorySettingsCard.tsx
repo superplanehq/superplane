@@ -11,6 +11,16 @@ import {
   factorySettingsWideSectionHeaderClassName,
 } from "../factoryPageLayoutStyles";
 
+function hasSettingsCardBody(children: ReactNode): boolean {
+  return children != null && children !== false;
+}
+
+function settingsCardHeaderClassName(attachedList: boolean, hasBody: boolean, hasAction: boolean): string {
+  const spacing = attachedList ? "pb-2" : hasBody && "mb-3";
+  const alignment = hasAction ? "items-start" : "items-center";
+  return cn("flex flex-wrap justify-between gap-3", spacing, alignment);
+}
+
 export function FactorySettingsPageFrame({
   title,
   subtitle,
@@ -82,7 +92,7 @@ export function FactorySettingsCard({
   titleClassName?: string;
   description?: ReactNode;
   action?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
   /** List rows sit directly under the header with a top border, like integration instances. */
   attachedList?: boolean;
@@ -91,6 +101,7 @@ export function FactorySettingsCard({
 }) {
   const sectionId = id ?? testId;
   const showHeader = Boolean(title || description || action);
+  const hasBody = hasSettingsCardBody(children);
   return (
     <section
       id={sectionId}
@@ -98,13 +109,7 @@ export function FactorySettingsCard({
       data-testid={testId}
     >
       {showHeader ? (
-        <div
-          className={cn(
-            "flex justify-between gap-3",
-            attachedList ? "pb-2" : "mb-3",
-            action ? "items-start" : "items-center",
-          )}
-        >
+        <div className={settingsCardHeaderClassName(attachedList, hasBody, Boolean(action))}>
           {title || description ? (
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               {title ? (
@@ -120,7 +125,7 @@ export function FactorySettingsCard({
           {action}
         </div>
       ) : null}
-      {children}
+      {hasBody ? children : null}
     </section>
   );
 }

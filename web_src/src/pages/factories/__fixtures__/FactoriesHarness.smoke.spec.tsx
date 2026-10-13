@@ -270,6 +270,9 @@ describe("FactoriesHarness workspace setup", () => {
     );
 
     await user.click(await screen.findByTestId("first-run-get-started", {}, { timeout: 8000 }));
+    await user.click(
+      within(await screen.findByTestId("first-run-host-github", {}, { timeout: 8000 })).getByRole("button"),
+    );
 
     expect(await screen.findByTestId("first-run-connect-github", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-github-connected")).not.toBeInTheDocument();
@@ -288,6 +291,9 @@ describe("FactoriesHarness workspace setup", () => {
     );
 
     await user.click(await screen.findByTestId("first-run-get-started", {}, { timeout: 8000 }));
+    await user.click(
+      within(await screen.findByTestId("first-run-host-github", {}, { timeout: 8000 })).getByRole("button"),
+    );
 
     expect(await screen.findByTestId("first-run-connect-github", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
@@ -359,7 +365,7 @@ describe("FactoriesHarness workspace setup", () => {
     expect(screen.queryByTestId("factories-sidebar")).not.toBeInTheDocument();
   }, 15000);
 
-  it("opens the step from the URL with the saved answers restored", async () => {
+  it("opens the backlog step from the URL without a selected source", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=issues`}
@@ -370,8 +376,11 @@ describe("FactoriesHarness workspace setup", () => {
     );
 
     expect(await screen.findByTestId("first-run-tickets", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /GitHub Issues/ }, { timeout: 8000 })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled(), { timeout: 8000 });
+    expect(await screen.findByRole("button", { name: /GitHub Issues/ }, { timeout: 8000 })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
   }, 15000);
 });
 

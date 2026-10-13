@@ -80,7 +80,8 @@ func parseAssigneeIDs(tx *gorm.DB, organizationID uuid.UUID, assigneeIDs []strin
 
 func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkOrdersFilters {
 	filters := models.ListFactoryWorkOrdersFilters{
-		Unassigned: req.Unassigned,
+		Unassigned:      req.Unassigned,
+		ExcludeArchived: true,
 	}
 
 	if req.GetBeforeId() != "" {
@@ -98,6 +99,9 @@ func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkO
 	for _, result := range req.Results {
 		if mapped, ok := workOrderResultFromProto(result); ok {
 			filters.Results = append(filters.Results, mapped)
+			if mapped == models.FactoryWorkOrderResultRejected {
+				filters.Results = append(filters.Results, models.FactoryWorkOrderResultManualRejected)
+			}
 		}
 	}
 
@@ -119,7 +123,7 @@ func listWorkOrderFilters(req *pb.ListWorkOrdersRequest) models.ListFactoryWorkO
 func closeWorkOrderResult(result pb.WorkOrder_Result) (string, error) {
 	mapped, ok := workOrderResultFromProto(result)
 	if !ok {
-		return "", invalidArgument("result must be completed, rejected, or failed")
+		return "", invalidArgument("result must be completed, rejected, failed, archived, or pr_closed")
 	}
 	return mapped, nil
 }
@@ -148,6 +152,10 @@ func workOrderResultFromProto(result pb.WorkOrder_Result) (string, bool) {
 		return models.FactoryWorkOrderResultRejected, true
 	case pb.WorkOrder_RESULT_FAILED:
 		return models.FactoryWorkOrderResultFailed, true
+	case pb.WorkOrder_RESULT_ARCHIVED:
+		return models.FactoryWorkOrderResultArchived, true
+	case pb.WorkOrder_RESULT_PR_CLOSED:
+		return models.FactoryWorkOrderResultPRClosed, true
 	}
 	return "", false
 }

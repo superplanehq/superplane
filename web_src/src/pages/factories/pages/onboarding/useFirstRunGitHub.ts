@@ -42,6 +42,7 @@ function useGitHubConnectionState(organizationId: string, options?: { poll?: boo
     ],
     synchronizing: Boolean(onboarding.data?.synchronizing),
     appConfigured: Boolean(onboarding.data?.providerConfigured),
+    accountConnectionRequired: onboarding.data?.accountConnectionRequired === true,
   };
 }
 
@@ -80,7 +81,9 @@ export function useFirstRunGitHub(args: {
   );
   return {
     connection,
-    githubReady: Boolean(connection.identity) && githubConnected,
+    githubReady: connection.accountConnectionRequired
+      ? Boolean(connection.identity) && githubConnected
+      : connection.appConfigured,
     installScope,
     checkingGitHub,
   };

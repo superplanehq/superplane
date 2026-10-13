@@ -24,7 +24,6 @@ export type FactorySettingsSection =
   | "security"
   | "notifications"
   | "repository"
-  | "agent"
   | "superplane-mcp-server"
   | "mcp"
   | "skills"
@@ -162,15 +161,6 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "pull request automations",
           "save repository",
         ],
-      },
-      {
-        id: "workspace-agent",
-        label: "Agent",
-        Icon: Cpu,
-        scope: "workspace",
-        section: "agent",
-        permission: { resource: "factories", action: "update" },
-        keywords: ["mcp server", "mcp", "oauth", "header", "sign-in", "tools", "skill", "skill.md", "github package"],
       },
       {
         id: "workspace-superplane-mcp-server",

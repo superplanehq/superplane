@@ -86,7 +86,7 @@ export function splitRunCloseNeedsConfirm(kind: SplitRunFooterKind): boolean {
 }
 
 export function isClosedWorkOrderDisplayStatus(status?: WorkOrderDisplayStatus): boolean {
-  return status === "completed" || status === "failed" || status === "rejected" || status === "cancelled";
+  return ["completed", "failed", "rejected", "closed", "cancelled"].includes(status ?? "");
 }
 
 export function showsArchive(footer: Pick<SplitRunFooter, "kind" | "status">): boolean {
@@ -156,10 +156,12 @@ export interface SplitRunFooter {
   attentionCard?: boolean;
   run?: { appId: string; runId: string };
   status?: WorkOrderDisplayStatus;
-  /** Draft Clarity. 0–5. Missing while analysis has not scored yet. */
+  /** Draft Clarity. Missing while analysis has not scored yet. */
   clarityScore?: number;
-  /** Draft Confidence. 0–5. Missing while analysis has not scored yet. */
+  /** Draft Confidence. Missing while analysis has not scored yet. */
   confidenceScore?: number;
+  /** Top of the scale these scores use. 5 for legacy scores, 3 for review scores. */
+  scoreMax?: number;
 }
 
 export function isTaskResultFooter(footer: SplitRunFooter): boolean {
@@ -211,6 +213,7 @@ export function classicSplitRunFooter(footer: SplitRunFooter): SplitRunFooter {
     note: { ...SPLIT_RUN_CLASSIC_DRAFT_NOTE },
     clarityScore: undefined,
     confidenceScore: undefined,
+    scoreMax: undefined,
     actions: [ARCHIVE, START],
   };
 }
@@ -230,9 +233,9 @@ export type SplitRunDecisionTone =
   | "done"
   | "rejected";
 
-/** Both draft scores in the shape `draftReadiness` and `startConfirm` read. */
-export function splitRunFooterScores(footer: Pick<SplitRunFooter, "clarityScore" | "confidenceScore">) {
-  return { clarity: footer.clarityScore, confidence: footer.confidenceScore };
+/** Draft scores in the shape `draftReadiness` and `startConfirm` read, including the scale. */
+export function splitRunFooterScores(footer: Pick<SplitRunFooter, "clarityScore" | "confidenceScore" | "scoreMax">) {
+  return { clarity: footer.clarityScore, confidence: footer.confidenceScore, scoreMax: footer.scoreMax };
 }
 
 function creditBillingNote(note?: SplitRunFooterNote): SplitRunFooterNote | undefined {
@@ -255,7 +258,7 @@ export function splitRunDecisionTone(footer: SplitRunFooter): SplitRunDecisionTo
   if (footer.kind === "failed" || footer.status === "failed") {
     return "failed";
   }
-  if (footer.kind === "stopped" || footer.status === "rejected") {
+  if (footer.kind === "stopped" || footer.status === "rejected" || footer.status === "closed") {
     return "rejected";
   }
   return "done";
@@ -275,6 +278,9 @@ function closedDecisionNote(
   status?: WorkOrderDisplayStatus,
   closer?: { actor?: OrgUserDisplay; automationName?: string },
 ): SplitRunFooterNote {
+  if (status === "closed") {
+    return { headline: "This task is closed", text: "The pull request was closed without a merge." };
+  }
   if (status === "rejected") {
     const headline =
       closerHeadline(SPLIT_RUN_REJECTED_HEADLINE_ACTOR, closer?.actor, closer?.automationName) ||
@@ -299,7 +305,7 @@ function closedDecisionNote(
 }
 
 function closedDecisionActions(status?: WorkOrderDisplayStatus): SplitRunFooterAction[] {
-  if (status === "failed" || status === "rejected" || status === "cancelled") {
+  if (status === "failed" || status === "rejected" || status === "closed" || status === "cancelled") {
     return [SEND_TO_BACKLOG, REOPEN];
   }
   return [];
@@ -384,13 +390,16 @@ type FooterInput = {
   isAnalyzing?: boolean;
   clarityScore?: number;
   confidenceScore?: number;
+  scoreMax?: number;
 };
 
 function withFooterMeta(input: FooterInput, footer: SplitRunFooter): SplitRunFooter {
   const next = input.status ? { ...footer, status: input.status } : footer;
   const withRun = input.run ? { ...next, run: input.run } : next;
   const withClarity = input.clarityScore == null ? withRun : { ...withRun, clarityScore: input.clarityScore };
-  return input.confidenceScore == null ? withClarity : { ...withClarity, confidenceScore: input.confidenceScore };
+  const withConfidence =
+    input.confidenceScore == null ? withClarity : { ...withClarity, confidenceScore: input.confidenceScore };
+  return input.scoreMax == null ? withConfidence : { ...withConfidence, scoreMax: input.scoreMax };
 }
 
 const DRAFT_TONE: Record<DraftReadinessTone, SplitRunDecisionTone> = {
@@ -446,7 +455,7 @@ function closedFooterNote(input: FooterInput, note?: SplitRunFooterNote): SplitR
   if (input.status === "failed" || input.kind === "failed") {
     return closedDecisionNote(input.status ?? "failed");
   }
-  if (input.status === "completed" || input.status === "rejected") {
+  if (input.status === "completed" || input.status === "rejected" || input.status === "closed") {
     return closedDecisionNote(input.status, {
       actor: input.actor,
       automationName: input.automationName,

@@ -1,0 +1,24 @@
+{
+  "data": {
+    "id": 7001,
+    "type": "pullrequest_comment",
+    "content": {
+      "raw": "## Visual evidence",
+      "markup": "markdown"
+    },
+    "created_on": "2026-04-22T10:05:00.000000+00:00",
+    "user": {
+      "display_name": "SuperPlane Agent",
+      "uuid": "{c3a8f1d2-0000-4000-8000-000000000001}"
+    },
+    "pullrequest": {
+      "id": 42,
+      "title": "feat: Add retry handling"
+    },
+    "links": {
+      "html": { "href": "https://bitbucket.org/acme/widgets/pull-requests/42#comment-7001" }
+    }
+  },
+  "timestamp": "2026-04-22T10:05:00.000000000Z",
+  "type": "bitbucket.pullRequestComment"
+}

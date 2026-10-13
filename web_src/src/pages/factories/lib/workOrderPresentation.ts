@@ -19,6 +19,10 @@ export function formatWorkOrderResult(result?: FactoriesWorkOrder["result"]) {
       return "Completed";
     case "RESULT_REJECTED":
       return "Rejected";
+    case "RESULT_PR_CLOSED":
+      return "Closed";
+    case "RESULT_ARCHIVED":
+      return "Archived";
     case "RESULT_FAILED":
       return "Failed";
     default:

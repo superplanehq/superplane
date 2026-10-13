@@ -445,8 +445,13 @@ query Labels($teamId: ID!, $first: Int!, $after: String) {
 
 func (c *Client) ListLabels(teamID string) ([]Label, error) {
 	variables := map[string]any{"teamId": teamID, "first": pageSize}
+	query := labelsQuery
+	if teamID == "" {
+		query = workspaceLabelsQuery
+		delete(variables, "teamId")
+	}
 
-	return collectPages(c, labelsQuery, variables, func(data json.RawMessage) (*connection[Label], error) {
+	return collectPages(c, query, variables, func(data json.RawMessage) (*connection[Label], error) {
 		response := struct {
 			IssueLabels connection[Label] `json:"issueLabels"`
 		}{}
@@ -458,6 +463,14 @@ func (c *Client) ListLabels(teamID string) ([]Label, error) {
 		return &response.IssueLabels, nil
 	})
 }
+
+const workspaceLabelsQuery = `
+query WorkspaceLabels($first: Int!, $after: String) {
+  issueLabels(first: $first, after: $after) {
+    nodes { id name }
+    pageInfo { hasNextPage endCursor }
+  }
+}`
 
 const issueFields = `
       id identifier number title description url

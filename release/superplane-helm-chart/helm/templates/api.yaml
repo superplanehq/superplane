@@ -1,3 +1,5 @@
+{{- $mountRunnerLogs := or .Values.runner.api.enabled (eq (include "runner.workers.enabled" .) "true") -}}
+{{- $pinRunnerLogs := and $mountRunnerLogs (not .Values.runner.activeLogs.existingClaim) -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -29,6 +31,12 @@ metadata:
     service: {{ .Release.Name }}-api
 spec:
   replicas: {{ .Values.api.replicas }}
+  {{- if $pinRunnerLogs }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  {{- end }}
   selector:
     matchLabels:
       app: superplane
@@ -39,18 +47,40 @@ spec:
       labels:
         app: superplane
         service: {{ .Release.Name }}-api
+        {{- with .Values.podLabels }}
+        {{- include "superplane.podLabels" . | nindent 8 }}
+        {{- end }}
     spec:
+      {{- if $pinRunnerLogs }}
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: superplane
+                  service: {{ .Release.Name }}-{{ if .Values.runner.api.enabled }}runner-api{{ else }}runner-workers{{ end }}
+              topologyKey: kubernetes.io/hostname
+      {{- end }}
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
+      {{- end }}
+      {{- if $mountRunnerLogs }}
+      securityContext:
+        fsGroup: {{ .Values.runner.activeLogs.fsGroup }}
       {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.database.local.enabled }}
+      initContainers:
+        {{- include "superplane.migrateWaitContainer" . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Release.Name }}-api
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/build/superplane"]
           envFrom:
             - configMapRef:
                 name: {{ .Values.domain.configMapName }}
@@ -127,6 +157,10 @@ spec:
 {{- end }}
             - name: ENABLE_PASSWORD_LOGIN
               value: {{ ternary "yes" "no" .Values.authentication.enablePasswordLogin | quote }}
+            {{- if and .Values.ingress.ssl.enabled (eq .Values.ingress.className "gce") (eq .Values.ingress.ssl.type "cert-manager") }}
+            - name: REDIRECT_HTTP_REQUESTS
+              value: "yes"
+            {{- end }}
             - name: OWNER_SETUP_ENABLED
 {{- if .Values.api.ownerSetupEnabled }}
               value: "yes"
@@ -141,6 +175,8 @@ spec:
               value: {{ .Values.installation.type | quote }}
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
+            - name: BLOB_STORAGE_ACCOUNT
+              value: {{ .Values.blobStorage.account | quote }}
             - name: BLOB_STORAGE_BUCKET
               value: {{ .Values.blobStorage.bucket | quote }}
             - name: BLOB_STORAGE_REGION
@@ -159,6 +195,12 @@ spec:
             - name: SUPERPLANE_LICENSE_KEYS_URL
               value: {{ .Values.license.keysURL | quote }}
 {{- end }}
+            - name: SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER
+              value: {{ ternary "yes" "no" .Values.license.hideExpiryBanner | quote }}
+            {{- if $mountRunnerLogs }}
+            - name: RUNNER_ACTIVE_LOG_FS_PATH
+              value: {{ .Values.runner.activeLogs.path | quote }}
+            {{- end }}
 
           volumeMounts:
             - name: oidc-keys
@@ -173,21 +215,32 @@ spec:
             - name: blob-data
               mountPath: {{ .Values.blobStorage.localPath }}
 {{- end }}
+{{- if $mountRunnerLogs }}
+            - name: runner-active-logs
+              mountPath: {{ .Values.runner.activeLogs.path }}
+{{- end }}
 
           ports:
             - name: http
               containerPort: 8000
               protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 30
           livenessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 5
           readinessProbe:
             httpGet:
-              path: /
+              path: /health
               port: http
             periodSeconds: 10
             timeoutSeconds: 2
@@ -218,4 +271,9 @@ spec:
 {{- if eq .Values.blobStorage.provider "filesystem" }}
         - name: blob-data
           emptyDir: {}
+{{- end }}
+{{- if $mountRunnerLogs }}
+        - name: runner-active-logs
+          persistentVolumeClaim:
+            claimName: {{ include "runner.activeLogs.claimName" . }}
 {{- end }}

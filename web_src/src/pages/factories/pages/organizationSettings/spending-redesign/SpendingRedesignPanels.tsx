@@ -379,40 +379,42 @@ function SpendingBreakdownCard({
       {empty ? (
         <SpendingEmptyState message={emptyMessage} />
       ) : (
-        <table className="mt-2 w-full text-left text-[13px]">
-          <thead>
-            <tr className="border-b border-border text-muted-foreground">
-              <th className="px-4 py-2 font-medium">{spendingBreakdownColumnLabel(breakdown)}</th>
-              <th className="px-4 py-2 font-medium">Spend</th>
-              {showTokens ? <th className="px-4 py-2 font-medium">Tokens</th> : null}
-              <th className="px-4 py-2 font-medium">Share</th>
-            </tr>
-          </thead>
-          <tbody>
-            {report.breakdown.map((row) => (
-              <tr key={row.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-2">{row.label}</td>
-                <td className="px-4 py-2">{formatUsdCents(row.costCents)}</td>
-                {showTokens ? <td className="px-4 py-2">{formatCompactTokens(row.tokens)}</td> : null}
-                <td className="px-4 py-2 text-muted-foreground">{formatShare(row.share)}</td>
+        <div className="overflow-x-auto">
+          <table className="mt-2 w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground">
+                <th className="px-4 py-2 font-medium">{spendingBreakdownColumnLabel(breakdown)}</th>
+                <th className="px-4 py-2 font-medium">Spend</th>
+                {showTokens ? <th className="px-4 py-2 font-medium">Tokens</th> : null}
+                <th className="px-4 py-2 font-medium">Share</th>
               </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="border-t border-border" data-testid={`${testId}-total`}>
-              <th scope="row" className="px-4 py-2 font-medium">
-                Total
-              </th>
-              <td className="px-4 py-2 font-medium">{formatUsdCents(report.totals.costCents)}</td>
-              {showTokens ? (
-                <td className="px-4 py-2 font-medium">{formatCompactTokens(report.totals.tokens)}</td>
-              ) : null}
-              <td className="px-4 py-2 font-medium text-muted-foreground">
-                {formatShare(report.totals.costCents > 0 ? 1 : 0)}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
+            </thead>
+            <tbody>
+              {report.breakdown.map((row) => (
+                <tr key={row.id} className="border-b border-border last:border-0">
+                  <td className="px-4 py-2">{row.label}</td>
+                  <td className="px-4 py-2">{formatUsdCents(row.costCents)}</td>
+                  {showTokens ? <td className="px-4 py-2">{formatCompactTokens(row.tokens)}</td> : null}
+                  <td className="px-4 py-2 text-muted-foreground">{formatShare(row.share)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-border" data-testid={`${testId}-total`}>
+                <th scope="row" className="px-4 py-2 font-medium">
+                  Total
+                </th>
+                <td className="px-4 py-2 font-medium">{formatUsdCents(report.totals.costCents)}</td>
+                {showTokens ? (
+                  <td className="px-4 py-2 font-medium">{formatCompactTokens(report.totals.tokens)}</td>
+                ) : null}
+                <td className="px-4 py-2 font-medium text-muted-foreground">
+                  {formatShare(report.totals.costCents > 0 ? 1 : 0)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       )}
     </section>
   );

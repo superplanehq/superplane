@@ -259,7 +259,7 @@ func seedAdminVelocityPeopleMerge(
 	merge.AuthorLogin = "hidden-velocity-author"
 	from := time.Now().AddDate(0, 0, -90)
 	to := time.Now().Add(time.Hour)
-	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factory.ID, from, to, []models.FactoryVelocityRepositoryMerge{merge}))
+	require.NoError(t, models.ReplaceFactoryVelocityRepositoryMerges(db, factory.ID, models.ProviderGitHub, from, to, []models.FactoryVelocityRepositoryMerge{merge}))
 	sync, err := models.ClaimFactoryVelocitySync(db, factory.ID, time.Now())
 	require.NoError(t, err)
 	require.NoError(t, sync.RecordSuccess(db, repository, time.Now(), from))

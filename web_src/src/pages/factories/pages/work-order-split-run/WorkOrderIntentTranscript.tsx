@@ -13,6 +13,7 @@ import { FALLBACK_COLLAPSED_MAX_HEIGHT_PX } from "../../workOrderDescriptionOver
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { CreateWithAgentMessage } from "../createWithAgentTypes";
 import { parsePlanningSurveyReply } from "../planningSessionSurvey";
+import { ChatMessageTimestamp } from "./ChatMessageTimestamp";
 import { AgentActivityView } from "./AgentActivityView";
 import type { AgentActivity } from "./agentActivity";
 import {
@@ -72,17 +73,19 @@ export function WorkOrderIntentTranscript({
         return (
           <div key={message.id}>
             {activity ? <AgentActivityView activity={activity} /> : null}
-            <TranscriptMessage
-              message={message}
-              resolveUser={resolveUser}
-              streaming={
-                newAgentMessageIDs.has(message.id) || (streaming && last?.role === "agent" && message.id === last.id)
-              }
-              files={files}
-              adjacentUserAbove={visible[index - 1]?.role === "user"}
-              adjacentUserBelow={visible[index + 1]?.role === "user"}
-              sameSenderAbove={sameUserSender(visible[index - 1], message)}
-            />
+            <ChatMessageTimestamp createdAt={message.createdAtMs} align={message.role === "user" ? "end" : "start"}>
+              <TranscriptMessage
+                message={message}
+                resolveUser={resolveUser}
+                streaming={
+                  newAgentMessageIDs.has(message.id) || (streaming && last?.role === "agent" && message.id === last.id)
+                }
+                files={files}
+                adjacentUserAbove={visible[index - 1]?.role === "user"}
+                adjacentUserBelow={visible[index + 1]?.role === "user"}
+                sameSenderAbove={sameUserSender(visible[index - 1], message)}
+              />
+            </ChatMessageTimestamp>
           </div>
         );
       })}
@@ -115,10 +118,16 @@ function TranscriptMessage({
   }
   if (message.role === "user") {
     const frameClassName = userMessageFrameClass(adjacentUserAbove, adjacentUserBelow);
-    const sender = sameSenderAbove ? null : senderDisplay(message.userId, resolveUser);
     if (message.origin === "survey") {
-      return <SurveyAnswerBubble text={message.text} sender={sender} frameClassName={frameClassName} />;
+      return (
+        <SurveyAnswerBubble
+          text={message.text}
+          sender={senderDisplay(message.userId, resolveUser)}
+          frameClassName={frameClassName}
+        />
+      );
     }
+    const sender = sameSenderAbove ? null : senderDisplay(message.userId, resolveUser);
     return <ComposerNoteBubble text={message.text} sender={sender} files={files} frameClassName={frameClassName} />;
   }
 
@@ -222,7 +231,6 @@ function SurveyAnswerBubble({
   return (
     <div className={frameClassName}>
       <div className={USER_TURN_CLASSNAME} data-testid="split-run-intent-survey-answer">
-        {sender ? <ChatSenderRow display={sender} prefix={CREATE_WITH_AGENT_COPY.answeredBy} /> : null}
         {pairs.length > 0 ? (
           <ul className="flex w-full flex-col items-end gap-2">
             {pairs.map((pair) => (
@@ -231,9 +239,7 @@ function SurveyAnswerBubble({
                 {pair.answer === "skipped" ? (
                   <span className={SURVEY_SKIPPED_CLASSNAME}>{CREATE_WITH_AGENT_COPY.surveyAnswerSkipped}</span>
                 ) : (
-                  <span className={SURVEY_PICK_CLASSNAME} data-testid="split-run-intent-survey-pick">
-                    {pair.answer}
-                  </span>
+                  <SurveyPickBubble text={pair.answer} sender={sender} />
                 )}
               </li>
             ))}
@@ -241,9 +247,7 @@ function SurveyAnswerBubble({
         ) : skipped ? (
           <span className={SURVEY_SKIPPED_CLASSNAME}>{CREATE_WITH_AGENT_COPY.surveySkipped}</span>
         ) : (
-          <span className={SURVEY_PICK_CLASSNAME} data-testid="split-run-intent-survey-pick">
-            {text}
-          </span>
+          <SurveyPickBubble text={text} sender={sender} />
         )}
       </div>
     </div>
@@ -259,18 +263,38 @@ function senderDisplay(userId: string | undefined, resolveUser: OrgUserDisplayLo
   return display?.name?.trim() ? display : null;
 }
 
-/** Sender row above an outgoing turn: optional prefix, avatar, given name. */
-function ChatSenderRow({ display, prefix }: { display: OrgUserDisplay; prefix?: string }) {
+/** Sender row above an outgoing composer note: avatar and given name. */
+function ChatSenderRow({ display }: { display: OrgUserDisplay }) {
   return (
     <div className={SENDER_ROW_CLASSNAME}>
-      {prefix ? <span className="shrink-0">{prefix}</span> : null}
       <span className="inline-flex min-w-0 items-center gap-1.5" title={display.name}>
-        <span className="inline-flex size-5 shrink-0 items-center justify-center">
-          <OrgUserReference display={display} size="xs" showName={false} className="rounded-full leading-none" />
-        </span>
+        <SenderAvatar display={display} />
         <span className="truncate">{senderGivenName(display.name)}</span>
       </span>
     </div>
+  );
+}
+
+function SurveyPickBubble({ text, sender }: { text: string; sender: OrgUserDisplay | null }) {
+  return (
+    <span className={SURVEY_PICK_CLASSNAME} data-testid="split-run-intent-survey-pick">
+      {sender ? (
+        <span className="inline-flex min-w-0 items-center gap-1.5" title={sender.name}>
+          <SenderAvatar display={sender} />
+          <span>{text}</span>
+        </span>
+      ) : (
+        text
+      )}
+    </span>
+  );
+}
+
+function SenderAvatar({ display }: { display: OrgUserDisplay }) {
+  return (
+    <span className="inline-flex size-5 shrink-0 items-center justify-center">
+      <OrgUserReference display={display} size="xs" showName={false} className="rounded-full leading-none" />
+    </span>
   );
 }
 

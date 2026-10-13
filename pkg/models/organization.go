@@ -3,16 +3,20 @@ package models
 import (
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/features"
+	"github.com/superplanehq/superplane/pkg/usage/pricebook"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+const OrganizationSortRemainingCreditCents = "remaining_credit_cents"
 
 type Organization struct {
 	ID uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
@@ -52,10 +56,11 @@ func (o *Organization) HasExperimentalFeature(id string) bool {
 
 type OrganizationWithCounts struct {
 	Organization
-	CanvasCount   int64 `gorm:"column:canvas_count"`
-	TaskCount     int64 `gorm:"column:task_count"`
-	DoneTaskCount int64 `gorm:"column:done_task_count"`
-	MemberCount   int64 `gorm:"column:member_count"`
+	CanvasCount           int64  `gorm:"column:canvas_count"`
+	TaskCount             int64  `gorm:"column:task_count"`
+	DoneTaskCount         int64  `gorm:"column:done_task_count"`
+	MemberCount           int64  `gorm:"column:member_count"`
+	RemainingCreditMicros *int64 `gorm:"-"`
 }
 
 func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string) ([]OrganizationWithCounts, int64, error) {
@@ -64,29 +69,17 @@ func ListAllOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy,
 }
 
 func ListUnpinnedOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) (organizations []OrganizationWithCounts, unpinnedTotal int64, matchTotal int64, err error) {
-	matchQuery := organizationsMatchingSearch(tx, search)
-	if err = matchQuery.Count(&matchTotal).Error; err != nil {
+	if err = organizationsMatchingSearch(tx, search).Count(&matchTotal).Error; err != nil {
 		return nil, 0, 0, err
 	}
 
-	query := excludeOrganizationIDs(organizationsMatchingSearch(tx, search), excludeIDs)
-	if err = query.Count(&unpinnedTotal).Error; err != nil {
-		return nil, 0, 0, err
+	if sortBy == OrganizationSortRemainingCreditCents {
+		organizations, unpinnedTotal, err = listOrganizationsByRemainingCredit(tx, search, limit, offset, sortDirection, excludeIDs)
+		return organizations, unpinnedTotal, matchTotal, err
 	}
 
-	query = withOrganizationCounts(tx, query)
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-	if offset > 0 {
-		query = query.Offset(offset)
-	}
-
-	if err = query.Order(resolveOrganizationOrderClause(sortBy, sortDirection)).Find(&organizations).Error; err != nil {
-		return nil, 0, 0, err
-	}
-
-	return organizations, unpinnedTotal, matchTotal, nil
+	organizations, unpinnedTotal, err = listOrganizations(tx, search, limit, offset, sortBy, sortDirection, excludeIDs)
+	return organizations, unpinnedTotal, matchTotal, err
 }
 
 func organizationsMatchingSearch(tx *gorm.DB, search string) *gorm.DB {
@@ -113,6 +106,82 @@ func excludeOrganizationIDs(query *gorm.DB, ids []uuid.UUID) *gorm.DB {
 	}
 
 	return query.Where("organizations.id NOT IN ?", ids)
+}
+
+func listOrganizations(tx *gorm.DB, search string, limit, offset int, sortBy, sortDirection string, excludeIDs []uuid.UUID) ([]OrganizationWithCounts, int64, error) {
+	query := excludeOrganizationIDs(organizationsMatchingSearch(tx, search), excludeIDs)
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	query = withOrganizationCounts(tx, query)
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+
+	var organizations []OrganizationWithCounts
+	if err := query.Order(resolveOrganizationOrderClause(sortBy, sortDirection)).Find(&organizations).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return organizations, total, nil
+}
+
+func listOrganizationsByRemainingCredit(tx *gorm.DB, search string, limit, offset int, sortDirection string, excludeIDs []uuid.UUID) ([]OrganizationWithCounts, int64, error) {
+	organizations, total, err := listOrganizations(tx, search, 0, 0, "name", "asc", excludeIDs)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(organizations) == 0 {
+		return []OrganizationWithCounts{}, total, nil
+	}
+
+	ids := make([]uuid.UUID, len(organizations))
+	for i, organization := range organizations {
+		ids[i] = organization.ID
+	}
+	remaining, err := RemainingHostedCreditMicros(tx, ids)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	descending := sortDirection != "asc"
+	sort.SliceStable(organizations, func(i, j int) bool {
+		left := pricebook.MicrosToCents(remaining[organizations[i].ID])
+		right := pricebook.MicrosToCents(remaining[organizations[j].ID])
+		if left != right {
+			if descending {
+				return left > right
+			}
+			return left < right
+		}
+		return organizations[i].Name < organizations[j].Name
+	})
+
+	page := sliceOrganizations(organizations, limit, offset)
+	for i := range page {
+		micros := remaining[page[i].ID]
+		page[i].RemainingCreditMicros = &micros
+	}
+	return page, total, nil
+}
+
+func sliceOrganizations(organizations []OrganizationWithCounts, limit, offset int) []OrganizationWithCounts {
+	if offset >= len(organizations) {
+		return []OrganizationWithCounts{}
+	}
+	if offset > 0 {
+		organizations = organizations[offset:]
+	}
+	if limit > 0 && len(organizations) > limit {
+		organizations = organizations[:limit]
+	}
+	return organizations
 }
 
 func FindOrganizationWithCounts(tx *gorm.DB, id uuid.UUID) (*OrganizationWithCounts, error) {
@@ -191,6 +260,8 @@ func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
 		return "COALESCE(done_task_counts.count, 0) " + direction + ", organizations.name ASC"
 	case "member_count":
 		return "COALESCE(member_counts.count, 0) " + direction + ", organizations.name ASC"
+	case OrganizationSortRemainingCreditCents:
+		return "organizations.name ASC"
 	default:
 		return "organizations.created_at DESC"
 	}

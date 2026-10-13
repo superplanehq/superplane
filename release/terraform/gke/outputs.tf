@@ -53,6 +53,49 @@ output "superplane_url" {
 }
 
 # -----------------------------------------------------------------------------
+# Blob Storage Outputs
+# -----------------------------------------------------------------------------
+
+output "blob_bucket_name" {
+  description = "GCS bucket for SuperPlane blobs"
+  value       = local.gcs_blob_storage_enabled ? google_storage_bucket.blobs[0].name : null
+}
+
+output "app_service_account_email" {
+  description = "GCP service account that SuperPlane pods use through Workload Identity"
+  value       = local.gcs_blob_storage_enabled ? google_service_account.app[0].email : null
+}
+
+# -----------------------------------------------------------------------------
+# Runner Outputs
+# -----------------------------------------------------------------------------
+
+output "runner_subnetwork" {
+  description = "Subnetwork for runner VMs"
+  value       = local.runners_enabled ? google_compute_subnetwork.runners[0].id : null
+}
+
+output "runner_network_tag" {
+  description = "Network tag on runner VMs"
+  value       = local.runners_enabled ? local.runner_network_tag : null
+}
+
+output "runner_image_families" {
+  description = "Image families that Fleet Manager uses when a fleet has no image"
+  value       = local.runners_enabled ? local.runner_fleet_images : null
+}
+
+output "fleet_manager_service_account_email" {
+  description = "GCP service account that Fleet Manager uses through Workload Identity"
+  value       = local.runners_enabled ? google_service_account.fleet_manager[0].email : null
+}
+
+output "fleet_manager_deployed" {
+  description = "Whether Terraform deployed Fleet Manager"
+  value       = local.fleet_manager_enabled
+}
+
+# -----------------------------------------------------------------------------
 # kubectl Configuration Command
 # -----------------------------------------------------------------------------
 

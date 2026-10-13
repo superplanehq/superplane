@@ -81,7 +81,7 @@ describe("createWithAgentViewFromSession", () => {
     expect(view.executionId).toBe("exec-1");
   });
 
-  it("marks the machine failed when the session has ended", () => {
+  it("marks an ended session as waiting for the next user message", () => {
     const view = createWithAgentViewFromSession(
       {
         repository: "acme/payments",
@@ -93,23 +93,48 @@ describe("createWithAgentViewFromSession", () => {
       { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
     );
 
-    expect(view.machineStatus).toBe("failed");
+    expect(view.machineStatus).toBe("waiting");
+    expect(view.turnEnded).toBe(true);
     expect(view.canvasRunId).toBe("run-1");
   });
 
-  it("marks the machine passed when the session ended after a score and plan", () => {
-    const view = createWithAgentViewFromSession(
-      {
-        repository: "acme/payments",
-        state: "ended",
-        canvasId: "canvas-1",
-        canvasRunId: "run-1",
-        executionId: "exec-1",
-      },
-      { composer: "", right: { kind: "empty" }, endConfirmOpen: false, analysisDelivered: true },
+  it("marks a passed turn as waiting after the idle wait ends the session", () => {
+    const view = applyPlanningSessionLiveRun(
+      createWithAgentViewFromSession(
+        {
+          repository: "acme/payments",
+          state: "ended",
+          canvasId: "canvas-1",
+          canvasRunId: "run-1",
+          executionId: "exec-1",
+          survey: { id: "survey-1", questions: [{ prompt: "Which form?", options: ["Current", "New"] }] },
+        },
+        { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+      ),
+      { result: "RESULT_PASSED" },
+      true,
     );
 
-    expect(view.machineStatus).toBe("passed");
+    expect(view.machineStatus).toBe("waiting");
+    expect(view.turnEnded).toBe(true);
+    expect(view.survey?.questions).toHaveLength(1);
+  });
+
+  it("marks a passed run as waiting before the session payload shows the end", () => {
+    const view = applyPlanningSessionLiveRun(
+      createWithAgentViewFromSession(
+        {
+          repository: "acme/payments",
+          canvasId: "canvas-1",
+          canvasRunId: "run-1",
+          executionId: "exec-1",
+        },
+        { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
+      ),
+      { result: "RESULT_PASSED" },
+    );
+
+    expect(view.machineStatus).toBe("waiting");
   });
 
   it("marks the machine failed before starting when the live run failed", () => {
@@ -128,21 +153,20 @@ describe("createWithAgentViewFromSession", () => {
     expect(view.machineStatus).toBe("failed");
   });
 
-  it("marks the machine failed when the live run passed and SuperPlane is not waiting", () => {
-    const view = applyPlanningSessionLiveRun(
-      createWithAgentViewFromSession(
-        {
-          repository: "acme/payments",
-          canvasId: "canvas-1",
-          canvasRunId: "run-1",
-          executionId: "exec-1",
-        },
-        { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
-      ),
-      { result: "RESULT_PASSED" },
+  it("marks an ended session stopped when its run failed or was cancelled", () => {
+    const ended = createWithAgentViewFromSession(
+      {
+        repository: "acme/payments",
+        state: "ended",
+        canvasId: "canvas-1",
+        canvasRunId: "run-1",
+        executionId: "exec-1",
+      },
+      { composer: "", right: { kind: "empty" }, endConfirmOpen: false },
     );
 
-    expect(view.machineStatus).toBe("failed");
+    expect(applyPlanningSessionLiveRun(ended, { result: "RESULT_FAILED" }).machineStatus).toBe("failed");
+    expect(applyPlanningSessionLiveRun(ended, { result: "RESULT_CANCELLED" }).machineStatus).toBe("failed");
   });
 
   it("marks a cancelled live run passed when a score and plan already exist", () => {
@@ -194,6 +218,7 @@ describe("createWithAgentViewFromSession", () => {
     );
 
     expect(view.machineStatus).toBe("waiting");
+    expect(view.turnEnded).toBe(false);
   });
 
   it("treats a pending wait as waiting, not working", () => {

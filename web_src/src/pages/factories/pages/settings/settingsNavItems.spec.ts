@@ -19,7 +19,6 @@ describe("factorySettingsRouteFromPathname", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/organization/models")?.id).toBe(
       "organization-models",
     );
-    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/agent")?.id).toBe("workspace-agent");
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/superplane-mcp-server")?.id).toBe(
       "workspace-superplane-mcp-server",
     );
@@ -35,6 +34,10 @@ describe("factorySettingsRouteFromPathname", () => {
   it("no longer resolves the removed workspace Automations settings page", () => {
     expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/automations")).toBeUndefined();
   });
+
+  it("no longer resolves the removed workspace Agent settings page", () => {
+    expect(factorySettingsRouteFromPathname("/org/workspaces/RF/settings/workspace/agent")).toBeUndefined();
+  });
 });
 
 describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
@@ -45,7 +48,6 @@ describe("FACTORY_SETTINGS_NAV_GROUPS", () => {
       "Notifications",
       "General",
       "Repository",
-      "Agent",
       "MCP Server",
       "Usage",
       "General",
@@ -84,7 +86,6 @@ describe("filterFactorySettingsNavGroups", () => {
     expect(workspaceGroup?.items.map((item) => item.id)).toEqual([
       "workspace-general",
       "workspace-repository",
-      "workspace-agent",
       "workspace-superplane-mcp-server",
       "workspace-usage",
     ]);

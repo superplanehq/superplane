@@ -133,7 +133,7 @@ export function SplitRunDecisionFooterPreview({ kind }: { kind: DecisionFooterKi
       </header>
       <div className="min-h-0 flex-1 px-5 py-4 text-[13px] text-muted-foreground">
         {kind === "running"
-          ? "Implement is running. Stop lives on that automation. The header has no Reject or Approve."
+          ? "Implementation in progress. Stop lives on that automation. The header has no Reject or Approve."
           : kind === "statusNote"
             ? "A task status note supplies the headline, body, and Review PR link. Reject and Approve stay on this strip."
             : "Automations log. Close actions stay in the footer note, not in the header."}

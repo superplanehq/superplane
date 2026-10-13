@@ -18,6 +18,18 @@ import (
 	"gorm.io/datatypes"
 )
 
+func Test_NodeConfigurationBuilder_EvaluatesMultilineExpression(t *testing.T) {
+	builder := &NodeConfigurationBuilder{}
+
+	got, err := builder.ResolveTemplateExpressions("{{\n1 + 1\n}}")
+	require.NoError(t, err)
+	assert.Equal(t, "2", got)
+
+	got, err = builder.ResolveTemplateExpressions("{{1 + 1}}\n\n{{2 + 2}}")
+	require.NoError(t, err)
+	assert.Equal(t, "2\n\n4", got)
+}
+
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -683,6 +695,23 @@ func Test_NodeConfigurationBuilder_OrderFunction(t *testing.T) {
 		noComments, err := builderNoPR.ResolveExpression(`order().comments`)
 		require.NoError(t, err)
 		assert.Equal(t, []any{}, noComments)
+	})
+
+	t.Run("keeps the saved Git host after the workspace switches", func(t *testing.T) {
+		provider := models.ProviderGitHub
+		require.NoError(t, database.Conn().Model(order).Updates(map[string]any{
+			"repository":     repository,
+			"default_branch": defaultBranch,
+			"vcs_provider":   provider,
+		}).Error)
+		bitbucket := models.ProviderBitbucket
+		require.NoError(t, factoryModel.UpdateOnboarding(database.Conn(), models.FactoryOnboardingPatch{
+			VCSProvider: &bitbucket,
+		}))
+
+		result, err := builder.ResolveExpression(`order().repository_url`)
+		require.NoError(t, err)
+		assert.Equal(t, "https://github.com/"+repository+".git", result)
 	})
 }
 

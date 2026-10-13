@@ -13,7 +13,6 @@ import {
   FactorySettingsAccountProfilePage,
   FactorySettingsAccountSecurityPage,
   FactorySettingsGeneralPage,
-  FactorySettingsAgentPage,
   FactorySettingsConnectPage,
   FactorySettingsMCPPage,
   FactorySettingsMCPConnectionPage,
@@ -40,16 +39,17 @@ import {
 } from "@/pages/factories/pages/settings/FactoryOrganizationSettingsPages";
 import {
   AccountLinkedAccountsRedirect,
-  LegacyFactorySettingsIndexRedirect,
   LegacyFactorySettingsRedirect,
   OrganizationUsageRedirect,
+  WorkspaceAgentSettingsRedirect,
   WorkspaceAutomationsSettingsRedirect,
   WorkspaceSpendingRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
 import { LegacyAgentResourcesRedirect } from "@/pages/factories/pages/settings/LegacyAgentResourcesRedirect";
+import { FactorySettingsIndexRoute } from "@/pages/factories/pages/settings/MobileSettingsIndexPage";
 
 export const factorySettingsSectionRoutes = [
-  <Route key="factory-settings-index" index element={<LegacyFactorySettingsIndexRedirect />} />,
+  <Route key="factory-settings-index" index element={<FactorySettingsIndexRoute />} />,
   <Route
     key="factory-settings-account-general"
     path="account/general"
@@ -118,17 +118,7 @@ export const factorySettingsSectionRoutes = [
       </RequirePermission>
     }
   />,
-  <Route
-    key="factory-settings-workspace-agent"
-    path="workspace/agent"
-    element={
-      <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature anyOf={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}>
-          <FactorySettingsAgentPage />
-        </RequireExperimentalFeature>
-      </RequirePermission>
-    }
-  />,
+  <Route key="factory-settings-workspace-agent" path="workspace/agent" element={<WorkspaceAgentSettingsRedirect />} />,
   <Route
     key="factory-settings-workspace-superplane-mcp-server"
     path="workspace/superplane-mcp-server"

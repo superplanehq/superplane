@@ -30,6 +30,8 @@ interface SettingsAutomationWorkspaceProps {
   showFindControls?: boolean;
   focusNodeId?: string | null;
   focusNonce?: number;
+  focusFit?: boolean;
+  lockNativeZoom?: boolean;
   layoutFitNonce?: number | null;
   /** Keep the chosen run when this workspace unmounts. */
   selectedRunId?: string | null;
@@ -88,6 +90,8 @@ export function SettingsAutomationWorkspace({
   showFindControls = true,
   focusNodeId = null,
   focusNonce = 0,
+  focusFit = true,
+  lockNativeZoom = false,
   layoutFitNonce = null,
   selectedRunId: controlledRunId,
   onSelectedRunIdChange,
@@ -116,6 +120,8 @@ export function SettingsAutomationWorkspace({
       showFindControls={showFindControls}
       focusNodeId={focusNodeId}
       focusNonce={focusNonce}
+      focusFit={focusFit}
+      lockNativeZoom={lockNativeZoom}
       layoutFitNonce={layoutFitNonce}
       runs={runs}
       className={className}
@@ -177,6 +183,8 @@ function AutomationWorkspaceLayout({
   showFindControls,
   focusNodeId,
   focusNonce,
+  focusFit,
+  lockNativeZoom,
   layoutFitNonce,
   runs,
   className,
@@ -193,6 +201,8 @@ function AutomationWorkspaceLayout({
   showFindControls: boolean;
   focusNodeId: string | null;
   focusNonce: number;
+  focusFit: boolean;
+  lockNativeZoom: boolean;
   layoutFitNonce: number | null;
   runs: ReturnType<typeof useAutomationRuns>;
   className?: string;
@@ -229,6 +239,8 @@ function AutomationWorkspaceLayout({
             showFindControls={showFindControls}
             focusNodeId={focusNodeId}
             focusNonce={focusNonce}
+            focusFit={focusFit}
+            lockNativeZoom={lockNativeZoom}
             layoutFitNonce={layoutFitNonce}
           />
         </div>

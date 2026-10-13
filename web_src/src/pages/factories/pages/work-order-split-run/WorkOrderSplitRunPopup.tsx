@@ -13,13 +13,8 @@ import { DRAFT_START_MODEL_AUTO } from "./draftStartModel";
 import { THINKING_LEVEL_MEDIUM } from "@/lib/thinkingLevel";
 import { SplitRunPopupTabs } from "./SplitRunPopupTabs";
 import { SplitRunReview } from "./SplitRunReview";
-import {
-  classicSplitRunFooter,
-  composerCreditVerdict,
-  creditBillingHref,
-  isTaskResultFooter,
-  SPLIT_RUN_ANALYZING_NOTE,
-} from "./splitRunFooter";
+import { draftStripAnalysis } from "./draftStripAnalysis";
+import { classicSplitRunFooter, isTaskResultFooter, SPLIT_RUN_ANALYZING_NOTE } from "./splitRunFooter";
 import { refinePopupShowsAutomations, SPLIT_RUN_POPUP_DIALOG_CLASSNAME } from "./splitRunPopupModel";
 import { isPullRequestReviewFooter } from "./splitRunPullRequestReview";
 import { useSplitRunPopupData } from "./useSplitRunPopupData";
@@ -32,7 +27,7 @@ import type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
 import { draftStartAction, footerMutationHandlers } from "./workOrderPopupActions";
 import { AnalysisPopupHeader, LoadingWorkOrderPopup } from "./workOrderPopupHeader";
 import { workOrderPopupMode } from "./workOrderPopupMode";
-import { factoryPlanningEnabled, factoryShowsClarity, factoryShowsConfidence } from "../planningSettingsModel";
+import { factoryPlanningEnabled } from "../planningSettingsModel";
 import { PopupShell } from "../work-order-popup-redesign/popupShared";
 
 export type { WorkOrderSplitRunPopupProps } from "./WorkOrderSplitRunBody";
@@ -422,20 +417,6 @@ function analysisPopupView(fixture: WorkOrderSplitRunPopupProps["fixture"], fact
   return {
     sourceOnly,
     viewFixture: sourceOnly ? { ...fixture, footer: classicSplitRunFooter(fixture.footer) } : fixture,
-  };
-}
-
-function draftStripAnalysis(args: AnalysisDraftChromeArgs, modelSelect: ReactNode | undefined) {
-  if (args.fixture.footer.kind !== "draft") {
-    return undefined;
-  }
-  const billingHref = creditBillingHref(args.organizationId, args.factoryKey);
-  return {
-    ...args.analysis,
-    modelSelect,
-    showClarity: factoryShowsClarity(args.factory),
-    showConfidence: factoryShowsConfidence(args.factory),
-    creditVerdict: composerCreditVerdict(args.fixture.footer.note, billingHref),
   };
 }
 

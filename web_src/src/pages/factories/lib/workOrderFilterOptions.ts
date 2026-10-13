@@ -16,7 +16,7 @@ import {
   type WorkOrderListEntry,
 } from "./workOrderListModel";
 import { MCP_SOURCE_FILTER_PREFIX } from "./workOrderCardSource";
-import { WORK_ORDER_DISPLAY_STATUSES, getWorkOrderDisplayStatusMeta } from "./workOrderProgress";
+import { WORK_ORDER_BOARD_FILTER_STATUSES, getWorkOrderDisplayStatusMeta } from "./workOrderProgress";
 
 /** One selectable value in a Filter submenu. */
 export interface WorkOrderFilterOption {
@@ -34,7 +34,7 @@ export interface WorkOrderFilterChip {
 }
 
 export function buildStatusFilterOptions(): WorkOrderFilterOption[] {
-  return WORK_ORDER_DISPLAY_STATUSES.map((status) => {
+  return WORK_ORDER_BOARD_FILTER_STATUSES.map((status) => {
     const meta = getWorkOrderDisplayStatusMeta(status);
     return { value: status, label: meta.filterLabel, dot: meta.dotClassName };
   });

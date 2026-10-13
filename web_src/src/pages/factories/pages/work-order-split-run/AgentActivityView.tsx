@@ -60,6 +60,7 @@ export function AgentActivityView({
     <div className="space-y-0 px-2" data-testid={`agent-activity-${activity.id}`}>
       <ActivityEntries
         entries={entries}
+        live={live}
         truncated={activity.truncated}
         tone={tone}
         collapseReasoning={collapseReasoning}
@@ -113,6 +114,7 @@ function CompletedActivity({
 function ActivityEntries({
   entries,
   truncated,
+  live = false,
   groupTools = true,
   tone = "chat",
   collapseReasoning = true,
@@ -120,6 +122,7 @@ function ActivityEntries({
 }: {
   entries: AgentActivityItem[];
   truncated: boolean;
+  live?: boolean;
   groupTools?: boolean;
   tone?: "chat" | "log";
   collapseReasoning?: boolean;
@@ -140,7 +143,7 @@ function ActivityEntries({
           if (item.kind === "assistant") {
             return <AssistantContent key={item.id} item={item} tone={tone} />;
           }
-          return <ReasoningContent key={item.id} item={item} collapseReasoning={collapseReasoning} />;
+          return <ReasoningContent key={item.id} item={item} collapseReasoning={collapseReasoning} live={live} />;
         }
         return (
           <p
@@ -290,7 +293,15 @@ function isVisibleActivityItem(
   return item.type !== "content" || item.kind !== "reasoning" || item.status === "running" || Boolean(item.text.trim());
 }
 
-function ReasoningContent({ item, collapseReasoning = true }: { item: AgentContentItem; collapseReasoning?: boolean }) {
+function ReasoningContent({
+  item,
+  collapseReasoning = true,
+  live,
+}: {
+  item: AgentContentItem;
+  collapseReasoning?: boolean;
+  live: boolean;
+}) {
   const [manualOpen, setManualOpen] = useState<boolean | null>(null);
   const running = item.status === "running";
   const label = reasoningLabel(item);
@@ -330,7 +341,7 @@ function ReasoningContent({ item, collapseReasoning = true }: { item: AgentConte
     );
   }
 
-  const open = manualOpen ?? false;
+  const open = manualOpen ?? live;
   return (
     <div className="px-1">
       <button

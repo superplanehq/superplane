@@ -148,13 +148,28 @@ func TestHandOffTaskReturnsOpenImplementTask(t *testing.T) {
 	require.NotEmpty(t, payload["key"])
 }
 
-func TestCallToolRejectsWithoutMCPServerFlag(t *testing.T) {
+func TestCallToolSucceedsWithoutMCPServerFlag(t *testing.T) {
 	r := support.Setup(t)
 	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
 	ctx := t.Context()
 	db := database.DB(ctx)
 
 	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "No MCP", "", "NMC")
+	require.NoError(t, err)
+
+	runtime := &Runtime{Auth: r.AuthService}
+	result, err := runtime.CallTool(ctx, toolClaims(r, factoryModel.ID), "list_tasks", map[string]any{})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+}
+
+func TestCallToolRejectsWithoutFactories(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactories))
+	ctx := t.Context()
+	db := database.DB(ctx)
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, "No factories", "", "NF")
 	require.NoError(t, err)
 
 	runtime := &Runtime{Auth: r.AuthService}

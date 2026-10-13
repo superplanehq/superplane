@@ -15,7 +15,7 @@ export const START_CONFIRM_COPY = {
 
 export type StartConfirmTone = "missing" | "low" | "mid";
 
-export type StartConfirmScores = Pick<DraftReadinessInput, "clarity" | "confidence">;
+export type StartConfirmScores = Pick<DraftReadinessInput, "clarity" | "confidence" | "scoreMax">;
 
 const CONFIRM_TONE: Record<DraftReadinessTone, StartConfirmTone | undefined> = {
   analyzing: "missing",

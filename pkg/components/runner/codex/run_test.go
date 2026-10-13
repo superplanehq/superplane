@@ -232,15 +232,17 @@ func TestCodexExecArgsUsesDeveloperInstructionsForAnalysis(t *testing.T) {
 
 	joined := strings.Join(args, " ")
 	assert.Contains(t, joined, "developer_instructions=")
-	assert.Contains(t, joined, "propose_spec")
-	assert.Contains(t, joined, "propose_clarity")
-	assert.Contains(t, joined, "propose_confidence")
+	assert.Contains(t, joined, "propose_update")
+	assert.Contains(t, joined, "Do not call propose_spec, propose_clarity, propose_confidence, or survey")
+	assert.NotContains(t, joined, "Call propose_spec")
+	assert.NotContains(t, joined, "Call propose_clarity")
+	assert.NotContains(t, joined, "Call propose_confidence")
 	assert.NotContains(t, joined, "propose_plan")
 	assert.Contains(t, joined, "Use only the analysis tools")
 }
 
 func TestCodexExecArgsKeepsProtocolAtDeveloperPriority(t *testing.T) {
-	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol.md"))
+	protocol, err := os.ReadFile(filepath.Join("..", "analysis_protocol_review.md"))
 	require.NoError(t, err)
 	args := codexExecArgsFromScriptWithPrompt(t, map[string]string{
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
@@ -504,4 +506,25 @@ func liveLogRecords(t *testing.T, output string) []map[string]any {
 		}
 	}
 	return records
+}
+
+func TestFormatCodexJsonLinesEmitsCompletedUsage(t *testing.T) {
+	output := runCodexFormatter(t, []string{
+		`{"type":"item.completed","item":{"id":"answer","type":"agent_message","text":"done"}}`,
+		`{"type":"turn.completed","usage":{"input_tokens":100,"cached_input_tokens":30,"output_tokens":20},"total_cost_usd":0.12}`,
+	})
+	var last map[string]any
+	for _, line := range strings.Split(output, "\n") {
+		var record map[string]any
+		if json.Unmarshal([]byte(line), &record) == nil && record["type"] == "turn" {
+			last = record
+		}
+	}
+	require.NotNil(t, last)
+	usage := last["usage"].(map[string]any)
+	assert.Equal(t, float64(100), usage["input_tokens"])
+	assert.Equal(t, float64(30), usage["cache_read_input_tokens"])
+	assert.Equal(t, float64(20), usage["output_tokens"])
+	require.Contains(t, usage, "total_cost_usd")
+	assert.InDelta(t, 0.12, usage["total_cost_usd"], 1e-9)
 }

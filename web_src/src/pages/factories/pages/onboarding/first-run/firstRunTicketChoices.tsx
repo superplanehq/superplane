@@ -8,10 +8,10 @@ import type { FirstRunTicketSource } from "./firstRunTypes";
 type TicketProject = { id?: string; name?: string };
 
 export function FirstRunTicketChoices({
+  githubAvailable,
   ticketSource,
   saving,
-  jiraAvailable,
-  jiraFeatureLoading,
+  githubConnected,
   jiraConnected,
   jiraProjects,
   jiraProjectsLoading,
@@ -25,6 +25,7 @@ export function FirstRunTicketChoices({
   linearProjectsError,
   linearProjectIds,
   onSelectTicketSource,
+  onConnectGitHub,
   onConnectJira,
   onSelectJiraProject,
   onRetryJiraProjects,
@@ -32,10 +33,10 @@ export function FirstRunTicketChoices({
   onToggleLinearProject,
   onRetryLinearProjects,
 }: {
+  githubAvailable: boolean;
   ticketSource: FirstRunTicketSource | null;
   saving: boolean;
-  jiraAvailable: boolean;
-  jiraFeatureLoading: boolean;
+  githubConnected: boolean;
   jiraConnected: boolean;
   jiraProjects: TicketProject[];
   jiraProjectsLoading: boolean;
@@ -49,6 +50,7 @@ export function FirstRunTicketChoices({
   linearProjectsError: boolean;
   linearProjectIds: string[];
   onSelectTicketSource: (source: FirstRunTicketSource) => void;
+  onConnectGitHub?: () => void;
   onConnectJira?: () => void;
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
@@ -60,25 +62,27 @@ export function FirstRunTicketChoices({
   return (
     <FirstRunPanel>
       <div className="space-y-3">
+        {githubAvailable && (
+          <ConnectOptionRow
+            icon={<IntegrationChoiceIcon name="github" />}
+            title={copy.githubIssues}
+            detail={copy.githubIssuesHelper}
+            connectLabel="GitHub"
+            connected={githubConnected}
+            onConnect={onConnectGitHub}
+            selected={ticketSource === "github-issues"}
+            disabled={saving}
+            onSelect={() => onSelectTicketSource("github-issues")}
+          />
+        )}
         <ConnectOptionRow
-          icon={<IntegrationChoiceIcon name="github" />}
-          title={copy.githubIssues}
-          detail={copy.githubIssuesHelper}
-          selected={ticketSource === "github-issues"}
-          disabled={saving}
-          onSelect={() => onSelectTicketSource("github-issues")}
-        />
-        <FirstRunFlaggedTicketRow
-          icon="jira"
+          icon={<IntegrationChoiceIcon name="jira" />}
           title={copy.jira}
-          helper={copy.jiraHelper}
-          soonHelper={copy.jiraSoonHelper}
-          lookupLoading={copy.jiraLookupLoading}
-          available={jiraAvailable}
-          featureLoading={jiraFeatureLoading}
+          detail={copy.jiraHelper}
           selected={ticketSource === "jira"}
+          connectLabel={copy.jira}
           connected={jiraConnected}
-          saving={saving}
+          disabled={saving}
           onSelect={() => onSelectTicketSource("jira")}
           onConnect={onConnectJira}
         />
@@ -98,7 +102,6 @@ export function FirstRunTicketChoices({
         />
       </div>
       <FirstRunJiraProjectFields
-        jiraAvailable={jiraAvailable}
         visible={ticketSource === "jira" && jiraConnected}
         copy={copy}
         saving={saving}
@@ -235,7 +238,6 @@ function FirstRunLinearProjectFields({
 }
 
 function FirstRunJiraProjectFields({
-  jiraAvailable,
   visible,
   copy,
   saving,
@@ -246,7 +248,6 @@ function FirstRunJiraProjectFields({
   onSelectJiraProject,
   onRetryJiraProjects,
 }: {
-  jiraAvailable: boolean;
   visible: boolean;
   copy: (typeof FIRST_RUN_COPY)["tickets"];
   saving: boolean;
@@ -257,7 +258,7 @@ function FirstRunJiraProjectFields({
   onSelectJiraProject?: (id: string) => void;
   onRetryJiraProjects?: () => void;
 }) {
-  if (!jiraAvailable || !visible) {
+  if (!visible) {
     return null;
   }
 

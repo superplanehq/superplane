@@ -256,6 +256,72 @@ func Test__SendPlanningSessionMessage__KeepsLiveAnalysisOnTheCurrentRun(t *testi
 	assert.Equal(t, len(before), len(after))
 }
 
+func Test__SendPlanningSessionMessage__DeliversMessageDuringIdleWaitOnTheCurrentRun(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	require.NoError(t, session.BeginWait(db))
+	before, err := models.ListCanvasEvents(db, *session.CanvasID, "start", 10, nil)
+	require.NoError(t, err)
+
+	sent, err := SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+		Text:      "Keep the existing retry helper.",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, models.PlanningSessionStateRunning, sent.Session.State)
+	assert.Equal(t, session.CanvasRunID.String(), sent.Session.CanvasRunId)
+	assert.Equal(t, models.PlanningWaitResolved, sent.Session.WaitState)
+
+	after, err := models.ListCanvasEvents(db, *session.CanvasID, "start", 10, nil)
+	require.NoError(t, err)
+	assert.Equal(t, len(before), len(after))
+}
+
+func Test__SendPlanningSessionMessage__StartsNewRunAfterIdleWaitEndsTheTurn(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	session := openAnalysisSession(t, r, db)
+	require.NoError(t, session.RecordAgentMessage(db, "Which retry form should the task use?"))
+	require.NoError(t, session.ProposeSurvey(db, models.PlanningSessionSurvey{
+		Questions: []models.PlanningSessionSurveyQuestion{{Prompt: "Which form?", Options: []string{"Current", "New"}}},
+	}))
+	require.NoError(t, session.BeginWait(db))
+
+	// The follow-up loop exits after the idle wait, so the runner task and
+	// the canvas run pass. The run finalizer then closes the session.
+	run, err := models.FindCanvasRunInTransaction(db, *session.CanvasID, *session.CanvasRunID)
+	require.NoError(t, err)
+	require.NoError(t, finishCanvasRun(db, run, models.CanvasRunResultPassed))
+	require.NoError(t, models.EndPlanningSessionForFinishedRun(db, run.ID, models.CanvasRunResultPassed))
+	ended, err := models.FindPlanningSession(db, session.OrganizationID, session.FactoryID, session.ID)
+	require.NoError(t, err)
+	require.Equal(t, models.PlanningSessionStateEnded, ended.State)
+	before, err := models.ListCanvasEvents(db, *session.CanvasID, "start", 10, nil)
+	require.NoError(t, err)
+
+	sent, err := SendPlanningSessionMessage(ctx, r.Organization.ID.String(), &pb.SendPlanningSessionMessageRequest{
+		FactoryId: session.FactoryID.String(),
+		SessionId: session.ID.String(),
+		Text:      "Use the current form.",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, session.ID.String(), sent.Session.Id)
+	assert.Equal(t, models.PlanningSessionStateRunning, sent.Session.State)
+	assert.Empty(t, sent.Session.CanvasRunId)
+	assert.Empty(t, sent.Session.WaitState)
+	assert.Nil(t, sent.Session.Survey)
+	require.Len(t, sent.Session.Messages, 2)
+	assert.Equal(t, "Use the current form.", sent.Session.Messages[1].Text)
+
+	after, err := models.ListCanvasEvents(db, *session.CanvasID, "start", 10, nil)
+	require.NoError(t, err)
+	assert.Len(t, after, len(before)+1)
+}
+
 func Test__SendPlanningSessionMessage__DoesNotRestartAfterTaskStarts(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
