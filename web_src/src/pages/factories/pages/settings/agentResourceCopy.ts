@@ -154,6 +154,7 @@ export const AGENT_RESOURCES_COPY = {
   postmanInstruction: "Sign in with Postman.",
   notionInstruction: "Sign in with Notion.",
   figmaInstruction: "Sign in with Figma.",
+  mobbinInstruction: "Sign in with Mobbin.",
   slackInstruction: "Sign in with Slack.",
   vercelInstruction: "Sign in with Vercel.",
   renderInstruction: "Sign in with Render.",
