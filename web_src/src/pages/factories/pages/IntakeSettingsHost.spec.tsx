@@ -13,11 +13,12 @@ import {
   DATADOG_INTAKE,
   DEPENDABOT_INTAKE,
   DEPENDABOT_INTAKE_CANVAS,
-  GITHUB_INTAKE_CANVAS,
   PRODUCTIVE_INTAKE,
   renderHost,
+  resetIntakeSettingsHostMocks,
   SENTRY_INTAKE,
 } from "./IntakeSettingsHost.spec.fixtures";
+import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomationsCopy";
 import { DEFAULT_GITHUB_INTAKE_SETTINGS, INTAKE_SETTINGS_COPY, intakeSettingsToApi } from "./intakeSourceSettingsModel";
 
 const {
@@ -79,109 +80,17 @@ vi.mock("@/hooks/useFactoryIntakeData", () => ({
 
 describe("IntakeSettingsHost", () => {
   beforeEach(() => {
-    useCanvas.mockReturnValue({
-      data: GITHUB_INTAKE_CANVAS,
-      isPending: false,
-      isError: false,
-      refetch: vi.fn().mockResolvedValue(undefined),
-    });
-    useTriggers.mockReturnValue({
-      data: [
-        { name: "github.onIssue", label: "On Issue" },
-        { name: "github.onDependabotAlert", label: "On Dependabot Alert" },
-      ],
-      isLoading: false,
-    });
-    useComponents.mockReturnValue({
-      data: [
-        { name: "if", label: "If" },
-        { name: "createWorkOrder", label: "Create Task" },
-      ],
-      isLoading: false,
-    });
-    useAvailableIntegrations.mockReturnValue({
-      data: [{ name: "jira", label: "Jira", hostedAppInstall: true }],
-      isLoading: false,
-    });
-    useIntegrationResources.mockImplementation(
-      (_organizationId: string, _integrationId: string, resourceType: string) => {
-        if (resourceType === "issueStatus") {
-          return {
-            data: [
-              { id: "todo", name: "To Do" },
-              { id: "qa", name: "QA" },
-              { id: "done", name: "Done" },
-            ],
-            isLoading: false,
-            isError: false,
-            refetch: vi.fn(),
-          };
-        }
-        if (resourceType === "service") {
-          return {
-            data: [
-              { id: "checkout", name: "checkout" },
-              { id: "billing", name: "billing" },
-            ],
-            isLoading: false,
-            isError: false,
-            refetch: vi.fn(),
-          };
-        }
-        if (resourceType === "project") {
-          return {
-            data: [
-              { id: "ENG", name: "Engineering" },
-              { id: "OPS", name: "Operations" },
-            ],
-            isLoading: false,
-            isError: false,
-            refetch: vi.fn(),
-          };
-        }
-        return { data: [], isLoading: false, isError: false, refetch: vi.fn() };
-      },
-    );
-    useDescribeRun.mockReturnValue({ data: undefined, isLoading: false, isFetched: true });
-    useEventExecutions.mockReturnValue({ data: { executions: [] }, isLoading: false });
-    updateIntake.mockResolvedValue({ id: "intake-github" });
-    deleteIntake.mockResolvedValue(undefined);
-    localStorage.clear();
-    useInfiniteCanvasRuns.mockReturnValue({
-      data: {
-        pages: [
-          {
-            runs: [
-              {
-                id: "run-intake-1",
-                canvasId: "app-github-issues-intake",
-                state: "STATE_FINISHED",
-                result: "RESULT_PASSED",
-                createdAt: "2026-05-01T12:00:00Z",
-                rootEvent: {
-                  id: "event-intake-1",
-                  nodeId: "github-issues-trigger",
-                  customName: "On mention on Issue",
-                },
-                executions: [
-                  {
-                    id: "exec-filter-1",
-                    nodeId: "github-issues-filter",
-                    state: "STATE_FINISHED",
-                    result: "RESULT_PASSED",
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-      isPending: false,
-      isError: false,
-      hasNextPage: false,
-      isFetchingNextPage: false,
-      fetchNextPage: vi.fn(),
-      refetch: vi.fn(),
+    resetIntakeSettingsHostMocks({
+      useCanvas,
+      useTriggers,
+      useComponents,
+      useAvailableIntegrations,
+      useIntegrationResources,
+      useDescribeRun,
+      useEventExecutions,
+      useInfiniteCanvasRuns,
+      updateIntake,
+      deleteIntake,
     });
   });
 
@@ -451,6 +360,67 @@ describe("IntakeSettingsHost", () => {
     await user.click(within(dialog).getByTestId("merge-confidence-config-tab-runs"));
 
     expect(within(dialog).getByTestId("factory-automation-runs-sidebar")).toBeInTheDocument();
+  });
+
+  it("keeps Dependabot severity settings when the intake has no canvas", async () => {
+    useCanvas.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: false,
+      refetch: vi.fn().mockResolvedValue(undefined),
+    });
+    const user = userEvent.setup();
+    renderHost({
+      intake: { ...DEPENDABOT_INTAKE, appId: "" },
+      repository: "superplanehq/superplane",
+    });
+
+    const dialog = screen.getByTestId("merge-confidence-config");
+    const form = within(dialog).getByTestId("merge-confidence-config-form");
+    expect(within(form).getByRole("heading", { name: "On Dependabot Alert" })).toBeInTheDocument();
+    expect(within(form).getByRole("checkbox", { name: "Critical" })).toBeChecked();
+    expect(within(form).queryByTestId("merge-confidence-config-form-collapse")).not.toBeInTheDocument();
+    expect(within(dialog).getByText(COLUMN_AUTOMATIONS_COPY.viewEmpty)).toBeInTheDocument();
+    expect(within(dialog).queryByRole("tab", { name: "Runs" })).not.toBeInTheDocument();
+
+    await user.click(within(form).getByRole("checkbox", { name: "Low" }));
+    await user.click(within(form).getByTestId("dependabot-intake-config-save"));
+
+    expect(updateIntake).toHaveBeenCalledWith({
+      intakeId: "intake-dependabot",
+      settings: expect.objectContaining({
+        dependabotSeverities: ["critical", "high", "medium"],
+      }),
+    });
+  });
+
+  it("keeps Dependabot severity settings when the canvas fails to load", async () => {
+    const refetch = vi.fn().mockResolvedValue(undefined);
+    useCanvas.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      refetch,
+    });
+    const user = userEvent.setup();
+    renderHost({ intake: DEPENDABOT_INTAKE, repository: "superplanehq/superplane" });
+
+    const dialog = screen.getByTestId("merge-confidence-config");
+    const form = within(dialog).getByTestId("merge-confidence-config-form");
+    expect(within(form).getByRole("checkbox", { name: "High" })).toBeChecked();
+    expect(within(dialog).getByText(COLUMN_AUTOMATIONS_COPY.viewError)).toBeInTheDocument();
+    expect(within(dialog).getByRole("tab", { name: "Runs" })).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole("button", { name: COLUMN_AUTOMATIONS_COPY.viewRetry }));
+    await user.click(within(form).getByTestId("dependabot-intake-config-save"));
+
+    expect(refetch).toHaveBeenCalled();
+    expect(updateIntake).toHaveBeenCalledWith({
+      intakeId: "intake-dependabot",
+      settings: expect.objectContaining({
+        dependabotSeverities: [],
+      }),
+    });
   });
 
   it("saves Dependabot severities through intake settings", async () => {

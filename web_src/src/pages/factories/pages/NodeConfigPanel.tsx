@@ -93,7 +93,7 @@ export function NodeConfigPanel({
   factoryKey?: string;
   widthPercent?: number;
   body?: ReactNode;
-  onClose: () => void;
+  onClose?: () => void;
   onSave: (update: NodeConfigurationUpdate) => Promise<void> | void;
 }) {
   const catalog = useNodeCatalog(node, organizationId);
@@ -110,20 +110,22 @@ export function NodeConfigPanel({
       >
         <header className="flex shrink-0 items-center gap-3 px-10 pt-6">
           <h2 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground">{catalog.nodeName}</h2>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label={NODE_CONFIG_COPY.collapseStep}
-                data-testid="merge-confidence-config-form-collapse"
-                className={factorySidebarCloseButtonClassName}
-              >
-                <PanelLeftClose className="h-4 w-4" aria-hidden />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{NODE_CONFIG_COPY.collapseStep}</TooltipContent>
-          </Tooltip>
+          {onClose ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label={NODE_CONFIG_COPY.collapseStep}
+                  data-testid="merge-confidence-config-form-collapse"
+                  className={factorySidebarCloseButtonClassName}
+                >
+                  <PanelLeftClose className="h-4 w-4" aria-hidden />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{NODE_CONFIG_COPY.collapseStep}</TooltipContent>
+            </Tooltip>
+          ) : null}
         </header>
         <div className="flex min-h-0 flex-1 flex-col">
           {body ??

@@ -41,7 +41,7 @@ interface MergeConfidenceConfigShellProps {
   widthPercent: number;
   isResizing: boolean;
   onResizeStart: (event: ReactPointerEvent<HTMLDivElement>) => void;
-  onClosePanel: () => void;
+  onClosePanel?: () => void;
   onSaveNode: (update: NodeConfigurationUpdate) => Promise<void> | void;
   graph?: IntakeAutomationGraph;
   loading: boolean;

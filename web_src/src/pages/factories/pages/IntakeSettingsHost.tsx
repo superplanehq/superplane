@@ -1,3 +1,4 @@
+import type { SuperplaneComponentsNode } from "@/api-client";
 import { useDeleteFactoryIntake, useUpdateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -91,6 +92,7 @@ function DependabotIntakeSettings({
       deleteCopy={DEPENDABOT_INTAKE_DELETE_COPY}
       page={page}
       showRunsTab={Boolean(intake.appId)}
+      fallbackNode={DEPENDABOT_SETTINGS_NODE}
       renderNodeBody={(node) =>
         node.component === "github.onDependabotAlert" ? (
           <DependabotIntakeConfigBody
@@ -192,6 +194,13 @@ function SourceIntakeSettings({
     />
   );
 }
+
+const DEPENDABOT_SETTINGS_NODE: SuperplaneComponentsNode = {
+  id: "dependabot-alerts-settings",
+  name: "On Dependabot Alert",
+  type: "TYPE_TRIGGER",
+  component: "github.onDependabotAlert",
+};
 
 const DEPENDABOT_INTAKE_DELETE_COPY: SplitConfigDeleteCopy = {
   menuLabel: INTAKE_SETTINGS_COPY.delete,

@@ -27,6 +27,7 @@ interface MergeConfidenceConfigModalProps {
   page?: boolean;
   showRunsTab?: boolean;
   renderNodeBody?: (node: SuperplaneComponentsNode) => ReactNode;
+  fallbackNode?: SuperplaneComponentsNode;
 }
 
 /** Merge confidence configuration. The first component starts selected. */
@@ -49,47 +50,16 @@ export function MergeConfidenceConfigModal({
   page = false,
   showRunsTab = true,
   renderNodeBody,
+  fallbackNode,
 }: MergeConfidenceConfigModalProps) {
   const [tab, setTab] = useState<"automation" | "runs">("automation");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const initialNodeId = firstComponentId(graph);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(initialNodeId);
-  const appliedInitialNode = useRef(initialNodeId !== null);
-  const [focusNonce, setFocusNonce] = useState(0);
-  const [layoutFitNonce, setLayoutFitNonce] = useState<number | null>(null);
+  const selection = useCanvasNodeSelection(graph);
+  const focus = usePanelFocus(tab, selection.selectedNodeId);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const panelWasOpen = useRef(false);
   const split = useSplitRunPanePercent({ defaultPercent: 50, minPercent: 28, maxPercent: 72 });
-
-  useEffect(() => {
-    if (appliedInitialNode.current) {
-      return;
-    }
-    const nextId = firstComponentId(graph);
-    if (!nextId) {
-      return;
-    }
-    appliedInitialNode.current = true;
-    setSelectedNodeId(nextId);
-  }, [graph]);
-  const selectedNode =
-    tab === "automation" && selectedNodeId ? graph?.specNodes?.find((node) => node.id === selectedNodeId) : undefined;
-
-  useEffect(() => {
-    if (tab !== "automation") {
-      return;
-    }
-    if (selectedNodeId) {
-      panelWasOpen.current = true;
-      const timeout = window.setTimeout(() => setFocusNonce((nonce) => nonce + 1), 80);
-      return () => window.clearTimeout(timeout);
-    }
-    if (!panelWasOpen.current) {
-      return;
-    }
-    const timeout = window.setTimeout(() => setLayoutFitNonce((nonce) => (nonce ?? 0) + 1), 80);
-    return () => window.clearTimeout(timeout);
-  }, [selectedNodeId, tab]);
+  const selectedNode = nodeForSelection(tab, selection.selectedNodeId, graph);
+  const panelNode = visiblePanelNode(tab, selectedNode, selection.selectedNodeId, focus.panelWasOpen, fallbackNode);
 
   return (
     <MergeConfidenceConfigShell
@@ -107,15 +77,15 @@ export function MergeConfidenceConfigModal({
       showRunsTab={showRunsTab}
       onTabChange={setTab}
       containerRef={split.containerRef}
-      selectedNode={selectedNode}
-      nodeBody={selectedNode ? renderNodeBody?.(selectedNode) : undefined}
+      selectedNode={panelNode}
+      nodeBody={panelNode ? renderNodeBody?.(panelNode) : undefined}
       organizationId={graph?.organizationId}
       factoryId={panelFactoryId(factoryId, graph)}
       factoryKey={factoryKey}
       widthPercent={split.percent}
       isResizing={split.isResizing}
       onResizeStart={split.startResize}
-      onClosePanel={() => setSelectedNodeId(null)}
+      onClosePanel={selectedNode ? () => selection.setSelectedNodeId(null) : undefined}
       onSaveNode={onSaveNode}
       graph={graph}
       loading={loading}
@@ -125,12 +95,83 @@ export function MergeConfidenceConfigModal({
       runHrefFor={runHrefFor}
       selectedRunId={selectedRunId}
       onSelectedRunIdChange={setSelectedRunId}
-      onNodeSelect={setSelectedNodeId}
-      selectedNodeId={selectedNodeId}
-      focusNonce={focusNonce}
-      layoutFitNonce={layoutFitNonce}
+      onNodeSelect={selection.setSelectedNodeId}
+      selectedNodeId={selection.selectedNodeId}
+      focusNonce={focus.focusNonce}
+      layoutFitNonce={focus.layoutFitNonce}
     />
   );
+}
+
+function useCanvasNodeSelection(graph: IntakeAutomationGraph | undefined) {
+  const initialNodeId = firstComponentId(graph);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(initialNodeId);
+  const appliedInitialNode = useRef(initialNodeId !== null);
+
+  useEffect(() => {
+    if (appliedInitialNode.current) {
+      return;
+    }
+    const nextId = firstComponentId(graph);
+    if (!nextId) {
+      return;
+    }
+    appliedInitialNode.current = true;
+    setSelectedNodeId(nextId);
+  }, [graph]);
+
+  return { selectedNodeId, setSelectedNodeId };
+}
+
+function usePanelFocus(tab: "automation" | "runs", selectedNodeId: string | null) {
+  const [focusNonce, setFocusNonce] = useState(0);
+  const [layoutFitNonce, setLayoutFitNonce] = useState<number | null>(null);
+  const panelWasOpen = useRef(false);
+
+  useEffect(() => {
+    if (tab !== "automation") {
+      return;
+    }
+    if (selectedNodeId) {
+      panelWasOpen.current = true;
+      const timeout = window.setTimeout(() => setFocusNonce((nonce) => nonce + 1), 80);
+      return () => window.clearTimeout(timeout);
+    }
+    if (!panelWasOpen.current) {
+      return;
+    }
+    const timeout = window.setTimeout(() => setLayoutFitNonce((nonce) => (nonce ?? 0) + 1), 80);
+    return () => window.clearTimeout(timeout);
+  }, [selectedNodeId, tab]);
+
+  return { focusNonce, layoutFitNonce, panelWasOpen: panelWasOpen.current };
+}
+
+function nodeForSelection(
+  tab: "automation" | "runs",
+  selectedNodeId: string | null,
+  graph: IntakeAutomationGraph | undefined,
+) {
+  if (tab !== "automation" || !selectedNodeId) {
+    return undefined;
+  }
+  return graph?.specNodes?.find((node) => node.id === selectedNodeId);
+}
+
+function visiblePanelNode(
+  tab: "automation" | "runs",
+  selectedNode: SuperplaneComponentsNode | undefined,
+  selectedNodeId: string | null,
+  panelWasOpen: boolean,
+  fallbackNode: SuperplaneComponentsNode | undefined,
+) {
+  if (selectedNode) {
+    return selectedNode;
+  }
+  if (tab !== "automation" || (panelWasOpen && !selectedNodeId)) {
+    return undefined;
+  }
+  return fallbackNode;
 }
 
 function panelFactoryId(factoryId: string | undefined, graph: IntakeAutomationGraph | undefined) {
