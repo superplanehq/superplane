@@ -1,5 +1,7 @@
 import type { FactoriesAutomationRef, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
+import claudeIcon from "@/assets/icons/integrations/claude.svg";
+import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import dependabotIcon from "@/assets/icons/integrations/dependabot.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
@@ -181,8 +183,7 @@ export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: 
     return {
       kind: "mcp",
       name: mcpName,
-      iconSrc: superplaneIcon,
-      iconAlt: "SuperPlane",
+      ...mcpSourceIcon(mcpName),
     };
   }
 
@@ -192,6 +193,21 @@ export function splitRunSourceForOrder(order: FactoriesWorkOrder, resolveUser?: 
     detail: CREATED_MANUALLY,
     addedBy: { kind: "manual" },
   };
+}
+
+function mcpSourceIcon(name: string): { iconSrc: string; iconAlt: string } {
+  const normalized = name.trim().toLowerCase();
+  if (matchesClientName(normalized, "cursor")) {
+    return { iconSrc: cursorIcon, iconAlt: "Cursor" };
+  }
+  if (matchesClientName(normalized, "claude")) {
+    return { iconSrc: claudeIcon, iconAlt: "Claude" };
+  }
+  return { iconSrc: superplaneIcon, iconAlt: "SuperPlane" };
+}
+
+function matchesClientName(normalizedName: string, client: string): boolean {
+  return normalizedName === client || normalizedName.startsWith(`${client} `);
 }
 
 function addedByForIntakeOrder(order: FactoriesWorkOrder, intakeName: string): SplitRunAddedBy {
