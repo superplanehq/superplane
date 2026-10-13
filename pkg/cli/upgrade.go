@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,13 +20,19 @@ const (
 	releasesDownloadBaseURL      = "https://github.com/superplanehq/superplane/releases/download"
 	releaseDownloadHeaderTimeout = 30 * time.Second
 	releaseDownloadTimeout       = 15 * time.Minute
+	maximumReleasePages          = 10
 )
 
-var latestReleaseURL = "https://api.github.com/repos/superplanehq/superplane/releases/latest"
+var (
+	releasesURL                 = "https://api.github.com/repos/superplanehq/superplane/releases?per_page=100"
+	stableApplicationTagPattern = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
+)
 
 type releaseInfo struct {
-	TagName string         `json:"tag_name"`
-	Assets  []releaseAsset `json:"assets"`
+	TagName    string         `json:"tag_name"`
+	Draft      bool           `json:"draft"`
+	Prerelease bool           `json:"prerelease"`
+	Assets     []releaseAsset `json:"assets"`
 }
 
 type releaseAsset struct {
@@ -78,34 +86,71 @@ func init() {
 
 func fetchLatestRelease() (*releaseInfo, error) {
 	client := &http.Client{Timeout: 3 * time.Second}
+	nextURL := releasesURL
 
-	req, err := http.NewRequest(http.MethodGet, latestReleaseURL, nil)
+	for range maximumReleasePages {
+		releases, nextPageURL, err := fetchReleasePage(client, nextURL)
+		if err != nil {
+			return nil, err
+		}
+
+		for i := range releases {
+			release := &releases[i]
+			if release.Draft || release.Prerelease {
+				continue
+			}
+			if stableApplicationTagPattern.MatchString(release.TagName) {
+				return release, nil
+			}
+		}
+
+		if nextPageURL == "" {
+			return nil, fmt.Errorf("release response does not contain a stable application release")
+		}
+		nextURL = nextPageURL
+	}
+
+	return nil, fmt.Errorf("stable application release was not found in the first %d pages", maximumReleasePages)
+}
+
+func fetchReleasePage(client *http.Client, url string) ([]releaseInfo, string, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	req.Header.Set("Accept", "application/vnd.github+json")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
+		return nil, "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
-	var release releaseInfo
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return nil, err
+	var releases []releaseInfo
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, "", err
 	}
 
-	if release.TagName == "" {
-		return nil, fmt.Errorf("latest release response is missing tag_name")
-	}
+	return releases, nextReleasePageURL(resp.Header.Get("Link")), nil
+}
 
-	return &release, nil
+func nextReleasePageURL(linkHeader string) string {
+	for link := range strings.SplitSeq(linkHeader, ",") {
+		if !strings.Contains(link, `rel="next"`) {
+			continue
+		}
+		start := strings.IndexByte(link, '<')
+		end := strings.IndexByte(link, '>')
+		if start >= 0 && end > start {
+			return link[start+1 : end]
+		}
+	}
+	return ""
 }
 
 func cliAssetName(goos, goarch string) string {
