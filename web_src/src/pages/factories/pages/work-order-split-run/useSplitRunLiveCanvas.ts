@@ -2,8 +2,20 @@ import { useCanvas, useDescribeRun } from "@/hooks/useCanvasData";
 import { useCanvasRuntimeWebsocket } from "@/hooks/useCanvasWebsocket";
 import { useMemo } from "react";
 
+import { agentRunnerQueue, type AgentRunnerQueue } from "./agentRunnerQueue";
 import { liveCanvasKeyForPhase, splitRunCanvasFromLive, streamFromLiveRun } from "./splitRunLiveCanvas";
-import type { SplitRunPhase } from "./splitRunMocks";
+import type { SplitRunCanvasModel } from "./splitRunCanvases";
+import type { SplitRunPhase, SplitRunStreamLine } from "./splitRunMocks";
+
+type SplitRunLiveCanvasResult = {
+  enabled: boolean;
+  isError: boolean;
+  isLoading: boolean;
+  canvas: SplitRunCanvasModel | undefined;
+  stream: SplitRunStreamLine[];
+  rootEventId: string | undefined;
+  agentQueue?: AgentRunnerQueue;
+};
 
 function splitRunLiveQueryState(
   enabled: boolean,
@@ -18,7 +30,10 @@ function splitRunLiveQueryState(
   };
 }
 
-export function useSplitRunLiveCanvas(organizationId: string | undefined, phase: SplitRunPhase | undefined) {
+export function useSplitRunLiveCanvas(
+  organizationId: string | undefined,
+  phase: SplitRunPhase | undefined,
+): SplitRunLiveCanvasResult {
   const appId = phase?.appId ?? "";
   const runId = phase?.runId ?? null;
   const enabled = Boolean(organizationId && appId);
@@ -42,6 +57,15 @@ export function useSplitRunLiveCanvas(organizationId: string | undefined, phase:
     () => streamFromLiveRun(canvasQuery.data, runQuery.data?.run),
     [canvasQuery.data, runQuery.data?.run],
   );
+  const agentQueue = useMemo(() => {
+    if (!enabled || !runId) {
+      return undefined;
+    }
+    if (!canvasQuery.data || !runQuery.data?.run) {
+      return undefined;
+    }
+    return agentRunnerQueue(canvasQuery.data, runQuery.data.run);
+  }, [canvasQuery.data, enabled, runId, runQuery.data?.run]);
 
   return {
     enabled,
@@ -50,5 +74,6 @@ export function useSplitRunLiveCanvas(organizationId: string | undefined, phase:
     canvas,
     stream,
     rootEventId: runQuery.data?.run?.rootEvent?.id,
+    agentQueue,
   };
 }
