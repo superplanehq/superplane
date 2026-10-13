@@ -239,13 +239,13 @@ func (s *Service) CreateRunner(ctx context.Context, req *pb.CreateRunnerRequest)
 	if err != nil {
 		return nil, err
 	}
+	if !req.GetEphemeral() {
+		return nil, grpcerrors.InvalidArgument(nil, "installation fleet runners must be ephemeral")
+	}
 
 	taskID, err := optionalID(req.TaskId, "task ID")
 	if err != nil {
 		return nil, err
-	}
-	if taskID != nil && !req.GetEphemeral() {
-		return nil, grpcerrors.InvalidArgument(nil, "task-specific runners must be ephemeral")
 	}
 
 	idempotencyKey := strings.TrimSpace(req.GetIdempotencyKey())

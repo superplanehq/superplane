@@ -98,7 +98,7 @@ func TestCreateGenericRunnerWithoutIdempotencyKeyCreatesNewRunnerEachTime(t *tes
 	support.Setup(t)
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
 	service := newTestRunnerService()
-	request := &pb.CreateRunnerRequest{FleetId: fleet.Slug}
+	request := &pb.CreateRunnerRequest{FleetId: fleet.Slug, Ephemeral: true}
 
 	first, err := service.CreateRunner(t.Context(), request)
 	require.NoError(t, err)
@@ -106,21 +106,21 @@ func TestCreateGenericRunnerWithoutIdempotencyKeyCreatesNewRunnerEachTime(t *tes
 	require.NoError(t, err)
 
 	assert.NotEqual(t, first.Runner.Id, second.Runner.Id)
-	assert.False(t, first.Runner.Ephemeral)
-	assert.False(t, second.Runner.Ephemeral)
+	assert.True(t, first.Runner.Ephemeral)
+	assert.True(t, second.Runner.Ephemeral)
 }
 
-func TestCreateGenericEphemeralRunner(t *testing.T) {
+func TestCreateGenericInstallationRunnerMustBeEphemeral(t *testing.T) {
 	support.Setup(t)
 	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
 	service := newTestRunnerService()
 
-	response, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
-		FleetId:   fleet.Slug,
-		Ephemeral: true,
-	})
-	require.NoError(t, err)
-	assert.True(t, response.Runner.Ephemeral)
+	_, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{FleetId: fleet.Slug})
+
+	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+	var runnerCount int64
+	require.NoError(t, database.DB(t.Context()).Model(&models.Runner{}).Count(&runnerCount).Error)
+	assert.Zero(t, runnerCount)
 }
 
 func TestCreateFleetCreatesInstallationFleet(t *testing.T) {
@@ -241,25 +241,6 @@ func TestCreateTaskSpecificRunnerRequiresIdempotencyKey(t *testing.T) {
 	assert.Zero(t, runnerCount)
 }
 
-func TestCreateTaskSpecificRunnerMustBeEphemeral(t *testing.T) {
-	resource := support.Setup(t)
-	db := database.DB(t.Context())
-	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
-	task := createTestTask(t, resource.Organization.ID, fleet.ID, []byte("encrypted secret"))
-	service := newTestRunnerService()
-
-	_, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
-		FleetId:        fleet.Slug,
-		TaskId:         stringPointer(task.ID.String()),
-		IdempotencyKey: "request-1",
-	})
-
-	assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
-	var runnerCount int64
-	require.NoError(t, db.Model(&models.Runner{}).Count(&runnerCount).Error)
-	assert.Zero(t, runnerCount)
-}
-
 func TestCreateRunnerRejectsReusedIdempotencyKeyForDifferentRequest(t *testing.T) {
 	resource := support.Setup(t)
 	firstFleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
@@ -270,29 +251,12 @@ func TestCreateRunnerRejectsReusedIdempotencyKeyForDifferentRequest(t *testing.T
 	_, err := service.CreateRunner(ctx, &pb.CreateRunnerRequest{
 		FleetId:        firstFleet.Slug,
 		IdempotencyKey: "request-1",
+		Ephemeral:      true,
 	})
 	require.NoError(t, err)
 
 	_, err = service.CreateRunner(ctx, &pb.CreateRunnerRequest{
 		FleetId:        secondFleet.Slug,
-		IdempotencyKey: "request-1",
-	})
-	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
-}
-
-func TestCreateRunnerRejectsReusedIdempotencyKeyForDifferentLifecycle(t *testing.T) {
-	support.Setup(t)
-	fleet := createTestFleet(t, models.RunnerFleetScopeInstallation, nil)
-	service := newTestRunnerService()
-
-	_, err := service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
-		FleetId:        fleet.Slug,
-		IdempotencyKey: "request-1",
-	})
-	require.NoError(t, err)
-
-	_, err = service.CreateRunner(t.Context(), &pb.CreateRunnerRequest{
-		FleetId:        fleet.Slug,
 		IdempotencyKey: "request-1",
 		Ephemeral:      true,
 	})
@@ -346,6 +310,11 @@ func TestListRunnersOnlyReturnsRunnersForFleet(t *testing.T) {
 		FleetID:       installationFleet.ID,
 		State:         models.RunnerStatePending,
 		RunnerVersion: "0.1.0",
+		OS:            "linux",
+		Arch:          "amd64",
+		Hostname:      "worker-a",
+		IP:            "198.51.100.4",
+		Tags:          datatypes.NewJSONType(map[string]string{"ec2_instance_id": "i-123"}),
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -367,6 +336,11 @@ func TestListRunnersOnlyReturnsRunnersForFleet(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, response.Runners, 1)
 	assert.Equal(t, installationRunner.ID.String(), response.Runners[0].Id)
+	assert.Equal(t, "i-123", response.Runners[0].Tags["ec2_instance_id"])
+	assert.Equal(t, "linux", response.Runners[0].Os)
+	assert.Equal(t, "amd64", response.Runners[0].Arch)
+	assert.Equal(t, "worker-a", response.Runners[0].Hostname)
+	assert.Equal(t, "198.51.100.4", response.Runners[0].Ip)
 	assert.Equal(t, int64(1), response.TotalCount)
 	assert.False(t, response.HasNextPage)
 }

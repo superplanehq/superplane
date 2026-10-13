@@ -246,14 +246,13 @@ describe("LinesPage Done column", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps a rejected task out of Done", () => {
+  it("keeps a rejected task in Done", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [BOARD_DONE_REJECTED_ORDER],
     });
     renderBoard();
 
-    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No tasks in Done.");
-    expect(screen.queryByText("Replace the refund batch exporter")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("Replace the refund batch exporter");
   });
 
   it("collects finished tasks in the Done column", () => {
@@ -285,7 +284,7 @@ describe("LinesPage Done column", () => {
       expect.objectContaining({
         done: {
           lineId: REFUND_LINE_PLAN_ID,
-          results: ["RESULT_COMPLETED", "RESULT_FAILED"],
+          results: ["RESULT_COMPLETED", "RESULT_FAILED", "RESULT_REJECTED", "RESULT_PR_CLOSED"],
         },
       }),
     );
@@ -335,7 +334,7 @@ describe("LinesPage Done column", () => {
     expect(screen.getByTestId("lines-phase-column-1")).toHaveTextContent("Nothing here.");
   });
 
-  it("does not show a draft rejected out of the Backlog in Done — it archives off the board", () => {
+  it("shows rejected tasks in Done with their Rejected status", () => {
     useFactoryWorkOrders.mockReturnValue({
       data: [
         {
@@ -349,8 +348,9 @@ describe("LinesPage Done column", () => {
     });
     renderBoard();
 
-    expect(screen.getByTestId("lines-done-column")).toHaveTextContent("No tasks in Done.");
-    expect(screen.queryByText("Retire the legacy refund webhook")).not.toBeInTheDocument();
+    const done = screen.getByTestId("lines-done-column");
+    expect(within(done).getByRole("button", { name: "Open Retire the legacy refund webhook" })).toBeInTheDocument();
+    expect(within(done).getByLabelText("Rejected")).toBeInTheDocument();
   });
 
   it("keeps the bookend Done column when the line has its own Done automation", () => {
@@ -413,7 +413,7 @@ describe("LinesPage Done column", () => {
       expect.objectContaining({
         done: {
           lineId: REFUND_LINE_PLAN_ID,
-          results: ["RESULT_COMPLETED", "RESULT_FAILED"],
+          results: ["RESULT_COMPLETED", "RESULT_FAILED", "RESULT_REJECTED", "RESULT_PR_CLOSED"],
         },
       }),
     );
@@ -475,7 +475,7 @@ describe("LinesPage Done column", () => {
       expect.objectContaining({
         done: {
           lineId: REFUND_LINE_HOTFIX_ID,
-          results: ["RESULT_COMPLETED", "RESULT_FAILED"],
+          results: ["RESULT_COMPLETED", "RESULT_FAILED", "RESULT_REJECTED", "RESULT_PR_CLOSED"],
         },
       }),
     );

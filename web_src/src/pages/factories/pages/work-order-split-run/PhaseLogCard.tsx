@@ -548,6 +548,7 @@ function PhaseLogCardStream({
           onSelect={onSelectNode}
           organizationId={organizationId}
           canvasId={canvasId ?? phase.appId}
+          analysisStatus={phase.status}
           compactSessionLog={compactSessionLog}
           stickyRows={stickyRows}
           files={files}
@@ -913,14 +914,17 @@ function statusTimeMark(status: SplitRunPhaseStatus): ReactNode {
 function livePhaseSpend(agents: PhaseAgentUsageEntry[]): { tokens: number; cents: number } {
   let tokens = 0;
   let cents = 0;
+  let hostedMicros = 0;
   for (const agent of agents) {
     tokens += agentRunNewTokenCount(agent.telemetry);
-    const usd = agent.telemetry.usage.total_cost_usd;
-    if (usd != null && Number.isFinite(usd)) {
-      cents += Math.round(usd * 100);
+    const { hosted_cost_usd: hostedUsd, total_cost_usd: reportedUsd } = agent.telemetry.usage;
+    if (hostedUsd != null && Number.isFinite(hostedUsd)) {
+      hostedMicros += Math.round(hostedUsd * 1_000_000);
+    } else if (reportedUsd != null && Number.isFinite(reportedUsd)) {
+      cents += Math.round(reportedUsd * 100);
     }
   }
-  return { tokens, cents };
+  return { tokens, cents: cents + Math.floor(hostedMicros / 10_000) };
 }
 
 function displayedPhaseSpend(phase: SplitRunPhase, agents: PhaseAgentUsageEntry[]): { tokens: number; cents: number } {
@@ -1012,6 +1016,7 @@ function StreamNode({
   onSelect,
   organizationId,
   canvasId,
+  analysisStatus,
   compactSessionLog,
   stickyRows,
   files,
@@ -1021,12 +1026,17 @@ function StreamNode({
   onSelect?: (nodeId: string) => void;
   organizationId?: string;
   canvasId?: string;
+  analysisStatus?: SplitRunPhaseStatus;
   compactSessionLog: boolean;
   stickyRows: boolean;
   files?: FilesFile[];
 }) {
   const { line, notes, artifact, pullRequest } = group;
-  const { notes: liveNotes, usageSeries, usageLoading } = useRunnerNodeLiveNotes(line, organizationId, canvasId);
+  const {
+    notes: liveNotes,
+    usageSeries,
+    usageLoading,
+  } = useRunnerNodeLiveNotes(line, organizationId, canvasId, analysisStatus);
   useReportPhaseAgentUsageSeries({
     nodeId: line.nodeId ?? line.id,
     fallbackName: line.componentName,
@@ -1485,6 +1495,7 @@ function useRunnerNodeLiveNotes(
   line: SplitRunStreamLine,
   organizationId?: string,
   canvasId?: string,
+  analysisStatus?: SplitRunPhaseStatus,
 ): {
   notes: SplitRunStreamLine[] | undefined;
   telemetry: AgentRunTelemetry;
@@ -1518,6 +1529,7 @@ function useRunnerNodeLiveNotes(
       error,
       isStreaming,
       nodeStatus: line.status,
+      analysisStatus,
     }),
     telemetry: nextTelemetry,
     usageSeries: nextSeries,

@@ -286,7 +286,7 @@ function sourcePerson(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLoo
   }
   // `resolveUser` looks the source up against the org members list, which
   // carries the avatar image. Without it we can only show initials.
-  const resolved = resolveUser?.(user.id, user.name);
+  const resolved = resolveUser?.(user.id, user.name, user.deleted, user.formerMember);
   if (resolved) {
     return resolved;
   }
@@ -295,6 +295,8 @@ function sourcePerson(order: FactoriesWorkOrder, resolveUser?: OrgUserDisplayLoo
     id: user.id ?? SOURCE_PERSON_FALLBACK.id,
     name,
     initials: getUserInitials(name),
+    ...(user.deleted ? { deleted: true } : {}),
+    ...(user.formerMember ? { formerMember: true } : {}),
     avatarUrl: user.id === SOURCE_PERSON_FALLBACK.id ? SOURCE_PERSON_FALLBACK.avatarUrl : undefined,
   };
 }

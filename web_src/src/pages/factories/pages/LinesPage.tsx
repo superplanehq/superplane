@@ -126,7 +126,6 @@ import { FilterChips } from "../workOrders/header/FilterChips";
 import { FilterMenu } from "../workOrders/header/FilterMenu";
 import { ScopePills, type ScopePillOption } from "../workOrders/header/ScopePills";
 import { SearchField } from "../workOrders/header/SearchField";
-import { WorkOrderClosedStatusDialog } from "../workOrders/WorkOrderClosedStatusDialog";
 import {
   WorkOrderBoardLane,
   WorkOrderKanbanBoard,
@@ -156,7 +155,6 @@ import {
   factorySentryIntakeSetupPath,
   columnAutomationViewCanvasIdFromSearch,
   firstFactoryLineId,
-  factoryRouteSegment,
   workOrderDetailPath,
   workOrderBoardLineIdFromSearch,
   intakeIdFromSearch,
@@ -721,12 +719,9 @@ export function LinesPage() {
         <div className="shrink-0">
           <LineDetailHeader
             organizationId={organizationId}
-            factoryId={factoryId}
-            line={selectedLine}
             workOrders={workOrders}
             factory={factory}
             state={listState}
-            canUpdate={canUpdate}
             hostedCreditHeaderKicker={hostedCreditHeaderKicker}
             nextStepsRestore={
               nextStepsCollapsed && nextStepBanner ? (
@@ -838,12 +833,9 @@ export function LinesPage() {
 
 function LineDetailHeader({
   organizationId,
-  factoryId,
-  line,
   workOrders,
   factory,
   state,
-  canUpdate,
   hostedCreditHeaderKicker,
   nextStepsRestore,
   intakes,
@@ -853,12 +845,9 @@ function LineDetailHeader({
   onColorViewChange,
 }: {
   organizationId: string;
-  factoryId: string;
-  line: FactoriesFactoryLine;
   workOrders: FactoriesWorkOrder[];
   factory: FactoriesFactory | null;
   state: WorkOrderListState;
-  canUpdate: boolean;
   hostedCreditHeaderKicker?: ReactNode;
   nextStepsRestore?: ReactNode;
   intakes: FactoriesFactoryIntake[];
@@ -885,8 +874,6 @@ function LineDetailHeader({
   );
   const visibleFilterCount =
     countWorkOrderFilters(visibleWorkOrderFilters(state.filters, showPullRequestMerge)) - state.filters.lineIds.length;
-  const [closedStatusDialogOpen, setClosedStatusDialogOpen] = useState(false);
-  const factoryKey = factoryRouteSegment(factory);
 
   return (
     <>
@@ -915,7 +902,6 @@ function LineDetailHeader({
               sourceOptions={sourceOptions}
               assigneeOptions={assigneeOptions}
               showPullRequestMerge={showPullRequestMerge}
-              onOpenStatusDialog={() => setClosedStatusDialogOpen(true)}
             />
             <SearchField
               inputRef={searchRef}
@@ -944,21 +930,6 @@ function LineDetailHeader({
           ) : undefined
         }
       />
-      {closedStatusDialogOpen ? (
-        <WorkOrderClosedStatusDialog
-          open
-          organizationId={organizationId}
-          factoryId={factoryId}
-          factoryKey={factoryKey}
-          lineId={line.id}
-          canManage={canUpdate}
-          onOpenChange={(open) => {
-            if (!open) {
-              setClosedStatusDialogOpen(false);
-            }
-          }}
-        />
-      ) : null}
     </>
   );
 }

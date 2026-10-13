@@ -30,6 +30,7 @@ const publicBoardPageSize = 100
 const publicBoardMaxPages = 10
 
 var riskScoreCanvasName = regexp.MustCompile(`^(?:Merge confidence|Risk score) \(\d+\)$`)
+var visualEvidenceCanvasName = regexp.MustCompile(`^Visual Evidence \(\d+\)$`)
 
 var errPublicBoardNotFound = errors.New("public board not found")
 
@@ -418,10 +419,13 @@ func publicCardColumn(
 	case models.FactoryWorkOrderStateDraft:
 		return "backlog"
 	case models.FactoryWorkOrderStateClosed:
-		if order.Result != models.FactoryWorkOrderResultCompleted && order.Result != models.FactoryWorkOrderResultFailed {
+		switch order.Result {
+		case models.FactoryWorkOrderResultCompleted, models.FactoryWorkOrderResultFailed,
+			models.FactoryWorkOrderResultManualRejected, models.FactoryWorkOrderResultPRClosed:
+			return "done"
+		default:
 			return ""
 		}
-		return "done"
 	}
 
 	dispatch := newestDispatch(dispatches, lineID)
@@ -577,10 +581,14 @@ func uiWorkOrderResult(result string) string {
 	switch result {
 	case models.FactoryWorkOrderResultCompleted:
 		return "RESULT_COMPLETED"
-	case models.FactoryWorkOrderResultRejected:
+	case models.FactoryWorkOrderResultRejected, models.FactoryWorkOrderResultManualRejected:
 		return "RESULT_REJECTED"
 	case models.FactoryWorkOrderResultFailed:
 		return "RESULT_FAILED"
+	case models.FactoryWorkOrderResultArchived:
+		return "RESULT_ARCHIVED"
+	case models.FactoryWorkOrderResultPRClosed:
+		return "RESULT_PR_CLOSED"
 	default:
 		return ""
 	}
@@ -805,6 +813,19 @@ func verifyAutomations(canvases []models.Canvas, handlers []models.FactoryPRFeed
 			Health:    "healthy",
 		})
 	}
+	for _, canvas := range canvases {
+		if !isVisualEvidenceCanvas(canvas) {
+			continue
+		}
+		skip[canvas.ID] = struct{}{}
+		rows = append(rows, publicAutomation{
+			ID:        "visual-evidence-" + strconv.Itoa(len(rows)),
+			Kind:      "visual-evidence",
+			Name:      strings.TrimSpace(canvas.Name),
+			CatalogID: "visual-evidence",
+			Health:    "healthy",
+		})
+	}
 	return append(rows, customColumnAutomations(canvases, models.CanvasColumnKeyVerify, skip)...)
 }
 
@@ -898,6 +919,14 @@ func isRiskScoreCanvas(canvas models.Canvas) bool {
 	}
 	name := strings.TrimSpace(canvas.Name)
 	return name == "Merge confidence" || name == "Risk score" || riskScoreCanvasName.MatchString(name)
+}
+
+func isVisualEvidenceCanvas(canvas models.Canvas) bool {
+	if canvas.ColumnKey == nil || *canvas.ColumnKey != models.CanvasColumnKeyVerify {
+		return false
+	}
+	name := strings.TrimSpace(canvas.Name)
+	return name == "Visual Evidence" || visualEvidenceCanvasName.MatchString(name)
 }
 
 func intakeSourceName(source string) string {

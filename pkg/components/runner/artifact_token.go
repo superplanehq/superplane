@@ -2,9 +2,11 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,8 +45,9 @@ type ArtifactRunContext struct {
 	LineExecution  *models.FactoryWorkOrderExecution
 }
 
-// ResolveArtifactRunContext accepts factory line runs and registered PR
-// discussion runs. Other factory canvases do not receive artifact access.
+// ResolveArtifactRunContext accepts factory line runs, registered PR
+// discussion runs, and Verify visual evidence runs. Other factory canvases
+// do not receive artifact access.
 func ResolveArtifactRunContext(tx *gorm.DB, runID uuid.UUID) (*ArtifactRunContext, error) {
 	execution, err := models.FindWorkOrderExecutionForRun(tx, runID)
 	if err == nil {
@@ -75,7 +78,10 @@ func ResolveArtifactRunContext(tx *gorm.DB, runID uuid.UUID) (*ArtifactRunContex
 	if err != nil {
 		return nil, err
 	}
-	if handler == nil || handler.Source != models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
+	if handler == nil {
+		return resolveVisualEvidenceArtifactRun(tx, run)
+	}
+	if handler.Source != models.FactoryPRFeedbackHandlerSourcePullRequestDiscussion {
 		return nil, ErrArtifactRunScopeNotFound
 	}
 	activity, err := models.FindPullRequestActivityByRunID(tx, runID)
@@ -103,6 +109,101 @@ func ResolveArtifactRunContext(tx *gorm.DB, runID uuid.UUID) (*ArtifactRunContex
 		WorkOrderID:    pullRequest.WorkOrderID,
 		CanvasID:       run.WorkflowID,
 	}, nil
+}
+
+func resolveVisualEvidenceArtifactRun(tx *gorm.DB, run *models.CanvasRun) (*ArtifactRunContext, error) {
+	matches, err := models.CanvasHasFactoryAppTemplate(tx, run.WorkflowID, models.FactoryAppTemplateVisualEvidenceID)
+	if err != nil {
+		return nil, err
+	}
+	if !matches {
+		return nil, ErrArtifactRunScopeNotFound
+	}
+
+	canvas, err := models.FindUnscopedCanvasInTransaction(tx, run.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+	if canvas.FactoryID == nil {
+		return nil, ErrArtifactRunScopeNotFound
+	}
+
+	rootEvent, err := models.FindRootEventForRun(tx, run.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrArtifactRunScopeNotFound
+		}
+		return nil, err
+	}
+	repository, number, ok := visualEvidencePullRequestIdentity(rootEvent)
+	if !ok {
+		return nil, ErrArtifactRunScopeNotFound
+	}
+
+	factoryModel, err := models.FindFactory(tx, canvas.OrganizationID, *canvas.FactoryID)
+	if err != nil {
+		return nil, err
+	}
+	pullRequest, err := factoryModel.FindPullRequest(tx, models.FactoryPullRequestLookup{
+		Provider:   models.FactoryPullRequestProviderGitHub,
+		Repository: repository,
+		Number:     number,
+	})
+	if err != nil {
+		if errors.Is(err, models.ErrFactoryPullRequestNotFound) || errors.Is(err, models.ErrFactoryPullRequestLookupIncomplete) {
+			return nil, ErrArtifactRunScopeNotFound
+		}
+		return nil, err
+	}
+
+	return &ArtifactRunContext{
+		OrganizationID: canvas.OrganizationID,
+		FactoryID:      *canvas.FactoryID,
+		WorkOrderID:    pullRequest.WorkOrderID,
+		CanvasID:       run.WorkflowID,
+	}, nil
+}
+
+func visualEvidencePullRequestIdentity(event *models.CanvasEvent) (string, int64, bool) {
+	if event == nil {
+		return "", 0, false
+	}
+	payload, ok := objectMap(models.RootEventSourcePayload(event.Data.Data()))
+	if !ok {
+		return "", 0, false
+	}
+	repository, _ := objectMap(payload["repository"])
+	fullName, _ := repository["full_name"].(string)
+	pullRequest, _ := objectMap(payload["pull_request"])
+	number, ok := positiveInt64(pullRequest["number"])
+	if strings.TrimSpace(fullName) == "" || !ok {
+		return "", 0, false
+	}
+	return strings.TrimSpace(fullName), number, true
+}
+
+func objectMap(value any) (map[string]any, bool) {
+	mapped, ok := value.(map[string]any)
+	return mapped, ok
+}
+
+func positiveInt64(value any) (int64, bool) {
+	switch typed := value.(type) {
+	case json.Number:
+		number, err := typed.Int64()
+		return number, err == nil && number > 0
+	case int64:
+		return typed, typed > 0
+	case int:
+		return int64(typed), typed > 0
+	case float64:
+		return int64(typed), typed > 0 && typed == float64(int64(typed))
+	case string:
+		number, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
+		return number, err == nil && number > 0
+	default:
+		return 0, false
+	}
 }
 
 func MintArtifactUploadToken(signer *jwt.Signer, scope ArtifactUploadScope, ttl time.Duration) (string, error) {

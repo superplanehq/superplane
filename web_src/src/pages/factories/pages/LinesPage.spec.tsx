@@ -1046,6 +1046,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-column-automation-template-discussion")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-checks")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-risk-score")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toBeInTheDocument();
     expect(screen.queryByTestId("add-column-automation-template-custom")).not.toBeInTheDocument();
   });
 
@@ -1072,7 +1073,10 @@ describe("LinesPage board extras", () => {
       isPending: false,
     });
     useFactoryAutomations.mockReturnValue({
-      data: [{ id: "app-risk", name: "Risk score", columnKey: "verify" }],
+      data: [
+        { id: "app-risk", name: "Risk score", columnKey: "verify" },
+        { id: "app-evidence", name: "Visual Evidence", columnKey: "verify" },
+      ],
     });
     const user = userEvent.setup();
     renderLinesBoard();
@@ -1776,7 +1780,7 @@ describe("LinesPage board editing", () => {
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
   });
 
-  it("opens closed tasks from the Status filter", async () => {
+  it("filters Rejected on the board without opening a dialog", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1784,11 +1788,8 @@ describe("LinesPage board editing", () => {
     await user.hover(screen.getByTestId("work-orders-filter-statuses"));
     fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-rejected"));
 
-    expect(await screen.findByTestId("work-order-closed-status-dialog")).toBeInTheDocument();
-    expect(
-      screen.getByText("Rejected and Canceled tasks. Send a task to Backlog to work on it again."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("No closed tasks.")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-closed-status-dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-orders-filter-chips")).toHaveTextContent("Rejected");
   });
 
   it("treats a leftover Active scope as All and keeps every card", () => {

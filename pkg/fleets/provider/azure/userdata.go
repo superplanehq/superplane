@@ -17,6 +17,11 @@ var userDataTemplate = template.Must(template.New("userdata").Funcs(template.Fun
 	"shellQuote": shellQuote,
 }).Parse(userDataTemplateSource))
 
+type userData struct {
+	provider.RunnerBootstrap
+	TagsValue string
+}
+
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
 }
@@ -37,8 +42,12 @@ func buildUserData(request provider.RunnerBootstrap) ([]byte, error) {
 		return nil, fmt.Errorf("runner artifact SHA-256 is invalid")
 	}
 
+	tags, err := provider.FormatRunnerTags(request.Tags)
+	if err != nil {
+		return nil, fmt.Errorf("encode runner tags: %w", err)
+	}
 	var output bytes.Buffer
-	if err := userDataTemplate.Execute(&output, request); err != nil {
+	if err := userDataTemplate.Execute(&output, userData{RunnerBootstrap: request, TagsValue: tags}); err != nil {
 		return nil, fmt.Errorf("render Azure runner bootstrap: %w", err)
 	}
 	return output.Bytes(), nil

@@ -60,6 +60,8 @@ var workOrderEmailStatusStyles = map[string]workOrderEmailStatusStyle{
 		Border: "#fecaca",
 		Dot:    "#ef4444",
 	},
+	"rejected": {Label: "Rejected", Fg: "#b91c1c", Bg: "#fef2f2", Border: "#fecaca", Dot: "#ef4444"},
+	"closed":   {Label: "Closed", Fg: "#52525b", Bg: "#f4f4f5", Border: "#e4e4e7", Dot: "#a1a1aa"},
 	"cancelled": {
 		Label:  "Cancelled",
 		Fg:     "#52525b",
@@ -116,8 +118,12 @@ func workOrderEmailDisplayStatus(
 ) string {
 	if order.State == models.FactoryWorkOrderStateClosed {
 		switch order.Result {
-		case models.FactoryWorkOrderResultRejected:
-			return "cancelled"
+		case models.FactoryWorkOrderResultRejected, models.FactoryWorkOrderResultManualRejected:
+			return "rejected"
+		case models.FactoryWorkOrderResultPRClosed:
+			return "closed"
+		case models.FactoryWorkOrderResultArchived:
+			return "closed"
 		case models.FactoryWorkOrderResultFailed:
 			return "failed"
 		default:

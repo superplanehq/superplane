@@ -14,6 +14,11 @@ export type FleetRunner = {
   id: string;
   state: string;
   runnerVersion?: string;
+  os?: string;
+  arch?: string;
+  hostname?: string;
+  ip?: string;
+  tags?: Record<string, string>;
   ephemeral?: boolean;
   createdAt?: string | null;
   lastSeenAt?: string | null;
@@ -148,6 +153,18 @@ export const fetchInstallationFleets = async (signal?: AbortSignal) => {
   }
   const data: { fleets?: InstallationFleet[] } = await response.json();
   return data.fleets ?? [];
+};
+
+export const fetchRunner = async (fleetId: string, runnerId: string, signal?: AbortSignal): Promise<FleetRunner> => {
+  const response = await adminFetch(fleetURL(fleetId, `/runners/${encodeURIComponent(runnerId)}`), signal);
+  if (response.status === 404) {
+    throw new Error("Runner not found.");
+  }
+  if (!response.ok) {
+    throw new Error("Failed to load runner.");
+  }
+  const body: { runner: FleetRunner } = await response.json();
+  return body.runner;
 };
 
 export const fetchBrokerTasks = async () => {

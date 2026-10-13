@@ -8,7 +8,12 @@ import productiveIcon from "@/assets/icons/integrations/productive.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 
 import type { FactoriesFactoryPullRequest, FactoriesWorkOrder } from "@/api-client";
-import { ANALYSIS_ENTRY, PR_CLOSURE_ENTRY, prFeedbackSentence } from "../lib/columnAutomationCatalog";
+import {
+  ANALYSIS_ENTRY,
+  PR_CLOSURE_ENTRY,
+  VISUAL_EVIDENCE_ENTRY,
+  prFeedbackSentence,
+} from "../lib/columnAutomationCatalog";
 import type { ColumnAutomation, ColumnAutomationKind } from "../lib/columnAutomations";
 import {
   buildAssigneeFilterOptions,
@@ -79,6 +84,7 @@ const PUBLIC_AUTOMATION_KINDS = new Set<ColumnAutomationKind>([
   "pr-checks",
   "pr-closure",
   "risk-score",
+  "visual-evidence",
 ]);
 
 const PUBLIC_AUTOMATION_ICONS: Record<string, { src: string; alt: string }> = {
@@ -363,6 +369,9 @@ function automationCopy(kind: ColumnAutomationKind, name: string): { trigger: st
   }
   if (kind === "pr-discussion") {
     return prFeedbackSentence("discussion");
+  }
+  if (kind === "visual-evidence") {
+    return { trigger: VISUAL_EVIDENCE_ENTRY.trigger, action: VISUAL_EVIDENCE_ENTRY.action };
   }
   return { trigger: "", action: "" };
 }

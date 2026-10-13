@@ -35,6 +35,10 @@ func CloseWorkOrder(ctx context.Context, organizationID string, req *pb.CloseWor
 		return nil, factoryErrorToStatus(err, "failed to close work order")
 	}
 
+	if result == models.FactoryWorkOrderResultRejected {
+		result = models.FactoryWorkOrderResultManualRejected
+	}
+
 	db := database.DB(ctx)
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
 	if err != nil {

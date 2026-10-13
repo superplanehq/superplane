@@ -12,11 +12,7 @@ import {
   type WorkOrderOrdering,
   type WorkOrderScope,
 } from "./workOrderListModel";
-import {
-  WORK_ORDER_BOARD_FILTER_STATUSES,
-  isWorkOrderDialogStatus,
-  type WorkOrderDisplayStatus,
-} from "./workOrderProgress";
+import { WORK_ORDER_BOARD_FILTER_STATUSES, type WorkOrderDisplayStatus } from "./workOrderProgress";
 
 /** One of the dimensions the Filter menu can narrow. */
 export type WorkOrderFilterDimension = keyof WorkOrderFilters;
@@ -273,7 +269,7 @@ export function useWorkOrderListState(factoryId: string): WorkOrderListState {
 
   const toggleFilter = useCallback(
     (dimension: WorkOrderFilterDimension, value: string) => {
-      if (dimension === "statuses" && isWorkOrderDialogStatus(value)) {
+      if (dimension === "statuses" && !VALID_BOARD_FILTER_STATUSES.has(value)) {
         return;
       }
       setFilters((current) => {

@@ -139,6 +139,46 @@ func TestHandleRunnerLiveLogSession(t *testing.T) {
 
 	server, signer := mustRunnerLiveLogServer(t, r)
 
+	t.Run("hosted pricing follows execution credentials without charging for reads", func(t *testing.T) {
+		markup := 2000
+		require.NoError(t, database.Conn().Save(&models.OrganizationLLMSettings{
+			OrganizationID: r.Organization.ID, MarkupBPS: &markup,
+		}).Error)
+		for _, item := range []struct {
+			name, component, source string
+			priced                  bool
+		}{
+			{"hosted", models.SuperPlaneRunnerComponent, "hosted", true},
+			{"BYOK", "runnerCodex", "integration", false},
+		} {
+			t.Run(item.name, func(t *testing.T) {
+				canvasID, execID := createCanvasWithComponentExecution(t, r, item.component, "pricing-"+item.name, map[string]any{
+					runneraction.ExecutionMetadataBrokerTaskID: "task-pricing",
+					runneraction.ExecutionMetadataTaskBackend:  "integrated",
+				})
+				require.NoError(t, database.Conn().Model(&models.CanvasNodeExecution{}).Where("id = ?", execID).
+					Update("configuration", datatypes.NewJSONType(map[string]any{
+						"model": "gpt-4o", "hostedProvider": "openai", "credentials": map[string]any{"source": item.source},
+					})).Error)
+				var before, after int64
+				require.NoError(t, database.Conn().Model(&models.WorkspaceUsageEvent{}).Count(&before).Error)
+				rec := runnerLiveLogSessionGET(t, server, signer, r, canvasID.String(), execID.String())
+				require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+				var session runneraction.LiveLogSession
+				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &session))
+				if item.priced {
+					require.NotNil(t, session.HostedPricing)
+					assert.Equal(t, int64(250), session.HostedPricing.Rate.Input)
+					assert.Equal(t, 2000, session.HostedPricing.MarkupBPS)
+				} else {
+					assert.Nil(t, session.HostedPricing)
+				}
+				require.NoError(t, database.Conn().Model(&models.WorkspaceUsageEvent{}).Count(&after).Error)
+				assert.Equal(t, before, after, "opening live logs must not record or charge usage")
+			})
+		}
+	})
+
 	t.Run("no session cookie", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet,
 			fmt.Sprintf("/api/v1/canvases/%s/node-executions/%s/runner-live-logs/session", uuid.New(), uuid.New()),

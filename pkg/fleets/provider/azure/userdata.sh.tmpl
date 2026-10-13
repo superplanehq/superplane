@@ -19,4 +19,5 @@ tar \
 set +x
 RUNNER_API_URL={{shellQuote .RunnerAPIURL}} \
 RUNNER_REGISTRATION_TOKEN={{shellQuote .RegistrationToken}} \
+RUNNER_TAGS={{shellQuote .TagsValue}} \
   "$bundle_dir/install.sh"

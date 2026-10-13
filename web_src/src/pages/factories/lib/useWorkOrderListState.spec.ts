@@ -203,13 +203,13 @@ describe("useWorkOrderListState", () => {
     expect(result.current.filters.statuses).toEqual(["completed"]);
   });
 
-  it("persists Failed as a board filter and skips Rejected", () => {
+  it("persists Rejected as a board filter and skips Canceled", () => {
     const { result } = renderHook(() => useWorkOrderListState("factory-1"));
     act(() => {
-      result.current.toggleFilter("statuses", "failed");
       result.current.toggleFilter("statuses", "rejected");
+      result.current.toggleFilter("statuses", "cancelled");
     });
-    expect(result.current.filters.statuses).toEqual(["failed"]);
+    expect(result.current.filters.statuses).toEqual(["rejected"]);
   });
 
   it("clearFilterDimension only clears the dimension it targets", () => {
