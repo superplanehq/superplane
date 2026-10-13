@@ -3,6 +3,7 @@
 /* eslint-disable no-console */
 
 const crypto = require("node:crypto");
+const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const http = require("node:http");
 const https = require("node:https");
@@ -13,14 +14,37 @@ const USER_AGENT = "superplane-component-release";
 const VERSION_PATTERN =
   /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?$/;
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
+const RELEASE_NOTES_NAME = "release-notes.md";
+const GIT_CLIFF_IMAGE =
+  "ghcr.io/orhun/git-cliff/git-cliff:2.14.0@sha256:0f72b15def11c5836c9dfb2e4da8b9b52b4bc2c8c2f46c47701b7e68f3998ff7";
 const COMPONENTS = {
   runner: {
+    initialChangelogRef: "v0.30.0",
     tagPrefix: "runner/",
     releaseName: "Runner",
+    releaseScopes: ["runner", "runners", "release/runner"],
+    releasePaths: [
+      ".semaphore/*runner-release.yml",
+      "cliff.toml",
+      "cmd/runner/**",
+      "pkg/runners/**",
+      "release/component-release.*",
+      "release/runner/**",
+    ],
   },
   "fleet-manager": {
+    initialChangelogRef: "v0.30.0",
     tagPrefix: "fleet-manager/",
     releaseName: "Fleet Manager",
+    releaseScopes: ["fleet-manager", "fleets", "release/fleet-manager"],
+    releasePaths: [
+      ".semaphore/*fleet-manager-release.yml",
+      "cliff.toml",
+      "cmd/fleetmanager/**",
+      "pkg/fleets/**",
+      "release/component-release.*",
+      "release/fleet-manager/**",
+    ],
   },
 };
 
@@ -52,11 +76,175 @@ function validateSHA(sha) {
   return sha;
 }
 
+function isPrerelease(version) {
+  return parseVersion(version).includes("-");
+}
+
 function sha256File(filePath) {
   return crypto
     .createHash("sha256")
     .update(fs.readFileSync(filePath))
     .digest("hex");
+}
+
+function releaseNotesMetadata(version, directory) {
+  const filePath = path.join(directory, RELEASE_NOTES_NAME);
+  if (isPrerelease(version)) {
+    if (fs.existsSync(filePath)) {
+      throw new Error(
+        "release candidates must not include git-cliff release notes",
+      );
+    }
+    return null;
+  }
+  if (!fs.existsSync(filePath)) {
+    throw new Error("stable releases require git-cliff release notes");
+  }
+  const stat = fs.statSync(filePath);
+  if (!stat.isFile() || stat.size === 0) {
+    throw new Error("git-cliff release notes must be a non-empty file");
+  }
+  return {
+    name: RELEASE_NOTES_NAME,
+    sha256: sha256File(filePath),
+    size: stat.size,
+  };
+}
+
+function gitOutput(args, repository) {
+  return execFileSync("git", args, {
+    cwd: repository,
+    encoding: "utf8",
+  }).trim();
+}
+
+function previousStableTag(component, sha, repository) {
+  const config = componentConfig(component);
+  const tagPrefix = config.tagPrefix;
+  const componentTags = gitOutput(
+    [
+      "tag",
+      "--merged",
+      sha,
+      "--list",
+      `${tagPrefix}v*`,
+      "--sort=-version:refname",
+    ],
+    repository,
+  ).split("\n");
+  const stablePattern = new RegExp(
+    `^${tagPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}v\\d+\\.\\d+\\.\\d+$`,
+  );
+  const previousComponentTag = componentTags.find((tag) =>
+    stablePattern.test(tag),
+  );
+  if (previousComponentTag) {
+    return previousComponentTag;
+  }
+
+  gitOutput(
+    ["merge-base", "--is-ancestor", config.initialChangelogRef, sha],
+    repository,
+  );
+  return config.initialChangelogRef;
+}
+
+function conventionalCommitScope(subject) {
+  const match = /^[a-z][a-z0-9-]*(?:\(([^)]+)\))?!?:/.exec(subject);
+  return match ? match[1] : null;
+}
+
+function commitsScopedToOtherComponents(component, range, repository) {
+  const scopeOwners = new Map();
+  for (const [componentName, config] of Object.entries(COMPONENTS)) {
+    for (const scope of config.releaseScopes) {
+      scopeOwners.set(scope, componentName);
+    }
+  }
+
+  const log = gitOutput(["log", "--format=%H%x09%s", range], repository);
+  if (!log) {
+    return [];
+  }
+
+  const commits = [];
+  for (const line of log.split("\n")) {
+    const separator = line.indexOf("\t");
+    if (separator === -1) {
+      continue;
+    }
+    const sha = line.slice(0, separator);
+    const subject = line.slice(separator + 1);
+    const owner = scopeOwners.get(conventionalCommitScope(subject));
+    if (owner && owner !== component) {
+      commits.push(sha);
+    }
+  }
+  return commits;
+}
+
+function generateReleaseNotes({
+  component,
+  version,
+  sha,
+  output,
+  repository,
+  dockerExec = execFileSync,
+}) {
+  const config = componentConfig(component);
+  parseVersion(version);
+  validateSHA(sha);
+  if (isPrerelease(version)) {
+    console.log(`* Skipping git-cliff notes for prerelease ${version}`);
+    return false;
+  }
+
+  const sourceRepository =
+    repository || gitOutput(["rev-parse", "--show-toplevel"]);
+  const previousTag = previousStableTag(component, sha, sourceRepository);
+  const tag = componentTag(component, version);
+  const tagPattern = `^${config.tagPrefix}v[0-9]+\\.[0-9]+\\.[0-9]+$`;
+  const args = [
+    "run",
+    "--rm",
+    "--volume",
+    `${sourceRepository}:/app:ro`,
+    "--entrypoint",
+    "git-cliff",
+    GIT_CLIFF_IMAGE,
+    "--config",
+    "cliff.toml",
+    "--no-exec",
+    "--offline",
+    "--strip",
+    "header",
+    "--tag",
+    tag,
+    "--tag-pattern",
+    tagPattern,
+  ];
+  for (const releasePath of config.releasePaths) {
+    args.push("--include-path", releasePath);
+  }
+  const range = `${previousTag}..${sha}`;
+  for (const commit of commitsScopedToOtherComponents(
+    component,
+    range,
+    sourceRepository,
+  )) {
+    args.push("--skip-commit", commit);
+  }
+  args.push(range);
+
+  const notes = dockerExec("docker", args, {
+    encoding: "utf8",
+    maxBuffer: 10 * 1024 * 1024,
+  }).trim();
+  if (!notes) {
+    throw new Error("git-cliff generated empty release notes");
+  }
+  fs.writeFileSync(output, `${notes}\n`, { flag: "wx" });
+  return true;
 }
 
 function createManifest({
@@ -97,13 +285,14 @@ function createManifest({
   });
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     component,
     version,
     tag,
     sourceSha: sha,
     semaphoreWorkflowId: workflowID,
     preparationPipelineId: pipelineID,
+    releaseNotes: releaseNotesMetadata(version, directory),
     assets,
   };
 }
@@ -112,7 +301,7 @@ function verifyManifest(
   manifest,
   { component, version, sha, workflowID, directory, assetNames },
 ) {
-  if (manifest.schemaVersion !== 1) {
+  if (manifest.schemaVersion !== 2) {
     throw new Error(`unsupported manifest schema: ${manifest.schemaVersion}`);
   }
   if (
@@ -127,6 +316,14 @@ function verifyManifest(
   }
   if (!Array.isArray(manifest.assets) || manifest.assets.length === 0) {
     throw new Error("manifest does not contain assets");
+  }
+
+  const expectedReleaseNotes = releaseNotesMetadata(version, directory);
+  if (
+    JSON.stringify(manifest.releaseNotes) !==
+    JSON.stringify(expectedReleaseNotes)
+  ) {
+    throw new Error("release notes checksum does not match manifest");
   }
   const recordedNames = manifest.assets.map((asset) => asset.name).sort();
   const expectedNames = [...assetNames].sort();
@@ -306,6 +503,12 @@ async function findOrCreateDraft({
   if (release.tag_name !== tag || release.target_commitish !== sha) {
     throw new Error(`GitHub draft ${tag} does not match source SHA ${sha}`);
   }
+  if (
+    release.prerelease !== undefined &&
+    release.prerelease !== isPrerelease(version)
+  ) {
+    throw new Error(`GitHub draft ${tag} has the wrong prerelease setting`);
+  }
   return release;
 }
 
@@ -397,19 +600,41 @@ async function publishGitHubRelease({
   repository,
   token,
   releaseID,
+  component,
+  version,
   sha,
   imageDigest,
+  releaseNotes,
 }) {
+  componentConfig(component);
+  const prerelease = isPrerelease(version);
   validateSHA(sha);
-  const body = imageDigest
+  if (prerelease && releaseNotes) {
+    throw new Error(
+      "release candidates must not include git-cliff release notes",
+    );
+  }
+  if (!prerelease && !releaseNotes?.trim()) {
+    throw new Error("stable releases require git-cliff release notes");
+  }
+
+  let body = imageDigest
     ? `Source commit: ${sha}\n\nFleet Manager image digest: \`${imageDigest}\``
     : `Source commit: ${sha}`;
+  if (!prerelease) {
+    body += `\n\n${releaseNotes.trim()}`;
+  }
   const response = await request({
     apiURL,
     method: "PATCH",
     pathname: `/repos/${repository}/releases/${releaseID}`,
     token,
-    body: JSON.stringify({ draft: false, make_latest: "false", body }),
+    body: JSON.stringify({
+      draft: false,
+      prerelease,
+      make_latest: prerelease ? "false" : "true",
+      body,
+    }),
     headers: { "Content-Type": "application/json" },
   });
   if (response.statusCode !== 200) {
@@ -445,6 +670,15 @@ async function main() {
   }
   if (command === "tag") {
     console.log(componentTag(process.argv[3], process.argv[4]));
+    return;
+  }
+  if (command === "generate-release-notes") {
+    generateReleaseNotes({
+      component: option("component"),
+      version: option("version"),
+      sha: option("sha"),
+      output: option("output"),
+    });
     return;
   }
   if (command === "create-manifest") {
@@ -502,13 +736,19 @@ async function main() {
     if (!process.env.GITHUB_TOKEN) {
       throw new Error("GITHUB_TOKEN is required");
     }
+    const releaseNotesPath = optionalOption("release-notes");
     const release = await publishGitHubRelease({
       apiURL: process.env.GITHUB_API_URL || "https://api.github.com",
       repository: process.env.GITHUB_REPOSITORY || "superplanehq/superplane",
       token: process.env.GITHUB_TOKEN,
       releaseID: option("release-id"),
+      component: option("component"),
+      version: option("version"),
       sha: option("sha"),
       imageDigest: process.env.FLEET_MANAGER_IMAGE_DIGEST,
+      releaseNotes: releaseNotesPath
+        ? fs.readFileSync(releaseNotesPath, "utf8")
+        : undefined,
     });
     console.log(release.html_url || release.id);
     return;
@@ -526,6 +766,7 @@ if (require.main === module) {
 module.exports = {
   componentTag,
   createManifest,
+  generateReleaseNotes,
   parseVersion,
   publishGitHubRelease,
   stageGitHubRelease,

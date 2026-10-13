@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,39 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestFetchLatestReleaseSelectsStableApplicationRelease(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodGet, r.Method)
+		require.Equal(t, "application/vnd.github+json", r.Header.Get("Accept"))
+
+		releases := []map[string]any{
+			{"tag_name": "runner/v1.2.3"},
+			{"tag_name": "fleet-manager/v1.2.3"},
+			{"tag_name": "v0.18.0-rc.1", "prerelease": true},
+			{
+				"tag_name": "v0.17.0",
+				"assets": []map[string]string{
+					{
+						"name":                 "superplane-cli-linux-amd64",
+						"browser_download_url": "https://example.com/superplane-cli-linux-amd64",
+					},
+				},
+			},
+		}
+		require.NoError(t, json.NewEncoder(w).Encode(releases))
+	}))
+	t.Cleanup(server.Close)
+
+	originalURL := releasesURL
+	releasesURL = server.URL
+	t.Cleanup(func() { releasesURL = originalURL })
+
+	release, err := fetchLatestRelease()
+	require.NoError(t, err)
+	require.Equal(t, "v0.17.0", release.TagName)
+	require.Len(t, release.Assets, 1)
+}
 
 func TestCLIAssetName(t *testing.T) {
 	require.Equal(t, "superplane-cli-darwin-arm64", cliAssetName("darwin", "arm64"))

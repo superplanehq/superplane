@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"time"
 
@@ -20,11 +21,16 @@ const (
 	releaseDownloadTimeout       = 15 * time.Minute
 )
 
-var latestReleaseURL = "https://api.github.com/repos/superplanehq/superplane/releases/latest"
+var (
+	releasesURL                 = "https://api.github.com/repos/superplanehq/superplane/releases?per_page=100"
+	stableApplicationTagPattern = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
+)
 
 type releaseInfo struct {
-	TagName string         `json:"tag_name"`
-	Assets  []releaseAsset `json:"assets"`
+	TagName    string         `json:"tag_name"`
+	Draft      bool           `json:"draft"`
+	Prerelease bool           `json:"prerelease"`
+	Assets     []releaseAsset `json:"assets"`
 }
 
 type releaseAsset struct {
@@ -79,7 +85,7 @@ func init() {
 func fetchLatestRelease() (*releaseInfo, error) {
 	client := &http.Client{Timeout: 3 * time.Second}
 
-	req, err := http.NewRequest(http.MethodGet, latestReleaseURL, nil)
+	req, err := http.NewRequest(http.MethodGet, releasesURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -96,16 +102,22 @@ func fetchLatestRelease() (*releaseInfo, error) {
 		return nil, fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
-	var release releaseInfo
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+	var releases []releaseInfo
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
 		return nil, err
 	}
 
-	if release.TagName == "" {
-		return nil, fmt.Errorf("latest release response is missing tag_name")
+	for i := range releases {
+		release := &releases[i]
+		if release.Draft || release.Prerelease {
+			continue
+		}
+		if stableApplicationTagPattern.MatchString(release.TagName) {
+			return release, nil
+		}
 	}
 
-	return &release, nil
+	return nil, fmt.Errorf("release response does not contain a stable application release")
 }
 
 func cliAssetName(goos, goarch string) string {
