@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -214,26 +215,33 @@ func Test__CanvasRun__RequestCompletion__StopsRunAndIsIdempotent(t *testing.T) {
 }
 
 func Test__CanvasRun__RequestCompletion__DoesNotRewriteFinishedRun(t *testing.T) {
-	r := support.Setup(t)
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
-		[]models.Edge{},
-	)
-	run := createRunWithState(t, canvas.ID, models.CanvasRunStateFinished, models.CanvasRunResultCancelled)
-	db := database.DB(t.Context())
+	for _, storedResult := range []string{
+		models.CanvasRunResultCancelled,
+		models.CanvasRunResultPassed,
+	} {
+		t.Run(storedResult, func(t *testing.T) {
+			r := support.Setup(t)
+			canvas, _ := support.CreateCanvas(
+				t,
+				r.Organization.ID,
+				r.User,
+				[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+				[]models.Edge{},
+			)
+			run := createRunWithState(t, canvas.ID, models.CanvasRunStateFinished, storedResult)
+			db := database.DB(t.Context())
 
-	require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
-		_, err := run.RequestCompletion(tx, nil)
-		return err
-	}))
+			require.NoError(t, db.Transaction(func(tx *gorm.DB) error {
+				_, err := run.RequestCompletion(tx, nil)
+				return err
+			}))
 
-	updatedRun, err := models.FindCanvasRunInTransaction(db, run.WorkflowID, run.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
-	assert.Equal(t, models.CanvasRunResultCancelled, updatedRun.Result)
+			updatedRun, err := models.FindCanvasRunInTransaction(db, run.WorkflowID, run.ID)
+			require.NoError(t, err)
+			assert.Equal(t, models.CanvasRunStateFinished, updatedRun.State)
+			assert.Equal(t, storedResult, updatedRun.Result)
+		})
+	}
 }
 
 func Test__CanvasRun__RequestCancellation__OverridesCompletionRequest(t *testing.T) {
@@ -315,6 +323,84 @@ func Test__CanvasRun__RequestCompletion__DoesNotOverrideCancellationRequest(t *t
 	result, err := updatedRun.CalculateResult(db)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasRunResultCancelled, result)
+}
+
+func Test__CanvasRun__CalculateResult__UnconsumedFailedChannelFailsRun(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+	require.NoError(t, db.Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultPassed,
+		"updated_at": time.Now(),
+	}).Error)
+
+	cancelled := createExecutionForRun(t, run, execution.RootEventID, "node-2")
+	require.NoError(t, db.Model(cancelled).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultCancelled,
+		"updated_at": time.Now(),
+	}).Error)
+
+	support.EmitCanvasEventForNode(t, run.WorkflowID, execution.NodeID, runner.FailedOutputChannel, &execution.ID)
+
+	result, err := run.CalculateResult(db)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultFailed, result)
+}
+
+func Test__CanvasRun__CalculateResult__ConsumedFailedChannelPassesWhenHandlerPasses(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+	require.NoError(t, db.Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultPassed,
+		"updated_at": time.Now(),
+	}).Error)
+
+	failedEvent := support.EmitCanvasEventForNode(t, run.WorkflowID, execution.NodeID, runner.FailedOutputChannel, &execution.ID)
+	handler := createExecutionForRun(t, run, execution.RootEventID, "node-2")
+	require.NoError(t, db.Model(handler).Updates(map[string]any{
+		"event_id":   failedEvent.ID,
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultPassed,
+		"updated_at": time.Now(),
+	}).Error)
+
+	result, err := run.CalculateResult(db)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultPassed, result)
+}
+
+func Test__CanvasRun__CalculateResult__FailedChannelHandledBySharedExecutionPasses(t *testing.T) {
+	run, execution := setupRunWithExecution(t)
+	db := database.DB(t.Context())
+	require.NoError(t, db.Model(execution).Updates(map[string]any{
+		"state":      models.CanvasNodeExecutionStateFinished,
+		"result":     models.CanvasNodeExecutionResultPassed,
+		"updated_at": time.Now(),
+	}).Error)
+
+	passedEvent := support.EmitCanvasEventForNode(t, run.WorkflowID, execution.NodeID, "default", &execution.ID)
+	firstFailed := support.EmitCanvasEventForNode(t, run.WorkflowID, execution.NodeID, runner.FailedOutputChannel, &execution.ID)
+	secondFailed := support.EmitCanvasEventForNode(t, run.WorkflowID, execution.NodeID, runner.FailedOutputChannel, &execution.ID)
+	shared := createExecutionForRun(t, run, execution.RootEventID, "node-2")
+	require.NoError(t, db.Model(shared).Updates(map[string]any{
+		"event_id": passedEvent.ID,
+		"state":    models.CanvasNodeExecutionStateFinished,
+		"result":   models.CanvasNodeExecutionResultPassed,
+		"metadata": datatypes.NewJSONType(map[string]any{
+			"eventIDs": []string{
+				passedEvent.ID.String(),
+				firstFailed.ID.String(),
+				secondFailed.ID.String(),
+			},
+		}),
+		"updated_at": time.Now(),
+	}).Error)
+
+	result, err := run.CalculateResult(db)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunResultPassed, result)
 }
 
 func Test__CanvasRun__CalculateResult__Passed(t *testing.T) {
