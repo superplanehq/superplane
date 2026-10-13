@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 
@@ -61,11 +61,11 @@ function commentRun(description: string): AutomationStage {
   };
 }
 
-function renderRuns(runs: AutomationStage[]) {
+function renderRuns(runs: AutomationStage[], phases: SplitRunPhase[] = []) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <AgentRunsPage runs={runs} phases={[]} automationName="Address PR feedback" />
+      <AgentRunsPage runs={runs} phases={phases} automationName="Address PR feedback" />
     </QueryClientProvider>,
   );
 }
@@ -511,5 +511,53 @@ describe("AgentRunsPage pull request checks", () => {
     expect(screen.getByText("Please add tests for the new card.")).toBeInTheDocument();
     expect(screen.queryByRole("list", { name: "Pull request checks" })).not.toBeInTheDocument();
     expect(screen.queryByText("build")).not.toBeInTheDocument();
+  });
+});
+
+function captureRun(id: string, status: AutomationStage["status"] = "running"): AutomationStage {
+  return {
+    ...commentRun(""),
+    id,
+    name: id,
+    componentName: "Visual Evidence",
+    status,
+    statusLabel: status === "waiting" ? "Waiting" : "Running",
+    duration: "40m",
+  };
+}
+
+function renderCaptureRuns(runs: AutomationStage[], queuedIds: string[] = []) {
+  useSplitRunLiveCanvas.mockImplementation((_organizationId: unknown, phase?: SplitRunPhase) => ({
+    enabled: true,
+    isError: false,
+    isLoading: false,
+    canvas: undefined,
+    stream: [],
+    rootEventId: undefined,
+    agentQueue: { queued: queuedIds.includes(phase?.id ?? "") },
+  }));
+  return renderRuns(
+    runs,
+    runs.map((run) => ({ ...checksPhase(), id: run.id, status: run.status })),
+  );
+}
+
+describe("AgentRunsPage queued agent runs", () => {
+  it("shows a queued agent with the dashed mark and not the running dot", () => {
+    renderCaptureRuns([captureRun("queued"), captureRun("working")], ["queued"]);
+
+    const queuedRow = screen.getByRole("button", { name: "Toggle queued" }).parentElement;
+    const workingRow = screen.getByRole("button", { name: "Toggle working" }).parentElement;
+    expect(within(queuedRow!).getByText("Queued")).toBeInTheDocument();
+    expect(queuedRow!.querySelector(".lucide-circle-dashed")).toBeTruthy();
+    expect(queuedRow!.querySelector("[class*='status-running-dot']")).toBeNull();
+    expect(within(workingRow!).queryByText("Queued")).not.toBeInTheDocument();
+    expect(workingRow!.querySelector("[class*='status-running-dot']")).toBeTruthy();
+  });
+
+  it("leaves an exclusive-access wait labeled waiting", () => {
+    renderCaptureRuns([captureRun("access", "waiting"), captureRun("done", "passed")]);
+
+    expect(screen.queryByText("Queued")).not.toBeInTheDocument();
   });
 });
