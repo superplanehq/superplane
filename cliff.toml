@@ -5,44 +5,13 @@
 header = ""
 body = """
 {% if version %}
-## What's new since {{ previous.version | default(value="the previous release") }}
-
-<!--
-CUSTOM SUMMARY PLACEHOLDER
-
-Write the curated release summary here, for example:
-
-### Workflow and execution
-
-...
-
-### 1 new integration
-
-- ...
-
-### Improvements to existing integrations
-
-- ...
-
-### New components and capabilities
-
-- ...
-
-### Agents
-
-- ...
-
-### Breaking changes
-
-- ...
--->
-
+## {{ version }} - {{ timestamp | date(format="%Y-%m-%d") }}
 {% endif %}
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group | upper_first }}
 
 {% for commit in commits %}
-- {{ commit.message | upper_first }}{% if commit.github.username %} by @{{ commit.github.username }}{% endif %}
+- {% if commit.scope %}*({{ commit.scope }})* {% endif %}{% if commit.breaking %}**breaking** {% endif %}{{ commit.message | upper_first }} ([{{ commit.id | truncate(length=7, end="") }}](https://github.com/superplanehq/superplane/commit/{{ commit.id }})){% if commit.remote.username %} by [@{{ commit.remote.username }}](https://github.com/{{ commit.remote.username }}){% endif %}
 {% endfor %}
 
 {% endfor %}
@@ -63,6 +32,8 @@ tag_pattern = "v[0-9]*"
 sort_commits = "oldest"
 
 commit_parsers = [
+  { message = "^chore\\(release\\): prepare for", skip = true },
+  { message = "^chore\\(deps.*\\)", skip = true },
   { message = "^feat", group = "New features" },
   { message = "^fix", group = "Bug Fixes" },
   { message = "^perf", group = "Improvements" },
