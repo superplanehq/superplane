@@ -58,14 +58,14 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # ffmpeg, ffprobe, whisper-cli, the baked Whisper model, and the pinned
-# yt-dlp binary. install-media-tools.sh installs yt-dlp from the script
-# copied beside it. Build tools are removed after the install. libgomp1
+# yt-dlp binary. Build tools are removed after the install. libgomp1
 # stays because whisper-cli links it.
 COPY release/runner/packer/aws/scripts/install-media-tools.sh release/runner/packer/aws/scripts/install-yt-dlp.sh /tmp/
 RUN apt-get update \
   && apt-get install -y --no-install-recommends cmake g++ make ffmpeg libgomp1 \
   && chmod +x /tmp/install-media-tools.sh /tmp/install-yt-dlp.sh \
   && /tmp/install-media-tools.sh \
+  && /tmp/install-yt-dlp.sh \
   && rm /tmp/install-media-tools.sh /tmp/install-yt-dlp.sh \
   && apt-get purge -y cmake g++ make \
   && apt-get autoremove -y --purge \
