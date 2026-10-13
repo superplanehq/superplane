@@ -28,8 +28,8 @@ function idleMutation(mutateAsync = vi.fn().mockResolvedValue(undefined)) {
   return { mutateAsync, isPending: false, variables: undefined };
 }
 
-function mockMutations(overrides?: { dispatch?: ReturnType<typeof vi.fn> }) {
-  const dispatch = overrides?.dispatch ?? vi.fn().mockResolvedValue(undefined);
+function mockMutations() {
+  const dispatch = vi.fn().mockResolvedValue(undefined);
   const close = vi.fn().mockResolvedValue(undefined);
   const updateStatus = vi.fn().mockResolvedValue(undefined);
   const addComment = vi.fn().mockResolvedValue(undefined);
