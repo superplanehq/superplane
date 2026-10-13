@@ -74,6 +74,427 @@ func Test__VelocitySyncWindow__RestartsWhenTheRepositoryChanges(t *testing.T) {
 		"a new repository has no history, whatever the old one reached")
 }
 
+func Test__VelocitySyncWindow__RebuildsStaleBitbucketHistory(t *testing.T) {
+	now := time.Now()
+	syncedAt := now.Add(-10 * time.Minute)
+	backfilledFrom := now.AddDate(0, 0, -velocitySyncBackfillDays-1)
+
+	from := velocitySyncWindow(models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		SyncedAt:         &syncedAt,
+		BackfilledFrom:   &backfilledFrom,
+	}, now)
+
+	assert.WithinDuration(t, now.AddDate(0, 0, -velocitySyncBackfillDays), from, time.Second,
+		"a Bitbucket workspace saved before the app filter must rebuild the full history, not only the last seven days")
+}
+
+func Test__VelocitySyncWindow__KeepsBitbucketIncrementalAfterRulesRebuild(t *testing.T) {
+	now := time.Now()
+	syncedAt := now.Add(-10 * time.Minute)
+	backfilledFrom := now.AddDate(0, 0, -velocitySyncBackfillDays-1)
+
+	from := velocitySyncWindow(models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		SyncedAt:         &syncedAt,
+		BackfilledFrom:   &backfilledFrom,
+		RulesGeneration:  bitbucketVelocityRulesGeneration,
+	}, now)
+
+	assert.WithinDuration(t, now.Add(-velocitySyncRecomputeWindow), from, time.Second,
+		"a Bitbucket workspace that already rebuilt under the current rules only recomputes recent days")
+}
+
+func Test__NextVelocityRulesGeneration__RecordsBitbucketRulesOnlyAfterFullRebuild(t *testing.T) {
+	now := time.Now()
+	target := models.FactoryVelocitySyncTarget{VCSProvider: models.ProviderBitbucket}
+
+	assert.Equal(t, bitbucketVelocityRulesGeneration, nextVelocityRulesGeneration(target, velocitySyncBackfillStart(now), now),
+		"replacing the full history window is what makes the app filter apply to saved merges")
+	assert.Equal(t, 0, nextVelocityRulesGeneration(target, now.Add(-velocitySyncRecomputeWindow), now),
+		"a seven-day recompute must not mark the older app merges as corrected")
+
+	github := models.FactoryVelocitySyncTarget{VCSProvider: models.ProviderGitHub, RulesGeneration: 4}
+	assert.Equal(t, 4, nextVelocityRulesGeneration(github, velocitySyncBackfillStart(now), now),
+		"a GitHub rebuild must not consume the Bitbucket rules generation")
+
+	catchUp := models.FactoryVelocitySyncTarget{
+		VCSProvider:     models.ProviderBitbucket,
+		RulesGeneration: bitbucketVelocityRulesCatchUp,
+	}
+	assert.Equal(t, bitbucketVelocityRulesGeneration, nextVelocityRulesGeneration(catchUp, now.Add(-velocitySyncRecomputeWindow), now),
+		"a newer-window read finishes the rebuild even though it does not replace the whole history")
+
+	catchingUp := catchUp
+	catchingUp.RulesGeneration = bitbucketVelocityRulesCatchingUp
+	assert.Equal(t, bitbucketVelocityRulesGeneration, nextVelocityRulesGeneration(catchingUp, now.Add(-velocitySyncRecomputeWindow), now),
+		"a catch-up that needed more than one read still finishes when the last slice reaches the window start")
+}
+
+func Test__VelocitySyncWindow__CatchUpReadsTheNewerWindow(t *testing.T) {
+	now := time.Now()
+	slice := now.Add(-10 * 24 * time.Hour)
+	windowStart := velocitySyncBackfillStart(now)
+	target := models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		SyncedAt:         &slice,
+		BackfilledFrom:   &windowStart,
+		RulesGeneration:  bitbucketVelocityRulesCatchUp,
+	}
+
+	from, until := velocitySyncBounds(target, now)
+	assert.Equal(t, slice, from, "a long rebuild must catch merges made after the first slice")
+	assert.True(t, until.IsZero(), "the catch-up must read the newest pages, not another older slice")
+
+	refreshFrom, refreshUntil := velocityRefreshBounds(target, now)
+	assert.Equal(t, from, refreshFrom, "a refresh that finishes the rebuild must not skip the newer window")
+	assert.True(t, refreshUntil.IsZero())
+}
+
+func Test__BitbucketCatchUpFrom__CoversTheNewestSliceAndTheRecomputeWindow(t *testing.T) {
+	now := time.Now()
+	oldSlice := now.Add(-10 * 24 * time.Hour)
+	target := models.FactoryVelocitySyncTarget{SyncedAt: &oldSlice}
+	assert.Equal(t, oldSlice, bitbucketCatchUpFrom(target, now))
+
+	recent := now.Add(-time.Hour)
+	target.SyncedAt = &recent
+	assert.WithinDuration(t, now.Add(-velocitySyncRecomputeWindow), bitbucketCatchUpFrom(target, now), time.Second,
+		"a short rebuild still recomputes the days that can change")
+}
+
+func Test__ProgressAfterVelocityRead__ShortBitbucketReadContinuesOlderHistory(t *testing.T) {
+	now := time.Now()
+	requestedFrom := velocitySyncBackfillStart(now)
+	cursor := now.Add(-2 * 24 * time.Hour)
+	target := models.FactoryVelocitySyncTarget{VCSProvider: models.ProviderBitbucket}
+
+	replaceFrom, replaceTo, backfilledFrom, generation := progressAfterVelocityRead(
+		target,
+		requestedFrom,
+		time.Time{},
+		velocityReadCoverage{ContinueBefore: cursor},
+		now,
+		false,
+		now,
+	)
+
+	assert.Equal(t, cursor, replaceFrom, "a short read must not delete merges it did not read")
+	assert.True(t, replaceTo.After(now), "the first slice must cover merges up to now")
+	assert.Equal(t, cursor, backfilledFrom, "the next read must continue strictly before this slice")
+	assert.Equal(t, bitbucketVelocityRulesRebuilding, generation, "a short read must not mark the rebuild done")
+}
+
+func Test__ProgressAfterVelocityRead__ContinuationKeepsTheNewerSlice(t *testing.T) {
+	now := time.Now()
+	requestedFrom := velocitySyncBackfillStart(now)
+	savedSlice := now.Add(-2 * 24 * time.Hour)
+	older := now.Add(-10 * 24 * time.Hour)
+	target := models.FactoryVelocitySyncTarget{
+		VCSProvider:     models.ProviderBitbucket,
+		RulesGeneration: bitbucketVelocityRulesRebuilding,
+		BackfilledFrom:  &savedSlice,
+	}
+
+	replaceFrom, replaceTo, backfilledFrom, generation := progressAfterVelocityRead(
+		target,
+		requestedFrom,
+		savedSlice,
+		velocityReadCoverage{ContinueBefore: older},
+		now,
+		false,
+		now,
+	)
+
+	assert.Equal(t, older, replaceFrom)
+	assert.Equal(t, savedSlice, replaceTo, "the older slice must not delete merges already saved")
+	assert.Equal(t, older, backfilledFrom)
+	assert.Equal(t, bitbucketVelocityRulesRebuilding, generation)
+
+	replaceFrom, replaceTo, backfilledFrom, generation = progressAfterVelocityRead(
+		target,
+		requestedFrom,
+		savedSlice,
+		completeVelocityRead(),
+		now,
+		false,
+		now,
+	)
+	assert.Equal(t, requestedFrom, replaceFrom)
+	assert.Equal(t, savedSlice, replaceTo)
+	assert.Equal(t, requestedFrom, backfilledFrom, "finishing the older slice must restore the full history window")
+	assert.Equal(t, bitbucketVelocityRulesCatchUp, generation,
+		"a finished older slice must not mark the rebuild done before the newer window is read")
+}
+
+func Test__ProgressAfterVelocityRead__ShortCatchUpDoesNotRestartTheOlderHistory(t *testing.T) {
+	now := time.Now()
+	windowStart := velocitySyncBackfillStart(now)
+	firstSlice := now.Add(-10 * 24 * time.Hour)
+	cursor := now.Add(-24 * time.Hour)
+	catchUpFrom := firstSlice
+	target := models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		SyncedAt:         &firstSlice,
+		BackfilledFrom:   &windowStart,
+		RulesGeneration:  bitbucketVelocityRulesCatchUp,
+	}
+
+	replaceFrom, replaceTo, backfilledFrom, generation := progressAfterVelocityRead(
+		target,
+		catchUpFrom,
+		time.Time{},
+		velocityReadCoverage{ContinueBefore: cursor},
+		now,
+		false,
+		now,
+	)
+
+	assert.Equal(t, cursor, replaceFrom, "a short catch-up must not delete merges it did not read")
+	assert.True(t, replaceTo.After(now))
+	assert.Equal(t, cursor, backfilledFrom)
+	assert.Equal(t, bitbucketVelocityRulesCatchingUp, generation,
+		"a short catch-up must not switch back to the older rebuild")
+
+	target.RulesGeneration = bitbucketVelocityRulesCatchingUp
+	target.BackfilledFrom = &cursor
+	older := now.Add(-3 * 24 * time.Hour)
+	replaceFrom, replaceTo, backfilledFrom, generation = progressAfterVelocityRead(
+		target,
+		catchUpFrom,
+		cursor,
+		velocityReadCoverage{ContinueBefore: older},
+		now,
+		false,
+		now,
+	)
+	assert.Equal(t, older, replaceFrom)
+	assert.Equal(t, cursor, replaceTo, "the next catch-up slice must not delete the newer slice already saved")
+	assert.Equal(t, older, backfilledFrom)
+	assert.Equal(t, bitbucketVelocityRulesCatchingUp, generation)
+
+	replaceFrom, replaceTo, backfilledFrom, generation = progressAfterVelocityRead(
+		target,
+		catchUpFrom,
+		cursor,
+		completeVelocityRead(),
+		now,
+		false,
+		now,
+	)
+	assert.Equal(t, catchUpFrom, replaceFrom)
+	assert.Equal(t, cursor, replaceTo)
+	assert.Equal(t, windowStart, backfilledFrom, "finishing the catch-up must restore the full history window")
+	assert.Equal(t, bitbucketVelocityRulesGeneration, generation,
+		"the last catch-up slice must finish instead of starting the newer window again")
+}
+
+func Test__ProgressAfterVelocityRead__ShortFullRefreshKeepsTheOriginalStart(t *testing.T) {
+	now := time.Now()
+	windowStart := now.AddDate(0, 0, -velocitySyncBackfillDays-1)
+	syncedAt := now.Add(-time.Hour)
+	cursor := now.Add(-15 * 24 * time.Hour)
+	target := models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		SyncedAt:         &syncedAt,
+		BackfilledFrom:   &windowStart,
+		RulesGeneration:  bitbucketVelocityRulesGeneration,
+	}
+
+	_, _, backfilledFrom, generation := progressAfterVelocityRead(
+		target,
+		velocitySyncBackfillStart(now),
+		time.Time{},
+		velocityReadCoverage{ContinueBefore: cursor},
+		now,
+		false,
+		now,
+	)
+
+	assert.Equal(t, cursor, backfilledFrom)
+	assert.Equal(t, bitbucketVelocityRulesRebuilding, generation,
+		"a short full refresh must not switch to the seven-day catch-up")
+
+	_, _, _, generation = progressAfterVelocityRead(
+		target,
+		velocitySyncBackfillStart(now),
+		time.Time{},
+		velocityReadCoverage{ContinueBefore: cursor},
+		now.Add(time.Minute),
+		false,
+		now,
+	)
+	assert.Equal(t, bitbucketVelocityRulesRebuilding, generation,
+		"a later store clock must not turn a full refresh into the seven-day catch-up")
+
+	target.RulesGeneration = generation
+	target.BackfilledFrom = &backfilledFrom
+	from, until := velocityRefreshBounds(target, now)
+	assert.WithinDuration(t, velocitySyncBackfillStart(now), from, time.Second,
+		"the next refresh must keep the original start, not the last seven days")
+	assert.Equal(t, cursor, until, "the next refresh must continue strictly before the saved cursor")
+	assert.True(t, until.After(from), "the remaining history must still be inside the next read")
+
+	scheduledFrom, scheduledUntil := velocitySyncBounds(target, now)
+	assert.Equal(t, from, scheduledFrom, "a later scheduled sync must not shrink the unfinished refresh")
+	assert.Equal(t, until, scheduledUntil)
+}
+
+func Test__ProgressAfterVelocityRead__ShortRecomputeDoesNotRestartTheOlderHistory(t *testing.T) {
+	now := time.Now()
+	windowStart := now.AddDate(0, 0, -velocitySyncBackfillDays-1)
+	syncedAt := now.Add(-time.Hour)
+	cursor := now.Add(-24 * time.Hour)
+	target := models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		SyncedAt:         &syncedAt,
+		BackfilledFrom:   &windowStart,
+		RulesGeneration:  bitbucketVelocityRulesGeneration,
+	}
+
+	requestedFrom := now.Add(-velocitySyncRecomputeWindow)
+	_, _, backfilledFrom, generation := progressAfterVelocityRead(
+		target,
+		requestedFrom,
+		time.Time{},
+		velocityReadCoverage{ContinueBefore: cursor},
+		now,
+		false,
+		now,
+	)
+
+	assert.Equal(t, cursor, backfilledFrom)
+	assert.Equal(t, bitbucketVelocityRulesCatchingUp, generation,
+		"a busy seven-day recompute must not rebuild the older history")
+
+	_, _, _, generation = progressAfterVelocityRead(
+		target,
+		requestedFrom,
+		time.Time{},
+		velocityReadCoverage{ContinueBefore: cursor},
+		now.Add(time.Minute),
+		false,
+		now,
+	)
+	assert.Equal(t, bitbucketVelocityRulesCatchingUp, generation,
+		"a later store clock must not turn a seven-day recompute into an older rebuild")
+}
+
+func Test__VelocitySyncBounds__CatchUpSliceDoesNotRereadOlderHistory(t *testing.T) {
+	now := time.Now()
+	firstSlice := now.Add(-10 * 24 * time.Hour)
+	cursor := now.Add(-24 * time.Hour)
+	target := models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		SyncedAt:         &firstSlice,
+		BackfilledFrom:   &cursor,
+		RulesGeneration:  bitbucketVelocityRulesCatchingUp,
+	}
+
+	from, until := velocitySyncBounds(target, now)
+	assert.Equal(t, firstSlice, from, "the next slice must keep the newer window, not the 60-day start")
+	assert.Equal(t, cursor, until, "the next slice must continue strictly before the saved catch-up cursor")
+
+	refreshFrom, refreshUntil := velocityRefreshBounds(target, now)
+	assert.Equal(t, from, refreshFrom, "a refresh must not restart the older history while the catch-up is open")
+	assert.Equal(t, until, refreshUntil)
+}
+
+func Test__ProgressAfterVelocityRead__CompleteWindowFinishesTheRebuild(t *testing.T) {
+	now := time.Now()
+	requestedFrom := velocitySyncBackfillStart(now)
+	target := models.FactoryVelocitySyncTarget{VCSProvider: models.ProviderBitbucket}
+
+	replaceFrom, replaceTo, backfilledFrom, generation := progressAfterVelocityRead(
+		target,
+		requestedFrom,
+		time.Time{},
+		completeVelocityRead(),
+		now,
+		false,
+		now,
+	)
+
+	assert.Equal(t, requestedFrom, replaceFrom)
+	assert.True(t, replaceTo.After(now))
+	assert.Equal(t, requestedFrom, backfilledFrom)
+	assert.Equal(t, bitbucketVelocityRulesGeneration, generation)
+}
+
+func Test__BitbucketRebuildUntil__ContinuesOlderThanTheSavedSlice(t *testing.T) {
+	now := time.Now()
+	syncedAt := now.Add(-time.Minute)
+	cursor := now.Add(-2 * 24 * time.Hour)
+	target := models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		SyncedAt:         &syncedAt,
+		BackfilledFrom:   &cursor,
+		RulesGeneration:  bitbucketVelocityRulesRebuilding,
+	}
+
+	until, ok := bitbucketRebuildUntil(target, now)
+	require.True(t, ok)
+	assert.Equal(t, cursor, until)
+
+	from, bound := velocitySyncBounds(target, now)
+	assert.WithinDuration(t, velocitySyncBackfillStart(now), from, time.Second)
+	assert.Equal(t, cursor, bound)
+}
+
+func Test__BitbucketRebuildUntil__ContinuesAFirstSliceWithoutAFinishedSync(t *testing.T) {
+	now := time.Now()
+	cursor := now.Add(-2 * 24 * time.Hour)
+	target := models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		BackfilledFrom:   &cursor,
+		RulesGeneration:  bitbucketVelocityRulesRebuilding,
+	}
+
+	until, ok := bitbucketRebuildUntil(target, now)
+	require.True(t, ok)
+	assert.Equal(t, cursor, until, "a short first slice must continue even though SyncedAt is still unset")
+}
+
+func Test__BitbucketRebuildUntil__DoesNotContinueAFinishedOrMovedRepository(t *testing.T) {
+	now := time.Now()
+	syncedAt := now.Add(-time.Minute)
+	cursor := now.Add(-2 * 24 * time.Hour)
+	finished := models.FactoryVelocitySyncTarget{
+		Repository:       "example/repo",
+		SyncedRepository: "example/repo",
+		VCSProvider:      models.ProviderBitbucket,
+		SyncedAt:         &syncedAt,
+		BackfilledFrom:   &cursor,
+		RulesGeneration:  bitbucketVelocityRulesGeneration,
+	}
+	_, ok := bitbucketRebuildUntil(finished, now)
+	assert.False(t, ok, "a finished rebuild reads the normal window, not an old cursor")
+
+	moved := finished
+	moved.RulesGeneration = bitbucketVelocityRulesRebuilding
+	moved.Repository = "example/other"
+	_, ok = bitbucketRebuildUntil(moved, now)
+	assert.False(t, ok, "a repository change must not continue the previous repository's slice")
+}
+
 func Test__EarliestBackfill__KeepsTheOldestWindowEverCollected(t *testing.T) {
 	now := time.Now()
 	backfilledFrom := now.AddDate(0, 0, -velocitySyncBackfillDays)

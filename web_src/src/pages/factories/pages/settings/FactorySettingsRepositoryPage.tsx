@@ -13,6 +13,15 @@ import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettings
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
 import { useFactoryRepository } from "./useFactoryRepository";
 
+/**
+ * The API serializes int64 repository IDs as strings with EmitUnpopulated,
+ * so an unset ID arrives as "0", which is truthy in JavaScript. Only a
+ * non-zero ID means the workspace uses the version-control catalog.
+ */
+function hasCatalogRepositoryId(id: string | null | undefined): boolean {
+  return Boolean(id && id !== "0");
+}
+
 export function FactorySettingsRepositoryPage() {
   const { organizationId, factoryId, factory } = useFactorySettingsLayout();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
@@ -20,7 +29,9 @@ export function FactorySettingsRepositoryPage() {
   const bitbucket = factory.onboarding?.vcsProvider === "bitbucket";
   const resources = useIntegrationResources(organizationId, integrationId, "repository");
   const githubOnboarding = useGitHubOnboarding(organizationId, { poll: false });
-  const usesCatalogRepository = Boolean(factory.onboarding?.appRepositoryId || factory.onboarding?.backlogRepositoryId);
+  const usesCatalogRepository =
+    hasCatalogRepositoryId(factory.onboarding?.appRepositoryId) ||
+    hasCatalogRepositoryId(factory.onboarding?.backlogRepositoryId);
   const catalogRepositories = githubOnboarding.data?.repositories;
   const repositories = useMemo(() => {
     const names = usesCatalogRepository
