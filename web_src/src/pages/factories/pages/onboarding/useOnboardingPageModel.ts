@@ -417,7 +417,8 @@ export function useOnboardingPageModel(args: {
     const existing = selectReadyIntegrationInstance(connectedIntegrations, integrations.selections, "customLlm");
     if (existing) {
       integrations.setSelections(existing);
-      return true;
+      // True means the browser left this page. A saved connection stays here.
+      return false;
     }
     setCustomProviderDialogOpen(true);
     return false;

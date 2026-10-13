@@ -276,6 +276,23 @@ describe("FirstRunSetup Jira intake", () => {
     expect(model.toggleLinearProject).toHaveBeenCalledWith("project-1");
   });
 
+  it("keeps setup available after Connect GitHub selects a saved connection", async () => {
+    const user = userEvent.setup();
+    const requestConnect = vi.fn().mockResolvedValue(false);
+    const model = pageModel({ requestConnect });
+
+    renderLiveSetup(model, { simulateDiscovery: false });
+
+    await user.click(screen.getByRole("button", { name: "Connect GitHub" }));
+
+    await waitFor(() => {
+      expect(requestConnect).toHaveBeenCalledWith("github");
+      expect(screen.getByTestId("first-run-tickets")).not.toHaveAttribute("aria-busy");
+    });
+    expect(screen.getByTestId("first-run-back")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Connect Jira" })).toBeEnabled();
+  });
+
   it("keeps a saved Linear choice while the feature lookup is loading", () => {
     feature.isLoading = true;
     const model = pageModel({

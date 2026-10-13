@@ -5,8 +5,13 @@ import type * as ReactRouterModule from "react-router";
 import { unmockedPackage, unmockedSrc } from "@/test/unmockedModule";
 
 import type * as StartDirectJiraConnectModule from "@/lib/startDirectJiraConnect";
+import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 
-import { selectReadyIntegrationInstance, useHostedJiraConnect } from "./useIntegrationConnectDialog";
+import {
+  selectReadyIntegrationInstance,
+  useHostedJiraConnect,
+  useIntegrationConnectDialog,
+} from "./useIntegrationConnectDialog";
 
 const startDirectJiraConnect = vi.hoisted(() => vi.fn().mockResolvedValue(true));
 
@@ -19,6 +24,16 @@ vi.mock("react-router", () => {
   const actual = unmockedPackage<typeof ReactRouterModule>("react-router/dist/development/index.js");
   return { ...actual, useNavigate: () => vi.fn() };
 });
+
+vi.mock("@/hooks/useMe", () => ({
+  useMe: () => ({ data: { id: "user-1" } }),
+}));
+
+vi.mock("@/hooks/useIntegrations", () => ({
+  useConnectedIntegrations: vi.fn(() => ({ data: [], refetch: vi.fn(), isLoading: false })),
+  useAvailableIntegrations: vi.fn(() => ({ data: [] })),
+  useCreateIntegration: vi.fn(() => ({ mutateAsync: vi.fn() })),
+}));
 
 describe("useHostedJiraConnect", () => {
   beforeEach(() => {
@@ -72,6 +87,46 @@ describe("selectReadyIntegrationInstance", () => {
 
     expect(selectReadyIntegrationInstance(connected, {}, "openrouter")).toEqual({
       openrouter: { id: "openrouter-1", name: "openrouter", ready: true },
+    });
+  });
+});
+
+describe("useIntegrationConnectDialog", () => {
+  it("does not start navigation when Connect selects a saved connection", async () => {
+    const onSelectionsChange = vi.fn();
+    vi.mocked(useConnectedIntegrations).mockReturnValue({
+      data: [
+        {
+          metadata: { id: "github-1", name: "github", integrationName: "github" },
+          status: { state: "ready" },
+        },
+      ],
+      refetch: vi.fn(),
+      isLoading: false,
+    } as ReturnType<typeof useConnectedIntegrations>);
+    vi.mocked(useAvailableIntegrations).mockReturnValue({ data: [] } as ReturnType<typeof useAvailableIntegrations>);
+    vi.mocked(useCreateIntegration).mockReturnValue({
+      mutateAsync: vi.fn(),
+    } as unknown as ReturnType<typeof useCreateIntegration>);
+
+    const { result } = renderHook(() =>
+      useIntegrationConnectDialog({
+        organizationId: "org-1",
+        integrationNames: ["github"],
+        selections: {},
+        onSelectionsChange,
+        manualSelectionNames: ["github"],
+      }),
+    );
+
+    let navigationStarted = true;
+    await act(async () => {
+      navigationStarted = await result.current.requestConnect("github");
+    });
+
+    expect(navigationStarted).toBe(false);
+    expect(onSelectionsChange).toHaveBeenCalledWith({
+      github: { id: "github-1", name: "github", ready: true },
     });
   });
 });
