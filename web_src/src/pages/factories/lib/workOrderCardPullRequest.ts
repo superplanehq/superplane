@@ -54,6 +54,7 @@ export function workOrderCardPullRequestIsMergeable(pullRequest: FactoriesFactor
 type MergeConfidenceScore = {
   key?: string;
   score?: number;
+  scoreSupplied?: boolean;
 };
 
 /**
@@ -73,7 +74,7 @@ export function workOrderCardPullRequestShowsMergeable(
 }
 
 function isCriticalMergeConfidenceCheck(check: MergeConfidenceScore): boolean {
-  if (check.score == null || !isMergeConfidenceMetric(check)) {
+  if (check.scoreSupplied === false || check.score == null || !isMergeConfidenceMetric(check)) {
     return false;
   }
   return mergeConfidenceCheckLevel(check.key, check.score) === "critical";

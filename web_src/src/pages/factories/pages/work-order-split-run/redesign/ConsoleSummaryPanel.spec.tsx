@@ -47,4 +47,10 @@ describe("ConsoleSummaryPanel mergeable chip", () => {
 
     expect(screen.getByTestId("work-order-mergeable-chip")).toHaveTextContent("Mergeable");
   });
+
+  it("shows Mergeable when a higher-is-better metric has no score", () => {
+    renderPanel([check("security-review"), check("performance-review"), check("reversibility-review")]);
+
+    expect(screen.getByTestId("work-order-mergeable-chip")).toHaveTextContent("Mergeable");
+  });
 });
