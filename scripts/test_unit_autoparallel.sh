@@ -6,54 +6,41 @@ set -euo pipefail
 #   make test.coverage.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/shard_args.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/weighted_shards.sh"
 
 echo "Running unit tests shard ${SHARD_INDEX}/${SHARD_COUNT}"
 
 module_prefix="$(go list -m)"
 
-# Weigh each package by its test file count, so that heavy packages do not
-# cluster on one shard.
+# Test file count estimates compile cost. Add measured test time for packages
+# whose runtime is large enough to dominate a shard.
+load_shard_weights "$(dirname "${BASH_SOURCE[0]}")/ci_unit_package_weights.tsv"
+
+# Command packages request VCS stamping by default. CI may not let the app
+# container read checkout metadata, and tests do not need VCS stamping.
+packages="$(go list -buildvcs=false ./pkg/... ./ee/... ./cmd/... ./test/support/...)"
+if [[ -z "$packages" ]]; then
+  echo "No unit test packages found." >&2
+  exit 1
+fi
+
 weighted_packages=()
 while IFS= read -r import_path; do
   package_dir="./${import_path#"$module_prefix"/}"
   test_file_count="$(find "$package_dir" -maxdepth 1 -type f -name '*_test.go' | wc -l | tr -d ' ')"
-  weighted_packages+=("${test_file_count}:${package_dir}")
-done < <(go list ./pkg/... ./ee/...)
+  package_path="${package_dir#./}"
+  extra_weight="$(shard_weight_for "$package_path" 0)"
+  # A package with no tests still has to compile in the selected job.
+  weight=$(( (test_file_count > 0 ? test_file_count : 1) + extra_weight ))
+  weighted_packages+=("${weight}"$'\t'"${package_dir}")
+done <<< "$packages"
 
-if [[ "${#weighted_packages[@]}" -eq 0 ]]; then
-  echo "No packages found under ./pkg or ./ee, nothing to run."
-  exit 0
-fi
-
-# Heaviest package first, so the greedy assignment below stays balanced.
-sorted_packages=()
-while IFS= read -r entry; do
-  sorted_packages+=("$entry")
-done < <(printf '%s\n' "${weighted_packages[@]}" | sort -t: -k1,1nr -k2,2)
-
-shard_loads=()
-for ((shard = 0; shard < SHARD_COUNT; shard++)); do
-  shard_loads+=("0")
-done
-
-# Assign every package to the least loaded shard, and keep the ones for us.
 shard_packages=()
-for entry in "${sorted_packages[@]}"; do
-  test_file_count="${entry%%:*}"
-  package_dir="${entry#*:}"
-
-  lightest_shard=0
-  for ((shard = 1; shard < SHARD_COUNT; shard++)); do
-    if [[ "${shard_loads[$shard]}" -lt "${shard_loads[$lightest_shard]}" ]]; then
-      lightest_shard="$shard"
-    fi
-  done
-
-  shard_loads[$lightest_shard]=$((shard_loads[lightest_shard] + test_file_count))
-  if [[ $((lightest_shard + 1)) -eq "$SHARD_INDEX" ]]; then
+while IFS=$'\t' read -r shard package_dir; do
+  if [[ "$shard" -eq "$SHARD_INDEX" ]]; then
     shard_packages+=("$package_dir")
   fi
-done
+done < <(printf '%s\n' "${weighted_packages[@]}" | assign_weighted_shards "$SHARD_COUNT")
 
 if [[ "${#shard_packages[@]}" -eq 0 ]]; then
   echo "No packages assigned to shard ${SHARD_INDEX}/${SHARD_COUNT}; exiting successfully."
@@ -72,6 +59,7 @@ gotestsum \
   --junitfile junit-report.xml \
   --packages="${shard_packages[*]}" \
   -- \
+  -buildvcs=false \
   -p 1 \
   -coverprofile=coverage-go.out \
   -covermode=atomic
