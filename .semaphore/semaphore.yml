@@ -64,6 +64,7 @@ blocks:
 
         - name: Checks
           commands:
+            - make check.test.shards
             - make test.release
             - make check.db.structure
             - make check.db.migrations
