@@ -75,24 +75,24 @@ output "runner_subnetwork" {
   value       = local.runners_enabled ? google_compute_subnetwork.runners[0].id : null
 }
 
+output "runner_project" {
+  description = "GCP project for runner VMs"
+  value       = local.runners_enabled ? var.project_id : null
+}
+
+output "runner_zones" {
+  description = "Zones for runner VMs"
+  value       = local.runners_enabled ? local.runner_zones : null
+}
+
 output "runner_network_tag" {
   description = "Network tag on runner VMs"
   value       = local.runners_enabled ? local.runner_network_tag : null
 }
 
-output "runner_image_families" {
-  description = "Image families that Fleet Manager uses when a fleet has no image"
-  value       = local.runners_enabled ? local.runner_fleet_images : null
-}
-
 output "fleet_manager_service_account_email" {
   description = "GCP service account that Fleet Manager uses through Workload Identity"
   value       = local.runners_enabled ? google_service_account.fleet_manager[0].email : null
-}
-
-output "fleet_manager_deployed" {
-  description = "Whether Terraform deployed Fleet Manager"
-  value       = local.fleet_manager_enabled
 }
 
 # -----------------------------------------------------------------------------
