@@ -186,8 +186,9 @@ export function validateFleetManagerConfiguration(input: FleetManagerConfigurati
 
 export function fleetManagerSecretCommand(namespace: string, secretName: string): string {
   const createSecret = [
-    `kubectl --namespace ${namespace} create secret generic ${secretName}`,
-    '  --from-literal=INSTALLATION_ADMIN_TOKEN="$FLEET_MANAGER_TOKEN"',
+    'printf %s "$FLEET_MANAGER_TOKEN" |',
+    `  kubectl --namespace ${namespace} create secret generic ${secretName}`,
+    "  --from-file=INSTALLATION_ADMIN_TOKEN=/dev/stdin",
     "  --dry-run=client --output=yaml | kubectl apply -f -",
   ].join(" \\\n");
   return [
