@@ -64,6 +64,7 @@ func CreateFactoryPullRequest(
 			factory.ID,
 			pullRequest.ID,
 		)
+		StartPullRequestChecks(ctx, deps, pullRequest.ID)
 		StartVisualEvidenceCapture(
 			ctx,
 			deps,
