@@ -23,6 +23,7 @@ export {
   FactorySettingsMCPConnectionPage,
   FactorySettingsSkillsPage,
   FactorySettingsSkillEditorPage,
+  FactorySettingsSetupStepsPage,
   FACTORY_SETTINGS_NAV_GROUPS,
   FACTORY_SETTINGS_NAV_ITEMS,
   LegacyFactoryAppRedirect,

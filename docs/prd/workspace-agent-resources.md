@@ -1,6 +1,6 @@
 # Workspace agent resources
 
-> Status: Implemented for MCP connections and inline SKILL.md skills.
+> Status: Implemented for MCP connections and inline SKILL.md skills, plus workspace setup commands and cross-repo context.
 > Audience: Product and engineering
 
 This playbook is the source for workspace MCP servers and skills. One
