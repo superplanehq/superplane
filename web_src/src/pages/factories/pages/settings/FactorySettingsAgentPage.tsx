@@ -3,7 +3,7 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 
 import { AgentResourceConnectionDialog } from "./AgentResourceConnectionDialog";
 import { factoryAgentMcpConnectionPath, factoryRouteSegment } from "../../lib/factoryPagePaths";
@@ -21,6 +21,7 @@ export function FactorySettingsAgentPage() {
   const page = useMCPPage();
   const { has } = useExperimentalFeature(page.organizationId);
   const showSkills = has(FEATURE_WORKSPACE_SKILLS);
+  const showAgentSetup = has(FEATURE_WORKSPACE_AGENT);
   const showMcp = page.showAgentMCP;
   usePageTitle([AGENT_RESOURCES_COPY.agentTitle, page.factory?.name ?? "Workspace"]);
 
@@ -31,18 +32,22 @@ export function FactorySettingsAgentPage() {
       subtitle={AGENT_RESOURCES_COPY.agentSubtitle}
     >
       <div className="flex flex-col gap-5" data-testid="factory-settings-agent">
-        <WorkspaceSetupStepsSection
-          organizationId={page.organizationId}
-          factoryId={page.factoryId}
-          factoryKey={factoryRouteSegment(page.factory)}
-          canUpdate={page.canUpdate}
-        />
-        <CrossRepoContextCard
-          organizationId={page.organizationId}
-          factoryId={page.factoryId}
-          factory={page.factory}
-          canUpdate={page.canUpdate}
-        />
+        {showAgentSetup ? (
+          <WorkspaceSetupStepsSection
+            organizationId={page.organizationId}
+            factoryId={page.factoryId}
+            factoryKey={factoryRouteSegment(page.factory)}
+            canUpdate={page.canUpdate}
+          />
+        ) : null}
+        {showAgentSetup ? (
+          <CrossRepoContextCard
+            organizationId={page.organizationId}
+            factoryId={page.factoryId}
+            factory={page.factory}
+            canUpdate={page.canUpdate}
+          />
+        ) : null}
         {showMcp ? <WorkspaceMCPServers page={page} /> : null}
         {showSkills ? (
           <WorkspaceSkillsSection

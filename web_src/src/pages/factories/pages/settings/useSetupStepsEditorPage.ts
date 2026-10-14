@@ -39,11 +39,11 @@ export function useSetupStepsEditorPage() {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    if (!setup.isLoading && !initialized) {
+    if (!setup.isLoading && !setup.isError && !initialized) {
       setValue(storedText);
       setInitialized(true);
     }
-  }, [setup.isLoading, storedText, initialized]);
+  }, [setup.isLoading, setup.isError, storedText, initialized]);
 
   const isSaving = createResource.isPending || updateResource.isPending || deleteResource.isPending;
   const isDirty = parseCommands(value).join("\n") !== parseCommands(storedText).join("\n");

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,6 +58,7 @@ var (
 	ErrFactoryAgentResourceKindInvalid           = errors.New("factory agent resource kind is not valid")
 	ErrFactoryAgentResourceNameInvalid           = errors.New("factory agent resource name is not valid")
 	ErrFactoryAgentResourceNameReserved          = errors.New("factory agent resource name is reserved")
+	ErrFactoryAgentResourceNameSetupReserved     = errors.New("factory agent resource name is reserved for setup commands")
 	ErrFactoryAgentResourceNameTaken             = errors.New("factory agent resource name already exists")
 	ErrFactoryAgentResourceAuthInvalid           = errors.New("factory agent resource auth is not valid")
 	ErrFactoryAgentResourceURLRequired           = errors.New("MCP URL is required")
@@ -156,6 +158,9 @@ func ValidateFactoryAgentResourceName(name string) error {
 	}
 	if name == ReservedFactoryAgentResourceName {
 		return ErrFactoryAgentResourceNameReserved
+	}
+	if name == FactoryAgentResourceSetupName {
+		return ErrFactoryAgentResourceNameSetupReserved
 	}
 	return nil
 }
@@ -317,6 +322,9 @@ func NormalizeContextRepoName(repository string) string {
 	if name == "" {
 		return "repo"
 	}
+	if name[0] >= '0' && name[0] <= '9' {
+		name = "repo-" + name
+	}
 	if len(name) > 63 {
 		name = name[:63]
 		name = strings.Trim(name, "-")
@@ -324,14 +332,43 @@ func NormalizeContextRepoName(repository string) string {
 	if name == "" {
 		return "repo"
 	}
-	if name[0] >= '0' && name[0] <= '9' {
-		name = "repo-" + name
-	}
 	return name
 }
 
 func CanonicalContextRepo(repository string) string {
 	return strings.ToLower(strings.TrimSpace(repository))
+}
+
+// uniqueFactoryAgentResourceName returns base when no other resource in the
+// factory uses it, otherwise the first free suffixed variant (base-2,
+// base-3, ...) that fits the 63-character name limit.
+func (f *Factory) uniqueFactoryAgentResourceName(tx *gorm.DB, base string, exceptID uuid.UUID) (string, error) {
+	candidate := base
+	for i := 2; ; i++ {
+		var count int64
+		query := tx.Model(&FactoryAgentResource{}).Where(
+			"organization_id = ? AND factory_id = ? AND name = ?",
+			f.OrganizationID, f.ID, candidate,
+		)
+		if exceptID != uuid.Nil {
+			query = query.Where("id <> ?", exceptID)
+		}
+		if err := query.Count(&count).Error; err != nil {
+			return "", err
+		}
+		if count == 0 {
+			return candidate, nil
+		}
+		if i > 99 {
+			return "", ErrFactoryAgentResourceNameTaken
+		}
+		suffix := "-" + strconv.Itoa(i)
+		trimmed := base
+		if len(trimmed) > 63-len(suffix) {
+			trimmed = strings.Trim(trimmed[:63-len(suffix)], "-")
+		}
+		candidate = trimmed + suffix
+	}
 }
 
 func (c FactoryAgentResourceConfig) ValidateContextRepo() error {
@@ -469,6 +506,11 @@ func (f *Factory) CreateAgentResource(tx *gorm.DB, kind, name string, enabled bo
 		config = config.NormalizedContextRepo()
 		if strings.TrimSpace(name) == "" {
 			name = NormalizeContextRepoName(config.Repository)
+			unique, err := f.uniqueFactoryAgentResourceName(tx, name, uuid.Nil)
+			if err != nil {
+				return nil, err
+			}
+			name = unique
 		} else {
 			name = NormalizeFactoryAgentResourceName(name)
 		}
@@ -711,8 +753,12 @@ func (r *FactoryAgentResource) Update(tx *gorm.DB, name *string, enabled *bool, 
 				if name == nil {
 					derived := NormalizeContextRepoName(config.Repository)
 					if derived != "" && derived != r.Name {
-						updates["name"] = derived
-						r.Name = derived
+						unique, err := factory.uniqueFactoryAgentResourceName(inner, derived, r.ID)
+						if err != nil {
+							return err
+						}
+						updates["name"] = unique
+						r.Name = unique
 					}
 				}
 			} else if err := config.ValidateMCP(); err != nil {

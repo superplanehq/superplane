@@ -169,6 +169,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, "name must be lowercase letters, digits, and dashes")
 	case errors.Is(err, models.ErrFactoryAgentResourceNameReserved):
 		return grpcerrors.InvalidArgument(err, "the name superplane is reserved")
+	case errors.Is(err, models.ErrFactoryAgentResourceNameSetupReserved):
+		return grpcerrors.InvalidArgument(err, "the name setup is reserved for setup commands")
 	case errors.Is(err, models.ErrFactoryAgentResourceNameTaken):
 		return grpcerrors.AlreadyExists(err, "an agent resource with this name already exists")
 	case errors.Is(err, models.ErrFactoryAgentResourceURLTaken):

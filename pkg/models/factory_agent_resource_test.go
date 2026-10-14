@@ -347,6 +347,7 @@ func Test__ValidateFactoryAgentResourceName(t *testing.T) {
 	assert.ErrorIs(t, models.ValidateFactoryAgentResourceName(""), models.ErrFactoryAgentResourceNameInvalid)
 	assert.ErrorIs(t, models.ValidateFactoryAgentResourceName("Superplane"), models.ErrFactoryAgentResourceNameInvalid)
 	assert.ErrorIs(t, models.ValidateFactoryAgentResourceName("superplane"), models.ErrFactoryAgentResourceNameReserved)
+	assert.ErrorIs(t, models.ValidateFactoryAgentResourceName("setup"), models.ErrFactoryAgentResourceNameSetupReserved)
 	assert.NoError(t, models.ValidateFactoryAgentResourceName("linear-docs"))
 }
 
@@ -380,6 +381,15 @@ func Test__FactoryAgentResourceSetupCommands(t *testing.T) {
 			Commands: []string{"go test"},
 		})
 		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceNameTaken)
+	})
+
+	t.Run("rejects the setup name for skills", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "setup", true, models.FactoryAgentResourceConfig{
+			Markdown: "# setup",
+		})
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceNameSetupReserved)
 	})
 
 	t.Run("rejects empty commands", func(t *testing.T) {
@@ -451,6 +461,21 @@ func Test__FactoryAgentResourceContextRepos(t *testing.T) {
 		assert.Equal(t, resource.ID, enabled[0].ID)
 	})
 
+	t.Run("suffixes derived names on collision", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		first, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: "acme/my_repo",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "acme-my-repo", first.Name)
+		second, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: "acme/my.repo",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "acme-my-repo-2", second.Name)
+	})
+
 	t.Run("rejects invalid repository", func(t *testing.T) {
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
@@ -514,6 +539,17 @@ func Test__NormalizeContextRepoName(t *testing.T) {
 	assert.Equal(t, "superplanehq-suss", models.NormalizeContextRepoName("superplanehq/suss"))
 	assert.Equal(t, "superplanehq-suss", models.NormalizeContextRepoName("SuperplaneHQ/Suss"))
 	assert.Equal(t, "acme-repo", models.NormalizeContextRepoName("acme/repo"))
+	assert.Equal(t, "acme-my-repo", models.NormalizeContextRepoName("acme/my_repo"))
+	assert.Equal(t, "acme-my-repo", models.NormalizeContextRepoName("acme/my.repo"))
+}
+
+func Test__NormalizeContextRepoNameStaysWithinLimit(t *testing.T) {
+	t.Parallel()
+	long := "1/" + strings.Repeat("x", 70)
+	name := models.NormalizeContextRepoName(long)
+	assert.LessOrEqual(t, len(name), 63)
+	assert.NoError(t, models.ValidateFactoryAgentResourceName(name))
+	assert.True(t, strings.HasPrefix(name, "repo-"))
 }
 
 func Test__FactoryAgentResourceConfigValidateMCP(t *testing.T) {

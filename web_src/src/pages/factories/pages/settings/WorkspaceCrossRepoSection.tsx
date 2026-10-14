@@ -135,13 +135,13 @@ export function CrossRepoContextCard({
 
   return (
     <>
-    <FactorySettingsCard
-      title={AGENT_RESOURCES_COPY.crossRepoTitle}
-      titleClassName="text-sm font-semibold"
-      description={AGENT_RESOURCES_COPY.crossRepoHelper}
-      icon={<GitBranch className="size-4" strokeWidth={1.75} aria-hidden />}
-      iconClassName="border-border bg-muted/60 text-foreground"
-      className="shadow-sm"
+      <FactorySettingsCard
+        title={AGENT_RESOURCES_COPY.crossRepoTitle}
+        titleClassName="text-sm font-semibold"
+        description={AGENT_RESOURCES_COPY.crossRepoHelper}
+        icon={<GitBranch className="size-4" strokeWidth={1.75} aria-hidden />}
+        iconClassName="border-border bg-muted/60 text-foreground"
+        className="shadow-sm"
         action={
           <PermissionTooltip allowed={canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission}>
             <Button

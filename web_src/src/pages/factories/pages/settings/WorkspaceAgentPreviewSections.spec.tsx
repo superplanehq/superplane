@@ -51,4 +51,21 @@ describe("workspace agent preview fields", () => {
     await user.click(await screen.findByTestId("agent-setup-steps-edit", {}, { timeout: 8000 }));
     expect(await screen.findByTestId("agent-setup-steps-editor", {}, { timeout: 8000 })).toBeInTheDocument();
   }, 10000);
+
+  it("hides setup and context cards without the workspace agent experiment", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [] },
+        }}
+        experimentalFeatures={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}
+      />,
+    );
+
+    expect(await screen.findByTestId("factory-settings-agent", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-setup-steps")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-cross-repo")).not.toBeInTheDocument();
+  }, 10000);
 });
