@@ -91,20 +91,3 @@ resource "kubernetes_secret" "oidc" {
     "${time_static.oidc_key.unix}.pem" = tls_private_key.oidc.private_key_pem
   }
 }
-
-# -----------------------------------------------------------------------------
-# Fleet Manager configuration
-# -----------------------------------------------------------------------------
-
-resource "kubernetes_secret" "fleet_manager" {
-  count = local.fleet_manager_enabled ? 1 : 0
-
-  metadata {
-    name      = "superplane-fleet-manager"
-    namespace = kubernetes_namespace.superplane.metadata[0].name
-  }
-
-  data = {
-    "fleet-manager.yaml" = var.fleet_manager_config
-  }
-}
