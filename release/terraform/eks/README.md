@@ -94,6 +94,17 @@ kubectl get pvc superplane-runner-active-logs -n superplane
 
 Access SuperPlane at `https://your-domain.com`
 
+### 7. Install Fleet Manager (optional)
+
+Open **Fleet setup** in SuperPlane. Select AWS and copy the runner subnet,
+security group, instance profile, region, and Fleet Manager role outputs from
+Terraform. Replace the AMI placeholder with an immutable Runner image. Then
+create the token Secret and install the standalone Fleet Manager chart.
+
+Terraform creates the AWS runner infrastructure, but it does not install Fleet
+Manager or store its token. See
+[the standalone chart guide](../../fleet-manager-chart/README.md).
+
 ## Destroy
 
 Use the same AWS profile and Terraform state as the install.
