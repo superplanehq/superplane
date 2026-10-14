@@ -13,11 +13,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// linkableProviders lists the services a member can link. A linked account
-// records who the member is on that service, so SuperPlane can attribute the
-// activity it finds there. Sign-in methods are a separate concern.
-var linkableProviders = []string{models.ProviderGitHub}
-
 func accountLinkedAccountResponses(linked []models.AccountLinkedAccount) []AccountLinkedAccountResponse {
 	responses := make([]AccountLinkedAccountResponse, 0, len(linked))
 	for _, account := range linked {
@@ -45,7 +40,7 @@ func (s *Server) disconnectLinkedAccount(w http.ResponseWriter, r *http.Request)
 	}
 
 	provider := mux.Vars(r)["provider"]
-	if !slices.Contains(linkableProviders, provider) {
+	if !slices.Contains(models.LinkableProviders, provider) {
 		http.Error(w, "Unknown linked account", http.StatusBadRequest)
 		return
 	}

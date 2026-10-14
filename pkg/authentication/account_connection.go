@@ -24,11 +24,6 @@ const (
 	authErrorConnectInUse  = "linked_account_in_use"
 )
 
-// connectableProviders lists the services that hold activity SuperPlane can
-// attribute to a member. A linked account is not a sign-in method, so a
-// provider that only proves identity does not belong here.
-var connectableProviders = []string{models.ProviderGitHub, models.ProviderBitbucket}
-
 type connectState struct {
 	AccountID string
 	Provider  string
@@ -40,7 +35,7 @@ func isConnectIntent(r *http.Request) bool {
 }
 
 func isConnectableProvider(provider string) bool {
-	return slices.ContainsFunc(connectableProviders, func(candidate string) bool {
+	return slices.ContainsFunc(models.LinkableProviders, func(candidate string) bool {
 		return strings.EqualFold(candidate, provider)
 	})
 }
