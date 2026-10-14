@@ -45,10 +45,18 @@ version.
 | Azure | `azure.identityId` | `runner_identity_id` |
 | Azure | `serviceAccount.annotations.azure.workload.identity/client-id` | `fleet_manager_identity_client_id` |
 | Azure | `serviceAccount.name` | `fleet_manager_service_account_name` |
+| Azure | `podLabels.azure.workload.identity/use` | Set to `"true"` |
 
 AWS IRSA, GKE Workload Identity, and AKS Workload Identity grant cloud access
 to the chart service account. Keep the default service-account name unless you
 also update the provider trust binding.
+
+For Azure, add the workload identity label to `values.yaml`:
+
+```yaml
+podLabels:
+  azure.workload.identity/use: "true"
+```
 
 Public VM images are not part of this release. Replace these placeholders
 before production use:

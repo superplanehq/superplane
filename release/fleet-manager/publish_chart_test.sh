@@ -35,7 +35,7 @@ case "$1 $2" in
     cp "${REMOTE_CHART}" "${destination}/fleet-manager-chart-1.2.3.tgz"
     ;;
   "push "*)
-    printf 'Pushed: test\nDigest: sha256:%064d\n' 1
+    printf 'Pushed: test\nDigest: sha256:%064d\n' 1 >&2
     ;;
   *)
     echo "unexpected helm invocation: $*" >&2

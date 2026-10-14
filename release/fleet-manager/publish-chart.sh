@@ -43,7 +43,7 @@ if ! grep -Eqi 'not found|manifest unknown|does not exist' "${inspect_error}"; t
   exit 1
 fi
 
-push_output="$(helm push "${CHART_ARCHIVE}" "${CHART_NAMESPACE}")"
+push_output="$(helm push "${CHART_ARCHIVE}" "${CHART_NAMESPACE}" 2>&1)"
 digest="$(printf '%s\n' "${push_output}" | awk '$1 == "Digest:" {print $2}')"
 if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
   echo "Error: Helm did not return a valid chart digest" >&2
