@@ -121,6 +121,37 @@ kubectl config current-context
 Set `AWS_REGION` to the value of `region` in `terraform.tfvars`.
 Confirm that the kubectl context is the test cluster before you use the recovery commands below.
 
+Before you destroy the infrastructure, disable every fleet in SuperPlane and
+wait for active jobs to finish and warm capacity to reach zero. Then stop Fleet
+Manager and inspect any runner instances that remain:
+
+```bash
+FLEET_MANAGER_NAMESPACE=superplane # Use the namespace from the chart installation.
+FLEET_MANAGER_ID=$(helm get values fleet-manager -n "$FLEET_MANAGER_NAMESPACE" --all --output json | jq -er '.manager.id')
+helm uninstall fleet-manager -n "$FLEET_MANAGER_NAMESPACE"
+
+aws ec2 describe-instances --region "$AWS_REGION" \
+  --filters "Name=tag:superplane_fleet_manager_id,Values=${FLEET_MANAGER_ID}" \
+    "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+  --query 'Reservations[].Instances[].[InstanceId,State.Name,PrivateIpAddress]' \
+  --output table
+```
+
+Confirm that every listed instance belongs to this installation. Terminate and
+wait for any remaining instances before you create the Terraform destroy plan:
+
+```bash
+read -r -a RUNNER_INSTANCE_IDS <<< "$(aws ec2 describe-instances --region "$AWS_REGION" \
+  --filters "Name=tag:superplane_fleet_manager_id,Values=${FLEET_MANAGER_ID}" \
+    "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+  --query 'Reservations[].Instances[].InstanceId' --output text)"
+
+if ((${#RUNNER_INSTANCE_IDS[@]} > 0)); then
+  aws ec2 terminate-instances --region "$AWS_REGION" --instance-ids "${RUNNER_INSTANCE_IDS[@]}"
+  aws ec2 wait instance-terminated --region "$AWS_REGION" --instance-ids "${RUNNER_INSTANCE_IDS[@]}"
+fi
+```
+
 If `aws_db_instance.superplane` is in the state, disable its deletion protection in `terraform.tfvars`:
 
 ```hcl
