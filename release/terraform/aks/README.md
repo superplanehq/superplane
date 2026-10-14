@@ -131,7 +131,7 @@ If `az postgres flexible-server list-skus --location eastus` is empty:
 create_postgresql_flexible_server = false
 ```
 
-Leave `fleet_manager_config` empty until owner setup is complete.
+Terraform does not install Fleet Manager or store its installation token.
 
 Do not keep a `*_override.tf` file. Chart path and image registry are
 Terraform variables.
@@ -182,8 +182,7 @@ forward to the API:
 kubectl port-forward -n superplane svc/superplane-api 8000:8000
 ```
 
-Open `http://localhost:8000`. Complete owner setup. Create an admin API
-token if you will start Fleet Manager.
+Open `http://localhost:8000` and complete owner setup.
 
 ## 9. Verify
 
@@ -218,23 +217,11 @@ packer build \
 Use a size from `az vm list-skus`. Do not use `*_v5` unless the
 subscription allows it.
 
-Build runner archives:
-
-```bash
-release/runner/build.sh "v0.0.0-local"
-```
-
-Host the archives on a public HTTPS prefix:
-
-```text
-<base>/<release-id>/runner-linux-amd64.tar.gz
-<base>/<release-id>/checksums.txt
-```
-
-The SuperPlane blob account is private. Use a separate public storage
-account or another HTTPS host.
-
-Set `fleet_manager_config` from `terraform output` and apply again.
+Open **Fleet setup** in SuperPlane. Select Azure and use the runner and
+identity outputs from this Terraform stack. Replace the Azure image
+placeholder with the immutable gallery image version that Packer created.
+Then create the token Secret and install the standalone Fleet Manager chart.
+See [the standalone chart guide](../../fleet-manager-chart/README.md).
 
 ## Destroy
 
@@ -395,7 +382,7 @@ These run in the cluster:
 - SuperPlane API, workers, websocket
 - RabbitMQ
 - Postgres StatefulSet when Flexible Server is off
-- Fleet Manager Deployment when `fleet_manager_config` is set
+- Fleet Manager, when installed separately with its standalone Helm chart
 
 ### Created outside Terraform
 
