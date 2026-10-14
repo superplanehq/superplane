@@ -7,8 +7,14 @@ const meta = {
   component: FleetManagerStep,
   parameters: { layout: "centered" },
   args: {
-    onContinue: () => undefined,
-    onSkip: () => undefined,
+    onContinue: () => {
+      // eslint-disable-next-line no-console
+      console.log("Continue");
+    },
+    onSkip: () => {
+      // eslint-disable-next-line no-console
+      console.log("Skip");
+    },
   },
 } satisfies Meta<typeof FleetManagerStep>;
 
