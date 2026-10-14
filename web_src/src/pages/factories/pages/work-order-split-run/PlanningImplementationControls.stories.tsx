@@ -4,11 +4,10 @@ import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import { withFactoriesTheme } from "../../__fixtures__/factoriesStoryTheme";
-import { DRAFT_READINESS_NOTES } from "../../lib/draftReadiness";
 import { PlanningImplementationControls } from "./PlanningImplementationControls";
 
 const meta = {
-  title: "Factories/Pages/Task Split Run/Phone override",
+  title: "Factories/Pages/Task Split Run/Implementation controls",
   parameters: {
     layout: "fullscreen",
     options: { showPanel: false },
@@ -25,20 +24,12 @@ const MODEL_LABEL = "claude-opus-4-6 Medium";
 export const Discouraged: Story = {
   render: () => (
     <div className="min-h-svh bg-background">
-      <PlanningImplementationControls
-        startDiscouraged
-        readinessNote={DRAFT_READINESS_NOTES.uncertain}
-        modelSelect={<PhoneModelControl />}
-        actions={<PhoneStartAction />}
-        canSend
-        showSuggestChanges={false}
-        onSuggestChanges={() => undefined}
-      />
+      <PlanningImplementationControls startDiscouraged modelSelect={<ModelControl />} actions={<StartAction />} />
     </div>
   ),
 };
 
-function PhoneModelControl() {
+function ModelControl() {
   return (
     <Button
       type="button"
@@ -54,7 +45,7 @@ function PhoneModelControl() {
   );
 }
 
-function PhoneStartAction() {
+function StartAction() {
   return (
     <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
       <Button type="button" size="sm" variant="outline">

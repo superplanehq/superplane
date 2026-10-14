@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ArrowUp } from "lucide-react";
 
 import type { FilesFile } from "@/api-client";
@@ -114,7 +114,6 @@ function AnalysisRequestChat({
     markdown: analysis.composer ?? "",
   });
   const transcriptFiles = mergeAnalysisTranscriptFiles(files, images.transcriptFiles);
-  const composer = usePlanningComposer(analysis, images.pending.length, state.showSurvey);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" data-testid="split-run-intent-chat">
@@ -160,13 +159,11 @@ function AnalysisRequestChat({
           <JumpToLatestPill onJumpToLatest={() => follow.setFollowing(true)} testId="split-run-intent-older" />
         ) : null}
       </div>
-      {composer.visible ? (
+      {!state.showSurvey ? (
         <AnalysisComposer
           analysis={analysis}
           images={images}
           chipsWorking={chipsWorking}
-          focusOnMount={composer.focusOnMount}
-          onFocus={composer.onFocus}
           placeholder={state.placeholder}
           chatSolo={chatSolo}
           chatColumnClass={chatColumnClass}
@@ -183,35 +180,11 @@ function AnalysisRequestChat({
       ) : null}
       <PlanningImplementationControls
         startDiscouraged={analysis.startDiscouraged}
-        readinessNote={analysis.readinessNote}
         modelSelect={analysis.modelSelect}
         actions={analysis.closedDecision}
-        canSend={analysis.canSend}
-        showSuggestChanges={composer.collapsed}
-        onSuggestChanges={composer.expand}
       />
     </div>
   );
-}
-
-function usePlanningComposer(analysis: IntentAnalysisChat, pendingFiles: number, showSurvey: boolean) {
-  const [expanded, setExpanded] = useState(false);
-  const collapsed = Boolean(
-    analysis.prioritizeImplementation &&
-      !expanded &&
-      !analysis.composer &&
-      !analysis.composerError &&
-      !analysis.isUploading &&
-      pendingFiles === 0,
-  );
-  const expand = () => setExpanded(true);
-  return {
-    collapsed,
-    expand,
-    visible: !showSurvey && !collapsed,
-    focusOnMount: expanded,
-    onFocus: expand,
-  };
 }
 
 function useAnalysisComposerDictation(composer: string, onComposerChange: (next: string) => void) {
@@ -237,8 +210,6 @@ function AnalysisComposer({
   placeholder,
   chatSolo,
   chatColumnClass,
-  focusOnMount,
-  onFocus,
   chipsWorking,
 }: {
   analysis: IntentAnalysisChat;
@@ -246,8 +217,6 @@ function AnalysisComposer({
   placeholder: string;
   chatSolo: boolean;
   chatColumnClass: string;
-  focusOnMount: boolean;
-  onFocus?: () => void;
   chipsWorking: boolean;
 }) {
   const canSubmit = analysis.canSend && Boolean(analysis.composer.trim() || images.pending.length);
@@ -279,7 +248,6 @@ function AnalysisComposer({
           "w-full flex-col items-stretch justify-center border-0 bg-transparent px-0 pt-0 pb-0",
         )}
         onSubmit={handleSubmit}
-        onFocusCapture={onFocus}
       >
         <Label htmlFor="split-run-intent-composer" className="sr-only">
           {ANALYSIS_PLANNING_COPY.composerPlaceholder}
@@ -290,7 +258,6 @@ function AnalysisComposer({
             analysis={analysis}
             images={images}
             dictation={dictation}
-            focusOnMount={focusOnMount}
             placeholder={placeholder}
             canSubmit={canSubmit}
             composerRef={composerRef}
@@ -311,7 +278,6 @@ function AnalysisComposerField({
   dictation,
   placeholder,
   canSubmit,
-  focusOnMount,
   composerRef,
   onSend,
 }: {
@@ -320,15 +286,10 @@ function AnalysisComposerField({
   dictation: UseSpeechDictationResult;
   placeholder: string;
   canSubmit: boolean;
-  focusOnMount: boolean;
   composerRef: { current: string };
   onSend: () => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const focusInitially = useRef(focusOnMount);
-  useEffect(() => {
-    if (focusInitially.current) textareaRef.current?.focus();
-  }, []);
   const skillKeyboardRef = useRef<((event: KeyboardEvent) => boolean) | null>(null);
   const [cursor, setCursor] = useState(0);
   const insertSkill = (next: { value: string; cursor: number }) => {

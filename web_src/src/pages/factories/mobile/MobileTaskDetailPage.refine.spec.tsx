@@ -1,10 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from "react-router";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type { FactoriesFactory, FactoriesWorkOrder } from "@/api-client";
+import type { FactoriesFactory, FactoriesWorkOrder, FactoriesWorkOrderArtifact } from "@/api-client";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -22,6 +22,7 @@ import {
 } from "../__fixtures__/factoryPageResponses";
 import { clarityCheck } from "../__fixtures__/workOrderCheckFixtures";
 import { CONFIDENCE_CHECK_NAME } from "../lib/confidenceScore";
+import { SPEC_ARTIFACT_NAME } from "../lib/intentDocument";
 import { FactoriesLayoutContext } from "../layout/factoriesLayoutContext";
 import { MOBILE_TASK_COPY } from "./mobileCopy";
 import { MobileTaskDetailPage } from "./MobileTaskDetailPage";
@@ -31,6 +32,7 @@ const useWorkOrder = vi.fn((): { data: FactoriesWorkOrder | undefined; isLoading
   isLoading: true,
   isError: false,
 }));
+const useWorkOrderArtifacts = vi.fn((): { data: FactoriesWorkOrderArtifact[] } => ({ data: [] }));
 
 const {
   onDispatch,
@@ -71,7 +73,7 @@ vi.mock("../pages/work-order-split-run/useSplitRunLiveCanvas", () => ({
 
 vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrder: () => useWorkOrder(),
-  useWorkOrderArtifacts: () => ({ data: [] }),
+  useWorkOrderArtifacts: () => useWorkOrderArtifacts(),
   useFactoryAutomations: () => ({ data: [] }),
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -222,6 +224,8 @@ const SURVEY_SESSION = {
 describe("MobileTaskDetailPage refine chat", () => {
   beforeEach(() => {
     useWorkOrder.mockReset();
+    useWorkOrderArtifacts.mockReset();
+    useWorkOrderArtifacts.mockReturnValue({ data: [] });
     onDispatch.mockReset();
     dispatchingIds.current = new Set();
     canUpdateWorkOrder.current = true;
@@ -229,14 +233,13 @@ describe("MobileTaskDetailPage refine chat", () => {
     resetPlanningSession();
   });
 
-  it("shows the composer, one Start, and one model control on a Planning draft", async () => {
+  it("shows the composer without Start before a plan exists", async () => {
     findPlanningSession.mockResolvedValue(WAITING_SESSION);
     renderDraft();
 
     expect(await screen.findByTestId("split-run-intent-transcript")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-composer")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Start" })).toHaveLength(1);
-    expect(screen.getAllByTestId("split-run-draft-model")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
     expect(screen.getByTestId("mobile-task-detail")).toBeInTheDocument();
   });
 
@@ -274,7 +277,6 @@ describe("MobileTaskDetailPage refine chat", () => {
 
     expect(await screen.findByTestId("create-with-agent-survey")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /High/ }));
-    await user.click(screen.getByRole("button", { name: "Send answers" }));
 
     await waitFor(() => {
       expect(answerPlanningSurvey).toHaveBeenCalledWith(
@@ -315,10 +317,21 @@ describe("MobileTaskDetailPage refine chat", () => {
     expect(findPlanningSession).not.toHaveBeenCalled();
   });
 
-  it("opens the override drawer without clipping the plan message", async () => {
-    const desktopWidth = window.innerWidth;
-    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 390 });
+  it("keeps Start available when a plan needs review", async () => {
     findPlanningSession.mockResolvedValue(WAITING_SESSION);
+    useWorkOrderArtifacts.mockReturnValue({
+      data: [
+        {
+          id: "plan-1",
+          type: "TYPE_MARKDOWN",
+          data: {
+            name: SPEC_ARTIFACT_NAME,
+            title: SPEC_ARTIFACT_NAME,
+            body: "# Plan\n\nImplement the approved scope.",
+          },
+        },
+      ],
+    });
     useWorkOrder.mockReturnValue({
       data: {
         ...DRAFT_WORK_ORDER,
@@ -337,41 +350,12 @@ describe("MobileTaskDetailPage refine chat", () => {
       isLoading: false,
       isError: false,
     });
-    const user = userEvent.setup();
-    try {
-      renderTask(
-        `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${DRAFT_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
-      );
+    renderTask(
+      `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/task/${DRAFT_WORK_ORDER.number}?lineId=${REFUND_LINE_PLAN_ID}`,
+    );
 
-      expect(await screen.findByRole("button", { name: "Override" })).toHaveAttribute("aria-expanded", "false");
-      expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
-      expect(screen.queryByTestId("split-run-draft-model")).not.toBeInTheDocument();
-
-      await user.click(screen.getByRole("button", { name: "Override" }));
-
-      const implementation = screen.getByRole("region", { name: "Implementation" });
-      expect(within(implementation).getByRole("heading", { name: "Review the plan before you start" })).toBeVisible();
-      expect(
-        within(implementation).getByText(
-          "The work is still uncertain. Add more context, or start if you accept the risk.",
-        ),
-      ).toBeVisible();
-      const actions = within(implementation).getByTestId("split-run-intent-settings");
-      expect(actions).toContainElement(screen.getByRole("button", { name: "Start" }));
-      expect(actions).toContainElement(screen.getByTestId("split-run-draft-model"));
-      expect(actions.className).not.toMatch(/flex-wrap/);
-      expect(
-        screen
-          .getByRole("heading", { name: "Review the plan before you start" })
-          .closest("[data-testid=split-run-intent-settings]"),
-      ).toBeNull();
-
-      await user.click(screen.getByRole("button", { name: "Hide options" }));
-      expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
-      expect(screen.queryByTestId("phone-override-drawer")).not.toBeInTheDocument();
-    } finally {
-      Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: desktopWidth });
-    }
+    await screen.findByTestId("split-run-intent-transcript");
+    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument();
   });
 });
 

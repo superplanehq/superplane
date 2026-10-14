@@ -9,6 +9,7 @@ export type TaskPlanningReviewOptions = {
   scores: { clarity: 1 | 2 | 3; complexity: 1 | 2 | 3; verifiability: 1 | 2 | 3 };
   response: "questions" | "message" | "ready" | "updating";
   hasPlan?: boolean;
+  singleQuestion?: boolean;
 };
 
 type ReviewScore = TaskPlanningReviewOptions["scores"]["clarity"];
@@ -114,12 +115,17 @@ export function taskPlanningReviewFixture({
   scores,
   response,
   hasPlan = true,
+  singleQuestion = false,
 }: TaskPlanningReviewOptions): FactoriesFixture {
   const fixture = refineChatBoardFixture();
   const orderId = DRAFT_WORK_ORDER.id!;
   const session = refineChatPlanningSession();
   const scoreAt = new Date(Date.now() - 120_000).toISOString();
   const confidence = Math.min(scores.clarity, scores.complexity, scores.verifiability);
+  const agentMessage =
+    singleQuestion && response === "questions"
+      ? "I prepared a first draft with a ranked company shortlist. Which companies should appear on the homepage?"
+      : AGENT_MESSAGE[response];
 
   return {
     ...fixture,
@@ -156,8 +162,10 @@ export function taskPlanningReviewFixture({
             id: "agent-summary",
             role: "agent",
             text: hasPlan
-              ? AGENT_MESSAGE[response]
-              : "I researched Northstar, Fieldwork, and Relay. I need two decisions before I can write the plan.",
+              ? agentMessage
+              : response === "updating"
+                ? "I am writing the first plan from the company research."
+                : "I researched Northstar, Fieldwork, and Relay. I need two decisions before I can write the plan.",
             createdAt: scoreAt,
           },
         ],
@@ -178,7 +186,7 @@ export function taskPlanningReviewFixture({
                     prompt: "Which logo assets should the agent use?",
                     options: ["Approved assets in the repository", "Text names for now", "I will provide the assets"],
                   },
-                ],
+                ].slice(0, singleQuestion ? 1 : 2),
               }
             : null,
       },

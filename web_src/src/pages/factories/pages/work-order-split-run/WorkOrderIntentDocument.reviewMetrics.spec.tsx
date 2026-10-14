@@ -115,6 +115,40 @@ describe("WorkOrderIntentDocument review metrics", () => {
     expect(screen.getByTestId("split-run-intent-review-metrics")).toBeVisible();
   });
 
+  it("keeps checks available while a question needs an answer", async () => {
+    const user = userEvent.setup();
+    renderIntentDocument(
+      <WorkOrderIntentDocument
+        {...INTENT_DOC}
+        artifacts={[INTENT]}
+        confidence={{ ...HIGH_CONFIDENCE, score: 2, maxScore: 3 }}
+        reviewMetrics={[
+          reviewMetric("clarity", 2, "The task needs a choice."),
+          reviewMetric("complexity", 3, "The work is limited."),
+          reviewMetric("verifiability", 3, "The result can be checked."),
+        ]}
+        analysis={analysisChat({
+          view: {
+            ...WAITING_WITH_PLAN,
+            messages: [
+              ...WAITING_WITH_PLAN.messages,
+              { id: "agent-1", kind: "text" as const, role: "agent" as const, text: "Choose companies." },
+            ],
+            survey: { id: "survey-1", questions: [{ prompt: "Which companies?", options: ["Northstar"] }] },
+          },
+        })}
+      />,
+    );
+
+    const confidence = screen.getByTestId("split-run-intent-composer-confidence");
+    expect(confidence).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("split-run-intent-review-metrics")).not.toBeInTheDocument();
+    expect(screen.getByText("Which companies?")).toBeVisible();
+
+    await user.click(confidence);
+    expect(screen.getByTestId("split-run-intent-review-metrics")).toBeVisible();
+  });
+
   it("shows all review checks at 3/3", async () => {
     const user = userEvent.setup();
     renderIntentDocument(
