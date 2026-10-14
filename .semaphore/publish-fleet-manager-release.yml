@@ -51,6 +51,15 @@ blocks:
                 --manifest "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum --check checksums.txt)
               test -n "${GITHUB_TOKEN:-}"
+            - bash release/fetch-component-release-history.sh
+            - |
+              set -euo pipefail
+              node release/component-release.js generate-release-notes \
+                --component fleet-manager \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --output /tmp/fleet-manager-release-notes.md \
+                --github-authors
             - |
               set -euo pipefail
               release_dir="build/fleet-manager/$RELEASE_VERSION"
@@ -82,10 +91,9 @@ blocks:
                 "$SEMAPHORE_GIT_SHA"
             - |
               set -euo pipefail
-              release_dir="build/fleet-manager/$RELEASE_VERSION"
               release_notes_args=()
-              if [ -f "$release_dir/release-notes.md" ]; then
-                release_notes_args=(--release-notes "$release_dir/release-notes.md")
+              if [ -f /tmp/fleet-manager-release-notes.md ]; then
+                release_notes_args=(--release-notes /tmp/fleet-manager-release-notes.md)
               fi
               export FLEET_MANAGER_IMAGE_DIGEST="$(cat /tmp/fleet-manager-image-digest)"
               node release/component-release.js publish-github-release \
