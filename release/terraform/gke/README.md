@@ -377,11 +377,11 @@ Stop the runners first. Uninstall the standalone Fleet Manager chart. Then
 delete runner VMs that remain:
 
 ```bash
+# Read the Fleet Manager ID from the installed standalone chart.
+FLEET_MANAGER_ID=$(helm get values fleet-manager -n superplane --all --output json | jq -er '.manager.id')
 helm uninstall fleet-manager -n superplane
 
-# Fleet Manager labels runner VMs with cluster_name. The default is superplane.
-CLUSTER_NAME=superplane
-gcloud compute instances list --filter="labels.superplane_fleet_manager_id=${CLUSTER_NAME}" \
+gcloud compute instances list --filter="labels.superplane_fleet_manager_id=${FLEET_MANAGER_ID}" \
   --format="value(name,zone.basename())" |
   while read -r name zone; do gcloud compute instances delete "$name" --zone="$zone" --quiet; done
 ```
