@@ -176,7 +176,7 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(onRemoveGithub).toHaveBeenCalledWith("202");
   });
 
-  it("states repository access for a linked Bitbucket account", async () => {
+  it("states pull request credit for a linked Bitbucket account", async () => {
     const user = userEvent.setup();
     render(
       <AccountProfileAssociatedAccountsCard
@@ -190,7 +190,7 @@ describe("AccountProfileRedesignPlayground", () => {
     );
 
     expect(screen.getByTestId("account-redesign-associated-bitbucket")).toHaveTextContent(
-      "Linked as ada-bitbucket. SuperPlane uses this account to find repositories you can open.",
+      "Linked as ada-bitbucket. Velocity uses this account to credit your pull requests.",
     );
 
     await user.click(
@@ -198,10 +198,9 @@ describe("AccountProfileRedesignPlayground", () => {
     );
     expect(
       screen.getByText(
-        "SuperPlane will no longer use this Bitbucket account to find repositories you can open. Your sign-in methods do not change.",
+        "Velocity reports will no longer credit pull requests from this Bitbucket account. Your sign-in methods do not change.",
       ),
     ).toBeInTheDocument();
-    expect(within(screen.getByRole("dialog")).queryByText(/pull request/i)).not.toBeInTheDocument();
   });
 
   it("turns task emails off and hides events", async () => {
