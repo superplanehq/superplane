@@ -495,7 +495,7 @@ resource "helm_release" "superplane" {
   # Integrated Runner API and workers share active logs through EFS.
   set {
     name  = "runner.api.enabled"
-    value = "true"
+    value = var.enable_runners ? "true" : "false"
   }
 
   set {
