@@ -32,6 +32,15 @@ type GenerateValuesInput = {
   warmCapacity: number;
   maxCapacity: number;
   fields: FleetManagerProviderFields;
+  serviceAccountName?: string;
+};
+
+export type FleetManagerConfigurationInput = Pick<
+  GenerateValuesInput,
+  "managerId" | "runnerVersion" | "selectedFleetIds" | "warmCapacity" | "maxCapacity"
+> & {
+  namespace: string;
+  serviceAccountName: string;
 };
 
 const splitList = (value: string | undefined, fallback: string) =>
@@ -40,12 +49,15 @@ const splitList = (value: string | undefined, fallback: string) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
+const machineType = (spec: FleetSpec, fields: FleetManagerProviderFields, fallback: string) =>
+  fields[`machineType${spec.architecture === "amd64" ? "Amd64" : "Arm64"}`] || fallback;
+
 const providerConfiguration = {
   aws: (spec: FleetSpec, fields: FleetManagerProviderFields) => ({
     aws: {
       region: fields.region || "<AWS_REGION>",
       ami: "<PUBLIC_AMI_ID_FOR_REGION_AND_ARCH>",
-      instanceType: fields.machineType || "<INSTANCE_TYPE>",
+      instanceType: machineType(spec, fields, "<INSTANCE_TYPE>"),
       architecture: spec.architecture,
       subnetIds: splitList(fields.subnetIds, "<SUBNET_ID>"),
       securityGroupIds: splitList(fields.securityGroupIds, "<SECURITY_GROUP_ID>"),
@@ -57,7 +69,7 @@ const providerConfiguration = {
     gcp: {
       projectId: fields.projectId || "<GCP_PROJECT_ID>",
       zones: splitList(fields.zones, "<GCP_ZONE>"),
-      machineType: fields.machineType || "<MACHINE_TYPE>",
+      machineType: machineType(spec, fields, "<MACHINE_TYPE>"),
       image: "<PUBLIC_GCP_IMAGE_OR_FAMILY>",
       architecture: spec.architecture,
       subnetwork: fields.subnetwork || "<RUNNER_SUBNETWORK>",
@@ -72,7 +84,7 @@ const providerConfiguration = {
       resourceGroup: fields.resourceGroup || "<RESOURCE_GROUP>",
       location: fields.location || "<AZURE_LOCATION>",
       imageId: "<PUBLIC_AZURE_IMAGE_VERSION_ID>",
-      vmSize: fields.machineType || "<VM_SIZE>",
+      vmSize: machineType(spec, fields, "<VM_SIZE>"),
       architecture: spec.architecture,
       subnetId: fields.subnetId || "<RUNNER_SUBNET_ID>",
       networkSecurityGroupId: fields.securityGroupIds || "<NETWORK_SECURITY_GROUP_ID>",
@@ -133,7 +145,7 @@ export function generateFleetManagerValues(input: GenerateValuesInput): string {
       },
       serviceAccount: {
         create: true,
-        name: "superplane-fleet-manager",
+        name: input.serviceAccountName || "superplane-fleet-manager",
         ...workloadIdentity,
       },
       podLabels: input.provider === "azure" ? { "azure.workload.identity/use": "true" } : {},
@@ -141,6 +153,35 @@ export function generateFleetManagerValues(input: GenerateValuesInput): string {
     },
     { noRefs: true, lineWidth: 120, quotingType: '"' },
   );
+}
+
+export function validateFleetManagerConfiguration(input: FleetManagerConfigurationInput): string[] {
+  const errors: string[] = [];
+  if (!/^[a-z0-9][a-z0-9_-]{0,62}$/.test(input.managerId)) {
+    errors.push("Enter a valid Fleet Manager ID.");
+  }
+  if (!/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(input.runnerVersion)) {
+    errors.push("Enter a valid immutable Runner version.");
+  }
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(input.namespace)) {
+    errors.push("Enter a valid Kubernetes namespace.");
+  }
+  if (!/^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$/.test(input.serviceAccountName)) {
+    errors.push("Enter a valid service account name.");
+  }
+  if (input.selectedFleetIds.length === 0) {
+    errors.push("Select at least one fleet.");
+  }
+  if (!Number.isInteger(input.warmCapacity) || input.warmCapacity < 0) {
+    errors.push("Warm capacity must be a non-negative integer.");
+  }
+  if (!Number.isInteger(input.maxCapacity) || input.maxCapacity < 0) {
+    errors.push("Maximum capacity must be a non-negative integer.");
+  }
+  if (input.warmCapacity > input.maxCapacity) {
+    errors.push("Warm capacity cannot exceed maximum capacity.");
+  }
+  return errors;
 }
 
 export function fleetManagerSecretCommand(namespace: string, secretName: string): string {

@@ -68,4 +68,35 @@ describe("FleetManagerSetup", () => {
       "token",
     );
   });
+
+  it("explains token creation failures and permits a retry", async () => {
+    createToken.mockRejectedValueOnce(new Error("request failed"));
+    render(<FleetManagerSetup />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Create Fleet Manager token" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("SuperPlane could not create the token. Try again.");
+    expect(screen.getByRole("button", { name: "Create Fleet Manager token" })).toBeEnabled();
+  });
+
+  it("prevents copying values when capacity is invalid", async () => {
+    render(<FleetManagerSetup />);
+    fireEvent.change(await screen.findByLabelText("Warm capacity"), { target: { value: "2" } });
+
+    expect(screen.getByRole("button", { name: "Copy values.yaml" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent("Warm capacity cannot exceed maximum capacity.");
+  });
+
+  it("keeps infrastructure fields separate for each provider", async () => {
+    render(<FleetManagerSetup />);
+    fireEvent.change(await screen.findByLabelText("EC2 instance type for AMD64"), {
+      target: { value: "m8a.large" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "GCP" }));
+    expect(screen.getByLabelText("Compute Engine machine type for AMD64")).toHaveValue("");
+
+    fireEvent.click(screen.getByRole("button", { name: "AWS" }));
+    expect(screen.getByLabelText("EC2 instance type for AMD64")).toHaveValue("m8a.large");
+  });
 });
