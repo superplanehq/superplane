@@ -11,6 +11,9 @@ bash release/fetch_component_release_history_test.sh
 bash release/runner/upload_test.sh
 bash release/fleet-manager/publish_image_test.sh
 bash release/fleet-manager/verify_image_test.sh
+bash release/fleet-manager/publish_chart_test.sh
+bash release/fleet-manager-chart/test-chart.sh
+bash release/fleet-manager-chart/test-sync-fleets.sh
 
 bash -n \
   release/generate-component-sbom.sh \
@@ -25,6 +28,8 @@ bash -n \
   release/fleet-manager/build.sh \
   release/fleet-manager/build-release.sh \
   release/fleet-manager/publish-image.sh \
+  release/fleet-manager/publish-chart.sh \
+  release/fleet-manager/publish_chart_test.sh \
   release/fleet-manager/publish_image_test.sh \
   release/fleet-manager/run-skopeo.sh \
   release/fleet-manager/verify-oci-archive.sh \
