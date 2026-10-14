@@ -4,6 +4,8 @@ import { Link } from "@/components/Link/link";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { BookOpen } from "lucide-react";
 import type { FactoriesFactoryAgentResource } from "@/api-client";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { skillDisplayTitle, skillListDescription } from "./settings/skillFrontmatter";
@@ -46,87 +48,90 @@ export function SkillPromptTextarea({
   } = useSkillPromptCompletion({ value, onChange, skills, textarea, backdrop, listId });
 
   return (
-    <div className="relative rounded-lg bg-card" data-testid={`${testId}-skills`}>
-      <div
-        ref={backdrop}
-        aria-hidden="true"
-        className={cn(
-          PROMPT_TEXTAREA_CLASS,
-          "pointer-events-none absolute inset-0 z-10 bg-transparent overflow-hidden whitespace-pre-wrap wrap-anywhere border border-transparent text-foreground",
-        )}
-      >
-        <SkillPromptTokens value={value} skills={skills} onSelect={focusToken} skillHref={skillHref} />
-        {"\n"}
+    <>
+      <div className="relative rounded-lg bg-card" data-testid={`${testId}-skills`}>
+        <div
+          ref={backdrop}
+          aria-hidden="true"
+          className={cn(
+            PROMPT_TEXTAREA_CLASS,
+            "pointer-events-none absolute inset-0 z-10 bg-transparent overflow-hidden whitespace-pre-wrap wrap-anywhere border border-transparent text-foreground",
+          )}
+        >
+          <SkillPromptTokens value={value} skills={skills} onSelect={focusToken} skillHref={skillHref} />
+          {"\n"}
+        </div>
+        <Textarea
+          ref={textarea}
+          value={value}
+          aria-label={label}
+          data-testid={testId}
+          placeholder="Tell the agent what to do in this step."
+          className={cn(
+            PROMPT_TEXTAREA_CLASS,
+            "relative bg-transparent dark:bg-transparent text-transparent dark:text-transparent caret-foreground selection:bg-primary/20",
+          )}
+          aria-autocomplete="list"
+          aria-controls={open ? listId : undefined}
+          aria-activedescendant={open && matches.length ? `${listId}-${active}` : undefined}
+          onChange={(event) => {
+            onChange(event.target.value);
+            setCursor(event.target.selectionStart);
+            setSelected(0);
+            setDismissed(false);
+          }}
+          onSelect={updateCursor}
+          onFocus={() => {
+            setFocused(true);
+            updateCursor();
+          }}
+          onBlur={() => setFocused(false)}
+          onKeyDown={handleKeyDown}
+          onScroll={(event) => {
+            if (backdrop.current) {
+              backdrop.current.scrollTop = event.currentTarget.scrollTop;
+              backdrop.current.scrollLeft = event.currentTarget.scrollLeft;
+            }
+            setDismissed(true);
+          }}
+        />
+        {open && rect
+          ? createPortal(
+              <div
+                id={listId}
+                role="listbox"
+                aria-label="Available skills"
+                className="fixed z-[9999] max-h-56 overflow-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+                style={{
+                  left: Math.max(8, Math.min(rect.left, window.innerWidth - 328)),
+                  top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 232)),
+                  width: Math.min(320, window.innerWidth - 16),
+                }}
+              >
+                <div className="px-2 py-1 text-xs text-muted-foreground">Skills</div>
+                {matches.length ? (
+                  matches.map((skill, index) => (
+                    <SkillSuggestion
+                      key={skill.id ?? skill.name}
+                      skill={skill}
+                      id={`${listId}-${index}`}
+                      selected={index === active}
+                      onSelect={() => insert(skill)}
+                      onHover={() => setSelected(index)}
+                    />
+                  ))
+                ) : (
+                  <p className="px-2 py-2 text-xs text-muted-foreground">
+                    {skills.length ? "No matching skills." : "No skills available for this agent."}
+                  </p>
+                )}
+              </div>,
+              document.body,
+            )
+          : null}
       </div>
-      <Textarea
-        ref={textarea}
-        value={value}
-        aria-label={label}
-        data-testid={testId}
-        placeholder="Tell the agent what to do in this step."
-        className={cn(
-          PROMPT_TEXTAREA_CLASS,
-          "relative bg-transparent dark:bg-transparent text-transparent dark:text-transparent caret-foreground selection:bg-primary/20",
-        )}
-        aria-autocomplete="list"
-        aria-controls={open ? listId : undefined}
-        aria-activedescendant={open && matches.length ? `${listId}-${active}` : undefined}
-        onChange={(event) => {
-          onChange(event.target.value);
-          setCursor(event.target.selectionStart);
-          setSelected(0);
-          setDismissed(false);
-        }}
-        onSelect={updateCursor}
-        onFocus={() => {
-          setFocused(true);
-          updateCursor();
-        }}
-        onBlur={() => setFocused(false)}
-        onKeyDown={handleKeyDown}
-        onScroll={(event) => {
-          if (backdrop.current) {
-            backdrop.current.scrollTop = event.currentTarget.scrollTop;
-            backdrop.current.scrollLeft = event.currentTarget.scrollLeft;
-          }
-          setDismissed(true);
-        }}
-      />
-      {open && rect
-        ? createPortal(
-            <div
-              id={listId}
-              role="listbox"
-              aria-label="Available skills"
-              className="fixed z-[9999] max-h-56 overflow-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"
-              style={{
-                left: Math.max(8, Math.min(rect.left, window.innerWidth - 328)),
-                top: Math.max(8, Math.min(rect.bottom + 4, window.innerHeight - 232)),
-                width: Math.min(320, window.innerWidth - 16),
-              }}
-            >
-              <div className="px-2 py-1 text-xs text-muted-foreground">Skills</div>
-              {matches.length ? (
-                matches.map((skill, index) => (
-                  <SkillSuggestion
-                    key={skill.id ?? skill.name}
-                    skill={skill}
-                    id={`${listId}-${index}`}
-                    selected={index === active}
-                    onSelect={() => insert(skill)}
-                    onHover={() => setSelected(index)}
-                  />
-                ))
-              ) : (
-                <p className="px-2 py-2 text-xs text-muted-foreground">
-                  {skills.length ? "No matching skills." : "No skills available for this agent."}
-                </p>
-              )}
-            </div>,
-            document.body,
-          )
-        : null}
-    </div>
+      <PromptSkillDetails value={value} skills={skills} skillHref={skillHref} />
+    </>
   );
 }
 
@@ -186,7 +191,7 @@ function useSkillPromptCompletion({
     onChange(next);
     setDismissed(true);
     requestAnimationFrame(() => {
-      const position = command.start + token.length + separator.length;
+      const position = command.start + token.length + (separator.length || 1);
       textarea.current?.focus();
       textarea.current?.setSelectionRange(position, position);
       setCursor(position);
@@ -274,11 +279,9 @@ function SkillSuggestion({
 function skillCommandAtCursor(value: string, cursor: number) {
   const match = /(^|[\s(])\/([a-zA-Z0-9_-]*)$/.exec(value.slice(0, cursor));
   if (!match) return undefined;
-  return {
-    query: match[2],
-    start: match.index + match[1].length,
-    end: cursor + (/^[a-zA-Z0-9_-]*/.exec(value.slice(cursor))?.[0].length ?? 0),
-  };
+  const end = cursor + (/^[a-zA-Z0-9_-]*/.exec(value.slice(cursor))?.[0].length ?? 0);
+  if (end < value.length && !/[\s.,!?;:)]/.test(value[end])) return undefined;
+  return { query: match[2], start: match.index + match[1].length, end };
 }
 
 function SkillPromptTokens({
@@ -294,11 +297,7 @@ function SkillPromptTokens({
 }) {
   const parts: React.ReactNode[] = [];
   let position = 0;
-  for (const match of value.matchAll(/(^|[\s(])\/([a-zA-Z0-9_-]+)(?=$|[\s.,!?;:)])/g)) {
-    const skill = skills.find((resource) => resource.name === match[2]);
-    if (!skill) continue;
-    const start = match.index + match[1].length;
-    const end = start + match[2].length + 1;
+  for (const { skill, start, end } of skillRanges(value, skills)) {
     parts.push(value.slice(position, start));
     parts.push(
       <SkillToken
@@ -326,42 +325,102 @@ function SkillToken({
   href?: string;
   onSelect: () => void;
 }) {
-  const description = skillListDescription(skill);
   return (
     <HoverCard openDelay={250} closeDelay={150}>
       <HoverCardTrigger asChild>
-        <button
+        <Button
+          variant="ghost"
           type="button"
           tabIndex={-1}
           data-skill-token={skill.name}
           data-skill-id={skill.id}
-          className="pointer-events-auto cursor-text rounded-md border-0 bg-violet-500/15 -mx-0.5 px-0.5 py-0 text-violet-700 ring-1 ring-inset ring-violet-500/30 dark:bg-violet-500/20 dark:text-violet-300 dark:ring-violet-500/50"
+          className="pointer-events-auto inline h-auto cursor-text rounded-md border-0 text-[13px] leading-[inherit] font-normal shadow-none hover:bg-violet-500/15 hover:text-violet-700 bg-violet-500/15 -mx-0.5 px-0.5 py-0 text-violet-700 ring-1 ring-inset ring-violet-500/30 dark:bg-violet-500/20 dark:text-violet-300 dark:ring-violet-500/50 dark:hover:bg-violet-500/20 dark:hover:text-violet-300"
           onMouseDown={(event) => {
             event.preventDefault();
             onSelect();
           }}
         >
           {command}
-        </button>
+        </Button>
       </HoverCardTrigger>
       <HoverCardContent
         align="start"
         className="pointer-events-auto z-[10000] w-72 space-y-2 p-3"
         data-testid="prompt-skill-hover-card"
       >
-        <h4 className="text-[13px] font-semibold">{skillDisplayTitle(skill)}</h4>
-        {description ? <p className="text-[13px] leading-5 text-muted-foreground">{description}</p> : null}
-        {href ? (
-          <Link
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block text-[13px] font-medium underline underline-offset-2"
-          >
-            Open skill <span aria-hidden="true">↗</span>
-          </Link>
-        ) : null}
+        <SkillDetails skill={skill} href={href} />
       </HoverCardContent>
     </HoverCard>
+  );
+}
+
+function skillRanges(value: string, skills: FactoriesFactoryAgentResource[]) {
+  const ranges: { skill: FactoriesFactoryAgentResource; start: number; end: number }[] = [];
+  for (const match of value.matchAll(/(^|[\s(])\/([a-zA-Z0-9_-]+)(?=$|[\s.,!?;:)])/g)) {
+    const skill = skills.find((resource) => resource.name === match[2]);
+    if (!skill) continue;
+    const start = match.index + match[1].length;
+    ranges.push({ skill, start, end: start + match[2].length + 1 });
+  }
+  return ranges;
+}
+
+function PromptSkillDetails({
+  value,
+  skills,
+  skillHref,
+}: {
+  value: string;
+  skills: FactoriesFactoryAgentResource[];
+  skillHref?: (skill: FactoriesFactoryAgentResource) => string | undefined;
+}) {
+  const referenced = [...new Map(skillRanges(value, skills).map(({ skill }) => [skill.name, skill])).values()];
+  if (referenced.length === 0) return null;
+  return (
+    <div className="flex gap-1" aria-label="Skill details">
+      {referenced.map((skill) => (
+        <Popover key={skill.id ?? skill.name}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="sr-only focus:not-sr-only data-[state=open]:not-sr-only"
+              aria-label={`Skill details: ${skillDisplayTitle(skill)}`}
+            >
+              <BookOpen className="size-3.5" aria-hidden />
+              {skillDisplayTitle(skill)}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="z-[10000] space-y-2 p-3"
+            aria-label={`Skill details: ${skillDisplayTitle(skill)}`}
+          >
+            <SkillDetails skill={skill} href={skillHref?.(skill)} />
+          </PopoverContent>
+        </Popover>
+      ))}
+    </div>
+  );
+}
+
+function SkillDetails({ skill, href }: { skill: FactoriesFactoryAgentResource; href?: string }) {
+  const description = skillListDescription(skill);
+  return (
+    <>
+      <h4 className="text-[13px] font-semibold">{skillDisplayTitle(skill)}</h4>
+      {description ? <p className="text-[13px] leading-5 text-muted-foreground">{description}</p> : null}
+      {href ? (
+        <Link
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block text-[13px] font-medium underline underline-offset-2"
+        >
+          Open skill <span aria-hidden="true">↗</span>
+        </Link>
+      ) : null}
+    </>
   );
 }

@@ -33,6 +33,9 @@ describe("skill prompt input", () => {
     await user.keyboard("{Enter}");
     await waitFor(() => expect(field).toHaveValue("Use /review-copy to review."));
     expect(document.querySelector('[data-skill-token="review-copy"]')).toHaveTextContent("/review-copy");
+    await waitFor(() => expect((field as HTMLTextAreaElement).selectionStart).toBe(17));
+    await user.keyboard("next ");
+    expect(field).toHaveValue("Use /review-copy next to review.");
   });
 
   it("allows mouse selection without losing the cursor or surrounding prompt text", async () => {
@@ -80,7 +83,7 @@ describe("skill prompt input", () => {
     const user = userEvent.setup();
     render(<Editor initial="Use /review-copy." />);
     await user.hover(document.querySelector<HTMLElement>('[data-skill-token="review-copy"]')!);
-    expect(await screen.findByText("Review copy")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Review copy" })).toBeInTheDocument();
     expect(screen.getByText("Review UI copy.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open skill" })).toHaveAttribute("href", `/skills/${INLINE_SKILL.id}`);
     expect(screen.getByRole("link", { name: "Open skill" })).toHaveAttribute("target", "_blank");
@@ -94,5 +97,26 @@ describe("skill prompt input", () => {
     expect(field).toHaveValue("Use /review-copy next.");
     await user.keyboard("the ");
     expect(field).toHaveValue("Use /review-copy the next.");
+  });
+  it("does not offer skills when the caret is inside an absolute path", async () => {
+    const user = userEvent.setup();
+    render(<Editor initial="Use /rev/path" />);
+    const field = screen.getByRole("textbox");
+    await user.click(field);
+    fireEvent.select(field, { target: { selectionStart: 8, selectionEnd: 8 } });
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(field).toHaveValue("Use /rev/path");
+  });
+
+  it("makes referenced skill details and their link available from the keyboard", async () => {
+    const user = userEvent.setup();
+    render(<Editor initial="Use /review-copy." />);
+    await user.click(screen.getByRole("textbox"));
+    await user.tab();
+    const details = screen.getByRole("button", { name: "Skill details: Review copy" });
+    expect(details).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(await screen.findByText("Review UI copy.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open skill" })).toHaveAttribute("href", `/skills/${INLINE_SKILL.id}`);
   });
 });
