@@ -38,7 +38,6 @@ export const AGENT_RESOURCES_COPY = {
   setupStepsLoading: "Loading setup steps...",
   setupStepsLoadError: "SuperPlane could not load setup steps. Try again.",
   editSetupSteps: "Edit",
-  setupStepsSummary: (count: number) => (count === 1 ? "1 setup step" : `${count} setup steps`),
   crossRepoTitle: "Cross-repo context",
   crossRepoHelper: "Extra repositories cloned into the workspace on each run.",
   add: "Add",

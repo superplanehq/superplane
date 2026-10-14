@@ -136,7 +136,7 @@ function SkillRow({
               aria-label={AGENT_RESOURCES_COPY.editSkill}
               data-testid={`agent-resource-configure-${resource.id}`}
             >
-              <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
+              <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
             </Link>
           </Button>
         </PermissionTooltip>

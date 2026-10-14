@@ -56,43 +56,33 @@ export function WorkspaceSetupStepsSection({
       ) : setup.isError ? (
         <p className="text-[13px] text-destructive">{AGENT_RESOURCES_COPY.setupStepsLoadError}</p>
       ) : commands.length === 0 ? null : (
-        <SetupStepsTerminal commands={commands} />
+        <SetupStepsPreview commands={commands} />
       )}
     </FactorySettingsCard>
   );
 }
 
-function SetupStepsTerminal({ commands }: { commands: string[] }) {
+function SetupStepsPreview({ commands }: { commands: string[] }) {
   const visible = commands.slice(0, PREVIEW_COMMAND_LIMIT);
   const truncated = commands.length > PREVIEW_COMMAND_LIMIT;
   return (
-    <div className="overflow-hidden rounded-lg bg-zinc-950 text-zinc-200" data-testid="agent-setup-steps-preview">
-      <div className="flex items-center gap-1.5 border-b border-white/10 px-3 py-2">
-        <span className="size-2 rounded-full bg-zinc-700" aria-hidden />
-        <span className="size-2 rounded-full bg-zinc-700" aria-hidden />
-        <span className="size-2 rounded-full bg-zinc-700" aria-hidden />
-        <span className="ml-1 font-mono text-[11px] tracking-wider text-zinc-500 uppercase">
-          {AGENT_RESOURCES_COPY.setupStepsTitle}
-        </span>
-        <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[11px] whitespace-nowrap text-zinc-300">
-          {AGENT_RESOURCES_COPY.setupStepsSummary(commands.length)}
-        </span>
-      </div>
-      <div className="overflow-x-auto p-3 font-mono text-[12px] leading-6">
-        {visible.map((command, index) => (
-          <div key={`${index}-${command}`} className="flex gap-2">
-            <span aria-hidden className="text-emerald-400/70 select-none">
-              $
-            </span>
-            <span className="min-w-0 flex-1 truncate text-zinc-100">{command}</span>
-          </div>
-        ))}
-        {truncated ? (
-          <div aria-hidden className="text-zinc-500 select-none">
-            …
-          </div>
-        ) : null}
-      </div>
+    <div
+      className="rounded-lg border border-border bg-muted/40 px-3 py-2 font-mono text-[12px] leading-6"
+      data-testid="agent-setup-steps-preview"
+    >
+      {visible.map((command, index) => (
+        <div key={`${index}-${command}`} className="truncate text-muted-foreground">
+          <span aria-hidden className="mr-2 select-none">
+            $
+          </span>
+          {command}
+        </div>
+      ))}
+      {truncated ? (
+        <div aria-hidden className="text-muted-foreground/60 select-none">
+          …
+        </div>
+      ) : null}
     </div>
   );
 }
