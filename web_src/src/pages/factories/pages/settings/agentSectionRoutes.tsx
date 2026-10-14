@@ -6,6 +6,7 @@ import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILL
 
 import { FactorySettingsAgentPage } from "./FactorySettingsAgentPage";
 import { FactorySettingsMCPConnectionPage } from "./FactorySettingsMCPConnectionPage";
+import { FactorySettingsSetupStepsPage } from "./FactorySettingsSetupStepsPage";
 import { FactorySettingsSkillEditorPage } from "./FactorySettingsSkillEditorPage";
 
 /**
@@ -27,6 +28,14 @@ export const agentSectionRoute = (
     }
   >
     <Route index element={<FactorySettingsAgentPage />} />
+    <Route
+      path="setup-steps"
+      element={
+        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_AGENT}>
+          <FactorySettingsSetupStepsPage />
+        </RequireExperimentalFeature>
+      }
+    />
     <Route
       path="mcp/:resourceId"
       element={

@@ -231,3 +231,38 @@ export const CONFIGURED_MCP_RESOURCE_TOOLS_BY_ID: Record<
   "resource-semaphore": toolList(3),
   "resource-vercel": toolList(21),
 };
+
+export const SETUP_COMMANDS_RESOURCE: FactoriesFactoryAgentResource = {
+  id: "resource-setup",
+  factoryId: PRIMARY_FACTORY_ID,
+  kind: "KIND_SETUP_COMMAND",
+  name: "setup",
+  enabled: true,
+  commands: ["npm ci", "go mod download"],
+  createdAt: NOW,
+  updatedAt: NOW,
+};
+
+export const CONTEXT_REPO_SUSS: FactoriesFactoryAgentResource = {
+  id: "resource-context-suss",
+  factoryId: PRIMARY_FACTORY_ID,
+  kind: "KIND_CONTEXT_REPO",
+  name: "superplanehq-suss",
+  enabled: true,
+  repository: "superplanehq/suss",
+  vcsProvider: "github",
+  createdAt: NOW,
+  updatedAt: NOW,
+};
+
+export const CONTEXT_REPO_RUNNER: FactoriesFactoryAgentResource = {
+  id: "resource-context-runner",
+  factoryId: PRIMARY_FACTORY_ID,
+  kind: "KIND_CONTEXT_REPO",
+  name: "superplanehq-runner",
+  enabled: true,
+  repository: "superplanehq/runner",
+  vcsProvider: "github",
+  createdAt: NOW,
+  updatedAt: NOW,
+};
