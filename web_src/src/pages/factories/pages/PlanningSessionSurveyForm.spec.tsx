@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 
@@ -13,44 +13,52 @@ const twoQuestions = {
 };
 
 describe("PlanningSessionSurveyForm", () => {
-  it("shows one question at a time and pages with Next and Previous", async () => {
+  it("advances after a choice and keeps that choice when navigating back", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
     render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
 
-    expect(screen.getByText(CREATE_WITH_AGENT_COPY.surveyHeader)).toBeInTheDocument();
-    expect(screen.getByTestId("create-with-agent-survey-card")).toHaveClass("border", "bg-card");
     expect(screen.getByText("What is the priority?")).toBeInTheDocument();
     expect(screen.queryByText("What is the scope?")).not.toBeInTheDocument();
-    expect(screen.getByText("1 of 2")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /High/ })).toHaveTextContent("A");
+    expect(screen.getByText("Question 1 of 2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).toBeInTheDocument();
 
     const high = screen.getByRole("button", { name: /High/ });
     await user.click(high);
-    expect(high).toHaveAttribute("aria-pressed", "true");
-    expect(high).toHaveClass("bg-primary", "text-primary-foreground");
-    expect(high).not.toHaveClass("dark:text-gray-300");
-    expect(screen.getByRole("button", { name: /Low/ })).toHaveClass("bg-background");
-    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
 
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText("What is the scope?")).toBeInTheDocument();
     expect(screen.queryByText("What is the priority?")).not.toBeInTheDocument();
-    expect(screen.getByText("2 of 2")).toBeInTheDocument();
+    expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers })).toBeDisabled();
-    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).not.toHaveClass("bg-primary");
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.previousQuestion }));
 
     expect(screen.getByText("What is the priority?")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /High/ })).toHaveAttribute("aria-pressed", "true");
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("does not send when Next is followed by the primary action before the next question is answered", async () => {
+  it("moves keyboard focus to the next question after a choice", async () => {
+    const user = userEvent.setup();
+    render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={vi.fn()} />);
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: "High" })).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByText("What is the scope?")).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "One file" })).toHaveFocus();
+  });
+
+  it("keeps Next as navigation without submitting an unanswered question", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
     render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
 
-    await user.click(screen.getByRole("button", { name: /High/ }));
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers }));
 
@@ -64,26 +72,36 @@ describe("PlanningSessionSurveyForm", () => {
 
     const high = screen.getByRole("button", { name: /High/ });
     await user.click(high);
-    await user.click(high);
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.previousQuestion }));
+    await user.click(screen.getByRole("button", { name: /High/ }));
 
-    expect(high).toHaveAttribute("aria-pressed", "false");
-    expect(high).toHaveClass("bg-background", "text-foreground");
-    expect(high).not.toHaveClass("bg-primary");
+    expect(screen.getByRole("button", { name: /High/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Question 1 of 2")).toBeInTheDocument();
   });
 
   it("replaces the current choice when a different option is clicked", async () => {
     const user = userEvent.setup();
     render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={vi.fn()} />);
 
-    const high = screen.getByRole("button", { name: /High/ });
-    const low = screen.getByRole("button", { name: /Low/ });
-    await user.click(high);
-    await user.click(low);
+    await user.click(screen.getByRole("button", { name: /High/ }));
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.previousQuestion }));
+    await user.click(screen.getByRole("button", { name: /Low/ }));
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.previousQuestion }));
 
-    expect(high).toHaveAttribute("aria-pressed", "false");
-    expect(low).toHaveAttribute("aria-pressed", "true");
-    expect(low).toHaveClass("bg-primary", "text-primary-foreground");
-    expect(low).not.toHaveClass("dark:text-gray-300");
+    expect(screen.getByRole("button", { name: /High/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /Low/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("clears a typed answer when an option is selected", async () => {
+    const user = userEvent.setup();
+    render(<PlanningSessionSurveyForm survey={{ questions: [twoQuestions.questions[0]] }} onSubmit={vi.fn()} />);
+
+    const answer = screen.getByRole("textbox", { name: /What is the priority/ });
+    await user.type(answer, "Ask the agent to decide");
+    await user.click(screen.getByRole("button", { name: /High/ }));
+
+    expect(answer).toHaveValue("");
+    expect(screen.getByRole("button", { name: /High/ })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("keeps send disabled after the last choice is cleared", async () => {
@@ -101,24 +119,38 @@ describe("PlanningSessionSurveyForm", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
-  it("renders Skip as a quiet action until a single question is answered", async () => {
+  it("sends a single selected choice immediately", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
     render(
       <PlanningSessionSurveyForm
-        survey={{ questions: [{ prompt: "What is the priority?", options: ["High", "Low"] }] }}
+        survey={{ questions: [{ prompt: "What is the priority?", options: ["High", "Low", "Medium"] }] }}
         onSubmit={onSubmit}
       />,
     );
 
     const skip = screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey });
-    expect(skip).not.toHaveClass("bg-primary");
-    expect(skip).toHaveClass("text-muted-foreground");
+    expect(screen.getByTestId("create-with-agent-survey-card")).toContainElement(skip);
+    expect(within(screen.getByRole("button", { name: "High" })).getByText("A")).toBeInTheDocument();
+    expect(within(skip).getByText("D")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(CREATE_WITH_AGENT_COPY.otherAnswer)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswer })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: /High/ }));
 
-    expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers })).toHaveClass("bg-primary");
+    expect(onSubmit).toHaveBeenCalledWith("What is the priority? High");
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends a single skipped question immediately", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<PlanningSessionSurveyForm survey={{ questions: [twoQuestions.questions[0]] }} onSubmit={onSubmit} />);
+
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey }));
+
+    expect(onSubmit).toHaveBeenCalledWith(CREATE_WITH_AGENT_COPY.surveySkipped);
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
   it("hides page controls when there is one question", () => {
@@ -132,6 +164,7 @@ describe("PlanningSessionSurveyForm", () => {
     expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: CREATE_WITH_AGENT_COPY.previousQuestion })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswer })).toBeInTheDocument();
   });
 
   it("uses Enter on a middle question as Next, not Submit", async () => {
@@ -145,14 +178,40 @@ describe("PlanningSessionSurveyForm", () => {
     expect(screen.getByText("What is the scope?")).toBeInTheDocument();
   });
 
-  it("sends answered and skipped questions from Skip on the last page", async () => {
+  it("keeps a skipped first question when browsing back and sends it with the final answer", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
+
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey }));
+    expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.previousQuestion }));
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
+    await user.click(screen.getByRole("button", { name: /One file/ }));
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers }));
+
+    expect(onSubmit).toHaveBeenCalledWith("What is the priority? skipped\nWhat is the scope? One file");
+  });
+
+  it("sends answered and skipped questions after Skip on the last page", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
     render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
 
     await user.click(screen.getByRole("button", { name: /High/ }));
-    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.skipSurvey })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers }));
 
     expect(onSubmit).toHaveBeenCalledWith("What is the priority? High\nWhat is the scope? skipped");
   });
@@ -163,8 +222,8 @@ describe("PlanningSessionSurveyForm", () => {
     render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={onSubmit} />);
 
     await user.click(screen.getByRole("button", { name: /High/ }));
-    await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
     await user.click(screen.getByRole("button", { name: /One file/ }));
+    expect(screen.getByText("Question 2 of 2")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.sendAnswers }));
 
     expect(onSubmit).toHaveBeenCalledWith("What is the priority? High\nWhat is the scope? One file");

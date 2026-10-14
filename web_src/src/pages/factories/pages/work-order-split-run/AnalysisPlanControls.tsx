@@ -1,5 +1,6 @@
 import { PlanningReview } from "./PlanningReview";
 import type { IntentAnalysisChat } from "./intentAnalysisChat";
+import { hasPendingPlanningQuestions } from "./planningReviewState";
 
 /** Plan controls stay in the conversation, above the composer. */
 export function AnalysisPlanControls({
@@ -21,6 +22,7 @@ export function AnalysisPlanControls({
       clarity={analysis.clarity}
       confidence={analysis.confidence}
       reviewMetrics={analysis.reviewMetrics}
+      questionsPending={hasPendingPlanningQuestions(analysis.view)}
       showClarity={analysis.showClarity !== false}
       showConfidence={analysis.showConfidence !== false}
       isAnalyzing={chipsWorking}
