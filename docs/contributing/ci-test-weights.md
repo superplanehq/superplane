@@ -14,11 +14,17 @@ not enter the history.
 
 The **Refresh test weights** Semaphore task runs each Monday at 09:00 UTC. It
 uses the five most recent successful `main` commits. It requires at least
-three distinct commits. It uses the median test time, which limits the effect
-of one slow run. The task removes deleted tests, adds measured new tests, and
+three distinct commits. It uses the upper quartile of E2E test times because
+browser tests can take much longer in some runs. It uses the median for unit
+package times. The task removes deleted tests, adds measured new tests, and
 opens or updates a pull request when a weight changes by at least five seconds
 and 20%. New E2E tests use a 30-second estimate until a successful `main` run
 measures them. Unit packages below seven seconds use their test-file count.
+
+The weights are estimates. Test retries, shared CI load, and setup time can
+still make job durations different. Check the test reports if one shard stays
+slow across several runs. The scheduled task updates weights after it has
+enough successful runs; it does not change the current build.
 
 The task uses the `github-release-token` Semaphore secret. Its
 `GITHUB_RELEASE_TOKEN` must have **Contents: write** and **Pull requests: write**
