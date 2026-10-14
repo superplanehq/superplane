@@ -109,6 +109,9 @@ resource "aws_iam_role_policy" "fleet_manager" {
           StringEquals = {
             "ec2:ResourceTag/Name" = "superplane-runner"
           }
+          ArnEquals = {
+            "ec2:InstanceProfile" = aws_iam_instance_profile.runner[0].arn
+          }
         }
       },
       {
