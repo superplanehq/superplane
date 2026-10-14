@@ -13,7 +13,6 @@ export function WorkOrderIntentSurvey({ survey, onSubmit, disabled }: WorkOrderI
       <PlanningSessionSurveyForm
         key={survey.id ?? survey.questions[0]?.prompt ?? "survey"}
         survey={survey}
-        nextVariant="default"
         onSubmit={onSubmit}
       />
     </fieldset>

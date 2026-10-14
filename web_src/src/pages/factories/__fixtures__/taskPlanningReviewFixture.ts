@@ -163,7 +163,9 @@ export function taskPlanningReviewFixture({
             role: "agent",
             text: hasPlan
               ? agentMessage
-              : "I researched Northstar, Fieldwork, and Relay. I need two decisions before I can write the plan.",
+              : response === "updating"
+                ? "I am writing the first plan from the company research."
+                : "I researched Northstar, Fieldwork, and Relay. I need two decisions before I can write the plan.",
             createdAt: scoreAt,
           },
         ],
