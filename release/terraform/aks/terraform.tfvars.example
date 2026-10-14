@@ -29,12 +29,17 @@ letsencrypt_email = "admin@example.com"
 # container_registry_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane-images/providers/Microsoft.ContainerRegistry/registries/myregistry"
 # superplane_namespace = "superplane"
 
+# Use the independently versioned Fleet Manager image from GHCR.
+# fleet_manager_image_registry = "ghcr.io/superplanehq"
+# fleet_manager_image_name     = "fleet-manager"
+# fleet_manager_image_tag      = "v0.1.0"
+
 # Set a Fleet Manager YAML body to start the Deployment.
 # fleet_manager_config = <<EOF
 # id: aks
 # superplaneUrl: https://superplane.example.com
 # installationAdminToken: replace-me
-# runnerReleaseBaseUrl: https://downloads.example/runner
+# runnerReleaseBaseUrl: https://github.com/superplanehq/superplane/releases/download/runner%2F{version}
 # fleets:
 #   - id: linux-amd64
 #     provider: azure
