@@ -50,6 +50,11 @@ export const LowConfidenceQuestions: Story = {
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "questions" },
 };
 
+export const SingleQuestionWithSkip: Story = {
+  name: "One question · Skip available",
+  args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "questions", singleQuestion: true },
+};
+
 export const LowConfidenceQuestionsWithoutPlan: Story = {
   name: "Two checks need review · questions, no plan",
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "questions", hasPlan: false },
