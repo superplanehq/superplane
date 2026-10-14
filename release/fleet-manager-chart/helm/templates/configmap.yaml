@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "fleet-manager.name" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "fleet-manager.labels" . | nindent 4 }}
+data:
+  fleet-manager.yaml: |
+    {{- include "fleet-manager.runtimeConfig" . | nindent 4 }}
