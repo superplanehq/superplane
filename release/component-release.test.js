@@ -157,6 +157,53 @@ test("generates stable notes from component release ranges", () => {
   assert.ok(calls[1].args.includes(`runner/v1.0.0..${nextSha}`));
 });
 
+test("uses a protected token for GitHub author attribution", () => {
+  const { repository, releaseSha } = createReleaseHistory();
+  const output = path.join(repository, "release-notes.md");
+  const githubToken = "release-token";
+  let invocation;
+
+  assert.throws(
+    () =>
+      generateReleaseNotes({
+        component: "runner",
+        version: "v1.0.0",
+        sha: releaseSha,
+        output,
+        repository,
+        includeGitHubAuthors: true,
+        dockerExec: () => "notes must not be generated",
+      }),
+    /GITHUB_TOKEN is required/,
+  );
+
+  generateReleaseNotes({
+    component: "runner",
+    version: "v1.0.0",
+    sha: releaseSha,
+    output,
+    repository,
+    includeGitHubAuthors: true,
+    githubToken,
+    dockerExec: (command, args, options) => {
+      invocation = { command, args, options };
+      return "## runner/v1.0.0\n\n- Add runner release by @author.\n";
+    },
+  });
+
+  assert.equal(invocation.command, "docker");
+  assert.equal(invocation.args.includes("--offline"), false);
+  assert.deepEqual(
+    invocation.args.slice(
+      invocation.args.indexOf("--env"),
+      invocation.args.indexOf("--env") + 2,
+    ),
+    ["--env", "GITHUB_TOKEN"],
+  );
+  assert.equal(invocation.args.includes(githubToken), false);
+  assert.equal(invocation.options.env.GITHUB_TOKEN, githubToken);
+});
+
 test("routes established component scopes to their component notes", () => {
   const { repository, runnerSha, fleetManagerSha } =
     createReleaseHistory();
