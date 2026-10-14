@@ -21,23 +21,23 @@ class TestTimingRefresh(unittest.TestCase):
         (self.repo / "scripts/ci_e2e_test_weights.tsv").write_text("TestCurrent 30\nTestDeleted 40\n")
         (self.repo / "scripts/ci_unit_package_weights.tsv").write_text("pkg/deleted 20\n")
 
-    def report(self, kind, index, suite):
-        path = self.reports / kind / f"{index}.xml"
+    def report(self, kind, index, count, suite):
+        path = self.reports / kind / f"{index}-of-{count}.xml"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(f'<testsuites failures="0" errors="0">{suite}</testsuites>')
 
     def test_collect_requires_every_successful_shard(self):
-        self.report("e2e", 0, '<testsuite><testcase name="TestCurrent" time="12" /></testsuite>')
-        with self.assertRaisesRegex(ValueError, "expected 10 E2E and 4 unit"):
+        self.report("e2e", 1, 2, '<testsuite><testcase name="TestCurrent" time="12" /></testsuite>')
+        with self.assertRaisesRegex(ValueError, "incomplete shard reports"):
             collect(self.reports, self.root / "summary.json", "abc")
 
     def test_collect_uses_root_or_child_time(self):
         for index in range(1, 11):
-            self.report("e2e", index,
+            self.report("e2e", index, 10,
                         f'<testsuite><testcase name="TestCase{index}" time="0" />'
                         f'<testcase name="TestCase{index}/step" time="12" /></testsuite>')
         for index in range(1, 5):
-            self.report("unit", index,
+            self.report("unit", index, 4,
                         f'<testsuite name="github.com/superplanehq/superplane/pkg/part{index}" time="9" />')
         output = self.root / "summary.json"
         collect(self.reports, output, "abc")
