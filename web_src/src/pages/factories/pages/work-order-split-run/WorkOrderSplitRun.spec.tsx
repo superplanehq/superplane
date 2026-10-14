@@ -1630,12 +1630,7 @@ describe("WorkOrderSplitRunPopup", () => {
     const card = screen.getByTestId("split-run-intent-status-card");
     expect(card).toHaveAttribute("data-slot", "frame");
     expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
-    expect(
-      within(screen.getByRole("region", { name: "Implementation" })).getByRole("button", { name: "Start" }),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByRole("region", { name: "Implementation" })).getByRole("button", { name: /^Model/ }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-plan-updated")).toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
@@ -1715,12 +1710,6 @@ describe("WorkOrderSplitRunPopup", () => {
     expect(screen.queryByTestId("split-run-intent-composer-score-copy")).not.toBeInTheDocument();
     expect(screen.getByTestId("split-run-intent-verdict-analyzing").querySelector(".t-matrix")).not.toBeNull();
     expect(screen.queryByTestId("split-run-intent-plan-chip-analyzing")).not.toBeInTheDocument();
-    expect(
-      within(screen.getByRole("region", { name: "Implementation" })).getByRole("button", { name: "Start" }),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByRole("region", { name: "Implementation" })).getByRole("button", { name: /^Model/ }),
-    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Refine" })).not.toBeInTheDocument();
     expect(screen.getByTestId("popup-work-order-archive-button")).toHaveAttribute("aria-label", "Archive");
   });
