@@ -334,7 +334,7 @@ function SkillToken({
           tabIndex={-1}
           data-skill-token={skill.name}
           data-skill-id={skill.id}
-          className="pointer-events-auto inline h-auto cursor-text rounded-md border-0 text-[13px] leading-[inherit] font-normal shadow-none hover:bg-violet-500/15 hover:text-violet-700 bg-violet-500/15 -mx-0.5 px-0.5 py-0 text-violet-700 ring-1 ring-inset ring-violet-500/30 dark:bg-violet-500/20 dark:text-violet-300 dark:ring-violet-500/50 dark:hover:bg-violet-500/20 dark:hover:text-violet-300"
+          className="pointer-events-auto inline h-auto whitespace-pre-wrap cursor-text rounded-md border-0 text-[13px] leading-[inherit] font-normal shadow-none hover:bg-violet-500/15 hover:text-violet-700 bg-violet-500/15 -mx-0.5 px-0.5 py-0 text-violet-700 ring-1 ring-inset ring-violet-500/30 dark:bg-violet-500/20 dark:text-violet-300 dark:ring-violet-500/50 dark:hover:bg-violet-500/20 dark:hover:text-violet-300"
           onMouseDown={(event) => {
             event.preventDefault();
             onSelect();
