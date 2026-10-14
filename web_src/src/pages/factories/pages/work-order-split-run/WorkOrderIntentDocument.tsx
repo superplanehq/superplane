@@ -11,7 +11,6 @@ import { liveDraftReadiness, type DraftReadinessTone } from "../../lib/draftRead
 import { INTENT_DOCUMENT_TITLE, type IntentDocument } from "../../lib/intentDocument";
 import { LOADING_REVEAL_CLASSNAME } from "../../lib/loadingReveal";
 import type { WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
-import { hasPendingPlanningQuestions } from "./planningReviewState";
 import { useRefineDocumentModel } from "./useRefineDocumentModel";
 import { WorkOrderIntentConfidenceFooter } from "./WorkOrderIntentConfidenceFooter";
 import { IntentDocumentSkeleton } from "./IntentDocumentSkeleton";
@@ -160,8 +159,8 @@ function withClosedDecision(
   if (!analysisChat) {
     return undefined;
   }
-  if (!showClosedDecision) {
-    return { ...analysisChat, closedDecision: undefined, modelSelect: undefined, readinessNote: undefined };
+  if (!showClosedDecision || !analysisChat.canTogglePlan) {
+    return { ...analysisChat, closedDecision: undefined, modelSelect: undefined };
   }
   const readiness = planningReadiness(analysisChat);
   const startTone = analysisChat.creditVerdict ? "blocked" : readiness.tone;
@@ -169,12 +168,6 @@ function withClosedDecision(
   return {
     ...analysisChat,
     startDiscouraged,
-    readinessNote: startDiscouraged ? { headline: readiness.headline, text: readiness.text } : undefined,
-    prioritizeImplementation:
-      Boolean(analysisChat.canTogglePlan) &&
-      readiness.tone === "ready" &&
-      analysisChat.view.machineStatus === "waiting" &&
-      !hasPendingPlanningQuestions(analysisChat.view),
     closedDecision: <ClosedPlanActions resultFooter={resultFooter} startTone={startTone} />,
   };
 }

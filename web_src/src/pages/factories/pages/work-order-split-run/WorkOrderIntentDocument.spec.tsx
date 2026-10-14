@@ -445,7 +445,6 @@ describe("WorkOrderIntentDocument", () => {
       within(screen.getByTestId("split-run-intent-chat-log")).getByTestId("create-with-agent-survey"),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /High/ }));
     await user.click(screen.getByRole("button", { name: CREATE_WITH_AGENT_COPY.nextQuestion }));
 
     expect(onSubmitSurvey).not.toHaveBeenCalled();
