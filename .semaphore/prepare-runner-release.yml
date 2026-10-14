@@ -33,7 +33,9 @@ blocks:
             - docker buildx create --driver docker-container --use --name "component-release-$SEMAPHORE_JOB_ID"
             - docker buildx inspect --bootstrap
             - bash release/runner/build.sh "$RELEASE_VERSION"
+            - bash release/fetch-component-release-history.sh
             - |
+              set -euo pipefail
               release_dir="build/runner/$RELEASE_VERSION"
               node release/component-release.js generate-release-notes \
                 --component runner \
