@@ -1,5 +1,10 @@
 {{- if eq .Values.encryption.secretName "" }}
-{{- $key := .Values.encryption.key | required ".Values.encryption.key is required." -}}
+{{- $key := .Values.encryption.key -}}
+{{- $local := .Values.encryption.localMasterKeys -}}
+{{- $kms := .Values.encryption.kmsKeyURIs -}}
+{{- if not (or $key $local $kms) -}}
+{{- fail "Set encryption.key, encryption.localMasterKeys, or encryption.kmsKeyURIs." -}}
+{{- end -}}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -7,5 +12,16 @@ metadata:
   namespace: {{ .Release.Namespace }}
 type: Opaque
 data:
+  {{- if $key }}
   ENCRYPTION_KEY: {{ $key }}
+  {{- end }}
+  {{- if $local }}
+  ENCRYPTION_LOCAL_MASTER_KEYS: {{ $local | b64enc | quote }}
+  {{- end }}
+  {{- if $kms }}
+  ENCRYPTION_KMS_KEY_URIS: {{ $kms | b64enc | quote }}
+  {{- end }}
+  {{- if .Values.encryption.initialMasterKeyRef }}
+  ENCRYPTION_INITIAL_MASTER_KEY_REF: {{ .Values.encryption.initialMasterKeyRef | b64enc | quote }}
+  {{- end }}
 {{- end }}

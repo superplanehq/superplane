@@ -251,6 +251,54 @@ CREATE TABLE public.app_messages (
 
 
 --
+-- Name: application_encryption_keys; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.application_encryption_keys (
+    id uuid NOT NULL,
+    wrapped_key bytea NOT NULL,
+    master_key_ref text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: application_encryption_migrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.application_encryption_migrations (
+    id uuid NOT NULL,
+    target_key_id uuid NOT NULL,
+    state text NOT NULL,
+    registry_version integer NOT NULL,
+    storage_location text NOT NULL,
+    cursor text DEFAULT ''::text NOT NULL,
+    pass integer DEFAULT 1 NOT NULL,
+    lease_owner uuid,
+    lease_expires_at timestamp with time zone,
+    lease_generation bigint DEFAULT 0 NOT NULL,
+    error_message text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    CONSTRAINT application_encryption_migrations_state_check CHECK ((state = ANY (ARRAY['pending'::text, 'running'::text, 'failed'::text, 'completed'::text, 'abandoned'::text])))
+);
+
+
+--
+-- Name: application_encryption_state; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.application_encryption_state (
+    id integer DEFAULT 1 NOT NULL,
+    active_key_id uuid NOT NULL,
+    generation bigint DEFAULT 1 NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT application_encryption_state_id_check CHECK ((id = 1))
+);
+
+
+--
 -- Name: bitbucket_forge_installations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2167,6 +2215,30 @@ ALTER TABLE ONLY public.app_messages
 
 
 --
+-- Name: application_encryption_keys application_encryption_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.application_encryption_keys
+    ADD CONSTRAINT application_encryption_keys_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: application_encryption_migrations application_encryption_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.application_encryption_migrations
+    ADD CONSTRAINT application_encryption_migrations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: application_encryption_state application_encryption_state_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.application_encryption_state
+    ADD CONSTRAINT application_encryption_state_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: bitbucket_forge_installations bitbucket_forge_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3104,6 +3176,13 @@ CREATE INDEX agent_sessions_provider_session_id_idx ON public.agent_sessions USI
 --
 
 CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USING btree (organization_id, user_id, canvas_id);
+
+
+--
+-- Name: application_encryption_migrations_unfinished; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX application_encryption_migrations_unfinished ON public.application_encryption_migrations USING btree ((1)) WHERE (state = ANY (ARRAY['pending'::text, 'running'::text, 'failed'::text]));
 
 
 --
@@ -4513,6 +4592,22 @@ ALTER TABLE ONLY public.app_messages
 
 
 --
+-- Name: application_encryption_migrations application_encryption_migrations_target_key_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.application_encryption_migrations
+    ADD CONSTRAINT application_encryption_migrations_target_key_id_fkey FOREIGN KEY (target_key_id) REFERENCES public.application_encryption_keys(id);
+
+
+--
+-- Name: application_encryption_state application_encryption_state_active_key_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.application_encryption_state
+    ADD CONSTRAINT application_encryption_state_active_key_id_fkey FOREIGN KEY (active_key_id) REFERENCES public.application_encryption_keys(id);
+
+
+--
 -- Name: canvas_memories canvas_memories_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5680,7 +5775,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261014121106	f
+20261014192641	f
 \.
 
 

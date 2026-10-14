@@ -32,6 +32,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/encryption"
 	"github.com/superplanehq/superplane/pkg/enterprise"
 	"github.com/superplanehq/superplane/pkg/githubapp"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
@@ -480,22 +481,26 @@ func buildGRPCServices(
 	agentService agentsActions.AgentsService,
 	jwtSigner *jwt.Signer,
 	licenseService *licensing.Service,
+	keyStore *encryption.Store,
+	migrator *encryption.Migrator,
 ) (*grpc.Services, error) {
 	features := enterprise.NewRegistry()
 	features.Register(enterprise.RBAC, rbac.NewService(authService, licenseService))
 
 	return grpc.NewServices(grpc.ServicesConfig{
-		BaseURL:          baseURL,
-		WebhooksBaseURL:  webhooksBaseURL,
-		RunnerAPIBaseURL: runnerAPIBaseURL,
-		Encryptor:        encryptor,
-		AuthService:      authService,
-		Registry:         registry,
-		OIDCProvider:     oidcProvider,
-		AgentService:     agentService,
-		JWTSigner:        jwtSigner,
-		Entitlements:     licenseService,
-		Enterprise:       features,
+		BaseURL:            baseURL,
+		WebhooksBaseURL:    webhooksBaseURL,
+		RunnerAPIBaseURL:   runnerAPIBaseURL,
+		Encryptor:          encryptor,
+		EncryptionStore:    keyStore,
+		EncryptionMigrator: migrator,
+		AuthService:        authService,
+		Registry:           registry,
+		OIDCProvider:       oidcProvider,
+		AgentService:       agentService,
+		JWTSigner:          jwtSigner,
+		Entitlements:       licenseService,
+		Enterprise:         features,
 	})
 }
 
@@ -744,19 +749,37 @@ func Start() {
 	}
 
 	encryptionKey := os.Getenv("ENCRYPTION_KEY")
-	if encryptionKey == "" {
-		panic("ENCRYPTION_KEY can't be empty")
-	}
 
 	log.SetLevel(log.DebugLevel)
 
 	var encryptorInstance crypto.Encryptor
+	var keyStore *encryption.Store
 	if os.Getenv("NO_ENCRYPTION") == "yes" {
 		log.Warn("NO_ENCRYPTION is set to yes, using NoOpEncryptor")
 		encryptorInstance = crypto.NewNoOpEncryptor()
 	} else {
-		encryptorInstance = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
+		var legacy crypto.Encryptor
+		if encryptionKey != "" {
+			legacy = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
+		}
+		masters, initialRef, err := crypto.MasterKeysFromEnv(context.Background())
+		if err != nil {
+			panic(fmt.Sprintf("load encryption master keys: %v", err))
+		}
+		if masters == nil {
+			if legacy == nil {
+				panic("ENCRYPTION_KEY or an application encryption master key is required")
+			}
+			encryptorInstance = legacy
+		} else {
+			keyStore = encryption.NewStore(masters)
+			if err := keyStore.Initialize(context.Background(), initialRef); err != nil {
+				panic(fmt.Sprintf("load application data keys: %v", err))
+			}
+			encryptorInstance = crypto.NewVersionedEncryptor(keyStore, legacy)
+		}
 	}
+	crypto.SetProcessEncryptor(encryptorInstance)
 
 	bitbucketapp.SetSystemTokenSource(func(installationID string) (string, time.Time, error) {
 		return bitbucketapp.LoadSystemToken(context.Background(), database.Conn(), encryptorInstance, installationID, time.Now())
@@ -860,6 +883,13 @@ func Start() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
+	var migrator *encryption.Migrator
+	if keyStore != nil {
+		migrator = encryption.NewMigrator(encryptorInstance.(*crypto.VersionedEncryptor), registry, models.ApplicationEncryptedStorage())
+		if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
+			go migrator.Run(context.Background())
+		}
+	}
 
 	agentProvider, agentService := buildAgentService(authService)
 
@@ -876,6 +906,8 @@ func Start() {
 			agentService,
 			jwtSigner,
 			licenseService,
+			keyStore,
+			migrator,
 		)
 		if err != nil {
 			log.Fatalf("failed to build gRPC services: %v", err)

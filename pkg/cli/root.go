@@ -58,6 +58,7 @@ func init() {
 
 	options := defaultBindOptions()
 	RootCmd.AddCommand(apps.NewCommand(options))
+	RootCmd.AddCommand(newAdminCommand())
 	RootCmd.AddCommand(runs.NewCommand(options))
 	RootCmd.AddCommand(groups.NewCommand(options))
 	RootCmd.AddCommand(index.NewCommand(options))

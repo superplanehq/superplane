@@ -48,6 +48,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
+	pbAdminKeys "github.com/superplanehq/superplane/pkg/protos/admin/keys"
 	pbAdminRunners "github.com/superplanehq/superplane/pkg/protos/admin/runners"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbAPIKeys "github.com/superplanehq/superplane/pkg/protos/api_keys"
@@ -417,8 +418,12 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	if err := pbAdminRunners.RegisterRunnersHandlerServer(ctx, adminGatewayMux, services.AdminRunners); err != nil {
 		return err
 	}
+	if err := pbAdminKeys.RegisterKeysHandlerServer(ctx, adminGatewayMux, services.AdminKeys); err != nil {
+		return err
+	}
 	adminGatewayHandler := s.grpcGatewayAccountHandler(adminGatewayMux)
 	s.adminRouter.PathPrefix("/installation/fleets").Handler(adminGatewayHandler)
+	s.adminRouter.PathPrefix("/installation/keys").Handler(adminGatewayHandler)
 
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {

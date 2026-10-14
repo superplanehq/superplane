@@ -67,11 +67,17 @@ authentication:
     clientSecret: ""
 
 #
-# Key used to encrypt sensitive values before storing them in the database.
+# Application encryption. `key` is the base64-encoded legacy ENCRYPTION_KEY.
+# Set localMasterKeys or kmsKeyURIs to write new values with versioned data keys.
+# For a new installation, a master key can replace the legacy key.
+# If secretName is set, supply these environment variables in that Secret.
 #
 encryption:
   secretName: ""
   key: ""
+  localMasterKeys: ""
+  kmsKeyURIs: ""
+  initialMasterKeyRef: ""
 
 #
 # Optional Enterprise license from an existing Kubernetes secret. When set,

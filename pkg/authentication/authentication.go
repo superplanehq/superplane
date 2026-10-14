@@ -1318,7 +1318,8 @@ func getAuthState(r *http.Request) string {
 }
 
 func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account, gothUser goth.User) error {
-	accessToken, err := encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Email))
+	email := utils.NormalizeEmail(gothUser.Email)
+	accessToken, err := encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(email))
 	if err != nil {
 		return err
 	}
@@ -1331,7 +1332,7 @@ func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account,
 	if err == nil {
 		accountProvider.AccessToken = base64.StdEncoding.EncodeToString(accessToken)
 		accountProvider.Username = gothUser.NickName
-		accountProvider.Email = utils.NormalizeEmail(gothUser.Email)
+		accountProvider.Email = email
 		accountProvider.Name = gothUser.Name
 		accountProvider.AvatarURL = gothUser.AvatarURL
 		accountProvider.RefreshToken = gothUser.RefreshToken
@@ -1350,7 +1351,7 @@ func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account,
 		Provider:       gothUser.Provider,
 		ProviderID:     gothUser.UserID,
 		Username:       gothUser.NickName,
-		Email:          utils.NormalizeEmail(gothUser.Email),
+		Email:          email,
 		Name:           gothUser.Name,
 		AvatarURL:      gothUser.AvatarURL,
 		AccessToken:    base64.StdEncoding.EncodeToString(accessToken),
