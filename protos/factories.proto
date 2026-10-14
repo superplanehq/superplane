@@ -2656,6 +2656,8 @@ message FactoryAgentResource {
     KIND_UNSPECIFIED = 0;
     KIND_MCP_SERVER = 1;
     KIND_SKILL = 2;
+    KIND_SETUP_COMMAND = 3;
+    KIND_CONTEXT_REPO = 4;
   }
 
   enum Auth {
@@ -2697,6 +2699,8 @@ message FactoryAgentResource {
   string path = 17;
   string markdown = 18;
   repeated string disabled_tools = 19;
+  repeated string commands = 20;
+  string vcs_provider = 21;
 }
 
 message ListFactoryAgentResourcesRequest {
@@ -2717,6 +2721,9 @@ message CreateFactoryAgentResourceRequest {
   FactoryAgentResource.Auth auth = 6;
   repeated FactoryAgentResource.Header headers = 7;
   string markdown = 8;
+  string repository = 9;
+  repeated string commands = 10;
+  string vcs_provider = 11;
 }
 
 message CreateFactoryAgentResourceResponse {
@@ -2734,6 +2741,10 @@ message UpdateFactoryAgentResourceRequest {
   optional string markdown = 8;
   repeated string disabled_tools = 9;
   optional bool replace_disabled_tools = 10;
+  optional string repository = 11;
+  repeated string commands = 12;
+  optional bool replace_commands = 13;
+  optional string vcs_provider = 14;
 }
 
 message UpdateFactoryAgentResourceResponse {

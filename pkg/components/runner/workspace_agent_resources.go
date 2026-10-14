@@ -23,6 +23,8 @@ const (
 	workspaceMCPConfigEnvValue      = "$SUPERPLANE_TASK_DIR/" + WorkspaceMCPConfigPath
 	workspaceClaudeSkillPath        = ".claude/skills/%s/SKILL.md"
 	workspaceAgentsSkillPath        = ".agents/skills/%s/SKILL.md"
+	WorkspaceSetupConfigPath        = "workspace_setup.json"
+	WorkspaceContextConfigPath      = "workspace_context.json"
 )
 
 type workspaceMCPServer struct {
@@ -36,9 +38,24 @@ type workspaceMCPFile struct {
 	Servers []workspaceMCPServer `json:"servers"`
 }
 
-// AttachWorkspaceAgentResources ships enabled workspace MCP connections and
-// inline skills on the broker task. It is a no-op when the canvas is not
-// factory-owned.
+type workspaceSetupFile struct {
+	Commands []string `json:"commands"`
+}
+
+type workspaceContextRepository struct {
+	Name       string `json:"name"`
+	Repository string `json:"repository"`
+	URL        string `json:"url"`
+	Directory  string `json:"directory"`
+}
+
+type workspaceContextFile struct {
+	Repositories []workspaceContextRepository `json:"repositories"`
+}
+
+// AttachWorkspaceAgentResources ships enabled workspace MCP connections,
+// inline skills, setup commands, and context repositories on the broker
+// task. It is a no-op when the canvas is not factory-owned.
 func AttachWorkspaceAgentResources(
 	ctx core.ExecutionContext,
 	environment []BrokerEnvironmentVariable,
@@ -59,7 +76,12 @@ func AttachWorkspaceAgentResources(
 		logger.WithError(err).Warn("skip workspace agent resources: skills feature check failed")
 		return environment, files
 	}
-	if !mcpEnabled && !skillsEnabled {
+	agentEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceAgent)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace agent resources: agent feature check failed")
+		return environment, files
+	}
+	if !mcpEnabled && !skillsEnabled && !agentEnabled {
 		return environment, files
 	}
 	canvasID, err := uuid.Parse(strings.TrimSpace(ctx.WorkflowID))
@@ -95,18 +117,57 @@ func AttachWorkspaceAgentResources(
 			return environment, files
 		}
 	}
+	var setupCommands []string
+	var contextRepos []models.FactoryAgentResource
+	if agentEnabled {
+		setupCommands, contextRepos, err = loadWorkspaceSetupAndContext(db, factory)
+		if err != nil {
+			logger.WithError(err).Warn("skip workspace setup and context: list failed")
+			return environment, files
+		}
+	}
 
 	disabled := disabledAgentResourceIDs(ctx.Configuration)
 	disabledTools := disabledAgentResourceTools(ctx.Configuration)
 	enabledTools := enabledAgentResourceTools(ctx.Configuration)
 	mcpServers = rejectDisabledAgentResources(mcpServers, disabled)
 	skills = rejectDisabledAgentResources(skills, disabled)
+	contextRepos = rejectDisabledAgentResources(contextRepos, disabled)
+	setupCommands = rejectDisabledSetupCommands(db, factory, setupCommands, disabled)
 
 	var mcpNames []string
 	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, disabledTools, enabledTools, environment, files)
 	files = appendWorkspaceSkillFiles(skills, files)
-	files = appendWorkspaceAgentResourcesHint(files, mcpNames)
+	files = appendWorkspaceSetupFiles(setupCommands, files)
+	files = appendWorkspaceContextFiles(factory, contextRepos, files)
+	files = appendWorkspaceAgentResourcesHint(files, mcpNames, setupCommands, contextRepos)
 	return environment, files
+}
+
+func loadWorkspaceSetupAndContext(db *gorm.DB, factory *models.Factory) ([]string, []models.FactoryAgentResource, error) {
+	commands, err := factory.ListEnabledSetupCommands(db)
+	if err != nil {
+		return nil, nil, err
+	}
+	repos, err := factory.ListEnabledContextRepos(db)
+	if err != nil {
+		return nil, nil, err
+	}
+	return commands, repos, nil
+}
+
+func rejectDisabledSetupCommands(db *gorm.DB, factory *models.Factory, commands []string, disabled map[string]struct{}) []string {
+	if len(disabled) == 0 || len(commands) == 0 {
+		return commands
+	}
+	setup, err := factory.FindSetupCommands(db)
+	if err != nil {
+		return commands
+	}
+	if _, skip := disabled[setup.ID.String()]; skip {
+		return nil
+	}
+	return commands
 }
 
 func attachWorkspaceMCPServers(
@@ -182,6 +243,84 @@ func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []
 		)
 	}
 	return files
+}
+
+func appendWorkspaceSetupFiles(commands []string, files []BrokerTaskFile) []BrokerTaskFile {
+	commands = models.NormalizeSetupCommands(commands)
+	if len(commands) == 0 {
+		return files
+	}
+	payload, err := json.Marshal(workspaceSetupFile{Commands: commands})
+	if err != nil {
+		return files
+	}
+	return append(files, BrokerTaskFile{
+		Path:    WorkspaceSetupConfigPath,
+		Content: string(payload) + "\n",
+		Mode:    "0644",
+	})
+}
+
+func WorkspaceContextRepoURL(provider, repository string) string {
+	repository = strings.TrimSpace(repository)
+	if strings.HasPrefix(repository, "https://") {
+		return repository
+	}
+	if strings.EqualFold(strings.TrimSpace(provider), models.ProviderBitbucket) {
+		return "https://bitbucket.org/" + repository + ".git"
+	}
+	return "https://github.com/" + repository + ".git"
+}
+
+func WorkspaceContextRepoDirectory(repository string) string {
+	repository = strings.TrimSpace(strings.Trim(repository, "/"))
+	if repository == "" {
+		return "context/repo"
+	}
+	return "context/" + repository
+}
+
+func appendWorkspaceContextFiles(factory *models.Factory, resources []models.FactoryAgentResource, files []BrokerTaskFile) []BrokerTaskFile {
+	if len(resources) == 0 {
+		return files
+	}
+	factoryProvider := ""
+	if factory != nil {
+		factoryProvider = factory.OnboardingConfigValue().EffectiveVCSProvider()
+	}
+	repos := make([]workspaceContextRepository, 0, len(resources))
+	for i := range resources {
+		config := resources[i].Config.Data()
+		repository := strings.TrimSpace(config.Repository)
+		if repository == "" {
+			continue
+		}
+		if err := config.ValidateContextRepo(); err != nil {
+			continue
+		}
+		provider := strings.TrimSpace(config.VCSProvider)
+		if provider == "" {
+			provider = factoryProvider
+		}
+		repos = append(repos, workspaceContextRepository{
+			Name:       resources[i].Name,
+			Repository: repository,
+			URL:        WorkspaceContextRepoURL(provider, repository),
+			Directory:  WorkspaceContextRepoDirectory(repository),
+		})
+	}
+	if len(repos) == 0 {
+		return files
+	}
+	payload, err := json.Marshal(workspaceContextFile{Repositories: repos})
+	if err != nil {
+		return files
+	}
+	return append(files, BrokerTaskFile{
+		Path:    WorkspaceContextConfigPath,
+		Content: string(payload) + "\n",
+		Mode:    "0644",
+	})
 }
 
 func workspaceAgentResourcesLogger(ctx core.ExecutionContext) *log.Entry {
@@ -382,8 +521,8 @@ func rejectDisabledAgentResources(resources []models.FactoryAgentResource, disab
 	return out
 }
 
-func workspaceAgentResourcesHint(mcpNames []string) string {
-	if len(mcpNames) == 0 {
+func workspaceAgentResourcesHint(mcpNames []string, setupCommands []string, contextRepos []models.FactoryAgentResource) string {
+	if len(mcpNames) == 0 && len(setupCommands) == 0 && len(contextRepos) == 0 {
 		return ""
 	}
 	var builder strings.Builder
@@ -392,11 +531,27 @@ func workspaceAgentResourcesHint(mcpNames []string) string {
 		builder.WriteString("\nMCP servers: ")
 		builder.WriteString(strings.Join(mcpNames, ", "))
 	}
+	if len(setupCommands) > 0 {
+		builder.WriteString("\nSetup commands (run in repo/ after clone, in order): ")
+		builder.WriteString(strings.Join(setupCommands, " && "))
+	}
+	if len(contextRepos) > 0 {
+		names := make([]string, 0, len(contextRepos))
+		for i := range contextRepos {
+			repository := strings.TrimSpace(contextRepos[i].Config.Data().Repository)
+			if repository == "" {
+				repository = contextRepos[i].Name
+			}
+			names = append(names, repository+" ("+WorkspaceContextRepoDirectory(repository)+")")
+		}
+		builder.WriteString("\nExtra repositories (clone with the workspace token when needed): ")
+		builder.WriteString(strings.Join(names, ", "))
+	}
 	return builder.String()
 }
 
-func appendWorkspaceAgentResourcesHint(files []BrokerTaskFile, mcpNames []string) []BrokerTaskFile {
-	hint := workspaceAgentResourcesHint(mcpNames)
+func appendWorkspaceAgentResourcesHint(files []BrokerTaskFile, mcpNames []string, setupCommands []string, contextRepos []models.FactoryAgentResource) []BrokerTaskFile {
+	hint := workspaceAgentResourcesHint(mcpNames, setupCommands, contextRepos)
 	if hint == "" {
 		return files
 	}

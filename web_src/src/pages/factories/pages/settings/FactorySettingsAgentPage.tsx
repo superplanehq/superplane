@@ -1,3 +1,4 @@
+import { Blocks } from "lucide-react";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -12,6 +13,8 @@ import { MCPAddPicker } from "./MCPAddPicker";
 import { MCPCatalogSetupDialog } from "./MCPCatalogSetupDialog";
 import { MCPServerList } from "./MCPServerList";
 import { useMCPPage } from "./useMCPPage";
+import { CrossRepoContextCard } from "./WorkspaceCrossRepoSection";
+import { WorkspaceSetupStepsSection } from "./WorkspaceSetupStepsSection";
 import { WorkspaceSkillsSection } from "./WorkspaceSkillsSection";
 
 export function FactorySettingsAgentPage() {
@@ -22,8 +25,24 @@ export function FactorySettingsAgentPage() {
   usePageTitle([AGENT_RESOURCES_COPY.agentTitle, page.factory?.name ?? "Workspace"]);
 
   return (
-    <FactorySettingsPageFrame narrow title={AGENT_RESOURCES_COPY.agentTitle}>
+    <FactorySettingsPageFrame
+      narrow
+      title={AGENT_RESOURCES_COPY.agentTitle}
+      subtitle={AGENT_RESOURCES_COPY.agentSubtitle}
+    >
       <div className="flex flex-col gap-5" data-testid="factory-settings-agent">
+        <WorkspaceSetupStepsSection
+          organizationId={page.organizationId}
+          factoryId={page.factoryId}
+          factoryKey={factoryRouteSegment(page.factory)}
+          canUpdate={page.canUpdate}
+        />
+        <CrossRepoContextCard
+          organizationId={page.organizationId}
+          factoryId={page.factoryId}
+          factory={page.factory}
+          canUpdate={page.canUpdate}
+        />
         {showMcp ? <WorkspaceMCPServers page={page} /> : null}
         {showSkills ? (
           <WorkspaceSkillsSection
@@ -93,7 +112,11 @@ function WorkspaceMCPServers({ page }: { page: ReturnType<typeof useMCPPage> }) 
     return (
       <FactorySettingsCard
         title={AGENT_RESOURCES_COPY.mcpConnectionsSectionTitle}
+        titleClassName="text-sm font-semibold"
         description={AGENT_RESOURCES_COPY.mcpConnectionsSectionDescription}
+        icon={<Blocks className="size-4" strokeWidth={1.75} aria-hidden />}
+        iconClassName="border-border bg-muted/60 text-foreground"
+        className="shadow-sm"
         action={addConnectionAction}
         data-testid="agent-resources-connections-empty"
       />
@@ -103,7 +126,11 @@ function WorkspaceMCPServers({ page }: { page: ReturnType<typeof useMCPPage> }) 
   return (
     <FactorySettingsCard
       title={AGENT_RESOURCES_COPY.mcpConnectionsSectionTitle}
+      titleClassName="text-sm font-semibold"
       description={AGENT_RESOURCES_COPY.mcpConnectionsSectionDescription}
+      icon={<Blocks className="size-4" strokeWidth={1.75} aria-hidden />}
+      iconClassName="border-border bg-muted/60 text-foreground"
+      className="shadow-sm"
       action={addConnectionAction}
       attachedList
     >

@@ -64,7 +64,7 @@ func CreateFactoryAgentResource(
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
 
-	config, err := protoAgentResourceConfig(req.GetKind(), req.GetUrl(), req.GetAuth(), req.GetHeaders(), req.GetMarkdown())
+	config, err := protoAgentResourceConfig(req.GetKind(), req.GetUrl(), req.GetAuth(), req.GetHeaders(), req.GetMarkdown(), req.GetRepository(), req.GetCommands(), req.GetVcsProvider())
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create agent resource")
 	}
@@ -127,6 +127,23 @@ func UpdateFactoryAgentResource(
 			merged := resource.Config.Data()
 			merged.Markdown = req.GetMarkdown()
 			merged.Source = models.FactoryAgentResourceSourceInline
+			config = &merged
+		}
+	} else if resource.Kind == models.FactoryAgentResourceKindSetup {
+		if req.GetReplaceCommands() || len(req.GetCommands()) > 0 {
+			merged := resource.Config.Data()
+			merged.Commands = models.NormalizeSetupCommands(req.GetCommands())
+			config = &merged
+		}
+	} else if resource.Kind == models.FactoryAgentResourceKindContextRepo {
+		if req.Repository != nil || req.VcsProvider != nil {
+			merged := resource.Config.Data()
+			if req.Repository != nil {
+				merged.Repository = req.GetRepository()
+			}
+			if req.VcsProvider != nil {
+				merged.VCSProvider = req.GetVcsProvider()
+			}
 			config = &merged
 		}
 	} else if req.Url != nil || req.Auth != nil || len(req.GetHeaders()) > 0 || req.GetReplaceDisabledTools() {
@@ -207,6 +224,8 @@ func serializeFactoryAgentResource(resource *models.FactoryAgentResource) *pb.Fa
 		Auth:          modelAuthToProto(config.MCPAuth()),
 		Headers:       modelHeadersToProto(config.Headers),
 		DisabledTools: config.DisabledTools,
+		Commands:      config.Commands,
+		VcsProvider:   config.VCSProvider,
 		OauthError:    resource.OAuthError,
 		CreatedAt:     timestamppb.New(resource.CreatedAt),
 		UpdatedAt:     timestamppb.New(resource.UpdatedAt),
@@ -219,6 +238,9 @@ func serializeFactoryAgentResource(resource *models.FactoryAgentResource) *pb.Fa
 		out.Ref = config.Ref
 		out.Path = config.Path
 		out.Markdown = config.Markdown
+	}
+	if resource.Kind == models.FactoryAgentResourceKindContextRepo {
+		out.Repository = config.Repository
 	}
 	if resource.OAuthConnectedBy != nil {
 		out.OauthConnectedByUserId = resource.OAuthConnectedBy.String()
@@ -235,11 +257,25 @@ func protoAgentResourceConfig(
 	auth pb.FactoryAgentResource_Auth,
 	headers []*pb.FactoryAgentResource_Header,
 	markdown string,
+	repository string,
+	commands []string,
+	vcsProvider string,
 ) (models.FactoryAgentResourceConfig, error) {
 	if kind == pb.FactoryAgentResource_KIND_SKILL {
 		return models.FactoryAgentResourceConfig{
 			Source:   models.FactoryAgentResourceSourceInline,
 			Markdown: markdown,
+		}, nil
+	}
+	if kind == pb.FactoryAgentResource_KIND_SETUP_COMMAND {
+		return models.FactoryAgentResourceConfig{
+			Commands: models.NormalizeSetupCommands(commands),
+		}, nil
+	}
+	if kind == pb.FactoryAgentResource_KIND_CONTEXT_REPO {
+		return models.FactoryAgentResourceConfig{
+			Repository:  repository,
+			VCSProvider: vcsProvider,
 		}, nil
 	}
 	return protoMCPConfig(rawURL, auth, headers)
@@ -269,6 +305,10 @@ func protoKindToModel(kind pb.FactoryAgentResource_Kind) string {
 	switch kind {
 	case pb.FactoryAgentResource_KIND_SKILL:
 		return models.FactoryAgentResourceKindSkill
+	case pb.FactoryAgentResource_KIND_SETUP_COMMAND:
+		return models.FactoryAgentResourceKindSetup
+	case pb.FactoryAgentResource_KIND_CONTEXT_REPO:
+		return models.FactoryAgentResourceKindContextRepo
 	case pb.FactoryAgentResource_KIND_MCP_SERVER, pb.FactoryAgentResource_KIND_UNSPECIFIED:
 		return models.FactoryAgentResourceKindMCPServer
 	default:
@@ -280,13 +320,22 @@ func modelKindToProto(kind string) pb.FactoryAgentResource_Kind {
 	if kind == models.FactoryAgentResourceKindSkill {
 		return pb.FactoryAgentResource_KIND_SKILL
 	}
+	if kind == models.FactoryAgentResourceKindSetup {
+		return pb.FactoryAgentResource_KIND_SETUP_COMMAND
+	}
+	if kind == models.FactoryAgentResourceKindContextRepo {
+		return pb.FactoryAgentResource_KIND_CONTEXT_REPO
+	}
 	return pb.FactoryAgentResource_KIND_MCP_SERVER
 }
 
 func requireAgentResourceKindFeature(orgID uuid.UUID, kind string) error {
 	featureID := features.FeatureWorkspaceMCP
-	if kind == models.FactoryAgentResourceKindSkill {
+	switch kind {
+	case models.FactoryAgentResourceKindSkill:
 		featureID = features.FeatureWorkspaceSkills
+	case models.FactoryAgentResourceKindSetup, models.FactoryAgentResourceKindContextRepo:
+		featureID = features.FeatureWorkspaceAgent
 	}
 	enabled, err := models.HasExperimentalFeature(orgID, featureID)
 	if err != nil {
@@ -295,10 +344,14 @@ func requireAgentResourceKindFeature(orgID uuid.UUID, kind string) error {
 	if enabled {
 		return nil
 	}
-	if kind == models.FactoryAgentResourceKindSkill {
+	switch kind {
+	case models.FactoryAgentResourceKindSkill:
 		return errWorkspaceSkillsDisabled
+	case models.FactoryAgentResourceKindSetup, models.FactoryAgentResourceKindContextRepo:
+		return errWorkspaceAgentDisabled
+	default:
+		return errWorkspaceMCPDisabled
 	}
-	return errWorkspaceMCPDisabled
 }
 
 func protoAuthToModel(auth pb.FactoryAgentResource_Auth) string {
