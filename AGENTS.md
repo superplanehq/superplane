@@ -105,9 +105,11 @@ Run these three steps once, in order:
 
 Factory workspace onboarding needs a GitHub App on a
 stable tunnel. Cloud holds `SUPERPLANE_GITHUB_APP_*`. Self-host and local
-development can create a private GitHub App from workspace Connect. Factory Sentry intake uses a public SuperPlane
-Sentry app. Without `SUPERPLANE_SENTRY_APP_*` in `.env`, SuperPlane asks
-for a personal token. See
+development can create a public GitHub App from workspace Connect. Other
+GitHub accounts can install that app. It is not listed in GitHub
+Marketplace. Factory Sentry intake uses a public SuperPlane Sentry app.
+Without `SUPERPLANE_SENTRY_APP_*` in `.env`, SuperPlane asks for a personal
+token. See
 [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
 
 `make dev.up`, `make dev.setup`, and `make dev.server` use the integrated

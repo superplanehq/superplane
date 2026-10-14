@@ -55,8 +55,11 @@ func PublicManifestJSON(baseURL, webhooksBaseURL string) (string, error) {
 	}
 
 	manifest := map[string]any{
-		"name":   "SuperPlane",
-		"public": false,
+		"name": "SuperPlane",
+		// Public lets other GitHub accounts install this app.
+		// It does not list the app in GitHub Marketplace.
+		// Organization integration apps stay private.
+		"public": true,
 		"url":    publicAppHomepageURL,
 		// GitHub's app creation form rejects email_addresses. Sign-in
 		// still requests the user:email scope.
