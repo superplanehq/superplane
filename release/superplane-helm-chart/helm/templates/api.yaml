@@ -139,6 +139,10 @@ spec:
               value: /app/rbac/rbac_canvas_policy.csv
             - name: APPLICATION_NAME
               value: superplane
+            - name: RUNNER_STABLE_VERSION
+              value: {{ .Values.componentReleases.runnerVersion | quote }}
+            - name: FLEET_MANAGER_STABLE_VERSION
+              value: {{ .Values.componentReleases.fleetManagerVersion | quote }}
             - name: DB_POOL_SIZE
               value: "{{ .Values.api.dbPoolSize }}"
             - name: DB_STATEMENT_TIMEOUT
