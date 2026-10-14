@@ -153,7 +153,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       fullHeight = false,
       ...rest
     } = props;
-    const [inputValue, setInputValue] = useState(value);
+    const normalizedValue = String(value ?? "");
+    const [inputValue, setInputValue] = useState(normalizedValue);
     const [suggestions, setSuggestions] = useState<Array<ReturnType<typeof getSuggestions>[number]>>([]);
     const [isOpen, setIsOpen] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
@@ -168,7 +169,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     const [previewMode, setPreviewMode] = useState(false);
     const dropdownWidth = 350;
     const previousWordLength = useRef<number>(0);
-    const previousInputValue = useRef<string>(value);
+    const previousInputValue = useRef<string>(normalizedValue);
     const highlightedIndexRef = useRef(highlightedIndex);
     const suggestionListKeyRef = useRef("");
     const suggestionItemsRef = useRef<Array<ReturnType<typeof getSuggestions>[number]>>([]);
@@ -987,7 +988,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       mirror.style.wordBreak = computed.wordBreak;
       mirror.style.overflow = "hidden";
 
-      mirror.replaceChildren(document.createTextNode(inputValue.substring(0, cursorPosition)));
+      mirror.replaceChildren(document.createTextNode(String(inputValue ?? "").substring(0, cursorPosition)));
 
       const cursorMarker = document.createElement("span");
       cursorMarker.textContent = "\u200b";
@@ -1058,7 +1059,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     }, [isOpen, suggestions.length, measureCursorPixelPosition]);
 
     useEffect(() => {
-      setInputValue(value);
+      setInputValue(String(value ?? ""));
     }, [value]);
 
     // Adjust textarea height when value or preview mode changes
