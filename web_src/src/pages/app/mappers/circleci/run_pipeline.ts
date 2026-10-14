@@ -111,12 +111,8 @@ export const runPipelineMapper: ComponentBaseMapper = {
   },
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
-    const outputs = context.execution.outputs as
-      | { success?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] }
-      | undefined;
-    const payload = asRunPipelineSource(
-      outputs?.success?.[0]?.data || outputs?.failed?.[0]?.data || outputs?.default?.[0]?.data,
-    );
+    const outputs = context.execution.outputs as RunPipelineOutputs | undefined;
+    const payload = runPipelineSourceFromOutputs(outputs);
 
     const nestedData = asRunPipelineSource(payload?.data);
     const payloadData = nestedData ?? payload;
@@ -155,6 +151,16 @@ type RunPipelineSource = {
   data?: unknown;
   pipeline?: RunPipelineInfo;
 };
+
+type RunPipelineOutputs = {
+  success?: OutputPayload[];
+  failed?: OutputPayload[];
+  default?: OutputPayload[];
+};
+
+function runPipelineSourceFromOutputs(outputs: RunPipelineOutputs | undefined): RunPipelineSource | undefined {
+  return asRunPipelineSource(outputs?.success?.[0]?.data || outputs?.failed?.[0]?.data || outputs?.default?.[0]?.data);
+}
 
 function asRunPipelineSource(value: unknown): RunPipelineSource | undefined {
   if (!value || typeof value !== "object") {
