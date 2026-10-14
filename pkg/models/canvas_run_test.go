@@ -244,6 +244,45 @@ func Test__CanvasRun__RequestCompletion__DoesNotRewriteFinishedRun(t *testing.T)
 	}
 }
 
+func Test__CanvasRun__RequestCancellation__WaitsForTheRunLock(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		[]models.Edge{},
+	)
+	run := createRunWithState(t, canvas.ID, models.CanvasRunStateStarted, "")
+	db := database.DB(t.Context())
+	release := holdCanvasRunLocks(t, run.ID)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- db.Transaction(func(tx *gorm.DB) error {
+			_, err := run.RequestCancellation(tx, nil)
+			return err
+		})
+	}()
+	select {
+	case err := <-done:
+		release()
+		require.NoError(t, err)
+		t.Fatal("cancellation returned while the run lock was held")
+	case <-time.After(300 * time.Millisecond):
+	}
+
+	busy, err := models.FindUnscopedCanvasRun(db, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateStarted, busy.State)
+	release()
+	require.NoError(t, <-done)
+
+	cancelled, err := models.FindUnscopedCanvasRun(db, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasRunStateCancelling, cancelled.State)
+}
+
 func Test__CanvasRun__RequestCancellation__OverridesCompletionRequest(t *testing.T) {
 	run, _ := setupRunWithExecution(t)
 	db := database.DB(t.Context())

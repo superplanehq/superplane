@@ -3428,6 +3428,13 @@ CREATE UNIQUE INDEX idx_factory_planning_sessions_canvas_run ON public.factory_p
 
 
 --
+-- Name: idx_factory_planning_sessions_draft_work_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_factory_planning_sessions_draft_work_order ON public.factory_planning_sessions USING btree (draft_work_order_id) INCLUDE (canvas_run_id) WHERE (draft_work_order_id IS NOT NULL);
+
+
+--
 -- Name: idx_factory_planning_sessions_factory_open; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3897,6 +3904,20 @@ CREATE INDEX idx_workflow_events_state ON public.workflow_events USING btree (st
 
 
 --
+-- Name: idx_workflow_events_work_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_work_order ON public.workflow_events USING btree ((((COALESCE((data -> 'data'::text), data) -> 'work_order'::text) ->> 'id'::text)), workflow_id) INCLUDE (run_id) WHERE (octet_length(((COALESCE((data -> 'data'::text), data) -> 'work_order'::text) ->> 'id'::text)) <= 36);
+
+
+--
+-- Name: idx_workflow_events_work_order_camel; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_work_order_camel ON public.workflow_events USING btree ((((COALESCE((data -> 'data'::text), data) -> 'workOrder'::text) ->> 'id'::text)), workflow_id) INCLUDE (run_id) WHERE (octet_length(((COALESCE((data -> 'data'::text), data) -> 'workOrder'::text) ->> 'id'::text)) <= 36);
+
+
+--
 -- Name: idx_workflow_events_workflow_node_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4023,6 +4044,13 @@ CREATE INDEX idx_workflow_runs_cancelling ON public.workflow_runs USING btree (c
 
 
 --
+-- Name: idx_workflow_runs_parent_execution; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_parent_execution ON public.workflow_runs USING btree (parent_workflow_id, parent_execution_id) WHERE ((parent_workflow_id IS NOT NULL) AND (parent_execution_id IS NOT NULL));
+
+
+--
 -- Name: idx_workflow_runs_parent_run_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4034,6 +4062,13 @@ CREATE INDEX idx_workflow_runs_parent_run_id ON public.workflow_runs USING btree
 --
 
 CREATE INDEX idx_workflow_runs_version_id ON public.workflow_runs USING btree (version_id);
+
+
+--
+-- Name: idx_workflow_runs_work_order_input; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_work_order_input ON public.workflow_runs USING btree ((((input -> 'work_order'::text) ->> 'id'::text)), workflow_id) INCLUDE (id) WHERE (octet_length(((input -> 'work_order'::text) ->> 'id'::text)) <= 36);
 
 
 --
@@ -5665,7 +5700,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261013085910	f
+20261014080343	f
 \.
 
 

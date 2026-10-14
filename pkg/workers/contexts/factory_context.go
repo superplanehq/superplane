@@ -46,9 +46,10 @@ type FactoryContext struct {
 	// notification payload for mutations that should email work order
 	// owners/creators. The node executor collects these and publishes
 	// them after the surrounding transaction commits.
-	onWorkOrderNotification func(messages.FactoryWorkOrderNotificationMessage)
-	onRunsCancelled         func([]*models.RunCancellationResult)
-	onFileBindCleanup       func(FileBindCleanup)
+	onWorkOrderNotification   func(messages.FactoryWorkOrderNotificationMessage)
+	onRunsCancelled           func([]*models.RunCancellationResult)
+	onRunCancellationDeferred func(orderID uuid.UUID, runIDs []uuid.UUID, excludedRunID uuid.UUID)
+	onFileBindCleanup         func(FileBindCleanup)
 
 	encryptor crypto.Encryptor
 	registry  *registry.Registry
@@ -105,6 +106,11 @@ func (c *FactoryContext) WithWorkOrderNotification(
 
 func (c *FactoryContext) WithRunsCancelled(callback func([]*models.RunCancellationResult)) *FactoryContext {
 	c.onRunsCancelled = callback
+	return c
+}
+
+func (c *FactoryContext) WithRunCancellationDeferred(callback func(orderID uuid.UUID, runIDs []uuid.UUID, excludedRunID uuid.UUID)) *FactoryContext {
+	c.onRunCancellationDeferred = callback
 	return c
 }
 
@@ -612,6 +618,13 @@ func (c *FactoryContext) UpdateWorkOrderStatus(params core.UpdateWorkOrderStatus
 	})
 	if err != nil {
 		return nil, false, err
+	}
+	if c.onRunCancellationDeferred != nil && len(order.DeferredRunCancellationIDs) > 0 {
+		excluded := uuid.Nil
+		if ref := c.runRef(); ref != nil {
+			excluded = ref.ID
+		}
+		c.onRunCancellationDeferred(order.ID, append([]uuid.UUID(nil), order.DeferredRunCancellationIDs...), excluded)
 	}
 
 	// A SkipSame no-op leaves the row untouched — skipping the fan-out

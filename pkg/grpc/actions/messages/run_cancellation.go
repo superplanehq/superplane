@@ -1,11 +1,15 @@
 package messages
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
+
+const deferredRunCancellationDeadline = 2 * time.Minute
 
 // PublishWorkOrderRunCancellations wakes terminators after a task close commits.
 func PublishWorkOrderRunCancellations(db *gorm.DB, order *models.FactoryWorkOrder) {
@@ -31,6 +35,46 @@ func PublishWorkOrderRunCancellations(db *gorm.DB, order *models.FactoryWorkOrde
 		}
 		if err := NewCanvasRunMessage(run.WorkflowID.String(), run.ID.String()).Publish(); err != nil {
 			log.WithError(err).Error("failed to publish task run cancelling message")
+		}
+	}
+}
+
+func PublishDeferredWorkOrderRunCancellations(db *gorm.DB, actor *uuid.UUID, runIDs []uuid.UUID, excluded uuid.UUID) {
+	pending := append([]uuid.UUID(nil), runIDs...)
+	if len(pending) == 0 {
+		return
+	}
+	deadline := time.Now().Add(deferredRunCancellationDeadline)
+	for {
+		results, remaining, err := models.FinishDeferredRunCancellations(db, actor, pending, excluded)
+		if err != nil {
+			log.WithError(err).Error("failed to finish deferred run cancellation")
+			return
+		}
+		publishCancellationResults(results)
+		if len(remaining) == 0 {
+			return
+		}
+		pending = remaining
+		if !time.Now().Before(deadline) {
+			log.Errorf("deferred run cancellation still waiting on the run lock for %s", pending)
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func publishCancellationResults(results []*models.RunCancellationResult) {
+	for _, result := range results {
+		if result == nil || result.Run == nil || result.Drain == nil {
+			continue
+		}
+		PublishRunCancellationDrain(result.Run.WorkflowID, result.Drain)
+		if !result.NewlyCancelling {
+			continue
+		}
+		if err := NewCanvasRunMessage(result.Run.WorkflowID.String(), result.Run.ID.String()).Publish(); err != nil {
+			log.WithError(err).Error("failed to publish deferred task run cancelling message")
 		}
 	}
 }
