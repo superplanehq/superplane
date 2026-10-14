@@ -253,8 +253,9 @@ rollback instructions, see
 Confirm that Fleet Manager runs:
 
 ```bash
-kubectl get pods -n superplane -l service=superplane-fleet-manager
-kubectl logs -n superplane deploy/superplane-fleet-manager
+kubectl get pods -n superplane \
+  -l app.kubernetes.io/instance=fleet-manager,app.kubernetes.io/name=fleet-manager
+kubectl logs -n superplane deployment/fleet-manager-fleet-manager
 ```
 
 The log must not show configuration or permission errors.
@@ -296,6 +297,7 @@ must stop and Fleet Manager must delete it after the task.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `superplane_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the SuperPlane image. |
+| `fleet_manager_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the standalone Fleet Manager image. Set this for private GCP registries so nodes keep pull access. |
 | `superplane_image_tag` | required | Image tag. Must contain `selfhosted`. Published tags are `<git-sha>-selfhosted`. |
 | `enable_gcs_blob_storage` | `false` | Store blobs in GCS. |
 | `blob_bucket_name` | `<project_id>-superplane-blobs` | Name of the blob bucket. |
@@ -332,7 +334,7 @@ One Certificate must exist in the namespace:
 port 80. Wait up to 15 minutes.
 
 **Fleet Manager restarts.** Read the log with
-`kubectl logs -n superplane deploy/superplane-fleet-manager --previous`.
+`kubectl logs -n superplane deployment/fleet-manager-fleet-manager --previous`.
 A configuration error names the field that is not correct.
 
 **Fleet Manager cannot create VMs.** Make sure that the Kubernetes service
@@ -375,7 +377,7 @@ Stop the runners first. Uninstall the standalone Fleet Manager chart. Then
 delete runner VMs that remain:
 
 ```bash
-helm uninstall superplane-fleet-manager -n superplane
+helm uninstall fleet-manager -n superplane
 
 # Fleet Manager labels runner VMs with cluster_name. The default is superplane.
 CLUSTER_NAME=superplane
