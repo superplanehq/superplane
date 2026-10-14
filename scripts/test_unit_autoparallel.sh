@@ -16,7 +16,9 @@ module_prefix="$(go list -m)"
 # whose runtime is large enough to dominate a shard.
 load_shard_weights "$(dirname "${BASH_SOURCE[0]}")/ci_unit_package_weights.tsv"
 
-packages="$(go list ./pkg/... ./ee/... ./cmd/... ./test/support/...)"
+# Command packages request VCS stamping by default. CI may not let the app
+# container read checkout metadata, and tests do not need VCS stamping.
+packages="$(go list -buildvcs=false ./pkg/... ./ee/... ./cmd/... ./test/support/...)"
 if [[ -z "$packages" ]]; then
   echo "No unit test packages found." >&2
   exit 1
@@ -57,6 +59,7 @@ gotestsum \
   --junitfile junit-report.xml \
   --packages="${shard_packages[*]}" \
   -- \
+  -buildvcs=false \
   -p 1 \
   -coverprofile=coverage-go.out \
   -covermode=atomic
