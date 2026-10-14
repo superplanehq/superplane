@@ -40,6 +40,15 @@ blocks:
                 --manifest "$release_dir/release-manifest.json"
               (cd "$release_dir" && sha256sum --check checksums.txt)
               test -n "${GITHUB_TOKEN:-}"
+            - bash release/fetch-component-release-history.sh
+            - |
+              set -euo pipefail
+              node release/component-release.js generate-release-notes \
+                --component runner \
+                --version "$RELEASE_VERSION" \
+                --sha "$SEMAPHORE_GIT_SHA" \
+                --output /tmp/runner-release-notes.md \
+                --github-authors
             - |
               set -euo pipefail
               release_dir="build/runner/$RELEASE_VERSION"
@@ -52,10 +61,9 @@ blocks:
                 --release-id-file /tmp/github-release-id
             - |
               set -euo pipefail
-              release_dir="build/runner/$RELEASE_VERSION"
               release_notes_args=()
-              if [ -f "$release_dir/release-notes.md" ]; then
-                release_notes_args=(--release-notes "$release_dir/release-notes.md")
+              if [ -f /tmp/runner-release-notes.md ]; then
+                release_notes_args=(--release-notes /tmp/runner-release-notes.md)
               fi
               node release/component-release.js publish-github-release \
                 --release-id "$(cat /tmp/github-release-id)" \

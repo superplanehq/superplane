@@ -59,6 +59,8 @@ promotions:
   - name: Publish Fleet Manager Release
     pipeline_file: publish-fleet-manager-release.yml
     deployment_target: release
+    auto_promote:
+      when: "branch = 'main' AND result = 'passed'"
     parameters:
       env_vars:
         - name: RELEASE_VERSION

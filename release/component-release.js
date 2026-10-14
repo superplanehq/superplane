@@ -189,6 +189,8 @@ function generateReleaseNotes({
   sha,
   output,
   repository,
+  includeGitHubAuthors = false,
+  githubToken,
   dockerExec = execFileSync,
 }) {
   const config = componentConfig(component);
@@ -211,18 +213,33 @@ function generateReleaseNotes({
     `${sourceRepository}:/app:ro`,
     "--entrypoint",
     "git-cliff",
+  ];
+  const dockerOptions = {
+    encoding: "utf8",
+    maxBuffer: 10 * 1024 * 1024,
+  };
+  if (includeGitHubAuthors) {
+    if (!githubToken?.trim()) {
+      throw new Error("GITHUB_TOKEN is required for GitHub author attribution");
+    }
+    args.push("--env", "GITHUB_TOKEN");
+    dockerOptions.env = { ...process.env, GITHUB_TOKEN: githubToken };
+  }
+  args.push(
     GIT_CLIFF_IMAGE,
     "--config",
     "cliff.toml",
     "--no-exec",
-    "--offline",
     "--strip",
     "header",
     "--tag",
     tag,
     "--tag-pattern",
     tagPattern,
-  ];
+  );
+  if (!includeGitHubAuthors) {
+    args.push("--offline");
+  }
   for (const releasePath of config.releasePaths) {
     args.push("--include-path", releasePath);
   }
@@ -236,10 +253,7 @@ function generateReleaseNotes({
   }
   args.push(range);
 
-  const notes = dockerExec("docker", args, {
-    encoding: "utf8",
-    maxBuffer: 10 * 1024 * 1024,
-  }).trim();
+  const notes = dockerExec("docker", args, dockerOptions).trim();
   if (!notes) {
     throw new Error("git-cliff generated empty release notes");
   }
@@ -673,11 +687,16 @@ async function main() {
     return;
   }
   if (command === "generate-release-notes") {
+    const includeGitHubAuthors = process.argv.includes("--github-authors");
     generateReleaseNotes({
       component: option("component"),
       version: option("version"),
       sha: option("sha"),
       output: option("output"),
+      includeGitHubAuthors,
+      githubToken: includeGitHubAuthors
+        ? process.env.GITHUB_TOKEN
+        : undefined,
     });
     return;
   }
