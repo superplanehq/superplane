@@ -12,7 +12,7 @@ export const useUserTokens = (organizationId: string) => {
   return useQuery({
     queryKey: userTokenKeys.list(organizationId),
     queryFn: async () => {
-      const response = await meListTokens(withOrganizationHeader({}));
+      const response = await meListTokens(withOrganizationHeader({ organizationId }));
       return response.data?.tokens || [];
     },
     staleTime: 2 * 60 * 1000,
@@ -28,6 +28,7 @@ export const useCreateUserToken = (organizationId: string) => {
     mutationFn: async (params: { name: string }) => {
       const response = await meCreateToken(
         withOrganizationHeader({
+          organizationId,
           body: { name: params.name },
         }),
       );
@@ -47,6 +48,7 @@ export const useRevokeUserToken = (organizationId: string) => {
     mutationFn: async (id: string) => {
       return meRevokeToken(
         withOrganizationHeader({
+          organizationId,
           path: { id },
         }),
       );

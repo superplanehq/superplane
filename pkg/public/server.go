@@ -822,7 +822,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/installation/factory-templates/{templateId}/reset", s.adminResetFactoryTemplate).Methods("POST")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminUpdateInstallationNetworkSettings).Methods("PATCH")
-	adminRoute.HandleFunc("/installation/first-run/fleet-manager", s.adminPrepareFleetManager).Methods("POST")
+	adminRoute.HandleFunc("/installation/fleet-manager/setup", s.adminGetFleetManagerSetup).Methods("GET")
 	adminRoute.HandleFunc("/installation/license", s.adminGetInstallationLicense).Methods("GET")
 	adminRoute.HandleFunc("/installation/license", s.adminInstallInstallationLicense).Methods("PUT")
 	adminRoute.HandleFunc("/installation/license", s.adminRemoveInstallationLicense).Methods("DELETE")
