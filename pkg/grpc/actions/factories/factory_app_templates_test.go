@@ -755,6 +755,16 @@ func TestMaterializeFactoryTemplateBitbucketImplement(t *testing.T) {
 	assert.NotContains(t, result.canvasYAML, "visualEvidence")
 	assert.NotContains(t, result.canvasYAML, "bitbucket.createPullRequestComment")
 	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
+
+	cloneCommand, ok := implementationStep(t, agent, "Clone Repo")["command"].(string)
+	require.True(t, ok)
+	assert.Contains(t, cloneCommand, `git config --global user.name "SuperPlane"`)
+	assert.Contains(t, cloneCommand, `git config user.name "SuperPlane"`)
+	assert.Contains(t, cloneCommand, `export GIT_AUTHOR_NAME="SuperPlane"`)
+	assert.Contains(t, cloneCommand, `export GIT_COMMITTER_NAME="SuperPlane"`)
+	assert.Contains(t, cloneCommand, `signoff="Signed-off-by: SuperPlane <${agent_email}>"`)
+	assert.Contains(t, cloneCommand, runner.FactoryAgentEmail)
+	assert.NotContains(t, cloneCommand, "SuperPlane Agent")
 }
 
 func TestMaterializeFactoryTemplateBitbucketPRClosure(t *testing.T) {
@@ -821,6 +831,9 @@ func TestBuildDiscussionPRFeedbackCanvasBitbucket(t *testing.T) {
 	assert.Contains(t, string(encoded), "BITBUCKET_EMAIL")
 	assert.Contains(t, string(encoded), "source.repository.full_name")
 	assert.NotContains(t, string(encoded), "git push origin HEAD")
+
+	runnerNode := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
+	assertBitbucketCommitSteps(t, runnerNode)
 }
 
 func TestMaterializeFactoryTemplateRejectsRetiredPlan(t *testing.T) {

@@ -243,6 +243,9 @@ func prFeedbackChecksRunnerConfiguration(request prFeedbackBuildRequest) map[str
 }
 
 func prFeedbackChecksRunnerSteps(request prFeedbackBuildRequest) []any {
+	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
+		return prFeedbackBitbucketChecksRunnerSteps(request)
+	}
 	steps := []any{
 		map[string]any{
 			"name": "Set Up Git User",
@@ -252,28 +255,6 @@ func prFeedbackChecksRunnerSteps(request prFeedbackBuildRequest) []any {
 				"git config --global user.name \"" + runner.FactoryAgentName + "\"",
 			}, "\n"),
 		},
-	}
-	if prFeedbackVCSProvider(request) == models.ProviderBitbucket {
-		return append(steps,
-			map[string]any{
-				"name":    "Checkout Pull Request",
-				"type":    "bash",
-				"command": bitbucketCheckoutCommand(),
-			},
-			map[string]any{
-				"name":             "Set Up DCO Signing",
-				"type":             "bash",
-				"workingDirectory": "repo",
-				"command":          runner.FactoryRepoCommitSetup(),
-			},
-			map[string]any{
-				"name":             "Fix Failed Builds",
-				"type":             "prompt",
-				"workingDirectory": "repo",
-				"prompt":           prFeedbackChecksPrompt(request),
-			},
-			prFeedbackBitbucketCommitPushStep(),
-		)
 	}
 	return append(steps,
 		map[string]any{
@@ -309,6 +290,38 @@ func prFeedbackChecksRunnerSteps(request prFeedbackBuildRequest) []any {
 		},
 		prFeedbackGitHubCommitPushStep(),
 	)
+}
+
+func prFeedbackBitbucketChecksRunnerSteps(request prFeedbackBuildRequest) []any {
+	agentName := runner.FactoryCommitName(models.ProviderBitbucket)
+	return []any{
+		map[string]any{
+			"name": "Set Up Git User",
+			"type": "bash",
+			"command": strings.Join([]string{
+				"git config --global user.email \"" + runner.FactoryAgentEmail + "\"",
+				"git config --global user.name \"" + agentName + "\"",
+			}, "\n"),
+		},
+		map[string]any{
+			"name":    "Checkout Pull Request",
+			"type":    "bash",
+			"command": bitbucketCheckoutCommand(),
+		},
+		map[string]any{
+			"name":             "Set Up DCO Signing",
+			"type":             "bash",
+			"workingDirectory": "repo",
+			"command":          runner.FactoryRepoCommitSetupForAgent(agentName),
+		},
+		map[string]any{
+			"name":             "Fix Failed Builds",
+			"type":             "prompt",
+			"workingDirectory": "repo",
+			"prompt":           prFeedbackChecksPrompt(request),
+		},
+		prFeedbackBitbucketCommitPushStep(),
+	}
 }
 
 func prFeedbackGitHubCommitPushStep() map[string]any {

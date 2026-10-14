@@ -344,6 +344,7 @@ func Test__BuildPRFeedbackCanvas(t *testing.T) {
 		assert.NotContains(t, checkout, "pr-feedback")
 
 		assert.Contains(t, runnerEnv(t, runner, "COAUTHORS"), "task().assignees")
+		assert.Contains(t, runnerStepCommand(t, runner, "Set Up Git User"), `git config --global user.name "`+runnerpkg.FactoryAgentName+`"`)
 		dco := runnerStepCommand(t, runner, "Set Up DCO Signing")
 		assert.Contains(t, dco, runnerpkg.FactoryRepoCommitSetup())
 		assert.Contains(t, dco, "agent@superplane.com")
@@ -471,6 +472,7 @@ func Test__BuildChecksPRFeedbackCanvas(t *testing.T) {
 		assert.Contains(t, push, "REMOTE_HEAD")
 		assert.Contains(t, push, `if [ "${REMOTE_HEAD}" != "${PR_REVISION}" ]`)
 		assert.Contains(t, push, `git commit -s -m "fix: repair failing checks on PR #${PR_NUMBER}"`)
+		assert.Contains(t, runnerStepCommand(t, runner, "Set Up Git User"), `git config --global user.name "`+runnerpkg.FactoryAgentName+`"`)
 		assert.Contains(t, runnerStepCommand(t, runner, "Set Up DCO Signing"), runnerpkg.FactoryRepoCommitSetup())
 		assert.Contains(t, runnerStepPrompt(t, runner, "Fix Failed Checks"), runnerpkg.FactoryCommitIdentityPrompt)
 
@@ -553,6 +555,17 @@ func runnerEnv(t *testing.T, node yaml.Node, name string) string {
 func runnerStepCommand(t *testing.T, node yaml.Node, name string) string {
 	t.Helper()
 	return runnerStepString(t, node, name, "command")
+}
+
+func assertBitbucketCommitSteps(t *testing.T, node yaml.Node) {
+	t.Helper()
+	gitUser := runnerStepCommand(t, node, "Set Up Git User")
+	assert.Contains(t, gitUser, `git config --global user.name "`+runnerpkg.FactoryBitbucketAgentName+`"`)
+	assert.NotContains(t, gitUser, runnerpkg.FactoryAgentName)
+	dco := runnerStepCommand(t, node, "Set Up DCO Signing")
+	assert.Contains(t, dco, runnerpkg.FactoryRepoCommitSetupForAgent(runnerpkg.FactoryBitbucketAgentName))
+	assert.NotContains(t, dco, `git config user.name "`+runnerpkg.FactoryAgentName+`"`)
+	assert.Contains(t, dco, `signoff="Signed-off-by: `+runnerpkg.FactoryBitbucketAgentName+` <${agent_email}>"`)
 }
 
 func runnerStepPrompt(t *testing.T, node yaml.Node, name string) string {

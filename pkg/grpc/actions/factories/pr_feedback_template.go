@@ -658,13 +658,14 @@ func prFeedbackRunnerStepsFor(request prFeedbackBuildRequest) []any {
 // prFeedbackBitbucketRunnerSteps checks out the pull request source
 // repository. A same-named branch on the destination is not a push target.
 func prFeedbackBitbucketRunnerSteps(request prFeedbackBuildRequest) []any {
+	agentName := runner.FactoryCommitName(models.ProviderBitbucket)
 	return []any{
 		map[string]any{
 			"name": "Set Up Git User",
 			"type": "bash",
 			"command": strings.Join([]string{
 				"git config --global user.email \"" + runner.FactoryAgentEmail + "\"",
-				"git config --global user.name \"" + runner.FactoryAgentName + "\"",
+				"git config --global user.name \"" + agentName + "\"",
 			}, "\n"),
 		},
 		map[string]any{
@@ -676,7 +677,7 @@ func prFeedbackBitbucketRunnerSteps(request prFeedbackBuildRequest) []any {
 			"name":             "Set Up DCO Signing",
 			"type":             "bash",
 			"workingDirectory": "repo",
-			"command":          runner.FactoryRepoCommitSetup(),
+			"command":          runner.FactoryRepoCommitSetupForAgent(agentName),
 		},
 		map[string]any{
 			"name":             "Address PR feedback",
