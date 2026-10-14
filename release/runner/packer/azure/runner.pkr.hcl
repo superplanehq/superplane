@@ -141,25 +141,9 @@ build {
     pause_before    = "15s"
   }
 
-  # Packer uploads one script to /tmp. Keep both media scripts in one
-  # directory so install-media-tools.sh can call install-yt-dlp.sh.
-  provisioner "file" {
-    source      = "${path.root}/../aws/scripts/install-media-tools.sh"
-    destination = "/tmp/install-media-tools.sh"
-  }
-
-  provisioner "file" {
-    source      = "${path.root}/../aws/scripts/install-yt-dlp.sh"
-    destination = "/tmp/install-yt-dlp.sh"
-  }
-
   provisioner "shell" {
-    inline = [
-      "mkdir -p /tmp/superplane-media",
-      "cp /tmp/install-media-tools.sh /tmp/install-yt-dlp.sh /tmp/superplane-media/",
-      "chmod 0755 /tmp/superplane-media/install-media-tools.sh /tmp/superplane-media/install-yt-dlp.sh",
-      "sudo -E bash /tmp/superplane-media/install-media-tools.sh",
-    ]
+    script          = "${path.root}/../aws/scripts/install-media-tools.sh"
+    execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
   }
 
   provisioner "shell" {
