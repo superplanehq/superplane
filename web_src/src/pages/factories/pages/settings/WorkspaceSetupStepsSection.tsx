@@ -1,3 +1,4 @@
+import { Terminal } from "lucide-react";
 import { useNavigate } from "react-router";
 
 import { PermissionTooltip } from "@/components/PermissionGate";
@@ -30,7 +31,11 @@ export function WorkspaceSetupStepsSection({
   return (
     <FactorySettingsCard
       title={AGENT_RESOURCES_COPY.setupStepsTitle}
+      titleClassName="text-sm font-semibold"
       description={AGENT_RESOURCES_COPY.setupStepsHelper}
+      icon={<Terminal className="size-4" strokeWidth={1.75} aria-hidden />}
+      iconClassName="border-border bg-muted/60 text-foreground"
+      className="shadow-sm"
       action={
         <PermissionTooltip allowed={canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission}>
           <Button
@@ -51,14 +56,43 @@ export function WorkspaceSetupStepsSection({
       ) : setup.isError ? (
         <p className="text-[13px] text-destructive">{AGENT_RESOURCES_COPY.setupStepsLoadError}</p>
       ) : commands.length === 0 ? null : (
-        <div className="flex flex-col gap-2">
-          <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.setupStepsSummary(commands.length)}</p>
-          <pre className="overflow-x-auto rounded-lg border border-border bg-muted/40 p-3 font-mono text-[12px] leading-5">
-            {commands.slice(0, PREVIEW_COMMAND_LIMIT).join("\n")}
-            {commands.length > PREVIEW_COMMAND_LIMIT ? "\n…" : ""}
-          </pre>
-        </div>
+        <SetupStepsTerminal commands={commands} />
       )}
     </FactorySettingsCard>
+  );
+}
+
+function SetupStepsTerminal({ commands }: { commands: string[] }) {
+  const visible = commands.slice(0, PREVIEW_COMMAND_LIMIT);
+  const truncated = commands.length > PREVIEW_COMMAND_LIMIT;
+  return (
+    <div className="overflow-hidden rounded-lg bg-zinc-950 text-zinc-200" data-testid="agent-setup-steps-preview">
+      <div className="flex items-center gap-1.5 border-b border-white/10 px-3 py-2">
+        <span className="size-2 rounded-full bg-zinc-700" aria-hidden />
+        <span className="size-2 rounded-full bg-zinc-700" aria-hidden />
+        <span className="size-2 rounded-full bg-zinc-700" aria-hidden />
+        <span className="ml-1 font-mono text-[11px] tracking-wider text-zinc-500 uppercase">
+          {AGENT_RESOURCES_COPY.setupStepsTitle}
+        </span>
+        <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[11px] whitespace-nowrap text-zinc-300">
+          {AGENT_RESOURCES_COPY.setupStepsSummary(commands.length)}
+        </span>
+      </div>
+      <div className="overflow-x-auto p-3 font-mono text-[12px] leading-6">
+        {visible.map((command, index) => (
+          <div key={`${index}-${command}`} className="flex gap-2">
+            <span aria-hidden className="text-emerald-400/70 select-none">
+              $
+            </span>
+            <span className="min-w-0 flex-1 truncate text-zinc-100">{command}</span>
+          </div>
+        ))}
+        {truncated ? (
+          <div aria-hidden className="text-zinc-500 select-none">
+            …
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }

@@ -7,7 +7,11 @@ import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILL
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import { defaultFactoriesFixture, PRIMARY_FACTORY_KEY } from "../../__fixtures__/factoryPageResponses";
-import { CONNECTED_SETUP_INTEGRATIONS, SETUP_ANSWERS, factoriesFixtureWithSetupAnswers } from "../../__fixtures__/setupStoryFixtures";
+import {
+  CONNECTED_SETUP_INTEGRATIONS,
+  SETUP_ANSWERS,
+  factoriesFixtureWithSetupAnswers,
+} from "../../__fixtures__/setupStoryFixtures";
 import { RepositoryPicker } from "../onboarding/onboardingSteps";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 
@@ -34,21 +38,12 @@ describe("cross-repo context picker", () => {
     expect(await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(screen.getByText(AGENT_RESOURCES_COPY.crossRepoMissingHint)).toBeInTheDocument();
     expect(screen.getByText(AGENT_RESOURCES_COPY.crossRepoMissingQuestion)).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: AGENT_RESOURCES_COPY.crossRepoGrantGitHub }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: AGENT_RESOURCES_COPY.crossRepoGrantGitHub })).toBeInTheDocument();
   }, 10000);
 
   it("says no match only when a search filters everything out", async () => {
     const user = userEvent.setup();
-    render(
-      <RepositoryPicker
-        host="github"
-        repos={["acme/api", "acme/web"]}
-        selectedRepo={null}
-        onSelect={() => {}}
-      />,
-    );
+    render(<RepositoryPicker host="github" repos={["acme/api", "acme/web"]} selectedRepo={null} onSelect={() => {}} />);
 
     await user.type(screen.getByRole("textbox", { name: "Search repositories" }), "zzz-no-such-repo");
     expect(await screen.findByText("No matching repositories.", {}, { timeout: 8000 })).toBeInTheDocument();

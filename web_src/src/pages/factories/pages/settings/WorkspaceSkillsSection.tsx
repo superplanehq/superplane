@@ -37,7 +37,7 @@ export function WorkspaceSkillsSection({
         disabled={!canUpdate}
         data-testid="agent-resources-add-skill"
       >
-        {AGENT_RESOURCES_COPY.addSkill}
+        {AGENT_RESOURCES_COPY.add}
       </Button>
     </PermissionTooltip>
   );
@@ -51,14 +51,22 @@ export function WorkspaceSkillsSection({
       ) : (skills.data ?? []).length === 0 ? (
         <FactorySettingsCard
           title={AGENT_RESOURCES_COPY.skillsTitle}
+          titleClassName="text-sm font-semibold"
           description={AGENT_RESOURCES_COPY.skillsHelper}
+          icon={<BookOpen className="size-4" strokeWidth={1.75} aria-hidden />}
+          iconClassName="border-border bg-muted/60 text-foreground"
+          className="shadow-sm"
           action={addSkillAction}
           data-testid="agent-resources-skills-empty"
         />
       ) : (
         <FactorySettingsCard
           title={AGENT_RESOURCES_COPY.skillsTitle}
+          titleClassName="text-sm font-semibold"
           description={AGENT_RESOURCES_COPY.skillsHelper}
+          icon={<BookOpen className="size-4" strokeWidth={1.75} aria-hidden />}
+          iconClassName="border-border bg-muted/60 text-foreground"
+          className="shadow-sm"
           action={addSkillAction}
           attachedList
           data-testid="agent-resources-skills-list"

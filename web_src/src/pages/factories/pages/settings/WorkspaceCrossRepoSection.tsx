@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { GitBranch, X } from "lucide-react";
 
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Button } from "@/components/ui/button";
@@ -56,14 +56,17 @@ function ContextRepoList({
       {resources.map((resource) => {
         const name = contextRepoName(resource);
         return (
-          <li key={resource.id ?? name} className="flex min-w-0 items-center gap-3 px-3 py-2.5">
+          <li
+            key={resource.id ?? name}
+            className="group flex min-w-0 items-center gap-3 px-3 py-2.5 transition-colors hover:bg-accent/40"
+          >
             <IntegrationChoiceIcon name={host} />
             <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{name}</span>
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="size-8 shrink-0 text-muted-foreground"
+              className="size-8 shrink-0 text-muted-foreground transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:focus-visible:opacity-100 [@media(hover:hover)]:group-hover:opacity-100"
               disabled={!canUpdate || isSaving}
               aria-label={AGENT_RESOURCES_COPY.removeRepository}
               data-testid={`agent-cross-repo-remove-${resource.id}`}
@@ -132,9 +135,13 @@ export function CrossRepoContextCard({
 
   return (
     <>
-      <FactorySettingsCard
-        title={AGENT_RESOURCES_COPY.crossRepoTitle}
-        description={AGENT_RESOURCES_COPY.crossRepoHelper}
+    <FactorySettingsCard
+      title={AGENT_RESOURCES_COPY.crossRepoTitle}
+      titleClassName="text-sm font-semibold"
+      description={AGENT_RESOURCES_COPY.crossRepoHelper}
+      icon={<GitBranch className="size-4" strokeWidth={1.75} aria-hidden />}
+      iconClassName="border-border bg-muted/60 text-foreground"
+      className="shadow-sm"
         action={
           <PermissionTooltip allowed={canUpdate} message={AGENT_RESOURCES_COPY.noUpdatePermission}>
             <Button
@@ -144,7 +151,7 @@ export function CrossRepoContextCard({
               onClick={() => setAdding(true)}
               data-testid="agent-cross-repo-add"
             >
-              {AGENT_RESOURCES_COPY.addRepository}
+              {AGENT_RESOURCES_COPY.add}
             </Button>
           </PermissionTooltip>
         }
