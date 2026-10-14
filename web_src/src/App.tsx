@@ -96,6 +96,7 @@ import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
 import InstallationLicenseAdmin from "./pages/admin/InstallationLicense";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
+import FleetManagerSetupAdmin from "./pages/admin/FleetManagerSetup";
 import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
 import { Webhooks as WebhooksAdmin } from "./pages/admin/Webhooks";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";
@@ -274,6 +275,7 @@ function AppRouter() {
                 <Route path="license" element={<InstallationLicenseAdmin />} />
                 <Route path="price-books" element={<PriceBooksAdmin />} />
                 <Route path="runner-tasks" element={<RunnerTasksAdmin />} />
+                <Route path="fleet-manager-setup" element={<FleetManagerSetupAdmin />} />
                 <Route path="polar-webhooks" element={<PolarWebhooksAdmin />} />
                 <Route path="webhooks" element={<WebhooksAdmin />} />
                 <Route path="sentry-webhooks" element={<Navigate to="/admin/webhooks" replace />} />

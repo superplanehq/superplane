@@ -70,9 +70,6 @@ function stubOwnerSetupFetch() {
       if (url.endsWith("/api/v1/setup-owner") && init?.method === "POST") {
         return jsonResponse({ organization_id: "org-1", organization_slug: "acme" });
       }
-      if (url.endsWith("/admin/api/installation/first-run/fleet-manager")) {
-        return jsonResponse({ yaml: "id: self-host\n", token: "tok" });
-      }
       return new Response("", { status: 404 });
     }),
   );
@@ -101,7 +98,7 @@ async function reachFleetStep() {
   fireEvent.click(screen.getByTestId("owner-setup-smtp-skip"));
 
   expect(await screen.findByTestId("owner-setup-fleet")).toBeInTheDocument();
-  await screen.findByTestId("owner-setup-fleet-yaml");
+  expect(screen.getByRole("link", { name: OWNER_SETUP_COPY.fleet.open })).toBeInTheDocument();
 }
 
 describe("OwnerSetup", () => {
