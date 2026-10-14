@@ -80,10 +80,53 @@ resource "aws_iam_role_policy" "fleet_manager" {
         Resource = "*"
       },
       {
+        Sid    = "UseRunnerLaunchResources"
+        Effect = "Allow"
+        Action = ["ec2:RunInstances"]
+        Resource = concat(
+          [
+            "arn:aws:ec2:${var.region}::image/*",
+            "arn:aws:ec2:${var.region}:${data.aws_caller_identity.current.account_id}:key-pair/*",
+            aws_security_group.runners[0].arn
+          ],
+          aws_subnet.private[*].arn
+        )
+      },
+      {
+        Sid      = "UseRunnerNetworkInterfaces"
+        Effect   = "Allow"
+        Action   = ["ec2:RunInstances"]
+        Resource = "arn:aws:ec2:${var.region}:${data.aws_caller_identity.current.account_id}:network-interface/*"
+        Condition = {
+          ArnEquals = {
+            "ec2:Subnet" = aws_subnet.private[*].arn
+          }
+        }
+      },
+      {
         Sid      = "CreateRunnerInstances"
         Effect   = "Allow"
         Action   = ["ec2:RunInstances"]
-        Resource = "*"
+        Resource = "arn:aws:ec2:${var.region}:${data.aws_caller_identity.current.account_id}:instance/*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Name" = "superplane-runner"
+          }
+          ArnEquals = {
+            "ec2:InstanceProfile" = aws_iam_instance_profile.runner[0].arn
+          }
+        }
+      },
+      {
+        Sid      = "CreateRunnerVolumes"
+        Effect   = "Allow"
+        Action   = ["ec2:RunInstances"]
+        Resource = "arn:aws:ec2:${var.region}:${data.aws_caller_identity.current.account_id}:volume/*"
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/Name" = "superplane-runner"
+          }
+        }
       },
       {
         Sid    = "TagRunnerResourcesDuringLaunch"
