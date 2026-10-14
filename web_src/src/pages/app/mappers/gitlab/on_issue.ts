@@ -32,6 +32,33 @@ interface OnIssueEventData {
   };
 }
 
+function buildMetadataItems(metadata?: GitLabNodeMetadata, configuration?: OnIssueConfiguration) {
+  const metadataItems = [];
+
+  if (metadata?.project?.name) {
+    metadataItems.push({
+      icon: "book",
+      label: metadata.project.name,
+    });
+  }
+
+  if (configuration?.actions) {
+    metadataItems.push({
+      icon: "funnel",
+      label: configuration.actions.join(", "),
+    });
+  }
+
+  if (configuration?.labels && configuration?.labels?.length > 0) {
+    metadataItems.push({
+      icon: "label",
+      label: configuration.labels.map((label) => formatPredicate(label)).join(", "),
+    });
+  }
+
+  return metadataItems;
+}
+
 export const onIssueTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext) => {
     const eventData = context.event?.data as OnIssueEventData;
@@ -63,35 +90,13 @@ export const onIssueTriggerRenderer: TriggerRenderer = {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as GitLabNodeMetadata;
     const configuration = node.configuration as unknown as OnIssueConfiguration;
-    const metadataItems = [];
-
-    if (metadata?.project?.name) {
-      metadataItems.push({
-        icon: "book",
-        label: metadata.project.name,
-      });
-    }
-
-    if (configuration?.actions) {
-      metadataItems.push({
-        icon: "funnel",
-        label: configuration.actions.join(", "),
-      });
-    }
-
-    if (configuration?.labels && configuration?.labels?.length > 0) {
-      metadataItems.push({
-        icon: "label",
-        label: configuration.labels.map((label) => formatPredicate(label)).join(", "),
-      });
-    }
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
       iconSrc: gitlabIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: metadataItems,
+      metadata: buildMetadataItems(metadata, configuration),
     };
 
     if (lastEvent) {
