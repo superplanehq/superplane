@@ -84,11 +84,6 @@ export function AccountProfileAssociatedAccountsCard({
             </li>
           ) : null}
         </ul>
-        {githubAccounts.length > 0 ? (
-          <Button type="button" size="sm" variant="outline" className="mt-4" onClick={onLinkGithub}>
-            Link another GitHub account
-          </Button>
-        ) : null}
         <BitbucketAssociatedAccounts
           accounts={bitbucketAccounts}
           onLink={onLinkBitbucket}
@@ -131,47 +126,40 @@ function BitbucketAssociatedAccounts({
   onRemove: (account: { providerId: string; username: string }) => void;
 }) {
   return (
-    <>
-      <ul className="mt-4 space-y-4">
-        {accounts.map((account, index) => (
-          <li key={account.providerId}>
-            <SettingsActionRow
-              title={<BitbucketTitle />}
-              description={`Linked as ${account.username}. Velocity uses this account to credit your pull requests.`}
-              testId={
-                index === 0
-                  ? "account-redesign-associated-bitbucket"
-                  : `account-redesign-associated-bitbucket-${account.providerId}`
-              }
-              action={
-                <Button type="button" size="sm" variant="ghost" onClick={() => onRemove(account)}>
-                  Remove
-                </Button>
-              }
-            />
-          </li>
-        ))}
-        {accounts.length === 0 ? (
-          <li>
-            <SettingsActionRow
-              title={<BitbucketTitle />}
-              description="Velocity uses your Bitbucket account to credit your pull requests."
-              testId="account-redesign-associated-bitbucket"
-              action={
-                <Button type="button" size="sm" variant="outline" onClick={onLink}>
-                  Link Bitbucket
-                </Button>
-              }
-            />
-          </li>
-        ) : null}
-      </ul>
-      {accounts.length > 0 ? (
-        <Button type="button" size="sm" variant="outline" className="mt-4" onClick={onLink}>
-          Link another Bitbucket account
-        </Button>
+    <ul className="mt-4 space-y-4">
+      {accounts.map((account, index) => (
+        <li key={account.providerId}>
+          <SettingsActionRow
+            title={<BitbucketTitle />}
+            description={`Linked as ${account.username}. Velocity uses this account to credit your pull requests.`}
+            testId={
+              index === 0
+                ? "account-redesign-associated-bitbucket"
+                : `account-redesign-associated-bitbucket-${account.providerId}`
+            }
+            action={
+              <Button type="button" size="sm" variant="ghost" onClick={() => onRemove(account)}>
+                Remove
+              </Button>
+            }
+          />
+        </li>
+      ))}
+      {accounts.length === 0 ? (
+        <li>
+          <SettingsActionRow
+            title={<BitbucketTitle />}
+            description="Velocity uses your Bitbucket account to credit your pull requests."
+            testId="account-redesign-associated-bitbucket"
+            action={
+              <Button type="button" size="sm" variant="outline" onClick={onLink}>
+                Link Bitbucket
+              </Button>
+            }
+          />
+        </li>
       ) : null}
-    </>
+    </ul>
   );
 }
 

@@ -138,6 +138,7 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByTestId("account-redesign-associated-github")).toHaveTextContent(
       "Linked as ada-lovelace. Velocity uses this account to credit your pull requests.",
     );
+    expect(screen.queryByRole("button", { name: "Link another GitHub account" })).not.toBeInTheDocument();
 
     await user.click(
       within(screen.getByTestId("account-redesign-associated-github")).getByRole("button", { name: "Remove" }),
@@ -168,7 +169,7 @@ describe("AccountProfileRedesignPlayground", () => {
 
     expect(screen.getByText(/Linked as forestileao/)).toBeInTheDocument();
     expect(screen.getByText(/Linked as forestigamer/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Link another GitHub account" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Link another GitHub account" })).not.toBeInTheDocument();
 
     const secondAccount = screen.getByTestId("account-redesign-associated-github-202");
     await user.click(within(secondAccount).getByRole("button", { name: "Remove" }));
@@ -192,6 +193,7 @@ describe("AccountProfileRedesignPlayground", () => {
     expect(screen.getByTestId("account-redesign-associated-bitbucket")).toHaveTextContent(
       "Linked as ada-bitbucket. Velocity uses this account to credit your pull requests.",
     );
+    expect(screen.queryByRole("button", { name: "Link another Bitbucket account" })).not.toBeInTheDocument();
 
     await user.click(
       within(screen.getByTestId("account-redesign-associated-bitbucket")).getByRole("button", { name: "Remove" }),
