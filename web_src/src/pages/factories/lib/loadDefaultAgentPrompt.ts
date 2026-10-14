@@ -3,7 +3,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { parseCanvasYamlForImport } from "@/pages/app/lib/workflow-spec-files";
 
 import type { PlanningReviewStep } from "../pages/planningReviewMockup";
-import { defaultAgentSteps, RESTORE_DEFAULT_PROMPT_COPY } from "./defaultAgentPrompt";
+import { defaultAgentSteps, DefaultPromptUnavailableError } from "./defaultAgentPrompt";
 
 export async function loadDefaultAgentPrompt(input: {
   organizationId: string;
@@ -20,12 +20,12 @@ export async function loadDefaultAgentPrompt(input: {
   );
   const parsed = parseCanvasYamlForImport(response.data?.canvasYaml ?? "");
   if (!parsed.ok) {
-    throw new Error(RESTORE_DEFAULT_PROMPT_COPY.error);
+    throw new DefaultPromptUnavailableError();
   }
 
   const steps = defaultAgentSteps(parsed.spec, input.agentNodeId);
   if (!steps?.some((step) => step.prompt)) {
-    throw new Error(RESTORE_DEFAULT_PROMPT_COPY.error);
+    throw new DefaultPromptUnavailableError();
   }
   return steps;
 }
