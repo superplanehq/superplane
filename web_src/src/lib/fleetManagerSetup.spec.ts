@@ -142,6 +142,8 @@ it("keeps the token out of generated commands", () => {
   const install = fleetManagerInstallCommand(metadata, "superplane", "values.yaml");
 
   expect(secret).toContain("read -rsp");
+  expect(secret).toContain("--from-file=INSTALLATION_ADMIN_TOKEN=/dev/stdin");
+  expect(secret).not.toContain("--from-literal");
   expect(secret).not.toContain("<TOKEN>");
   expect(install).toContain("--version 0.1.0");
   expect(install).not.toContain("token");
