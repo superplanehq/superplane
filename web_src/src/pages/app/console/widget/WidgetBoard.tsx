@@ -240,7 +240,7 @@ function BoardCard({
       {visibleActions.length > 0 ? (
         <div className="mt-2 flex flex-wrap justify-end gap-1">
           {visibleActions.map((action, ai) => (
-            <WidgetRowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
+            <WidgetRowActionButton key={`${rowKey}-${ai}`} action={action} row={row} rowKey={rowKey} />
           ))}
         </div>
       ) : null}
