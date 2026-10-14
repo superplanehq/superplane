@@ -33,6 +33,31 @@ output "fleet_manager_identity_client_id" {
   value       = azurerm_user_assigned_identity.fleet_manager.client_id
 }
 
+output "fleet_manager_service_account_name" {
+  description = "Kubernetes service account name for Fleet Manager workload identity"
+  value       = "superplane-fleet-manager"
+}
+
+output "runner_subscription_id" {
+  description = "Azure subscription for runner VMs"
+  value       = var.subscription_id
+}
+
+output "runner_resource_group" {
+  description = "Azure resource group for runner VMs"
+  value       = azurerm_resource_group.runners.name
+}
+
+output "runner_location" {
+  description = "Azure location for runner VMs"
+  value       = azurerm_resource_group.runners.location
+}
+
+output "runner_zones" {
+  description = "Availability zones for runner VMs"
+  value       = var.runner_zones
+}
+
 output "runner_identity_id" {
   description = "User-assigned identity resource ID for runner VMs"
   value       = azurerm_user_assigned_identity.runner.id

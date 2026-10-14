@@ -10,11 +10,7 @@ resource "random_password" "db_password" {
 }
 
 locals {
-  db_password                  = var.db_password != "" ? var.db_password : random_password.db_password[0].result
-  fleet_manager_image_tag      = var.fleet_manager_image_tag != "" ? var.fleet_manager_image_tag : var.superplane_image_tag
-  fleet_manager_image_registry = var.fleet_manager_image_registry != "" ? var.fleet_manager_image_registry : var.image_registry
-  # The config stays sensitive. Only the present check is safe for count.
-  fleet_manager_enabled = nonsensitive(trimspace(var.fleet_manager_config)) != ""
+  db_password           = var.db_password != "" ? var.db_password : random_password.db_password[0].result
   kubernetes_version    = trimspace(var.kubernetes_version) != "" ? var.kubernetes_version : null
   use_local_helm_chart  = trimspace(var.helm_chart_path) != ""
   helm_chart            = local.use_local_helm_chart ? "${path.module}/${var.helm_chart_path}" : var.helm_chart_name
