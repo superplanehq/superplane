@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -38,18 +39,22 @@ const (
 // factory-owned agent tasks. Bitbucket workspaces use SuperPlane.
 // Other workspaces use SuperPlane Agent. Both use
 // superplaneagent@superplane.com. A canvas that is not a factory app
-// is left unchanged.
+// is left unchanged. A failed factory lookup returns an error. It does
+// not use the GitHub name.
 func AttachFactoryCommitIdentity(
 	ctx core.ExecutionContext,
 	environment []BrokerEnvironmentVariable,
 	files []BrokerTaskFile,
-) ([]BrokerEnvironmentVariable, []BrokerTaskFile) {
+) ([]BrokerEnvironmentVariable, []BrokerTaskFile, error) {
 	factoryID, ok := factoryIDForCanvas(ctx)
 	if !ok {
-		return environment, files
+		return environment, files, nil
 	}
 
-	agentName := commitNameForFactory(factoryID)
+	agentName, err := commitNameForFactory(factoryID)
+	if err != nil {
+		return environment, files, err
+	}
 	environment = upsertEnvironment(environment, EnvGitAuthorName, agentName)
 	environment = upsertEnvironment(environment, EnvGitAuthorEmail, FactoryAgentEmail)
 	environment = upsertEnvironment(environment, EnvGitCommitterName, agentName)
@@ -64,7 +69,7 @@ func AttachFactoryCommitIdentity(
 		Content: FactoryPrepareCommitMessageHookForAgent(agentName),
 		Mode:    "0755",
 	})
-	return environment, files
+	return environment, files, nil
 }
 
 // FactoryCommitName returns the Git author and committer name for a
@@ -97,12 +102,15 @@ func factoryIDForCanvas(ctx core.ExecutionContext) (uuid.UUID, bool) {
 	return *factoryID, true
 }
 
-func commitNameForFactory(factoryID uuid.UUID) string {
+func commitNameForFactory(factoryID uuid.UUID) (string, error) {
 	factory, err := models.FindFactoryByID(database.DB(context.Background()), factoryID)
-	if err != nil || factory == nil {
-		return FactoryAgentName
+	if err != nil {
+		return "", fmt.Errorf("load factory commit identity: %w", err)
 	}
-	return FactoryCommitName(factory.OnboardingConfigValue().EffectiveVCSProvider())
+	if factory == nil {
+		return "", fmt.Errorf("load factory commit identity: factory %s not found", factoryID)
+	}
+	return FactoryCommitName(factory.OnboardingConfigValue().EffectiveVCSProvider()), nil
 }
 
 func upsertEnvironment(environment []BrokerEnvironmentVariable, name, value string) []BrokerEnvironmentVariable {

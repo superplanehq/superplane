@@ -177,7 +177,10 @@ func (c *RunSuperPlane) Execute(ctx core.ExecutionContext) error {
 	}
 	files = runner.AppendPlanningSessionContinuation(ctx, environment, files)
 	environment, files = runner.AttachWorkspaceAgentResources(ctx, environment, files)
-	environment, files = runner.AttachFactoryCommitIdentity(ctx, environment, files)
+	environment, files, err = runner.AttachFactoryCommitIdentity(ctx, environment, files)
+	if err != nil {
+		return err
+	}
 	files = runner.AppendTaskArtifactMCP(environment, files)
 	files = runner.AppendMergeConfidenceMCP(environment, files)
 

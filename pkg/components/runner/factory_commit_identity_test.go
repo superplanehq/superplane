@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -25,20 +26,22 @@ func TestAttachFactoryCommitIdentitySkipsCanvasWithoutFactory(t *testing.T) {
 		Value: "agent@superplane.com",
 	}}
 
-	environment, files := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
+	environment, files, err := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
 	}, original, nil)
+	require.NoError(t, err)
 
 	assert.Equal(t, original, environment)
 	assert.Empty(t, files)
 }
 
 func TestAttachFactoryCommitIdentitySkipsInvalidCanvasID(t *testing.T) {
-	environment, files := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
+	environment, files, err := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
 		OrganizationID: "not-a-uuid",
 		WorkflowID:     "also-not",
 	}, nil, nil)
+	require.NoError(t, err)
 
 	assert.Empty(t, environment)
 	assert.Empty(t, files)
@@ -51,13 +54,14 @@ func TestAttachFactoryCommitIdentitySetsAuthorEnvironmentAndGitWrapper(t *testin
 	require.NoError(t, err)
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 
-	environment, files := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
+	environment, files, err := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
 	}, []runner.BrokerEnvironmentVariable{
 		{Name: runner.EnvGitAuthorEmail, Value: "agent@superplane.com"},
 		{Name: "KEEP", Value: "yes"},
 	}, nil)
+	require.NoError(t, err)
 
 	assert.Equal(t, runner.FactoryAgentEmail, envValue(t, environment, runner.EnvGitAuthorEmail))
 	assert.Equal(t, runner.FactoryAgentName, envValue(t, environment, runner.EnvGitAuthorName))
@@ -100,10 +104,11 @@ func TestAttachFactoryCommitIdentityUsesProviderName(t *testing.T) {
 			}
 			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 
-			environment, files := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
+			environment, files, err := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
 				OrganizationID: r.Organization.ID.String(),
 				WorkflowID:     canvas.ID.String(),
 			}, nil, nil)
+			require.NoError(t, err)
 
 			assert.Equal(t, tc.wantName, envValue(t, environment, runner.EnvGitAuthorName))
 			assert.Equal(t, runner.FactoryAgentEmail, envValue(t, environment, runner.EnvGitAuthorEmail))

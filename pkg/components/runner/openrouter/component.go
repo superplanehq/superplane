@@ -166,7 +166,10 @@ func (c *RunOpenRouter) Execute(ctx core.ExecutionContext) error {
 	task.Files = runner.AppendMergeConfidenceMCP(environment, task.Files)
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
-	environment, task.Files = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
+	environment, task.Files, err = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
+	if err != nil {
+		return err
+	}
 	taskID, err := client.CreateTask(runner.CreateTaskParams{
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
