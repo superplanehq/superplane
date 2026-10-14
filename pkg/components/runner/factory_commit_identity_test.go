@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -25,20 +26,22 @@ func TestAttachFactoryCommitIdentitySkipsCanvasWithoutFactory(t *testing.T) {
 		Value: "agent@superplane.com",
 	}}
 
-	environment, files := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
+	environment, files, err := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
 	}, original, nil)
+	require.NoError(t, err)
 
 	assert.Equal(t, original, environment)
 	assert.Empty(t, files)
 }
 
 func TestAttachFactoryCommitIdentitySkipsInvalidCanvasID(t *testing.T) {
-	environment, files := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
+	environment, files, err := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
 		OrganizationID: "not-a-uuid",
 		WorkflowID:     "also-not",
 	}, nil, nil)
+	require.NoError(t, err)
 
 	assert.Empty(t, environment)
 	assert.Empty(t, files)
@@ -51,13 +54,14 @@ func TestAttachFactoryCommitIdentitySetsAuthorEnvironmentAndGitWrapper(t *testin
 	require.NoError(t, err)
 	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
 
-	environment, files := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
+	environment, files, err := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
 	}, []runner.BrokerEnvironmentVariable{
 		{Name: runner.EnvGitAuthorEmail, Value: "agent@superplane.com"},
 		{Name: "KEEP", Value: "yes"},
 	}, nil)
+	require.NoError(t, err)
 
 	assert.Equal(t, runner.FactoryAgentEmail, envValue(t, environment, runner.EnvGitAuthorEmail))
 	assert.Equal(t, runner.FactoryAgentName, envValue(t, environment, runner.EnvGitAuthorName))
@@ -75,6 +79,55 @@ func TestAttachFactoryCommitIdentitySetsAuthorEnvironmentAndGitWrapper(t *testin
 	assert.Contains(t, hook.Content, "agent@superplane.ai")
 	assert.Contains(t, hook.Content, "opencode@superplane.io")
 	assert.Contains(t, hook.Content, runner.FactoryAgentEmail)
+}
+
+func TestAttachFactoryCommitIdentityUsesProviderName(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	cases := []struct {
+		name     string
+		provider string
+		wantName string
+	}{
+		{name: "empty provider", wantName: runner.FactoryAgentName},
+		{name: "github", provider: models.ProviderGitHub, wantName: runner.FactoryAgentName},
+		{name: "bitbucket", provider: models.ProviderBitbucket, wantName: runner.FactoryBitbucketAgentName},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+			require.NoError(t, err)
+			if tc.provider != "" {
+				provider := tc.provider
+				require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSProvider: &provider}))
+			}
+			canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+
+			environment, files, err := runner.AttachFactoryCommitIdentity(core.ExecutionContext{
+				OrganizationID: r.Organization.ID.String(),
+				WorkflowID:     canvas.ID.String(),
+			}, nil, nil)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.wantName, envValue(t, environment, runner.EnvGitAuthorName))
+			assert.Equal(t, runner.FactoryAgentEmail, envValue(t, environment, runner.EnvGitAuthorEmail))
+			assert.Equal(t, tc.wantName, envValue(t, environment, runner.EnvGitCommitterName))
+			assert.Equal(t, runner.FactoryAgentEmail, envValue(t, environment, runner.EnvGitCommitterEmail))
+			wrapper := taskFile(t, files, runner.FactoryGitWrapperPath)
+			assert.Contains(t, wrapper.Content, `export GIT_AUTHOR_NAME="`+tc.wantName+`"`)
+			assert.Contains(t, wrapper.Content, `export GIT_COMMITTER_NAME="`+tc.wantName+`"`)
+			assert.Contains(t, wrapper.Content, `export GIT_AUTHOR_EMAIL="`+runner.FactoryAgentEmail+`"`)
+			assert.Contains(t, wrapper.Content, `export GIT_COMMITTER_EMAIL="`+runner.FactoryAgentEmail+`"`)
+			hook := taskFile(t, files, runner.FactoryGitHookPath)
+			assert.Contains(t, hook.Content, `signoff="Signed-off-by: `+tc.wantName+` <${agent_email}>"`)
+			assert.Contains(t, hook.Content, "agent_email='"+runner.FactoryAgentEmail+"'")
+			if tc.wantName != runner.FactoryAgentName {
+				assert.NotContains(t, wrapper.Content, runner.FactoryAgentName)
+				assert.NotContains(t, hook.Content, runner.FactoryAgentName)
+			}
+		})
+	}
 }
 
 func TestFactoryCommitHookDropsOtherAgentTrailers(t *testing.T) {
@@ -196,6 +249,67 @@ func TestFactoryGitWrapperForcesIdentityOnCommitAndMerge(t *testing.T) {
 	unchanged := runWrapper("-c", "core.hooksPath=/dev/null", "status", "--short")
 	assert.Contains(t, unchanged, "core.hooksPath=/dev/null")
 	assert.NotContains(t, unchanged, "git-hooks-active.")
+}
+
+func TestFactoryGitWrapperBitbucketCommitUsesSuperPlaneIdentity(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+
+	taskDir := t.TempDir()
+	repo := filepath.Join(taskDir, "repo")
+	wrapper := installFactoryGitWrapperForAgent(t, taskDir, runner.FactoryBitbucketAgentName)
+	env := factoryGitCommandEnv(taskDir)
+	initRepository(t, repo, env, "")
+
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "README"), []byte("hello\n"), 0o644))
+	messagePath := filepath.Join(taskDir, "message.txt")
+	require.NoError(t, os.WriteFile(messagePath, []byte(strings.Join([]string{
+		"feat: bitbucket identity",
+		"",
+		"Signed-off-by: SuperPlane Agent <superplaneagent@superplane.com>",
+		"Signed-off-by: Jane Doe <jane@example.com>",
+	}, "\n")), 0o644))
+	runGit(t, repo, wrapper, env, "add", "README")
+	runGit(t, repo, wrapper, env, "commit", "--author", "Bad Agent <agent@superplane.com>", "-F", messagePath)
+
+	signoff := "Signed-off-by: SuperPlane <" + runner.FactoryAgentEmail + ">"
+	humanSignoff := "Signed-off-by: Jane Doe <jane@example.com>"
+	coauthor := "Co-authored-by: Pat Example <pat@example.com>"
+	assertBitbucketCommitIdentity(t, repo, env, signoff, humanSignoff, coauthor)
+
+	runGit(t, repo, wrapper, env, "commit", "--amend", "--no-edit")
+	assertBitbucketCommitIdentity(t, repo, env, signoff, humanSignoff, coauthor)
+
+	runGit(t, repo, "git", env, "checkout", "-b", "feature")
+	require.NoError(t, os.WriteFile(filepath.Join(repo, "feature.txt"), []byte("feature\n"), 0o644))
+	runGit(t, repo, wrapper, env, "add", "feature.txt")
+	runGit(t, repo, wrapper, env, "commit", "-m", "feat: branch")
+	runGit(t, repo, "git", env, "checkout", "main")
+	runGit(t, repo, wrapper, env, "merge", "--no-ff", "feature", "-m", "Merge branch feature")
+
+	assert.Equal(t, runner.FactoryBitbucketAgentName, gitShow(t, repo, env, "%an"))
+	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ae"))
+	assert.Equal(t, runner.FactoryBitbucketAgentName, gitShow(t, repo, env, "%cn"))
+	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ce"))
+	mergeBody := gitShow(t, repo, env, "%B")
+	assert.Equal(t, 1, strings.Count(mergeBody, signoff))
+	assert.NotContains(t, mergeBody, "SuperPlane Agent")
+}
+
+func assertBitbucketCommitIdentity(t *testing.T, repo string, env []string, signoff, humanSignoff, coauthor string) {
+	t.Helper()
+	assert.Equal(t, runner.FactoryBitbucketAgentName, gitShow(t, repo, env, "%an"))
+	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ae"))
+	assert.Equal(t, runner.FactoryBitbucketAgentName, gitShow(t, repo, env, "%cn"))
+	assert.Equal(t, runner.FactoryAgentEmail, gitShow(t, repo, env, "%ce"))
+	body := gitShow(t, repo, env, "%B")
+	assert.Equal(t, 1, strings.Count(body, signoff))
+	assert.Contains(t, body, humanSignoff)
+	assert.Equal(t, 1, strings.Count(body, humanSignoff))
+	assert.Contains(t, body, coauthor)
+	assert.Equal(t, 1, strings.Count(body, coauthor))
+	assert.NotContains(t, body, "SuperPlane Agent")
 }
 
 func TestFactoryGitWrapperCommitUsesAgentIdentityAndRepositoryHooks(t *testing.T) {
@@ -394,11 +508,16 @@ func assertCallerHooksPathReplacesRepositoryHooks(t *testing.T) {
 
 func installFactoryGitWrapper(t *testing.T, taskDir string) string {
 	t.Helper()
+	return installFactoryGitWrapperForAgent(t, taskDir, runner.FactoryAgentName)
+}
+
+func installFactoryGitWrapperForAgent(t *testing.T, taskDir, agentName string) string {
+	t.Helper()
 	require.NoError(t, os.MkdirAll(filepath.Join(taskDir, "bin"), 0o755))
 	require.NoError(t, os.MkdirAll(filepath.Join(taskDir, "git-hooks"), 0o755))
 	wrapper := filepath.Join(taskDir, "bin", "git")
-	require.NoError(t, os.WriteFile(wrapper, []byte(runner.FactoryGitWrapperScript()), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "git-hooks", "prepare-commit-msg"), []byte(runner.FactoryPrepareCommitMessageHook()), 0o755))
+	require.NoError(t, os.WriteFile(wrapper, []byte(runner.FactoryGitWrapperScriptForAgent(agentName)), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(taskDir, "git-hooks", "prepare-commit-msg"), []byte(runner.FactoryPrepareCommitMessageHookForAgent(agentName)), 0o755))
 	return wrapper
 }
 

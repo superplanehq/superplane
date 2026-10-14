@@ -2,6 +2,7 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -11,8 +12,15 @@ import (
 )
 
 const (
-	FactoryAgentName  = "SuperPlane Agent"
-	FactoryAgentEmail = "superplaneagent@superplane.com"
+	// FactoryAgentName is the Git author and committer name for GitHub
+	// factory runs.
+	FactoryAgentName = "SuperPlane Agent"
+	// FactoryBitbucketAgentName is the Git author and committer name for
+	// Bitbucket factory runs. Pull requests from the Forge app use the same name.
+	FactoryBitbucketAgentName = "SuperPlane"
+	FactoryAgentEmail         = "superplaneagent@superplane.com"
+
+	factoryAgentNamePlaceholder = "__FACTORY_AGENT_NAME__"
 
 	EnvGitAuthorName     = "GIT_AUTHOR_NAME"
 	EnvGitAuthorEmail    = "GIT_AUTHOR_EMAIL"
@@ -27,49 +35,82 @@ const (
 	FactoryCommitIdentityPrompt = "Do not set git user.email, and do not add Co-authored-by or Signed-off-by trailers."
 )
 
-// AttachFactoryCommitIdentity forces SuperPlane Agent
-// <superplaneagent@superplane.com> on factory-owned agent tasks.
-// A canvas that is not a factory app is left unchanged.
+// AttachFactoryCommitIdentity forces the factory Git identity on
+// factory-owned agent tasks. Bitbucket workspaces use SuperPlane.
+// Other workspaces use SuperPlane Agent. Both use
+// superplaneagent@superplane.com. A canvas that is not a factory app
+// is left unchanged. A failed factory lookup returns an error. It does
+// not use the GitHub name.
 func AttachFactoryCommitIdentity(
 	ctx core.ExecutionContext,
 	environment []BrokerEnvironmentVariable,
 	files []BrokerTaskFile,
-) ([]BrokerEnvironmentVariable, []BrokerTaskFile) {
-	if !canvasBelongsToFactory(ctx) {
-		return environment, files
+) ([]BrokerEnvironmentVariable, []BrokerTaskFile, error) {
+	factoryID, ok := factoryIDForCanvas(ctx)
+	if !ok {
+		return environment, files, nil
 	}
 
-	environment = upsertEnvironment(environment, EnvGitAuthorName, FactoryAgentName)
+	agentName, err := commitNameForFactory(factoryID)
+	if err != nil {
+		return environment, files, err
+	}
+	environment = upsertEnvironment(environment, EnvGitAuthorName, agentName)
 	environment = upsertEnvironment(environment, EnvGitAuthorEmail, FactoryAgentEmail)
-	environment = upsertEnvironment(environment, EnvGitCommitterName, FactoryAgentName)
+	environment = upsertEnvironment(environment, EnvGitCommitterName, agentName)
 	environment = upsertEnvironment(environment, EnvGitCommitterEmail, FactoryAgentEmail)
 	files = upsertTaskFile(files, BrokerTaskFile{
 		Path:    FactoryGitWrapperPath,
-		Content: FactoryGitWrapperScript(),
+		Content: FactoryGitWrapperScriptForAgent(agentName),
 		Mode:    "0755",
 	})
 	files = upsertTaskFile(files, BrokerTaskFile{
 		Path:    FactoryGitHookPath,
-		Content: FactoryPrepareCommitMessageHook(),
+		Content: FactoryPrepareCommitMessageHookForAgent(agentName),
 		Mode:    "0755",
 	})
-	return environment, files
+	return environment, files, nil
+}
+
+// FactoryCommitName returns the Git author and committer name for a
+// factory host. An empty provider means GitHub.
+func FactoryCommitName(provider string) string {
+	if strings.EqualFold(strings.TrimSpace(provider), models.ProviderBitbucket) {
+		return FactoryBitbucketAgentName
+	}
+	return FactoryAgentName
 }
 
 func canvasBelongsToFactory(ctx core.ExecutionContext) bool {
+	_, ok := factoryIDForCanvas(ctx)
+	return ok
+}
+
+func factoryIDForCanvas(ctx core.ExecutionContext) (uuid.UUID, bool) {
 	orgID, err := uuid.Parse(strings.TrimSpace(ctx.OrganizationID))
 	if err != nil {
-		return false
+		return uuid.Nil, false
 	}
 	canvasID, err := uuid.Parse(strings.TrimSpace(ctx.WorkflowID))
 	if err != nil {
-		return false
+		return uuid.Nil, false
 	}
 	factoryID, err := models.FindFactoryIDForCanvas(database.DB(context.Background()), orgID, canvasID)
 	if err != nil || factoryID == nil {
-		return false
+		return uuid.Nil, false
 	}
-	return true
+	return *factoryID, true
+}
+
+func commitNameForFactory(factoryID uuid.UUID) (string, error) {
+	factory, err := models.FindFactoryByID(database.DB(context.Background()), factoryID)
+	if err != nil {
+		return "", fmt.Errorf("load factory commit identity: %w", err)
+	}
+	if factory == nil {
+		return "", fmt.Errorf("load factory commit identity: factory %s not found", factoryID)
+	}
+	return FactoryCommitName(factory.OnboardingConfigValue().EffectiveVCSProvider()), nil
 }
 
 func upsertEnvironment(environment []BrokerEnvironmentVariable, name, value string) []BrokerEnvironmentVariable {
@@ -96,15 +137,21 @@ func upsertTaskFile(files []BrokerTaskFile, file BrokerTaskFile) []BrokerTaskFil
 // It sets the local identity and installs the trailer hook so a later
 // factory reset cannot restore the old hook.
 func FactoryRepoCommitSetup() string {
+	return FactoryRepoCommitSetupForAgent(FactoryAgentName)
+}
+
+// FactoryRepoCommitSetupForAgent is FactoryRepoCommitSetup with the given
+// author and committer name. The email stays FactoryAgentEmail.
+func FactoryRepoCommitSetupForAgent(agentName string) string {
 	return strings.Join([]string{
 		`git config user.email "` + FactoryAgentEmail + `"`,
-		`git config user.name "` + FactoryAgentName + `"`,
-		`export GIT_AUTHOR_NAME="` + FactoryAgentName + `"`,
+		`git config user.name "` + agentName + `"`,
+		`export GIT_AUTHOR_NAME="` + agentName + `"`,
 		`export GIT_AUTHOR_EMAIL="` + FactoryAgentEmail + `"`,
-		`export GIT_COMMITTER_NAME="` + FactoryAgentName + `"`,
+		`export GIT_COMMITTER_NAME="` + agentName + `"`,
 		`export GIT_COMMITTER_EMAIL="` + FactoryAgentEmail + `"`,
 		"cat > .git/hooks/prepare-commit-msg <<'HOOK'",
-		FactoryPrepareCommitMessageHook() + "HOOK",
+		FactoryPrepareCommitMessageHookForAgent(agentName) + "HOOK",
 		"chmod +x .git/hooks/prepare-commit-msg",
 	}, "\n")
 }
@@ -114,12 +161,22 @@ func FactoryRepoCommitSetup() string {
 // line in the body stays. Human sign-offs, human co-authors, and the agent
 // co-author stay.
 func FactoryPrepareCommitMessageHook() string {
-	return `#!/bin/sh
+	return FactoryPrepareCommitMessageHookForAgent(FactoryAgentName)
+}
+
+// FactoryPrepareCommitMessageHookForAgent is FactoryPrepareCommitMessageHook
+// with the given sign-off name. Any sign-off that uses FactoryAgentEmail is
+// replaced, including a stale SuperPlane Agent sign-off.
+func FactoryPrepareCommitMessageHookForAgent(agentName string) string {
+	return strings.ReplaceAll(factoryPrepareCommitMessageHookTemplate, factoryAgentNamePlaceholder, agentName)
+}
+
+const factoryPrepareCommitMessageHookTemplate = `#!/bin/sh
 set -u
 
 msg_file="${1:?}"
 agent_email='superplaneagent@superplane.com'
-signoff="Signed-off-by: SuperPlane Agent <${agent_email}>"
+signoff="Signed-off-by: __FACTORY_AGENT_NAME__ <${agent_email}>"
 tmp="${msg_file}.sp-identity"
 coauthors_file="${msg_file}.sp-coauthors"
 kept_file="${msg_file}.sp-kept"
@@ -266,13 +323,21 @@ git interpret-trailers --in-place --if-exists addIfDifferent \
 
 exit 0
 `
-}
 
 // FactoryGitWrapperScript shadows git on factory agent tasks. Commit and
 // merge keep the caller's hook directory and replace only prepare-commit-msg.
 // A disabled hooks path skips repository hooks. The identity hook still runs.
 func FactoryGitWrapperScript() string {
-	return `#!/bin/bash
+	return FactoryGitWrapperScriptForAgent(FactoryAgentName)
+}
+
+// FactoryGitWrapperScriptForAgent is FactoryGitWrapperScript with the given
+// author and committer name. The email stays FactoryAgentEmail.
+func FactoryGitWrapperScriptForAgent(agentName string) string {
+	return strings.ReplaceAll(factoryGitWrapperScriptTemplate, factoryAgentNamePlaceholder, agentName)
+}
+
+const factoryGitWrapperScriptTemplate = `#!/bin/bash
 set -euo pipefail
 
 sh_quote() {
@@ -408,9 +473,9 @@ if [[ -z "$real_git" ]]; then
   exit 127
 fi
 
-export GIT_AUTHOR_NAME="SuperPlane Agent"
+export GIT_AUTHOR_NAME="__FACTORY_AGENT_NAME__"
 export GIT_AUTHOR_EMAIL="superplaneagent@superplane.com"
-export GIT_COMMITTER_NAME="SuperPlane Agent"
+export GIT_COMMITTER_NAME="__FACTORY_AGENT_NAME__"
 export GIT_COMMITTER_EMAIL="superplaneagent@superplane.com"
 
 args=("$@")
@@ -559,4 +624,3 @@ write_prepare_commit_msg "$source_hooks" "$active_hooks"
 
 exec "$real_git" "${global[@]}" -c "core.hooksPath=${active_hooks}" "$subcommand" "${rest[@]}"
 `
-}

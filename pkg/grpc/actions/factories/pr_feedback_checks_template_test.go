@@ -115,6 +115,9 @@ func TestBuildChecksPRFeedbackCanvasBitbucket(t *testing.T) {
 	assert.Contains(t, string(encoded), "failedBuilds")
 	assert.NotContains(t, string(encoded), "git push origin HEAD")
 	assert.NotContains(t, string(encoded), "failedChecks")
+
+	runnerNode := findSpecNode(t, canvas, prFeedbackRunnerNodeID)
+	assertBitbucketCommitSteps(t, runnerNode)
 }
 
 func TestPrFeedbackChecksPassedDescriptionExpression(t *testing.T) {
