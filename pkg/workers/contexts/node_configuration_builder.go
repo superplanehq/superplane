@@ -1057,11 +1057,12 @@ func (b *NodeConfigurationBuilder) resolveRunPayload() (any, error) {
 }
 
 // resolveOrderPayload exposes the work order driving this run via order()
-// and its task() alias. Returns nil when the run is not attached to a
-// factory work-order execution. The url, key, artifacts, comments,
-// assignees, and spec are loaded only when the expression AST references
-// those fields on order() or task(). Origin is attached whenever the work
-// order has one.
+// and its task() alias. A line-step execution is used first. When that
+// execution is absent, the run's pull request link is used if the task
+// belongs to this canvas. Returns nil when neither path matches. The url,
+// key, artifacts, comments, assignees, and spec are loaded only when the
+// expression AST references those fields on order() or task(). Origin is
+// attached whenever the work order has one.
 func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, error) {
 	if b.rootEventID == nil {
 		return nil, nil
@@ -1075,17 +1076,9 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 		return nil, fmt.Errorf("order() could not resolve the current run: %w", err)
 	}
 
-	execution, err := models.FindWorkOrderExecutionByRunID(b.tx, run.ID)
-	if err != nil {
-		if errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("order() could not resolve the work order execution: %w", err)
-	}
-
-	order, err := models.FindUnscopedWorkOrder(b.tx, execution.WorkOrderID)
-	if err != nil {
-		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
+	order, err := b.workOrderForRun(run)
+	if err != nil || order == nil {
+		return nil, err
 	}
 	owningFactory, err := models.FindFactory(b.tx, order.OrganizationID, order.FactoryID)
 	if err != nil {
@@ -1223,6 +1216,68 @@ func (b *NodeConfigurationBuilder) resolveOrderPayload(expression string) (any, 
 	}
 
 	return payload, nil
+}
+
+func (b *NodeConfigurationBuilder) workOrderForRun(run *models.CanvasRun) (*models.FactoryWorkOrder, error) {
+	execution, err := models.FindWorkOrderExecutionByRunID(b.tx, run.ID)
+	if err == nil {
+		return loadExpressionWorkOrder(b.tx, execution.WorkOrderID)
+	}
+	if !errors.Is(err, models.ErrFactoryWorkOrderExecutionNotFound) {
+		return nil, fmt.Errorf("order() could not resolve the work order execution: %w", err)
+	}
+	return b.workOrderFromPullRequestLink(run.ID)
+}
+
+func (b *NodeConfigurationBuilder) workOrderFromPullRequestLink(runID uuid.UUID) (*models.FactoryWorkOrder, error) {
+	workOrderID, err := workOrderIDFromPullRequestLink(b.tx, runID)
+	if err != nil || workOrderID == nil {
+		return nil, err
+	}
+
+	order, err := loadExpressionWorkOrder(b.tx, *workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	matches, err := b.workOrderMatchesCanvas(order)
+	if err != nil || !matches {
+		return nil, err
+	}
+	return order, nil
+}
+
+func workOrderIDFromPullRequestLink(tx *gorm.DB, runID uuid.UUID) (*uuid.UUID, error) {
+	linked, err := models.FindWorkOrderIDsByLinkedRunIDs(tx, []uuid.UUID{runID})
+	if err != nil {
+		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
+	}
+	workOrderID, ok := linked[runID]
+	if !ok {
+		return nil, nil
+	}
+	return &workOrderID, nil
+}
+
+func loadExpressionWorkOrder(tx *gorm.DB, id uuid.UUID) (*models.FactoryWorkOrder, error) {
+	order, err := models.FindUnscopedWorkOrder(tx, id)
+	if err != nil {
+		return nil, fmt.Errorf("order() could not resolve the work order: %w", err)
+	}
+	return order, nil
+}
+
+func (b *NodeConfigurationBuilder) workOrderMatchesCanvas(order *models.FactoryWorkOrder) (bool, error) {
+	canvas, err := models.FindCanvasWithoutOrgScopeInTransaction(b.tx, b.workflowID)
+	if err != nil {
+		return false, fmt.Errorf("order() could not resolve the canvas: %w", err)
+	}
+	if order.OrganizationID != canvas.OrganizationID {
+		return false, nil
+	}
+	if canvas.FactoryID == nil || *canvas.FactoryID != order.FactoryID {
+		return false, nil
+	}
+	return true, nil
 }
 
 func (b *NodeConfigurationBuilder) resolveOrderSpec(order *models.FactoryWorkOrder) (string, error) {
