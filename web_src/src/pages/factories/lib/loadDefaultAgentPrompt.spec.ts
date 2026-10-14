@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { DefaultPromptUnavailableError } from "./defaultAgentPrompt";
+import { DefaultPromptUnavailableError, RESTORE_DEFAULT_PROMPT_COPY } from "./defaultAgentPrompt";
 import { loadDefaultAgentPrompt } from "./loadDefaultAgentPrompt";
 
 const { materializeDefaults } = vi.hoisted(() => ({ materializeDefaults: vi.fn() }));
@@ -62,7 +62,7 @@ describe("loadDefaultAgentPrompt", () => {
 
       expect(failure).toBeInstanceOf(Error);
       expect(failure).not.toBeInstanceOf(DefaultPromptUnavailableError);
-      expect(failure).toMatchObject({ message });
+      expect(failure).toMatchObject({ message: RESTORE_DEFAULT_PROMPT_COPY.error, cause: message });
     }
   });
 
