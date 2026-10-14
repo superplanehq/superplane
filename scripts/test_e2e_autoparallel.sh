@@ -6,6 +6,7 @@ set -euo pipefail
 #   make test.e2e.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/shard_args.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/weighted_shards.sh"
 
 echo "Running e2e tests shard ${SHARD_INDEX}/${SHARD_COUNT}"
 
@@ -36,17 +37,28 @@ if [[ "${#all_tests[@]}" -eq 0 ]]; then
 fi
 
 # Deduplicate and sort test names.
-mapfile -t all_tests < <(printf '%s\n' "${all_tests[@]}" | sort -u)
+sorted_tests=()
+while IFS= read -r test_name; do
+  sorted_tests+=("$test_name")
+done < <(printf '%s\n' "${all_tests[@]}" | LC_ALL=C sort -u)
+all_tests=("${sorted_tests[@]}")
+
+# Use recent root-test durations so long browser scenarios do not cluster on
+# the same worker. A new test receives the median estimate until measured.
+load_shard_weights "$(dirname "${BASH_SOURCE[0]}")/ci_e2e_test_weights.tsv"
+
+weighted_tests=()
+for test_name in "${all_tests[@]}"; do
+  weight="$(shard_weight_for "$test_name" 30)"
+  weighted_tests+=("${weight}"$'\t'"${test_name}")
+done
 
 selected_tests=()
-idx=0
-for test_name in "${all_tests[@]}"; do
-  shard=$(( (idx % SHARD_COUNT) + 1 ))
+while IFS=$'\t' read -r shard test_name; do
   if [[ "$shard" -eq "$SHARD_INDEX" ]]; then
     selected_tests+=("$test_name")
   fi
-  idx=$((idx + 1))
-done
+done < <(printf '%s\n' "${weighted_tests[@]}" | assign_weighted_shards "$SHARD_COUNT")
 
 if [[ "${#selected_tests[@]}" -eq 0 ]]; then
   echo "No tests assigned to shard ${SHARD_INDEX}/${SHARD_COUNT}; exiting successfully."
