@@ -125,6 +125,9 @@ function activityStatus(status: string): AgentActivityStatus {
   if (status === "cancelled") {
     return "cancelled";
   }
+  if (status === "stopped") {
+    return "interrupted";
+  }
   if (status === "running") {
     return "running";
   }

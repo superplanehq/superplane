@@ -105,6 +105,7 @@ function billedUsageGaps(turns, billed) {
   return {
     output_tokens: Math.max(0, asNumber(billed.output_tokens) - recorded.output_tokens),
     reasoning_tokens: Math.max(0, asNumber(billed.reasoning_tokens) - recorded.reasoning_tokens),
+    total_cost_usd: Math.max(0, asNumber(billed.total_cost_usd) - asNumber(recorded.total_cost_usd)),
   };
 }
 
@@ -120,7 +121,8 @@ function usageEquals(left, right) {
     a.output_tokens === b.output_tokens &&
     a.cache_read_input_tokens === b.cache_read_input_tokens &&
     a.cache_creation_input_tokens === b.cache_creation_input_tokens &&
-    a.reasoning_tokens === b.reasoning_tokens
+    a.reasoning_tokens === b.reasoning_tokens &&
+    a.total_cost_usd === b.total_cost_usd
   );
 }
 
@@ -315,8 +317,11 @@ function createTurnTelemetry(options) {
       if (totalCostUsd != null && Number.isFinite(Number(totalCostUsd))) {
         incoming.total_cost_usd = Number(totalCostUsd);
       }
-      snapshot.usage = resolveCumulative(snapshot.usage, incoming);
+      const nextUsage = resolveCumulative(snapshot.usage, incoming);
+      if (usageEquals(snapshot.usage, nextUsage)) return snapshot.turn;
+      snapshot.usage = nextUsage;
       persist();
+      emitTurn(snapshot);
       return snapshot.turn;
     },
     replaceTurnUsage(turn, usage) {
@@ -377,7 +382,7 @@ function createTurnTelemetry(options) {
         return 0;
       }
       const gaps = billedUsageGaps(state.turns, normalizeUsage(usage));
-      if (gaps.output_tokens === 0 && gaps.reasoning_tokens === 0) {
+      if (gaps.output_tokens === 0 && gaps.reasoning_tokens === 0 && gaps.total_cost_usd === 0) {
         return snapshot.turn;
       }
       snapshot.usage = {
@@ -385,6 +390,9 @@ function createTurnTelemetry(options) {
         output_tokens: asNumber(snapshot.usage.output_tokens) + gaps.output_tokens,
         reasoning_tokens: asNumber(snapshot.usage.reasoning_tokens) + gaps.reasoning_tokens,
       };
+      if (gaps.total_cost_usd > 0) {
+        snapshot.usage.total_cost_usd = asNumber(snapshot.usage.total_cost_usd) + gaps.total_cost_usd;
+      }
       persist();
       emitTurn(snapshot);
       return snapshot.turn;
@@ -395,11 +403,11 @@ function createTurnTelemetry(options) {
       }
       const opts = extra && typeof extra === "object" && !Array.isArray(extra) ? extra : {};
       if (result.usage) {
-        this.applyBilledUsage(result.usage);
+        this.applyBilledUsage(result);
       }
       const telemetry = sanitize(buildTelemetry(state));
       if (result.usage) {
-        telemetry.usage = normalizeUsage(result.usage);
+        telemetry.usage = normalizeUsage(result);
       }
       if (result.num_turns != null && Number(result.num_turns) > telemetry.num_turns) {
         telemetry.num_turns = Number(result.num_turns);

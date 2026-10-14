@@ -41,6 +41,7 @@ import {
 import type { SplitRunSource } from "./splitRunSource";
 import { hasPendingPlanningQuestions } from "./planningReviewState";
 import { WorkOrderIntentSurvey } from "./WorkOrderIntentSurvey";
+import { ChatMessageTimestamp } from "./ChatMessageTimestamp";
 import { WorkOrderIntentTranscript } from "./WorkOrderIntentTranscript";
 import { WorkOrderSplitRunSource } from "./WorkOrderSplitRunSource";
 
@@ -126,7 +127,9 @@ function AnalysisRequestChat({
         >
           <div className={cn(chatColumnClass, chatSolo ? "py-6" : "py-3")} data-testid="split-run-intent-chat-column">
             {analysis.leading}
-            <RequestMessage description={description} files={files} source={source} asChat />
+            <ChatMessageTimestamp createdAt={analysis.requestCreatedAt} align="end">
+              <RequestMessage description={description} files={files} source={source} asChat />
+            </ChatMessageTimestamp>
             <WorkOrderIntentTranscript
               messages={analysis.view.messages}
               organizationId={analysis.organizationId}
@@ -180,6 +183,7 @@ function AnalysisRequestChat({
       ) : null}
       <PlanningImplementationControls
         startDiscouraged={analysis.startDiscouraged}
+        readinessNote={analysis.readinessNote}
         modelSelect={analysis.modelSelect}
         actions={analysis.closedDecision}
         canSend={analysis.canSend}
@@ -298,6 +302,9 @@ function AnalysisComposer({
   );
 }
 
+const COMPOSER_CARD_CLASSNAME =
+  "h-auto overflow-visible rounded-xl border-border bg-background shadow-none has-[[data-slot=input-group-control]:focus]:ring-0";
+
 function AnalysisComposerField({
   analysis,
   images,
@@ -350,7 +357,7 @@ function AnalysisComposerField({
           keyboardRef={skillKeyboardRef}
         />
       ) : null}
-      <InputGroup className="h-auto overflow-visible rounded-xl" data-testid="split-run-intent-composer-card">
+      <InputGroup className={COMPOSER_CARD_CLASSNAME} data-testid="split-run-intent-composer-card">
         <InputGroupTextarea
           ref={textareaRef}
           id="split-run-intent-composer"
@@ -485,7 +492,7 @@ function RequestMessage({
   }
 
   return (
-    <div className="mb-3 flex w-full justify-end" data-testid="split-run-description">
+    <div className="mb-2 flex w-full justify-end" data-testid="split-run-description">
       <div className={cn(REQUEST_CARD_CLASSNAME, "max-w-[85%]")}>
         {source ? (
           <div className="mb-2">

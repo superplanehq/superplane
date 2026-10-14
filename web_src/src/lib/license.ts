@@ -1,5 +1,5 @@
 export type LicenseEdition = "community" | "enterprise";
-export type LicenseState = "none" | "active" | "expired" | "not_yet_valid" | "invalid";
+export type LicenseState = "none" | "active" | "expired" | "not_yet_valid" | "invalid" | "revoked";
 export type LicenseSource = "none" | "file" | "database";
 export type TrustedKeysState = "disabled" | "syncing" | "synced" | "failed";
 
@@ -56,6 +56,7 @@ const reasonMessages: Record<string, string> = {
   invalid_claims: "The license is not valid for self-hosted SuperPlane.",
   expired: "The license has expired.",
   not_yet_valid: "The license is not valid yet.",
+  revoked: "This license was revoked.",
   unreadable: "The license could not be read.",
 };
 
@@ -75,15 +76,17 @@ export const licenseExpiryWarning = (
     return null;
   }
 
-  if (license.state === "expired") {
+  const daysLeft = daysUntil(license.expires_at, now);
+  const tracksExpiry = license.state === "active" || license.state === "revoked";
+
+  if (license.state === "expired" || (license.state === "revoked" && daysLeft <= 0)) {
     return { expired: true, daysLeft: 0 };
   }
 
-  if (license.state !== "active") {
+  if (!tracksExpiry) {
     return null;
   }
 
-  const daysLeft = daysUntil(license.expires_at, now);
   if (daysLeft > LICENSE_EXPIRY_WARNING_DAYS) {
     return null;
   }

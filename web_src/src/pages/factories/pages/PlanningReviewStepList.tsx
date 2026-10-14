@@ -1,3 +1,4 @@
+import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { useRef, useState } from "react";
 import { Check, ChevronDown, GripVertical, MessageSquareText, Plus, Terminal, Trash2 } from "lucide-react";
 
@@ -27,7 +28,11 @@ export function PlanningReviewStepList({
   onRetryRestore,
   restoreRetryDisabled = false,
   createStep,
+  skills,
+  skillHref,
 }: {
+  skills?: FactoriesFactoryAgentResource[];
+  skillHref?: (skill: FactoriesFactoryAgentResource) => string | undefined;
   appearance?: "card" | "fields";
   steps: PlanningReviewStep[];
   onChange: (steps: PlanningReviewStep[]) => void;
@@ -112,6 +117,8 @@ export function PlanningReviewStepList({
               className={fields ? "overflow-hidden rounded-lg border border-foreground/20 bg-card" : undefined}
             >
               <StepRow
+                skills={skills}
+                skillHref={skillHref}
                 step={step}
                 position={index}
                 canReorder={steps.length > 1}
@@ -196,6 +203,8 @@ function StepListHeader({
 }
 
 function StepRow({
+  skills,
+  skillHref,
   step,
   position,
   canReorder,
@@ -206,6 +215,8 @@ function StepRow({
   onChange,
   onRemove,
 }: {
+  skills?: FactoriesFactoryAgentResource[];
+  skillHref?: (skill: FactoriesFactoryAgentResource) => string | undefined;
   step: PlanningReviewStep;
   position: number;
   canReorder: boolean;
@@ -273,6 +284,8 @@ function StepRow({
       {isOpen ? (
         <div id={bodyId} className="px-3 pb-3">
           <PlanningReviewStepBody
+            skills={skills}
+            skillHref={skillHref}
             kind={kind}
             value={kind === "prompt" ? mergeCheckPromptBody(step.prompt) : (step.command ?? "")}
             onChange={(next) =>

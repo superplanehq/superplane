@@ -15,9 +15,9 @@ function hasActiveLineDispatch(order: FactoriesWorkOrder): boolean {
 
 /**
  * Display vocabulary for the Tasks workspace: Draft, Running, Waiting,
- * Completed, Failed, Rejected, Canceled. The idle-open key stays `waiting` so
- * stored filters keep working. Persisted state + result columns in the
- * database stay unchanged; this file is the single mapping layer.
+ * Completed, Failed, Rejected, Closed. Closed covers a pull request that
+ * closed without a merge and filters under Rejected. Archived tasks stay
+ * hidden. The idle-open key stays `waiting` so stored filters keep working.
  */
 export type WorkOrderDisplayStatus =
   | "draft"
@@ -25,6 +25,7 @@ export type WorkOrderDisplayStatus =
   | "waiting"
   | "completed"
   | "failed"
+  | "closed"
   | "rejected"
   | "cancelled";
 
@@ -78,6 +79,14 @@ const DISPLAY_STATUS_META: Record<
       "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]",
     dotClassName: "bg-[color:var(--status-failed-dot)]",
   },
+  closed: {
+    label: "Closed",
+    filterLabel: "Rejected",
+    summary: "The pull request was closed without a merge.",
+    className:
+      "border-[color:var(--status-failed-border)] bg-[color:var(--status-failed-bg)] text-[color:var(--status-failed-fg)]",
+    dotClassName: "bg-[color:var(--status-failed-dot)]",
+  },
   rejected: {
     label: "Rejected",
     filterLabel: "Rejected",
@@ -103,26 +112,22 @@ export const WORK_ORDER_DISPLAY_STATUSES: WorkOrderDisplayStatus[] = [
   "completed",
   "failed",
   "rejected",
+  "closed",
   "cancelled",
 ];
 
-/** Statuses that stay on the board. Rejected and Canceled open the closed-tasks dialog. */
+/** Statuses shown in the Status filter. */
 export const WORK_ORDER_BOARD_FILTER_STATUSES: WorkOrderDisplayStatus[] = [
   "draft",
   "running",
   "waiting",
   "completed",
   "failed",
+  "rejected",
 ];
 
-export const WORK_ORDER_DIALOG_STATUSES: WorkOrderDisplayStatus[] = ["rejected", "cancelled"];
-
-export function isWorkOrderDialogStatus(status: string): status is "rejected" | "cancelled" {
-  return status === "rejected" || status === "cancelled";
-}
-
-export function isWorkOrderRecoveryStatus(status: string): status is "failed" | "rejected" | "cancelled" {
-  return status === "failed" || isWorkOrderDialogStatus(status);
+export function isWorkOrderRecoveryStatus(status: string): status is "failed" | "rejected" | "closed" | "cancelled" {
+  return status === "failed" || status === "rejected" || status === "closed" || status === "cancelled";
 }
 
 /** Board lanes used across every layout. Order matters — Board renders them left-to-right. */
@@ -157,8 +162,8 @@ export const WORK_ORDER_BOARD_LANES: WorkOrderBoardLaneDefinition[] = [
   {
     id: "done",
     title: "Done",
-    description: "Completed and failed work.",
-    statuses: ["completed", "failed"],
+    description: "Completed, failed, and rejected work.",
+    statuses: ["completed", "failed", "rejected", "closed"],
   },
 ];
 
@@ -186,7 +191,10 @@ export function getWorkOrderDisplayKey(order: FactoriesWorkOrder, factoryKey?: s
 
 export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderDisplayStatus {
   if (order.state === "STATE_CLOSED") {
-    if (order.result === "RESULT_REJECTED") {
+    if (order.result === "RESULT_PR_CLOSED") {
+      return "closed";
+    }
+    if (order.result === "RESULT_REJECTED" || order.result === "RESULT_ARCHIVED") {
       return "rejected";
     }
     if (order.result === "RESULT_FAILED") {
@@ -196,7 +204,7 @@ export function getWorkOrderDisplayStatus(order: FactoriesWorkOrder): WorkOrderD
       order.result !== "RESULT_COMPLETED" &&
       (order.lineDispatches ?? []).some((dispatch) => dispatch.result === "RESULT_CANCELLED")
     ) {
-      return "cancelled";
+      return "rejected";
     }
     return "completed";
   }
@@ -276,7 +284,10 @@ export function filterWorkOrdersByStatus(
   if (statusFilter === "active") {
     return orders.filter((order) => ACTIVE_DISPLAY_STATUSES.includes(getWorkOrderDisplayStatus(order)));
   }
-  return orders.filter((order) => getWorkOrderDisplayStatus(order) === statusFilter);
+  return orders.filter((order) => {
+    const status = getWorkOrderDisplayStatus(order);
+    return status === statusFilter || (statusFilter === "rejected" && status === "closed");
+  });
 }
 
 export function groupWorkOrdersByLane(

@@ -279,7 +279,7 @@ describe("FactoriesHarness workspace setup", () => {
     expect(screen.queryByTestId("first-run-github-continue")).not.toBeInTheDocument();
   }, 15000);
 
-  it("asks the user to connect GitHub when the identity only comes from sign-in", async () => {
+  it("opens repository selection when GitHub is already linked", async () => {
     const user = userEvent.setup();
     render(
       <FactoriesHarness
@@ -295,8 +295,8 @@ describe("FactoriesHarness workspace setup", () => {
       within(await screen.findByTestId("first-run-host-github", {}, { timeout: 8000 })).getByRole("button"),
     );
 
-    expect(await screen.findByTestId("first-run-connect-github", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(screen.queryByTestId("first-run-choose")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("first-run-choose", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("first-run-connect-github")).not.toBeInTheDocument();
   }, 15000);
 
   it("skips installation when initial onboarding already has repository access", async () => {
@@ -365,7 +365,7 @@ describe("FactoriesHarness workspace setup", () => {
     expect(screen.queryByTestId("factories-sidebar")).not.toBeInTheDocument();
   }, 15000);
 
-  it("opens the step from the URL with the saved answers restored", async () => {
+  it("opens the backlog step from the URL without a selected source", async () => {
     render(
       <FactoriesHarness
         pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/setup?step=issues`}
@@ -376,8 +376,11 @@ describe("FactoriesHarness workspace setup", () => {
     );
 
     expect(await screen.findByTestId("first-run-tickets", {}, { timeout: 8000 })).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /GitHub Issues/ }, { timeout: 8000 })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTestId("first-run-analyze-tickets")).toBeEnabled(), { timeout: 8000 });
+    expect(await screen.findByRole("button", { name: /GitHub Issues/ }, { timeout: 8000 })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByTestId("first-run-analyze-tickets")).toBeDisabled();
   }, 15000);
 });
 

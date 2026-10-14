@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,6 +18,12 @@ import (
 )
 
 var errFactoryBitbucketNotConnected = errors.New("bitbucket is not connected")
+
+const (
+	bitbucketMergeBlockedMissingIntegration = "Bitbucket is not connected."
+	bitbucketMergeBlockedPermission         = "The Bitbucket user cannot merge this pull request."
+	bitbucketMergeFastForwardOnly           = "Bitbucket only allows fast-forward merges on this branch. Merge this pull request in Bitbucket."
+)
 
 // bitbucketProvider runs Bitbucket pull request calls for a factory workspace.
 // Velocity listing uses its own Bitbucket provider in the sync worker.
@@ -34,16 +40,17 @@ func (b *bitbucketProvider) ListMergedPullRequests(context.Context, string, time
 	return nil, vcs.ErrNotSupported
 }
 
-// ReadMergeability reads draft, head, and build status for one pull request.
-// Bitbucket exposes no conflict flag, so conflicts surface at merge time;
-// an empty build list does not block, matching the GitHub contract.
+// ReadMergeability reads draft, head, mergeability checks, and build status
+// for one pull request. Bitbucket mergeability checks block conflicts,
+// insufficient permissions, and required checks. API failures leave the
+// pull request disabled with an unavailable status instead of an error.
 func (b *bitbucketProvider) ReadMergeability(ctx context.Context, pullRequest *models.FactoryPullRequest) (vcs.Mergeability, error) {
 	if err := b.ensureClient(); err != nil {
 		if errors.Is(err, errFactoryBitbucketNotConnected) {
 			return vcs.Mergeability{
 				CanMerge:      false,
 				BlockedReason: mergeabilityBlockedReasonName(pb.FactoryPullRequestMergeability_BLOCKED_REASON_MISSING_INTEGRATION),
-				Message:       mergeBlockedMissingIntegration,
+				Message:       bitbucketMergeBlockedMissingIntegration,
 			}, nil
 		}
 		return vcs.Mergeability{}, err
@@ -51,7 +58,7 @@ func (b *bitbucketProvider) ReadMergeability(ctx context.Context, pullRequest *m
 
 	current, err := b.client.GetPullRequest(pullRequest.Repository, pullRequest.Number)
 	if err != nil {
-		return vcs.Mergeability{}, err
+		return unavailableBitbucketMergeability(""), nil
 	}
 	if current.Draft {
 		return vcs.Mergeability{
@@ -76,8 +83,7 @@ func (b *bitbucketProvider) ReadMergeability(ctx context.Context, pullRequest *m
 	}
 
 	headSHA := strings.TrimSpace(current.SourceHash)
-	// ponytail: strategies default open client-side; live verification can restrict
-	allowed := []string{"SQUASH", "MERGE", "REBASE"}
+	allowed := bitbucketAllowedMethods(current.DestMergeStrategies)
 	if headSHA == "" {
 		return vcs.Mergeability{
 			CanMerge:       false,
@@ -87,9 +93,22 @@ func (b *bitbucketProvider) ReadMergeability(ctx context.Context, pullRequest *m
 			AllowedMethods: allowed,
 		}, nil
 	}
+	checks, err := b.client.ListMergeabilityChecks(pullRequest.Repository, pullRequest.Number)
+	if err != nil {
+		return unavailableBitbucketMergeability(headSHA), nil
+	}
+	if blocked := bitbucketBlockingCheck(checks); blocked != nil {
+		return vcs.Mergeability{
+			CanMerge:       false,
+			BlockedReason:  mergeabilityBlockedReasonName(blocked.Reason),
+			Message:        blocked.Message,
+			HeadSHA:        headSHA,
+			AllowedMethods: allowed,
+		}, nil
+	}
 	statuses, err := b.client.ListCommitStatuses(pullRequest.Repository, headSHA)
 	if err != nil {
-		return vcs.Mergeability{}, err
+		return unavailableBitbucketMergeability(headSHA), nil
 	}
 	builds := bitbucketintegration.NormalizeBuildStatuses(statuses)
 	unfinished, failed := false, false
@@ -119,51 +138,138 @@ func (b *bitbucketProvider) ReadMergeability(ctx context.Context, pullRequest *m
 			AllowedMethods: allowed,
 		}, nil
 	default:
-		// Bitbucket merge has no source-commit precondition. A matching
-		// read does not stop a later push from becoming the merged head.
+		if len(allowed) == 0 {
+			return vcs.Mergeability{
+				CanMerge:       false,
+				BlockedReason:  mergeabilityBlockedReasonName(pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNSPECIFIED),
+				Message:        bitbucketMergeFastForwardOnly,
+				HeadSHA:        headSHA,
+				AllowedMethods: allowed,
+			}, nil
+		}
 		return vcs.Mergeability{
-			CanMerge:       false,
-			BlockedReason:  mergeabilityBlockedReasonName(pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNSPECIFIED),
-			Message:        bitbucketMergeNotRevisionSafe,
+			CanMerge:       true,
 			HeadSHA:        headSHA,
 			AllowedMethods: allowed,
 		}, nil
 	}
 }
 
-func (b *bitbucketProvider) MergePullRequest(ctx context.Context, repository string, number int, method, expectedSHA string) error {
+// unavailableBitbucketMergeability disables merging without caching the
+// snapshot, so the next read retries the Bitbucket API.
+func unavailableBitbucketMergeability(headSHA string) vcs.Mergeability {
+	return vcs.Mergeability{
+		CanMerge:      false,
+		BlockedReason: mergeabilityBlockedReasonName(pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE),
+		Message:       mergeBlockedUnavailable,
+		HeadSHA:       headSHA,
+	}
+}
+
+type bitbucketBlock struct {
+	Reason  pb.FactoryPullRequestMergeability_BlockedReason
+	Message string
+}
+
+// bitbucketBlockingCheck maps the first blocking Bitbucket mergeability
+// check to a merge status. Only blocking checks prevent merging; other
+// failures are advisory.
+func bitbucketBlockingCheck(checks []bitbucketintegration.MergeabilityCheck) *bitbucketBlock {
+	for _, check := range checks {
+		if !check.Blocking {
+			continue
+		}
+		switch check.Type {
+		case bitbucketintegration.MergeabilityCheckGit:
+			return &bitbucketBlock{
+				Reason:  pb.FactoryPullRequestMergeability_BLOCKED_REASON_CONFLICTING,
+				Message: mergeBlockedConflicting,
+			}
+		case bitbucketintegration.MergeabilityCheckPermission:
+			return &bitbucketBlock{
+				Reason:  pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNSPECIFIED,
+				Message: bitbucketMergeBlockedPermission,
+			}
+		default:
+			return &bitbucketBlock{
+				Reason:  pb.FactoryPullRequestMergeability_BLOCKED_REASON_CHECK_FAILED,
+				Message: mergeBlockedCheckFailed,
+			}
+		}
+	}
+	return nil
+}
+
+// bitbucketAllowedMethods offers the squash and merge-commit strategies the
+// destination branch supports. Fast-forward is never offered as rebase.
+func bitbucketAllowedMethods(strategies []string) []string {
+	allowed := []string{}
+	for _, strategy := range strategies {
+		switch strings.ToLower(strings.TrimSpace(strategy)) {
+		case "squash":
+			allowed = append(allowed, "SQUASH")
+		case "merge_commit":
+			allowed = append(allowed, "MERGE")
+		}
+	}
+	if len(strategies) == 0 {
+		return []string{"SQUASH", "MERGE"}
+	}
+	return allowed
+}
+
+func (b *bitbucketProvider) MergePullRequest(ctx context.Context, pullRequest *models.FactoryPullRequest, method, expectedSHA string) error {
 	if err := b.ensureClient(); err != nil {
 		return err
 	}
-	current, err := b.client.GetPullRequest(repository, int64(number))
+	// Recheck mergeability immediately before merging. Bitbucket has no
+	// head precondition on the merge request, so a push between this read
+	// and the merge can still change the merged commit.
+	fresh, err := b.ReadMergeability(ctx, pullRequest)
 	if err != nil {
 		return err
 	}
-	if !strings.EqualFold(strings.TrimSpace(current.State), bitbucketintegration.PullRequestStateOpen) {
-		return errors.New("the pull request is no longer open")
+	if !fresh.CanMerge {
+		message := fresh.Message
+		if message == "" {
+			message = errFactoryPullRequestNotMergeable.Error()
+		}
+		return errors.New("bitbucket blocked the merge: " + message)
 	}
 	expectedSHA = strings.TrimSpace(expectedSHA)
-	if expectedSHA != "" &&
-		strings.TrimSpace(current.SourceHash) != "" &&
-		!strings.EqualFold(strings.TrimSpace(current.SourceHash), expectedSHA) {
+	if expectedSHA == "" || !strings.EqualFold(strings.TrimSpace(fresh.HeadSHA), expectedSHA) {
 		return errFactoryPullRequestHeadMoved
 	}
-	// The merge request cannot carry the approved hash. Do not merge a
-	// revision the caller asked to lock.
-	if expectedSHA != "" {
-		return errFactoryBitbucketMergeNotRevisionSafe
+	if !slices.Contains(fresh.AllowedMethods, bitbucketMergeMethodName(method)) {
+		return errFactoryPullRequestMergeMethodNotAllowed
 	}
-	_, err = b.client.MergePullRequest(repository, int64(number), method)
+	merged, err := b.client.MergePullRequest(pullRequest.Repository, pullRequest.Number, bitbucketMergeStrategy(method))
 	if err != nil {
-		var apiErr *bitbucketintegration.APIError
-		// ponytail: Bitbucket reports unmergeable heads as 409; the board
-		// re-syncs and asks for review. Live verification refines this.
-		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusConflict {
-			return fmt.Errorf("%w: %w", errFactoryPullRequestHeadMoved, err)
-		}
 		return err
 	}
+	if merged == nil || !strings.EqualFold(strings.TrimSpace(merged.State), bitbucketintegration.PullRequestStateMerged) {
+		return errors.New("bitbucket did not confirm the merge")
+	}
 	return nil
+}
+
+// bitbucketMergeStrategy maps a GitHub merge method name to the Bitbucket
+// merge strategy. Only squash and merge commit are offered; anything else
+// falls back to a merge commit after the allowed-methods check rejects it.
+func bitbucketMergeStrategy(method string) string {
+	if strings.EqualFold(strings.TrimSpace(method), "squash") {
+		return "squash"
+	}
+	return "merge_commit"
+}
+
+// bitbucketMergeMethodName maps a GitHub merge method name to the stored
+// Bitbucket method name. Fast-forward is never reported back as rebase.
+func bitbucketMergeMethodName(method string) string {
+	if strings.EqualFold(strings.TrimSpace(method), "squash") {
+		return "SQUASH"
+	}
+	return "MERGE"
 }
 
 func (b *bitbucketProvider) ClosePullRequest(ctx context.Context, ref vcs.PullRequestRef) error {

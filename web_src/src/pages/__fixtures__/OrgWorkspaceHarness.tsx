@@ -1,3 +1,8 @@
+import {
+  FactoryMoreRouteSwitch,
+  FactoryWorkspaceLayoutSwitch,
+  LineBoardRouteSwitch,
+} from "../factories/mobile/MobileShellSwitch";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useContext, useEffect, useState, type ComponentType, type ReactNode } from "react";
 import { MemoryRouter, Navigate, Outlet, Route, Routes, useParams } from "react-router";
@@ -30,7 +35,6 @@ import {
   RiskScoreSetupPage,
   SentryIntakeSetupPage,
   FactoriesIndexPage,
-  FactoriesLayout,
   FactoryAppCanvasPage,
   FactoryAppSplitRunPage,
   FactoryHomeRedirect,
@@ -41,7 +45,6 @@ import {
   LegacyWorkOrderDetailRedirect,
   LegacyWorkOrderPermalinkRedirect,
   LegacyWorkOrdersRedirect,
-  LinesPage,
   MissionsPage,
   NewWorkspacePage,
   OverviewPage,
@@ -57,6 +60,7 @@ import {
   LegacyFactorySettingsRedirect,
   LegacyOrganizationSettingsRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
+import { agentSectionRoute } from "@/pages/factories/pages/settings/agentSectionRoutes";
 import { factorySettingsSectionRoutes } from "@/pages/factories/pages/settings/factorySettingsSectionRoutes";
 import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
@@ -300,7 +304,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
         <Route path="workspaces">
           <Route index element={factoryRoute(<FactoriesIndexPage />)} />
           <Route path="new" element={factoryRoute(<NewWorkspacePage />)} />
-          <Route path=":factoryKey" element={factoryRoute(<FactoriesLayout />)}>
+          <Route path=":factoryKey" element={factoryRoute(<FactoryWorkspaceLayoutSwitch />)}>
             <Route element={<OptionalOnboardingGate enabled={onboardingEnabled} />}>
               <Route index element={<FactoryHomeRedirect />} />
               {OnboardingRoutePage ? <Route path="setup" element={<OnboardingRoutePage />} /> : null}
@@ -309,6 +313,8 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               <Route path="missions/:missionId" element={<MissionDetailPage />} />
               <Route path="wiki" element={<WikiRoutePage />} />
               <Route path="velocity" element={<VelocityRoutePage />} />
+              {agentSectionRoute}
+              <Route path="more" element={<FactoryMoreRouteSwitch />} />
               <Route path="tasks">
                 <Route index element={<WorkOrdersRoutePage />} />
                 <Route path="new" element={<CreateWorkOrderComposeRedirect />} />
@@ -321,7 +327,7 @@ function OrgWorkspaceRoutes({ pageOverrides }: { pageOverrides?: OrgWorkspacePag
               <Route path="lines">
                 <Route index element={<FactoryHomeRedirect />} />
                 <Route path="new" element={<FactoryLineEditPage />} />
-                <Route path=":lineId" element={<LinesPage />} />
+                <Route path=":lineId" element={<LineBoardRouteSwitch />} />
                 <Route path=":lineId/edit" element={<FactoryLineEditPage />} />
                 <Route path=":lineId/setup/comments" element={<DiscussionPRFeedbackSetupPage />} />
                 <Route path=":lineId/setup/checks" element={<ChecksPRFeedbackSetupPage />} />

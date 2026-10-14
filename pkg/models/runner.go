@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -60,6 +61,11 @@ type Runner struct {
 	FleetID                uuid.UUID
 	State                  string
 	RunnerVersion          string
+	OS                     string
+	Arch                   string
+	Hostname               string
+	IP                     string
+	Tags                   datatypes.JSONType[map[string]string]
 	Ephemeral              bool
 	RegisteredAt           *time.Time
 	LastSeenAt             *time.Time
@@ -70,6 +76,20 @@ type Runner struct {
 	TerminatedAt           *time.Time
 	CreationIdempotencyKey *string
 	CreationRequestHash    *string
+}
+
+type RunnerHost struct {
+	OS       string
+	Arch     string
+	Hostname string
+	IP       string
+	Tags     map[string]string
+}
+
+type StaleRunner struct {
+	ID         uuid.UUID
+	FleetSlug  string
+	FleetScope string
 }
 
 /*
@@ -190,16 +210,36 @@ func RevokeTerminatedRunnerCredentials(tx *gorm.DB, terminatedBefore, now time.T
 	).Error
 }
 
-func ListStaleRunnerIDs(tx *gorm.DB, lastSeenBefore time.Time, limit int) ([]uuid.UUID, error) {
-	var ids []uuid.UUID
-	err := tx.Model(&Runner{}).
-		Where("state IN ?", []string{RunnerStateIdle, RunnerStateBusy}).
-		Where("last_seen_at IS NOT NULL AND last_seen_at <= ?", lastSeenBefore).
-		Order("last_seen_at ASC").
+func ListStaleRunners(tx *gorm.DB, lastSeenBefore time.Time, limit int) ([]StaleRunner, error) {
+	type row struct {
+		ID               uuid.UUID
+		FleetSlug        string
+		ScopeType        string
+		OrganizationSlug string
+	}
+	var rows []row
+	err := tx.Table("runners").
+		Select("runners.id, runner_fleets.slug AS fleet_slug, runner_fleets.scope_type, organizations.slug AS organization_slug").
+		Joins("JOIN runner_fleets ON runner_fleets.id = runners.fleet_id").
+		Joins("LEFT JOIN organizations ON organizations.id = runner_fleets.scope_id").
+		Where("runners.state IN ?", []string{RunnerStateIdle, RunnerStateBusy}).
+		Where("runners.last_seen_at IS NOT NULL AND runners.last_seen_at <= ?", lastSeenBefore).
+		Order("runners.last_seen_at ASC").
 		Limit(limit).
-		Pluck("id", &ids).
-		Error
-	return ids, err
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	runners := make([]StaleRunner, 0, len(rows))
+	for _, row := range rows {
+		runners = append(runners, StaleRunner{
+			ID:         row.ID,
+			FleetSlug:  row.FleetSlug,
+			FleetScope: RunnerFleetMetricScope(row.ScopeType, row.OrganizationSlug),
+		})
+	}
+	return runners, nil
 }
 
 /*
@@ -217,6 +257,7 @@ func (r *Runner) Register(
 	fleetSlug string,
 	taskID *uuid.UUID,
 	version string,
+	host RunnerHost,
 	accessTokenHash string,
 	now time.Time,
 ) error {
@@ -301,6 +342,11 @@ func (r *Runner) Register(
 		Where("state = ?", RunnerStatePending).
 		Updates(map[string]any{
 			"state":         RunnerStateIdle,
+			"os":            host.OS,
+			"arch":          host.Arch,
+			"hostname":      host.Hostname,
+			"ip":            host.IP,
+			"tags":          datatypes.NewJSONType(host.Tags),
 			"registered_at": now,
 			"last_seen_at":  now,
 			"updated_at":    now,
@@ -313,6 +359,11 @@ func (r *Runner) Register(
 	}
 
 	r.State = RunnerStateIdle
+	r.OS = host.OS
+	r.Arch = host.Arch
+	r.Hostname = host.Hostname
+	r.IP = host.IP
+	r.Tags = datatypes.NewJSONType(host.Tags)
 	r.RegisteredAt = &now
 	r.LastSeenAt = &now
 	r.UpdatedAt = now

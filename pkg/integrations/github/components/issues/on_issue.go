@@ -286,6 +286,7 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 		}
 	}
 
+	blankMissingIssueBody(data)
 	err = ctx.Events.Emit("github.issue", data)
 	if err != nil {
 		ctx.Logger.Errorf("Failed to emit event: %v", err)
@@ -297,6 +298,20 @@ func (i *OnIssue) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 
 func (i *OnIssue) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func blankMissingIssueBody(data map[string]any) {
+	issue, ok := data["issue"].(map[string]any)
+	if !ok {
+		return
+	}
+
+	body, present := issue["body"]
+	if present && body != nil {
+		return
+	}
+
+	issue["body"] = ""
 }
 
 func issueMatchesFilters(data map[string]any, config OnIssueConfiguration) bool {

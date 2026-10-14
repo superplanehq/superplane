@@ -42,7 +42,10 @@ const draft: FactoriesWorkOrderSummary = {
   assignees: [],
 };
 
-function renderCard(order: FactoriesWorkOrderSummary = draft, isAnalyzing = false, creditLabel?: string) {
+function renderCard(
+  order: FactoriesWorkOrderSummary = draft,
+  options: { isAnalyzing?: boolean; creditLabel?: string; showMergeConfidence?: boolean } = {},
+) {
   const onOpenWorkOrder = vi.fn();
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
@@ -52,8 +55,9 @@ function renderCard(order: FactoriesWorkOrderSummary = draft, isAnalyzing = fals
             order={order}
             workOrderCardContext={cardContext}
             onOpenWorkOrder={onOpenWorkOrder}
-            isAnalyzing={isAnalyzing}
-            creditLabel={creditLabel}
+            isAnalyzing={options.isAnalyzing}
+            creditLabel={options.creditLabel}
+            showMergeConfidence={options.showMergeConfidence}
           />
         </FactoriesLayoutContext.Provider>
       </MemoryRouter>
@@ -87,20 +91,20 @@ describe("LineBoardOrderCard", () => {
   });
 
   it("shows No credit when backlog analysis stopped for hosted credit", () => {
-    renderCard(draft, false, "No credit");
+    renderCard(draft, { creditLabel: "No credit" });
 
     expect(screen.getByText("No credit")).toBeInTheDocument();
   });
 
   it("hides the analysis credit label after the task leaves the backlog", () => {
-    renderCard({ ...draft, state: "STATE_CLOSED", result: "RESULT_COMPLETED" }, false, "No credit");
+    renderCard({ ...draft, state: "STATE_CLOSED", result: "RESULT_COMPLETED" }, { creditLabel: "No credit" });
 
     expect(screen.queryByText("No credit")).not.toBeInTheDocument();
   });
 
   it("shows a local backlog analysis without loading a planning session", () => {
     const fetchMock = vi.spyOn(globalThis, "fetch");
-    renderCard(draft, true);
+    renderCard(draft, { isAnalyzing: true });
 
     expect(screen.getByTestId("work-order-card-analyzing-wo-1")).toBeInTheDocument();
     expect(planningSessionRequests(fetchMock)).toEqual([]);
@@ -149,13 +153,16 @@ describe("LineBoardOrderCard", () => {
       ],
     });
 
-    const chip = screen.getByRole("img", { name: "Merge confidence 5 of 5" });
+    const chip = screen.getByRole("img", {
+      name: "Merge confidence. Blast radius: Passed. Drift from Specification: Passed",
+    });
     expect(chip).toHaveTextContent("Confidence");
     expect(chip).not.toHaveTextContent(/\d/);
     expect(screen.queryByText("Blast radius")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-order-card-merge-wo-verify-meter").children).toHaveLength(2);
   });
 
-  it("shows the weakest flipped merge confidence check", () => {
+  it("orders the available merge checks and reports each result", () => {
     renderCard({
       ...draft,
       id: "wo-verify",
@@ -166,7 +173,9 @@ describe("LineBoardOrderCard", () => {
       ],
     });
 
-    expect(screen.getByRole("img", { name: "Merge confidence 3 of 5" })).not.toHaveTextContent("Merge");
+    expect(
+      screen.getByRole("img", { name: "Merge confidence. Blast radius: Needs review. Performance: Passed" }),
+    ).not.toHaveTextContent("Merge");
   });
 
   it("hides the merge chip when no merge confidence check exists", () => {
@@ -180,16 +189,20 @@ describe("LineBoardOrderCard", () => {
     expect(screen.queryByRole("img", { name: /Merge confidence/ })).not.toBeInTheDocument();
   });
 
-  it("shows merge confidence on a done card", () => {
-    renderCard({
-      ...draft,
-      id: "wo-done",
-      state: "STATE_CLOSED",
-      result: "RESULT_COMPLETED",
-      checkScores: [{ key: "security-review", name: "Security", score: 4, maxScore: 5 }],
-    });
+  it("hides merge confidence on a done card", () => {
+    renderCard(
+      {
+        ...draft,
+        id: "wo-done",
+        state: "STATE_CLOSED",
+        result: "RESULT_COMPLETED",
+        checkScores: [{ key: "security-review", name: "Security", score: 4, maxScore: 5 }],
+      },
+      { showMergeConfidence: false },
+    );
 
-    expect(screen.getByRole("img", { name: "Merge confidence 4 of 5" })).not.toHaveTextContent("Merge");
+    expect(screen.getByText("The site feels weird lately")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /Merge confidence/ })).not.toBeInTheDocument();
   });
 
   it("shows Clarity and Confidence only on a draft", () => {
@@ -261,7 +274,9 @@ describe("LineBoardOrderCard", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByRole("img", { name: "Merge confidence 4 of 5" })).toHaveTextContent("Confidence");
+    expect(screen.getByRole("img", { name: "Merge confidence. Reversibility: Passed" })).toHaveTextContent(
+      "Confidence",
+    );
     expect(screen.queryByText("Clarity")).not.toBeInTheDocument();
     expect(screen.queryByTestId("work-order-card-score-wo-hidden-planning")).not.toBeInTheDocument();
   });

@@ -7,6 +7,16 @@ import { confidenceBandForScore, isScoreCheckName, type ConfidenceBand } from ".
  * number is good (coverage) or bad (risk). */
 export type WorkOrderCheckLevel = "positive" | "neutral" | "caution" | "critical";
 
+/** Shared accessible labels for status icons in planning and merge checks. */
+export function workOrderCheckLevelLabel(level: WorkOrderCheckLevel): string {
+  return {
+    positive: "Passed",
+    neutral: "Not assessed",
+    caution: "Needs review",
+    critical: "Needs attention",
+  }[level];
+}
+
 /** How the score renders: `65/100`, `82%`, or a Pass/Fail verdict. */
 export type WorkOrderCheckScoreFormat = "fraction" | "percent" | "boolean";
 
@@ -17,6 +27,7 @@ export interface WorkOrderCheckPresentation {
   /** Short human name, e.g. "Risk score" or "Code quality". */
   name: string;
   score: number;
+  scoreSupplied?: boolean;
   maxScore: number;
   /** "percent" renders `82%`; "boolean" renders `Pass`/`Fail`;
    * "fraction" (default) renders `65/100`. */
@@ -193,6 +204,7 @@ export function presentWorkOrderCheck(check: FactoriesWorkOrderCheck): WorkOrder
     key: emptyToUndefined(check.key),
     name: workOrderCheckDisplayName({ key: emptyToUndefined(check.key), name: check.name ?? "" }),
     score: check.score ?? 0,
+    scoreSupplied: check.score != null,
     maxScore: check.maxScore ?? 0,
     format: presentCheckFormat(check.format),
     level: presentCheckLevel(check.level),

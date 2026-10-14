@@ -14,7 +14,6 @@ import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLan
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_DATADOG_INTAKE,
-  FEATURE_FACTORY_LINEAR_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
@@ -1047,6 +1046,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-column-automation-template-discussion")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-checks")).toBeInTheDocument();
     expect(screen.getByTestId("add-column-automation-template-risk-score")).toBeInTheDocument();
+    expect(screen.getByTestId("add-column-automation-template-visual-evidence")).toBeInTheDocument();
     expect(screen.queryByTestId("add-column-automation-template-custom")).not.toBeInTheDocument();
   });
 
@@ -1073,7 +1073,10 @@ describe("LinesPage board extras", () => {
       isPending: false,
     });
     useFactoryAutomations.mockReturnValue({
-      data: [{ id: "app-risk", name: "Risk score", columnKey: "verify" }],
+      data: [
+        { id: "app-risk", name: "Risk score", columnKey: "verify" },
+        { id: "app-evidence", name: "Visual Evidence", columnKey: "verify" },
+      ],
     });
     const user = userEvent.setup();
     renderLinesBoard();
@@ -1211,12 +1214,12 @@ describe("LinesPage board extras", () => {
     );
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-linear-issues")).toBeEnabled();
+    expect(screen.getByTestId("add-intake-template-linear-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
 
     await user.click(screen.getByTestId("add-intake-template-productive-tasks"));
     await user.click(screen.getByTestId("add-intake-template-datadog"));
-    await user.click(screen.getByTestId("add-intake-template-linear-issues"));
 
     expect(screen.queryByTestId("jira-intake-setup")).not.toBeInTheDocument();
     expect(screen.queryByTestId("productive-intake-setup")).not.toBeInTheDocument();
@@ -1245,7 +1248,6 @@ describe("LinesPage board extras", () => {
   });
 
   it("opens guided Linear setup from the overflow menu", async () => {
-    enabledExperimentalFeatures.add(FEATURE_FACTORY_LINEAR_INTAKE);
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1277,7 +1279,7 @@ describe("LinesPage board extras", () => {
     expect(screen.getByTestId("add-intake-template-jira-issues")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-jira-issues")).not.toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.getByTestId("add-intake-template-datadog")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
-    expect(screen.getByTestId("add-intake-template-linear-issues")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
+    expect(screen.getByTestId("add-intake-template-linear-issues")).toBeEnabled();
     expect(screen.getByTestId("add-intake-template-notion")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
     expect(screen.queryByTestId("add-intake-template-pagerduty-incidents")).not.toBeInTheDocument();
     expect(screen.getByTestId("add-intake-template-productive-tasks")).toHaveTextContent(ADD_INTAKE_COPY.comingSoon);
@@ -1778,7 +1780,7 @@ describe("LinesPage board editing", () => {
     expect(screen.getByTestId("work-orders-filter-assigneeIds")).toBeInTheDocument();
   });
 
-  it("opens closed tasks from the Status filter", async () => {
+  it("filters Rejected on the board without opening a dialog", async () => {
     const user = userEvent.setup();
     renderLinesBoard();
 
@@ -1786,11 +1788,8 @@ describe("LinesPage board editing", () => {
     await user.hover(screen.getByTestId("work-orders-filter-statuses"));
     fireEvent.click(await screen.findByTestId("work-orders-filter-statuses-rejected"));
 
-    expect(await screen.findByTestId("work-order-closed-status-dialog")).toBeInTheDocument();
-    expect(
-      screen.getByText("Rejected and Canceled tasks. Send a task to Backlog to work on it again."),
-    ).toBeInTheDocument();
-    expect(screen.getByText("No closed tasks.")).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-closed-status-dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("work-orders-filter-chips")).toHaveTextContent("Rejected");
   });
 
   it("treats a leftover Active scope as All and keeps every card", () => {

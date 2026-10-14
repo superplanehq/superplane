@@ -1,10 +1,15 @@
+import type { SuperplaneComponentsNode } from "@/api-client";
 import { useDeleteFactoryIntake, useUpdateFactoryIntake } from "@/hooks/useFactoryIntakeData";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { factoryAppConfigurePath, factoryAppRunPath } from "../lib/factoryPagePaths";
+import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomationsCopy";
+import { DependabotIntakeConfigBody } from "./DependabotIntakeConfigBody";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
+import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
+import { type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
   INTAKE_SETTINGS_COPY,
@@ -26,11 +31,86 @@ interface IntakeSettingsHostProps {
   /** GitHub integration that has access to that repository. */
   vcsIntegrationId?: string;
   initialTab?: IntakeSettingsTab;
+  page?: boolean;
   onClose: () => void;
 }
 
 /** Settings for one intake, opened from its row at the foot of Backlog. */
-export function IntakeSettingsHost({
+export function IntakeSettingsHost(props: IntakeSettingsHostProps) {
+  if (props.intake.source.id === "dependabot-alerts") {
+    return <DependabotIntakeSettings {...props} />;
+  }
+  return <SourceIntakeSettings {...props} />;
+}
+
+function DependabotIntakeSettings({
+  organizationId,
+  factoryId,
+  factoryKey,
+  lineId,
+  intake,
+  repository,
+  page = false,
+  onClose,
+}: IntakeSettingsHostProps) {
+  const automation = useIntakeAutomationCanvas(organizationId, intake.appId);
+  const agent = useColumnCanvasAgentEditor(organizationId, intake.appId);
+  const updateIntake = useUpdateFactoryIntake(organizationId, factoryId);
+  const deleteIntake = useDeleteFactoryIntake(organizationId, factoryId);
+  const actions = useIntakeSettingsActions({
+    intake,
+    updateIntake,
+    deleteIntake,
+    automationRefetch: automation.refetch,
+    onClose,
+  });
+  const [severityDraft, setSeverityDraft] = useState(intake.settings);
+  const saveError = updateIntake.error
+    ? getApiErrorMessage(updateIntake.error, INTAKE_SETTINGS_COPY.saveError)
+    : undefined;
+
+  useEffect(() => {
+    setSeverityDraft(intake.settings);
+  }, [intake.settings]);
+
+  return (
+    <MergeConfidenceConfigModal
+      title={intake.settings.name.trim() || intake.source.name}
+      graph={automation.graph}
+      loading={automation.isLoading}
+      error={automation.isError}
+      onRetry={() => void automation.refetch()}
+      canvasId={intake.appId}
+      factoryId={factoryId}
+      factoryKey={factoryKey}
+      runHrefFor={intakeRunHref(organizationId, factoryKey, intake.appId, lineId)}
+      onClose={onClose}
+      onSaveNode={(update) => agent.saveNode(update, { notify: false })}
+      onDelete={actions.removeIntake}
+      deletePending={deleteIntake.isPending}
+      deleteError={actions.deleteError}
+      deleteCopy={DEPENDABOT_INTAKE_DELETE_COPY}
+      page={page}
+      showRunsTab={Boolean(intake.appId)}
+      fallbackNode={DEPENDABOT_SETTINGS_NODE}
+      renderNodeBody={(node) =>
+        node.component === "github.onDependabotAlert" ? (
+          <DependabotIntakeConfigBody
+            node={node}
+            fallbackRepository={repository}
+            settings={severityDraft}
+            savePending={updateIntake.isPending}
+            saveError={saveError}
+            onSettingsChange={setSeverityDraft}
+            onSave={actions.saveSettings}
+          />
+        ) : null
+      }
+    />
+  );
+}
+
+function SourceIntakeSettings({
   organizationId,
   factoryId,
   factoryKey,
@@ -39,6 +119,7 @@ export function IntakeSettingsHost({
   repository,
   vcsIntegrationId,
   initialTab = "general",
+  page = false,
   onClose,
 }: IntakeSettingsHostProps) {
   const automation = useIntakeAutomationCanvas(organizationId, intake.appId);
@@ -67,6 +148,9 @@ export function IntakeSettingsHost({
   const editAutomationHref = intake.appId
     ? factoryAppConfigurePath(organizationId, factoryKey, intake.appId, { from: "lines", lineId })
     : undefined;
+  const saveError = updateIntake.error
+    ? getApiErrorMessage(updateIntake.error, INTAKE_SETTINGS_COPY.saveError)
+    : undefined;
 
   return (
     <IntakeSourceSettingsPopup
@@ -83,21 +167,13 @@ export function IntakeSettingsHost({
       onRetryAutomation={automation.refetch}
       onSave={actions.saveSettings}
       savePending={updateIntake.isPending || automation.isLoading}
-      saveError={
-        updateIntake.error
-          ? getApiErrorMessage(updateIntake.error, "SuperPlane could not save the intake settings. Try again.")
-          : undefined
-      }
+      saveError={saveError}
       deletePending={deleteIntake.isPending}
       deleteError={actions.deleteError}
       onDelete={actions.removeIntake}
       editAutomationHref={editAutomationHref}
       canvasId={intake.appId}
-      runHrefFor={
-        intake.appId
-          ? (runId) => factoryAppRunPath(organizationId, factoryKey, intake.appId, runId, { from: "lines", lineId })
-          : undefined
-      }
+      runHrefFor={intakeRunHref(organizationId, factoryKey, intake.appId, lineId)}
       agent={
         agent.agentNode
           ? {
@@ -113,9 +189,33 @@ export function IntakeSettingsHost({
       }
       onClose={onClose}
       initialTab={initialTab}
+      page={page}
       fixed
     />
   );
+}
+
+const DEPENDABOT_SETTINGS_NODE: SuperplaneComponentsNode = {
+  id: "dependabot-alerts-settings",
+  name: "On Dependabot Alert",
+  type: "TYPE_TRIGGER",
+  component: "github.onDependabotAlert",
+};
+
+const DEPENDABOT_INTAKE_DELETE_COPY: SplitConfigDeleteCopy = {
+  menuLabel: INTAKE_SETTINGS_COPY.delete,
+  title: INTAKE_SETTINGS_COPY.deleteTitle,
+  description: INTAKE_SETTINGS_COPY.deleteDescription,
+  confirmLabel: INTAKE_SETTINGS_COPY.deleteConfirm,
+  pendingLabel: COLUMN_AUTOMATIONS_COPY.deletingLabel,
+  keepLabel: INTAKE_SETTINGS_COPY.deleteCancel,
+};
+
+function intakeRunHref(organizationId: string, factoryKey: string, appId: string | undefined, lineId?: string) {
+  if (!appId) {
+    return undefined;
+  }
+  return (runId: string) => factoryAppRunPath(organizationId, factoryKey, appId, runId, { from: "lines", lineId });
 }
 
 function useIntakeSettingsActions({

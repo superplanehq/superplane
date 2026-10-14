@@ -7,6 +7,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUNNER_BINARY="${SCRIPT_DIR}/runner"
 RUNNER_API_URL="${RUNNER_API_URL:-}"
 RUNNER_REGISTRATION_TOKEN="${RUNNER_REGISTRATION_TOKEN:-}"
+RUNNER_TAGS="${RUNNER_TAGS:-}"
+RUNNER_TAGS_FROM_EC2_METADATA="${RUNNER_TAGS_FROM_EC2_METADATA:-}"
+RUNNER_TAGS_FROM_GCP_METADATA="${RUNNER_TAGS_FROM_GCP_METADATA:-}"
 
 fail() {
   echo "Error: $*" >&2
@@ -36,6 +39,24 @@ quote_environment_value() {
 command -v systemctl >/dev/null 2>&1 || fail "systemd is required"
 validate_environment_value "RUNNER_API_URL" "${RUNNER_API_URL}"
 validate_environment_value "RUNNER_REGISTRATION_TOKEN" "${RUNNER_REGISTRATION_TOKEN}"
+if [ -n "${RUNNER_TAGS}" ]; then
+  validate_environment_value "RUNNER_TAGS" "${RUNNER_TAGS}"
+fi
+if [ -n "${RUNNER_TAGS_FROM_EC2_METADATA}" ]; then
+  validate_environment_value "RUNNER_TAGS_FROM_EC2_METADATA" "${RUNNER_TAGS_FROM_EC2_METADATA}"
+fi
+if [ -n "${RUNNER_TAGS_FROM_GCP_METADATA}" ]; then
+  validate_environment_value "RUNNER_TAGS_FROM_GCP_METADATA" "${RUNNER_TAGS_FROM_GCP_METADATA}"
+fi
+
+# Azure gallery images do not include the Ubuntu cloud user. The service
+# runs as that user, so create it before systemd starts the unit.
+if ! id ubuntu >/dev/null 2>&1; then
+  useradd --create-home --shell /bin/bash ubuntu
+fi
+if getent group docker >/dev/null 2>&1; then
+  usermod -aG docker ubuntu
+fi
 
 install -d -m 0755 /usr/local/bin
 install -m 0755 "${RUNNER_BINARY}" /usr/local/bin/superplane-runner
@@ -46,6 +67,12 @@ install -d -m 0700 /var/lib/superplane-runner
   quote_environment_value "${RUNNER_API_URL}"
   printf '\nRUNNER_REGISTRATION_TOKEN='
   quote_environment_value "${RUNNER_REGISTRATION_TOKEN}"
+  printf '\nRUNNER_TAGS='
+  quote_environment_value "${RUNNER_TAGS}"
+  printf '\nRUNNER_TAGS_FROM_EC2_METADATA='
+  quote_environment_value "${RUNNER_TAGS_FROM_EC2_METADATA}"
+  printf '\nRUNNER_TAGS_FROM_GCP_METADATA='
+  quote_environment_value "${RUNNER_TAGS_FROM_GCP_METADATA}"
   printf '\n'
 } > /etc/default/superplane-runner
 chmod 0600 /etc/default/superplane-runner

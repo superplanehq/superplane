@@ -18,15 +18,15 @@ function renderShell(ui: ReactNode) {
 }
 
 describe("FirstRunShell", () => {
-  it("keeps owner setup on the app shell and does not load the art script", () => {
+  it("keeps the default shell on the app visual and does not load the art script", () => {
     const scriptsBefore = document.querySelectorAll("script[data-onboarding-src]").length;
     renderShell(
-      <FirstRunShell testId="owner-setup" chrome={{ stepIndex: 0, stepCount: 2 }}>
-        <p>Create the owner account</p>
+      <FirstRunShell testId="default-shell" chrome={{ stepIndex: 0, stepCount: 2 }}>
+        <p>Continue</p>
       </FirstRunShell>,
     );
 
-    expect(screen.getByTestId("owner-setup")).toHaveAttribute("data-visual", "app");
+    expect(screen.getByTestId("default-shell")).toHaveAttribute("data-visual", "app");
     expect(screen.queryByTestId("first-run-logo")).not.toBeInTheDocument();
     expect(document.querySelectorAll("script[data-onboarding-src]")).toHaveLength(scriptsBefore);
   });

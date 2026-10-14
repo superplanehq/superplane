@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 
 import {
   canAnalyzeTicketSource,
-  DEFAULT_TICKET_SOURCE,
   issuesChoiceForTicketSource,
   ticketSourceFromIssuesChoice,
 } from "./firstRunTicketSource";
@@ -15,15 +14,23 @@ describe("firstRunTicketSource", () => {
     expect(issuesChoiceForTicketSource(null)).toBeNull();
   });
 
-  it("defaults an unanswered issues choice to GitHub Issues", () => {
-    expect(ticketSourceFromIssuesChoice(null)).toBe(DEFAULT_TICKET_SOURCE);
+  it("keeps an unanswered issues choice unselected", () => {
+    expect(ticketSourceFromIssuesChoice(null)).toBeNull();
+    expect(ticketSourceFromIssuesChoice("skip")).toBeNull();
     expect(ticketSourceFromIssuesChoice("vcs")).toBe("github-issues");
     expect(ticketSourceFromIssuesChoice("jira")).toBe("jira");
     expect(ticketSourceFromIssuesChoice("linear")).toBe("linear");
   });
 
-  it("allows analysis for GitHub Issues without extra setup", () => {
-    expect(canAnalyzeTicketSource({ ticketSource: "github-issues" })).toBe(true);
+  it("ignores a saved GitHub backlog choice for Bitbucket", () => {
+    expect(ticketSourceFromIssuesChoice("vcs", "bitbucket")).toBeNull();
+    expect(ticketSourceFromIssuesChoice("jira", "bitbucket")).toBe("jira");
+    expect(ticketSourceFromIssuesChoice("linear", "bitbucket")).toBe("linear");
+  });
+
+  it("requires a GitHub connection for analysis", () => {
+    expect(canAnalyzeTicketSource({ ticketSource: "github-issues" })).toBe(false);
+    expect(canAnalyzeTicketSource({ ticketSource: "github-issues", githubConnected: true })).toBe(true);
     expect(canAnalyzeTicketSource({ ticketSource: null })).toBe(false);
   });
 

@@ -46,7 +46,7 @@ func newCreateCommand(options core.BindOptions) *cobra.Command {
 		"",
 		"idempotency key",
 	)
-	cmd.Flags().BoolVar(&handler.Ephemeral, "ephemeral", false, "terminate after one task")
+	cmd.Flags().BoolVar(&handler.Ephemeral, "ephemeral", true, "terminate after one task")
 	_ = cmd.MarkFlagRequired("fleet")
 	core.Bind(cmd, handler, options)
 	return cmd

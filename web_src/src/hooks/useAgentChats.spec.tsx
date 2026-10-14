@@ -8,7 +8,13 @@ import {
   agentsSendAgentChatMessage,
 } from "@/api-client/sdk.gen";
 import type { AgentMessagesPage } from "./useAgentChats";
-import { agentChatKeys, useAgentChatMessages, useResetCanvasAgentChat, useSendAgentChatMessage } from "./useAgentChats";
+import {
+  agentChatKeys,
+  upsertAgentMessageInCache,
+  useAgentChatMessages,
+  useResetCanvasAgentChat,
+  useSendAgentChatMessage,
+} from "./useAgentChats";
 
 vi.mock("@/api-client/sdk.gen", () => ({
   agentsListAgentChatMessages: vi.fn(),
@@ -84,6 +90,66 @@ describe("useSendAgentChatMessage", () => {
     const data = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"));
     expect(data?.pages[0]?.messages).toHaveLength(1);
     expect(data?.pages[0]?.messages[0]?.id).toBe("server-message-1");
+  });
+
+  it("keeps the user message before tool rows that arrive during send", async () => {
+    type SendAgentChatMessageResult = Awaited<ReturnType<typeof agentsSendAgentChatMessage>>;
+    let resolveSend: ((value: SendAgentChatMessageResult) => void) | undefined;
+    vi.mocked(agentsSendAgentChatMessage).mockReturnValue(
+      new Promise((resolve) => {
+        resolveSend = resolve;
+      }) as ReturnType<typeof agentsSendAgentChatMessage>,
+    );
+
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"), {
+      pages: [{ messages: [], hasMore: false }],
+      pageParams: [""],
+    });
+
+    const { result } = renderHook(() => useSendAgentChatMessage("org-1", "canvas-1"), {
+      wrapper: wrapper(queryClient),
+    });
+
+    const sendPromise = result.current.mutateAsync({
+      chatId: "chat-1",
+      content: "Inspect the canvas",
+    });
+
+    await waitFor(() => {
+      const data = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"));
+      expect(data?.pages[0]?.messages[0]?.content).toBe("Inspect the canvas");
+    });
+
+    upsertAgentMessageInCache(queryClient, "chat-1", {
+      id: "tool-1",
+      role: "tool",
+      content: "superplane apps canvas get",
+      toolName: "bash",
+      toolCallId: "call-1",
+      toolStatus: "started",
+      createdAt: new Date().toISOString(),
+    });
+
+    if (!resolveSend) {
+      throw new Error("send promise was not created");
+    }
+
+    resolveSend({
+      data: {
+        message: {
+          id: "server-message-1",
+          role: "user",
+          content: "Inspect the canvas",
+        },
+      },
+      request: new Request("https://superplane.test"),
+      response: new Response(),
+    } as SendAgentChatMessageResult);
+    await sendPromise;
+
+    const data = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("chat-1"));
+    expect(data?.pages[0]?.messages.map((message) => message.id)).toEqual(["server-message-1", "tool-1"]);
   });
 });
 

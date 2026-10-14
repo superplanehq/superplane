@@ -21,6 +21,8 @@ type mcpClientRowLayout struct {
 	CardLeft       float64 `json:"cardLeft"`
 	CardRight      float64 `json:"cardRight"`
 	ListWidth      float64 `json:"listWidth"`
+	ScrollWidth    float64 `json:"scrollWidth"`
+	PersonWidth    float64 `json:"personWidth"`
 	ButtonLeft     float64 `json:"buttonLeft"`
 	ButtonRight    float64 `json:"buttonRight"`
 	ButtonWidth    float64 `json:"buttonWidth"`
@@ -49,7 +51,9 @@ func TestMCPClientRevokeStaysInsideNarrowCard(t *testing.T) {
 	})
 
 	// Phone settings hide both sidebars below 768px, so a 760px viewport is a
-	// wide card. 800px stays on the desktop shell and still squeezes the list.
+	// wide card. 800px stays on the desktop shell and still squeezes the card.
+	// The table keeps a 35rem minimum so the person column stays readable, and
+	// the row scrolls instead of collapsing.
 	page, err := browser.NewPage(pw.BrowserNewPageOptions{
 		Viewport: &pw.Size{Width: 800, Height: 900},
 	})
@@ -63,12 +67,23 @@ func TestMCPClientRevokeStaysInsideNarrowCard(t *testing.T) {
 	require.NoError(t, revoke.ScrollIntoViewIfNeeded())
 
 	narrow := waitForMCPClientRowLayout(t, page, func(layout mcpClientRowLayout) error {
-		if layout.ListWidth >= 480 {
-			return fmt.Errorf("client list is %.1f px wide; viewport does not reproduce a narrow card", layout.ListWidth)
+		if layout.ScrollWidth >= 480 {
+			return fmt.Errorf("client list viewport is %.1f px wide; viewport does not reproduce a narrow card", layout.ScrollWidth)
+		}
+		if layout.ListWidth < 35*16-1 {
+			return fmt.Errorf("client table is %.1f px wide; names can collapse on a narrow card", layout.ListWidth)
+		}
+		if layout.PersonWidth < 12*16-8 {
+			return fmt.Errorf("person column is %.1f px wide; the name has no room", layout.PersonWidth)
+		}
+		if layout.ListWidth <= layout.ScrollWidth+1 {
+			return fmt.Errorf("narrow card does not scroll: table %.1f, viewport %.1f", layout.ListWidth, layout.ScrollWidth)
 		}
 		return mcpClientRevokeInsideCard(layout)
 	})
-	require.Less(t, narrow.ListWidth, 480.0)
+	require.Less(t, narrow.ScrollWidth, 480.0)
+	require.GreaterOrEqual(t, narrow.ListWidth, float64(35*16-1))
+	require.GreaterOrEqual(t, narrow.PersonWidth, float64(12*16-8))
 	require.True(t, narrow.ButtonHit)
 	require.True(t, narrow.NameTruncated)
 
@@ -133,15 +148,19 @@ func waitForMCPClientRowLayout(t *testing.T, page pw.Page, check func(mcpClientR
 func readMCPClientRowLayout(page pw.Page) (mcpClientRowLayout, error) {
 	script := strings.ReplaceAll(`() => {
 		const card = document.querySelector('[data-testid="superplane-mcp-server"]');
+		const scroll = document.querySelector('[data-testid="superplane-mcp-clients-scroll"]');
 		const list = document.querySelector('[data-testid="superplane-mcp-clients-list"]');
+		const row = document.querySelector('[data-testid="superplane-mcp-client-LONG_ID"]');
+		const person = row ? row.querySelector('td') : null;
 		const button = document.querySelector('[data-testid="superplane-mcp-client-revoke-LONG_ID"]');
 		const name = document.querySelector('[data-testid="superplane-mcp-client-name-LONG_ID"]');
 		const cursorTime = document.querySelector('[data-testid="superplane-mcp-client-time-mcp-client-cursor-leonardo"]');
 		const codexTime = document.querySelector('[data-testid="superplane-mcp-client-time-mcp-client-codex"]');
-		if (!card || !list || !button || !name || !cursorTime || !codexTime) {
+		if (!card || !scroll || !list || !person || !button || !name || !cursorTime || !codexTime) {
 			return null;
 		}
 		const cardBox = card.getBoundingClientRect();
+		const scrollBox = scroll.getBoundingClientRect();
 		const listBox = list.getBoundingClientRect();
 		const buttonBox = button.getBoundingClientRect();
 		const centerX = buttonBox.left + buttonBox.width / 2;
@@ -151,6 +170,8 @@ func readMCPClientRowLayout(page pw.Page) (mcpClientRowLayout, error) {
 			cardLeft: cardBox.left,
 			cardRight: cardBox.right,
 			listWidth: listBox.width,
+			scrollWidth: scrollBox.width,
+			personWidth: person.getBoundingClientRect().width,
 			buttonLeft: buttonBox.left,
 			buttonRight: buttonBox.right,
 			buttonWidth: buttonBox.width,

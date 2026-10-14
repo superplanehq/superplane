@@ -20,7 +20,7 @@ export function FactorySettingsSkillEditorPage() {
   usePageTitle([
     editor.isCreate ? AGENT_RESOURCES_COPY.addSkill : editor.name || AGENT_RESOURCES_COPY.editSkill,
     AGENT_RESOURCES_COPY.agentTitle,
-    editor.factory.name ?? "Workspace",
+    editor.factory?.name ?? "Workspace",
   ]);
 
   if (!editor.isCreate && !editor.skillsLoading && !editor.resource) {
@@ -131,7 +131,7 @@ function SkillEditorFields({
   onMarkdownChange: (value: string) => void;
 }) {
   return (
-    <div className="flex min-h-[70vh] flex-col gap-4" data-testid="factory-settings-skill-editor">
+    <div className="flex flex-col gap-4" data-testid="factory-settings-skill-editor">
       <SkillNameFields
         name={name}
         command={command}
@@ -139,10 +139,10 @@ function SkillEditorFields({
         nameError={nameError}
         onNameChange={onNameChange}
       />
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5">
         <Label>{AGENT_RESOURCES_COPY.markdownLabel}</Label>
         <div
-          className="min-h-[480px] flex-1 overflow-hidden rounded-lg border border-border"
+          className="h-[70vh] min-h-[480px] overflow-hidden rounded-lg border border-border"
           data-testid="agent-resource-skill-markdown"
         >
           <Editor

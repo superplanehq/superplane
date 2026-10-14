@@ -148,6 +148,29 @@ function createSpendingPeriodChangeHandler(args: {
   };
 }
 
+function resolveSpendingControlledState(
+  props: SpendingRedesignControlledState,
+  states: {
+    period: SpendingPeriodPreset;
+    customRange: SpendingDateRange | undefined;
+    customOpen: boolean;
+    modelFilters: SpendingFilters;
+    machineFilters: SpendingFilters;
+    modelBreakdown: SpendingBreakdown;
+    machineBreakdown: SpendingBreakdown;
+  },
+) {
+  return {
+    period: props.period ?? states.period,
+    customRange: props.customRange ?? states.customRange,
+    customOpen: props.customOpen ?? states.customOpen,
+    modelFilters: props.modelFilters ?? states.modelFilters,
+    machineFilters: props.machineFilters ?? states.machineFilters,
+    modelBreakdown: props.modelBreakdown ?? states.modelBreakdown,
+    machineBreakdown: props.machineBreakdown ?? states.machineBreakdown,
+  };
+}
+
 export function useSpendingRedesignPageModel(args: SpendingRedesignModelArgs) {
   const {
     events = [],
@@ -163,13 +186,6 @@ export function useSpendingRedesignPageModel(args: SpendingRedesignModelArgs) {
     modelReport: modelReportProp,
     machineReport: machineReportProp,
     range: rangeProp,
-    period: periodProp,
-    customRange: customRangeProp,
-    customOpen: customOpenProp,
-    modelFilters: modelFiltersProp,
-    machineFilters: machineFiltersProp,
-    modelBreakdown: modelBreakdownProp,
-    machineBreakdown: machineBreakdownProp,
     onPeriodChange,
     onCustomOpenChange,
     onCustomRangeChange,
@@ -188,13 +204,16 @@ export function useSpendingRedesignPageModel(args: SpendingRedesignModelArgs) {
   const [modelBreakdownState, setModelBreakdownState] = useState(initialModelBreakdown);
   const [machineBreakdownState, setMachineBreakdownState] = useState(initialMachineBreakdown);
 
-  const period = periodProp ?? periodState;
-  const customRange = customRangeProp ?? customRangeState;
-  const customOpen = customOpenProp ?? customOpenState;
-  const modelFilters = modelFiltersProp ?? modelFiltersState;
-  const machineFilters = machineFiltersProp ?? machineFiltersState;
-  const modelBreakdown = modelBreakdownProp ?? modelBreakdownState;
-  const machineBreakdown = machineBreakdownProp ?? machineBreakdownState;
+  const { period, customRange, customOpen, modelFilters, machineFilters, modelBreakdown, machineBreakdown } =
+    resolveSpendingControlledState(args, {
+      period: periodState,
+      customRange: customRangeState,
+      customOpen: customOpenState,
+      modelFilters: modelFiltersState,
+      machineFilters: machineFiltersState,
+      modelBreakdown: modelBreakdownState,
+      machineBreakdown: machineBreakdownState,
+    });
   const range = useMemo(
     () => resolveSpendingRange(rangeProp, period, customRange, now),
     [customRange, now, period, rangeProp],

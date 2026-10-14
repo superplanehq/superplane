@@ -6,10 +6,11 @@ import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "bun:test";
 
 import type { FactoriesFactory, FactoriesFactoryLine, FactoriesWorkOrder } from "@/api-client";
+import cursorIcon from "@/assets/icons/integrations/cursor.svg";
 import datadogIcon from "@/assets/icons/integrations/datadog.svg";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
-import superplaneIcon from "@/assets/superplane.svg";
+import superplaneMark from "@/assets/superplane-mark.svg";
 
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
 import { WorkOrderCard } from "./WorkOrderCard";
@@ -136,8 +137,36 @@ describe("WorkOrderCard source icon", () => {
     const icon = screen.getByTestId("work-order-card-source-wo-1");
     expect(icon.tagName).toBe("SPAN");
     expect(icon).not.toHaveAttribute("href");
-    expect(icon.querySelector("img")).toHaveAttribute("src", superplaneIcon);
+    expect(icon.querySelector("img")).toHaveAttribute("src", superplaneMark);
     expect(icon).toHaveAttribute("aria-label", "Created manually");
+  });
+
+  it("renders the Cursor logo for a Cursor MCP task", () => {
+    renderCard({
+      ...baseOrder,
+      mcpClient: { id: "superplane-local", name: "Cursor" },
+    });
+
+    const icon = screen.getByTestId("work-order-card-source-wo-1");
+    expect(icon.tagName).toBe("SPAN");
+    expect(icon).not.toHaveAttribute("href");
+    expect(icon.querySelector("img")).toHaveAttribute("src", cursorIcon);
+    expect(icon.querySelector("img")?.className).toContain("object-contain");
+    expect(icon.querySelector("img")?.className).not.toContain("dark:invert");
+    expect(icon).toHaveAttribute("aria-label", "Cursor");
+  });
+
+  it("keeps the SuperPlane mark for an unknown MCP client", () => {
+    renderCard({
+      ...baseOrder,
+      mcpClient: { id: "superplane-local", name: "OpenCode" },
+    });
+
+    const icon = screen.getByTestId("work-order-card-source-wo-1");
+    expect(icon.tagName).toBe("SPAN");
+    expect(icon.querySelector("img")).toHaveAttribute("src", superplaneMark);
+    expect(icon.querySelector("img")?.className).toContain("dark:invert");
+    expect(icon).toHaveAttribute("aria-label", "OpenCode");
   });
 
   it("names the creator on a manual source mark", () => {

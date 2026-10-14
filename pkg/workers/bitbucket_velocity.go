@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,53 +24,80 @@ type bitbucketVelocity struct {
 	integrationID  uuid.UUID
 }
 
-func (b *bitbucketVelocity) ListMergedPullRequests(
+func (b *bitbucketVelocity) listMerges(
 	ctx context.Context,
 	repository string,
-	from, to time.Time,
-) ([]vcs.MergedPullRequest, error) {
+	from, to, until time.Time,
+) ([]vcs.MergedPullRequest, velocityReadCoverage, error) {
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, velocityReadCoverage{}, err
 	}
 	client, err := b.worker.bitbucketClient(b.organizationID, b.integrationID)
 	if err != nil {
-		return nil, err
+		return nil, velocityReadCoverage{}, err
 	}
-	return listBitbucketMerges(ctx, client, repository, from, to)
+	return listBitbucketMerges(ctx, client, repository, from, to, until)
 }
 
 // listBitbucketMerges returns the pull requests that merged in [from, to).
 // The merge instant is the pull request updated_on. The merge commit is read
 // only for the agent co-author trailer. A fast-forward merge reuses an older
 // commit, so that commit date is not the merge date.
+//
+// A non-zero until continues a bounded rebuild: only pulls older than that
+// instant are read. When the page cap cuts the walk short, the read is not
+// an error. ContinueBefore is the oldest instant fully included in the slice.
+// The next read must start strictly before it. An instant the page cap splits
+// is left out, so unread pulls at that instant are not deleted or skipped.
 func listBitbucketMerges(
 	ctx context.Context,
 	client *bitbucketintegration.Client,
 	repository string,
-	from, to time.Time,
-) ([]vcs.MergedPullRequest, error) {
-	prs, truncated, err := client.ListMergedPullRequests(repository, from, velocitySyncMaxPages)
+	from, to, until time.Time,
+) ([]vcs.MergedPullRequest, velocityReadCoverage, error) {
+	prs, truncated, err := client.ListMergedPullRequestsThroughBoundary(
+		repository, from, until, velocitySyncMaxPages, bitbucketVelocityBoundaryPages,
+	)
 	if err != nil {
-		return nil, err
+		return nil, velocityReadCoverage{}, err
 	}
+	coverage := completeVelocityRead()
 	if truncated {
-		return nil, fmt.Errorf("bitbucket merge list exceeded %d pages before the window start", velocitySyncMaxPages)
+		oldest := oldestBitbucketUpdate(prs)
+		if oldest.IsZero() || (!until.IsZero() && !oldest.Before(until)) {
+			return nil, velocityReadCoverage{}, fmt.Errorf("bitbucket merge list exceeded %d pages before the window start", velocitySyncMaxPages)
+		}
+		coverage = velocityReadCoverage{ContinueBefore: oldest}
 	}
 
 	merged := make([]vcs.MergedPullRequest, 0, len(prs))
 	for i := range prs {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return nil, velocityReadCoverage{}, err
 		}
 		merge, ok, err := toBitbucketRepositoryMerge(client, repository, &prs[i], from, to)
 		if err != nil {
-			return nil, err
+			return nil, velocityReadCoverage{}, err
 		}
 		if ok {
 			merged = append(merged, merge)
 		}
 	}
-	return merged, nil
+	return merged, coverage, nil
+}
+
+func oldestBitbucketUpdate(prs []bitbucketintegration.MergedBitbucketPullRequest) time.Time {
+	var oldest time.Time
+	for i := range prs {
+		updated := prs[i].UpdatedOn
+		if updated.IsZero() {
+			continue
+		}
+		if oldest.IsZero() || updated.Before(oldest) {
+			oldest = updated
+		}
+	}
+	return oldest
 }
 
 func toBitbucketRepositoryMerge(
@@ -98,6 +126,10 @@ func toBitbucketRepositoryMerge(
 		}
 	}
 	if mergedAt.IsZero() || mergedAt.Before(from) || !mergedAt.Before(to) {
+		return vcs.MergedPullRequest{}, false, nil
+	}
+	// Keep recognized agent output, but do not count other apps as people.
+	if !agent && strings.EqualFold(pr.AuthorType, "app_user") {
 		return vcs.MergedPullRequest{}, false, nil
 	}
 

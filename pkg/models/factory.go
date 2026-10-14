@@ -1124,9 +1124,9 @@ type ListFactoryWorkOrdersFilters struct {
 	// LineID keeps orders that ran on this line, plus orders with no line.
 	LineID *uuid.UUID
 	// PublicBoard keeps the orders a public line board can show. Drafts stay
-	// even after a run on another line. Closed rejected orders are omitted
-	// so they do not consume the page.
-	PublicBoard bool
+	// even after a run on another line. Archives do not consume the page.
+	PublicBoard     bool
+	ExcludeArchived bool
 }
 
 func (f *Factory) CountWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilters) (int64, error) {
@@ -1144,9 +1144,9 @@ func (f *Factory) ListWorkOrders(tx *gorm.DB, filters ListFactoryWorkOrdersFilte
 	}
 
 	query := f.workOrdersQuery(tx, filters).
-		Preload("CreatedBy").
+		Preload("CreatedBy", PreloadRemovedMember).
 		Preload("Assignees").
-		Preload("Assignees.User")
+		Preload("Assignees.User", PreloadRemovedMember)
 
 	if filters.BeforeID != nil {
 		cursor, err := f.workOrderListCursor(tx, *filters.BeforeID)
@@ -1189,6 +1189,11 @@ func (f *Factory) workOrdersQuery(tx *gorm.DB, filters ListFactoryWorkOrdersFilt
 
 	if len(filters.Results) > 0 {
 		query = query.Where("factory_work_orders.result IN ?", filters.Results)
+	}
+
+	if filters.ExcludeArchived || filters.PublicBoard {
+		query = query.Where("NOT (factory_work_orders.state = ? AND COALESCE(factory_work_orders.result, '') IN ?)",
+			FactoryWorkOrderStateClosed, []string{FactoryWorkOrderResultArchived, FactoryWorkOrderResultRejected})
 	}
 
 	query = applyWorkOrderUserFilters(query, filters)
@@ -1253,7 +1258,7 @@ func applyPublicBoardFilter(query *gorm.DB, lineID *uuid.UUID) *gorm.DB {
 		)`,
 		[]string{FactoryWorkOrderStateDraft, FactoryWorkOrderStateOpen},
 		FactoryWorkOrderStateClosed,
-		[]string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed},
+		[]string{FactoryWorkOrderResultCompleted, FactoryWorkOrderResultFailed, FactoryWorkOrderResultManualRejected, FactoryWorkOrderResultPRClosed},
 	)
 	if lineID == nil {
 		return query
@@ -1320,9 +1325,9 @@ func (f *Factory) findWorkOrderByKey(tx *gorm.DB, key string) (*FactoryWorkOrder
 func (f *Factory) findWorkOrder(tx *gorm.DB, cond string, arg any) (*FactoryWorkOrder, error) {
 	var order FactoryWorkOrder
 	err := tx.
-		Preload("CreatedBy").
+		Preload("CreatedBy", PreloadRemovedMember).
 		Preload("Assignees").
-		Preload("Assignees.User").
+		Preload("Assignees.User", PreloadRemovedMember).
 		Where("organization_id = ? AND factory_id = ?", f.OrganizationID, f.ID).
 		Where(cond, arg).
 		First(&order).

@@ -52,11 +52,11 @@ func (g *githubProvider) ReadMergeability(ctx context.Context, pullRequest *mode
 	return mergeabilityToVCS(result), nil
 }
 
-func (g *githubProvider) MergePullRequest(ctx context.Context, repository string, number int, method, expectedSHA string) error {
+func (g *githubProvider) MergePullRequest(ctx context.Context, pullRequest *models.FactoryPullRequest, method, expectedSHA string) error {
 	if err := g.ensureClient(); err != nil {
 		return err
 	}
-	_, _, err := g.client.MergePullRequest(ctx, repository, number, "", &github.PullRequestOptions{
+	_, _, err := g.client.MergePullRequest(ctx, pullRequest.Repository, int(pullRequest.Number), "", &github.PullRequestOptions{
 		MergeMethod: method,
 		SHA:         expectedSHA,
 	})
@@ -95,11 +95,14 @@ func (g *githubProvider) ensureClient() error {
 }
 
 func connectFactoryVCS(provider vcs.Provider) error {
-	github, ok := provider.(*githubProvider)
-	if !ok {
+	switch provider := provider.(type) {
+	case *githubProvider:
+		return provider.ensureClient()
+	case *bitbucketProvider:
+		return provider.ensureClient()
+	default:
 		return nil
 	}
-	return github.ensureClient()
 }
 
 func readFactoryPullRequestMergeability(

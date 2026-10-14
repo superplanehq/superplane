@@ -1,18 +1,57 @@
-import type { FactoriesWorkOrderArtifact } from "@/api-client";
+import type { FactoriesWorkOrderArtifact, FactoriesWorkOrderCheck } from "@/api-client";
 
 import { SPEC_ARTIFACT_NAME } from "../lib/intentDocument";
+import { PLANNING_REVIEW_SCORE_MAX } from "../lib/planningReviewScore";
 import { DRAFT_WORK_ORDER, PRIMARY_FACTORY_ID, type FactoriesFixture } from "./factoryPageResponses";
 import { refineChatBoardFixture, refineChatPlanningSession } from "./refineChatBoardFixture";
-import { clarityCheck } from "./workOrderCheckFixtures";
 
 export type TaskPlanningReviewOptions = {
-  confidence: 2 | 4;
+  scores: { clarity: 1 | 2 | 3; complexity: 1 | 2 | 3; verifiability: 1 | 2 | 3 };
   response: "questions" | "message" | "ready" | "updating";
   hasPlan?: boolean;
-  clarity?: 2 | 5;
 };
 
-const TITLE = "Add customer logos to the homepage";
+type ReviewScore = TaskPlanningReviewOptions["scores"]["clarity"];
+
+const REVIEW_SUMMARIES: Record<keyof TaskPlanningReviewOptions["scores"], Record<ReviewScore, string>> = {
+  clarity: {
+    1: "The homepage companies and logo assets are not specified.",
+    2: "The company shortlist and logo assets need a decision.",
+    3: "The plan names the approved companies and logo assets.",
+  },
+  complexity: {
+    1: "The implementation depends on several unknown systems.",
+    2: "The logo assets and responsive layout need coordination.",
+    3: "The change is limited to one homepage section.",
+  },
+  verifiability: {
+    1: "The plan has no reliable way to confirm the selected companies.",
+    2: "The company evidence and approved assets still need confirmation.",
+    3: "The plan checks company approval, labels, and layout.",
+  },
+};
+
+function reviewCheck(
+  key: keyof TaskPlanningReviewOptions["scores"],
+  score: ReviewScore,
+  updatedAt: string,
+): FactoriesWorkOrderCheck {
+  const summary = REVIEW_SUMMARIES[key][score];
+  return {
+    id: `check-homepage-${key}`,
+    key,
+    name: key.charAt(0).toUpperCase() + key.slice(1),
+    score,
+    maxScore: PLANNING_REVIEW_SCORE_MAX,
+    level: score === 3 ? "LEVEL_POSITIVE" : score === 2 ? "LEVEL_CAUTION" : "LEVEL_CRITICAL",
+    summary,
+    analysis: `## Evidence\n\n${summary}`,
+    updatedAt,
+  };
+}
+
+const TASK_TITLE = "Review repository stars for company logos";
+const PLAN_TITLE = "Add customer logos to the homepage";
 const DESCRIPTION =
   "Review the repository stars and suggest companies for the homepage. Rank recognizable brands and teams with at least 10 people.";
 
@@ -24,7 +63,7 @@ function planArtifact(response: TaskPlanningReviewOptions["response"]): Factorie
       name: SPEC_ARTIFACT_NAME,
       title: SPEC_ARTIFACT_NAME,
       body: [
-        `# ${TITLE}`,
+        `# ${PLAN_TITLE}`,
         "",
         "## Executive summary",
         "",
@@ -72,47 +111,34 @@ const AGENT_MESSAGE: Record<TaskPlanningReviewOptions["response"], string> = {
 
 /** Current production UI, seeded for issues #7834 and #7837 and adjacent states. */
 export function taskPlanningReviewFixture({
-  confidence,
+  scores,
   response,
   hasPlan = true,
-  clarity,
 }: TaskPlanningReviewOptions): FactoriesFixture {
   const fixture = refineChatBoardFixture();
   const orderId = DRAFT_WORK_ORDER.id!;
   const session = refineChatPlanningSession();
   const scoreAt = new Date(Date.now() - 120_000).toISOString();
-  const summary =
-    confidence === 2
-      ? "Company evidence is incomplete. The agent needs help to confirm the shortlist and logo assets."
-      : "The change is limited to one homepage section. The layout and verification steps are defined.";
+  const confidence = Math.min(scores.clarity, scores.complexity, scores.verifiability);
 
   return {
     ...fixture,
     factories: fixture.factories.map((factory) => ({
       ...factory,
-      planning: { ...factory.planning, enabled: true, confidence: true, clarity: clarity !== undefined },
+      planning: { ...factory.planning, enabled: true, confidence: true },
     })),
     workOrdersByFactoryId: {
       ...fixture.workOrdersByFactoryId,
       [PRIMARY_FACTORY_ID]: fixture.workOrdersByFactoryId[PRIMARY_FACTORY_ID].map((order) =>
-        order.id === orderId ? { ...order, title: TITLE, description: DESCRIPTION } : order,
+        order.id === orderId ? { ...order, title: TASK_TITLE, description: DESCRIPTION } : order,
       ),
     },
     checksByOrderId: {
       ...fixture.checksByOrderId,
       [orderId]: [
-        ...(clarity === undefined ? [] : [clarityCheck(orderId, clarity)]),
-        {
-          id: "check-homepage-confidence",
-          key: "confidence",
-          name: "Confidence score",
-          score: confidence,
-          maxScore: 5,
-          level: confidence === 2 ? "LEVEL_CRITICAL" : "LEVEL_POSITIVE",
-          summary,
-          analysis: `## Evidence\n\n${summary}`,
-          updatedAt: scoreAt,
-        },
+        reviewCheck("clarity", scores.clarity, scoreAt),
+        reviewCheck("complexity", scores.complexity, scoreAt),
+        reviewCheck("verifiability", scores.verifiability, scoreAt),
       ],
     },
     artifactsByOrderId: {
@@ -122,10 +148,10 @@ export function taskPlanningReviewFixture({
     planningSessionsByWorkOrderId: {
       [orderId]: {
         ...session,
-        draft: { ...session.draft, title: TITLE, description: DESCRIPTION },
+        draft: { ...session.draft, title: TASK_TITLE, description: DESCRIPTION },
         waitState: response === "updating" ? "" : "pending",
         messages: [
-          { id: "plan-score", role: "plan", text: JSON.stringify({ score: clarity ?? 5 }), createdAt: scoreAt },
+          { id: "plan-score", role: "plan", text: JSON.stringify({ score: confidence }), createdAt: scoreAt },
           {
             id: "agent-summary",
             role: "agent",

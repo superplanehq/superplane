@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, FactoriesWorkOrder } from "@/api-client";
 
+import { columnAutomationUsesSplitConfig } from "./columnAutomationHeadline";
 import {
   applyColumnAutomationsOverlay,
   buildColumnAutomations,
@@ -249,6 +250,8 @@ describe("buildColumnAutomations", () => {
         { id: "app-risk-2", name: "Risk score (2)", columnKey: "verify" },
         { id: "app-merge", name: "Merge confidence", columnKey: "verify" },
         { id: "app-merge-2", name: "Merge confidence (2)", columnKey: "verify" },
+        { id: "app-evidence", name: "Visual Evidence", columnKey: "verify" },
+        { id: "app-evidence-2", name: "Visual Evidence (2)", columnKey: "verify" },
         { id: "app-create-env", name: "Create env", columnKey: "verify" },
         { id: "app-risk-payments", name: "Risk score payments", columnKey: "verify" },
         { id: "app-merge-payments", name: "Merge confidence payments", columnKey: "verify" },
@@ -261,6 +264,8 @@ describe("buildColumnAutomations", () => {
       "risk-score",
       "risk-score",
       "risk-score",
+      "visual-evidence",
+      "visual-evidence",
       "custom",
       "custom",
       "custom",
@@ -276,9 +281,18 @@ describe("buildColumnAutomations", () => {
     expect(automations[1]).toMatchObject({ canvasId: "app-risk-2" });
     expect(automations[2]).toMatchObject({ canvasId: "app-merge", name: "Merge confidence" });
     expect(automations[3]).toMatchObject({ canvasId: "app-merge-2" });
-    expect(automations[4]).toMatchObject({ kind: "custom", canvasId: "app-create-env" });
-    expect(automations[5]).toMatchObject({ kind: "custom", canvasId: "app-risk-payments" });
-    expect(automations[6]).toMatchObject({ kind: "custom", canvasId: "app-merge-payments" });
+    expect(automations[4]).toMatchObject({
+      kind: "visual-evidence",
+      catalogId: "visual-evidence",
+      name: "Visual Evidence",
+      trigger: "On pull request opened or updated",
+      action: "Capture screenshots or a short video",
+      canvasId: "app-evidence",
+    });
+    expect(automations[5]).toMatchObject({ canvasId: "app-evidence-2" });
+    expect(automations[6]).toMatchObject({ kind: "custom", canvasId: "app-create-env" });
+    expect(automations[7]).toMatchObject({ kind: "custom", canvasId: "app-risk-payments" });
+    expect(automations[8]).toMatchObject({ kind: "custom", canvasId: "app-merge-payments" });
   });
 
   it("appends custom canvases attached to Verify or Done", () => {
@@ -335,8 +349,13 @@ describe("catalogForColumn", () => {
     expect(catalog.map((entry) => entry.id)).toEqual([...LINE_INTAKE_SOURCES.map((source) => source.id), "analysis"]);
   });
 
-  it("offers discussion, status-check, and merge confidence setup in the verify catalog", () => {
-    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual(["discussion", "checks", "risk-score"]);
+  it("offers discussion, status-check, merge confidence, and visual evidence in the verify catalog", () => {
+    expect(catalogForColumn("verify").map((entry) => entry.id)).toEqual([
+      "discussion",
+      "checks",
+      "risk-score",
+      "visual-evidence",
+    ]);
   });
 
   it("offers a custom canvas in the verify catalog when the feature is on", () => {
@@ -344,6 +363,7 @@ describe("catalogForColumn", () => {
       "discussion",
       "checks",
       "risk-score",
+      "visual-evidence",
       "custom",
     ]);
   });
@@ -378,7 +398,7 @@ describe("catalogForColumn", () => {
 describe("onlyCustomCatalogRemains", () => {
   it("is true when every unique Verify type is taken", () => {
     const catalog = catalogForColumn("verify", { allowCustom: true });
-    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score"])).toBe(true);
+    expect(onlyCustomCatalogRemains(catalog, ["discussion", "checks", "risk-score", "visual-evidence"])).toBe(true);
   });
 
   it("is false when risk score is still available", () => {
@@ -506,6 +526,14 @@ describe("columnAutomationViewTabs", () => {
 
   it("shows General then Automation when a form exists without an agent", () => {
     expect(columnAutomationViewTabs({ hasGeneral: true, hasAgent: false })).toEqual(["general", "automation"]);
+  });
+});
+
+describe("columnAutomationUsesSplitConfig", () => {
+  it("opens the split settings panel for merge confidence and visual evidence", () => {
+    expect(columnAutomationUsesSplitConfig(["on-pr-risk"])).toBe(true);
+    expect(columnAutomationUsesSplitConfig(["on-pr-visual-evidence", "capture-visual-evidence"])).toBe(true);
+    expect(columnAutomationUsesSplitConfig(["on-pr-closed"])).toBe(false);
   });
 });
 

@@ -19,6 +19,9 @@ spec:
       labels:
         app: superplane
         service: {{ .Release.Name }}-runner-workers
+        {{- with .Values.podLabels }}
+        {{- include "superplane.podLabels" . | nindent 8 }}
+        {{- end }}
     spec:
       {{- if and .Values.runner.api.enabled (not .Values.runner.activeLogs.existingClaim) }}
       affinity:
@@ -87,6 +90,8 @@ spec:
               value: /app/oidc-keys
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
+            - name: BLOB_STORAGE_ACCOUNT
+              value: {{ .Values.blobStorage.account | quote }}
             - name: BLOB_STORAGE_BUCKET
               value: {{ .Values.blobStorage.bucket | quote }}
             - name: BLOB_STORAGE_REGION

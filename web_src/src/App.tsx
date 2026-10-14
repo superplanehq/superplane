@@ -23,6 +23,7 @@ import { ThemeProvider } from "./contexts/ThemeProvider";
 import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequirePermission } from "./components/PermissionGate";
+import { agentSectionRoute } from "./pages/factories/pages/settings/agentSectionRoutes";
 import { isFactoryAppConfigureMode } from "./pages/factories/lib/factoryAppCanvasCopy";
 import { Login } from "./pages/auth/Login";
 import { OrganizationOnboardingRedirect } from "./pages/auth/OrganizationOnboardingRedirect";
@@ -67,7 +68,11 @@ import {
 import { createFactoryLinePath, editFactoryLinePath } from "./pages/factories/lib/factoryPagePaths";
 import { isPublicFactoryLinePath } from "./pages/factories/lib/publicFactoryLinePath";
 import { FactoryLineAccessGate } from "./pages/factories/pages/FactoryLineAccessGate";
-import { FactoryWorkspaceLayoutSwitch, WorkOrderDetailRouteSwitch } from "./pages/factories/mobile/MobileShellSwitch";
+import {
+  FactoryMoreRouteSwitch,
+  FactoryWorkspaceLayoutSwitch,
+  WorkOrderDetailRouteSwitch,
+} from "./pages/factories/mobile/MobileShellSwitch";
 import { WorkspaceLoadingProvider } from "./pages/factories/layout/workspaceLoading";
 import { OnboardingEntryPathProvider } from "./pages/factories/pages/onboarding/OnboardingEntryPathProvider";
 import { InitialWorkspaceOnboarding } from "./pages/factories/pages/onboarding/InitialWorkspaceOnboarding";
@@ -161,6 +166,8 @@ function organizationScopedRouteTree() {
             <Route path="missions" element={<MissionsPage />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="velocity" element={<VelocityPage />} />
+            {agentSectionRoute}
+            <Route path="more" element={<FactoryMoreRouteSwitch />} />
             <Route path="tasks">
               <Route index element={<WorkOrdersPage />} />
               <Route path="new" element={<CreateWorkOrderComposeGate />} />

@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -149,6 +150,27 @@ func KeyListHeader(keyID string) map[string]any {
 // KeyList signs, as a root key, a key list that trusts the signers.
 func (i *Issuer) KeyList(version int64, signers ...*Issuer) []byte {
 	return i.SignWithHeader(KeyListHeader(i.KeyID), KeyListClaims(version, signers...))
+}
+
+// RevocationList signs, as a root key, a revocation list that names the ids.
+func (i *Issuer) RevocationList(version int64, ids ...uuid.UUID) []byte {
+	revoked := make([]string, 0, len(ids))
+	for _, id := range ids {
+		revoked = append(revoked, id.String())
+	}
+	slices.Sort(revoked)
+
+	return i.SignWithHeader(map[string]any{
+		"alg": licensing.SigningAlgorithm,
+		"kid": i.KeyID,
+		"typ": licensing.RevocationListType,
+	}, map[string]any{
+		"iss":     licensing.ExpectedIssuer,
+		"aud":     licensing.RevocationListAudience,
+		"version": version,
+		"iat":     time.Now().Unix(),
+		"revoked": revoked,
+	})
 }
 
 // StaticSource is a read-only license source for tests.

@@ -1,3 +1,4 @@
+import bitbucketIcon from "@/assets/icons/integrations/bitbucket.svg";
 import githubIcon from "@/assets/icons/integrations/github.svg";
 
 import { LINE_INTAKE_SOURCES } from "../pages/lineIntakeModel";
@@ -14,6 +15,7 @@ export const AGENT_STEP_CATALOG_ID = "agent-step";
 export const CUSTOM_CATALOG_ID = "custom";
 export const PR_CLOSURE_CATALOG_ID = "pr-closure";
 export const RISK_SCORE_CATALOG_ID = "risk-score";
+export const VISUAL_EVIDENCE_CATALOG_ID = "visual-evidence";
 
 export const ANALYSIS_ENTRY: ColumnAutomationCatalogEntry = {
   id: ANALYSIS_CATALOG_ID,
@@ -75,6 +77,18 @@ export const RISK_SCORE_ENTRY: ColumnAutomationCatalogEntry = {
   unique: true,
 };
 
+export const VISUAL_EVIDENCE_ENTRY: ColumnAutomationCatalogEntry = {
+  id: VISUAL_EVIDENCE_CATALOG_ID,
+  kind: "visual-evidence",
+  name: "Visual Evidence",
+  description: "Capture screenshots or a short video when a pull request changes the user interface.",
+  trigger: "On pull request opened or updated",
+  action: "Capture screenshots or a short video",
+  iconSrc: "",
+  iconAlt: "",
+  unique: true,
+};
+
 export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
   id: PR_CLOSURE_CATALOG_ID,
   kind: "pr-closure",
@@ -87,7 +101,10 @@ export const PR_CLOSURE_ENTRY: ColumnAutomationCatalogEntry = {
   unique: true,
 };
 
-export function catalogForColumn(key: ColumnKey, options?: { allowCustom?: boolean }): ColumnAutomationCatalogEntry[] {
+export function catalogForColumn(
+  key: ColumnKey,
+  options?: { allowCustom?: boolean; vcsProvider?: string },
+): ColumnAutomationCatalogEntry[] {
   const allowCustom = options?.allowCustom === true;
   if (key === "backlog") {
     return [
@@ -107,7 +124,7 @@ export function catalogForColumn(key: ColumnKey, options?: { allowCustom?: boole
   }
   if (key === "verify") {
     return [
-      ...availablePRFeedbackSources().map((source) => {
+      ...availablePRFeedbackSources(options?.vcsProvider).map((source) => {
         const sentence = prFeedbackSentence(source.id);
         return {
           id: source.id,
@@ -122,11 +139,16 @@ export function catalogForColumn(key: ColumnKey, options?: { allowCustom?: boole
         };
       }),
       RISK_SCORE_ENTRY,
+      ...(options?.vcsProvider === "bitbucket" ? [] : [VISUAL_EVIDENCE_ENTRY]),
       ...(allowCustom ? [EVENT_CUSTOM_ENTRY] : []),
     ];
   }
   if (key === "done") {
-    return allowCustom ? [PR_CLOSURE_ENTRY, EVENT_CUSTOM_ENTRY] : [PR_CLOSURE_ENTRY];
+    const closureEntry =
+      options?.vcsProvider === "bitbucket"
+        ? { ...PR_CLOSURE_ENTRY, iconSrc: bitbucketIcon, iconAlt: "Bitbucket" }
+        : PR_CLOSURE_ENTRY;
+    return allowCustom ? [closureEntry, EVENT_CUSTOM_ENTRY] : [closureEntry];
   }
   return allowCustom ? [AGENT_STEP_ENTRY, CUSTOM_ENTRY] : [AGENT_STEP_ENTRY];
 }

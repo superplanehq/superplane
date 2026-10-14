@@ -708,7 +708,8 @@ CREATE TABLE public.factory_velocity_syncs (
     backfilled_from timestamp with time zone,
     error text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    sync_state integer DEFAULT 0 NOT NULL
 );
 
 
@@ -996,6 +997,21 @@ CREATE TABLE public.installation_license_keys (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT installation_license_keys_singleton CHECK ((id = 1)),
     CONSTRAINT installation_license_keys_version_positive CHECK ((version > 0))
+);
+
+
+--
+-- Name: installation_license_revocations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.installation_license_revocations (
+    id integer NOT NULL,
+    document text NOT NULL,
+    version bigint NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT installation_license_revocations_singleton CHECK ((id = 1)),
+    CONSTRAINT installation_license_revocations_version_positive CHECK ((version > 0))
 );
 
 
@@ -1387,6 +1403,11 @@ CREATE TABLE public.runners (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     terminated_at timestamp with time zone,
+    tags jsonb DEFAULT '{}'::jsonb NOT NULL,
+    os text DEFAULT ''::text NOT NULL,
+    arch text DEFAULT ''::text NOT NULL,
+    hostname text DEFAULT ''::text NOT NULL,
+    ip text DEFAULT ''::text NOT NULL,
     CONSTRAINT runners_creation_idempotency_check CHECK ((((creation_idempotency_key IS NULL) AND (creation_request_hash IS NULL)) OR ((creation_idempotency_key IS NOT NULL) AND (creation_request_hash IS NOT NULL)))),
     CONSTRAINT runners_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'idle'::character varying, 'busy'::character varying, 'terminated'::character varying])::text[]))),
     CONSTRAINT runners_termination_check CHECK (((((state)::text = 'terminated'::text) AND (terminated_at IS NOT NULL)) OR (((state)::text <> 'terminated'::text) AND (terminated_at IS NULL))))
@@ -2518,6 +2539,14 @@ ALTER TABLE ONLY public.installation_github_apps
 
 ALTER TABLE ONLY public.installation_license_keys
     ADD CONSTRAINT installation_license_keys_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: installation_license_revocations installation_license_revocations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.installation_license_revocations
+    ADD CONSTRAINT installation_license_revocations_pkey PRIMARY KEY (id);
 
 
 --
@@ -3991,6 +4020,13 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 --
 
 CREATE INDEX idx_workflow_runs_cancelling ON public.workflow_runs USING btree (cancelled_at) WHERE ((state)::text = 'cancelling'::text);
+
+
+--
+-- Name: idx_workflow_runs_parent_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_parent_run_id ON public.workflow_runs USING btree (parent_run_id) INCLUDE (id) WHERE (parent_run_id IS NOT NULL);
 
 
 --
@@ -5629,7 +5665,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261008223314	f
+20261013085910	f
 \.
 
 

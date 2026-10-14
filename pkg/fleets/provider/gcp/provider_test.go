@@ -341,6 +341,7 @@ func TestBuildBootstrapRendersValidShellScript(t *testing.T) {
 		FleetID:           "e1-large-amd64",
 		RunnerAPIURL:      "https://superplane.example",
 		RegistrationToken: "registration-token",
+		Tags:              map[string]string{"fleet_manager_id": "manager-a"},
 		Artifact: artifact.Artifact{
 			URL:    "https://downloads.example/runner/v1.2.3/runner-linux-amd64.tar.gz",
 			SHA256: sha,
@@ -356,6 +357,8 @@ func TestBuildBootstrapRendersValidShellScript(t *testing.T) {
 		sha + "  $bundle_dir/runner.tar.gz",
 		`RUNNER_API_URL='https://superplane.example'`,
 		`RUNNER_REGISTRATION_TOKEN='registration-token'`,
+		`RUNNER_TAGS='fleet_manager_id=manager-a'`,
+		`RUNNER_TAGS_FROM_GCP_METADATA=true`,
 	} {
 		if !strings.Contains(script, expected) {
 			t.Fatalf("bootstrap is missing %q:\n%s", expected, script)

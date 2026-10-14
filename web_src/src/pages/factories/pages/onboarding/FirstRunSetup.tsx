@@ -196,7 +196,9 @@ function AgentScreen({
 function backActionFor(target: FirstRunScreen, flow: FirstRunSetupFlow): (() => void) | undefined {
   const backScreen = (flow.agentBeforeTickets ? BACK_SCREEN_AGENT_FIRST : BACK_SCREEN)[target];
   // Bitbucket has no separate connect screen.
-  if (backScreen === "connect" && flow.vcsHost === "bitbucket") return () => flow.goToScreen("host");
+  if (backScreen === "connect" && (flow.vcsHost === "bitbucket" || !flow.accountConnectionRequired)) {
+    return () => flow.goToScreen("host");
+  }
   return backScreen ? () => flow.goToScreen(backScreen) : undefined;
 }
 
@@ -221,16 +223,16 @@ function TicketsScreenHost({
   const finishing = flow.blockingAction === "finishing-setup" || (flow.ticketsFinishSetup && saving);
   return (
     <FirstRunTicketsScreen
+      githubAvailable={flow.vcsHost !== "bitbucket"}
       ticketSource={flow.ticketSource}
       chrome={chrome}
       sphere={sphere}
-      linearAvailable={flow.linearAvailable}
-      linearFeatureLoading={flow.linearFeatureLoading}
-      linearChoiceBlock={flow.linearChoiceBlock}
       continueLabel={ticketsContinueLabel(flow.ticketsFinishSetup)}
       continuePending={flow.agentGatePending}
       saving={flow.blockingAction === "saving-ticket-source" || finishing}
       savingLabel={finishing ? FIRST_RUN_COPY.finish.saving : FIRST_RUN_COPY.tickets.saving}
+      githubConnected={model.setup.connected.has("github")}
+      onConnectGitHub={() => void flow.connectGitHubIssues()}
       jiraConnected={model.setup.connected.has("jira")}
       jiraProjects={model.jiraProjects}
       jiraProjectsLoading={model.jiraProjectsLoading}

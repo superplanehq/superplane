@@ -50,7 +50,7 @@ export function factoryHomePath(organizationId: string, factoryKey: string, line
   return factoryDetailPath(organizationId, factoryKey);
 }
 
-const WORKSPACE_PAGES_TO_KEEP = ["/settings", "/velocity", "/overview", "/missions", "/wiki"];
+const WORKSPACE_PAGES_TO_KEEP = ["/more", "/settings", "/velocity", "/agent", "/overview", "/missions", "/wiki"];
 const WORKSPACE_LIST_PAGES_TO_KEEP = ["/work-orders", "/automations"];
 
 function workspacePageToKeep(pathnameRest: string): boolean {
@@ -61,9 +61,9 @@ function workspacePageToKeep(pathnameRest: string): boolean {
 }
 
 /**
- * Path after a workspace switch. Keeps settings, Velocity, and other pages
- * that exist in every workspace. A line board, task, or app URL opens the
- * new workspace home — those identifiers belong to one workspace.
+ * Path after a workspace switch. Keeps settings, Agent, Velocity, and other
+ * pages that exist in every workspace. A line board, task, or app URL opens
+ * the new workspace home — those identifiers belong to one workspace.
  */
 export function pathAfterWorkspaceSwitch({
   pathname,
@@ -641,4 +641,25 @@ export function factoryWikiPath(organizationId: string, factoryKey: string) {
 
 export function factoryVelocityPath(organizationId: string, factoryKey: string) {
   return `${factoryDetailPath(organizationId, factoryKey)}/velocity`;
+}
+
+export function factoryAgentPath(organizationId: string, factoryKey: string) {
+  return `${factoryDetailPath(organizationId, factoryKey)}/agent`;
+}
+
+export function factoryAgentMcpConnectionPath(organizationId: string, factoryKey: string, resourceId: string) {
+  return `${factoryAgentPath(organizationId, factoryKey)}/mcp/${resourceId}`;
+}
+
+/** Skill editor. Omit `resourceId` (or pass `new`) for the create page. */
+export function factoryAgentSkillEditorPath(organizationId: string, factoryKey: string, resourceId?: string) {
+  if (!resourceId || resourceId === "new") {
+    return `${factoryAgentPath(organizationId, factoryKey)}/skills/new`;
+  }
+  return `${factoryAgentPath(organizationId, factoryKey)}/skills/${resourceId}`;
+}
+
+export function factoryMorePath(organizationId: string, factoryKey: string, lineId?: string) {
+  const path = `${factoryDetailPath(organizationId, factoryKey)}/more`;
+  return lineId ? `${path}?lineId=${encodeURIComponent(lineId)}` : path;
 }

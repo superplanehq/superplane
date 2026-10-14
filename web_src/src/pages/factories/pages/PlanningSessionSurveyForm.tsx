@@ -152,6 +152,8 @@ function handleSurveyEnter(
   }
 }
 
+const quietActionClassName = "h-8 text-[13px] text-muted-foreground";
+
 function SurveyFormPager({
   nextVariant,
   questionCount,
@@ -178,7 +180,7 @@ function SurveyFormPager({
           type="button"
           variant="ghost"
           size="sm"
-          className="h-8 text-[13px] text-muted-foreground"
+          className={quietActionClassName}
           disabled={isFirst}
           onClick={onPrevious}
         >
@@ -191,27 +193,11 @@ function SurveyFormPager({
       {isLast ? (
         <div className="flex items-center gap-2">
           {questionCount > 1 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 text-[13px] text-muted-foreground"
-              onClick={onSend}
-            >
+            <Button type="button" variant="ghost" size="sm" className={quietActionClassName} onClick={onSend}>
               {CREATE_WITH_AGENT_COPY.skipSurvey}
             </Button>
           ) : null}
-          <Button
-            type="button"
-            size="sm"
-            className="h-8 text-[13px]"
-            disabled={questionCount > 1 && !hasCurrentAnswer}
-            onClick={onSend}
-          >
-            {hasCurrentAnswer || questionCount > 1
-              ? CREATE_WITH_AGENT_COPY.sendAnswers
-              : CREATE_WITH_AGENT_COPY.skipSurvey}
-          </Button>
+          <LastPageActionButton questionCount={questionCount} hasCurrentAnswer={hasCurrentAnswer} onSend={onSend} />
         </div>
       ) : (
         <Button
@@ -227,6 +213,39 @@ function SurveyFormPager({
       )}
     </div>
   );
+}
+
+function LastPageActionButton({
+  questionCount,
+  hasCurrentAnswer,
+  onSend,
+}: {
+  questionCount: number;
+  hasCurrentAnswer: boolean;
+  onSend: () => void;
+}) {
+  const label = lastPageActionLabel(questionCount, hasCurrentAnswer);
+  const isSkip = label === CREATE_WITH_AGENT_COPY.skipSurvey;
+
+  return (
+    <Button
+      type="button"
+      variant={isSkip ? "ghost" : "default"}
+      size="sm"
+      className={isSkip ? quietActionClassName : "h-8 text-[13px]"}
+      disabled={questionCount > 1 && !hasCurrentAnswer}
+      onClick={onSend}
+    >
+      {label}
+    </Button>
+  );
+}
+
+function lastPageActionLabel(questionCount: number, hasCurrentAnswer: boolean) {
+  if (hasCurrentAnswer || questionCount > 1) {
+    return CREATE_WITH_AGENT_COPY.sendAnswers;
+  }
+  return CREATE_WITH_AGENT_COPY.skipSurvey;
 }
 
 function replaceAtIndex<T>(items: T[], index: number, value: T): T[] {

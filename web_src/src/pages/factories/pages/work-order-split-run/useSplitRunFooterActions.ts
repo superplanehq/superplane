@@ -1,4 +1,4 @@
-import { canvasesCancelRun } from "@/api-client";
+import { canvasesCancelRun, type FactoriesWorkOrderResult } from "@/api-client";
 import { useCloseWorkOrder, useDispatchWorkOrder, useUpdateWorkOrderStatus } from "@/hooks/useFactoryData";
 import { invalidateFactoryWorkOrderQueries } from "@/hooks/useFactoryWebsocket";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -93,13 +93,13 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
 
   const busy = cancelRun.isPending || closeWorkOrder.isPending || updateStatus.isPending || dispatchWorkOrder.isPending;
 
-  const closeAsRejected = useCallback(
-    async (copy: RejectedCloseCopy) => {
+  const closeWorkOrderWithToast = useCallback(
+    async (copy: RejectedCloseCopy, result: FactoriesWorkOrderResult) => {
       if (!live || !orderId || busy) {
         return false;
       }
       try {
-        await closeWorkOrder.mutateAsync({ orderId, result: "RESULT_REJECTED" });
+        await closeWorkOrder.mutateAsync({ orderId, result });
         showSuccessToast(copy.success);
         return true;
       } catch (error) {
@@ -110,8 +110,14 @@ export function useSplitRunFooterActions(organizationId?: string, factoryId?: st
     [busy, closeWorkOrder, live, orderId],
   );
 
-  const handleReject = useCallback(() => closeAsRejected(REJECT_COPY), [closeAsRejected]);
-  const handleArchive = useCallback(() => closeAsRejected(ARCHIVE_COPY), [closeAsRejected]);
+  const handleReject = useCallback(
+    () => closeWorkOrderWithToast(REJECT_COPY, "RESULT_REJECTED"),
+    [closeWorkOrderWithToast],
+  );
+  const handleArchive = useCallback(
+    () => closeWorkOrderWithToast(ARCHIVE_COPY, "RESULT_ARCHIVED"),
+    [closeWorkOrderWithToast],
+  );
 
   const handleStop = useCallback(
     async (choice: SplitRunStopChoice, footer: StopFooter) => {

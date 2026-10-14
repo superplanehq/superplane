@@ -2,13 +2,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import type { ComponentProps } from "react";
-import { describe, expect, it, vi } from "bun:test";
+import { describe, expect, it, vi, beforeEach } from "bun:test";
 
 import type {
   FactoriesFactory,
   FactoriesFactoryLine,
   FactoriesFactoryPullRequest,
   FactoriesWorkOrder,
+  FactoriesWorkOrderCheckScore,
+  FactoriesWorkOrderSummary,
 } from "@/api-client";
 
 import { buildWorkOrderListEntry } from "../lib/workOrderListModel";
@@ -51,6 +53,10 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({
   }),
 }));
 
+beforeEach(() => {
+  experimentalFeatureHas.current = () => true;
+});
+
 const openPullRequest: FactoriesFactoryPullRequest = {
   id: "pr-2323",
   workOrderId: "wo-waiting",
@@ -68,6 +74,10 @@ function renderCard(props: Partial<ComponentProps<typeof WorkOrderCard>> = {}) {
       </MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+function entryWithScores(checkScores: FactoriesWorkOrderCheckScore[]) {
+  return buildWorkOrderListEntry({ ...waitingOrder, checkScores } as FactoriesWorkOrderSummary, factory);
 }
 
 describe("WorkOrderCard pull request pill", () => {
@@ -136,7 +146,7 @@ describe("WorkOrderCard pull request pill", () => {
       "href",
       "https://github.com/acme/app/commit/d8b80c2",
     );
-    expect(screen.queryByText("Addressing user feedback")).not.toBeInTheDocument();
+    expect(screen.queryByText("Addressing PR comments")).not.toBeInTheDocument();
     expect(screen.queryByText("Waiting for user review")).not.toBeInTheDocument();
   });
 
@@ -199,6 +209,58 @@ describe("WorkOrderCard pull request pill", () => {
       "href",
       "https://github.com/acme/app/commit/2e46445",
     );
+    expect(screen.queryByTestId("work-order-mergeable-chip")).not.toBeInTheDocument();
+  });
+
+  it("hides Mergeable and shows Status checks passed when a merge confidence check is critical", () => {
+    renderCard({
+      entry: entryWithScores([{ key: "risk-review", name: "Blast radius", score: 4, maxScore: 5 }]),
+      pullRequests: [{ ...openPullRequest, mergeable: true }],
+      checksPassedOrderIds: new Set(["wo-waiting"]),
+    });
+
+    expect(screen.getByRole("link", { name: "Review pull request #2323." })).toBeInTheDocument();
+    expect(screen.queryByTestId("work-order-mergeable-chip")).not.toBeInTheDocument();
+    expect(screen.getByText("Status checks passed")).toBeInTheDocument();
+  });
+
+  it("keeps Mergeable when merge confidence scores are caution", () => {
+    renderCard({
+      entry: entryWithScores([
+        { key: "risk-review", name: "Blast radius", score: 3, maxScore: 5 },
+        { key: "performance-review", name: "Performance", score: 3, maxScore: 5 },
+      ]),
+      pullRequests: [{ ...openPullRequest, mergeable: true }],
+      checksPassedOrderIds: new Set(["wo-waiting"]),
+    });
+
+    expect(screen.getByTestId("work-order-mergeable-chip")).toHaveTextContent("Mergeable");
+    expect(screen.queryByText("Status checks passed")).not.toBeInTheDocument();
+  });
+
+  it("keeps Mergeable when no scored merge confidence metric exists", () => {
+    renderCard({
+      entry: entryWithScores([
+        { key: "planning-review", name: "Planning", score: 1, maxScore: 5 },
+        { key: "security-review", name: "Security" },
+      ]),
+      pullRequests: [{ ...openPullRequest, mergeable: true }],
+    });
+
+    expect(screen.getByTestId("work-order-mergeable-chip")).toHaveTextContent("Mergeable");
+  });
+
+  it("uses merge confidence checks from the prop when the lines board passes them", () => {
+    renderCard({
+      entry: entryWithScores([{ key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 }]),
+      mergeConfidence: {
+        score: 2,
+        maxScore: 5,
+        checks: [{ key: "security-review", name: "Security", score: 2, maxScore: 5 }],
+      },
+      pullRequests: [{ ...openPullRequest, mergeable: true }],
+    });
+
     expect(screen.queryByTestId("work-order-mergeable-chip")).not.toBeInTheDocument();
   });
 });

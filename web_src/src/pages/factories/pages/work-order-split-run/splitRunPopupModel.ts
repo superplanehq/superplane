@@ -4,8 +4,8 @@ import { factoryAppConfigurePath, factoryAppSplitRunPath } from "../../lib/facto
 import {
   composeIntentDocument,
   EMPTY_INTENT_DOCUMENT,
-  INTENT_ARTIFACT_NAME,
-  SPEC_ARTIFACT_NAME,
+  isPlanningArtifactName,
+  PLANNING_ARTIFACT_NAMES,
   type IntentDocument,
   parseIntentDocument,
 } from "../../lib/intentDocument";
@@ -183,7 +183,7 @@ export function splitRunDescriptionMarkdown(artifacts: FactoriesWorkOrderArtifac
 }
 
 export function splitRunIntentMarkdown(artifacts: FactoriesWorkOrderArtifact[]): string {
-  return firstArtifactMarkdown(artifacts, [SPEC_ARTIFACT_NAME, INTENT_ARTIFACT_NAME]);
+  return firstArtifactMarkdown(artifacts, PLANNING_ARTIFACT_NAMES);
 }
 
 export function splitRunIntentDocument(args: {
@@ -217,7 +217,7 @@ export function splitRunSourceDescription(args: {
 
 /**
  * Every artifact on the task for the console summary panel, including
- * document markdowns such as description.md and spec.md. Only the origin
+ * document markdowns such as description.md and plan.md. Only the origin
  * ticket stays out, because the Source row already links it. Oldest first.
  */
 export function splitRunPanelArtifacts(
@@ -234,11 +234,8 @@ export function splitRunLinkedArtifacts(
 ): FactoriesWorkOrderArtifact[] {
   return artifacts
     .filter((artifact) => {
-      if (
-        DESCRIPTION_NAMES.includes(artifactName(artifact)) ||
-        artifactName(artifact) === INTENT_ARTIFACT_NAME ||
-        artifactName(artifact) === SPEC_ARTIFACT_NAME
-      ) {
+      const name = artifactName(artifact);
+      if (DESCRIPTION_NAMES.includes(name) || isPlanningArtifactName(name)) {
         return false;
       }
       return !isOriginTicketArtifact(artifact, source);

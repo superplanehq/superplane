@@ -1470,6 +1470,7 @@ function githubOnboardingRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
   const onboarding = (): MeDescribeVcsProviderOnboardingResponse =>
     fixture.githubOnboarding ?? {
       providerConfigured: true,
+      accountConnectionRequired: true,
       repositories: [],
       pendingRequests: [],
       synchronizing: false,

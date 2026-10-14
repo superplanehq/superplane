@@ -218,6 +218,8 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 
 	triggerConfig := map[string]any{
 		"contentFilter": mention,
+		"allowedBots":   allowedBotsNodeValue(request.AllowedBots),
+		"ignoreBots":    request.IgnoreBots,
 	}
 	if strings.TrimSpace(request.Repository) != "" {
 		triggerConfig["repository"] = request.Repository

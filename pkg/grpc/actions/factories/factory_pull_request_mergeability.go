@@ -25,7 +25,6 @@ var (
 	errFactoryPullRequestNotMergeable            = errors.New("the pull request cannot merge")
 	errFactoryPullRequestMergeMethodNotAllowed   = errors.New("the repository does not allow this merge method")
 	errFactoryPullRequestHeadMoved               = errors.New("the pull request head changed")
-	errFactoryBitbucketMergeNotRevisionSafe      = errors.New("bitbucket cannot lock the approved revision")
 	errFactoryPullRequestMergeabilityUnavailable = errors.New("merge status is unavailable")
 	errFactoryPullRequestMergeabilityTemporary   = errors.New("merge status lookup failed temporarily")
 )
@@ -38,7 +37,6 @@ const (
 	mergeBlockedConflicting        = "The pull request has conflicts."
 	mergeBlockedMissingIntegration = "GitHub is not connected."
 	mergeBlockedUnavailable        = "Merge status is unavailable right now."
-	bitbucketMergeNotRevisionSafe  = "Bitbucket cannot lock the approved revision. Merge this pull request in Bitbucket."
 )
 
 type factoryPullRequestMergeability struct {
@@ -159,8 +157,15 @@ func recoverFactoryPullRequestMergeability(
 	if !isRecoverableGitHubMergeabilityError(ctx, err) {
 		return nil, err
 	}
-	recordFactoryPullRequestMergeabilityError(ctx, factory.ID.String(), result.PullRequest.ID.String(), result.PullRequest.Repository, err)
-	result.canRetry = isRetryableGitHubMergeabilityError(err)
+	factoryID := factory.ID.String()
+	pullRequestID := result.PullRequest.ID.String()
+	repository := result.PullRequest.Repository
+	logFactoryPullRequestMergeabilityLookupFailure(factoryID, pullRequestID, repository, err)
+	retryable := isRetryableGitHubMergeabilityError(err)
+	if !retryable {
+		captureFactoryPullRequestMergeabilityException(ctx, factoryID, pullRequestID, repository, err)
+	}
+	result.canRetry = retryable
 	return blockedMergeability(result, pb.FactoryPullRequestMergeability_BLOCKED_REASON_UNAVAILABLE, mergeBlockedUnavailable), nil
 }
 

@@ -374,7 +374,8 @@ function BitbucketContinue({
 function NewWorkspaceCheck({ active }: { active: boolean }) {
   if (!active) return null;
   return (
-    <p className="text-[13px] text-muted-foreground" role="status">
+    <p className="flex items-center gap-2 text-[13px] text-muted-foreground" role="status">
+      <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
       {copy.checkingNewWorkspace}
     </p>
   );

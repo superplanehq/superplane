@@ -234,6 +234,7 @@ func TruncateTables() error {
 			installation_github_apps,
 			installation_licenses,
 			installation_license_keys,
+			installation_license_revocations,
 			workflows,
 			workflow_runs,
 			workflow_nodes,

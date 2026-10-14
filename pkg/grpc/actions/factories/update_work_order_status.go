@@ -37,6 +37,9 @@ func UpdateWorkOrderStatus(
 			return nil, factoryErrorToStatus(invalidArgument("closing a work order requires a result"), "failed to update work order status")
 		}
 		result = mapped
+		if result == models.FactoryWorkOrderResultRejected {
+			result = models.FactoryWorkOrderResultManualRejected
+		}
 	}
 
 	userIDStr, ok := authentication.GetUserIdFromMetadata(ctx)
@@ -106,6 +109,9 @@ func UpdateWorkOrderStatus(
 	}
 
 	if changed {
+		if toState == models.FactoryWorkOrderStateClosed {
+			messages.PublishWorkOrderRunCancellations(db, order)
+		}
 		notification := messages.FactoryWorkOrderNotificationMessage{
 			OrganizationID: orgID.String(),
 			FactoryID:      factory.ID.String(),

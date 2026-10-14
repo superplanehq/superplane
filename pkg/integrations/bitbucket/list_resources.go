@@ -11,10 +11,11 @@ import (
 const (
 	resourceTypeRepository    = "repository"
 	resourceTypeDefaultBranch = "default_branch"
+	resourceTypeStatusCheck   = "status_check"
 )
 
 func (b *Bitbucket) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != resourceTypeRepository && resourceType != resourceTypeDefaultBranch {
+	if resourceType != resourceTypeRepository && resourceType != resourceTypeDefaultBranch && resourceType != resourceTypeStatusCheck {
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -34,6 +35,14 @@ func (b *Bitbucket) ListResources(resourceType string, ctx core.ListResourcesCon
 			repository = metadata.Repository.FullName
 		}
 		return listDefaultBranch(ctx.Integration, client, repository)
+	}
+
+	if resourceType == resourceTypeStatusCheck {
+		repository := strings.TrimSpace(ctx.Parameters["repository"])
+		if repository == "" && metadata.AuthType == AuthTypeRepositoryAccessToken && metadata.Repository != nil {
+			repository = metadata.Repository.FullName
+		}
+		return b.listStatusCheckResources(ctx, client, repository)
 	}
 
 	if metadata.AuthType == AuthTypeRepositoryAccessToken {

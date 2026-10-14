@@ -26,7 +26,7 @@ import (
 	"gorm.io/gorm"
 )
 
-var expressionRegex = regexp.MustCompile(`\{\{(.*?)\}\}`)
+var expressionRegex = regexp.MustCompile(`(?s)\{\{(.*?)\}\}`)
 
 type NodeConfigurationBuilder struct {
 	tx                  *gorm.DB

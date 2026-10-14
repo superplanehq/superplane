@@ -1,5 +1,5 @@
 {{- if and (or .Values.runner.api.enabled (eq (include "runner.workers.enabled" .) "true")) (eq .Values.blobStorage.provider "filesystem") }}
-{{- fail "runner.api and runner.workers need blobStorage.provider set to a shared store such as gcs or s3. filesystem is a pod-local directory, so runner pods cannot read the same blobs as the API." }}
+{{- fail "runner.api and runner.workers need blobStorage.provider set to a shared store such as gcs, s3, or azure. filesystem is a pod-local directory, so runner pods cannot read the same blobs as the API." }}
 {{- end }}
 {{- if .Values.runner.api.enabled }}
 apiVersion: v1
@@ -43,6 +43,9 @@ spec:
       labels:
         app: superplane
         service: {{ .Release.Name }}-runner-api
+        {{- with .Values.podLabels }}
+        {{- include "superplane.podLabels" . | nindent 8 }}
+        {{- end }}
     spec:
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
@@ -119,6 +122,8 @@ spec:
               value: /app/oidc-keys
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
+            - name: BLOB_STORAGE_ACCOUNT
+              value: {{ .Values.blobStorage.account | quote }}
             - name: BLOB_STORAGE_BUCKET
               value: {{ .Values.blobStorage.bucket | quote }}
             - name: BLOB_STORAGE_REGION

@@ -90,16 +90,7 @@ func UpdateFactoryRepository(
 		selectedIntegration := integration
 		_, bindingErr := models.FindVCSProviderIntegrationBinding(tx, integration.ID)
 		if bindingErr == nil {
-			providerUserID, userErr := factoryVCSProviderUserID(ctx, tx, organizationID, models.ProviderGitHub)
-			if userErr != nil {
-				return userErr
-			}
-			catalogRepository, findErr := models.FindAccessibleVCSProviderRepositoryByName(
-				tx,
-				models.ProviderGitHub,
-				providerUserID,
-				repository,
-			)
+			catalogRepository, findErr := findGitHubCatalogRepositoryByName(ctx, tx, organizationID, repository)
 			if errors.Is(findErr, gorm.ErrRecordNotFound) {
 				return grpcerrors.PermissionDenied(findErr, "VCS repository is not accessible")
 			}
@@ -318,6 +309,9 @@ func reconcileFactoryRepository(
 			case "risk-score":
 				managedRunnerNodeIDs["assess-risk"] = true
 				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
+			case "visual-evidence":
+				managedRunnerNodeIDs["capture-visual-evidence"] = true
+				changed = replaceNodeConfigurationValues(nodes, []configurationReplacement{{from: previousAppRepository, to: repository}}) || changed
 			}
 		}
 		if _, ok := intakeCanvasIDs[canvas.ID]; ok {
@@ -392,6 +386,8 @@ func factoryTemplateVCSNodeIDs(templateID string) []string {
 		return []string{"on-issue-labeled", "on-issue-assigned"}
 	case "risk-score":
 		return []string{"on-pr-risk"}
+	case "visual-evidence":
+		return []string{"on-pr-visual-evidence", "read-pr-description", "update-pr-description"}
 	default:
 		return nil
 	}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -30,11 +31,7 @@ func (s *Server) HandleGitHubAppManifest(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
-	if config.LoadGitHubHostedAppConfig().Enabled() {
-		http.Error(w, "GitHub App is already configured", http.StatusConflict)
-		return
-	}
-	if githubapp.Enabled(r.Context(), database.DB(r.Context()), s.encryptor) {
+	if s.githubAppCreateBlocked(r) {
 		http.Error(w, "GitHub App is already configured", http.StatusConflict)
 		return
 	}
@@ -77,8 +74,8 @@ func (s *Server) HandleGitHubAppCreated(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
-	if config.LoadGitHubHostedAppConfig().Enabled() || githubapp.Enabled(r.Context(), database.DB(r.Context()), s.encryptor) {
-		http.Redirect(w, r, returnPath, http.StatusFound)
+	if s.githubAppCreateBlocked(r) {
+		s.redirectAfterGitHubApp(w, r, returnPath)
 		return
 	}
 
@@ -90,12 +87,52 @@ func (s *Server) HandleGitHubAppCreated(w http.ResponseWriter, r *http.Request) 
 	}
 	if err := githubapp.Save(r.Context(), database.DB(r.Context()), s.encryptor, cfg); err != nil {
 		if errors.Is(err, githubapp.ErrAlreadyConfigured) {
-			http.Redirect(w, r, returnPath, http.StatusFound)
+			s.redirectAfterGitHubApp(w, r, returnPath)
 			return
 		}
 		log.WithError(err).Error("failed to store GitHub App credentials")
 		http.Error(w, "failed to save GitHub App", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, returnPath, http.StatusFound)
+	s.redirectAfterGitHubApp(w, r, returnPath)
+}
+
+func (s *Server) githubAppCreateBlocked(r *http.Request) bool {
+	if config.LoadGitHubHostedAppConfig().Enabled() {
+		return true
+	}
+	cfg, err := githubapp.Resolve(r.Context(), database.DB(r.Context()), s.encryptor)
+	return err == nil && cfg.Enabled()
+}
+
+func (s *Server) redirectAfterGitHubApp(w http.ResponseWriter, r *http.Request, returnPath string) {
+	if githubapp.UserConnectReady(r.Context()) {
+		http.Redirect(w, r, githubAccountConnectURL(returnPath), http.StatusFound)
+		return
+	}
+	http.Redirect(w, r, workspaceSetupURL(returnPath), http.StatusFound)
+}
+
+func workspaceSetupURL(returnPath string) string {
+	target, err := url.Parse(returnPath)
+	if err != nil || target.Path == "" || !strings.HasPrefix(target.Path, "/") {
+		return "/"
+	}
+	return target.String()
+}
+
+func githubAccountConnectURL(returnPath string) string {
+	target, err := url.Parse(returnPath)
+	if err != nil || target.Path == "" || !strings.HasPrefix(target.Path, "/") {
+		target = &url.URL{Path: "/"}
+	}
+	query := target.Query()
+	if query.Get("githubConnected") == "" {
+		query.Set("githubConnected", "1")
+	}
+	target.RawQuery = query.Encode()
+	values := url.Values{}
+	values.Set("intent", "connect")
+	values.Set("redirect", target.String())
+	return "/auth/github?" + values.Encode()
 }

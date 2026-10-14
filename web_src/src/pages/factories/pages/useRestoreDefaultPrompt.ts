@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 
+import { usePermissions } from "@/contexts/usePermissions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 
@@ -24,8 +25,11 @@ export function useRestoreDefaultPrompt({
   factoryId?: string;
   automationId?: string;
 }) {
+  const { canAct } = usePermissions();
   const agentNodeId = draft.components[0]?.id;
-  const restoreEnabled = Boolean(organizationId && factoryId && automationId && agentNodeId);
+  const restoreEnabled = Boolean(
+    canAct("factories", "update") && organizationId && factoryId && automationId && agentNodeId,
+  );
   const loadRestorePrompt = useCallback(() => {
     if (!organizationId || !factoryId || !automationId || !agentNodeId) {
       return Promise.reject(new Error(RESTORE_DEFAULT_PROMPT_COPY.error));
@@ -56,7 +60,7 @@ export function useRestoreDefaultPrompt({
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          rememberRestoreError(error, setDefaultSteps, setRestoreError);
+          console.warn("Could not load the default agent prompt.", error);
         }
       });
     return () => {
@@ -86,18 +90,10 @@ export function useRestoreDefaultPrompt({
   };
 
   const retryRestore = () => {
-    if (isRestoring) {
+    if (isRestoring || !applyOnRetry) {
       return;
     }
-    if (applyOnRetry) {
-      void applyDefaultPrompt();
-      return;
-    }
-    setIsRestoring(true);
-    void loadDefaultSteps(restoreLoaderRef)
-      .then((steps) => rememberDefaultSteps(steps, setDefaultSteps, setRestoreError))
-      .catch((error: unknown) => rememberRestoreError(error, setDefaultSteps, setRestoreError))
-      .finally(() => setIsRestoring(false));
+    void applyDefaultPrompt();
   };
 
   return {

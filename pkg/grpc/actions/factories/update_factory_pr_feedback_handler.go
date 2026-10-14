@@ -181,6 +181,9 @@ func applyPRFeedbackSettings(
 					configuration = map[string]any{}
 				}
 				configuration["environmentFrom"] = runnerEnvironmentFrom
+				if provider == models.ProviderBitbucket {
+					refreshBitbucketRunnerSteps(configuration, graph.isChecks())
+				}
 				nodes[i].Configuration = configuration
 				continue
 			}

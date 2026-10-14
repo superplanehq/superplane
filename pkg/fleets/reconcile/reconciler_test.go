@@ -215,6 +215,7 @@ func TestQueuedTaskAddsCapacityWithoutReplacingWarmRunner(t *testing.T) {
 	}
 	if resourceProvider.createRequest.RunnerID != "runner-1" ||
 		resourceProvider.bootstrap.RegistrationToken != "registration-token" ||
+		resourceProvider.bootstrap.Tags["fleet_manager_id"] != "manager-a" ||
 		resourceProvider.bootstrap.RunnerAPIURL != "https://superplane.example" {
 		t.Fatalf("provider requests = %#v %#v", resourceProvider.createRequest, resourceProvider.bootstrap)
 	}
@@ -678,6 +679,7 @@ func newTestReconciler(
 	t.Helper()
 	reconciler, err := New(admin, resolver, resourceProvider, Config{
 		FleetID:         "fleet-a",
+		FleetManagerID:  "manager-a",
 		WarmCapacity:    warmCapacity,
 		MaxCapacity:     maxCapacity,
 		OperatingSystem: "linux",

@@ -1,7 +1,7 @@
 # Fleet Manager
 
 This process reconciles SuperPlane runner demand with configured infrastructure
-providers. A fleet can use AWS, GCP, or Docker. Fleet Manager only uses the
+providers. A fleet can use AWS, Azure, GCP, or Docker. Fleet Manager only uses the
 installation admin HTTP API.
 
 Set `FLEET_MANAGER_CONFIG` to the JSON or YAML configuration body, or set
@@ -14,9 +14,10 @@ extension. The default file path is `/etc/superplane/fleet-manager.yaml`.
 configuration source.
 
 Set the top-level `id` to a stable identifier for the Fleet Manager
-deployment. AWS providers apply it as the `superplane_fleet_manager_id`
-resource tag and use it with the fleet ID to find owned runners. GCP
-providers apply it as the `superplane_fleet_manager_id` instance label.
+deployment. AWS and Azure providers apply it as the
+`superplane_fleet_manager_id` resource tag and use it with the fleet ID to
+find owned runners. GCP providers apply it as the
+`superplane_fleet_manager_id` instance label.
 
 Each AWS fleet can define additional `resourceTags`. Fleet Manager applies
 them to runner instances and root volumes. Additional tags cannot override the
@@ -32,8 +33,15 @@ their short-lived registration token.
 The local Compose service waits for owner setup and manages a development
 token automatically. It does not require `INSTALLATION_ADMIN_TOKEN`.
 
-AWS fleets require `runnerReleaseBaseUrl`. Fleet Manager selects a release
-from this layout:
+Cloud fleets require `runnerReleaseBaseUrl`. For versioned Runner releases, use
+the GitHub Releases URL template:
+
+```text
+https://github.com/superplanehq/superplane/releases/download/runner%2F{version}
+```
+
+Fleet Manager replaces `{version}` with the fleet's exact Runner version. A
+base URL without the placeholder continues to use this layout:
 
 ```text
 <runnerReleaseBaseUrl>/<release-id>/runner-linux-amd64.tar.gz
@@ -77,6 +85,20 @@ Its trust policy must allow EC2 to assume the role. The example sets
 `aws.iamInstanceProfile` to `superplane-runner-instance-profile` and leaves
 `aws.keyName` empty because Session Manager does not require an SSH key.
 
+Azure fleets also require `runnerReleaseBaseUrl`. Bootstrap uses the same
+archive layout and `install.sh` flow as AWS. Set `azure.imageId` to a
+Compute Gallery image version. Set `azure.vmSize` to a Trusted Launch size.
+`Standard_D2ds_v4` is the default for amd64. An arm64 fleet must set
+`azure.vmSize`. Set `azure.ephemeralOSDisk` to `true`
+only when that size has a local SSD. Fleet Manager creates one virtual
+machine per runner. It places the NIC on `azure.subnetId`, applies
+`azure.networkSecurityGroupId`, and assigns `azure.identityId`. It does not
+give the VM a public IP. Set `azure.zones` to the availability zones that
+the fleet may use. Fleet Manager retries the next zone when Azure reports
+insufficient capacity.
+
+See `config.azure.example.json` for a complete Azure fleet.
+
 GCP fleets also require `runnerReleaseBaseUrl`. Bootstrap uses the same
 archive layout and `install.sh` flow as AWS. Fleet Manager uses Application
 Default Credentials, for example GKE Workload Identity. The credential needs
@@ -107,6 +129,17 @@ See `config.gcp.example.json` for a complete GCP fleet.
 Docker fleets use a configured runner image instead of a release artifact.
 The local development configuration uses the tool-rich
 `superplane-runner-local:dev` image.
+
+The runner sends OS, architecture, and hostname as registration fields. The
+server records the registration request's IP in the runner's `ip` field when available.
+It uses the rightmost `X-Forwarded-For` address from the ingress proxy, or the
+connection peer address for direct requests. Fleet Manager adds the
+`fleet_manager_id` tag. Use `--tag key=value` more than once, or set `--tags`
+or `RUNNER_TAGS` to comma-separated `key=value` pairs. Quote a pair as a CSV
+field if its value contains a comma. Use `--tags-from-ec2-metadata` or
+`--tags-from-gcp-metadata` to add cloud instance tags. AWS Fleet Manager enables
+EC2 tags for its runners. The admin runner list and describe API return the
+host fields and tags.
 
 Fleet Manager creates unbound ephemeral runners. An idle runner can reserve the
 next queued task. The target capacity is the number of queued tasks plus

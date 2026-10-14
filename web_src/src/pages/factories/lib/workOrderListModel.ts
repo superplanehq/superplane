@@ -5,7 +5,7 @@ import type {
   FactoriesWorkOrderLineDispatch,
   FactoriesWorkOrderSummary,
 } from "@/api-client";
-import { selectWorkOrderCardPullRequest, workOrderCardPullRequestIsMergeable } from "./workOrderCardPullRequest";
+import { selectWorkOrderCardPullRequest, workOrderCardPullRequestShowsMergeable } from "./workOrderCardPullRequest";
 import { workOrderListSource } from "./workOrderCardSource";
 import { pullRequestState } from "./workOrderPullRequest";
 import { workOrderMatchesUser } from "./workOrderListPagination";
@@ -232,7 +232,9 @@ export function buildWorkOrderListEntries(
   orders: FactoriesWorkOrderSummary[],
   factory: FactoriesFactory | null | undefined,
 ): WorkOrderListEntry[] {
-  return orders.map((order) => buildWorkOrderListEntry(order, factory));
+  return orders
+    .filter((order) => order.result !== "RESULT_ARCHIVED")
+    .map((order) => buildWorkOrderListEntry(order, factory));
 }
 
 /**
@@ -424,7 +426,7 @@ function workOrderMatchesFilterLabel(order: FactoriesWorkOrderSummary, label: Wo
   if (label === "review") {
     return pullRequestState(card.pullRequest.state) === "open";
   }
-  return workOrderCardPullRequestIsMergeable(card.pullRequest);
+  return workOrderCardPullRequestShowsMergeable(card.pullRequest, order.checkScores);
 }
 
 export function applyWorkOrderFilters(
@@ -438,7 +440,10 @@ export function applyWorkOrderFilters(
   );
   let result = entries;
   if (statuses.length > 0) {
-    result = result.filter((entry) => statuses.includes(entry.displayStatus));
+    result = result.filter(
+      (entry) =>
+        statuses.includes(entry.displayStatus) || (statuses.includes("rejected") && entry.displayStatus === "closed"),
+    );
   }
   if (labels.length > 0) {
     result = result.filter((entry) => labels.some((label) => workOrderMatchesFilterLabel(entry.order, label)));

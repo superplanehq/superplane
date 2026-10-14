@@ -3,7 +3,7 @@ import { useUpdateCanvasPreference } from "@/hooks/useCanvasData";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Palette } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Navigate, useParams } from "react-router";
 import { Heading } from "../../components/Heading/heading";
 import { Text } from "../../components/Text/text";
@@ -61,16 +61,16 @@ function ClassicHomePage() {
     failed: !!canvasError,
   });
 
-  if (isHomePageLoading) {
-    return <LoadingView />;
-  }
-
-  if (!account || !organizationId) {
-    return <ErrorView />;
-  }
-
-  if (canvases.length === 0 && !canvasError && canCreateCanvases) {
-    return <Navigate to={`/${organizationId}/apps/new`} replace />;
+  const earlyView = classicHomeEarlyView({
+    isHomePageLoading,
+    account,
+    organizationId,
+    canvasCount: canvases.length,
+    canvasError,
+    canCreateCanvases,
+  });
+  if (earlyView.kind === "view") {
+    return earlyView.view;
   }
 
   return (
@@ -90,7 +90,7 @@ function ClassicHomePage() {
           <Content
             filteredCanvases={filteredCanvases}
             preferredFilteredCanvases={preferredFilteredCanvases}
-            organizationId={organizationId}
+            organizationId={earlyView.organizationId}
             searchQuery={searchQuery}
             onEditCanvas={openEdit}
             onToggleStar={(canvasId, starred) => updateCanvasPreference.mutate({ canvasId, starred })}
@@ -111,6 +111,38 @@ function ClassicHomePage() {
       />
     </HomePageShell>
   );
+}
+
+type ClassicHomeEarlyView = { kind: "view"; view: ReactNode } | { kind: "ready"; organizationId: string };
+
+function classicHomeEarlyView({
+  isHomePageLoading,
+  account,
+  organizationId,
+  canvasCount,
+  canvasError,
+  canCreateCanvases,
+}: {
+  isHomePageLoading: boolean;
+  account: unknown;
+  organizationId: string | undefined;
+  canvasCount: number;
+  canvasError: string | null;
+  canCreateCanvases: boolean;
+}): ClassicHomeEarlyView {
+  if (isHomePageLoading) {
+    return { kind: "view", view: <LoadingView /> };
+  }
+
+  if (!account || !organizationId) {
+    return { kind: "view", view: <ErrorView /> };
+  }
+
+  if (canvasCount === 0 && !canvasError && canCreateCanvases) {
+    return { kind: "view", view: <Navigate to={`/${organizationId}/apps/new`} replace /> };
+  }
+
+  return { kind: "ready", organizationId };
 }
 
 function Content({

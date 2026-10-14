@@ -1,5 +1,8 @@
+import { Navigate } from "react-router";
+import { useFactoriesLayout } from "../layout/factoriesLayoutContext";
+import { factorySettingsPath } from "../lib/factoryPagePaths";
+import { MobileMorePage } from "./MobileMorePage";
 import type { ReactNode } from "react";
-import { useParams } from "react-router";
 
 import { FactoriesLayout } from "../layout/FactoriesLayout";
 import { LinesPage } from "../pages/LinesPage";
@@ -11,24 +14,26 @@ import { useMobileFactoryShell } from "./useMobileFactoryShell";
 
 /**
  * Route-level switches between the desktop workspace shell and the mobile
- * proof-of-concept shell. Every switch keeps the desktop component as the
- * fallback, so nothing changes until the organization turns on the
- * `mobile_factory_board` feature and the viewport is phone-width.
+ * shell. Every switch keeps the desktop component as the fallback for
+ * wider viewports; phone-width viewports render the mobile shell.
  */
 export function FactoryWorkspaceLayoutSwitch({ children }: { children?: ReactNode }) {
-  const { organizationId } = useParams<{ organizationId: string }>();
-  if (useMobileFactoryShell(organizationId)) {
+  if (useMobileFactoryShell()) {
     return <MobileFactoriesLayout>{children}</MobileFactoriesLayout>;
   }
   return <FactoriesLayout>{children}</FactoriesLayout>;
 }
 
 export function LineBoardRouteSwitch() {
-  const { organizationId } = useParams<{ organizationId: string }>();
-  return useMobileFactoryShell(organizationId) ? <MobileBoardPage /> : <LinesPage />;
+  return useMobileFactoryShell() ? <MobileBoardPage /> : <LinesPage />;
 }
 
 export function WorkOrderDetailRouteSwitch() {
-  const { organizationId } = useParams<{ organizationId: string }>();
-  return useMobileFactoryShell(organizationId) ? <MobileTaskDetailPage /> : <WorkOrderDetailPage />;
+  return useMobileFactoryShell() ? <MobileTaskDetailPage /> : <WorkOrderDetailPage />;
+}
+
+export function FactoryMoreRouteSwitch() {
+  const mobile = useMobileFactoryShell();
+  const { organizationId, routeSegment } = useFactoriesLayout();
+  return mobile ? <MobileMorePage /> : <Navigate to={factorySettingsPath(organizationId, routeSegment)} replace />;
 }

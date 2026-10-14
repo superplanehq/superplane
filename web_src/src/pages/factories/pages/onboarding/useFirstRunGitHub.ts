@@ -42,6 +42,7 @@ function useGitHubConnectionState(organizationId: string, options?: { poll?: boo
     ],
     synchronizing: Boolean(onboarding.data?.synchronizing),
     appConfigured: Boolean(onboarding.data?.providerConfigured),
+    accountConnectionRequired: onboarding.data?.accountConnectionRequired === true,
   };
 }
 
@@ -57,8 +58,9 @@ function useRepositoryErrorToast(error: unknown, reportErrors: boolean) {
 }
 
 /**
- * GitHub access for this person in this workspace. A GitHub identity is ready
- * only after the person connects GitHub here.
+ * GitHub access for this person. A linked GitHub identity is the connection,
+ * including one saved during sign-in. Later workspaces reuse it without
+ * asking the person to connect GitHub again.
  */
 export function useFirstRunGitHub(args: {
   organizationId: string;
@@ -71,7 +73,7 @@ export function useFirstRunGitHub(args: {
   useRepositoryErrorToast(connection.onboarding.error, !setupFinished);
   const { account } = useAccount();
   const accountId = account?.id ?? "";
-  const githubConnected = useOnboardingGitHubConnect({ accountId, factoryId, connectedBefore });
+  const githubConnect = useOnboardingGitHubConnect({ accountId, factoryId, connectedBefore });
   const installScope = { accountId, factoryId };
   const checkingGitHub = useGitHubInstallReturn(
     installScope,
@@ -80,7 +82,8 @@ export function useFirstRunGitHub(args: {
   );
   return {
     connection,
-    githubReady: Boolean(connection.identity) && githubConnected,
+    githubReady: connection.accountConnectionRequired ? Boolean(connection.identity) : connection.appConfigured,
+    githubReturned: githubConnect.returned,
     installScope,
     checkingGitHub,
   };

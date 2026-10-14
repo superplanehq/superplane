@@ -54,8 +54,10 @@ func (w velocityWindow) contains(t time.Time) bool {
 }
 
 // velocityOrder is the work order behind the pull requests of one window.
-// Costs and cycle time belong to the order, not to each pull request, so an
-// order that opened several pull requests is counted once.
+// Cycle time, waste cost, and the People cost belong to the order, not to
+// each pull request, so an order that opened several pull requests is counted
+// once. Velocity Costs does not use this cost. It sums the ledger by the day
+// each event occurred.
 type velocityOrder struct {
 	id          uuid.UUID
 	createdByID *uuid.UUID
@@ -65,7 +67,9 @@ type velocityOrder struct {
 	day        time.Time
 	merged     bool
 	cycleHours *float64
-	costCents  int64
+	// Lifetime ledger of the order, in cents. People, waste cost, and the
+	// per-task median use this. Velocity Costs does not.
+	costCents int64
 	// Bands of costCents: what the order spent on model tokens and on runner
 	// compute.
 	modelCostCents   int64

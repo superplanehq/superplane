@@ -18,7 +18,7 @@ export type WorkOrderAttentionReason =
 
 export const WORK_ORDER_ATTENTION_LABEL: Record<WorkOrderAttentionReason, string> = {
   approval: "Waiting for user review",
-  feedback: "Addressing user feedback",
+  feedback: "Addressing PR comments",
   checks: "Waiting on status checks",
   checksPassed: "Status checks passed",
   fixesPaused: "Automatic fixes paused",
@@ -50,7 +50,7 @@ export const WORK_ORDER_ATTENTION_ICON: Record<WorkOrderAttentionReason, LucideI
  * Maps a task to attention reasons. Closed failed orders and waiting
  * orders with a failed latest step are Run failed. A cancelled latest
  * step is Stopped. An exclusive or discussion PR-feedback run is
- * Addressing user feedback. An active concurrent check wait is Waiting
+ * Addressing PR comments. An active concurrent check wait is Waiting
  * on status checks and hides user review. A check handler at its attempt
  * limit is Automatic fixes paused and hides user review. A finished
  * passed check wait is Status checks passed. A visible status note is

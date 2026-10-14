@@ -42,7 +42,7 @@ variable "cluster_name" {
 variable "cluster_version" {
   description = "Kubernetes version for the EKS cluster"
   type        = string
-  default     = "1.36"
+  default     = "1.37"
 }
 
 variable "node_count" {
@@ -118,6 +118,12 @@ variable "superplane_namespace" {
   description = "Kubernetes namespace for SuperPlane"
   type        = string
   default     = "superplane"
+}
+
+variable "superplane_chart_version" {
+  description = "Published SuperPlane Helm chart version with a matching self-hosted image"
+  type        = string
+  default     = "0.0.0-782e528cea1fd707313bcfa4a2e8f57e9148f5c5"
 }
 
 variable "superplane_image_tag" {

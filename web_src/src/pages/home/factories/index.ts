@@ -46,13 +46,11 @@ function lineAppComponentIntegrations(provider: FactoryVCSProvider): Record<stri
   if (provider === "bitbucket") {
     return {
       "bitbucket.createPullRequest": "bitbucket",
-      "bitbucket.createPullRequestComment": "bitbucket",
       "bitbucket.findPullRequest": "bitbucket",
       "bitbucket.updatePullRequest": "bitbucket",
     };
   }
   return {
-    "github.createIssueComment": "github",
     "github.createPullRequest": "github",
   };
 }
@@ -100,21 +98,24 @@ function buildLineApp(
   });
 }
 
-function buildEventApp(args: {
-  id: string;
-  title: string;
-  description: string;
-  triggerNodeId: string;
-}): FactoryDefinition {
+function buildEventApp(
+  args: {
+    id: string;
+    title: string;
+    description: string;
+    triggerNodeId: string;
+  },
+  provider: FactoryVCSProvider = "github",
+): FactoryDefinition {
   return buildOnboardingApp({
     id: args.id,
     title: args.title,
     description: args.description,
-    integrations: ["github"],
-    componentIntegrations: {
-      "github.onIssue": "github",
-      "github.onPullRequest": "github",
-    },
+    integrations: [provider],
+    componentIntegrations:
+      provider === "bitbucket"
+        ? { "bitbucket.onPullRequest": "bitbucket" }
+        : { "github.onIssue": "github", "github.onPullRequest": "github" },
     entrypointNodeId: args.triggerNodeId,
   });
 }
@@ -134,13 +135,13 @@ export const ONBOARDING_LINE_APPS: OnboardingLineApp[] = [
 ];
 
 // Event-driven factory apps provisioned during onboarding. These listen for
-// GitHub events; they are not factory line steps. Issue intake is not here: the
+// Git host events; they are not factory line steps. Issue intake is not here: the
 // workspace gets a first-class factory intake instead.
 export const ONBOARDING_EVENT_APPS = ["pr-closure", "risk-score"] as const;
 
-// Event apps listen for GitHub webhooks. Other providers have no event app templates yet.
+// Bitbucket closure listens for merge and decline events.
 export function onboardingEventAppsFor(vcsProvider?: string): readonly string[] {
-  return factoryVCSProvider(vcsProvider) === "github" ? ONBOARDING_EVENT_APPS : [];
+  return factoryVCSProvider(vcsProvider) === "github" ? ONBOARDING_EVENT_APPS : ["pr-closure"];
 }
 
 const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
@@ -163,6 +164,18 @@ const FACTORY_BY_ID: Record<string, FactoryDefinition> = {
     description: "Score a pull request when it opens or updates.",
     triggerNodeId: "on-pr-risk",
   }),
+  "visual-evidence": buildOnboardingApp({
+    id: "visual-evidence",
+    title: "Visual Evidence",
+    description: "Capture screenshots or a short video when a pull request changes the user interface.",
+    integrations: ["github"],
+    componentIntegrations: {
+      "github.getIssue": "github",
+      "github.updatePullRequest": "github",
+      "github.onPullRequest": "github",
+    },
+    entrypointNodeId: "on-pr-visual-evidence",
+  }),
 };
 
 export const DEFAULT_FACTORY_ID = "software-factory";
@@ -184,6 +197,17 @@ function factoryDefinitionForProvider(id: string, provider: FactoryVCSProvider):
         title: "Implement",
         description: "Create a branch, implement the task, and open a pull request.",
         entrypointNodeId: "onrun-implement",
+      },
+      provider,
+    );
+  }
+  if (id === "pr-closure") {
+    return buildEventApp(
+      {
+        id,
+        title: FACTORY_BY_ID[id].title,
+        description: FACTORY_BY_ID[id].description,
+        triggerNodeId: "on-pr-closed",
       },
       provider,
     );

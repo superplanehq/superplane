@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -105,4 +107,21 @@ func Save(
 		return ErrAlreadyConfigured
 	}
 	return err
+}
+
+// UserConnectReady reports whether GitHub account connection can start.
+// Cloud sets GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET. A self-hosted app
+// does not offer Sign in with GitHub.
+func UserConnectReady(_ context.Context) bool {
+	return strings.TrimSpace(os.Getenv("GITHUB_CLIENT_ID")) != "" && strings.TrimSpace(os.Getenv("GITHUB_CLIENT_SECRET")) != ""
+}
+
+// AccountConnectionRequired reports whether repository access stays on the
+// linked GitHub account. Cloud sets the public GitHub App, the login client,
+// or both. A self-hosted app stored on the installation does not.
+func AccountConnectionRequired(ctx context.Context) bool {
+	if UserConnectReady(ctx) {
+		return true
+	}
+	return config.LoadGitHubHostedAppConfig().Enabled()
 }

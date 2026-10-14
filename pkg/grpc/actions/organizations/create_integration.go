@@ -341,6 +341,8 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 		})
 	}
 
+	appendHostedGitHubInstallationURL(instance, proto)
+
 	return proto, nil
 }
 

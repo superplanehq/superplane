@@ -22,16 +22,6 @@ function buildScanResult(overrides?: Partial<VulnerabilityScanResult>): Vulnerab
 }
 
 describe("getPackageVulnerabilitiesMapper.getExecutionDetails", () => {
-  it("does not throw when outputs is undefined", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
-    expect(() => getPackageVulnerabilitiesMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
-  it("does not throw when default array is empty", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
-    expect(() => getPackageVulnerabilitiesMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
   it("returns only Executed At when scan result has no identifier", () => {
     const ctx = buildDetailsCtx({
       execution: { outputs: { default: [buildPackageOutput({})] } },

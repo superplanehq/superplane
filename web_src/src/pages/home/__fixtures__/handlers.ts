@@ -172,6 +172,11 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               description: "Add a custom model provider with a URL, token, and API type",
             },
             {
+              id: "workspace_agent",
+              label: "SuperPlane Agent",
+              description: "Show the SuperPlane Agent page",
+            },
+            {
               id: "workspace_mcp",
               label: "Workspace MCP",
               description: "Add MCP servers for workspace agents",
@@ -186,11 +191,6 @@ function buildRoutes(fixture: HomePageFixture): Route[] {
               label: "MCP Server",
               description: "Allow Cursor and other MCP clients to connect to workspaces in this organization",
               released: true,
-            },
-            {
-              id: "mobile_factory_board",
-              label: "Mobile Factory Board",
-              description: "Phone layout for workspace boards",
             },
           ],
         },

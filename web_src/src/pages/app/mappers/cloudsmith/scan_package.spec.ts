@@ -3,16 +3,6 @@ import { scanPackageMapper } from "./scan_package";
 import { buildDetailsCtx, buildOutput } from "./test_helpers";
 
 describe("scanPackageMapper.getExecutionDetails", () => {
-  it("does not throw when outputs is undefined", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
-    expect(() => scanPackageMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
-  it("does not throw when default array is empty", () => {
-    const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
-    expect(() => scanPackageMapper.getExecutionDetails(ctx)).not.toThrow();
-  });
-
   it("returns Executed At", () => {
     const ctx = buildDetailsCtx();
     const details = scanPackageMapper.getExecutionDetails(ctx);

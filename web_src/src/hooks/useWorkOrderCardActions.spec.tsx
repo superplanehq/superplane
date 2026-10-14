@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "bun:test";
+import { beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useDispatchWorkOrder, useUpdateWorkOrderAssignees } from "./useFactoryData";
 import { useWorkOrderCardActions } from "./useWorkOrderCardActions";
 
@@ -33,6 +34,11 @@ function mockMutations() {
 }
 
 describe("useWorkOrderCardActions", () => {
+  beforeEach(() => {
+    vi.mocked(showErrorToast).mockClear();
+    vi.mocked(showSuccessToast).mockClear();
+  });
+
   it("reports only the task that dispatches as in flight", async () => {
     const { finishDispatch } = mockMutations();
     const { result } = renderHook(() => useWorkOrderCardActions("org-1", "factory-1"));
@@ -51,6 +57,7 @@ describe("useWorkOrderCardActions", () => {
     });
 
     expect(result.current.dispatchingOrderIds.has("wo-1")).toBe(false);
+    expect(showSuccessToast).not.toHaveBeenCalled();
   });
 
   it("clears the in-flight task when the dispatch fails", async () => {
@@ -65,5 +72,7 @@ describe("useWorkOrderCardActions", () => {
     });
 
     expect(result.current.dispatchingOrderIds.has("wo-1")).toBe(false);
+    expect(showErrorToast).toHaveBeenCalledWith("Failed to dispatch task.");
+    expect(showSuccessToast).not.toHaveBeenCalled();
   });
 });

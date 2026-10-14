@@ -264,7 +264,7 @@ function splitRunOwnerDisplay(order: FactoriesWorkOrder, resolveUser?: OrgUserDi
   if (assignee?.id) {
     // `resolveUser` looks the owner up against the org members list, which
     // carries the avatar image. Without it we can only show initials.
-    const resolved = resolveUser?.(assignee.id, assignee.name);
+    const resolved = resolveUser?.(assignee.id, assignee.name, assignee.deleted, assignee.formerMember);
     if (resolved) {
       return resolved;
     }
@@ -273,6 +273,8 @@ function splitRunOwnerDisplay(order: FactoriesWorkOrder, resolveUser?: OrgUserDi
       id: assignee.id,
       name,
       initials: getUserInitials(name) || UNKNOWN_OWNER.initials,
+      ...(assignee.deleted ? { deleted: true } : {}),
+      ...(assignee.formerMember ? { formerMember: true } : {}),
     };
   }
   return workOrderOwnerDisplay(order, UNKNOWN_OWNER, resolveUser);
@@ -567,7 +569,7 @@ function reviewSurfaces(
   if (displayStatus === "draft") {
     return draftReviewSurface(order, checks, input);
   }
-  if (displayStatus === "completed" || displayStatus === "rejected") {
+  if (displayStatus === "completed" || displayStatus === "rejected" || displayStatus === "closed") {
     return surfaces(doneFooterForStatus(displayStatus, input.closer), [], checks);
   }
   if (current?.result === "RESULT_FAILED") {
@@ -815,7 +817,13 @@ function phasesForOrder(
 
 export const SPLIT_RUN_CLOSURE_PHASE_ID = "done-closure";
 
-const CLOSED_DISPLAY_STATUSES = new Set<WorkOrderDisplayStatus>(["completed", "rejected", "cancelled", "failed"]);
+const CLOSED_DISPLAY_STATUSES = new Set<WorkOrderDisplayStatus>([
+  "completed",
+  "rejected",
+  "closed",
+  "cancelled",
+  "failed",
+]);
 
 /**
  * The decision that closed the task, as a Done stage. Mirrors the

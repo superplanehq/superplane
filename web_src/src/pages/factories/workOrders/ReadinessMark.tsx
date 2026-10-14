@@ -12,10 +12,11 @@ import {
   type ConfidenceBand,
 } from "../lib/confidenceScore";
 import { DRAFT_READINESS_SHORT_LABEL, draftReadiness, type DraftReadinessTone } from "../lib/draftReadiness";
-import { PLANNING_REVIEW_SCORE_MAX, planningReviewAtMax, planningReviewLevel } from "../lib/planningReviewScore";
+import { PLANNING_REVIEW_SCORE_MAX, planningReviewLevel } from "../lib/planningReviewScore";
 import { mergeConfidenceCheckLevel, type MergeConfidenceCardCheck } from "../lib/mergeConfidenceScore";
-import { workOrderCheckDisplayName, workOrderCheckStatus, type WorkOrderCheckLevel } from "../lib/workOrderChecks";
-import { ConfidenceMeter } from "./ConfidenceMeter";
+import { workOrderCheckDisplayName, workOrderCheckLevelLabel, type WorkOrderCheckLevel } from "../lib/workOrderChecks";
+import { CheckStatusIcon } from "./CheckStatusIcon";
+import { CheckStatusBars, ConfidenceMeter } from "./ConfidenceMeter";
 
 const DOT_TONE: Record<DraftReadinessTone, string> = {
   analyzing: "text-[color:var(--status-draft-dot)]",
@@ -61,19 +62,8 @@ const BADGE_TONE: Record<ConfidenceBand, string> = {
 const BADGE_MUTED = "border-border bg-muted/40 text-muted-foreground";
 
 /**
- * Tooltip uses `bg-foreground`, so it is dark in light mode and light in
- * dark mode. Invert the usual card tones.
- */
-const TOOLTIP_RESULT_TONE: Record<WorkOrderCheckLevel, string> = {
-  positive: "text-emerald-300 dark:text-emerald-700",
-  neutral: "text-slate-300 dark:text-slate-700",
-  caution: "text-amber-300 dark:text-amber-700",
-  critical: "text-red-300 dark:text-red-700",
-};
-
-/**
  * Board card scores: Clarity stays a pill. Confidence and Merge use the
- * same step meter as the plan card. The tooltip carries the verdict.
+ * same per-check bars as the plan card. Legacy scores keep their meter.
  */
 export function CardScoreBadges({
   clarity,
@@ -103,13 +93,13 @@ export function CardScoreBadges({
     showClarity: hasReview ? false : showClarity,
     showConfidence,
   });
-  const breakdownMetrics = reviewBreakdown(reviewMetrics);
+  const breakdownMetrics = hasReview ? reviewMetrics : undefined;
+  const heading = hasReview ? "Confidence in autonomous completion" : readiness.headline;
   const metricSpeech = (breakdownMetrics ?? []).map((metric) => {
-    const status = reviewMetricStatus(metric);
-    return `${metric.name} ${status.label}`;
+    return `${metric.name}: ${workOrderCheckLevelLabel(metric.level ?? planningReviewLevel(metric.score))}`;
   });
   const speech = [
-    readiness.headline,
+    heading,
     ...(metricSpeech.length > 0 ? metricSpeech : rows.map((row) => scoreSpeech(row, scoreMax))),
   ].join(". ");
 
@@ -118,6 +108,7 @@ export function CardScoreBadges({
       <TooltipTrigger asChild>
         <span
           role="img"
+          tabIndex={0}
           aria-label={speech}
           data-testid={testId}
           data-tone={readiness.tone}
@@ -129,6 +120,10 @@ export function CardScoreBadges({
                 key={row.key}
                 score={row.score}
                 max={scoreMax}
+                checks={breakdownMetrics?.map((metric) => ({
+                  id: metric.key,
+                  level: metric.level ?? planningReviewLevel(metric.score),
+                }))}
                 testId={testId ? `${testId}-${row.key}` : undefined}
               />
             ) : (
@@ -149,17 +144,21 @@ export function CardScoreBadges({
       </TooltipTrigger>
       <TooltipContent>
         <span className="block font-medium" data-testid={testId ? `${testId}-verdict` : undefined}>
-          {readiness.headline}
+          {heading}
         </span>
         {breakdownMetrics ? (
-          <span className="mt-1 grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5">
+          <span className="mt-1.5 flex flex-col gap-1.5">
             {breakdownMetrics.map((metric) => {
-              const status = reviewMetricStatus(metric);
+              const level = metric.level ?? planningReviewLevel(metric.score);
               return (
-                <Fragment key={metric.key}>
+                <span key={metric.key} className="flex items-center gap-2">
+                  <CheckStatusIcon
+                    level={level}
+                    label={workOrderCheckLevelLabel(level)}
+                    className="[&>:first-child]:stroke-transparent"
+                  />
                   <span>{metric.name}</span>
-                  <span className={tooltipResultTone(metric)}>{status.label}</span>
-                </Fragment>
+                </span>
               );
             })}
           </span>
@@ -169,15 +168,15 @@ export function CardScoreBadges({
   );
 }
 
-function ScoreMeterLabel({
-  label,
+function ConfidenceChip({
   score,
   max,
+  checks,
   testId,
 }: {
-  label: string;
   score?: number;
   max: number;
+  checks?: { id: string; level: WorkOrderCheckLevel }[];
   testId?: string;
 }) {
   const value = score == null ? undefined : clampConfidenceScore(score, max);
@@ -186,8 +185,10 @@ function ScoreMeterLabel({
       data-testid={testId}
       className="inline-flex items-center gap-1 whitespace-nowrap text-[10px] font-medium leading-none text-muted-foreground"
     >
-      <span>{label}</span>
-      {value == null ? (
+      <span>Confidence</span>
+      {checks?.length ? (
+        <CheckStatusBars checks={checks} testId={testId ? `${testId}-meter` : undefined} />
+      ) : value == null ? (
         <span>–</span>
       ) : (
         <ConfidenceMeter
@@ -202,16 +203,12 @@ function ScoreMeterLabel({
   );
 }
 
-function ConfidenceChip({ score, max, testId }: { score?: number; max: number; testId?: string }) {
-  return <ScoreMeterLabel label="Confidence" score={score} max={max} testId={testId} />;
-}
-
 const MERGE_METER_BARS = 3;
 
 /**
  * Board footer mark. The Confidence prefix matches the backlog card.
- * A 1–5 score uses three bars: 4–5 fill three, 3 fills two, and 1–2
- * fill one. Hover opens the check list on the right.
+ * Each check colors its own bar. Legacy aggregate scores use three steps.
+ * Hover opens the same ordered check list on the right.
  */
 export function MergeConfidenceChip({
   score,
@@ -226,33 +223,41 @@ export function MergeConfidenceChip({
 }) {
   const value = clampConfidenceScore(score, maxScore);
   const rows = mergeConfidenceRows(checks);
+  const speech = rows.length
+    ? `Merge confidence. ${rows.map((row) => `${row.name}: ${row.label}`).join(". ")}`
+    : `Merge confidence ${value} of ${maxScore}`;
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span
           role="img"
-          aria-label={`Merge confidence ${value} of ${maxScore}`}
+          aria-label={speech}
+          tabIndex={0}
           className="pointer-events-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10px] font-medium leading-none text-muted-foreground"
         >
           <span>Confidence</span>
-          <ConfidenceMeter
-            score={mergeMeterBars(value, maxScore)}
-            max={MERGE_METER_BARS}
-            showTooltip={false}
-            decorative
-            testId={testId ? `${testId}-meter` : undefined}
-          />
+          {rows.length > 0 ? (
+            <CheckStatusBars checks={rows} testId={testId ? `${testId}-meter` : undefined} />
+          ) : (
+            <ConfidenceMeter
+              score={mergeMeterBars(value, maxScore)}
+              max={MERGE_METER_BARS}
+              showTooltip={false}
+              decorative
+              testId={testId ? `${testId}-meter` : undefined}
+            />
+          )}
         </span>
       </TooltipTrigger>
       <TooltipContent side="right" data-testid={testId ? `${testId}-popup` : undefined}>
         <span className="block font-medium">Merge confidence</span>
         {rows.length > 0 ? (
-          <span className="mt-1 grid grid-cols-[auto_auto] gap-x-2 gap-y-0.5">
+          <span className="mt-1.5 flex flex-col gap-1.5">
             {rows.map((row) => (
-              <Fragment key={row.key}>
+              <span key={row.id} className="flex items-center gap-2">
+                <CheckStatusIcon level={row.level} label={row.label} className="[&>:first-child]:stroke-transparent" />
                 <span>{row.name}</span>
-                <span className={TOOLTIP_RESULT_TONE[row.level]}>{row.label}</span>
-              </Fragment>
+              </span>
             ))}
           </span>
         ) : null}
@@ -265,13 +270,7 @@ function mergeConfidenceRows(checks: MergeConfidenceCardCheck[]) {
   return checks.map((check) => {
     const name = workOrderCheckDisplayName(check);
     const level = mergeConfidenceCheckLevel(check.key, check.score);
-    const status = workOrderCheckStatus({
-      name,
-      key: check.key,
-      score: check.score,
-      level,
-    });
-    return { key: check.key || name, name, label: status.label, level };
+    return { id: check.key || name, name, label: workOrderCheckLevelLabel(level), level };
   });
 }
 
@@ -287,30 +286,6 @@ function mergeMeterBars(score: number, maxScore: number): number {
     return MERGE_METER_BARS - 1;
   }
   return score <= 0 ? 0 : 1;
-}
-
-/**
- * At the top score the verdict already says it all, so the tooltip
- * skips the per-check breakdown.
- */
-function reviewBreakdown<Metric extends { score: number }>(reviewMetrics?: Metric[]): Metric[] | undefined {
-  if (!reviewMetrics || reviewMetrics.length === 0 || planningReviewAtMax(reviewMetrics)) {
-    return undefined;
-  }
-  return reviewMetrics;
-}
-
-function reviewMetricStatus(metric: { key: string; name: string; score: number; level?: WorkOrderCheckLevel }) {
-  return workOrderCheckStatus({
-    name: metric.name,
-    key: metric.key,
-    score: metric.score,
-    level: metric.level ?? planningReviewLevel(metric.score),
-  });
-}
-
-function tooltipResultTone(metric: { score: number; level?: WorkOrderCheckLevel }) {
-  return TOOLTIP_RESULT_TONE[metric.level ?? planningReviewLevel(metric.score)];
 }
 
 function scoreText(score?: number, max: number = CONFIDENCE_SCORE_MAX) {

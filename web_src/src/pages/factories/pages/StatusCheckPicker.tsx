@@ -1,10 +1,11 @@
 import type { OrganizationsIntegrationResourceRef } from "@/api-client";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Check, Loader2 } from "lucide-react";
 import { useMemo } from "react";
 
-import { statusCheckRows } from "./checksPRFeedbackSetup";
+import { statusCheckDisplay, statusCheckRows } from "./checksPRFeedbackSetup";
 import { PR_FEEDBACK_SETTINGS_COPY } from "./prFeedbackSettingsModel";
 
 export function StatusCheckPicker({
@@ -69,25 +70,26 @@ export function StatusCheckPicker({
           <>
             <ul className="divide-y divide-border" data-testid="pr-feedback-check-names-list">
               {rows.map((row) => {
-                const isSelected = selected.has(row.name.toLowerCase());
+                const isSelected = selected.has(row.value.toLowerCase());
                 return (
-                  <li key={row.name}>
-                    <button
+                  <li key={row.value.toLowerCase()}>
+                    <Button
                       type="button"
+                      variant="ghost"
                       role="option"
                       aria-selected={isSelected}
-                      onClick={() => onToggle(row.name)}
+                      onClick={() => onToggle(row.value)}
                       className={cn(
-                        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+                        "h-auto w-full justify-start gap-3 rounded-none px-3 py-2.5 text-left text-[13px] font-medium",
                         isSelected ? "bg-accent/50" : "hover:bg-accent/30",
                       )}
-                      data-testid={`pr-feedback-check-option-${row.name}`}
+                      data-testid={`pr-feedback-check-option-${row.value}`}
                     >
-                      <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{row.name}</span>
+                      <span className="min-w-0 flex-1 truncate">{statusCheckDisplay(row, rows)}</span>
                       {isSelected ? (
                         <Check className="size-3.5 shrink-0 text-foreground" strokeWidth={2.5} aria-hidden />
                       ) : null}
-                    </button>
+                    </Button>
                   </li>
                 );
               })}

@@ -302,6 +302,9 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 	if err := models.MaybeAttachAnalysisSession(tx, canvas, event, run); err != nil {
 		return nil, uuid.Nil, fmt.Errorf("attach analysis session for run %s: %w", run.ID, err)
 	}
+	if err := models.MaybeLinkVisualEvidenceRun(tx, canvas, event, run); err != nil {
+		return nil, uuid.Nil, fmt.Errorf("link visual evidence run %s: %w", run.ID, err)
+	}
 
 	var queueItems []models.CanvasNodeQueueItem
 	for _, edge := range outgoingEdges {
