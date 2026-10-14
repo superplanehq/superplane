@@ -100,6 +100,10 @@ installation:
   type: "kubernetes"
   beaconEnabled: true
 
+componentReleases:
+  runnerVersion: v0.1.0
+  fleetManagerVersion: v0.1.0
+
 sentry:
   secretName: ""
   enabled: false
@@ -314,39 +318,6 @@ runner:
     size: 10Gi
     # Group that owns the log volume. The SuperPlane image runs as nobody (65534).
     fsGroup: 65534
-
-#
-# Integrated Fleet Manager. Off by default.
-# Fleet Manager creates and deletes runner machines for the configured fleets.
-# Put the Fleet Manager configuration in an existing secret, under the key
-# fleet-manager.yaml. See pkg/fleets/README.md for the format.
-# Set serviceAccount.annotations to bind a cloud identity, for example
-# iam.gke.io/gcp-service-account for GKE Workload Identity or
-# azure.workload.identity/client-id for AKS.
-#
-fleetManager:
-  enabled: false
-  existingSecret: ""
-  image:
-    registry: ghcr.io/superplanehq
-    name: fleet-manager
-    tag: ""
-    pullPolicy: IfNotPresent
-  serviceAccount:
-    create: false
-    name: ""
-    annotations: {}
-  # Fleet Manager reads its configuration once at start. Change an annotation,
-  # for example a checksum of the configuration, to restart it.
-  podAnnotations: {}
-  podLabels: {}
-  resources:
-    limits:
-      cpu: 100m
-      memory: 128Mi
-    requests:
-      cpu: 100m
-      memory: 128Mi
 
 #
 # Email configuration

@@ -17,15 +17,12 @@ export const OWNER_SETUP_COPY = {
     error: "SuperPlane could not save SMTP settings. Check the values and try again.",
   },
   fleet: {
-    headline: "Configure Fleet Manager",
-    body: "SuperPlane does not call Fleet Manager. Copy this YAML into the Fleet Manager configuration, then apply it.",
-    helper: "Replace the placeholder values with the values from your Terraform ConfigMap.",
-    copy: "Copy YAML",
-    copied: "Copied",
-    continue: "Continue",
+    headline: "Set up runner fleets",
+    body: "Use the standalone Fleet Manager chart to connect runner infrastructure to this SuperPlane installation.",
+    helper:
+      "The reusable setup page generates values for AWS, GCP, or Azure. It creates a token only when you request installation instructions.",
+    open: "Open Fleet Manager setup",
+    continue: "Finish installation",
     skip: "Skip for now",
-    loading: "Preparing Fleet Manager configuration…",
-    error: "SuperPlane could not prepare Fleet Manager. Try again, or skip this step.",
-    retry: "Try again",
   },
 } as const;
