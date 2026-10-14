@@ -117,13 +117,14 @@ out of user-facing copy.
 `This change updates the onboarding flow for integrations.`  
 `The new flow shows connection status and the next required step.`
 
-**Weak PR test step:**  
+**Weak UI procedure:**  
 `Just make sure everything still works when you click around connecting GitHub and then going back.`
 
-**STE test step:**  
-`- [ ] Connect GitHub from the onboarding screen.`  
-`- [ ] Confirm the status shows Connected.`  
-`- [ ] Go back one step and confirm the status stays Connected.`
+**STE UI procedure:**  
+`Connect GitHub from the onboarding screen.`  
+`Confirm the status shows Connected.`  
+`Go back one step.`  
+`Confirm the status stays Connected.`
 
 **Weak UI:**  
 `Oops! Something went wrong on our end.`
