@@ -287,4 +287,32 @@ func Test__UpdateIntegration(t *testing.T) {
 		_, exists = updateResponse.Integration.Spec.Configuration.AsMap()["adminKey"]
 		assert.False(t, exists, "serialized configuration must not return a redacted cleared secret")
 	})
+
+	t.Run("org slug in path -> sync receives the resolved org UUID", func(t *testing.T) {
+		//
+		// Sync must see the canonical org UUID even when the caller addresses
+		// the org by slug, matching CreateIntegrationWithUsage. Capture what
+		// the integration receives as SyncContext.OrganizationID.
+		//
+		var syncedOrgID string
+		r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
+			OnSync: func(ctx core.SyncContext) error {
+				syncedOrgID = ctx.OrganizationID
+				ctx.Integration.Ready()
+				return nil
+			},
+		})
+
+		integrationName := support.RandomName("integration")
+		appConfig, err := structpb.NewStruct(map[string]any{"key": "value1"})
+		require.NoError(t, err)
+
+		createResponse, err := CreateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.ID.String(), "dummy", integrationName, appConfig)
+		require.NoError(t, err)
+		integrationID := createResponse.Integration.Metadata.Id
+
+		_, err = UpdateIntegration(ctx, r.Registry, nil, baseURL, baseURL, r.Organization.Slug, integrationID, map[string]any{"key": "value2"}, "")
+		require.NoError(t, err)
+		assert.Equal(t, r.Organization.ID.String(), syncedOrgID)
+	})
 }
