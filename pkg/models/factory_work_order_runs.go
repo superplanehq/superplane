@@ -2,6 +2,7 @@ package models
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"slices"
@@ -18,39 +19,43 @@ func (o *FactoryWorkOrder) ListRuns(tx *gorm.DB) ([]CanvasRun, error) {
 		WITH RECURSIVE shared_creator AS (
 			SELECT source_run_id AS id
 			FROM factory_work_orders
-			WHERE factory_id = ? AND source_run_id = ? AND id <> ? AND source_run_id IS NOT NULL
+			WHERE factory_id = @factory AND source_run_id = @source AND id <> @order AND source_run_id IS NOT NULL
+		),
+		candidate_runs AS (
+			SELECT CAST(@source AS uuid) AS id
+			UNION ALL
+			SELECT run_id FROM factory_work_order_executions WHERE work_order_id = @order
+			UNION ALL
+			SELECT canvas_run_id FROM factory_planning_sessions WHERE draft_work_order_id = @order
+			UNION ALL
+			SELECT a.run_id FROM factory_pull_request_runs a
+			JOIN factory_pull_requests p ON p.id = a.pull_request_id WHERE p.work_order_id = @order
+			UNION ALL
+			SELECT id FROM workflow_runs WHERE input->'work_order'->>'id' = @order_text
+			UNION ALL
+			SELECT e.run_id FROM workflow_events e
+			JOIN workflows w ON w.id = e.workflow_id
+			WHERE w.factory_id = @factory AND COALESCE(e.data->'data', e.data)->'workOrder'->>'id' = @order_text
+			UNION ALL
+			SELECT e.run_id FROM workflow_events e
+			JOIN workflows w ON w.id = e.workflow_id
+			WHERE w.factory_id = @factory AND COALESCE(e.data->'data', e.data)->'work_order'->>'id' = @order_text
 		),
 		task_runs AS (
 			SELECT r.id FROM workflow_runs r
+			JOIN candidate_runs c ON c.id = r.id
 			JOIN workflows w ON w.id = r.workflow_id
-			WHERE w.organization_id = ? AND w.factory_id = ?
+			WHERE w.organization_id = @organization AND w.factory_id = @factory
 			  AND r.id NOT IN (SELECT id FROM shared_creator)
-			  AND (
-				r.id = ?
-				OR r.id IN (SELECT run_id FROM factory_work_order_executions WHERE work_order_id = ?)
-				OR r.id IN (SELECT canvas_run_id FROM factory_planning_sessions WHERE draft_work_order_id = ?)
-				OR r.id IN (
-					SELECT a.run_id FROM factory_pull_request_runs a
-					JOIN factory_pull_requests p ON p.id = a.pull_request_id WHERE p.work_order_id = ?
-				)
-				OR r.input->'work_order'->>'id' = ?
-				OR r.id IN (
-					SELECT run_id FROM workflow_events
-					WHERE workflow_id IN (SELECT id FROM workflows WHERE factory_id = ?) AND (
-						COALESCE(data->'data', data)->'workOrder'->>'id' = ?
-						OR COALESCE(data->'data', data)->'work_order'->>'id' = ?
-					)
-				)
-			)
 			UNION
 			SELECT r.id FROM workflow_runs r
 			JOIN task_runs t ON r.parent_run_id = t.id
 			WHERE r.id NOT IN (SELECT id FROM shared_creator)
 		)
 		SELECT r.* FROM workflow_runs r JOIN task_runs t ON r.id = t.id ORDER BY r.id
-	`, o.FactoryID, o.SourceRunID, o.ID,
-		o.OrganizationID, o.FactoryID, o.SourceRunID, o.ID, o.ID, o.ID,
-		o.ID.String(), o.FactoryID, o.ID.String(), o.ID.String()).Scan(&runs).Error
+	`, sql.Named("factory", o.FactoryID), sql.Named("source", o.SourceRunID),
+		sql.Named("order", o.ID), sql.Named("organization", o.OrganizationID),
+		sql.Named("order_text", o.ID.String())).Scan(&runs).Error
 	return runs, err
 }
 

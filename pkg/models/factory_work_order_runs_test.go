@@ -76,6 +76,58 @@ func Test__FactoryWorkOrder__Close__CancelsExclusiveCreator(t *testing.T) {
 	assert.Equal(t, models.CanvasRunStateCancelling, source.State)
 }
 
+func Test__FactoryWorkOrder__Close__CancelsEventAutomationsAndDescendants(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	order, err := factory.CreateWorkOrder(db, "Archive", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "automation", "start")
+	otherFactory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("other"), "", "")
+	require.NoError(t, err)
+	childApp, childEntrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, otherFactory.ID, "child", "start")
+	otherApp, otherEntrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, otherFactory.ID, "other", "start")
+	unrelated, err := models.CreateCanvasRunInTransaction(db, otherApp.ID, otherEntrypoint, models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, db.Model(unrelated).Update("input", models.NewJSONValue(map[string]any{
+		"work_order": map[string]any{"id": order.ID.String()},
+	})).Error)
+
+	var runIDs []uuid.UUID
+	for _, key := range []string{"workOrder", "work_order"} {
+		for _, wrapped := range []bool{false, true} {
+			run, err := models.CreateCanvasRunInTransaction(db, app.ID, entrypoint, models.CanvasRunStateStarted, "")
+			require.NoError(t, err)
+			payload := map[string]any{key: map[string]any{"id": order.ID.String()}}
+			if wrapped {
+				payload = map[string]any{"data": payload}
+			}
+			require.NoError(t, db.Create(&models.CanvasEvent{
+				WorkflowID: app.ID, NodeID: entrypoint, RunID: run.ID,
+				State: models.CanvasEventStatePending, Data: models.NewJSONValue(payload),
+			}).Error)
+			runIDs = append(runIDs, run.ID)
+		}
+	}
+	// Finished parents must still lead to active descendants in other apps.
+	finished, err := models.CreateCanvasRunInTransaction(db, childApp.ID, childEntrypoint, models.CanvasRunStateFinished, "")
+	require.NoError(t, err)
+	require.NoError(t, db.Model(finished).Update("parent_run_id", runIDs[0]).Error)
+	descendant, err := models.CreateCanvasRunInTransaction(db, childApp.ID, childEntrypoint, models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, db.Model(descendant).Update("parent_run_id", finished.ID).Error)
+	runIDs = append(runIDs, descendant.ID)
+
+	_, err = order.Close(db, models.FactoryWorkOrderResultArchived, &r.User)
+	require.NoError(t, err)
+	for _, id := range runIDs {
+		assertRunState(t, db, id, models.CanvasRunStateCancelling)
+	}
+	assertRunState(t, db, finished.ID, models.CanvasRunStateFinished)
+	assertRunState(t, db, unrelated.ID, models.CanvasRunStateStarted)
+}
+
 func Test__FactoryWorkOrder__Close__DoesNotWaitForBusyAnalysisRun(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
