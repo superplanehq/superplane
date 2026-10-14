@@ -21,7 +21,7 @@ Do the steps in this order:
 | SuperPlane | GKE cluster, Cloud NAT (private nodes), Cloud SQL, cert-manager, Helm release | Always |
 | Blob storage | GCS bucket, `superplane-app` service account, Workload Identity binding | `enable_gcs_blob_storage` |
 | Runner network | Runner subnetwork, deny-all ingress firewall rule, `superplane-fleet-mgr` service account | `enable_runners` |
-| Fleet Manager | Kubernetes secret with the Fleet Manager configuration, Fleet Manager deployment | `installation_admin_token` |
+| Fleet Manager infrastructure | Service account and Workload Identity binding | `enable_runners` |
 
 All optional parts are off by default.
 
@@ -159,39 +159,7 @@ account is the installation admin.
 
 Do these steps after the installation in step 2 works.
 
-### 3.1 Select the versions
-
-Runners need four artifacts. SuperPlane publishes each one from a `main`
-commit and tags it with the commit SHA. Use versions that are compatible:
-
-| Artifact | Variable or field | Requirement |
-| --- | --- | --- |
-| SuperPlane image | `superplane_image_tag` | Must contain the integrated runner API. Use `<commit-sha>-selfhosted`. The plain `<commit-sha>` image loads the UI from the hosted CDN and fails CORS on your domain. |
-| Helm chart | `superplane_chart_version` | Must contain the `runner.api` and `fleetManager` values. Chart `0.26.0` does not. Use `0.0.0-<commit-sha>`. |
-| Fleet Manager image | `fleet_manager_image_tag` | Must contain the GCP provider. Use `<commit-sha>`. |
-| Runner release | `runnerVersion` of the fleet | A published release ID, `v<version>` or `sha:<commit-sha>`. |
-
-Make sure that the images and the chart exist:
-
-```bash
-docker manifest inspect ghcr.io/superplanehq/superplane:<commit-sha>-selfhosted
-docker manifest inspect ghcr.io/superplanehq/fleet-manager:<commit-sha>
-helm show chart oci://ghcr.io/superplanehq/superplane-chart --version 0.0.0-<commit-sha>
-```
-
-To test chart changes that are not published, set `superplane_chart_path` to
-`../../superplane-helm-chart/helm`. To test Fleet Manager changes that are not
-published, build the image with `release/fleet-manager/build.sh`. Push it to a
-registry that the cluster can read, and set `fleet_manager_image_registry`.
-
-Make sure that the runner release exists. The command must show checksums for
-`runner-linux-amd64.tar.gz` and `runner-linux-arm64.tar.gz`:
-
-```bash
-curl -fsS "https://superplanehq-releases.s3.amazonaws.com/runner/sha:<commit-sha>/checksums.txt"
-```
-
-### 3.2 Build the runner image
+### 3.1 Build the runner image
 
 Build the image with Packer. Follow
 [release/runner/packer/gce/README.md](../../runner/packer/gce/README.md).
@@ -229,7 +197,7 @@ cd release/terraform/gke
 
 Allow inbound TCP 22 from `35.235.240.0/20` for IAP.
 
-### 3.3 Enable the runner API and the runner network
+### 3.2 Enable the runner API and runner infrastructure
 
 Add these values to `terraform.tfvars`:
 
@@ -259,70 +227,30 @@ This apply creates:
 
 If `172.20.0.0/24` overlaps a range in your network, set `runner_subnet_cidr`.
 
-### 3.4 Create an API token
+### 3.3 Install the standalone Fleet Manager
 
-1. Sign in to SuperPlane as the owner.
-2. Open your profile. In **API Tokens**, click **Create token**.
-3. Copy the token. SuperPlane shows it one time.
-
-Fleet Manager uses this token to read the task queue and register runners.
-The token must belong to an installation admin.
+Open **Fleet setup** in SuperPlane. Select GCP and copy these Terraform outputs
+into the generated configuration:
 
 ```bash
-export SUPERPLANE_URL=https://superplane.example.com
-export TF_VAR_installation_admin_token='<token>'
+terraform output runner_project
+terraform output runner_zones
+terraform output runner_subnetwork
+terraform output runner_network_tag
+terraform output fleet_manager_service_account_email
 ```
 
-### 3.5 Create the fleet in SuperPlane
+Replace the GCP image placeholder with an image or image family that contains
+the Runner. Generate the installation token and follow the displayed
+`kubectl` and `helm install` commands. The token is stored in a Kubernetes
+Secret. It does not enter Terraform state or Helm release metadata.
 
-A fleet in SuperPlane has an ID, a runner release, and a machine spec. The ID
-must be the same as the `id` in `runner_fleets`. The default Terraform fleet is
-`e1-large-amd64`. Its default machine type is `e2-standard-4`.
+The chart startup Job creates or updates the fleets before Fleet Manager
+starts. For complete install, upgrade, token rotation, fleet removal, and
+rollback instructions, see
+[the standalone chart guide](../../fleet-manager-chart/README.md).
 
-```bash
-curl -fsS -X POST "$SUPERPLANE_URL/admin/api/installation/fleets" \
-  -H "Authorization: Bearer $TF_VAR_installation_admin_token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "fleetId": "e1-large-amd64",
-    "runnerVersion": "sha:<commit-sha>",
-    "spec": {
-      "operatingSystem": "linux",
-      "architecture": "amd64",
-      "cpuMillicores": 4000,
-      "memoryMb": 16384,
-      "diskGb": 30
-    }
-  }' | jq
-```
-
-List the fleets:
-
-```bash
-curl -fsS "$SUPERPLANE_URL/admin/api/installation/fleets" \
-  -H "Authorization: Bearer $TF_VAR_installation_admin_token" | jq
-```
-
-### 3.6 Deploy Fleet Manager
-
-Add the image tag to `terraform.tfvars`:
-
-```hcl
-fleet_manager_image_tag = "<commit-sha>"
-```
-
-Do not put the token in `terraform.tfvars`. Keep it in
-`TF_VAR_installation_admin_token`. Apply:
-
-```bash
-terraform apply
-```
-
-Terraform writes the Fleet Manager configuration to the
-`superplane-fleet-manager` secret. Terraform gets the project, zones, image
-family, subnetwork, and network tag from the resources it created.
-
-Make sure that Fleet Manager runs:
+Confirm that Fleet Manager runs:
 
 ```bash
 kubectl get pods -n superplane -l service=superplane-fleet-manager
@@ -331,10 +259,9 @@ kubectl logs -n superplane deploy/superplane-fleet-manager
 
 The log must not show configuration or permission errors.
 
-To change the fleets, edit `runner_fleets` and apply again. Fleet Manager
-restarts when its configuration changes.
+To change fleets, edit the standalone chart values and run `helm upgrade`.
 
-### 3.7 Run a task
+### 3.4 Run a task
 
 1. Create a canvas.
 2. Add a Manual Run trigger.
@@ -376,25 +303,8 @@ must stop and Fleet Manager must delete it after the task.
 | `superplane_chart_path` | empty | Path to a local chart. Empty installs the published chart. |
 | `superplane_chart_version` | empty | Version of the published chart, for example `0.0.0-<commit-sha>`. Required when `superplane_chart_path` is empty. |
 | `enable_runners` | `false` | Enable the runner API and create the runner network. |
-| `installation_admin_token` | empty | Personal API token of an installation admin. Deploys Fleet Manager. |
-| `fleet_manager_image_registry` | `ghcr.io/superplanehq` | Registry of the Fleet Manager image. |
-| `fleet_manager_image_tag` | empty | Tag of the Fleet Manager image. |
-| `runner_release_base_url` | SuperPlane release bucket | Base URL of runner release artifacts. |
 | `runner_subnet_cidr` | `172.20.0.0/24` | Range of the runner subnetwork. |
 | `runner_zones` | `[zone]` | Zones for runner VMs. |
-| `runner_fleets` | one `e1-large-amd64` fleet | Fleets that Fleet Manager controls. |
-
-Each item in `runner_fleets` has these fields:
-
-| Field | Default | Description |
-| --- | --- | --- |
-| `id` | required | SuperPlane fleet ID. |
-| `architecture` | required | `amd64` or `arm64`. |
-| `machine_type` | `e2-standard-4` (amd64), `t2a-standard-4` (arm64) | Compute Engine machine type. |
-| `image` | `superplane-runner-<architecture>` family | Image or image family. |
-| `disk_size_gb` | `30` | Boot disk size. |
-| `warm_capacity` | `0` | Idle runners to keep ready. |
-| `max_capacity` | `2` | Maximum runners. |
 
 For an arm64 fleet, build the arm64 image and use zones that have the machine
 type. For example, T2A machines are not available in all zones.
@@ -406,8 +316,8 @@ self-hosted tag. Set `superplane_image_tag` to `<commit-sha>-selfhosted`
 and apply again. Hard-refresh the browser.
 
 **Pods stay in `ImagePullBackOff` with HTTP 403.** You pointed
-`superplane_image_registry` or `fleet_manager_image_registry` at
-`gcr.io/<project>` or Artifact Registry. Terraform grants
+`superplane_image_registry` at `gcr.io/<project>` or Artifact Registry.
+Terraform grants
 `roles/artifactregistry.reader` to the default Compute Engine service
 account. Wait one minute, then delete the failing pods.
 
@@ -455,18 +365,17 @@ signBlob API. Make sure that the IAM Credentials API is enabled and that the
 - Fleet Manager has `roles/compute.instanceAdmin.v1` on the project. It can
   change all VMs in the project. This is another reason to use a dedicated
   project.
-- The Terraform state contains secrets: the database password, the session and
-  encryption keys, and the installation admin token. Store the state in an
+- The Terraform state contains the database password and the session and
+  encryption keys. Store the state in an
   encrypted remote backend with restricted access.
 
 ## Destroy
 
-Stop the runners first. Remove `installation_admin_token` from the environment
-and apply. This removes Fleet Manager. Then delete the runner VMs that remain:
+Stop the runners first. Uninstall the standalone Fleet Manager chart. Then
+delete runner VMs that remain:
 
 ```bash
-unset TF_VAR_installation_admin_token
-terraform apply
+helm uninstall superplane-fleet-manager -n superplane
 
 # Fleet Manager labels runner VMs with cluster_name. The default is superplane.
 CLUSTER_NAME=superplane
