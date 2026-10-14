@@ -389,6 +389,7 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 			recorded.factoryID,
 			recorded.pullRequestID,
 		)
+		factoryactions.StartPullRequestChecks(context.Background(), w.factoryIntakeDeps(), recorded.pullRequestID)
 		factoryactions.StartVisualEvidenceCapture(
 			context.Background(),
 			w.factoryIntakeDeps(),
