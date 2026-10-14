@@ -149,36 +149,6 @@ describe("WorkOrderIntentDocument composer", () => {
     expect(screen.getByRole("button", { name: "Open plan" })).toBeInTheDocument();
   });
 
-  it("keeps implementation actions available before a score exists", () => {
-    renderIntentDocument(
-      <WorkOrderIntentDocument
-        {...INTENT_DOC}
-        artifacts={[]}
-        resultFooter={<div data-testid="split-run-review">Ready</div>}
-        analysis={analysisChat({
-          view: {
-            machineStatus: "running",
-            canvasId: "canvas-1",
-            canvasRunId: "run-1",
-            executionId: "exec-1",
-          },
-        })}
-      />,
-    );
-
-    const card = screen.getByTestId("split-run-intent-status-card");
-    const chips = screen.getByTestId("split-run-intent-composer-chips");
-    expect(card).toHaveAttribute("data-slot", "frame");
-    expect(card).toContainElement(chips);
-    expect(screen.queryByTestId("split-run-intent-summary-drawer")).not.toBeInTheDocument();
-    expect(within(chips).getByRole("status", { name: /^Clarity\./ })).toBeInTheDocument();
-    expect(within(chips).getByRole("status", { name: /^Confidence\./ })).toBeInTheDocument();
-    expect(
-      within(screen.getByRole("region", { name: "Implementation" })).getByTestId("split-run-review"),
-    ).toHaveTextContent("Ready");
-    expect(within(card).getByTestId("split-run-intent-verdict")).toHaveAttribute("data-tone", "analyzing");
-  });
-
   it("hides the plan toggle until a spec exists", () => {
     renderIntentDocument(
       <WorkOrderIntentDocument

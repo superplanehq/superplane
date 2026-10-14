@@ -332,7 +332,7 @@ check.db.migrations:
 	bash ./scripts/verify_branch_migrations_are_latest.sh
 
 check.build.ui:
-	$(COMPOSE) exec app bash -c "cd web_src && npm run build"
+	$(COMPOSE) exec app bash -c "cd web_src && NODE_OPTIONS=--max-old-space-size=4096 npm run build"
 
 check.build.storybook:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build-storybook"
