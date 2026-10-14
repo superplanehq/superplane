@@ -138,6 +138,12 @@ variable "runner_active_log_volume_capacity" {
   default     = "1Gi"
 }
 
+variable "enable_runners" {
+  description = "Enable the runner API and create infrastructure for standalone Fleet Manager runner VMs."
+  type        = bool
+  default     = true
+}
+
 # -----------------------------------------------------------------------------
 # Optional Variables - Network
 # -----------------------------------------------------------------------------
