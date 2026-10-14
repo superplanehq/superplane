@@ -25,10 +25,12 @@ locals {
   # gcr.io/<project> and <region>-docker.pkg.dev/<project>/... live in this
   # project. The default GKE node service account cannot pull them until it
   # has Artifact Registry reader.
-  pulls_from_gcp_registry = (
-    startswith(var.superplane_image_registry, "gcr.io/${var.project_id}") ||
-    can(regex("docker\\.pkg\\.dev/${var.project_id}(/|$)", var.superplane_image_registry))
-  )
+  workload_image_registries = [var.superplane_image_registry, var.fleet_manager_image_registry]
+  pulls_from_gcp_registry = anytrue([
+    for registry in local.workload_image_registries :
+    startswith(registry, "gcr.io/${var.project_id}") ||
+    can(regex("docker\\.pkg\\.dev/${var.project_id}(/|$)", registry))
+  ])
 }
 
 resource "google_project_service" "artifactregistry" {
