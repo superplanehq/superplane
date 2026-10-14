@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -128,7 +130,10 @@ func Test__HandOffWorkOrder__VerifyWritesRecordsWithoutARun(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	useGitHub(t, openHandOffPullRequest("acme/app", 42, "feat/refunds"))
+	checksCanvas := createChecksStartupCanvas(t, r, factoryModel, "acme/app")
+	olderPR := checksStartupGitHubPullRequest()
+	olderPR.CreatedAt = &github.Timestamp{Time: time.Now().Add(-20 * time.Minute)}
+	useGitHub(t, olderPR)
 
 	result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
 		FactoryID:      factoryModel.ID.String(),
@@ -168,6 +173,10 @@ func Test__HandOffWorkOrder__VerifyWritesRecordsWithoutARun(t *testing.T) {
 	var runCount int64
 	require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id IN ?", []any{planApp.ID, implApp.ID, doneApp.ID}).Count(&runCount).Error)
 	assert.Zero(t, runCount)
+	var requests int64
+	require.NoError(t, db.Model(&models.CanvasNodeRequest{}).Where("workflow_id = ? AND type = ?", checksCanvas.ID, "pull-request-checks-start").Count(&requests).Error)
+	assert.EqualValues(t, 1, requests, "Verify handoff must durably start checks without another PR webhook")
+	assert.EqualValues(t, 1, countCanvasEvents(t, checksCanvas.ID))
 }
 
 func Test__HandOffWorkOrder__VerifyUsesBoardLastStageWhenClosureIsRenamed(t *testing.T) {
@@ -463,4 +472,29 @@ func hasBranchArtifact(artifacts []models.FactoryWorkOrderArtifact, name, reposi
 		}
 	}
 	return false
+}
+
+func createChecksStartupCanvas(t *testing.T, r *support.ResourceRegistry, factoryModel *models.Factory, repository string) *models.Canvas {
+	t.Helper()
+	db := database.DB(t.Context())
+	template := buildChecksPRFeedbackCanvas(prFeedbackBuildRequest{Repository: repository, MaximumAttempts: prFeedbackDefaultMaximumAttempts, CheckNames: []string{"build"}})
+	var nodes []models.CanvasNode
+	for _, node := range template.Nodes() {
+		if node.ID == prFeedbackPullRequestTriggerNodeID {
+			node.ID = "renamed-pr-trigger"
+			node.Configuration["ignoreDrafts"] = true
+		}
+		nodes = append(nodes, models.CanvasNode{NodeID: node.ID, Name: node.Name, Type: node.Type, Ref: datatypes.NewJSONType(node.Ref), Configuration: datatypes.NewJSONType(node.Configuration)})
+	}
+	edges := template.Edges()
+	for i := range edges {
+		if edges[i].SourceID == prFeedbackPullRequestTriggerNodeID {
+			edges[i].SourceID = "renamed-pr-trigger"
+		}
+	}
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nodes, edges)
+	require.NoError(t, db.Model(canvas).Update("factory_id", factoryModel.ID).Error)
+	_, err := factoryModel.CreatePRFeedbackHandler(db, canvas.ID, models.FactoryPRFeedbackHandlerSubjectGitHubPullRequest, models.FactoryPRFeedbackHandlerSourcePullRequestChecks)
+	require.NoError(t, err)
+	return canvas
 }
