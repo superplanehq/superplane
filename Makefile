@@ -78,6 +78,7 @@ test.e2e.autoparallel:
 	$(COMPOSE) exec -e DB_NAME=superplane_test $(TEST_TASK_BROKER_ENV) -e SHARD_INDEX -e SHARD_COUNT app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"
 
 check.test.shards:
+	bash scripts/check_test_discovery.sh
 	$(COMPOSE) exec app bash /app/scripts/check_test_shards.sh
 
 test.e2e.single:

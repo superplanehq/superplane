@@ -16,6 +16,12 @@ module_prefix="$(go list -m)"
 # whose runtime is large enough to dominate a shard.
 load_shard_weights "$(dirname "${BASH_SOURCE[0]}")/ci_unit_package_weights.tsv"
 
+packages="$(go list ./pkg/... ./ee/... ./cmd/... ./test/support/...)"
+if [[ -z "$packages" ]]; then
+  echo "No unit test packages found." >&2
+  exit 1
+fi
+
 weighted_packages=()
 while IFS= read -r import_path; do
   package_dir="./${import_path#"$module_prefix"/}"
@@ -25,12 +31,7 @@ while IFS= read -r import_path; do
   # A package with no tests still has to compile in the selected job.
   weight=$(( (test_file_count > 0 ? test_file_count : 1) + extra_weight ))
   weighted_packages+=("${weight}"$'\t'"${package_dir}")
-done < <(go list ./pkg/... ./ee/...)
-
-if [[ "${#weighted_packages[@]}" -eq 0 ]]; then
-  echo "No packages found under ./pkg or ./ee, nothing to run."
-  exit 0
-fi
+done <<< "$packages"
 
 shard_packages=()
 while IFS=$'\t' read -r shard package_dir; do
