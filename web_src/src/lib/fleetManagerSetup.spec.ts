@@ -153,6 +153,7 @@ it("uses a custom namespace in generated commands", () => {
   const secret = fleetManagerSecretCommand("runners", "superplane-fleet-manager-token");
   const install = fleetManagerInstallCommand(metadata, "runners", "values.yaml");
 
+  expect(secret).toContain("kubectl create namespace runners");
   expect(secret).toContain("--namespace runners");
   expect(install).toContain("--namespace runners");
 });
