@@ -403,7 +403,7 @@ export function splitRunStatusLabel(status: SplitRunPhaseStatus): string {
   if (status === "running") return "Running";
   if (status === "waiting") return "Waiting";
   if (status === "failed") return "Failed";
-  if (status === "cancelled") return "Canceled";
+  if (status === "cancelled") return "Stopped";
   return "Pending";
 }
 

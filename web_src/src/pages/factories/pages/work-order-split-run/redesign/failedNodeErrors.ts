@@ -1,4 +1,4 @@
-import type { SplitRunStreamLine } from "../splitRunMocks";
+import type { SplitRunPhaseStatus, SplitRunStreamLine } from "../splitRunMocks";
 import { isRunnerComponent } from "../streamNotesFromLiveLog";
 
 export type FailedNodeError = {
@@ -8,7 +8,10 @@ export type FailedNodeError = {
   iconSlug?: string;
 };
 
-export function failedNonRunnerErrors(lines: SplitRunStreamLine[]): FailedNodeError[] {
+export function failedNonRunnerErrors(lines: SplitRunStreamLine[], runStatus?: SplitRunPhaseStatus): FailedNodeError[] {
+  if (runStatus === "cancelled") {
+    return [];
+  }
   return lines
     .filter((line) => !line.note && line.status === "failed" && !isRunnerComponent(line.component))
     .map((line) => ({

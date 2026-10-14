@@ -337,7 +337,8 @@ function plumbingNodeFromGroup({ line }: StreamNodeGroup): PlumbingNode {
  * its transcript steps in its place. Any other node is one `node` step.
  */
 function runSteps(nodes: StreamNodeGroup[], runStatus?: SplitRunPhaseStatus): AgentStep[] {
-  return applyPromptStepRunStatus(flattenRunSteps(nodes), runStatus);
+  const steps = applyPromptStepRunStatus(flattenRunSteps(nodes), runStatus);
+  return runStatus === "cancelled" ? settleStoppedSteps(steps, runStatus) : steps;
 }
 
 function flattenRunSteps(nodes: StreamNodeGroup[]): AgentStep[] {
@@ -368,7 +369,8 @@ export function agentStepsFromNotes(
   canvasLines?: SplitRunStreamLine[],
 ): AgentStep[] {
   const steps = groupClaudeSteps(notes.filter((line) => line.note)).map(agentStepFromGroup);
-  return applyPromptStepRunStatus(steps, runStatus, stoppingIndexForTranscript(notes, steps, canvasLines));
+  const shown = applyPromptStepRunStatus(steps, runStatus, stoppingIndexForTranscript(notes, steps, canvasLines));
+  return runStatus === "cancelled" ? settleStoppedSteps(shown, runStatus) : shown;
 }
 
 function applyPromptStepRunStatus(
@@ -434,13 +436,13 @@ function stoppingStepIndex(steps: AgentStep[]): number {
   return -1;
 }
 
-/** A canceled stage stops an open step. A failed stage stops an open command without marking it Failed. */
+/** A cancelled stage overrides failed child steps. A failed stage stops an open command without marking it Failed. */
 export function settleStoppedSteps(steps: AgentStep[], status?: SplitRunPhaseStatus): AgentStep[] {
   if (status !== "cancelled" && status !== "failed") {
     return steps;
   }
   return steps.map((step) => {
-    if (step.status !== "running") {
+    if (step.status !== "running" && !(status === "cancelled" && step.status === "failed")) {
       return step;
     }
     if (status === "failed" && step.type === "bash") {

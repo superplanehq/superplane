@@ -980,7 +980,7 @@ describe("splitRunFixtureForWorkOrder", () => {
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Send to backlog", "Reopen"]);
   });
 
-  it("marks a cancelled implement step as canceled, not waiting", () => {
+  it("marks a cancelled implement step as stopped, not waiting", () => {
     const fixture = splitRunFixtureForWorkOrder(
       order({
         title: "Stopped job",
@@ -995,7 +995,7 @@ describe("splitRunFixtureForWorkOrder", () => {
 
     expect(fixture.lineStatus).toBe("waiting");
     expect(fixture.phases.at(-1)?.status).toBe("cancelled");
-    expect(splitRunStatusLabel(fixture.phases.at(-1)!.status)).toBe("Canceled");
+    expect(splitRunStatusLabel(fixture.phases.at(-1)!.status)).toBe("Stopped");
     expect(fixture.footerTone).toBe("stopped");
     expect(fixture.footer.actions.map((action) => action.label)).toEqual(["Reject", "Rerun"]);
     expect(fixture.footer.note?.cta).toBeUndefined();
@@ -1904,7 +1904,7 @@ describe("line board work-order examples", () => {
     });
   });
 
-  it("keeps an explicitly stopped analysis failed when no score or plan exists", () => {
+  it("keeps an explicitly stopped analysis cancelled when no score or plan exists", () => {
     const fixture = splitRunFixtureForWorkOrder(DRAFT_WORK_ORDER, {
       demoArtifacts: false,
       analysisRuns: [
@@ -1924,7 +1924,7 @@ describe("line board work-order examples", () => {
       ],
     });
 
-    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")?.status).toBe("failed");
+    expect(fixture.phases.find((phase) => phase.id === "backlog-analysis-wo-draft-refunds")?.status).toBe("cancelled");
   });
 
   it("shows a failed analysis and its retry as one running phase", () => {

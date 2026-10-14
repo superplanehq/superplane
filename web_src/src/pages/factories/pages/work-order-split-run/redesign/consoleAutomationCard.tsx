@@ -161,6 +161,9 @@ function ConsoleCardHeader({
         aria-label={`Toggle ${automation.name} details`}
       />
       <StageStatusGlyph status={shownStatus} />
+      {shownStatus === "cancelled" ? (
+        <span className="shrink-0 text-[13px] font-medium text-muted-foreground">Stopped</span>
+      ) : null}
       {shownStatus === "queued" ? (
         <span className="shrink-0 text-[13px] font-medium text-muted-foreground">Queued</span>
       ) : null}
