@@ -55,11 +55,14 @@ letsencrypt_email = "admin@example.com"
 
 # superplane_namespace = "superplane"
 
+# Published application images are available from GitHub Container Registry.
+# superplane_image_registry = "ghcr.io/superplanehq"
+
 # Required. The plain SHA and stable images fail CORS on your domain.
 superplane_image_tag = "<git-sha>-selfhosted"
 
-# Required unless you set superplane_chart_path. Empty installs the latest
-# published chart, which may lack GKE ACME and migrate fixes.
+# Required unless you set superplane_chart_path. Terraform downloads published
+# charts from oci://ghcr.io/superplanehq/superplane-chart.
 superplane_chart_version = "0.0.0-<git-sha>"
 
 # Install the chart from this repository to test changes that are not published.
@@ -84,7 +87,12 @@ superplane_chart_version = "0.0.0-<git-sha>"
 # Step 2: after owner setup, create a personal API token and deploy Fleet Manager.
 # Do not commit the token. You can set TF_VAR_installation_admin_token instead.
 # installation_admin_token = "..."
-# fleet_manager_image_tag  = "<git-sha>"
+# fleet_manager_image_registry = "ghcr.io/superplanehq"
+# fleet_manager_image_tag      = "v0.1.0"
+
+# Download versioned Runner archives from GitHub Releases. Fleet Manager
+# replaces {version} with the exact version selected by the fleet.
+# runner_release_base_url = "https://github.com/superplanehq/superplane/releases/download/runner%2F{version}"
 
 # runner_zones       = ["us-central1-a", "us-central1-b"]
 # runner_subnet_cidr = "172.20.0.0/24"
