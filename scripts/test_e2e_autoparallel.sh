@@ -44,7 +44,7 @@ done < <(printf '%s\n' "${all_tests[@]}" | LC_ALL=C sort -u)
 all_tests=("${sorted_tests[@]}")
 
 # Use recent root-test durations so long browser scenarios do not cluster on
-# the same worker. A new test receives the median estimate until measured.
+# the same worker. A new test receives a 30-second estimate until measured.
 load_shard_weights "$(dirname "${BASH_SOURCE[0]}")/ci_e2e_test_weights.tsv"
 
 weighted_tests=()

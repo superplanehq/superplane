@@ -1,13 +1,13 @@
-# Root test durations in seconds, rounded to whole seconds. Measured from the
-# Semaphore main Go test report on 2026-10-14 (workflow ad71cc00). New tests
-# use a 30-second estimate until this file is updated.
+# E2E root estimates updated from the upper quartile of three successful
+# PR #8504 runs on 2026-10-14. Small changes keep prior weights. Refresh weekly
+# with the Semaphore Refresh test weights task. New tests use 30 seconds.
 TestAccountBlocking 50
-TestAdminDashboard 63
-TestAdminOwnerSetupPromotion 15
-TestAgentE2E 67
+TestAdminDashboard 99
+TestAdminOwnerSetupPromotion 26
+TestAgentE2E 51
 TestAgentStagingEditTransition 28
 TestAgentSuggestionsE2E 24
-TestAPIKeys 77
+TestAPIKeys 99
 TestApprovals 196
 TestCanvasAutoSave 63
 TestCanvasMultiUserStaging 60
@@ -18,20 +18,20 @@ TestCanvasPermissionGuards 45
 TestCanvasSidebarClose 17
 TestCanvasStagingCommitPromoteLive 17
 TestCanvasStagingHiddenOnLiveView 19
-TestCanvasVersionPreview 15
+TestCanvasVersionPreview 25
 TestFactories 47
 TestGitHubInstallRequest 16
-TestGitHubSSONoAccountSignup 28
-TestGoogleSSONoAccountSignup 28
-TestGroups 8
-TestHomePage 23
+TestGitHubSSONoAccountSignup 18
+TestGoogleSSONoAccountSignup 21
+TestGroups 16
+TestHomePage 33
 TestInvitations 52
 TestLinesPhaseRunFitsIntoView 9
 TestLoginPage 62
 TestMagicCodeLogin 76
 TestMembersInvitations 11
 TestOrganizationEntry 46
-TestOwnerSetupFlow 52
+TestOwnerSetupFlow 41
 TestParameterizedManualRun 13
 TestPersonalAPITokens 23
 TestRoles 9
@@ -43,6 +43,6 @@ TestSettingsAutoSave 34
 TestSettingsPermissionGuards 56
 TestSSHCommandLineEndings 3
 TestTimeGateComponent 65
-TestTriggerRunTitle 59
+TestTriggerRunTitle 73
 TestWaitComponent 58
 TestWebhookResetSecret 16

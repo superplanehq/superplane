@@ -118,6 +118,12 @@ def stable_weight(old, measured):
     return measured
 
 
+def upper_quartile(samples):
+    if len(samples) == 1:
+        return samples[0]
+    return statistics.quantiles(samples, n=4, method="inclusive")[2]
+
+
 def write_weights(path, comment, values):
     content = comment + "\n" + "".join(f"{name} {values[name]}\n" for name in sorted(values))
     if path.read_text() != content:
@@ -157,7 +163,7 @@ def refresh(history, repo, runs, minimum):
         samples = [run["e2e"][name] for run in selected if name in run["e2e"]]
         if not samples:
             raise ValueError(f"no timing for current E2E test {name}")
-        measured = max(1, math.ceil(statistics.median(samples)))
+        measured = max(1, math.ceil(upper_quartile(samples)))
         e2e[name] = stable_weight(prior_e2e.get(name), measured)
 
     unit = {}
@@ -171,9 +177,9 @@ def refresh(history, repo, runs, minimum):
             if weight >= MIN_UNIT_SECONDS:
                 unit[package] = weight
 
-    provenance = f"# Median test times from {len(selected)} successful main runs.\n# Refresh weekly with the Semaphore Refresh test weights task."
-    write_weights(e2e_path, provenance + "\n# Root E2E seconds; new tests use 30 seconds until measured.", e2e)
-    write_weights(unit_path, provenance + "\n# Extra unit package seconds above test-file count; unlisted packages use file count.", unit)
+    provenance = f"# Times from {len(selected)} successful main runs.\n# Refresh weekly with the Semaphore Refresh test weights task."
+    write_weights(e2e_path, provenance + "\n# E2E root estimates use upper-quartile seconds; small changes keep prior weights.\n# New tests use 30 seconds until measured.", e2e)
+    write_weights(unit_path, provenance + "\n# Extra unit package estimates use median seconds above test-file count.\n# Unlisted packages use file count; small changes keep prior weights.", unit)
 
 
 def main():

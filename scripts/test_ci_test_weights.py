@@ -45,20 +45,28 @@ class TestTimingRefresh(unittest.TestCase):
         self.assertEqual(summary["e2e"]["TestCase1"], 12)
         self.assertEqual(summary["unit"]["pkg/part1"], 9)
 
-    def test_median_refresh_keeps_noise_and_removes_deleted_tests(self):
+    def test_refresh_uses_upper_quartile_and_keeps_small_changes(self):
+        (self.repo / "test/e2e/example_test.go").write_text(
+            "func TestCurrent(t *testing.T) {}\n"
+            "func TestStable(t *testing.T) {}\n"
+        )
+        (self.repo / "scripts/ci_e2e_test_weights.tsv").write_text(
+            "TestCurrent 30\nTestStable 30\nTestDeleted 40\n"
+        )
         history = self.root / "history"
         history.mkdir()
-        for index, seconds in enumerate((33, 34, 90), start=1):
+        for index, (seconds, stable) in enumerate(((33, 31), (34, 34), (90, 34)), start=1):
             (history / f"{index}.json").write_text(json.dumps({
                 "sha": f"commit-{index}",
-                "e2e": {"TestCurrent": seconds},
+                "e2e": {"TestCurrent": seconds, "TestStable": stable},
                 "unit": {"pkg/example": 9},
             }))
 
         refresh(history, self.repo, runs=5, minimum=3)
         e2e = (self.repo / "scripts/ci_e2e_test_weights.tsv").read_text()
         unit = (self.repo / "scripts/ci_unit_package_weights.tsv").read_text()
-        self.assertIn("TestCurrent 30\n", e2e)
+        self.assertIn("TestCurrent 62\n", e2e)
+        self.assertIn("TestStable 30\n", e2e)
         self.assertNotIn("TestDeleted", e2e)
         self.assertIn("pkg/example 9\n", unit)
         self.assertNotIn("pkg/deleted", unit)
