@@ -117,6 +117,12 @@ variable "superplane_image_registry" {
   default     = "ghcr.io/superplanehq"
 }
 
+variable "fleet_manager_image_registry" {
+  description = "Registry that hosts the standalone Fleet Manager image. Terraform uses this value only to grant GKE node pull access for a private GCP registry."
+  type        = string
+  default     = "ghcr.io/superplanehq"
+}
+
 variable "superplane_image_tag" {
   description = "SuperPlane image tag. Must end with -selfhosted. The plain <git-sha> and stable images load UI files from the hosted CDN and fail CORS on a customer domain."
   type        = string
