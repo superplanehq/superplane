@@ -192,6 +192,7 @@ export function fleetManagerSecretCommand(namespace: string, secretName: string)
     "  --dry-run=client --output=yaml | kubectl apply -f -",
   ].join(" \\\n");
   return [
+    `kubectl create namespace ${namespace} --dry-run=client --output=yaml | kubectl apply -f -`,
     "read -rsp 'Fleet Manager token: ' FLEET_MANAGER_TOKEN; echo",
     createSecret,
     "unset FLEET_MANAGER_TOKEN",
