@@ -14,6 +14,7 @@ from pathlib import Path
 MODULE = "github.com/superplanehq/superplane/"
 E2E_ROOT = re.compile(r"^func\s+(Test[A-Za-z0-9_]*)\s*\(", re.MULTILINE)
 MIN_UNIT_SECONDS = 7
+SHARD_REPORT = re.compile(r"^([1-9][0-9]*)-of-([1-9][0-9]*)\.xml$")
 
 
 def read_report(path):
@@ -25,12 +26,24 @@ def read_report(path):
     return root
 
 
+def shard_reports(directory):
+    paths = sorted(directory.glob("*.xml"))
+    matches = [SHARD_REPORT.fullmatch(path.name) for path in paths]
+    if not paths or any(match is None for match in matches):
+        raise ValueError(f"missing or invalid shard reports in {directory}")
+    counts = {int(match.group(2)) for match in matches}
+    if len(counts) != 1:
+        raise ValueError(f"mixed shard counts in {directory}")
+    count = counts.pop()
+    expected = {f"{index}-of-{count}.xml" for index in range(1, count + 1)}
+    if {path.name for path in paths} != expected:
+        raise ValueError(f"incomplete shard reports in {directory}")
+    return paths
+
+
 def collect(reports, output, sha):
-    e2e_reports = sorted((reports / "e2e").glob("*.xml"))
-    unit_reports = sorted((reports / "unit").glob("*.xml"))
-    if ({path.name for path in e2e_reports} != {f"{index}.xml" for index in range(1, 11)}
-            or {path.name for path in unit_reports} != {f"{index}.xml" for index in range(1, 5)}):
-        raise ValueError("expected 10 E2E and 4 unit shard reports")
+    e2e_reports = shard_reports(reports / "e2e")
+    unit_reports = shard_reports(reports / "unit")
 
     e2e = {}
     unit = {}

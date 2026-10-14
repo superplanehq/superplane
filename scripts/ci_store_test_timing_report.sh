@@ -15,7 +15,7 @@ if [[ "${SEMAPHORE_JOB_RESULT:-}" != passed ]]; then
   exit 0
 fi
 
-path="ci-test-timings/${kind}/${SEMAPHORE_JOB_INDEX}.xml"
+path="ci-test-timings/${kind}/${SEMAPHORE_JOB_INDEX}-of-${SEMAPHORE_JOB_COUNT}.xml"
 mkdir -p "$(dirname "$path")"
 cp junit-report.xml "$path"
 artifact push workflow "$path" --force
