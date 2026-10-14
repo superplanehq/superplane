@@ -80,26 +80,6 @@ locals {
     }
   }) : ""
 
-  fleet_manager_values = local.fleet_manager_enabled ? yamlencode({
-    fleetManager = {
-      enabled        = true
-      existingSecret = kubernetes_secret.fleet_manager[0].metadata[0].name
-      image = {
-        registry = var.fleet_manager_image_registry
-        tag      = var.fleet_manager_image_tag
-      }
-      serviceAccount = {
-        create = true
-        name   = local.fleet_manager_service_account_name
-        annotations = {
-          "iam.gke.io/gcp-service-account" = google_service_account.fleet_manager[0].email
-        }
-      }
-      podAnnotations = {
-        "checksum/config" = sha256(local.fleet_manager_config)
-      }
-    }
-  }) : ""
 }
 
 resource "helm_release" "superplane" {
@@ -121,7 +101,6 @@ resource "helm_release" "superplane" {
   values = compact([
     local.gcs_blob_storage_values,
     local.runner_api_values,
-    local.fleet_manager_values,
   ])
 
   # Database configuration
