@@ -1795,7 +1795,8 @@ CREATE TABLE public.workflow_events (
     execution_id uuid,
     created_at timestamp without time zone NOT NULL,
     custom_name text,
-    run_id uuid NOT NULL
+    run_id uuid NOT NULL,
+    dedup_key text
 );
 
 
@@ -3876,6 +3877,13 @@ CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at)
 
 
 --
+-- Name: idx_workflow_events_dedup_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_dedup_key ON public.workflow_events USING btree (workflow_id, node_id, dedup_key) WHERE (dedup_key IS NOT NULL);
+
+
+--
 -- Name: idx_workflow_events_execution_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5665,7 +5673,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261013085910	f
+20261014121106	f
 \.
 
 

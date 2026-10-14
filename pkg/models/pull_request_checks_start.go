@@ -65,6 +65,90 @@ func (h *FactoryPRFeedbackHandler) GitHubChecksTrigger(tx *gorm.DB, repository s
 	return nil, nil
 }
 
+// Include requests whose canvas was deleted so the processor can retire them.
+func ListDuePullRequestChecksStartRequests(tx *gorm.DB) ([]CanvasNodeRequest, error) {
+	var requests []CanvasNodeRequest
+	err := tx.Where("type = ? AND state = ? AND run_at <= ?", NodeRequestTypePullRequestChecksStart, NodeExecutionRequestStatePending, time.Now()).Find(&requests).Error
+	return requests, err
+}
+
+func ListPullRequestChecksStartRequests(tx *gorm.DB, pullRequestID uuid.UUID) ([]CanvasNodeRequest, error) {
+	var requests []CanvasNodeRequest
+	err := tx.Where("type = ? AND state = ?", NodeRequestTypePullRequestChecksStart, NodeExecutionRequestStatePending).
+		Where("spec->'pull_request_checks_start'->>'pull_request_id' = ?", pullRequestID.String()).Find(&requests).Error
+	return requests, err
+}
+
+func ClaimDuePullRequestChecksStartRequest(tx *gorm.DB, id uuid.UUID, leaseUntil time.Time) (*CanvasNodeRequest, error) {
+	var request CanvasNodeRequest
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("id = ? AND type = ? AND state = ? AND run_at <= ?", id, NodeRequestTypePullRequestChecksStart, NodeExecutionRequestStatePending, time.Now()).First(&request).Error
+	if err != nil {
+		return nil, err
+	}
+	if err := request.Reschedule(tx, leaseUntil); err != nil {
+		return nil, err
+	}
+	return &request, nil
+}
+
+// CreateGitHubChecksEvent serializes startup and webhook delivery for one
+// handler revision. The same delivery stays a duplicate after the run finishes.
+// A later reopen, ready-for-review, or new push back to that revision starts again.
+func (n *CanvasNode) CreateGitHubChecksEvent(tx *gorm.DB, event *CanvasEvent) (bool, error) {
+	handler, err := FindPRFeedbackHandlerByCanvasID(tx, n.WorkflowID)
+	if err != nil {
+		return false, err
+	}
+	if handler == nil || handler.Source != FactoryPRFeedbackHandlerSourcePullRequestChecks || handler.Subject != FactoryPRFeedbackHandlerSubjectGitHubPullRequest {
+		return true, tx.Create(event).Error
+	}
+	configuredRepository, _ := n.Configuration.Data()["repository"].(string)
+	trigger, err := handler.GitHubChecksTrigger(tx, configuredRepository)
+	if err != nil {
+		return false, err
+	}
+	if trigger == nil || trigger.NodeID != n.NodeID {
+		return true, tx.Create(event).Error
+	}
+	incoming, err := checksEventIdentityFrom(event)
+	if err != nil {
+		return false, err
+	}
+	key := incoming.dedupKey()
+	event.DedupKey = &key
+	created := false
+	err = tx.Transaction(func(inner *gorm.DB) error {
+		lockKey := "pr-checks:" + n.WorkflowID.String() + ":" + n.NodeID + ":" + key
+		if err := inner.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
+			return err
+		}
+		var stored []CanvasEvent
+		if err := inner.Select("data").
+			Where("workflow_id = ? AND node_id = ? AND dedup_key = ?", n.WorkflowID, n.NodeID, key).
+			Find(&stored).Error; err != nil {
+			return err
+		}
+		known := make([]checksEventIdentity, 0, len(stored))
+		for i := range stored {
+			identity, err := checksEventIdentityFrom(&stored[i])
+			if err != nil {
+				return err
+			}
+			known = append(known, identity)
+		}
+		if checksEventIsDuplicate(known, incoming) {
+			return nil
+		}
+		if err := inner.Create(event).Error; err != nil {
+			return err
+		}
+		created = true
+		return nil
+	})
+	return created, err
+}
+
 func (p *FactoryPullRequest) enqueueChecksStart(tx *gorm.DB) error {
 	if p.Provider != FactoryPullRequestProviderGitHub || p.State != FactoryPullRequestStateOpen {
 		return nil
@@ -98,59 +182,32 @@ func (p *FactoryPullRequest) enqueueChecksStart(tx *gorm.DB) error {
 	return nil
 }
 
-// Include requests whose canvas was deleted so the processor can retire them.
-func ListDuePullRequestChecksStartRequests(tx *gorm.DB) ([]CanvasNodeRequest, error) {
-	var requests []CanvasNodeRequest
-	err := tx.Where("type = ? AND state = ? AND run_at <= ?", NodeRequestTypePullRequestChecksStart, NodeExecutionRequestStatePending, time.Now()).Find(&requests).Error
-	return requests, err
+type checksEventIdentity struct {
+	repository   string
+	number       string
+	sha          string
+	action       string
+	before       string
+	updatedAt    time.Time
+	hasUpdatedAt bool
 }
 
-func ListPullRequestChecksStartRequests(tx *gorm.DB, pullRequestID uuid.UUID) ([]CanvasNodeRequest, error) {
-	var requests []CanvasNodeRequest
-	err := tx.Where("type = ? AND state = ?", NodeRequestTypePullRequestChecksStart, NodeExecutionRequestStatePending).
-		Where("spec->'pull_request_checks_start'->>'pull_request_id' = ?", pullRequestID.String()).Find(&requests).Error
-	return requests, err
+func (identity checksEventIdentity) dedupKey() string {
+	return identity.repository + "|" + identity.number + "|" + identity.sha
 }
 
-func ClaimDuePullRequestChecksStartRequest(tx *gorm.DB, id uuid.UUID, leaseUntil time.Time) (*CanvasNodeRequest, error) {
-	var request CanvasNodeRequest
-	err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("id = ? AND type = ? AND state = ? AND run_at <= ?", id, NodeRequestTypePullRequestChecksStart, NodeExecutionRequestStatePending, time.Now()).First(&request).Error
-	if err != nil {
-		return nil, err
-	}
-	if err := request.Reschedule(tx, leaseUntil); err != nil {
-		return nil, err
-	}
-	return &request, nil
-}
-
-// CreateGitHubChecksEvent serializes startup and webhook delivery for the same
-// handler revision. Routed events remain part of the identity check.
-func (n *CanvasNode) CreateGitHubChecksEvent(tx *gorm.DB, event *CanvasEvent) (bool, error) {
-	handler, err := FindPRFeedbackHandlerByCanvasID(tx, n.WorkflowID)
-	if err != nil {
-		return false, err
-	}
-	if handler == nil || handler.Source != FactoryPRFeedbackHandlerSourcePullRequestChecks || handler.Subject != FactoryPRFeedbackHandlerSubjectGitHubPullRequest {
-		return true, tx.Create(event).Error
-	}
-	configuredRepository, _ := n.Configuration.Data()["repository"].(string)
-	trigger, err := handler.GitHubChecksTrigger(tx, configuredRepository)
-	if err != nil {
-		return false, err
-	}
-	if trigger == nil || trigger.NodeID != n.NodeID {
-		return true, tx.Create(event).Error
-	}
+func checksEventIdentityFrom(event *CanvasEvent) (checksEventIdentity, error) {
 	var payload struct {
 		Data struct {
+			Action     string `json:"action"`
+			Before     string `json:"before"`
 			Repository struct {
 				FullName string `json:"full_name"`
 			} `json:"repository"`
 			PullRequest struct {
-				Number int64 `json:"number"`
-				Head   struct {
+				Number    int64  `json:"number"`
+				UpdatedAt string `json:"updated_at"`
+				Head      struct {
 					SHA string `json:"sha"`
 				} `json:"head"`
 			} `json:"pull_request"`
@@ -158,40 +215,99 @@ func (n *CanvasNode) CreateGitHubChecksEvent(tx *gorm.DB, event *CanvasEvent) (b
 	}
 	raw, err := event.Data.MarshalJSON()
 	if err != nil {
-		return false, err
+		return checksEventIdentity{}, err
 	}
 	if err := json.Unmarshal(raw, &payload); err != nil {
-		return false, fmt.Errorf("decode checks startup identity: %w", err)
+		return checksEventIdentity{}, fmt.Errorf("decode checks startup identity: %w", err)
 	}
 	repository := strings.ToLower(strings.TrimSpace(payload.Data.Repository.FullName))
-	number := strconv.FormatInt(payload.Data.PullRequest.Number, 10)
 	sha := strings.TrimSpace(payload.Data.PullRequest.Head.SHA)
 	if repository == "" || payload.Data.PullRequest.Number <= 0 || sha == "" {
-		return false, errors.New("GitHub checks event has no repository, PR number, or head SHA")
+		return checksEventIdentity{}, errors.New("GitHub checks event has no repository, PR number, or head SHA")
 	}
-	created := false
-	err = tx.Transaction(func(inner *gorm.DB) error {
-		lockKey := "pr-checks:" + n.WorkflowID.String() + ":" + n.NodeID + ":" + repository + ":" + number + ":" + sha
-		if err := inner.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
-			return err
+	updatedAt, hasUpdatedAt := parseChecksUpdatedAt(payload.Data.PullRequest.UpdatedAt)
+	return checksEventIdentity{
+		repository:   repository,
+		number:       strconv.FormatInt(payload.Data.PullRequest.Number, 10),
+		sha:          sha,
+		action:       strings.TrimSpace(payload.Data.Action),
+		before:       strings.TrimSpace(payload.Data.Before),
+		updatedAt:    updatedAt,
+		hasUpdatedAt: hasUpdatedAt,
+	}, nil
+}
+
+func parseChecksUpdatedAt(value string) (time.Time, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return time.Time{}, false
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed.UTC(), true
+}
+
+func checksEventIsDuplicate(stored []checksEventIdentity, incoming checksEventIdentity) bool {
+	if len(stored) == 0 {
+		return false
+	}
+	for _, event := range stored {
+		if sameChecksDelivery(event, incoming) {
+			return true
 		}
-		var count int64
-		if err := inner.Model(&CanvasEvent{}).
-			Where("workflow_id = ? AND node_id = ?", n.WorkflowID, n.NodeID).
-			Where("data->>'type' = ?", "github.pullRequest").
-			Where("lower(data #>> '{data,repository,full_name}') = ?", repository).
-			Where("data #>> '{data,pull_request,number}' = ?", number).
-			Where("data #>> '{data,pull_request,head,sha}' = ?", sha).Count(&count).Error; err != nil {
-			return err
+	}
+	if checksEventIsLaterLifecycle(stored, incoming) {
+		return false
+	}
+	return true
+}
+
+func sameChecksDelivery(left, right checksEventIdentity) bool {
+	if left.action != right.action || left.before != right.before || left.hasUpdatedAt != right.hasUpdatedAt {
+		return false
+	}
+	if !left.hasUpdatedAt {
+		return true
+	}
+	return left.updatedAt.Equal(right.updatedAt)
+}
+
+func checksEventIsLaterLifecycle(stored []checksEventIdentity, incoming checksEventIdentity) bool {
+	switch incoming.action {
+	case "reopened", "ready_for_review":
+		return true
+	case "synchronize":
+		if incoming.before == "" || !incoming.hasUpdatedAt {
+			return false
 		}
-		if count > 0 {
-			return nil
+		for _, event := range stored {
+			if event.action == "synchronize" && event.before == incoming.before {
+				return false
+			}
 		}
-		if err := inner.Create(event).Error; err != nil {
-			return err
+		newest, ok := newestChecksUpdatedAt(stored)
+		if !ok {
+			return false
 		}
-		created = true
-		return nil
-	})
-	return created, err
+		return incoming.updatedAt.After(newest)
+	default:
+		return false
+	}
+}
+
+func newestChecksUpdatedAt(stored []checksEventIdentity) (time.Time, bool) {
+	var newest time.Time
+	found := false
+	for _, event := range stored {
+		if !event.hasUpdatedAt {
+			continue
+		}
+		if !found || event.updatedAt.After(newest) {
+			newest = event.updatedAt
+			found = true
+		}
+	}
+	return newest, found
 }

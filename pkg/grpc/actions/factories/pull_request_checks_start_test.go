@@ -377,12 +377,59 @@ func emitChecksStartupWebhook(t *testing.T, node *models.CanvasNode, payload map
 	headers.Set("X-Hub-Signature-256", "sha256="+fmt.Sprintf("%x", mac.Sum(nil)))
 	code, _, err := (&pulls.OnPullRequest{}).HandleWebhook(core.WebhookRequestContext{
 		Body: body, Headers: headers, Logger: log.NewEntry(log.New()),
-		Configuration: pulls.OnPullRequestConfiguration{Repository: "acme/app", Actions: []string{"opened", "synchronize"}},
+		Configuration: pulls.OnPullRequestConfiguration{Repository: "acme/app", Actions: []string{"opened", "synchronize", "reopened"}},
 		Webhook:       &testcontexts.NodeWebhookContext{Secret: "test-secret"},
 		Events:        contexts.NewEventContext(database.DB(t.Context()), node, nil, nil),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
+}
+
+func TestPullRequestChecksRestartAfterLifecycleChange(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	_, order, pullRequest, canvas, request := checksStartupFixture(t, r)
+	attachedAt := time.Now().Add(-time.Hour).UTC().Truncate(time.Second)
+	current := checksStartupGitHubPullRequest()
+	current.UpdatedAt = &github.Timestamp{Time: attachedAt}
+	useGitHub(t, current)
+	events, err := ProcessPullRequestChecksStartRequest(t.Context(), IntakeDependencies{}, request.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.NoError(t, db.Model(&events[0]).Update("state", models.CanvasEventStateRouted).Error)
+	require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", events[0].RunID).Update("state", models.CanvasRunStateFinished).Error)
+	node, err := models.FindCanvasNode(db, canvas.ID, "renamed-pr-trigger")
+	require.NoError(t, err)
+
+	emitChecksStartupWebhook(t, node, checksLifecyclePayload(t, pullRequest, order, current, "synchronize", "1111111111111111111111111111111111111111", attachedAt))
+	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID), "delayed synchronize for the attached head")
+
+	reopenedAt := attachedAt.Add(time.Minute)
+	emitChecksStartupWebhook(t, node, checksLifecyclePayload(t, pullRequest, order, current, "reopened", "", reopenedAt))
+	assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID))
+	emitChecksStartupWebhook(t, node, checksLifecyclePayload(t, pullRequest, order, current, "reopened", "", reopenedAt))
+	assert.EqualValues(t, 2, countCanvasEvents(t, canvas.ID), "repeated reopen delivery")
+
+	returnedAt := reopenedAt.Add(time.Minute)
+	returned := checksLifecyclePayload(t, pullRequest, order, current, "synchronize", "2222222222222222222222222222222222222222", returnedAt)
+	emitChecksStartupWebhook(t, node, returned)
+	assert.EqualValues(t, 3, countCanvasEvents(t, canvas.ID))
+	emitChecksStartupWebhook(t, node, returned)
+	assert.EqualValues(t, 3, countCanvasEvents(t, canvas.ID), "repeated push delivery")
+}
+
+func checksLifecyclePayload(t *testing.T, pullRequest *models.FactoryPullRequest, order *models.FactoryWorkOrder, current *github.PullRequest, action, before string, updatedAt time.Time) map[string]any {
+	t.Helper()
+	revision := *current
+	revision.UpdatedAt = &github.Timestamp{Time: updatedAt}
+	payload, err := pullRequestChecksEventData(pullRequest, order, &revision)
+	require.NoError(t, err)
+	payload["action"] = action
+	if before != "" {
+		payload["before"] = before
+		payload["after"] = revision.GetHead().GetSHA()
+	}
+	return payload
 }
 
 func TestPullRequestChecksStartupAttachmentEntries(t *testing.T) {
