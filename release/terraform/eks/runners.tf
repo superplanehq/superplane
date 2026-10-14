@@ -82,8 +82,23 @@ resource "aws_iam_role_policy" "fleet_manager" {
       {
         Sid      = "CreateRunnerInstances"
         Effect   = "Allow"
-        Action   = ["ec2:RunInstances", "ec2:CreateTags"]
+        Action   = ["ec2:RunInstances"]
         Resource = "*"
+      },
+      {
+        Sid    = "TagRunnerResourcesDuringLaunch"
+        Effect = "Allow"
+        Action = ["ec2:CreateTags"]
+        Resource = [
+          "arn:aws:ec2:${var.region}:${data.aws_caller_identity.current.account_id}:instance/*",
+          "arn:aws:ec2:${var.region}:${data.aws_caller_identity.current.account_id}:volume/*"
+        ]
+        Condition = {
+          StringEquals = {
+            "ec2:CreateAction"    = "RunInstances"
+            "aws:RequestTag/Name" = "superplane-runner"
+          }
+        }
       },
       {
         Sid      = "TerminateManagedRunnerInstances"
