@@ -94,7 +94,8 @@ func ClaimDuePullRequestChecksStartRequest(tx *gorm.DB, id uuid.UUID, leaseUntil
 
 // CreateGitHubChecksEvent serializes startup and webhook delivery for one
 // handler revision. The same delivery stays a duplicate after the run finishes.
-// A later reopen, ready-for-review, or new push back to that revision starts again.
+// A later reopen, ready-for-review, or new push starts again only when its
+// pull request time is newer than the stored snapshot.
 func (n *CanvasNode) CreateGitHubChecksEvent(tx *gorm.DB, event *CanvasEvent) (bool, error) {
 	handler, err := FindPRFeedbackHandlerByCanvasID(tx, n.WorkflowID)
 	if err != nil {
@@ -121,6 +122,9 @@ func (n *CanvasNode) CreateGitHubChecksEvent(tx *gorm.DB, event *CanvasEvent) (b
 	err = tx.Transaction(func(inner *gorm.DB) error {
 		lockKey := "pr-checks:" + n.WorkflowID.String() + ":" + n.NodeID + ":" + key
 		if err := inner.Exec("SELECT pg_advisory_xact_lock(hashtext(?))", lockKey).Error; err != nil {
+			return err
+		}
+		if err := repairLegacyChecksDedupKeys(inner, n, key, incoming); err != nil {
 			return err
 		}
 		var stored []CanvasEvent
@@ -194,6 +198,20 @@ type checksEventIdentity struct {
 
 func (identity checksEventIdentity) dedupKey() string {
 	return identity.repository + "|" + identity.number + "|" + identity.sha
+}
+
+// Events stored before dedup_key existed still match the previous JSON lookup.
+// Copy the key onto those rows so the next delivery uses the indexed column.
+func repairLegacyChecksDedupKeys(tx *gorm.DB, node *CanvasNode, key string, incoming checksEventIdentity) error {
+	return tx.Exec(`
+		UPDATE workflow_events
+		SET dedup_key = ?
+		WHERE workflow_id = ? AND node_id = ? AND dedup_key IS NULL
+		  AND data ->> 'type' = 'github.pullRequest'
+		  AND lower(data #>> '{data,repository,full_name}') = ?
+		  AND data #>> '{data,pull_request,number}' = ?
+		  AND data #>> '{data,pull_request,head,sha}' = ?
+	`, key, node.WorkflowID, node.NodeID, incoming.repository, incoming.number, incoming.sha).Error
 }
 
 func checksEventIdentityFrom(event *CanvasEvent) (checksEventIdentity, error) {
@@ -276,15 +294,18 @@ func sameChecksDelivery(left, right checksEventIdentity) bool {
 
 func checksEventIsLaterLifecycle(stored []checksEventIdentity, incoming checksEventIdentity) bool {
 	switch incoming.action {
-	case "reopened", "ready_for_review":
-		return true
-	case "synchronize":
-		if incoming.before == "" || !incoming.hasUpdatedAt {
+	case "reopened", "ready_for_review", "synchronize":
+		if !incoming.hasUpdatedAt {
 			return false
 		}
-		for _, event := range stored {
-			if event.action == "synchronize" && event.before == incoming.before {
+		if incoming.action == "synchronize" {
+			if incoming.before == "" {
 				return false
+			}
+			for _, event := range stored {
+				if event.action == "synchronize" && event.before == incoming.before {
+					return false
+				}
 			}
 		}
 		newest, ok := newestChecksUpdatedAt(stored)

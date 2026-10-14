@@ -7,6 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -377,7 +380,7 @@ func emitChecksStartupWebhook(t *testing.T, node *models.CanvasNode, payload map
 	headers.Set("X-Hub-Signature-256", "sha256="+fmt.Sprintf("%x", mac.Sum(nil)))
 	code, _, err := (&pulls.OnPullRequest{}).HandleWebhook(core.WebhookRequestContext{
 		Body: body, Headers: headers, Logger: log.NewEntry(log.New()),
-		Configuration: pulls.OnPullRequestConfiguration{Repository: "acme/app", Actions: []string{"opened", "synchronize", "reopened"}},
+		Configuration: pulls.OnPullRequestConfiguration{Repository: "acme/app", Actions: []string{"opened", "synchronize", "reopened", "ready_for_review"}},
 		Webhook:       &testcontexts.NodeWebhookContext{Secret: "test-secret"},
 		Events:        contexts.NewEventContext(database.DB(t.Context()), node, nil, nil),
 	})
@@ -403,6 +406,13 @@ func TestPullRequestChecksRestartAfterLifecycleChange(t *testing.T) {
 
 	emitChecksStartupWebhook(t, node, checksLifecyclePayload(t, pullRequest, order, current, "synchronize", "1111111111111111111111111111111111111111", attachedAt))
 	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID), "delayed synchronize for the attached head")
+
+	emitChecksStartupWebhook(t, node, checksLifecyclePayload(t, pullRequest, order, current, "reopened", "", attachedAt))
+	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID), "reopened webhook for the attached snapshot")
+	emitChecksStartupWebhook(t, node, checksLifecyclePayload(t, pullRequest, order, current, "reopened", "", attachedAt.Add(-time.Minute)))
+	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID), "older reopened webhook")
+	emitChecksStartupWebhook(t, node, checksLifecyclePayload(t, pullRequest, order, current, "ready_for_review", "", attachedAt))
+	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID), "ready for review webhook for the attached snapshot")
 
 	reopenedAt := attachedAt.Add(time.Minute)
 	emitChecksStartupWebhook(t, node, checksLifecyclePayload(t, pullRequest, order, current, "reopened", "", reopenedAt))
@@ -430,6 +440,60 @@ func checksLifecyclePayload(t *testing.T, pullRequest *models.FactoryPullRequest
 		payload["after"] = revision.GetHead().GetSHA()
 	}
 	return payload
+}
+
+func TestPullRequestChecksLegacyEventStaysDuplicate(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	_, order, pullRequest, canvas, request := checksStartupFixture(t, r)
+	current := checksStartupGitHubPullRequest()
+	current.UpdatedAt = &github.Timestamp{Time: time.Now().Add(-time.Hour).UTC().Truncate(time.Second)}
+	useGitHub(t, current)
+	events, err := ProcessPullRequestChecksStartRequest(t.Context(), IntakeDependencies{}, request.ID)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.NoError(t, db.Model(&events[0]).Update("state", models.CanvasEventStateRouted).Error)
+	require.NoError(t, db.Model(&models.CanvasRun{}).Where("id = ?", events[0].RunID).Update("state", models.CanvasRunStateFinished).Error)
+	require.NoError(t, db.Exec("UPDATE workflow_events SET dedup_key = NULL WHERE id = ?", events[0].ID).Error)
+	node, err := models.FindCanvasNode(db, canvas.ID, "renamed-pr-trigger")
+	require.NoError(t, err)
+	payload, err := pullRequestChecksEventData(pullRequest, order, current)
+	require.NoError(t, err)
+	attachedAt := current.GetUpdatedAt().Time
+
+	emitChecksStartupWebhook(t, node, checksLifecyclePayload(t, pullRequest, order, current, "reopened", "", attachedAt))
+	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID), "legacy reopened webhook for the attached snapshot")
+	emitChecksStartupWebhook(t, node, payload)
+	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID), "legacy event with no dedup key")
+	var restored models.CanvasEvent
+	require.NoError(t, db.Where("id = ?", events[0].ID).First(&restored).Error)
+	require.NotNil(t, restored.DedupKey)
+	assert.Equal(t, "acme/app|42|"+current.GetHead().GetSHA(), *restored.DedupKey)
+
+	require.NoError(t, db.Exec("UPDATE workflow_events SET dedup_key = NULL WHERE id = ?", events[0].ID).Error)
+	applyChecksDedupBackfill(t, db)
+	require.NoError(t, db.Where("id = ?", events[0].ID).First(&restored).Error)
+	require.NotNil(t, restored.DedupKey)
+	assert.Equal(t, "acme/app|42|"+current.GetHead().GetSHA(), *restored.DedupKey)
+	emitChecksStartupWebhook(t, node, payload)
+	assert.EqualValues(t, 1, countCanvasEvents(t, canvas.ID), "backfilled legacy event")
+}
+
+func applyChecksDedupBackfill(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	path := filepath.Join(filepath.Dir(filename), "..", "..", "..", "..", "db", "migrations", "20261014121106_index-workflow-event-checks-dedup.up.sql")
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	sqlText := string(raw)
+	start := strings.Index(sqlText, "UPDATE ")
+	require.NotEqual(t, -1, start)
+	update := sqlText[start:]
+	if end := strings.Index(update, "CREATE INDEX"); end >= 0 {
+		update = update[:end]
+	}
+	require.NoError(t, db.Exec(strings.TrimSpace(update)).Error)
 }
 
 func TestPullRequestChecksStartupAttachmentEntries(t *testing.T) {

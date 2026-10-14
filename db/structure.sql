@@ -3891,6 +3891,13 @@ CREATE INDEX idx_workflow_events_execution_id ON public.workflow_events USING bt
 
 
 --
+-- Name: idx_workflow_events_legacy_pull_request; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_legacy_pull_request ON public.workflow_events USING btree (workflow_id, node_id) WHERE ((dedup_key IS NULL) AND ((data ->> 'type'::text) = 'github.pullRequest'::text));
+
+
+--
 -- Name: idx_workflow_events_run_id_state; Type: INDEX; Schema: public; Owner: -
 --
 
