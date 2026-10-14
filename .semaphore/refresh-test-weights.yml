@@ -1,0 +1,27 @@
+version: v1.0
+name: Refresh test weights
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+
+queue:
+  name: ci-test-weight-refresh
+  scope: project
+  processing: serialized
+
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+  secrets:
+    - name: github-release-token
+
+blocks:
+  - name: Refresh
+    task:
+      jobs:
+        - name: Propose measured test weights
+          commands:
+            - artifact pull project ci-test-timings
+            - bash scripts/ci_refresh_test_weights.sh
