@@ -75,10 +75,10 @@ The AWS integration uses OpenID Connect. When running locally, AWS IAM needs an 
 
 Factory workspace setup installs a GitHub App. Cloud holds the public
 SuperPlane app in `SUPERPLANE_GITHUB_APP_*`. Self-host and local development
-can create a GitHub App from the workspace Connect screen. That app stays
-private to the GitHub account that creates it. SuperPlane stores the
-credentials on the installation. You do not need Helm or `.env` values for
-the process app.
+can create a GitHub App from the workspace Connect screen. GitHub marks
+that app public. Other accounts can install it. It is not listed in
+GitHub Marketplace. SuperPlane stores the credentials on the
+installation. You do not need Helm or `.env` values for the process app.
 
 A stable public tunnel is still required. GitHub must reach setup and
 webhook URLs on this SuperPlane instance.
@@ -103,7 +103,7 @@ above if you still need to expose `localhost:8000`.
 1. Open `/onboarding` or create a workspace.
 2. SuperPlane opens the workspace wizard. The Connect screen shows
    **Create GitHub App** when this installation has no process app.
-3. Create the GitHub App. The app stays private. GitHub returns to
+3. Create the GitHub App. The app is public. GitHub returns to
    Connect. Then install the app on a GitHub organization and choose the
    repository.
 
@@ -129,7 +129,7 @@ installation row.
    Disable **Request user authorization (OAuth) during installation**. The
    GitHub App does not authorize users.
 
-5. Grant repository permissions that match the private-app manifest:
+5. Grant repository permissions that match the workspace GitHub App manifest:
    - Issues: Read and write
    - Actions: Read and write
    - Checks: Read-only
@@ -151,8 +151,8 @@ installation row.
    subscribe to installation or installation_repositories events.
 
 6. Create the app.
-7. Leave the app **private**. Self-host and local development install the
-   app only on GitHub accounts that the owner controls. Cloud keeps the
+7. Make the app public. Other GitHub accounts can then install it.
+   This does not list the app in GitHub Marketplace. Cloud keeps the
    public SuperPlane app in `SUPERPLANE_GITHUB_APP_*`.
 8. Generate a private key and download the PEM file.
 9. Copy the App ID and slug from the app page.
