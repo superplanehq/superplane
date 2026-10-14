@@ -227,13 +227,18 @@ func TestAttachWorkspaceAgentResourcesWritesInlineSkills(t *testing.T) {
 	environment, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
 		OrganizationID: r.Organization.ID.String(),
 		WorkflowID:     canvas.ID.String(),
-	}, nil, nil)
+	}, nil, []runner.BrokerTaskFile{
+		{Path: "prompts/refine.txt", Content: "Refine the request.\n", Mode: "0644"},
+		{Path: "prompts/implement.txt", Content: "Implement the plan.\n\n", Mode: "0644"},
+	})
 	assert.Empty(t, environment)
-	require.Len(t, files, 2)
-	assert.Equal(t, ".claude/skills/review-copy/SKILL.md", files[0].Path)
-	assert.Equal(t, ".agents/skills/review-copy/SKILL.md", files[1].Path)
-	assert.Equal(t, "# Review copy\n\nWrite STE UI copy.\n", files[0].Content)
-	assert.Equal(t, files[0].Content, files[1].Content)
+	require.Len(t, files, 4)
+	assert.Equal(t, "Refine the request.\n", files[0].Content)
+	assert.Equal(t, "Implement the plan.\n\n", files[1].Content)
+	assert.Equal(t, ".claude/skills/review-copy/SKILL.md", files[2].Path)
+	assert.Equal(t, ".agents/skills/review-copy/SKILL.md", files[3].Path)
+	assert.Equal(t, "# Review copy\n\nWrite STE UI copy.\n", files[2].Content)
+	assert.Equal(t, files[2].Content, files[3].Content)
 }
 
 func TestAttachWorkspaceAgentResourcesWritesMCPAndSkills(t *testing.T) {
@@ -310,7 +315,8 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledIDsAndHintsPrompts(t *testing
 	assert.Equal(t, "prompts/implement.txt", files[0].Path)
 	assert.Contains(t, files[0].Content, "You can use these resources.")
 	assert.Contains(t, files[0].Content, "MCP servers: "+kept.Name)
-	assert.Contains(t, files[0].Content, "Skills: review-copy")
+	assert.NotContains(t, files[0].Content, "Skills:")
+	assert.NotContains(t, files[0].Content, "review-copy")
 	assert.NotContains(t, files[0].Content, "linear")
 	assert.Equal(t, runner.WorkspaceMCPConfigPath, files[1].Path)
 	var payload struct {
