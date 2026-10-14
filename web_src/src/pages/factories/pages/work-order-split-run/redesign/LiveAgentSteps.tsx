@@ -137,7 +137,7 @@ function useLiveAgentRun(stage: AutomationStage, phase: SplitRunPhase | undefine
     () => settleStoppedSteps(agentStepsFromNotes(transcriptNotes, runStatus, stream), stoppedStatus),
     [runStatus, stream, transcriptNotes, stoppedStatus],
   );
-  const failedNodes = useMemo(() => failedNonRunnerErrors(stream), [stream]);
+  const failedNodes = useMemo(() => failedNonRunnerErrors(stream, phase?.status), [phase?.status, stream]);
   const runningRunner = [...runners].reverse().find((line) => line.status === "running" && Boolean(line.executionId));
   const running = Boolean(runningRunner);
   const liveActivity = activityFromTranscript(runningRunner ? (liveByLine[runningRunner.id]?.activities ?? []) : []);

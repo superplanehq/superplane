@@ -276,6 +276,57 @@ describe("LiveAgentSteps finished runs", () => {
     expect(screen.queryByText("No steps for this run.")).not.toBeInTheDocument();
   });
 
+  it("hides the red failure alert when a cancelled run has a failed child", async () => {
+    vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
+      enabled: true,
+      isError: false,
+      isLoading: false,
+      canvas: undefined,
+      rootEventId: undefined,
+      stream: [
+        {
+          id: "upload",
+          nodeId: "upload",
+          at: "09:00:01",
+          componentName: "Upload evidence",
+          status: "failed",
+          action: "failed",
+          kind: "action",
+          detail: "upload failed",
+        },
+      ],
+    });
+    const stage = {
+      ...implementStage(),
+      status: "cancelled" as const,
+      agentSteps: [
+        {
+          id: "upload",
+          title: "Upload evidence",
+          type: "node" as const,
+          status: "failed" as const,
+          summary: "",
+          toolCount: 0,
+          events: [],
+        },
+      ],
+    };
+
+    render(
+      <LiveAgentSteps
+        stage={stage}
+        phase={{ ...implementPhase(), status: "cancelled" as const }}
+        organizationId="org-1"
+        expandSteps
+      />,
+    );
+
+    expect(await screen.findByText("Stopped")).toBeInTheDocument();
+    expect(screen.getByText("Upload evidence")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("upload failed")).not.toBeInTheDocument();
+  });
+
   it("shows the dedicated error below agent steps when a non-runner also failed", async () => {
     vi.mocked(useSplitRunLiveCanvas).mockReturnValue({
       enabled: true,
