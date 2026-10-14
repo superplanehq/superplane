@@ -76,11 +76,6 @@ resource "helm_release" "superplane" {
       error_message = "With a local chart (helm_chart_path), set superplane_image_tag. The local Chart.yaml appVersion (0.1.0) is a placeholder, not a published image."
     }
 
-    # fleet_manager_config is sensitive. The enabled local is the same empty check the secret count uses.
-    precondition {
-      condition     = !local.fleet_manager_enabled || var.fleet_manager_image_tag != ""
-      error_message = "Set fleet_manager_image_tag when fleet_manager_config is set."
-    }
   }
 
   set {
@@ -270,59 +265,6 @@ resource "helm_release" "superplane" {
     name  = "podLabels.azure\\.workload\\.identity/use"
     value = "true"
     type  = "string"
-  }
-
-  set {
-    name  = "fleetManager.enabled"
-    value = local.fleet_manager_enabled ? "true" : "false"
-  }
-
-  set {
-    name  = "fleetManager.image.registry"
-    value = local.fleet_manager_image_registry
-  }
-
-  set {
-    name  = "fleetManager.image.name"
-    value = var.fleet_manager_image_name
-  }
-
-  set {
-    name  = "fleetManager.image.tag"
-    value = var.fleet_manager_image_tag
-  }
-
-  set {
-    name  = "fleetManager.existingSecret"
-    value = local.fleet_manager_enabled ? kubernetes_secret.fleet_manager[0].metadata[0].name : ""
-  }
-
-  set {
-    name  = "fleetManager.serviceAccount.create"
-    value = "true"
-  }
-
-  set {
-    name  = "fleetManager.serviceAccount.name"
-    value = "${var.cluster_name}-fleet-manager"
-  }
-
-  set {
-    name  = "fleetManager.serviceAccount.annotations.azure\\.workload\\.identity/client-id"
-    value = azurerm_user_assigned_identity.fleet_manager.client_id
-  }
-
-  set {
-    name  = "fleetManager.podLabels.azure\\.workload\\.identity/use"
-    value = "true"
-    type  = "string"
-  }
-
-  # The config stays sensitive. Only the checksum is safe to publish.
-  # A changed checksum restarts Fleet Manager so it loads the new file.
-  set {
-    name  = "fleetManager.podAnnotations.checksum/config"
-    value = nonsensitive(sha256(var.fleet_manager_config))
   }
 
   set {
