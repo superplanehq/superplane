@@ -50,6 +50,11 @@ export const LowConfidenceQuestions: Story = {
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "questions" },
 };
 
+export const SingleQuestionWithSkip: Story = {
+  name: "One question · Skip available",
+  args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "questions", singleQuestion: true },
+};
+
 export const LowConfidenceQuestionsWithoutPlan: Story = {
   name: "Two checks need review · questions, no plan",
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "questions", hasPlan: false },
@@ -58,6 +63,11 @@ export const LowConfidenceQuestionsWithoutPlan: Story = {
 export const LowConfidenceSummary: Story = {
   name: "Two checks need review · summary and plan",
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "message" },
+};
+
+export const LowClaritySummary: Story = {
+  name: "Clarity critical · one review warning",
+  args: { scores: { clarity: 1, complexity: 3, verifiability: 2 }, response: "message" },
 };
 
 export const ReadyPlan: Story = {
@@ -78,4 +88,9 @@ export const LowClarityQuestions: Story = {
 export const UpdatingPlan: Story = {
   name: "Updating a plan with previous scores",
   args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "updating" },
+};
+
+export const CreatingPlanWithoutPlan: Story = {
+  name: "Creating the first plan · no Start",
+  args: { scores: { clarity: 2, complexity: 3, verifiability: 2 }, response: "updating", hasPlan: false },
 };

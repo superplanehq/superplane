@@ -12,7 +12,7 @@ export const CREATE_WITH_AGENT_COPY = {
   youSurvey: "Answer",
   surveyAnswerSkipped: "Skipped",
   request: "Request",
-  surveyHeader: "Agent question",
+  sendAnswer: "Send answer",
   sendAnswers: "Send answers",
   skipSurvey: "Skip",
   previousQuestion: "Previous",
