@@ -246,9 +246,9 @@ contractions, slang, or idioms).
   imperative, capitalized summary with no trailing period
   (e.g. `feat: Add empty-state copy for integrations`).
 - PR descriptions must explain **why** the change exists (problem, motivation,
-  user/system impact), not narrate the diff. Use a short STE Summary plus a
-  concrete STE Test plan checklist. Avoid empty or placeholder bodies when
-  context matters.
+  user/system impact), not narrate the diff. Use a short STE Summary only.
+  Do not add a Test plan or other checklist of checks that the author already ran.
+  Avoid empty or placeholder bodies when context matters.
 - Commit subjects use the same imperative style; put motivation and trade-offs
   in the body. Separate subject and body with a blank line; wrap the body at
   72 characters.

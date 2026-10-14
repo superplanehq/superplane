@@ -26,7 +26,7 @@ for agents, not a substitute for the official document.
 
 | Text | STE mode |
 | --- | --- |
-| PR description Summary and Test plan | Descriptive + procedural |
+| PR description Summary | Descriptive |
 | Commit message **body** | Descriptive |
 | UI labels, buttons, helper text, empty states, errors, confirmations | Procedural / short descriptive |
 | Docs, runbooks, onboarding steps | Procedural and/or descriptive |
@@ -79,7 +79,7 @@ for agents, not a substitute for the official document.
 
 ### Procedural pattern
 
-When the reader must do something (test plan, UI steps, recovery text):
+When the reader must do something (UI steps, recovery text):
 
 ```text
 If the condition is true, do the action.
