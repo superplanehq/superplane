@@ -128,10 +128,14 @@ Manager and inspect any runner instances that remain:
 ```bash
 FLEET_MANAGER_NAMESPACE=superplane # Use the namespace from the chart installation.
 FLEET_MANAGER_ID=$(helm get values fleet-manager -n "$FLEET_MANAGER_NAMESPACE" --all --output json | jq -er '.manager.id')
+RUNNER_INSTANCE_PROFILE_ARN=$(aws iam get-instance-profile \
+  --instance-profile-name "$(terraform output -raw runner_instance_profile_name)" \
+  --query 'InstanceProfile.Arn' --output text)
 helm uninstall fleet-manager -n "$FLEET_MANAGER_NAMESPACE"
 
 aws ec2 describe-instances --region "$AWS_REGION" \
   --filters "Name=tag:superplane_fleet_manager_id,Values=${FLEET_MANAGER_ID}" \
+    "Name=iam-instance-profile.arn,Values=${RUNNER_INSTANCE_PROFILE_ARN}" \
     "Name=instance-state-name,Values=pending,running,stopping,stopped" \
   --query 'Reservations[].Instances[].[InstanceId,State.Name,PrivateIpAddress]' \
   --output table
@@ -143,6 +147,7 @@ wait for any remaining instances before you create the Terraform destroy plan:
 ```bash
 read -r -a RUNNER_INSTANCE_IDS <<< "$(aws ec2 describe-instances --region "$AWS_REGION" \
   --filters "Name=tag:superplane_fleet_manager_id,Values=${FLEET_MANAGER_ID}" \
+    "Name=iam-instance-profile.arn,Values=${RUNNER_INSTANCE_PROFILE_ARN}" \
     "Name=instance-state-name,Values=pending,running,stopping,stopped" \
   --query 'Reservations[].Instances[].InstanceId' --output text)"
 
