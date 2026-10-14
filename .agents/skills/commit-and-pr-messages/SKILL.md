@@ -90,8 +90,11 @@ PR titles are the public subject line for a whole change set.
 
 Treat the PR body like an expanded commit body for reviewers and future
 maintainers. Lead with purpose; do not narrate the diff file-by-file.
-Write the Summary and Test plan in STE
+Write the Summary in STE
 ([simplified-technical-english](../simplified-technical-english/SKILL.md)).
+Do not add a Test plan or other checklist of checks that the author already ran.
+If the author needs to show proof, the Summary or the UI review context can
+say what was verified and how.
 
 ### Required shape
 
@@ -101,11 +104,6 @@ Write the Summary and Test plan in STE
 <2–4 short STE sentences or bullets: what problem this solves and why this
 change exists. Max 25 words per descriptive sentence. Focus on motivation
 and user/system impact, not implementation tourism.>
-
-## Test plan
-
-- [ ] <STE procedural step: max 20 words, one instruction, imperative>
-- [ ] <Edge cases or regressions worth checking>
 ```
 
 ### Writing rules for the Summary
@@ -153,7 +151,6 @@ Before submitting a PR description, confirm:
 
 - [ ] Title completes: *If merged, this PR will ________.*
 - [ ] Summary explains **why**, not a file list
-- [ ] Summary and Test plan obey STE sentence limits and style
-- [ ] Test plan has actionable checks
+- [ ] Summary obeys STE sentence limits and style
 - [ ] No trailing period / non-imperative mush in the title
 - [ ] Body would still make sense months later without the author present
