@@ -491,7 +491,16 @@ function ensureAgentResources(fixture: FactoriesFixture, factoryId: string): Fac
 }
 
 function requestedAgentResourceKind(url: URL): FactoriesFactoryAgentResource["kind"] {
-  return url.searchParams.get("kind") === "KIND_SKILL" ? "KIND_SKILL" : "KIND_MCP_SERVER";
+  const kind = url.searchParams.get("kind");
+  if (
+    kind === "KIND_SKILL" ||
+    kind === "KIND_SETUP_COMMAND" ||
+    kind === "KIND_CONTEXT_REPO" ||
+    kind === "KIND_MCP_SERVER"
+  ) {
+    return kind;
+  }
+  return "KIND_MCP_SERVER";
 }
 
 const DEFAULT_MCP_TOOLS = [
@@ -506,11 +515,16 @@ function toolsForAgentResource(
   return fixture.agentResourceToolsById?.[resourceId] ?? DEFAULT_MCP_TOOLS;
 }
 
-function patchAgentResource(resource: FactoriesFactoryAgentResource, body: unknown): FactoriesFactoryAgentResource {
-  const request = (body ?? {}) as FactoriesFactoryAgentResource & {
-    disabledTools?: string[];
-    replaceDisabledTools?: boolean;
-  };
+type AgentResourcePatchRequest = FactoriesFactoryAgentResource & {
+  disabledTools?: string[];
+  replaceDisabledTools?: boolean;
+  commands?: string[];
+  replaceCommands?: boolean;
+  repository?: string;
+  vcsProvider?: string;
+};
+
+function patchAgentResourceBase(resource: FactoriesFactoryAgentResource, request: AgentResourcePatchRequest) {
   if (typeof request.name === "string" && request.name.trim()) {
     resource.name = request.name.trim();
   }
@@ -529,6 +543,24 @@ function patchAgentResource(resource: FactoriesFactoryAgentResource, body: unkno
   if (typeof request.markdown === "string") {
     resource.markdown = request.markdown;
   }
+}
+
+function patchAgentResourceSetupContext(resource: FactoriesFactoryAgentResource, request: AgentResourcePatchRequest) {
+  if (typeof request.repository === "string") {
+    resource.repository = request.repository;
+  }
+  if (typeof request.vcsProvider === "string") {
+    resource.vcsProvider = request.vcsProvider;
+  }
+  if (request.replaceCommands || Array.isArray(request.commands)) {
+    resource.commands = Array.isArray(request.commands) ? request.commands : [];
+  }
+}
+
+function patchAgentResource(resource: FactoriesFactoryAgentResource, body: unknown): FactoriesFactoryAgentResource {
+  const request = (body ?? {}) as AgentResourcePatchRequest;
+  patchAgentResourceBase(resource, request);
+  patchAgentResourceSetupContext(resource, request);
   if (request.replaceDisabledTools) {
     resource.disabledTools = Array.isArray(request.disabledTools) ? request.disabledTools : [];
   }
@@ -601,19 +633,65 @@ function factoryAgentResourceItemRoute(fixture: FactoriesFixture): FactoriesRout
   };
 }
 
+function createPostedSkillResource(factoryId: string, id: string, request: FactoriesFactoryAgentResource, now: string) {
+  return {
+    id,
+    factoryId,
+    kind: "KIND_SKILL" as const,
+    name: typeof request.name === "string" ? request.name.trim() : "skill",
+    enabled: request.enabled !== false,
+    markdown: typeof request.markdown === "string" ? request.markdown : "",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function createPostedSetupResource(factoryId: string, id: string, request: FactoriesFactoryAgentResource, now: string) {
+  return {
+    id,
+    factoryId,
+    kind: "KIND_SETUP_COMMAND" as const,
+    name: "setup",
+    enabled: request.enabled !== false,
+    commands: Array.isArray(request.commands) ? request.commands : [],
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function createPostedContextRepoResource(
+  factoryId: string,
+  id: string,
+  request: FactoriesFactoryAgentResource,
+  now: string,
+) {
+  const repository = typeof request.repository === "string" ? request.repository.trim() : "";
+  return {
+    id,
+    factoryId,
+    kind: "KIND_CONTEXT_REPO" as const,
+    name:
+      typeof request.name === "string" && request.name.trim()
+        ? request.name.trim()
+        : repository.toLowerCase().replace("/", "-") || "repo",
+    enabled: request.enabled !== false,
+    repository,
+    vcsProvider: typeof request.vcsProvider === "string" ? request.vcsProvider : "github",
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function createPostedAgentResource(factoryId: string, id: string, request: FactoriesFactoryAgentResource) {
   const now = new Date().toISOString();
   if (request.kind === "KIND_SKILL") {
-    return {
-      id,
-      factoryId,
-      kind: "KIND_SKILL" as const,
-      name: typeof request.name === "string" ? request.name.trim() : "skill",
-      enabled: request.enabled !== false,
-      markdown: typeof request.markdown === "string" ? request.markdown : "",
-      createdAt: now,
-      updatedAt: now,
-    };
+    return createPostedSkillResource(factoryId, id, request, now);
+  }
+  if (request.kind === "KIND_SETUP_COMMAND") {
+    return createPostedSetupResource(factoryId, id, request, now);
+  }
+  if (request.kind === "KIND_CONTEXT_REPO") {
+    return createPostedContextRepoResource(factoryId, id, request, now);
   }
   return {
     id,

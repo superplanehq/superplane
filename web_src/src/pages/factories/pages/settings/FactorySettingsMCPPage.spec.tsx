@@ -174,8 +174,8 @@ describe("FactorySettingsMCPPage", () => {
     expect(empty).not.toHaveTextContent("No MCP servers yet");
     expect(screen.getByTestId("agent-resources-add-connection")).toHaveTextContent("Connect");
     expect(screen.queryByTestId("agent-default-model")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("agent-setup-steps")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("agent-cross-repo")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("agent-setup-steps")).toBeInTheDocument();
+    expect(await screen.findByTestId("agent-cross-repo")).toBeInTheDocument();
   }, 10000);
 
   it("lists a header MCP server with a connected status", async () => {
