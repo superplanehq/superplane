@@ -77,6 +77,9 @@ export function agentStepStatusFromSection(input: {
   stoppedTheRun: boolean;
 }): SplitRunPhaseStatus {
   const status = knownPhaseStatus(input.sectionStatus);
+  if (input.runStatus === "cancelled" && (status === "failed" || status === "running")) {
+    return "cancelled";
+  }
   if (input.kind !== "prompt" || status !== "failed") {
     return status;
   }

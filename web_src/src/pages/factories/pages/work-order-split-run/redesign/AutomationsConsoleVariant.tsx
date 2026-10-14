@@ -431,7 +431,7 @@ const COLUMN_MARKER_LABEL: Record<ColumnMarker, string> = {
   running: "Running",
   waiting: "Waiting",
   failed: "Failed",
-  cancelled: "Canceled",
+  cancelled: "Stopped",
   pending: "Not started",
 };
 

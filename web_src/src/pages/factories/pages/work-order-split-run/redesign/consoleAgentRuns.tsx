@@ -154,6 +154,9 @@ function AgentRunRow({
           />
           {clock ? <span className={cn(META_TEXT_CLASSNAME, "shrink-0 tabular-nums")}>{clock}</span> : null}
           {queued ? <QueuedRunMark /> : <StaticStatusGlyph status={run.status} />}
+          {run.status === "cancelled" ? (
+            <span className="shrink-0 text-[12px] font-medium text-muted-foreground">Stopped</span>
+          ) : null}
           <MarkdownContent
             content={run.name}
             variant="workspace"
