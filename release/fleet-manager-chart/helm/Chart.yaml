@@ -1,0 +1,11 @@
+apiVersion: v2
+name: fleet-manager-chart
+description: Provision and reconcile SuperPlane runner fleets
+type: application
+version: 0.1.0
+appVersion: v0.1.0
+home: https://github.com/superplanehq/superplane
+sources:
+  - https://github.com/superplanehq/superplane
+annotations:
+  org.opencontainers.image.source: https://github.com/superplanehq/superplane
