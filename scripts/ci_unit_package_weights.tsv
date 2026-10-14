@@ -1,0 +1,11 @@
+# Extra seconds above test-file count. Measured from the Go test report on
+# Semaphore main, 2026-10-14 (workflow ad71cc00). Unlisted packages use their
+# test-file count. Update these weights when the slow packages change.
+pkg/models 31
+pkg/workers 45
+pkg/workers/contexts 10
+pkg/grpc/actions/factories 31
+pkg/public 24
+pkg/integrations/jira 12
+pkg/grpc/actions/canvases 11
+pkg/components/runner 7
