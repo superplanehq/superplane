@@ -17,6 +17,17 @@ render_provider() {
 
 helm lint "${CHART_DIR}" --values "${SCRIPT_DIR}/testdata/aws.yaml"
 
+helm package "${CHART_DIR}" \
+  --version 1.2.3 \
+  --app-version v1.2.3 \
+  --destination "${TMP_DIR}" \
+  >/dev/null
+helm template fleet-manager "${TMP_DIR}/fleet-manager-chart-1.2.3.tgz" \
+  --namespace superplane \
+  --values "${SCRIPT_DIR}/testdata/aws.yaml" \
+  >"${TMP_DIR}/packaged.yaml"
+grep -q 'image: "ghcr.io/superplanehq/fleet-manager:v1.2.3"' "${TMP_DIR}/packaged.yaml"
+
 for provider in aws gcp azure; do
   render_provider "${provider}"
   grep -q 'helm.sh/hook: pre-install,pre-upgrade' "${TMP_DIR}/${provider}.yaml"

@@ -43,7 +43,7 @@
       "required": ["repository", "tag", "pullPolicy"],
       "properties": {
         "repository": {"type": "string", "minLength": 1},
-        "tag": {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"},
+        "tag": {"type": "string", "pattern": "^(?:v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?)?$"},
         "pullPolicy": {"enum": ["Always", "IfNotPresent", "Never"]},
         "pullSecrets": {"type": "array", "items": {"type": "object"}}
       }
