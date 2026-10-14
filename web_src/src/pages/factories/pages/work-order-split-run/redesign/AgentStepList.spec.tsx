@@ -68,6 +68,19 @@ function stepsFromSections(sections: CommandSection[], runStatus: "passed" | "fa
 }
 
 describe("AgentStepMarkers", () => {
+  it.each([
+    { status: "cancelled" as const, label: "Stopped", destructive: false },
+    { status: "failed" as const, label: "Failed", destructive: true },
+  ])("shows $label with the correct outcome style", ({ status, label, destructive }) => {
+    render(<AgentStepMarkers stage={stageWithSteps([{ ...stepPlaceholder(), status }], status)} />);
+
+    const badge = screen.getByText(label);
+    expect(badge.classList.contains("text-destructive")).toBe(destructive);
+    if (!destructive) {
+      expect(badge).toHaveClass("text-muted-foreground");
+    }
+  });
+
   it("keeps the step duration on one line and shows it on hover", () => {
     render(
       <AgentStepMarkers

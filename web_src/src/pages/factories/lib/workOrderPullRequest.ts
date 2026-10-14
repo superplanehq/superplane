@@ -98,18 +98,23 @@ export function isActiveCanvasRun(run: CanvasesCanvasRunRef | undefined): boolea
   return run.state === "STATE_PENDING" || run.state === "STATE_STARTED";
 }
 
-export function statusForCanvasRun(run: CanvasesCanvasRunRef | undefined): "passed" | "running" | "pending" | "failed" {
+export function statusForCanvasRun(
+  run: CanvasesCanvasRunRef | undefined,
+): "passed" | "running" | "pending" | "failed" | "cancelled" {
   if (run?.state === "STATE_STARTED") {
     return "running";
   }
   if (run?.state === "STATE_CANCELLING") {
-    return run.result === "RESULT_PASSED" ? "passed" : "failed";
+    return run.result === "RESULT_PASSED" ? "passed" : "cancelled";
   }
   if (run?.state === "STATE_FINISHED") {
     if (run.result === "RESULT_PASSED") {
       return "passed";
     }
-    if (run.result === "RESULT_FAILED" || run.result === "RESULT_CANCELLED") {
+    if (run.result === "RESULT_CANCELLED") {
+      return "cancelled";
+    }
+    if (run.result === "RESULT_FAILED") {
       return "failed";
     }
   }

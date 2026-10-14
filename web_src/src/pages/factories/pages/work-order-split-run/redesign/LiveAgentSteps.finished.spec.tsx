@@ -379,7 +379,7 @@ describe("LiveAgentSteps finished runs", () => {
     const command = await screen.findByRole("button", { name: /Run script/ });
     expect(command).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Failed")).not.toBeInTheDocument();
-    expect(screen.queryByText("Canceled")).not.toBeInTheDocument();
+    expect(screen.queryByText("Stopped")).not.toBeInTheDocument();
 
     fireEvent.click(command);
 

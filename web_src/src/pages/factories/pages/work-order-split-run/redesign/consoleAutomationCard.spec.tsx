@@ -2,7 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, mock } from "bun:test";
-import type { SplitRunPhase } from "../splitRunMocks";
+import { splitRunFixtureForWorkOrder, type SplitRunPhase } from "../splitRunMocks";
+import { stageFromPhase } from "./automationsViewModel";
 import type { AutomationStage } from "./automationsViewModel";
 import * as canvasData from "@/hooks/useCanvasData";
 
@@ -57,6 +58,45 @@ function checksPhase(): SplitRunPhase {
 }
 
 const { ConsoleAutomationCard } = await import("./consoleAutomationCard");
+
+describe("stopped automation card", () => {
+  it("keeps the cancelled run neutral in the header and history row after the stop request finishes", () => {
+    const fixture = splitRunFixtureForWorkOrder(
+      { id: "task", state: "STATE_OPEN" },
+      {
+        demoArtifacts: false,
+        prFeedbackRuns: [
+          {
+            canvasId: "visual-evidence",
+            handlerName: "Visual Evidence",
+            title: "Capture screenshots or a short video",
+            run: { id: "stopped", state: "STATE_FINISHED", result: "RESULT_CANCELLED" },
+          },
+        ],
+      },
+    );
+    const phase = fixture.phases.find((entry) => entry.runId === "stopped")!;
+    const latest = stageFromPhase(phase);
+    const previous = captureRun("previous", "passed");
+    const view = render(
+      <ConsoleAutomationCard
+        automation={{ id: "evidence", name: "Visual Evidence", latest, runs: [previous, latest] }}
+        phase={phase}
+        phases={[phase]}
+        expandIdle={false}
+        canStopRun
+        actionBusy={false}
+      />,
+    );
+
+    const header = screen.getByTestId("redesign-console-card-header-evidence");
+    expect(header).toHaveTextContent("Stopped");
+    fireEvent.click(screen.getByRole("button", { name: "Toggle Visual Evidence details" }));
+    expect(screen.getAllByText("Stopped")).toHaveLength(2);
+    expect(view.container.querySelectorAll(".bg-\\[color\\:var\\(--status-cancelled-dot\\)\\]")).toHaveLength(2);
+    expect(screen.queryByText("Failed")).not.toBeInTheDocument();
+  });
+});
 
 describe("queued automation card", () => {
   it("shows one queue label and Cancel, then restores the run details when work starts", async () => {
