@@ -18,4 +18,4 @@ fi
 path="ci-test-timings/${kind}/${SEMAPHORE_JOB_INDEX}.xml"
 mkdir -p "$(dirname "$path")"
 cp junit-report.xml "$path"
-artifact push workflow "$path"
+artifact push workflow "$path" --force
