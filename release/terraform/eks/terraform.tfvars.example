@@ -12,6 +12,9 @@ letsencrypt_email = "admin@example.com"
 # SuperPlane
 # -----------------------------------------------------------------------------
 
+# Terraform downloads the chart from
+# oci://ghcr.io/superplanehq/superplane-chart. The chart uses the application
+# image at ghcr.io/superplanehq/superplane.
 # superplane_chart_version = "0.0.0-782e528cea1fd707313bcfa4a2e8f57e9148f5c5"
 # superplane_image_tag    = "<git-sha>-selfhosted"  # Empty uses the chart's matching image.
 # superplane_namespace = "superplane"
