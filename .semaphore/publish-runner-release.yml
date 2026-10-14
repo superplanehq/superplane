@@ -27,6 +27,7 @@ blocks:
           commands:
             - bash release/component-release-artifact.sh pull runner "$RELEASE_VERSION" "build/runner/$RELEASE_VERSION"
             - |
+              set -euo pipefail
               release_dir="build/runner/$RELEASE_VERSION"
               (cd "$release_dir" && sha256sum --check release-manifest.sha256)
               node release/component-release.js verify-manifest \
@@ -40,6 +41,7 @@ blocks:
               (cd "$release_dir" && sha256sum --check checksums.txt)
               test -n "${GITHUB_TOKEN:-}"
             - |
+              set -euo pipefail
               release_dir="build/runner/$RELEASE_VERSION"
               node release/component-release.js stage-github-release \
                 --component runner \
@@ -49,6 +51,7 @@ blocks:
                 --assets runner-linux-amd64.tar.gz,runner-linux-arm64.tar.gz,runner.spdx.json,checksums.txt \
                 --release-id-file /tmp/github-release-id
             - |
+              set -euo pipefail
               release_dir="build/runner/$RELEASE_VERSION"
               release_notes_args=()
               if [ -f "$release_dir/release-notes.md" ]; then
@@ -61,6 +64,7 @@ blocks:
                 --sha "$SEMAPHORE_GIT_SHA" \
                 "${release_notes_args[@]}"
             - |
+              set -euo pipefail
               encoded_tag="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "runner/$RELEASE_VERSION")"
               bash release/verify-public-assets.sh \
                 "https://github.com/superplanehq/superplane/releases/download/$encoded_tag" \
