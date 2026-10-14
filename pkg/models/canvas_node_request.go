@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	NodeRequestTypeInvokeAction          = "invoke-action"
-	NodeRequestTypeVisualEvidenceCapture = "visual-evidence-capture"
+	NodeRequestTypePullRequestChecksStart = "pull-request-checks-start"
+	NodeRequestTypeInvokeAction           = "invoke-action"
+	NodeRequestTypeVisualEvidenceCapture  = "visual-evidence-capture"
 
 	NodeExecutionRequestStatePending   = "pending"
 	NodeExecutionRequestStateCompleted = "completed"
@@ -39,8 +40,16 @@ func (r *CanvasNodeRequest) TableName() string {
 }
 
 type NodeExecutionRequestSpec struct {
-	InvokeAction          *InvokeAction                 `json:"invoke_action,omitempty"`
-	VisualEvidenceCapture *VisualEvidenceCaptureRequest `json:"visual_evidence_capture,omitempty"`
+	PullRequestChecksStart *PullRequestChecksStartRequest `json:"pull_request_checks_start,omitempty"`
+	InvokeAction           *InvokeAction                  `json:"invoke_action,omitempty"`
+	VisualEvidenceCapture  *VisualEvidenceCaptureRequest  `json:"visual_evidence_capture,omitempty"`
+}
+
+type PullRequestChecksStartRequest struct {
+	OrganizationID string `json:"organization_id"`
+	FactoryID      string `json:"factory_id"`
+	PullRequestID  string `json:"pull_request_id"`
+	Attempts       int    `json:"attempts,omitempty"`
 }
 
 type VisualEvidenceCaptureRequest struct {
@@ -69,7 +78,8 @@ func LockNodeRequest(tx *gorm.DB, id uuid.UUID) (*CanvasNodeRequest, error) {
 		}).
 		Where("workflow_node_requests.id = ?", id).
 		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
-		Where("workflow_node_requests.run_at <= ?", now)
+		Where("workflow_node_requests.run_at <= ?", now).
+		Where("workflow_node_requests.type <> ?", NodeRequestTypePullRequestChecksStart)
 
 	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").
 		First(&request).
@@ -90,7 +100,8 @@ func ListNodeRequests() ([]CanvasNodeRequest, error) {
 		Table("workflow_node_requests").
 		Select("workflow_node_requests.*").
 		Where("workflow_node_requests.state = ?", NodeExecutionRequestStatePending).
-		Where("workflow_node_requests.run_at <= ?", now)
+		Where("workflow_node_requests.run_at <= ?", now).
+		Where("workflow_node_requests.type <> ?", NodeRequestTypePullRequestChecksStart)
 
 	err := withActiveCanvas(query, "workflow_node_requests.workflow_id").
 		Find(&requests).

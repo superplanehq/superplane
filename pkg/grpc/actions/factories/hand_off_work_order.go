@@ -221,6 +221,7 @@ func HandOffWorkOrder(
 				factory.ID,
 				trackedPR.ID,
 			)
+			StartPullRequestChecks(ctx, deps, trackedPR.ID)
 			StartVisualEvidenceCapture(
 				ctx,
 				deps,
