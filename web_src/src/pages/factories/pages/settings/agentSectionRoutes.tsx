@@ -18,7 +18,7 @@ export const agentSectionRoute = (
     path="agent"
     element={
       <RequirePermission resource="factories" action="update">
-        <RequireExperimentalFeature featureId={FEATURE_WORKSPACE_AGENT}>
+        <RequireExperimentalFeature anyOf={[FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS]}>
           <div className="min-h-full bg-sidebar dark:bg-background">
             <Outlet />
           </div>

@@ -3,11 +3,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useByokRunnerModelDefault } from "@/hooks/useByokRunnerModelDefault";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useFactoryAgentResources } from "@/hooks/useFactoryAgentResources";
+import { FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
 import { useComponent } from "@/hooks/useComponentData";
 import { HOSTED_MODEL_ALL_PROVIDERS } from "@/lib/hostedLLMModels";
 import { cn } from "@/lib/utils";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 
+import { factoryAgentSkillEditorPath } from "../lib/factoryPagePaths";
 import { isMergeConfidenceSteps, newMergeConfidenceStep } from "./mergeConfidenceSteps";
 import type { PlanningReviewComponent, PlanningReviewDraft, PlanningReviewStep } from "./planningReviewMockup";
 import { planningReviewModelUsedField } from "./planningReviewRunnerFields";
@@ -120,6 +124,19 @@ function AgentPanel({
   restoreRetryDisabled: boolean;
   onChange: (next: PlanningReviewComponent) => void;
 }) {
+  const features = useExperimentalFeature(organizationId);
+  const skillsEnabled = Boolean(organizationId && factoryId && features.has(FEATURE_WORKSPACE_SKILLS));
+  const skills = useFactoryAgentResources(organizationId ?? "", factoryId ?? "", "KIND_SKILL", skillsEnabled);
+  const disabledSkills = disabledAgentResourceIds(component.configuration);
+  const promptSkills = skillsEnabled
+    ? (skills.data ?? []).filter(
+        (skill) =>
+          skill.enabled !== false &&
+          skill.name &&
+          skill.name !== "superplane" &&
+          !disabledSkills.includes(skill.id ?? ""),
+      )
+    : undefined;
   const componentRef = useRef(component);
   const setConfigurationField = (name: string, value: unknown) => {
     const current = componentRef.current;
@@ -232,6 +249,12 @@ function AgentPanel({
         ) : null}
       </section>
       <PlanningReviewStepList
+        skills={promptSkills}
+        skillHref={(skill) =>
+          organizationId && factoryKey && skill.id
+            ? factoryAgentSkillEditorPath(organizationId, factoryKey, skill.id)
+            : undefined
+        }
         appearance={appearance}
         steps={(component.configuration.steps as PlanningReviewStep[]) ?? []}
         onChange={(steps) => setConfigurationField("steps", steps)}
