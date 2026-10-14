@@ -352,8 +352,11 @@ function stepReason(step: AgentStep): string {
 function StepStatusBadge({ status }: { status: AgentStep["status"] }) {
   if (status === "failed" || status === "cancelled") {
     return (
-      <Badge variant="outline" className="border-destructive/40 text-destructive">
-        {status === "cancelled" ? "Canceled" : "Failed"}
+      <Badge
+        variant="outline"
+        className={status === "failed" ? "border-destructive/40 text-destructive" : "text-muted-foreground"}
+      >
+        {status === "cancelled" ? "Stopped" : "Failed"}
       </Badge>
     );
   }

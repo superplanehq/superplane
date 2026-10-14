@@ -66,6 +66,22 @@ function phase(stream: SplitRunStreamLine[]): SplitRunPhase {
 }
 
 describe("prompt step failure", () => {
+  it("shows a failed child execution as stopped when its run was cancelled", () => {
+    const stopped = stageFromPhase({
+      ...phase([
+        canvasNode("checkout", "Checkout Pull Request", "passed"),
+        canvasNode("agent", "Capture Visual Evidence", "failed"),
+        failedPromptNote(),
+        { ...failedPromptNote(), id: "command", componentType: "bash" },
+        canvasNode("upload", "Upload evidence", "failed"),
+      ]),
+      status: "cancelled",
+    });
+
+    expect(stopped.steps.map((step) => step.status)).toEqual(["passed", "cancelled", "cancelled", "cancelled"]);
+    expect(stopped.agentSteps.map((step) => step.status)).toEqual(["cancelled", "cancelled"]);
+  });
+
   it("keeps a failed prompt off the step when the run passed", () => {
     const notes = notesFromLiveLogSections("agent", [promptSection()], "passed");
 
