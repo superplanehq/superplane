@@ -2,6 +2,8 @@ package models_test
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/base64"
 	"slices"
 	"testing"
 	"time"
@@ -126,6 +128,55 @@ func Test__FactoryWorkOrder__Close__CancelsEventAutomationsAndDescendants(t *tes
 	}
 	assertRunState(t, db, finished.ID, models.CanvasRunStateFinished)
 	assertRunState(t, db, unrelated.ID, models.CanvasRunStateStarted)
+}
+
+func Test__FactoryWorkOrder__ListRuns__SavesLongIDsAndFindsTaskUUID(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "automation", "start")
+	order, err := factoryModel.CreateWorkOrder(db, "Archive", "", &r.User, nil, nil)
+	require.NoError(t, err)
+
+	longID := incompressibleText(t, 3000)
+	longRun, err := models.CreateCanvasRunInTransaction(db, app.ID, entrypoint, models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, db.Model(longRun).Update("input", models.NewJSONValue(map[string]any{
+		"work_order": map[string]any{"id": longID},
+	})).Error)
+	for _, payload := range []map[string]any{
+		{
+			"work_order": map[string]any{"id": longID},
+			"workOrder":  map[string]any{"id": longID},
+		},
+		{"data": map[string]any{
+			"work_order": map[string]any{"id": longID},
+			"workOrder":  map[string]any{"id": longID},
+		}},
+	} {
+		require.NoError(t, db.Create(&models.CanvasEvent{
+			WorkflowID: app.ID, NodeID: entrypoint, RunID: longRun.ID,
+			State: models.CanvasEventStatePending, Data: models.NewJSONValue(payload),
+		}).Error)
+	}
+
+	matched, err := models.CreateCanvasRunInTransaction(db, app.ID, entrypoint, models.CanvasRunStateStarted, "")
+	require.NoError(t, err)
+	require.NoError(t, db.Create(&models.CanvasEvent{
+		WorkflowID: app.ID, NodeID: entrypoint, RunID: matched.ID,
+		State: models.CanvasEventStatePending,
+		Data:  models.NewJSONValue(map[string]any{"work_order": map[string]any{"id": order.ID.String()}}),
+	}).Error)
+
+	runs, err := order.ListRuns(db)
+	require.NoError(t, err)
+	ids := make([]uuid.UUID, len(runs))
+	for i := range runs {
+		ids[i] = runs[i].ID
+	}
+	assert.Contains(t, ids, matched.ID)
+	assert.NotContains(t, ids, longRun.ID)
 }
 
 func Test__FactoryWorkOrder__Close__DoesNotWaitForBusyAnalysisRun(t *testing.T) {
@@ -382,6 +433,14 @@ func holdCanvasRunLocks(t *testing.T, runIDs ...uuid.UUID) func() {
 		close(release)
 		require.NoError(t, <-holdErr)
 	}
+}
+
+func incompressibleText(t *testing.T, size int) string {
+	t.Helper()
+	raw := make([]byte, size)
+	_, err := rand.Read(raw)
+	require.NoError(t, err)
+	return base64.RawURLEncoding.EncodeToString(raw)
 }
 
 func assertRunState(t *testing.T, db *gorm.DB, runID uuid.UUID, state string) {

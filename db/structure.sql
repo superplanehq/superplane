@@ -3907,14 +3907,14 @@ CREATE INDEX idx_workflow_events_state ON public.workflow_events USING btree (st
 -- Name: idx_workflow_events_work_order; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_workflow_events_work_order ON public.workflow_events USING btree ((((COALESCE((data -> 'data'::text), data) -> 'work_order'::text) ->> 'id'::text)), workflow_id) INCLUDE (run_id) WHERE (((COALESCE((data -> 'data'::text), data) -> 'work_order'::text) ->> 'id'::text) IS NOT NULL);
+CREATE INDEX idx_workflow_events_work_order ON public.workflow_events USING btree ((((COALESCE((data -> 'data'::text), data) -> 'work_order'::text) ->> 'id'::text)), workflow_id) INCLUDE (run_id) WHERE (octet_length(((COALESCE((data -> 'data'::text), data) -> 'work_order'::text) ->> 'id'::text)) <= 36);
 
 
 --
 -- Name: idx_workflow_events_work_order_camel; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_workflow_events_work_order_camel ON public.workflow_events USING btree ((((COALESCE((data -> 'data'::text), data) -> 'workOrder'::text) ->> 'id'::text)), workflow_id) INCLUDE (run_id) WHERE (((COALESCE((data -> 'data'::text), data) -> 'workOrder'::text) ->> 'id'::text) IS NOT NULL);
+CREATE INDEX idx_workflow_events_work_order_camel ON public.workflow_events USING btree ((((COALESCE((data -> 'data'::text), data) -> 'workOrder'::text) ->> 'id'::text)), workflow_id) INCLUDE (run_id) WHERE (octet_length(((COALESCE((data -> 'data'::text), data) -> 'workOrder'::text) ->> 'id'::text)) <= 36);
 
 
 --
@@ -4068,7 +4068,7 @@ CREATE INDEX idx_workflow_runs_version_id ON public.workflow_runs USING btree (v
 -- Name: idx_workflow_runs_work_order_input; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_workflow_runs_work_order_input ON public.workflow_runs USING btree ((((input -> 'work_order'::text) ->> 'id'::text)), workflow_id) INCLUDE (id) WHERE (((input -> 'work_order'::text) ->> 'id'::text) IS NOT NULL);
+CREATE INDEX idx_workflow_runs_work_order_input ON public.workflow_runs USING btree ((((input -> 'work_order'::text) ->> 'id'::text)), workflow_id) INCLUDE (id) WHERE (octet_length(((input -> 'work_order'::text) ->> 'id'::text)) <= 36);
 
 
 --

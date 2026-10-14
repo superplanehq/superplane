@@ -31,15 +31,21 @@ func (o *FactoryWorkOrder) ListRuns(tx *gorm.DB) ([]CanvasRun, error) {
 			SELECT a.run_id FROM factory_pull_request_runs a
 			JOIN factory_pull_requests p ON p.id = a.pull_request_id WHERE p.work_order_id = @order
 			UNION ALL
-			SELECT id FROM workflow_runs WHERE input->'work_order'->>'id' = @order_text
+			SELECT id FROM workflow_runs
+			WHERE octet_length(input->'work_order'->>'id') <= 36
+			  AND input->'work_order'->>'id' = @order_text
 			UNION ALL
 			SELECT e.run_id FROM workflow_events e
 			JOIN workflows w ON w.id = e.workflow_id
-			WHERE w.factory_id = @factory AND COALESCE(e.data->'data', e.data)->'workOrder'->>'id' = @order_text
+			WHERE w.factory_id = @factory
+			  AND octet_length(COALESCE(e.data->'data', e.data)->'workOrder'->>'id') <= 36
+			  AND COALESCE(e.data->'data', e.data)->'workOrder'->>'id' = @order_text
 			UNION ALL
 			SELECT e.run_id FROM workflow_events e
 			JOIN workflows w ON w.id = e.workflow_id
-			WHERE w.factory_id = @factory AND COALESCE(e.data->'data', e.data)->'work_order'->>'id' = @order_text
+			WHERE w.factory_id = @factory
+			  AND octet_length(COALESCE(e.data->'data', e.data)->'work_order'->>'id') <= 36
+			  AND COALESCE(e.data->'data', e.data)->'work_order'->>'id' = @order_text
 		),
 		task_runs AS (
 			SELECT r.id FROM workflow_runs r
