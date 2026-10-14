@@ -58,6 +58,9 @@ letsencrypt_email = "admin@example.com"
 # Published application images are available from GitHub Container Registry.
 # superplane_image_registry = "ghcr.io/superplanehq"
 
+# Set this when the standalone Fleet Manager image is in a private GCP registry.
+# fleet_manager_image_registry = "ghcr.io/superplanehq"
+
 # Required. The plain SHA and stable images fail CORS on your domain.
 superplane_image_tag = "<git-sha>-selfhosted"
 
