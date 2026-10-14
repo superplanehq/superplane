@@ -68,4 +68,34 @@ describe("workspace agent preview fields", () => {
     expect(screen.queryByTestId("agent-setup-steps")).not.toBeInTheDocument();
     expect(screen.queryByTestId("agent-cross-repo")).not.toBeInTheDocument();
   }, 10000);
+
+  it("shows load errors when the resource request fails", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          failAgentResourcesListForFactoryIds: [PRIMARY_FACTORY_ID],
+        }}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    expect(await screen.findByText("SuperPlane could not load setup steps. Try again.", {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
+
+  it("shows a load error in the setup editor when the request fails", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`${agentPath}/setup-steps`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          failAgentResourcesListForFactoryIds: [PRIMARY_FACTORY_ID],
+        }}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    expect(await screen.findByText("SuperPlane could not load setup steps. Try again.", {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
 });
