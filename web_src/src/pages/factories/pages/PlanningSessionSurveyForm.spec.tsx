@@ -40,6 +40,20 @@ describe("PlanningSessionSurveyForm", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+  it("moves keyboard focus to the next question after a choice", async () => {
+    const user = userEvent.setup();
+    render(<PlanningSessionSurveyForm survey={twoQuestions} onSubmit={vi.fn()} />);
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: "High" })).toHaveFocus();
+
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByText("What is the scope?")).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "One file" })).toHaveFocus();
+  });
+
   it("keeps Next as navigation without submitting an unanswered question", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();

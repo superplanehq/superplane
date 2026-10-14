@@ -1,8 +1,9 @@
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { ArrowUp, Check, ChevronLeft, ChevronRight, CircleHelp } from "lucide-react";
-import { useId, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { CREATE_WITH_AGENT_COPY } from "./createWithAgentCopy";
 import type { CreateWithAgentSurvey } from "./createWithAgentTypes";
@@ -21,6 +22,12 @@ export function PlanningSessionSurveyForm({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<SurveyAnswer[]>(() => survey.questions.map(() => null));
   const [customInputs, setCustomInputs] = useState<string[]>(() => survey.questions.map(() => ""));
+  const questionRef = useRef<HTMLParagraphElement>(null);
+  const previousIndex = useRef(currentIndex);
+  useEffect(() => {
+    if (previousIndex.current !== currentIndex) questionRef.current?.focus();
+    previousIndex.current = currentIndex;
+  }, [currentIndex]);
   const question = survey.questions[currentIndex];
   const questionCount = survey.questions.length;
   const isFirst = currentIndex === 0;
@@ -65,6 +72,8 @@ export function PlanningSessionSurveyForm({
         ) : null}
         <div key={question.prompt} className="sp-survey-page">
           <p
+            ref={questionRef}
+            tabIndex={-1}
             className={cn(
               "flex items-start gap-2 text-sm font-semibold text-foreground",
               questionCount > 1 && "mt-1.5",
@@ -142,9 +151,9 @@ function SurveyAnswerComposer({
 
   return (
     <div className="mt-3">
-      <label htmlFor={inputId} className="sr-only">
+      <Label htmlFor={inputId} className="sr-only">
         {CREATE_WITH_AGENT_COPY.otherAnswer}
-      </label>
+      </Label>
       <InputGroup className="h-10 rounded-lg border-border bg-background shadow-none dark:bg-background">
         <InputGroupInput
           id={inputId}
