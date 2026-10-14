@@ -52,7 +52,9 @@ describe("FleetManagerSetup", () => {
 
     expect(await screen.findByRole("heading", { name: "1. Select a provider and fleets" })).toBeInTheDocument();
     expect(createToken).not.toHaveBeenCalled();
-    expect((screen.getByLabelText("Fleet Manager values") as HTMLTextAreaElement).value).toContain("provider: aws");
+    await waitFor(() =>
+      expect((screen.getByLabelText("Fleet Manager values") as HTMLTextAreaElement).value).toContain("provider: aws"),
+    );
   });
 
   it("creates and shows the token only after an explicit action", async () => {
