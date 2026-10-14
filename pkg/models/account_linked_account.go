@@ -14,6 +14,12 @@ import (
 // one member per organization.
 var ErrLinkedAccountInUse = errors.New("linked account belongs to another account")
 
+// LinkableProviders lists the services a member can link and unlink.
+// A linked account records who the member is on that service, so SuperPlane
+// can attribute the activity it finds there. A provider that only proves
+// identity does not belong here.
+var LinkableProviders = []string{ProviderGitHub, ProviderBitbucket}
+
 // AccountLinkedAccount is an identity a member owns on another service. It is
 // not a sign-in method: it grants no session and stores no token. SuperPlane
 // uses it to attribute activity, such as repository authorship in Velocity.
