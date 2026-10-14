@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/google/go-github/v84/github"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -28,7 +28,31 @@ const (
 
 	lineImplementationTemplateID = "line-implementation"
 	prClosureTemplateID          = "pr-closure"
+
+	handOffPullRequestURLInvalid = "pull_request_url must be a GitHub or Bitbucket pull request URL"
 )
+
+var bitbucketHandOffPullRequestURLPattern = regexp.MustCompile(
+	`(?i)^https?://(?:www\.)?bitbucket\.org/([^/]+)/([^/]+)/pull-requests/(\d+)(?:[/?#].*)?$`,
+)
+
+type handOffPullRequest struct {
+	Provider       string
+	ExternalID     string
+	Repository     string
+	Number         int64
+	URL            string
+	Title          string
+	State          string
+	HeadBranch     string
+	HeadRepository string
+}
+
+type parsedHandOffPullRequestURL struct {
+	Provider   string
+	Repository string
+	Number     int
+}
 
 type HandOffWorkOrderRequest struct {
 	FactoryID      string
@@ -126,10 +150,9 @@ func HandOffWorkOrder(
 		}
 	}
 
-	var githubPR *github.PullRequest
-	var prRepository string
+	var pullRequest *handOffPullRequest
 	if column == HandOffColumnVerify {
-		githubPR, prRepository, err = loadHandOffPullRequest(ctx, db, deps, factory, strings.TrimSpace(req.PullRequestURL))
+		pullRequest, err = loadHandOffPullRequest(ctx, db, deps, factory, strings.TrimSpace(req.PullRequestURL))
 		if err != nil {
 			return nil, factoryErrorToStatus(err, "failed to hand off work order")
 		}
@@ -181,7 +204,7 @@ func HandOffWorkOrder(
 			order = started.order
 			return nil
 		}
-		return recordVerifyHandOff(tx, factory, order, line, &actor, githubPR, prRepository, verifyIndex)
+		return recordVerifyHandOff(tx, factory, order, line, &actor, pullRequest, verifyIndex)
 	})
 	if delErr := storedfiles.ApplyBindResult(ctx, db, blob.Current(), orgID, factory.ID, bound, err); delErr != nil {
 		log.WithError(delErr).Warn("Failed to delete file objects after bind")
@@ -257,11 +280,10 @@ func recordVerifyHandOff(
 	order *models.FactoryWorkOrder,
 	line *models.FactoryLine,
 	actor *uuid.UUID,
-	githubPR *github.PullRequest,
-	prRepository string,
+	pullRequest *handOffPullRequest,
 	verifyIndex int,
 ) error {
-	if githubPR == nil {
+	if pullRequest == nil {
 		return invalidArgument("pull_request_url is required")
 	}
 	taskRepo := ""
@@ -271,26 +293,29 @@ func recordVerifyHandOff(
 	if taskRepo == "" {
 		return invalidArgument("This workspace has no repository.")
 	}
-	if !strings.EqualFold(prRepository, taskRepo) {
+	if !strings.EqualFold(pullRequest.Repository, taskRepo) {
 		return invalidArgument("The pull request repository does not match the task repository.")
 	}
-	if !strings.EqualFold(strings.TrimSpace(githubPR.GetState()), models.FactoryPullRequestStateOpen) {
+	if !strings.EqualFold(strings.TrimSpace(pullRequest.State), models.FactoryPullRequestStateOpen) {
 		return grpcerrors.FailedPrecondition(errFactoryPullRequestNotOpen, "The pull request is not open.")
 	}
 
-	headRef := strings.TrimPrefix(strings.TrimSpace(githubPR.GetHead().GetRef()), "refs/heads/")
+	headRef := strings.TrimPrefix(strings.TrimSpace(pullRequest.HeadBranch), "refs/heads/")
 	if headRef == "" {
 		return invalidArgument("The pull request has no head branch.")
 	}
-	headRepo := pullRequestHeadRepository(githubPR, taskRepo)
+	headRepo := strings.TrimSpace(pullRequest.HeadRepository)
+	if headRepo == "" {
+		headRepo = taskRepo
+	}
 
 	if _, err := order.CreatePullRequest(tx, models.FactoryPullRequestParams{
-		Provider:   models.FactoryPullRequestProviderGitHub,
-		ExternalID: strconv.FormatInt(githubPR.GetID(), 10),
-		Repository: prRepository,
-		Number:     int64(githubPR.GetNumber()),
-		URL:        githubPR.GetHTMLURL(),
-		Title:      githubPR.GetTitle(),
+		Provider:   pullRequest.Provider,
+		ExternalID: pullRequest.ExternalID,
+		Repository: pullRequest.Repository,
+		Number:     pullRequest.Number,
+		URL:        pullRequest.URL,
+		Title:      pullRequest.Title,
 		State:      models.FactoryPullRequestStateOpen,
 	}); err != nil {
 		return err
@@ -327,30 +352,129 @@ func loadHandOffPullRequest(
 	deps IntakeDependencies,
 	factory *models.Factory,
 	rawURL string,
-) (*github.PullRequest, string, error) {
-	repository, number, ok := parseGitHubPullRequestURL(rawURL)
+) (*handOffPullRequest, error) {
+	parsed, ok := parseHandOffPullRequestURL(rawURL)
 	if !ok {
-		return nil, "", invalidArgument("pull_request_url must be a GitHub pull request URL")
+		return nil, invalidArgument(handOffPullRequestURLInvalid)
 	}
+	workspaceProvider := factory.OnboardingConfigValue().EffectiveVCSProvider()
+	if !strings.EqualFold(parsed.Provider, workspaceProvider) {
+		return nil, invalidArgument(handOffPullRequestProviderMismatch(parsed.Provider, workspaceProvider))
+	}
+	if parsed.Provider == models.FactoryPullRequestProviderBitbucket {
+		return loadBitbucketHandOffPullRequest(db, deps, factory, rawURL, parsed)
+	}
+	return loadGitHubHandOffPullRequest(ctx, db, deps, factory, rawURL, parsed)
+}
 
+func loadGitHubHandOffPullRequest(
+	ctx context.Context,
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	rawURL string,
+	parsed parsedHandOffPullRequestURL,
+) (*handOffPullRequest, error) {
 	client, err := newFactoryGitHubAPI(db, deps, factory)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
-	githubPR, _, err := client.GetPullRequest(ctx, repository, number)
+	githubPR, _, err := client.GetPullRequest(ctx, parsed.Repository, parsed.Number)
 	if err != nil {
-		return nil, "", grpcerrors.FailedPrecondition(err, "SuperPlane could not load the pull request.")
+		return nil, grpcerrors.FailedPrecondition(err, "SuperPlane could not load the pull request.")
 	}
 	if githubPR == nil {
-		return nil, "", grpcerrors.NotFound(errFactoryPullRequestMissing, "The pull request was not found.")
+		return nil, grpcerrors.NotFound(errFactoryPullRequestMissing, "The pull request was not found.")
 	}
 
-	prRepository := strings.TrimSpace(githubPR.GetBase().GetRepo().GetFullName())
-	if prRepository == "" {
-		prRepository = repository
+	repository := strings.TrimSpace(githubPR.GetBase().GetRepo().GetFullName())
+	if repository == "" {
+		repository = parsed.Repository
 	}
-	return githubPR, prRepository, nil
+	return &handOffPullRequest{
+		Provider:       models.FactoryPullRequestProviderGitHub,
+		ExternalID:     strconv.FormatInt(githubPR.GetID(), 10),
+		Repository:     repository,
+		Number:         int64(githubPR.GetNumber()),
+		URL:            handOffPullRequestURL(githubPR.GetHTMLURL(), rawURL),
+		Title:          githubPR.GetTitle(),
+		State:          githubPR.GetState(),
+		HeadBranch:     githubPR.GetHead().GetRef(),
+		HeadRepository: githubPR.GetHead().GetRepo().GetFullName(),
+	}, nil
+}
+
+func loadBitbucketHandOffPullRequest(
+	db *gorm.DB,
+	deps IntakeDependencies,
+	factory *models.Factory,
+	rawURL string,
+	parsed parsedHandOffPullRequestURL,
+) (*handOffPullRequest, error) {
+	client, err := newFactoryBitbucketAPI(db, deps, factory)
+	if err != nil {
+		return nil, err
+	}
+
+	pullRequest, err := client.GetPullRequest(parsed.Repository, int64(parsed.Number))
+	if err != nil {
+		return nil, grpcerrors.FailedPrecondition(err, "SuperPlane could not load the pull request.")
+	}
+	if pullRequest == nil {
+		return nil, grpcerrors.NotFound(errFactoryPullRequestMissing, "The pull request was not found.")
+	}
+
+	number := pullRequest.ID
+	if number <= 0 {
+		number = int64(parsed.Number)
+	}
+	return &handOffPullRequest{
+		Provider:       models.FactoryPullRequestProviderBitbucket,
+		Repository:     parsed.Repository,
+		Number:         number,
+		URL:            handOffPullRequestURL(pullRequest.HTMLURL, rawURL),
+		Title:          pullRequest.Title,
+		State:          pullRequest.State,
+		HeadBranch:     pullRequest.SourceBr,
+		HeadRepository: pullRequest.SourceRepository,
+	}, nil
+}
+
+func handOffPullRequestURL(apiURL, rawURL string) string {
+	if trimmed := strings.TrimSpace(apiURL); trimmed != "" {
+		return trimmed
+	}
+	return normalizeHandOffPullRequestURL(rawURL)
+}
+
+func normalizeHandOffPullRequestURL(rawURL string) string {
+	trimmed := strings.TrimSpace(rawURL)
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Host == "" {
+		return trimmed
+	}
+	parsed.Fragment = ""
+	return strings.TrimRight(parsed.String(), "/")
+}
+
+func handOffPullRequestProviderMismatch(urlProvider, workspaceProvider string) string {
+	return fmt.Sprintf(
+		"The pull request URL is for %s, but this workspace uses %s. SuperPlane supports GitHub and Bitbucket pull request URLs.",
+		handOffProviderLabel(urlProvider),
+		handOffProviderLabel(workspaceProvider),
+	)
+}
+
+func handOffProviderLabel(provider string) string {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case models.ProviderBitbucket:
+		return "Bitbucket"
+	case models.ProviderGitHub:
+		return "GitHub"
+	default:
+		return provider
+	}
 }
 
 func resolveHandOffLine(tx *gorm.DB, factory *models.Factory, lineName string) (*models.FactoryLine, error) {
@@ -450,17 +574,6 @@ func resolveImplementationStageIndex(stages []handOffStage) (int, error) {
 	return 0, invalidArgument("Cannot choose an implementation stage. Stages: " + joinStageNames(stages))
 }
 
-func pullRequestHeadRepository(githubPR *github.PullRequest, taskRepo string) string {
-	if githubPR == nil {
-		return taskRepo
-	}
-	headRepo := strings.TrimSpace(githubPR.GetHead().GetRepo().GetFullName())
-	if headRepo != "" {
-		return headRepo
-	}
-	return taskRepo
-}
-
 func resolveVerifyStageIndex(stages []handOffStage) (int, error) {
 	last := -1
 	for _, stage := range stages {
@@ -481,6 +594,33 @@ func joinStageNames(stages []handOffStage) string {
 		names = append(names, stage.Name)
 	}
 	return strings.Join(names, ", ")
+}
+
+func parseHandOffPullRequestURL(rawURL string) (parsedHandOffPullRequestURL, bool) {
+	if repository, number, ok := parseGitHubPullRequestURL(rawURL); ok {
+		return parsedHandOffPullRequestURL{
+			Provider:   models.FactoryPullRequestProviderGitHub,
+			Repository: repository,
+			Number:     number,
+		}, true
+	}
+	return parseBitbucketPullRequestURL(rawURL)
+}
+
+func parseBitbucketPullRequestURL(rawURL string) (parsedHandOffPullRequestURL, bool) {
+	matches := bitbucketHandOffPullRequestURLPattern.FindStringSubmatch(strings.TrimSpace(rawURL))
+	if len(matches) != 4 {
+		return parsedHandOffPullRequestURL{}, false
+	}
+	number, err := strconv.Atoi(matches[3])
+	if err != nil || number <= 0 {
+		return parsedHandOffPullRequestURL{}, false
+	}
+	return parsedHandOffPullRequestURL{
+		Provider:   models.FactoryPullRequestProviderBitbucket,
+		Repository: matches[1] + "/" + matches[2],
+		Number:     number,
+	}, true
 }
 
 func parseGitHubPullRequestURL(rawURL string) (repository string, number int, ok bool) {
