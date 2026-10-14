@@ -74,7 +74,7 @@ spec:
               set -euo pipefail
 
               git config --global user.email "superplaneagent@superplane.com"
-              git config --global user.name "SuperPlane Agent"
+              git config --global user.name "SuperPlane"
 
               branch="${BASE:-main}"
               heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1
@@ -89,10 +89,10 @@ spec:
               cd repo
 
               git config user.email "superplaneagent@superplane.com"
-              git config user.name "SuperPlane Agent"
-              export GIT_AUTHOR_NAME="SuperPlane Agent"
+              git config user.name "SuperPlane"
+              export GIT_AUTHOR_NAME="SuperPlane"
               export GIT_AUTHOR_EMAIL="superplaneagent@superplane.com"
-              export GIT_COMMITTER_NAME="SuperPlane Agent"
+              export GIT_COMMITTER_NAME="SuperPlane"
               export GIT_COMMITTER_EMAIL="superplaneagent@superplane.com"
               cat > .git/hooks/prepare-commit-msg <<'HOOK'
               #!/bin/sh
@@ -100,7 +100,7 @@ spec:
 
               msg_file="${1:?}"
               agent_email='superplaneagent@superplane.com'
-              signoff="Signed-off-by: SuperPlane Agent <${agent_email}>"
+              signoff="Signed-off-by: SuperPlane <${agent_email}>"
               tmp="${msg_file}.sp-identity"
               coauthors_file="${msg_file}.sp-coauthors"
               kept_file="${msg_file}.sp-kept"
