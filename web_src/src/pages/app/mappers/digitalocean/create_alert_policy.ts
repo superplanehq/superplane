@@ -65,16 +65,7 @@ export const createAlertPolicyMapper: ComponentBaseMapper = {
     details["Threshold"] = policy.value?.toString() ?? "-";
     details["Window"] = policy.window || "-";
     details["Enabled"] = policy.enabled ? "Yes" : "No";
-
-    const emails: string[] = policy.alerts?.email ?? [];
-    if (emails.length > 0) {
-      details["Email Notifications"] = emails.join(", ");
-    }
-
-    const slackChannels = policy.alerts?.slack ?? [];
-    if (slackChannels.length > 0) {
-      details["Slack Channel"] = slackChannels.map((s) => s.channel).join(", ");
-    }
+    addAlertNotificationDetails(details, policy);
 
     return details;
   },
@@ -84,6 +75,18 @@ export const createAlertPolicyMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function addAlertNotificationDetails(details: Record<string, string>, policy: AlertPolicyOutput): void {
+  const emails: string[] = policy.alerts?.email ?? [];
+  if (emails.length > 0) {
+    details["Email Notifications"] = emails.join(", ");
+  }
+
+  const slackChannels = policy.alerts?.slack ?? [];
+  if (slackChannels.length > 0) {
+    details["Slack Channel"] = slackChannels.map((channel) => channel.channel).join(", ");
+  }
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
