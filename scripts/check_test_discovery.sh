@@ -29,7 +29,7 @@ browser_tests="$(awk '
   }
 ' test/browser/*_test.go | LC_ALL=C sort -u)"
 browser_runners="$(awk '
-  {
+  /go test[[:space:]].*[[:space:]]-run[[:space:]]/ {
     while (match($0, /Test[A-Z][[:alnum:]_]*/)) {
       print substr($0, RSTART, RLENGTH)
       $0 = substr($0, RSTART + RLENGTH)
