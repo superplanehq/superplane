@@ -259,6 +259,9 @@ type BitbucketPullRequest struct {
 	ID                  int64  `json:"id"`
 	State               string `json:"state"`
 	Draft               bool   `json:"draft"`
+	Title               string `json:"title"`
+	HTMLURL             string
+	SourceRepository    string
 	SourceHash          string
 	SourceBr            string
 	DestBranch          string
@@ -274,9 +277,15 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 	}
 
 	var response struct {
-		ID     int64  `json:"id"`
-		State  string `json:"state"`
-		Draft  bool   `json:"draft"`
+		ID    int64  `json:"id"`
+		State string `json:"state"`
+		Draft bool   `json:"draft"`
+		Title string `json:"title"`
+		Links struct {
+			HTML struct {
+				Href string `json:"href"`
+			} `json:"html"`
+		} `json:"links"`
 		Source struct {
 			Branch struct {
 				Name string `json:"name"`
@@ -284,6 +293,9 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 			Commit struct {
 				Hash string `json:"hash"`
 			} `json:"commit"`
+			Repository struct {
+				FullName string `json:"full_name"`
+			} `json:"repository"`
 		} `json:"source"`
 		Destination struct {
 			Branch struct {
@@ -306,6 +318,9 @@ func (c *Client) GetPullRequest(repository string, id int64) (*BitbucketPullRequ
 		ID:                  response.ID,
 		State:               response.State,
 		Draft:               response.Draft,
+		Title:               response.Title,
+		HTMLURL:             response.Links.HTML.Href,
+		SourceRepository:    response.Source.Repository.FullName,
 		SourceHash:          response.Source.Commit.Hash,
 		SourceBr:            response.Source.Branch.Name,
 		DestBranch:          response.Destination.Branch.Name,
