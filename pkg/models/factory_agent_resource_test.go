@@ -350,6 +350,172 @@ func Test__ValidateFactoryAgentResourceName(t *testing.T) {
 	assert.NoError(t, models.ValidateFactoryAgentResourceName("linear-docs"))
 }
 
+func Test__FactoryAgentResourceSetupCommands(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	t.Run("creates the setup singleton", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "ignored", true, models.FactoryAgentResourceConfig{
+			Commands: []string{"npm ci", "  ", "go mod download"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, models.FactoryAgentResourceSetupName, resource.Name)
+		assert.Equal(t, []string{"npm ci", "go mod download"}, resource.Config.Data().Commands)
+
+		commands, err := factory.ListEnabledSetupCommands(db)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"npm ci", "go mod download"}, commands)
+	})
+
+	t.Run("rejects a second setup row", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{
+			Commands: []string{"npm ci"},
+		})
+		require.NoError(t, err)
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{
+			Commands: []string{"go test"},
+		})
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceNameTaken)
+	})
+
+	t.Run("rejects empty commands", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{})
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceCommandsRequired)
+	})
+
+	t.Run("rejects too many commands", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		commands := make([]string, models.MaxFactorySetupCommands+1)
+		for i := range commands {
+			commands[i] = fmt.Sprintf("echo %d", i)
+		}
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{
+			Commands: commands,
+		})
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceTooManyCommands)
+	})
+
+	t.Run("updates commands", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{
+			Commands: []string{"npm ci"},
+		})
+		require.NoError(t, err)
+		next := models.FactoryAgentResourceConfig{Commands: []string{"go test ./..."}}
+		require.NoError(t, resource.Update(db, nil, nil, &next))
+		commands, err := factory.ListEnabledSetupCommands(db)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"go test ./..."}, commands)
+	})
+
+	t.Run("disabled setup returns no commands", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{
+			Commands: []string{"npm ci"},
+		})
+		require.NoError(t, err)
+		disabled := false
+		require.NoError(t, resource.Update(db, nil, &disabled, nil))
+		commands, err := factory.ListEnabledSetupCommands(db)
+		require.NoError(t, err)
+		assert.Empty(t, commands)
+	})
+}
+
+func Test__FactoryAgentResourceContextRepos(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+
+	t.Run("creates a context repo with a derived name", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: "superplanehq/suss",
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "superplanehq-suss", resource.Name)
+		assert.Equal(t, "superplanehq/suss", resource.Config.Data().Repository)
+
+		enabled, err := factory.ListEnabledContextRepos(db)
+		require.NoError(t, err)
+		require.Len(t, enabled, 1)
+		assert.Equal(t, resource.ID, enabled[0].ID)
+	})
+
+	t.Run("rejects invalid repository", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: "not-a-repo",
+		})
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceRepositoryInvalid)
+	})
+
+	t.Run("rejects duplicate repository", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: "superplanehq/suss",
+		})
+		require.NoError(t, err)
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: "SuperplaneHQ/Suss",
+		})
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceRepositoryTaken)
+	})
+
+	t.Run("rejects over the context repo cap", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		for i := 0; i < models.MaxEnabledFactoryContextRepos; i++ {
+			_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+				Repository: fmt.Sprintf("acme/repo-%02d", i),
+			})
+			require.NoError(t, err)
+		}
+		_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: "acme/over-cap",
+		})
+		assert.ErrorIs(t, err, models.ErrFactoryAgentResourceContextRepoCapReached)
+	})
+
+	t.Run("renames the derived name when the repository changes", func(t *testing.T) {
+		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+		require.NoError(t, err)
+		resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+			Repository: "superplanehq/suss",
+		})
+		require.NoError(t, err)
+		next := models.FactoryAgentResourceConfig{Repository: "superplanehq/runner"}
+		require.NoError(t, resource.Update(db, nil, nil, &next))
+		assert.Equal(t, "superplanehq-runner", resource.Name)
+	})
+}
+
+func Test__NormalizeSetupCommands(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, []string{"npm ci", "go test"}, models.NormalizeSetupCommands([]string{"  npm ci ", "", "go test"}))
+	assert.Equal(t, "npm ci\ngo test", models.SetupCommandsText([]string{"npm ci", "go test"}))
+	assert.Equal(t, []string{"npm ci"}, models.ParseSetupCommandsText("npm ci\n\n"))
+	assert.Empty(t, models.ParseSetupCommandsText("  \n "))
+}
+
+func Test__NormalizeContextRepoName(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "superplanehq-suss", models.NormalizeContextRepoName("superplanehq/suss"))
+	assert.Equal(t, "superplanehq-suss", models.NormalizeContextRepoName("SuperplaneHQ/Suss"))
+	assert.Equal(t, "acme-repo", models.NormalizeContextRepoName("acme/repo"))
+}
+
 func Test__FactoryAgentResourceConfigValidateMCP(t *testing.T) {
 	t.Parallel()
 	err := models.FactoryAgentResourceConfig{Auth: models.FactoryAgentResourceAuthOAuth}.ValidateMCP()

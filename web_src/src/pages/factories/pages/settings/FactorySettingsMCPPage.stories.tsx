@@ -12,6 +12,9 @@ import {
   CONFIGURED_MCP_RESOURCES,
   CONFIGURED_MCP_RESOURCE_TOOLS_BY_ID,
   CONFIGURED_SKILLS,
+  CONTEXT_REPO_RUNNER,
+  CONTEXT_REPO_SUSS,
+  SETUP_COMMANDS_RESOURCE,
 } from "../../__fixtures__/agentResourceFixtures";
 import {
   defaultFactoriesFixture,
@@ -21,9 +24,7 @@ import {
 } from "../../__fixtures__/factoryPageResponses";
 import { factorySettingsNarrowSectionBodyClassName } from "../factoryPageLayoutStyles";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
-import { CrossRepoContextCard } from "./WorkspaceCrossRepoSection";
 import { WorkspaceDefaultModelSection } from "./WorkspaceDefaultModelSection";
-import { WorkspaceSetupStepsSection } from "./WorkspaceSetupStepsSection";
 
 const meta = {
   title: "Factories/Pages/Settings/Agent",
@@ -75,14 +76,26 @@ export const Configured: Story = {
     }),
 };
 
-/** Bash commands in the setup-steps field. The Agent page does not show this field. */
+/** Bash commands in the setup-steps summary card. */
 export const SetupSteps: Story = {
+  render: () =>
+    agentHarness({
+      ...defaultFactoriesFixture,
+      agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [SETUP_COMMANDS_RESOURCE] },
+    }),
+};
+
+/** Setup steps editor page. */
+export const SetupStepsEditor: Story = {
   render: () => (
-    <div className="min-h-screen bg-sidebar dark:bg-background">
-      <div className={cn(factorySettingsNarrowSectionBodyClassName, "pt-14")}>
-        <WorkspaceSetupStepsSection canUpdate commands={"npm ci\ngo mod download"} />
-      </div>
-    </div>
+    <FactoriesHarness
+      pathSuffix={`${agentPath}/setup-steps`}
+      experimentalFeatures={agentExperimentalFeatures}
+      factoriesFixture={{
+        ...defaultFactoriesFixture,
+        agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [SETUP_COMMANDS_RESOURCE] },
+      }}
+    />
   ),
 };
 
@@ -104,21 +117,13 @@ export const DefaultModel: Story = {
   ),
 };
 
-/** Extra repositories in the cross-repo list. The Agent page does not show this list. */
+/** Extra repositories in the cross-repo list. */
 export const CrossRepoContext: Story = {
-  render: () => (
-    <div className="min-h-screen bg-sidebar dark:bg-background">
-      <div className={cn(factorySettingsNarrowSectionBodyClassName, "pt-14")}>
-        <CrossRepoContextCard
-          canUpdate
-          host="github"
-          connected
-          catalog={["superplanehq/suss", "superplanehq/runner", "superplanehq/superplane"]}
-          initial={["superplanehq/suss", "superplanehq/runner"]}
-        />
-      </div>
-    </div>
-  ),
+  render: () =>
+    agentHarness({
+      ...defaultFactoriesFixture,
+      agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [CONTEXT_REPO_SUSS, CONTEXT_REPO_RUNNER] },
+    }),
 };
 
 /** Outbound MCP list request fails. */

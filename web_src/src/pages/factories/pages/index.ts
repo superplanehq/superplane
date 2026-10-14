@@ -44,6 +44,7 @@ export { FactorySettingsMCPPage } from "./settings/FactorySettingsMCPPage";
 export { FactorySettingsMCPConnectionPage } from "./settings/FactorySettingsMCPConnectionPage";
 export { FactorySettingsSkillsPage } from "./settings/FactorySettingsSkillsPage";
 export { FactorySettingsSkillEditorPage } from "./settings/FactorySettingsSkillEditorPage";
+export { FactorySettingsSetupStepsPage } from "./settings/FactorySettingsSetupStepsPage";
 export { FACTORY_SETTINGS_NAV_GROUPS, FACTORY_SETTINGS_NAV_ITEMS } from "./settings/settingsNavItems";
 export { OrganizationSettingsLayout } from "./organizationSettings/OrganizationSettingsLayout";
 export { OrganizationSettingsOverviewPage } from "./organizationSettings/OrganizationSettingsOverviewPage";
