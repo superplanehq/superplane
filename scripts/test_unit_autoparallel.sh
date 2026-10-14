@@ -6,18 +6,19 @@ set -euo pipefail
 #   make test.coverage.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/shard_args.sh"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+timings_file="${TEST_TIMINGS_FILE:-${script_dir}/test_timings.json}"
 
 echo "Running unit tests shard ${SHARD_INDEX}/${SHARD_COUNT}"
 
 module_prefix="$(go list -m)"
 
-# Weigh each package by its test file count, so that heavy packages do not
-# cluster on one shard.
+# Test file counts provide fallback weights for packages without timings.
 weighted_packages=()
 while IFS= read -r import_path; do
   package_dir="./${import_path#"$module_prefix"/}"
   test_file_count="$(find "$package_dir" -maxdepth 1 -type f -name '*_test.go' | wc -l | tr -d ' ')"
-  weighted_packages+=("${test_file_count}:${package_dir}")
+  weighted_packages+=("${package_dir}"$'\t'"${test_file_count}")
 done < <(go list ./pkg/... ./ee/...)
 
 if [[ "${#weighted_packages[@]}" -eq 0 ]]; then
@@ -25,35 +26,14 @@ if [[ "${#weighted_packages[@]}" -eq 0 ]]; then
   exit 0
 fi
 
-# Heaviest package first, so the greedy assignment below stays balanced.
-sorted_packages=()
-while IFS= read -r entry; do
-  sorted_packages+=("$entry")
-done < <(printf '%s\n' "${weighted_packages[@]}" | sort -t: -k1,1nr -k2,2)
-
-shard_loads=()
-for ((shard = 0; shard < SHARD_COUNT; shard++)); do
-  shard_loads+=("0")
-done
-
-# Assign every package to the least loaded shard, and keep the ones for us.
+# Capture the helper status before reading its output, so errors cannot silently
+# turn a shard into an empty successful job.
+assignment="$(printf '%s\n' "${weighted_packages[@]}" |
+  python3 "${script_dir}/lib/test_shards.py" unit "$SHARD_INDEX" "$SHARD_COUNT" "$timings_file")"
 shard_packages=()
-for entry in "${sorted_packages[@]}"; do
-  test_file_count="${entry%%:*}"
-  package_dir="${entry#*:}"
-
-  lightest_shard=0
-  for ((shard = 1; shard < SHARD_COUNT; shard++)); do
-    if [[ "${shard_loads[$shard]}" -lt "${shard_loads[$lightest_shard]}" ]]; then
-      lightest_shard="$shard"
-    fi
-  done
-
-  shard_loads[$lightest_shard]=$((shard_loads[lightest_shard] + test_file_count))
-  if [[ $((lightest_shard + 1)) -eq "$SHARD_INDEX" ]]; then
-    shard_packages+=("$package_dir")
-  fi
-done
+if [[ -n "$assignment" ]]; then
+  mapfile -t shard_packages <<< "$assignment"
+fi
 
 if [[ "${#shard_packages[@]}" -eq 0 ]]; then
   echo "No packages assigned to shard ${SHARD_INDEX}/${SHARD_COUNT}; exiting successfully."

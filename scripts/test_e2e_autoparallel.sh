@@ -6,6 +6,8 @@ set -euo pipefail
 #   make test.e2e.autoparallel SHARD_INDEX=$SEMAPHORE_JOB_INDEX SHARD_COUNT=$SEMAPHORE_JOB_COUNT
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib/shard_args.sh"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+timings_file="${TEST_TIMINGS_FILE:-${script_dir}/test_timings.json}"
 
 echo "Running e2e tests shard ${SHARD_INDEX}/${SHARD_COUNT}"
 
@@ -38,15 +40,12 @@ fi
 # Deduplicate and sort test names.
 mapfile -t all_tests < <(printf '%s\n' "${all_tests[@]}" | sort -u)
 
+assignment="$(printf '%s\t1\n' "${all_tests[@]}" |
+  python3 "${script_dir}/lib/test_shards.py" e2e "$SHARD_INDEX" "$SHARD_COUNT" "$timings_file")"
 selected_tests=()
-idx=0
-for test_name in "${all_tests[@]}"; do
-  shard=$(( (idx % SHARD_COUNT) + 1 ))
-  if [[ "$shard" -eq "$SHARD_INDEX" ]]; then
-    selected_tests+=("$test_name")
-  fi
-  idx=$((idx + 1))
-done
+if [[ -n "$assignment" ]]; then
+  mapfile -t selected_tests <<< "$assignment"
+fi
 
 if [[ "${#selected_tests[@]}" -eq 0 ]]; then
   echo "No tests assigned to shard ${SHARD_INDEX}/${SHARD_COUNT}; exiting successfully."
