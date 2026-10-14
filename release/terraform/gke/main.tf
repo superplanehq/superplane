@@ -27,9 +27,7 @@ locals {
   # has Artifact Registry reader.
   pulls_from_gcp_registry = (
     startswith(var.superplane_image_registry, "gcr.io/${var.project_id}") ||
-    can(regex("docker\\.pkg\\.dev/${var.project_id}(/|$)", var.superplane_image_registry)) ||
-    startswith(var.fleet_manager_image_registry, "gcr.io/${var.project_id}") ||
-    can(regex("docker\\.pkg\\.dev/${var.project_id}(/|$)", var.fleet_manager_image_registry))
+    can(regex("docker\\.pkg\\.dev/${var.project_id}(/|$)", var.superplane_image_registry))
   )
 }
 
