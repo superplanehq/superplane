@@ -26,7 +26,7 @@ for agents, not a substitute for the official document.
 
 | Text | STE mode |
 | --- | --- |
-| PR description Summary and Test plan | Descriptive + procedural |
+| PR description Summary | Descriptive |
 | Commit message **body** | Descriptive |
 | UI labels, buttons, helper text, empty states, errors, confirmations | Procedural / short descriptive |
 | Docs, runbooks, onboarding steps | Procedural and/or descriptive |
@@ -79,7 +79,7 @@ for agents, not a substitute for the official document.
 
 ### Procedural pattern
 
-When the reader must do something (test plan, UI steps, recovery text):
+When the reader must do something (UI steps, recovery text):
 
 ```text
 If the condition is true, do the action.
@@ -117,13 +117,14 @@ out of user-facing copy.
 `This change updates the onboarding flow for integrations.`  
 `The new flow shows connection status and the next required step.`
 
-**Weak PR test step:**  
+**Weak UI procedure:**  
 `Just make sure everything still works when you click around connecting GitHub and then going back.`
 
-**STE test step:**  
-`- [ ] Connect GitHub from the onboarding screen.`  
-`- [ ] Confirm the status shows Connected.`  
-`- [ ] Go back one step and confirm the status stays Connected.`
+**STE UI procedure:**  
+`Connect GitHub from the onboarding screen.`  
+`Confirm the status shows Connected.`  
+`Go back one step.`  
+`Confirm the status stays Connected.`
 
 **Weak UI:**  
 `Oops! Something went wrong on our end.`
