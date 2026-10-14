@@ -147,24 +147,6 @@ variable "image_name" {
   default     = "superplane"
 }
 
-variable "fleet_manager_image_registry" {
-  description = "Container registry for Fleet Manager. Empty uses image_registry."
-  type        = string
-  default     = ""
-}
-
-variable "fleet_manager_image_name" {
-  description = "Fleet Manager image repository name"
-  type        = string
-  default     = "superplane-fleet-manager"
-}
-
-variable "fleet_manager_image_tag" {
-  description = "Fleet Manager image tag. Empty uses superplane_image_tag. Set a tag when Fleet Manager is enabled and superplane_image_tag is empty."
-  type        = string
-  default     = ""
-}
-
 variable "helm_chart_repository" {
   description = "OCI or HTTP Helm repository. Ignored when helm_chart_path is set."
   type        = string
@@ -189,11 +171,10 @@ variable "container_registry_id" {
   default     = ""
 }
 
-variable "fleet_manager_config" {
-  description = "Fleet Manager YAML or JSON body. Empty disables the Fleet Manager Deployment."
-  type        = string
-  default     = ""
-  sensitive   = true
+variable "runner_zones" {
+  description = "Availability zones that Fleet Manager can use for runner VMs."
+  type        = list(string)
+  default     = ["1"]
 }
 
 # -----------------------------------------------------------------------------
