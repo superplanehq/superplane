@@ -16,7 +16,7 @@ global_job_config:
     - name: FLEET_MANAGER_IMAGE_REPO
       value: ghcr.io/superplanehq/fleet-manager
     - name: SKOPEO_CONTAINER_IMAGE
-      value: quay.io/skopeo/stable@sha256:97772f3c64fd2fba720b2bafaf37239dc44d8b1c625c8383c64044832efe9ed9
+      value: quay.io/skopeo/stable:v1.22.3@sha256:22ea3c3baf639147b07fb9f2ea28a6308edf7909e919d91a5d296af0121d7ed9
   prologue:
     commands:
       - checkout
@@ -38,6 +38,7 @@ blocks:
           commands:
             - bash release/component-release-artifact.sh pull fleet-manager "$RELEASE_VERSION" "build/fleet-manager/$RELEASE_VERSION"
             - |
+              set -euo pipefail
               release_dir="build/fleet-manager/$RELEASE_VERSION"
               (cd "$release_dir" && sha256sum --check release-manifest.sha256)
               node release/component-release.js verify-manifest \
@@ -51,6 +52,7 @@ blocks:
               (cd "$release_dir" && sha256sum --check checksums.txt)
               test -n "${GITHUB_TOKEN:-}"
             - |
+              set -euo pipefail
               release_dir="build/fleet-manager/$RELEASE_VERSION"
               node release/component-release.js stage-github-release \
                 --component fleet-manager \
@@ -63,12 +65,14 @@ blocks:
             - mkdir -m 700 /tmp/ghcr-auth
             - printf '%s' "$GHCR_PUSH_TOKEN" | REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json bash release/fleet-manager/run-skopeo.sh login ghcr.io --username superplanehq --password-stdin
             - |
+              set -euo pipefail
               export REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json
               export FLEET_MANAGER_DIGEST_OUTPUT=/tmp/fleet-manager-image-digest
               bash release/fleet-manager/publish-image.sh \
                 "$RELEASE_VERSION" \
                 "build/fleet-manager/$RELEASE_VERSION/fleet-manager.oci.tar"
             - |
+              set -euo pipefail
               export REGISTRY_AUTH_FILE=/tmp/ghcr-auth/auth.json
               image_digest="$(cat /tmp/fleet-manager-image-digest)"
               bash release/fleet-manager/verify-image.sh \
@@ -77,6 +81,7 @@ blocks:
                 "$RELEASE_VERSION" \
                 "$SEMAPHORE_GIT_SHA"
             - |
+              set -euo pipefail
               release_dir="build/fleet-manager/$RELEASE_VERSION"
               release_notes_args=()
               if [ -f "$release_dir/release-notes.md" ]; then
@@ -90,6 +95,7 @@ blocks:
                 --sha "$SEMAPHORE_GIT_SHA" \
                 "${release_notes_args[@]}"
             - |
+              set -euo pipefail
               encoded_tag="$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "fleet-manager/$RELEASE_VERSION")"
               bash release/verify-public-assets.sh \
                 "https://github.com/superplanehq/superplane/releases/download/$encoded_tag" \
