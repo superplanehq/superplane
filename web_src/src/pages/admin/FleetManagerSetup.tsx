@@ -1,25 +1,24 @@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
-import { useCreateUserToken } from "@/hooks/useUserTokens";
+import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
 import {
   fleetManagerInstallCommand,
   fleetManagerRestartCommand,
   fleetManagerSecretCommand,
-  generateFleetManagerValues,
   type FleetManagerProvider,
   type FleetManagerSetupMetadata,
 } from "@/lib/fleetManagerSetup";
 import { CopyButton } from "@/ui/CopyButton";
-import { useEffect, useMemo, useState } from "react";
 
 type ProviderField = { key: string; label: string; placeholder: string };
 const providerFields: Record<FleetManagerProvider, ProviderField[]> = {
   aws: [
     { key: "region", label: "AWS region", placeholder: "us-east-1" },
-    { key: "machineType", label: "EC2 instance type", placeholder: "m8a.large" },
+    { key: "machineTypeAmd64", label: "EC2 instance type for AMD64", placeholder: "m8a.large" },
+    { key: "machineTypeArm64", label: "EC2 instance type for ARM64", placeholder: "m8g.large" },
     { key: "subnetIds", label: "Private subnet IDs", placeholder: "subnet-a, subnet-b" },
     { key: "securityGroupIds", label: "Runner security group IDs", placeholder: "sg-0123456789" },
     { key: "runnerIdentity", label: "Runner instance profile", placeholder: "superplane-runner" },
@@ -32,7 +31,8 @@ const providerFields: Record<FleetManagerProvider, ProviderField[]> = {
   gcp: [
     { key: "projectId", label: "GCP project", placeholder: "my-project" },
     { key: "zones", label: "Zones", placeholder: "us-central1-a, us-central1-b" },
-    { key: "machineType", label: "Compute Engine machine type", placeholder: "e2-standard-4" },
+    { key: "machineTypeAmd64", label: "Compute Engine machine type for AMD64", placeholder: "e2-standard-4" },
+    { key: "machineTypeArm64", label: "Compute Engine machine type for ARM64", placeholder: "t2a-standard-4" },
     { key: "subnetwork", label: "Runner subnetwork", placeholder: "projects/.../subnetworks/runners" },
     { key: "networkTags", label: "Runner network tags", placeholder: "superplane-runner" },
     {
@@ -51,7 +51,8 @@ const providerFields: Record<FleetManagerProvider, ProviderField[]> = {
     { key: "resourceGroup", label: "Resource group", placeholder: "superplane" },
     { key: "location", label: "Location", placeholder: "eastus" },
     { key: "zones", label: "Zones", placeholder: "1, 2" },
-    { key: "machineType", label: "Azure VM size", placeholder: "Standard_D2ds_v4" },
+    { key: "machineTypeAmd64", label: "Azure VM size for AMD64", placeholder: "Standard_D2ds_v4" },
+    { key: "machineTypeArm64", label: "Azure VM size for ARM64", placeholder: "Standard_D2ps_v5" },
     { key: "subnetId", label: "Runner subnet ID", placeholder: "/subscriptions/.../subnets/runners" },
     {
       key: "securityGroupIds",
@@ -114,12 +115,12 @@ function FleetSelection({ metadata, provider, selected, onProvider, onToggle }: 
                 checked={selected.includes(preset.id)}
                 onChange={(event) => onToggle(preset.id, event.target.checked)}
               />
-              <label htmlFor={inputId} className="text-sm">
+              <Label htmlFor={inputId} className="text-sm">
                 <span className="block font-medium">{preset.id}</span>
                 <span className="text-gray-500">
                   {preset.spec.architecture}, {preset.spec.cpuMillicores}m CPU, {preset.spec.memoryMb} MB memory
                 </span>
-              </label>
+              </Label>
             </div>
           );
         })}
@@ -131,11 +132,15 @@ function FleetSelection({ metadata, provider, selected, onProvider, onToggle }: 
 type InfrastructureProps = {
   provider: FleetManagerProvider;
   managerId: string;
+  namespace: string;
+  serviceAccountName: string;
   runnerVersion: string;
   warmCapacity: number;
   maxCapacity: number;
   fields: Record<string, string>;
   setManagerId: (value: string) => void;
+  setNamespace: (value: string) => void;
+  setServiceAccountName: (value: string) => void;
   setRunnerVersion: (value: string) => void;
   setWarmCapacity: (value: number) => void;
   setMaxCapacity: (value: number) => void;
@@ -144,7 +149,7 @@ type InfrastructureProps = {
 
 const Field = ({ id, label, ...props }: { id: string; label: string } & React.ComponentProps<typeof Input>) => (
   <div className="space-y-1 text-sm">
-    <label htmlFor={id}>{label}</label>
+    <Label htmlFor={id}>{label}</Label>
     <Input id={id} {...props} />
   </div>
 );
@@ -164,6 +169,18 @@ function InfrastructureFields(props: InfrastructureProps) {
           label="Immutable Runner version"
           value={props.runnerVersion}
           onChange={(event) => props.setRunnerVersion(event.target.value)}
+        />
+        <Field
+          id="namespace"
+          label="Kubernetes namespace"
+          value={props.namespace}
+          onChange={(event) => props.setNamespace(event.target.value)}
+        />
+        <Field
+          id="service-account-name"
+          label="Fleet Manager service account"
+          value={props.serviceAccountName}
+          onChange={(event) => props.setServiceAccountName(event.target.value)}
         />
         <Field
           id="warm-capacity"
@@ -200,14 +217,18 @@ type InstructionsProps = {
   metadata: FleetManagerSetupMetadata;
   values: string;
   organizationId: string;
+  namespace: string;
+  validationErrors: string[];
   tokenPending: boolean;
+  tokenError: string | null;
   plaintextToken: string | null;
   onCreateToken: () => void;
 };
 
 function InstallationInstructions(props: InstructionsProps) {
-  const secretCommand = fleetManagerSecretCommand("superplane", "superplane-fleet-manager-token");
-  const installCommand = fleetManagerInstallCommand(props.metadata, "superplane", "values.yaml");
+  const secretCommand = fleetManagerSecretCommand(props.namespace, "superplane-fleet-manager-token");
+  const installCommand = fleetManagerInstallCommand(props.metadata, props.namespace, "values.yaml");
+  const configurationIsValid = props.validationErrors.length === 0;
   return (
     <>
       <Section title="3. Review values.yaml">
@@ -220,9 +241,25 @@ function InstallationInstructions(props: InstructionsProps) {
           className="min-h-96 font-mono text-xs"
           aria-label="Fleet Manager values"
         />
-        <CopyButton variant="button" text={props.values}>
-          Copy values.yaml
-        </CopyButton>
+        {props.validationErrors.length > 0 && (
+          <div role="alert" className="text-sm text-red-600 dark:text-red-400">
+            <p>Fix these values before you copy the configuration:</p>
+            <ul className="list-disc pl-5">
+              {props.validationErrors.map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {configurationIsValid ? (
+          <CopyButton variant="button" text={props.values}>
+            Copy values.yaml
+          </CopyButton>
+        ) : (
+          <Button type="button" variant="outline" disabled>
+            Copy values.yaml
+          </Button>
+        )}
       </Section>
       <Section title="4. Create the token Secret">
         <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -232,6 +269,11 @@ function InstallationInstructions(props: InstructionsProps) {
         <Button type="button" disabled={!props.organizationId || props.tokenPending} onClick={props.onCreateToken}>
           {props.tokenPending ? "Creating token..." : "Create Fleet Manager token"}
         </Button>
+        {props.tokenError && (
+          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+            {props.tokenError}
+          </p>
+        )}
         {props.plaintextToken && (
           <div className="space-y-2">
             <Textarea
@@ -266,8 +308,8 @@ function InstallationInstructions(props: InstructionsProps) {
           Copy Helm command
         </CopyButton>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          After token rotation, run <code>{fleetManagerRestartCommand("superplane")}</code>. Verify the new token, then
-          revoke the old token.
+          After token rotation, run <code>{fleetManagerRestartCommand(props.namespace)}</code>. Verify the new token,
+          then revoke the old token.
         </p>
       </Section>
       <Section title="Fleet removal">
@@ -282,64 +324,11 @@ function InstallationInstructions(props: InstructionsProps) {
 }
 
 export default function FleetManagerSetup() {
-  const [metadata, setMetadata] = useState<FleetManagerSetupMetadata | null>(null);
-  const [loadError, setLoadError] = useState(false);
-  const [provider, setProvider] = useState<FleetManagerProvider>("aws");
-  const [managerId, setManagerId] = useState("my-cluster");
-  const [runnerVersion, setRunnerVersion] = useState("");
-  const [selectedFleetIds, setSelectedFleetIds] = useState<string[]>([]);
-  const [warmCapacity, setWarmCapacity] = useState(0);
-  const [maxCapacity, setMaxCapacity] = useState(1);
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [plaintextToken, setPlaintextToken] = useState<string | null>(null);
-  const organizationId = useAccountOrganizations().data?.[0]?.id || "";
-  const createToken = useCreateUserToken(organizationId);
+  const setup = useFleetManagerSetup();
 
-  useEffect(() => {
-    let active = true;
-    fetch("/admin/api/installation/fleet-manager/setup", { credentials: "include" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Could not load Fleet Manager setup metadata");
-        return (await response.json()) as FleetManagerSetupMetadata;
-      })
-      .then((body) => {
-        if (!active) return;
-        setMetadata(body);
-        setRunnerVersion(body.defaultRunnerVersion);
-        setSelectedFleetIds(body.fleetPresets[0] ? [body.fleetPresets[0].id] : []);
-      })
-      .catch(() => active && setLoadError(true));
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const values = useMemo(
-    () =>
-      metadata
-        ? generateFleetManagerValues({
-            metadata,
-            provider,
-            managerId,
-            runnerVersion,
-            selectedFleetIds,
-            warmCapacity,
-            maxCapacity,
-            fields,
-          })
-        : "",
-    [fields, managerId, maxCapacity, metadata, provider, runnerVersion, selectedFleetIds, warmCapacity],
-  );
-  const toggleFleet = (id: string, checked: boolean) =>
-    setSelectedFleetIds((current) =>
-      checked ? [...new Set([...current, id])] : current.filter((item) => item !== id),
-    );
-  const generateToken = async () =>
-    setPlaintextToken((await createToken.mutateAsync({ name: "Fleet Manager" }))?.plaintext || null);
-
-  if (loadError)
+  if (setup.loadError)
     return <p className="text-sm text-red-600">Could not load Fleet Manager setup. Refresh the page and try again.</p>;
-  if (!metadata) return <p className="text-sm text-gray-500">Loading Fleet Manager setup...</p>;
+  if (!setup.metadata) return <p className="text-sm text-gray-500">Loading Fleet Manager setup...</p>;
 
   return (
     <div className="space-y-6">
@@ -350,32 +339,39 @@ export default function FleetManagerSetup() {
         </p>
       </header>
       <FleetSelection
-        metadata={metadata}
-        provider={provider}
-        selected={selectedFleetIds}
-        onProvider={setProvider}
-        onToggle={toggleFleet}
+        metadata={setup.metadata}
+        provider={setup.provider}
+        selected={setup.selectedFleetIds}
+        onProvider={setup.setProvider}
+        onToggle={setup.toggleFleet}
       />
       <InfrastructureFields
-        provider={provider}
-        managerId={managerId}
-        runnerVersion={runnerVersion}
-        warmCapacity={warmCapacity}
-        maxCapacity={maxCapacity}
-        fields={fields}
-        setManagerId={setManagerId}
-        setRunnerVersion={setRunnerVersion}
-        setWarmCapacity={setWarmCapacity}
-        setMaxCapacity={setMaxCapacity}
-        setField={(key, value) => setFields((current) => ({ ...current, [key]: value }))}
+        provider={setup.provider}
+        managerId={setup.managerId}
+        namespace={setup.namespace}
+        serviceAccountName={setup.serviceAccountName}
+        runnerVersion={setup.runnerVersion}
+        warmCapacity={setup.warmCapacity}
+        maxCapacity={setup.maxCapacity}
+        fields={setup.fields}
+        setManagerId={setup.setManagerId}
+        setNamespace={setup.setNamespace}
+        setServiceAccountName={setup.setServiceAccountName}
+        setRunnerVersion={setup.setRunnerVersion}
+        setWarmCapacity={setup.setWarmCapacity}
+        setMaxCapacity={setup.setMaxCapacity}
+        setField={setup.setField}
       />
       <InstallationInstructions
-        metadata={metadata}
-        values={values}
-        organizationId={organizationId}
-        tokenPending={createToken.isPending}
-        plaintextToken={plaintextToken}
-        onCreateToken={() => void generateToken()}
+        metadata={setup.metadata}
+        values={setup.values}
+        organizationId={setup.organizationId}
+        namespace={setup.namespace}
+        validationErrors={setup.validationErrors}
+        tokenPending={setup.tokenPending}
+        tokenError={setup.tokenError}
+        plaintextToken={setup.plaintextToken}
+        onCreateToken={() => void setup.generateToken()}
       />
     </div>
   );
