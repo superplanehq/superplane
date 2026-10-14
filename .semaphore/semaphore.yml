@@ -64,6 +64,7 @@ blocks:
 
         - name: Checks
           commands:
+            - python3 -m unittest discover -s scripts -p 'test_ci_test_weights.py'
             - make check.test.shards
             - make test.release
             - make check.db.structure
@@ -81,6 +82,7 @@ blocks:
         always:
           commands:
             - "[ -f junit-report.xml ] && test-results publish junit-report.xml"
+            - bash scripts/ci_store_test_timing_report.sh
             - "if [ -d tmp/screenshots ] && ls tmp/screenshots/**/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi"
             - bash scripts/ci_cache_store_go.sh
 
@@ -192,6 +194,10 @@ after_pipeline:
       - name: Submit Reports
         commands:
           - test-results gen-pipeline-report
+      - name: Store Test Timings
+        commands:
+          - checkout
+          - bash scripts/ci_publish_test_timings.sh
 
 promotions:
   - name: Prepare Runner Release
