@@ -425,15 +425,14 @@ func loadBitbucketHandOffPullRequest(
 		return nil, grpcerrors.NotFound(errFactoryPullRequestMissing, "The pull request was not found.")
 	}
 
-	id := pullRequest.ID
-	if id <= 0 {
-		id = int64(parsed.Number)
+	number := pullRequest.ID
+	if number <= 0 {
+		number = int64(parsed.Number)
 	}
 	return &handOffPullRequest{
 		Provider:       models.FactoryPullRequestProviderBitbucket,
-		ExternalID:     strconv.FormatInt(id, 10),
 		Repository:     parsed.Repository,
-		Number:         id,
+		Number:         number,
 		URL:            handOffPullRequestURL(pullRequest.HTMLURL, rawURL),
 		Title:          pullRequest.Title,
 		State:          pullRequest.State,

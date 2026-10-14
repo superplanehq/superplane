@@ -281,6 +281,18 @@ func Test__HandOffWorkOrder__VerifyAcceptsBitbucketPullRequest(t *testing.T) {
 	}
 
 	t.Run("records the pull request and places the task in verify", func(t *testing.T) {
+		prior, err := factoryModel.CreateWorkOrder(db, "Old repository", "", &r.User, nil, nil)
+		require.NoError(t, err)
+		_, err = prior.CreatePullRequest(db, models.FactoryPullRequestParams{
+			Provider:   models.FactoryPullRequestProviderBitbucket,
+			ExternalID: "42",
+			Repository: "acme/old",
+			Number:     42,
+			URL:        "https://bitbucket.org/acme/old/pull-requests/42",
+			State:      models.FactoryPullRequestStateOpen,
+		})
+		require.NoError(t, err)
+
 		result := handOff(t, 42, `{
 			"id": 42,
 			"title": "Ready",
@@ -293,9 +305,11 @@ func Test__HandOffWorkOrder__VerifyAcceptsBitbucketPullRequest(t *testing.T) {
 		assert.Equal(t, "https://bitbucket.org/acme/app/pull-requests/42", result.PullRequestURL)
 		assert.Equal(t, pb.WorkOrder_STATE_OPEN, result.Order.GetState())
 		require.Len(t, result.Order.GetPullRequests(), 1)
-		assert.Equal(t, pb.FactoryPullRequest_PROVIDER_BITBUCKET, result.Order.GetPullRequests()[0].GetProvider())
-		assert.Equal(t, "42", result.Order.GetPullRequests()[0].GetExternalId())
-		assert.Equal(t, "acme/app", result.Order.GetPullRequests()[0].GetRepository())
+		recorded := result.Order.GetPullRequests()[0]
+		assert.Equal(t, pb.FactoryPullRequest_PROVIDER_BITBUCKET, recorded.GetProvider())
+		assert.Empty(t, recorded.GetExternalId())
+		assert.Equal(t, int64(42), recorded.GetNumber())
+		assert.Equal(t, "acme/app", recorded.GetRepository())
 
 		order, err := factoryModel.FindWorkOrder(db, uuid.MustParse(result.Order.GetId()))
 		require.NoError(t, err)
