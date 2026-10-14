@@ -21,8 +21,21 @@ if (( ${#uncovered[@]} > 0 )); then
   exit 1
 fi
 
-browser_tests="$(rg --no-filename -o '^func Test[[:alnum:]_]*' test/browser --glob '*_test.go' | awk '{print $2}' | LC_ALL=C sort -u)"
-browser_runners="$(rg --no-filename -o 'Test[A-Z][[:alnum:]_]*' scripts/check_monaco_worker_startup.sh scripts/check_backlog_create_tabs.sh | LC_ALL=C sort -u)"
+browser_tests="$(awk '
+  /^func Test[[:alnum:]_]*[[:space:]]*\(/ {
+    name = $2
+    sub(/\(.*/, "", name)
+    print name
+  }
+' test/browser/*_test.go | LC_ALL=C sort -u)"
+browser_runners="$(awk '
+  {
+    while (match($0, /Test[A-Z][[:alnum:]_]*/)) {
+      print substr($0, RSTART, RLENGTH)
+      $0 = substr($0, RSTART + RLENGTH)
+    }
+  }
+' scripts/check_monaco_worker_startup.sh scripts/check_backlog_create_tabs.sh | LC_ALL=C sort -u)"
 unrouted_browser_tests="$(comm -23 <(printf '%s\n' "$browser_tests") <(printf '%s\n' "$browser_runners"))"
 
 if [[ -n "$unrouted_browser_tests" ]]; then
