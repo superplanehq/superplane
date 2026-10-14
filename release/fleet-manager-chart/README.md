@@ -72,8 +72,9 @@ interactively so it does not enter shell history:
 
 ```sh
 read -rsp 'Fleet Manager token: ' FLEET_MANAGER_TOKEN; echo
-kubectl --namespace superplane create secret generic superplane-fleet-manager-token \
-  --from-literal=INSTALLATION_ADMIN_TOKEN="$FLEET_MANAGER_TOKEN" \
+printf %s "$FLEET_MANAGER_TOKEN" | \
+  kubectl --namespace superplane create secret generic superplane-fleet-manager-token \
+  --from-file=INSTALLATION_ADMIN_TOKEN=/dev/stdin \
   --dry-run=client --output=yaml | kubectl apply -f -
 unset FLEET_MANAGER_TOKEN
 ```
