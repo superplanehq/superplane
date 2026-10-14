@@ -3,6 +3,7 @@ package factories
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"strconv"
 	"testing"
 	"time"
@@ -246,6 +247,158 @@ func Test__HandOffWorkOrder__VerifyStoresForkHeadRepository(t *testing.T) {
 	require.True(t, hasBranchArtifact(artifacts, "feat/refunds", "contributor/app"))
 }
 
+func Test__HandOffWorkOrder__VerifyAcceptsBitbucketPullRequest(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel := seedBitbucketHandOffFactory(t, r, db)
+	implApp, implEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start-impl")
+	doneApp, doneEntry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "done", "start-done")
+	require.NoError(t, implApp.StampFactoryAppTemplate(db, implEntry, "line-implementation", 1))
+	require.NoError(t, doneApp.StampFactoryAppTemplate(db, doneEntry, "pr-closure", 1))
+	renameCanvas(t, db, doneApp, "Done")
+	_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: implApp.ID, Entrypoint: implEntry},
+		{Type: models.FactoryLineStepTypeRunApp, AppID: doneApp.ID, Entrypoint: doneEntry},
+	})
+	require.NoError(t, err)
+
+	handOff := func(t *testing.T, number int, body, rawURL string) *HandOffWorkOrderResult {
+		t.Helper()
+		stubBitbucketMergeAPI(t, map[string][]*http.Response{
+			"/2.0/repositories/acme/app/pullrequests/" + strconv.Itoa(number): {okBitbucketResponse(body)},
+		})
+		result, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+			FactoryID:      factoryModel.ID.String(),
+			Title:          "Review refund retries",
+			Plan:           "# Retry refunds",
+			Column:         HandOffColumnVerify,
+			PullRequestURL: rawURL,
+		})
+		require.NoError(t, err)
+		return result
+	}
+
+	t.Run("records the pull request and places the task in verify", func(t *testing.T) {
+		result := handOff(t, 42, `{
+			"id": 42,
+			"title": "Ready",
+			"state": "OPEN",
+			"links": {"html": {"href": "https://bitbucket.org/acme/app/pull-requests/42"}},
+			"source": {"branch": {"name": "feat/refunds"}, "repository": {"full_name": "contributor/app"}}
+		}`, "https://bitbucket.org/acme/app/pull-requests/42?w=1")
+
+		assert.Equal(t, HandOffColumnVerify, result.Column)
+		assert.Equal(t, "https://bitbucket.org/acme/app/pull-requests/42", result.PullRequestURL)
+		assert.Equal(t, pb.WorkOrder_STATE_OPEN, result.Order.GetState())
+		require.Len(t, result.Order.GetPullRequests(), 1)
+		assert.Equal(t, pb.FactoryPullRequest_PROVIDER_BITBUCKET, result.Order.GetPullRequests()[0].GetProvider())
+		assert.Equal(t, "42", result.Order.GetPullRequests()[0].GetExternalId())
+		assert.Equal(t, "acme/app", result.Order.GetPullRequests()[0].GetRepository())
+
+		order, err := factoryModel.FindWorkOrder(db, uuid.MustParse(result.Order.GetId()))
+		require.NoError(t, err)
+		grouped, err := models.ListPullRequestsByWorkOrderIDs(db, []uuid.UUID{order.ID})
+		require.NoError(t, err)
+		require.Len(t, grouped[order.ID], 1)
+		assert.Equal(t, models.FactoryPullRequestProviderBitbucket, grouped[order.ID][0].Provider)
+
+		artifacts, err := order.ListArtifacts(db)
+		require.NoError(t, err)
+		require.True(t, hasBranchArtifact(artifacts, "feat/refunds", "contributor/app"))
+
+		require.Len(t, result.Order.GetLineDispatches(), 1)
+		dispatch := result.Order.GetLineDispatches()[0]
+		assert.Equal(t, pb.WorkOrderLineDispatch_STATE_FINISHED, dispatch.GetState())
+		assert.Equal(t, pb.WorkOrderLineDispatch_RESULT_PASSED, dispatch.GetResult())
+		require.Len(t, dispatch.GetStepExecutions(), 1)
+		assert.Equal(t, int32(0), dispatch.GetStepExecutions()[0].GetStepIndex())
+		assert.Nil(t, dispatch.GetStepExecutions()[0].GetRun())
+
+		var runCount int64
+		require.NoError(t, db.Model(&models.CanvasRun{}).Where("workflow_id IN ?", []any{implApp.ID, doneApp.ID}).Count(&runCount).Error)
+		assert.Zero(t, runCount)
+	})
+
+	t.Run("uses the caller URL and task repository when Bitbucket omits them", func(t *testing.T) {
+		result := handOff(t, 43, `{
+			"id": 43,
+			"state": "OPEN",
+			"source": {"branch": {"name": "feat/refunds"}}
+		}`, "https://bitbucket.org/acme/app/pull-requests/43/")
+
+		assert.Equal(t, "https://bitbucket.org/acme/app/pull-requests/43", result.PullRequestURL)
+		order, err := factoryModel.FindWorkOrder(db, uuid.MustParse(result.Order.GetId()))
+		require.NoError(t, err)
+		artifacts, err := order.ListArtifacts(db)
+		require.NoError(t, err)
+		require.True(t, hasBranchArtifact(artifacts, "feat/refunds", "acme/app"))
+	})
+}
+
+func Test__HandOffWorkOrder__VerifyRejectsUnsupportedPullRequestURL(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	githubFactory := seedHandOffFactory(t, r, db)
+	addHandOffLine(t, r, db, githubFactory)
+	bitbucketFactory := seedBitbucketHandOffFactory(t, r, db)
+	addHandOffLine(t, r, db, bitbucketFactory)
+
+	reject := func(t *testing.T, factoryID, rawURL string) error {
+		t.Helper()
+		_, err := HandOffWorkOrder(ctx, IntakeDependencies{}, r.Organization.ID.String(), HandOffWorkOrderRequest{
+			FactoryID:      factoryID,
+			Title:          "Ship it",
+			Plan:           "# Plan",
+			Column:         HandOffColumnVerify,
+			PullRequestURL: rawURL,
+		})
+		require.Error(t, err)
+		return err
+	}
+
+	t.Run("bitbucket url on a github workspace", func(t *testing.T) {
+		err := reject(t, githubFactory.ID.String(), "https://bitbucket.org/acme/app/pull-requests/42")
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assertNamesSupportedPullRequestURL(t, err)
+	})
+
+	t.Run("github url on a bitbucket workspace", func(t *testing.T) {
+		err := reject(t, bitbucketFactory.ID.String(), "https://github.com/acme/app/pull/42")
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assertNamesSupportedPullRequestURL(t, err)
+	})
+
+	t.Run("malformed url", func(t *testing.T) {
+		err := reject(t, bitbucketFactory.ID.String(), "https://bitbucket.org/acme/app/pull/42")
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assertNamesSupportedPullRequestURL(t, err)
+	})
+
+	t.Run("bitbucket pull request in another repository", func(t *testing.T) {
+		stubBitbucketMergeAPI(t, bitbucketHandOffPRResponse("other/repo", 9, "OPEN", "feat/other"))
+		err := reject(t, bitbucketFactory.ID.String(), "https://bitbucket.org/other/repo/pull-requests/9")
+		assert.Equal(t, codes.InvalidArgument, grpcerrors.Code(err))
+		assert.Contains(t, grpcerrors.StatusMessage(err), "does not match the task repository")
+	})
+
+	t.Run("declined bitbucket pull request", func(t *testing.T) {
+		stubBitbucketMergeAPI(t, bitbucketHandOffPRResponse("acme/app", 7, "DECLINED", "feat/closed"))
+		err := reject(t, bitbucketFactory.ID.String(), "https://bitbucket.org/acme/app/pull-requests/7")
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+		assert.Contains(t, grpcerrors.StatusMessage(err), "not open")
+	})
+
+	t.Run("merged bitbucket pull request", func(t *testing.T) {
+		stubBitbucketMergeAPI(t, bitbucketHandOffPRResponse("acme/app", 8, "MERGED", "feat/merged"))
+		err := reject(t, bitbucketFactory.ID.String(), "https://bitbucket.org/acme/app/pull-requests/8")
+		assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+		assert.Contains(t, grpcerrors.StatusMessage(err), "not open")
+	})
+}
+
 func Test__HandOffWorkOrder__ImplementFailedDispatchLeavesNoTask(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -401,6 +554,37 @@ func Test__HandOffWorkOrder__RejectsInvalidInput(t *testing.T) {
 		assert.Contains(t, grpcerrors.StatusMessage(err), planApp.Name)
 		assert.Contains(t, grpcerrors.StatusMessage(err), "Close work")
 	})
+}
+
+func seedBitbucketHandOffFactory(t *testing.T, r *support.ResourceRegistry, db *gorm.DB) *models.Factory {
+	t.Helper()
+	factoryModel := seedHandOffFactory(t, r, db)
+	provider := models.ProviderBitbucket
+	require.NoError(t, factoryModel.UpdateOnboarding(db, models.FactoryOnboardingPatch{VCSProvider: &provider}))
+	return factoryModel
+}
+
+func addHandOffLine(t *testing.T, r *support.ResourceRegistry, db *gorm.DB, factoryModel *models.Factory) {
+	t.Helper()
+	app, entry := support.CreateFactoryAppWithOnRunTrigger(t, r, factoryModel.ID, "implement", "start-impl")
+	_, err := factoryModel.CreateLine(db, "ship", []models.FactoryLineStep{
+		{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entry},
+	})
+	require.NoError(t, err)
+}
+
+func bitbucketHandOffPRResponse(repository string, number int, state, branch string) map[string][]*http.Response {
+	body := `{"id": ` + strconv.Itoa(number) + `, "state": "` + state + `", "source": {"branch": {"name": "` + branch + `"}}}`
+	path := "/2.0/repositories/" + repository + "/pullrequests/" + strconv.Itoa(number)
+	return map[string][]*http.Response{path: {okBitbucketResponse(body)}}
+}
+
+func assertNamesSupportedPullRequestURL(t *testing.T, err error) {
+	t.Helper()
+	message := grpcerrors.StatusMessage(err)
+	assert.Contains(t, message, "pull request URL")
+	assert.Contains(t, message, "GitHub")
+	assert.Contains(t, message, "Bitbucket")
 }
 
 func seedHandOffFactory(t *testing.T, r *support.ResourceRegistry, db *gorm.DB) *models.Factory {
