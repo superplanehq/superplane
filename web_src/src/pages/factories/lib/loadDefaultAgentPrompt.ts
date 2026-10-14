@@ -20,7 +20,7 @@ export async function loadDefaultAgentPrompt(input: {
   );
   const parsed = parseCanvasYamlForImport(response.data?.canvasYaml ?? "");
   if (!parsed.ok) {
-    throw new DefaultPromptUnavailableError();
+    throw new Error(parsed.error);
   }
 
   const steps = defaultAgentSteps(parsed.spec, input.agentNodeId);
