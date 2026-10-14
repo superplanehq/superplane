@@ -104,9 +104,8 @@ func AttachWorkspaceAgentResources(
 
 	var mcpNames []string
 	environment, files, mcpNames = attachWorkspaceMCPServers(ctx, db, mcpServers, disabledTools, enabledTools, environment, files)
-	var skillNames []string
-	files, skillNames = appendWorkspaceSkillFiles(skills, files)
-	files = appendWorkspaceAgentResourcesHint(files, mcpNames, skillNames)
+	files = appendWorkspaceSkillFiles(skills, files)
+	files = appendWorkspaceAgentResourcesHint(files, mcpNames)
 	return environment, files
 }
 
@@ -167,8 +166,7 @@ func attachWorkspaceMCPServers(
 	return environment, files, names
 }
 
-func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []BrokerTaskFile) ([]BrokerTaskFile, []string) {
-	names := make([]string, 0, len(resources))
+func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []BrokerTaskFile) []BrokerTaskFile {
 	for i := range resources {
 		markdown := strings.TrimSpace(resources[i].Config.Data().Markdown)
 		if markdown == "" || resources[i].Name == models.ReservedFactoryAgentResourceName {
@@ -182,9 +180,8 @@ func appendWorkspaceSkillFiles(resources []models.FactoryAgentResource, files []
 			BrokerTaskFile{Path: fmt.Sprintf(workspaceClaudeSkillPath, resources[i].Name), Content: content, Mode: "0644"},
 			BrokerTaskFile{Path: fmt.Sprintf(workspaceAgentsSkillPath, resources[i].Name), Content: content, Mode: "0644"},
 		)
-		names = append(names, resources[i].Name)
 	}
-	return files, names
+	return files
 }
 
 func workspaceAgentResourcesLogger(ctx core.ExecutionContext) *log.Entry {
@@ -385,8 +382,8 @@ func rejectDisabledAgentResources(resources []models.FactoryAgentResource, disab
 	return out
 }
 
-func workspaceAgentResourcesHint(mcpNames, skillNames []string) string {
-	if len(mcpNames) == 0 && len(skillNames) == 0 {
+func workspaceAgentResourcesHint(mcpNames []string) string {
+	if len(mcpNames) == 0 {
 		return ""
 	}
 	var builder strings.Builder
@@ -395,15 +392,11 @@ func workspaceAgentResourcesHint(mcpNames, skillNames []string) string {
 		builder.WriteString("\nMCP servers: ")
 		builder.WriteString(strings.Join(mcpNames, ", "))
 	}
-	if len(skillNames) > 0 {
-		builder.WriteString("\nSkills: ")
-		builder.WriteString(strings.Join(skillNames, ", "))
-	}
 	return builder.String()
 }
 
-func appendWorkspaceAgentResourcesHint(files []BrokerTaskFile, mcpNames, skillNames []string) []BrokerTaskFile {
-	hint := workspaceAgentResourcesHint(mcpNames, skillNames)
+func appendWorkspaceAgentResourcesHint(files []BrokerTaskFile, mcpNames []string) []BrokerTaskFile {
+	hint := workspaceAgentResourcesHint(mcpNames)
 	if hint == "" {
 		return files
 	}
