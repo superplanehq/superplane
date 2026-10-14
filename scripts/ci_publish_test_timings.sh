@@ -13,4 +13,4 @@ python3 scripts/ci_test_weights.py collect \
   --reports ci-test-timings \
   --output "ci-test-timings/${SEMAPHORE_PIPELINE_CREATED_AT}-${SEMAPHORE_WORKFLOW_ID}.json" \
   --sha "$SEMAPHORE_GIT_SHA"
-artifact push project "ci-test-timings/${SEMAPHORE_PIPELINE_CREATED_AT}-${SEMAPHORE_WORKFLOW_ID}.json"
+artifact push project "ci-test-timings/${SEMAPHORE_PIPELINE_CREATED_AT}-${SEMAPHORE_WORKFLOW_ID}.json" --force

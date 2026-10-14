@@ -51,7 +51,8 @@ def main():
         raise ValueError("GITHUB_RELEASE_TOKEN is required")
     query = urllib.parse.urlencode({"state": "open", "base": "main", "per_page": "100"})
     pulls = [pull for pull in api("GET", f"/pulls?{query}")
-             if pull["title"] == TITLE and pull["head"]["repo"]["full_name"] == REPO]
+             if pull["title"] == TITLE
+             and (pull["head"].get("repo") or {}).get("full_name") == REPO]
     if len(pulls) > 1:
         raise ValueError("multiple open test weight PRs")
     branch = pulls[0]["head"]["ref"] if pulls else "ci/refresh-test-weights"

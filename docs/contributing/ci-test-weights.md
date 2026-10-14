@@ -7,9 +7,10 @@ fails if a Go test file is outside the covered folders.
 
 ## Automatic refresh
 
-Each successful `main` CI run stores one timing summary in Semaphore project
-artifacts under `ci-test-timings/`. The summary contains the times from all
-four unit jobs and all ten E2E jobs. Failed runs do not enter the history.
+Each successful `main` CI run that executes backend tests stores one timing
+summary in Semaphore project artifacts under `ci-test-timings/`. The summary
+contains the times from all four unit jobs and all ten E2E jobs. Failed runs do
+not enter the history.
 
 The **Refresh test weights** Semaphore task runs each Monday at 09:00 UTC. It
 uses the five most recent successful `main` commits. It requires at least
