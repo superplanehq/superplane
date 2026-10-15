@@ -3,8 +3,13 @@
   "superplaneUrl": "https://superplane.example",
   "installationAdminToken": "replace-with-personal-api-token",
   "runnerReleaseBaseUrl": "https://github.com/superplanehq/superplane/releases/download/runner%2F{version}",
-  "reconcileIntervalSeconds": 15,
-  "requestTimeoutSeconds": 90,
+  "reconciliation": {
+    "pollTimeout": "30s",
+    "errorRetryInterval": "15s"
+  },
+  "http": {
+    "requestTimeout": "90s"
+  },
   "fleets": [
     {
       "id": "linux-amd64",
@@ -15,7 +20,7 @@
         "subscriptionId": "00000000-0000-0000-0000-000000000000",
         "resourceGroup": "superplane-runners",
         "location": "eastus",
-        "imageId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane-runners/providers/Microsoft.Compute/galleries/superplanerunners/images/superplane-runner-amd64/versions/1.0.0",
+        "imageId": "/CommunityGalleries/Superplane-e02dee64-33d2-4663-b192-4f86050ba3ff/Images/superplane-runner-amd64/Versions/0.1.0",
         "vmSize": "Standard_D2ds_v4",
         "architecture": "amd64",
         "subnetId": "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane/providers/Microsoft.Network/virtualNetworks/superplane-vnet/subnets/superplane-runners",
