@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -36,6 +37,11 @@ const (
 	vmProvisioningDeleting   = "Deleting"
 )
 
+var (
+	communityGalleryImagePattern = regexp.MustCompile(`(?i)^/communitygalleries/[^/]+/images/[^/]+/versions/[^/]+$`)
+	sharedGalleryImagePattern    = regexp.MustCompile(`(?i)^/sharedgalleries/[^/]+/images/[^/]+/versions/[^/]+$`)
+)
+
 type Config struct {
 	FleetManagerID         string
 	SubscriptionID         string
@@ -56,6 +62,7 @@ type Config struct {
 type Provider struct {
 	client ComputeAPI
 	config Config
+	image  galleryImageReference
 	log    *slog.Logger
 }
 
@@ -92,10 +99,12 @@ func New(client ComputeAPI, config Config, log *slog.Logger) (*Provider, error) 
 		return nil, fmt.Errorf("Azure network security group ID is required")
 	case config.IdentityID == "":
 		return nil, fmt.Errorf("Azure identity ID is required")
-	case len(config.Zones) == 0:
-		return nil, fmt.Errorf("at least one Azure availability zone is required")
 	case client == nil:
 		return nil, fmt.Errorf("Azure compute client is required")
+	}
+	image, err := parseGalleryImageID(config.ImageID)
+	if err != nil {
+		return nil, err
 	}
 	if config.DiskSizeGB <= 0 {
 		config.DiskSizeGB = 30
@@ -118,7 +127,7 @@ func New(client ComputeAPI, config Config, log *slog.Logger) (*Provider, error) 
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Provider{client: client, config: config, log: log}, nil
+	return &Provider{client: client, config: config, image: image, log: log}, nil
 }
 
 func (p *Provider) Name() string {
@@ -244,8 +253,12 @@ func (p *Provider) Create(
 		return provider.Resource{}, fmt.Errorf("create Azure runner SSH key: %w", err)
 	}
 
+	zones := p.config.Zones
+	if len(zones) == 0 {
+		zones = []string{""}
+	}
 	var lastErr error
-	for _, zone := range p.config.Zones {
+	for _, zone := range zones {
 		vm, err := p.client.CreateVM(
 			ctx,
 			p.config.ResourceGroup,
@@ -263,13 +276,15 @@ func (p *Provider) Create(
 			if created := createdAt(vm); !created.IsZero() {
 				resource.CreatedAt = created
 			}
-			p.log.Info(
-				"created Azure runner",
+			attrs := []any{
 				slog.String("runner_id", request.RunnerID),
 				slog.String("fleet_id", request.FleetID),
 				slog.String("vm_name", resource.ID),
-				slog.String("zone", zone),
-			)
+			}
+			if zone != "" {
+				attrs = append(attrs, slog.String("zone", zone))
+			}
+			p.log.Info("created Azure runner", attrs...)
 			return resource, nil
 		}
 		lastErr = err
@@ -286,8 +301,13 @@ func (p *Provider) Create(
 			slog.String("runner_id", request.RunnerID),
 		)
 	}
+	place := "configured zones"
+	if len(p.config.Zones) == 0 {
+		place = "the configured region"
+	}
 	return provider.Resource{}, p.cleanupNIC(ctx, name, fmt.Errorf(
-		"create Azure runner in configured zones: %w",
+		"create Azure runner in %s: %w",
+		place,
 		lastErr,
 	))
 }
@@ -367,9 +387,8 @@ func (p *Provider) vmParameters(
 			Placement: to.Ptr(armcompute.DiffDiskPlacementCacheDisk),
 		}
 	}
-	return armcompute.VirtualMachine{
+	vm := armcompute.VirtualMachine{
 		Location: to.Ptr(p.config.Location),
-		Zones:    []*string{to.Ptr(zone)},
 		Tags:     tags,
 		Identity: &armcompute.VirtualMachineIdentity{
 			Type: to.Ptr(armcompute.ResourceIdentityTypeUserAssigned),
@@ -382,10 +401,8 @@ func (p *Provider) vmParameters(
 				VMSize: to.Ptr(armcompute.VirtualMachineSizeTypes(p.config.VMSize)),
 			},
 			StorageProfile: &armcompute.StorageProfile{
-				ImageReference: &armcompute.ImageReference{
-					ID: to.Ptr(p.config.ImageID),
-				},
-				OSDisk: osDisk,
+				ImageReference: p.image.sdk(),
+				OSDisk:         osDisk,
 			},
 			OSProfile: &armcompute.OSProfile{
 				ComputerName:  to.Ptr(name),
@@ -419,6 +436,10 @@ func (p *Provider) vmParameters(
 			},
 		},
 	}
+	if zone != "" {
+		vm.Zones = []*string{to.Ptr(zone)}
+	}
+	return vm
 }
 
 func (p *Provider) resourceTags(request provider.CreateRequest) map[string]*string {
@@ -509,6 +530,48 @@ func isReservedTag(key string) bool {
 	default:
 		return false
 	}
+}
+
+type galleryImageReference struct {
+	resourceID  string
+	communityID string
+	sharedID    string
+}
+
+func parseGalleryImageID(imageID string) (galleryImageReference, error) {
+	switch {
+	case hasPrefixFold(imageID, "/CommunityGalleries/"):
+		if !communityGalleryImagePattern.MatchString(imageID) {
+			return galleryImageReference{}, fmt.Errorf(
+				"Azure community gallery image ID must be /CommunityGalleries/<gallery>/Images/<image>/Versions/<version>",
+			)
+		}
+		return galleryImageReference{communityID: imageID}, nil
+	case hasPrefixFold(imageID, "/SharedGalleries/"):
+		if !sharedGalleryImagePattern.MatchString(imageID) {
+			return galleryImageReference{}, fmt.Errorf(
+				"Azure shared gallery image ID must be /SharedGalleries/<gallery>/Images/<image>/Versions/<version>",
+			)
+		}
+		return galleryImageReference{sharedID: imageID}, nil
+	default:
+		return galleryImageReference{resourceID: imageID}, nil
+	}
+}
+
+func (image galleryImageReference) sdk() *armcompute.ImageReference {
+	switch {
+	case image.communityID != "":
+		return &armcompute.ImageReference{CommunityGalleryImageID: to.Ptr(image.communityID)}
+	case image.sharedID != "":
+		return &armcompute.ImageReference{SharedGalleryImageID: to.Ptr(image.sharedID)}
+	default:
+		return &armcompute.ImageReference{ID: to.Ptr(image.resourceID)}
+	}
+}
+
+func hasPrefixFold(value, prefix string) bool {
+	return len(value) >= len(prefix) && strings.EqualFold(value[:len(prefix)], prefix)
 }
 
 func nonEmpty(values []string) []string {

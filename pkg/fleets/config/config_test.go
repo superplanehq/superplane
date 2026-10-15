@@ -487,8 +487,8 @@ func TestLoadRejectsARMAzureFleetWithoutVMSize(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsAzureFleetWithoutZones(t *testing.T) {
-	_, err := Load(writeConfig(t, `{
+func TestLoadAcceptsAzureFleetWithoutZones(t *testing.T) {
+	config, err := Load(writeConfig(t, `{
 		"id":"fleet-manager",
 		"superplaneUrl":"https://superplane.example",
 		"installationAdminToken":"personal-token",
@@ -499,7 +499,7 @@ func TestLoadRejectsAzureFleetWithoutZones(t *testing.T) {
 			"azure":{
 				"subscriptionId":"00000000-0000-0000-0000-000000000000",
 				"resourceGroup":"superplane-runners",
-				"location":"eastus",
+				"location":"westus",
 				"imageId":"/galleries/runners/images/runner/versions/1.0.0",
 				"architecture":"amd64",
 				"subnetId":"/subnets/runners",
@@ -508,13 +508,20 @@ func TestLoadRejectsAzureFleetWithoutZones(t *testing.T) {
 			}
 		}]
 	}`))
-	if err == nil || !strings.Contains(err.Error(), "azure.zones must not be empty") {
-		t.Fatalf("error = %v", err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(config.Fleets[0].Azure.Zones) != 0 {
+		t.Fatalf("zones = %#v", config.Fleets[0].Azure.Zones)
 	}
 }
 
 func TestExampleConfigsLoad(t *testing.T) {
-	for _, name := range []string{"config.example.json", "config.gcp.example.json"} {
+	for _, name := range []string{
+		"config.example.json",
+		"config.azure.example.json",
+		"config.gcp.example.json",
+	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := Load(filepath.Join("..", name)); err != nil {
 				t.Fatal(err)

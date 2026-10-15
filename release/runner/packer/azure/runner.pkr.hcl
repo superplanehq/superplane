@@ -84,15 +84,31 @@ variable "playwright_version" {
   default     = "1.63.0"
 }
 
+variable "build_resource_group_name" {
+  type        = string
+  default     = ""
+  description = "Existing resource group for the temporary build VM. Empty lets Packer create one."
+}
+
+variable "replication_regions" {
+  type        = list(string)
+  default     = []
+  description = "Extra regions to replicate the gallery image version to. var.location is always included."
+}
+
 locals {
-  image_sku = var.architecture == "arm64" ? "24_04-lts-arm64" : "24_04-lts-gen2"
+  image_sku       = var.architecture == "arm64" ? "24_04-lts-arm64" : "24_04-lts-gen2"
+  gallery_regions = distinct(concat([var.location], var.replication_regions))
 }
 
 source "azure-arm" "ubuntu" {
   use_azure_cli_auth = true
   subscription_id    = var.subscription_id
-  location           = var.location
-  vm_size            = var.vm_size
+  # Plugin 2.3.3 accepts location or build_resource_group_name, not both.
+  # var.location still selects gallery replica regions.
+  location                  = var.build_resource_group_name == "" ? var.location : null
+  build_resource_group_name = var.build_resource_group_name != "" ? var.build_resource_group_name : null
+  vm_size                   = var.vm_size
 
   os_type         = "Linux"
   image_publisher = "Canonical"
@@ -119,8 +135,11 @@ source "azure-arm" "ubuntu" {
     image_version        = var.image_version
     storage_account_type = "Standard_LRS"
 
-    target_region {
-      name = var.location
+    dynamic "target_region" {
+      for_each = local.gallery_regions
+      content {
+        name = target_region.value
+      }
     }
   }
 }

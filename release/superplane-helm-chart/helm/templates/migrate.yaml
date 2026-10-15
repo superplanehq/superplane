@@ -34,13 +34,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534
-        runAsGroup: 65534
-        fsGroup: 65534
-        seccompProfile:
-          type: RuntimeDefault
+      {{- include "superplane.migratePodSecurityContext" (dict "migratePodSecurityContext" .Values.migrate.podSecurityContext "podSecurityContext" .Values.podSecurityContext "indent" 6) }}
       containers:
         - name: migrate
           image: "{{ .Values.image.registry }}/{{ .Values.image.name }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -87,12 +81,7 @@ spec:
             - name: POSTGRES_DB_SSL
               value: {{ .Values.database.ssl | toString | quote }}
             {{- end }}
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            capabilities:
-              drop: [ALL]
+          {{- include "superplane.migrateContainerSecurityContext" (dict "migrateSecurityContext" .Values.migrate.securityContext "securityContext" .Values.securityContext "indent" 10) }}
           resources:
             requests:
               cpu: 25m

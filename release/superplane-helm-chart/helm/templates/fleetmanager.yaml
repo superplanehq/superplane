@@ -52,12 +52,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65532
-        runAsGroup: 65532
-        seccompProfile:
-          type: RuntimeDefault
+      {{- include "superplane.fleetManagerPodSecurityContext" (dict "podSecurityContext" .Values.fleetManager.podSecurityContext "indent" 6) }}
       containers:
         - name: fleet-manager
           image: "{{ .Values.fleetManager.image.registry }}/{{ .Values.fleetManager.image.name }}:{{ required "fleetManager.image.tag is required when fleetManager.enabled is true" .Values.fleetManager.image.tag }}"
@@ -69,12 +64,7 @@ spec:
             - name: config
               mountPath: /etc/superplane
               readOnly: true
-          securityContext:
-            privileged: false
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: [ALL]
+          {{- include "superplane.fleetManagerContainerSecurityContext" (dict "securityContext" .Values.fleetManager.securityContext "indent" 10) }}
           {{- with .Values.fleetManager.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
