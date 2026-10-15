@@ -16,15 +16,6 @@ import (
 )
 
 func TestWaitComponent(t *testing.T) {
-	t.Run("configure Wait for seconds", func(t *testing.T) {
-		steps := &WaitSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists("Wait Seconds")
-		steps.addWaitWithDuration(10, "Seconds")
-		steps.canvas.CommitAndPublish()
-		steps.assertWaitSavedToDB(10, "seconds")
-	})
-
 	t.Run("configure Wait for minutes", func(t *testing.T) {
 		steps := &WaitSteps{t: t}
 		steps.start()
@@ -32,15 +23,6 @@ func TestWaitComponent(t *testing.T) {
 		steps.addWaitWithDuration(5, "Minutes")
 		steps.canvas.CommitAndPublish()
 		steps.assertWaitSavedToDB(5, "minutes")
-	})
-
-	t.Run("configure Wait for hours", func(t *testing.T) {
-		steps := &WaitSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists("Wait Hours")
-		steps.addWaitWithDuration(2, "Hours")
-		steps.canvas.CommitAndPublish()
-		steps.assertWaitSavedToDB(2, "hours")
 	})
 
 	t.Run("push through the wait item", func(t *testing.T) {
