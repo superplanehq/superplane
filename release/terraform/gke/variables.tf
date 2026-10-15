@@ -117,6 +117,12 @@ variable "superplane_image_registry" {
   default     = "ghcr.io/superplanehq"
 }
 
+variable "fleet_manager_image_registry" {
+  description = "Registry that hosts the standalone Fleet Manager image. Terraform uses this value only to grant GKE node pull access for a private GCP registry."
+  type        = string
+  default     = "ghcr.io/superplanehq"
+}
+
 variable "superplane_image_tag" {
   description = "SuperPlane image tag. Must end with -selfhosted. The plain <git-sha> and stable images load UI files from the hosted CDN and fail CORS on a customer domain."
   type        = string
@@ -146,7 +152,7 @@ variable "superplane_chart_version" {
 variable "enable_gcs_blob_storage" {
   description = "Store blobs (task logs and files) in a GCS bucket. SuperPlane uses Workload Identity to access the bucket. Runners require this."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "blob_bucket_name" {
@@ -168,32 +174,7 @@ variable "blob_bucket_force_destroy" {
 variable "enable_runners" {
   description = "Enable the runner API and create the runner network and the Fleet Manager service account. Requires enable_gcs_blob_storage."
   type        = bool
-  default     = false
-}
-
-variable "installation_admin_token" {
-  description = "Personal API token of an installation admin. When set with enable_runners, Terraform deploys Fleet Manager."
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
-variable "fleet_manager_image_registry" {
-  description = "Registry of the fleet-manager image. Change it to use an image that you build and push."
-  type        = string
-  default     = "ghcr.io/superplanehq"
-}
-
-variable "fleet_manager_image_tag" {
-  description = "Tag of the fleet-manager image. Required when Fleet Manager is deployed."
-  type        = string
-  default     = ""
-}
-
-variable "runner_release_base_url" {
-  description = "Base URL of the runner release artifacts."
-  type        = string
-  default     = "https://superplanehq-releases.s3.amazonaws.com/runner"
+  default     = true
 }
 
 variable "runner_subnet_cidr" {
@@ -206,30 +187,6 @@ variable "runner_zones" {
   description = "Zones for runner VMs. Fleet Manager tries the next zone when a zone has no capacity. Leave empty to use var.zone."
   type        = list(string)
   default     = []
-}
-
-variable "runner_fleets" {
-  description = "Runner fleets for Fleet Manager. Each id must match a fleet created in SuperPlane. Leave image empty to use the superplane-runner-<architecture> image family in this project."
-  type = list(object({
-    id            = string
-    architecture  = string
-    machine_type  = optional(string, "")
-    image         = optional(string, "")
-    disk_size_gb  = optional(number, 30)
-    warm_capacity = optional(number, 0)
-    max_capacity  = optional(number, 2)
-  }))
-  default = [
-    {
-      id           = "e1-large-amd64"
-      architecture = "amd64"
-    }
-  ]
-
-  validation {
-    condition     = alltrue([for fleet in var.runner_fleets : contains(["amd64", "arm64"], fleet.architecture)])
-    error_message = "Each runner fleet architecture must be amd64 or arm64."
-  }
 }
 
 # -----------------------------------------------------------------------------

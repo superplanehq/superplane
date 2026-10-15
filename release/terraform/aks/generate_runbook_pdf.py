@@ -360,7 +360,7 @@ helm_chart_path       = "../../superplane-helm-chart/helm"
     )
     story.append(
         Paragraph(
-            "Leave fleet_manager_config empty until owner setup is complete. Do not keep a *_override.tf file. Chart path and image registry are Terraform variables.",
+            "Terraform does not install Fleet Manager or store its installation token. Do not keep a *_override.tf file. Chart path and image registry are Terraform variables.",
             s["body"],
         )
     )
@@ -430,7 +430,7 @@ kubectl get svc -n ingress-nginx ingress-nginx-controller \\
     )
     story.append(
         Paragraph(
-            "Complete owner setup. Create an admin API token if you will start Fleet Manager.",
+            "Complete owner setup. The SuperPlane chart provisions the dedicated Fleet Manager service-token Secret in Kubernetes.",
             s["body"],
         )
     )
@@ -455,15 +455,13 @@ kubectl get certificate -n superplane""",
 packer build -var-file=release/runner/packer/azure/runner.pkrvars.hcl \\
   -var architecture=amd64 -var vm_size=Standard_D2ds_v4 \\
   -var image_name=superplane-runner-amd64 -var image_version=1.0.0 \\
-  release/runner/packer/azure/runner.pkr.hcl
-
-release/runner/build.sh "v0.0.0-local" """,
+  release/runner/packer/azure/runner.pkr.hcl""",
             s,
         )
     )
     story.append(
         Paragraph(
-            "Host runner archives on a public HTTPS prefix. The SuperPlane blob account is private. Set fleet_manager_config from terraform output, then apply again.",
+            "Open Set up runner fleets in SuperPlane. The wizard preloads the Terraform outputs. Replace the Azure image placeholder with the immutable gallery image version, confirm that the dedicated Secret exists, and install the standalone Fleet Manager chart.",
             s["body"],
         )
     )
@@ -740,7 +738,7 @@ release/runner/build.sh "v0.0.0-local" """,
                 "SuperPlane API, workers, and websocket Deployments",
                 "RabbitMQ StatefulSet",
                 "Postgres StatefulSet when Flexible Server is off",
-                "Fleet Manager Deployment when fleet_manager_config is set",
+                "Fleet Manager, when installed separately with its standalone Helm chart",
             ],
             s,
         )
@@ -753,7 +751,7 @@ release/runner/build.sh "v0.0.0-local" """,
                 "Azure Container Registry, if you build images locally",
                 "DNS A record for the SuperPlane domain",
                 "Packer gallery image versions",
-                "Public HTTPS host for runner release archives",
+                "Immutable Runner archives from the SuperPlane GitHub release",
                 "Let's Encrypt certificate (cert-manager creates it after DNS works)",
             ],
             s,
@@ -767,6 +765,7 @@ release/runner/build.sh "v0.0.0-local" """,
             [
                 ["release/terraform/aks", "Azure install stack"],
                 ["release/superplane-helm-chart/helm", "Helm chart used by this stack"],
+                ["release/fleet-manager-chart/helm", "Standalone Fleet Manager chart"],
                 ["Dockerfile --target runner", "SuperPlane application image"],
                 ["release/fleet-manager/Dockerfile", "Fleet Manager image"],
                 ["release/runner/packer/azure", "Packer gallery images"],
