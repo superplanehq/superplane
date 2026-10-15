@@ -90,6 +90,16 @@ output "runner_network_tag" {
   value       = local.runners_enabled ? local.runner_network_tag : null
 }
 
+output "runner_image_amd64" {
+  description = "Packer-built image configured for linux/amd64 runner VMs"
+  value       = local.runners_enabled ? var.runner_image_amd64 : null
+}
+
+output "runner_image_arm64" {
+  description = "Packer-built image configured for linux/arm64 runner VMs"
+  value       = local.runners_enabled ? var.runner_image_arm64 : null
+}
+
 output "fleet_manager_service_account_email" {
   description = "GCP service account that Fleet Manager uses through Workload Identity"
   value       = local.runners_enabled ? google_service_account.fleet_manager[0].email : null

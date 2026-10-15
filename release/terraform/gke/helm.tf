@@ -87,17 +87,14 @@ locals {
       managerId          = var.cluster_name
       namespace          = var.superplane_namespace
       serviceAccountName = local.fleet_manager_service_account_name
-      credentials = {
-        provision      = true
-        existingSecret = "superplane-fleet-manager-token"
-        tokenKey       = "INSTALLATION_ADMIN_TOKEN"
-      }
       infrastructure = local.runners_enabled ? {
         superplaneUrl        = "https://${var.domain_name}"
         projectId            = var.project_id
         zones                = local.runner_zones
         subnetwork           = google_compute_subnetwork.runners[0].id
         networkTags          = [local.runner_network_tag]
+        imageAmd64           = var.runner_image_amd64
+        imageArm64           = var.runner_image_arm64
         fleetManagerIdentity = google_service_account.fleet_manager[0].email
       } : null
     }
@@ -112,7 +109,7 @@ resource "helm_release" "superplane" {
   version          = local.superplane_chart_local || var.superplane_chart_version == "" ? null : var.superplane_chart_version
   namespace        = var.superplane_namespace
   create_namespace = false
-  timeout          = 900 # GCE Ingress + first-boot migrate exceed the 300s default
+  timeout          = 1200 # Match EKS and AKS. First image pull and migrate can exceed 15 minutes.
 
   lifecycle {
     precondition {
