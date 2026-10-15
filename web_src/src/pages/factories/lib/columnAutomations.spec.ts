@@ -2,7 +2,6 @@ import { describe, expect, it } from "bun:test";
 
 import type { FactoriesFactoryIntake, FactoriesFactoryPrFeedbackHandler, FactoriesWorkOrder } from "@/api-client";
 
-import { columnAutomationUsesSplitConfig } from "./columnAutomationHeadline";
 import {
   applyColumnAutomationsOverlay,
   buildColumnAutomations,
@@ -526,17 +525,6 @@ describe("columnAutomationViewTabs", () => {
 
   it("shows General then Automation when a form exists without an agent", () => {
     expect(columnAutomationViewTabs({ hasGeneral: true, hasAgent: false })).toEqual(["general", "automation"]);
-  });
-});
-
-describe("columnAutomationUsesSplitConfig", () => {
-  it("opens the split settings panel for merge confidence, visual evidence, pull-request closure, and the Implement agent", () => {
-    expect(columnAutomationUsesSplitConfig(["on-pr-risk"])).toBe(true);
-    expect(columnAutomationUsesSplitConfig(["on-pr-visual-evidence", "capture-visual-evidence"])).toBe(true);
-    expect(columnAutomationUsesSplitConfig(["onrun-implement", "implementation-agent-no-issue"])).toBe(true);
-    expect(columnAutomationUsesSplitConfig(["implementation-agent"])).toBe(false);
-    expect(columnAutomationUsesSplitConfig(["on-pr-closed"])).toBe(true);
-    expect(columnAutomationUsesSplitConfig(["on-run"])).toBe(false);
   });
 });
 
