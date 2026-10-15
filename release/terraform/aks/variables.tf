@@ -168,17 +168,17 @@ variable "helm_chart_path" {
 variable "superplane_chart_version" {
   description = "Published SuperPlane Helm chart version with a matching self-hosted image. Ignored when helm_chart_path is set."
   type        = string
-  default     = "0.0.0-f711ba6b1ebf19ae26825b8a6397b9ef24832f68"
+  default     = "0.0.0-25eae97f1259c9c4a8f10cada152fa94764846b8"
 }
 
 variable "fleet_manager_version" {
-  description = "Fleet Manager release the owner-setup wizard installs. 0.1.2+ supports community gallery images and empty zones."
+  description = "Fleet Manager release the owner-setup wizard installs. Use v0.1.3 or later with this chart. The Fleet Manager binary syncs fleets. Community gallery images and empty zones need 0.1.2 or later."
   type        = string
-  default     = "v0.1.2"
+  default     = "v0.1.3"
 
   validation {
     condition     = can(regex("^v\\d+\\.\\d+\\.\\d+$", var.fleet_manager_version))
-    error_message = "Set fleet_manager_version to vMAJOR.MINOR.PATCH, for example v0.1.2."
+    error_message = "Set fleet_manager_version to vMAJOR.MINOR.PATCH, for example v0.1.3."
   }
 }
 
@@ -215,13 +215,13 @@ variable "runner_zones" {
 }
 
 variable "runner_image_amd64" {
-  description = "Packer-built Azure Compute Gallery version resource ID for linux/amd64 runner VMs."
+  description = "linux/amd64 runner image version ID. Use /CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-amd64/Versions/<version>, or a customer gallery version ID from the development path."
   type        = string
   default     = ""
 }
 
 variable "runner_image_arm64" {
-  description = "Packer-built Azure Compute Gallery version resource ID for linux/arm64 runner VMs."
+  description = "linux/arm64 runner image version ID. Use /CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-arm64/Versions/<version>, or a customer gallery version ID from the development path."
   type        = string
   default     = ""
 }
