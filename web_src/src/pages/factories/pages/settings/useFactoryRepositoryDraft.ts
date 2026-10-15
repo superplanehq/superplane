@@ -51,6 +51,7 @@ export function useFactoryRepositoryDraft(args: {
   useEffect(() => {
     const lookup = ++branchLookup.current;
     const isCurrent = () => branchLookup.current === lookup;
+    setIsResolvingDefaultBranch(false);
     if (savedBranch) {
       setBranch(savedBranch);
       setBaselineBranch(savedBranch);

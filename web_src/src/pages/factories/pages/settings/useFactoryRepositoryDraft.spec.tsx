@@ -112,6 +112,35 @@ describe("useFactoryRepositoryDraft", () => {
     expect(result.current.isSaving).toBe(false);
   });
 
+  it("clears branch loading when saved settings replace a pending lookup", async () => {
+    const lookups = new Map<string, Deferred<string>>();
+    resolveGithubDefaultBranch.mockImplementation(
+      (_organizationId: string, _integrationId: string, repository: string) => {
+        const pending = deferred<string>();
+        lookups.set(repository, pending);
+        return pending.promise;
+      },
+    );
+    const { result, rerender } = renderHook(
+      (savedRepository: string) => useFactoryRepositoryDraft(draftArgs({ savedRepository, savedBranch: "main" })),
+      { initialProps: "acme/api" },
+    );
+
+    act(() => result.current.selectRepository("acme/web"));
+    expect(result.current.isSaving).toBe(true);
+
+    rerender("acme/other");
+
+    expect(result.current.isSaving).toBe(false);
+    expect(result.current.branch).toBe("main");
+
+    await act(async () => {
+      lookups.get("acme/web")?.resolve("develop");
+    });
+    expect(result.current.branch).toBe("main");
+    expect(result.current.isSaving).toBe(false);
+  });
+
   it("ignores a failed lookup after the user selects another repository", async () => {
     const lookups = new Map<string, Deferred<string>>();
     resolveGithubDefaultBranch.mockImplementation(
