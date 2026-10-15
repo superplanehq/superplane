@@ -500,33 +500,6 @@ func TestAgentStreamWorker_ParallelToolsTrackedIndependently(t *testing.T) {
 	assert.Equal(t, models.AgentToolStatusFinished, statuses["toolu_3"], "tools without a result close on turn end")
 }
 
-func TestAgentStreamWorker_ForceClosesOpenToolsOnTurnEnd(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-	session := mustCreateSession(t, r, canvas.ID)
-
-	// Provider emits tool_use but never tool_result — then turn_completed.
-	// Mirrors the real-world case where Anthropic emits idle before a
-	// tool_result for one of the built-in toolset tools.
-	provider := &scriptedProvider{
-		name: testProvider,
-		events: []agents.ProviderEvent{
-			{ProviderEventID: "tool-stuck", Type: agents.ProviderEventToolUseStarted, ToolName: "bash", ToolCallID: "call-stuck"},
-			{Type: agents.ProviderEventTurnCompleted},
-		},
-	}
-
-	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
-	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
-	require.NoError(t, w.Handle(context.Background(), body))
-
-	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
-	require.NoError(t, err)
-	require.Len(t, stored, 1)
-	assert.Equal(t, models.AgentToolStatusFinished, stored[0].ToolStatus, "open tool must be force-closed when the turn ends")
-}
-
 func TestAgentStreamWorker_DoesNotOverwriteIdleWithFailedAfterInterrupt(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
