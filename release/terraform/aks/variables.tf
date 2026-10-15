@@ -165,13 +165,10 @@ variable "helm_chart_path" {
   default     = ""
 }
 
-# This chart does not include templates/_security.tpl.
-# podSecurityContext and securityContext values have no effect until
-# maintainers publish a chart from the merge that adds those templates.
 variable "superplane_chart_version" {
   description = "Published SuperPlane Helm chart version with a matching self-hosted image. Ignored when helm_chart_path is set."
   type        = string
-  default     = "0.0.0-77688495d9ae8bdb1dcb3252998b5850bc032b69"
+  default     = "0.0.0-f711ba6b1ebf19ae26825b8a6397b9ef24832f68"
 }
 
 # Latest stable chart on https://charts.jetstack.io as of 2026-10-14.
