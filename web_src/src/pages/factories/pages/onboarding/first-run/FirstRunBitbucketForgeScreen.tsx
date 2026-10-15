@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 
 import { RepositoryPicker } from "../onboardingSteps";
+import { BitbucketCopyInstallLink } from "./BitbucketCopyInstallLink";
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 import { FirstRunGithubStepper } from "./FirstRunGithubStepper";
 import { FirstRunMissingAccessLine } from "./FirstRunMissingAccessLine";
@@ -144,17 +145,6 @@ function BitbucketGrantScreen(props: FirstRunBitbucketForgeScreenProps) {
   } = props;
   const waiting = granting || attemptActive;
   const busy = granting || switchingAccount;
-  const [copied, setCopied] = useState(false);
-  const copyLink = async () => {
-    if (!onCopyInstallLink) return;
-    try {
-      await onCopyInstallLink();
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  };
   return (
     <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={busy} visual="preview">
       <FirstRunHeading headline={copy.workspaceHeadline}>
@@ -174,18 +164,7 @@ function BitbucketGrantScreen(props: FirstRunBitbucketForgeScreenProps) {
           >
             {copy.grantAction}
           </LoadingButton>
-          <p className="text-[12px] text-muted-foreground">
-            {copy.wrongAccountNote}{" "}
-            <button
-              type="button"
-              className="font-medium underline underline-offset-2 hover:no-underline"
-              disabled={!installUrl}
-              onClick={() => void copyLink()}
-              data-testid="first-run-bitbucket-copy-install-link"
-            >
-              {copied ? copy.copiedInstallLink : copy.copyInstallLink}
-            </button>
-          </p>
+          <BitbucketCopyInstallLink installUrl={installUrl} onCopy={onCopyInstallLink} />
           {waiting ? (
             <div
               className="flex gap-3 rounded-md border border-border px-3 py-2.5 text-[13px]"

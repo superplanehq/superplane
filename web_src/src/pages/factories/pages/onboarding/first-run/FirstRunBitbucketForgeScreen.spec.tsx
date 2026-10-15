@@ -84,6 +84,44 @@ describe("FirstRunBitbucketForgeScreen", () => {
     expect(screen.getByRole("button", { name: "Install on another workspace" })).toHaveClass("underline");
   });
 
+  it("explains a failed install-link copy and keeps the link selectable", async () => {
+    const user = userEvent.setup();
+    const installUrl = "https://bitbucket.org/site/addons/authorize?addon_key=superplane";
+    const onCopyInstallLink = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValueOnce(new Error("denied"))
+      .mockResolvedValueOnce(undefined);
+    render(
+      <FirstRunBitbucketForgeScreen
+        phase="grant"
+        connectHref=""
+        repositories={[]}
+        installedWorkspaces={[]}
+        selectedRepository={null}
+        installUrl={installUrl}
+        onCopyInstallLink={onCopyInstallLink}
+        chrome={{ stepIndex: 2, onBack: vi.fn() }}
+        onGrantAccess={vi.fn()}
+        onSelectRepository={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
+
+    const copyButton = screen.getByRole("button", { name: "Copy install link" });
+    expect(copyButton).toHaveAttribute("data-slot", "button");
+    await user.click(copyButton);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("SuperPlane could not copy the install link.");
+    expect(screen.getByText("Select the link below, or try again.")).toBeInTheDocument();
+    const link = screen.getByRole("textbox", { name: "Install link" });
+    expect(link).toHaveValue(installUrl);
+    expect(link).toHaveAttribute("readonly");
+
+    await user.click(copyButton);
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("offers Check again after the installation attempt times out", async () => {
     const user = userEvent.setup();
     const onRetryLookup = vi.fn();
