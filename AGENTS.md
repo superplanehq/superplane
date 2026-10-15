@@ -203,6 +203,14 @@ Further reading:
   handling useful. Load
   [.agents/skills/test-audit/SKILL.md](.agents/skills/test-audit/SKILL.md)
   when you write, change, review, or sweep tests.
+- Before adding a test, identify the observable behavior and a credible
+  regression that existing coverage does not catch.
+- Do not pin cosmetic CSS classes, wrapper structure, or copied display
+  constants without an explicit product contract. Preserve checks for
+  visibility, accessibility, theme behavior, and other functional requirements.
+- Prefer tests that execute the real behavior over duplicate private-helper
+  or generated-source assertions. Before removing overlapping coverage,
+  confirm that the retained test exercises the same regression and runs in CI.
 - Tests end with `_test.go`.
 - Always prefer early returns over else blocks when possible.
 - Go: prefer `any` over `interface{}`.
