@@ -289,6 +289,47 @@ blobStorage:
 podLabels: {}
 
 #
+# Pod securityContext for the API, workers, websocket, and runner pods.
+# Empty emits no pod securityContext. Pods that mount runner logs still set
+# fsGroup from runner.activeLogs.fsGroup. That fsGroup wins over this map.
+#
+podSecurityContext: {}
+
+#
+# Container securityContext for the API, workers, websocket, and runner
+# containers. These defaults match the previous fixed template.
+#
+securityContext:
+  privileged: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+#
+# Migration Job. The SuperPlane image runs as nobody (65534).
+# These defaults match the previous fixed template.
+# A non-empty podSecurityContext is merged over migrate.podSecurityContext.
+# A container securityContext that differs from the chart default is merged
+# over migrate.securityContext.
+#
+migrate:
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+    fsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    capabilities:
+      drop:
+        - ALL
+
+#
 # Runner API and runner workers. Off by default.
 # The runner API serves /runner/v1. Runner workers compact finished task
 # logs into blob storage and remove stale runners.
@@ -340,6 +381,21 @@ fleetManager:
   # for example a checksum of the configuration, to restart it.
   podAnnotations: {}
   podLabels: {}
+  # Distroless nonroot runs as UID 65532. Keep this separate from
+  # podSecurityContext. The SuperPlane image runs as nobody (65534).
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    privileged: false
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
   resources:
     limits:
       cpu: 100m
