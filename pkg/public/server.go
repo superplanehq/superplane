@@ -2041,6 +2041,10 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	for _, node := range nodes {
 		code, response, organizationID, err := s.executeWebhookNode(requestCtx, body, r.Header, webhookDeliveryQuery(r), node, onNewEvents, recordExecution)
+		if errors.Is(err, registry.ErrNotRegistered) {
+			logUnregisteredWebhookNode(webhook, node, err)
+			continue
+		}
 		if err != nil {
 			track.complete(requestCtx, code, len(nodes))
 			s.replyWebhookError(w, r, webhook, node, code, err, organizationID)
@@ -2083,6 +2087,14 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+func logUnregisteredWebhookNode(webhook *models.Webhook, node models.CanvasNode, err error) {
+	log.WithFields(log.Fields{
+		"webhook_id": webhook.ID.String(),
+		"canvas_id":  node.WorkflowID.String(),
+		"node_id":    node.NodeID,
+	}).Warnf("skipping webhook node with unregistered component: %v", err)
 }
 
 func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, string, error) {

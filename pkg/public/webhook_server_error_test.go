@@ -11,6 +11,8 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -196,6 +198,111 @@ func Test__HandleWebhook_ClientErrorIsNotSentToSentry(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, response.Code)
 	assert.Contains(t, response.Body.String(), webhookSentryCause)
 	assert.Empty(t, transport.Events())
+}
+
+func Test__HandleWebhook_SkipsUnregisteredNode(t *testing.T) {
+	testCases := []struct {
+		name     string
+		nodeType string
+		refName  string
+	}{
+		{
+			name:     "unknown trigger",
+			nodeType: models.NodeTypeTrigger,
+			refName:  "github",
+		},
+		{
+			name:     "unknown action",
+			nodeType: models.NodeTypeComponent,
+			refName:  "missing-action",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			transport := bindTestSentryHub(t)
+			resources := support.Setup(t)
+			t.Cleanup(resources.Close)
+
+			server := newWebhookTestServer(t, resources)
+			webhookID := uuid.New()
+			require.NoError(t, database.Conn().Create(&models.Webhook{
+				ID:     webhookID,
+				State:  models.WebhookStateReady,
+				Secret: []byte(webhookSentrySecret),
+			}).Error)
+
+			nodeID := "github-github-uwc5fj"
+			node := models.CanvasNode{
+				NodeID: nodeID,
+				Name:   nodeID,
+				Type:   testCase.nodeType,
+			}
+			if testCase.nodeType == models.NodeTypeTrigger {
+				node.Ref = datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: testCase.refName}})
+			} else {
+				node.Ref = datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: testCase.refName}})
+			}
+
+			canvas, _ := support.CreateCanvas(t, resources.Organization.ID, resources.User, []models.CanvasNode{node}, nil)
+			require.NoError(t, database.Conn().
+				Model(&models.CanvasNode{}).
+				Where("workflow_id = ?", canvas.ID).
+				Where("node_id = ?", nodeID).
+				Update("webhook_id", webhookID).
+				Error)
+
+			hook := logtest.NewGlobal()
+			t.Cleanup(func() {
+				log.StandardLogger().ReplaceHooks(make(log.LevelHooks))
+			})
+
+			response := execRequest(server, requestParams{
+				method: "POST",
+				path:   "/webhooks/" + webhookID.String(),
+				body:   []byte(webhookSentryBody),
+				headers: map[string]string{
+					"X-GitHub-Event":    "pull_request",
+					"X-GitHub-Delivery": "84e916b0-c09e-11f1-88cb-295fd7dc3ca1",
+				},
+			})
+
+			require.Equal(t, http.StatusOK, response.Code)
+			assert.Empty(t, response.Body.String())
+			assert.Empty(t, transport.Events())
+
+			stored, err := models.FindCanvasNode(database.Conn(), canvas.ID, nodeID)
+			require.NoError(t, err)
+			assert.Equal(t, testCase.refName, componentName(stored))
+
+			warning := unregisteredWebhookWarning(hook)
+			require.NotNil(t, warning)
+			assert.Equal(t, webhookID.String(), warning.Data["webhook_id"])
+			assert.Equal(t, canvas.ID.String(), warning.Data["canvas_id"])
+			assert.Equal(t, nodeID, warning.Data["node_id"])
+			assert.Contains(t, warning.Message, testCase.refName)
+		})
+	}
+}
+
+func componentName(node *models.CanvasNode) string {
+	ref := node.Ref.Data()
+	if ref.Trigger != nil {
+		return ref.Trigger.Name
+	}
+	if ref.Component != nil {
+		return ref.Component.Name
+	}
+	return ""
+}
+
+func unregisteredWebhookWarning(hook *logtest.Hook) *log.Entry {
+	for _, entry := range hook.AllEntries() {
+		if entry.Level == log.WarnLevel && entry.Data["canvas_id"] != nil {
+			return entry
+		}
+	}
+	return nil
 }
 
 type webhookFailureIDs struct {
