@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   clearFleetManagerDraft,
+  DEFAULT_FLEET_CAPACITY,
   fleetsMatchConfiguration,
   generateFleetManagerValues,
   loadFleetManagerDraft,
@@ -29,8 +30,9 @@ function defaultDraft(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
     superplaneUrl: superplaneUrl || window.location.origin,
     runnerVersion: metadata.defaultRunnerVersion,
     selectedFleetIds: metadata.fleetPresets[0] ? [metadata.fleetPresets[0].id] : [],
-    warmCapacity: 0,
-    maxCapacity: 1,
+    fleetCapacities: Object.fromEntries(
+      metadata.fleetPresets.map((preset) => [preset.id, { ...DEFAULT_FLEET_CAPACITY }]),
+    ),
     fields,
   };
 }
@@ -119,6 +121,21 @@ export function useFleetManagerSetup(enabled = true) {
         selectedFleetIds: checked
           ? [...new Set([...current.selectedFleetIds, id])]
           : current.selectedFleetIds.filter((item) => item !== id),
+        fleetCapacities: current.fleetCapacities[id]
+          ? current.fleetCapacities
+          : { ...current.fleetCapacities, [id]: { ...DEFAULT_FLEET_CAPACITY } },
+      })),
+    [updateDraft],
+  );
+
+  const setFleetCapacity = useCallback(
+    (id: string, capacity: Partial<{ warmCapacity: number; maxCapacity: number }>) =>
+      updateDraft((current) => ({
+        ...current,
+        fleetCapacities: {
+          ...current.fleetCapacities,
+          [id]: { ...(current.fleetCapacities[id] ?? DEFAULT_FLEET_CAPACITY), ...capacity },
+        },
       })),
     [updateDraft],
   );
@@ -147,14 +164,13 @@ export function useFleetManagerSetup(enabled = true) {
     importedFieldKeys,
     setProvider,
     toggleFleet,
+    setFleetCapacity,
     setField,
     setManagerId: (value: string) => updateDraft((current) => ({ ...current, managerId: value })),
     setNamespace: (value: string) => updateDraft((current) => ({ ...current, namespace: value })),
     setServiceAccountName: (value: string) => updateDraft((current) => ({ ...current, serviceAccountName: value })),
     setSuperplaneUrl: (value: string) => updateDraft((current) => ({ ...current, superplaneUrl: value })),
     setRunnerVersion: (value: string) => updateDraft((current) => ({ ...current, runnerVersion: value })),
-    setWarmCapacity: (value: number) => updateDraft((current) => ({ ...current, warmCapacity: value })),
-    setMaxCapacity: (value: number) => updateDraft((current) => ({ ...current, maxCapacity: value })),
   };
 }
 

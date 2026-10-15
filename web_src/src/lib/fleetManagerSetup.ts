@@ -36,6 +36,11 @@ export type FleetManagerSetupMetadata = {
 
 export type FleetManagerProviderFields = Record<string, string>;
 
+export type FleetCapacity = {
+  warmCapacity: number;
+  maxCapacity: number;
+};
+
 export type FleetManagerDraft = {
   provider: FleetManagerProvider;
   managerId: string;
@@ -44,8 +49,7 @@ export type FleetManagerDraft = {
   superplaneUrl: string;
   runnerVersion: string;
   selectedFleetIds: string[];
-  warmCapacity: number;
-  maxCapacity: number;
+  fleetCapacities: Record<string, FleetCapacity>;
   fields: FleetManagerProviderFields;
 };
 
@@ -61,16 +65,14 @@ type GenerateValuesInput = Omit<FleetManagerDraft, "namespace" | "serviceAccount
 };
 
 export type FleetManagerConfigurationInput = Omit<FleetManagerDraft, "provider" | "fields">;
-type FleetSelectionInput = Pick<
-  FleetManagerDraft,
-  "runnerVersion" | "selectedFleetIds" | "warmCapacity" | "maxCapacity"
->;
+type FleetSelectionInput = Pick<FleetManagerDraft, "runnerVersion" | "selectedFleetIds" | "fleetCapacities">;
 type FleetInfrastructureInput = Pick<
   FleetManagerDraft,
   "managerId" | "namespace" | "serviceAccountName" | "superplaneUrl"
 >;
 
 export const FLEET_MANAGER_DRAFT_KEY = "superplane.fleet-manager-setup.v1";
+export const DEFAULT_FLEET_CAPACITY: FleetCapacity = { warmCapacity: 0, maxCapacity: 1 };
 
 const splitList = (value: string | undefined, fallback: string) =>
   (value || fallback)
@@ -130,15 +132,18 @@ export function generateFleetManagerValues(input: GenerateValuesInput): string {
   const selected = new Set(input.selectedFleetIds);
   const fleets = input.metadata.fleetPresets
     .filter((preset) => selected.has(preset.id))
-    .map((preset) => ({
-      id: preset.id,
-      runnerVersion: input.runnerVersion,
-      warmCapacity: input.warmCapacity,
-      maxCapacity: input.maxCapacity,
-      spec: preset.spec,
-      provider: input.provider,
-      ...providerConfiguration[input.provider](preset.id, preset.spec, input.fields),
-    }));
+    .map((preset) => {
+      const capacity = input.fleetCapacities[preset.id] ?? DEFAULT_FLEET_CAPACITY;
+      return {
+        id: preset.id,
+        runnerVersion: input.runnerVersion,
+        warmCapacity: capacity.warmCapacity,
+        maxCapacity: capacity.maxCapacity,
+        spec: preset.spec,
+        provider: input.provider,
+        ...providerConfiguration[input.provider](preset.id, preset.spec, input.fields),
+      };
+    });
 
   const workloadIdentity =
     input.provider === "aws"
@@ -214,14 +219,17 @@ export function validateFleetSelection(input: FleetSelectionInput): string[] {
   if (input.selectedFleetIds.length === 0) {
     errors.push("Select at least one fleet.");
   }
-  if (!Number.isInteger(input.warmCapacity) || input.warmCapacity < 0) {
-    errors.push("Warm capacity must be a non-negative integer.");
-  }
-  if (!Number.isInteger(input.maxCapacity) || input.maxCapacity < 0) {
-    errors.push("Maximum capacity must be a non-negative integer.");
-  }
-  if (input.warmCapacity > input.maxCapacity) {
-    errors.push("Warm capacity cannot exceed maximum capacity.");
+  for (const fleetId of input.selectedFleetIds) {
+    const capacity = input.fleetCapacities[fleetId] ?? DEFAULT_FLEET_CAPACITY;
+    if (!Number.isInteger(capacity.warmCapacity) || capacity.warmCapacity < 0) {
+      errors.push(`Warm capacity for ${fleetId} must be a non-negative integer.`);
+    }
+    if (!Number.isInteger(capacity.maxCapacity) || capacity.maxCapacity < 0) {
+      errors.push(`Maximum capacity for ${fleetId} must be a non-negative integer.`);
+    }
+    if (capacity.warmCapacity > capacity.maxCapacity) {
+      errors.push(`Warm capacity for ${fleetId} cannot exceed maximum capacity.`);
+    }
   }
   return errors;
 }
@@ -290,16 +298,19 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
   if (!stored) return null;
 
   try {
-    const draft = JSON.parse(stored) as Partial<FleetManagerDraft>;
+    const draft = JSON.parse(stored) as Partial<FleetManagerDraft> & {
+      warmCapacity?: unknown;
+      maxCapacity?: unknown;
+    };
     if (!draft.provider || !["aws", "gcp", "azure"].includes(draft.provider)) return null;
     if (!hasRequiredDraftStrings(draft)) return null;
     if (!Array.isArray(draft.selectedFleetIds) || !draft.selectedFleetIds.every((id) => typeof id === "string"))
       return null;
     if (typeof draft.fields !== "object" || draft.fields === null) return null;
-    if (typeof draft.warmCapacity !== "number" || typeof draft.maxCapacity !== "number") return null;
     const fields = Object.fromEntries(
       Object.entries(draft.fields).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
     );
+    const fleetCapacities = storedFleetCapacities(draft);
     return {
       provider: draft.provider,
       managerId: draft.managerId,
@@ -308,13 +319,35 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
       superplaneUrl: draft.superplaneUrl,
       runnerVersion: draft.runnerVersion,
       selectedFleetIds: draft.selectedFleetIds,
-      warmCapacity: draft.warmCapacity,
-      maxCapacity: draft.maxCapacity,
+      fleetCapacities,
       fields,
     };
   } catch {
     return null;
   }
+}
+
+function storedFleetCapacities(
+  draft: Partial<FleetManagerDraft> & { warmCapacity?: unknown; maxCapacity?: unknown },
+): Record<string, FleetCapacity> {
+  const capacities = Object.fromEntries(
+    Object.entries(draft.fleetCapacities ?? {}).filter(
+      (entry): entry is [string, FleetCapacity] =>
+        typeof entry[1] === "object" &&
+        entry[1] !== null &&
+        typeof entry[1].warmCapacity === "number" &&
+        typeof entry[1].maxCapacity === "number",
+    ),
+  );
+  const legacyCapacity =
+    typeof draft.warmCapacity === "number" && typeof draft.maxCapacity === "number"
+      ? { warmCapacity: draft.warmCapacity, maxCapacity: draft.maxCapacity }
+      : DEFAULT_FLEET_CAPACITY;
+
+  for (const fleetId of draft.selectedFleetIds ?? []) {
+    capacities[fleetId] ??= { ...legacyCapacity };
+  }
+  return capacities;
 }
 
 export function clearFleetManagerDraft(): void {
