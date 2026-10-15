@@ -51,6 +51,8 @@ type FirstRunBitbucketForgeScreenProps = {
   sphere?: FirstRunSphereProps;
   onRetryLookup?: () => void;
   onGrantAccess: () => void;
+  installUrl?: string;
+  onCopyInstallLink?: () => Promise<void>;
   onSelectRepository: (repository: string) => void;
   onClearRepository?: () => void;
   onContinue: () => void;
@@ -133,13 +135,26 @@ function BitbucketGrantScreen(props: FirstRunBitbucketForgeScreenProps) {
     attemptActive = false,
     attemptTimedOut = false,
     switchingAccount = false,
+    installUrl = "",
     chrome,
     sphere,
     onGrantAccess,
     onRetryLookup,
+    onCopyInstallLink,
   } = props;
   const waiting = granting || attemptActive;
   const busy = granting || switchingAccount;
+  const [copied, setCopied] = useState(false);
+  const copyLink = async () => {
+    if (!onCopyInstallLink) return;
+    try {
+      await onCopyInstallLink();
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
   return (
     <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={busy} visual="preview">
       <FirstRunHeading headline={copy.workspaceHeadline}>
@@ -159,6 +174,18 @@ function BitbucketGrantScreen(props: FirstRunBitbucketForgeScreenProps) {
           >
             {copy.grantAction}
           </LoadingButton>
+          <p className="text-[12px] text-muted-foreground">
+            {copy.wrongAccountNote}{" "}
+            <button
+              type="button"
+              className="font-medium underline underline-offset-2 hover:no-underline"
+              disabled={!installUrl}
+              onClick={() => void copyLink()}
+              data-testid="first-run-bitbucket-copy-install-link"
+            >
+              {copied ? copy.copiedInstallLink : copy.copyInstallLink}
+            </button>
+          </p>
           {waiting ? (
             <div
               className="flex gap-3 rounded-md border border-border px-3 py-2.5 text-[13px]"

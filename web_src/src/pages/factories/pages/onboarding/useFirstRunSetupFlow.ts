@@ -441,6 +441,8 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bitbucketLookupRetrying: bitbucketConnect.lookupRetrying,
     retryBitbucketLookup: bitbucketConnect.retryLookup,
     bitbucketConnectHref: bitbucketConnect.connectHref,
+    bitbucketInstallUrl: bitbucketConnect.installUrl,
+    copyBitbucketInstallLink: bitbucketConnect.copyInstallLink,
     grantBitbucketAccess: bitbucketConnect.grantAccess,
     // The ticket screen is the last screen, so it finishes setup.
     ticketsFinishSetup: agentGate === "skip" || agentGate === "first",

@@ -311,6 +311,8 @@ function BitbucketChooseHost({
         sphere={sphere}
         onRetryLookup={flow.retryBitbucketLookup}
         onGrantAccess={() => void flow.grantBitbucketAccess()}
+        installUrl={flow.bitbucketInstallUrl}
+        onCopyInstallLink={() => flow.copyBitbucketInstallLink()}
         onSelectRepository={model.setup.selectRepo}
         onClearRepository={model.setup.clearRepository}
         onContinue={() => void flow.continueFromRepository()}

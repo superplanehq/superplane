@@ -80,6 +80,14 @@ export function useFirstRunBitbucket(args: {
 
   const startAttempt = (known: string[]) => setAttempt({ startedAt: Date.now(), knownSlugs: known });
 
+  const installUrl = onboarding.data?.installUrl ?? "";
+
+  const copyInstallLink = async () => {
+    const url = onboarding.data?.installUrl ?? (await onboarding.startInstallation.mutateAsync());
+    await navigator.clipboard.writeText(url);
+    startAttempt(installedSlugs(onboarding.data));
+  };
+
   const grantAccess = () =>
     args.blocking.run("opening-bitbucket", async () => {
       const popup = openGitHubWindow();
@@ -114,6 +122,8 @@ export function useFirstRunBitbucket(args: {
       "bitbucket",
       onboardingStepPath(`${location.pathname}${location.search}`, "repo"),
     ),
+    installUrl,
+    copyInstallLink,
     grantAccess,
   };
 }
