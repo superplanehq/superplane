@@ -243,7 +243,7 @@ describe("AutomationsConsoleVariant timeline markers", () => {
     });
 
     expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveAttribute("data-status", "cancelled");
-    expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveTextContent("Canceled");
+    expect(screen.getByTestId("redesign-console-column-marker-implement")).toHaveTextContent("Stopped");
     expect(screen.getByTestId("redesign-console-column-implement").getAttribute("data-completed")).toBe("true");
   });
 

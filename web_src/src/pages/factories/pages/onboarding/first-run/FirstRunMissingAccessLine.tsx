@@ -11,6 +11,7 @@ export function FirstRunMissingAccessLine({
   loading,
   loadingText = FIRST_RUN_COPY.choose.openingGitHub,
   onClick,
+  testId = "first-run-grant-access",
 }: {
   hint: string;
   question: string;
@@ -19,6 +20,7 @@ export function FirstRunMissingAccessLine({
   loading: boolean;
   loadingText?: string;
   onClick: () => void;
+  testId?: string;
 }) {
   return (
     <div className="space-y-1 text-[13px] text-muted-foreground">
@@ -33,7 +35,7 @@ export function FirstRunMissingAccessLine({
           disabled={disabled}
           loading={loading}
           loadingText={loadingText}
-          data-testid="first-run-grant-access"
+          data-testid={testId}
         >
           {action}
         </LoadingButton>

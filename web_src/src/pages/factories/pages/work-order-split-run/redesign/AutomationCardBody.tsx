@@ -4,7 +4,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/pages/app/Markdown";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
-import { ChevronRight, CircleStop, RotateCw } from "lucide-react";
+import { ChevronRight, CircleStop, RotateCw, X } from "lucide-react";
 import { useState } from "react";
 
 import { formatUsdCents, parseWorkOrderMetric } from "../../../lib/workOrderUsage";
@@ -48,7 +48,9 @@ export function AutomationCardBody({
   onRetry,
   actionBusy,
   phases,
+  queued = false,
 }: {
+  queued?: boolean;
   automation: ConsoleAutomation;
   phase?: SplitRunPhase;
   phases?: SplitRunPhase[];
@@ -63,9 +65,13 @@ export function AutomationCardBody({
   const pages = consolePages(latest, phase, runs);
   const [chosen, setChosen] = useState<ConsolePageId>();
   const active = chosen && pages.includes(chosen) ? chosen : pages[0];
+  if (compactQueuedRun(queued, runs.length, automation, pages)) {
+    return <CompactQueuedRun actionBusy={actionBusy} onStop={onStop} />;
+  }
   return (
     <PhaseAgentUsageProvider>
       <div className="space-y-3">
+        <QueuedRunNote show={queuedNoteWithoutAgentPage(queued, pages)} />
         {pages.includes("agent") ? null : <StageDescription stage={latest} />}
         <CardPageTabs pages={pages} active={active} stage={latest} runCount={runs.length} onChange={setChosen} />
         {/* The log stays mounted so live steps and spend keep streaming. */}
@@ -84,10 +90,62 @@ export function AutomationCardBody({
         ) : null}
         {active === "artifacts" ? <ArtifactsPage stage={latest} /> : null}
         {active === "checks" ? <ChecksPage checks={latest.checks} /> : null}
-        <CardRunFooter stage={latest} phase={phase} actionBusy={actionBusy} onRetry={onRetry} onStop={onStop} />
+        <CardRunFooter
+          stage={latest}
+          phase={phase}
+          actionBusy={actionBusy}
+          onRetry={onRetry}
+          onStop={onStop}
+          queued={queued}
+        />
       </div>
     </PhaseAgentUsageProvider>
   );
+}
+
+function compactQueuedRun(
+  queued: boolean,
+  runCount: number,
+  automation: ConsoleAutomation,
+  pages: ConsolePageId[],
+): boolean {
+  return queued && runCount === 1 && !queuedRunKeepsResults(automation, pages);
+}
+
+function queuedNoteWithoutAgentPage(queued: boolean, pages: ConsolePageId[]): boolean {
+  return queued && !pages.includes("agent");
+}
+
+function CompactQueuedRun({ actionBusy, onStop }: { actionBusy: boolean; onStop?: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-[12.5px] text-muted-foreground">Waiting for an available agent slot.</p>
+      {onStop ? (
+        <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onStop}>
+          <X className="size-3.5" aria-hidden />
+          Cancel
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function QueuedRunNote({ show }: { show: boolean }) {
+  if (!show) {
+    return null;
+  }
+  return <p className="text-[12.5px] text-muted-foreground">Waiting for an available agent slot.</p>;
+}
+
+function queuedRunKeepsResults(automation: ConsoleAutomation, pages: ConsolePageId[]): boolean {
+  const stage = automation.latest;
+  if (pages.some((page) => page !== "agent")) {
+    return true;
+  }
+  if (stage.description?.trim() || stage.checks.length > 0 || stage.agentSteps.length > 0) {
+    return true;
+  }
+  return artifactsPageCount(stage) > 0;
 }
 
 function CardPageTabs({
@@ -123,6 +181,7 @@ function CardPageTabs({
 }
 
 function CardRunFooter({
+  queued,
   stage,
   phase,
   actionBusy,
@@ -130,6 +189,7 @@ function CardRunFooter({
   onStop,
 }: {
   stage: AutomationStage;
+  queued: boolean;
   phase?: SplitRunPhase;
   actionBusy: boolean;
   onRetry?: () => void;
@@ -151,7 +211,7 @@ function CardRunFooter({
         spendLabel={spendLabel}
         model={model}
       />
-      <CardFooterActions actionBusy={actionBusy} onRetry={onRetry} onStop={onStop} />
+      <CardFooterActions actionBusy={actionBusy} onRetry={onRetry} onStop={onStop} queued={queued} />
     </div>
   );
 }
@@ -203,10 +263,12 @@ function CardFooterMeta({
 }
 
 function CardFooterActions({
+  queued,
   actionBusy,
   onRetry,
   onStop,
 }: {
+  queued: boolean;
   actionBusy: boolean;
   onRetry?: () => void;
   onStop?: () => void;
@@ -222,7 +284,7 @@ function CardFooterActions({
       {onStop ? (
         <Button size="sm" variant="outline" className="gap-1.5" disabled={actionBusy} onClick={onStop}>
           <CircleStop className="size-3.5" aria-hidden />
-          Stop
+          {queued ? "Cancel" : "Stop"}
         </Button>
       ) : null}
     </div>

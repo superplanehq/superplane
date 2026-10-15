@@ -100,6 +100,30 @@ installation:
   type: "kubernetes"
   beaconEnabled: true
 
+#
+# Fleet Manager setup metadata and its dedicated service credential.
+# The credential value is generated in Kubernetes and never enters Helm values.
+# Set provision to false when existingSecret is managed outside this chart.
+#
+fleetManagerSetup:
+  enabled: true
+  provider: ""
+  managerId: ""
+  namespace: ""
+  serviceAccountName: superplane-fleet-manager
+  credentials:
+    provision: true
+    existingSecret: superplane-fleet-manager-token
+    tokenKey: INSTALLATION_ADMIN_TOKEN
+  infrastructure: {}
+  credentialJob:
+    image: curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6
+    activeDeadlineSeconds: 180
+
+componentReleases:
+  runnerVersion: v0.1.0
+  fleetManagerVersion: v0.1.0
+
 sentry:
   secretName: ""
   enabled: false
@@ -289,6 +313,47 @@ blobStorage:
 podLabels: {}
 
 #
+# Pod securityContext for the API, workers, websocket, and runner pods.
+# Empty emits no pod securityContext. Pods that mount runner logs still set
+# fsGroup from runner.activeLogs.fsGroup. That fsGroup wins over this map.
+#
+podSecurityContext: {}
+
+#
+# Container securityContext for the API, workers, websocket, and runner
+# containers. These defaults match the previous fixed template.
+#
+securityContext:
+  privileged: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+#
+# Migration Job. The SuperPlane image runs as nobody (65534).
+# These defaults match the previous fixed template.
+# A non-empty podSecurityContext is merged over migrate.podSecurityContext.
+# A container securityContext that differs from the chart default is merged
+# over migrate.securityContext.
+#
+migrate:
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+    fsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    capabilities:
+      drop:
+        - ALL
+
+#
 # Runner API and runner workers. Off by default.
 # The runner API serves /runner/v1. Runner workers compact finished task
 # logs into blob storage and remove stale runners.
@@ -314,39 +379,6 @@ runner:
     size: 10Gi
     # Group that owns the log volume. The SuperPlane image runs as nobody (65534).
     fsGroup: 65534
-
-#
-# Integrated Fleet Manager. Off by default.
-# Fleet Manager creates and deletes runner machines for the configured fleets.
-# Put the Fleet Manager configuration in an existing secret, under the key
-# fleet-manager.yaml. See pkg/fleets/README.md for the format.
-# Set serviceAccount.annotations to bind a cloud identity, for example
-# iam.gke.io/gcp-service-account for GKE Workload Identity or
-# azure.workload.identity/client-id for AKS.
-#
-fleetManager:
-  enabled: false
-  existingSecret: ""
-  image:
-    registry: ghcr.io/superplanehq
-    name: fleet-manager
-    tag: ""
-    pullPolicy: IfNotPresent
-  serviceAccount:
-    create: false
-    name: ""
-    annotations: {}
-  # Fleet Manager reads its configuration once at start. Change an annotation,
-  # for example a checksum of the configuration, to restart it.
-  podAnnotations: {}
-  podLabels: {}
-  resources:
-    limits:
-      cpu: 100m
-      memory: 128Mi
-    requests:
-      cpu: 100m
-      memory: 128Mi
 
 #
 # Email configuration

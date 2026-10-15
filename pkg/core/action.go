@@ -136,4 +136,6 @@ type OutputChannel struct {
 	Description string
 }
 
+const FailedOutputChannel = "failed"
+
 var DefaultOutputChannel = OutputChannel{Name: "default", Label: "Default"}

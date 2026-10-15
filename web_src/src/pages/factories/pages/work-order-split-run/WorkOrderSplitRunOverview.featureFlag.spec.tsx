@@ -39,7 +39,7 @@ describe("Task planning review", () => {
     );
 
     expect(screen.getByRole("button", { name: "Open plan" })).toBeVisible();
-    expect(screen.getByRole("button", { name: "Suggest changes" })).toBeVisible();
+    expect(screen.getByRole("textbox", { name: "Tell the agent more about this task" })).toBeVisible();
     expect(screen.getByRole("region", { name: "Implementation" })).toBeVisible();
   });
 });

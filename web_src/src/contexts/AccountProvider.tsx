@@ -41,46 +41,7 @@ export function AccountProvider({ children }: AccountProviderProps) {
       return;
     }
 
-    const signupResult = getSignupAnalyticsResult(window.location.search);
-    if (
-      signupResult === "created" ||
-      (signupResult !== "existing" && hasConfirmedSignupAnalyticsPreference(accountData.email))
-    ) {
-      trackGoogleSignup(accountData.id);
-    }
-    const signupPreference = consumePendingSignupAnalyticsPreference({
-      accountEmail: accountData.email,
-      currentPath: window.location.pathname,
-      signupResult,
-    });
-
-    const accountProperties = {
-      email: accountData.email,
-      name: accountData.name,
-      installation_admin: accountData.installation_admin,
-      ...(signupPreference
-        ? {
-            product_updates_opt_in: signupPreference.productUpdatesOptIn,
-          }
-        : {}),
-    };
-
-    posthog.identify(accountData.id, accountProperties);
-
-    if (signupPreference) {
-      posthog.capture("auth:signup", {
-        product_updates_opt_in: signupPreference.productUpdatesOptIn,
-        $set: {
-          product_updates_opt_in: signupPreference.productUpdatesOptIn,
-        },
-      });
-    } else if (signupResult === "created") {
-      posthog.capture("auth:signup");
-    }
-
-    if (signupResult) {
-      removeSignupAnalyticsResult();
-    }
+    identifySignedInAccount(accountData);
   }, []);
 
   useEffect(() => {
@@ -98,6 +59,56 @@ export function AccountProvider({ children }: AccountProviderProps) {
       {children}
     </AccountContext.Provider>
   );
+}
+
+interface SignedInAccount {
+  id: string;
+  email: string;
+  name: string;
+  installation_admin: boolean;
+}
+
+function identifySignedInAccount(accountData: SignedInAccount) {
+  const signupResult = getSignupAnalyticsResult(window.location.search);
+  if (
+    signupResult === "created" ||
+    (signupResult !== "existing" && hasConfirmedSignupAnalyticsPreference(accountData.email))
+  ) {
+    trackGoogleSignup(accountData.id);
+  }
+  const signupPreference = consumePendingSignupAnalyticsPreference({
+    accountEmail: accountData.email,
+    currentPath: window.location.pathname,
+    signupResult,
+  });
+
+  const accountProperties = {
+    email: accountData.email,
+    name: accountData.name,
+    installation_admin: accountData.installation_admin,
+    ...(signupPreference
+      ? {
+          product_updates_opt_in: signupPreference.productUpdatesOptIn,
+        }
+      : {}),
+  };
+
+  posthog.identify(accountData.id, accountProperties);
+
+  if (signupPreference) {
+    posthog.capture("auth:signup", {
+      product_updates_opt_in: signupPreference.productUpdatesOptIn,
+      $set: {
+        product_updates_opt_in: signupPreference.productUpdatesOptIn,
+      },
+    });
+  } else if (signupResult === "created") {
+    posthog.capture("auth:signup");
+  }
+
+  if (signupResult) {
+    removeSignupAnalyticsResult();
+  }
 }
 
 function getSignupAnalyticsResult(search: string) {

@@ -93,26 +93,34 @@ export const linkGitHubIssueMapper: ComponentBaseMapper = {
 function buildMetadata(node: NodeInfo) {
   const configuration = node.configuration as LinkGitHubIssueConfiguration | undefined;
   const nodeMetadata = node.metadata as LinkGitHubIssueNodeMetadata | undefined;
-  const metadata = [];
+  const metadata: Array<{ icon: string; label: string }> = [];
 
-  const issueLabel = nodeMetadata?.issueTitle || configuration?.issueId;
-  if (issueLabel) {
-    metadata.push({ icon: "bug", label: issueLabel });
-  }
-
-  const externalIssueLabel =
-    nodeMetadata?.externalIssueLabel ||
-    (configuration?.repo && configuration?.externalIssue
-      ? `${configuration.repo}#${configuration.externalIssue}`
-      : configuration?.externalIssue);
-  if (externalIssueLabel) {
-    metadata.push({ icon: "link", label: externalIssueLabel });
-  }
-
-  const integrationLabel = nodeMetadata?.githubIntegrationLabel || configuration?.githubIntegrationId;
-  if (integrationLabel) {
-    metadata.push({ icon: "github", label: integrationLabel });
-  }
+  pushMetadataItem(metadata, "bug", nodeMetadata?.issueTitle || configuration?.issueId);
+  pushMetadataItem(metadata, "link", githubIssueLinkLabel(nodeMetadata, configuration));
+  pushMetadataItem(metadata, "github", nodeMetadata?.githubIntegrationLabel || configuration?.githubIntegrationId);
 
   return metadata.slice(0, 3);
+}
+
+function pushMetadataItem(metadata: Array<{ icon: string; label: string }>, icon: string, label?: string) {
+  if (!label) {
+    return;
+  }
+
+  metadata.push({ icon, label });
+}
+
+function githubIssueLinkLabel(
+  nodeMetadata: LinkGitHubIssueNodeMetadata | undefined,
+  configuration: LinkGitHubIssueConfiguration | undefined,
+): string | undefined {
+  if (nodeMetadata?.externalIssueLabel) {
+    return nodeMetadata.externalIssueLabel;
+  }
+
+  if (configuration?.repo && configuration?.externalIssue) {
+    return `${configuration.repo}#${configuration.externalIssue}`;
+  }
+
+  return configuration?.externalIssue;
 }

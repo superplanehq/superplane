@@ -205,8 +205,8 @@ func persistOAuthStart(
 	return resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthNotConnected, "", nil)
 }
 
-func FactoryAgentResourceSettingsPath(orgSlug, factoryKey string) string {
-	return "/" + strings.Trim(orgSlug, "/") + "/workspaces/" + factoryKey + "/settings/workspace/mcp"
+func factoryAgentPagePath(orgSlug, factoryKey string) string {
+	return "/" + strings.Trim(orgSlug, "/") + "/workspaces/" + factoryKey + "/agent"
 }
 
 func CompleteFactoryAgentResourceOAuth(
@@ -227,7 +227,7 @@ func CompleteFactoryAgentResourceOAuth(
 	if err != nil {
 		return "", 404, "organization not found"
 	}
-	redirectPath = FactoryAgentResourceSettingsPath(org.Slug, factory.RouteSegment())
+	redirectPath = factoryAgentPagePath(org.Slug, factory.RouteSegment())
 
 	if oauthError != "" {
 		_ = resource.ClearOAuthPending(db)

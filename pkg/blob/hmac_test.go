@@ -28,6 +28,20 @@ func TestFileAccessURLRoundTrip(t *testing.T) {
 	require.Error(t, VerifyFileAccess(fileID, time.Now().Add(-time.Minute).Unix(), sig, key))
 }
 
+func TestSigningKeyRequiresDedicatedKey(t *testing.T) {
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "")
+	t.Setenv("ENCRYPTION_KEY", "encryption-key")
+	t.Setenv("JWT_SECRET", "jwt-secret")
+
+	_, err := SigningKey()
+	require.ErrorContains(t, err, "BLOB_STORAGE_SIGNING_KEY")
+
+	t.Setenv("BLOB_STORAGE_SIGNING_KEY", "file-signing-key")
+	key, err := SigningKey()
+	require.NoError(t, err)
+	assert.Equal(t, []byte("file-signing-key"), key)
+}
+
 func TestFileAccessURLStaysStableInsideExpiryBucket(t *testing.T) {
 	fileID := uuid.MustParse("55555555-5555-5555-5555-555555555555")
 	key := []byte("signing-secret")

@@ -15,7 +15,8 @@ type FactoryVelocityWindowTotals struct {
 	SuperplaneMerged int
 	PeopleMerged     int
 	Waste            int
-	CostCents        int64
+	// Ledger spend in the window, in cents.
+	CostCents int64
 }
 
 // FactoryVelocityDayPoint is one day of the "who created" series.
@@ -101,6 +102,9 @@ func loadVelocityWindowData(
 	}
 	fillBuckets(buckets, rows, currentOrders, cohort.merges, current)
 	fillBuckets(previousBuckets, rows, previousOrders, cohort.merges, previous)
+	if err := applyVelocityLedgerSpend(db, factory, previousBuckets, buckets); err != nil {
+		return nil, err
+	}
 
 	return &velocityWindowData{
 		buckets:         buckets,
@@ -135,6 +139,47 @@ func summarizeVelocityWindows(data *velocityWindowData) FactoryVelocityWindows {
 		HasPeople:   data.cohort.hasPeople,
 		Days:        days,
 	}
+}
+
+func applyVelocityLedgerSpend(db *gorm.DB, factory *models.Factory, previous, current []dayBucket) error {
+	if len(current) == 0 {
+		return nil
+	}
+	bounds := make([]time.Time, 0, len(previous)+len(current)+1)
+	for i := range previous {
+		bounds = append(bounds, previous[i].start)
+	}
+	for i := range current {
+		bounds = append(bounds, current[i].start)
+	}
+	bounds = append(bounds, current[len(current)-1].end)
+
+	factoryID := factory.ID
+	days, err := models.SummarizeUsageByLocalDay(db, models.UsageReportFilter{
+		OrganizationID: factory.OrganizationID,
+		FactoryID:      &factoryID,
+		Since:          bounds[0],
+		Until:          bounds[len(bounds)-1],
+	}, bounds)
+	if err != nil {
+		return err
+	}
+
+	for i := range previous {
+		writeLedgerSpend(&previous[i], days[i])
+	}
+	offset := len(previous)
+	for i := range current {
+		writeLedgerSpend(&current[i], days[offset+i])
+	}
+	return nil
+}
+
+func writeLedgerSpend(bucket *dayBucket, split models.UsageSplit) {
+	bucket.modelCostMicros = split.Model.CostMicros
+	bucket.computeCostMicros = split.Compute.CostMicros
+	bucket.costMicros = split.Total().CostMicros
+	bucket.tokens = split.Total().TotalTokens
 }
 
 func windowTotalsFromProto(totals *pb.DescribeFactoryVelocityTotals) FactoryVelocityWindowTotals {

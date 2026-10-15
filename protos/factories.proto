@@ -2410,17 +2410,16 @@ message DescribeFactoryVelocityDay {
   int32 waste = 5;
   // Merged SuperPlane pull requests grouped by intake source.
   repeated DescribeFactoryVelocityIntakeCount intake = 6;
-  // Tracked spend of the work orders that closed on this day. A work order
-  // counts on the day its pull request merged, or on the day its last pull
-  // request closed when none merged.
+  // Ledger spend that occurred on this local day, in cents.
   int64 cost_cents = 7;
+  // Ledger tokens that occurred on this local day.
   int64 tokens = 8;
-  // Part of `cost_cents` spent on work orders that closed without a merge.
+  // Spend of work orders that closed without a merge, on the close day.
+  // This is not the ledger spend above.
   int64 waste_cost_cents = 9;
-  // Part of `cost_cents` spent on model tokens. Adds up to `cost_cents`
-  // together with `compute_cost_cents`.
+  // Part of the day's ledger spend on model tokens.
   int64 model_cost_cents = 10;
-  // Part of `cost_cents` spent on runner compute.
+  // Part of the day's ledger spend on runner compute.
   int64 compute_cost_cents = 11;
   // Median model spend of one work order reported on this day. Medians of the
   // two bands do not add up to the median of the total, so these two describe
@@ -2498,10 +2497,12 @@ message DescribeFactoryVelocityTotals {
   int32 superplane_share_pct = 4;
   // Waste as a percentage of SuperPlane closes (merged + waste), 0-100.
   int32 waste_pct = 5;
-  // Tracked spend of the work orders that closed in the window.
+  // Ledger spend that occurred in the window, in cents.
   int64 cost_cents = 6;
+  // Ledger tokens that occurred in the window.
   int64 tokens = 7;
-  // Part of `cost_cents` spent on work orders that closed without a merge.
+  // Spend of work orders that closed without a merge, on the close day.
+  // This is not the ledger spend above.
   int64 waste_cost_cents = 8;
   // Work orders (tasks) that closed in the window. A work order counts once,
   // even when it opened several pull requests, which is why this differs from
@@ -2509,10 +2510,9 @@ message DescribeFactoryVelocityTotals {
   int32 tasks_closed = 9;
   // Part of `tasks_closed` whose pull requests all closed without a merge.
   int32 tasks_waste = 10;
-  // Part of `cost_cents` spent on model tokens. Adds up to `cost_cents`
-  // together with `compute_cost_cents`.
+  // Part of the window ledger spend on model tokens.
   int64 model_cost_cents = 11;
-  // Part of `cost_cents` spent on runner compute.
+  // Part of the window ledger spend on runner compute.
   int64 compute_cost_cents = 12;
 }
 
@@ -2656,6 +2656,8 @@ message FactoryAgentResource {
     KIND_UNSPECIFIED = 0;
     KIND_MCP_SERVER = 1;
     KIND_SKILL = 2;
+    KIND_SETUP_COMMAND = 3;
+    KIND_CONTEXT_REPO = 4;
   }
 
   enum Auth {
@@ -2697,6 +2699,8 @@ message FactoryAgentResource {
   string path = 17;
   string markdown = 18;
   repeated string disabled_tools = 19;
+  repeated string commands = 20;
+  string vcs_provider = 21;
 }
 
 message ListFactoryAgentResourcesRequest {
@@ -2717,6 +2721,9 @@ message CreateFactoryAgentResourceRequest {
   FactoryAgentResource.Auth auth = 6;
   repeated FactoryAgentResource.Header headers = 7;
   string markdown = 8;
+  string repository = 9;
+  repeated string commands = 10;
+  string vcs_provider = 11;
 }
 
 message CreateFactoryAgentResourceResponse {
@@ -2734,6 +2741,10 @@ message UpdateFactoryAgentResourceRequest {
   optional string markdown = 8;
   repeated string disabled_tools = 9;
   optional bool replace_disabled_tools = 10;
+  optional string repository = 11;
+  repeated string commands = 12;
+  optional bool replace_commands = 13;
+  optional string vcs_provider = 14;
 }
 
 message UpdateFactoryAgentResourceResponse {

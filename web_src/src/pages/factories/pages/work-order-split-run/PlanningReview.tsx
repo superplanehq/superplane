@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 
-import { ChevronRight, CircleCheck, CircleMinus, CircleX, FileText, TriangleAlert } from "lucide-react";
+import { ChevronRight, FileText } from "lucide-react";
 
 import { Link } from "@/components/Link/link";
 import { Frame, FramePanel } from "@/components/reui/frame";
@@ -9,12 +9,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 
 import { ConfidenceAnalyzingIndicator } from "../../workOrders/ConfidenceMeter";
+import { CheckStatusIcon } from "../../workOrders/CheckStatusIcon";
 import { ReadinessDot } from "../../workOrders/ReadinessMark";
-import {
-  workOrderCheckStatus,
-  type WorkOrderCheckLevel,
-  type WorkOrderCheckPresentation,
-} from "../../lib/workOrderChecks";
+import { workOrderCheckStatus, type WorkOrderCheckPresentation } from "../../lib/workOrderChecks";
 import { ScoreEvidenceRow, type ScoreEvidenceDetails, type ScoreEvidenceValue } from "../../workOrders/ScoreEvidence";
 import { CREATE_WITH_AGENT_COPY } from "../createWithAgentCopy";
 import type { PlanChipStatus } from "./planChipStatus";
@@ -34,6 +31,7 @@ export function PlanningReview({
   clarity,
   confidence,
   reviewMetrics,
+  questionsPending = false,
   showClarity = true,
   showConfidence = true,
   isAnalyzing = false,
@@ -47,6 +45,7 @@ export function PlanningReview({
   clarity?: ComposerScore;
   confidence?: ComposerScore;
   reviewMetrics?: WorkOrderCheckPresentation[];
+  questionsPending?: boolean;
   showClarity?: boolean;
   showConfidence?: boolean;
   isAnalyzing?: boolean;
@@ -57,7 +56,7 @@ export function PlanningReview({
 }) {
   const analyzing = isAnalyzing && !creditVerdict;
   const metrics = reviewMetrics?.length ? reviewMetrics : undefined;
-  const checks = useConfidenceChecks({ confidence, metrics, showConfidence, analyzing });
+  const checks = useConfidenceChecks({ confidence, metrics, showConfidence, analyzing, questionsPending });
   return (
     <Frame
       dense
@@ -73,6 +72,7 @@ export function PlanningReview({
             title={title}
             analyzing={analyzing}
             canTogglePlan={canTogglePlan}
+            questionsPending={questionsPending}
             planStatus={planStatus}
             onToggle={onToggle}
             creditVerdict={creditVerdict}
@@ -99,6 +99,7 @@ function PlanningReviewHeading({
   title,
   analyzing,
   canTogglePlan,
+  questionsPending,
   planStatus,
   onToggle,
   creditVerdict,
@@ -107,6 +108,7 @@ function PlanningReviewHeading({
   title?: string;
   analyzing: boolean;
   canTogglePlan: boolean;
+  questionsPending: boolean;
   planStatus?: PlanChipStatus;
   onToggle?: () => void;
   creditVerdict?: ComposerCreditVerdict;
@@ -122,7 +124,7 @@ function PlanningReviewHeading({
           <PlanToggle open={open} title={title} isAnalyzing={analyzing} planStatus={planStatus} onToggle={onToggle} />
         </div>
       ) : creditVerdict ? null : (
-        <PlanningAssessmentHeading analyzing={analyzing} />
+        <PlanningAssessmentHeading analyzing={analyzing} questionsPending={questionsPending} />
       )}
     </>
   );
@@ -133,17 +135,22 @@ function useConfidenceChecks({
   metrics,
   showConfidence,
   analyzing,
+  questionsPending,
 }: {
   confidence?: ComposerScore;
   metrics?: WorkOrderCheckPresentation[];
   showConfidence: boolean;
   analyzing: boolean;
+  questionsPending: boolean;
 }): ScoreEvidenceDetails | undefined {
   const controlsId = useId();
   const maxScore = confidence?.maxScore ?? 3;
   const scoreKey = `${confidence?.score}/${maxScore}:${metrics?.map((metric) => `${metric.key ?? metric.id}:${metric.score}`).join("|")}`;
   const [userChoice, setUserChoice] = useState<{ scoreKey: string; open: boolean }>();
-  const open = userChoice?.scoreKey === scoreKey ? userChoice.open : (confidence?.score ?? maxScore) < maxScore;
+  const open =
+    userChoice?.scoreKey === scoreKey
+      ? userChoice.open
+      : !questionsPending && (confidence?.score ?? maxScore) < maxScore;
   if (!metrics || !showConfidence || analyzing || confidence?.score == null) {
     return undefined;
   }
@@ -161,9 +168,7 @@ function ReviewMetricsSection({ id, metrics }: { id: string; metrics: WorkOrderC
       className="border-t border-border/70 bg-muted/20 px-4"
     >
       {attentionSummary ? (
-        <p className="border-b border-border/60 py-2.5 text-[12px] font-medium leading-4 text-foreground">
-          {attentionSummary}
-        </p>
+        <p className="border-b border-border/60 py-2.5 text-sm font-semibold text-foreground">{attentionSummary}</p>
       ) : null}
       <div className="divide-y divide-border/60">
         {metrics.map((metric) => (
@@ -188,28 +193,20 @@ function reviewAttentionSummary(metrics: WorkOrderCheckPresentation[]): string |
   return `${names.length} checks need review.`;
 }
 
-const REVIEW_STATUS_ICON: Record<WorkOrderCheckLevel, { Icon: typeof CircleCheck; className: string }> = {
-  positive: { Icon: CircleCheck, className: "fill-emerald-600 stroke-white" },
-  neutral: { Icon: CircleMinus, className: "fill-slate-500 stroke-white" },
-  caution: { Icon: TriangleAlert, className: "fill-amber-500 stroke-white" },
-  critical: { Icon: CircleX, className: "fill-red-600 stroke-white" },
-};
-
 function ReviewMetricRow({ metric }: { metric: WorkOrderCheckPresentation }) {
   const status = workOrderCheckStatus(metric);
-  const { Icon, className } = REVIEW_STATUS_ICON[metric.level];
   return (
     <div className="flex min-w-0 gap-2.5 py-3">
-      <Icon className={cn("mt-0.5 size-4 shrink-0", className)} role="img" aria-label={status.label} />
+      <CheckStatusIcon level={metric.level} label={status.label} className="mt-0.5" />
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-medium text-foreground">{metric.name}</p>
-        {metric.summary ? <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{metric.summary}</p> : null}
+        <p className="text-sm font-semibold text-foreground">{metric.name}</p>
+        {metric.summary ? <p className="mt-0.5 text-sm text-foreground/75">{metric.summary}</p> : null}
       </div>
     </div>
   );
 }
 
-function PlanningAssessmentHeading({ analyzing }: { analyzing: boolean }) {
+function PlanningAssessmentHeading({ analyzing, questionsPending }: { analyzing: boolean; questionsPending: boolean }) {
   return (
     <div
       className="flex min-w-0 items-center gap-2.5"
@@ -227,6 +224,11 @@ function PlanningAssessmentHeading({ analyzing }: { analyzing: boolean }) {
       <div className="min-w-0">
         <p className="break-words text-[13px] leading-5 font-medium text-foreground">Planning assessment</p>
         {analyzing ? <p className="text-[12px] leading-4 text-muted-foreground">Analyzing task…</p> : null}
+        {questionsPending && !analyzing ? (
+          <p className="mt-0.5 text-[13px] leading-5 text-foreground/75">
+            There is no plan yet. Answer the questions to help the agent create one.
+          </p>
+        ) : null}
       </div>
     </div>
   );
@@ -290,13 +292,13 @@ function PlanToggle({
             className="shrink-0"
           />
         ) : (
-          <FileText aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+          <FileText aria-hidden className="size-4 shrink-0 text-foreground/65" />
         )}
         <span className="min-w-0 break-words whitespace-normal text-[14px] leading-5 font-semibold text-foreground">
           {title || "Plan"}
         </span>
       </span>
-      <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-muted-foreground group-hover:text-foreground">
+      <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-foreground/70 group-hover:text-foreground">
         {open ? "Hide plan" : "Open plan"}
         <ChevronRight aria-hidden className={cn("size-3.5 transition-transform", open && "rotate-90")} />
         <PlanStatusMark isAnalyzing={isAnalyzing} planStatus={planStatus} />

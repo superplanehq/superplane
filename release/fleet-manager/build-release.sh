@@ -35,6 +35,15 @@ mkdir -p "${STAGING_DIR}/sbom-input"
 trap 'rm -rf "${STAGING_DIR}"' EXIT
 
 cd "${REPO_ROOT}"
+bash "${REPO_ROOT}/release/fleet-manager-chart/test-chart.sh"
+helm package "${REPO_ROOT}/release/fleet-manager-chart/helm" \
+  --version "${VERSION#v}" \
+  --app-version "${VERSION}" \
+  --destination "${OUTPUT_DIR}" >/dev/null
+CHART_ARCHIVE="fleet-manager-chart-${VERSION#v}.tgz"
+test "$(helm show chart "${OUTPUT_DIR}/${CHART_ARCHIVE}" | awk '$1 == "version:" {print $2}')" = "${VERSION#v}"
+test "$(helm show chart "${OUTPUT_DIR}/${CHART_ARCHIVE}" | awk '$1 == "appVersion:" {print $2}')" = "${VERSION}"
+
 for architecture in "${ARCHITECTURES[@]}"; do
   architecture_dir="${STAGING_DIR}/${architecture}"
   image="superplane-fleet-manager-release:${VERSION#v}-${architecture}"
@@ -43,7 +52,7 @@ for architecture in "${ARCHITECTURES[@]}"; do
   docker buildx build \
     --platform "linux/${architecture}" \
     --progress=plain \
-    --provenance=mode=max \
+    --provenance=false \
     --build-arg "FLEET_MANAGER_VERSION=${VERSION}" \
     --build-arg "SOURCE_REVISION=${GIT_SHA}" \
     --target runtime \
@@ -81,6 +90,7 @@ bash "${REPO_ROOT}/release/generate-component-sbom.sh" \
     fleet-manager-linux-amd64.tar.gz
     fleet-manager-linux-arm64.tar.gz
     fleet-manager.spdx.json
+    "${CHART_ARCHIVE}"
   )
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "${artifacts[@]}" >checksums.txt

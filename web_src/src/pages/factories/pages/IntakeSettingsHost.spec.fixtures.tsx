@@ -72,6 +72,37 @@ export const PRODUCTIVE_INTAKE: ConfiguredLineIntakeSource = {
   source: lineIntakeSourceById("productive-tasks")!,
 };
 
+export const DEPENDABOT_INTAKE: ConfiguredLineIntakeSource = {
+  intakeId: "intake-dependabot",
+  appId: "app-dependabot-intake",
+  healthy: true,
+  paused: false,
+  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Dependabot alerts", dependabotSeverities: [] },
+  source: lineIntakeSourceById("dependabot-alerts")!,
+};
+
+export const DEPENDABOT_INTAKE_CANVAS = {
+  metadata: { id: "app-dependabot-intake", name: "Dependabot alerts", factoryId: "factory-1" },
+  spec: {
+    nodes: [
+      {
+        id: "dependabot-alerts-trigger",
+        name: "On Dependabot Alert",
+        type: "TYPE_TRIGGER",
+        component: "github.onDependabotAlert",
+        configuration: { repository: "superplanehq/superplane", actions: ["created"] },
+      },
+      {
+        id: "dependabot-alerts-create",
+        name: "Create Task",
+        type: "TYPE_ACTION",
+        component: "createWorkOrder",
+      },
+    ],
+    edges: [{ channel: "default", sourceId: "dependabot-alerts-trigger", targetId: "dependabot-alerts-create" }],
+  },
+};
+
 export const DATADOG_INTAKE: ConfiguredLineIntakeSource = {
   intakeId: "intake-datadog",
   appId: "app-datadog-intake",
@@ -92,9 +123,121 @@ export function connectedJiraIntake(overrides: Partial<ConfiguredLineIntakeSourc
   };
 }
 
+export function resetIntakeSettingsHostMocks(mocks: {
+  useCanvas: ReturnType<typeof vi.fn>;
+  useTriggers: ReturnType<typeof vi.fn>;
+  useComponents: ReturnType<typeof vi.fn>;
+  useAvailableIntegrations: ReturnType<typeof vi.fn>;
+  useIntegrationResources: ReturnType<typeof vi.fn>;
+  useDescribeRun: ReturnType<typeof vi.fn>;
+  useEventExecutions: ReturnType<typeof vi.fn>;
+  useInfiniteCanvasRuns: ReturnType<typeof vi.fn>;
+  updateIntake: ReturnType<typeof vi.fn>;
+  deleteIntake: ReturnType<typeof vi.fn>;
+}) {
+  mocks.useCanvas.mockReturnValue({
+    data: GITHUB_INTAKE_CANVAS,
+    isPending: false,
+    isError: false,
+    refetch: vi.fn().mockResolvedValue(undefined),
+  });
+  mocks.useTriggers.mockReturnValue({
+    data: [
+      { name: "github.onIssue", label: "On Issue" },
+      { name: "github.onDependabotAlert", label: "On Dependabot Alert" },
+    ],
+    isLoading: false,
+  });
+  mocks.useComponents.mockReturnValue({
+    data: [
+      { name: "if", label: "If" },
+      { name: "createWorkOrder", label: "Create Task" },
+    ],
+    isLoading: false,
+  });
+  mocks.useAvailableIntegrations.mockReturnValue({
+    data: [{ name: "jira", label: "Jira", hostedAppInstall: true }],
+    isLoading: false,
+  });
+  mocks.useIntegrationResources.mockImplementation(integrationResourceResult);
+  mocks.useDescribeRun.mockReturnValue({ data: undefined, isLoading: false, isFetched: true });
+  mocks.useEventExecutions.mockReturnValue({ data: { executions: [] }, isLoading: false });
+  mocks.updateIntake.mockResolvedValue({ id: "intake-github" });
+  mocks.deleteIntake.mockResolvedValue(undefined);
+  localStorage.clear();
+  mocks.useInfiniteCanvasRuns.mockReturnValue(intakeRunsResult());
+}
+
+function integrationResourceResult(_organizationId: string, _integrationId: string, resourceType: string) {
+  if (resourceType === "issueStatus") {
+    return resourceResult([
+      { id: "todo", name: "To Do" },
+      { id: "qa", name: "QA" },
+      { id: "done", name: "Done" },
+    ]);
+  }
+  if (resourceType === "service") {
+    return resourceResult([
+      { id: "checkout", name: "checkout" },
+      { id: "billing", name: "billing" },
+    ]);
+  }
+  if (resourceType === "project") {
+    return resourceResult([
+      { id: "ENG", name: "Engineering" },
+      { id: "OPS", name: "Operations" },
+    ]);
+  }
+  return resourceResult([]);
+}
+
+function resourceResult(data: Array<{ id: string; name: string }>) {
+  return { data, isLoading: false, isError: false, refetch: vi.fn() };
+}
+
+function intakeRunsResult() {
+  return {
+    data: {
+      pages: [
+        {
+          runs: [
+            {
+              id: "run-intake-1",
+              canvasId: "app-github-issues-intake",
+              state: "STATE_FINISHED",
+              result: "RESULT_PASSED",
+              createdAt: "2026-05-01T12:00:00Z",
+              rootEvent: {
+                id: "event-intake-1",
+                nodeId: "github-issues-trigger",
+                customName: "On mention on Issue",
+              },
+              executions: [
+                {
+                  id: "exec-filter-1",
+                  nodeId: "github-issues-filter",
+                  state: "STATE_FINISHED",
+                  result: "RESULT_PASSED",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    isPending: false,
+    isError: false,
+    hasNextPage: false,
+    isFetchingNextPage: false,
+    fetchNextPage: vi.fn(),
+    refetch: vi.fn(),
+  };
+}
+
 export function renderHost(
   props: {
     intake?: ConfiguredLineIntakeSource;
+    repository?: string;
     initialTab?: IntakeSettingsTab;
     onClose?: () => void;
     path?: string;
@@ -111,6 +254,7 @@ export function renderHost(
               factoryKey="RF"
               lineId="line-plan"
               intake={props.intake ?? GITHUB_INTAKE}
+              repository={props.repository}
               initialTab={props.initialTab}
               onClose={props.onClose ?? vi.fn()}
             />

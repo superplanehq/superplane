@@ -146,6 +146,11 @@ build {
     execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
   }
 
+  provisioner "shell" {
+    script          = "${path.root}/scripts/install-yt-dlp.sh"
+    execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
+  }
+
   post-processor "manifest" {
     output     = "${path.root}/manifest.json"
     strip_path = true

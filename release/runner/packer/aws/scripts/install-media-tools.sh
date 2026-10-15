@@ -68,5 +68,3 @@ echo "${WHISPER_MODEL_SHA256}  ${MODEL_DIR}/ggml-tiny.bin" | sha256sum -c -
 command -v whisper-cli
 whisper-cli --help >/dev/null
 test -s "${MODEL_DIR}/ggml-tiny.bin"
-
-bash "$(dirname "$0")/install-yt-dlp.sh"

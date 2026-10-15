@@ -57,7 +57,6 @@ func TestAgentE2E(t *testing.T) {
 		steps.sendMessage("Inspect the canvas")
 		steps.assertVisible(q.TestID("agent-tool-group"))
 		steps.expandToolGroupIfNeeded()
-		steps.assertVisible(q.TestID("agent-tool-message"))
 		steps.assertAssistantMessage("Tool run complete")
 	})
 
@@ -339,14 +338,22 @@ func (s *agentSteps) assertAssistantMessage(message string) {
 }
 
 func (s *agentSteps) expandToolGroupIfNeeded() {
-	toolMessage := s.session.Page().GetByTestId("agent-tool-message").First()
-	visible, err := toolMessage.IsVisible()
-	require.NoError(s.t, err)
-	if visible {
-		return
-	}
+	require.Eventually(s.t, func() bool {
+		toolMessage := s.session.Page().GetByTestId("agent-tool-message").First()
+		visible, err := toolMessage.IsVisible()
+		if err == nil && visible {
+			return true
+		}
 
-	s.session.Click(q.Locator(`[data-testid="agent-tool-group"] button`))
+		buttons := s.session.Page().Locator(`[data-testid="agent-tool-group"] button`)
+		count, err := buttons.Count()
+		if err != nil || count == 0 {
+			return false
+		}
+
+		_ = buttons.Nth(count - 1).Click(pw.LocatorClickOptions{Timeout: pw.Float(1000)})
+		return false
+	}, agentWaitTimeout, agentPollInterval)
 }
 
 func (s *agentSteps) assertText(text string) {

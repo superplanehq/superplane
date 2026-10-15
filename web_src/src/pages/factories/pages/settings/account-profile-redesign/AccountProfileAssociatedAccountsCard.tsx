@@ -38,7 +38,7 @@ export function AccountProfileAssociatedAccountsCard({
     <>
       <FactorySettingsCard title="Associated accounts" data-testid="account-redesign-associated-accounts">
         <p className="text-[12px] text-muted-foreground">
-          SuperPlane uses these accounts to credit your work. This does not change how you sign in.
+          Link accounts from other services. Each account has its own use. This does not change how you sign in.
         </p>
         <ul className="mt-4 space-y-4">
           {githubAccounts.map((account, index) => (
@@ -50,7 +50,7 @@ export function AccountProfileAssociatedAccountsCard({
                     GitHub
                   </span>
                 }
-                description={`Linked as ${account.username}. Velocity uses this GitHub account to credit your pull requests.`}
+                description={`Linked as ${account.username}. Velocity uses this account to credit your pull requests.`}
                 testId={
                   index === 0
                     ? "account-redesign-associated-github"
@@ -73,7 +73,7 @@ export function AccountProfileAssociatedAccountsCard({
                     GitHub
                   </span>
                 }
-                description="Velocity uses this GitHub account to credit your pull requests."
+                description="Velocity uses your GitHub account to credit your pull requests."
                 testId="account-redesign-associated-github"
                 action={
                   <Button type="button" size="sm" variant="outline" onClick={onLinkGithub}>
@@ -84,11 +84,6 @@ export function AccountProfileAssociatedAccountsCard({
             </li>
           ) : null}
         </ul>
-        {githubAccounts.length > 0 ? (
-          <Button type="button" size="sm" variant="outline" className="mt-4" onClick={onLinkGithub}>
-            Link another GitHub account
-          </Button>
-        ) : null}
         <BitbucketAssociatedAccounts
           accounts={bitbucketAccounts}
           onLink={onLinkBitbucket}
@@ -131,47 +126,40 @@ function BitbucketAssociatedAccounts({
   onRemove: (account: { providerId: string; username: string }) => void;
 }) {
   return (
-    <>
-      <ul className="mt-4 space-y-4">
-        {accounts.map((account, index) => (
-          <li key={account.providerId}>
-            <SettingsActionRow
-              title={<BitbucketTitle />}
-              description={`Linked as ${account.username}. SuperPlane uses this Bitbucket account to find repositories you can open.`}
-              testId={
-                index === 0
-                  ? "account-redesign-associated-bitbucket"
-                  : `account-redesign-associated-bitbucket-${account.providerId}`
-              }
-              action={
-                <Button type="button" size="sm" variant="ghost" onClick={() => onRemove(account)}>
-                  Remove
-                </Button>
-              }
-            />
-          </li>
-        ))}
-        {accounts.length === 0 ? (
-          <li>
-            <SettingsActionRow
-              title={<BitbucketTitle />}
-              description="SuperPlane uses this Bitbucket account to find repositories you can open."
-              testId="account-redesign-associated-bitbucket"
-              action={
-                <Button type="button" size="sm" variant="outline" onClick={onLink}>
-                  Link Bitbucket
-                </Button>
-              }
-            />
-          </li>
-        ) : null}
-      </ul>
-      {accounts.length > 0 ? (
-        <Button type="button" size="sm" variant="outline" className="mt-4" onClick={onLink}>
-          Link another Bitbucket account
-        </Button>
+    <ul className="mt-4 space-y-4">
+      {accounts.map((account, index) => (
+        <li key={account.providerId}>
+          <SettingsActionRow
+            title={<BitbucketTitle />}
+            description={`Linked as ${account.username}. Velocity uses this account to credit your pull requests.`}
+            testId={
+              index === 0
+                ? "account-redesign-associated-bitbucket"
+                : `account-redesign-associated-bitbucket-${account.providerId}`
+            }
+            action={
+              <Button type="button" size="sm" variant="ghost" onClick={() => onRemove(account)}>
+                Remove
+              </Button>
+            }
+          />
+        </li>
+      ))}
+      {accounts.length === 0 ? (
+        <li>
+          <SettingsActionRow
+            title={<BitbucketTitle />}
+            description="Velocity uses your Bitbucket account to credit your pull requests."
+            testId="account-redesign-associated-bitbucket"
+            action={
+              <Button type="button" size="sm" variant="outline" onClick={onLink}>
+                Link Bitbucket
+              </Button>
+            }
+          />
+        </li>
       ) : null}
-    </>
+    </ul>
   );
 }
 
@@ -201,8 +189,8 @@ function RemoveAssociatedBitbucketDialog({
         <DialogHeader>
           <DialogTitle>Remove {username}?</DialogTitle>
           <DialogDescription>
-            SuperPlane will no longer use this Bitbucket account to find repositories you can open. Your sign-in methods
-            do not change.
+            Velocity reports will no longer credit pull requests from this Bitbucket account. Your sign-in methods do
+            not change.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

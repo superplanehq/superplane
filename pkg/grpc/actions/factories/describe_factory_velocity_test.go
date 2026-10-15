@@ -576,8 +576,8 @@ func TestFillBuckets_CountsIntakeAndChargesOrdersOnce(t *testing.T) {
 	last := buckets[len(buckets)-1]
 	assert.Equal(t, 2, last.superplaneMerged, "both pull requests count as output")
 	assert.Equal(t, 2, last.intake[models.FactoryIntakeSourceGitHubIssues])
-	assert.Equal(t, int64(250), last.costCents, "the order is charged once")
-	assert.Equal(t, int64(1200), last.tokens)
+	assert.Zero(t, last.costMicros, "ledger spend is not charged from the order")
+	assert.Zero(t, last.tokens)
 	assert.Equal(t, 1, last.tasksClosed, "two pull requests of one order are one task")
 	assert.Zero(t, last.tasksWaste)
 	assert.Zero(t, last.wasteCostCents)
@@ -603,7 +603,7 @@ func TestFillBuckets_ChargesWasteCost(t *testing.T) {
 	)
 
 	last := buckets[len(buckets)-1]
-	assert.Equal(t, int64(180), last.costCents)
+	assert.Zero(t, last.costMicros, "ledger spend is not charged from the order")
 	assert.Equal(t, int64(180), last.wasteCostCents, "spend on an unmerged close is waste")
 	assert.Equal(t, 1, last.tasksClosed)
 	assert.Equal(t, 1, last.tasksWaste, "a task that closed without a merge is waste")
@@ -629,17 +629,16 @@ func TestFillBuckets_SplitsSpendAndKeepsTaskSamples(t *testing.T) {
 	)
 
 	last := buckets[len(buckets)-1]
-	assert.Equal(t, int64(1000), last.modelCostCents)
-	assert.Equal(t, int64(220), last.computeCostCents)
-	assert.Equal(t, last.costCents, last.modelCostCents+last.computeCostCents, "the bands add up to the day")
+	assert.Zero(t, last.modelCostMicros, "ledger bands are not charged from the order")
+	assert.Zero(t, last.computeCostMicros)
 	assert.ElementsMatch(t, []int64{100, 900}, last.taskModelCostCents, "the median needs one sample per task")
 	assert.ElementsMatch(t, []int64{20, 200}, last.taskComputeCostCents)
 }
 
 func TestAggregateTotals(t *testing.T) {
 	buckets := []dayBucket{
-		{superplaneMerged: 3, peopleMerged: 1, waste: 1, costCents: 400, modelCostCents: 320, computeCostCents: 80, tokens: 900, wasteCostCents: 100, tasksClosed: 3, tasksWaste: 1},
-		{superplaneMerged: 1, peopleMerged: 3, waste: 0, costCents: 200, modelCostCents: 150, computeCostCents: 50, tokens: 300, tasksClosed: 1},
+		{superplaneMerged: 3, peopleMerged: 1, waste: 1, costMicros: 4_000_000, modelCostMicros: 3_200_000, computeCostMicros: 800_000, tokens: 900, wasteCostCents: 100, tasksClosed: 3, tasksWaste: 1},
+		{superplaneMerged: 1, peopleMerged: 3, waste: 0, costMicros: 2_000_000, modelCostMicros: 1_500_000, computeCostMicros: 500_000, tokens: 300, tasksClosed: 1},
 	}
 	got := aggregateTotals(buckets, true)
 	assert.Equal(t, int32(4), got.SuperplaneMerged)
@@ -1050,6 +1049,243 @@ func TestDescribeFactoryVelocity_ReportsSpendPerBandAndMedianTask(t *testing.T) 
 	quiet := resp.Points[0]
 	assert.Zero(t, quiet.MedianTaskModelCostCents, "a day with no tasks reports no median")
 	assert.Zero(t, quiet.MedianTaskComputeCostCents)
+}
+
+func TestDescribeFactoryVelocity_CostsMatchTheWorkspaceLedger(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	other, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("other"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now().In(time.Local)
+	period := 7
+	buckets := buildDayBuckets(now, period)
+	today := buckets[len(buckets)-1].start.Add(12 * time.Hour)
+	quietDay := buckets[1].start.Add(12 * time.Hour)
+	previousDay := buckets[0].start.AddDate(0, 0, -3).Add(12 * time.Hour)
+	outside := buckets[0].start.AddDate(0, 0, -period).Add(-time.Hour)
+
+	insertVelocityUsage(t, factoryModel, nil, models.UsageKindModel, today, 1_000_000, 4_000)
+	insertVelocityUsage(t, factoryModel, nil, models.UsageKindCompute, today, 200_000, 0)
+	insertVelocityUsage(t, factoryModel, nil, models.UsageKindModel, today, 15_000, 11)
+	insertVelocityUsage(t, factoryModel, nil, models.UsageKindModel, quietDay, 15_000, 7)
+	insertVelocityUsage(t, factoryModel, nil, models.UsageKindModel, previousDay, 500_000, 80)
+	insertVelocityUsage(t, factoryModel, nil, models.UsageKindModel, outside, 7_000_000, 900)
+	insertVelocityUsage(t, other, nil, models.UsageKindModel, today, 9_000_000, 50_000)
+	unscoped := insertVelocityUsage(t, factoryModel, nil, models.UsageKindModel, today, 8_000_000, 60_000)
+	require.NoError(t, db.Exec("UPDATE workspace_usage_events SET factory_id = NULL WHERE id = ?", unscoped.ID).Error)
+
+	mergedOutside := buckets[0].start.AddDate(0, 0, -40)
+	order, err := factoryModel.CreateWorkOrder(db, "Merged outside the window", "", nil, nil, nil)
+	require.NoError(t, err)
+	_, err = order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL:      "https://github.com/example/repo/pull/40",
+		State:    models.FactoryPullRequestStateMerged,
+		MergedAt: &mergedOutside,
+	})
+	require.NoError(t, err)
+	insertVelocityUsage(t, factoryModel, &order.ID, models.UsageKindModel, today, 300_000, 30)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: int32(period),
+		Repository: "example/other",
+	})
+	require.NoError(t, err)
+
+	currentStart, currentEnd := velocityBoundsFromPoints(resp.Points)
+	factoryID := factoryModel.ID
+	model, _, err := models.SummarizeUsage(db, models.UsageReportFilter{
+		OrganizationID: factoryModel.OrganizationID,
+		FactoryID:      &factoryID,
+		Since:          currentStart,
+		Until:          currentEnd,
+	})
+	require.NoError(t, err)
+	compute, _, err := models.SummarizeComputeUsage(db, models.UsageReportFilter{
+		OrganizationID: factoryModel.OrganizationID,
+		FactoryID:      &factoryID,
+		Since:          currentStart,
+		Until:          currentEnd,
+	})
+	require.NoError(t, err)
+	ledger := model.Add(compute)
+
+	assert.Equal(t, ledger.CostCents(), resp.Totals.CostCents)
+	assert.Equal(t, model.CostCents(), resp.Totals.ModelCostCents)
+	assert.Equal(t, compute.CostCents(), resp.Totals.ComputeCostCents)
+	assert.Equal(t, ledger.TotalTokens, resp.Totals.Tokens)
+	assert.Equal(t, int32(0), resp.Totals.TasksClosed, "a merge outside the window is not a closed task")
+	assert.Zero(t, resp.Totals.SuperplaneMerged, "a repository filter does not hide ledger spend, and this repo has no merges")
+
+	var pointCents, pointTokens int64
+	for _, point := range resp.Points {
+		pointCents += point.CostCents
+		pointTokens += point.Tokens
+	}
+	assert.Equal(t, resp.Totals.Tokens, pointTokens)
+	assert.NotEqual(t, pointCents, resp.Totals.CostCents, "the total is rounded from summed micros, not from daily cents")
+	assert.Equal(t, ledger.CostCents(), resp.Totals.CostCents)
+
+	quiet := velocityPointOn(t, resp.Points, buckets[1].start)
+	assert.Zero(t, quiet.SuperplaneMerged)
+	assert.Equal(t, int64(1), quiet.CostCents, "spend on a day with no merge still counts")
+
+	previousStart := currentStart.AddDate(0, 0, -period)
+	previousModel, _, err := models.SummarizeUsage(db, models.UsageReportFilter{
+		OrganizationID: factoryModel.OrganizationID,
+		FactoryID:      &factoryID,
+		Since:          previousStart,
+		Until:          currentStart,
+	})
+	require.NoError(t, err)
+	previousCompute, _, err := models.SummarizeComputeUsage(db, models.UsageReportFilter{
+		OrganizationID: factoryModel.OrganizationID,
+		FactoryID:      &factoryID,
+		Since:          previousStart,
+		Until:          currentStart,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, previousModel.Add(previousCompute).CostCents(), resp.PreviousTotals.CostCents)
+	assert.Equal(t, previousModel.CostCents(), resp.PreviousTotals.ModelCostCents)
+	assert.Equal(t, previousCompute.CostCents(), resp.PreviousTotals.ComputeCostCents)
+	assert.Equal(t, previousModel.Add(previousCompute).TotalTokens, resp.PreviousTotals.Tokens)
+}
+
+func TestDescribeFactoryVelocity_SplitsLedgerSpendAtLocalMidnight(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now().In(time.Local)
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	insertVelocityUsage(t, factoryModel, nil, models.UsageKindModel, midnight.Add(-time.Second), 100_000, 10)
+	insertVelocityUsage(t, factoryModel, nil, models.UsageKindModel, midnight.Add(time.Second), 200_000, 20)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+	})
+	require.NoError(t, err)
+
+	before := velocityPointOn(t, resp.Points, midnight.AddDate(0, 0, -1))
+	after := velocityPointOn(t, resp.Points, midnight)
+	assert.Equal(t, int64(10), before.CostCents)
+	assert.Equal(t, int64(10), before.Tokens)
+	assert.Equal(t, int64(20), after.CostCents)
+	assert.Equal(t, int64(20), after.Tokens)
+}
+
+func TestDescribeFactoryVelocity_KeepsCloseDayCostApartFromLedgerSpend(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+
+	factoryModel, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	now := time.Now().In(time.Local)
+	buckets := buildDayBuckets(now, 7)
+	closedAt := buckets[len(buckets)-1].start.Add(15 * time.Hour)
+	spentAt := buckets[len(buckets)-2].start.Add(10 * time.Hour)
+	outside := buckets[0].start.AddDate(0, 0, -40)
+
+	order, err := factoryModel.CreateWorkOrder(db, "Closed without a merge", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	_, err = order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		URL:      "https://github.com/example/repo/pull/9",
+		State:    models.FactoryPullRequestStateClosed,
+		ClosedAt: &closedAt,
+	})
+	require.NoError(t, err)
+	insertVelocityUsage(t, factoryModel, &order.ID, models.UsageKindModel, spentAt, 1_000_000, 100)
+	insertVelocityUsage(t, factoryModel, &order.ID, models.UsageKindModel, outside, 2_000_000, 200)
+
+	resp, err := DescribeFactoryVelocity(ctx, r.Organization.ID.String(), &pb.DescribeFactoryVelocityRequest{
+		FactoryId:  factoryModel.ID.String(),
+		PeriodDays: 7,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(100), resp.Totals.CostCents, "only spend that occurred in the window")
+	assert.Equal(t, int64(300), resp.Totals.WasteCostCents, "waste keeps the lifetime cost on the close day")
+	assert.Equal(t, int32(1), resp.Totals.TasksClosed)
+
+	closeDay := velocityPointOn(t, resp.Points, buckets[len(buckets)-1].start)
+	spendDay := velocityPointOn(t, resp.Points, buckets[len(buckets)-2].start)
+	assert.Zero(t, closeDay.CostCents)
+	assert.Equal(t, int64(300), closeDay.WasteCostCents)
+	assert.Equal(t, int64(300), closeDay.MedianTaskModelCostCents)
+	assert.Equal(t, int64(100), spendDay.CostCents)
+	assert.Zero(t, spendDay.WasteCostCents)
+	assert.Zero(t, spendDay.MedianTaskModelCostCents)
+
+	require.Len(t, resp.People, 1)
+	assert.Equal(t, int64(300), resp.People[0].CostCents, "People keeps the lifetime cost of the closed order")
+}
+
+func velocityBoundsFromPoints(points []*pb.DescribeFactoryVelocityDay) (time.Time, time.Time) {
+	start := points[0].GetDate().AsTime().In(time.Local)
+	end := points[len(points)-1].GetDate().AsTime().In(time.Local).AddDate(0, 0, 1)
+	return start, end
+}
+
+func velocityPointOn(t *testing.T, points []*pb.DescribeFactoryVelocityDay, day time.Time) *pb.DescribeFactoryVelocityDay {
+	t.Helper()
+	for _, point := range points {
+		if point.GetDate().AsTime().Equal(day) {
+			return point
+		}
+	}
+	t.Fatalf("no point for %s", day)
+	return nil
+}
+
+func insertVelocityUsage(
+	t *testing.T,
+	factoryModel *models.Factory,
+	orderID *uuid.UUID,
+	kind string,
+	at time.Time,
+	micros, tokens int64,
+) models.WorkspaceUsageEvent {
+	t.Helper()
+
+	event := models.WorkspaceUsageEvent{
+		ID:               uuid.New(),
+		OrganizationID:   factoryModel.OrganizationID,
+		FactoryID:        &factoryModel.ID,
+		WorkOrderID:      orderID,
+		CanvasRunID:      uuid.New(),
+		NodeExecutionID:  uuid.New(),
+		NodeID:           "prompt",
+		Provider:         models.UsageProviderAnthropic,
+		Model:            "claude-sonnet-4-6",
+		UsageKind:        kind,
+		TotalTokens:      tokens,
+		CostMicros:       micros,
+		FundingSource:    models.UsageFundingSourceBYOK,
+		Currency:         "usd",
+		PriceBookVersion: "test",
+		IdempotencyKey:   uuid.NewString(),
+		OccurredAt:       at,
+	}
+	if kind == models.UsageKindCompute {
+		event.Provider = models.UsageProviderRunner
+		event.Model = "e1-large-amd64"
+		event.MachineType = "e1-large-amd64"
+		event.DurationSeconds = 60
+		event.FundingSource = models.UsageFundingSourceHosted
+	}
+	require.NoError(t, database.DB(t.Context()).Create(&event).Error)
+	return event
 }
 
 // seedVelocityOrderSpend creates a merged work order and charges it the given

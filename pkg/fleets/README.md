@@ -33,8 +33,15 @@ their short-lived registration token.
 The local Compose service waits for owner setup and manages a development
 token automatically. It does not require `INSTALLATION_ADMIN_TOKEN`.
 
-AWS fleets require `runnerReleaseBaseUrl`. Fleet Manager selects a release
-from this layout:
+Cloud fleets require `runnerReleaseBaseUrl`. For versioned Runner releases, use
+the GitHub Releases URL template:
+
+```text
+https://github.com/superplanehq/superplane/releases/download/runner%2F{version}
+```
+
+Fleet Manager replaces `{version}` with the fleet's exact Runner version. A
+base URL without the placeholder continues to use this layout:
 
 ```text
 <runnerReleaseBaseUrl>/<release-id>/runner-linux-amd64.tar.gz
@@ -79,16 +86,25 @@ Its trust policy must allow EC2 to assume the role. The example sets
 `aws.keyName` empty because Session Manager does not require an SSH key.
 
 Azure fleets also require `runnerReleaseBaseUrl`. Bootstrap uses the same
-archive layout and `install.sh` flow as AWS. Set `azure.imageId` to a
-Compute Gallery image version. Set `azure.vmSize` to a Trusted Launch size.
-`Standard_D2ds_v4` is the default for amd64. An arm64 fleet must set
-`azure.vmSize`. Set `azure.ephemeralOSDisk` to `true`
-only when that size has a local SSD. Fleet Manager creates one virtual
-machine per runner. It places the NIC on `azure.subnetId`, applies
-`azure.networkSecurityGroupId`, and assigns `azure.identityId`. It does not
-give the VM a public IP. Set `azure.zones` to the availability zones that
-the fleet may use. Fleet Manager retries the next zone when Azure reports
-insufficient capacity.
+archive layout and `install.sh` flow as AWS. Set `azure.imageId` to one of
+these IDs:
+
+- `/CommunityGalleries/<gallery>/Images/<image>/Versions/<version>`
+- `/SharedGalleries/<gallery>/Images/<image>/Versions/<version>`
+- a Compute Gallery resource ID
+
+Set `azure.vmSize` to a Trusted Launch size. `Standard_D2ds_v4` is the
+default for amd64. An arm64 fleet must set `azure.vmSize`. Set
+`azure.ephemeralOSDisk` to `true` only when that size has a local SSD.
+Fleet Manager creates one virtual machine per runner. It places the NIC on
+`azure.subnetId`, applies `azure.networkSecurityGroupId`, and assigns
+`azure.identityId`. It does not give the VM a public IP.
+
+Set `azure.zones` from `az vm list-skus --location <region> --size <vmSize>`
+in the subscription that owns the VMs. Zone numbers differ by subscription.
+Leave `azure.zones` empty when the region or size has no availability zones.
+Fleet Manager then creates the VM with no zone. When zones are set, Fleet
+Manager retries the next zone when Azure reports insufficient capacity.
 
 See `config.azure.example.json` for a complete Azure fleet.
 

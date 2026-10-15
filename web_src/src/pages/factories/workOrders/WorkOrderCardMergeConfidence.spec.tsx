@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "bun:test";
 import { MemoryRouter } from "react-router";
@@ -59,7 +59,7 @@ function renderCard(
 }
 
 describe("WorkOrderCard merge confidence", () => {
-  it("shows three bars in the footer and keeps planning scores hidden", async () => {
+  it("colors all five merge checks independently and keeps planning scores hidden", async () => {
     const user = userEvent.setup();
     const order = verifyOrder("wo-verify");
     renderCard(order, {
@@ -67,19 +67,25 @@ describe("WorkOrderCard merge confidence", () => {
       maxScore: 5,
       checks: [
         { key: "risk-review", name: "Blast radius", score: 1, maxScore: 5 },
-        { key: "security-review", name: "Security", score: 4, maxScore: 5 },
+        { key: "performance-review", name: "Performance", score: 3, maxScore: 5 },
+        { key: "security-review", name: "Security", score: 2, maxScore: 5 },
+        { key: "drift-review", name: "Plan drift", score: 4, maxScore: 5 },
+        { key: "reversibility-review", name: "Reversibility", score: 5, maxScore: 5 },
       ],
     });
 
-    const chip = screen.getByRole("img", { name: "Merge confidence 4 of 5" });
+    const chip = screen.getByRole("img", { name: /Merge confidence.*Blast radius: Passed.*Security: Needs attention/ });
     expect(chip).toHaveTextContent("Confidence");
     expect(chip).not.toHaveTextContent("Merge");
     expect(chip).not.toHaveTextContent(/\d/);
     expect(chip.className).not.toContain("rounded-full");
     const meter = screen.getByTestId("work-order-card-merge-wo-verify-meter");
-    expect(meter.querySelectorAll("[data-filled]")).toHaveLength(3);
-    expect(meter.querySelectorAll("[data-filled='true']")).toHaveLength(3);
-    expect(meter.querySelector("[data-filled='true']")).toHaveClass("bg-emerald-500");
+    expect(meter.children).toHaveLength(5);
+    expect(meter.children[0]).toHaveClass("bg-emerald-500");
+    expect(meter.children[1]).toHaveClass("bg-amber-500");
+    expect(meter.children[2]).toHaveClass("bg-red-500");
+    expect(meter.children[3]).toHaveClass("bg-red-500");
+    expect(meter.children[4]).toHaveClass("bg-emerald-500");
     expect(screen.queryByText("Clarity")).not.toBeInTheDocument();
     const footer = screen.getByTestId("work-order-card-footer-leading-wo-verify").parentElement;
     expect(footer).toContainElement(chip);
@@ -92,9 +98,10 @@ describe("WorkOrderCard merge confidence", () => {
     expect(popup).toHaveAttribute("data-side", "right");
     expect(popup).toHaveTextContent("Merge confidence");
     expect(popup).toHaveTextContent("Blast radius");
-    expect(popup).toHaveTextContent("Low");
+    expect(within(popup).getAllByRole("img", { name: "Passed" })).toHaveLength(2);
     expect(popup).toHaveTextContent("Security");
-    expect(popup).toHaveTextContent("Met");
+    expect(within(popup).getAllByRole("img", { name: "Needs attention" })).toHaveLength(2);
+    expect(popup).not.toHaveTextContent(/Low|Missed|Partial|Easy/);
     expect(popup).not.toHaveTextContent("4/5");
   });
 

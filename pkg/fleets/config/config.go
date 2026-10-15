@@ -419,9 +419,6 @@ func (c *Config) validate() error {
 			fleet.Azure.IdentityID == "":
 			return fmt.Errorf("%s.azure.identityId is required", prefix)
 		case fleet.Provider == ProviderAzure &&
-			len(fleet.Azure.Zones) == 0:
-			return fmt.Errorf("%s.azure.zones must not be empty", prefix)
-		case fleet.Provider == ProviderAzure &&
 			fleet.Azure.DiskSizeGB < 1:
 			return fmt.Errorf("%s.azure.diskSizeGb must be positive", prefix)
 		case fleet.Provider == ProviderAzure:

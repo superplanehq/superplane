@@ -4,36 +4,9 @@
 
 locals {
   runners_enabled                    = var.enable_runners
-  fleet_manager_enabled              = var.enable_runners && nonsensitive(var.installation_admin_token != "")
   fleet_manager_service_account_name = "superplane-fleet-manager"
   runner_network_tag                 = "superplane-runner"
   runner_zones                       = length(var.runner_zones) > 0 ? var.runner_zones : [var.zone]
-  runner_fleet_images = {
-    for fleet in var.runner_fleets : fleet.id => fleet.image != "" ? fleet.image : "projects/${var.project_id}/global/images/family/superplane-runner-${fleet.architecture}"
-  }
-
-  fleet_manager_config = local.fleet_manager_enabled ? yamlencode({
-    id                     = var.cluster_name
-    superplaneUrl          = "http://superplane-api.${var.superplane_namespace}.svc.cluster.local:8000"
-    installationAdminToken = var.installation_admin_token
-    runnerReleaseBaseUrl   = var.runner_release_base_url
-    fleets = [for fleet in var.runner_fleets : {
-      id           = fleet.id
-      provider     = "gcp"
-      warmCapacity = fleet.warm_capacity
-      maxCapacity  = fleet.max_capacity
-      gcp = {
-        projectId    = var.project_id
-        zones        = local.runner_zones
-        machineType  = fleet.machine_type
-        image        = local.runner_fleet_images[fleet.id]
-        architecture = fleet.architecture
-        subnetwork   = google_compute_subnetwork.runners[0].id
-        networkTags  = [local.runner_network_tag]
-        diskSizeGb   = fleet.disk_size_gb
-      }
-    }]
-  }) : ""
 }
 
 resource "google_compute_subnetwork" "runners" {
@@ -118,24 +91,4 @@ resource "google_service_account_iam_member" "fleet_manager_workload_identity" {
 
   # The workload identity pool exists only after the cluster exists.
   depends_on = [google_container_cluster.superplane]
-}
-
-resource "kubernetes_secret" "fleet_manager" {
-  count = local.fleet_manager_enabled ? 1 : 0
-
-  metadata {
-    name      = "superplane-fleet-manager"
-    namespace = kubernetes_namespace.superplane.metadata[0].name
-  }
-
-  data = {
-    "fleet-manager.yaml" = local.fleet_manager_config
-  }
-
-  lifecycle {
-    precondition {
-      condition     = var.fleet_manager_image_tag != ""
-      error_message = "Set fleet_manager_image_tag when installation_admin_token is set."
-    }
-  }
 }

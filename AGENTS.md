@@ -105,9 +105,11 @@ Run these three steps once, in order:
 
 Factory workspace onboarding needs a GitHub App on a
 stable tunnel. Cloud holds `SUPERPLANE_GITHUB_APP_*`. Self-host and local
-development can create a private GitHub App from workspace Connect. Factory Sentry intake uses a public SuperPlane
-Sentry app. Without `SUPERPLANE_SENTRY_APP_*` in `.env`, SuperPlane asks
-for a personal token. See
+development can create a public GitHub App from workspace Connect. Other
+GitHub accounts can install that app. It is not listed in GitHub
+Marketplace. Factory Sentry intake uses a public SuperPlane Sentry app.
+Without `SUPERPLANE_SENTRY_APP_*` in `.env`, SuperPlane asks for a personal
+token. See
 [docs/contributing/connecting-to-3rdparty-services-from-development.md](docs/contributing/connecting-to-3rdparty-services-from-development.md).
 
 `make dev.up`, `make dev.setup`, and `make dev.server` use the integrated
@@ -246,9 +248,9 @@ contractions, slang, or idioms).
   imperative, capitalized summary with no trailing period
   (e.g. `feat: Add empty-state copy for integrations`).
 - PR descriptions must explain **why** the change exists (problem, motivation,
-  user/system impact), not narrate the diff. Use a short STE Summary plus a
-  concrete STE Test plan checklist. Avoid empty or placeholder bodies when
-  context matters.
+  user/system impact), not narrate the diff. Use a short STE Summary only.
+  Do not add a Test plan or other checklist of checks that the author already ran.
+  Avoid empty or placeholder bodies when context matters.
 - Commit subjects use the same imperative style; put motivation and trade-offs
   in the body. Separate subject and body with a blank line; wrap the body at
   72 characters.

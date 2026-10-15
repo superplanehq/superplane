@@ -47,3 +47,12 @@ Each command builds one architecture. Use a new `image_version` for every
 build. The image definition must already exist in the gallery. Terraform
 creates `superplane-runner-amd64` and `superplane-runner-arm64` with
 `TrustedLaunchSupported`.
+
+`runner.pkr.hcl` and `runner.local.pkr.hcl` accept the same optional
+variables. Leave `build_resource_group_name` empty to let Packer create a
+temporary resource group in `location`. Set it to build in an existing
+resource group. Packer 2.3.3 rejects a template that sets both `location`
+and `build_resource_group_name` on the source. This template omits
+`location` on the source when the build group is set. Keep `location` equal
+to that group's region. Replica regions are `location` plus
+`replication_regions`.

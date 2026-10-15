@@ -1,11 +1,30 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it, vi } from "bun:test";
 
+import { client } from "@/api-client/client.gen";
+import { FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS } from "@/lib/experimentalFeatures";
+
+import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
+import {
+  defaultFactoriesFixture,
+  PRIMARY_FACTORY_ID,
+  PRIMARY_FACTORY_KEY,
+} from "../../__fixtures__/factoryPageResponses";
 import { WorkspaceDefaultModelSection } from "./WorkspaceDefaultModelSection";
-import { WorkspaceSetupStepsSection } from "./WorkspaceSetupStepsSection";
+
+vi.mock("@monaco-editor/react", () => ({
+  Editor: () => <div data-testid="monaco-mock" />,
+}));
+
+const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
+const agentPageFeatures = [FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS];
 
 describe("workspace agent preview fields", () => {
+  beforeAll(() => {
+    client.setConfig({ baseUrl: "http://localhost" });
+  });
+
   it("opens the model selector from its label", async () => {
     const user = userEvent.setup();
     render(<WorkspaceDefaultModelSection canUpdate models={[{ value: "claude-sonnet", label: "Claude Sonnet" }]} />);
@@ -16,12 +35,71 @@ describe("workspace agent preview fields", () => {
     expect(screen.getByRole("listbox")).toBeInTheDocument();
   });
 
-  it("focuses the setup command field from its label", async () => {
+  it("opens the setup steps editor from the Agent page", async () => {
     const user = userEvent.setup();
-    render(<WorkspaceSetupStepsSection canUpdate />);
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [] },
+        }}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
 
-    await user.click(screen.getByText("Setup steps"));
+    await user.click(await screen.findByTestId("agent-setup-steps-edit", {}, { timeout: 8000 }));
+    expect(await screen.findByTestId("agent-setup-steps-editor", {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
 
-    expect(screen.getByRole("textbox", { name: "Setup steps" })).toHaveFocus();
-  });
+  it("hides setup and context cards without the workspace agent experiment", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [] },
+        }}
+        experimentalFeatures={[FEATURE_WORKSPACE_MCP, FEATURE_WORKSPACE_SKILLS]}
+      />,
+    );
+
+    expect(await screen.findByTestId("factory-settings-agent", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-setup-steps")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agent-cross-repo")).not.toBeInTheDocument();
+  }, 10000);
+
+  it("shows load errors when the resource request fails", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          failAgentResourcesListForFactoryIds: [PRIMARY_FACTORY_ID],
+        }}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    expect(
+      await screen.findByText("SuperPlane could not load setup steps. Try again.", {}, { timeout: 8000 }),
+    ).toBeInTheDocument();
+  }, 10000);
+
+  it("shows a load error in the setup editor when the request fails", async () => {
+    render(
+      <FactoriesHarness
+        pathSuffix={`${agentPath}/setup-steps`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          failAgentResourcesListForFactoryIds: [PRIMARY_FACTORY_ID],
+        }}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    expect(
+      await screen.findByText("SuperPlane could not load setup steps. Try again.", {}, { timeout: 8000 }),
+    ).toBeInTheDocument();
+  }, 10000);
 });

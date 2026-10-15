@@ -174,8 +174,8 @@ describe("FactorySettingsMCPPage", () => {
     expect(empty).not.toHaveTextContent("No MCP servers yet");
     expect(screen.getByTestId("agent-resources-add-connection")).toHaveTextContent("Connect");
     expect(screen.queryByTestId("agent-default-model")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("agent-setup-steps")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("agent-cross-repo")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("agent-setup-steps")).toBeInTheDocument();
+    expect(await screen.findByTestId("agent-cross-repo")).toBeInTheDocument();
   }, 10000);
 
   it("lists a header MCP server with a connected status", async () => {
@@ -195,7 +195,7 @@ describe("FactorySettingsMCPPage", () => {
     expect(screen.getByTestId(`agent-resource-status-${HEADER_MCP_RESOURCE.id}`)).toHaveTextContent("Connected");
     expect(screen.getByTestId(`agent-resource-tools-${HEADER_MCP_RESOURCE.id}`)).toHaveTextContent("2/2 tools");
     expect(screen.queryByText("Header")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Configure")).toBeInTheDocument();
+    expect(screen.getByLabelText("Configure")).toHaveAttribute("href", expect.stringContaining("/agent/mcp/"));
   }, 10000);
 
   it("renders each server as its own compact card", async () => {
@@ -245,6 +245,8 @@ describe("FactorySettingsMCPPage", () => {
     expect(await screen.findByTestId("mcp-connection-tools", {}, { timeout: 8000 })).toBeInTheDocument();
     expect(await screen.findByTestId("mcp-tools-list")).toHaveTextContent("search");
     expect(screen.queryByText("Search the catalog.")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("factory-settings-sidebar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("factories-nav-agent")).toHaveAttribute("aria-current", "page");
   }, 10000);
 
   it("hides tools when sign-in is not connected", async () => {

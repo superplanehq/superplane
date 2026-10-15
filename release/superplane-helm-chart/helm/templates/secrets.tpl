@@ -136,16 +136,6 @@
 {{- end }}
 {{- end -}}
 
-{{- define "superplane.fleetManager.serviceAccountName" -}}
-{{- if .Values.fleetManager.serviceAccount.name }}
-{{- .Values.fleetManager.serviceAccount.name }}
-{{- else if .Values.fleetManager.serviceAccount.create }}
-{{- printf "%s-fleet-manager" .Release.Name }}
-{{- else }}
-{{- "default" }}
-{{- end }}
-{{- end }}
-
 {{- define "superplane.podLabels" -}}
 {{- range $key, $value := . }}
 {{ $key }}: {{ $value | toString | quote }}
@@ -237,10 +227,5 @@
   envFrom:
     - secretRef:
         name: {{ include "secrets.database.name" . }}
-  securityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    capabilities:
-      drop: ["ALL"]
+  {{- include "superplane.migrateContainerSecurityContext" (dict "migrateSecurityContext" .Values.migrate.securityContext "securityContext" .Values.securityContext "quoteDrop" true "indent" 2) }}
 {{- end }}

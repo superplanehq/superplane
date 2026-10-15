@@ -53,34 +53,7 @@ export const sendLogEventMapper: ComponentBaseMapper = {
       details["Status"] = "Successfully sent";
     }
 
-    if (responseData?.severityText) {
-      details["Severity"] = String(responseData.severityText);
-    }
-
-    if (responseData?.body) {
-      const bodyText = String(responseData.body);
-      details["Body"] = bodyText.length > 100 ? bodyText.substring(0, 100) + "..." : bodyText;
-    }
-
-    if (responseData?.eventName) {
-      details["Event Name"] = String(responseData.eventName);
-    }
-
-    if (responseData?.serviceName) {
-      details["Service Name"] = String(responseData.serviceName);
-    }
-
-    if (responseData?.dataset) {
-      details["Dataset"] = String(responseData.dataset);
-    }
-
-    if (responseData?.attributes && typeof responseData.attributes === "object") {
-      const attrs = responseData.attributes as Record<string, unknown>;
-      const attrCount = Object.keys(attrs).length;
-      if (attrCount > 0) {
-        details["Attributes"] = `${attrCount} attribute${attrCount > 1 ? "s" : ""}`;
-      }
-    }
+    addLogEventFields(details, responseData);
 
     return details;
   },
@@ -90,6 +63,41 @@ export const sendLogEventMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function addLogEventFields(details: Record<string, string>, responseData: Record<string, unknown> | undefined) {
+  if (!responseData) {
+    return;
+  }
+
+  if (responseData.severityText) {
+    details["Severity"] = String(responseData.severityText);
+  }
+
+  if (responseData.body) {
+    const bodyText = String(responseData.body);
+    details["Body"] = bodyText.length > 100 ? bodyText.substring(0, 100) + "..." : bodyText;
+  }
+
+  if (responseData.eventName) {
+    details["Event Name"] = String(responseData.eventName);
+  }
+
+  if (responseData.serviceName) {
+    details["Service Name"] = String(responseData.serviceName);
+  }
+
+  if (responseData.dataset) {
+    details["Dataset"] = String(responseData.dataset);
+  }
+
+  if (responseData.attributes && typeof responseData.attributes === "object") {
+    const attrs = responseData.attributes as Record<string, unknown>;
+    const attrCount = Object.keys(attrs).length;
+    if (attrCount > 0) {
+      details["Attributes"] = `${attrCount} attribute${attrCount > 1 ? "s" : ""}`;
+    }
+  }
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

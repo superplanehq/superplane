@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manager", "superplane", "credentials", "runner", "image", "serviceAccount", "fleets"],
+  "properties": {
+    "manager": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"}
+      }
+    },
+    "superplane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url"],
+      "properties": {
+        "url": {"type": "string", "pattern": "^https?://[^[:space:]]+$"}
+      }
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["existingSecret", "tokenKey"],
+      "properties": {
+        "existingSecret": {"type": "string", "minLength": 1},
+        "tokenKey": {"type": "string", "minLength": 1}
+      }
+    },
+    "runner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["releaseBaseUrl"],
+      "properties": {
+        "releaseBaseUrl": {"type": "string", "minLength": 1}
+      }
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "tag", "pullPolicy"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "tag": {"type": "string", "pattern": "^(?:v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?)?$"},
+        "pullPolicy": {"enum": ["Always", "IfNotPresent", "Never"]},
+        "pullSecrets": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["create", "name", "annotations"],
+      "properties": {
+        "create": {"type": "boolean"},
+        "name": {"type": "string"},
+        "annotations": {"type": "object", "additionalProperties": {"type": "string"}}
+      }
+    },
+    "podLabels": {"type": "object", "additionalProperties": {"type": "string"}},
+    "podAnnotations": {"type": "object", "additionalProperties": {"type": "string"}},
+    "reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "interval": {"type": "string", "minLength": 1},
+        "errorRetryInterval": {"type": "string", "minLength": 1}
+      }
+    },
+    "http": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requestTimeout": {"type": "string", "minLength": 1}
+      }
+    },
+    "resources": {"type": "object"},
+    "startupJob": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image", "activeDeadlineSeconds"],
+      "properties": {
+        "image": {"type": "string", "pattern": "^curlimages/curl:[^@]+@sha256:[0-9a-f]{64}$"},
+        "activeDeadlineSeconds": {"type": "integer", "minimum": 30, "maximum": 900}
+      }
+    },
+    "fleets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/definitions/fleet"}
+    }
+  },
+  "definitions": {
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operatingSystem", "architecture", "cpuMillicores", "memoryMb", "diskGb", "capabilities"],
+      "properties": {
+        "operatingSystem": {"const": "linux"},
+        "architecture": {"enum": ["amd64", "arm64"]},
+        "cpuMillicores": {"type": "integer", "minimum": 1},
+        "memoryMb": {"type": "integer", "minimum": 1},
+        "diskGb": {"type": "integer", "minimum": 1},
+        "capabilities": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      }
+    },
+    "fleet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "runnerVersion", "warmCapacity", "maxCapacity", "spec", "provider"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"},
+        "runnerVersion": {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"},
+        "warmCapacity": {"type": "integer", "minimum": 0},
+        "maxCapacity": {"type": "integer", "minimum": 0},
+        "spec": {"$ref": "#/definitions/spec"},
+        "provider": {"enum": ["aws", "gcp", "azure"]},
+        "aws": {"$ref": "#/definitions/aws"},
+        "gcp": {"$ref": "#/definitions/gcp"},
+        "azure": {"$ref": "#/definitions/azure"}
+      },
+      "allOf": [
+        {"if": {"properties": {"provider": {"const": "aws"}}}, "then": {"required": ["aws"]}},
+        {"if": {"properties": {"provider": {"const": "gcp"}}}, "then": {"required": ["gcp"]}},
+        {"if": {"properties": {"provider": {"const": "azure"}}}, "then": {"required": ["azure"]}}
+      ]
+    },
+    "aws": {
+      "type": "object",
+      "required": ["region", "ami", "instanceType", "architecture", "subnetIds", "securityGroupIds", "volumeSizeGb"],
+      "properties": {
+        "region": {"type": "string", "minLength": 1},
+        "ami": {"type": "string", "minLength": 1},
+        "instanceType": {"type": "string", "minLength": 1},
+        "architecture": {"enum": ["amd64", "arm64"]},
+        "subnetIds": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "securityGroupIds": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "iamInstanceProfile": {"type": "string"},
+        "keyName": {"type": "string"},
+        "volumeSizeGb": {"type": "integer", "minimum": 1},
+        "volumeIops": {"type": "integer", "minimum": 0},
+        "volumeThroughputMbps": {"type": "integer", "minimum": 0},
+        "resourceTags": {"type": "object", "additionalProperties": {"type": "string"}},
+        "cloudWatch": {"type": "object"}
+      }
+    },
+    "gcp": {
+      "type": "object",
+      "required": ["projectId", "zones", "machineType", "image", "architecture", "subnetwork", "diskSizeGb"],
+      "properties": {
+        "projectId": {"type": "string", "minLength": 1},
+        "zones": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "machineType": {"type": "string", "minLength": 1},
+        "image": {"type": "string", "minLength": 1},
+        "architecture": {"enum": ["amd64", "arm64"]},
+        "subnetwork": {"type": "string", "minLength": 1},
+        "serviceAccountEmail": {"type": "string"},
+        "networkTags": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "diskSizeGb": {"type": "integer", "minimum": 1},
+        "diskType": {"type": "string"},
+        "labels": {"type": "object", "additionalProperties": {"type": "string"}}
+      }
+    },
+    "azure": {
+      "type": "object",
+      "required": ["subscriptionId", "resourceGroup", "location", "imageId", "vmSize", "architecture", "subnetId", "networkSecurityGroupId", "identityId", "zones", "diskSizeGb"],
+      "properties": {
+        "subscriptionId": {"type": "string", "minLength": 1},
+        "resourceGroup": {"type": "string", "minLength": 1},
+        "location": {"type": "string", "minLength": 1},
+        "imageId": {"type": "string", "minLength": 1},
+        "vmSize": {"type": "string", "minLength": 1},
+        "architecture": {"enum": ["amd64", "arm64"]},
+        "subnetId": {"type": "string", "minLength": 1},
+        "networkSecurityGroupId": {"type": "string", "minLength": 1},
+        "identityId": {"type": "string", "minLength": 1},
+        "zones": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "diskSizeGb": {"type": "integer", "minimum": 1},
+        "ephemeralOSDisk": {"type": "boolean"},
+        "resourceTags": {"type": "object", "additionalProperties": {"type": "string"}}
+      }
+    }
+  }
+}

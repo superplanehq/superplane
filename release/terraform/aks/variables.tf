@@ -147,24 +147,6 @@ variable "image_name" {
   default     = "superplane"
 }
 
-variable "fleet_manager_image_registry" {
-  description = "Container registry for Fleet Manager. Empty uses image_registry."
-  type        = string
-  default     = ""
-}
-
-variable "fleet_manager_image_name" {
-  description = "Fleet Manager image repository name"
-  type        = string
-  default     = "superplane-fleet-manager"
-}
-
-variable "fleet_manager_image_tag" {
-  description = "Fleet Manager image tag. Empty uses superplane_image_tag. Set a tag when Fleet Manager is enabled and superplane_image_tag is empty."
-  type        = string
-  default     = ""
-}
-
 variable "helm_chart_repository" {
   description = "OCI or HTTP Helm repository. Ignored when helm_chart_path is set."
   type        = string
@@ -178,9 +160,38 @@ variable "helm_chart_name" {
 }
 
 variable "helm_chart_path" {
-  description = "Path to the Helm chart in this repository. Empty uses helm_chart_repository."
+  description = "Local SuperPlane Helm chart path for chart development. Empty installs the published chart."
   type        = string
-  default     = "../../superplane-helm-chart/helm"
+  default     = ""
+}
+
+# This chart does not include templates/_security.tpl.
+# podSecurityContext and securityContext values have no effect until
+# maintainers publish a chart from the merge that adds those templates.
+variable "superplane_chart_version" {
+  description = "Published SuperPlane Helm chart version with a matching self-hosted image. Ignored when helm_chart_path is set."
+  type        = string
+  default     = "0.0.0-77688495d9ae8bdb1dcb3252998b5850bc032b69"
+}
+
+# Latest stable chart on https://charts.jetstack.io as of 2026-10-14.
+# cert-manager 1.21 supports Kubernetes 1.33-1.36.
+# aks.tf leaves kubernetes_version empty, so AKS uses the N-1 minor version.
+# The October 2026 AKS calendar includes 1.34, 1.35, and 1.36.
+# GKE and EKS do not pin this chart. EKS pins the Traefik chart.
+variable "cert_manager_chart_version" {
+  description = "cert-manager Helm chart version"
+  type        = string
+  default     = "v1.21.2"
+}
+
+# Latest chart on https://kubernetes.github.io/ingress-nginx as of 2026-10-14.
+# Controller 1.15.1 was published on 2026-03-19. kubeVersion is >=1.21.0-0.
+# That release tested Kubernetes 1.35. The project is retired. See README.md.
+variable "ingress_nginx_chart_version" {
+  description = "ingress-nginx Helm chart version"
+  type        = string
+  default     = "4.15.1"
 }
 
 variable "container_registry_id" {
@@ -189,11 +200,10 @@ variable "container_registry_id" {
   default     = ""
 }
 
-variable "fleet_manager_config" {
-  description = "Fleet Manager YAML or JSON body. Empty disables the Fleet Manager Deployment."
-  type        = string
-  default     = ""
-  sensitive   = true
+variable "runner_zones" {
+  description = "Availability zones that Fleet Manager can use for runner VMs."
+  type        = list(string)
+  default     = ["1"]
 }
 
 # -----------------------------------------------------------------------------

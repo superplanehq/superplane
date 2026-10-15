@@ -6,6 +6,7 @@ resource "helm_release" "cert_manager" {
   name             = "cert-manager"
   repository       = "https://charts.jetstack.io"
   chart            = "cert-manager"
+  version          = var.cert_manager_chart_version
   namespace        = "cert-manager"
   create_namespace = true
   timeout          = 600
@@ -29,6 +30,7 @@ resource "helm_release" "nginx_ingress" {
   name             = "ingress-nginx"
   repository       = "https://kubernetes.github.io/ingress-nginx"
   chart            = "ingress-nginx"
+  version          = var.ingress_nginx_chart_version
   namespace        = "ingress-nginx"
   create_namespace = true
   timeout          = 1200
@@ -53,6 +55,34 @@ resource "helm_release" "nginx_ingress" {
 # SuperPlane Helm Release
 # -----------------------------------------------------------------------------
 
+locals {
+  fleet_manager_setup_values = yamlencode({
+    fleetManagerSetup = {
+      enabled            = true
+      provider           = "azure"
+      managerId          = var.cluster_name
+      namespace          = var.superplane_namespace
+      serviceAccountName = "superplane-fleet-manager"
+      credentials = {
+        provision      = true
+        existingSecret = "superplane-fleet-manager-token"
+        tokenKey       = "INSTALLATION_ADMIN_TOKEN"
+      }
+      infrastructure = {
+        superplaneUrl        = "https://${var.domain_name}"
+        subscriptionId       = var.subscription_id
+        resourceGroup        = azurerm_resource_group.runners.name
+        location             = azurerm_resource_group.runners.location
+        zones                = var.runner_zones
+        subnetId             = azurerm_subnet.runners.id
+        securityGroupIds     = azurerm_network_security_group.runners.id
+        runnerIdentity       = azurerm_user_assigned_identity.runner.id
+        fleetManagerIdentity = azurerm_user_assigned_identity.fleet_manager.client_id
+      }
+    }
+  })
+}
+
 resource "helm_release" "superplane" {
   name             = "superplane"
   repository       = local.helm_chart_repository
@@ -61,6 +91,21 @@ resource "helm_release" "superplane" {
   create_namespace = false
   timeout          = 1200
   wait             = true
+  version          = local.use_local_helm_chart ? null : var.superplane_chart_version
+
+  lifecycle {
+    precondition {
+      condition     = local.use_local_helm_chart || var.superplane_chart_version != ""
+      error_message = "Set superplane_chart_version, or set helm_chart_path for a local chart."
+    }
+
+    precondition {
+      condition     = !local.use_local_helm_chart || var.superplane_image_tag != ""
+      error_message = "With a local chart (helm_chart_path), set superplane_image_tag. The local Chart.yaml appVersion (0.1.0) is a placeholder, not a published image."
+    }
+  }
+
+  values = [local.fleet_manager_setup_values]
 
   set {
     name  = "database.secretName"
@@ -107,9 +152,12 @@ resource "helm_release" "superplane" {
     value = var.image_name
   }
 
-  set {
-    name  = "image.tag"
-    value = var.superplane_image_tag
+  dynamic "set" {
+    for_each = var.superplane_image_tag == "" ? [] : [var.superplane_image_tag]
+    content {
+      name  = "image.tag"
+      value = set.value
+    }
   }
 
   set {
@@ -246,59 +294,6 @@ resource "helm_release" "superplane" {
     name  = "podLabels.azure\\.workload\\.identity/use"
     value = "true"
     type  = "string"
-  }
-
-  set {
-    name  = "fleetManager.enabled"
-    value = local.fleet_manager_enabled ? "true" : "false"
-  }
-
-  set {
-    name  = "fleetManager.image.registry"
-    value = local.fleet_manager_image_registry
-  }
-
-  set {
-    name  = "fleetManager.image.name"
-    value = var.fleet_manager_image_name
-  }
-
-  set {
-    name  = "fleetManager.image.tag"
-    value = local.fleet_manager_image_tag
-  }
-
-  set {
-    name  = "fleetManager.existingSecret"
-    value = local.fleet_manager_enabled ? kubernetes_secret.fleet_manager[0].metadata[0].name : ""
-  }
-
-  set {
-    name  = "fleetManager.serviceAccount.create"
-    value = "true"
-  }
-
-  set {
-    name  = "fleetManager.serviceAccount.name"
-    value = "${var.cluster_name}-fleet-manager"
-  }
-
-  set {
-    name  = "fleetManager.serviceAccount.annotations.azure\\.workload\\.identity/client-id"
-    value = azurerm_user_assigned_identity.fleet_manager.client_id
-  }
-
-  set {
-    name  = "fleetManager.podLabels.azure\\.workload\\.identity/use"
-    value = "true"
-    type  = "string"
-  }
-
-  # The config stays sensitive. Only the checksum is safe to publish.
-  # A changed checksum restarts Fleet Manager so it loads the new file.
-  set {
-    name  = "fleetManager.podAnnotations.checksum/config"
-    value = nonsensitive(sha256(var.fleet_manager_config))
   }
 
   set {
