@@ -41,9 +41,11 @@ export function columnAutomationHeaderRowCount(columns: ReadonlyArray<ReadonlyAr
   return Math.max(1, ...columns.map((automations) => automations.length));
 }
 
-const SPLIT_CONFIG_NODE_IDS = new Set(["on-pr-risk", "on-pr-visual-evidence"]);
+export const IMPLEMENT_AGENT_NODE_ID = "implementation-agent-no-issue";
 
-/** Merge confidence and visual evidence open the split node settings panel. */
+const SPLIT_CONFIG_NODE_IDS = new Set(["on-pr-risk", "on-pr-visual-evidence", IMPLEMENT_AGENT_NODE_ID]);
+
+/** Merge confidence, visual evidence, and the Implement agent open the split settings panel. */
 export function columnAutomationUsesSplitConfig(nodeIds: Iterable<string | undefined>): boolean {
   for (const id of nodeIds) {
     if (id && SPLIT_CONFIG_NODE_IDS.has(id)) {
