@@ -136,7 +136,7 @@ const providerConfiguration = {
       subnetId: fields.subnetId || "<RUNNER_SUBNET_ID>",
       networkSecurityGroupId: fields.securityGroupIds || "<NETWORK_SECURITY_GROUP_ID>",
       identityId: fields.runnerIdentity || "<RUNNER_IDENTITY_ID>",
-      zones: splitList(fields.zones, "<AZURE_ZONE>"),
+      zones: fields.zones?.trim() ? splitList(fields.zones, "<AZURE_ZONE>") : [],
       diskSizeGb: spec.diskGb,
     },
   }),

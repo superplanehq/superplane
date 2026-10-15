@@ -241,9 +241,7 @@ function PreviewShell({
           )}
           data-testid="first-run-content"
         >
-          <div className={cn(PREVIEW_CONTENT_CLASS, "my-auto shrink-0")}>
-            {children}
-          </div>
+          <div className={cn(PREVIEW_CONTENT_CLASS, "my-auto shrink-0")}>{children}</div>
         </div>
         <div className="flex items-center justify-between pt-4" data-testid="first-run-bottom-row">
           <div className="flex items-center gap-3">

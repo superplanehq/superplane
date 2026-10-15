@@ -341,6 +341,56 @@ it.each([
   expect(terraformInstallPlaceholders(draft, terraformMetadata)).toEqual([]);
 });
 
+it("writes an empty Azure zone list when Terraform sets no zones", () => {
+  const terraformMetadata: FleetManagerSetupMetadata = {
+    ...metadata,
+    infrastructureDefaults: {
+      source: "terraform",
+      provider: "azure",
+      managerId: "superplane",
+      namespace: "superplane",
+      serviceAccountName: "superplane-fleet-manager",
+      fields: {
+        superplaneUrl: "https://superplane.example.com",
+        subscriptionId: "00000000-0000-0000-0000-000000000000",
+        resourceGroup: "superplane-runners",
+        location: "eastus",
+        zones: [],
+        subnetId: "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/runners/subnets/runners",
+        securityGroupIds:
+          "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/runners/networkSecurityGroups/runners",
+        imageAmd64: "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/runners/images/amd64",
+        imageArm64: "",
+        runnerIdentity:
+          "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/runners/userAssignedIdentities/runner",
+        fleetManagerIdentity: "11111111-1111-1111-1111-111111111111",
+      },
+    },
+  };
+  const draft = mergeTerraformInfrastructure(
+    {
+      provider: "azure",
+      managerId: "my-cluster",
+      namespace: "superplane",
+      serviceAccountName: "superplane-fleet-manager",
+      superplaneUrl: "http://localhost:8000",
+      runnerVersion: "v0.1.0",
+      selectedFleetIds: ["e1-large-amd64"],
+      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 10 } },
+      fields: {},
+    },
+    terraformMetadata,
+  );
+  const values = generateFleetManagerValues({
+    metadata: terraformMetadata,
+    ...draft,
+    installationAdminToken: "personal-token",
+  });
+
+  expect(load(values)).toMatchObject({ fleets: [{ azure: { zones: [] } }] });
+  expect(terraformInstallPlaceholders(draft, terraformMetadata)).toEqual([]);
+});
+
 it("blocks a Terraform install that would still contain a placeholder", () => {
   const draft = mergeTerraformInfrastructure(
     {
