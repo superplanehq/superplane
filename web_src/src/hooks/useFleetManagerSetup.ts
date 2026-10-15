@@ -9,7 +9,7 @@ import {
   fleetsMatchConfiguration,
   generateFleetManagerValues,
   loadFleetManagerDraft,
-  mergeTerraformRunnerImages,
+  mergeTerraformInfrastructure,
   normalizeInfrastructureFields,
   recommendedMachineType,
   rememberProviderFields,
@@ -62,7 +62,7 @@ function draftFromMetadata(metadata: FleetManagerSetupMetadata): FleetManagerDra
   metadata.runnerVersions = metadata.runnerVersions?.length ? metadata.runnerVersions : [metadata.defaultRunnerVersion];
   const restoredDraft = loadFleetManagerDraft();
   if (!restoredDraft) return defaultDraft(metadata);
-  return mergeTerraformRunnerImages(
+  return mergeTerraformInfrastructure(
     {
       ...restoredDraft,
       fields: withRecommendedMachineTypes(restoredDraft.fields, restoredDraft.provider, metadata),

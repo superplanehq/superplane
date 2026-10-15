@@ -7,7 +7,7 @@ import {
   fleetManagerInstallCommand,
   generateFleetManagerValues,
   loadFleetManagerDraft,
-  mergeTerraformRunnerImages,
+  mergeTerraformInfrastructure,
   saveFleetManagerDraft,
   validateFleetManagerConfiguration,
   type FleetManagerSetupMetadata,
@@ -217,21 +217,23 @@ it("matches installed fleets by version and specification", () => {
   expect(fleetsMatchConfiguration(installed, { ...draft, selectedFleetIds: [] }, metadata.fleetPresets)).toBe(false);
 });
 
-it("replaces saved runner images with the current Terraform images", () => {
+it("replaces saved infrastructure with the current Terraform values", () => {
   const draft = {
     provider: "aws" as const,
     managerId: "test-cluster",
     namespace: "superplane",
     serviceAccountName: "superplane-fleet-manager",
-    superplaneUrl: "https://superplane.example.com",
+    superplaneUrl: "https://old.example.com",
     runnerVersion: "v0.1.0",
     selectedFleetIds: [] as string[],
     fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
-    fields: { region: "us-east-1", imageAmd64: "" },
-    fieldsByProvider: { aws: { region: "us-east-1", imageAmd64: "" } },
+    fields: { region: "eu-west-1", imageAmd64: "ami-old", "machineType.e1-large-amd64": "t3.small" },
+    fieldsByProvider: {
+      aws: { region: "eu-west-1", imageAmd64: "ami-old", "machineType.e1-large-amd64": "t3.small" },
+    },
   };
 
-  const merged = mergeTerraformRunnerImages(draft, metadata);
+  const merged = mergeTerraformInfrastructure(draft, metadata);
   const values = generateFleetManagerValues({
     metadata,
     ...merged,
@@ -239,13 +241,18 @@ it("replaces saved runner images with the current Terraform images", () => {
     selectedFleetIds: ["e1-large-amd64"],
   });
 
-  expect(merged.fields.imageAmd64).toBe("runner-image-amd64");
-  expect(merged.fieldsByProvider?.aws?.imageAmd64).toBe("runner-image-amd64");
+  expect(values).toContain("region: us-east-1");
   expect(values).toContain("ami: runner-image-amd64");
+  expect(values).toContain("instanceType: t3.small");
+  expect(values).toContain("url: https://superplane.example.com");
+  expect(merged.fieldsByProvider?.aws?.region).toBe("us-east-1");
+  expect(mergeTerraformInfrastructure({ ...draft, provider: "gcp" }, metadata).fields.region).toBe("eu-west-1");
   expect(
-    mergeTerraformRunnerImages({ ...draft, provider: "gcp", fieldsByProvider: { gcp: draft.fields } }, metadata).fields
-      .imageAmd64,
-  ).toBe("");
+    mergeTerraformInfrastructure(draft, {
+      ...metadata,
+      infrastructureDefaults: { ...metadata.infrastructureDefaults, source: "manual" },
+    }).fields.region,
+  ).toBe("eu-west-1");
 });
 
 it("uses a browser key that stores only the non-secret draft", () => {

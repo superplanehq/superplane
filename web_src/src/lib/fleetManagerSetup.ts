@@ -289,30 +289,25 @@ export function fleetsMatchConfiguration(
 
 const FLEET_MANAGER_PROVIDERS: FleetManagerProvider[] = ["aws", "gcp", "azure"];
 
-const runnerImageFields = ["imageAmd64", "imageArm64"] as const;
-
-export function mergeTerraformRunnerImages(
+export function mergeTerraformInfrastructure(
   draft: FleetManagerDraft,
   metadata: FleetManagerSetupMetadata,
 ): FleetManagerDraft {
-  if (metadata.infrastructureDefaults.provider !== draft.provider) return draft;
+  const defaults = metadata.infrastructureDefaults;
+  if (defaults.source !== "terraform" || defaults.provider !== draft.provider) return draft;
 
-  const defaults = normalizeInfrastructureFields(metadata.infrastructureDefaults.fields);
-  const images = Object.fromEntries(
-    runnerImageFields.flatMap((key) => {
-      const image = defaults[key]?.trim();
-      return image ? [[key, image]] : [];
-    }),
+  const { superplaneUrl, ...infrastructureFields } = normalizeInfrastructureFields(defaults.fields);
+  const machineTypes = Object.fromEntries(
+    Object.entries(draft.fields).filter(([key]) => key.startsWith("machineType.")),
   );
-  if (Object.keys(images).length === 0) return draft;
-
-  const fields = { ...draft.fields, ...images };
+  const fields = { ...infrastructureFields, ...machineTypes };
   return {
     ...draft,
+    superplaneUrl: superplaneUrl || draft.superplaneUrl,
     fields,
     fieldsByProvider: {
       ...draft.fieldsByProvider,
-      [draft.provider]: { ...(draft.fieldsByProvider?.[draft.provider] ?? fields), ...images },
+      [draft.provider]: fields,
     },
   };
 }
