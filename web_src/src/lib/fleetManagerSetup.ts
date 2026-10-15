@@ -179,27 +179,41 @@ export function generateFleetManagerValues(input: GenerateValuesInput): string {
             },
           };
 
-  return dump(
-    {
-      manager: { id: input.managerId },
-      superplane: { url: input.superplaneUrl },
-      installationAdminToken: input.installationAdminToken,
-      runner: { releaseBaseUrl: input.metadata.runnerReleaseUrlTemplate },
-      image: {
-        repository: input.metadata.imageRepository,
-        tag: input.metadata.defaultFleetManagerVersion,
-        pullPolicy: "IfNotPresent",
+  return quoteReleaseBaseUrl(
+    dump(
+      {
+        manager: { id: input.managerId },
+        superplane: { url: input.superplaneUrl },
+        installationAdminToken: input.installationAdminToken,
+        runner: { releaseBaseUrl: input.metadata.runnerReleaseUrlTemplate },
+        image: {
+          repository: input.metadata.imageRepository,
+          tag: input.metadata.defaultFleetManagerVersion,
+          pullPolicy: "IfNotPresent",
+        },
+        serviceAccount: {
+          create: true,
+          name: input.serviceAccountName || "superplane-fleet-manager",
+          ...workloadIdentity,
+        },
+        podLabels: input.provider === "azure" ? { "azure.workload.identity/use": "true" } : {},
+        fleets,
       },
-      serviceAccount: {
-        create: true,
-        name: input.serviceAccountName || "superplane-fleet-manager",
-        ...workloadIdentity,
-      },
-      podLabels: input.provider === "azure" ? { "azure.workload.identity/use": "true" } : {},
-      fleets,
-    },
-    { noRefs: true, lineWidth: 120, quotingType: '"' },
+      { noRefs: true, lineWidth: 120, quotingType: '"' },
+    ),
   );
+}
+
+// An unquoted https value is a shell URL. zsh url-quote-magic then inserts
+// a backslash before { and }. Fleet Manager replaces only the exact text {version}.
+function quoteReleaseBaseUrl(values: string): string {
+  return values.replace(/^(\s*releaseBaseUrl:\s+)(.+?)\s*$/m, (_match, prefix: string, value: string) => {
+    const trimmed = value.trim();
+    if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+      return `${prefix}${trimmed}`;
+    }
+    return `${prefix}"${trimmed.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  });
 }
 
 export function validateFleetInfrastructure(input: FleetInfrastructureInput): string[] {

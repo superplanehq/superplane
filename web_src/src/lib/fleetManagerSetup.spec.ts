@@ -70,6 +70,24 @@ describe("generateFleetManagerValues", () => {
     expect(values).not.toContain("credentials:");
   });
 
+  it("quotes the runner release URL so a shell paste keeps the version placeholder", () => {
+    const values = generateFleetManagerValues({
+      metadata,
+      installationAdminToken: "personal-token",
+      provider: "gcp",
+      managerId: "test-gcp",
+      superplaneUrl: "https://superplane.example.com",
+      runnerVersion: "v0.1.0",
+      selectedFleetIds: ["e1-large-amd64"],
+      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+      fields: {},
+    });
+
+    expect(values).toContain('releaseBaseUrl: "https://example/releases/runner%2F{version}"');
+    const parsed = load(values) as { runner: { releaseBaseUrl: string } };
+    expect(parsed.runner.releaseBaseUrl).toBe(metadata.runnerReleaseUrlTemplate);
+  });
+
   it("generates capacity for each selected fleet", () => {
     const values = generateFleetManagerValues({
       metadata: {
