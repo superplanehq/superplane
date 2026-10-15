@@ -530,9 +530,11 @@ describe("columnAutomationViewTabs", () => {
 });
 
 describe("columnAutomationUsesSplitConfig", () => {
-  it("opens the split settings panel for merge confidence, visual evidence, and pull-request closure", () => {
+  it("opens the split settings panel for merge confidence, visual evidence, pull-request closure, and the Implement agent", () => {
     expect(columnAutomationUsesSplitConfig(["on-pr-risk"])).toBe(true);
     expect(columnAutomationUsesSplitConfig(["on-pr-visual-evidence", "capture-visual-evidence"])).toBe(true);
+    expect(columnAutomationUsesSplitConfig(["onrun-implement", "implementation-agent-no-issue"])).toBe(true);
+    expect(columnAutomationUsesSplitConfig(["implementation-agent"])).toBe(false);
     expect(columnAutomationUsesSplitConfig(["on-pr-closed"])).toBe(true);
     expect(columnAutomationUsesSplitConfig(["on-run"])).toBe(false);
   });

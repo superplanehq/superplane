@@ -26,6 +26,7 @@ type RepositoryWorkspace = {
   onboarding?: {
     vcsIntegrationId?: string;
     vcsProvider?: string;
+    appRepository?: string;
     appRepositoryId?: string;
     backlogRepositoryId?: string;
   } | null;
@@ -33,6 +34,12 @@ type RepositoryWorkspace = {
 
 function contextRepoName(resource: { name?: string | null; repository?: string | null }): string {
   return resource.repository ?? resource.name ?? "";
+}
+
+function isWorkspaceMainRepository(name: string, appRepository: string | undefined): boolean {
+  const main = appRepository?.trim().toLowerCase() ?? "";
+  if (!main) return false;
+  return name.trim().toLowerCase() === main;
 }
 
 function ContextRepoList({
@@ -99,12 +106,16 @@ export function CrossRepoContextCard({
   const choices = useWorkspaceRepositoryChoices(organizationId, factory);
 
   const added = (contextRepos.data ?? []).map(contextRepoName).filter(Boolean);
-  const available = choices.repositories.filter((name) => !added.includes(name));
+  const mainRepository = factory?.onboarding?.appRepository;
+  const available = choices.repositories.filter(
+    (name) => !added.includes(name) && !isWorkspaceMainRepository(name, mainRepository),
+  );
   const isSaving = createResource.isPending || deleteResource.isPending;
 
   const choose = async (name: string) => {
     const repository = name.trim();
     if (!repository) return;
+    if (isWorkspaceMainRepository(repository, factory?.onboarding?.appRepository)) return;
     if (added.includes(repository)) {
       showInfoToast(AGENT_RESOURCES_COPY.crossRepoAlreadyAdded);
       setAdding(false);

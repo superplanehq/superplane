@@ -10,14 +10,15 @@ import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
-import { ColumnAutomationViewPopup } from "./ColumnAutomationViewPopup";
+import { ColumnAutomationViewHost, ColumnAutomationViewPopup } from "./ColumnAutomationViewPopup";
 import { MergeConfidenceSettingsForm } from "./MergeConfidenceSettingsForm";
 import type { PlanningReviewDraft } from "./planningReviewMockup";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
-const { useInfiniteCanvasRuns } = vi.hoisted(() => ({
+const { useInfiniteCanvasRuns, useCanvas } = vi.hoisted(() => ({
   useInfiniteCanvasRuns: vi.fn(),
+  useCanvas: vi.fn(),
 }));
 
 vi.mock("@monaco-editor/react", () => ({
@@ -31,6 +32,7 @@ vi.mock("@/hooks/useCanvasData", () => {
   return {
     ...actual,
     useInfiniteCanvasRuns,
+    useCanvas,
   };
 });
 
@@ -55,6 +57,13 @@ useInfiniteCanvasRuns.mockReturnValue({
   hasNextPage: false,
   isFetchingNextPage: false,
   fetchNextPage: vi.fn(),
+  refetch: vi.fn(),
+});
+
+useCanvas.mockReturnValue({
+  data: undefined,
+  isPending: false,
+  isError: false,
   refetch: vi.fn(),
 });
 
@@ -272,5 +281,82 @@ describe("ColumnAutomationViewPopup", () => {
     const tabs = screen.getAllByRole("tab").map((tab) => tab.textContent);
     expect(tabs).toEqual(["General", "Agent", "Automation"]);
     expect(screen.getByTestId("column-automation-view-general")).toBeInTheDocument();
+  });
+});
+
+function renderHost() {
+  return render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter>
+        <ThemeProvider>
+          <TooltipProvider>
+            <ColumnAutomationViewHost
+              organizationId="org-1"
+              factoryId="factory-1"
+              factoryKey="RF"
+              lineId="line-plan"
+              canvasId="app-refund-implementer"
+              title="Implement"
+              onClose={vi.fn()}
+            />
+          </TooltipProvider>
+        </ThemeProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+describe("ColumnAutomationViewHost", () => {
+  it("opens the Implement agent on the split screen with that step selected", () => {
+    useCanvas.mockReturnValue({
+      data: {
+        metadata: { id: "app-refund-implementer", name: "Implement", liveVersionId: "version-live" },
+        spec: {
+          nodes: [
+            { id: "onrun-implement", name: "Start Implementation", type: "TYPE_TRIGGER", component: "onRun" },
+            {
+              id: "implementation-agent-no-issue",
+              name: "Implement From Task Description",
+              type: "TYPE_ACTION",
+              component: "runnerClaudeCode",
+            },
+          ],
+          edges: [],
+        },
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    renderHost();
+
+    expect(screen.queryByTestId("column-automation-view")).not.toBeInTheDocument();
+    const dialog = screen.getByTestId("merge-confidence-config");
+    expect(within(dialog).getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
+    expect(within(dialog).getByRole("heading", { name: "Implement From Task Description" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("heading", { name: "Start Implementation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
+  });
+
+  it("keeps a canvas without a split-config step on the board popup", () => {
+    useCanvas.mockReturnValue({
+      data: {
+        metadata: { id: "app-no-agent", name: "Custom", liveVersionId: "version-live" },
+        spec: {
+          nodes: [{ id: "on-run", name: "On run", type: "TYPE_TRIGGER", component: "onRun" }],
+          edges: [],
+        },
+      },
+      isPending: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    renderHost();
+
+    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    expect(screen.queryByTestId("merge-confidence-config")).not.toBeInTheDocument();
   });
 });

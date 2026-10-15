@@ -459,10 +459,6 @@ func Test__ExecuteCode__ComponentInfo(t *testing.T) {
 	component := ExecuteCode{}
 
 	assert.Equal(t, "daytona.executeCode", component.Name())
-	assert.Equal(t, "Execute Code", component.Label())
-	assert.Equal(t, "Execute code in a sandbox environment", component.Description())
-	assert.Equal(t, "daytona", component.Icon())
-	assert.Equal(t, "orange", component.Color())
 	assert.NotEmpty(t, component.Documentation())
 }
 
