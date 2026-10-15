@@ -1,5 +1,6 @@
 import {
   meDescribeVcsProviderOnboarding,
+  meSelectVcsProviderOnboardingIdentity,
   meStartVcsProviderInstallation,
   type MeDescribeVcsProviderOnboardingResponse,
 } from "@/api-client";
@@ -30,6 +31,7 @@ export function useBitbucketOnboarding(
       bitbucketOnboardingPollInterval(options.poll !== false, current.state, options.attemptActive === true),
   });
 
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: bitbucketOnboardingKey(organizationId) });
   const startInstallation = useMutation({
     mutationFn: async () => {
       const response = await meStartVcsProviderInstallation(
@@ -38,10 +40,16 @@ export function useBitbucketOnboarding(
       if (!response.data?.url) throw new Error("Bitbucket did not return an installation URL");
       return response.data.url;
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: bitbucketOnboardingKey(organizationId) });
+    onSuccess: () => void invalidate(),
+  });
+  const selectIdentity = useMutation({
+    mutationFn: async (providerUserId: string) => {
+      await meSelectVcsProviderOnboardingIdentity(
+        withOrganizationHeader({ organizationId, path: { provider: bitbucketProvider }, body: { providerUserId } }),
+      );
     },
+    onSuccess: () => invalidate(),
   });
 
-  return { ...query, startInstallation };
+  return { ...query, startInstallation, selectIdentity };
 }

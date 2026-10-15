@@ -78,7 +78,7 @@ func TestUseRealProviderAuthInDevelopment(t *testing.T) {
 	})
 }
 
-func TestHandler_handleAuth_GitHubAccountPicker(t *testing.T) {
+func TestHandler_handleAuth_AccountPicker(t *testing.T) {
 	handler, r := setupAuthHandler(t, false)
 	handler.InitializeProviders(map[string]ProviderConfig{
 		models.ProviderGitHub: {
@@ -86,12 +86,17 @@ func TestHandler_handleAuth_GitHubAccountPicker(t *testing.T) {
 			Secret:      "client-secret",
 			CallbackURL: "https://app.example/auth/github/callback",
 		},
+		models.ProviderBitbucket: {
+			Key:         "bitbucket-client-id",
+			Secret:      "bitbucket-client-secret",
+			CallbackURL: "https://app.example/auth/bitbucket/callback",
+		},
 	})
 
-	authorizeQuery := func(t *testing.T, target string, withSession bool) url.Values {
+	authorizeURL := func(t *testing.T, provider, target string, withSession bool) *url.URL {
 		request := mux.SetURLVars(
 			httptest.NewRequest(http.MethodGet, target, nil),
-			map[string]string{"provider": models.ProviderGitHub},
+			map[string]string{"provider": provider},
 		)
 		if withSession {
 			token, err := handler.jwtSigner.GenerateWithClaims(time.Hour, map[string]string{
@@ -108,22 +113,35 @@ func TestHandler_handleAuth_GitHubAccountPicker(t *testing.T) {
 		require.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
 		location, err := url.Parse(recorder.Header().Get("Location"))
 		require.NoError(t, err)
-		assert.Equal(t, "github.com", location.Host)
-		return location.Query()
+		return location
 	}
 
 	t.Run("asks GitHub to show the account picker when connecting an account", func(t *testing.T) {
-		query := authorizeQuery(t, "/auth/github?intent=connect&redirect=/onboarding", true)
+		location := authorizeURL(t, models.ProviderGitHub, "/auth/github?intent=connect&redirect=/onboarding", true)
+		query := location.Query()
 
+		assert.Equal(t, "github.com", location.Host)
 		assert.Equal(t, "select_account", query.Get("prompt"))
 		assert.Equal(t, "user:email", query.Get("scope"))
 		assert.NotEmpty(t, query.Get("state"))
 	})
 
-	t.Run("keeps sign-in on the active GitHub account", func(t *testing.T) {
-		query := authorizeQuery(t, "/auth/github", false)
+	t.Run("asks Bitbucket to show the account picker when connecting an account", func(t *testing.T) {
+		location := authorizeURL(t, models.ProviderBitbucket, "/auth/bitbucket?intent=connect&redirect=/onboarding", true)
+		query := location.Query()
 
-		assert.Empty(t, query.Get("prompt"))
+		assert.Equal(t, "bitbucket.org", location.Host)
+		assert.Equal(t, "/site/oauth2/authorize", location.Path)
+		assert.Equal(t, "select_account", query.Get("prompt"))
+		assert.Equal(t, "bitbucket-client-id", query.Get("client_id"))
+		assert.NotEmpty(t, query.Get("state"))
+	})
+
+	t.Run("keeps sign-in on the active GitHub account", func(t *testing.T) {
+		location := authorizeURL(t, models.ProviderGitHub, "/auth/github", false)
+
+		assert.Equal(t, "github.com", location.Host)
+		assert.Empty(t, location.Query().Get("prompt"))
 	})
 }
 

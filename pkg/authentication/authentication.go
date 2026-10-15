@@ -187,7 +187,7 @@ func (a *Handler) beginProviderAuth(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if !requestsGitHubAccountPicker(r) {
+	if !requestsAccountPicker(r) {
 		gothic.BeginAuthHandler(w, r)
 		return
 	}
@@ -198,7 +198,7 @@ func (a *Handler) beginProviderAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, withGitHubAccountPicker(authURL), http.StatusTemporaryRedirect)
+	http.Redirect(w, r, withAccountPicker(authURL), http.StatusTemporaryRedirect)
 }
 
 // Cloud registers GitHub at startup from GITHUB_CLIENT_ID and
@@ -237,13 +237,17 @@ func githubOAuthCallbackURL() string {
 	return githubapp.OAuthCallbackURL(baseURL)
 }
 
-// GitHub otherwise authorizes the active browser account, so a user with
-// several signed-in GitHub accounts cannot choose which one to connect.
-func requestsGitHubAccountPicker(r *http.Request) bool {
-	return mux.Vars(r)["provider"] == models.ProviderGitHub && isConnectIntent(r)
+// GitHub and Bitbucket otherwise authorize the active browser account, so a
+// user with several signed-in accounts cannot choose which one to connect.
+func requestsAccountPicker(r *http.Request) bool {
+	provider := mux.Vars(r)["provider"]
+	if provider != models.ProviderGitHub && provider != models.ProviderBitbucket {
+		return false
+	}
+	return isConnectIntent(r)
 }
 
-func withGitHubAccountPicker(authURL string) string {
+func withAccountPicker(authURL string) string {
 	parsed, err := url.Parse(authURL)
 	if err != nil {
 		return authURL
