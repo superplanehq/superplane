@@ -170,6 +170,10 @@ spec:
               value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
             - name: SUPERPLANE_INSTALLATION_TYPE
               value: {{ .Values.installation.type | quote }}
+{{- if .Values.fleetManagerSetup.enabled }}
+            - name: FLEET_MANAGER_TOKEN_PATH
+              value: /var/run/secrets/superplane/fleet-manager/token
+{{- end }}
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
             - name: BLOB_STORAGE_ACCOUNT
@@ -215,6 +219,11 @@ spec:
 {{- if $mountRunnerLogs }}
             - name: runner-active-logs
               mountPath: {{ .Values.runner.activeLogs.path }}
+{{- end }}
+{{- if .Values.fleetManagerSetup.enabled }}
+            - name: fleet-manager-token
+              mountPath: /var/run/secrets/superplane/fleet-manager
+              readOnly: true
 {{- end }}
 
           ports:
@@ -269,4 +278,12 @@ spec:
         - name: runner-active-logs
           persistentVolumeClaim:
             claimName: {{ include "runner.activeLogs.claimName" . }}
+{{- end }}
+{{- if .Values.fleetManagerSetup.enabled }}
+        - name: fleet-manager-token
+          secret:
+            secretName: {{ required "fleetManagerSetup.credentials.existingSecret is required when fleetManagerSetup.enabled is true" .Values.fleetManagerSetup.credentials.existingSecret }}
+            items:
+              - key: {{ required "fleetManagerSetup.credentials.tokenKey is required when fleetManagerSetup.enabled is true" .Values.fleetManagerSetup.credentials.tokenKey }}
+                path: token
 {{- end }}
