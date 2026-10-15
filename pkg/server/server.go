@@ -748,35 +748,46 @@ func Start() {
 		log.WithError(err).Warn("failed to load usage price book; using in-memory rates")
 	}
 
-	encryptionKey := os.Getenv("ENCRYPTION_KEY")
-
 	log.SetLevel(log.DebugLevel)
 
 	var encryptorInstance crypto.Encryptor
 	var keyStore *encryption.Store
-	if os.Getenv("NO_ENCRYPTION") == "yes" {
-		log.Warn("NO_ENCRYPTION is set to yes, using NoOpEncryptor")
-		encryptorInstance = crypto.NewNoOpEncryptor()
+	legacy, err := crypto.LegacyDecryptorFromEnv()
+	if err != nil {
+		panic(fmt.Sprintf("load legacy encryption: %v", err))
+	}
+	masters, primaryRef, err := crypto.MasterKeysFromEnv(context.Background())
+	if err != nil {
+		panic(fmt.Sprintf("load encryption master keys: %v", err))
+	}
+	writeFormat := os.Getenv("ENCRYPTION_WRITE_FORMAT")
+	if writeFormat != "" && writeFormat != "legacy" && writeFormat != "versioned" {
+		panic("ENCRYPTION_WRITE_FORMAT must be legacy or versioned")
+	}
+	if writeFormat == "legacy" && (masters == nil || legacy == nil || os.Getenv("ENCRYPTION_LEGACY_FORMAT") == "plaintext") {
+		panic("legacy writes require ENCRYPTION_MASTER_KEYS and an AES-GCM ENCRYPTION_KEY")
+	}
+	if writeFormat == "versioned" && masters == nil {
+		panic("versioned writes require ENCRYPTION_MASTER_KEYS")
+	}
+	if masters == nil {
+		if legacy == nil {
+			panic("ENCRYPTION_KEY or ENCRYPTION_MASTER_KEYS is required")
+		}
+		if os.Getenv("ENCRYPTION_LEGACY_FORMAT") == "plaintext" {
+			panic("ENCRYPTION_MASTER_KEYS is required to convert plaintext values")
+		}
+		encryptorInstance = legacy
 	} else {
-		var legacy crypto.Encryptor
-		if encryptionKey != "" {
-			legacy = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
+		keyStore = encryption.NewStore(masters, primaryRef)
+		if err := keyStore.Initialize(context.Background()); err != nil {
+			panic(fmt.Sprintf("load application data keys: %v", err))
 		}
-		masters, initialRef, err := crypto.MasterKeysFromEnv(context.Background())
-		if err != nil {
-			panic(fmt.Sprintf("load encryption master keys: %v", err))
-		}
-		if masters == nil {
-			if legacy == nil {
-				panic("ENCRYPTION_KEY or an application encryption master key is required")
-			}
-			encryptorInstance = legacy
+		versioned := crypto.NewVersionedEncryptor(keyStore, legacy)
+		if writeFormat == "legacy" {
+			encryptorInstance = versioned.WithLegacyWrites()
 		} else {
-			keyStore = encryption.NewStore(masters)
-			if err := keyStore.Initialize(context.Background(), initialRef); err != nil {
-				panic(fmt.Sprintf("load application data keys: %v", err))
-			}
-			encryptorInstance = crypto.NewVersionedEncryptor(keyStore, legacy)
+			encryptorInstance = versioned
 		}
 	}
 	crypto.SetProcessEncryptor(encryptorInstance)
@@ -884,7 +895,7 @@ func Start() {
 		panic(fmt.Sprintf("failed to create registry: %v", err))
 	}
 	var migrator *encryption.Migrator
-	if keyStore != nil {
+	if keyStore != nil && writeFormat != "legacy" {
 		migrator = encryption.NewMigrator(encryptorInstance.(*crypto.VersionedEncryptor), registry, models.ApplicationEncryptedStorage())
 		if os.Getenv("START_CONSUMERS") == "yes" && os.Getenv("START_REGULAR_WORKERS") != "no" {
 			go migrator.Run(context.Background())

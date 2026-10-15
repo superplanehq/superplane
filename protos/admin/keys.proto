@@ -41,6 +41,12 @@ service Keys {
     };
   }
 
+  rpc ListMigrations(ListMigrationsRequest) returns (ListMigrationsResponse) {
+    option (google.api.http) = {
+      get: "/admin/api/installation/keys/migrations"
+    };
+  }
+
   rpc RetryMigration(RetryMigrationRequest) returns (MigrationResponse) {
     option (google.api.http) = {
       post: "/admin/api/installation/keys/migrations/{id}/retry"
@@ -60,6 +66,7 @@ message ListKeysRequest {}
 message ListKeysResponse {
   repeated DataKey keys = 1;
   string active_key_id = 2;
+  string primary_master_key_ref = 3;
 }
 
 message RotateKeyRequest {}
@@ -68,9 +75,7 @@ message RotateKeyResponse {
   string active_key_id = 1;
 }
 
-message RewrapKeysRequest {
-  string master_key_ref = 1;
-}
+message RewrapKeysRequest {}
 
 message RewrapKeysResponse {}
 
@@ -78,6 +83,12 @@ message StartMigrationRequest {}
 
 message GetMigrationRequest {
   string id = 1;
+}
+
+message ListMigrationsRequest {}
+
+message ListMigrationsResponse {
+  repeated MigrationResponse migrations = 1;
 }
 
 message RetryMigrationRequest {

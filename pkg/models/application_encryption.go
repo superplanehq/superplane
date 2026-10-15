@@ -12,34 +12,30 @@ type ApplicationEncryptionKey struct {
 	ID           uuid.UUID `gorm:"primaryKey"`
 	WrappedKey   []byte
 	MasterKeyRef string
+	State        string
 	CreatedAt    time.Time
 }
 
-type ApplicationEncryptionState struct {
-	ID          int `gorm:"primaryKey"`
-	ActiveKeyID uuid.UUID
-	Generation  int64
-	UpdatedAt   time.Time
-}
+const (
+	ApplicationEncryptionKeyActive    = "active"
+	ApplicationEncryptionKeyAvailable = "available"
+)
 
-func (ApplicationEncryptionState) TableName() string {
-	return "application_encryption_state"
-}
-
-func LoadApplicationEncryptionState(tx *gorm.DB) (*ApplicationEncryptionState, error) {
-	var state ApplicationEncryptionState
-	if err := tx.First(&state, 1).Error; err != nil {
+func LoadActiveApplicationEncryptionKey(tx *gorm.DB) (*ApplicationEncryptionKey, error) {
+	var key ApplicationEncryptionKey
+	if err := tx.Where("state = ?", ApplicationEncryptionKeyActive).First(&key).Error; err != nil {
 		return nil, err
 	}
-	return &state, nil
+	return &key, nil
 }
 
-func LockApplicationEncryptionState(tx *gorm.DB) (*ApplicationEncryptionState, error) {
-	var state ApplicationEncryptionState
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&state, 1).Error; err != nil {
+func LockActiveApplicationEncryptionKey(tx *gorm.DB) (*ApplicationEncryptionKey, error) {
+	var key ApplicationEncryptionKey
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("state = ?", ApplicationEncryptionKeyActive).First(&key).Error; err != nil {
 		return nil, err
 	}
-	return &state, nil
+	return &key, nil
 }
 
 func ListApplicationEncryptionKeys(tx *gorm.DB) ([]ApplicationEncryptionKey, error) {
@@ -58,33 +54,17 @@ func LoadApplicationEncryptionKey(tx *gorm.DB, id uuid.UUID) (*ApplicationEncryp
 	return &key, nil
 }
 
-func CreateApplicationEncryptionKey(tx *gorm.DB, key *ApplicationEncryptionKey) error {
-	return tx.Create(key).Error
-}
-
-func CreateApplicationEncryptionState(tx *gorm.DB, state *ApplicationEncryptionState) error {
-	return tx.Create(state).Error
-}
-
-func ActivateApplicationEncryptionKey(tx *gorm.DB, state *ApplicationEncryptionState, id uuid.UUID) error {
-	return tx.Model(state).Updates(map[string]any{
-		"active_key_id": id,
-		"generation":    state.Generation + 1,
-		"updated_at":    time.Now(),
-	}).Error
+func ActivateApplicationEncryptionKey(tx *gorm.DB, current, next *ApplicationEncryptionKey) error {
+	if err := tx.Model(current).Update("state", ApplicationEncryptionKeyAvailable).Error; err != nil {
+		return err
+	}
+	return tx.Model(next).Update("state", ApplicationEncryptionKeyActive).Error
 }
 
 func RewrapApplicationEncryptionKey(tx *gorm.DB, key *ApplicationEncryptionKey, wrapped []byte, reference string) error {
 	return tx.Model(key).Updates(map[string]any{
 		"wrapped_key":    wrapped,
 		"master_key_ref": reference,
-	}).Error
-}
-
-func AdvanceApplicationEncryptionGeneration(tx *gorm.DB, state *ApplicationEncryptionState) error {
-	return tx.Model(state).Updates(map[string]any{
-		"generation": state.Generation + 1,
-		"updated_at": time.Now(),
 	}).Error
 }
 

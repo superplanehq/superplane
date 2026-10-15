@@ -23,7 +23,7 @@ type LocalMasterKeys struct {
 
 func ParseLocalMasterKeys(configured string) (*LocalMasterKeys, error) {
 	if configured == "" {
-		return nil, fmt.Errorf("ENCRYPTION_LOCAL_MASTER_KEYS is required")
+		return nil, fmt.Errorf("local master keys are required")
 	}
 
 	keys := make(map[string]cipher.AEAD)
@@ -69,11 +69,13 @@ func validMasterKeyID(name string) bool {
 }
 
 func (k *LocalMasterKeys) Has(reference string) bool {
+	reference = strings.TrimPrefix(reference, "env://")
 	_, ok := k.keys[reference]
 	return ok
 }
 
 func (k *LocalMasterKeys) Wrap(_ context.Context, reference string, plain, associatedData []byte) ([]byte, error) {
+	reference = strings.TrimPrefix(reference, "env://")
 	aead, ok := k.keys[reference]
 	if !ok {
 		return nil, fmt.Errorf("local master key %q is not configured", reference)
@@ -82,6 +84,7 @@ func (k *LocalMasterKeys) Wrap(_ context.Context, reference string, plain, assoc
 }
 
 func (k *LocalMasterKeys) Unwrap(_ context.Context, reference string, wrapped, associatedData []byte) ([]byte, error) {
+	reference = strings.TrimPrefix(reference, "env://")
 	aead, ok := k.keys[reference]
 	if !ok {
 		return nil, fmt.Errorf("local master key %q is not configured", reference)

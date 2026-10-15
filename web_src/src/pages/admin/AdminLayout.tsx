@@ -61,6 +61,10 @@ const AdminLayout: React.FC = () => {
                 <Network size={14} />
                 Settings
               </NavLink>
+              <NavLink to="/admin/encryption" className={navLinkClass}>
+                <KeyRound size={14} />
+                Encryption
+              </NavLink>
               <NavLink to="/admin/license" className={navLinkClass}>
                 <KeyRound size={14} />
                 License

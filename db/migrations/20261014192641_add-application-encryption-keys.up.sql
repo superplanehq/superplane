@@ -4,15 +4,12 @@ CREATE TABLE application_encryption_keys (
   id UUID PRIMARY KEY,
   wrapped_key BYTEA NOT NULL,
   master_key_ref TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('active', 'available')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE application_encryption_state (
-  id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-  active_key_id UUID NOT NULL REFERENCES application_encryption_keys(id),
-  generation BIGINT NOT NULL DEFAULT 1,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+CREATE UNIQUE INDEX application_encryption_keys_one_active
+  ON application_encryption_keys ((1)) WHERE state = 'active';
 
 CREATE TABLE application_encryption_migrations (
   id UUID PRIMARY KEY,
@@ -22,9 +19,6 @@ CREATE TABLE application_encryption_migrations (
   storage_location TEXT NOT NULL,
   cursor TEXT NOT NULL DEFAULT '',
   pass INTEGER NOT NULL DEFAULT 1,
-  lease_owner UUID,
-  lease_expires_at TIMESTAMPTZ,
-  lease_generation BIGINT NOT NULL DEFAULT 0,
   error_message TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -10,7 +10,7 @@ Ciphertext will include a SuperPlane format marker and a data key identifier.
 Readers will support the current legacy format during conversion. Writers will
 use the new format after the rollout completes.
 
-Installation admins will manage data keys through `superplane admin keys`.
+Installation admins will manage data keys in the admin UI.
 An installation worker will migrate stored ciphertext in bounded batches.
 PostgreSQL will store job progress and coordinate worker pods.
 
@@ -26,8 +26,9 @@ PostgreSQL will store job progress and coordinate worker pods.
 
 ## Key Model
 
-The key registry holds one active data key and older keys needed for decryption.
-PostgreSQL stores each wrapped data key and its master key reference. The master
+The `application_encryption_keys` table stores each key with `active` or
+`available` state. A unique index permits at most one active key. PostgreSQL
+also stores each wrapped data key and its master key reference. The master
 provider wraps and unwraps data keys. It does not encrypt each application value.
 
 Use Go's AES-256-GCM implementation for data values. Store a format marker
@@ -60,16 +61,13 @@ identity. Neither provider will write plaintext data keys to disk or logs.
 SuperPlane will fail startup if it cannot unwrap a stored data key. It will not
 create replacement keys over unreadable ones.
 
-Use `ENCRYPTION_LOCAL_MASTER_KEYS` for the local provider. Its value will be a
-comma-separated list of `key-id:base64-key` entries. Each key must contain
-32 random bytes before base64 encoding. For example,
-`local-v1:<base64-key>,local-v2:<base64-key>`. Permit only letters, digits,
-hyphens, and underscores in key IDs. Reject duplicate IDs, invalid base64,
-and keys of the wrong length at startup. Use
-`ENCRYPTION_KMS_KEY_URIS` for the KMS provider. Its value will use the
-`gcp-kms://projects/.../locations/.../keyRings/.../cryptoKeys/...` form.
-Keep `ENCRYPTION_KEY` for legacy decryption during conversion. A new
-installation can use a master key without setting `ENCRYPTION_KEY`.
+Configure master keys with one ordered `ENCRYPTION_MASTER_KEYS` value. The first
+entry is primary for new data keys and rewraps. A local entry has the form
+`env://<id>:<base64-key>` and contains 32 random key bytes. A KMS entry has
+the form `gcp-kms://projects/.../locations/.../keyRings/.../cryptoKeys/...`.
+The database stores `env://<id>` or the KMS URI as `master_key_ref`; it never
+stores local key material. Keep old entries until rewrap and backup retention
+permit removal. Keep `ENCRYPTION_KEY` for legacy AES-GCM ciphertext.
 
 For a single-VM installation, generate a local master key:
 
@@ -80,8 +78,7 @@ openssl rand -base64 32
 Then add the result to the application environment:
 
 ```dotenv
-ENCRYPTION_LOCAL_MASTER_KEYS=local-v1:<base64-output>
-ENCRYPTION_INITIAL_MASTER_KEY_REF=local-v1
+ENCRYPTION_MASTER_KEYS=env://local-v1:<base64-output>
 ```
 
 For a Helm installation with Google Cloud KMS, set these values and bind the
@@ -90,8 +87,7 @@ with the CryptoKey:
 
 ```yaml
 encryption:
-  kmsKeyURIs: gcp-kms://projects/PROJECT/locations/global/keyRings/RING/cryptoKeys/KEY
-  initialMasterKeyRef: gcp-kms://projects/PROJECT/locations/global/keyRings/RING/cryptoKeys/KEY
+  masterKeys: gcp-kms://projects/PROJECT/locations/global/keyRings/RING/cryptoKeys/KEY
 ```
 
 For an existing installation, keep its `ENCRYPTION_KEY` in the encryption
@@ -140,23 +136,24 @@ Do not remove a handler until all installations have completed jobs that use it.
 
 ## Admin Interface
 
-Add these commands to the regular `superplane` CLI. Use its existing context
-URL and personal API token. Installation admin authorization will apply to all
-endpoints. Never return key material in an API response.
+Add an Encryption page to the installation admin UI. Installation admin
+authorization will apply to all endpoints. Never return key material in an API
+response.
 
-| Command | Endpoint | Result |
+| UI action | Endpoint | Result |
 | --- | --- | --- |
-| `superplane admin keys list` | `GET /admin/api/installation/keys` | List data key IDs, creation times, and the active ID. |
-| `superplane admin keys rotate` | `POST /admin/api/installation/keys/rotate` | Add and activate a data key. |
-| `superplane admin keys migrate` | `POST /admin/api/installation/keys/migrations` | Create a migration job for the current active key. Return its ID. |
-| `superplane admin keys migrate status <id>` | `GET /admin/api/installation/keys/migrations/{id}` | Show state, current storage location, and failures. |
-| `superplane admin keys migrate retry <id>` | `POST /admin/api/installation/keys/migrations/{id}/retry` | Resume a failed job. |
-| `superplane admin keys rewrap [--master-key-ref <ref>]` | `POST /admin/api/installation/keys/rewrap` | Rewrap data keys with a configured master key. |
+| View data keys | `GET /admin/api/installation/keys` | List data key IDs, creation times, and the active ID. |
+| Rotate data key | `POST /admin/api/installation/keys/rotate` | Add and activate a data key. |
+| Start migration | `POST /admin/api/installation/keys/migrations` | Create a migration job for the current active key. Return its ID. |
+| View migrations | `GET /admin/api/installation/keys/migrations` | List recent jobs so progress remains visible after a page reload. |
+| Fetch one job | `GET /admin/api/installation/keys/migrations/{id}` | Show state, current storage location, and failures. |
+| Retry migration | `POST /admin/api/installation/keys/migrations/{id}/retry` | Resume a failed job. |
+| Rewrap data keys | `POST /admin/api/installation/keys/rewrap` | Rewrap data keys with a configured master key. |
 
-The `migrate` command starts a server job and exits after it receives the job
-ID. The CLI does not hold decrypted values or run migration batches.
+The UI starts a server job and shows its saved progress. The browser does not
+hold decrypted values or run migration batches.
 
-Reject `keys rotate` while a migration job is pending, running, or failed.
+Reject data key rotation while a migration job is pending, running, or failed.
 Enforce this rule in the same database transaction that activates a new key.
 An admin must retry a failed job and complete it before another rotation.
 Keep old data keys available while stored values or backups reference them.
@@ -213,26 +210,42 @@ skipped successes.
 
 ### Convert legacy ciphertext
 
-1. Add the data key registry, master providers, new envelope, and dual-format reader.
-2. Add the storage registry, admin APIs, CLI commands, and migration worker.
-3. Deploy the new reader to every API and worker instance.
-4. Switch every writer to the new envelope and active data key.
-5. Confirm that old application versions can no longer write legacy values.
-6. Start `superplane admin keys migrate`.
-7. Inspect failures and retry the job until it completes.
-8. Keep `ENCRYPTION_KEY` available while legacy values or retained backups need it.
+1. Apply the database migration and configure `ENCRYPTION_MASTER_KEYS` while
+   keeping the existing `ENCRYPTION_KEY` unchanged.
+2. Set `ENCRYPTION_WRITE_FORMAT=legacy` and roll out the new application to
+   every API and worker instance. Each new instance creates or loads the active
+   data key at startup. It reads both formats but continues to write legacy
+   ciphertext, so old instances can still read new writes.
+3. Confirm that no old application instances remain. Do not start an
+   encryption migration during this phase; the admin migration API is
+   unavailable while legacy writes are enabled.
+4. Set `ENCRYPTION_WRITE_FORMAT=versioned` and roll out every instance again.
+   During this rollout, both configurations can read both formats.
+5. Start a migration from the admin UI when old ciphertext must be converted.
+   Inspect failures and retry the job until it completes.
+6. Keep `ENCRYPTION_KEY` available while legacy values or retained backups need it.
+
+After step 4, roll back only to an application version that can read both
+formats. Older versions cannot read values written with versioned encryption.
+
+New installations can start with `ENCRYPTION_MASTER_KEYS` and versioned writes.
+They do not need `ENCRYPTION_KEY` or the legacy rollout phase.
 
 Do not remove the legacy decryptor only because the current database is clean.
 An older backup can restore legacy ciphertext. Define backup restore support
-before retiring the old key or code path. Development installations that use
-`NO_ENCRYPTION=yes` need a separate conversion decision; their stored values
-do not have legacy AES-GCM ciphertext.
+before retiring the old key or code path. Development and demo installations that previously used `NO_ENCRYPTION=yes`
+can set `ENCRYPTION_LEGACY_FORMAT=plaintext` while they migrate. This setting
+changes only how unmarked old values are read. New values use versioned
+encryption. Start the migration in the admin UI and finish it before changing
+the legacy format. Use this setting only when the old unmarked values are
+known to be plaintext; an installation with legacy AES-GCM data must keep the
+default `aes-gcm` format. Do not mix both unmarked formats in one database.
 
 ### Rotate a data key
 
-1. Run `superplane admin keys rotate`.
+1. Rotate the data key from the admin UI.
 2. New writes use the new active key. Old ciphertext stays readable.
-3. Run `superplane admin keys migrate` only when re-encryption is required.
+3. Start a migration only when re-encryption is required.
 4. Keep old data keys while current data or retained backups need them.
 
 Rotation does not require a migration job. Migration is an explicit operation.
@@ -241,19 +254,19 @@ Do not remove an old data key until verification and backup retention allow it.
 ### Rotate a master key
 
 For a new version of the same KMS CryptoKey, rotate the KMS key version first.
-Then run `superplane admin keys rewrap`. The endpoint unwraps the stored data
+Then select Rewrap data keys in the admin UI. The endpoint unwraps the stored data
 keys and wraps them with the new primary KMS version. It atomically
 replaces the wrapped keys and verifies that it can read them. Application
-ciphertext and data key IDs do not change. If the flag is absent, use the stored
-master key reference.
+ciphertext and data key IDs do not change. The rewrap operation uses the first configured KMS URI.
 
-For a new KMS URI or local master key, deploy both old and new key access to
-every API and worker instance before rewrap. The stored master key reference
-selects the old key. Run `superplane admin keys rewrap --master-key-ref <new-ref>`.
-The server selects the new key from its configuration. It updates the wrapped
+For a new KMS URI or local master key, first deploy `old,new` to every API and
+worker instance. Wait for the rollout to finish. Then deploy `new,old` to every
+instance. Both versions can read data keys during this second rollout. Rewrap
+the data keys in the admin UI after it finishes. The server selects the first
+configured key. It updates the wrapped
 data keys and stored references in one transaction. Afterward, verify a fresh
 instance can start. Remove old access only after backup retention permits it.
-The CLI and API must not accept raw master keys. A rewrap failure must keep
+The UI and API must not accept raw master keys. A rewrap failure must keep
 the prior data keys and references intact.
 
 ## Validation
@@ -275,7 +288,7 @@ the prior data keys and references intact.
 1. Complete the encryption call-site audit and registry inventory.
 2. Implement the data key registry, master providers, and versioned encryptor.
 3. Add dual-format decryption and switch all writers to the new format.
-4. Add installation admin APIs and regular CLI commands.
+4. Add installation admin APIs and an admin UI page.
 5. Add the durable migration job, worker row lock, and storage handlers.
 6. Run legacy conversion and verify every registered location.
 7. Add the master rewrap operation and document backup key retention.

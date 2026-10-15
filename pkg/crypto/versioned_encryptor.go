@@ -24,15 +24,25 @@ type DataKeys interface {
 }
 
 type VersionedEncryptor struct {
-	keys   DataKeys
-	legacy Encryptor
+	keys         DataKeys
+	legacy       Encryptor
+	legacyWrites bool
 }
 
 func NewVersionedEncryptor(keys DataKeys, legacy Encryptor) *VersionedEncryptor {
 	return &VersionedEncryptor{keys: keys, legacy: legacy}
 }
 
+func (e *VersionedEncryptor) WithLegacyWrites() *VersionedEncryptor {
+	copy := *e
+	copy.legacyWrites = true
+	return &copy
+}
+
 func (e *VersionedEncryptor) Encrypt(ctx context.Context, plain, associatedData []byte) ([]byte, error) {
+	if e.legacyWrites {
+		return e.legacy.Encrypt(ctx, plain, associatedData)
+	}
 	key, err := e.keys.Active(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load active data key: %w", err)

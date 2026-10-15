@@ -67,17 +67,13 @@ authentication:
     clientSecret: ""
 
 #
-# Application encryption. `key` is the base64-encoded legacy ENCRYPTION_KEY.
-# Set localMasterKeys or kmsKeyURIs to write new values with versioned data keys.
-# For a new installation, a master key can replace the legacy key.
-# If secretName is set, supply these environment variables in that Secret.
+# Application encryption. The first master key is primary.
+# Use env://<id>:<base64> or gcp-kms://<CryptoKey URI>.
+# If secretName is set, supply ENCRYPTION_MASTER_KEYS in that Secret.
 #
 encryption:
   secretName: ""
-  key: ""
-  localMasterKeys: ""
-  kmsKeyURIs: ""
-  initialMasterKeyRef: ""
+  masterKeys: ""
 
 #
 # Optional Enterprise license from an existing Kubernetes secret. When set,

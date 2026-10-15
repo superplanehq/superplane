@@ -12,47 +12,54 @@ type ConfiguredMasterKeys struct {
 }
 
 func MasterKeysFromEnv(ctx context.Context) (MasterKeys, string, error) {
+	configured := os.Getenv("ENCRYPTION_MASTER_KEYS")
+	if configured == "" {
+		return nil, "", nil
+	}
+	var localEntries, kmsEntries []string
+	var primary string
+	seen := make(map[string]bool)
+	for entry := range strings.SplitSeq(configured, ",") {
+		entry = strings.TrimSpace(entry)
+		var reference string
+		switch {
+		case strings.HasPrefix(entry, "env://"):
+			name, value, ok := strings.Cut(strings.TrimPrefix(entry, "env://"), ":")
+			if !ok || !validMasterKeyID(name) || value == "" {
+				return nil, "", fmt.Errorf("invalid env master key entry")
+			}
+			reference = "env://" + name
+			localEntries = append(localEntries, name+":"+value)
+		case strings.HasPrefix(entry, "gcp-kms://"):
+			reference = entry
+			kmsEntries = append(kmsEntries, entry)
+		default:
+			return nil, "", fmt.Errorf("unsupported encryption master key entry")
+		}
+		if seen[reference] {
+			return nil, "", fmt.Errorf("duplicate encryption master key reference %q", reference)
+		}
+		seen[reference] = true
+		if primary == "" {
+			primary = reference
+		}
+	}
 	var providers []MasterKeys
-	var references []string
-	if configured := os.Getenv("ENCRYPTION_LOCAL_MASTER_KEYS"); configured != "" {
-		local, err := ParseLocalMasterKeys(configured)
+	if len(localEntries) > 0 {
+		local, err := ParseLocalMasterKeys(strings.Join(localEntries, ","))
 		if err != nil {
 			return nil, "", err
 		}
 		providers = append(providers, local)
-		for entry := range strings.SplitSeq(configured, ",") {
-			name, _, _ := strings.Cut(entry, ":")
-			references = append(references, name)
-		}
 	}
-	kmsURIs := os.Getenv("ENCRYPTION_KMS_KEY_URIS")
-	if kmsURIs == "" {
-		kmsURIs = os.Getenv("ENCRYPTION_KMS_KEY_URI")
-	}
-	if kmsURIs != "" {
-		kms, err := NewGCPMasterKeys(ctx, kmsURIs)
+	if len(kmsEntries) > 0 {
+		kms, err := NewGCPMasterKeys(ctx, strings.Join(kmsEntries, ","))
 		if err != nil {
 			return nil, "", err
 		}
 		providers = append(providers, kms)
-		for uri := range strings.SplitSeq(kmsURIs, ",") {
-			if uri != "" {
-				references = append(references, uri)
-			}
-		}
 	}
-	if len(providers) == 0 {
-		return nil, "", nil
-	}
-	keys := &ConfiguredMasterKeys{providers: providers}
-	initial := os.Getenv("ENCRYPTION_INITIAL_MASTER_KEY_REF")
-	if initial == "" && len(references) == 1 {
-		initial = references[0]
-	}
-	if initial != "" && !keys.Has(initial) {
-		return nil, "", fmt.Errorf("ENCRYPTION_INITIAL_MASTER_KEY_REF must identify a configured master key")
-	}
-	return keys, initial, nil
+	return &ConfiguredMasterKeys{providers: providers}, primary, nil
 }
 
 func (k *ConfiguredMasterKeys) Has(reference string) bool {

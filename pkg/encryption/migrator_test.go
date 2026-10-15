@@ -16,15 +16,29 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/openrouter"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"gorm.io/gorm"
 )
 
 func TestMigratorConvertsLegacyCiphertextAndUnblocksRotation(t *testing.T) {
+	for _, source := range []struct {
+		name      string
+		encryptor crypto.Encryptor
+	}{
+		{"aes-gcm", crypto.NewAESGCMEncryptor(bytes.Repeat([]byte{4}, 32))},
+		{"plaintext", crypto.NewNoOpEncryptor()},
+	} {
+		t.Run(source.name, func(t *testing.T) {
+			testMigratorConvertsLegacyValues(t, source.encryptor)
+		})
+	}
+}
+
+func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	ctx := t.Context()
 	db := database.DB(context.Background())
 	require.NoError(t, database.VerifyTestDatabase(db))
 	clean := func() {
 		require.NoError(t, db.Exec("DELETE FROM application_encryption_migrations").Error)
-		require.NoError(t, db.Exec("DELETE FROM application_encryption_state").Error)
 		require.NoError(t, db.Exec("DELETE FROM application_encryption_keys").Error)
 	}
 	clean()
@@ -33,25 +47,15 @@ func TestMigratorConvertsLegacyCiphertextAndUnblocksRotation(t *testing.T) {
 	master := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{3}, 32))
 	masters, err := crypto.ParseLocalMasterKeys("local-v1:" + master)
 	require.NoError(t, err)
-	store := NewStore(masters)
-	require.NoError(t, store.Initialize(ctx, "local-v1"))
-	legacy := crypto.NewAESGCMEncryptor(bytes.Repeat([]byte{4}, 32))
+	store := NewStore(masters, "local-v1")
+	require.NoError(t, store.Initialize(ctx))
 	encryptor := crypto.NewVersionedEncryptor(store, legacy)
 	table := "encryption_migration_test_" + uuid.NewString()[:8]
 	require.NoError(t, db.Exec(fmt.Sprintf("CREATE TABLE %s (id uuid PRIMARY KEY, secret bytea NOT NULL, configuration jsonb NOT NULL, app_name text NOT NULL, access_token text NOT NULL)", table)).Error)
 	t.Cleanup(func() { require.NoError(t, db.Exec("DROP TABLE "+table).Error) })
-	location := models.EncryptedStorageLocation{
-		Name: table + ".secret", Table: table, KeyColumn: "id", KeyType: "uuid",
-		ValueColumn: "secret", AADExpression: "'smtp_password'", AppExpression: "''", Encoding: "bytes",
-	}
-	configurationLocation := models.EncryptedStorageLocation{
-		Name: table + ".configuration", Table: table, KeyColumn: "id", KeyType: "uuid",
-		ValueColumn: "configuration", AADExpression: "id::text", AppExpression: "app_name", Encoding: "integration_json",
-	}
-	base64Location := models.EncryptedStorageLocation{
-		Name: table + ".access_token", Table: table, KeyColumn: "id", KeyType: "uuid",
-		ValueColumn: "access_token", AADExpression: "id::text", AppExpression: "''", Encoding: "base64",
-	}
+	location := testEncryptedStorageLocation(table, "secret", "'smtp_password'", "''", models.EncryptedStorageBytes)
+	configurationLocation := testEncryptedStorageLocation(table, "configuration", "id::text", "app_name", models.EncryptedStorageIntegrationJSON)
+	base64Location := testEncryptedStorageLocation(table, "access_token", "id::text", "''", models.EncryptedStorageBase64)
 	integrations, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 	require.NoError(t, err)
 	migrator := NewMigrator(encryptor, integrations, []models.EncryptedStorageLocation{location, configurationLocation, base64Location})
@@ -97,9 +101,9 @@ func TestMigratorConvertsLegacyCiphertextAndUnblocksRotation(t *testing.T) {
 	keyID, versioned, err := crypto.EncryptedDataKeyID(stored)
 	require.NoError(t, err)
 	require.True(t, versioned)
-	state, err := models.LoadApplicationEncryptionState(db)
+	active, err := models.LoadActiveApplicationEncryptionKey(db)
 	require.NoError(t, err)
-	require.Equal(t, state.ActiveKeyID, keyID)
+	require.Equal(t, active.ID, keyID)
 	plain, err := encryptor.Decrypt(ctx, stored, []byte("smtp_password"))
 	require.NoError(t, err)
 	require.Equal(t, "smtp secret", string(plain))
@@ -117,7 +121,7 @@ func TestMigratorConvertsLegacyCiphertextAndUnblocksRotation(t *testing.T) {
 		keyID, versioned, err := crypto.EncryptedDataKeyID(decoded)
 		require.NoError(t, err)
 		require.True(t, versioned)
-		require.Equal(t, state.ActiveKeyID, keyID)
+		require.Equal(t, active.ID, keyID)
 		plain, err := encryptor.Decrypt(ctx, decoded, []byte(id.String()))
 		require.NoError(t, err)
 		require.Equal(t, expected, string(plain))
@@ -136,12 +140,15 @@ func TestMigratorConvertsLegacyCiphertextAndUnblocksRotation(t *testing.T) {
 	keyID, versioned, err = crypto.EncryptedDataKeyID(decoded)
 	require.NoError(t, err)
 	require.True(t, versioned)
-	require.Equal(t, state.ActiveKeyID, keyID)
+	require.Equal(t, active.ID, keyID)
 	plain, err = encryptor.Decrypt(ctx, decoded, []byte(id.String()))
 	require.NoError(t, err)
 	require.Equal(t, "api secret", string(plain))
 	_, err = store.Rotate(ctx)
 	require.NoError(t, err)
+	if _, plaintext := legacy.(*crypto.NoOpEncryptor); plaintext {
+		return
+	}
 	require.NoError(t, db.Exec("UPDATE "+table+" SET secret = ? WHERE id = ?", []byte("invalid ciphertext"), id).Error)
 	failedJob, err := migrator.Start(ctx)
 	require.NoError(t, err)
@@ -162,4 +169,48 @@ func TestMigratorConvertsLegacyCiphertextAndUnblocksRotation(t *testing.T) {
 		}
 	}
 	require.Equal(t, "completed", failedJob.State, failedJob.ErrorMessage)
+}
+
+func testEncryptedStorageLocation(table, column, associatedData, appName string, format models.EncryptedStorageFormat) models.EncryptedStorageLocation {
+	return models.EncryptedStorageLocation{
+		Name:   table + "." + column,
+		Format: format,
+		ReadPage: func(tx *gorm.DB, cursor string, limit int) ([]models.EncryptedStorageRow, error) {
+			query := fmt.Sprintf("SELECT id::text, %s, %s, %s FROM %s WHERE %s IS NOT NULL", column, associatedData, appName, table, column)
+			args := []any{}
+			if cursor != "" {
+				query += " AND id > CAST(? AS uuid)"
+				args = append(args, cursor)
+			}
+			query += " ORDER BY id LIMIT ?"
+			args = append(args, limit)
+			rows, err := tx.Raw(query, args...).Rows()
+			if err != nil {
+				return nil, err
+			}
+			defer rows.Close()
+			page := make([]models.EncryptedStorageRow, 0, limit)
+			for rows.Next() {
+				var row models.EncryptedStorageRow
+				if err := rows.Scan(&row.Cursor, &row.Value, &row.AssociatedData, &row.AppName); err != nil {
+					return nil, err
+				}
+				page = append(page, row)
+			}
+			return page, rows.Err()
+		},
+		Replace: func(tx *gorm.DB, row models.EncryptedStorageRow, replacement []byte) (bool, error) {
+			oldValue, newValue := any(row.Value), any(replacement)
+			valueExpr := "?"
+			if format == models.EncryptedStorageIntegrationJSON {
+				oldValue, newValue = string(row.Value), string(replacement)
+				valueExpr = "CAST(? AS jsonb)"
+			} else if format == models.EncryptedStorageBase64 {
+				oldValue, newValue = string(row.Value), string(replacement)
+			}
+			query := fmt.Sprintf("UPDATE %s SET %s = %s WHERE id = CAST(? AS uuid) AND %s = %s", table, column, valueExpr, column, valueExpr)
+			result := tx.Exec(query, newValue, row.Cursor, oldValue)
+			return result.RowsAffected == 1, result.Error
+		},
+	}
 }

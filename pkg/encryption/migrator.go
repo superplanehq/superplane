@@ -37,7 +37,7 @@ func NewMigrator(encryptor *crypto.VersionedEncryptor, registry *registry.Regist
 func (m *Migrator) Start(ctx context.Context) (*models.ApplicationEncryptionMigration, error) {
 	var job *models.ApplicationEncryptionMigration
 	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		state, err := models.LockApplicationEncryptionState(tx)
+		active, err := models.LockActiveApplicationEncryptionKey(tx)
 		if err != nil {
 			return err
 		}
@@ -49,18 +49,22 @@ func (m *Migrator) Start(ctx context.Context) (*models.ApplicationEncryptionMigr
 			return ErrMigrationAlreadyRunning
 		}
 		job = &models.ApplicationEncryptionMigration{
-			ID: uuid.New(), TargetKeyID: state.ActiveKeyID, State: "pending",
+			ID: uuid.New(), TargetKeyID: active.ID, State: "pending",
 			RegistryVersion: encryptionRegistryVersion,
 			StorageLocation: m.locations[0].Name,
 			Pass:            1,
 		}
-		return models.CreateApplicationEncryptionMigration(tx, job)
+		return tx.Create(job).Error
 	})
 	return job, err
 }
 
 func (m *Migrator) Get(ctx context.Context, id uuid.UUID) (*models.ApplicationEncryptionMigration, error) {
 	return models.LoadApplicationEncryptionMigration(database.DB(ctx), id)
+}
+
+func (m *Migrator) List(ctx context.Context) ([]models.ApplicationEncryptionMigration, error) {
+	return models.ListApplicationEncryptionMigrations(database.DB(ctx))
 }
 
 func (m *Migrator) Retry(ctx context.Context, id uuid.UUID) (*models.ApplicationEncryptionMigration, error) {
@@ -76,7 +80,7 @@ func (m *Migrator) Retry(ctx context.Context, id uuid.UUID) (*models.Application
 		}
 		job.State = "pending"
 		job.ErrorMessage = ""
-		return models.SaveApplicationEncryptionMigration(tx, job)
+		return tx.Save(job).Error
 	})
 	return job, err
 }
@@ -113,7 +117,7 @@ func (m *Migrator) RunBatch(ctx context.Context) error {
 		}); err != nil {
 			return m.failJob(tx, job, err.Error())
 		}
-		return models.SaveApplicationEncryptionMigration(tx, &next)
+		return tx.Save(&next).Error
 	})
 }
 
@@ -132,7 +136,7 @@ func (m *Migrator) processBatch(ctx context.Context, tx *gorm.DB, job *models.Ap
 	if locationIndex == -1 {
 		return errors.New("migration storage location is not supported")
 	}
-	page, err := models.ReadEncryptedStoragePage(tx, locations[locationIndex], job.Cursor, migrationBatchSize)
+	page, err := locations[locationIndex].ReadPage(tx, job.Cursor, migrationBatchSize)
 	if err != nil {
 		return fmt.Errorf("read %s: %w", job.StorageLocation, err)
 	}
@@ -166,14 +170,14 @@ func (m *Migrator) processBatch(ctx context.Context, tx *gorm.DB, job *models.Ap
 func (m *Migrator) failJob(tx *gorm.DB, job *models.ApplicationEncryptionMigration, message string) error {
 	job.State = "failed"
 	job.ErrorMessage = message
-	return models.SaveApplicationEncryptionMigration(tx, job)
+	return tx.Save(job).Error
 }
 
 func (m *Migrator) migrateRow(ctx context.Context, tx *gorm.DB, location models.EncryptedStorageLocation, row models.EncryptedStorageRow, target uuid.UUID) (bool, error) {
-	switch location.Encoding {
-	case "integration_json":
+	switch location.Format {
+	case models.EncryptedStorageIntegrationJSON:
 		return m.migrateIntegrationConfiguration(ctx, tx, location, row, target)
-	case "base64":
+	case models.EncryptedStorageBase64:
 		return m.migrateBase64(ctx, tx, location, row, target)
 	default:
 		if len(row.Value) == 0 {
@@ -216,7 +220,7 @@ func (m *Migrator) migrateCiphertext(ctx context.Context, tx *gorm.DB, location 
 	if err != nil || actual != target {
 		return false, errors.New("active data key changed during migration")
 	}
-	return models.ReplaceEncryptedStorageValue(tx, location, row, encode(replacement))
+	return location.Replace(tx, row, encode(replacement))
 }
 
 func (m *Migrator) migrateIntegrationConfiguration(ctx context.Context, tx *gorm.DB, location models.EncryptedStorageLocation, row models.EncryptedStorageRow, target uuid.UUID) (bool, error) {
@@ -280,5 +284,5 @@ func (m *Migrator) migrateIntegrationConfiguration(ctx context.Context, tx *gorm
 	if err != nil {
 		return false, err
 	}
-	return models.ReplaceEncryptedStorageValue(tx, location, row, replacement)
+	return location.Replace(tx, row, replacement)
 }
