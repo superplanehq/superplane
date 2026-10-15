@@ -15,7 +15,7 @@ func TestIntakeAnalysisCloneCommandProvider(t *testing.T) {
 
 	bitbucket := intakeAnalysisCloneCommand(models.ProviderBitbucket)
 	assert.NotContains(t, bitbucket, "GITHUB_TOKEN")
-	assert.Contains(t, bitbucket, "git ls-remote --heads")
+	assert.Contains(t, bitbucket, "checkout")
 }
 
 func TestRejectVCSProviderChange(t *testing.T) {
