@@ -97,7 +97,7 @@ describe("InstallationSettings", () => {
     renderInstallationSettings();
 
     expect(await screen.findByText("Network policy")).toBeInTheDocument();
-    expect(screen.queryByText("Onboarding templates")).not.toBeInTheDocument();
+    expect(screen.queryByText(/onboarding templates/i)).not.toBeInTheDocument();
     expect(await screen.findByText("SuperPlane-hosted models")).toBeInTheDocument();
     expect(screen.queryByText("Signup access")).not.toBeInTheDocument();
     expect(screen.queryByText("Public signups")).not.toBeInTheDocument();
