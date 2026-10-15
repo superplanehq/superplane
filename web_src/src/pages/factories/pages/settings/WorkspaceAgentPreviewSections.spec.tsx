@@ -81,7 +81,9 @@ describe("workspace agent preview fields", () => {
       />,
     );
 
-    expect(await screen.findByText("SuperPlane could not load setup steps. Try again.", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(
+      await screen.findByText("SuperPlane could not load setup steps. Try again.", {}, { timeout: 8000 }),
+    ).toBeInTheDocument();
   }, 10000);
 
   it("shows a load error in the setup editor when the request fails", async () => {
@@ -96,6 +98,8 @@ describe("workspace agent preview fields", () => {
       />,
     );
 
-    expect(await screen.findByText("SuperPlane could not load setup steps. Try again.", {}, { timeout: 8000 })).toBeInTheDocument();
+    expect(
+      await screen.findByText("SuperPlane could not load setup steps. Try again.", {}, { timeout: 8000 }),
+    ).toBeInTheDocument();
   }, 10000);
 });
