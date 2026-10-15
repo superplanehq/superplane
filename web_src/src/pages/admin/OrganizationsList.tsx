@@ -1,6 +1,6 @@
 import { Text } from "@/components/Text/text";
 import { formatUsdCents } from "@/pages/factories/lib/workOrderUsage";
-import { Building, CircleCheck, ClipboardList, Palette, User } from "lucide-react";
+import { Building, CircleCheck, ClipboardList, Factory, GitBranch, Palette, User } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { Link, useNavigate } from "react-router";
@@ -16,6 +16,8 @@ interface AdminOrganization {
   task_count: number;
   done_task_count: number;
   member_count: number;
+  workspace_count: number;
+  repository_count: number;
   remaining_credit_cents?: number;
   created_at?: string;
 }
@@ -27,7 +29,9 @@ type SortField =
   | "member_count"
   | "name"
   | "remaining_credit_cents"
-  | "task_count";
+  | "repository_count"
+  | "task_count"
+  | "workspace_count";
 
 const PAGE_SIZE = 50;
 
@@ -88,6 +92,8 @@ function OrganizationRow({ organization }: { organization: AdminOrganization }) 
       <CountCell icon={<ClipboardList size={13} />} value={organization.task_count} />
       <CountCell icon={<CircleCheck size={13} />} value={organization.done_task_count} />
       <CountCell icon={<User size={13} />} value={organization.member_count} />
+      <CountCell icon={<Factory size={13} />} value={organization.workspace_count} />
+      <CountCell icon={<GitBranch size={13} />} value={organization.repository_count} />
       <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap dark:text-gray-400">
         {formatUsdCents(organization.remaining_credit_cents ?? 0)}
       </td>
@@ -135,6 +141,20 @@ function OrganizationsTable({ organizations, sortBy, sortDirection, onSort }: Or
             <SortableHeader
               label="Members"
               field="member_count"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
+            <SortableHeader
+              label="Workspaces"
+              field="workspace_count"
+              currentSort={sortBy}
+              currentDirection={sortDirection}
+              onSort={onSort}
+            />
+            <SortableHeader
+              label="Repositories"
+              field="repository_count"
               currentSort={sortBy}
               currentDirection={sortDirection}
               onSort={onSort}

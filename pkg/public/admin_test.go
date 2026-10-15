@@ -317,6 +317,10 @@ func TestAdminGetOrganization(t *testing.T) {
 		require.NoError(t, err)
 		_, err = factory.CreateWorkOrder(db, "Open task", "", nil, nil, nil)
 		require.NoError(t, err)
+		appRepository := "acme/api"
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{AppRepository: &appRepository}))
+		_, err = models.CreateFactory(db, org.ID, "No Repository", "", "")
+		require.NoError(t, err)
 		done, err := factory.CreateWorkOrder(db, "Done task", "", nil, nil, nil)
 		require.NoError(t, err)
 		require.NoError(t, db.Model(done).Updates(map[string]any{
@@ -341,6 +345,8 @@ func TestAdminGetOrganization(t *testing.T) {
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
 		assert.Equal(t, int64(3), body.TaskCount)
 		assert.Equal(t, int64(1), body.DoneTaskCount)
+		assert.Equal(t, int64(2), body.WorkspaceCount)
+		assert.Equal(t, int64(1), body.RepositoryCount)
 	})
 
 	t.Run("returns 404 for unknown organization", func(t *testing.T) {

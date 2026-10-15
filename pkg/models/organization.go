@@ -60,6 +60,8 @@ type OrganizationWithCounts struct {
 	TaskCount             int64  `gorm:"column:task_count"`
 	DoneTaskCount         int64  `gorm:"column:done_task_count"`
 	MemberCount           int64  `gorm:"column:member_count"`
+	WorkspaceCount        int64  `gorm:"column:workspace_count"`
+	RepositoryCount       int64  `gorm:"column:repository_count"`
 	RemainingCreditMicros *int64 `gorm:"-"`
 }
 
@@ -205,18 +207,35 @@ func withOrganizationCounts(tx *gorm.DB, query *gorm.DB) *gorm.DB {
 		Where("type = ?", UserTypeHuman).
 		Group("organization_id")
 
+	workspaceCountsQuery := tx.
+		Table("factories").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Group("organization_id")
+
+	repositoryCountsQuery := tx.
+		Table("factories").
+		Select("organization_id, COUNT(*) AS count").
+		Where("deleted_at IS NULL").
+		Where("BTRIM(COALESCE(onboarding_config->>'app_repository', '')) <> ''").
+		Group("organization_id")
+
 	return query.
 		Select(`
 			organizations.*,
 			COALESCE(canvas_counts.count, 0) AS canvas_count,
 			COALESCE(task_counts.count, 0) AS task_count,
 			COALESCE(done_task_counts.count, 0) AS done_task_count,
-			COALESCE(member_counts.count, 0) AS member_count
+			COALESCE(member_counts.count, 0) AS member_count,
+			COALESCE(workspace_counts.count, 0) AS workspace_count,
+			COALESCE(repository_counts.count, 0) AS repository_count
 		`).
 		Joins("LEFT JOIN (?) AS canvas_counts ON canvas_counts.organization_id = organizations.id", canvasCountsQuery).
 		Joins("LEFT JOIN (?) AS task_counts ON task_counts.organization_id = organizations.id", taskCountsQuery).
 		Joins("LEFT JOIN (?) AS done_task_counts ON done_task_counts.organization_id = organizations.id", doneTaskCountsQuery).
-		Joins("LEFT JOIN (?) AS member_counts ON member_counts.organization_id = organizations.id", memberCountsQuery)
+		Joins("LEFT JOIN (?) AS member_counts ON member_counts.organization_id = organizations.id", memberCountsQuery).
+		Joins("LEFT JOIN (?) AS workspace_counts ON workspace_counts.organization_id = organizations.id", workspaceCountsQuery).
+		Joins("LEFT JOIN (?) AS repository_counts ON repository_counts.organization_id = organizations.id", repositoryCountsQuery)
 }
 
 func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
@@ -238,6 +257,10 @@ func resolveOrganizationOrderClause(sortBy, sortDirection string) string {
 		return "COALESCE(done_task_counts.count, 0) " + direction + ", organizations.name ASC"
 	case "member_count":
 		return "COALESCE(member_counts.count, 0) " + direction + ", organizations.name ASC"
+	case "workspace_count":
+		return "COALESCE(workspace_counts.count, 0) " + direction + ", organizations.name ASC"
+	case "repository_count":
+		return "COALESCE(repository_counts.count, 0) " + direction + ", organizations.name ASC"
 	case OrganizationSortRemainingCreditCents:
 		return "organizations.name ASC"
 	default:

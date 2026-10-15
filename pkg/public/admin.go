@@ -944,6 +944,8 @@ type adminOrgItem struct {
 	TaskCount            int64   `json:"task_count"`
 	DoneTaskCount        int64   `json:"done_task_count"`
 	MemberCount          int64   `json:"member_count"`
+	WorkspaceCount       int64   `json:"workspace_count"`
+	RepositoryCount      int64   `json:"repository_count"`
 	RemainingCreditCents int64   `json:"remaining_credit_cents"`
 	CreatedAt            *string `json:"created_at,omitempty"`
 	UpdatedAt            *string `json:"updated_at,omitempty"`
@@ -1024,6 +1026,8 @@ func serializeAdminOrganization(org models.OrganizationWithCounts, remainingCred
 		TaskCount:            org.TaskCount,
 		DoneTaskCount:        org.DoneTaskCount,
 		MemberCount:          org.MemberCount,
+		WorkspaceCount:       org.WorkspaceCount,
+		RepositoryCount:      org.RepositoryCount,
 		RemainingCreditCents: remainingCreditCents,
 	}
 
