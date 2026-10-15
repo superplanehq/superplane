@@ -316,7 +316,7 @@ function factoryAutomationRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/automations"),
-      resolve: (match, method, body) => {
+      resolve: (match, method, body, url) => {
         const factoryId = match[1];
         if (method === "POST") {
           const request = (body ?? {}) as { name?: string; columnKey?: string };
@@ -328,6 +328,11 @@ function factoryAutomationRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           };
           fixture.appsByFactoryId[factoryId] = [...(fixture.appsByFactoryId[factoryId] ?? []), automation];
           return { json: { automation } };
+        }
+        const skillName = url.searchParams.get("skillName");
+        if (skillName) {
+          if (fixture.failSkillUsage) return { status: 503, json: { message: "Usage unavailable" } };
+          return { json: { automations: fixture.skillUsageByName?.[skillName] ?? [] } };
         }
         return { json: { automations: fixture.appsByFactoryId[factoryId] ?? [] } };
       },
@@ -611,6 +616,23 @@ function factoryAgentResourceOAuthDisconnectRoute(fixture: FactoriesFixture): Fa
   };
 }
 
+function factorySystemSkillRestoreRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/restore"),
+    resolve: (match, method) => {
+      if (method !== "POST") return { json: {} };
+      if (fixture.failAgentResourceRestoreForIds?.includes(match[2]))
+        return { status: 503, json: { message: "Could not restore skill." } };
+      const restored = fixture.restoredAgentResourcesById?.[match[2]];
+      const resources = ensureAgentResources(fixture, match[1]);
+      const index = resources.findIndex((entry) => entry.id === match[2]);
+      if (!restored || index < 0) return { status: 404, json: { message: "Skill not found." } };
+      resources[index] = { ...restored };
+      return { json: { resource: resources[index] } };
+    },
+  };
+}
+
 function factoryAgentResourceItemRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)"),
@@ -736,6 +758,7 @@ function factoryAgentResourceRoutes(fixture: FactoriesFixture): FactoriesRoute[]
     factoryAgentResourceToolsRoute(fixture),
     factoryAgentResourceOAuthStartRoute(fixture),
     factoryAgentResourceOAuthDisconnectRoute(fixture),
+    factorySystemSkillRestoreRoute(fixture),
     factoryAgentResourceItemRoute(fixture),
     factoryAgentResourceListRoute(fixture),
   ];

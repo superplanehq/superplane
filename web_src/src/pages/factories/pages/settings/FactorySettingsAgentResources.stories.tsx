@@ -24,13 +24,15 @@ type Story = StoryObj<typeof meta>;
 
 const agentPath = `workspaces/${PRIMARY_FACTORY_KEY}/agent`;
 
-function skillsHarness(pathSuffix: string, resources: (typeof INLINE_SKILL)[]) {
+function skillsHarness(pathSuffix: string, resources: (typeof INLINE_SKILL)[], failSkillUsage = false) {
   return (
     <FactoriesHarness
       pathSuffix={pathSuffix}
       experimentalFeatures={[FEATURE_WORKSPACE_AGENT, FEATURE_WORKSPACE_SKILLS]}
       factoriesFixture={{
         ...defaultFactoriesFixture,
+        skillUsageByName: { [INLINE_SKILL.name!]: [{ id: "implementation", name: "Implement changes" }] },
+        failSkillUsage,
         agentResourcesByFactoryId: {
           [PRIMARY_FACTORY_ID]: resources,
         },
@@ -53,4 +55,17 @@ export const GitHubSkill: Story = {
 
 export const EditorNew: Story = {
   render: () => skillsHarness(`${agentPath}/skills/new`, [INLINE_SKILL]),
+};
+
+export const InUseSkill: Story = {
+  render: () => skillsHarness(`${agentPath}/skills/${INLINE_SKILL.id}`, [INLINE_SKILL]),
+};
+export const InUseSystemSkill: Story = {
+  render: () =>
+    skillsHarness(`${agentPath}/skills/${INLINE_SKILL.id}`, [
+      { ...INLINE_SKILL, systemSkill: { templateId: "refine-task", version: 1 } },
+    ]),
+};
+export const UsageCheckError: Story = {
+  render: () => skillsHarness(`${agentPath}/skills/${INLINE_SKILL.id}`, [INLINE_SKILL], true),
 };

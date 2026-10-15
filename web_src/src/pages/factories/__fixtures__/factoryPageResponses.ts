@@ -399,6 +399,10 @@ export interface FactoriesFixture {
   intakeItemCatalog?: BacklogIntakeItemCatalog;
   /** Workspace agent resources (MCP connections and skill shells). */
   agentResourcesByFactoryId?: Record<string, FactoriesFactoryAgentResource[]>;
+  skillUsageByName?: Record<string, FactoryAutomation[]>;
+  failSkillUsage?: boolean;
+  restoredAgentResourcesById?: Record<string, FactoriesFactoryAgentResource>;
+  failAgentResourceRestoreForIds?: string[];
   /** SuperPlane MCP clients connected to a workspace. */
   mcpClientsByFactoryId?: Record<string, FactoriesFactoryMcpClient[]>;
   /** Tools returned by GET .../agent-resources/{id}/tools. */
