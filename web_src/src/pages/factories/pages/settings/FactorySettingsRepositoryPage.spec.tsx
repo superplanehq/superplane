@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeAll, describe, expect, it } from "bun:test";
+import { beforeAll, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
@@ -12,14 +12,8 @@ import {
 } from "../../__fixtures__/setupStoryFixtures";
 
 describe("FactorySettingsRepositoryPage", () => {
-  const originalFetch = globalThis.fetch;
-
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
   });
 
   it("selects and saves the workspace repository", async () => {
