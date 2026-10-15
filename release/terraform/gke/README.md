@@ -112,6 +112,11 @@ enable_runners          = true
 Set both flags in this file. Do not rely on the variable defaults. Those
 defaults stay `false` so an existing install keeps its current blob storage.
 
+The default node type is `e2-standard-2`. Keep that type, or use a larger
+type. The API, the runner API, and the runner workers share one log disk.
+They must run on one node. `e2-medium` does not have enough CPU for that
+node. The Helm release then fails at the timeout.
+
 Select a `main` commit that published both artifacts. The image and the
 chart can use different SHAs. Confirm them:
 
@@ -239,7 +244,7 @@ terraform output fleet_manager_service_account_email
 ```
 
 Select only fleets whose image output is set. SuperPlane creates a personal
-token when you generate the install command. Run the displayed Helm heredoc.
+token when you generate the install command. Run the displayed Helm commands.
 The standalone chart stores the complete configuration in
 `fleet-manager-config`.
 
@@ -314,6 +319,11 @@ type. For example, T2A machines are not available in all zones.
 **The UI loads HTML but scripts fail CORS.** The image tag is not a
 self-hosted tag. Set `superplane_image_tag` to `<commit-sha>-selfhosted`
 and apply again. Hard-refresh the browser.
+
+**The API or the runner workers stay `Pending`.** The node does not have
+enough CPU. Those pods share one log disk, so they must run on one node.
+Set `machine_type` to `e2-standard-2` or a larger type. A change of
+`machine_type` replaces the cluster.
 
 **Pods stay in `ImagePullBackOff` with HTTP 403.** You pointed
 `superplane_image_registry` at `gcr.io/<project>` or Artifact Registry.

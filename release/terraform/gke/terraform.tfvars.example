@@ -29,7 +29,7 @@ letsencrypt_email = "admin@example.com"
 # cluster_name    = "superplane"
 # cluster_version = "1.36"
 # node_count      = 2
-# machine_type    = "e2-medium"
+# machine_type    = "e2-standard-2"
 
 # Set to false and apply before terraform destroy
 # gke_deletion_protection = true
