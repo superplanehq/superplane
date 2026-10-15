@@ -450,10 +450,11 @@ describe("OrganizationDetail", () => {
       created_at: "2024-01-15T12:00:00Z",
       updated_at: "2024-02-20T12:00:00Z",
     };
+    let allowOrganization = false;
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url === `/admin/api/organizations/${ORG_ID}`) {
-        if (vi.mocked(fetch).mock.calls.filter(([call]) => String(call) === url).length === 1) {
+        if (!allowOrganization) {
           return new Response("error", { status: 500 });
         }
         return jsonResponse(overview);
@@ -464,6 +465,7 @@ describe("OrganizationDetail", () => {
     renderPage();
 
     expect(await screen.findByText("Could not load this organization.")).toBeInTheDocument();
+    allowOrganization = true;
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText("Acme")).toBeInTheDocument();
   });
