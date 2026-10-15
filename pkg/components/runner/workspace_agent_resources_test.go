@@ -606,6 +606,45 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledSetupAndContext(t *testing.T)
 	}, nil, []runner.BrokerTaskFile{
 		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
 	})
-	require.Len(t, files, 1)
+	// The prompt stays untouched, but the checkout helper still ships: it
+	// checks out the main repo even when every context repo is disabled.
+	require.Len(t, files, 2)
 	assert.Equal(t, "Implement the plan.\n", files[0].Content)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[1].Path)
+}
+
+func TestAttachWorkspaceAgentResourcesShipsCheckoutHelper(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+	require.Len(t, files, 1)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
+	script := files[0].Content
+	assert.Contains(t, script, "REPO_URL")
+	assert.Contains(t, script, "workspace_context.json")
+	assert.Contains(t, script, "git clone --depth 1")
+	assert.NotContains(t, script, "GITHUB_TOKEN")
+	assert.NotContains(t, script, "x-access-token")
+}
+
+func TestAttachWorkspaceAgentResourcesSkipsCheckoutHelperWhenFlagOff(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+	assert.Empty(t, files)
 }

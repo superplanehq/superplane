@@ -17,10 +17,18 @@ import (
 func TestCloneRepositoryChecksRemoteHeads(t *testing.T) {
 	analysis := intakeAnalysisCloneCommand("")
 	implementation := implementationCloneCommand(t)
-	clone := cloneRepositoryCommand()
 
-	assert.Contains(t, analysis, clone)
-	assert.Contains(t, implementation, clone)
+	// Both scripts prefer the smart checkout helper when the agent screen
+	// shipped it, and keep the inline clone as a fallback for stored
+	// canvases without the file.
+	for _, fragment := range []string{
+		"setup/checkout-workspace.sh",
+		`git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo`,
+		"Remote branch ${branch} not found. The repository has other branches.",
+	} {
+		assert.Contains(t, analysis, fragment)
+		assert.Contains(t, implementation, fragment)
+	}
 	rewriteAt := strings.Index(analysis, "insteadOf")
 	headsAt := strings.Index(analysis, "git ls-remote --heads")
 	require.GreaterOrEqual(t, rewriteAt, 0)
