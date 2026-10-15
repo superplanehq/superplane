@@ -80,6 +80,28 @@ locals {
     }
   }) : ""
 
+  fleet_manager_setup_values = yamlencode({
+    fleetManagerSetup = {
+      enabled            = local.runners_enabled
+      provider           = local.runners_enabled ? "gcp" : ""
+      managerId          = var.cluster_name
+      namespace          = var.superplane_namespace
+      serviceAccountName = local.fleet_manager_service_account_name
+      credentials = {
+        provision      = true
+        existingSecret = "superplane-fleet-manager-token"
+        tokenKey       = "INSTALLATION_ADMIN_TOKEN"
+      }
+      infrastructure = local.runners_enabled ? {
+        projectId            = var.project_id
+        zones                = local.runner_zones
+        subnetwork           = google_compute_subnetwork.runners[0].id
+        networkTags          = [local.runner_network_tag]
+        fleetManagerIdentity = google_service_account.fleet_manager[0].email
+      } : {}
+    }
+  })
+
 }
 
 resource "helm_release" "superplane" {
@@ -101,6 +123,7 @@ resource "helm_release" "superplane" {
   values = compact([
     local.gcs_blob_storage_values,
     local.runner_api_values,
+    local.fleet_manager_setup_values,
   ])
 
   # Database configuration
