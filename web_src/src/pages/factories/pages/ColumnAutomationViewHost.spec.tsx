@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
@@ -10,14 +11,19 @@ import type * as IntegrationsModule from "@/hooks/useIntegrations";
 import { unmockedSrc } from "@/test/unmockedModule";
 import { TooltipProvider } from "@/ui/tooltip";
 
+import { dematerializeCanvasSpec } from "@/pages/app/lib/workflow-spec-files";
+
 import { ColumnAutomationViewHost } from "./ColumnAutomationViewPopup";
 
-const { useCanvas, useTriggers, useComponents, useInfiniteCanvasRuns } = vi.hoisted(() => ({
-  useCanvas: vi.fn(),
-  useTriggers: vi.fn(),
-  useComponents: vi.fn(),
-  useInfiniteCanvasRuns: vi.fn(),
-}));
+const { useCanvas, useTriggers, useComponents, useInfiniteCanvasRuns, updateCanvasVersion, commitCanvasStaging } =
+  vi.hoisted(() => ({
+    useCanvas: vi.fn(),
+    useTriggers: vi.fn(),
+    useComponents: vi.fn(),
+    useInfiniteCanvasRuns: vi.fn(),
+    updateCanvasVersion: vi.fn(),
+    commitCanvasStaging: vi.fn(),
+  }));
 
 vi.mock("@monaco-editor/react", () => ({
   Editor: ({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) => (
@@ -38,6 +44,8 @@ vi.mock("@/hooks/useCanvasData", () => ({
     isPending: false,
     refetch: vi.fn().mockResolvedValue({ data: { hasStaging: false, stale: false } }),
   }),
+  useUpdateCanvasVersion: () => ({ mutateAsync: updateCanvasVersion, isPending: false }),
+  useCommitCanvasStaging: () => ({ mutateAsync: commitCanvasStaging, isPending: false }),
 }));
 
 vi.mock("@/hooks/useComponentData", () => ({
@@ -104,9 +112,32 @@ const BITBUCKET_PULL_REQUEST_TRIGGER = {
   ],
 };
 
+const UPDATE_TASK_STATUS = {
+  name: "updateWorkOrderStatus",
+  label: "Update Task Status",
+  configuration: [
+    { name: "orderId", label: "Task ID", type: "string", required: true },
+    {
+      name: "status",
+      label: "Status",
+      type: "select",
+      required: true,
+      typeOptions: {
+        select: {
+          options: [
+            { label: "Draft", value: "draft" },
+            { label: "Open", value: "open" },
+            { label: "Closed", value: "closed" },
+          ],
+        },
+      },
+    },
+  ],
+};
+
 function closureCanvas(component: "github.onPullRequest" | "bitbucket.onPullRequest", actions: string[]) {
   return {
-    metadata: { id: "app-pr-closure", name: "PR Closure", factoryId: "factory-1" },
+    metadata: { id: "app-pr-closure", name: "PR Closure", factoryId: "factory-1", liveVersionId: "version-1" },
     spec: {
       nodes: [
         {
@@ -125,6 +156,10 @@ function closureCanvas(component: "github.onPullRequest" | "bitbucket.onPullRequ
           name: "Complete Task",
           type: "TYPE_ACTION",
           component: "updateWorkOrderStatus",
+          configuration: {
+            orderId: "{{ root().data.workOrder.id }}",
+            status: "open",
+          },
         },
       ],
       edges: [{ channel: "default", sourceId: "on-pr-closed", targetId: "complete-work-order" }],
@@ -180,9 +215,13 @@ describe("ColumnAutomationViewHost", () => {
       isLoading: false,
     });
     useComponents.mockReturnValue({
-      data: [{ name: "updateWorkOrderStatus", label: "Update Task Status" }],
+      data: [UPDATE_TASK_STATUS],
       isLoading: false,
     });
+    updateCanvasVersion.mockReset();
+    updateCanvasVersion.mockResolvedValue(undefined);
+    commitCanvasStaging.mockReset();
+    commitCanvasStaging.mockResolvedValue(undefined);
     useInfiniteCanvasRuns.mockReturnValue({
       data: { pages: [{ runs: [] }] },
       isPending: false,
@@ -222,5 +261,28 @@ describe("ColumnAutomationViewHost", () => {
     expect(within(form).getByText("Actions")).toBeInTheDocument();
     expect(within(form).queryByText("Start a run when:")).not.toBeInTheDocument();
     expect(within(form).queryByRole("checkbox", { name: "A pull request is opened" })).not.toBeInTheDocument();
+  });
+
+  it("saves the selected action when its status changes", async () => {
+    const user = userEvent.setup();
+    renderHost();
+
+    await user.click(screen.getByTestId("factory-node-update-task-status"));
+
+    const form = screen.getByTestId("merge-confidence-config-form");
+    expect(within(form).getByRole("heading", { name: "Complete Task" })).toBeInTheDocument();
+    await user.click(within(form).getByTestId("field-status-select"));
+    await user.click(screen.getByRole("option", { name: "Closed" }));
+
+    await waitFor(() => expect(updateCanvasVersion).toHaveBeenCalled());
+
+    const saved = dematerializeCanvasSpec(updateCanvasVersion.mock.calls.at(-1)?.[0].canvasYaml);
+    const savedNode = saved?.nodes?.find((node) => node.id === "complete-work-order");
+    expect(savedNode?.name).toBe("Complete Task");
+    expect(savedNode?.configuration).toEqual({
+      orderId: "{{ root().data.workOrder.id }}",
+      status: "closed",
+    });
+    expect(commitCanvasStaging).toHaveBeenCalledWith("Update step");
   });
 });
