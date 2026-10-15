@@ -71,7 +71,8 @@ type FleetInfrastructureInput = Pick<
   "managerId" | "namespace" | "serviceAccountName" | "superplaneUrl"
 >;
 
-export const FLEET_MANAGER_DRAFT_KEY = "superplane.fleet-manager-setup.v1";
+const LEGACY_FLEET_MANAGER_DRAFT_KEY = "superplane.fleet-manager-setup.v1";
+export const FLEET_MANAGER_DRAFT_KEY = "superplane.fleet-manager-setup.v2";
 export const DEFAULT_FLEET_CAPACITY: FleetCapacity = { warmCapacity: 0, maxCapacity: 1 };
 
 const splitList = (value: string | undefined, fallback: string) =>
@@ -277,6 +278,7 @@ export function fleetsMatchConfiguration(
 }
 
 export function saveFleetManagerDraft(draft: FleetManagerDraft): void {
+  window.localStorage.removeItem(LEGACY_FLEET_MANAGER_DRAFT_KEY);
   window.localStorage.setItem(FLEET_MANAGER_DRAFT_KEY, JSON.stringify(draft));
 }
 
@@ -351,5 +353,6 @@ function storedFleetCapacities(
 }
 
 export function clearFleetManagerDraft(): void {
+  window.localStorage.removeItem(LEGACY_FLEET_MANAGER_DRAFT_KEY);
   window.localStorage.removeItem(FLEET_MANAGER_DRAFT_KEY);
 }
