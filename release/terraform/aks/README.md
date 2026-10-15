@@ -14,7 +14,6 @@ Install these tools:
 - Azure CLI
 - Helm 3
 - kubectl
-- Packer 1.16.1 or later (runner images only)
 
 You also need:
 
@@ -76,6 +75,17 @@ docker manifest inspect ghcr.io/superplanehq/fleet-manager:38fd599797f475b299f80
 
 `helm show chart` must print `appVersion: ${SHA}-selfhosted`.
 Leave `superplane_image_tag` empty. The chart uses that appVersion.
+
+These defaults predate the chart and Fleet Manager changes in this
+repository.
+
+The pinned chart does not read `podSecurityContext` or `securityContext`.
+Those Terraform values have no effect until maintainers publish a chart
+from the merge commit.
+
+The pinned Fleet Manager image still requires an image resource ID and
+at least one availability zone. A community gallery image ID and an
+empty `zones` list need a Fleet Manager image from that same merge.
 
 ## 3. Configure Terraform
 
@@ -288,19 +298,21 @@ Build `azure.imageId` from that file:
 ```
 
 Use `superplane-runner-amd64` or `superplane-runner-arm64`. The fleet
-`architecture` must match that definition. Set `azure.location` to a region
-listed in the manifest. Replica regions in the current publisher build are
-`eastus`, `centralus`, and `westus`.
+`architecture` must match that definition. Read `azure.regions` in the
+manifest. Set `azure.location` to a region in that list.
 
 Choose zones in the customer subscription:
 
 ```bash
-az vm list-skus --location eastus --size Standard_D2ds_v4
+az vm list-skus --location <region> --size <vmSize>
 ```
 
 Zone numbers are not the same in every subscription. Leave `azure.zones`
-empty when the region or size has no availability zones. `westus` is one
-region that has no zones.
+empty when the region or size has no availability zones.
+
+The default Fleet Manager image does not accept a community gallery ID
+or an empty zone list. Publish a Fleet Manager image from the merge
+commit before you set those values.
 
 Set `fleet_manager_config` from `terraform output` for the subnet, network
 security group, and runner identity. Apply again.
@@ -314,6 +326,8 @@ galleries that already contain image versions.
 
 Use this path to publish a runner image into the customer gallery. The
 install path above does not use it.
+
+Install Packer 1.16.1 or later.
 
 ```bash
 az login

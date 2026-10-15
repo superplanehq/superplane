@@ -159,6 +159,9 @@ variable "fleet_manager_image_name" {
   default     = "fleet-manager"
 }
 
+# This image still requires ImageReference.ID and at least one zone.
+# A community gallery ID and an empty zones list need a Fleet Manager
+# image published from the merge that adds that support.
 variable "fleet_manager_image_tag" {
   description = "Fleet Manager image tag. Required when fleet_manager_config is set."
   type        = string
@@ -183,6 +186,9 @@ variable "helm_chart_path" {
   default     = ""
 }
 
+# This chart does not include templates/_security.tpl.
+# podSecurityContext and securityContext values have no effect until
+# maintainers publish a chart from the merge that adds those templates.
 variable "superplane_chart_version" {
   description = "Published SuperPlane Helm chart version with a matching self-hosted image. Ignored when helm_chart_path is set."
   type        = string

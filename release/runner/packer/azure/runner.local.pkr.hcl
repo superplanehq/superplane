@@ -106,9 +106,9 @@ source "azure-arm" "ubuntu" {
   subscription_id    = var.subscription_id
   # Plugin 2.3.3 accepts location or build_resource_group_name, not both.
   # var.location still selects gallery replica regions.
-  location                   = var.build_resource_group_name == "" ? var.location : null
-  build_resource_group_name  = var.build_resource_group_name != "" ? var.build_resource_group_name : null
-  vm_size                    = var.vm_size
+  location                  = var.build_resource_group_name == "" ? var.location : null
+  build_resource_group_name = var.build_resource_group_name != "" ? var.build_resource_group_name : null
+  vm_size                   = var.vm_size
 
   os_type         = "Linux"
   image_publisher = "Canonical"
