@@ -373,6 +373,11 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_SYSTEM_SKILL_SYNC_WORKER") == "yes" {
+		log.Println("Starting System Skill Sync Worker")
+		go workers.NewSystemSkillSyncWorker().Start(context.Background())
+	}
+
 	if os.Getenv("START_PRICE_BOOK_SYNC_WORKER") == "yes" {
 		log.Println("Starting Price Book Sync Worker")
 
