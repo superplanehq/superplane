@@ -586,12 +586,12 @@ func intakeAnalysisCloneCommand(vcsProvider string) string {
 	if !strings.EqualFold(strings.TrimSpace(vcsProvider), models.ProviderBitbucket) {
 		lines = append(lines, `git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`)
 	}
-	// Every factory task ships the checkout helper, so the clone stays a
-	// single line. Stored canvases without the new template keep their
-	// inline clone, so existing automations are never rewritten.
-	lines = append(lines,
-		`source "$SUPERPLANE_TASK_DIR/`+runner.WorkspaceCheckoutScriptPath+`"`,
-	)
+	// Every factory task ships the checkout command on PATH, so the clone
+	// stays a single line. Stored canvases without the new template keep
+	// their inline clone, so existing automations are never rewritten.
+	// The commit setup flag stays off here: analysis never mutates the
+	// remote.
+	lines = append(lines, "checkout")
 	return strings.Join(lines, "\n")
 }
 

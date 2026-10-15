@@ -60,16 +60,16 @@ type checkoutScriptOptions struct {
 	context     string
 	commitSetup string
 	home        string
-	// probe runs after the helper is sourced (like the template Clone
-	// step does), so tests can assert on the caller environment.
-	probe string
 }
 
 func runCheckoutScriptFull(t *testing.T, dir, repoURL, base string, opts checkoutScriptOptions) (string, error) {
 	t.Helper()
 	requireGitAndNode(t)
-	script := filepath.Join(dir, "checkout.sh")
-	require.NoError(t, os.WriteFile(script, []byte(runner.WorkspaceCheckoutScript()), 0o755))
+	// Stage the checkout command where production steps find it: on PATH
+	// in the task bin directory.
+	binDir := filepath.Join(dir, "bin")
+	require.NoError(t, os.MkdirAll(binDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(binDir, "checkout"), []byte(runner.WorkspaceCheckoutScript()), 0o755))
 	if opts.context != "" {
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "workspace_context.json"), []byte(opts.context), 0o644))
 	}
@@ -82,7 +82,7 @@ func runCheckoutScriptFull(t *testing.T, dir, repoURL, base string, opts checkou
 		pathEnv = "/usr/bin:/bin:/usr/local/bin"
 	}
 	env := []string{
-		"PATH=" + pathEnv,
+		"PATH=" + binDir + string(os.PathListSeparator) + pathEnv,
 		"HOME=" + home,
 		"SUPERPLANE_TASK_DIR=" + dir,
 		"REPO_URL=" + repoURL,
@@ -93,12 +93,7 @@ func runCheckoutScriptFull(t *testing.T, dir, repoURL, base string, opts checkou
 	if opts.commitSetup != "" {
 		env = append(env, runner.WorkspaceCheckoutCommitSetupEnv+"="+opts.commitSetup)
 	}
-	var cmd *exec.Cmd
-	if opts.probe != "" {
-		cmd = exec.Command("bash", "-c", "source ./checkout.sh && "+opts.probe)
-	} else {
-		cmd = exec.Command("bash", script)
-	}
+	cmd := exec.Command("bash", "-c", "checkout")
 	cmd.Dir = dir
 	cmd.Env = env
 	output, err := cmd.CombinedOutput()
@@ -240,18 +235,6 @@ func TestWorkspaceCheckoutScriptCommitSetupInstallsIdentity(t *testing.T) {
 	assert.DirExists(t, filepath.Join(dir, "context", "acme", "extra", ".git"))
 }
 
-func TestWorkspaceCheckoutScriptCommitSetupExportsIdentityToCaller(t *testing.T) {
-	main := initBareRepo(t, "main")
-	dir, err := filepath.EvalSymlinks(t.TempDir())
-	require.NoError(t, err)
-	output, err := runCheckoutScriptFull(t, dir, "file://"+main, "main", checkoutScriptOptions{
-		commitSetup: "1",
-		probe:       `printf 'PROBE|%s|%s|%s' "$GIT_AUTHOR_EMAIL" "$GIT_COMMITTER_NAME" "$PWD"`,
-	})
-	require.NoError(t, err, output)
-	assert.Contains(t, output, "PROBE|"+runner.FactoryAgentEmail+"|"+runner.FactoryAgentName+"|"+dir)
-}
-
 func TestWorkspaceCheckoutScriptCommitSetupCreatesBranchOnEmptyRemote(t *testing.T) {
 	remote := initBareRepo(t, "")
 	dir := t.TempDir()
@@ -259,7 +242,11 @@ func TestWorkspaceCheckoutScriptCommitSetupCreatesBranchOnEmptyRemote(t *testing
 	require.NoError(t, err, output)
 	heads := runGitQuiet(t, "", "", "ls-remote", "--heads", "file://"+remote)
 	assert.Contains(t, heads, "refs/heads/main")
-	assert.Equal(t, "main", runGitQuiet(t, "", filepath.Join(dir, "repo"), "rev-parse", "--abbrev-ref", "HEAD"))
+	repo := filepath.Join(dir, "repo")
+	assert.Equal(t, "main", runGitQuiet(t, "", repo, "rev-parse", "--abbrev-ref", "HEAD"))
+	// The initial commit carries the agent identity.
+	assert.Equal(t, runner.FactoryAgentEmail+"|"+runner.FactoryAgentName,
+		runGitQuiet(t, "", repo, "log", "-1", "--format=%ae|%an"))
 }
 
 func TestWorkspaceCheckoutScriptCommitSetupSkipsBranchCreationOnReadonlyCheckout(t *testing.T) {
