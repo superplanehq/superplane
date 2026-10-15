@@ -687,9 +687,10 @@ func TestAttachWorkspaceAgentResourcesKeepsSystemSkillsEnabled(t *testing.T) {
 		OrganizationID: r.Organization.ID.String(), WorkflowID: canvas.ID.String(),
 		Configuration: map[string]any{"disabledAgentResourceIds": []string{system.ID.String(), custom.ID.String()}},
 	}, nil, nil)
-	require.Len(t, files, 2)
-	assert.Equal(t, ".claude/skills/refine-task/SKILL.md", files[0].Path)
-	assert.Equal(t, ".agents/skills/refine-task/SKILL.md", files[1].Path)
-	assert.Equal(t, "# Refine task\n", files[0].Content)
-	assert.Equal(t, files[0].Content, files[1].Content)
+	require.Len(t, files, 3)
+	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
+	assert.Equal(t, ".claude/skills/refine-task/SKILL.md", files[1].Path)
+	assert.Equal(t, ".agents/skills/refine-task/SKILL.md", files[2].Path)
+	assert.Equal(t, "# Refine task\n", files[1].Content)
+	assert.Equal(t, files[1].Content, files[2].Content)
 }
