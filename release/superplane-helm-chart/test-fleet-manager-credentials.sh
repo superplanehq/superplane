@@ -59,3 +59,15 @@ if grep -Eq 'FLEET_MANAGER_(TOKEN|SETUP_CONFIG)_PATH|fleet-manager-(credential|s
   echo "disabled Fleet Manager setup rendered credential resources" >&2
   exit 1
 fi
+
+for provider in aws gcp azure; do
+  provider_manifest="${TMP_DIR}/${provider}.yaml"
+  helm template superplane "${CHART_DIR}" \
+    "${common_args[@]}" \
+    --set "fleetManagerSetup.provider=${provider}" \
+    --set "fleetManagerSetup.infrastructure.testField=${provider}-value" >"${provider_manifest}"
+
+  grep -q "\"provider\":\"${provider}\"" "${provider_manifest}"
+  grep -q '"source":"terraform"' "${provider_manifest}"
+  grep -q "\"testField\":\"${provider}-value\"" "${provider_manifest}"
+done

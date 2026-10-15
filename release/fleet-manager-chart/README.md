@@ -2,8 +2,10 @@
 
 The Fleet Manager chart provisions runner VMs for one SuperPlane installation.
 Install the chart after Terraform creates the cluster, network, and workload
-identity resources. The chart does not accept an installation token as a
-value. Create the token Secret before the Helm installation.
+identity resources. The SuperPlane chart creates a dedicated service-token
+Secret in its namespace. Fleet Manager values reference the Secret name and
+key. The credential value does not enter Helm values, Terraform state, browser
+storage, logs, or API responses.
 
 ## Release coordinates
 
@@ -26,16 +28,19 @@ version.
 
 | Provider | Chart field | Terraform output |
 | --- | --- | --- |
+| AWS | `superplane.url` | `superplane_url` |
 | AWS | `aws.region` | `runner_region` |
 | AWS | `aws.subnetIds` | `runner_private_subnet_ids` |
 | AWS | `aws.securityGroupIds` | `runner_security_group_id` |
 | AWS | `aws.iamInstanceProfile` | `runner_instance_profile_name` |
 | AWS | `serviceAccount.annotations.eks.amazonaws.com/role-arn` | `fleet_manager_role_arn` |
+| GCP | `superplane.url` | `superplane_url` |
 | GCP | `gcp.projectId` | `runner_project` |
 | GCP | `gcp.zones` | `runner_zones` |
 | GCP | `gcp.subnetwork` | `runner_subnetwork` |
 | GCP | `gcp.networkTags` | `runner_network_tag` |
 | GCP | `serviceAccount.annotations.iam.gke.io/gcp-service-account` | `fleet_manager_service_account_email` |
+| Azure | `superplane.url` | `superplane_url` |
 | Azure | `azure.subscriptionId` | `runner_subscription_id` |
 | Azure | `azure.resourceGroup` | `runner_resource_group` |
 | Azure | `azure.location` | `runner_location` |
@@ -67,16 +72,17 @@ before production use:
 
 ## Install and upgrade
 
-Create a personal token from the Fleet Manager setup page. Enter it
-interactively so it does not enter shell history:
+Complete **Set up runner fleets** during owner setup. For installations that
+use the repository Terraform stacks, SuperPlane loads the provider, network,
+location, and workload-identity fields from the chart configuration. Review
+the values, replace the public VM image placeholder, and save `values.yaml`.
+
+The automatically provisioned credential requires Fleet Manager and
+SuperPlane in the same namespace. Confirm that the Secret exists without
+reading its value:
 
 ```sh
-read -rsp 'Fleet Manager token: ' FLEET_MANAGER_TOKEN; echo
-printf %s "$FLEET_MANAGER_TOKEN" | \
-  kubectl --namespace superplane create secret generic superplane-fleet-manager-token \
-  --from-file=INSTALLATION_ADMIN_TOKEN=/dev/stdin \
-  --dry-run=client --output=yaml | kubectl apply -f -
-unset FLEET_MANAGER_TOKEN
+kubectl --namespace superplane get secret superplane-fleet-manager-token
 ```
 
 Install or upgrade an exact chart version:
@@ -87,23 +93,34 @@ helm upgrade --install fleet-manager \
   --version X.Y.Z \
   --namespace superplane \
   --create-namespace \
-  --values values.yaml
+  --values values.yaml \
+  --wait \
+  --timeout 10m
 ```
 
 The pre-install and pre-upgrade Job creates missing fleets and updates the
 Runner version and specification of existing fleets. It preserves the current
 `enabled` state. Removing values does not delete a fleet.
 
+For an advanced cross-namespace installation, use an external secret manager.
+Set `fleetManagerSetup.credentials.provision=false` in the SuperPlane chart and
+provision the same dedicated credential Secret in both namespaces. Do not copy
+the credential through Helm values or command-line arguments.
+
 ## Token rotation
 
-Create a new token, update the Secret, and restart Fleet Manager:
+For an automatically provisioned credential, delete the old Secret and upgrade
+the SuperPlane chart. Its pre-upgrade hook creates a new random credential.
+Then restart Fleet Manager:
 
 ```sh
 kubectl --namespace superplane rollout restart deployment/fleet-manager-fleet-manager
 kubectl --namespace superplane rollout status deployment/fleet-manager-fleet-manager
 ```
 
-Verify reconciliation before you revoke the old token.
+Confirm that Fleet Manager reconciles each configured fleet after the restart.
+For an externally managed credential, rotate the Secret in both namespaces
+through the external secret manager.
 
 ## Remove a fleet
 
@@ -116,14 +133,14 @@ Verify reconciliation before you revoke the old token.
 
 1. Export the current Fleet Manager configuration.
 2. Preserve the current Fleet Manager ID.
-3. Create a new token Secret with a different name.
-4. Prepare standalone chart values.
-5. Scale the integrated Fleet Manager Deployment to zero.
-6. Upgrade the SuperPlane chart to a version without the integrated Deployment.
-7. Install the standalone Fleet Manager chart.
-8. Verify that the startup Job updated every fleet.
-9. Verify that Fleet Manager adopted the existing runner VMs.
-10. Revoke the old token.
+3. Prepare standalone chart values that reference the dedicated Secret.
+4. Scale the integrated Fleet Manager Deployment to zero.
+5. Upgrade the SuperPlane chart. This upgrade creates the dedicated Secret and
+   removes the integrated Deployment.
+6. Install the standalone Fleet Manager chart in the SuperPlane namespace.
+7. Verify that the startup Job updated every fleet.
+8. Verify that Fleet Manager adopted the existing runner VMs.
+9. Revoke the old personal token.
 
 Changing the Fleet Manager ID can leave existing cloud resources unmanaged.
 
