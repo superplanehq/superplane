@@ -6,7 +6,7 @@ import { useState, type ReactNode } from "react";
 
 import { ColumnAutomationFooterSlotProvider } from "./columnAutomationFooterSlot";
 
-import { columnAutomationUsesSplitConfig } from "../lib/columnAutomationHeadline";
+import { columnAutomationUsesSplitConfig, IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
 import {
   COLUMN_AUTOMATIONS_COPY,
   columnAutomationViewTabs,
@@ -279,8 +279,8 @@ export function ColumnAutomationViewHost({
 }) {
   const automation = useIntakeAutomationCanvas(organizationId, canvasId);
   const agent = useColumnCanvasAgentEditor(organizationId, canvasId);
-  const usesSplitConfig = columnAutomationUsesSplitConfig(automation.graph?.specNodes?.map((node) => node.id) ?? []);
-  if (usesSplitConfig) {
+  const nodeIds = automation.graph?.specNodes?.map((node) => node.id) ?? [];
+  if (columnAutomationUsesSplitConfig(nodeIds)) {
     return (
       <MergeConfidenceConfigModal
         title={automation.name?.trim() || title}
@@ -298,6 +298,7 @@ export function ColumnAutomationViewHost({
         onSaveNode={(update) => agent.saveNode(update, { notify: false })}
         onDelete={onDelete}
         deletePending={deletePending}
+        initialNodeId={nodeIds.includes(IMPLEMENT_AGENT_NODE_ID) ? IMPLEMENT_AGENT_NODE_ID : undefined}
       />
     );
   }
