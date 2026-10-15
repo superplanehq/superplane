@@ -4,6 +4,7 @@ type FirstRunBlockingAction =
   | "opening-github"
   | "opening-bitbucket"
   | "switching-github-account"
+  | "switching-bitbucket-account"
   | "saving-repository"
   | "saving-ticket-source"
   | "connecting-jira"
