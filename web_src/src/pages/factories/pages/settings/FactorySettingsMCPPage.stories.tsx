@@ -5,13 +5,15 @@ import {
   FEATURE_WORKSPACE_MCP,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
-import { cn } from "@/lib/utils";
 
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
 import {
   CONFIGURED_MCP_RESOURCES,
   CONFIGURED_MCP_RESOURCE_TOOLS_BY_ID,
   CONFIGURED_SKILLS,
+  CONTEXT_REPO_RUNNER,
+  CONTEXT_REPO_SUSS,
+  SETUP_COMMANDS_RESOURCE,
 } from "../../__fixtures__/agentResourceFixtures";
 import {
   defaultFactoriesFixture,
@@ -19,14 +21,10 @@ import {
   PRIMARY_FACTORY_KEY,
   type FactoriesFixture,
 } from "../../__fixtures__/factoryPageResponses";
-import { factorySettingsNarrowSectionBodyClassName } from "../factoryPageLayoutStyles";
 import { FactorySettingsLayout } from "./FactorySettingsLayout";
-import { CrossRepoContextCard } from "./WorkspaceCrossRepoSection";
-import { WorkspaceDefaultModelSection } from "./WorkspaceDefaultModelSection";
-import { WorkspaceSetupStepsSection } from "./WorkspaceSetupStepsSection";
 
 const meta = {
-  title: "Factories/Pages/Settings/Agent",
+  title: "Factories/Pages/Agent",
   component: FactorySettingsLayout,
   parameters: { layout: "fullscreen" },
 } satisfies Meta<typeof FactorySettingsLayout>;
@@ -54,7 +52,7 @@ function agentHarness(fixture: FactoriesFixture) {
   );
 }
 
-/** Agent page with no outbound MCP servers or skills. */
+/** Agent page with no setup steps, context repos, MCP servers, or skills. */
 export const Empty: Story = {
   render: () =>
     agentHarness({
@@ -63,69 +61,20 @@ export const Empty: Story = {
     }),
 };
 
-/** Outbound MCP servers and skills configured. */
+/** Agent page with every section configured. */
 export const Configured: Story = {
   render: () =>
     agentHarness({
       ...defaultFactoriesFixture,
       agentResourceToolsById: CONFIGURED_MCP_RESOURCE_TOOLS_BY_ID,
       agentResourcesByFactoryId: {
-        [PRIMARY_FACTORY_ID]: [...CONFIGURED_MCP_RESOURCES, ...CONFIGURED_SKILLS],
+        [PRIMARY_FACTORY_ID]: [
+          SETUP_COMMANDS_RESOURCE,
+          CONTEXT_REPO_SUSS,
+          CONTEXT_REPO_RUNNER,
+          ...CONFIGURED_MCP_RESOURCES,
+          ...CONFIGURED_SKILLS,
+        ],
       },
-    }),
-};
-
-/** Bash commands in the setup-steps field. The Agent page does not show this field. */
-export const SetupSteps: Story = {
-  render: () => (
-    <div className="min-h-screen bg-sidebar dark:bg-background">
-      <div className={cn(factorySettingsNarrowSectionBodyClassName, "pt-14")}>
-        <WorkspaceSetupStepsSection canUpdate commands={"npm ci\ngo mod download"} />
-      </div>
-    </div>
-  ),
-};
-
-/** Model choices for the Storybook preview. The Agent page does not show this field. */
-const previewModels = [
-  { value: "claude-sonnet", label: "Claude Sonnet" },
-  { value: "claude-opus", label: "Claude Opus" },
-  { value: "gpt-5", label: "GPT-5" },
-];
-
-/** Default model field. The Agent page does not show this field. */
-export const DefaultModel: Story = {
-  render: () => (
-    <div className="min-h-screen bg-sidebar dark:bg-background">
-      <div className={cn(factorySettingsNarrowSectionBodyClassName, "pt-14")}>
-        <WorkspaceDefaultModelSection canUpdate models={previewModels} />
-      </div>
-    </div>
-  ),
-};
-
-/** Extra repositories in the cross-repo list. The Agent page does not show this list. */
-export const CrossRepoContext: Story = {
-  render: () => (
-    <div className="min-h-screen bg-sidebar dark:bg-background">
-      <div className={cn(factorySettingsNarrowSectionBodyClassName, "pt-14")}>
-        <CrossRepoContextCard
-          canUpdate
-          host="github"
-          connected
-          catalog={["superplanehq/suss", "superplanehq/runner", "superplanehq/superplane"]}
-          initial={["superplanehq/suss", "superplanehq/runner"]}
-        />
-      </div>
-    </div>
-  ),
-};
-
-/** Outbound MCP list request fails. */
-export const Error: Story = {
-  render: () =>
-    agentHarness({
-      ...defaultFactoriesFixture,
-      failAgentResourcesListForFactoryIds: [PRIMARY_FACTORY_ID],
     }),
 };

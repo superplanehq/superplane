@@ -18,6 +18,7 @@ import { sanitizeSkillCommandName, setSkillFrontmatterFields, skillDisplayTitle 
 
 const NAME_PATTERN = /^[a-z][a-z0-9-]{0,62}$/;
 const RESERVED_NAME = "superplane";
+const SETUP_NAME = "setup";
 const EMPTY_SKILL_MARKDOWN = "---\nname: \ntitle: \ndescription: \n---\n\n";
 
 export { sanitizeSkillCommandName };
@@ -33,8 +34,8 @@ export function validateSkillName(name: string): string {
   if (!name) {
     return AGENT_RESOURCES_COPY.nameRequired;
   }
-  if (name === RESERVED_NAME) {
-    return AGENT_RESOURCES_COPY.nameReserved;
+  if (name === RESERVED_NAME || name === SETUP_NAME) {
+    return AGENT_RESOURCES_COPY.nameReserved(name);
   }
   if (!NAME_PATTERN.test(name)) {
     return AGENT_RESOURCES_COPY.nameInvalid;
