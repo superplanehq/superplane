@@ -114,7 +114,8 @@ export function FirstRunChooseScreen({
             activeKey={githubUserId}
             identities={githubLinkedIdentities(githubIdentities)}
             disabled={busy}
-            signedInText={FIRST_RUN_COPY.connect.signedInAs(githubLogin)}
+            signedInPrefix={FIRST_RUN_COPY.connect.signedInAsPrefix}
+            signedInSuffix={FIRST_RUN_COPY.connect.signedInAsSuffix}
             connectAnotherLabel={copy.connectAnotherAccount}
             testIds={githubSignedInTestIds}
             onSelectIdentity={onSelectGitHubIdentity}

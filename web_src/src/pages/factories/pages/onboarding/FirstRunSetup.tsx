@@ -306,6 +306,7 @@ function BitbucketChooseHost({
         providerUserId={flow.bitbucketProviderUserId}
         identities={flow.bitbucketIdentities}
         switchingAccount={flow.blockingAction === "switching-bitbucket-account"}
+        switchFailed={flow.bitbucketSwitchFailed}
         chrome={chrome}
         sphere={sphere}
         onRetryLookup={flow.retryBitbucketLookup}

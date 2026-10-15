@@ -46,6 +46,7 @@ type FirstRunBitbucketForgeScreenProps = {
   providerUserId?: string;
   identities?: MeVcsProviderIdentity[];
   switchingAccount?: boolean;
+  switchFailed?: boolean;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   onRetryLookup?: () => void;
@@ -299,12 +300,13 @@ function BitbucketSignedInAs({
   providerUserId = "",
   identities = [],
   disabled,
+  switchFailed = false,
   onSelectIdentity,
   onConnectAnotherAccount,
   onAccountSwitch,
 }: Pick<
   FirstRunBitbucketForgeScreenProps,
-  "login" | "providerUserId" | "identities" | "onSelectIdentity" | "onConnectAnotherAccount"
+  "login" | "providerUserId" | "identities" | "switchFailed" | "onSelectIdentity" | "onConnectAnotherAccount"
 > & { disabled: boolean; onAccountSwitch?: () => void }) {
   if (!login) return null;
   const selectIdentity = onSelectIdentity
@@ -314,20 +316,28 @@ function BitbucketSignedInAs({
       }
     : undefined;
   return (
-    <FirstRunSignedInAsLine
-      login={login}
-      activeKey={providerUserId}
-      identities={identities.map((identity) => ({
-        key: identity.providerUserId ?? "",
-        login: identity.login ?? "",
-      }))}
-      disabled={disabled}
-      signedInText={copy.signedInAs(login)}
-      connectAnotherLabel={copy.connectAnotherAccount}
-      testIds={bitbucketSignedInTestIds}
-      onSelectIdentity={selectIdentity}
-      onConnectAnotherAccount={onConnectAnotherAccount}
-    />
+    <div className="space-y-1">
+      <FirstRunSignedInAsLine
+        login={login}
+        activeKey={providerUserId}
+        identities={identities.map((identity) => ({
+          key: identity.providerUserId ?? "",
+          login: identity.login ?? "",
+        }))}
+        disabled={disabled}
+        signedInPrefix={copy.signedInAsPrefix}
+        signedInSuffix={copy.signedInAsSuffix}
+        connectAnotherLabel={copy.connectAnotherAccount}
+        testIds={bitbucketSignedInTestIds}
+        onSelectIdentity={selectIdentity}
+        onConnectAnotherAccount={onConnectAnotherAccount}
+      />
+      {switchFailed ? (
+        <p className="text-[13px] text-destructive" role="alert" data-testid="first-run-bitbucket-switch-error">
+          {copy.switchAccountError}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

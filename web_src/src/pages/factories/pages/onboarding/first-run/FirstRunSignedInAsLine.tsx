@@ -25,7 +25,8 @@ export function FirstRunSignedInAsLine({
   activeKey,
   identities,
   disabled,
-  signedInText,
+  signedInPrefix,
+  signedInSuffix,
   connectAnotherLabel,
   testIds,
   onSelectIdentity,
@@ -35,19 +36,19 @@ export function FirstRunSignedInAsLine({
   activeKey: string;
   identities: FirstRunLinkedIdentity[];
   disabled: boolean;
-  signedInText: string;
+  signedInPrefix: string;
+  signedInSuffix: string;
   connectAnotherLabel: string;
   testIds: FirstRunSignedInAsTestIds;
   onSelectIdentity?: (key: string) => void;
   onConnectAnotherAccount?: () => void;
 }) {
-  const [before, after] = signedInText.split(login);
   return (
     <div className="flex items-center gap-2 text-[13px] leading-5">
       <p className="text-muted-foreground" data-testid={testIds.signedInAs}>
-        {before}
+        {signedInPrefix}
         <span className="font-medium text-foreground">{login}</span>
-        {after}
+        {signedInSuffix}
       </p>
       {onSelectIdentity && onConnectAnotherAccount ? (
         <AccountMenu

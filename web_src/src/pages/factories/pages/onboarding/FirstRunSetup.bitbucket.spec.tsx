@@ -438,6 +438,47 @@ describe("FirstRunSetup Bitbucket", () => {
       expect(screen.getByTestId("first-run-switch-bitbucket-account")).toBeEnabled();
     });
 
+    it("explains a failed account switch and clears the message on the next attempt", async () => {
+      bitbucketOnboarding.identities = [ada, grace];
+      let rejectSwitch: ((error: Error) => void) | undefined;
+      let finishSwitch: (() => void) | undefined;
+      bitbucketOnboarding.selectIdentity = vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise<void>((_, reject) => {
+              rejectSwitch = reject;
+            }),
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise<void>((resolve) => {
+              finishSwitch = resolve;
+            }),
+        );
+      const user = userEvent.setup();
+      renderSetup(new Set());
+      await chooseBitbucket(user);
+
+      await user.click(screen.getByTestId("first-run-switch-bitbucket-account"));
+      await user.click(screen.getByRole("menuitemradio", { name: "grace-bb" }));
+      await act(async () => rejectSwitch?.(new Error("denied")));
+
+      expect(await screen.findByTestId("first-run-bitbucket-switch-error")).toHaveTextContent(
+        "SuperPlane could not switch the Bitbucket account. Try again.",
+      );
+      expect(screen.getByTestId("first-run-bitbucket-signed-in-as")).toHaveTextContent(
+        "You are signed in to Bitbucket as ada-bb.",
+      );
+
+      await user.click(screen.getByTestId("first-run-switch-bitbucket-account"));
+      await user.click(screen.getByRole("menuitemradio", { name: "grace-bb" }));
+
+      expect(screen.queryByTestId("first-run-bitbucket-switch-error")).not.toBeInTheDocument();
+      await act(async () => finishSwitch?.());
+      expect(screen.queryByTestId("first-run-bitbucket-switch-error")).not.toBeInTheDocument();
+    });
+
     it("offers to connect another account when only one account is linked", async () => {
       bitbucketOnboarding.identities = [ada];
       const previousAssign = window.location.assign.bind(window.location);

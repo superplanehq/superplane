@@ -407,10 +407,16 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     forgeConfigured: bitbucketConnect.configured,
     installScope,
   });
+  const [bitbucketSwitchFailed, setBitbucketSwitchFailed] = useState(false);
   const selectBitbucketIdentity = (providerUserId: string) =>
     blocking.run("switching-bitbucket-account", async () => {
-      await bitbucketConnect.selectIdentity(providerUserId);
-      model.setup.clearRepository();
+      setBitbucketSwitchFailed(false);
+      try {
+        await bitbucketConnect.selectIdentity(providerUserId);
+        model.setup.clearRepository();
+      } catch {
+        setBitbucketSwitchFailed(true);
+      }
     });
   return {
     ...navigation,
@@ -430,6 +436,7 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     bitbucketProviderUserId: bitbucketConnect.providerUserId,
     bitbucketIdentities: bitbucketConnect.identities,
     bitbucketLoadError: bitbucketConnect.loadError,
+    bitbucketSwitchFailed,
     bitbucketLookupFailed: bitbucketConnect.lookupFailed,
     bitbucketLookupRetrying: bitbucketConnect.lookupRetrying,
     retryBitbucketLookup: bitbucketConnect.retryLookup,
