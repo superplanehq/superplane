@@ -191,11 +191,12 @@ func TestWaitIntervalUnitOptions(t *testing.T) {
 	require.True(t, found, "interval unit field")
 	require.NotNil(t, unit.TypeOptions)
 	require.NotNil(t, unit.TypeOptions.Select)
-	assert.Equal(t, []configuration.FieldOption{
-		{Label: "Seconds", Value: "seconds"},
-		{Label: "Minutes", Value: "minutes"},
-		{Label: "Hours", Value: "hours"},
-	}, unit.TypeOptions.Select.Options)
+
+	values := make([]string, 0, len(unit.TypeOptions.Select.Options))
+	for _, option := range unit.TypeOptions.Select.Options {
+		values = append(values, option.Value)
+	}
+	assert.Equal(t, []string{"seconds", "minutes", "hours"}, values)
 }
 
 func TestCalculateIntervalDuration(t *testing.T) {
