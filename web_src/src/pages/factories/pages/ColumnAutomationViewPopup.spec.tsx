@@ -340,14 +340,12 @@ describe("ColumnAutomationViewHost", () => {
     expect(screen.queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
   });
 
-  it("keeps a canvas without the Implement agent on the board popup", () => {
+  it("keeps a canvas without a split-config step on the board popup", () => {
     useCanvas.mockReturnValue({
       data: {
-        metadata: { id: "app-no-agent", name: "PR Closure", liveVersionId: "version-live" },
+        metadata: { id: "app-no-agent", name: "Custom", liveVersionId: "version-live" },
         spec: {
-          nodes: [
-            { id: "on-pr-closed", name: "On closed", type: "TYPE_TRIGGER", component: "github.onPullRequestClosed" },
-          ],
+          nodes: [{ id: "on-run", name: "On run", type: "TYPE_TRIGGER", component: "onRun" }],
           edges: [],
         },
       },
