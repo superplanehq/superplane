@@ -13,7 +13,6 @@ type EncryptedStorageFormat uint8
 
 const (
 	EncryptedStorageBytes EncryptedStorageFormat = iota
-	EncryptedStorageBase64
 	EncryptedStorageIntegrationJSON
 )
 
@@ -116,12 +115,6 @@ func ApplicationEncryptedStorage() []EncryptedStorageLocation {
 			Format:   EncryptedStorageBytes,
 			ReadPage: ReadSentryAppInstallGrantRefreshTokenPage,
 			Replace:  ReplaceSentryAppInstallGrantRefreshToken,
-		},
-		{
-			Name:     "account_providers.access_token",
-			Format:   EncryptedStorageBase64,
-			ReadPage: ReadAccountProviderAccessTokenPage,
-			Replace:  ReplaceAccountProviderAccessToken,
 		},
 	}
 }
@@ -348,21 +341,6 @@ func ReadSentryAppInstallGrantRefreshTokenPage(tx *gorm.DB, cursor string, limit
 
 func ReplaceSentryAppInstallGrantRefreshToken(tx *gorm.DB, row EncryptedStorageRow, replacement []byte) (bool, error) {
 	result := tx.Exec("UPDATE sentry_app_install_grants SET refresh_token = ? WHERE installation_uuid = ? AND refresh_token = ?", replacement, row.Cursor, row.Value)
-	return result.RowsAffected == 1, result.Error
-}
-
-func ReadAccountProviderAccessTokenPage(tx *gorm.DB, cursor string, limit int) ([]EncryptedStorageRow, error) {
-	query := tx.Table("account_providers").
-		Select("id::text, access_token, COALESCE(email, ''), ''").
-		Where("access_token IS NOT NULL")
-	if cursor != "" {
-		query = query.Where("id > CAST(? AS uuid)", cursor)
-	}
-	return scanEncryptedStorageRows(query.Order("id").Limit(limit), limit)
-}
-
-func ReplaceAccountProviderAccessToken(tx *gorm.DB, row EncryptedStorageRow, replacement []byte) (bool, error) {
-	result := tx.Exec("UPDATE account_providers SET access_token = ? WHERE id = CAST(? AS uuid) AND access_token = ?", string(replacement), row.Cursor, string(row.Value))
 	return result.RowsAffected == 1, result.Error
 }
 

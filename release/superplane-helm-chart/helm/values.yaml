@@ -102,6 +102,23 @@ installation:
   type: "kubernetes"
   beaconEnabled: true
 
+#
+# Fleet Manager setup metadata for the installation wizard.
+#
+fleetManagerSetup:
+  enabled: true
+  provider: ""
+  managerId: ""
+  namespace: ""
+  serviceAccountName: superplane-fleet-manager
+  infrastructure: {}
+
+componentReleases:
+  runnerVersion: v0.2.0
+  runnerVersions:
+    - v0.2.0
+  fleetManagerVersion: v0.1.3
+
 sentry:
   secretName: ""
   enabled: false
@@ -291,6 +308,47 @@ blobStorage:
 podLabels: {}
 
 #
+# Pod securityContext for the API, workers, websocket, and runner pods.
+# Empty emits no pod securityContext. Pods that mount runner logs still set
+# fsGroup from runner.activeLogs.fsGroup. That fsGroup wins over this map.
+#
+podSecurityContext: {}
+
+#
+# Container securityContext for the API, workers, websocket, and runner
+# containers. These defaults match the previous fixed template.
+#
+securityContext:
+  privileged: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+#
+# Migration Job. The SuperPlane image runs as nobody (65534).
+# These defaults match the previous fixed template.
+# A non-empty podSecurityContext is merged over migrate.podSecurityContext.
+# A container securityContext that differs from the chart default is merged
+# over migrate.securityContext.
+#
+migrate:
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+    fsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    capabilities:
+      drop:
+        - ALL
+
+#
 # Runner API and runner workers. Off by default.
 # The runner API serves /runner/v1. Runner workers compact finished task
 # logs into blob storage and remove stale runners.
@@ -300,9 +358,12 @@ podLabels: {}
 # Active logs are a shared filesystem. The API reads live logs from this
 # volume. Leave existingClaim empty to create a ReadWriteOnce claim. The
 # API then schedules on the runner API node, or on the worker node when
-# the runner API is off. A rollout stops the old API pod before a new
-# pod starts, because that claim attaches to one node. Set existingClaim
-# to a ReadWriteMany claim when replicas run on more than one node.
+# the runner API is off. The websocket and the workers prefer another
+# node so the shared log pods have CPU. A one-node cluster can still
+# schedule them. A rollout stops the old API pod before
+# a new pod starts, because that claim attaches to one node. Set
+# existingClaim to a ReadWriteMany claim when replicas run on more than
+# one node.
 #
 runner:
   api:
@@ -316,39 +377,6 @@ runner:
     size: 10Gi
     # Group that owns the log volume. The SuperPlane image runs as nobody (65534).
     fsGroup: 65534
-
-#
-# Integrated Fleet Manager. Off by default.
-# Fleet Manager creates and deletes runner machines for the configured fleets.
-# Put the Fleet Manager configuration in an existing secret, under the key
-# fleet-manager.yaml. See pkg/fleets/README.md for the format.
-# Set serviceAccount.annotations to bind a cloud identity, for example
-# iam.gke.io/gcp-service-account for GKE Workload Identity or
-# azure.workload.identity/client-id for AKS.
-#
-fleetManager:
-  enabled: false
-  existingSecret: ""
-  image:
-    registry: ghcr.io/superplanehq
-    name: fleet-manager
-    tag: ""
-    pullPolicy: IfNotPresent
-  serviceAccount:
-    create: false
-    name: ""
-    annotations: {}
-  # Fleet Manager reads its configuration once at start. Change an annotation,
-  # for example a checksum of the configuration, to restart it.
-  podAnnotations: {}
-  podLabels: {}
-  resources:
-    limits:
-      cpu: 100m
-      memory: 128Mi
-    requests:
-      cpu: 100m
-      memory: 128Mi
 
 #
 # Email configuration

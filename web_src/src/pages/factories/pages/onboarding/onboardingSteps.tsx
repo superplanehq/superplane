@@ -195,6 +195,8 @@ export function RepositoryPicker({
     if (!q) return repos;
     return repos.filter((repo) => repo.toLowerCase().includes(q));
   }, [repos, query]);
+  const searching = query.trim().length > 0;
+  const emptyLabel = searching && repos.length > 0 ? "No matching repositories." : "No repositories available.";
 
   return (
     <div className="space-y-3">
@@ -217,7 +219,7 @@ export function RepositoryPicker({
         aria-label="Repositories"
       >
         {filtered.length === 0 ? (
-          <p className="px-3 py-6 text-center text-[13px] text-muted-foreground">No matching repositories.</p>
+          <p className="px-3 py-6 text-center text-[13px] text-muted-foreground">{emptyLabel}</p>
         ) : (
           <ul className="divide-y divide-border">
             {filtered.map((repo) => {

@@ -508,3 +508,127 @@ func TestAttachWorkspaceAgentResourcesOmitsHintWhenAllDisabled(t *testing.T) {
 	require.Len(t, files, 1)
 	assert.Equal(t, "Implement the plan.\n", files[0].Content)
 }
+
+func TestAttachWorkspaceAgentResourcesWritesSetupAndContext(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{
+		Commands: []string{"npm ci", "go mod download"},
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "superplanehq/suss",
+	})
+	require.NoError(t, err)
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, []runner.BrokerTaskFile{
+		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
+	})
+
+	paths := map[string]string{}
+	for _, file := range files {
+		paths[file.Path] = file.Content
+	}
+	require.Contains(t, paths, runner.WorkspaceSetupConfigPath)
+	require.Contains(t, paths, runner.WorkspaceContextConfigPath)
+
+	var setup struct {
+		Commands []string `json:"commands"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(paths[runner.WorkspaceSetupConfigPath]), &setup))
+	assert.Equal(t, []string{"npm ci", "go mod download"}, setup.Commands)
+
+	var contextFile struct {
+		Repositories []struct {
+			Repository string `json:"repository"`
+			URL        string `json:"url"`
+			Directory  string `json:"directory"`
+		} `json:"repositories"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(paths[runner.WorkspaceContextConfigPath]), &contextFile))
+	require.Len(t, contextFile.Repositories, 1)
+	assert.Equal(t, "superplanehq/suss", contextFile.Repositories[0].Repository)
+	assert.Equal(t, "https://github.com/superplanehq/suss.git", contextFile.Repositories[0].URL)
+	assert.Equal(t, "context/superplanehq/suss", contextFile.Repositories[0].Directory)
+	assert.Contains(t, paths["prompts/implement.txt"], "Setup commands")
+	assert.Contains(t, paths["prompts/implement.txt"], "superplanehq/suss")
+}
+
+func TestAttachWorkspaceAgentResourcesSkipsSetupAndContextWhenFlagOff(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceMCP))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{
+		Commands: []string{"npm ci"},
+	})
+	require.NoError(t, err)
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+	}, nil, nil)
+	assert.Empty(t, files)
+}
+
+func TestAttachWorkspaceAgentResourcesSkipsDisabledSetupAndContext(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	setup, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{
+		Commands: []string{"npm ci"},
+	})
+	require.NoError(t, err)
+	repo, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "superplanehq/suss",
+	})
+	require.NoError(t, err)
+
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(),
+		WorkflowID:     canvas.ID.String(),
+		Configuration: map[string]any{
+			"disabledAgentResourceIds": []string{setup.ID.String(), repo.ID.String()},
+		},
+	}, nil, []runner.BrokerTaskFile{
+		{Path: "prompts/implement.txt", Content: "Implement the plan.\n", Mode: "0644"},
+	})
+	require.Len(t, files, 1)
+	assert.Equal(t, "Implement the plan.\n", files[0].Content)
+}
+
+func TestAttachWorkspaceAgentResourcesKeepsSystemSkillsEnabled(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceSkills))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	system, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "refine-task", true, models.FactoryAgentResourceConfig{
+		Markdown: "# Refine task", SystemSkill: &models.FactorySystemSkill{TemplateID: "refine-task", Version: 1},
+	})
+	require.NoError(t, err)
+	custom, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "custom", true, models.FactoryAgentResourceConfig{Markdown: "# Custom"})
+	require.NoError(t, err)
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(), WorkflowID: canvas.ID.String(),
+		Configuration: map[string]any{"disabledAgentResourceIds": []string{system.ID.String(), custom.ID.String()}},
+	}, nil, nil)
+	require.Len(t, files, 2)
+	assert.Equal(t, ".claude/skills/refine-task/SKILL.md", files[0].Path)
+	assert.Equal(t, ".agents/skills/refine-task/SKILL.md", files[1].Path)
+	assert.Equal(t, "# Refine task\n", files[0].Content)
+	assert.Equal(t, files[0].Content, files[1].Content)
+}

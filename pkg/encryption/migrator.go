@@ -177,27 +177,12 @@ func (m *Migrator) migrateRow(ctx context.Context, tx *gorm.DB, location models.
 	switch location.Format {
 	case models.EncryptedStorageIntegrationJSON:
 		return m.migrateIntegrationConfiguration(ctx, tx, location, row, target)
-	case models.EncryptedStorageBase64:
-		return m.migrateBase64(ctx, tx, location, row, target)
 	default:
 		if len(row.Value) == 0 {
 			return false, nil
 		}
 		return m.migrateCiphertext(ctx, tx, location, row, row.Value, target, func(value []byte) []byte { return value })
 	}
-}
-
-func (m *Migrator) migrateBase64(ctx context.Context, tx *gorm.DB, location models.EncryptedStorageLocation, row models.EncryptedStorageRow, target uuid.UUID) (bool, error) {
-	if len(row.Value) == 0 {
-		return false, nil
-	}
-	ciphertext, err := base64.StdEncoding.DecodeString(string(row.Value))
-	if err != nil {
-		return false, fmt.Errorf("decode base64 ciphertext: %w", err)
-	}
-	return m.migrateCiphertext(ctx, tx, location, row, ciphertext, target, func(value []byte) []byte {
-		return []byte(base64.StdEncoding.EncodeToString(value))
-	})
 }
 
 func (m *Migrator) migrateCiphertext(ctx context.Context, tx *gorm.DB, location models.EncryptedStorageLocation, row models.EncryptedStorageRow, ciphertext []byte, target uuid.UUID, encode func([]byte) []byte) (bool, error) {

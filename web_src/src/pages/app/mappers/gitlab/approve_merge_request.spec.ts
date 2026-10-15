@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { buildGitLabDetailsContext } from "./test_support";
 
-import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
+import type { ExecutionDetailsContext, ExecutionInfo } from "../types";
 import { approveMergeRequestMapper } from "./approve_merge_request";
 
 describe("approveMergeRequestMapper", () => {
@@ -37,6 +38,8 @@ describe("approveMergeRequestMapper", () => {
       }),
     );
 
+    expect(Object.keys(details)[0]).toBe("Approved At");
+    expect(Object.keys(details).length).toBeLessThanOrEqual(6);
     expect(details).toEqual({
       "Approved At": expect.any(String),
       "Merge Request": "!42 feat: add login page",
@@ -45,33 +48,6 @@ describe("approveMergeRequestMapper", () => {
       "Approvals Required": "2",
       "Approvals Left": "1",
     });
-  });
-
-  it("shows the timestamp first and at most 6 details", () => {
-    const details = approveMergeRequestMapper.getExecutionDetails(
-      buildDetailsContext({
-        outputs: {
-          default: [
-            {
-              type: "gitlab.mergeRequestApproval",
-              timestamp: "2026-02-13T10:15:30.000Z",
-              data: {
-                id: 1,
-                iid: 42,
-                title: "feat: add login page",
-                approvals_required: 2,
-                approvals_left: 1,
-                approved_by: [{ user: { username: "root" } }],
-              },
-            },
-          ],
-        },
-      }),
-    );
-
-    const keys = Object.keys(details);
-    expect(keys[0]).toBe("Approved At");
-    expect(keys.length).toBeLessThanOrEqual(6);
   });
 
   it("omits approval counts when no approvals are required", () => {
@@ -137,39 +113,15 @@ describe("approveMergeRequestMapper", () => {
 });
 
 function buildDetailsContext(execution: Partial<ExecutionInfo>): ExecutionDetailsContext {
-  const node: NodeInfo = {
-    id: "node-1",
-    name: "Approve Merge Request",
-    componentName: "gitlab.approveMergeRequest",
-    isCollapsed: false,
-    configuration: {
-      project: "123",
-      mergeRequestIid: "42",
-    },
-    metadata: {
-      project: {
-        id: 123,
-        name: "felixgateru/hello-world",
-        url: "https://gitlab.com/felixgateru/hello-world",
+  return buildGitLabDetailsContext(
+    {
+      name: "Approve Merge Request",
+      componentName: "gitlab.approveMergeRequest",
+      configuration: {
+        project: "123",
+        mergeRequestIid: "42",
       },
     },
-  };
-
-  return {
-    nodes: [node],
-    node,
-    execution: {
-      id: "exec-1",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      resultReason: "RESULT_REASON_OK",
-      resultMessage: "",
-      metadata: {},
-      configuration: {},
-      rootEvent: undefined,
-      ...execution,
-    },
-  };
+    execution,
+  );
 }

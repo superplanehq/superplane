@@ -61,9 +61,9 @@ variable "node_count" {
 }
 
 variable "machine_type" {
-  description = "Machine type for GKE nodes"
+  description = "Machine type for GKE nodes. Use e2-standard-2 or a larger type. The API and the runner pods share one log disk, so they run on one node. e2-medium does not have enough CPU for that node."
   type        = string
-  default     = "e2-medium"
+  default     = "e2-standard-2"
 }
 
 # -----------------------------------------------------------------------------
@@ -113,6 +113,12 @@ variable "superplane_namespace" {
 
 variable "superplane_image_registry" {
   description = "Registry that hosts the SuperPlane image, without the image name."
+  type        = string
+  default     = "ghcr.io/superplanehq"
+}
+
+variable "fleet_manager_image_registry" {
+  description = "Registry that hosts the standalone Fleet Manager image. Terraform uses this value only to grant GKE node pull access for a private GCP registry."
   type        = string
   default     = "ghcr.io/superplanehq"
 }
@@ -171,31 +177,6 @@ variable "enable_runners" {
   default     = false
 }
 
-variable "installation_admin_token" {
-  description = "Personal API token of an installation admin. When set with enable_runners, Terraform deploys Fleet Manager."
-  type        = string
-  default     = ""
-  sensitive   = true
-}
-
-variable "fleet_manager_image_registry" {
-  description = "Registry of the fleet-manager image. Change it to use an image that you build and push."
-  type        = string
-  default     = "ghcr.io/superplanehq"
-}
-
-variable "fleet_manager_image_tag" {
-  description = "Tag of the fleet-manager image. Required when Fleet Manager is deployed."
-  type        = string
-  default     = ""
-}
-
-variable "runner_release_base_url" {
-  description = "Base URL of the runner release artifacts."
-  type        = string
-  default     = "https://superplanehq-releases.s3.amazonaws.com/runner"
-}
-
 variable "runner_subnet_cidr" {
   description = "CIDR range of the runner subnetwork. It must not overlap other subnetworks or GKE ranges in the network."
   type        = string
@@ -208,28 +189,16 @@ variable "runner_zones" {
   default     = []
 }
 
-variable "runner_fleets" {
-  description = "Runner fleets for Fleet Manager. Each id must match a fleet created in SuperPlane. Leave image empty to use the superplane-runner-<architecture> image family in this project."
-  type = list(object({
-    id            = string
-    architecture  = string
-    machine_type  = optional(string, "")
-    image         = optional(string, "")
-    disk_size_gb  = optional(number, 30)
-    warm_capacity = optional(number, 0)
-    max_capacity  = optional(number, 2)
-  }))
-  default = [
-    {
-      id           = "e1-large-amd64"
-      architecture = "amd64"
-    }
-  ]
+variable "runner_image_amd64" {
+  description = "Packer-built GCP image resource for linux/amd64 runner VMs."
+  type        = string
+  default     = ""
+}
 
-  validation {
-    condition     = alltrue([for fleet in var.runner_fleets : contains(["amd64", "arm64"], fleet.architecture)])
-    error_message = "Each runner fleet architecture must be amd64 or arm64."
-  }
+variable "runner_image_arm64" {
+  description = "Packer-built GCP image resource for linux/arm64 runner VMs."
+  type        = string
+  default     = ""
 }
 
 # -----------------------------------------------------------------------------

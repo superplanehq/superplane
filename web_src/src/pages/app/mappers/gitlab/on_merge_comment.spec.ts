@@ -1,43 +1,18 @@
 import { describe, expect, it } from "bun:test";
+import { createGitLabTriggerBuilders } from "./test_support";
 
 import { onMergeCommentTriggerRenderer } from "./on_merge_comment";
-import type { NodeInfo, TriggerEventContext, TriggerRendererContext, ComponentDefinition, EventInfo } from "../types";
+import type { TriggerEventContext, TriggerRendererContext } from "../types";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "On Merge Comment",
-    componentName: "gitlab.onMergeComment",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildDefinition(overrides?: Partial<ComponentDefinition>): ComponentDefinition {
-  return {
-    name: "onMergeComment",
-    label: "On Merge Comment",
-    description: "",
-    icon: "gitlab",
-    color: "orange",
-    ...overrides,
-  };
-}
-
-function buildEvent(overrides?: Partial<NonNullable<EventInfo>>): EventInfo {
-  return {
-    id: "evt-1",
-    createdAt: new Date().toISOString(),
-    data: {},
-    nodeId: "node-1",
-    type: "gitlab.mergeComment",
-    ...overrides,
-  };
-}
+const { buildNode, buildDefinition, buildEvent } = createGitLabTriggerBuilders({
+  name: "On Merge Comment",
+  componentName: "gitlab.onMergeComment",
+  definitionName: "onMergeComment",
+  label: "On Merge Comment",
+  eventType: "gitlab.mergeComment",
+});
 
 function buildEventData() {
   return {
@@ -96,23 +71,14 @@ describe("onMergeCommentTriggerRenderer.getRootEventValues", () => {
   it("extracts comment details from event data", () => {
     const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
     const values = onMergeCommentTriggerRenderer.getRootEventValues(ctx);
+    expect(Object.keys(values)[0]).toBe("Received At");
+    expect(values["Received At"]).toBe(new Date(ctx.event!.createdAt!).toLocaleString());
+    expect(Object.keys(values).length).toBeLessThanOrEqual(6);
     expect(values["Comment"]).toBe("/deploy to staging");
     expect(values["Comment URL"]).toBe("https://gitlab.example.com/group/example/-/merge_requests/12#note_1244");
     expect(values["Author"]).toBe("agarcia");
     expect(values["Merge Request"]).toBe("!12 - Add merge request trigger");
     expect(values["Project"]).toBe("group/example");
-  });
-
-  it("includes received at as the first value", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    const values = onMergeCommentTriggerRenderer.getRootEventValues(ctx);
-    expect(Object.keys(values)[0]).toBe("Received At");
-    expect(values["Received At"]).not.toBe("-");
-  });
-
-  it("returns at most 6 values", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    expect(Object.keys(onMergeCommentTriggerRenderer.getRootEventValues(ctx)).length).toBeLessThanOrEqual(6);
   });
 
   it("returns placeholders when event data is missing", () => {

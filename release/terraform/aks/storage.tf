@@ -16,6 +16,18 @@ resource "azurerm_storage_account" "superplane" {
   # workload identity, not account keys.
   shared_access_key_enabled = true
   local_user_enabled        = false
+
+  # Finished runner logs are a signed GET. The browser fetches that URL
+  # from the SuperPlane origin, so the account must allow that origin.
+  blob_properties {
+    cors_rule {
+      allowed_headers    = ["*"]
+      allowed_methods    = ["GET", "HEAD"]
+      allowed_origins    = ["https://${var.domain_name}"]
+      exposed_headers    = ["Content-Type", "Content-Encoding", "Content-Length"]
+      max_age_in_seconds = 3600
+    }
+  }
 }
 
 resource "azurerm_storage_container" "blobs" {

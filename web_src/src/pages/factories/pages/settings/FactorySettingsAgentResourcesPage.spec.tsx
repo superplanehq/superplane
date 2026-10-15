@@ -48,7 +48,7 @@ describe("FactorySettingsSkillsPage", () => {
     const empty = await screen.findByTestId("agent-resources-skills-empty", {}, { timeout: 8000 });
     expect(empty).not.toHaveTextContent("No skills yet");
     expect(screen.getByTestId("agent-resources-add-skill")).toBeEnabled();
-    expect(screen.getByTestId("agent-resources-add-skill")).toHaveTextContent("Add skill");
+    expect(screen.getByTestId("agent-resources-add-skill")).toHaveTextContent("Add");
   }, 10000);
 
   it("opens the full-page skill editor", async () => {
@@ -155,6 +155,41 @@ describe("FactorySettingsSkillsPage", () => {
     await user.click(enabledSwitch);
     expect(enabledSwitch).toBeChecked();
   }, 10000);
+
+  it("locks system skill controls while allowing content edits", async () => {
+    const user = userEvent.setup();
+    const systemSkill = { ...INLINE_SKILL, systemSkill: { templateId: "review-copy", version: 1 } };
+    render(
+      <FactoriesHarness
+        pathSuffix={`${skillsEditorPath}/${systemSkill.id}`}
+        factoriesFixture={{
+          ...defaultFactoriesFixture,
+          agentResourcesByFactoryId: { [PRIMARY_FACTORY_ID]: [systemSkill] },
+        }}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+    expect(await screen.findByTestId("skill-editor-enabled", {}, { timeout: 8000 })).toBeDisabled();
+    expect(screen.getByTestId("skill-editor-enabled")).toBeChecked();
+    expect(screen.getByTestId("agent-resource-skill-name")).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("System skills cannot be deleted.");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    const markdown = screen.getByTestId("agent-resource-skill-markdown").querySelector("textarea")!;
+    await user.clear(markdown);
+    await user.type(markdown, "# My refinement instructions");
+    expect(markdown).toHaveValue("# My refinement instructions");
+    expect(screen.getByTestId("agent-resource-skill-save")).toBeEnabled();
+    await user.click(screen.getByTestId("agent-resource-skill-save"));
+    expect(await screen.findByTestId("agent-resources-skills-list", {}, { timeout: 8000 })).toBeInTheDocument();
+    await user.click(screen.getByTestId(`agent-resource-edit-${systemSkill.id}`));
+    expect(await screen.findByTestId("agent-resource-skill-command", {}, { timeout: 8000 })).toHaveValue(
+      "/review-copy",
+    );
+    expect(screen.getByTestId("agent-resource-skill-markdown").querySelector("textarea")?.value).toContain(
+      "# My refinement instructions",
+    );
+  }, 15000);
 
   it("lists a GitHub skill package", async () => {
     render(

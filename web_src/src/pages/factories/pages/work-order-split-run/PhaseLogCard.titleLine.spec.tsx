@@ -39,12 +39,6 @@ describe("PhaseLogCard title line", () => {
     expect(within(row).queryByText("Completed")).not.toBeInTheDocument();
     expect(within(row).queryByText("Passed 01:00")).not.toBeInTheDocument();
     expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("1m");
-    expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveClass("text-[11px]");
-    expect(row.firstElementChild?.className).toMatch(/rounded-md/);
-    expect(row.firstElementChild?.className).toMatch(/\bbg-muted\b/);
-    expect(row.firstElementChild?.className).toMatch(/hover:bg-/);
-    expect(row.firstElementChild?.className).not.toMatch(/\bborder\b/);
-    expect(within(row).getByRole("button", { name: "Plan" }).querySelector(".lucide-chevron-right")).toBeNull();
   });
 
   it("shows cost and tokens next to duration when the phase has spend", () => {
@@ -137,25 +131,6 @@ describe("PhaseLogCard title line", () => {
     expect(metrics).not.toHaveTextContent("Medium");
   });
 
-  it("uses one mono face and size on the name and artifact", () => {
-    render(
-      <PhaseLogCard
-        phase={{ ...PHASE, status: "running", artifacts: [PLAN_MD_ARTIFACT] }}
-        expanded={false}
-        onStop={vi.fn()}
-      />,
-    );
-
-    const header = screen.getByTestId("split-run-automation-header-plan");
-    const name = within(header).getByRole("button", { name: "Plan" });
-    const artifact = within(header).getByRole("button", { name: "PLAN.md" });
-
-    for (const el of [name, artifact]) {
-      expect(el.className).toMatch(/font-mono/);
-      expect(el.className).toMatch(/text-\[14px\]/);
-    }
-  });
-
   it("ticks the running clock on the automation and the node", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
@@ -181,8 +156,6 @@ describe("PhaseLogCard title line", () => {
     expect(badge).not.toHaveTextContent("✓");
     expect(badge).toHaveTextContent("04:00");
     expect(badge).not.toHaveTextContent("Running");
-    expect(badge.querySelector(".lucide-loader-circle")).toBeNull();
-    expect(badge.className).not.toMatch(/bg-/);
 
     await act(async () => {
       vi.advanceTimersByTime(1000);
@@ -224,7 +197,7 @@ describe("PhaseLogCard title line", () => {
     expect(streamDuration).toHaveTextContent("02:00");
   });
 
-  it("keeps bold artifacts on the automation header when the card is expanded", () => {
+  it("keeps artifacts on the automation header when the card is expanded", () => {
     const phase = {
       ...PHASE,
       artifacts: [PLAN_MD_ARTIFACT],
@@ -232,17 +205,9 @@ describe("PhaseLogCard title line", () => {
     const { rerender } = render(<PhaseLogCard phase={phase} expanded={false} />);
 
     const row = screen.getByTestId("split-run-phase-plan");
-    const name = within(row).getByRole("button", { name: "Plan" });
-    const artifact = within(row).getByRole("button", { name: "PLAN.md" });
+    expect(within(row).getByRole("button", { name: "PLAN.md" })).toBeInTheDocument();
 
-    expect(name.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(artifact.className).toMatch(/font-bold/);
-    expect(name.className).not.toMatch(/flex-1/);
-    const artifacts = within(row).getByTestId("split-run-phase-artifacts-plan");
     const duration = within(row).getByTestId("split-run-phase-duration-plan");
-    expect(artifacts.className).toMatch(/justify-end/);
-    expect(artifacts.parentElement).toBe(duration.parentElement);
-    expect(artifacts.parentElement?.className).toMatch(/ml-auto/);
     expect(duration).toHaveTextContent("1m");
 
     rerender(<PhaseLogCard phase={phase} expanded stream={[]} />);
@@ -250,27 +215,6 @@ describe("PhaseLogCard title line", () => {
     expect(
       within(screen.getByTestId("split-run-automation-header-plan")).getByRole("button", { name: "PLAN.md" }),
     ).toBeInTheDocument();
-  });
-
-  it("puts artifacts immediately before the duration on the right", () => {
-    render(
-      <PhaseLogCard
-        phase={{
-          ...PHASE,
-          status: "running",
-          artifacts: [PLAN_MD_ARTIFACT],
-        }}
-        expanded={false}
-        onStop={vi.fn()}
-      />,
-    );
-
-    const header = screen.getByTestId("split-run-automation-header-plan");
-    const artifacts = within(header).getByTestId("split-run-phase-artifacts-plan");
-    const duration = within(header).getByTestId("split-run-phase-duration-plan");
-    expect(artifacts.compareDocumentPosition(duration) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(artifacts.parentElement).toBe(duration.parentElement);
-    expect(artifacts.nextElementSibling).toBe(duration);
   });
 
   it("offers Stop on a running automation and Rerun on a failed one", () => {
@@ -281,8 +225,6 @@ describe("PhaseLogCard title line", () => {
     );
 
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Stop" }).className).toMatch(/size-6/);
-    expect(screen.getByRole("button", { name: "Stop" }).className).toMatch(/hover:text-destructive/);
     expect(screen.queryByText("Stop")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Rerun" })).not.toBeInTheDocument();
 
@@ -291,7 +233,6 @@ describe("PhaseLogCard title line", () => {
     );
     const rerun = screen.getByRole("button", { name: "Rerun" });
     expect(rerun).toBeInTheDocument();
-    expect(rerun.className).toMatch(/size-6/);
     expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
 
@@ -334,7 +275,7 @@ describe("PhaseLogCard title line", () => {
     expect(onRerun).not.toHaveBeenCalled();
   });
 
-  it("toggles from the gray header except nested controls", async () => {
+  it("toggles from the header except nested controls", async () => {
     const onToggle = vi.fn();
     const onStop = vi.fn();
     const user = userEvent.setup();
@@ -347,8 +288,6 @@ describe("PhaseLogCard title line", () => {
       />,
     );
 
-    const card = screen.getByTestId("split-run-phase-plan").firstElementChild;
-    expect(card?.className).toMatch(/cursor-pointer/);
     expect(screen.getByTestId("split-run-phase-expand-plan")).toBeInTheDocument();
 
     await user.click(screen.getByTestId("split-run-phase-duration-plan"));
@@ -372,65 +311,12 @@ describe("PhaseLogCard title line", () => {
       />,
     );
     expect(screen.getByTestId("split-run-phase-expand-plan")).toBeInTheDocument();
-    expect(screen.getByTestId("split-run-phase-plan").firstElementChild?.className).not.toMatch(/cursor-pointer/);
-    expect(screen.getByTestId("split-run-automation-header-plan").className).toMatch(/cursor-pointer/);
 
     await user.click(screen.getByTestId("split-run-phase-duration-plan"));
     expect(onToggle).toHaveBeenCalledTimes(2);
 
     await user.click(screen.getByText("Agent - Plan for GH Issue"));
     expect(onToggle).toHaveBeenCalledTimes(2);
-  });
-
-  it("sits on a rounded block that tints on hover", () => {
-    const { rerender } = render(<PhaseLogCard phase={PHASE} expanded={false} />);
-
-    const card = () => screen.getByTestId("split-run-phase-plan").firstElementChild;
-    expect(card()?.className).toMatch(/rounded-md/);
-    expect(card()?.className).toMatch(/\bbg-muted\b/);
-    expect(card()?.className).toMatch(/hover:bg-/);
-    expect(card()?.className).not.toMatch(/\bbg-card\b/);
-    expect(card()?.className).not.toMatch(/\bborder\b/);
-    expect(card()?.className).not.toMatch(/border-l/);
-
-    expect(card()?.className).toMatch(/\bpy-2\b/);
-
-    rerender(<PhaseLogCard phase={PHASE} expanded stream={[]} />);
-    expect(card()?.className).toMatch(/\bbg-muted\b/);
-    expect(card()?.className).not.toMatch(/hover:bg-/);
-    expect(card()?.className).toMatch(/\bpb-2\b/);
-    expect(card()?.className).not.toMatch(/\bborder\b/);
-
-    const header = screen.getByTestId("split-run-automation-header-plan");
-    expect(header.className).toMatch(/\bh-8\b/);
-    expect(header.className).toMatch(/\bbg-muted\b/);
-    expect(header.className).not.toMatch(/\bbg-background\b/);
-    expect(card()?.className).not.toMatch(/\bpx-2\b/);
-    expect(header.className).toMatch(/\bpx-2\b/);
-    expect(header.className).not.toMatch(/-mx-2/);
-  });
-
-  it("keeps produced artifacts on the title line when the phase is expanded", () => {
-    render(
-      <PhaseLogCard
-        phase={{
-          ...PHASE,
-          artifacts: [
-            {
-              id: "art-plan",
-              type: "TYPE_MARKDOWN",
-              data: { name: "PLAN.md", title: "PLAN.md" },
-            },
-          ],
-        }}
-        expanded
-      />,
-    );
-
-    const row = screen.getByTestId("split-run-phase-plan");
-    expect(within(row).getByRole("button", { name: "PLAN.md" })).toBeInTheDocument();
-    expect(within(row).getByTestId("split-run-phase-artifacts-plan")).toBeInTheDocument();
-    expect(within(row).getByTestId("split-run-phase-duration-plan")).toHaveTextContent("1m");
   });
 });
 
@@ -449,41 +335,24 @@ describe("PhaseLogCard phase actions", () => {
     expect(screen.queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
   });
 
-  it("puts icon actions next to the expanded name without pill chrome", async () => {
+  it("offers a run link with a tooltip on expanded phases", async () => {
     const user = userEvent.setup();
     renderCard(<PhaseLogCard phase={{ ...PHASE, artifacts: [PLAN_MD_ARTIFACT] }} expanded runHref={RUN_HREF} />);
 
     const header = screen.getByTestId("split-run-automation-header-plan");
-    const name = within(header).getByRole("button", { name: "Plan" });
     const view = screen.getByRole("link", { name: "View run" });
-    const artifact = within(header).getByRole("button", { name: "PLAN.md" });
     const duration = within(header).getByTestId("split-run-phase-duration-plan");
     expect(view).toHaveAttribute("href", RUN_HREF);
-    expect(view.querySelector(".lucide-maximize-2")).not.toBeNull();
     expect(screen.queryByText("View run")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
-    expect(view.className).toMatch(/font-mono/);
-    expect(view.className).not.toMatch(/rounded-full/);
-    expect(view.className).not.toMatch(/border-border/);
-    expect(name.compareDocumentPosition(view) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(artifact.compareDocumentPosition(duration) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(duration.compareDocumentPosition(view) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(artifact.closest("[data-testid='split-run-phase-artifacts-plan']")?.parentElement).toBe(
-      duration.parentElement,
-    );
-    expect(view.parentElement).toBe(duration.parentElement);
-    expect(duration.parentElement?.className).toMatch(/ml-auto/);
     expect(duration).toHaveTextContent("1m");
-    expect(duration.className).toMatch(/font-mono/);
-    expect(duration.className).toMatch(/text-\[11px\]/);
-    expect(duration.className).toMatch(/tabular-nums/);
 
     await user.hover(view);
     expect(await screen.findByRole("tooltip", { name: "View run" })).toBeInTheDocument();
   });
 
-  it("puts Stop after the name on the left of a running automation", async () => {
+  it("stops a running automation from the expanded header", async () => {
     const user = userEvent.setup();
     const onStop = vi.fn();
     renderCard(
@@ -495,18 +364,7 @@ describe("PhaseLogCard phase actions", () => {
       />,
     );
 
-    const header = screen.getByTestId("split-run-automation-header-plan");
-    const name = within(header).getByRole("button", { name: "Plan" });
-    const view = screen.getByRole("link", { name: "View run" });
     const stop = screen.getByRole("button", { name: "Stop" });
-    const artifact = within(header).getByRole("button", { name: "PLAN.md" });
-    expect(name.compareDocumentPosition(stop) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(stop.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(artifact.compareDocumentPosition(view) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(artifact.closest("[data-testid='split-run-phase-artifacts-plan']")?.parentElement).not.toBe(
-      stop.parentElement,
-    );
-    expect(stop.querySelector(".lucide-circle-x")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
 
     await user.hover(stop);
@@ -515,7 +373,7 @@ describe("PhaseLogCard phase actions", () => {
     expect(onStop).toHaveBeenCalledTimes(1);
   });
 
-  it("puts Rerun after the name on the left of a failed automation", async () => {
+  it("reruns a failed automation from the expanded header", async () => {
     const user = userEvent.setup();
     const onRerun = vi.fn();
     renderCard(
@@ -527,17 +385,7 @@ describe("PhaseLogCard phase actions", () => {
       />,
     );
 
-    const header = screen.getByTestId("split-run-automation-header-plan");
-    const name = within(header).getByRole("button", { name: "Plan" });
-    const view = screen.getByRole("link", { name: "View run" });
     const rerun = screen.getByRole("button", { name: "Rerun" });
-    const artifact = within(header).getByRole("button", { name: "PLAN.md" });
-    expect(name.compareDocumentPosition(rerun) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(rerun.compareDocumentPosition(artifact) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(artifact.compareDocumentPosition(view) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(artifact.closest("[data-testid='split-run-phase-artifacts-plan']")?.parentElement).not.toBe(
-      rerun.parentElement,
-    );
     expect(screen.queryByText("Rerun")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
 

@@ -51,14 +51,13 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	require.NoError(t, store.Initialize(ctx))
 	encryptor := crypto.NewVersionedEncryptor(store, legacy)
 	table := "encryption_migration_test_" + uuid.NewString()[:8]
-	require.NoError(t, db.Exec(fmt.Sprintf("CREATE TABLE %s (id uuid PRIMARY KEY, secret bytea NOT NULL, configuration jsonb NOT NULL, app_name text NOT NULL, access_token text NOT NULL)", table)).Error)
+	require.NoError(t, db.Exec(fmt.Sprintf("CREATE TABLE %s (id uuid PRIMARY KEY, secret bytea NOT NULL, configuration jsonb NOT NULL, app_name text NOT NULL)", table)).Error)
 	t.Cleanup(func() { require.NoError(t, db.Exec("DROP TABLE "+table).Error) })
 	location := testEncryptedStorageLocation(table, "secret", "'smtp_password'", "''", models.EncryptedStorageBytes)
 	configurationLocation := testEncryptedStorageLocation(table, "configuration", "id::text", "app_name", models.EncryptedStorageIntegrationJSON)
-	base64Location := testEncryptedStorageLocation(table, "access_token", "id::text", "''", models.EncryptedStorageBase64)
 	integrations, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 	require.NoError(t, err)
-	migrator := NewMigrator(encryptor, integrations, []models.EncryptedStorageLocation{location, configurationLocation, base64Location})
+	migrator := NewMigrator(encryptor, integrations, []models.EncryptedStorageLocation{location, configurationLocation})
 
 	ciphertext, err := legacy.Encrypt(ctx, []byte("smtp secret"), []byte("smtp_password"))
 	require.NoError(t, err)
@@ -74,13 +73,13 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 		"largeNumber": int64(9007199254740993),
 	})
 	require.NoError(t, err)
-	require.NoError(t, db.Exec("INSERT INTO "+table+" (id, secret, configuration, app_name, access_token) VALUES (?, ?, ?, 'openai', ?)", id, ciphertext, string(configuration), base64.StdEncoding.EncodeToString(apiKey)).Error)
+	require.NoError(t, db.Exec("INSERT INTO "+table+" (id, secret, configuration, app_name) VALUES (?, ?, ?, 'openai')", id, ciphertext, string(configuration)).Error)
 	openRouterID := uuid.New()
 	openRouterKey, err := legacy.Encrypt(ctx, []byte("router secret"), []byte(openRouterID.String()))
 	require.NoError(t, err)
 	openRouterConfig, err := json.Marshal(map[string]string{"apiKey": base64.StdEncoding.EncodeToString(openRouterKey)})
 	require.NoError(t, err)
-	require.NoError(t, db.Exec("INSERT INTO "+table+" (id, secret, configuration, app_name, access_token) VALUES (?, ?, ?, 'openrouter', ?)", openRouterID, ciphertext, string(openRouterConfig), base64.StdEncoding.EncodeToString(openRouterKey)).Error)
+	require.NoError(t, db.Exec("INSERT INTO "+table+" (id, secret, configuration, app_name) VALUES (?, ?, ?, 'openrouter')", openRouterID, ciphertext, string(openRouterConfig)).Error)
 
 	job, err := migrator.Start(ctx)
 	require.NoError(t, err)
@@ -133,17 +132,6 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	plain, err = encryptor.Decrypt(ctx, decoded, []byte(openRouterID.String()))
 	require.NoError(t, err)
 	require.Equal(t, "router secret", string(plain))
-	var storedToken string
-	require.NoError(t, db.Raw("SELECT access_token FROM "+table+" WHERE id = ?", id).Row().Scan(&storedToken))
-	decoded, err = base64.StdEncoding.DecodeString(storedToken)
-	require.NoError(t, err)
-	keyID, versioned, err = crypto.EncryptedDataKeyID(decoded)
-	require.NoError(t, err)
-	require.True(t, versioned)
-	require.Equal(t, active.ID, keyID)
-	plain, err = encryptor.Decrypt(ctx, decoded, []byte(id.String()))
-	require.NoError(t, err)
-	require.Equal(t, "api secret", string(plain))
 	_, err = store.Rotate(ctx)
 	require.NoError(t, err)
 	if _, plaintext := legacy.(*crypto.NoOpEncryptor); plaintext {
@@ -205,8 +193,6 @@ func testEncryptedStorageLocation(table, column, associatedData, appName string,
 			if format == models.EncryptedStorageIntegrationJSON {
 				oldValue, newValue = string(row.Value), string(replacement)
 				valueExpr = "CAST(? AS jsonb)"
-			} else if format == models.EncryptedStorageBase64 {
-				oldValue, newValue = string(row.Value), string(replacement)
 			}
 			query := fmt.Sprintf("UPDATE %s SET %s = %s WHERE id = CAST(? AS uuid) AND %s = %s", table, column, valueExpr, column, valueExpr)
 			result := tx.Exec(query, newValue, row.Cursor, oldValue)

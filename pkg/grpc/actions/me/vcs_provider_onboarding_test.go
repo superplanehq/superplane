@@ -126,7 +126,7 @@ func TestSelectVCSProviderOnboardingIdentity(t *testing.T) {
 	require.Len(t, response.Repositories, 1)
 	assert.Equal(t, "acme/second", response.Repositories[0].FullName)
 
-	_, err = SelectVCSProviderOnboardingIdentity(ctx, models.ProviderGitHub, 101)
+	_, err = SelectVCSProviderOnboardingIdentity(ctx, models.ProviderGitHub, 101, "")
 	require.NoError(t, err)
 
 	response, err = DescribeVCSProviderOnboarding(ctx, models.ProviderGitHub)
@@ -142,10 +142,69 @@ func TestSelectVCSProviderOnboardingIdentityRejectsUnlinkedIdentity(t *testing.T
 	r := support.Setup(t)
 	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
 
-	_, err := SelectVCSProviderOnboardingIdentity(ctx, models.ProviderGitHub, 404)
+	_, err := SelectVCSProviderOnboardingIdentity(ctx, models.ProviderGitHub, 404, "")
 	code, _, ok := grpcerrors.HandlerStatus(err)
 	assert.True(t, ok)
 	assert.Equal(t, codes.PermissionDenied, code)
+}
+
+func TestSelectBitbucketOnboardingIdentity(t *testing.T) {
+	const firstAccountID = "11111111-1111-1111-1111-111111111111"
+	const secondAccountID = "22222222-2222-2222-2222-222222222222"
+
+	for _, testCase := range []struct {
+		name           string
+		storedID       string
+		providerUserID string
+	}{
+		{name: "braced stored id", storedID: "{" + firstAccountID + "}", providerUserID: firstAccountID},
+		{name: "braced request id", storedID: firstAccountID, providerUserID: "{" + firstAccountID + "}"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			r := support.Setup(t)
+			t.Setenv(config.EnvBitbucketForgeAppID, "")
+			t.Setenv(config.EnvBitbucketForgeInstallURL, "")
+			ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+			db := database.Conn()
+			require.NoError(t, models.SaveAccountLinkedAccount(db,
+				models.NewAccountLinkedAccount(r.Account.ID, models.ProviderBitbucket, testCase.storedID, "first-bb", "", "")))
+			require.NoError(t, models.SaveAccountLinkedAccount(db,
+				models.NewAccountLinkedAccount(r.Account.ID, models.ProviderBitbucket, "{"+secondAccountID+"}", "second-bb", "", "")))
+
+			_, err := SelectVCSProviderOnboardingIdentity(ctx, models.ProviderBitbucket, 0, testCase.providerUserID)
+			require.NoError(t, err)
+
+			response, err := DescribeVCSProviderOnboarding(ctx, models.ProviderBitbucket)
+			require.NoError(t, err)
+			require.NotNil(t, response.Identity)
+			assert.Equal(t, firstAccountID, response.Identity.GetProviderUserId())
+			assert.Equal(t, "first-bb", response.Identity.GetLogin())
+		})
+	}
+}
+
+func TestSelectBitbucketOnboardingIdentityRejectsInvalidIdentity(t *testing.T) {
+	r := support.Setup(t)
+	ctx := notificationSettingsContext(r.User.String(), r.Organization.ID.String())
+	require.NoError(t, models.SaveAccountLinkedAccount(database.Conn(),
+		models.NewAccountLinkedAccount(r.Account.ID, models.ProviderBitbucket,
+			"{11111111-1111-1111-1111-111111111111}", "first-bb", "", "")))
+
+	for _, testCase := range []struct {
+		name           string
+		providerUserID string
+		code           codes.Code
+	}{
+		{name: "empty id", providerUserID: "", code: codes.InvalidArgument},
+		{name: "unlinked id", providerUserID: "33333333-3333-3333-3333-333333333333", code: codes.PermissionDenied},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, err := SelectVCSProviderOnboardingIdentity(ctx, models.ProviderBitbucket, 0, testCase.providerUserID)
+			code, _, ok := grpcerrors.HandlerStatus(err)
+			assert.True(t, ok)
+			assert.Equal(t, testCase.code, code)
+		})
+	}
 }
 
 func TestStartVCSProviderInstallationSignsOrganizationState(t *testing.T) {

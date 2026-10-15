@@ -9,7 +9,7 @@ export const implementerCanvas = {
     nodes: [
       { id: "on-run", name: "On run", type: "TYPE_TRIGGER", component: "onRun", configuration: {} },
       {
-        id: "implementation-agent",
+        id: "implementation-agent-no-issue",
         name: "Implement From Task Description",
         type: "TYPE_ACTION",
         component: "runnerClaudeCode",

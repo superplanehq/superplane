@@ -6,10 +6,23 @@ import { vi } from "bun:test";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
+import {
+  deleteIntake,
+  updateIntake,
+  useAvailableIntegrations,
+  useCanvas,
+  useComponents,
+  useDescribeRun,
+  useEventExecutions,
+  useInfiniteCanvasRuns,
+  useIntegrationResources,
+  useTriggers,
+} from "./intakeSettingsHostSpecMocks";
 import { IntakeSettingsHost } from "./IntakeSettingsHost";
 import {
   DEFAULT_DATADOG_INTAKE_SETTINGS,
   DEFAULT_GITHUB_INTAKE_SETTINGS,
+  DEFAULT_SENTRY_INTAKE_SETTINGS,
   type IntakeSettingsTab,
 } from "./intakeSourceSettingsModel";
 import { lineIntakeSourceById, type ConfiguredLineIntakeSource } from "./lineIntakeModel";
@@ -59,8 +72,31 @@ export const SENTRY_INTAKE: ConfiguredLineIntakeSource = {
   appId: "app-sentry-intake",
   healthy: true,
   paused: false,
-  settings: { ...DEFAULT_GITHUB_INTAKE_SETTINGS, name: "Sentry exceptions" },
+  settings: { ...DEFAULT_SENTRY_INTAKE_SETTINGS, sentryProjectIds: ["payments"] },
   source: lineIntakeSourceById("sentry-exceptions")!,
+  integrationId: "sentry-1",
+  resourceId: "payments",
+};
+
+export const SENTRY_INTAKE_CANVAS = {
+  metadata: { id: "app-sentry-intake", name: "Sentry exceptions", factoryId: "factory-1" },
+  spec: {
+    nodes: [
+      {
+        id: "sentry-exceptions-trigger",
+        name: "On Issue",
+        type: "TYPE_TRIGGER",
+        component: "sentry.onIssue",
+      },
+      {
+        id: "sentry-exceptions-create",
+        name: "Create Task",
+        type: "TYPE_ACTION",
+        component: "createWorkOrder",
+      },
+    ],
+    edges: [{ channel: "default", sourceId: "sentry-exceptions-trigger", targetId: "sentry-exceptions-create" }],
+  },
 };
 
 export const PRODUCTIVE_INTAKE: ConfiguredLineIntakeSource = {
@@ -123,6 +159,23 @@ export function connectedJiraIntake(overrides: Partial<ConfiguredLineIntakeSourc
   };
 }
 
+export function resetHostMocks() {
+  resetIntakeSettingsHostMocks({
+    useCanvas,
+    useTriggers,
+    useComponents,
+    useAvailableIntegrations,
+    useIntegrationResources,
+    useDescribeRun,
+    useEventExecutions,
+    useInfiniteCanvasRuns,
+    updateIntake,
+    deleteIntake,
+  });
+}
+
+export { deleteIntake, updateIntake, useCanvas, useInfiniteCanvasRuns };
+
 export function resetIntakeSettingsHostMocks(mocks: {
   useCanvas: ReturnType<typeof vi.fn>;
   useTriggers: ReturnType<typeof vi.fn>;
@@ -145,6 +198,7 @@ export function resetIntakeSettingsHostMocks(mocks: {
     data: [
       { name: "github.onIssue", label: "On Issue" },
       { name: "github.onDependabotAlert", label: "On Dependabot Alert" },
+      { name: "sentry.onIssue", label: "On Issue" },
     ],
     isLoading: false,
   });
@@ -168,7 +222,13 @@ export function resetIntakeSettingsHostMocks(mocks: {
   mocks.useInfiniteCanvasRuns.mockReturnValue(intakeRunsResult());
 }
 
-function integrationResourceResult(_organizationId: string, _integrationId: string, resourceType: string) {
+function integrationResourceResult(_organizationId: string, integrationId: string, resourceType: string) {
+  if (resourceType === "project" && integrationId === "sentry-1") {
+    return resourceResult([
+      { id: "payments", name: "Payments" },
+      { id: "growth", name: "Growth" },
+    ]);
+  }
   if (resourceType === "issueStatus") {
     return resourceResult([
       { id: "todo", name: "To Do" },

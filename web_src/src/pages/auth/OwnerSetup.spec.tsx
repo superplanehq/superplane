@@ -8,6 +8,12 @@ import { OWNER_SETUP_COPY } from "./ownerSetup/ownerSetupCopy";
 const jsonResponse = (body: unknown) =>
   new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
 
+const { createToken } = vi.hoisted(() => ({ createToken: vi.fn() }));
+
+vi.mock("@/hooks/useUserTokens", () => ({
+  useCreateUserToken: () => ({ mutateAsync: createToken, isPending: false }),
+}));
+
 vi.mock("./ownerSetup/LicenseStep", () => ({
   LicenseStep: ({ onContinue }: { onContinue: () => void }) => (
     <button type="button" data-testid="owner-setup-license-skip" onClick={onContinue}>
@@ -62,6 +68,45 @@ const OWNER_SETUP_SURVEY = {
   ],
 };
 
+const fleetManagerMetadata = {
+  defaultRunnerVersion: "v0.1.0",
+  defaultFleetManagerVersion: "v0.1.0",
+  defaultChartVersion: "0.1.0",
+  runnerReleaseUrlTemplate: "https://example/releases/runner%2F{version}",
+  chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
+  imageRepository: "ghcr.io/superplanehq/fleet-manager",
+  runnerVersions: ["v0.1.0"],
+  fleetPresets: [
+    {
+      id: "e1-large-amd64",
+      spec: {
+        operatingSystem: "linux",
+        architecture: "amd64",
+        cpuMillicores: 2000,
+        memoryMb: 8192,
+        diskGb: 30,
+        capabilities: ["docker"],
+      },
+    },
+  ],
+  infrastructureDefaults: {
+    source: "terraform",
+    provider: "aws",
+    managerId: "test-cluster",
+    namespace: "superplane",
+    serviceAccountName: "superplane-fleet-manager",
+    fields: {
+      superplaneUrl: "https://superplane.example.com",
+      region: "us-east-1",
+      subnetIds: ["subnet-a"],
+      securityGroupIds: ["sg-runner"],
+      runnerIdentity: "runner-profile",
+      fleetManagerIdentity: "arn:aws:iam::123456789012:role/fleet-manager",
+      imageAmd64: "ami-amd64",
+    },
+  },
+};
+
 function stubOwnerSetupFetch() {
   vi.stubGlobal(
     "fetch",
@@ -70,8 +115,8 @@ function stubOwnerSetupFetch() {
       if (url.endsWith("/api/v1/setup-owner") && init?.method === "POST") {
         return jsonResponse({ organization_id: "org-1", organization_slug: "acme" });
       }
-      if (url.endsWith("/admin/api/installation/first-run/fleet-manager")) {
-        return jsonResponse({ yaml: "id: self-host\n", token: "tok" });
+      if (url.endsWith("/admin/api/installation/fleet-manager/setup")) {
+        return jsonResponse(fleetManagerMetadata);
       }
       return new Response("", { status: 404 });
     }),
@@ -101,16 +146,19 @@ async function reachFleetStep() {
   fireEvent.click(screen.getByTestId("owner-setup-smtp-skip"));
 
   expect(await screen.findByTestId("owner-setup-fleet")).toBeInTheDocument();
-  await screen.findByTestId("owner-setup-fleet-yaml");
+  expect(screen.queryByRole("link")).not.toBeInTheDocument();
 }
 
 describe("OwnerSetup", () => {
   const originalLocation = window.location;
 
   beforeEach(() => {
+    window.localStorage.clear();
     posthogMock.enabled = false;
     posthogMock.getActiveMatchingSurveys.mockReset();
     posthogMock.capture.mockReset();
+    createToken.mockReset();
+    createToken.mockResolvedValue({ plaintext: "owner-setup-token" });
     Object.defineProperty(window, "location", {
       configurable: true,
       value: { ...originalLocation, href: "http://localhost/setup" },
@@ -144,6 +192,46 @@ describe("OwnerSetup", () => {
 
     await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
     expect(screen.queryByText(OWNER_SETUP_COPY.smtp.headline)).not.toBeInTheDocument();
+  });
+
+  it("opens the Fleet Manager wizard inside owner setup", async () => {
+    stubOwnerSetupFetch();
+    renderOwnerSetup();
+    await reachFleetStep();
+
+    fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
+
+    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /fleet manager setup/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-progress")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByTestId("owner-setup-fleet")).toBeInTheDocument();
+  });
+
+  it("navigates forward and backward through the Fleet Manager steps", async () => {
+    stubOwnerSetupFetch();
+    renderOwnerSetup();
+    await reachFleetStep();
+
+    fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
+    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByRole("heading", { name: "Choose runner fleets" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Generate install command" }));
+    expect(await screen.findByRole("heading", { name: "Install Fleet Manager" })).toBeInTheDocument();
+    expect(createToken).toHaveBeenCalledWith({ name: "Fleet Manager" });
+
+    for (const heading of ["Choose runner fleets", "Choose a cloud provider", OWNER_SETUP_COPY.fleet.headline]) {
+      fireEvent.click(screen.getByRole("button", { name: "Back" }));
+      expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByRole("heading", { name: OWNER_SETUP_COPY.smtp.headline })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByTestId("owner-setup-license-skip")).toBeInTheDocument();
   });
 
   it("keeps the gold scene and hides step dots while the survey is completed", async () => {

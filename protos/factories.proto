@@ -739,6 +739,17 @@ service Factories {
     };
   }
 
+  rpc RestoreFactorySystemSkill(RestoreFactorySystemSkillRequest) returns (RestoreFactorySystemSkillResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/restore"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Restore a system skill to the latest SuperPlane version";
+      tags: "Factory";
+    };
+  }
+
   rpc DeleteFactoryAgentResource(DeleteFactoryAgentResourceRequest) returns (DeleteFactoryAgentResourceResponse) {
     option (google.api.http) = {
       delete: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}"
@@ -1153,6 +1164,8 @@ message UpdateFactoryLineResponse {
 
 message ListFactoryAutomationsRequest {
   string factory_id = 1;
+  // When set, list only automations whose saved prompts mention this skill command.
+  string skill_name = 2;
 }
 
 message ListFactoryAutomationsResponse {
@@ -2656,6 +2669,8 @@ message FactoryAgentResource {
     KIND_UNSPECIFIED = 0;
     KIND_MCP_SERVER = 1;
     KIND_SKILL = 2;
+    KIND_SETUP_COMMAND = 3;
+    KIND_CONTEXT_REPO = 4;
   }
 
   enum Auth {
@@ -2678,6 +2693,21 @@ message FactoryAgentResource {
     string secret_key = 3;
   }
 
+  // Read-only metadata supplied by SuperPlane.
+  message SystemSkill {
+    enum State {
+      STATE_UNSPECIFIED = 0;
+      STATE_LATEST = 1;
+      STATE_CUSTOM = 2;
+      STATE_UPDATE_AVAILABLE = 3;
+      STATE_UNAVAILABLE = 4;
+    }
+    string template_id = 1;
+    int32 version = 2;
+    State state = 3;
+    int32 latest_version = 4;
+  }
+
   string id = 1;
   string factory_id = 2;
   Kind kind = 3;
@@ -2697,6 +2727,9 @@ message FactoryAgentResource {
   string path = 17;
   string markdown = 18;
   repeated string disabled_tools = 19;
+  repeated string commands = 20;
+  string vcs_provider = 21;
+  SystemSkill system_skill = 22;
 }
 
 message ListFactoryAgentResourcesRequest {
@@ -2717,6 +2750,9 @@ message CreateFactoryAgentResourceRequest {
   FactoryAgentResource.Auth auth = 6;
   repeated FactoryAgentResource.Header headers = 7;
   string markdown = 8;
+  string repository = 9;
+  repeated string commands = 10;
+  string vcs_provider = 11;
 }
 
 message CreateFactoryAgentResourceResponse {
@@ -2734,9 +2770,22 @@ message UpdateFactoryAgentResourceRequest {
   optional string markdown = 8;
   repeated string disabled_tools = 9;
   optional bool replace_disabled_tools = 10;
+  optional string repository = 11;
+  repeated string commands = 12;
+  optional bool replace_commands = 13;
+  optional string vcs_provider = 14;
 }
 
 message UpdateFactoryAgentResourceResponse {
+  FactoryAgentResource resource = 1;
+}
+
+message RestoreFactorySystemSkillRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message RestoreFactorySystemSkillResponse {
   FactoryAgentResource resource = 1;
 }
 

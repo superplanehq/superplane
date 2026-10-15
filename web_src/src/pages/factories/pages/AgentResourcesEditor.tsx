@@ -1,3 +1,4 @@
+import { SystemSkillBadge } from "./settings/SystemSkillBadge";
 import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
@@ -322,19 +323,26 @@ function SkillAutomationRow({
   const name = skillDisplayTitle(resource) || AGENT_RESOURCES_COPY.unnamedSkill;
   const description = skillListDescription(resource);
   const workspaceOff = resource.enabled === false;
-  const checked = !workspaceOff && !disabledIds.includes(id);
+  const systemSkill = Boolean(resource.systemSkill);
+  const checked = systemSkill || (!workspaceOff && !disabledIds.includes(id));
   return (
     <li className={cn("flex flex-wrap items-center gap-3 px-5 py-3", resourceRowClass(flat))}>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
+          {systemSkill ? <SystemSkillBadge state={resource.systemSkill?.state} /> : null}
+        </div>
         {description ? <p className="truncate text-[12px] text-muted-foreground">{description}</p> : null}
+        {systemSkill ? (
+          <p className="text-[12px] text-muted-foreground">{AGENT_RESOURCES_COPY.systemSkillEnabled}</p>
+        ) : null}
         {workspaceOff ? (
           <p className="truncate text-[12px] text-muted-foreground">{PLANNING_REVIEW_RESOURCES_COPY.offForWorkspace}</p>
         ) : null}
       </div>
       <Switch
         checked={checked}
-        disabled={workspaceOff || !id}
+        disabled={systemSkill || workspaceOff || !id}
         onCheckedChange={(next) => onDisabledIdsChange(nextDisabledIds(disabledIds, id, next))}
         aria-label={PLANNING_REVIEW_RESOURCES_COPY.enableLabel(name)}
         data-testid={`planning-review-resource-${id}`}

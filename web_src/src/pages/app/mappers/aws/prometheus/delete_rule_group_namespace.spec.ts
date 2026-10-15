@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { buildComponentCtx, buildDetailsCtx, buildOutput } from "./common";
+import { buildComponentCtx, buildDetailsCtx, buildOutput } from "./test-support";
 import { deleteRuleGroupNamespaceMapper } from "./delete_rule_group_namespace";
 
 describe("deleteRuleGroupNamespaceMapper.props", () => {

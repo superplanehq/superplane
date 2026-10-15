@@ -60,6 +60,12 @@ variable "vm_size" {
   }
 }
 
+variable "trusted_launch" {
+  type        = bool
+  default     = true
+  description = "Use a Trusted Launch build VM for a private gallery image definition TrustedLaunch. Set false for a community or direct shared gallery image definition TrustedLaunchSupported."
+}
+
 variable "claude_code_version" {
   type        = string
   description = "Claude Code version installed in the images."
@@ -84,15 +90,31 @@ variable "playwright_version" {
   default     = "1.63.0"
 }
 
+variable "build_resource_group_name" {
+  type        = string
+  default     = ""
+  description = "Existing resource group for the temporary build VM. Empty lets Packer create one."
+}
+
+variable "replication_regions" {
+  type        = list(string)
+  default     = []
+  description = "Extra regions to replicate the gallery image version to. var.location is always included."
+}
+
 locals {
-  image_sku = var.architecture == "arm64" ? "24_04-lts-arm64" : "24_04-lts-gen2"
+  image_sku       = var.architecture == "arm64" ? "24_04-lts-arm64" : "24_04-lts-gen2"
+  gallery_regions = distinct(concat([var.location], var.replication_regions))
 }
 
 source "azure-arm" "ubuntu" {
   use_azure_cli_auth = true
   subscription_id    = var.subscription_id
-  location           = var.location
-  vm_size            = var.vm_size
+  # Plugin 2.3.3 accepts location or build_resource_group_name, not both.
+  # var.location still selects gallery replica regions.
+  location                  = var.build_resource_group_name == "" ? var.location : null
+  build_resource_group_name = var.build_resource_group_name != "" ? var.build_resource_group_name : null
+  vm_size                   = var.vm_size
 
   os_type         = "Linux"
   image_publisher = "Canonical"
@@ -100,9 +122,12 @@ source "azure-arm" "ubuntu" {
   image_sku       = local.image_sku
   image_version   = "latest"
 
-  secure_boot_enabled = true
-  vtpm_enabled        = true
-  security_type       = "TrustedLaunch"
+  # Plugin azure-arm 2.3.3 omits securityProfile when security_type is null
+  # and secure boot and vTPM are false. The Gen2 source image then builds
+  # a Standard VM with no VM Guest State.
+  secure_boot_enabled = var.trusted_launch
+  vtpm_enabled        = var.trusted_launch
+  security_type       = var.trusted_launch ? "TrustedLaunch" : null
 
   azure_tags = {
     Architecture = var.architecture
@@ -119,8 +144,11 @@ source "azure-arm" "ubuntu" {
     image_version        = var.image_version
     storage_account_type = "Standard_LRS"
 
-    target_region {
-      name = var.location
+    dynamic "target_region" {
+      for_each = local.gallery_regions
+      content {
+        name = target_region.value
+      }
     }
   }
 }
@@ -141,25 +169,14 @@ build {
     pause_before    = "15s"
   }
 
-  # Packer uploads one script to /tmp. Keep both media scripts in one
-  # directory so install-media-tools.sh can call install-yt-dlp.sh.
-  provisioner "file" {
-    source      = "${path.root}/../aws/scripts/install-media-tools.sh"
-    destination = "/tmp/install-media-tools.sh"
-  }
-
-  provisioner "file" {
-    source      = "${path.root}/../aws/scripts/install-yt-dlp.sh"
-    destination = "/tmp/install-yt-dlp.sh"
+  provisioner "shell" {
+    script          = "${path.root}/../aws/scripts/install-media-tools.sh"
+    execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
   }
 
   provisioner "shell" {
-    inline = [
-      "mkdir -p /tmp/superplane-media",
-      "cp /tmp/install-media-tools.sh /tmp/install-yt-dlp.sh /tmp/superplane-media/",
-      "chmod 0755 /tmp/superplane-media/install-media-tools.sh /tmp/superplane-media/install-yt-dlp.sh",
-      "sudo -E bash /tmp/superplane-media/install-media-tools.sh",
-    ]
+    script          = "${path.root}/../aws/scripts/install-yt-dlp.sh"
+    execute_command = "chmod +x {{ .Path }}; sudo -E sh -c '{{ .Vars }} {{ .Path }}'"
   }
 
   provisioner "shell" {

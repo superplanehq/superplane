@@ -569,6 +569,41 @@ test("release candidates omit cliff notes and do not become latest", async () =>
   });
 });
 
+test("Fleet Manager releases record image and chart digests", async () => {
+  let payload;
+  const server = http.createServer((request, response) => {
+    const chunks = [];
+    request.on("data", (chunk) => chunks.push(chunk));
+    request.on("end", () => {
+      payload = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ id: 44 }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+
+  try {
+    await publishGitHubRelease({
+      apiURL: `http://127.0.0.1:${address.port}`,
+      repository: "superplanehq/superplane",
+      token: "test-token",
+      releaseID: "44",
+      component: "fleet-manager",
+      version: "v1.2.3",
+      sha: "c".repeat(40),
+      imageDigest: `sha256:${"d".repeat(64)}`,
+      chartDigest: `sha256:${"e".repeat(64)}`,
+      releaseNotes: "## Fleet Manager changes\n\n- Publish the chart.",
+    });
+  } finally {
+    server.close();
+  }
+
+  assert.match(payload.body, /Fleet Manager image digest: `sha256:d{64}`/);
+  assert.match(payload.body, /Fleet Manager chart digest: `sha256:e{64}`/);
+});
+
 test("release notes match the release type", async () => {
   const common = {
     apiURL: "http://127.0.0.1:1",

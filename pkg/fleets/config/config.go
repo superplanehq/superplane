@@ -82,14 +82,25 @@ func newDuration(value time.Duration) Duration {
 }
 
 type Fleet struct {
-	ID           string `json:"id"`
-	WarmCapacity int    `json:"warmCapacity"`
-	MaxCapacity  int    `json:"maxCapacity"`
-	Provider     string `json:"provider"`
-	AWS          AWS    `json:"aws"`
-	Azure        Azure  `json:"azure"`
-	GCP          GCP    `json:"gcp"`
-	Docker       Docker `json:"docker"`
+	ID            string    `json:"id"`
+	RunnerVersion string    `json:"runnerVersion"`
+	Spec          FleetSpec `json:"spec"`
+	WarmCapacity  int       `json:"warmCapacity"`
+	MaxCapacity   int       `json:"maxCapacity"`
+	Provider      string    `json:"provider"`
+	AWS           AWS       `json:"aws"`
+	Azure         Azure     `json:"azure"`
+	GCP           GCP       `json:"gcp"`
+	Docker        Docker    `json:"docker"`
+}
+
+type FleetSpec struct {
+	OperatingSystem string   `json:"operatingSystem"`
+	Architecture    string   `json:"architecture"`
+	CPUMillicores   int32    `json:"cpuMillicores"`
+	MemoryMB        int32    `json:"memoryMb"`
+	DiskGB          int32    `json:"diskGb"`
+	Capabilities    []string `json:"capabilities"`
 }
 
 type AWS struct {
@@ -261,6 +272,7 @@ func (c *Config) applyDefaults() {
 			fleet.Azure.DiskSizeGB = defaultVolumeSizeGB
 		}
 		fleet.ID = strings.TrimSpace(fleet.ID)
+		fleet.RunnerVersion = strings.TrimSpace(fleet.RunnerVersion)
 		fleet.AWS.Region = strings.TrimSpace(fleet.AWS.Region)
 		fleet.AWS.Architecture = strings.ToLower(strings.TrimSpace(fleet.AWS.Architecture))
 		fleet.AWS.SubnetIDs = nonEmpty(fleet.AWS.SubnetIDs)
@@ -418,9 +430,6 @@ func (c *Config) validate() error {
 		case fleet.Provider == ProviderAzure &&
 			fleet.Azure.IdentityID == "":
 			return fmt.Errorf("%s.azure.identityId is required", prefix)
-		case fleet.Provider == ProviderAzure &&
-			len(fleet.Azure.Zones) == 0:
-			return fmt.Errorf("%s.azure.zones must not be empty", prefix)
 		case fleet.Provider == ProviderAzure &&
 			fleet.Azure.DiskSizeGB < 1:
 			return fmt.Errorf("%s.azure.diskSizeGb must be positive", prefix)

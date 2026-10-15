@@ -6,6 +6,7 @@ import { prepareData } from "@/pages/app/workflowPageHelpers";
 import { ComponentStoryShell } from "../__fixtures__/ComponentStoryShell";
 import { ColumnAutomationViewPopup } from "./ColumnAutomationViewPopup";
 import { PLANNING_REVIEW_DRAFT } from "./planningReviewMockup";
+import { draftWithBashCommand, LONG_BASH_COMMAND } from "./planningReviewFindBox.storyHelpers";
 import type { IntakeAutomationGraph } from "./useIntakeAutomationCanvas";
 
 function implementGraph(): IntakeAutomationGraph {
@@ -81,6 +82,14 @@ export const WithAgent: Story = {
   name: "Agent and Automation",
   args: {
     agent: { draft: PLANNING_REVIEW_DRAFT, organizationId: "org-1" },
+  },
+};
+
+export const WithLongScript: Story = {
+  name: "Agent long script",
+  args: {
+    agent: { draft: draftWithBashCommand(LONG_BASH_COMMAND), organizationId: "org-1" },
+    initialTab: "agent",
   },
 };
 

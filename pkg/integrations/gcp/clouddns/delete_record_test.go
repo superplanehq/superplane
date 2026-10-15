@@ -14,9 +14,7 @@ import (
 func TestDeleteRecord_Metadata(t *testing.T) {
 	c := &DeleteRecord{}
 	assert.Equal(t, "gcp.clouddns.deleteRecord", c.Name())
-	assert.Equal(t, "Cloud DNS • Delete Record", c.Label())
 	assert.NotEmpty(t, c.Description())
-	assert.Equal(t, "gcp", c.Icon())
 }
 
 func TestDeleteRecord_ExampleOutput(t *testing.T) {

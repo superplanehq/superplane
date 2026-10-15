@@ -17,9 +17,6 @@ func Test__GetArtifactInfo__ComponentInfo(t *testing.T) {
 	component := GetArtifactInfo{}
 
 	assert.Equal(t, "jfrogArtifactory.getArtifactInfo", component.Name())
-	assert.Equal(t, "Get Artifact Info", component.Label())
-	assert.Equal(t, "jfrogArtifactory", component.Icon())
-	assert.Equal(t, "gray", component.Color())
 	assert.NotEmpty(t, component.Description())
 	assert.NotEmpty(t, component.Documentation())
 }

@@ -1,47 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
-import type {
-  ComponentBaseContext,
-  ComponentDefinition,
-  ExecutionDetailsContext,
-  ExecutionInfo,
-  NodeInfo,
-} from "../types";
+import type { ComponentDefinition } from "../types";
 import { updateWorkerRouteMapper } from "./update_worker_route";
 import { eventStateRegistry } from "./index";
-
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "Test Node",
-    componentName: "cloudflare.updateWorkerRoute",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
-  return {
-    id: "exec-1",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    resultReason: "RESULT_REASON_OK",
-    resultMessage: "",
-    metadata: {},
-    configuration: {},
-    rootEvent: undefined,
-    ...overrides,
-  };
-}
-
-function buildDetailsCtx(overrides?: { execution?: Partial<ExecutionInfo> }): ExecutionDetailsContext {
-  const node = buildNode();
-  return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
-}
+import { buildExecution, createComponentFixtures } from "./test_support";
 
 const defaultDefinition: ComponentDefinition = {
   name: "cloudflare.updateWorkerRoute",
@@ -51,17 +13,7 @@ const defaultDefinition: ComponentDefinition = {
   color: "orange",
 };
 
-function buildPropsContext(overrides?: Partial<ComponentBaseContext>): ComponentBaseContext {
-  return {
-    nodes: [],
-    node: buildNode(),
-    componentDefinition: defaultDefinition,
-    lastExecutions: [],
-    currentUser: undefined,
-    actions: { invokeNodeExecutionHook: async () => {} },
-    ...overrides,
-  };
-}
+const { buildNode, buildDetailsCtx, buildPropsContext } = createComponentFixtures(defaultDefinition);
 
 describe("updateWorkerRouteMapper.getExecutionDetails", () => {
   it("reads route from output data", () => {

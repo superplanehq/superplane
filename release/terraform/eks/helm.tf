@@ -400,6 +400,35 @@ resource "helm_release" "traefik" {
 # SuperPlane Helm Release
 # -----------------------------------------------------------------------------
 
+locals {
+  fleet_manager_setup_values = yamlencode({
+    # The published chart still defaults both components to v0.1.0.
+    # Runner and Fleet Manager publish on separate release lines.
+    componentReleases = {
+      runnerVersion       = "v0.2.0"
+      runnerVersions      = ["v0.2.0"]
+      fleetManagerVersion = "v0.1.3"
+    }
+    fleetManagerSetup = {
+      enabled            = var.enable_runners
+      provider           = var.enable_runners ? "aws" : ""
+      managerId          = var.cluster_name
+      namespace          = var.superplane_namespace
+      serviceAccountName = "superplane-fleet-manager"
+      infrastructure = var.enable_runners ? {
+        superplaneUrl        = "https://${var.domain_name}"
+        region               = var.region
+        subnetIds            = aws_subnet.private[*].id
+        securityGroupIds     = [aws_security_group.runners[0].id]
+        imageAmd64           = var.runner_image_amd64
+        imageArm64           = var.runner_image_arm64
+        fleetManagerIdentity = aws_iam_role.fleet_manager[0].arn
+        runnerIdentity       = aws_iam_instance_profile.runner[0].name
+      } : null
+    }
+  })
+}
+
 resource "helm_release" "superplane" {
   name             = "superplane"
   repository       = "oci://ghcr.io/superplanehq"
@@ -408,6 +437,8 @@ resource "helm_release" "superplane" {
   namespace        = var.superplane_namespace
   create_namespace = false
   timeout          = 1200
+
+  values = [local.fleet_manager_setup_values]
 
   # Database configuration
   set {
@@ -495,7 +526,7 @@ resource "helm_release" "superplane" {
   # Integrated Runner API and workers share active logs through EFS.
   set {
     name  = "runner.api.enabled"
-    value = "true"
+    value = var.enable_runners ? "true" : "false"
   }
 
   set {

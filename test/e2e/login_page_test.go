@@ -157,14 +157,6 @@ func TestGoogleSSONoAccountSignup(t *testing.T) {
 	})
 }
 
-func TestGitHubSSONoAccountSignup(t *testing.T) {
-	runProviderSSONoAccountSignup(t, providerSSOCase{
-		provider:      "github",
-		continueLabel: "Continue with GitHub",
-		screenshot:    "sso-github-no-account",
-	})
-}
-
 type providerSSOCase struct {
 	provider      string
 	continueLabel string

@@ -122,7 +122,6 @@ This initial inventory requires confirmation during implementation:
 | `email_settings` | `smtp_password` |
 | `bitbucket_forge_installations` | `system_token` |
 | `sentry_app_install_grants` | `access_token`, `refresh_token` |
-| `account_providers` | Base64 ciphertext in `access_token` |
 
 The implementation audit must inspect all encryption and decryption call sites.
 It must also find sensitive values stored inside JSON configuration. Some tables

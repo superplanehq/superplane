@@ -1,3 +1,4 @@
+import { SystemSkillBadge } from "./SystemSkillBadge";
 import { BookOpen, Pencil } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 
@@ -37,7 +38,7 @@ export function WorkspaceSkillsSection({
         disabled={!canUpdate}
         data-testid="agent-resources-add-skill"
       >
-        {AGENT_RESOURCES_COPY.addSkill}
+        {AGENT_RESOURCES_COPY.add}
       </Button>
     </PermissionTooltip>
   );
@@ -51,14 +52,22 @@ export function WorkspaceSkillsSection({
       ) : (skills.data ?? []).length === 0 ? (
         <FactorySettingsCard
           title={AGENT_RESOURCES_COPY.skillsTitle}
+          titleClassName="text-sm font-semibold"
           description={AGENT_RESOURCES_COPY.skillsHelper}
+          icon={<BookOpen className="size-4" strokeWidth={1.75} aria-hidden />}
+          iconClassName="border-border bg-muted/60 text-foreground"
+          className="shadow-sm"
           action={addSkillAction}
           data-testid="agent-resources-skills-empty"
         />
       ) : (
         <FactorySettingsCard
           title={AGENT_RESOURCES_COPY.skillsTitle}
+          titleClassName="text-sm font-semibold"
           description={AGENT_RESOURCES_COPY.skillsHelper}
+          icon={<BookOpen className="size-4" strokeWidth={1.75} aria-hidden />}
+          iconClassName="border-border bg-muted/60 text-foreground"
+          className="shadow-sm"
           action={addSkillAction}
           attachedList
           data-testid="agent-resources-skills-list"
@@ -104,6 +113,7 @@ function SkillRow({
       >
         <BookOpen className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden />
         <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{name}</span>
+        {resource.systemSkill ? <SystemSkillBadge state={resource.systemSkill?.state} /> : null}
       </Link>
       <div className="flex shrink-0 items-center gap-1" data-testid={`agent-resource-actions-${resource.id}`}>
         {disabled ? (
@@ -128,7 +138,7 @@ function SkillRow({
               aria-label={AGENT_RESOURCES_COPY.editSkill}
               data-testid={`agent-resource-configure-${resource.id}`}
             >
-              <Pencil className="size-4" strokeWidth={1.75} aria-hidden />
+              <Pencil className="size-3.5" strokeWidth={1.75} aria-hidden />
             </Link>
           </Button>
         </PermissionTooltip>

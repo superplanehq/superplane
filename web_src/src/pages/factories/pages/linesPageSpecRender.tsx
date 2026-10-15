@@ -48,7 +48,7 @@ export function LinesBoardSpecHarness({
   navigateTo?: string;
 }) {
   return (
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <ThemeProvider>
         <TooltipProvider>
           <MemoryRouter initialEntries={[path]}>

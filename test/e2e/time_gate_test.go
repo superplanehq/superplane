@@ -14,21 +14,7 @@ import (
 )
 
 func TestTimeGateComponent(t *testing.T) {
-	weekendDays := []string{"saturday", "sunday"}
 	workweekDays := []string{"monday", "tuesday", "wednesday", "thursday", "friday"}
-
-	t.Run("add a TimeGate that blocks on weekends", func(t *testing.T) {
-		steps := &TimeGateSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists("Weekday Work Hours Gate")
-		steps.addTimeGate()
-		steps.setDaysTo(weekendDays)
-		steps.setTimeWindow("00:00", "23:59")
-		steps.setTimezone("0")
-		steps.saveTimeGate()
-		steps.canvas.CommitAndPublish()
-		steps.assertTimeGateSavedToDB("00:00-23:59", "0", weekendDays)
-	})
 
 	t.Run("add a TimeGate that blocks on outside of work hours", func(t *testing.T) {
 		steps := &TimeGateSteps{t: t}

@@ -25,6 +25,15 @@ resource "google_storage_bucket" "blobs" {
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
   force_destroy               = var.blob_bucket_force_destroy
+
+  # Finished runner logs are a signed GET. The browser fetches that URL
+  # from the SuperPlane origin, so the bucket must allow that origin.
+  cors {
+    origin          = ["https://${var.domain_name}"]
+    method          = ["GET", "HEAD"]
+    response_header = ["Content-Type", "Content-Encoding", "Content-Length"]
+    max_age_seconds = 3600
+  }
 }
 
 resource "google_service_account" "app" {
