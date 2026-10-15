@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -448,7 +449,7 @@ func Test__ListFactoryAgentResourceToolsDoesNotApplyDefaultsForAReplacedServer(t
 func Test__ListFactoryAgentResourceToolsOutboundTimeoutStaysRetryable(t *testing.T) {
 	t.Run("active request keeps the retry status", func(t *testing.T) {
 		ctx := context.Background()
-		err := listToolsForTimeout(t, ctx)
+		err := listToolsForTimeout(t, ctx, nil)
 		sanitized := grpcerrors.SanitizeError(ctx, err)
 		assert.Equal(t, codes.FailedPrecondition, status.Code(sanitized))
 		assert.Equal(t, "SuperPlane could not load the tools. Try again.", status.Convert(sanitized).Message())
@@ -456,26 +457,28 @@ func Test__ListFactoryAgentResourceToolsOutboundTimeoutStaysRetryable(t *testing
 	})
 
 	t.Run("request deadline stays deadline exceeded", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
-		defer cancel()
-		<-ctx.Done()
-
-		err := listToolsForTimeout(t, ctx)
+		ctx := newDeadlineContext()
+		err := listToolsForTimeout(t, ctx, func(req *http.Request) {
+			ctx.expire()
+			waitForRequestDone(t, req)
+		})
 		sanitized := grpcerrors.SanitizeError(ctx, err)
 		assert.Equal(t, codes.DeadlineExceeded, status.Code(sanitized))
 	})
 
 	t.Run("canceled request stays canceled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
-		cancel()
-
-		err := listToolsForTimeout(t, ctx)
+		defer cancel()
+		err := listToolsForTimeout(t, ctx, func(req *http.Request) {
+			cancel()
+			waitForRequestDone(t, req)
+		})
 		sanitized := grpcerrors.SanitizeError(ctx, err)
 		assert.Equal(t, codes.Canceled, status.Code(sanitized))
 	})
 }
 
-func listToolsForTimeout(t *testing.T, ctx context.Context) error {
+func listToolsForTimeout(t *testing.T, ctx context.Context, onCall func(*http.Request)) error {
 	t.Helper()
 	r := support.Setup(t)
 	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
@@ -489,8 +492,13 @@ func listToolsForTimeout(t *testing.T, ctx context.Context) error {
 	})
 	require.NoError(t, err)
 
+	called := false
 	previous := http.DefaultClient
 	http.DefaultClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		called = true
+		if onCall != nil {
+			onCall(req)
+		}
 		if err := req.Context().Err(); err != nil {
 			return nil, err
 		}
@@ -504,7 +512,51 @@ func listToolsForTimeout(t *testing.T, ctx context.Context) error {
 	})
 	http.DefaultClient = previous
 	require.Error(t, err)
+	require.True(t, called, "MCP transport was not called")
 	return err
+}
+
+func waitForRequestDone(t *testing.T, req *http.Request) {
+	t.Helper()
+	select {
+	case <-req.Context().Done():
+	case <-time.After(time.Second):
+		t.Fatal("request context stayed active after the outbound call ended it")
+	}
+}
+
+type deadlineContext struct {
+	context.Context
+	done chan struct{}
+	once sync.Once
+	err  error
+}
+
+func newDeadlineContext() *deadlineContext {
+	return &deadlineContext{
+		Context: context.Background(),
+		done:    make(chan struct{}),
+	}
+}
+
+func (c *deadlineContext) Done() <-chan struct{} {
+	return c.done
+}
+
+func (c *deadlineContext) Err() error {
+	select {
+	case <-c.done:
+		return c.err
+	default:
+		return nil
+	}
+}
+
+func (c *deadlineContext) expire() {
+	c.once.Do(func() {
+		c.err = context.DeadlineExceeded
+		close(c.done)
+	})
 }
 
 type roundTripFunc func(*http.Request) (*http.Response, error)
