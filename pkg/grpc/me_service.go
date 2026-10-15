@@ -67,7 +67,7 @@ func (s *MeService) DescribeVCSProviderOnboarding(ctx context.Context, req *pb.D
 }
 
 func (s *MeService) SelectVCSProviderOnboardingIdentity(ctx context.Context, req *pb.SelectVCSProviderOnboardingIdentityRequest) (*pb.SelectVCSProviderOnboardingIdentityResponse, error) {
-	return me.SelectVCSProviderOnboardingIdentity(ctx, req.GetProvider(), req.GetUserId())
+	return me.SelectVCSProviderOnboardingIdentity(ctx, req.GetProvider(), req.GetUserId(), req.GetProviderUserId())
 }
 
 func (s *MeService) StartVCSProviderInstallation(ctx context.Context, req *pb.StartVCSProviderInstallationRequest) (*pb.StartVCSProviderInstallationResponse, error) {

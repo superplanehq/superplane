@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { buildGitLabDetailsContext } from "./test_support";
 
-import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
+import type { ExecutionDetailsContext, ExecutionInfo } from "../types";
 import { createMergeCommentMapper } from "./create_merge_comment";
 
 describe("createMergeCommentMapper", () => {
@@ -46,35 +47,11 @@ describe("createMergeCommentMapper", () => {
 });
 
 function buildDetailsContext(execution: Partial<ExecutionInfo>): ExecutionDetailsContext {
-  const node: NodeInfo = {
-    id: "node-1",
-    name: "Create Merge Request Comment",
-    componentName: "gitlab.createMergeComment",
-    isCollapsed: false,
-    metadata: {
-      project: {
-        id: 123,
-        name: "felixgateru/hello-world",
-        url: "https://gitlab.com/felixgateru/hello-world",
-      },
+  return buildGitLabDetailsContext(
+    {
+      name: "Create Merge Request Comment",
+      componentName: "gitlab.createMergeComment",
     },
-  };
-
-  return {
-    nodes: [node],
-    node,
-    execution: {
-      id: "exec-1",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      resultReason: "RESULT_REASON_OK",
-      resultMessage: "",
-      metadata: {},
-      configuration: {},
-      rootEvent: undefined,
-      ...execution,
-    },
-  };
+    execution,
+  );
 }

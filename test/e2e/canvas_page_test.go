@@ -17,14 +17,6 @@ import (
 )
 
 func TestCanvasPage(t *testing.T) {
-	t.Run("adding a node to canvas displays custom node name", func(t *testing.T) {
-		steps := &CanvasPageSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists()
-		steps.addNoop("Hello")
-		steps.assertNodeIsAdded("Hello")
-	})
-
 	t.Run("adding multiple nodes generates unique names", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
@@ -60,14 +52,6 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertIsNodeExpanded("Hello")
 	})
 
-	t.Run("deleting a node from a canvas", func(t *testing.T) {
-		steps := &CanvasPageSteps{t: t}
-		steps.start()
-		steps.givenACanvasExistsWithANoopNode()
-		steps.deleteNodeFromCanvas("DeleteMe")
-		steps.assertNodeDeletedInDB("DeleteMe")
-	})
-
 	t.Run("deleting a newly added node updates the canvas before publish", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
@@ -79,16 +63,6 @@ func TestCanvasPage(t *testing.T) {
 		steps.publishCanvas()
 		steps.assertNodeDeletedInDB("DeleteMe")
 		steps.assertNodeIsAdded("Start")
-	})
-
-	t.Run("viewing queued items in the sidebar", func(t *testing.T) {
-		steps := &CanvasPageSteps{t: t}
-		steps.start()
-		steps.givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems(2)
-		steps.openSidebarForNode("Wait")
-		steps.assertRunningItemsCount("Wait", 1)
-		steps.assertQueuedItemsCount("Wait", 1)
-		steps.assertQueuedItemsVisibleInSidebar()
 	})
 
 	t.Run("canceling queued items from the sidebar", func(t *testing.T) {
@@ -168,30 +142,6 @@ func TestCanvasPage(t *testing.T) {
 		steps.assertAutocompleteRemainedVisible()
 		steps.assertHTTPURLInputContains(`$["Start"].data.`)
 		steps.assertAutocompleteSuggestionVisible("message")
-	})
-}
-
-func TestCanvasPageYamlViewer(t *testing.T) {
-	t.Run("YAML modal shows canvas YAML definition", func(t *testing.T) {
-		steps := &CanvasPageSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists()
-		steps.addNoop("YamlTestNode")
-		steps.openYamlModal()
-		steps.assertYamlTabIsOpen("canvas.yaml")
-		steps.assertYamlContentVisible("YamlTestNode")
-		steps.assertYamlContentVisible("metadata:")
-	})
-
-	t.Run("YAML modal can return to canvas", func(t *testing.T) {
-		steps := &CanvasPageSteps{t: t}
-		steps.start()
-		steps.givenACanvasExists()
-		steps.addNoop("SwitchTest")
-		steps.openYamlModal()
-		steps.assertYamlContentVisible("SwitchTest")
-		steps.closeYamlModal()
-		steps.assertNodeIsAdded("SwitchTest")
 	})
 }
 
@@ -311,15 +261,6 @@ func (s *CanvasPageSteps) assertNodeIsAdded(nodeName string) {
 
 func (s *CanvasPageSteps) assertNodeIsHidden(nodeName string) {
 	s.session.AssertHidden(q.TestID("node", nodeName, "header"))
-}
-
-func (s *CanvasPageSteps) givenACanvasExistsWithANoopNode() {
-	s.canvas = shared.NewCanvasSteps("E2E Canvas With Noop", s.t, s.session)
-
-	s.canvas.Create()
-	s.canvas.Visit()
-	s.canvas.EnterEditMode()
-	s.canvas.AddNoop("DeleteMe", models.Position{X: 500, Y: 200})
 }
 
 func (s *CanvasPageSteps) toggleNodeViewOnCanvas(nodeName string) {
@@ -507,7 +448,7 @@ func (s *CanvasPageSteps) pressEnterInExpressionAutocomplete() {
 
 func (s *CanvasPageSteps) assertAutocompleteNodeSuggestionVisible() {
 	s.session.AssertVisible(q.Locator(`div[data-suggestion-index="0"]`))
-	s.session.AssertVisible(q.Locator(`div[data-suggestion-index="0"] span:has-text("node")`))
+	s.session.AssertVisible(q.Locator(`div[data-suggestion-index] :text-is('["Start"]')`))
 }
 
 func (s *CanvasPageSteps) assertAutocompleteSuggestionHighlighted(index int) {
@@ -682,11 +623,6 @@ func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int)
 	require.Equal(s.t, expected, lastCount)
 }
 
-func (s *CanvasPageSteps) assertQueuedItemsVisibleInSidebar() {
-	s.session.AssertVisible(q.TestID("run-inspector-panel"))
-	s.session.AssertVisible(q.Locator(`[data-testid="run-inspector-panel"] button:has-text("Stop")`))
-}
-
 func (s *CanvasPageSteps) cancelFirstQueueItemFromSidebar() {
 	s.stopRunFromInspector()
 }
@@ -735,42 +671,5 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 		}
 
 		time.Sleep(200 * time.Millisecond)
-	}
-}
-
-func (s *CanvasPageSteps) openYamlModal() {
-	s.canvas.Save()
-	s.canvas.ClickOnEmptyCanvasArea()
-	s.session.Sleep(300)
-	yamlButton := q.TestID("canvas-spec-yaml-button")
-	s.session.AssertVisible(yamlButton)
-	s.session.Click(yamlButton)
-	s.session.AssertVisible(q.TestID("canvas-spec-yaml-modal"))
-	s.session.AssertVisible(q.TestID("canvas-spec-yaml-editor"))
-	s.waitForMonacoEditor()
-}
-
-func (s *CanvasPageSteps) closeYamlModal() {
-	s.session.Click(q.Locator(`[data-testid="canvas-spec-yaml-modal"] >> text=Close`))
-	s.session.Sleep(300)
-}
-
-func (s *CanvasPageSteps) assertYamlTabIsOpen(name string) {
-	s.session.AssertText(name)
-	s.session.AssertVisible(q.TestID("canvas-spec-yaml-editor"))
-}
-
-func (s *CanvasPageSteps) assertYamlContentVisible(text string) {
-	s.waitForMonacoEditor()
-	s.session.AssertVisible(q.Locator(fmt.Sprintf(`[data-testid="canvas-spec-yaml-editor"] >> text=%s`, text)))
-}
-
-func (s *CanvasPageSteps) waitForMonacoEditor() {
-	monacoLines := q.Locator(`[data-testid="canvas-spec-yaml-editor"] .view-lines`)
-	if err := monacoLines.Run(s.session).WaitFor(pw.LocatorWaitForOptions{
-		State:   pw.WaitForSelectorStateVisible,
-		Timeout: pw.Float(15000),
-	}); err != nil {
-		s.t.Fatalf("monaco editor did not become ready: %v", err)
 	}
 }

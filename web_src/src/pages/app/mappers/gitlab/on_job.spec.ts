@@ -1,43 +1,18 @@
 import { describe, expect, it } from "bun:test";
+import { createGitLabTriggerBuilders } from "./test_support";
 
 import { onJobTriggerRenderer } from "./on_job";
-import type { NodeInfo, TriggerEventContext, TriggerRendererContext, ComponentDefinition, EventInfo } from "../types";
+import type { TriggerEventContext, TriggerRendererContext } from "../types";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "On Job",
-    componentName: "gitlab.onJob",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildDefinition(overrides?: Partial<ComponentDefinition>): ComponentDefinition {
-  return {
-    name: "onJob",
-    label: "On Job",
-    description: "",
-    icon: "gitlab",
-    color: "orange",
-    ...overrides,
-  };
-}
-
-function buildEvent(overrides?: Partial<NonNullable<EventInfo>>): EventInfo {
-  return {
-    id: "evt-1",
-    createdAt: new Date().toISOString(),
-    data: {},
-    nodeId: "node-1",
-    type: "gitlab.job",
-    ...overrides,
-  };
-}
+const { buildNode, buildDefinition, buildEvent } = createGitLabTriggerBuilders({
+  name: "On Job",
+  componentName: "gitlab.onJob",
+  definitionName: "onJob",
+  label: "On Job",
+  eventType: "gitlab.job",
+});
 
 function buildEventData() {
   return {
@@ -83,23 +58,14 @@ describe("onJobTriggerRenderer.getRootEventValues", () => {
   it("extracts job details from event data", () => {
     const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
     const values = onJobTriggerRenderer.getRootEventValues(ctx);
+    expect(Object.keys(values)[0]).toBe("Received At");
+    expect(values["Received At"]).toBe(new Date(ctx.event!.createdAt!).toLocaleString());
+    expect(Object.keys(values).length).toBeLessThanOrEqual(6);
     expect(values["Job"]).toBe("unit-tests");
     expect(values["Status"]).toBe("success");
     expect(values["Stage"]).toBe("test");
     expect(values["Ref"]).toBe("main");
     expect(values["Job URL"]).toBe("https://gitlab.com/group/example-project/-/jobs/998876");
-  });
-
-  it("includes received at as the first value", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    const values = onJobTriggerRenderer.getRootEventValues(ctx);
-    expect(Object.keys(values)[0]).toBe("Received At");
-    expect(values["Received At"]).not.toBe("-");
-  });
-
-  it("returns at most 6 values", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    expect(Object.keys(onJobTriggerRenderer.getRootEventValues(ctx)).length).toBeLessThanOrEqual(6);
   });
 
   it("omits the job URL when the project web_url is missing", () => {

@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -353,50 +352,6 @@ func (s *TestSession) PressKey(key string) {
 	}
 }
 
-// DragSelectOnCanvas performs a rubber-band selection on the React Flow canvas.
-// It holds the platform multi-selection key (Ctrl/Meta) while dragging from
-// (startX, startY) to (endX, endY) in viewport coordinates.
-func (s *TestSession) DragSelectOnCanvas(target queries.Query, startX, startY, endX, endY int) {
-	s.t.Logf("Drag-selecting on canvas from (%d,%d) to (%d,%d)", startX, startY, endX, endY)
-
-	el := target.Run(s)
-	box, err := el.BoundingBox()
-	if err != nil || box == nil {
-		s.t.Fatalf("getting bounding box of canvas: %v", err)
-	}
-
-	absStartX := box.X + float64(startX)
-	absStartY := box.Y + float64(startY)
-	absEndX := box.X + float64(endX)
-	absEndY := box.Y + float64(endY)
-
-	key := "Control"
-	if isMac() {
-		key = "Meta"
-	}
-
-	if err := s.page.Keyboard().Down(key); err != nil {
-		s.t.Fatalf("pressing %s down: %v", key, err)
-	}
-
-	if err := s.page.Mouse().Move(absStartX, absStartY); err != nil {
-		s.t.Fatalf("moving mouse to start: %v", err)
-	}
-	if err := s.page.Mouse().Down(); err != nil {
-		s.t.Fatalf("mouse down: %v", err)
-	}
-	if err := s.page.Mouse().Move(absEndX, absEndY, pw.MouseMoveOptions{Steps: pw.Int(10)}); err != nil {
-		s.t.Fatalf("moving mouse to end: %v", err)
-	}
-	if err := s.page.Mouse().Up(); err != nil {
-		s.t.Fatalf("mouse up: %v", err)
-	}
-
-	if err := s.page.Keyboard().Up(key); err != nil {
-		s.t.Fatalf("releasing %s: %v", key, err)
-	}
-}
-
 func (s *TestSession) HoverOver(q queries.Query) {
 	s.t.Logf("Hovering over %q", q.Describe())
 
@@ -500,8 +455,4 @@ func (s *TestSession) ScrollToTheBottomOfPage() {
 	}
 
 	time.Sleep(300 * time.Millisecond)
-}
-
-func isMac() bool {
-	return runtime.GOOS == "darwin"
 }

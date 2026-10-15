@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { buildGitLabDetailsContext } from "./test_support";
 
-import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
+import type { ExecutionDetailsContext, ExecutionInfo } from "../types";
 import { markMergeRequestReadyForReviewMapper } from "./mark_merge_request_ready_for_review";
 
 describe("markMergeRequestReadyForReviewMapper", () => {
@@ -74,39 +75,15 @@ describe("markMergeRequestReadyForReviewMapper", () => {
 });
 
 function buildDetailsContext(execution: Partial<ExecutionInfo>): ExecutionDetailsContext {
-  const node: NodeInfo = {
-    id: "node-1",
-    name: "Mark Merge Request Ready for Review",
-    componentName: "gitlab.markMergeRequestReadyForReview",
-    isCollapsed: false,
-    configuration: {
-      project: "123",
-      mergeRequestIid: "42",
-    },
-    metadata: {
-      project: {
-        id: 123,
-        name: "felixgateru/hello-world",
-        url: "https://gitlab.com/felixgateru/hello-world",
+  return buildGitLabDetailsContext(
+    {
+      name: "Mark Merge Request Ready for Review",
+      componentName: "gitlab.markMergeRequestReadyForReview",
+      configuration: {
+        project: "123",
+        mergeRequestIid: "42",
       },
     },
-  };
-
-  return {
-    nodes: [node],
-    node,
-    execution: {
-      id: "exec-1",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      resultReason: "RESULT_REASON_OK",
-      resultMessage: "",
-      metadata: {},
-      configuration: {},
-      rootEvent: undefined,
-      ...execution,
-    },
-  };
+    execution,
+  );
 }

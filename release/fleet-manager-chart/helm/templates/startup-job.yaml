@@ -6,8 +6,8 @@ metadata:
   labels:
     {{- include "fleet-manager.labels" . | nindent 4 }}
   annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "-5"
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
   activeDeadlineSeconds: {{ .Values.startupJob.activeDeadlineSeconds }}
@@ -20,6 +20,10 @@ spec:
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
@@ -28,28 +32,12 @@ spec:
           type: RuntimeDefault
       containers:
         - name: sync-fleets
-          image: {{ .Values.startupJob.image | quote }}
-          imagePullPolicy: IfNotPresent
-          command: ["/bin/sh", "-c"]
-          args:
-            - |
-              {{- .Files.Get "files/sync-fleets.sh" | nindent 14 }}
-            - "--"
-            {{- range .Values.fleets }}
-            {{- $create := dict "fleetId" .id "runnerVersion" .runnerVersion "spec" .spec }}
-            {{- $update := dict "runnerVersion" .runnerVersion "spec" .spec }}
-            - {{ .id | quote }}
-            - {{ $create | toJson | b64enc | quote }}
-            - {{ $update | toJson | b64enc | quote }}
-            {{- end }}
+          image: {{ printf "%s:%s" .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["sync-fleets"]
           env:
-            - name: SUPERPLANE_URL
-              value: {{ .Values.superplane.url | trimSuffix "/" | quote }}
-            - name: INSTALLATION_ADMIN_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.credentials.existingSecret }}
-                  key: {{ .Values.credentials.tokenKey }}
+            - name: FLEET_MANAGER_CONFIG_FILE
+              value: /etc/superplane/fleet-manager.yaml
           securityContext:
             privileged: false
             allowPrivilegeEscalation: false
@@ -57,9 +45,10 @@ spec:
             capabilities:
               drop: ["ALL"]
           volumeMounts:
-            - name: temporary-files
-              mountPath: /tmp
+            - name: config
+              mountPath: /etc/superplane
+              readOnly: true
       volumes:
-        - name: temporary-files
-          emptyDir:
-            sizeLimit: 1Mi
+        - name: config
+          secret:
+            secretName: {{ include "fleet-manager.configSecretName" . }}

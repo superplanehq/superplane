@@ -8,6 +8,8 @@ import {
   factoriesListFactoryAgentResourceTools,
   factoriesStartFactoryAgentResourceOAuth,
   factoriesUpdateFactoryAgentResource,
+  factoriesRestoreFactorySystemSkill,
+  type FactoriesFactoryAgentResource,
   type FactoriesCreateFactoryAgentResourceBody,
   type FactoriesFactoryAgentResourceKind,
   type FactoriesUpdateFactoryAgentResourceBody,
@@ -94,6 +96,30 @@ export function useUpdateFactoryAgentResource(organizationId: string, factoryId:
       return response.data.resource;
     },
     onSuccess: () => invalidateAgentResources(queryClient, organizationId, factoryId),
+  });
+}
+
+export function useRestoreFactorySystemSkill(organizationId: string, factoryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (resourceId: string) => {
+      const response = await factoriesRestoreFactorySystemSkill(
+        withOrganizationHeader({
+          organizationId,
+          path: { factoryId, resourceId },
+          body: {},
+        }),
+      );
+      if (!response.data?.resource) throw new Error("Failed to restore system skill");
+      return response.data.resource;
+    },
+    onSuccess: (resource) => {
+      queryClient.setQueryData<FactoriesFactoryAgentResource[]>(
+        factoryAgentResourcesKey(organizationId, factoryId, "KIND_SKILL"),
+        (current) => current?.map((entry) => (entry.id === resource.id ? resource : entry)),
+      );
+      invalidateAgentResources(queryClient, organizationId, factoryId);
+    },
   });
 }
 

@@ -2,8 +2,7 @@ manager:
   id: test-azure
 superplane:
   url: https://superplane.example.com
-credentials:
-  existingSecret: fleet-manager-token
+installationAdminToken: fleet-manager-personal-token
 serviceAccount:
   annotations:
     azure.workload.identity/client-id: 00000000-0000-0000-0000-000000000001

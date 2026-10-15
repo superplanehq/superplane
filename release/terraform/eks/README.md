@@ -99,12 +99,14 @@ Access SuperPlane at `https://your-domain.com`
 Open **Set up runner fleets** during owner setup. Terraform passes the runner
 subnets, security group, instance profile, region, public SuperPlane URL,
 cluster name, and Fleet Manager role to SuperPlane. The wizard preloads these
-values. Replace the AMI placeholder with an immutable Runner image, save
-`values.yaml`, and run the displayed Helm command.
+values. Build immutable amd64 and arm64 AMIs with Packer. Set
+`runner_image_amd64` and `runner_image_arm64`, and run `terraform apply` again.
+The wizard disables fleets whose architecture has no configured AMI.
 
 Terraform creates the AWS runner infrastructure, but it does not install Fleet
-Manager. The SuperPlane chart creates the dedicated service-token Secret in
-Kubernetes. The credential does not enter Terraform state. See
+Manager. SuperPlane creates a normal personal token when you generate the Helm
+commands. The standalone chart stores the complete configuration and token in
+`fleet-manager-config`. See
 [the standalone chart guide](../../fleet-manager-chart/README.md).
 
 ## Destroy
