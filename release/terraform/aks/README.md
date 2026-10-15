@@ -131,7 +131,9 @@ If `az postgres flexible-server list-skus --location eastus` is empty:
 create_postgresql_flexible_server = false
 ```
 
-Terraform does not install Fleet Manager or store its installation token.
+Terraform does not install Fleet Manager. The SuperPlane chart creates its
+dedicated service-token Secret in Kubernetes. The credential does not enter
+Terraform state.
 
 Do not keep a `*_override.tf` file. Chart path and image registry are
 Terraform variables.
@@ -217,10 +219,11 @@ packer build \
 Use a size from `az vm list-skus`. Do not use `*_v5` unless the
 subscription allows it.
 
-Open **Fleet setup** in SuperPlane. Select Azure and use the runner and
-identity outputs from this Terraform stack. Replace the Azure image
-placeholder with the immutable gallery image version that Packer created.
-Then create the token Secret and install the standalone Fleet Manager chart.
+Open **Set up runner fleets** during owner setup. Terraform passes the runner
+network, location, identity, and cluster values to SuperPlane. The wizard
+preloads these values. Replace the Azure image placeholder with the immutable
+gallery image version that Packer created. Save `values.yaml` and run the
+displayed Helm command.
 See [the standalone chart guide](../../fleet-manager-chart/README.md).
 
 ## Destroy
