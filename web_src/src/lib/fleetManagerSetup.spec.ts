@@ -211,6 +211,7 @@ it("matches installed fleets by version and specification", () => {
   expect(fleetsMatchConfiguration([{ ...installed[0], runnerVersion: "v0.0.9" }], draft, metadata.fleetPresets)).toBe(
     false,
   );
+  expect(fleetsMatchConfiguration(installed, { ...draft, selectedFleetIds: [] }, metadata.fleetPresets)).toBe(false);
 });
 
 it("uses a browser key that stores only the non-secret draft", () => {

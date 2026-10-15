@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FLEET_MANAGER_DRAFT_KEY, saveFleetManagerDraft } from "@/lib/fleetManagerSetup";
@@ -235,6 +235,31 @@ describe("FleetManagerSetup", () => {
     expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).toBeNull();
     expect(screen.queryByRole("heading", { name: "Fleet Manager setup saved" })).not.toBeInTheDocument();
     expect(fleetRequestCount(vi.mocked(fetch))).toBe(1);
+  });
+
+  it("stops fleet verification when the draft changes", async () => {
+    render(<FleetManagerSetup />);
+    fireEvent.click(await screen.findByRole("button", { name: "Check installation" }));
+
+    expect(await screen.findByText(/created every selected fleet/i)).toBeInTheDocument();
+    expect(fleetRequestCount(vi.mocked(fetch))).toBe(1);
+
+    fireEvent.change(screen.getByLabelText("SuperPlane URL"), {
+      target: { value: "https://edited.example.com" },
+    });
+
+    expect(screen.queryByText(/created every selected fleet/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check installation" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /e1-large-amd64/ }));
+
+    expect(screen.getAllByText("Select at least one fleet.").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Check installation" })).toBeDisabled();
+    await waitFor(() => {
+      expect(fleetRequestCount(vi.mocked(fetch))).toBe(1);
+      expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).toContain('"selectedFleetIds":[]');
+    });
+    expect(screen.queryByText(/created every selected fleet/i)).not.toBeInTheDocument();
   });
 
   it("explains authentication failures and retries verification", async () => {

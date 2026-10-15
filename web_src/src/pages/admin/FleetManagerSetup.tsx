@@ -6,10 +6,10 @@ import {
   FleetManagerProviderSection,
 } from "@/components/fleet-manager-setup/FleetManagerSections";
 import { FleetManagerVerificationStatus } from "@/components/fleet-manager-setup/FleetManagerWizard";
-import { downloadFleetManagerValues } from "@/components/fleet-manager-setup/downloadFleetManagerValues";
 import { Button } from "@/components/ui/button";
 import { useFleetManagerSetup, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
-import { fleetManagerInstallCommand } from "@/lib/fleetManagerSetup";
+import { downloadFleetManagerValues } from "@/lib/downloadFleetManagerValues";
+import { fleetManagerInstallCommand, type FleetManagerDraft } from "@/lib/fleetManagerSetup";
 import { CopyButton } from "@/ui/CopyButton";
 import { Download, TriangleAlert } from "lucide-react";
 
@@ -72,9 +72,10 @@ function ValuesBlock({ values, command }: { values: string; command: string }) {
 
 export function FleetManagerSetup() {
   const setup = useFleetManagerSetup();
-  const [checkRequested, setCheckRequested] = useState(false);
-  const verification = useFleetManagerVerification(checkRequested, setup.draft, setup.metadata);
+  const [submittedDraft, setSubmittedDraft] = useState<FleetManagerDraft | null>(null);
   const draftIsValid = setup.validationErrors.length === 0;
+  const submittedDraftIsCurrent = submittedDraft !== null && setup.draft === submittedDraft;
+  const verification = useFleetManagerVerification(submittedDraftIsCurrent, submittedDraft, setup.metadata);
   const command = useMemo(
     () =>
       setup.metadata && setup.draft
@@ -127,10 +128,16 @@ export function FleetManagerSetup() {
                   {setup.validationErrors[0]}
                 </p>
               )}
-              <Button type="button" onClick={() => setCheckRequested(true)} disabled={!draftIsValid || checkRequested}>
+              <Button
+                type="button"
+                onClick={() => {
+                  if (setup.draft && draftIsValid) setSubmittedDraft(setup.draft);
+                }}
+                disabled={!draftIsValid || submittedDraftIsCurrent}
+              >
                 Check installation
               </Button>
-              {checkRequested && (
+              {submittedDraftIsCurrent && (
                 <FleetManagerVerificationStatus status={verification.status} onRetry={verification.retry} />
               )}
             </div>

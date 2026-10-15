@@ -6,7 +6,7 @@ import {
   FleetManagerProviderSection,
   type FleetManagerSetupState,
 } from "@/components/fleet-manager-setup/FleetManagerSections";
-import { downloadFleetManagerValues } from "@/components/fleet-manager-setup/downloadFleetManagerValues";
+import { downloadFleetManagerValues } from "@/lib/downloadFleetManagerValues";
 import { Button } from "@/components/ui/button";
 import { type FleetManagerVerificationStatus, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
 import { fleetManagerInstallCommand } from "@/lib/fleetManagerSetup";
