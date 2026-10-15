@@ -60,6 +60,12 @@ variable "vm_size" {
   }
 }
 
+variable "trusted_launch" {
+  type        = bool
+  default     = true
+  description = "Use a Trusted Launch build VM for a private gallery image definition TrustedLaunch. Set false for a community or direct shared gallery image definition TrustedLaunchSupported."
+}
+
 variable "claude_code_version" {
   type        = string
   description = "Claude Code version installed in the images."
@@ -116,9 +122,12 @@ source "azure-arm" "ubuntu" {
   image_sku       = local.image_sku
   image_version   = "latest"
 
-  secure_boot_enabled = true
-  vtpm_enabled        = true
-  security_type       = "TrustedLaunch"
+  # Plugin azure-arm 2.3.3 omits securityProfile when security_type is null
+  # and secure boot and vTPM are false. The Gen2 source image then builds
+  # a Standard VM with no VM Guest State.
+  secure_boot_enabled = var.trusted_launch
+  vtpm_enabled        = var.trusted_launch
+  security_type       = var.trusted_launch ? "TrustedLaunch" : null
 
   azure_tags = {
     Architecture = var.architecture
