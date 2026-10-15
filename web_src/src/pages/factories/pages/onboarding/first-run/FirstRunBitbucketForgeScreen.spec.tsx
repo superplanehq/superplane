@@ -114,6 +114,7 @@ describe("FirstRunBitbucketForgeScreen", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("SuperPlane could not copy the install link.");
     expect(screen.getByText("Select the link below, or try again.")).toBeInTheDocument();
     const link = screen.getByRole("textbox", { name: "Install link" });
+    expect(screen.getByText("Install link", { selector: "label" })).toHaveAttribute("for", link.id);
     expect(link).toHaveValue(installUrl);
     expect(link).toHaveAttribute("readonly");
 

@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useState } from "react";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
@@ -41,14 +42,19 @@ export function BitbucketCopyInstallLink({ installUrl, onCopy }: { installUrl: s
           <p className="text-[13px] text-destructive">{copy.copyInstallLinkError}</p>
           <p className="text-[12px] text-muted-foreground">{copy.copyInstallLinkRecovery}</p>
           {installUrl ? (
-            <Input
-              readOnly
-              value={installUrl}
-              aria-label={copy.installLinkLabel}
-              onFocus={(event) => event.currentTarget.select()}
-              data-testid="first-run-bitbucket-install-link"
-              className="h-8 font-mono text-[12px]"
-            />
+            <div className="space-y-1">
+              <Label htmlFor="first-run-bitbucket-install-link" className="text-[12px] font-medium">
+                {copy.installLinkLabel}
+              </Label>
+              <Input
+                id="first-run-bitbucket-install-link"
+                readOnly
+                value={installUrl}
+                onFocus={(event) => event.currentTarget.select()}
+                data-testid="first-run-bitbucket-install-link"
+                className="h-8 font-mono text-[12px]"
+              />
+            </div>
           ) : null}
         </div>
       ) : null}
