@@ -37,7 +37,7 @@ const metadata: FleetManagerSetupMetadata = {
     managerId: "test-cluster",
     namespace: "superplane",
     serviceAccountName: "superplane-fleet-manager",
-    fields: { region: "us-east-1", subnetIds: ["subnet-a"] },
+    fields: { superplaneUrl: "https://superplane.example.com", region: "us-east-1", subnetIds: ["subnet-a"] },
   },
   credentials: {
     existingSecret: "superplane-fleet-manager-token",
@@ -56,6 +56,7 @@ describe("generateFleetManagerValues", () => {
       metadata,
       provider,
       managerId: `test-${provider}`,
+      superplaneUrl: "https://superplane.example.com",
       runnerVersion: "v0.1.0",
       selectedFleetIds: ["e1-large-amd64"],
       warmCapacity: 0,
@@ -77,6 +78,7 @@ describe("generateFleetManagerValues", () => {
       },
       provider: "aws",
       managerId: "test-aws",
+      superplaneUrl: "https://superplane.example.com",
       runnerVersion: "v0.1.0",
       selectedFleetIds: ["e1-large-amd64", "e1-tiny-amd64"],
       warmCapacity: 0,
@@ -88,7 +90,7 @@ describe("generateFleetManagerValues", () => {
     expect(values).toContain("id: e1-tiny-amd64");
   });
 
-  it("uses an architecture-specific machine type for mixed fleets", () => {
+  it("uses a machine type for each selected fleet", () => {
     const values = generateFleetManagerValues({
       metadata: {
         ...metadata,
@@ -96,24 +98,29 @@ describe("generateFleetManagerValues", () => {
           ...metadata.fleetPresets,
           {
             ...metadata.fleetPresets[0],
-            id: "e1-large-arm64",
-            spec: { ...metadata.fleetPresets[0].spec, architecture: "arm64" },
+            id: "e1-tiny-amd64",
+            spec: { ...metadata.fleetPresets[0].spec, cpuMillicores: 250, memoryMb: 1024 },
           },
         ],
       },
       provider: "aws",
       managerId: "test-aws",
+      superplaneUrl: "https://cluster.example.com",
       runnerVersion: "v0.1.0",
-      selectedFleetIds: ["e1-large-amd64", "e1-large-arm64"],
+      selectedFleetIds: ["e1-large-amd64", "e1-tiny-amd64"],
       warmCapacity: 0,
       maxCapacity: 2,
-      fields: { machineTypeAmd64: "m8a.large", machineTypeArm64: "m8g.large" },
+      fields: {
+        "machineType.e1-large-amd64": "m8a.large",
+        "machineType.e1-tiny-amd64": "t3.small",
+      },
       serviceAccountName: "custom-fleet-manager",
     });
 
     expect(values).toContain("instanceType: m8a.large");
-    expect(values).toContain("instanceType: m8g.large");
+    expect(values).toContain("instanceType: t3.small");
     expect(values).toContain("name: custom-fleet-manager");
+    expect(values).toContain("url: https://cluster.example.com");
   });
 
   it("does not attach a GCP service account unless one is configured", () => {
@@ -121,6 +128,7 @@ describe("generateFleetManagerValues", () => {
       metadata,
       provider: "gcp",
       managerId: "test-gcp",
+      superplaneUrl: "https://superplane.example.com",
       runnerVersion: "v0.1.0",
       selectedFleetIds: ["e1-large-amd64"],
       warmCapacity: 0,
@@ -137,6 +145,7 @@ describe("validateFleetManagerConfiguration", () => {
     managerId: "my-cluster",
     namespace: "superplane",
     serviceAccountName: "superplane-fleet-manager",
+    superplaneUrl: "https://superplane.example.com",
     runnerVersion: "v0.1.0",
     selectedFleetIds: ["e1-large-amd64"],
     warmCapacity: 0,
@@ -148,6 +157,7 @@ describe("validateFleetManagerConfiguration", () => {
     [{ warmCapacity: -1 }, "Warm capacity must be a non-negative integer."],
     [{ maxCapacity: 1.5 }, "Maximum capacity must be a non-negative integer."],
     [{ warmCapacity: 2, maxCapacity: 1 }, "Warm capacity cannot exceed maximum capacity."],
+    [{ superplaneUrl: "not-a-url" }, "Enter a valid SuperPlane URL."],
   ])("rejects an invalid fleet configuration", (updates, expectedError) => {
     expect(validateFleetManagerConfiguration({ ...validConfiguration, ...updates })).toContain(expectedError);
   });
@@ -173,6 +183,7 @@ it("matches installed fleets by version and specification", () => {
     managerId: "test-cluster",
     namespace: "superplane",
     serviceAccountName: "superplane-fleet-manager",
+    superplaneUrl: "https://superplane.example.com",
     runnerVersion: "v0.1.0",
     selectedFleetIds: ["e1-large-amd64"],
     warmCapacity: 0,
@@ -193,6 +204,7 @@ it("uses a browser key that stores only the non-secret draft", () => {
     managerId: "test-cluster",
     namespace: "superplane",
     serviceAccountName: "superplane-fleet-manager",
+    superplaneUrl: "https://superplane.example.com",
     runnerVersion: "v0.1.0",
     selectedFleetIds: ["e1-large-amd64"],
     warmCapacity: 0,
@@ -214,6 +226,7 @@ it("removes unknown values from a stored Fleet Manager draft", () => {
       managerId: "test-cluster",
       namespace: "superplane",
       serviceAccountName: "superplane-fleet-manager",
+      superplaneUrl: "https://superplane.example.com",
       runnerVersion: "v0.1.0",
       selectedFleetIds: ["e1-large-amd64"],
       warmCapacity: 0,

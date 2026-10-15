@@ -28,6 +28,7 @@ const metadata = {
     namespace: "superplane",
     serviceAccountName: "superplane-fleet-manager",
     fields: {
+      superplaneUrl: "https://superplane.example.com",
       region: "us-east-1",
       subnetIds: ["subnet-a", "subnet-b"],
       securityGroupIds: ["sg-runner"],
@@ -79,6 +80,7 @@ describe("FleetManagerSetup", () => {
     await continueTo("Confirm cloud infrastructure");
     expect(screen.getByLabelText("AWS region")).toHaveValue("us-east-1");
     expect(screen.getByLabelText("Private subnet IDs")).toHaveValue("subnet-a, subnet-b");
+    expect(screen.getByLabelText("SuperPlane URL")).toHaveValue("https://superplane.example.com");
   });
 
   it("generates values with a Secret reference and no credential value", async () => {
@@ -89,6 +91,19 @@ describe("FleetManagerSetup", () => {
     expect(yaml).toContain("tokenKey: INSTALLATION_ADMIN_TOKEN");
     expect(yaml).not.toContain("kubernetes-api-token");
     expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("INSTALLATION_ADMIN_TOKEN");
+  });
+
+  it("uses the reachable SuperPlane URL entered by the administrator", async () => {
+    render(<FleetManagerSetup />);
+    await continueTo("Confirm cloud infrastructure");
+    fireEvent.change(screen.getByLabelText("SuperPlane URL"), {
+      target: { value: "https://runners.example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    const yaml = screen.getByText(/url: https:\/\/runners.example.com/).textContent ?? "";
+    expect(yaml).toContain("url: https://runners.example.com");
+    expect(yaml).not.toContain(window.location.origin);
   });
 
   it("clears incompatible fields when the provider changes", async () => {

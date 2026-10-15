@@ -88,7 +88,7 @@ const fleetManagerMetadata = {
     managerId: "test-cluster",
     namespace: "superplane",
     serviceAccountName: "superplane-fleet-manager",
-    fields: { region: "us-east-1" },
+    fields: { superplaneUrl: "https://superplane.example.com", region: "us-east-1" },
   },
   credentials: {
     existingSecret: "superplane-fleet-manager-token",
