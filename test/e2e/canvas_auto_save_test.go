@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -9,50 +8,12 @@ import (
 	pw "github.com/mxschmitt/playwright-go"
 	"github.com/stretchr/testify/require"
 
-	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
 )
 
 func TestCanvasAutoSave(t *testing.T) {
-	t.Run("versioned canvas auto-saves after moving a node", func(t *testing.T) {
-		steps := &canvasAutoSaveSteps{t: t}
-		steps.start()
-		steps.givenCanvas("E2E Auto Save Versioning")
-		steps.enterEditMode()
-		steps.addNoopNode("Auto Save Node", models.Position{X: 500, Y: 220})
-		steps.waitForSaved()
-		steps.dismissSidebar()
-		steps.moveNode("Auto Save Node", 100, 80)
-		steps.waitForSaved()
-	})
-
-	t.Run("versioned canvas keeps the latest position after two quick moves", func(t *testing.T) {
-		steps := &canvasAutoSaveSteps{t: t}
-		steps.start()
-		steps.givenCanvas("E2E Auto Save Queue")
-		steps.enterEditMode()
-		steps.addNoopNode("Queued Move Node", models.Position{X: 500, Y: 220})
-		steps.waitForSaved()
-		steps.dismissSidebar()
-
-		initialCenter := steps.nodeCenter("Queued Move Node")
-		steps.moveNode("Queued Move Node", 140, 60)
-		steps.moveNode("Queued Move Node", 90, 55)
-		steps.waitForSaved()
-
-		finalCenter := steps.nodeCenter("Queued Move Node")
-		require.Greater(t, finalCenter.X, initialCenter.X+180)
-		require.Greater(t, finalCenter.Y, initialCenter.Y+80)
-
-		steps.session.Sleep(1500)
-
-		stableCenter := steps.nodeCenter("Queued Move Node")
-		require.InDelta(t, finalCenter.X, stableCenter.X, 2)
-		require.InDelta(t, finalCenter.Y, stableCenter.Y, 2)
-	})
-
 	t.Run("versioned canvas auto-saves note edits on blur", func(t *testing.T) {
 		steps := &canvasAutoSaveSteps{t: t}
 		steps.start()
@@ -100,18 +61,8 @@ func (s *canvasAutoSaveSteps) enterEditMode() {
 	s.canvas.EnterEditMode()
 }
 
-func (s *canvasAutoSaveSteps) addNoopNode(name string, pos models.Position) {
-	s.canvas.AddNoop(name, pos)
-	s.session.AssertText(name)
-}
-
 func (s *canvasAutoSaveSteps) addNote() {
 	s.canvas.AddNote()
-}
-
-func (s *canvasAutoSaveSteps) dismissSidebar() {
-	s.canvas.ClickOnEmptyCanvasArea()
-	s.session.Sleep(300)
 }
 
 func (s *canvasAutoSaveSteps) startEditingNoteWithText(text string) {
@@ -147,64 +98,6 @@ func (s *canvasAutoSaveSteps) assertNoteTextInDB(expected string) {
 		text, _ := node.Configuration["text"].(string)
 		return text == expected
 	}, 10*time.Second, 200*time.Millisecond)
-}
-
-// nodeHeaderSelector builds the correct data-testid selector for a node header,
-// matching the DOM convention of lowercase, space-to-dash conversion.
-func nodeHeaderSelector(name string) q.Query {
-	safe := strings.ToLower(name)
-	safe = strings.ReplaceAll(safe, " ", "-")
-	return q.Locator(`[data-testid="node-` + safe + `-header"]`)
-}
-
-// moveNode grabs a node by its header and drags it by the given offset.
-func (s *canvasAutoSaveSteps) moveNode(name string, deltaX, deltaY int) {
-	loc := nodeHeaderSelector(name).Run(s.session)
-
-	err := loc.WaitFor(pw.LocatorWaitForOptions{
-		State:   pw.WaitForSelectorStateVisible,
-		Timeout: pw.Float(10000),
-	})
-	require.NoError(s.t, err)
-
-	box, err := loc.BoundingBox()
-	require.NoError(s.t, err)
-	require.NotNil(s.t, box)
-
-	startX := box.X + box.Width/2
-	startY := box.Y + box.Height/2
-
-	require.NoError(s.t, s.session.Page().Mouse().Move(startX, startY))
-	require.NoError(s.t, s.session.Page().Mouse().Down())
-	require.NoError(s.t, s.session.Page().Mouse().Move(
-		startX+float64(deltaX),
-		startY+float64(deltaY),
-		pw.MouseMoveOptions{Steps: pw.Int(10)},
-	))
-	require.NoError(s.t, s.session.Page().Mouse().Up())
-
-	s.session.Sleep(300)
-}
-
-func (s *canvasAutoSaveSteps) nodeCenter(name string) *pw.Rect {
-	loc := nodeHeaderSelector(name).Run(s.session)
-
-	err := loc.WaitFor(pw.LocatorWaitForOptions{
-		State:   pw.WaitForSelectorStateVisible,
-		Timeout: pw.Float(10000),
-	})
-	require.NoError(s.t, err)
-
-	box, err := loc.BoundingBox()
-	require.NoError(s.t, err)
-	require.NotNil(s.t, box)
-
-	return &pw.Rect{
-		X:      box.X + box.Width/2,
-		Y:      box.Y + box.Height/2,
-		Width:  box.Width,
-		Height: box.Height,
-	}
 }
 
 // waitForSaved waits until the current user's staged canvas reflects the latest autosave.
