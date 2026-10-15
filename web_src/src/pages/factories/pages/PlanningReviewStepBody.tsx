@@ -70,7 +70,7 @@ export function PlanningReviewStepBody({
 
   return (
     <div
-      className="relative overflow-hidden rounded-lg border border-border bg-card px-3 py-2"
+      className="planning-review-code-editor relative rounded-lg border border-border bg-card px-3 py-2"
       data-testid={`${testId}-editor`}
     >
       <Editor
