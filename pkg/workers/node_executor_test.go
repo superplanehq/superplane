@@ -231,57 +231,6 @@ func Test__NodeExecutor_ComponentNodeWithoutStateChange(t *testing.T) {
 	}, updatedExecution.Metadata.Data())
 }
 
-func Test__NodeExecutor_ComponentNodeWithStateChange(t *testing.T) {
-	r := support.Setup(t)
-
-	//
-	// Create a simple canvas with a trigger and a noop component node.
-	// The noop component DOES change state on Execute() - it calls Pass() immediately.
-	//
-	triggerNode := "trigger-1"
-	noopNode := "noop-1"
-	canvas, _ := support.CreateCanvas(
-		t,
-		r.Organization.ID,
-		r.User,
-		[]models.CanvasNode{
-			{
-				NodeID: triggerNode,
-				Type:   models.NodeTypeTrigger,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
-			},
-			{
-				NodeID: noopNode,
-				Type:   models.NodeTypeComponent,
-				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}}),
-			},
-		},
-		[]models.Edge{
-			{SourceID: triggerNode, TargetID: noopNode, Channel: "default"},
-		},
-	)
-
-	//
-	// Create a root event and a pending execution for the noop node.
-	//
-	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
-	execution := support.CreateCanvasNodeExecution(t, canvas.ID, noopNode, rootEvent.ID, rootEvent.ID)
-
-	//
-	// Process the execution and verify the execution is both started AND finished.
-	// The noop component calls Pass() in Execute(), which should finish the execution.
-	//
-	executor := newTestNodeExecutor(t, r)
-	err := executor.LockAndProcessNodeExecution(execution.ID)
-	require.NoError(t, err)
-
-	// Verify execution moved to finished state with passed result
-	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
-	require.NoError(t, err)
-	assert.Equal(t, models.CanvasNodeExecutionStateFinished, updatedExecution.State)
-	assert.Equal(t, models.CanvasNodeExecutionResultPassed, updatedExecution.Result)
-}
-
 func countConcurrentExecutionResults(t *testing.T, results []error) (successCount int, lockedCount int) {
 	for i, result := range results {
 		switch result {

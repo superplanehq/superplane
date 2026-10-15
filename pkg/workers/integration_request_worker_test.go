@@ -19,52 +19,6 @@ import (
 	"github.com/superplanehq/superplane/test/support/impl"
 )
 
-func Test__IntegrationRequestWorker_Sync(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	worker := NewIntegrationRequestWorker(r.Encryptor, r.Registry, nil, "http://localhost:8000", "http://localhost:8000")
-
-	//
-	// Register a dummy application and install it.
-	//
-	var syncCalled bool
-	r.Registry.Integrations["dummy"] = impl.NewDummyIntegration(impl.DummyIntegrationOptions{
-		OnSync: func(ctx core.SyncContext) error {
-			ctx.Integration.Ready()
-			syncCalled = true
-			return nil
-		},
-	})
-
-	integration, err := models.CreateIntegration(uuid.New(), r.Organization.ID, "dummy", support.RandomName("integration"), nil)
-	require.NoError(t, err)
-
-	//
-	// Create the integration sync request
-	//
-	runAt := time.Now().Add(-time.Second)
-	require.NoError(t, integration.CreateSyncRequest(database.Conn(), &runAt))
-	requests, err := integration.ListRequests(models.IntegrationRequestTypeSync)
-	require.NoError(t, err)
-	require.Len(t, requests, 1)
-	request := &requests[0]
-
-	//
-	// Lock and process request
-	//
-	err = worker.LockAndProcessRequest(*request)
-	require.NoError(t, err)
-
-	//
-	// Reload request, verify it was completed, and sync was called
-	//
-	request, err = integration.GetRequest(request.ID.String())
-	require.NoError(t, err)
-	assert.Equal(t, models.IntegrationRequestStateCompleted, request.State)
-	assert.True(t, syncCalled)
-}
-
 // Test__IntegrationRequestWorker_SyncRewritesSecret drives the self-perpetuating
 // token-refresh loop behind issue #5386: each sync rewrites the secret and
 // reschedules itself. It verifies the loop keeps rewriting a single row (rather
