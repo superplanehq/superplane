@@ -29,7 +29,12 @@ helm template superplane "${CHART_DIR}" \
 grep -q 'kind: Job' "${default_manifest}"
 grep -q 'name: superplane-fleet-manager-credential' "${default_manifest}"
 grep -q 'name: FLEET_MANAGER_TOKEN_PATH' "${default_manifest}"
+grep -q 'name: FLEET_MANAGER_SETUP_CONFIG_PATH' "${default_manifest}"
 grep -q 'secretName: superplane-fleet-manager-token' "${default_manifest}"
+grep -q 'name: superplane-fleet-manager-setup' "${default_manifest}"
+grep -q '"existingSecret":"superplane-fleet-manager-token"' "${default_manifest}"
+grep -q '"managerId":"test-cluster"' "${default_manifest}"
+grep -q '"source":"manual"' "${default_manifest}"
 if grep -q 'fleet-manager-service-token' "${default_manifest}"; then
   echo "rendered manifest contains a credential value" >&2
   exit 1
@@ -50,7 +55,7 @@ helm template superplane "${CHART_DIR}" \
   "${common_args[@]}" \
   --set fleetManagerSetup.enabled=false >"${disabled_manifest}"
 
-if grep -Eq 'FLEET_MANAGER_TOKEN_PATH|fleet-manager-credential|fleet-manager-token' "${disabled_manifest}"; then
+if grep -Eq 'FLEET_MANAGER_(TOKEN|SETUP_CONFIG)_PATH|fleet-manager-(credential|setup|token)' "${disabled_manifest}"; then
   echo "disabled Fleet Manager setup rendered credential resources" >&2
   exit 1
 fi
