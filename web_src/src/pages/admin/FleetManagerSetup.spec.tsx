@@ -86,18 +86,22 @@ describe("FleetManagerSetup", () => {
     expect(screen.getByLabelText("SuperPlane URL")).toHaveValue("https://superplane.example.com");
   });
 
-  it("adds Terraform defaults to an existing manual draft", async () => {
-    saveFleetManagerDraft({
-      provider: "aws",
-      managerId: "my-cluster",
-      namespace: "superplane",
-      serviceAccountName: "superplane-fleet-manager",
-      superplaneUrl: window.location.origin,
-      runnerVersion: "v0.1.0",
-      selectedFleetIds: ["e1-large-amd64"],
-      fleetCapacities: { "e1-large-amd64": { warmCapacity: 5, maxCapacity: 100 } },
-      fields: {},
-    });
+  it("uses Terraform defaults instead of an incompatible legacy draft", async () => {
+    window.localStorage.setItem(
+      "superplane.fleet-manager-setup.v1",
+      JSON.stringify({
+        provider: "aws",
+        managerId: "my-cluster",
+        namespace: "superplane",
+        serviceAccountName: "superplane-fleet-manager",
+        superplaneUrl: window.location.origin,
+        runnerVersion: "v0.1.0",
+        selectedFleetIds: ["e1-large-amd64"],
+        warmCapacity: 5,
+        maxCapacity: 100,
+        fields: {},
+      }),
+    );
 
     render(<FleetManagerSetup />);
     await continueTo("Confirm cloud infrastructure");
@@ -106,6 +110,29 @@ describe("FleetManagerSetup", () => {
     expect(screen.getByLabelText("SuperPlane URL")).toHaveValue("https://superplane.example.com");
     expect(screen.getByLabelText("AWS region")).toHaveValue("us-east-1");
     expect(screen.getByLabelText("Private subnet IDs")).toHaveValue("subnet-a, subnet-b");
+    expect(window.localStorage.getItem("superplane.fleet-manager-setup.v1")).toBeNull();
+  });
+
+  it("preserves explicit infrastructure changes in the current draft", async () => {
+    saveFleetManagerDraft({
+      provider: "aws",
+      managerId: "my-cluster",
+      namespace: "superplane",
+      serviceAccountName: "custom-fleet-manager",
+      superplaneUrl: "https://custom.example.com",
+      runnerVersion: "v0.1.0",
+      selectedFleetIds: ["e1-large-amd64"],
+      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+      fields: { region: "us-west-2" },
+    });
+
+    render(<FleetManagerSetup />);
+    await continueTo("Confirm cloud infrastructure");
+
+    expect(screen.getByLabelText("Fleet Manager ID")).toHaveValue("my-cluster");
+    expect(screen.getByLabelText("Fleet Manager service account")).toHaveValue("custom-fleet-manager");
+    expect(screen.getByLabelText("SuperPlane URL")).toHaveValue("https://custom.example.com");
+    expect(screen.getByLabelText("AWS region")).toHaveValue("us-west-2");
   });
 
   it("generates values with a Secret reference and no credential value", async () => {

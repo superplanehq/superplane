@@ -37,24 +37,6 @@ function defaultDraft(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
   };
 }
 
-function restoreDraft(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
-  const defaults = defaultDraft(metadata);
-  const saved = loadFleetManagerDraft();
-  if (!saved || metadata.infrastructureDefaults.source !== "terraform") return saved ?? defaults;
-
-  const fields = saved.provider === defaults.provider ? { ...defaults.fields, ...saved.fields } : saved.fields;
-
-  return {
-    ...saved,
-    managerId: saved.managerId === "my-cluster" ? defaults.managerId : saved.managerId,
-    namespace: saved.namespace === "superplane" ? defaults.namespace : saved.namespace,
-    serviceAccountName:
-      saved.serviceAccountName === "superplane-fleet-manager" ? defaults.serviceAccountName : saved.serviceAccountName,
-    superplaneUrl: saved.superplaneUrl === window.location.origin ? defaults.superplaneUrl : saved.superplaneUrl,
-    fields,
-  };
-}
-
 export function useFleetManagerSetup(enabled = true) {
   const [metadata, setMetadata] = useState<FleetManagerSetupMetadata | null>(null);
   const [draft, setDraft] = useState<FleetManagerDraft | null>(null);
@@ -74,7 +56,7 @@ export function useFleetManagerSetup(enabled = true) {
         return (await response.json()) as FleetManagerSetupMetadata;
       })
       .then((body) => {
-        const initialDraft = restoreDraft(body);
+        const initialDraft = loadFleetManagerDraft() ?? defaultDraft(body);
         setMetadata(body);
         saveFleetManagerDraft(initialDraft);
         setDraft(initialDraft);
