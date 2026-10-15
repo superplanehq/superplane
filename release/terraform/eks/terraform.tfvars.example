@@ -26,6 +26,8 @@ letsencrypt_email = "admin@example.com"
 # integrated Runner API. Install the standalone Fleet Manager chart after owner
 # setup with /admin/fleet-manager-setup.
 # enable_runners = true
+# runner_image_amd64 = "ami-0123456789abcdef0"
+# runner_image_arm64 = "ami-0fedcba9876543210"
 
 # -----------------------------------------------------------------------------
 # Optional Variables - AWS Region

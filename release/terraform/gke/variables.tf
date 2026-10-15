@@ -61,9 +61,9 @@ variable "node_count" {
 }
 
 variable "machine_type" {
-  description = "Machine type for GKE nodes"
+  description = "Machine type for GKE nodes. Use e2-standard-2 or a larger type. The API and the runner pods share one log disk, so they run on one node. e2-medium does not have enough CPU for that node."
   type        = string
-  default     = "e2-medium"
+  default     = "e2-standard-2"
 }
 
 # -----------------------------------------------------------------------------
@@ -187,6 +187,18 @@ variable "runner_zones" {
   description = "Zones for runner VMs. Fleet Manager tries the next zone when a zone has no capacity. Leave empty to use var.zone."
   type        = list(string)
   default     = []
+}
+
+variable "runner_image_amd64" {
+  description = "Packer-built GCP image resource for linux/amd64 runner VMs."
+  type        = string
+  default     = ""
+}
+
+variable "runner_image_arm64" {
+  description = "Packer-built GCP image resource for linux/arm64 runner VMs."
+  type        = string
+  default     = ""
 }
 
 # -----------------------------------------------------------------------------

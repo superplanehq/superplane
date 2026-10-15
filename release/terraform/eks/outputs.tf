@@ -67,6 +67,16 @@ output "runner_region" {
   value       = var.enable_runners ? var.region : null
 }
 
+output "runner_image_amd64" {
+  description = "Packer-built AMI configured for linux/amd64 runner VMs"
+  value       = var.enable_runners ? var.runner_image_amd64 : null
+}
+
+output "runner_image_arm64" {
+  description = "Packer-built AMI configured for linux/arm64 runner VMs"
+  value       = var.enable_runners ? var.runner_image_arm64 : null
+}
+
 # -----------------------------------------------------------------------------
 # Runner Storage Outputs
 # -----------------------------------------------------------------------------
