@@ -1,4 +1,7 @@
 import React, { useCallback, useState } from "react";
+import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
+import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
+import { FLEET_MANAGER_WIZARD_STEPS, type FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import { FirstRunShell } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import type { FirstRunSphereProps } from "@/pages/factories/pages/onboarding/first-run/FirstRunSpherePane";
@@ -11,7 +14,7 @@ import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { newOrganizationLandingPath } from "./newOrganizationLandingPath";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
-const OWNER_SETUP_STEPS = 4;
+const OWNER_SETUP_STEPS = 9;
 const OWNER_SETUP_PREVIEW: FirstRunSphereProps = {
   level: 0,
   art: {
@@ -22,14 +25,64 @@ const OWNER_SETUP_PREVIEW: FirstRunSphereProps = {
   },
 };
 
-type OwnerSetupStep = "owner" | "license" | "smtp" | "fleet" | "survey";
+type OwnerSetupStep = "owner" | "license" | "smtp" | "fleet-intro" | `fleet-${FleetManagerWizardStep}` | "survey";
 
 function ownerSetupStepNumber(step: OwnerSetupStep) {
   if (step === "owner") return 1;
   if (step === "license") return 2;
   if (step === "smtp") return 3;
-  if (step === "fleet") return 4;
+  if (step === "fleet-intro") return 4;
+  if (step === "fleet-provider") return 5;
+  if (step === "fleet-fleets") return 6;
+  if (step === "fleet-infrastructure") return 7;
+  if (step === "fleet-review") return 8;
+  if (step === "fleet-install") return 9;
   return OWNER_SETUP_STEPS;
+}
+
+function fleetWizardStep(step: OwnerSetupStep): FleetManagerWizardStep | null {
+  if (!step.startsWith("fleet-") || step === "fleet-intro") return null;
+  return step.slice("fleet-".length) as FleetManagerWizardStep;
+}
+
+function OwnerFleetSetupSteps({
+  step,
+  pendingOrganizationSlug,
+  activeFleetStep,
+  fleetStepIndex,
+  fleetSetup,
+  previousFleetStep,
+  finishInstallation,
+  setStep,
+}: {
+  step: OwnerSetupStep;
+  pendingOrganizationSlug: string | null;
+  activeFleetStep: FleetManagerWizardStep | null;
+  fleetStepIndex: number;
+  fleetSetup: ReturnType<typeof useFleetManagerSetup>;
+  previousFleetStep: () => void;
+  finishInstallation: () => void;
+  setStep: (step: OwnerSetupStep) => void;
+}) {
+  if (!pendingOrganizationSlug) return null;
+  if (step === "fleet-intro") {
+    return <FleetManagerStep onContinue={() => setStep("fleet-provider")} onSkip={finishInstallation} />;
+  }
+  if (!activeFleetStep) return null;
+
+  return (
+    <FleetManagerWizardScreen
+      step={activeFleetStep}
+      setup={fleetSetup}
+      onBack={previousFleetStep}
+      onNext={() => {
+        const next = FLEET_MANAGER_WIZARD_STEPS[fleetStepIndex + 1];
+        if (next) setStep(`fleet-${next}`);
+      }}
+      onFinish={finishInstallation}
+      onFinishLater={finishInstallation}
+    />
+  );
 }
 
 function isEmailValid(email: string) {
@@ -173,6 +226,8 @@ const OwnerSetup: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const activeFleetStep = fleetWizardStep(step);
+  const fleetSetup = useFleetManagerSetup(activeFleetStep !== null);
 
   useReportPageReady(true);
 
@@ -202,6 +257,14 @@ const OwnerSetup: React.FC = () => {
   }, [pendingOrganizationSlug]);
 
   const afterOwner = step !== "owner" && step !== "survey";
+  const fleetStepIndex = activeFleetStep ? FLEET_MANAGER_WIZARD_STEPS.indexOf(activeFleetStep) : -1;
+  const previousFleetStep = () => {
+    if (fleetStepIndex <= 0) {
+      setStep("fleet-intro");
+      return;
+    }
+    setStep(`fleet-${FLEET_MANAGER_WIZARD_STEPS[fleetStepIndex - 1]}`);
+  };
 
   return (
     <FirstRunShell
@@ -217,6 +280,7 @@ const OwnerSetup: React.FC = () => {
               stepCount: OWNER_SETUP_STEPS,
               email: afterOwner ? email : undefined,
               onLogOut: afterOwner ? () => (window.location.href = "/logout") : undefined,
+              onBack: activeFleetStep ? previousFleetStep : undefined,
             }
       }
     >
@@ -242,12 +306,19 @@ const OwnerSetup: React.FC = () => {
       {step === "license" && pendingOrganizationSlug && <LicenseStep onContinue={() => setStep("smtp")} />}
 
       {step === "smtp" && pendingOrganizationSlug && (
-        <SmtpStep onContinue={() => setStep("fleet")} onSkip={() => setStep("fleet")} />
+        <SmtpStep onContinue={() => setStep("fleet-intro")} onSkip={() => setStep("fleet-intro")} />
       )}
 
-      {step === "fleet" && pendingOrganizationSlug && (
-        <FleetManagerStep onContinue={finishInstallation} onSkip={finishInstallation} />
-      )}
+      <OwnerFleetSetupSteps
+        step={step}
+        pendingOrganizationSlug={pendingOrganizationSlug}
+        activeFleetStep={activeFleetStep}
+        fleetStepIndex={fleetStepIndex}
+        fleetSetup={fleetSetup}
+        previousFleetStep={previousFleetStep}
+        finishInstallation={finishInstallation}
+        setStep={setStep}
+      />
 
       {step === "survey" && activeSurvey && pendingOrganizationSlug && (
         <PostHogSurveyForm survey={activeSurvey} redirectTo={newOrganizationLandingPath(pendingOrganizationSlug)} />

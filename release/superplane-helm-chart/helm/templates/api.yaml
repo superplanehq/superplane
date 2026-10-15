@@ -139,6 +139,10 @@ spec:
               value: /app/rbac/rbac_canvas_policy.csv
             - name: APPLICATION_NAME
               value: superplane
+            - name: RUNNER_STABLE_VERSION
+              value: {{ .Values.componentReleases.runnerVersion | quote }}
+            - name: FLEET_MANAGER_STABLE_VERSION
+              value: {{ .Values.componentReleases.fleetManagerVersion | quote }}
             - name: DB_POOL_SIZE
               value: "{{ .Values.api.dbPoolSize }}"
             - name: DB_STATEMENT_TIMEOUT
@@ -176,6 +180,8 @@ spec:
 {{- if .Values.fleetManagerSetup.enabled }}
             - name: FLEET_MANAGER_TOKEN_PATH
               value: /var/run/secrets/superplane/fleet-manager/token
+            - name: FLEET_MANAGER_SETUP_CONFIG_PATH
+              value: /etc/superplane/fleet-manager-setup/setup.json
 {{- end }}
             - name: BLOB_STORAGE_PROVIDER
               value: {{ .Values.blobStorage.provider | quote }}
@@ -226,6 +232,9 @@ spec:
 {{- if .Values.fleetManagerSetup.enabled }}
             - name: fleet-manager-token
               mountPath: /var/run/secrets/superplane/fleet-manager
+              readOnly: true
+            - name: fleet-manager-setup
+              mountPath: /etc/superplane/fleet-manager-setup
               readOnly: true
 {{- end }}
 
@@ -293,4 +302,7 @@ spec:
             items:
               - key: {{ required "fleetManagerSetup.credentials.tokenKey is required when fleetManagerSetup.enabled is true" .Values.fleetManagerSetup.credentials.tokenKey }}
                 path: token
+        - name: fleet-manager-setup
+          configMap:
+            name: {{ .Release.Name }}-fleet-manager-setup
 {{- end }}
