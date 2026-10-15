@@ -73,6 +73,10 @@ const AdminLayout: React.FC = () => {
                 <Terminal size={14} />
                 Fleets
               </NavLink>
+              <NavLink to="/admin/fleet-manager-setup" className={navLinkClass}>
+                <Terminal size={14} />
+                Fleet setup
+              </NavLink>
               <NavLink to="/admin/polar-webhooks" className={navLinkClass}>
                 <Webhook size={14} />
                 Polar Webhooks
