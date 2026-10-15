@@ -80,19 +80,28 @@ az account set --subscription SUBSCRIPTION_ID
 The defaults pin these artifacts:
 
 - Chart `oci://ghcr.io/superplanehq/superplane-chart` version
-  `0.0.0-f711ba6b1ebf19ae26825b8a6397b9ef24832f68`
-- App image `ghcr.io/superplanehq/superplane:f711ba6b1ebf19ae26825b8a6397b9ef24832f68-selfhosted`
+  `0.0.0-25eae97f1259c9c4a8f10cada152fa94764846b8`
+- App image `ghcr.io/superplanehq/superplane:25eae97f1259c9c4a8f10cada152fa94764846b8-selfhosted`
+- Fleet Manager chart `oci://ghcr.io/superplanehq/fleet-manager-chart` version `0.1.3`
+- Fleet Manager image `ghcr.io/superplanehq/fleet-manager:v0.1.3`
+
+The owner-setup wizard installs that Fleet Manager chart and image.
+Use Fleet Manager `v0.1.3` or later with this SuperPlane chart.
+The Fleet Manager binary syncs fleets.
 
 Confirm them before you apply:
 
 ```bash
-SHA=f711ba6b1ebf19ae26825b8a6397b9ef24832f68
+SHA=25eae97f1259c9c4a8f10cada152fa94764846b8
 helm show chart oci://ghcr.io/superplanehq/superplane-chart --version "0.0.0-${SHA}"
 docker manifest inspect "ghcr.io/superplanehq/superplane:${SHA}-selfhosted"
+helm show chart oci://ghcr.io/superplanehq/fleet-manager-chart --version 0.1.3
+docker manifest inspect ghcr.io/superplanehq/fleet-manager:v0.1.3
 ```
 
-`helm show chart` must print `appVersion: ${SHA}-selfhosted`.
-Leave `superplane_image_tag` empty. The chart uses that appVersion.
+`helm show chart` for SuperPlane must print `appVersion: ${SHA}-selfhosted`.
+`helm show chart` for Fleet Manager must print `appVersion: v0.1.3`.
+Leave `superplane_image_tag` empty. The SuperPlane chart uses that appVersion.
 
 ## 3. Configure Terraform
 
@@ -287,47 +296,66 @@ Terraform variables.
 
 ## Runners
 
-Terraform sets `fleet_manager_version` to `v0.1.2`.
+Terraform sets `fleet_manager_version` to `v0.1.3`.
 The owner-setup wizard writes that chart version and that image tag.
-Version `0.1.2` accepts a community gallery image ID and an empty `zones` list.
+Use Fleet Manager `v0.1.3` or later with this SuperPlane chart.
+Version `0.1.2` and later accept a community gallery image ID and an empty `zones` list.
 
 Terraform creates the runner subnet, network security group, and identities.
-Use the SuperPlane community gallery for the VM image. Do not run Packer in
-the customer subscription.
+Use the SuperPlane community gallery for the VM image.
+Do not run Packer in the customer subscription.
 
-Download the manifest for the runner version:
-
-```text
-https://superplanehq-releases.s3.amazonaws.com/selfhosted/<version>/azure.json
-```
-
-Build `azure.imageId` from that file:
+`runner_image_amd64` and `runner_image_arm64` default to empty.
+Set each value to this image ID. Replace `<arch>` with `amd64` or `arm64`.
+Replace `<version>` with the runner version and omit the leading `v`.
 
 ```text
-/CommunityGalleries/<communityGalleryPublicName>/Images/<definition>/Versions/<image version>
+/CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-<arch>/Versions/<version>
 ```
 
-Use `superplane-runner-amd64` or `superplane-runner-arm64`. The fleet
-`architecture` must match that definition. Read `azure.regions` in the
-manifest. Set `azure.location` to a region in that list.
+Runner `v0.2.0` on linux/amd64 uses this image ID:
 
-Choose zones in the customer subscription:
+```text
+/CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-amd64/Versions/0.2.0
+```
+
+Use image definition `superplane-runner-amd64` or `superplane-runner-arm64`.
+The fleet `architecture` must match that definition.
+Set `azure.location` to a region in this table for that architecture.
+
+The zones in this table come from the publisher subscription.
+Confirm the zones in the customer subscription before you apply:
 
 ```bash
 az vm list-skus --location <region> --size <vmSize>
 ```
 
-Zone numbers are not the same in every subscription. Leave `azure.zones`
-empty when the region or size has no availability zones.
+| Region | amd64 zones | arm64 zones |
+| --- | --- | --- |
+| eastus | 1, 2, 3 | 1, 3 |
+| centralus | none | 1, 2, 3 |
+| westus2 | none | 1 |
+| westus3 | 1, 2, 3 | 1, 2, 3 |
 
-Open **Set up runner fleets** during owner setup. Terraform passes the runner
-network, location, identity, and cluster values to SuperPlane. The wizard
-preloads these values. Set `runner_image_amd64` and `runner_image_arm64` to
-immutable community gallery or customer gallery image-version IDs. Run
-`terraform apply`, then run the Helm commands from the wizard.
+The Fleet Manager default VM size is `Standard_D2ds_v4` for linux/amd64.
+For linux/arm64, set `vmSize` to `Standard_D2pds_v6`.
+Do not use `Standard_D2pds_v5`. That size does not support Trusted Launch.
+
+`runner_zones` defaults to `["1"]`.
+The wizard copies that list into `azure.zones`.
+When the zones field is empty, the wizard writes `zones: []`.
+For a region with no availability zones, set `runner_zones = []` before you apply.
+If `values.yaml` contains `zones: ["<AZURE_ZONE>"]`, change it to `zones: []` before you run Helm.
+
+Open **Set up runner fleets** during owner setup.
+Terraform passes the runner network, location, identity, and cluster values to SuperPlane.
+The wizard preloads these values.
+Set `runner_image_amd64` and `runner_image_arm64`.
+Run `terraform apply`.
+Run the Helm commands that the wizard shows.
 
 This stack still creates an empty customer Compute Gallery and two image
-definitions. You can ignore them when `azure.imageId` points at the
+definitions. You can ignore them when the image ID points at the
 community gallery. Turning that gallery off in Terraform would destroy
 galleries that already contain image versions.
 
