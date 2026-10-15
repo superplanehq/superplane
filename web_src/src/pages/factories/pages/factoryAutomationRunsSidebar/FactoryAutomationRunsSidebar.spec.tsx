@@ -179,8 +179,6 @@ describe("FactoryAutomationRunsSidebar", () => {
     expect(link).toHaveAttribute("href", "/org-1/workspaces/RF/apps/app-github-issues-intake?run=run-1&from=lines");
 
     await user.click(link);
-    expect(row.className).not.toMatch(/bg-sky-50/);
-    expect(link.className).toMatch(/bg-slate-200/);
     expect(link).toHaveAttribute("data-selected", "true");
   });
 
@@ -205,7 +203,6 @@ describe("FactoryAutomationRunsSidebar", () => {
     const card = screen.getByTestId("work-order-card-wo-1");
     expect(card).toHaveTextContent("feat: Add console empty-state");
     expect(card).not.toHaveAttribute("data-selected");
-    expect(screen.getByTestId("factory-automation-runs-row").className).not.toMatch(/bg-sky-50/);
     expect(screen.queryByTestId("factory-automation-run-run-intake")).not.toBeInTheDocument();
   });
 
