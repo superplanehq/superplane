@@ -14,39 +14,19 @@ letsencrypt_email = "admin@example.com"
 # SuperPlane
 # -----------------------------------------------------------------------------
 
-# superplane_image_tag = "<git-sha>-selfhosted"  # Empty uses the chart image. A local build can use local-<sha>.
+# Published application images are available from GitHub Container Registry.
 # image_registry = "ghcr.io/superplanehq"
+# superplane_image_tag = "<git-sha>-selfhosted"  # Empty uses the chart image. A local build can use local-<sha>.
+# helm_chart_repository = "oci://ghcr.io/superplanehq"
 # Use an ACR login server for images you build in this repository:
 # image_registry = "myregistry.azurecr.io"
 # container_registry_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane-images/providers/Microsoft.ContainerRegistry/registries/myregistry"
 # helm_chart_path = "../../superplane-helm-chart/helm"
 # superplane_namespace = "superplane"
 
-# Set a Fleet Manager YAML body to start the Deployment.
-# fleet_manager_config = <<EOF
-# id: aks
-# superplaneUrl: https://superplane.example.com
-# installationAdminToken: replace-me
-# runnerReleaseBaseUrl: https://downloads.example/runner
-# fleets:
-#   - id: linux-amd64
-#     provider: azure
-#     warmCapacity: 1
-#     maxCapacity: 10
-#     azure:
-#       subscriptionId: 00000000-0000-0000-0000-000000000000
-#       resourceGroup: superplane-runners
-#       location: eastus
-#       imageId: /subscriptions/.../images/superplane-runner-amd64/versions/1.0.0
-#       vmSize: Standard_D2ds_v4
-#       architecture: amd64
-#       subnetId: /subscriptions/.../subnets/superplane-runners
-#       networkSecurityGroupId: /subscriptions/.../networkSecurityGroups/superplane-runners
-#       identityId: /subscriptions/.../userAssignedIdentities/superplane-runner
-#       zones: ["1", "2"]
-#       diskSizeGb: 30
-#       ephemeralOSDisk: true
-# EOF
+# After owner setup, use /admin/fleet-manager-setup. The page maps Terraform
+# outputs to the standalone chart at
+# oci://ghcr.io/superplanehq/fleet-manager-chart.
 
 # -----------------------------------------------------------------------------
 # Optional Variables - Azure Region
@@ -89,5 +69,6 @@ letsencrypt_email = "admin@example.com"
 # aks_subnet_cidr       = "10.0.0.0/20"
 # postgres_subnet_cidr  = "10.0.16.0/24"
 # runner_subnet_cidr    = "10.0.17.0/24"
+# runner_zones          = ["1", "2"]
 # aks_service_cidr      = "172.16.0.0/16"
 # aks_dns_service_ip    = "172.16.0.10"
