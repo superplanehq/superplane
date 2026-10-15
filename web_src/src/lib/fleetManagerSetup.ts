@@ -212,7 +212,7 @@ function quoteReleaseBaseUrl(values: string): string {
     if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
       return `${prefix}${trimmed}`;
     }
-    return `${prefix}"${trimmed.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+    return `${prefix}"${trimmed.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   });
 }
 
