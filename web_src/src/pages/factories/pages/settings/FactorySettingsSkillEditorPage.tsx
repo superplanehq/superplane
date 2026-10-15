@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { useTheme } from "@/contexts/useTheme";
 import { usePageTitle } from "@/hooks/usePageTitle";
 
-import { FactoryDeleteDialog } from "../../FactoryDeleteDialog";
+import { SkillDeleteDialog } from "./SkillDeleteDialog";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
 import { FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useSkillEditorPage } from "./useSkillEditorPage";
@@ -32,8 +32,6 @@ export function FactorySettingsSkillEditorPage() {
       </FactorySettingsPageFrame>
     );
   }
-
-  const displayName = editor.name.trim() || AGENT_RESOURCES_COPY.unnamedSkill;
 
   return (
     <FactorySettingsPageFrame
@@ -66,16 +64,15 @@ export function FactorySettingsSkillEditorPage() {
         onClose={() => editor.setPendingRestore(false)}
         onConfirm={editor.confirmRestore}
       />
-      <FactoryDeleteDialog
-        open={editor.pendingDelete}
-        factoryName={displayName}
-        title={`Delete "${displayName}"?`}
-        description={AGENT_RESOURCES_COPY.deleteSkillDescription}
-        canDelete={editor.canUpdate && !editor.resource?.systemSkill}
-        isDeleting={editor.isDeleting}
-        onClose={() => editor.setPendingDelete(false)}
-        onConfirm={editor.confirmDelete}
-      />
+      {editor.pendingDelete && editor.resource ? (
+        <SkillDeleteDialog
+          resource={editor.resource}
+          canDelete={editor.canUpdate}
+          isDeleting={editor.isDeleting}
+          onClose={() => editor.setPendingDelete(false)}
+          onConfirm={editor.confirmDelete}
+        />
+      ) : null}
     </FactorySettingsPageFrame>
   );
 }
@@ -111,7 +108,7 @@ function SkillEditorActions({ editor }: { editor: ReturnType<typeof useSkillEdit
           type="button"
           variant="outline"
           onClick={() => editor.setPendingDelete(true)}
-          disabled={!editor.canUpdate || Boolean(editor.resource?.systemSkill)}
+          disabled={!editor.canUpdate}
         >
           {AGENT_RESOURCES_COPY.delete}
         </Button>

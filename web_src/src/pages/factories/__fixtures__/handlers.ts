@@ -316,7 +316,7 @@ function factoryAutomationRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
     },
     {
       pattern: re("/api/v1/factories/([^/]+)/automations"),
-      resolve: (match, method, body) => {
+      resolve: (match, method, body, url) => {
         const factoryId = match[1];
         if (method === "POST") {
           const request = (body ?? {}) as { name?: string; columnKey?: string };
@@ -328,6 +328,11 @@ function factoryAutomationRoutes(fixture: FactoriesFixture): FactoriesRoute[] {
           };
           fixture.appsByFactoryId[factoryId] = [...(fixture.appsByFactoryId[factoryId] ?? []), automation];
           return { json: { automation } };
+        }
+        const skillName = url.searchParams.get("skillName");
+        if (skillName) {
+          if (fixture.failSkillUsage) return { status: 503, json: { message: "Usage unavailable" } };
+          return { json: { automations: fixture.skillUsageByName?.[skillName] ?? [] } };
         }
         return { json: { automations: fixture.appsByFactoryId[factoryId] ?? [] } };
       },

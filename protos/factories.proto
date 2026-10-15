@@ -1164,6 +1164,8 @@ message UpdateFactoryLineResponse {
 
 message ListFactoryAutomationsRequest {
   string factory_id = 1;
+  // When set, list only automations whose saved prompts mention this skill command.
+  string skill_name = 2;
 }
 
 message ListFactoryAutomationsResponse {
