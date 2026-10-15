@@ -93,7 +93,7 @@ func TestWorkOrderCreatedPayloadIncludesRepository(t *testing.T) {
 	assert.Equal(t, "develop", workOrder["default_branch"])
 }
 
-func TestWorkOrderCreatedPayloadUsesBitbucketCloneURL(t *testing.T) {
+func TestWorkOrderCreatedPayloadUsesFactoryProviderWithoutDefaultBranch(t *testing.T) {
 	r := support.Setup(t)
 
 	db := database.Conn()
