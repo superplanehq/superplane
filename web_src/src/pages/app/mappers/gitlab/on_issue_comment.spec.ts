@@ -1,43 +1,18 @@
 import { describe, expect, it } from "bun:test";
+import { createGitLabTriggerBuilders } from "./test_support";
 
 import { onIssueCommentTriggerRenderer } from "./on_issue_comment";
-import type { NodeInfo, TriggerEventContext, TriggerRendererContext, ComponentDefinition, EventInfo } from "../types";
+import type { TriggerEventContext, TriggerRendererContext } from "../types";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "On Issue Comment",
-    componentName: "gitlab.onIssueComment",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildDefinition(overrides?: Partial<ComponentDefinition>): ComponentDefinition {
-  return {
-    name: "onIssueComment",
-    label: "On Issue Comment",
-    description: "",
-    icon: "gitlab",
-    color: "orange",
-    ...overrides,
-  };
-}
-
-function buildEvent(overrides?: Partial<NonNullable<EventInfo>>): EventInfo {
-  return {
-    id: "evt-1",
-    createdAt: new Date().toISOString(),
-    data: {},
-    nodeId: "node-1",
-    type: "gitlab.issueComment",
-    ...overrides,
-  };
-}
+const { buildNode, buildDefinition, buildEvent } = createGitLabTriggerBuilders({
+  name: "On Issue Comment",
+  componentName: "gitlab.onIssueComment",
+  definitionName: "onIssueComment",
+  label: "On Issue Comment",
+  eventType: "gitlab.issueComment",
+});
 
 function buildEventData() {
   return {
@@ -98,23 +73,14 @@ describe("onIssueCommentTriggerRenderer.getRootEventValues", () => {
   it("extracts comment details from event data", () => {
     const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
     const values = onIssueCommentTriggerRenderer.getRootEventValues(ctx);
+    expect(Object.keys(values)[0]).toBe("Received At");
+    expect(values["Received At"]).toBe(new Date(ctx.event!.createdAt!).toLocaleString());
+    expect(Object.keys(values).length).toBeLessThanOrEqual(6);
     expect(values["Comment"]).toBe("/sp-investigate");
     expect(values["Comment URL"]).toBe("https://gitlab.example.com/group/example/-/issues/8#note_1355");
     expect(values["Author"]).toBe("agarcia");
     expect(values["Issue"]).toBe("#8 - Login page throws 500 on invalid credentials");
     expect(values["Project"]).toBe("group/example");
-  });
-
-  it("includes received at as the first value", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    const values = onIssueCommentTriggerRenderer.getRootEventValues(ctx);
-    expect(Object.keys(values)[0]).toBe("Received At");
-    expect(values["Received At"]).not.toBe("-");
-  });
-
-  it("returns at most 6 values", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    expect(Object.keys(onIssueCommentTriggerRenderer.getRootEventValues(ctx)).length).toBeLessThanOrEqual(6);
   });
 
   it("returns placeholders when event data is missing", () => {

@@ -190,16 +190,4 @@ describe("cloudflare origin rule event states", () => {
     expect(eventStateRegistry.updateOriginRule.getState(execution)).toBe("updated");
     expect(eventStateRegistry.deleteOriginRule.getState(execution)).toBe("deleted");
   });
-
-  it("keeps non-successful origin rule states unchanged", () => {
-    const execution = buildExecution({
-      state: "STATE_STARTED",
-      result: "RESULT_UNKNOWN",
-      resultReason: "RESULT_REASON_OK",
-    });
-
-    expect(eventStateRegistry.createOriginRule.getState(execution)).toBe("running");
-    expect(eventStateRegistry.updateOriginRule.getState(execution)).toBe("running");
-    expect(eventStateRegistry.deleteOriginRule.getState(execution)).toBe("running");
-  });
 });

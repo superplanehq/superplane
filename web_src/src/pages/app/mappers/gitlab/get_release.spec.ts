@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { buildGitLabDetailsContext } from "./test_support";
 
-import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
+import type { ExecutionDetailsContext, ExecutionInfo } from "../types";
 import { getReleaseMapper } from "./get_release";
 
 describe("getReleaseMapper", () => {
@@ -98,40 +99,16 @@ describe("getReleaseMapper", () => {
 });
 
 function buildDetailsContext(execution: Partial<ExecutionInfo>): ExecutionDetailsContext {
-  const node: NodeInfo = {
-    id: "node-1",
-    name: "Get Release",
-    componentName: "gitlab.getRelease",
-    isCollapsed: false,
-    configuration: {
-      project: "123",
-      releaseStrategy: "specific",
-      tagName: "v1.0.0",
-    },
-    metadata: {
-      project: {
-        id: 123,
-        name: "felixgateru/hello-world",
-        url: "https://gitlab.com/felixgateru/hello-world",
+  return buildGitLabDetailsContext(
+    {
+      name: "Get Release",
+      componentName: "gitlab.getRelease",
+      configuration: {
+        project: "123",
+        releaseStrategy: "specific",
+        tagName: "v1.0.0",
       },
     },
-  };
-
-  return {
-    nodes: [node],
-    node,
-    execution: {
-      id: "exec-1",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      resultReason: "RESULT_REASON_OK",
-      resultMessage: "",
-      metadata: {},
-      configuration: {},
-      rootEvent: undefined,
-      ...execution,
-    },
-  };
+    execution,
+  );
 }

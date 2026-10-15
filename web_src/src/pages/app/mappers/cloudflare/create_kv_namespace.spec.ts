@@ -1,61 +1,9 @@
 import { describe, expect, it } from "bun:test";
 
-import type {
-  ComponentBaseContext,
-  ComponentDefinition,
-  ExecutionDetailsContext,
-  ExecutionInfo,
-  NodeInfo,
-  OutputPayload,
-} from "../types";
+import type { ComponentDefinition, ExecutionInfo } from "../types";
 import { createKVNamespaceMapper } from "./create_kv_namespace";
 import { eventStateRegistry } from "./index";
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "Test Node",
-    componentName: "cloudflare.createKVNamespace",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildOutput(data: unknown): OutputPayload {
-  return {
-    type: "cloudflare.kv.namespace.created",
-    timestamp: new Date().toISOString(),
-    data,
-  };
-}
-
-function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
-  return {
-    id: "exec-1",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    resultReason: "RESULT_REASON_OK",
-    resultMessage: "",
-    metadata: {},
-    configuration: {},
-    rootEvent: undefined,
-    ...overrides,
-  };
-}
-
-function buildDetailsCtx(overrides?: {
-  node?: Partial<NodeInfo>;
-  execution?: Partial<ExecutionInfo>;
-}): ExecutionDetailsContext {
-  const node = buildNode(overrides?.node);
-  return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
-}
+import { buildExecution, buildOutput as buildCloudflareOutput, createComponentFixtures } from "./test_support";
 
 const defaultDefinition: ComponentDefinition = {
   name: "cloudflare.createKVNamespace",
@@ -65,17 +13,8 @@ const defaultDefinition: ComponentDefinition = {
   color: "orange",
 };
 
-function buildPropsContext(overrides?: Partial<ComponentBaseContext>): ComponentBaseContext {
-  return {
-    nodes: [],
-    node: buildNode(),
-    componentDefinition: defaultDefinition,
-    lastExecutions: [],
-    currentUser: undefined,
-    actions: { invokeNodeExecutionHook: async () => {} },
-    ...overrides,
-  };
-}
+const { buildNode, buildDetailsCtx, buildPropsContext } = createComponentFixtures(defaultDefinition);
+const buildOutput = (data: unknown) => buildCloudflareOutput("cloudflare.kv.namespace.created", data);
 
 // ── getExecutionDetails ───────────────────────────────────────────────────────
 

@@ -270,7 +270,7 @@ describe("Cloudflare monitor component mappers", () => {
     ]);
   });
 
-  it("falls back to configured monitor id when node metadata is absent or stale", () => {
+  it("falls back to configured monitor id when node metadata is absent", () => {
     const node: NodeInfo = {
       id: "node-2",
       name: "Delete Cloudflare monitor",

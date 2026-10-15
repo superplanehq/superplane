@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { onEc2AlarmTriggerRenderer } from "./on_alarm";
 import { triggerRenderers } from "../index";
 import type { TriggerEventContext, TriggerRendererContext, NodeInfo } from "../../types";
+
+const onEc2AlarmTriggerRenderer = triggerRenderers["ec2.onAlarm"];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -189,13 +190,5 @@ describe("onEc2AlarmTriggerRenderer.getTriggerProps", () => {
   it("omits lastEventData when no lastEvent", () => {
     const props = onEc2AlarmTriggerRenderer.getTriggerProps(buildRendererContext({ lastEvent: undefined }));
     expect(props.lastEventData).toBeUndefined();
-  });
-});
-
-// ── triggerRenderers registration ─────────────────────────────────────────────
-
-describe("triggerRenderers['ec2.onAlarm']", () => {
-  it("is registered in the global trigger renderers map", () => {
-    expect(triggerRenderers["ec2.onAlarm"]).toBe(onEc2AlarmTriggerRenderer);
   });
 });
