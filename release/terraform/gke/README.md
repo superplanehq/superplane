@@ -21,7 +21,7 @@ Do the steps in this order:
 | SuperPlane | GKE cluster, Cloud NAT (private nodes), Cloud SQL, cert-manager, Helm release | Always |
 | Blob storage | GCS bucket, `superplane-app` service account, Workload Identity binding | `enable_gcs_blob_storage` |
 | Runner network | Runner subnetwork, deny-all ingress firewall rule, `superplane-fleet-mgr` service account | `enable_runners` |
-| Fleet Manager infrastructure | Service account, Workload Identity binding, setup values, service-token Secret | `enable_runners` |
+| Fleet Manager infrastructure | Service account, Workload Identity binding, and setup metadata | `enable_runners` |
 
 A new install sets both flags to `true` in `terraform.tfvars` before the first
 apply. The variable defaults stay `false`. An existing install that omitted
@@ -154,7 +154,7 @@ The runner infrastructure includes:
   the project.
 - A runner API Deployment. Runners connect to
   `https://superplane.example.com/runner/v1`.
-- Fleet Manager setup values and the service-token Secret.
+- Fleet Manager setup metadata, including the configured runner images.
 
 If `172.20.0.0/24` overlaps a range in your network, set `runner_subnet_cidr`
 before you apply.
@@ -177,8 +177,7 @@ account is the installation admin.
 
 ## 3. Install Fleet Manager
 
-Do these steps after the installation in step 2 works. They do not need another
-Terraform apply.
+Do these steps after the installation in step 2 works.
 
 ### 3.1 Build the runner image
 
@@ -197,8 +196,13 @@ packer build \
 cd release/terraform/gke
 ```
 
-The image goes into the `superplane-runner-amd64` image family. Fleet Manager
-uses the newest image in the family.
+The image goes into the `superplane-runner-amd64` image family. Set the
+immutable image resource in `terraform.tfvars`, and apply the stack again:
+
+```hcl
+runner_image_amd64 = "projects/PROJECT/global/images/IMAGE_NAME"
+runner_image_arm64 = "projects/PROJECT/global/images/ARM_IMAGE_NAME"
+```
 
 The default build uses a public IP address and SSH on TCP 22. If the
 network blocks inbound SSH, build after the apply. Use Identity-Aware Proxy
@@ -229,16 +233,18 @@ terraform output runner_project
 terraform output runner_zones
 terraform output runner_subnetwork
 terraform output runner_network_tag
+terraform output runner_image_amd64
+terraform output runner_image_arm64
 terraform output fleet_manager_service_account_email
 ```
 
-Replace the GCP image placeholder with an image or image family that contains
-the Runner. Save `values.yaml` and run the displayed Helm command. The
-SuperPlane chart creates a dedicated service-token Secret in Kubernetes. The
-credential does not enter Terraform state or Helm release metadata.
+Select only fleets whose image output is set. SuperPlane creates a personal
+token when you generate the install command. Run the displayed Helm heredoc.
+The standalone chart stores the complete configuration in
+`fleet-manager-config`.
 
-The chart startup Job creates or updates the fleets before Fleet Manager
-starts. For complete install, upgrade, token rotation, fleet removal, and
+The chart startup Job creates or updates the fleets after the configuration
+Secret exists. For complete install, upgrade, token rotation, fleet removal, and
 rollback instructions, see
 [the standalone chart guide](../../fleet-manager-chart/README.md).
 

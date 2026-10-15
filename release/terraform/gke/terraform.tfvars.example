@@ -94,6 +94,8 @@ superplane_chart_version = "0.0.0-<git-sha>"
 
 # runner_zones       = ["us-central1-a", "us-central1-b"]
 # runner_subnet_cidr = "172.20.0.0/24"
+# runner_image_amd64 = "projects/example/global/images/superplane-runner-amd64"
+# runner_image_arm64 = "projects/example/global/images/superplane-runner-arm64"
 
 # After owner setup, use /admin/fleet-manager-setup. The page maps Terraform
 # outputs to the standalone chart at
