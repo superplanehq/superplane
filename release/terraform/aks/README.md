@@ -364,10 +364,10 @@ Use a size from `az vm list-skus`. Do not use `*_v5` unless the
 subscription allows it.
 
 Open **Set up runner fleets** during owner setup. Terraform passes the runner
-network, location, identity, and cluster values to SuperPlane. The wizard
-preloads these values. Replace the Azure image placeholder with the immutable
-gallery image version that Packer created. Save `values.yaml` and run the
-displayed Helm command.
+network, location, identity, public SuperPlane URL, and cluster values to
+SuperPlane. The wizard preloads these values. Replace the Azure image
+placeholder with the immutable gallery image version that Packer created. Save
+`values.yaml` and run the displayed Helm command.
 See [the standalone chart guide](../../fleet-manager-chart/README.md).
 
 ## Destroy
