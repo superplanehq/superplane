@@ -100,9 +100,6 @@ CREATE TABLE public.account_providers (
     email character varying(255),
     name character varying(255),
     avatar_url text,
-    access_token text,
-    refresh_token text,
-    token_expires_at timestamp without time zone,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
@@ -5680,7 +5677,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261014121106	f
+20261015224712	f
 \.
 
 
