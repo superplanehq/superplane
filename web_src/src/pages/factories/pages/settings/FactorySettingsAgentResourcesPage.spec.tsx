@@ -172,7 +172,9 @@ describe("FactorySettingsSkillsPage", () => {
     expect(await screen.findByTestId("skill-editor-enabled", {}, { timeout: 8000 })).toBeDisabled();
     expect(screen.getByTestId("skill-editor-enabled")).toBeChecked();
     expect(screen.getByTestId("agent-resource-skill-name")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    expect(await screen.findByRole("alertdialog")).toHaveTextContent("System skills cannot be deleted.");
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
     const markdown = screen.getByTestId("agent-resource-skill-markdown").querySelector("textarea")!;
     await user.clear(markdown);
     await user.type(markdown, "# My refinement instructions");

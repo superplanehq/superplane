@@ -16,6 +16,28 @@ export const SEMAPHORE_API_TOKEN_URL =
 
 export const AGENT_RESOURCES_COPY = {
   systemSkillLabel: "System",
+  restoreSkill: "Restore to latest",
+  restoreSkillTitle: "Restore this skill to latest?",
+  restoreSkillDescription:
+    "This replaces the skill instructions with the current SuperPlane version. Saved and unsaved edits will be removed.",
+  restoreSkillSuccess: "Skill restored to latest.",
+  restoreSkillFailed: "SuperPlane could not restore this skill. Try again.",
+  systemSkillStates: {
+    STATE_LATEST: { label: "Latest", explanation: "Matches the current SuperPlane instructions." },
+    STATE_CUSTOM: {
+      label: "Custom",
+      explanation: "You customized this skill. Restore to latest to use the current SuperPlane instructions.",
+    },
+    STATE_UPDATE_AVAILABLE: {
+      label: "Update available",
+      explanation: "The supplied instructions differ from the current SuperPlane template. You can restore to latest.",
+    },
+    STATE_UNAVAILABLE: {
+      label: "Unavailable",
+      explanation:
+        "This template is unavailable in this SuperPlane version. Your instructions remain available to agents.",
+    },
+  },
   systemSkillExplanation:
     "Provided by SuperPlane. You can edit its instructions, but cannot rename, disable, or delete it.",
   systemSkillProtected: "You can edit instructions. System skills cannot be renamed, disabled, or deleted.",

@@ -362,6 +362,11 @@ func (s *FactoryService) UpdateFactoryAgentResource(ctx context.Context, req *pb
 	return actions.UpdateFactoryAgentResource(ctx, s.intakeDeps, organizationID, req)
 }
 
+func (s *FactoryService) RestoreFactorySystemSkill(ctx context.Context, req *pb.RestoreFactorySystemSkillRequest) (*pb.RestoreFactorySystemSkillResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.RestoreFactorySystemSkill(ctx, organizationID, req)
+}
+
 func (s *FactoryService) DeleteFactoryAgentResource(ctx context.Context, req *pb.DeleteFactoryAgentResourceRequest) (*pb.DeleteFactoryAgentResourceResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DeleteFactoryAgentResource(ctx, s.intakeDeps, organizationID, req)
