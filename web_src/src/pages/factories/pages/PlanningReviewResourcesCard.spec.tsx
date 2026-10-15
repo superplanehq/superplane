@@ -133,6 +133,22 @@ describe("PlanningReviewResourcesCard", () => {
     expect(screen.getByTestId(`planning-review-resource-${HEADER_MCP_RESOURCE.id}`)).toBeDisabled();
   });
 
+  it("keeps system skills enabled even with a saved disabled ID", async () => {
+    const user = userEvent.setup();
+    const onDisabledIdsChange = vi.fn();
+    useFactoryAgentResources.mockImplementation((_org: string, _factory: string, kind: string) => ({
+      data: kind === "KIND_SKILL" ? [{ ...INLINE_SKILL, systemSkill: { templateId: "review-copy", version: 1 } }] : [],
+      isLoading: false,
+      isError: false,
+    }));
+    renderCard({ disabledIds: [INLINE_SKILL.id!], onDisabledIdsChange });
+    const toggle = screen.getByTestId(`planning-review-resource-${INLINE_SKILL.id}`);
+    expect(toggle).toBeChecked();
+    expect(toggle).toBeDisabled();
+    await user.click(toggle);
+    expect(onDisabledIdsChange).not.toHaveBeenCalled();
+  });
+
   it("lets an automation turn a workspace-disabled tool on", async () => {
     const user = userEvent.setup();
     const onEnabledToolsChange = vi.fn();
