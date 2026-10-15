@@ -49,10 +49,8 @@ const metadata = {
 const jsonResponse = (body: unknown) =>
   new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
 
-async function continueTo(stepName: string) {
-  while (!screen.queryByRole("heading", { name: stepName })) {
-    fireEvent.click(await screen.findByRole("button", { name: /continue/i }));
-  }
+function fleetRequestCount(fetchMock: ReturnType<typeof vi.fn>) {
+  return fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/admin/api/installation/fleets")).length;
 }
 
 describe("FleetManagerSetup", () => {
@@ -73,17 +71,40 @@ describe("FleetManagerSetup", () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
+  it("shows provider, fleets, infrastructure, and values on one page", async () => {
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Choose runner fleets" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Confirm cloud infrastructure" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Install Fleet Manager" })).toBeInTheDocument();
+    expect(screen.getByText("values.yaml")).toBeInTheDocument();
+    expect(screen.getByText(/existingSecret: superplane-fleet-manager-token/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy values.yaml" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download values.yaml" })).toBeInTheDocument();
+    expect(screen.getByText("Run this command where kubectl can access your cluster.")).toBeInTheDocument();
+    expect(screen.getByText(/--wait --timeout 10m/)).toBeInTheDocument();
+    expect(screen.queryByText(/step \d+ of/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Fleet Manager setup saved" })).not.toBeInTheDocument();
+    expect(fleetRequestCount(vi.mocked(fetch))).toBe(0);
+  });
+
   it("uses Terraform defaults without creating or displaying a token", async () => {
     render(<FleetManagerSetup />);
 
     expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
     expect(screen.getAllByText("Loaded from Terraform").length).toBeGreaterThan(0);
     expect(screen.queryByText(/create fleet manager token/i)).not.toBeInTheDocument();
-
-    await continueTo("Confirm cloud infrastructure");
     expect(screen.getByLabelText("AWS region")).toHaveValue("us-east-1");
     expect(screen.getByLabelText("Private subnet IDs")).toHaveValue("subnet-a, subnet-b");
     expect(screen.getByLabelText("SuperPlane URL")).toHaveValue("https://superplane.example.com");
+
+    const yaml = screen.getByText(/existingSecret: superplane-fleet-manager-token/).textContent ?? "";
+    expect(yaml).toContain("tokenKey: INSTALLATION_ADMIN_TOKEN");
+    expect(yaml).not.toContain("kubernetes-api-token");
+    expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("INSTALLATION_ADMIN_TOKEN");
   });
 
   it("uses Terraform defaults instead of an incompatible legacy draft", async () => {
@@ -104,9 +125,8 @@ describe("FleetManagerSetup", () => {
     );
 
     render(<FleetManagerSetup />);
-    await continueTo("Confirm cloud infrastructure");
 
-    expect(screen.getByLabelText("Fleet Manager ID")).toHaveValue("terraform-cluster");
+    expect(await screen.findByLabelText("Fleet Manager ID")).toHaveValue("terraform-cluster");
     expect(screen.getByLabelText("SuperPlane URL")).toHaveValue("https://superplane.example.com");
     expect(screen.getByLabelText("AWS region")).toHaveValue("us-east-1");
     expect(screen.getByLabelText("Private subnet IDs")).toHaveValue("subnet-a, subnet-b");
@@ -127,28 +147,16 @@ describe("FleetManagerSetup", () => {
     });
 
     render(<FleetManagerSetup />);
-    await continueTo("Confirm cloud infrastructure");
 
-    expect(screen.getByLabelText("Fleet Manager ID")).toHaveValue("my-cluster");
+    expect(await screen.findByLabelText("Fleet Manager ID")).toHaveValue("my-cluster");
     expect(screen.getByLabelText("Fleet Manager service account")).toHaveValue("custom-fleet-manager");
     expect(screen.getByLabelText("SuperPlane URL")).toHaveValue("https://custom.example.com");
     expect(screen.getByLabelText("AWS region")).toHaveValue("us-west-2");
   });
 
-  it("generates values with a Secret reference and no credential value", async () => {
-    render(<FleetManagerSetup />);
-    await continueTo("Review Fleet Manager values");
-
-    const yaml = screen.getByText(/existingSecret: superplane-fleet-manager-token/).textContent ?? "";
-    expect(yaml).toContain("tokenKey: INSTALLATION_ADMIN_TOKEN");
-    expect(yaml).not.toContain("kubernetes-api-token");
-    expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("INSTALLATION_ADMIN_TOKEN");
-  });
-
   it("configures capacity independently for each fleet", async () => {
     render(<FleetManagerSetup />);
-    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByLabelText(/e1-large-arm64/));
+    fireEvent.click(await screen.findByRole("checkbox", { name: /e1-large-arm64/ }));
 
     fireEvent.change(screen.getByLabelText("Warm capacity for e1-large-amd64"), { target: { value: "2" } });
     fireEvent.change(screen.getByLabelText("Maximum capacity for e1-large-amd64"), { target: { value: "10" } });
@@ -162,18 +170,16 @@ describe("FleetManagerSetup", () => {
 
   it("uses the reachable SuperPlane URL entered by the administrator", async () => {
     render(<FleetManagerSetup />);
-    await continueTo("Confirm cloud infrastructure");
-    fireEvent.change(screen.getByLabelText("SuperPlane URL"), {
+    fireEvent.change(await screen.findByLabelText("SuperPlane URL"), {
       target: { value: "https://runners.example.com" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     const yaml = screen.getByText(/url: https:\/\/runners.example.com/).textContent ?? "";
     expect(yaml).toContain("url: https://runners.example.com");
     expect(yaml).not.toContain(window.location.origin);
   });
 
-  it("lets an administrator correct an invalid URL from a saved draft", async () => {
+  it("hides incomplete YAML when the URL is invalid", async () => {
     saveFleetManagerDraft({
       provider: "aws",
       managerId: "terraform-cluster",
@@ -187,39 +193,101 @@ describe("FleetManagerSetup", () => {
     });
 
     render(<FleetManagerSetup />);
-    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-    expect(await screen.findByRole("heading", { name: "Confirm cloud infrastructure" })).toBeInTheDocument();
-    expect(screen.getByRole("alert")).toHaveTextContent("Enter a valid SuperPlane URL.");
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    expect((await screen.findAllByText("Enter a valid SuperPlane URL.")).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/existingSecret:/)).not.toBeInTheDocument();
+    expect(screen.queryByText("values.yaml")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check installation" })).toBeDisabled();
 
     fireEvent.change(screen.getByLabelText("SuperPlane URL"), {
       target: { value: "https://superplane.example.com" },
     });
-    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+
+    expect(screen.getByText(/existingSecret: superplane-fleet-manager-token/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check installation" })).toBeEnabled();
+  });
+
+  it("hides incomplete YAML when no fleet is selected", async () => {
+    render(<FleetManagerSetup />);
+    fireEvent.click(await screen.findByRole("checkbox", { name: /e1-large-amd64/ }));
+
+    expect(screen.getAllByText("Select at least one fleet.").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/existingSecret:/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check installation" })).toBeDisabled();
   });
 
   it("clears incompatible fields when the provider changes", async () => {
     render(<FleetManagerSetup />);
     fireEvent.click(await screen.findByRole("button", { name: "GCP" }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
-    expect(await screen.findByLabelText("GCP project")).toHaveValue("");
+    expect(screen.getByLabelText("GCP project")).toHaveValue("");
     expect(screen.queryByLabelText("AWS region")).not.toBeInTheDocument();
   });
 
-  it("verifies every selected fleet after the Helm step", async () => {
+  it("uses the selected provider values in the values file", async () => {
     render(<FleetManagerSetup />);
-    await continueTo("Review Fleet Manager values");
-    fireEvent.click(screen.getByRole("button", { name: "Continue to install" }));
+
+    expect(await screen.findByText("The values file uses AWS.")).toBeInTheDocument();
+    expect(screen.getAllByText(/provider: aws/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/eks.amazonaws.com\/role-arn/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "GCP" }));
+    fireEvent.change(screen.getByLabelText("GCP project"), { target: { value: "runner-project" } });
+
+    expect(screen.getByText("The values file uses GCP.")).toBeInTheDocument();
+    expect(screen.getAllByText(/provider: gcp/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/projectId: runner-project/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/provider: aws/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/eks.amazonaws.com\/role-arn/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /AWS/ }));
+
+    expect(screen.getByText("The values file uses AWS.")).toBeInTheDocument();
+    expect(screen.getByLabelText("AWS region")).toHaveValue("us-east-1");
+    expect(screen.getAllByText(/provider: aws/).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "GCP" }));
+
+    expect(screen.getByLabelText("GCP project")).toHaveValue("runner-project");
+    expect(screen.getAllByText(/projectId: runner-project/).length).toBeGreaterThan(0);
+  });
+
+  it("starts fleet verification only after Check installation", async () => {
+    render(<FleetManagerSetup />);
+    expect(await screen.findByRole("button", { name: "Check installation" })).toBeEnabled();
+    expect(fleetRequestCount(vi.mocked(fetch))).toBe(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Check installation" }));
 
     expect(await screen.findByText(/created every selected fleet/i)).toBeInTheDocument();
-    expect(screen.getByText(/--wait --timeout 10m/)).toBeInTheDocument();
     expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Finish installation" }));
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Fleet Manager setup saved" })).toBeInTheDocument());
+    expect(screen.queryByRole("heading", { name: "Fleet Manager setup saved" })).not.toBeInTheDocument();
+    expect(fleetRequestCount(vi.mocked(fetch))).toBe(1);
+  });
+
+  it("stops fleet verification when the draft changes", async () => {
+    render(<FleetManagerSetup />);
+    fireEvent.click(await screen.findByRole("button", { name: "Check installation" }));
+
+    expect(await screen.findByText(/created every selected fleet/i)).toBeInTheDocument();
+    expect(fleetRequestCount(vi.mocked(fetch))).toBe(1);
+
+    fireEvent.change(screen.getByLabelText("SuperPlane URL"), {
+      target: { value: "https://edited.example.com" },
+    });
+
+    expect(screen.queryByText(/created every selected fleet/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check installation" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /e1-large-amd64/ }));
+
+    expect(screen.getAllByText("Select at least one fleet.").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Check installation" })).toBeDisabled();
+    await waitFor(() => {
+      expect(fleetRequestCount(vi.mocked(fetch))).toBe(1);
+      expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).toContain('"selectedFleetIds":[]');
+    });
+    expect(screen.queryByText(/created every selected fleet/i)).not.toBeInTheDocument();
   });
 
   it("explains authentication failures and retries verification", async () => {
@@ -239,8 +307,7 @@ describe("FleetManagerSetup", () => {
     );
 
     render(<FleetManagerSetup />);
-    await continueTo("Review Fleet Manager values");
-    fireEvent.click(screen.getByRole("button", { name: "Continue to install" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Check installation" }));
 
     expect(await screen.findByText(/sign in again and retry/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry verification" }));
@@ -250,10 +317,6 @@ describe("FleetManagerSetup", () => {
   });
 
   it("stops verification after the bounded timeout", async () => {
-    const now = vi
-      .spyOn(Date, "now")
-      .mockReturnValueOnce(0)
-      .mockReturnValue(10 * 60_000);
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -265,8 +328,11 @@ describe("FleetManagerSetup", () => {
     );
 
     render(<FleetManagerSetup />);
-    await continueTo("Review Fleet Manager values");
-    fireEvent.click(screen.getByRole("button", { name: "Continue to install" }));
+    const now = vi
+      .spyOn(Date, "now")
+      .mockReturnValueOnce(0)
+      .mockReturnValue(10 * 60_000);
+    fireEvent.click(await screen.findByRole("button", { name: "Check installation" }));
 
     expect(await screen.findByText(/verification timed out/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry verification" })).toBeEnabled();
