@@ -194,41 +194,47 @@ function FleetsStep({ setup, actions }: { setup: SetupState; actions: React.Reac
                   </span>
                 </Label>
                 {setup.draft?.selectedFleetIds.includes(preset.id) && (
-                  <Field
-                    id={`machine-type-${preset.id}`}
-                    label={`Machine type for ${preset.id}`}
-                    value={setup.draft.fields[`machineType.${preset.id}`] || ""}
-                    placeholder={machineTypePlaceholder(setup.draft.provider, preset.spec.architecture)}
-                    onChange={(event) => setup.setField(`machineType.${preset.id}`, event.target.value)}
-                  />
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Field
+                      id={`machine-type-${preset.id}`}
+                      label={`Machine type for ${preset.id}`}
+                      value={setup.draft.fields[`machineType.${preset.id}`] || ""}
+                      placeholder={machineTypePlaceholder(setup.draft.provider, preset.spec.architecture)}
+                      onChange={(event) => setup.setField(`machineType.${preset.id}`, event.target.value)}
+                    />
+                    <Field
+                      id={`warm-capacity-${preset.id}`}
+                      label={`Warm capacity for ${preset.id}`}
+                      type="number"
+                      min={0}
+                      value={setup.draft.fleetCapacities[preset.id]?.warmCapacity ?? 0}
+                      onChange={(event) =>
+                        setup.setFleetCapacity(preset.id, { warmCapacity: Number(event.target.value) })
+                      }
+                    />
+                    <Field
+                      id={`max-capacity-${preset.id}`}
+                      label={`Maximum capacity for ${preset.id}`}
+                      type="number"
+                      min={0}
+                      value={setup.draft.fleetCapacities[preset.id]?.maxCapacity ?? 1}
+                      onChange={(event) =>
+                        setup.setFleetCapacity(preset.id, { maxCapacity: Number(event.target.value) })
+                      }
+                    />
+                  </div>
                 )}
               </div>
             </div>
           );
         })}
       </div>
-      <div className="mt-5 grid gap-4 sm:grid-cols-3">
+      <div className="mt-5 max-w-xs">
         <Field
           id="runner-version"
           label="Runner version"
           value={setup.draft.runnerVersion}
           onChange={(event) => setup.setRunnerVersion(event.target.value)}
-        />
-        <Field
-          id="warm-capacity"
-          label="Warm capacity"
-          type="number"
-          min={0}
-          value={setup.draft.warmCapacity}
-          onChange={(event) => setup.setWarmCapacity(Number(event.target.value))}
-        />
-        <Field
-          id="max-capacity"
-          label="Maximum capacity"
-          type="number"
-          min={0}
-          value={setup.draft.maxCapacity}
-          onChange={(event) => setup.setMaxCapacity(Number(event.target.value))}
         />
       </div>
       {setup.fleetErrors.length > 0 && (

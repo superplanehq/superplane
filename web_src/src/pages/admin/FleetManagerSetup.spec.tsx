@@ -20,7 +20,10 @@ const metadata = {
   runnerReleaseUrlTemplate: "https://example/releases/runner%2F{version}",
   chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
   imageRepository: "ghcr.io/superplanehq/fleet-manager",
-  fleetPresets: [{ id: "e1-large-amd64", spec: fleetSpec }],
+  fleetPresets: [
+    { id: "e1-large-amd64", spec: fleetSpec },
+    { id: "e1-large-arm64", spec: { ...fleetSpec, architecture: "arm64" as const } },
+  ],
   infrastructureDefaults: {
     source: "terraform" as const,
     provider: "aws" as const,
@@ -92,8 +95,7 @@ describe("FleetManagerSetup", () => {
       superplaneUrl: window.location.origin,
       runnerVersion: "v0.1.0",
       selectedFleetIds: ["e1-large-amd64"],
-      warmCapacity: 5,
-      maxCapacity: 100,
+      fleetCapacities: { "e1-large-amd64": { warmCapacity: 5, maxCapacity: 100 } },
       fields: {},
     });
 
@@ -114,6 +116,21 @@ describe("FleetManagerSetup", () => {
     expect(yaml).toContain("tokenKey: INSTALLATION_ADMIN_TOKEN");
     expect(yaml).not.toContain("kubernetes-api-token");
     expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("INSTALLATION_ADMIN_TOKEN");
+  });
+
+  it("configures capacity independently for each fleet", async () => {
+    render(<FleetManagerSetup />);
+    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByLabelText(/e1-large-arm64/));
+
+    fireEvent.change(screen.getByLabelText("Warm capacity for e1-large-amd64"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Maximum capacity for e1-large-amd64"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("Maximum capacity for e1-large-arm64"), { target: { value: "3" } });
+
+    expect(screen.getByLabelText("Warm capacity for e1-large-amd64")).toHaveValue(2);
+    expect(screen.getByLabelText("Maximum capacity for e1-large-amd64")).toHaveValue(10);
+    expect(screen.getByLabelText("Warm capacity for e1-large-arm64")).toHaveValue(0);
+    expect(screen.getByLabelText("Maximum capacity for e1-large-arm64")).toHaveValue(3);
   });
 
   it("uses the reachable SuperPlane URL entered by the administrator", async () => {
@@ -138,8 +155,7 @@ describe("FleetManagerSetup", () => {
       superplaneUrl: "not-a-url",
       runnerVersion: "v0.1.0",
       selectedFleetIds: ["e1-large-amd64"],
-      warmCapacity: 0,
-      maxCapacity: 1,
+      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
       fields: {},
     });
 

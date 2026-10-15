@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { load } from "js-yaml";
 
 import {
   FLEET_MANAGER_DRAFT_KEY,
@@ -59,8 +60,7 @@ describe("generateFleetManagerValues", () => {
       superplaneUrl: "https://superplane.example.com",
       runnerVersion: "v0.1.0",
       selectedFleetIds: ["e1-large-amd64"],
-      warmCapacity: 0,
-      maxCapacity: 2,
+      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 2 } },
       fields: {},
     });
 
@@ -70,7 +70,7 @@ describe("generateFleetManagerValues", () => {
     expect(values).not.toContain("token:");
   });
 
-  it("generates more than one selected fleet", () => {
+  it("generates capacity for each selected fleet", () => {
     const values = generateFleetManagerValues({
       metadata: {
         ...metadata,
@@ -81,13 +81,20 @@ describe("generateFleetManagerValues", () => {
       superplaneUrl: "https://superplane.example.com",
       runnerVersion: "v0.1.0",
       selectedFleetIds: ["e1-large-amd64", "e1-tiny-amd64"],
-      warmCapacity: 0,
-      maxCapacity: 2,
+      fleetCapacities: {
+        "e1-large-amd64": { warmCapacity: 2, maxCapacity: 10 },
+        "e1-tiny-amd64": { warmCapacity: 0, maxCapacity: 3 },
+      },
       fields: {},
     });
 
-    expect(values).toContain("id: e1-large-amd64");
-    expect(values).toContain("id: e1-tiny-amd64");
+    const configuration = load(values) as {
+      fleets: Array<{ id: string; warmCapacity: number; maxCapacity: number }>;
+    };
+    expect(configuration.fleets).toEqual([
+      expect.objectContaining({ id: "e1-large-amd64", warmCapacity: 2, maxCapacity: 10 }),
+      expect.objectContaining({ id: "e1-tiny-amd64", warmCapacity: 0, maxCapacity: 3 }),
+    ]);
   });
 
   it("uses a machine type for each selected fleet", () => {
@@ -108,8 +115,10 @@ describe("generateFleetManagerValues", () => {
       superplaneUrl: "https://cluster.example.com",
       runnerVersion: "v0.1.0",
       selectedFleetIds: ["e1-large-amd64", "e1-tiny-amd64"],
-      warmCapacity: 0,
-      maxCapacity: 2,
+      fleetCapacities: {
+        "e1-large-amd64": { warmCapacity: 0, maxCapacity: 2 },
+        "e1-tiny-amd64": { warmCapacity: 0, maxCapacity: 2 },
+      },
       fields: {
         "machineType.e1-large-amd64": "m8a.large",
         "machineType.e1-tiny-amd64": "t3.small",
@@ -131,8 +140,7 @@ describe("generateFleetManagerValues", () => {
       superplaneUrl: "https://superplane.example.com",
       runnerVersion: "v0.1.0",
       selectedFleetIds: ["e1-large-amd64"],
-      warmCapacity: 0,
-      maxCapacity: 1,
+      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
       fields: {},
     });
 
@@ -148,15 +156,23 @@ describe("validateFleetManagerConfiguration", () => {
     superplaneUrl: "https://superplane.example.com",
     runnerVersion: "v0.1.0",
     selectedFleetIds: ["e1-large-amd64"],
-    warmCapacity: 0,
-    maxCapacity: 1,
+    fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
   };
 
   it.each([
     [{ selectedFleetIds: [] }, "Select at least one fleet."],
-    [{ warmCapacity: -1 }, "Warm capacity must be a non-negative integer."],
-    [{ maxCapacity: 1.5 }, "Maximum capacity must be a non-negative integer."],
-    [{ warmCapacity: 2, maxCapacity: 1 }, "Warm capacity cannot exceed maximum capacity."],
+    [
+      { fleetCapacities: { "e1-large-amd64": { warmCapacity: -1, maxCapacity: 1 } } },
+      "Warm capacity for e1-large-amd64 must be a non-negative integer.",
+    ],
+    [
+      { fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1.5 } } },
+      "Maximum capacity for e1-large-amd64 must be a non-negative integer.",
+    ],
+    [
+      { fleetCapacities: { "e1-large-amd64": { warmCapacity: 2, maxCapacity: 1 } } },
+      "Warm capacity for e1-large-amd64 cannot exceed maximum capacity.",
+    ],
     [{ superplaneUrl: "not-a-url" }, "Enter a valid SuperPlane URL."],
   ])("rejects an invalid fleet configuration", (updates, expectedError) => {
     expect(validateFleetManagerConfiguration({ ...validConfiguration, ...updates })).toContain(expectedError);
@@ -186,8 +202,7 @@ it("matches installed fleets by version and specification", () => {
     superplaneUrl: "https://superplane.example.com",
     runnerVersion: "v0.1.0",
     selectedFleetIds: ["e1-large-amd64"],
-    warmCapacity: 0,
-    maxCapacity: 1,
+    fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
     fields: {},
   };
   const installed = [{ id: "e1-large-amd64", runnerVersion: "v0.1.0", spec: metadata.fleetPresets[0].spec }];
@@ -207,8 +222,7 @@ it("uses a browser key that stores only the non-secret draft", () => {
     superplaneUrl: "https://superplane.example.com",
     runnerVersion: "v0.1.0",
     selectedFleetIds: ["e1-large-amd64"],
-    warmCapacity: 0,
-    maxCapacity: 1,
+    fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
     fields: { region: "us-east-1" },
   };
 
@@ -218,7 +232,7 @@ it("uses a browser key that stores only the non-secret draft", () => {
   expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("INSTALLATION_ADMIN_TOKEN");
 });
 
-it("removes unknown values from a stored Fleet Manager draft", () => {
+it("migrates global capacities and removes unknown values from a stored draft", () => {
   window.localStorage.setItem(
     FLEET_MANAGER_DRAFT_KEY,
     JSON.stringify({
@@ -236,5 +250,7 @@ it("removes unknown values from a stored Fleet Manager draft", () => {
     }),
   );
 
-  expect(loadFleetManagerDraft()).not.toHaveProperty("plaintextToken");
+  const draft = loadFleetManagerDraft();
+  expect(draft).not.toHaveProperty("plaintextToken");
+  expect(draft?.fleetCapacities).toEqual({ "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } });
 });
