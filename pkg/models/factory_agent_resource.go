@@ -1,7 +1,6 @@
 package models
 
 import (
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"net/url"
@@ -519,7 +518,7 @@ func (f *Factory) CreateAgentResource(tx *gorm.DB, kind, name string, enabled bo
 		if config.SystemSkill != nil {
 			metadata := *config.SystemSkill
 			metadata.TemplateID = strings.TrimSpace(metadata.TemplateID)
-			metadata.ContentHash = fmt.Sprintf("%x", sha256.Sum256([]byte(config.Markdown)))
+			metadata.ContentHash = config.SkillContentHash()
 			config.SystemSkill = &metadata
 		}
 	case FactoryAgentResourceKindSetup:

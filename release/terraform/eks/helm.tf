@@ -420,7 +420,7 @@ locals {
         securityGroupIds     = [aws_security_group.runners[0].id]
         fleetManagerIdentity = aws_iam_role.fleet_manager[0].arn
         runnerIdentity       = aws_iam_instance_profile.runner[0].name
-      } : {}
+      } : null
     }
   })
 }

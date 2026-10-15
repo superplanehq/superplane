@@ -99,7 +99,7 @@ locals {
         subnetwork           = google_compute_subnetwork.runners[0].id
         networkTags          = [local.runner_network_tag]
         fleetManagerIdentity = google_service_account.fleet_manager[0].email
-      } : {}
+      } : null
     }
   })
 
