@@ -1,3 +1,4 @@
+import { SystemSkillBadge } from "./SystemSkillBadge";
 import { Editor } from "@monaco-editor/react";
 
 import { PermissionTooltip } from "@/components/PermissionGate";
@@ -41,7 +42,10 @@ export function FactorySettingsSkillEditorPage() {
       actions={<SkillEditorActions editor={editor} />}
     >
       {editor.resource?.systemSkill ? (
-        <p className="mb-4 text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.systemSkillProtected}</p>
+        <div className="mb-4 flex items-center gap-2">
+          <SystemSkillBadge />
+          <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.systemSkillProtected}</p>
+        </div>
       ) : null}
       <SkillEditorFields
         systemSkill={Boolean(editor.resource?.systemSkill)}

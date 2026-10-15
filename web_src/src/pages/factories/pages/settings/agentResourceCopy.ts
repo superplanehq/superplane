@@ -15,8 +15,11 @@ export const SEMAPHORE_API_TOKEN_URL =
   "https://docs.semaphore.io/using-semaphore/ai/mcp-server#connect-with-an-api-token";
 
 export const AGENT_RESOURCES_COPY = {
+  systemSkillLabel: "System",
+  systemSkillExplanation:
+    "Provided by SuperPlane. You can edit its instructions, but cannot rename, disable, or delete it.",
   systemSkillProtected: "You can edit instructions. System skills cannot be renamed, disabled, or deleted.",
-  systemSkillEnabled: "System skill. Always enabled.",
+  systemSkillEnabled: "Always enabled.",
   agentTitle: "SuperPlane Agent",
   agentSubtitle: "Configure what the agent prepares, reads, and uses on every run.",
   superplaneMcpServerTitle: "MCP Server",

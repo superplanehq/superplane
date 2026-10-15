@@ -1,3 +1,4 @@
+import { SystemSkillBadge } from "./settings/SystemSkillBadge";
 import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { Button } from "@/components/ui/button";
@@ -327,7 +328,10 @@ function SkillAutomationRow({
   return (
     <li className={cn("flex flex-wrap items-center gap-3 px-5 py-3", resourceRowClass(flat))}>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
+          {systemSkill ? <SystemSkillBadge /> : null}
+        </div>
         {description ? <p className="truncate text-[12px] text-muted-foreground">{description}</p> : null}
         {systemSkill ? (
           <p className="text-[12px] text-muted-foreground">{AGENT_RESOURCES_COPY.systemSkillEnabled}</p>
