@@ -647,6 +647,8 @@ func TestAttachWorkspaceAgentResourcesShipsCheckoutHelper(t *testing.T) {
 	assert.Contains(t, script, "REPO_URL")
 	assert.Contains(t, script, "workspace_context.json")
 	assert.Contains(t, script, "git clone --depth 1")
+	assert.Contains(t, script, runner.WorkspaceCheckoutCommitSetupEnv)
+	assert.Contains(t, script, runner.FactoryRepoCommitSetup())
 	assert.NotContains(t, script, "GITHUB_TOKEN")
 	assert.NotContains(t, script, "x-access-token")
 }
