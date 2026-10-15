@@ -719,11 +719,24 @@ func setTaskState(t *testing.T, order *models.FactoryWorkOrder, state string, ac
 	if state == models.FactoryWorkOrderStateDraft {
 		return
 	}
-	update := models.FactoryWorkOrderStatusUpdate{ToState: state, Actor: &actor}
 	if state == models.FactoryWorkOrderStateClosed {
-		update.Result = models.FactoryWorkOrderResultRejected
+		_, err := order.UpdateStatus(database.DB(t.Context()), models.FactoryWorkOrderStatusUpdate{
+			ToState: models.FactoryWorkOrderStateOpen,
+			Actor:   &actor,
+		})
+		require.NoError(t, err)
+		_, err = order.UpdateStatus(database.DB(t.Context()), models.FactoryWorkOrderStatusUpdate{
+			ToState: models.FactoryWorkOrderStateClosed,
+			Result:  models.FactoryWorkOrderResultCompleted,
+			Actor:   &actor,
+		})
+		require.NoError(t, err)
+		return
 	}
-	_, err := order.UpdateStatus(database.DB(t.Context()), update)
+	_, err := order.UpdateStatus(database.DB(t.Context()), models.FactoryWorkOrderStatusUpdate{
+		ToState: state,
+		Actor:   &actor,
+	})
 	require.NoError(t, err)
 }
 
