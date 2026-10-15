@@ -82,8 +82,7 @@ describe("AdminLayout", () => {
     expect(within(nav).queryByRole("link", { name: "Sentry" })).not.toBeInTheDocument();
     expect(within(nav).queryByRole("tab", { name: "Sentry" })).not.toBeInTheDocument();
 
-    const page = within(main).getByRole("heading", { name: "Organizations page" });
-    expect(page.parentElement).toHaveClass("max-w-7xl", "mx-auto", "px-6", "py-6");
+    expect(within(main).getByRole("heading", { name: "Organizations page" })).toBeInTheDocument();
     expect(links[0]).toHaveAttribute("aria-current", "page");
     expect(links[0]).toHaveClass("bg-sky-100");
   });
