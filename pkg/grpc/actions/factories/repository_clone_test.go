@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/yaml"
 )
 
@@ -18,22 +19,20 @@ func TestCloneRepositoryChecksRemoteHeads(t *testing.T) {
 	analysis := intakeAnalysisCloneCommand("")
 	implementation := implementationCloneCommand(t)
 
-	// Both scripts prefer the smart checkout helper when the agent screen
-	// shipped it, and keep the inline clone as a fallback for stored
-	// canvases without the file.
+	// Both scripts delegate the checkout to the helper shipped on every
+	// factory task, so the step stays a single line.
 	for _, fragment := range []string{
-		"setup/checkout-workspace.sh",
-		`git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo`,
-		"Remote branch ${branch} not found. The repository has other branches.",
+		"source \"$SUPERPLANE_TASK_DIR/" + runner.WorkspaceCheckoutScriptPath + "\"",
 	} {
 		assert.Contains(t, analysis, fragment)
 		assert.Contains(t, implementation, fragment)
 	}
+	assert.NotContains(t, implementation, "git clone")
 	rewriteAt := strings.Index(analysis, "insteadOf")
-	headsAt := strings.Index(analysis, "git ls-remote --heads")
+	checkoutAt := strings.Index(analysis, runner.WorkspaceCheckoutScriptPath)
 	require.GreaterOrEqual(t, rewriteAt, 0)
-	require.GreaterOrEqual(t, headsAt, 0)
-	assert.Less(t, rewriteAt, headsAt)
+	require.GreaterOrEqual(t, checkoutAt, 0)
+	assert.Less(t, rewriteAt, checkoutAt)
 
 	scripts := []struct {
 		name   string
@@ -152,7 +151,7 @@ func TestEmptyRepositoryCreatesNamedBaseBranch(t *testing.T) {
 func TestCloneRepositoryUsesMainWhenBranchIsEmpty(t *testing.T) {
 	remote := bareRepository(t)
 	commitRemoteBranch(t, remote, "main")
-	result := runCloneScript(t, cloneRepositoryCommand(), fileURL(remote), "")
+	result := runCloneScript(t, intakeAnalysisCloneCommand(""), fileURL(remote), "")
 
 	require.NoError(t, result.err, result.stderr)
 	cloneLine := cloneInvocation(result.gitArgs)
@@ -226,11 +225,18 @@ func runCloneScriptWithPushShim(t *testing.T, script, repoURL, base, pushShim st
 	configPath := filepath.Join(home, ".gitconfig")
 	denyNetworkGit(t, configPath)
 
+	// Stage the real checkout helper: template scripts source it as a
+	// single line, so execution tests run through the shipped file.
+	helperPath := filepath.Join(dir, filepath.FromSlash(runner.WorkspaceCheckoutScriptPath))
+	require.NoError(t, os.MkdirAll(filepath.Dir(helperPath), 0o755))
+	require.NoError(t, os.WriteFile(helperPath, []byte(runner.WorkspaceCheckoutScript()), 0o644))
+
 	cmd := exec.Command("bash", "-c", script)
 	cmd.Dir = dir
 	cmd.Env = []string{
 		"PATH=" + binDir + ":/usr/bin:/bin",
 		"HOME=" + home,
+		"SUPERPLANE_TASK_DIR=" + dir,
 		"GIT_CONFIG_GLOBAL=" + configPath,
 		"GIT_CONFIG_NOSYSTEM=1",
 		"GIT_TERMINAL_PROMPT=0",

@@ -78,8 +78,8 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	cloneCommand, ok := implementationStep(t, agent, "Clone Repo")["command"].(string)
 	require.True(t, ok)
 	assert.Contains(t, cloneCommand, runner.FactoryRepoCommitSetup())
-	assert.Contains(t, cloneCommand, "setup/checkout-workspace.sh")
-	assert.Contains(t, cloneCommand, "git clone --depth 1")
+	assert.Contains(t, cloneCommand, `source "$SUPERPLANE_TASK_DIR/`+runner.WorkspaceCheckoutScriptPath+`"`)
+	assert.NotContains(t, cloneCommand, "git clone")
 	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
@@ -759,7 +759,8 @@ func TestMaterializeFactoryTemplateBitbucketImplement(t *testing.T) {
 	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
 	cloneCommand, ok := implementationStep(t, agent, "Clone Repo")["command"].(string)
 	require.True(t, ok)
-	assert.Contains(t, cloneCommand, "setup/checkout-workspace.sh")
+	assert.Contains(t, cloneCommand, `source "$SUPERPLANE_TASK_DIR/`+runner.WorkspaceCheckoutScriptPath+`"`)
+	assert.NotContains(t, cloneCommand, "git clone")
 }
 
 func TestMaterializeFactoryTemplateBitbucketPRClosure(t *testing.T) {
