@@ -2,6 +2,7 @@ package public
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -358,8 +360,32 @@ func Test__HandleWebhook_SkipsUnknownNodeAndRunsNext(t *testing.T) {
 	nodes, err := models.FindActiveWebhookNodes(webhookID)
 	require.NoError(t, err)
 	require.Len(t, nodes, 2)
-	require.Equal(t, unknownNodeID, nodes[0].NodeID)
+	ordered := append([]models.CanvasNode(nil), nodes...)
+	slices.SortStableFunc(ordered, func(left, right models.CanvasNode) int {
+		return cmp.Compare(webhookNodeTestRank(left.NodeID, unknownNodeID), webhookNodeTestRank(right.NodeID, unknownNodeID))
+	})
+	require.Equal(t, unknownNodeID, ordered[0].NodeID)
+	require.Equal(t, listenerNodeID, ordered[1].NodeID)
 
+	headers := http.Header{}
+	headers.Set("X-GitHub-Event", "pull_request")
+	headers.Set("X-GitHub-Delivery", "84e916b0-c09e-11f1-88cb-295fd7dc3ca1")
+	body := []byte(`{"action":"opened"}`)
+	code, _, _, _, err := server.runWebhookNodes(
+		context.Background(),
+		body,
+		headers,
+		nil,
+		&models.Webhook{ID: webhookID},
+		ordered,
+		func([]models.CanvasEvent) {},
+		func(uuid.UUID, uuid.UUID) {},
+	)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, []string{listenerNodeID}, handled)
+
+	handled = nil
 	response := execRequest(server, requestParams{
 		method: "POST",
 		path:   "/webhooks/" + webhookID.String(),
@@ -376,6 +402,13 @@ func Test__HandleWebhook_SkipsUnknownNodeAndRunsNext(t *testing.T) {
 	stored, err := models.FindCanvasNode(database.Conn(), canvas.ID, unknownNodeID)
 	require.NoError(t, err)
 	assert.Equal(t, "github", stored.Ref.Data().Trigger.Name)
+}
+
+func webhookNodeTestRank(nodeID, unknownNodeID string) int {
+	if nodeID == unknownNodeID {
+		return 0
+	}
+	return 1
 }
 
 type canvasesGatewayStubServer struct {
