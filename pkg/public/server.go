@@ -2037,19 +2037,20 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		touchedExecutions[executionID] = workflowID
 	}
 
-	var firstResponse *core.WebhookResponseBody
-
-	for _, node := range nodes {
-		code, response, organizationID, err := s.executeWebhookNode(requestCtx, body, r.Header, webhookDeliveryQuery(r), node, onNewEvents, recordExecution)
-		if err != nil {
-			track.complete(requestCtx, code, len(nodes))
-			s.replyWebhookError(w, r, webhook, node, code, err, organizationID)
-			return
-		}
-
-		if firstResponse == nil && response != nil && len(response.Body) > 0 {
-			firstResponse = response
-		}
+	code, firstResponse, failedNode, organizationID, err := s.runWebhookNodes(
+		requestCtx,
+		body,
+		r.Header,
+		webhookDeliveryQuery(r),
+		webhook,
+		nodes,
+		onNewEvents,
+		recordExecution,
+	)
+	if err != nil {
+		track.complete(requestCtx, code, len(nodes))
+		s.replyWebhookError(w, r, webhook, failedNode, code, err, organizationID)
+		return
 	}
 
 	for _, event := range newEvents {
@@ -2083,6 +2084,42 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+func (s *Server) runWebhookNodes(
+	ctx context.Context,
+	body []byte,
+	headers http.Header,
+	query url.Values,
+	webhook *models.Webhook,
+	nodes []models.CanvasNode,
+	onNewEvents func([]models.CanvasEvent),
+	recordExecution func(workflowID, executionID uuid.UUID),
+) (int, *core.WebhookResponseBody, models.CanvasNode, string, error) {
+	var firstResponse *core.WebhookResponseBody
+	for _, node := range nodes {
+		code, response, organizationID, err := s.executeWebhookNode(ctx, body, headers, query, node, onNewEvents, recordExecution)
+		if errors.Is(err, registry.ErrNotRegistered) {
+			logUnregisteredWebhookNode(webhook, node, err)
+			continue
+		}
+		if err != nil {
+			return code, nil, node, organizationID, err
+		}
+		if firstResponse == nil && response != nil && len(response.Body) > 0 {
+			firstResponse = response
+		}
+	}
+
+	return http.StatusOK, firstResponse, models.CanvasNode{}, "", nil
+}
+
+func logUnregisteredWebhookNode(webhook *models.Webhook, node models.CanvasNode, err error) {
+	log.WithFields(log.Fields{
+		"webhook_id": webhook.ID.String(),
+		"canvas_id":  node.WorkflowID.String(),
+		"node_id":    node.NodeID,
+	}).Warnf("skipping webhook node with unregistered component: %v", err)
 }
 
 func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, query url.Values, node models.CanvasNode, onNewEvents func([]models.CanvasEvent), recordExecution func(workflowID, executionID uuid.UUID)) (int, *core.WebhookResponseBody, string, error) {

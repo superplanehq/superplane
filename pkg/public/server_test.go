@@ -2,6 +2,7 @@ package public
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -28,6 +31,7 @@ import (
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
+	"github.com/superplanehq/superplane/test/support/impl"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -301,6 +305,110 @@ func Test__HandleWebhook_AcceptsGitHubMergeabilityEventsWithoutNodes(t *testing.
 		},
 	})
 	require.Equal(t, http.StatusNotFound, rejected.Code)
+}
+
+func Test__HandleWebhook_SkipsUnknownNodeAndRunsNext(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	const listenerName = "dummy-webhook-listener"
+	var handled []string
+	r.Registry.Triggers[listenerName] = impl.NewDummyTrigger(impl.DummyTriggerOptions{
+		Name: listenerName,
+		HandleWebhookFunc: func(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+			handled = append(handled, ctx.NodeID)
+			return http.StatusOK, nil, nil
+		},
+	})
+
+	server := newWebhookTestServer(t, r)
+	webhookID := uuid.New()
+	require.NoError(t, database.Conn().Create(&models.Webhook{
+		ID:     webhookID,
+		State:  models.WebhookStateReady,
+		Secret: []byte("secret"),
+	}).Error)
+
+	unknownNodeID := "github-node"
+	listenerNodeID := "listener-node"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: unknownNodeID,
+				Name:   unknownNodeID,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "github"}}),
+			},
+			{
+				NodeID: listenerNodeID,
+				Name:   listenerNodeID,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: listenerName}}),
+			},
+		},
+		nil,
+	)
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNode{}).
+		Where("workflow_id = ?", canvas.ID).
+		Update("webhook_id", webhookID).
+		Error)
+
+	nodes, err := models.FindActiveWebhookNodes(webhookID)
+	require.NoError(t, err)
+	require.Len(t, nodes, 2)
+	ordered := append([]models.CanvasNode(nil), nodes...)
+	slices.SortStableFunc(ordered, func(left, right models.CanvasNode) int {
+		return cmp.Compare(webhookNodeTestRank(left.NodeID, unknownNodeID), webhookNodeTestRank(right.NodeID, unknownNodeID))
+	})
+	require.Equal(t, unknownNodeID, ordered[0].NodeID)
+	require.Equal(t, listenerNodeID, ordered[1].NodeID)
+
+	headers := http.Header{}
+	headers.Set("X-GitHub-Event", "pull_request")
+	headers.Set("X-GitHub-Delivery", "84e916b0-c09e-11f1-88cb-295fd7dc3ca1")
+	body := []byte(`{"action":"opened"}`)
+	code, _, _, _, err := server.runWebhookNodes(
+		context.Background(),
+		body,
+		headers,
+		nil,
+		&models.Webhook{ID: webhookID},
+		ordered,
+		func([]models.CanvasEvent) {},
+		func(uuid.UUID, uuid.UUID) {},
+	)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, code)
+	assert.Equal(t, []string{listenerNodeID}, handled)
+
+	handled = nil
+	response := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   []byte(`{"action":"opened"}`),
+		headers: map[string]string{
+			"X-GitHub-Event":    "pull_request",
+			"X-GitHub-Delivery": "84e916b0-c09e-11f1-88cb-295fd7dc3ca1",
+		},
+	})
+
+	require.Equal(t, http.StatusOK, response.Code)
+	assert.Equal(t, []string{listenerNodeID}, handled)
+
+	stored, err := models.FindCanvasNode(database.Conn(), canvas.ID, unknownNodeID)
+	require.NoError(t, err)
+	assert.Equal(t, "github", stored.Ref.Data().Trigger.Name)
+}
+
+func webhookNodeTestRank(nodeID, unknownNodeID string) int {
+	if nodeID == unknownNodeID {
+		return 0
+	}
+	return 1
 }
 
 type canvasesGatewayStubServer struct {

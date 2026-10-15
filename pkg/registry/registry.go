@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -13,6 +14,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
+
+// ErrNotRegistered reports that a trigger or action name is not in the registry.
+// The caller-facing message stays the existing lookup text.
+var ErrNotRegistered = errors.New("not registered")
 
 var (
 	registeredActions         = make(map[string]core.Action)
@@ -246,7 +251,7 @@ func (r *Registry) GetTrigger(name string) (core.Trigger, error) {
 	if len(parts) == 1 {
 		trigger, ok := r.Triggers[name]
 		if !ok {
-			return nil, fmt.Errorf("trigger %s not registered", name)
+			return nil, notRegistered("trigger %s not registered", name)
 		}
 
 		return trigger, nil
@@ -274,7 +279,7 @@ func (r *Registry) GetAction(name string) (core.Action, error) {
 	if len(parts) == 1 {
 		action, ok := r.Actions[name]
 		if !ok {
-			return nil, fmt.Errorf("action %s not registered", name)
+			return nil, notRegistered("action %s not registered", name)
 		}
 
 		return action, nil
@@ -366,7 +371,7 @@ func (r *Registry) ListIntegrations() []core.Integration {
 func (r *Registry) GetIntegrationTrigger(appName, triggerName string) (core.Trigger, error) {
 	integration, err := r.GetIntegration(appName)
 	if err != nil {
-		return nil, err
+		return nil, notRegistered("%s", err.Error())
 	}
 
 	for _, trigger := range integration.Triggers() {
@@ -375,13 +380,13 @@ func (r *Registry) GetIntegrationTrigger(appName, triggerName string) (core.Trig
 		}
 	}
 
-	return nil, fmt.Errorf("trigger %s not found for integration %s", triggerName, appName)
+	return nil, notRegistered("trigger %s not found for integration %s", triggerName, appName)
 }
 
 func (r *Registry) GetIntegrationAction(appName, actionName string) (core.Action, error) {
 	integration, err := r.GetIntegration(appName)
 	if err != nil {
-		return nil, err
+		return nil, notRegistered("%s", err.Error())
 	}
 
 	for _, action := range integration.Actions() {
@@ -390,7 +395,7 @@ func (r *Registry) GetIntegrationAction(appName, actionName string) (core.Action
 		}
 	}
 
-	return nil, fmt.Errorf("action %s not found for integration %s", actionName, appName)
+	return nil, notRegistered("action %s not found for integration %s", actionName, appName)
 }
 
 func (r *Registry) IsCoreBlock(name string) bool {
@@ -454,4 +459,20 @@ func (r *Registry) AllCapabilities(name string) []core.Capability {
 	}
 
 	return capabilities
+}
+
+type notRegisteredError struct {
+	message string
+}
+
+func (e notRegisteredError) Error() string {
+	return e.message
+}
+
+func (e notRegisteredError) Unwrap() error {
+	return ErrNotRegistered
+}
+
+func notRegistered(format string, args ...any) error {
+	return notRegisteredError{message: fmt.Sprintf(format, args...)}
 }

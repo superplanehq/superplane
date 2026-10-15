@@ -105,7 +105,8 @@ func TestRegistry_FindActionHook(t *testing.T) {
 
 		_, _, err := r.FindActionHook("missing_action", "any-hook")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "action missing_action not registered")
+		require.ErrorIs(t, err, registry.ErrNotRegistered)
+		assert.Equal(t, "action missing_action not registered", err.Error())
 	})
 
 	t.Run("returns error when hook is missing", func(t *testing.T) {
@@ -174,7 +175,8 @@ func TestRegistry_FindTriggerHook(t *testing.T) {
 
 		_, _, err := r.FindTriggerHook("missing_trigger", "emit")
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "trigger missing_trigger not registered")
+		require.ErrorIs(t, err, registry.ErrNotRegistered)
+		assert.Equal(t, "trigger missing_trigger not registered", err.Error())
 	})
 
 	t.Run("returns error when hook is missing", func(t *testing.T) {
@@ -512,12 +514,12 @@ func TestRegistry_GetIntegrationTrigger(t *testing.T) {
 	assert.Equal(t, "app.on_event", got.Name())
 
 	_, err = r.GetIntegrationTrigger("missing", "app.on_event")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "integration missing not registered")
+	require.ErrorIs(t, err, registry.ErrNotRegistered)
+	assert.Equal(t, "integration missing not registered", err.Error())
 
 	_, err = r.GetIntegrationTrigger("app", "other.trigger")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "trigger other.trigger not found for integration app")
+	require.ErrorIs(t, err, registry.ErrNotRegistered)
+	assert.Equal(t, "trigger other.trigger not found for integration app", err.Error())
 }
 
 func TestRegistry_GetIntegrationAction(t *testing.T) {
@@ -535,12 +537,28 @@ func TestRegistry_GetIntegrationAction(t *testing.T) {
 	assert.Equal(t, "app.do_thing", got.Name())
 
 	_, err = r.GetIntegrationAction("missing", "app.do_thing")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "integration missing not registered")
+	require.ErrorIs(t, err, registry.ErrNotRegistered)
+	assert.Equal(t, "integration missing not registered", err.Error())
 
 	_, err = r.GetIntegrationAction("app", "app.other")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "action app.other not found for integration app")
+	require.ErrorIs(t, err, registry.ErrNotRegistered)
+	assert.Equal(t, "action app.other not found for integration app", err.Error())
+}
+
+func TestRegistry_UnknownTriggerAndActionAreNotRegistered(t *testing.T) {
+	r := &registry.Registry{
+		Actions:      map[string]core.Action{},
+		Triggers:     map[string]core.Trigger{},
+		Integrations: map[string]core.Integration{},
+	}
+
+	_, err := r.GetTrigger("github")
+	require.ErrorIs(t, err, registry.ErrNotRegistered)
+	assert.Equal(t, "trigger github not registered", err.Error())
+
+	_, err = r.GetAction("github")
+	require.ErrorIs(t, err, registry.ErrNotRegistered)
+	assert.Equal(t, "action github not registered", err.Error())
 }
 
 func TestRegistry_ListFunctionsSortByName(t *testing.T) {
