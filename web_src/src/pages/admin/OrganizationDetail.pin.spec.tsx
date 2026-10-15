@@ -121,6 +121,78 @@ describe("OrganizationDetail pin control", () => {
     expect(screen.queryByRole("button", { name: "Unpin" })).not.toBeInTheDocument();
   });
 
+  it("keeps a saved pin when an older overview response arrives", async () => {
+    const user = userEvent.setup();
+    let releaseRefresh: (response: Response) => void = () => {};
+    const refresh = new Promise<Response>((resolve) => {
+      releaseRefresh = resolve;
+    });
+    let detailCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === `/admin/api/organizations/${ORG_ID}/pin` && init?.method === "PUT") {
+          return jsonResponse({ pinned: true });
+        }
+        if (url === `/admin/api/organizations/${ORG_ID}`) {
+          detailCalls += 1;
+          if (detailCalls > 1) {
+            return refresh;
+          }
+          return jsonResponse(organizationDetail(ORG_ID, false));
+        }
+        return jsonResponse({ items: [], total: 0 });
+      }),
+    );
+
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: "Pin" })).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Users" }));
+    await user.click(screen.getByRole("tab", { name: "Overview" }));
+    await user.click(screen.getByRole("button", { name: "Pin" }));
+
+    expect(await screen.findByRole("button", { name: "Unpin" })).toBeInTheDocument();
+
+    releaseRefresh(jsonResponse({ ...organizationDetail(ORG_ID, false), member_count: 9 }));
+
+    expect(await screen.findByText("9")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Unpin" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pin" })).not.toBeInTheDocument();
+  });
+
+  it("applies a pin state from an overview response that starts after the pin", async () => {
+    const user = userEvent.setup();
+    let serverPinned = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === `/admin/api/organizations/${ORG_ID}/pin` && init?.method === "PUT") {
+          serverPinned = true;
+          return jsonResponse({ pinned: true });
+        }
+        if (url === `/admin/api/organizations/${ORG_ID}`) {
+          return jsonResponse(organizationDetail(ORG_ID, serverPinned));
+        }
+        return jsonResponse({ items: [], total: 0 });
+      }),
+    );
+
+    renderPage();
+
+    await user.click(await screen.findByRole("button", { name: "Pin" }));
+    expect(await screen.findByRole("button", { name: "Unpin" })).toBeInTheDocument();
+
+    serverPinned = false;
+    await user.click(screen.getByRole("tab", { name: "Users" }));
+    await user.click(screen.getByRole("tab", { name: "Overview" }));
+
+    expect(await screen.findByRole("button", { name: "Pin" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Unpin" })).not.toBeInTheDocument();
+  });
+
   it("shows the pin control after the overview load is retried", async () => {
     const user = userEvent.setup();
     let allowOrganization = false;

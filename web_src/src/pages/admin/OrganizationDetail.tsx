@@ -100,24 +100,46 @@ function OrganizationPinControl({
   );
 }
 
+type SavedPin = {
+  orgId: string;
+  pinned: boolean;
+  detailLoadID: number;
+};
+
+function organizationWithSavedPin(
+  organization: OrganizationOverview,
+  savedPin: SavedPin | null,
+  detailLoadID: number,
+): OrganizationOverview {
+  if (!savedPin || savedPin.orgId !== organization.id || savedPin.detailLoadID < detailLoadID) {
+    return organization;
+  }
+  return { ...organization, pinned: savedPin.pinned };
+}
+
 function useAdminOrganizationDetail(orgId: string | undefined) {
   const [organization, setOrganization] = useState<OrganizationOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(orgId));
   const [reloadToken, setReloadToken] = useState(0);
   const [loadedOrgId, setLoadedOrgId] = useState(orgId);
+  const detailLoadID = useRef(0);
+  const savedPin = useRef<SavedPin | null>(null);
 
   if (orgId !== loadedOrgId) {
     setLoadedOrgId(orgId);
     setOrganization(null);
     setError(null);
     setLoading(Boolean(orgId));
+    savedPin.current = null;
   }
 
   useEffect(() => {
     if (!orgId) {
       return;
     }
+    const requestLoadID = detailLoadID.current + 1;
+    detailLoadID.current = requestLoadID;
     let cancelled = false;
 
     const load = async () => {
@@ -130,7 +152,7 @@ function useAdminOrganizationDetail(orgId: string | undefined) {
         }
         const data: OrganizationOverview = await response.json();
         if (!cancelled) {
-          setOrganization(data);
+          setOrganization(organizationWithSavedPin(data, savedPin.current, requestLoadID));
         }
       } catch {
         if (!cancelled) {
@@ -151,6 +173,7 @@ function useAdminOrganizationDetail(orgId: string | undefined) {
   }, [orgId, reloadToken]);
 
   const setPinned = (targetOrgId: string, pinned: boolean) => {
+    savedPin.current = { orgId: targetOrgId, pinned, detailLoadID: detailLoadID.current };
     setOrganization((current) => {
       if (!current || current.id !== targetOrgId) {
         return current;
