@@ -62,3 +62,14 @@ type CreateRunnerResponse struct {
 	RunnerAPIURL          string    `json:"runnerApiUrl"`
 	DisplayName           string    `json:"displayName"`
 }
+
+type CreateFleetRequest struct {
+	FleetID       string    `json:"fleetId"`
+	RunnerVersion string    `json:"runnerVersion"`
+	Spec          FleetSpec `json:"spec"`
+}
+
+type UpdateFleetRequest struct {
+	RunnerVersion string    `json:"runnerVersion"`
+	Spec          FleetSpec `json:"spec"`
+}

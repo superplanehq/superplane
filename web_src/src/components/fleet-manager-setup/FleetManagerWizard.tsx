@@ -2,18 +2,16 @@ import { useMemo } from "react";
 
 import {
   FleetManagerFleetSection,
-  FleetManagerInfrastructureSection,
   FleetManagerProviderSection,
   type FleetManagerSetupState,
 } from "@/components/fleet-manager-setup/FleetManagerSections";
-import { downloadFleetManagerValues } from "@/lib/downloadFleetManagerValues";
 import { Button } from "@/components/ui/button";
 import { type FleetManagerVerificationStatus, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
 import { fleetManagerInstallCommand } from "@/lib/fleetManagerSetup";
 import type { FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
 import { FirstRunHeading } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
 import { CopyButton } from "@/ui/CopyButton";
-import { CheckCircle2, Download, LoaderCircle, TriangleAlert } from "lucide-react";
+import { CheckCircle2, LoaderCircle, TriangleAlert } from "lucide-react";
 
 type WizardProps = {
   step: FleetManagerWizardStep;
@@ -97,53 +95,6 @@ function FleetsStep({ setup, actions }: { setup: FleetManagerSetupState; actions
   );
 }
 
-function InfrastructureStep({ setup, actions }: { setup: FleetManagerSetupState; actions: React.ReactNode }) {
-  if (!setup.metadata || !setup.draft) return null;
-
-  return (
-    <div data-testid="fleet-manager-infrastructure-step">
-      <FirstRunHeading headline="Confirm cloud infrastructure" size="display">
-        <p className="text-[15px] leading-6 text-muted-foreground">
-          Review the values from Terraform and add missing account details.
-        </p>
-      </FirstRunHeading>
-      <div className="mt-6">
-        <FleetManagerInfrastructureSection setup={setup} contained />
-      </div>
-      {actions}
-    </div>
-  );
-}
-
-function ReviewStep({ setup, actions }: { setup: FleetManagerSetupState; actions: React.ReactNode }) {
-  return (
-    <div data-testid="fleet-manager-review-step">
-      <FirstRunHeading headline="Review Fleet Manager values" size="display">
-        <p className="text-[15px] leading-6 text-muted-foreground">
-          Save this file before you install the standalone chart.
-        </p>
-      </FirstRunHeading>
-      <div className="mt-5 flex gap-2 rounded-md border border-amber-700/60 bg-amber-950/30 p-3 text-sm text-amber-100">
-        <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-        <p>Replace each public VM image placeholder before production use.</p>
-      </div>
-      <pre className="mt-4 max-h-72 overflow-auto rounded-md border border-border bg-muted p-4 text-left font-mono text-xs">
-        <code>{setup.values}</code>
-      </pre>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <CopyButton variant="button" text={setup.values}>
-          Copy values.yaml
-        </CopyButton>
-        <Button type="button" variant="outline" onClick={() => downloadFleetManagerValues(setup.values)}>
-          <Download className="size-4" aria-hidden />
-          Download values.yaml
-        </Button>
-      </div>
-      {actions}
-    </div>
-  );
-}
-
 const fleetManagerVerificationCopy: Record<FleetManagerVerificationStatus, string> = {
   idle: "Verification has not started.",
   checking: "Checking Fleet Manager installation...",
@@ -189,9 +140,9 @@ function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
   const command = useMemo(
     () =>
       setup.metadata && setup.draft
-        ? fleetManagerInstallCommand(setup.metadata, setup.draft.namespace, "values.yaml")
+        ? fleetManagerInstallCommand(setup.metadata, setup.draft.namespace, setup.values)
         : "",
-    [setup.draft, setup.metadata],
+    [setup.draft, setup.metadata, setup.values],
   );
 
   return (
@@ -201,7 +152,7 @@ function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
           Run this command where kubectl can access your cluster.
         </p>
       </FirstRunHeading>
-      <pre className="mt-5 max-h-40 overflow-auto rounded-md border border-border bg-muted p-4 text-left font-mono text-xs">
+      <pre className="mt-5 max-h-80 overflow-auto rounded-md border border-border bg-muted p-4 text-left font-mono text-xs">
         <code>{command}</code>
       </pre>
       <div className="mt-3">
@@ -228,22 +179,26 @@ function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
 
 export function FleetManagerWizardScreen(props: WizardProps) {
   const back = props.showBackButton ? props.onBack : undefined;
-  const stepErrors =
-    props.step === "provider"
-      ? []
-      : props.step === "fleets"
-        ? props.setup.fleetErrors
-        : props.step === "review"
-          ? props.setup.validationErrors
-          : props.setup.infrastructureErrors;
+  const stepErrors = props.step === "fleets" ? props.setup.validationErrors : [];
+  const continueToNextStep = async () => {
+    if (props.step === "fleets" && !(await props.setup.prepareInstallation())) return;
+    props.onNext();
+  };
   const continueActions = (
-    <WizardActions
-      primary={props.step === "review" ? "Continue to install" : "Continue"}
-      onPrimary={props.onNext}
-      primaryDisabled={stepErrors.length > 0}
-      showBack={props.showBackButton}
-      onBack={back}
-    />
+    <>
+      <WizardActions
+        primary={props.step === "fleets" ? "Generate install command" : "Continue"}
+        onPrimary={() => void continueToNextStep()}
+        primaryDisabled={stepErrors.length > 0 || props.setup.isPreparingInstallation}
+        showBack={props.showBackButton}
+        onBack={back}
+      />
+      {props.setup.tokenError && (
+        <p role="alert" className="mt-3 text-sm text-destructive">
+          {props.setup.tokenError}
+        </p>
+      )}
+    </>
   );
 
   if (props.setup.loadError) {
@@ -259,7 +214,5 @@ export function FleetManagerWizardScreen(props: WizardProps) {
 
   if (props.step === "provider") return <ProviderStep setup={props.setup} actions={continueActions} />;
   if (props.step === "fleets") return <FleetsStep setup={props.setup} actions={continueActions} />;
-  if (props.step === "infrastructure") return <InfrastructureStep setup={props.setup} actions={continueActions} />;
-  if (props.step === "review") return <ReviewStep setup={props.setup} actions={continueActions} />;
   return <InstallStep {...props} />;
 }

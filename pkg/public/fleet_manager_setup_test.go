@@ -15,6 +15,7 @@ import (
 
 func TestAdminGetFleetManagerSetup(t *testing.T) {
 	t.Setenv("RUNNER_STABLE_VERSION", "v1.2.3")
+	t.Setenv("RUNNER_SUPPORTED_VERSIONS", "v1.1.0, v1.2.3, v1.0.0")
 	t.Setenv("FLEET_MANAGER_STABLE_VERSION", "v2.3.4")
 	server, user, token := setupAdminTestServer(t)
 
@@ -33,13 +34,12 @@ func TestAdminGetFleetManagerSetup(t *testing.T) {
 	assert.Equal(t, fleetManagerChartRepository, body.ChartRepository)
 	assert.Equal(t, fleetManagerImageRepository, body.ImageRepository)
 	assert.Equal(t, runnerReleaseURLTemplate, body.RunnerReleaseURLTemplate)
+	assert.Equal(t, []string{"v1.2.3", "v1.1.0", "v1.0.0"}, body.RunnerVersions)
 	require.Len(t, body.FleetPresets, 4)
 	assert.Equal(t, models.RunnerFleetE1LargeAMD64, body.FleetPresets[0].ID)
 	assert.Equal(t, "amd64", body.FleetPresets[0].Spec.Architecture)
 	assert.Equal(t, "manual", body.InfrastructureDefaults.Source)
 	assert.Nil(t, body.InfrastructureDefaults.Provider)
-	assert.Equal(t, "superplane-fleet-manager-token", body.Credentials.ExistingSecret)
-	assert.False(t, body.Credentials.AutoProvisioned)
 
 	fleets, err := models.ListInstallationRunnerFleets(database.DB(t.Context()))
 	require.NoError(t, err)
@@ -57,8 +57,7 @@ func TestAdminGetFleetManagerSetupLoadsChartDefaults(t *testing.T) {
 		"managerId":"test-cluster",
 		"namespace":"superplane",
 		"serviceAccountName":"superplane-fleet-manager",
-		"infrastructure":{"region":"us-east-1","subnetIds":["subnet-a","subnet-b"]},
-		"credentials":{"existingSecret":"generated-token","tokenKey":"TOKEN","provision":true}
+		"infrastructure":{"region":"us-east-1","subnetIds":["subnet-a","subnet-b"]}
 	}`
 	require.NoError(t, os.WriteFile(configPath, []byte(config), 0o600))
 	t.Setenv("FLEET_MANAGER_SETUP_CONFIG_PATH", configPath)
@@ -79,9 +78,6 @@ func TestAdminGetFleetManagerSetupLoadsChartDefaults(t *testing.T) {
 	assert.Equal(t, "test-cluster", body.InfrastructureDefaults.ManagerID)
 	assert.Equal(t, "us-east-1", body.InfrastructureDefaults.Fields["region"])
 	assert.Equal(t, []any{"subnet-a", "subnet-b"}, body.InfrastructureDefaults.Fields["subnetIds"])
-	assert.Equal(t, "generated-token", body.Credentials.ExistingSecret)
-	assert.Equal(t, "TOKEN", body.Credentials.TokenKey)
-	assert.True(t, body.Credentials.AutoProvisioned)
 }
 
 func TestAdminGetFleetManagerSetupRequiresAdministrator(t *testing.T) {
