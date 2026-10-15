@@ -75,8 +75,9 @@ superplane_chart_version = "0.0.0-<git-sha>"
 # Optional Variables - Blob Storage
 # -----------------------------------------------------------------------------
 
-# Store task logs and files in a GCS bucket. Runners require this.
-# enable_gcs_blob_storage = true
+# GCS blob storage is on by default. Runners require it.
+# Set both flags to false only for a short app-only evaluation.
+# enable_gcs_blob_storage = false
 # blob_bucket_name        = ""     # Default: <project_id>-superplane-blobs
 # blob_bucket_force_destroy = false
 
@@ -84,8 +85,8 @@ superplane_chart_version = "0.0.0-<git-sha>"
 # Optional Variables - Runners
 # -----------------------------------------------------------------------------
 
-# Create the runner network, workload identity, and runner API in one apply.
-# enable_runners = true
+# Runner infrastructure is on by default. The apply creates it.
+# enable_runners = false
 
 # runner_zones       = ["us-central1-a", "us-central1-b"]
 # runner_subnet_cidr = "172.20.0.0/24"
