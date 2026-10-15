@@ -9,6 +9,8 @@ import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomationsCopy";
 import { DependabotIntakeConfigBody } from "./DependabotIntakeConfigBody";
 import { IntakeSourceSettingsPopup } from "./IntakeSourceSettingsPopup";
 import { MergeConfidenceConfigModal } from "./MergeConfidenceConfigModal";
+import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
+import { SentryIntakeConfigBody } from "./SentryIntakeConfigBody";
 import { type SplitConfigDeleteCopy } from "./splitConfigDeleteCopy";
 import { useColumnCanvasAgentEditor } from "./useColumnCanvasAgentEditor";
 import {
@@ -40,34 +42,16 @@ export function IntakeSettingsHost(props: IntakeSettingsHostProps) {
   if (props.intake.source.id === "dependabot-alerts") {
     return <DependabotIntakeSettings {...props} />;
   }
+  if (props.intake.source.id === "sentry-exceptions") {
+    return <SentryIntakeSettings {...props} />;
+  }
   return <SourceIntakeSettings {...props} />;
 }
 
-function DependabotIntakeSettings({
-  organizationId,
-  factoryId,
-  factoryKey,
-  lineId,
-  intake,
-  repository,
-  page = false,
-  onClose,
-}: IntakeSettingsHostProps) {
-  const automation = useIntakeAutomationCanvas(organizationId, intake.appId);
-  const agent = useColumnCanvasAgentEditor(organizationId, intake.appId);
-  const updateIntake = useUpdateFactoryIntake(organizationId, factoryId);
-  const deleteIntake = useDeleteFactoryIntake(organizationId, factoryId);
-  const actions = useIntakeSettingsActions({
-    intake,
-    updateIntake,
-    deleteIntake,
-    automationRefetch: automation.refetch,
-    onClose,
-  });
+function DependabotIntakeSettings(props: IntakeSettingsHostProps) {
+  const { intake, repository } = props;
+  const split = useIntakeSplitSettings(props);
   const [severityDraft, setSeverityDraft] = useState(intake.settings);
-  const saveError = updateIntake.error
-    ? getApiErrorMessage(updateIntake.error, INTAKE_SETTINGS_COPY.saveError)
-    : undefined;
 
   useEffect(() => {
     setSeverityDraft(intake.settings);
@@ -75,23 +59,7 @@ function DependabotIntakeSettings({
 
   return (
     <MergeConfidenceConfigModal
-      title={intake.settings.name.trim() || intake.source.name}
-      graph={automation.graph}
-      loading={automation.isLoading}
-      error={automation.isError}
-      onRetry={() => void automation.refetch()}
-      canvasId={intake.appId}
-      factoryId={factoryId}
-      factoryKey={factoryKey}
-      runHrefFor={intakeRunHref(organizationId, factoryKey, intake.appId, lineId)}
-      onClose={onClose}
-      onSaveNode={(update) => agent.saveNode(update, { notify: false })}
-      onDelete={actions.removeIntake}
-      deletePending={deleteIntake.isPending}
-      deleteError={actions.deleteError}
-      deleteCopy={DEPENDABOT_INTAKE_DELETE_COPY}
-      page={page}
-      showRunsTab={Boolean(intake.appId)}
+      {...split.modalProps}
       fallbackNode={DEPENDABOT_SETTINGS_NODE}
       renderNodeBody={(node) =>
         node.component === "github.onDependabotAlert" ? (
@@ -99,10 +67,40 @@ function DependabotIntakeSettings({
             node={node}
             fallbackRepository={repository}
             settings={severityDraft}
-            savePending={updateIntake.isPending}
-            saveError={saveError}
+            savePending={split.updateIntake.isPending}
+            saveError={split.saveError}
             onSettingsChange={setSeverityDraft}
-            onSave={actions.saveSettings}
+            onSave={split.actions.saveSettings}
+          />
+        ) : null
+      }
+    />
+  );
+}
+
+function SentryIntakeSettings(props: IntakeSettingsHostProps) {
+  const { organizationId, intake } = props;
+  const split = useIntakeSplitSettings(props);
+  const [settingsDraft, setSettingsDraft] = useState(intake.settings);
+
+  useEffect(() => {
+    setSettingsDraft(intake.settings);
+  }, [intake.settings]);
+
+  return (
+    <MergeConfidenceConfigModal
+      {...split.modalProps}
+      fallbackNode={SENTRY_SETTINGS_NODE}
+      renderNodeBody={(node) =>
+        node.component === "sentry.onIssue" ? (
+          <SentryIntakeConfigBody
+            settings={settingsDraft}
+            organizationId={organizationId}
+            integrationId={intake.integrationId}
+            savePending={split.updateIntake.isPending}
+            saveError={split.saveError}
+            onSettingsChange={setSettingsDraft}
+            onSave={split.actions.saveSettings}
           />
         ) : null
       }
@@ -202,7 +200,14 @@ const DEPENDABOT_SETTINGS_NODE: SuperplaneComponentsNode = {
   component: "github.onDependabotAlert",
 };
 
-const DEPENDABOT_INTAKE_DELETE_COPY: SplitConfigDeleteCopy = {
+const SENTRY_SETTINGS_NODE: SuperplaneComponentsNode = {
+  id: "sentry-exceptions-settings",
+  name: "On Issue",
+  type: "TYPE_TRIGGER",
+  component: "sentry.onIssue",
+};
+
+const INTAKE_DELETE_COPY: SplitConfigDeleteCopy = {
   menuLabel: INTAKE_SETTINGS_COPY.delete,
   title: INTAKE_SETTINGS_COPY.deleteTitle,
   description: INTAKE_SETTINGS_COPY.deleteDescription,
@@ -210,6 +215,56 @@ const DEPENDABOT_INTAKE_DELETE_COPY: SplitConfigDeleteCopy = {
   pendingLabel: COLUMN_AUTOMATIONS_COPY.deletingLabel,
   keepLabel: INTAKE_SETTINGS_COPY.deleteCancel,
 };
+
+function useIntakeSplitSettings({
+  organizationId,
+  factoryId,
+  factoryKey,
+  lineId,
+  intake,
+  page = false,
+  onClose,
+}: IntakeSettingsHostProps) {
+  const automation = useIntakeAutomationCanvas(organizationId, intake.appId);
+  const agent = useColumnCanvasAgentEditor(organizationId, intake.appId);
+  const updateIntake = useUpdateFactoryIntake(organizationId, factoryId);
+  const deleteIntake = useDeleteFactoryIntake(organizationId, factoryId);
+  const actions = useIntakeSettingsActions({
+    intake,
+    updateIntake,
+    deleteIntake,
+    automationRefetch: automation.refetch,
+    onClose,
+  });
+  const saveError = updateIntake.error
+    ? getApiErrorMessage(updateIntake.error, INTAKE_SETTINGS_COPY.saveError)
+    : undefined;
+
+  return {
+    actions,
+    saveError,
+    updateIntake,
+    modalProps: {
+      title: intake.settings.name.trim() || intake.source.name,
+      graph: automation.graph,
+      loading: automation.isLoading,
+      error: automation.isError,
+      onRetry: () => void automation.refetch(),
+      canvasId: intake.appId,
+      factoryId,
+      factoryKey,
+      runHrefFor: intakeRunHref(organizationId, factoryKey, intake.appId, lineId),
+      onClose,
+      onSaveNode: (update: NodeConfigurationUpdate) => agent.saveNode(update, { notify: false }),
+      onDelete: actions.removeIntake,
+      deletePending: deleteIntake.isPending,
+      deleteError: actions.deleteError,
+      deleteCopy: INTAKE_DELETE_COPY,
+      page,
+      showRunsTab: Boolean(intake.appId),
+    },
+  };
+}
 
 function intakeRunHref(organizationId: string, factoryKey: string, appId: string | undefined, lineId?: string) {
   if (!appId) {

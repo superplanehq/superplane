@@ -2,96 +2,26 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import type * as CanvasDataModule from "@/hooks/useCanvasData";
-import type * as ComponentDataModule from "@/hooks/useComponentData";
-import type * as FactoryIntakeDataModule from "@/hooks/useFactoryIntakeData";
-import type * as IntegrationsModule from "@/hooks/useIntegrations";
-import { unmockedSrc } from "@/test/unmockedModule";
-
 import {
   connectedJiraIntake,
   DATADOG_INTAKE,
   DEPENDABOT_INTAKE,
   DEPENDABOT_INTAKE_CANVAS,
+  deleteIntake,
   PRODUCTIVE_INTAKE,
   renderHost,
-  resetIntakeSettingsHostMocks,
-  SENTRY_INTAKE,
+  resetHostMocks,
+  updateIntake,
+  useCanvas,
+  useInfiniteCanvasRuns,
 } from "./IntakeSettingsHost.spec.fixtures";
 import { COLUMN_AUTOMATIONS_COPY } from "../lib/columnAutomationsCopy";
 import { DEFAULT_GITHUB_INTAKE_SETTINGS, INTAKE_SETTINGS_COPY, intakeSettingsToApi } from "./intakeSourceSettingsModel";
-
-const {
-  useCanvas,
-  useTriggers,
-  useComponents,
-  useAvailableIntegrations,
-  useIntegrationResources,
-  updateIntake,
-  deleteIntake,
-  useInfiniteCanvasRuns,
-  useDescribeRun,
-  useEventExecutions,
-} = vi.hoisted(() => ({
-  useCanvas: vi.fn(),
-  useTriggers: vi.fn(),
-  useComponents: vi.fn(),
-  useAvailableIntegrations: vi.fn(),
-  useIntegrationResources: vi.fn(),
-  updateIntake: vi.fn(),
-  deleteIntake: vi.fn(),
-  useInfiniteCanvasRuns: vi.fn(),
-  useDescribeRun: vi.fn(),
-  useEventExecutions: vi.fn(),
-}));
-
-vi.mock("@monaco-editor/react", () => {
-  function MockMonacoEditor({ value, onChange }: { value?: string; onChange?: (value: string | undefined) => void }) {
-    return <textarea value={value ?? ""} onChange={(event) => onChange?.(event.target.value)} />;
-  }
-  return { default: MockMonacoEditor, Editor: MockMonacoEditor };
-});
-
-vi.mock("@/hooks/useCanvasData", () => ({
-  ...unmockedSrc<typeof CanvasDataModule>("hooks/useCanvasData"),
-  useCanvas,
-  useTriggers,
-  useInfiniteCanvasRuns,
-  useDescribeRun,
-  useEventExecutions,
-}));
-
-vi.mock("@/hooks/useComponentData", () => ({
-  ...unmockedSrc<typeof ComponentDataModule>("hooks/useComponentData"),
-  useComponents,
-}));
-
-vi.mock("@/hooks/useIntegrations", () => ({
-  ...unmockedSrc<typeof IntegrationsModule>("hooks/useIntegrations"),
-  useAvailableIntegrations,
-  useIntegrationResources,
-}));
-
-vi.mock("@/hooks/useFactoryIntakeData", () => ({
-  ...unmockedSrc<typeof FactoryIntakeDataModule>("hooks/useFactoryIntakeData"),
-  useUpdateFactoryIntake: () => ({ mutateAsync: updateIntake, isPending: false, error: null }),
-  useDeleteFactoryIntake: () => ({ mutateAsync: deleteIntake, isPending: false, error: null }),
-}));
+import "./intakeSettingsHostSentryCases";
 
 describe("IntakeSettingsHost", () => {
   beforeEach(() => {
-    resetIntakeSettingsHostMocks({
-      useCanvas,
-      useTriggers,
-      useComponents,
-      useAvailableIntegrations,
-      useIntegrationResources,
-      useDescribeRun,
-      useEventExecutions,
-      useInfiniteCanvasRuns,
-      updateIntake,
-      deleteIntake,
-    });
+    resetHostMocks();
   });
 
   it("opens the settings of the intake it is given", () => {
@@ -245,21 +175,6 @@ describe("IntakeSettingsHost", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("deletes a Sentry intake from settings", async () => {
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-    renderHost({
-      intake: SENTRY_INTAKE,
-      onClose,
-    });
-
-    await user.click(screen.getByTestId("intake-source-settings-delete"));
-    expect(screen.getByTestId("intake-delete-dialog")).toBeInTheDocument();
-    await user.click(screen.getByTestId("intake-delete-confirm"));
-    expect(deleteIntake).toHaveBeenCalledWith("intake-sentry");
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
   it("deletes a Jira intake from settings", async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
@@ -309,23 +224,6 @@ describe("IntakeSettingsHost", () => {
     await user.click(screen.getByTestId("intake-delete-confirm"));
     expect(deleteIntake).toHaveBeenCalledWith("intake-datadog");
     expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it("shows a delete error in the confirmation dialog when delete fails", async () => {
-    deleteIntake.mockRejectedValue(new Error("delete failed"));
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-    renderHost({
-      intake: SENTRY_INTAKE,
-      onClose,
-    });
-
-    await user.click(screen.getByTestId("intake-source-settings-delete"));
-    await user.click(screen.getByTestId("intake-delete-confirm"));
-
-    const dialog = screen.getByTestId("intake-delete-dialog");
-    expect(within(dialog).getByTestId("intake-delete-error")).toHaveTextContent("delete failed");
-    expect(onClose).not.toHaveBeenCalled();
   });
 
   it("opens Dependabot intake in the split config panel", async () => {
