@@ -118,12 +118,20 @@ export type FactoryAgentRewrite = {
   component: string;
   model: string;
   planningModel?: string;
-  credentials?: { source: "integration"; name: string };
+  credentials?: { source: "integration"; name: string } | { source: "subscription" };
   llmProvider?: "custom";
 };
 
 export function factoryAppTemplateAgentFromRewrite(rewrite: FactoryAgentRewrite) {
   const credentials = rewrite.credentials;
+  if (credentials?.source === "subscription") {
+    return {
+      component: "runnerCodex",
+      model: "",
+      planningModel: "",
+      credentialSource: "subscription" as const,
+    };
+  }
   return {
     component: rewrite.component,
     model: rewrite.model,
@@ -133,31 +141,61 @@ export function factoryAppTemplateAgentFromRewrite(rewrite: FactoryAgentRewrite)
   };
 }
 
+function subscriptionAgentNode(component: string | undefined): boolean {
+  return (
+    component === CLAUDE_CODE_COMPONENT ||
+    component === "runnerSuperPlane" ||
+    component === "runnerCodex" ||
+    component === "runnerOpenRouter"
+  );
+}
+
+function clearAgentModel(configuration: Record<string, unknown>) {
+  delete configuration.credentials;
+  delete configuration.model;
+  delete configuration.maxTurns;
+  delete configuration.llmProvider;
+}
+
+function applyRewrittenAgent(
+  node: { id?: string; component?: string; configuration?: Record<string, unknown> },
+  rewrite: FactoryAgentRewrite,
+) {
+  node.component = rewrite.component;
+  const configuration = node.configuration;
+  if (!configuration || typeof configuration !== "object") return;
+  if (rewrite.component === "runnerSuperPlane") {
+    clearAgentModel(configuration);
+    return;
+  }
+  if (rewrite.credentials?.source === "subscription") {
+    node.component = "runnerCodex";
+    configuration.credentials = { source: "subscription" };
+    delete configuration.model;
+    delete configuration.maxTurns;
+    delete configuration.llmProvider;
+    return;
+  }
+  if (rewrite.credentials?.source === "integration") {
+    configuration.credentials = {
+      source: "integration",
+      integration: { name: rewrite.credentials.name },
+    };
+  }
+  configuration.model = planningAgentModel(node.id, rewrite);
+  if (rewrite.llmProvider === "custom") {
+    configuration.llmProvider = "custom";
+  } else {
+    delete configuration.llmProvider;
+  }
+}
+
 function rewriteOnboardingAgentNodes(doc: YamlCanvas, rewrite: FactoryAgentRewrite): void {
+  const subscription = rewrite.credentials?.source === "subscription";
   for (const node of doc.spec?.nodes ?? []) {
-    if (node.component !== CLAUDE_CODE_COMPONENT) continue;
-    node.component = rewrite.component;
-    const configuration = node.configuration;
-    if (!configuration || typeof configuration !== "object") continue;
-    if (rewrite.component === "runnerSuperPlane") {
-      delete configuration.credentials;
-      delete configuration.model;
-      delete configuration.maxTurns;
-      delete configuration.llmProvider;
-      continue;
-    }
-    if (rewrite.credentials?.source === "integration") {
-      configuration.credentials = {
-        source: "integration",
-        integration: { name: rewrite.credentials.name },
-      };
-    }
-    configuration.model = planningAgentModel(node.id, rewrite);
-    if (rewrite.llmProvider === "custom") {
-      configuration.llmProvider = "custom";
-    } else {
-      delete configuration.llmProvider;
-    }
+    const matches = subscription ? subscriptionAgentNode(node.component) : node.component === CLAUDE_CODE_COMPONENT;
+    if (!matches) continue;
+    applyRewrittenAgent(node, rewrite);
   }
 }
 

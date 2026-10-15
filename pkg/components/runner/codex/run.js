@@ -369,7 +369,13 @@ async function runPrompt(promptFile, model, thinking) {
   }
   codexArgs.push(prompt);
 
+  const subscription = loadSubscriptionModule();
+  const childEnv =
+    subscription && subscription.subscriptionChildEnv
+      ? subscription.subscriptionChildEnv(process.env)
+      : process.env;
   const child = spawn("codex", codexArgs, {
+    env: childEnv,
     stdio: ["ignore", "pipe", "pipe"],
   });
   const stderrDone = pipeRedactedStderr(child.stderr);
@@ -441,7 +447,10 @@ async function runPrompt(promptFile, model, thinking) {
   telemetry.attachToResult(payload);
   const activityModule = loadActivityStreamModule();
   const safePayload = activityModule.sanitizeLogValue ? activityModule.sanitizeLogValue(payload) : payload;
-  fs.writeFileSync(resultFile, `${JSON.stringify(safePayload)}\n`);
+  if (typeof safePayload.result === "string") {
+    safePayload.result = redactSubscription(safePayload.result);
+  }
+  fs.writeFileSync(resultFile, `${redactSubscription(JSON.stringify(safePayload))}\n`);
   accumulateLLMUsage(safePayload);
   fs.writeFileSync(promptCountPath, `${promptCount + 1}\n`);
   if (planning) {
@@ -457,6 +466,14 @@ async function runPrompt(promptFile, model, thinking) {
         : 1,
     duration_ms: Date.now() - startedAt,
   });
+  if (exitCode === 0 && subscription && subscription.subscriptionEnabled()) {
+    try {
+      await subscription.checkpoint({ final: false });
+    } catch (err) {
+      writeStderr(`${err && err.message ? err.message : "ChatGPT subscription credentials were not saved"}\n`);
+      return 1;
+    }
+  }
   return exitCode;
 }
 
@@ -528,16 +545,33 @@ function writeLiveLogRecord(rec) {
   process.stdout.write(`${JSON.stringify(safe)}\n`);
 }
 
+function loadSubscriptionModule() {
+  const taskDir = process.env.SUPERPLANE_TASK_DIR || "";
+  const file = path.join(taskDir, "codex_subscription.js");
+  if (!taskDir || !fs.existsSync(file)) {
+    return null;
+  }
+  return require(file);
+}
+
+function redactSubscription(value) {
+  const helper = loadSubscriptionModule();
+  if (!helper || !helper.redactSecrets) {
+    return String(value);
+  }
+  return helper.redactSecrets(String(value));
+}
+
 function writeStdout(value) {
   const activity = loadActivityStreamModule();
   const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
-  process.stdout.write(safe);
+  process.stdout.write(redactSubscription(safe));
 }
 
 function writeStderr(value) {
   const activity = loadActivityStreamModule();
   const safe = activity.sanitizeLogText ? activity.sanitizeLogText(value) : String(value);
-  process.stderr.write(safe);
+  process.stderr.write(redactSubscription(safe));
 }
 
 function pipeRedactedStderr(stream) {

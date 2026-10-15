@@ -67,6 +67,9 @@ func (a *intakeAgent) credentials() map[string]any {
 }
 
 func (a *intakeAgent) model() string {
+	if a != nil && a.subscription() {
+		return ""
+	}
 	if a != nil && a.Component == models.SuperPlaneRunnerComponent {
 		return ""
 	}
@@ -92,8 +95,22 @@ func defaultIntakeAgentModel(component string) string {
 // resolveIntakeAgent picks the workspace agent. A SuperPlane harness from
 // setup uses Run SuperPlane Agent and ignores organization BYOK keys.
 // Older workspaces with no harness still fall back to those installations.
+func (a *intakeAgent) subscription() bool {
+	if a == nil {
+		return false
+	}
+	source, _ := a.Credentials["source"].(string)
+	return source == runner.CredentialsSourceSubscription
+}
+
 func resolveIntakeAgent(tx *gorm.DB, factory *models.Factory) *intakeAgent {
 	config := factory.OnboardingConfigValue()
+	if config.CodexSubscription {
+		return &intakeAgent{
+			Component:   "runnerCodex",
+			Credentials: map[string]any{"source": runner.CredentialsSourceSubscription},
+		}
+	}
 	if agent := fillCustomProviderModel(tx, factory, intakeAgentFromSetup(tx, factory, config.AgentIntegrationID)); agent != nil {
 		return agent
 	}

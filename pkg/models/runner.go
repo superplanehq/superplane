@@ -74,6 +74,7 @@ type Runner struct {
 	CreatedAt              time.Time
 	UpdatedAt              time.Time
 	TerminatedAt           *time.Time
+	ProviderDeletedAt      *time.Time
 	CreationIdempotencyKey *string
 	CreationRequestHash    *string
 }
@@ -544,6 +545,37 @@ func (r *Runner) Terminate(tx *gorm.DB, reason string) error {
 		Where("runner_id = ? AND revoked_at IS NULL", r.ID).
 		Update("revoked_at", now).
 		Error
+}
+
+// MarkProviderDeleted records that Fleet Manager removed the runner VM.
+// A terminated runner row alone does not prove the process has stopped.
+func (r *Runner) MarkProviderDeleted(tx *gorm.DB, now time.Time) error {
+	if r.State != RunnerStateTerminated {
+		return fmt.Errorf("runner %s is not terminated", r.ID)
+	}
+	if r.ProviderDeletedAt != nil {
+		return nil
+	}
+	result := tx.Model(r).
+		Where("state = ? AND provider_deleted_at IS NULL", RunnerStateTerminated).
+		Updates(map[string]any{
+			"provider_deleted_at": now,
+			"updated_at":          now,
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		current, err := FindRunner(tx, r.ID)
+		if err != nil {
+			return err
+		}
+		*r = *current
+		return nil
+	}
+	r.ProviderDeletedAt = &now
+	r.UpdatedAt = now
+	return ReleaseConfirmedCodexReservations(tx, now)
 }
 
 func releaseReservedRunnerTask(tx *gorm.DB, runnerID uuid.UUID, now time.Time) error {

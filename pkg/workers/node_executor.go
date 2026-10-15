@@ -512,7 +512,8 @@ func (w *NodeExecutor) executeActionNode(
 			w.encryptor,
 			workflow.OrganizationID,
 		),
-		Logger: logger,
+		CodexSubscription: contexts.NewCodexSubscriptionContext(tx, workflow),
+		Logger:            logger,
 	}
 	if node.AppInstallationID != nil {
 		instance, err := models.FindUnscopedIntegrationInTransaction(tx, *node.AppInstallationID)

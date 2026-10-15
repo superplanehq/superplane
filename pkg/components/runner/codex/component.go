@@ -2,10 +2,15 @@ package codex
 
 import (
 	"fmt"
+	"os"
+	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -126,7 +131,8 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return err
 	}
-	environment, err := injectCodexCredentials(ctx, resolved.Variables, spec.Credentials)
+	taskID := uuid.New()
+	environment, err := injectCodexCredentials(ctx, resolved.Variables, spec.Credentials, taskID, spec.ExecutionTimeoutSeconds)
 	if err != nil {
 		return err
 	}
@@ -164,7 +170,8 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	task.Files = runner.AppendPlanningSessionContinuation(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachWorkspaceAgentResources(ctx, environment, task.Files)
 	environment, task.Files = runner.AttachFactoryCommitIdentity(ctx, environment, task.Files)
-	taskID, err := client.CreateTask(runner.CreateTaskParams{
+	createdTaskID, err := client.CreateTask(runner.CreateTaskParams{
+		TaskID:         taskID.String(),
 		MachineType:    spec.MachineType,
 		Commands:       task.Commands,
 		Files:          task.Files,
@@ -177,10 +184,10 @@ func (c *RunCodex) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
-	return runner.AfterRunnerTaskCreated(ctx, taskID, backend)
+	return runner.AfterRunnerTaskCreated(ctx, createdTaskID, backend)
 }
 
-func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials) ([]runner.BrokerEnvironmentVariable, error) {
+func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, credentials runner.AgentCredentials, taskID uuid.UUID, timeoutSeconds int) ([]runner.BrokerEnvironmentVariable, error) {
 	switch credentials.Source {
 	case runner.CredentialsSourceSecret:
 		return runner.InjectSecretAPIKey(ctx, environment, envOpenAIAPIKey, credentials.Secret)
@@ -188,9 +195,59 @@ func injectCodexCredentials(ctx core.ExecutionContext, environment []runner.Brok
 		return runner.InjectIntegrationKeys(ctx, environment, credentials.Integration)
 	case runner.CredentialsSourceHosted:
 		return nil, runner.RejectHostedCredentials(credentials)
+	case runner.CredentialsSourceSubscription:
+		return injectSubscriptionCredentials(ctx, environment, taskID, timeoutSeconds)
 	default:
 		return nil, fmt.Errorf("invalid credentials source: %s", credentials.Source)
 	}
+}
+
+func injectSubscriptionCredentials(ctx core.ExecutionContext, environment []runner.BrokerEnvironmentVariable, taskID uuid.UUID, timeoutSeconds int) ([]runner.BrokerEnvironmentVariable, error) {
+	if ctx.CodexSubscription == nil {
+		return nil, fmt.Errorf("connect ChatGPT before this task can run")
+	}
+	lease, err := ctx.CodexSubscription.Reserve(taskID)
+	if err != nil {
+		return nil, err
+	}
+	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+	if secret == "" {
+		return nil, fmt.Errorf("chatgpt subscription token is not configured")
+	}
+	orgID, err := uuid.Parse(strings.TrimSpace(ctx.OrganizationID))
+	if err != nil {
+		return nil, fmt.Errorf("chatgpt subscription organization is missing")
+	}
+	token, err := runner.MintCodexSubscriptionToken(jwt.NewSigner(secret), runner.CodexSubscriptionScope{
+		OrganizationID: orgID,
+		FactoryID:      lease.FactoryID,
+		ConnectionID:   lease.ConnectionID,
+		TaskID:         taskID,
+		Generation:     lease.Generation,
+	}, time.Duration(timeoutSeconds)*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	baseURL := runner.RunnerSuperplaneBaseURL(ctx.BaseURL)
+	if baseURL == "" {
+		return nil, fmt.Errorf("chatgpt subscription endpoint is not configured")
+	}
+	environment = withoutCodexAPICredentials(environment)
+	return append(environment,
+		runner.BrokerEnvironmentVariable{Name: runner.EnvCodexSubscriptionToken, Value: token},
+		runner.BrokerEnvironmentVariable{Name: runner.EnvSuperplaneBaseURL, Value: baseURL},
+	), nil
+}
+
+func withoutCodexAPICredentials(environment []runner.BrokerEnvironmentVariable) []runner.BrokerEnvironmentVariable {
+	filtered := make([]runner.BrokerEnvironmentVariable, 0, len(environment))
+	for _, item := range environment {
+		if item.Name == envOpenAIAPIKey || item.Name == envOpenAIBaseURL {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	return filtered
 }
 
 func (c *RunCodex) Hooks() []core.Hook {

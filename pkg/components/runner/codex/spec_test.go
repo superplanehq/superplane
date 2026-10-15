@@ -95,6 +95,25 @@ func TestBuildCodexBrokerTaskRunsOrderedSteps(t *testing.T) {
 	assert.Equal(t, "Fix auth.py's nil panic", requireTaskFile(t, task.Files, "prompts/02-fix-panic.txt").Content)
 }
 
+func TestBuildCodexBrokerTaskRestoresSubscriptionWithoutModel(t *testing.T) {
+	t.Parallel()
+
+	spec := RunCodexSpec{
+		Credentials: runner.AgentCredentials{Source: runner.CredentialsSourceSubscription},
+		Steps: []runner.AgentStep{
+			{Name: "Fix panic", Type: runner.AgentStepPrompt, Prompt: strPtr("Fix it")},
+		},
+	}
+	task := buildCodexBrokerTask(spec, "", nil, nil, nil, false)
+	require.GreaterOrEqual(t, len(task.Commands), 4)
+	assert.Equal(t, "Prepare Codex", task.Commands[0].Name)
+	assert.Equal(t, "Restore ChatGPT sign-in", task.Commands[1].Name)
+	assert.Equal(t, "Save ChatGPT sign-in", task.Commands[len(task.Commands)-1].Name)
+	assert.Contains(t, task.Commands[2].Command, `node "$SUPERPLANE_TASK_DIR/run.js"`)
+	assert.NotContains(t, task.Commands[2].Command, "gpt-5")
+	assert.Contains(t, requireTaskFile(t, task.Files, "codex_subscription.js").Content, "auth.json")
+}
+
 func TestBuildCodexBrokerTaskPassesThinking(t *testing.T) {
 	t.Parallel()
 
@@ -149,6 +168,26 @@ func TestApplyPlanningFollowUpAppendsWaitLoopForPlanningToken(t *testing.T) {
 	assert.Equal(t, runner.FollowUpLoopFile().Content, requireTaskFile(t, got.Files, "follow_up_loop.js").Content)
 	assert.NotEmpty(t, requireTaskFile(t, got.Files, runner.AttachmentFetchScriptPath).Content)
 	assert.NotEmpty(t, requireTaskFile(t, got.Files, runner.AttachmentProcessScriptPath).Content)
+}
+
+func TestApplyPlanningFollowUpKeepsSubscriptionCheckpointLast(t *testing.T) {
+	t.Parallel()
+
+	spec := RunCodexSpec{
+		Credentials: runner.AgentCredentials{Source: runner.CredentialsSourceSubscription},
+		Steps: []runner.AgentStep{
+			{Name: "Hello", Type: runner.AgentStepPrompt, Prompt: strPtr("greet")},
+		},
+	}
+	base := buildCodexBrokerTask(spec, "", nil, nil, nil, false)
+	got := applyPlanningFollowUp(base, []runner.BrokerEnvironmentVariable{{
+		Name:  runner.EnvSuperplanePlanningID,
+		Value: "session-1",
+	}}, spec)
+
+	require.Len(t, got.Commands, len(base.Commands)+1)
+	assert.Equal(t, "Wait for the next message", got.Commands[len(got.Commands)-2].Name)
+	assert.Equal(t, "Save ChatGPT sign-in", got.Commands[len(got.Commands)-1].Name)
 }
 
 func requireTaskFile(t *testing.T, files []runner.BrokerTaskFile, path string) runner.BrokerTaskFile {

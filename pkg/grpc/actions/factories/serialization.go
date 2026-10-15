@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/models/factory"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -137,6 +138,10 @@ func serializeFactoryOnboarding(factory *models.Factory) *pb.FactoryOnboarding {
 		ProvisionedLineId:       config.ProvisionedLineID,
 		Initial:                 factory.IsInitialOnboarding(),
 		VcsProvider:             config.VCSProvider,
+		CodexSubscription:       config.CodexSubscription,
+	}
+	if connection, err := models.FindFactoryCodexConnection(database.Conn(), factory.OrganizationID, factory.ID); err == nil {
+		onboarding.CodexConnectionId = connection.ID.String()
 	}
 	if factory.OnboardingCompletedAt != nil {
 		onboarding.CompletedAt = timestamppb.New(*factory.OnboardingCompletedAt)

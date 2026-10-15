@@ -865,6 +865,52 @@ service Factories {
     };
   }
 
+  rpc DescribeFactoryCodexConnection(DescribeFactoryCodexConnectionRequest) returns (DescribeFactoryCodexConnectionResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/factories/{factory_id}/codex-connection"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe ChatGPT subscription";
+      description: "Returns the factory ChatGPT subscription status. Credentials are never included.";
+      tags: "Factory";
+    };
+  }
+
+  rpc StartFactoryCodexConnection(StartFactoryCodexConnectionRequest) returns (StartFactoryCodexConnectionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/codex-connection"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Start ChatGPT subscription sign-in";
+      description: "Starts a temporary runner that signs in to ChatGPT with a device code";
+      tags: "Factory";
+    };
+  }
+
+  rpc CancelFactoryCodexConnection(CancelFactoryCodexConnectionRequest) returns (CancelFactoryCodexConnectionResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/codex-connection:cancel"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Cancel ChatGPT subscription sign-in";
+      description: "Cancels a pending ChatGPT device sign-in";
+      tags: "Factory";
+    };
+  }
+
+  rpc DisconnectFactoryCodexConnection(DisconnectFactoryCodexConnectionRequest) returns (DisconnectFactoryCodexConnectionResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/factories/{factory_id}/codex-connection"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Disconnect ChatGPT subscription";
+      description: "Removes the saved ChatGPT subscription when no task is using it";
+      tags: "Factory";
+    };
+  }
+
   rpc FindPlanningSessionByWorkOrder(FindPlanningSessionByWorkOrderRequest) returns (FindPlanningSessionByWorkOrderResponse) {
     option (google.api.http) = {
       get: "/api/v1/factories/{factory_id}/work-orders/{work_order_id}/planning-session"
@@ -960,6 +1006,8 @@ message UpdateFactoryOnboardingRequest {
   optional string provisioned_line_id = 9;
   // When true, validate readiness and set onboarding_completed_at.
   optional bool complete = 10;
+  // When true, this workspace uses a ChatGPT subscription for Codex.
+  optional bool codex_subscription = 12;
   // Default branch of the app repository.
   optional string default_branch = 11;
 }
@@ -1051,6 +1099,10 @@ message FactoryOnboarding {
   string vcs_provider = 14;
   // Bitbucket repository UUID. GitHub leaves this empty.
   string app_repository_external_id = 15;
+  // True when setup uses a ChatGPT subscription instead of an API key.
+  bool codex_subscription = 16;
+  // Saved ChatGPT connection for this workspace. Empty until sign-in starts.
+  string codex_connection_id = 17;
 }
 
 // Automations the workspace Git host can run. Computed from vcs_provider.
@@ -2983,6 +3035,52 @@ message AnswerPlanningSessionSurveyRequest {
 
 message AnswerPlanningSessionSurveyResponse {
   PlanningSession session = 1;
+}
+
+message FactoryCodexConnection {
+  string id = 1;
+  // pending, finishing, ready, reconnect_required, or disconnected.
+  string status = 2;
+  string verification_url = 3;
+  string verification_code = 4;
+  string account_label = 5;
+  string active_task_id = 6;
+  // True when this organization can use a ChatGPT subscription.
+  bool eligible = 7;
+  // True while a login runner or a factory task still holds the connection.
+  bool reservation_held = 8;
+}
+
+message DescribeFactoryCodexConnectionRequest {
+  string factory_id = 1;
+}
+
+message DescribeFactoryCodexConnectionResponse {
+  FactoryCodexConnection connection = 1;
+}
+
+message StartFactoryCodexConnectionRequest {
+  string factory_id = 1;
+}
+
+message StartFactoryCodexConnectionResponse {
+  FactoryCodexConnection connection = 1;
+}
+
+message CancelFactoryCodexConnectionRequest {
+  string factory_id = 1;
+}
+
+message CancelFactoryCodexConnectionResponse {
+  FactoryCodexConnection connection = 1;
+}
+
+message DisconnectFactoryCodexConnectionRequest {
+  string factory_id = 1;
+}
+
+message DisconnectFactoryCodexConnectionResponse {
+  FactoryCodexConnection connection = 1;
 }
 
 message FindPlanningSessionByWorkOrderRequest {

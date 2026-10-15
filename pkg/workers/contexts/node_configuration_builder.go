@@ -2482,6 +2482,10 @@ func (b *NodeConfigurationBuilder) nodeAcceptsDispatchModel(
 		return false, err
 	}
 
+	if runnerFundingSourceFromConfig(resolved) == models.UsageFundingSourceSubscription {
+		return false, nil
+	}
+
 	if node.ComponentName() == models.SuperPlaneRunnerComponent {
 		return superPlaneAcceptsDispatchModel(b.tx, workflow.OrganizationID, workflow.FactoryID, model)
 	}
@@ -2554,6 +2558,8 @@ func runnerFundingSourceFromConfig(configuration map[string]any) string {
 	switch strings.TrimSpace(source) {
 	case "secret", "integration":
 		return models.UsageFundingSourceBYOK
+	case "subscription":
+		return models.UsageFundingSourceSubscription
 	default:
 		return models.UsageFundingSourceHosted
 	}

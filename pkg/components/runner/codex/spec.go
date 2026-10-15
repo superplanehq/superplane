@@ -45,10 +45,7 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 	if err := runner.ValidateAgentSteps(spec.Steps); err != nil {
 		return err
 	}
-	if err := runner.RejectHostedCredentials(spec.Credentials); err != nil {
-		return err
-	}
-	if err := runner.ValidateAgentCredentials(spec.Credentials, true); err != nil {
+	if err := validateCodexCredentials(spec); err != nil {
 		return err
 	}
 	if err := runner.ValidateEnvironmentFrom(spec.EnvironmentFrom); err != nil {
@@ -67,6 +64,19 @@ func validateRunCodexSpec(spec RunCodexSpec) error {
 	}
 	_, err := runner.NormalizeThinkingLevel(spec.ThinkingLevel)
 	return err
+}
+
+func validateCodexCredentials(spec RunCodexSpec) error {
+	if spec.Credentials.Source == runner.CredentialsSourceSubscription {
+		if strings.TrimSpace(spec.Model) != "" {
+			return fmt.Errorf("model must stay unset for a ChatGPT subscription")
+		}
+		return nil
+	}
+	if err := runner.RejectHostedCredentials(spec.Credentials); err != nil {
+		return err
+	}
+	return runner.ValidateAgentCredentials(spec.Credentials, true)
 }
 
 // CodexBrokerTask is the ordered broker commands and task files for a run.
@@ -93,6 +103,23 @@ func buildCodexBrokerTask(spec RunCodexSpec, usage string, setups []runner.Integ
 			return runner.PromptNodeCommand(promptName, model, spec.ThinkingLevel)
 		},
 	})
+	if spec.Credentials.Source == runner.CredentialsSourceSubscription {
+		files = append(files, runner.BrokerTaskFile{
+			Path:    "codex_subscription.js",
+			Content: subscriptionScript,
+			Mode:    "0644",
+		})
+		commands = append([]runner.BrokerCommand{commands[0], {
+			Name:    "Restore ChatGPT sign-in",
+			Command: `node "$SUPERPLANE_TASK_DIR/codex_subscription.js" restore`,
+			Kind:    runner.LiveLogKindSetup,
+		}}, commands[1:]...)
+		commands = append(commands, runner.BrokerCommand{
+			Name:    "Save ChatGPT sign-in",
+			Command: `node "$SUPERPLANE_TASK_DIR/codex_subscription.js" checkpoint --final`,
+			Kind:    runner.LiveLogKindSetup,
+		})
+	}
 	return CodexBrokerTask{Commands: commands, Files: files}
 }
 
@@ -118,7 +145,13 @@ func applyPlanningFollowUp(task CodexBrokerTask, environment []runner.BrokerEnvi
 		return task
 	}
 	task.Files = runner.AppendAttachmentSetupFiles(runner.AppendAttachmentLimitFile(append(task.Files, runner.FollowUpLoopFile())))
-	task.Commands = append(task.Commands, planningFollowUpCommand(spec))
+	followUp := planningFollowUpCommand(spec)
+	if len(task.Commands) > 0 && task.Commands[len(task.Commands)-1].Name == "Save ChatGPT sign-in" {
+		last := task.Commands[len(task.Commands)-1]
+		task.Commands = append(append(task.Commands[:len(task.Commands)-1], followUp), last)
+		return task
+	}
+	task.Commands = append(task.Commands, followUp)
 	return task
 }
 

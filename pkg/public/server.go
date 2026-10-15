@@ -425,6 +425,9 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/credentials", s.handleRunnerCodexSubscriptionCredentials).Methods("GET")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/checkpoint", s.handleRunnerCodexSubscriptionCheckpoint).Methods("POST")
+	s.Router.HandleFunc("/api/v1/runner/codex-subscription/progress", s.handleRunnerCodexSubscriptionProgress).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/wait", s.handleRunnerPlanningWait).Methods("GET")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/specs", s.handleRunnerPlanningSpec).Methods("POST")
 	s.Router.HandleFunc("/api/v1/runner/planning-sessions/updates", s.handleRunnerPlanningUpdate).Methods("POST")

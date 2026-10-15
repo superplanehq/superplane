@@ -27,6 +27,11 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return err
 	}
 
+	var busy *models.CodexConnectionBusyError
+	if errors.As(err, &busy) {
+		return grpcerrors.Conflict(err, busy.Error())
+	}
+
 	var datadogAPIErr *datadog.APIError
 	if errors.As(err, &datadogAPIErr) {
 		return grpcerrors.FailedPrecondition(err, datadogAPIErr.Error())
@@ -261,6 +266,18 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.InvalidArgument(err, err.Error())
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		return grpcerrors.NotFound(err, "resource not found")
+	case errors.Is(err, models.ErrCodexConnectionNotFound):
+		return grpcerrors.NotFound(err, "ChatGPT subscription connection not found")
+	case errors.Is(err, models.ErrCodexConnectionNotEligible):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionNotReady):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionStale):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionActive):
+		return grpcerrors.FailedPrecondition(err, err.Error())
+	case errors.Is(err, models.ErrCodexConnectionUnavailable):
+		return grpcerrors.FailedPrecondition(err, err.Error())
 	default:
 		return grpcerrors.Internal(err, internalMessage)
 	}

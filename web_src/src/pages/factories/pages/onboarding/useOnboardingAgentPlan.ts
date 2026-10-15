@@ -119,6 +119,14 @@ export function agentRewriteFromPlan(
       planningModel: "",
     };
   }
+  if (plan.credentialsSource === "subscription") {
+    return {
+      component: "runnerCodex",
+      model: "",
+      planningModel: "",
+      credentials: { source: "subscription" },
+    };
+  }
   const integrationName = plan.integrationName;
   if (!integrationName) {
     throw new Error("Agent integration is missing");

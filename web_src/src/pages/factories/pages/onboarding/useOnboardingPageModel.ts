@@ -11,7 +11,11 @@ import { fetchFactoryIntakes, useCreateFactoryIntake, useDeleteFactoryIntake } f
 import { resolveGithubDefaultBranch, useConnectedIntegrations } from "@/hooks/useIntegrations";
 import { useUpdateOrganization } from "@/hooks/useOrganizationData";
 import { getApiErrorMessage } from "@/lib/errors";
-import { FEATURE_ORGANIZATION_BYOK, FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER } from "@/lib/experimentalFeatures";
+import {
+  FEATURE_CODEX_SUBSCRIPTIONS,
+  FEATURE_ORGANIZATION_BYOK,
+  FEATURE_ORGANIZATION_BYOK_CUSTOM_PROVIDER,
+} from "@/lib/experimentalFeatures";
 import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { selectReadyIntegrationInstance, useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
@@ -26,7 +30,8 @@ import {
   githubIntegrationSelection,
   selectionsWithSavedVcsInstallation,
 } from "./githubIntegrationSelection";
-import { isHostedAgentReady } from "./onboardingAgentReadiness";
+import { CODEX_SUBSCRIPTION_PLAN, isHostedAgentReady } from "./onboardingAgentReadiness";
+import { codexSubscriptionReady, useFactoryCodexConnection } from "./useFactoryCodexConnection";
 import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
@@ -342,6 +347,62 @@ function onboardingSetupOptions(
   };
 }
 
+function requestOnboardingConnect(args: {
+  id: IntegrationId;
+  customProvider: boolean;
+  requestConnect: (name: string) => Promise<boolean>;
+  connectedIntegrations: Parameters<typeof selectReadyIntegrationInstance>[0];
+  selections: IntegrationSelections;
+  setSelections: (selections: IntegrationSelections) => void;
+  openCustomProvider: () => void;
+}) {
+  if (args.id !== "customLlm" || !args.customProvider) return args.requestConnect(args.id);
+  const existing = selectReadyIntegrationInstance(args.connectedIntegrations, args.selections, "customLlm");
+  if (!existing) {
+    args.openCustomProvider();
+    return false;
+  }
+  args.setSelections(existing);
+  // True means the browser left this page. A saved connection stays here.
+  return false;
+}
+
+function useTrimmedIntegrationNames(organizationId: string) {
+  const { data: connectedIntegrations = [] } = useConnectedIntegrations(organizationId, {
+    enabled: Boolean(organizationId),
+  });
+  const existingIntegrationNames = useMemo(
+    () =>
+      new Set(
+        connectedIntegrations
+          .map((item) => item.metadata?.name?.trim())
+          .filter((name): name is string => Boolean(name)),
+      ),
+    [connectedIntegrations],
+  );
+  return { connectedIntegrations, existingIntegrationNames };
+}
+
+function useCodexSubscriptionModel(organizationId: string, factoryId: string, flagLoading: boolean, flagOn: boolean) {
+  const enabled = !flagLoading && flagOn;
+  const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
+  const connection = codex.query.data;
+  return {
+    codexSubscriptionOffered: enabled && connection?.eligible === true,
+    codexSubscriptionLoading: flagLoading || (enabled && codex.query.isLoading),
+    codexConnection: connection,
+    codexSubscriptionReady: codexSubscriptionReady(connection),
+    startCodexConnection: () => {
+      codex.start.mutate();
+    },
+    cancelCodexConnection: () => {
+      codex.cancel.mutate();
+    },
+    codexStarting: codex.start.isPending,
+    codexCanceling: codex.cancel.isPending,
+  };
+}
+
 export function useOnboardingPageModel(args: {
   organizationId: string;
   factoryId: string;
@@ -360,18 +421,14 @@ export function useOnboardingPageModel(args: {
   const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
   const preferOwnKey = bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK) && agentCredentialChoice !== "hosted";
   const agent = useOnboardingAgentContext(args.organizationId, integrations.connected, preferOwnKey, customProvider);
-  const { data: connectedIntegrations = [] } = useConnectedIntegrations(args.organizationId, {
-    enabled: Boolean(args.organizationId),
-  });
-  const existingIntegrationNames = useMemo(
-    () =>
-      new Set(
-        connectedIntegrations
-          .map((item) => item.metadata?.name?.trim())
-          .filter((name): name is string => Boolean(name)),
-      ),
-    [connectedIntegrations],
+  const codex = useCodexSubscriptionModel(
+    args.organizationId,
+    args.factoryId,
+    bringYourOwnKey.isLoading,
+    bringYourOwnKey.has(FEATURE_CODEX_SUBSCRIPTIONS),
   );
+  const finishAgent = agentCredentialChoice === "subscription" ? { ...agent, plan: CODEX_SUBSCRIPTION_PLAN } : agent;
+  const { connectedIntegrations, existingIntegrationNames } = useTrimmedIntegrationNames(args.organizationId);
   const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
   const setup = useOnboardingSetupState(
     args.factory?.name ?? "",
@@ -409,24 +466,13 @@ export function useOnboardingPageModel(args: {
     mutations,
     setSaving,
     setProvisionedDestination,
-    agent,
+    agent: finishAgent,
   });
-
-  const requestConnect = (id: IntegrationId) => {
-    if (id !== "customLlm" || !customProvider) return connect.requestConnect(id);
-    const existing = selectReadyIntegrationInstance(connectedIntegrations, integrations.selections, "customLlm");
-    if (existing) {
-      integrations.setSelections(existing);
-      // True means the browser left this page. A saved connection stays here.
-      return false;
-    }
-    setCustomProviderDialogOpen(true);
-    return false;
-  };
 
   return {
     setup,
     hostedAgentReady: isHostedAgentReady(agent.plan),
+    ...codex,
     hostedModelsAvailable: agent.hostedModelsAvailable,
     hostedModelsAvailableLoading: agent.hostedModelsAvailableLoading,
     bringYourOwnKey: bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK),
@@ -437,7 +483,16 @@ export function useOnboardingPageModel(args: {
     agentLoading: agent.hostedModelsLoading,
     openSection,
     setOpenSection,
-    requestConnect,
+    requestConnect: (id: IntegrationId) =>
+      requestOnboardingConnect({
+        id,
+        customProvider,
+        requestConnect: connect.requestConnect,
+        connectedIntegrations,
+        selections: integrations.selections,
+        setSelections: integrations.setSelections,
+        openCustomProvider: () => setCustomProviderDialogOpen(true),
+      }),
     selectCatalogRepository: wired.selectCatalogRepository,
     selectBitbucketRepository: wired.selectBitbucketRepository,
     selectBitbucketForgeRepository: wired.selectBitbucketForgeRepository,

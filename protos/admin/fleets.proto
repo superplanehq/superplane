@@ -70,6 +70,13 @@ service Runners {
       delete: "/admin/api/installation/fleets/{fleet_id}/runners/{runner_id}"
     };
   }
+
+  rpc MarkRunnerProviderDeleted(MarkRunnerProviderDeletedRequest) returns (MarkRunnerProviderDeletedResponse) {
+    option (google.api.http) = {
+      post: "/admin/api/installation/fleets/{fleet_id}/runners/{runner_id}:provider-deleted"
+      body: "*"
+    };
+  }
 }
 
 message Fleet {
@@ -107,6 +114,8 @@ message Runner {
   string arch = 14;
   string hostname = 15;
   string ip = 16;
+  // Set after Fleet Manager deletes the provider VM. A terminated row is not enough.
+  optional google.protobuf.Timestamp provider_deleted_at = 17;
 }
 
 message Task {
@@ -228,5 +237,14 @@ message DeleteRunnerRequest {
 }
 
 message DeleteRunnerResponse {
+  Runner runner = 1;
+}
+
+message MarkRunnerProviderDeletedRequest {
+  string fleet_id = 1;
+  string runner_id = 2;
+}
+
+message MarkRunnerProviderDeletedResponse {
   Runner runner = 1;
 }

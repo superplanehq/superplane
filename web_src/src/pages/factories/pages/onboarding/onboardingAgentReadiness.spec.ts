@@ -324,6 +324,14 @@ describe("onboardingAgentGate", () => {
   it("shows the agent screen when no hosted model is available", () => {
     expect(gate()).toBe("show");
   });
+
+  it("shows the agent screen when a ChatGPT subscription is offered", () => {
+    expect(gate({ hostedModelsAvailable: true, codexSubscriptionOffered: true })).toBe("show");
+  });
+
+  it("waits while the ChatGPT subscription offer is still loading", () => {
+    expect(gate({ hostedModelsAvailable: true, codexSubscriptionLoading: true })).toBe("pending");
+  });
 });
 
 describe("agentFinishReady", () => {
@@ -356,6 +364,11 @@ describe("agentFinishReady", () => {
     expect(
       agentFinishReady({ ...ready, credentialChoice: "hosted", providerConnected: false, agentReady: false }),
     ).toBe(true);
+  });
+
+  it("waits until ChatGPT sign-in is ready", () => {
+    expect(agentFinishReady({ ...ready, credentialChoice: "subscription", subscriptionReady: false })).toBe(false);
+    expect(agentFinishReady({ ...ready, credentialChoice: "subscription", subscriptionReady: true })).toBe(true);
   });
 
   it("allows hosted models when no model source choice is offered", () => {

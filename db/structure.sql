@@ -454,6 +454,33 @@ CREATE TABLE public.factory_agent_resources (
 
 
 --
+-- Name: factory_codex_connections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.factory_codex_connections (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    factory_id uuid NOT NULL,
+    owner_user_id uuid NOT NULL,
+    status character varying(32) NOT NULL,
+    resume_status character varying(32) DEFAULT ''::character varying NOT NULL,
+    verification_url text DEFAULT ''::text NOT NULL,
+    verification_code text DEFAULT ''::text NOT NULL,
+    account_label text DEFAULT ''::text NOT NULL,
+    bundle_ciphertext bytea,
+    credential_version bigint DEFAULT 0 NOT NULL,
+    final_checkpoint_version bigint DEFAULT 0 NOT NULL,
+    reservation_started_version bigint DEFAULT 0 NOT NULL,
+    reservation_task_id uuid,
+    reservation_generation bigint DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT factory_codex_connections_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'finishing'::character varying, 'ready'::character varying, 'reconnect_required'::character varying, 'disconnected'::character varying])::text[]))),
+    CONSTRAINT factory_codex_connections_version_check CHECK (((credential_version >= 0) AND (final_checkpoint_version >= 0) AND (final_checkpoint_version <= credential_version) AND (reservation_generation >= 0) AND (reservation_started_version >= 0)))
+);
+
+
+--
 -- Name: factory_intakes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1408,7 +1435,9 @@ CREATE TABLE public.runners (
     arch text DEFAULT ''::text NOT NULL,
     hostname text DEFAULT ''::text NOT NULL,
     ip text DEFAULT ''::text NOT NULL,
+    provider_deleted_at timestamp with time zone,
     CONSTRAINT runners_creation_idempotency_check CHECK ((((creation_idempotency_key IS NULL) AND (creation_request_hash IS NULL)) OR ((creation_idempotency_key IS NOT NULL) AND (creation_request_hash IS NOT NULL)))),
+    CONSTRAINT runners_provider_deleted_check CHECK (((provider_deleted_at IS NULL) OR ((state)::text = 'terminated'::text))),
     CONSTRAINT runners_state_check CHECK (((state)::text = ANY ((ARRAY['pending'::character varying, 'idle'::character varying, 'busy'::character varying, 'terminated'::character varying])::text[]))),
     CONSTRAINT runners_termination_check CHECK (((((state)::text = 'terminated'::text) AND (terminated_at IS NOT NULL)) OR (((state)::text <> 'terminated'::text) AND (terminated_at IS NULL))))
 );
@@ -2271,6 +2300,22 @@ ALTER TABLE ONLY public.factory_agent_resources
 
 
 --
+-- Name: factory_codex_connections factory_codex_connections_factory_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_connections
+    ADD CONSTRAINT factory_codex_connections_factory_key UNIQUE (factory_id);
+
+
+--
+-- Name: factory_codex_connections factory_codex_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_connections
+    ADD CONSTRAINT factory_codex_connections_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: factory_intakes factory_intakes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3125,6 +3170,13 @@ CREATE UNIQUE INDEX factories_organization_id_key_active_key ON public.factories
 --
 
 CREATE UNIQUE INDEX factories_url_id_key ON public.factories USING btree (url_id);
+
+
+--
+-- Name: factory_codex_connections_reservation_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX factory_codex_connections_reservation_idx ON public.factory_codex_connections USING btree (reservation_task_id) WHERE (reservation_task_id IS NOT NULL);
 
 
 --
@@ -4585,6 +4637,30 @@ ALTER TABLE ONLY public.factory_agent_resources
 
 
 --
+-- Name: factory_codex_connections factory_codex_connections_factory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_connections
+    ADD CONSTRAINT factory_codex_connections_factory_id_fkey FOREIGN KEY (factory_id) REFERENCES public.factories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_codex_connections factory_codex_connections_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_connections
+    ADD CONSTRAINT factory_codex_connections_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: factory_codex_connections factory_codex_connections_owner_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.factory_codex_connections
+    ADD CONSTRAINT factory_codex_connections_owner_user_id_fkey FOREIGN KEY (owner_user_id) REFERENCES public.users(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: factory_intakes factory_intakes_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5680,7 +5756,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261014121106	f
+20261015161731	f
 \.
 
 
