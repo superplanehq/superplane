@@ -42,6 +42,8 @@ export const FIRST_RUN_COPY = {
     grantAction: "Install SuperPlane on Bitbucket",
     openingBitbucket: "Opening Bitbucket…",
     connectAction: "Connect Bitbucket",
+    signedInAs: (login: string) => `You are signed in to Bitbucket as ${login}.`,
+    connectAnotherAccount: "Connect another Bitbucket account",
     workspaceHeadline: "Choose a Bitbucket workspace",
     workspaceHelper: "Choose the Bitbucket workspace that owns your repository.",
     stepWorkspace: "Choose workspace",

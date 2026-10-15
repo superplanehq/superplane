@@ -59,6 +59,41 @@ func describeBitbucketOnboarding(ctx context.Context) (*pb.DescribeVCSProviderOn
 	return response, nil
 }
 
+// selectBitbucketOnboardingIdentity matches by normalized UUID because
+// stored Bitbucket provider ids can have braces, while describe returns
+// them without braces.
+func selectBitbucketOnboardingIdentity(
+	ctx context.Context,
+	providerUserID string,
+) (*pb.SelectVCSProviderOnboardingIdentityResponse, error) {
+	if strings.TrimSpace(providerUserID) == "" {
+		return nil, grpcerrors.InvalidArgument(nil, "provider user id is required")
+	}
+	requested, err := normalizeBitbucketAccountID(providerUserID)
+	if err != nil {
+		return nil, grpcerrors.InvalidArgument(err, "provider user id is invalid")
+	}
+	accountID, err := currentAccountID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	linkedAccounts, err := models.ListAccountLinkedAccounts(database.DB(ctx), accountID)
+	if err != nil {
+		return nil, grpcerrors.Internal(err, "failed to list linked provider accounts")
+	}
+	for _, linked := range linkedAccounts {
+		if linked.Provider != models.ProviderBitbucket {
+			continue
+		}
+		stored, parseErr := normalizeBitbucketAccountID(linked.ProviderID)
+		if parseErr != nil || stored != requested {
+			continue
+		}
+		return selectLinkedAccount(ctx, accountID, models.ProviderBitbucket, linked.ProviderID)
+	}
+	return nil, grpcerrors.PermissionDenied(nil, "provider account is not linked")
+}
+
 func startBitbucketInstallation(ctx context.Context) (*pb.StartVCSProviderInstallationResponse, error) {
 	cfg := config.LoadBitbucketForgeAppConfig()
 	if !cfg.Enabled() {

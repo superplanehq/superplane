@@ -1,3 +1,4 @@
+import type { MeVcsProviderIdentity } from "@/api-client";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Loader2 } from "lucide-react";
@@ -15,11 +16,16 @@ import {
   repositoryBelongsTo,
 } from "./githubOrganizations";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
+import { FirstRunSignedInAsLine } from "./FirstRunSignedInAsLine";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
 
 const copy = FIRST_RUN_COPY.bitbucket;
 const chooseCopy = FIRST_RUN_COPY.choose;
+const bitbucketSignedInTestIds = {
+  signedInAs: "first-run-bitbucket-signed-in-as",
+  switchAccount: "first-run-switch-bitbucket-account",
+};
 
 type FirstRunBitbucketForgeScreenProps = {
   phase: "connect" | "grant" | "choose";
@@ -35,6 +41,11 @@ type FirstRunBitbucketForgeScreenProps = {
   retrying?: boolean;
   attemptActive?: boolean;
   attemptTimedOut?: boolean;
+  /** The active Bitbucket account and the other linked accounts. */
+  login?: string;
+  providerUserId?: string;
+  identities?: MeVcsProviderIdentity[];
+  switchingAccount?: boolean;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   onRetryLookup?: () => void;
@@ -42,6 +53,8 @@ type FirstRunBitbucketForgeScreenProps = {
   onSelectRepository: (repository: string) => void;
   onClearRepository?: () => void;
   onContinue: () => void;
+  onSelectIdentity?: (providerUserId: string) => void;
+  onConnectAnotherAccount?: () => void;
 };
 
 export function FirstRunBitbucketForgeScreen(props: FirstRunBitbucketForgeScreenProps) {
@@ -111,22 +124,26 @@ function BitbucketConnectScreen({ connectHref, chrome, sphere }: FirstRunBitbuck
   );
 }
 
-function BitbucketGrantScreen({
-  granting = false,
-  loadError = false,
-  retrying = false,
-  attemptActive = false,
-  attemptTimedOut = false,
-  chrome,
-  sphere,
-  onGrantAccess,
-  onRetryLookup,
-}: FirstRunBitbucketForgeScreenProps & { onRetryLookup?: () => void }) {
+function BitbucketGrantScreen(props: FirstRunBitbucketForgeScreenProps) {
+  const {
+    granting = false,
+    loadError = false,
+    retrying = false,
+    attemptActive = false,
+    attemptTimedOut = false,
+    switchingAccount = false,
+    chrome,
+    sphere,
+    onGrantAccess,
+    onRetryLookup,
+  } = props;
   const waiting = granting || attemptActive;
+  const busy = granting || switchingAccount;
   return (
-    <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={granting} visual="preview">
+    <FirstRunShell testId="first-run-bitbucket-grant" chrome={chrome} sphere={sphere} busy={busy} visual="preview">
       <FirstRunHeading headline={copy.workspaceHeadline}>
         <p className="text-[13px] text-muted-foreground">{copy.grantBody}</p>
+        <BitbucketSignedInAs {...props} disabled={busy} />
       </FirstRunHeading>
       <div className="mt-8 space-y-6">
         <FirstRunGithubStepper current="organization" provider="bitbucket">
@@ -134,6 +151,7 @@ function BitbucketGrantScreen({
             type="button"
             className="w-full"
             onClick={onGrantAccess}
+            disabled={switchingAccount}
             loading={granting}
             loadingText={copy.openingBitbucket}
             data-testid="first-run-bitbucket-install"
@@ -179,26 +197,27 @@ function BitbucketGrantScreen({
   );
 }
 
-function BitbucketChooseRepositoryScreen({
-  repositories,
-  installedWorkspaces,
-  selectedRepository,
-  saving = false,
-  loadError,
-  attemptActive = false,
-  chrome,
-  sphere,
-  onSelectRepository,
-  onClearRepository,
-  onContinue,
-  onRetryLookup,
-  onGrantAccess,
-  retrying,
-  granting = false,
-}: FirstRunBitbucketForgeScreenProps) {
+function BitbucketChooseRepositoryScreen(props: FirstRunBitbucketForgeScreenProps) {
+  const {
+    repositories,
+    installedWorkspaces,
+    selectedRepository,
+    saving = false,
+    loadError,
+    attemptActive = false,
+    chrome,
+    sphere,
+    onSelectRepository,
+    onClearRepository,
+    onContinue,
+    onRetryLookup,
+    onGrantAccess,
+    retrying,
+    granting = false,
+  } = props;
   const choice = useBitbucketWorkspaceChoice(repositories, installedWorkspaces, selectedRepository, onClearRepository);
   const { workspace, workspaces, repositorySelected } = choice;
-  const busy = saving || granting;
+  const { busy, accessDisabled } = chooseScreenBusy(props);
   return (
     <FirstRunShell
       testId="first-run-bitbucket-choose"
@@ -210,6 +229,8 @@ function BitbucketChooseRepositoryScreen({
     >
       <FirstRunHeading headline={workspace ? chooseCopy.headline : copy.workspaceHeadline}>
         <p className="text-[13px] text-muted-foreground">{workspace ? copy.repositoryHelper : copy.workspaceHelper}</p>
+        {/* Another account can see other workspaces, so a switch starts at the workspace step. */}
+        <BitbucketSignedInAs {...props} disabled={busy} onAccountSwitch={choice.clear} />
       </FirstRunHeading>
       <div className="mt-8 space-y-4">
         {loadError ? <p className="text-[13px] text-destructive">{copy.loadError}</p> : null}
@@ -225,7 +246,7 @@ function BitbucketChooseRepositoryScreen({
                 hint={copy.workspaceWriteAccessHint}
                 question={copy.missingWorkspace}
                 action={copy.installAnother}
-                disabled={saving}
+                disabled={accessDisabled}
                 loading={granting}
                 loadingText={copy.openingBitbucket}
                 onClick={onGrantAccess}
@@ -245,7 +266,7 @@ function BitbucketChooseRepositoryScreen({
                 hint={chooseCopy.writeAccessHint}
                 question={chooseCopy.missingRepository}
                 action={copy.installAnother}
-                disabled={saving}
+                disabled={accessDisabled}
                 loading={granting}
                 loadingText={copy.openingBitbucket}
                 onClick={onGrantAccess}
@@ -263,6 +284,50 @@ function BitbucketChooseRepositoryScreen({
         </FirstRunGithubStepper>
       </div>
     </FirstRunShell>
+  );
+}
+
+function chooseScreenBusy({ saving, granting, switchingAccount }: FirstRunBitbucketForgeScreenProps) {
+  return {
+    busy: Boolean(saving || granting || switchingAccount),
+    accessDisabled: Boolean(saving || switchingAccount),
+  };
+}
+
+function BitbucketSignedInAs({
+  login = "",
+  providerUserId = "",
+  identities = [],
+  disabled,
+  onSelectIdentity,
+  onConnectAnotherAccount,
+  onAccountSwitch,
+}: Pick<
+  FirstRunBitbucketForgeScreenProps,
+  "login" | "providerUserId" | "identities" | "onSelectIdentity" | "onConnectAnotherAccount"
+> & { disabled: boolean; onAccountSwitch?: () => void }) {
+  if (!login) return null;
+  const selectIdentity = onSelectIdentity
+    ? (key: string) => {
+        onAccountSwitch?.();
+        onSelectIdentity(key);
+      }
+    : undefined;
+  return (
+    <FirstRunSignedInAsLine
+      login={login}
+      activeKey={providerUserId}
+      identities={identities.map((identity) => ({
+        key: identity.providerUserId ?? "",
+        login: identity.login ?? "",
+      }))}
+      disabled={disabled}
+      signedInText={copy.signedInAs(login)}
+      connectAnotherLabel={copy.connectAnotherAccount}
+      testIds={bitbucketSignedInTestIds}
+      onSelectIdentity={selectIdentity}
+      onConnectAnotherAccount={onConnectAnotherAccount}
+    />
   );
 }
 
