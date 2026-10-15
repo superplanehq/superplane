@@ -147,27 +147,6 @@ variable "image_name" {
   default     = "superplane"
 }
 
-variable "fleet_manager_image_registry" {
-  description = "Container registry for Fleet Manager. Empty uses image_registry."
-  type        = string
-  default     = ""
-}
-
-variable "fleet_manager_image_name" {
-  description = "Fleet Manager image repository name. The published image is fleet-manager."
-  type        = string
-  default     = "fleet-manager"
-}
-
-# This image still requires ImageReference.ID and at least one zone.
-# A community gallery ID and an empty zones list need a Fleet Manager
-# image published from the merge that adds that support.
-variable "fleet_manager_image_tag" {
-  description = "Fleet Manager image tag. Required when fleet_manager_config is set."
-  type        = string
-  default     = "38fd599797f475b299f80b7c28116d89935b53f4"
-}
-
 variable "helm_chart_repository" {
   description = "OCI or HTTP Helm repository. Ignored when helm_chart_path is set."
   type        = string
@@ -221,11 +200,10 @@ variable "container_registry_id" {
   default     = ""
 }
 
-variable "fleet_manager_config" {
-  description = "Fleet Manager YAML or JSON body. Empty disables the Fleet Manager Deployment."
-  type        = string
-  default     = ""
-  sensitive   = true
+variable "runner_zones" {
+  description = "Availability zones that Fleet Manager can use for runner VMs."
+  type        = list(string)
+  default     = ["1"]
 }
 
 # -----------------------------------------------------------------------------

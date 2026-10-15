@@ -94,6 +94,19 @@ kubectl get pvc superplane-runner-active-logs -n superplane
 
 Access SuperPlane at `https://your-domain.com`
 
+### 7. Install Fleet Manager (optional)
+
+Open **Set up runner fleets** during owner setup. Terraform passes the runner
+subnets, security group, instance profile, region, public SuperPlane URL,
+cluster name, and Fleet Manager role to SuperPlane. The wizard preloads these
+values. Replace the AMI placeholder with an immutable Runner image, save
+`values.yaml`, and run the displayed Helm command.
+
+Terraform creates the AWS runner infrastructure, but it does not install Fleet
+Manager. The SuperPlane chart creates the dedicated service-token Secret in
+Kubernetes. The credential does not enter Terraform state. See
+[the standalone chart guide](../../fleet-manager-chart/README.md).
+
 ## Destroy
 
 Use the same AWS profile and Terraform state as the install.
@@ -109,6 +122,42 @@ kubectl config current-context
 
 Set `AWS_REGION` to the value of `region` in `terraform.tfvars`.
 Confirm that the kubectl context is the test cluster before you use the recovery commands below.
+
+Before you destroy the infrastructure, disable every fleet in SuperPlane and
+wait for active jobs to finish and warm capacity to reach zero. Then stop Fleet
+Manager and inspect any runner instances that remain:
+
+```bash
+FLEET_MANAGER_NAMESPACE=superplane # Use the namespace from the chart installation.
+FLEET_MANAGER_ID=$(helm get values fleet-manager -n "$FLEET_MANAGER_NAMESPACE" --all --output json | jq -er '.manager.id')
+RUNNER_INSTANCE_PROFILE_ARN=$(aws iam get-instance-profile \
+  --instance-profile-name "$(terraform output -raw runner_instance_profile_name)" \
+  --query 'InstanceProfile.Arn' --output text)
+helm uninstall fleet-manager -n "$FLEET_MANAGER_NAMESPACE"
+
+aws ec2 describe-instances --region "$AWS_REGION" \
+  --filters "Name=tag:superplane_fleet_manager_id,Values=${FLEET_MANAGER_ID}" \
+    "Name=iam-instance-profile.arn,Values=${RUNNER_INSTANCE_PROFILE_ARN}" \
+    "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+  --query 'Reservations[].Instances[].[InstanceId,State.Name,PrivateIpAddress]' \
+  --output table
+```
+
+Confirm that every listed instance belongs to this installation. Terminate and
+wait for any remaining instances before you create the Terraform destroy plan:
+
+```bash
+read -r -a RUNNER_INSTANCE_IDS <<< "$(aws ec2 describe-instances --region "$AWS_REGION" \
+  --filters "Name=tag:superplane_fleet_manager_id,Values=${FLEET_MANAGER_ID}" \
+    "Name=iam-instance-profile.arn,Values=${RUNNER_INSTANCE_PROFILE_ARN}" \
+    "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+  --query 'Reservations[].Instances[].InstanceId' --output text)"
+
+if ((${#RUNNER_INSTANCE_IDS[@]} > 0)); then
+  aws ec2 terminate-instances --region "$AWS_REGION" --instance-ids "${RUNNER_INSTANCE_IDS[@]}"
+  aws ec2 wait instance-terminated --region "$AWS_REGION" --instance-ids "${RUNNER_INSTANCE_IDS[@]}"
+fi
+```
 
 If `aws_db_instance.superplane` is in the state, disable its deletion protection in `terraform.tfvars`:
 
