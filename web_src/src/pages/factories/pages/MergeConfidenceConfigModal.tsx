@@ -28,9 +28,10 @@ interface MergeConfidenceConfigModalProps {
   showRunsTab?: boolean;
   renderNodeBody?: (node: SuperplaneComponentsNode) => ReactNode;
   fallbackNode?: SuperplaneComponentsNode;
+  initialNodeId?: string;
 }
 
-/** Merge confidence configuration. The first component starts selected. */
+/** Split node settings. A named step starts selected when it is on the canvas. */
 export function MergeConfidenceConfigModal({
   title,
   graph,
@@ -51,10 +52,11 @@ export function MergeConfidenceConfigModal({
   showRunsTab = true,
   renderNodeBody,
   fallbackNode,
+  initialNodeId,
 }: MergeConfidenceConfigModalProps) {
   const [tab, setTab] = useState<"automation" | "runs">("automation");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const selection = useCanvasNodeSelection(graph);
+  const selection = useCanvasNodeSelection(graph, initialNodeId);
   const focus = usePanelFocus(tab, selection.selectedNodeId);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const split = useSplitRunPanePercent({ defaultPercent: 50, minPercent: 28, maxPercent: 72 });
@@ -103,8 +105,8 @@ export function MergeConfidenceConfigModal({
   );
 }
 
-function useCanvasNodeSelection(graph: IntakeAutomationGraph | undefined) {
-  const initialNodeId = firstComponentId(graph);
+function useCanvasNodeSelection(graph: IntakeAutomationGraph | undefined, preferredNodeId?: string) {
+  const initialNodeId = startingNodeId(graph, preferredNodeId);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(initialNodeId);
   const appliedInitialNode = useRef(initialNodeId !== null);
 
@@ -112,15 +114,29 @@ function useCanvasNodeSelection(graph: IntakeAutomationGraph | undefined) {
     if (appliedInitialNode.current) {
       return;
     }
-    const nextId = firstComponentId(graph);
+    const nextId = startingNodeId(graph, preferredNodeId);
     if (!nextId) {
       return;
     }
     appliedInitialNode.current = true;
     setSelectedNodeId(nextId);
-  }, [graph]);
+  }, [graph, preferredNodeId]);
 
   return { selectedNodeId, setSelectedNodeId };
+}
+
+function startingNodeId(graph: IntakeAutomationGraph | undefined, preferredNodeId?: string): string | null {
+  if (graphHasNode(graph, preferredNodeId)) {
+    return preferredNodeId;
+  }
+  return firstComponentId(graph);
+}
+
+function graphHasNode(graph: IntakeAutomationGraph | undefined, nodeId: string | undefined): nodeId is string {
+  if (!nodeId) {
+    return false;
+  }
+  return Boolean(graph?.specNodes?.some((node) => node.id === nodeId));
 }
 
 function usePanelFocus(tab: "automation" | "runs", selectedNodeId: string | null) {

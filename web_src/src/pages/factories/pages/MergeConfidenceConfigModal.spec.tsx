@@ -194,6 +194,7 @@ function renderModal(
   onDelete: () => void = vi.fn(),
   onSaveNode = vi.fn(),
   graph: IntakeAutomationGraph = confidenceGraph(),
+  options: { initialNodeId?: string } = {},
 ) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const element = (nextGraph: IntakeAutomationGraph = graph) => (
@@ -208,6 +209,7 @@ function renderModal(
               onClose={vi.fn()}
               onSaveNode={onSaveNode}
               onDelete={onDelete}
+              initialNodeId={options.initialNodeId}
             />
           </TooltipProvider>
         </ThemeProvider>
@@ -246,6 +248,33 @@ describe("MergeConfidenceConfigModal", () => {
     expect(screen.queryByRole("button", { name: "Errors" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Warnings" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "More actions" })).toBeInTheDocument();
+  });
+
+  it("selects the requested step when the canvas loads", () => {
+    const view = renderModal(
+      vi.fn(),
+      vi.fn(),
+      { nodes: [], edges: [], specNodes: [] },
+      { initialNodeId: "assess-risk" },
+    );
+
+    expect(screen.queryByTestId("merge-confidence-config-form")).not.toBeInTheDocument();
+
+    view.rerenderGraph(confidenceGraph());
+
+    expect(
+      within(screen.getByTestId("merge-confidence-config-form")).getByRole("heading", {
+        name: "Assess Merge Confidence",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the first trigger when the requested step is not on the canvas", () => {
+    renderModal(vi.fn(), vi.fn(), confidenceGraph(), { initialNodeId: "missing-step" });
+
+    expect(
+      within(screen.getByTestId("merge-confidence-config-form")).getByRole("heading", { name: "On Pull Request" }),
+    ).toBeInTheDocument();
   });
 
   it("selects the trigger when the automation loads with the agent listed first", () => {

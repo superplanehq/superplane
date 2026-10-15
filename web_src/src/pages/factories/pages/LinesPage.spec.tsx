@@ -10,6 +10,7 @@ import type {
   FactoryAutomation,
 } from "@/api-client";
 import type * as canvasData from "@/hooks/useCanvasData";
+import type * as integrationsData from "@/hooks/useIntegrations";
 import { resetFactoryBoardLaneScrollPositions } from "@/hooks/useFactoryBoardLaneScroll";
 import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
@@ -289,6 +290,30 @@ vi.mock("@/hooks/useCanvasData", () => {
     useUpdateCanvasVersion: () => ({ mutateAsync: updateCanvasVersionMutateAsync, isPending: false }),
     useCommitCanvasStaging: () => ({ mutateAsync: commitCanvasStagingMutateAsync, isPending: false }),
     useDiscardCanvasStaging: () => ({ mutateAsync: discardCanvasStagingMutateAsync, isPending: false }),
+    useTriggers: () => ({ data: [], isLoading: false, isPending: false }),
+    useWidgets: () => ({ data: [], isLoading: false, isPending: false }),
+  };
+});
+
+vi.mock("@/hooks/useComponentData", () => ({
+  useComponents: () => ({
+    data: [{ name: "runnerClaudeCode", label: "Run Claude Code", configuration: [] }],
+    isLoading: false,
+    isPending: false,
+  }),
+  useComponent: () => ({
+    data: { name: "runnerClaudeCode", configuration: [] },
+    isLoading: false,
+    isPending: false,
+  }),
+}));
+
+vi.mock("@/hooks/useIntegrations", () => {
+  const actual = unmockedSrc<typeof integrationsData>("hooks/useIntegrations");
+  return {
+    ...actual,
+    useAvailableIntegrations: () => ({ data: [], isLoading: false, isPending: false }),
+    useConnectedIntegrations: () => ({ data: [], isLoading: false, isPending: false }),
   };
 });
 
@@ -663,7 +688,7 @@ describe("LinesPage board", () => {
     expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
   });
 
-  it("opens an existing phase automation in the board view popup", async () => {
+  it("opens an existing phase automation on the split config screen", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
@@ -682,22 +707,22 @@ describe("LinesPage board", () => {
     );
     expect(location).not.toHaveTextContent("/apps/");
     expect(location).not.toHaveTextContent("configure=1");
-    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
-    expect(screen.queryByTestId("column-automation-view-delete")).not.toBeInTheDocument();
-    expect(
-      within(screen.getByTestId("column-automation-view")).getByRole("heading", { name: "Implement" }),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-view-tab-agent")).toHaveAttribute("data-state", "active");
-    expect(screen.getByTestId("planning-review-editor")).toBeInTheDocument();
-
-    await user.click(screen.getByTestId("column-automation-view-tab-automation"));
-    expect(screen.getByRole("link", { name: "Edit automation" })).toHaveAttribute(
-      "href",
-      factoryAppConfigurePath("org-1", PRIMARY_FACTORY_ROUTE_SEGMENT, "app-refund-implementer", {
-        from: "lines",
-        lineId: REFUND_LINE_PLAN_ID,
-      }),
+    expect(screen.queryByTestId("column-automation-view")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view-tab-agent")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view-tab-general")).not.toBeInTheDocument();
+    const dialog = screen.getByTestId("merge-confidence-config");
+    expect(within(dialog).getByRole("heading", { name: "Implement" })).toBeInTheDocument();
+    expect(within(dialog).getByTestId("merge-confidence-config-body")).toHaveAttribute("data-split", "true");
+    expect(within(dialog).getByTestId("merge-confidence-config-canvas")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("merge-confidence-config-tab-automation")).toHaveAttribute(
+      "data-state",
+      "active",
     );
+    expect(within(dialog).getByTestId("merge-confidence-config-tab-runs")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
   });
 
   it("opens Planning settings from the Task analysis row", async () => {
@@ -741,7 +766,8 @@ describe("LinesPage board", () => {
     await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
 
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    expect(screen.getByTestId("merge-confidence-config")).toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view")).not.toBeInTheDocument();
   });
 
   it("hides Add automation on step column menus", async () => {
@@ -1561,33 +1587,32 @@ describe("LinesPage board editing", () => {
 
     await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
     expect(screen.queryByTestId("column-automations-popup")).not.toBeInTheDocument();
-    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    expect(screen.getByTestId("merge-confidence-config")).toBeInTheDocument();
+    expect(screen.queryByTestId("column-automation-view")).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Edit Agent" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "Edit Automation" })).not.toBeInTheDocument();
   });
 
-  it("stages and commits the canvas agent on Save Agent", async () => {
+  it("saves the Implement agent when a choice changes", async () => {
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
     renderLinesBoard();
 
     await user.click(screen.getByTestId("lines-phase-0-automation-rows-row-step-0-app-refund-implementer"));
-    await user.click(screen.getByTestId("planning-review-step-toggle-0"));
-    const stepName = screen.getByTestId("planning-review-step-name-0");
-    await user.clear(stepName);
-    await user.type(stepName, "Clone repository");
-    await user.click(screen.getByTestId("planning-review-save"));
+    expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
+    expect(updateCanvasVersionMutateAsync).not.toHaveBeenCalled();
+    expect(await screen.findByRole("heading", { name: "Implement From Task Description" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Add step" }));
 
     await waitFor(() => {
       expect(updateCanvasVersionMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
           versionId: "version-live",
-          canvasYaml: expect.stringContaining("Clone repository"),
+          canvasYaml: expect.stringContaining("implementation-agent-no-issue"),
         }),
       );
     });
-    expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update agent");
-    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
   });
 
   it("keeps Backlog Edit as the only edit action", async () => {
