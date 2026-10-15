@@ -231,9 +231,9 @@ function FleetsStep({ setup, actions }: { setup: SetupState; actions: React.Reac
           onChange={(event) => setup.setMaxCapacity(Number(event.target.value))}
         />
       </div>
-      {setup.validationErrors.length > 0 && (
+      {setup.fleetErrors.length > 0 && (
         <p role="alert" className="mt-3 text-sm text-destructive">
-          {setup.validationErrors[0]}
+          {setup.fleetErrors[0]}
         </p>
       )}
       {actions}
@@ -299,6 +299,11 @@ function InfrastructureStep({ setup, actions }: { setup: SetupState; actions: Re
         {namespaceIsManaged && (
           <p className="text-xs text-muted-foreground">
             The generated credential requires Fleet Manager in the SuperPlane namespace.
+          </p>
+        )}
+        {setup.infrastructureErrors.length > 0 && (
+          <p role="alert" className="text-sm text-destructive">
+            {setup.infrastructureErrors[0]}
           </p>
         )}
       </div>
@@ -414,11 +419,19 @@ function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
 
 export function FleetManagerWizardScreen(props: WizardProps) {
   const back = props.showBackButton ? props.onBack : undefined;
+  const stepErrors =
+    props.step === "provider"
+      ? []
+      : props.step === "fleets"
+        ? props.setup.fleetErrors
+        : props.step === "review"
+          ? props.setup.validationErrors
+          : props.setup.infrastructureErrors;
   const continueActions = (
     <WizardActions
       primary={props.step === "review" ? "Continue to install" : "Continue"}
       onPrimary={props.onNext}
-      primaryDisabled={props.setup.validationErrors.length > 0}
+      primaryDisabled={stepErrors.length > 0}
       showBack={props.showBackButton}
       onBack={back}
     />

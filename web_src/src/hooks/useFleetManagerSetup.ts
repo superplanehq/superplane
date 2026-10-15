@@ -7,7 +7,8 @@ import {
   loadFleetManagerDraft,
   normalizeInfrastructureFields,
   saveFleetManagerDraft,
-  validateFleetManagerConfiguration,
+  validateFleetInfrastructure,
+  validateFleetSelection,
   type FleetManagerDraft,
   type FleetManagerProvider,
   type FleetManagerSetupMetadata,
@@ -108,7 +109,9 @@ export function useFleetManagerSetup(enabled = true) {
     () => (metadata && draft ? generateFleetManagerValues({ metadata, ...draft }) : ""),
     [draft, metadata],
   );
-  const validationErrors = draft ? validateFleetManagerConfiguration(draft) : [];
+  const fleetErrors = draft ? validateFleetSelection(draft) : [];
+  const infrastructureErrors = draft ? validateFleetInfrastructure(draft) : [];
+  const validationErrors = [...fleetErrors, ...infrastructureErrors];
   const importedFieldKeys = useMemo(() => {
     if (!metadata || !draft || metadata.infrastructureDefaults.provider !== draft.provider) return new Set<string>();
     const defaults = normalizeInfrastructureFields(metadata.infrastructureDefaults.fields);
@@ -121,6 +124,8 @@ export function useFleetManagerSetup(enabled = true) {
     loadError,
     values,
     validationErrors,
+    fleetErrors,
+    infrastructureErrors,
     importedFieldKeys,
     setProvider,
     toggleFleet,
