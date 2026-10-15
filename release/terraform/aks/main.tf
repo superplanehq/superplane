@@ -11,7 +11,6 @@ resource "random_password" "db_password" {
 
 locals {
   db_password                  = var.db_password != "" ? var.db_password : random_password.db_password[0].result
-  fleet_manager_image_tag      = var.fleet_manager_image_tag != "" ? var.fleet_manager_image_tag : var.superplane_image_tag
   fleet_manager_image_registry = var.fleet_manager_image_registry != "" ? var.fleet_manager_image_registry : var.image_registry
   # The config stays sensitive. Only the present check is safe for count.
   fleet_manager_enabled = nonsensitive(trimspace(var.fleet_manager_config)) != ""

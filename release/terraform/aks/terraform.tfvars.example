@@ -14,12 +14,19 @@ letsencrypt_email = "admin@example.com"
 # SuperPlane
 # -----------------------------------------------------------------------------
 
-# superplane_image_tag = "<git-sha>-selfhosted"  # Empty uses the chart image. A local build can use local-<sha>.
+# Empty image tag uses the chart appVersion (<sha>-selfhosted).
+# superplane_image_tag = ""
 # image_registry = "ghcr.io/superplanehq"
-# Use an ACR login server for images you build in this repository:
+# superplane_chart_version = "0.0.0-<git-sha>"
+# fleet_manager_image_tag = "<git-sha>"
+# cert_manager_chart_version  = "v1.21.2"
+# ingress_nginx_chart_version = "4.15.1"
+#
+# Local chart and images. See README, "Development: local images and chart".
+# helm_chart_path = "../../superplane-helm-chart/helm"
+# superplane_image_tag = "local-<git-sha>"
 # image_registry = "myregistry.azurecr.io"
 # container_registry_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane-images/providers/Microsoft.ContainerRegistry/registries/myregistry"
-# helm_chart_path = "../../superplane-helm-chart/helm"
 # superplane_namespace = "superplane"
 
 # Set a Fleet Manager YAML body to start the Deployment.
@@ -37,12 +44,13 @@ letsencrypt_email = "admin@example.com"
 #       subscriptionId: 00000000-0000-0000-0000-000000000000
 #       resourceGroup: superplane-runners
 #       location: eastus
-#       imageId: /subscriptions/.../images/superplane-runner-amd64/versions/1.0.0
+#       imageId: /CommunityGalleries/<publicName>/Images/superplane-runner-amd64/Versions/<version>
 #       vmSize: Standard_D2ds_v4
 #       architecture: amd64
 #       subnetId: /subscriptions/.../subnets/superplane-runners
 #       networkSecurityGroupId: /subscriptions/.../networkSecurityGroups/superplane-runners
 #       identityId: /subscriptions/.../userAssignedIdentities/superplane-runner
+#       # Leave zones empty when az vm list-skus shows no zones for this size.
 #       zones: ["1", "2"]
 #       diskSizeGb: 30
 #       ephemeralOSDisk: true
