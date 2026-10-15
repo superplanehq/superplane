@@ -2,8 +2,10 @@ package factories
 
 import (
 	"context"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 )
 
@@ -19,7 +21,15 @@ func ListFactoryAutomations(ctx context.Context, organizationID string, req *pb.
 		return nil, factoryErrorToStatus(err, "failed to list factory automations")
 	}
 
-	canvases, err := factory.ListCanvases(db)
+	var canvases []models.Canvas
+	if command := strings.TrimSpace(req.GetSkillName()); command != "" {
+		if err := requireAgentResourceKindFeature(orgID, models.FactoryAgentResourceKindSkill); err != nil {
+			return nil, factoryErrorToStatus(err, "failed to check skill usage")
+		}
+		canvases, err = factory.ListCanvasesMentioningSkill(db, command)
+	} else {
+		canvases, err = factory.ListCanvases(db)
+	}
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to list factory automations")
 	}
