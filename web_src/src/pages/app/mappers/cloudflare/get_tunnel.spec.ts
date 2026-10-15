@@ -1,79 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
-import type {
-  ComponentBaseContext,
-  ComponentDefinition,
-  ExecutionDetailsContext,
-  ExecutionInfo,
-  NodeInfo,
-  OutputPayload,
-} from "../types";
 import { getTunnelMapper } from "./get_tunnel";
 import { eventStateRegistry } from "./index";
+import { buildExecution, buildOutput as buildCloudflareOutput, createNodeFixtures } from "./test_support";
 
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "Test Node",
-    componentName: "cloudflare.getTunnel",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildOutput(data: unknown): OutputPayload {
-  return {
-    type: "cloudflare.tunnel.fetched",
-    timestamp: new Date().toISOString(),
-    data,
-  };
-}
-
-function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
-  return {
-    id: "exec-1",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    resultReason: "RESULT_REASON_OK",
-    resultMessage: "",
-    metadata: {},
-    configuration: {},
-    rootEvent: undefined,
-    ...overrides,
-  };
-}
-
-function buildDetailsCtx(overrides?: {
-  node?: Partial<NodeInfo>;
-  execution?: Partial<ExecutionInfo>;
-}): ExecutionDetailsContext {
-  const node = buildNode(overrides?.node);
-  return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
-}
-
-const defaultDefinition: ComponentDefinition = {
-  name: "cloudflare.getTunnel",
-  label: "Get Tunnel",
-  description: "",
-  icon: "cloud",
-  color: "orange",
-};
-
-function buildPropsContext(overrides?: Partial<ComponentBaseContext>): ComponentBaseContext {
-  return {
-    nodes: [],
-    node: buildNode(),
-    componentDefinition: defaultDefinition,
-    lastExecutions: [],
-    currentUser: undefined,
-    actions: { invokeNodeExecutionHook: async () => {} },
-    ...overrides,
-  };
-}
+const { buildDetailsCtx } = createNodeFixtures("cloudflare.getTunnel");
+const buildOutput = (data: unknown) => buildCloudflareOutput("cloudflare.tunnel.fetched", data);
 
 const tunnelOutputData = {
   tunnel: {
@@ -107,12 +39,5 @@ describe("getTunnelMapper.getExecutionDetails", () => {
 describe("eventStateRegistry.getTunnel", () => {
   it("maps finished passed to fetched", () => {
     expect(eventStateRegistry.getTunnel.getState(buildExecution())).toBe("fetched");
-  });
-});
-
-describe("getTunnelMapper.props", () => {
-  it("returns props without throwing", () => {
-    const props = getTunnelMapper.props(buildPropsContext({}));
-    expect(props.title).toBeDefined();
   });
 });

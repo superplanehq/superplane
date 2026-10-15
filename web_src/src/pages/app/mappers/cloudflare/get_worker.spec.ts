@@ -1,41 +1,11 @@
 import { describe, expect, it } from "bun:test";
 
-import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
+import type { ComponentBaseContext } from "../types";
 import { getWorkerMapper } from "./get_worker";
 import { eventStateRegistry } from "./index";
+import { buildExecution, createNodeFixtures } from "./test_support";
 
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "Test Node",
-    componentName: "cloudflare.getWorker",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
-  return {
-    id: "exec-1",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    resultReason: "RESULT_REASON_OK",
-    resultMessage: "",
-    metadata: {},
-    configuration: {},
-    rootEvent: undefined,
-    ...overrides,
-  };
-}
-
-function buildDetailsCtx(overrides?: { execution?: Partial<ExecutionInfo> }): ExecutionDetailsContext {
-  const node = buildNode();
-  return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
-}
+const { buildDetailsCtx } = createNodeFixtures("cloudflare.getWorker");
 
 describe("getWorkerMapper.getExecutionDetails", () => {
   it("includes deployment count", () => {

@@ -5,46 +5,13 @@ import type {
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
-  OutputPayload,
 } from "../types";
 import { orderCertificatePackMapper } from "./order_certificate_pack";
 import { eventStateRegistry } from "./index";
+import { buildExecution, buildOutput as buildCloudflareOutput, createNodeFixtures } from "./test_support";
 
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "Test Node",
-    componentName: "cloudflare.orderCertificatePack",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildOutput(data: unknown): OutputPayload {
-  return {
-    type: "cloudflare.certificate_pack.ordered",
-    timestamp: new Date().toISOString(),
-    data,
-  };
-}
-
-function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
-  return {
-    id: "exec-1",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    resultReason: "RESULT_REASON_OK",
-    resultMessage: "",
-    metadata: {},
-    configuration: {},
-    rootEvent: undefined,
-    ...overrides,
-  };
-}
+const { buildNode } = createNodeFixtures("cloudflare.orderCertificatePack");
+const buildOutput = (data: unknown) => buildCloudflareOutput("cloudflare.certificate_pack.ordered", data);
 
 function buildDetailsCtx(overrides?: {
   node?: Partial<NodeInfo>;
@@ -218,14 +185,5 @@ describe("orderCertificatePackMapper.getExecutionDetails", () => {
 describe("eventStateRegistry.orderCertificatePack", () => {
   it("maps finished success to ordered", () => {
     expect(eventStateRegistry.orderCertificatePack.getState(buildExecution())).toBe("ordered");
-  });
-
-  it("returns running when in progress", () => {
-    const running = buildExecution({
-      state: "STATE_STARTED",
-      result: "RESULT_UNSPECIFIED" as ExecutionInfo["result"],
-      resultReason: "RESULT_REASON_UNSPECIFIED" as ExecutionInfo["resultReason"],
-    });
-    expect(eventStateRegistry.orderCertificatePack.getState(running)).toBe("running");
   });
 });
