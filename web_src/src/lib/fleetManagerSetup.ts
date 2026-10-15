@@ -289,6 +289,34 @@ export function fleetsMatchConfiguration(
 
 const FLEET_MANAGER_PROVIDERS: FleetManagerProvider[] = ["aws", "gcp", "azure"];
 
+const runnerImageFields = ["imageAmd64", "imageArm64"] as const;
+
+export function mergeTerraformRunnerImages(
+  draft: FleetManagerDraft,
+  metadata: FleetManagerSetupMetadata,
+): FleetManagerDraft {
+  if (metadata.infrastructureDefaults.provider !== draft.provider) return draft;
+
+  const defaults = normalizeInfrastructureFields(metadata.infrastructureDefaults.fields);
+  const images = Object.fromEntries(
+    runnerImageFields.flatMap((key) => {
+      const image = defaults[key]?.trim();
+      return image ? [[key, image]] : [];
+    }),
+  );
+  if (Object.keys(images).length === 0) return draft;
+
+  const fields = { ...draft.fields, ...images };
+  return {
+    ...draft,
+    fields,
+    fieldsByProvider: {
+      ...draft.fieldsByProvider,
+      [draft.provider]: { ...(draft.fieldsByProvider?.[draft.provider] ?? fields), ...images },
+    },
+  };
+}
+
 export function rememberProviderFields(draft: FleetManagerDraft): FleetManagerDraft {
   return {
     ...draft,

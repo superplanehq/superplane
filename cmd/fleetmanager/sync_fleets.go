@@ -40,20 +40,23 @@ func syncConfiguredFleet(ctx context.Context, admin *adminclient.Client, fleet f
 		},
 	}
 
-	if _, err := admin.DescribeFleet(ctx, fleet.ID); err == nil {
+	_, err := admin.DescribeFleet(ctx, fleet.ID)
+	if err == nil {
 		_, err = admin.UpdateFleet(ctx, fleet.ID, request)
 		return err
-	} else if !adminclient.IsStatus(err, http.StatusNotFound) {
+	}
+	if !adminclient.IsStatus(err, http.StatusNotFound) {
 		return err
 	}
 
-	_, err := admin.CreateFleet(ctx, adminclient.CreateFleetRequest{
+	_, err = admin.CreateFleet(ctx, adminclient.CreateFleetRequest{
 		FleetID:       fleet.ID,
 		RunnerVersion: request.RunnerVersion,
 		Spec:          request.Spec,
 	})
-	if adminclient.IsStatus(err, http.StatusConflict) {
-		_, err = admin.UpdateFleet(ctx, fleet.ID, request)
+	if !adminclient.IsStatus(err, http.StatusConflict) {
+		return err
 	}
+	_, err = admin.UpdateFleet(ctx, fleet.ID, request)
 	return err
 }

@@ -7,6 +7,7 @@ import {
   fleetManagerInstallCommand,
   generateFleetManagerValues,
   loadFleetManagerDraft,
+  mergeTerraformRunnerImages,
   saveFleetManagerDraft,
   validateFleetManagerConfiguration,
   type FleetManagerSetupMetadata,
@@ -214,6 +215,37 @@ it("matches installed fleets by version and specification", () => {
     false,
   );
   expect(fleetsMatchConfiguration(installed, { ...draft, selectedFleetIds: [] }, metadata.fleetPresets)).toBe(false);
+});
+
+it("replaces saved runner images with the current Terraform images", () => {
+  const draft = {
+    provider: "aws" as const,
+    managerId: "test-cluster",
+    namespace: "superplane",
+    serviceAccountName: "superplane-fleet-manager",
+    superplaneUrl: "https://superplane.example.com",
+    runnerVersion: "v0.1.0",
+    selectedFleetIds: [] as string[],
+    fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+    fields: { region: "us-east-1", imageAmd64: "" },
+    fieldsByProvider: { aws: { region: "us-east-1", imageAmd64: "" } },
+  };
+
+  const merged = mergeTerraformRunnerImages(draft, metadata);
+  const values = generateFleetManagerValues({
+    metadata,
+    ...merged,
+    installationAdminToken: "personal-token",
+    selectedFleetIds: ["e1-large-amd64"],
+  });
+
+  expect(merged.fields.imageAmd64).toBe("runner-image-amd64");
+  expect(merged.fieldsByProvider?.aws?.imageAmd64).toBe("runner-image-amd64");
+  expect(values).toContain("ami: runner-image-amd64");
+  expect(
+    mergeTerraformRunnerImages({ ...draft, provider: "gcp", fieldsByProvider: { gcp: draft.fields } }, metadata).fields
+      .imageAmd64,
+  ).toBe("");
 });
 
 it("uses a browser key that stores only the non-secret draft", () => {
