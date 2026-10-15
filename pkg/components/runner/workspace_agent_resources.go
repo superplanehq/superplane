@@ -25,6 +25,13 @@ const (
 	workspaceAgentsSkillPath        = ".agents/skills/%s/SKILL.md"
 	WorkspaceSetupConfigPath        = "workspace_setup.json"
 	WorkspaceContextConfigPath      = "workspace_context.json"
+	// WorkspaceCheckoutScriptPath is the smart checkout helper shipped on
+	// factory tasks when the workspace agent flag is on. New factory
+	// templates source it (with an inline-clone fallback) so the main repo
+	// lands in repo/ and every context repo in its directory. Stored
+	// canvases are never rewritten, so existing automations keep their
+	// inline Clone Repo step until their owner adopts the helper.
+	WorkspaceCheckoutScriptPath = "setup/checkout-workspace.sh"
 )
 
 type workspaceMCPServer struct {
@@ -140,6 +147,9 @@ func AttachWorkspaceAgentResources(
 	files = appendWorkspaceSkillFiles(skills, files)
 	files = appendWorkspaceSetupFiles(setupCommands, files)
 	files = appendWorkspaceContextFiles(factory, contextRepos, files)
+	if agentEnabled {
+		files = appendWorkspaceCheckoutFile(files)
+	}
 	files = appendWorkspaceAgentResourcesHint(files, mcpNames, setupCommands, contextRepos)
 	return environment, files
 }
@@ -319,6 +329,89 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 	return append(files, BrokerTaskFile{
 		Path:    WorkspaceContextConfigPath,
 		Content: string(payload) + "\n",
+		Mode:    "0644",
+	})
+}
+
+// WorkspaceCheckoutScript is the smart checkout helper sourced by new factory
+// templates (with an inline-clone fallback for tasks without the file). It
+// checks out the main repo to repo/ with the same branch handling as the
+// legacy Clone Repo step, then clones every workspace_context.json entry to
+// its directory. Authentication comes from the VCS integration setup that
+// already ran (gh auth setup-git / Bitbucket credential helper), so the
+// script uses plain HTTPS URLs and never embeds tokens. It is idempotent:
+// directories that already contain a checkout are reused, never wiped.
+func WorkspaceCheckoutScript() string {
+	return `set -euo pipefail
+: "${SUPERPLANE_TASK_DIR:?SUPERPLANE_TASK_DIR is required}"
+: "${REPO_URL:?REPO_URL is required}"
+if ! command -v git >/dev/null 2>&1; then
+  echo "git not found on PATH; required for checkout" >&2
+  exit 1
+fi
+branch="${BASE:-main}"
+
+if [ -d repo/.git ]; then
+  echo "repo/ already checked out, reusing."
+else
+  rm -rf repo
+  heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1
+  if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then
+    git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo
+  elif [ -z "$heads" ]; then
+    git clone "${REPO_URL}" repo
+  else
+    echo "Remote branch ${branch} not found. The repository has other branches." >&2
+    exit 1
+  fi
+fi
+
+ctx="$SUPERPLANE_TASK_DIR/workspace_context.json"
+if [ -f "$ctx" ]; then
+  if ! command -v node >/dev/null 2>&1; then
+    echo "node not found on PATH; skipping context repositories" >&2
+  else
+    _sp_tab="$(printf '\t')"
+    _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();if(u&&dir){console.log(u+"\t"+dir);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx")" || exit 1
+    if [ -n "$_sp_ctx_list" ]; then
+      printf '%s\n' "$_sp_ctx_list" | while IFS="$_sp_tab" read -r url dir; do
+        case "$dir" in
+          ""|"."|"/"|*..*)
+            echo "Skipping context repository with unsafe directory: $dir" >&2
+            continue
+            ;;
+        esac
+        case "$url" in
+          "")
+            echo "Skipping context repository with missing URL: $dir" >&2
+            continue
+            ;;
+        esac
+        if [ -d "$dir/.git" ]; then
+          echo "$dir already checked out, reusing."
+          continue
+        fi
+        mkdir -p "$(dirname "$dir")"
+        rm -rf "$dir"
+        git clone --depth 1 "$url" "$dir" || exit 1
+      done
+    fi
+    unset _sp_tab _sp_ctx_list
+  fi
+fi
+echo "Checkout complete: repo/ and context repositories (if any)."
+`
+}
+
+func appendWorkspaceCheckoutFile(files []BrokerTaskFile) []BrokerTaskFile {
+	for i := range files {
+		if files[i].Path == WorkspaceCheckoutScriptPath {
+			return files
+		}
+	}
+	return append(files, BrokerTaskFile{
+		Path:    WorkspaceCheckoutScriptPath,
+		Content: WorkspaceCheckoutScript(),
 		Mode:    "0644",
 	})
 }
@@ -544,7 +637,8 @@ func workspaceAgentResourcesHint(mcpNames []string, setupCommands []string, cont
 			}
 			names = append(names, repository+" ("+WorkspaceContextRepoDirectory(repository)+")")
 		}
-		builder.WriteString("\nExtra repositories (clone with the workspace token when needed): ")
+		builder.WriteString("\nCheckout: source \"$SUPERPLANE_TASK_DIR/" + WorkspaceCheckoutScriptPath + "\" to check out repo/ and context repositories. ")
+		builder.WriteString("Extra repositories (already checked out by the script when the automation sources it): ")
 		builder.WriteString(strings.Join(names, ", "))
 	}
 	return builder.String()

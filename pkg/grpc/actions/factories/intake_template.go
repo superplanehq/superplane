@@ -586,7 +586,18 @@ func intakeAnalysisCloneCommand(vcsProvider string) string {
 	if !strings.EqualFold(strings.TrimSpace(vcsProvider), models.ProviderBitbucket) {
 		lines = append(lines, `git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`)
 	}
-	lines = append(lines, "rm -rf repo", cloneRepositoryCommand())
+	// New workspaces source the smart checkout helper (main repo to repo/,
+	// context repos to context/...) when the agent screen shipped it.
+	// Stored canvases without the file keep the inline clone below, so
+	// existing automations are never rewritten.
+	lines = append(lines,
+		`if [ -n "${SUPERPLANE_TASK_DIR:-}" ] && [ -f "$SUPERPLANE_TASK_DIR/`+runner.WorkspaceCheckoutScriptPath+`" ]; then`,
+		`  source "$SUPERPLANE_TASK_DIR/`+runner.WorkspaceCheckoutScriptPath+`"`,
+		`else`,
+		"  rm -rf repo",
+		cloneRepositoryCommand(),
+		`fi`,
+	)
 	return strings.Join(lines, "\n")
 }
 
