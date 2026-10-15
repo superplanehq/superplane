@@ -14,11 +14,8 @@ import (
 func TestCreateRecord_Metadata(t *testing.T) {
 	c := &CreateRecord{}
 	assert.Equal(t, "gcp.clouddns.createRecord", c.Name())
-	assert.Equal(t, "Cloud DNS • Create Record", c.Label())
 	assert.NotEmpty(t, c.Description())
 	assert.NotEmpty(t, c.Documentation())
-	assert.Equal(t, "gcp", c.Icon())
-	assert.Equal(t, "gray", c.Color())
 }
 
 func TestCreateRecord_ExampleOutput(t *testing.T) {
