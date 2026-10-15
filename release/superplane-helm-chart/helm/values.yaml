@@ -112,10 +112,10 @@ fleetManagerSetup:
   infrastructure: {}
 
 componentReleases:
-  runnerVersion: v0.1.0
+  runnerVersion: v0.2.0
   runnerVersions:
-    - v0.1.0
-  fleetManagerVersion: v0.1.0
+    - v0.2.0
+  fleetManagerVersion: v0.1.3
 
 sentry:
   secretName: ""
