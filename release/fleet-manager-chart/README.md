@@ -120,7 +120,8 @@ kubectl --namespace superplane rollout status deployment/fleet-manager-fleet-man
 
 Confirm that Fleet Manager reconciles each configured fleet after the restart.
 For an externally managed credential, rotate the Secret in both namespaces
-through the external secret manager.
+through the external secret manager. Then restart Fleet Manager with the same
+rollout commands.
 
 ## Remove a fleet
 
