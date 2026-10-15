@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { FLEET_MANAGER_DRAFT_KEY } from "@/lib/fleetManagerSetup";
-import FleetManagerSetup from "./FleetManagerSetup";
+import { FLEET_MANAGER_DRAFT_KEY, saveFleetManagerDraft } from "@/lib/fleetManagerSetup";
+import { FleetManagerSetup } from "./FleetManagerSetup";
 
 const fleetSpec = {
   operatingSystem: "linux",
@@ -104,6 +104,34 @@ describe("FleetManagerSetup", () => {
     const yaml = screen.getByText(/url: https:\/\/runners.example.com/).textContent ?? "";
     expect(yaml).toContain("url: https://runners.example.com");
     expect(yaml).not.toContain(window.location.origin);
+  });
+
+  it("lets an administrator correct an invalid URL from a saved draft", async () => {
+    saveFleetManagerDraft({
+      provider: "aws",
+      managerId: "terraform-cluster",
+      namespace: "superplane",
+      serviceAccountName: "superplane-fleet-manager",
+      superplaneUrl: "not-a-url",
+      runnerVersion: "v0.1.0",
+      selectedFleetIds: ["e1-large-amd64"],
+      warmCapacity: 0,
+      maxCapacity: 1,
+      fields: {},
+    });
+
+    render(<FleetManagerSetup />);
+    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByRole("heading", { name: "Confirm cloud infrastructure" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a valid SuperPlane URL.");
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText("SuperPlane URL"), {
+      target: { value: "https://superplane.example.com" },
+    });
+    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
   });
 
   it("clears incompatible fields when the provider changes", async () => {

@@ -96,7 +96,7 @@ import AccountsListAdmin from "./pages/admin/AccountsList";
 import InstallationSettingsAdmin from "./pages/admin/InstallationSettings";
 import InstallationLicenseAdmin from "./pages/admin/InstallationLicense";
 import RunnerTasksAdmin from "./pages/admin/RunnerTasks";
-import FleetManagerSetupAdmin from "./pages/admin/FleetManagerSetup";
+import { FleetManagerSetup as FleetManagerSetupAdmin } from "./pages/admin/FleetManagerSetup";
 import { PolarWebhooks as PolarWebhooksAdmin } from "./pages/admin/PolarWebhooks";
 import { Webhooks as WebhooksAdmin } from "./pages/admin/Webhooks";
 import { PriceBooks as PriceBooksAdmin } from "./pages/admin/PriceBooks";

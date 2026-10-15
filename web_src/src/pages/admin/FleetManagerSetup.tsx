@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
 import { FLEET_MANAGER_WIZARD_STEPS, type FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
 
-export default function FleetManagerSetup() {
+export function FleetManagerSetup() {
   const [step, setStep] = useState<FleetManagerWizardStep>("provider");
   const [complete, setComplete] = useState(false);
   const setup = useFleetManagerSetup();

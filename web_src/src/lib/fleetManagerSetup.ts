@@ -61,6 +61,14 @@ type GenerateValuesInput = Omit<FleetManagerDraft, "namespace" | "serviceAccount
 };
 
 export type FleetManagerConfigurationInput = Omit<FleetManagerDraft, "provider" | "fields">;
+type FleetSelectionInput = Pick<
+  FleetManagerDraft,
+  "runnerVersion" | "selectedFleetIds" | "warmCapacity" | "maxCapacity"
+>;
+type FleetInfrastructureInput = Pick<
+  FleetManagerDraft,
+  "managerId" | "namespace" | "serviceAccountName" | "superplaneUrl"
+>;
 
 export const FLEET_MANAGER_DRAFT_KEY = "superplane.fleet-manager-setup.v1";
 
@@ -178,13 +186,10 @@ export function generateFleetManagerValues(input: GenerateValuesInput): string {
   );
 }
 
-export function validateFleetManagerConfiguration(input: FleetManagerConfigurationInput): string[] {
+export function validateFleetInfrastructure(input: FleetInfrastructureInput): string[] {
   const errors: string[] = [];
   if (!/^[a-z0-9][a-z0-9_-]{0,62}$/.test(input.managerId)) {
     errors.push("Enter a valid Fleet Manager ID.");
-  }
-  if (!/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(input.runnerVersion)) {
-    errors.push("Enter a valid immutable Runner version.");
   }
   if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(input.namespace)) {
     errors.push("Enter a valid Kubernetes namespace.");
@@ -197,6 +202,14 @@ export function validateFleetManagerConfiguration(input: FleetManagerConfigurati
     if (url.protocol !== "https:" && url.protocol !== "http:") errors.push("Enter a valid SuperPlane URL.");
   } catch {
     errors.push("Enter a valid SuperPlane URL.");
+  }
+  return errors;
+}
+
+export function validateFleetSelection(input: FleetSelectionInput): string[] {
+  const errors: string[] = [];
+  if (!/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(input.runnerVersion)) {
+    errors.push("Enter a valid immutable Runner version.");
   }
   if (input.selectedFleetIds.length === 0) {
     errors.push("Select at least one fleet.");
@@ -211,6 +224,10 @@ export function validateFleetManagerConfiguration(input: FleetManagerConfigurati
     errors.push("Warm capacity cannot exceed maximum capacity.");
   }
   return errors;
+}
+
+export function validateFleetManagerConfiguration(input: FleetManagerConfigurationInput): string[] {
+  return [...validateFleetSelection(input), ...validateFleetInfrastructure(input)];
 }
 
 export function fleetManagerInstallCommand(
