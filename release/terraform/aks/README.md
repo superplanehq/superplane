@@ -269,11 +269,51 @@ az aks update --resource-group superplane --name superplane --attach-acr "$ACR_N
 Do not keep a `*_override.tf` file. Chart path and image registry are
 Terraform variables.
 
-## Optional: Azure runner VMs
+## Runners
 
-Terraform already creates the gallery, runner subnet, NSG, and identities.
+Terraform creates the runner subnet, network security group, and identities.
+Use the SuperPlane community gallery for the VM image. Do not run Packer in
+the customer subscription.
 
-Build gallery images:
+Download the manifest for the runner version:
+
+```text
+https://superplanehq-releases.s3.amazonaws.com/selfhosted/<version>/azure.json
+```
+
+Build `azure.imageId` from that file:
+
+```text
+/CommunityGalleries/<communityGalleryPublicName>/Images/<definition>/Versions/<image version>
+```
+
+Use `superplane-runner-amd64` or `superplane-runner-arm64`. The fleet
+`architecture` must match that definition. Set `azure.location` to a region
+listed in the manifest. Replica regions in the current publisher build are
+`eastus`, `centralus`, and `westus`.
+
+Choose zones in the customer subscription:
+
+```bash
+az vm list-skus --location eastus --size Standard_D2ds_v4
+```
+
+Zone numbers are not the same in every subscription. Leave `azure.zones`
+empty when the region or size has no availability zones. `westus` is one
+region that has no zones.
+
+Set `fleet_manager_config` from `terraform output` for the subnet, network
+security group, and runner identity. Apply again.
+
+This stack still creates an empty customer Compute Gallery and two image
+definitions. You can ignore them when `azure.imageId` points at the
+community gallery. Turning that gallery off in Terraform would destroy
+galleries that already contain image versions.
+
+## Development: local runner images
+
+Use this path to publish a runner image into the customer gallery. The
+install path above does not use it.
 
 ```bash
 az login
@@ -305,8 +345,6 @@ Host the archives on a public HTTPS prefix:
 
 The SuperPlane blob account is private. Use a separate public storage
 account or another HTTPS host.
-
-Set `fleet_manager_config` from `terraform output` and apply again.
 
 ## Destroy
 

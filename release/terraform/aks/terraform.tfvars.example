@@ -44,12 +44,13 @@ letsencrypt_email = "admin@example.com"
 #       subscriptionId: 00000000-0000-0000-0000-000000000000
 #       resourceGroup: superplane-runners
 #       location: eastus
-#       imageId: /subscriptions/.../images/superplane-runner-amd64/versions/1.0.0
+#       imageId: /CommunityGalleries/<publicName>/Images/superplane-runner-amd64/Versions/<version>
 #       vmSize: Standard_D2ds_v4
 #       architecture: amd64
 #       subnetId: /subscriptions/.../subnets/superplane-runners
 #       networkSecurityGroupId: /subscriptions/.../networkSecurityGroups/superplane-runners
 #       identityId: /subscriptions/.../userAssignedIdentities/superplane-runner
+#       # Leave zones empty when az vm list-skus shows no zones for this size.
 #       zones: ["1", "2"]
 #       diskSizeGb: 30
 #       ephemeralOSDisk: true
