@@ -1,6 +1,7 @@
 package authentication
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -473,13 +474,12 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 func attachGitHubIdentity(t *testing.T, account *models.Account, providerID string) {
 	t.Helper()
 	require.NoError(t, database.Conn().Create(&models.AccountProvider{
-		AccountID:   account.ID,
-		Provider:    models.ProviderGitHub,
-		ProviderID:  providerID,
-		Email:       account.Email,
-		Name:        account.Name,
-		AvatarURL:   "https://avatars.example/" + providerID + ".png",
-		AccessToken: "token-" + account.ID.String(),
+		AccountID:  account.ID,
+		Provider:   models.ProviderGitHub,
+		ProviderID: providerID,
+		Email:      account.Email,
+		Name:       account.Name,
+		AvatarURL:  "https://avatars.example/" + providerID + ".png",
 	}).Error)
 }
 
@@ -585,12 +585,14 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 	t.Run("should create the account when signup intent is missing", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)
 		googleUser := goth.User{
-			UserID:      "google-login-no-account",
-			Email:       "google-login-no-account@example.com",
-			Name:        "Google Login User",
-			NickName:    "googlelogin",
-			Provider:    "google",
-			AccessToken: "google-access-token",
+			UserID:       "google-login-no-account",
+			Email:        "google-login-no-account@example.com",
+			Name:         "Google Login User",
+			NickName:     "googlelogin",
+			Provider:     "google",
+			AccessToken:  "google-access-token",
+			RefreshToken: "google-refresh-token",
+			ExpiresAt:    time.Now().Add(time.Hour),
 		}
 		req := mux.SetURLVars(
 			httptest.NewRequest(http.MethodGet, "/auth/google", nil),
@@ -604,6 +606,7 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		account, err := models.FindAccountByEmail(googleUser.Email)
 		require.NoError(t, err)
 		assert.Equal(t, googleUser.Name, account.Name)
+		assertProviderTokensNotStored(t, account.ID.String(), googleUser.Provider)
 	})
 
 	t.Run("should create the account when signup intent is present", func(t *testing.T) {
@@ -685,12 +688,14 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		attachGitHubIdentity(t, account, "10001")
 
 		githubUser := goth.User{
-			UserID:      "10001",
-			Email:       account.Email,
-			Name:        account.Name,
-			NickName:    "solo",
-			Provider:    models.ProviderGitHub,
-			AccessToken: "solo-token",
+			UserID:       "10001",
+			Email:        account.Email,
+			Name:         account.Name,
+			NickName:     "solo",
+			Provider:     models.ProviderGitHub,
+			AccessToken:  "solo-token",
+			RefreshToken: "solo-refresh-token",
+			ExpiresAt:    time.Now().Add(time.Hour),
 		}
 		req := mux.SetURLVars(
 			httptest.NewRequest(http.MethodGet, "/auth/github", nil),
@@ -707,6 +712,7 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, githubUser.UserID, linked.ProviderID)
 		assert.Equal(t, githubUser.NickName, linked.Username)
+		assertProviderTokensNotStored(t, account.ID.String(), githubUser.Provider)
 	})
 
 	t.Run("should issue a session for the account that holds the identity, not an email match", func(t *testing.T) {
@@ -737,6 +743,49 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		assert.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
 		assert.Equal(t, identityAccount.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
 	})
+}
+
+func TestLinkProviderToAccountDoesNotStoreTokens(t *testing.T) {
+	_, registry := setupAuthHandler(t, false)
+	user := goth.User{
+		Provider:     models.ProviderGoogle,
+		UserID:       "google-linked",
+		Email:        "linked@example.com",
+		Name:         "Linked User",
+		NickName:     "linked",
+		AccessToken:  "access-token",
+		RefreshToken: "refresh-token",
+		ExpiresAt:    time.Now().Add(time.Hour),
+	}
+
+	require.NoError(t, LinkProviderToAccount(database.Conn(), registry.Account, user))
+	assertProviderTokensNotStored(t, registry.Account.ID.String(), user.Provider)
+
+	user.Name = "Updated Linked User"
+	user.AccessToken = "new-access-token"
+	user.RefreshToken = "new-refresh-token"
+	require.NoError(t, LinkProviderToAccount(database.Conn(), registry.Account, user))
+	assertProviderTokensNotStored(t, registry.Account.ID.String(), user.Provider)
+
+	provider, err := registry.Account.GetAccountProvider(user.Provider)
+	require.NoError(t, err)
+	assert.Equal(t, user.UserID, provider.ProviderID)
+	assert.Equal(t, user.Email, provider.Email)
+	assert.Equal(t, user.Name, provider.Name)
+}
+
+func assertProviderTokensNotStored(t *testing.T, accountID, provider string) {
+	t.Helper()
+	var accessToken, refreshToken sql.NullString
+	var expiresAt sql.NullTime
+	err := database.Conn().Raw(
+		"SELECT access_token, refresh_token, token_expires_at FROM account_providers WHERE account_id = ? AND provider = ?",
+		accountID, provider,
+	).Row().Scan(&accessToken, &refreshToken, &expiresAt)
+	require.NoError(t, err)
+	assert.False(t, accessToken.Valid)
+	assert.False(t, refreshToken.Valid)
+	assert.False(t, expiresAt.Valid)
 }
 
 func sessionAccountID(t *testing.T, recorder *httptest.ResponseRecorder, signer *jwt.Signer) string {

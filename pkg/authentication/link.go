@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/markbates/goth"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -132,7 +131,7 @@ func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	err = LinkProviderToAccount(database.DB(r.Context()), a.encryptor, sessionAccount, gothUser)
+	err = LinkProviderToAccount(database.DB(r.Context()), sessionAccount, gothUser)
 	if errors.Is(err, models.ErrSignInIdentityInUse) {
 		http.Redirect(w, r, linkErrorRedirectURL(state.Redirect, authErrorLinkFailed, gothUser.Provider), http.StatusSeeOther)
 		return
@@ -146,7 +145,7 @@ func (a *Handler) completeProviderLink(w http.ResponseWriter, r *http.Request, g
 	http.Redirect(w, r, linkSuccessRedirectURL(state.Redirect, gothUser.Provider), http.StatusSeeOther)
 }
 
-func LinkProviderToAccount(tx *gorm.DB, encryptor crypto.Encryptor, account *models.Account, gothUser goth.User) error {
+func LinkProviderToAccount(tx *gorm.DB, account *models.Account, gothUser goth.User) error {
 	existing, err := models.FindAccountByProvider(tx, gothUser.Provider, gothUser.UserID)
 	if err == nil && existing.ID != account.ID {
 		return models.ErrSignInIdentityInUse
@@ -155,7 +154,7 @@ func LinkProviderToAccount(tx *gorm.DB, encryptor crypto.Encryptor, account *mod
 		return err
 	}
 
-	return updateAccountProviders(encryptor, account, gothUser)
+	return updateAccountProviders(account, gothUser)
 }
 
 func linkSuccessRedirectURL(redirect, provider string) string {
