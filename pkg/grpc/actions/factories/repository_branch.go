@@ -2,6 +2,7 @@ package factories
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -60,10 +61,8 @@ func ensureGitHubBranch(
 	if err != nil {
 		return invalidArgument("could not verify the branch")
 	}
-	for _, name := range names {
-		if name == branch {
-			return nil
-		}
+	if slices.Contains(names, branch) {
+		return nil
 	}
 	return invalidArgument("branch does not exist")
 }

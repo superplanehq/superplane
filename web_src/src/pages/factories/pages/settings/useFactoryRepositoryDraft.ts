@@ -1,7 +1,7 @@
 import { resolveGithubDefaultBranch, useIntegrationResources } from "@/hooks/useIntegrations";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useFactoryRepository } from "./useFactoryRepository";
 
@@ -16,6 +16,8 @@ type RepositoryDraftFactory = {
     defaultBranch?: string | null;
   } | null;
 };
+
+const BRANCH_LOOKUP_ERROR = "Could not load the default branch. Try again.";
 
 export function useFactoryRepositoryDraft(args: {
   organizationId: string;
@@ -38,19 +40,38 @@ export function useFactoryRepositoryDraft(args: {
     repository ? { repository } : undefined,
     { enabled: Boolean(repository) },
   );
-  const hostDefaultBranch = useCallback(
-    (repositoryName: string) =>
-      hostDefaultBranchFor(args.organizationId, args.integrationId, args.catalogRepositories, repositoryName),
-    [args.catalogRepositories, args.integrationId, args.organizationId],
-  );
+  const catalogRepositories = useRef(args.catalogRepositories);
+  catalogRepositories.current = args.catalogRepositories;
+  const branchLookup = useRef(0);
 
   useEffect(() => {
     setRepository(savedRepository);
   }, [savedRepository]);
 
   useEffect(() => {
-    return prefillBranch(savedBranch, savedRepository, hostDefaultBranch, setBranch, setBaselineBranch);
-  }, [hostDefaultBranch, savedBranch, savedRepository]);
+    const lookup = ++branchLookup.current;
+    const isCurrent = () => branchLookup.current === lookup;
+    if (savedBranch) {
+      setBranch(savedBranch);
+      setBaselineBranch(savedBranch);
+      return () => {
+        branchLookup.current += 1;
+      };
+    }
+
+    void watchBranchLookup(
+      isCurrent,
+      hostDefaultBranchFor(args.organizationId, args.integrationId, catalogRepositories.current, savedRepository),
+      (next) => {
+        setBranch(next);
+        if (next) setBaselineBranch(next);
+      },
+    );
+
+    return () => {
+      branchLookup.current += 1;
+    };
+  }, [args.integrationId, args.organizationId, savedBranch, savedRepository]);
 
   const listedBranchNames = useMemo(() => branchNames(branchResources.data), [branchResources.data]);
   const branchChoices = useMemo(() => branchChoicesFor(listedBranchNames, branch), [branch, listedBranchNames]);
@@ -59,10 +80,17 @@ export function useFactoryRepositoryDraft(args: {
   const selectRepository = (next: string) => {
     setRepository(next);
     if (next === repository) return;
+    const lookup = ++branchLookup.current;
+    const isCurrent = () => branchLookup.current === lookup;
     setIsResolvingDefaultBranch(true);
-    void hostDefaultBranch(next)
-      .then((value) => setBranch(value))
-      .finally(() => setIsResolvingDefaultBranch(false));
+    void watchBranchLookup(
+      isCurrent,
+      hostDefaultBranchFor(args.organizationId, args.integrationId, catalogRepositories.current, next),
+      setBranch,
+    ).finally(() => {
+      if (!isCurrent()) return;
+      setIsResolvingDefaultBranch(false);
+    });
   };
   const save = async () => {
     if (!repository || !branch || !args.integrationId || isSaving) return;
@@ -101,27 +129,17 @@ function hostDefaultBranchFor(
   return resolveGithubDefaultBranch(organizationId, integrationId, repositoryName);
 }
 
-function prefillBranch(
-  savedBranch: string,
-  savedRepository: string,
-  hostDefaultBranch: (repositoryName: string) => Promise<string>,
-  setBranch: (branch: string) => void,
-  setBaselineBranch: (branch: string) => void,
-) {
-  if (savedBranch) {
-    setBranch(savedBranch);
-    setBaselineBranch(savedBranch);
-    return;
-  }
-  let cancelled = false;
-  void hostDefaultBranch(savedRepository).then((next) => {
-    if (cancelled) return;
-    setBranch(next);
-    setBaselineBranch(next);
-  });
-  return () => {
-    cancelled = true;
-  };
+function watchBranchLookup(isCurrent: () => boolean, request: Promise<string>, onBranch: (branch: string) => void) {
+  return request
+    .then((next) => {
+      if (!isCurrent()) return;
+      onBranch(next);
+    })
+    .catch((error: unknown) => {
+      if (!isCurrent()) return;
+      onBranch("");
+      showErrorToast(getApiErrorMessage(error, BRANCH_LOOKUP_ERROR));
+    });
 }
 
 function branchNames(resources: { name?: string | null; id?: string | null }[] | undefined) {

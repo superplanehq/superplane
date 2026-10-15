@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeAll, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
@@ -12,8 +12,14 @@ import {
 } from "../../__fixtures__/setupStoryFixtures";
 
 describe("FactorySettingsRepositoryPage", () => {
+  const originalFetch = globalThis.fetch;
+
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
   });
 
   it("selects and saves the workspace repository", async () => {
@@ -101,15 +107,18 @@ describe("FactorySettingsRepositoryPage", () => {
       }
       return currentFetch(input, init);
     };
-    const branch = await within(settings).findByTestId("factory-settings-default-branch");
-    await user.click(branch);
-    await user.click(await screen.findByRole("option", { name: "develop" }));
-    const saveButton = within(settings).getByTestId("factory-settings-repository-save");
-    await waitFor(() => expect(saveButton).toBeEnabled());
-    await user.click(saveButton);
+    try {
+      const branch = await within(settings).findByTestId("factory-settings-default-branch");
+      await user.click(branch);
+      await user.click(await screen.findByRole("option", { name: "develop" }));
+      const saveButton = within(settings).getByTestId("factory-settings-repository-save");
+      await waitFor(() => expect(saveButton).toBeEnabled());
+      await user.click(saveButton);
 
-    await waitFor(() => expect(saves).toEqual([{ repository: "acme/api", defaultBranch: "develop" }]));
-    globalThis.fetch = currentFetch;
+      await waitFor(() => expect(saves).toEqual([{ repository: "acme/api", defaultBranch: "develop" }]));
+    } finally {
+      globalThis.fetch = currentFetch;
+    }
   }, 10000);
 });
 
