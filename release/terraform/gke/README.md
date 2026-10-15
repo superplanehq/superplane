@@ -1,29 +1,31 @@
 # SuperPlane on Google Kubernetes Engine (GKE)
 
-This guide installs SuperPlane in your own GCP project. Terraform creates a GKE
-cluster, a Cloud SQL PostgreSQL instance, and the SuperPlane Helm release.
+This guide installs SuperPlane in your own GCP project. One Terraform apply
+creates a GKE cluster, a Cloud SQL PostgreSQL instance, runner infrastructure,
+and the SuperPlane Helm release.
 
-Runners are optional. A runner is a short-lived Compute Engine VM that runs one
-task, for example a Run Bash node or a factory agent. Fleet Manager runs in the
-cluster. It creates a runner VM when a task is queued and deletes the VM when
-the task ends.
+A runner is a short-lived Compute Engine VM that runs one task, for example a
+Run Bash node or a factory agent. Fleet Manager runs in the cluster. It creates
+a runner VM when a task is queued and deletes the VM when the task ends.
 
 Do the steps in this order:
 
 1. [Prepare the project](#1-prepare-the-project).
 2. [Install SuperPlane](#2-install-superplane).
-3. [Add runners](#3-add-runners) (optional).
+3. [Install Fleet Manager](#3-install-fleet-manager).
 
 ## What Terraform creates
 
 | Part | Resources | Variable |
 | --- | --- | --- |
 | SuperPlane | GKE cluster, Cloud NAT (private nodes), Cloud SQL, cert-manager, Helm release | Always |
-| Blob storage | GCS bucket, `superplane-app` service account, Workload Identity binding | `enable_gcs_blob_storage` |
-| Runner network | Runner subnetwork, deny-all ingress firewall rule, `superplane-fleet-mgr` service account | `enable_runners` |
-| Fleet Manager infrastructure | Service account and Workload Identity binding | `enable_runners` |
+| Blob storage | GCS bucket, `superplane-app` service account, Workload Identity binding | `enable_gcs_blob_storage` (default `true`) |
+| Runner network | Runner subnetwork, deny-all ingress firewall rule, `superplane-fleet-mgr` service account | `enable_runners` (default `true`) |
+| Fleet Manager infrastructure | Service account, Workload Identity binding, setup values, service-token Secret | `enable_runners` (default `true`) |
 
-All optional parts are off by default.
+The apply creates blob storage and runner infrastructure. Set both flags to
+`false` only for a short app-only evaluation. That evaluation stores blobs on
+pod volumes.
 
 ## Prerequisites
 
@@ -102,9 +104,14 @@ letsencrypt_email = "admin@example.com"
 # Required. Confirm both artifacts exist before you apply.
 superplane_image_tag     = "<commit-sha>-selfhosted"
 superplane_chart_version = "0.0.0-<commit-sha>"
+```
 
-# Recommended. Runners require it.
-enable_gcs_blob_storage = true
+GCS blob storage and runner infrastructure are on by default. Set both flags
+to `false` only for a short app-only evaluation:
+
+```hcl
+enable_gcs_blob_storage = false
+enable_runners          = false
 ```
 
 Select a `main` commit that published both artifacts. The image and the
@@ -137,7 +144,22 @@ terraform init
 terraform apply
 ```
 
-The first apply takes approximately 20 minutes.
+The apply takes approximately 20 minutes. It creates the cluster, the database,
+the SuperPlane release, the blob bucket, and the runner infrastructure.
+
+The runner infrastructure includes:
+
+- The runner subnetwork (`172.20.0.0/24` by default). Runner VMs have no
+  external IP address. Cloud NAT gives them outbound internet access.
+- A firewall rule that blocks all inbound traffic to runner VMs.
+- The Fleet Manager service account, with `roles/compute.instanceAdmin.v1` on
+  the project.
+- A runner API Deployment. Runners connect to
+  `https://superplane.example.com/runner/v1`.
+- Fleet Manager setup values and the service-token Secret.
+
+If `172.20.0.0/24` overlaps a range in your network, set `runner_subnet_cidr`
+before you apply.
 
 ### Verify
 
@@ -155,9 +177,10 @@ can take 15 minutes after the apply.
 Open `https://superplane.example.com`. Create the owner account. The owner
 account is the installation admin.
 
-## 3. Add runners
+## 3. Install Fleet Manager
 
-Do these steps after the installation in step 2 works.
+Do these steps after the installation in step 2 works. They do not need another
+Terraform apply.
 
 ### 3.1 Build the runner image
 
@@ -180,8 +203,8 @@ The image goes into the `superplane-runner-amd64` image family. Fleet Manager
 uses the newest image in the family.
 
 The default build uses a public IP address and SSH on TCP 22. If the
-network blocks inbound SSH, enable runners in step 3.3 first. Then build
-with Identity-Aware Proxy:
+network blocks inbound SSH, build after the apply. Use Identity-Aware Proxy
+and the runner subnetwork:
 
 ```bash
 cd ../../..   # repository root
@@ -197,37 +220,7 @@ cd release/terraform/gke
 
 Allow inbound TCP 22 from `35.235.240.0/20` for IAP.
 
-### 3.2 Enable the runner API and runner infrastructure
-
-Add these values to `terraform.tfvars`:
-
-```hcl
-enable_gcs_blob_storage = true
-enable_runners          = true
-
-superplane_image_tag     = "<commit-sha>-selfhosted"
-superplane_chart_version = "0.0.0-<commit-sha>"
-```
-
-Apply:
-
-```bash
-terraform apply
-```
-
-This apply creates:
-
-- The runner subnetwork (`172.20.0.0/24` by default). Runner VMs have no
-  external IP address. Cloud NAT gives them outbound internet access.
-- A firewall rule that blocks all inbound traffic to runner VMs.
-- The Fleet Manager service account, with `roles/compute.instanceAdmin.v1` on
-  the project.
-- A runner API Deployment. Runners connect to
-  `https://superplane.example.com/runner/v1`.
-
-If `172.20.0.0/24` overlaps a range in your network, set `runner_subnet_cidr`.
-
-### 3.3 Install the standalone Fleet Manager
+### 3.2 Install the standalone Fleet Manager
 
 Open **Set up runner fleets** during owner setup. Terraform passes the public
 SuperPlane URL and these values to SuperPlane. The wizard preloads them into
@@ -263,7 +256,7 @@ The log must not show configuration or permission errors.
 
 To change fleets, edit the standalone chart values and run `helm upgrade`.
 
-### 3.4 Run a task
+### 3.3 Run a task
 
 1. Create a canvas.
 2. Add a Manual Run trigger.
@@ -300,12 +293,12 @@ must stop and Fleet Manager must delete it after the task.
 | `superplane_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the SuperPlane image. |
 | `fleet_manager_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the standalone Fleet Manager image. Set this for private GCP registries so nodes keep pull access. |
 | `superplane_image_tag` | required | Image tag. Must contain `selfhosted`. Published tags are `<git-sha>-selfhosted`. |
-| `enable_gcs_blob_storage` | `false` | Store blobs in GCS. |
+| `enable_gcs_blob_storage` | `true` | Store blobs in GCS. Set this and `enable_runners` to `false` for an app-only evaluation. |
 | `blob_bucket_name` | `<project_id>-superplane-blobs` | Name of the blob bucket. |
 | `blob_bucket_force_destroy` | `false` | Delete the bucket objects on destroy. |
 | `superplane_chart_path` | empty | Path to a local chart. Empty installs the published chart. |
 | `superplane_chart_version` | empty | Version of the published chart, for example `0.0.0-<commit-sha>`. Required when `superplane_chart_path` is empty. |
-| `enable_runners` | `false` | Enable the runner API and create the runner network. |
+| `enable_runners` | `true` | Enable the runner API and create the runner network. |
 | `runner_subnet_cidr` | `172.20.0.0/24` | Range of the runner subnetwork. |
 | `runner_zones` | `[zone]` | Zones for runner VMs. |
 
