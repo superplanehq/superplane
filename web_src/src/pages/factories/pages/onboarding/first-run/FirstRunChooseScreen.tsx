@@ -1,15 +1,5 @@
 import type { MeVcsProviderIdentity } from "@/api-client";
-import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/ui/dropdownMenu";
 import { Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -26,11 +16,20 @@ import {
   repositoryOrganizations,
 } from "./githubOrganizations";
 import { FirstRunHeading, FirstRunShell } from "./FirstRunShell";
+import { FirstRunSignedInAsLine, type FirstRunLinkedIdentity } from "./FirstRunSignedInAsLine";
 import { repositorySphereFor, sphereFor } from "./firstRunSphereFor";
 import type { FirstRunSphereProps } from "./FirstRunSpherePane";
 import type { FirstRunChrome } from "./firstRunTypes";
 
 const copy = FIRST_RUN_COPY.choose;
+const githubSignedInTestIds = {
+  signedInAs: "first-run-github-signed-in-as",
+  switchAccount: "first-run-switch-github-account",
+};
+
+function githubLinkedIdentities(identities: MeVcsProviderIdentity[]): FirstRunLinkedIdentity[] {
+  return identities.map((identity) => ({ key: identity.userId ?? "", login: identity.login ?? "" }));
+}
 
 function chooseSphere(
   organization: string | null,
@@ -110,11 +109,14 @@ export function FirstRunChooseScreen({
           {organization ? copy.repositoryHelper : copy.organizationHelper}
         </p>
         {githubLogin ? (
-          <SignedInAsLine
+          <FirstRunSignedInAsLine
             login={githubLogin}
-            userId={githubUserId}
-            identities={githubIdentities}
+            activeKey={githubUserId}
+            identities={githubLinkedIdentities(githubIdentities)}
             disabled={busy}
+            signedInText={FIRST_RUN_COPY.connect.signedInAs(githubLogin)}
+            connectAnotherLabel={copy.connectAnotherAccount}
+            testIds={githubSignedInTestIds}
             onSelectIdentity={onSelectGitHubIdentity}
             onConnectAnotherAccount={onConnectAnotherGitHubAccount}
           />
@@ -184,96 +186,6 @@ function useOrganizationChoice(
     },
     clear: () => setChosen(null),
   };
-}
-
-function SignedInAsLine({
-  login,
-  userId,
-  identities,
-  disabled,
-  onSelectIdentity,
-  onConnectAnotherAccount,
-}: {
-  login: string;
-  userId: string;
-  identities: MeVcsProviderIdentity[];
-  disabled: boolean;
-  onSelectIdentity?: (userId: string) => void;
-  onConnectAnotherAccount?: () => void;
-}) {
-  const [before, after] = FIRST_RUN_COPY.connect.signedInAs(login).split(login);
-  return (
-    <div className="flex items-center gap-2 text-[13px] leading-5">
-      <p className="text-muted-foreground" data-testid="first-run-github-signed-in-as">
-        {before}
-        <span className="font-medium text-foreground">{login}</span>
-        {after}
-      </p>
-      {onSelectIdentity && onConnectAnotherAccount ? (
-        <GitHubAccountMenu
-          userId={userId}
-          identities={identities}
-          disabled={disabled}
-          onSelectIdentity={onSelectIdentity}
-          onConnectAnotherAccount={onConnectAnotherAccount}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function GitHubAccountMenu({
-  userId,
-  identities,
-  disabled,
-  onSelectIdentity,
-  onConnectAnotherAccount,
-}: {
-  userId: string;
-  identities: MeVcsProviderIdentity[];
-  disabled: boolean;
-  onSelectIdentity: (userId: string) => void;
-  onConnectAnotherAccount: () => void;
-}) {
-  const linkedIdentities = identities.filter(
-    (identity): identity is MeVcsProviderIdentity & { userId: string; login: string } =>
-      Boolean(identity.userId && identity.login),
-  );
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="h-auto p-0 text-[13px] font-normal text-muted-foreground hover:text-foreground"
-          disabled={disabled}
-          data-testid="first-run-switch-github-account"
-        >
-          {copy.switchAccount}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-60">
-        <DropdownMenuRadioGroup
-          value={userId}
-          onValueChange={(nextUserId) => {
-            if (nextUserId !== userId) onSelectIdentity(nextUserId);
-          }}
-        >
-          {linkedIdentities.map((identity) => (
-            <DropdownMenuRadioItem key={identity.userId} value={identity.userId} className="text-[13px]">
-              {identity.login}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-        {linkedIdentities.length > 0 ? <DropdownMenuSeparator /> : null}
-        <DropdownMenuItem className="text-[13px]" onSelect={onConnectAnotherAccount}>
-          {copy.connectAnotherAccount}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
 }
 
 function RepositoryStepBody({
