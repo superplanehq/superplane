@@ -34,13 +34,20 @@ export function agentNodeWithCommand(command: string): SuperplaneComponentsNode 
 }
 
 /** Rest the pointer on Close, then click the element under the pointer. */
-export async function playFindBoxCloses({ canvasElement }: { canvasElement: HTMLElement }) {
+export async function playFindBoxCloses(
+  { canvasElement }: { canvasElement: HTMLElement },
+  dismissed: { calls: number },
+) {
+  dismissed.calls = 0;
   const editor = await openBashStep(canvasElement);
   const surface = monacoSurface(editor);
   await openFind(surface, editor);
   await clickCloseUnderPointer(editor);
   await dismissFindWithEscape(surface, editor);
-  expect(within(canvasElement).getByTestId("planning-review-step-toggle-0")).toBeInTheDocument();
+  const toggle = within(canvasElement).getByTestId("planning-review-step-toggle-0");
+  expect(dismissed.calls).toBe(0);
+  expect(editor).toBeVisible();
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
 }
 
 async function openBashStep(canvasElement: HTMLElement) {

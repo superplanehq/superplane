@@ -18,7 +18,10 @@ function panel(command: string) {
   return (
     <MemoryRouter>
       <div className="flex h-svh w-full max-w-3xl flex-col border-r border-border bg-background">
-        <AgentRunnerSettings node={agentNodeWithCommand(command)} onSave={() => undefined} />
+        <AgentRunnerSettings
+          node={agentNodeWithCommand(command)}
+          onSave={(update) => console.log("save agent runner", update)}
+        />
       </div>
     </MemoryRouter>
   );

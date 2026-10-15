@@ -22,14 +22,14 @@ function popup(command?: string) {
       <div className="relative min-h-svh bg-background">
         <PlanningSettingsPopup
           settings={DEFAULT_PLANNING_SETTINGS}
-          onSave={() => undefined}
-          onClose={() => undefined}
+          onSave={(next) => console.log("save planning settings", next)}
+          onClose={() => console.log("close planning settings")}
           fixed={false}
           initialTab="agent"
           agent={{
             draft: command ? draftWithBashCommand(command) : PLANNING_REVIEW_DRAFT,
             organizationId: "org-1",
-            onSave: () => undefined,
+            onSave: (draft) => console.log("save planning agent", draft),
           }}
         />
       </div>

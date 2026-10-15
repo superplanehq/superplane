@@ -35,14 +35,14 @@ function popup(command?: string) {
         <PRFeedbackSettingsPopup
           settings={settings}
           healthy
-          onSave={() => undefined}
-          onClose={() => undefined}
+          onSave={(next) => console.log("save PR feedback settings", next)}
+          onClose={() => console.log("close PR feedback settings")}
           fixed={false}
           initialTab="agent"
           agent={{
             draft: command ? draftWithBashCommand(command) : PLANNING_REVIEW_DRAFT,
             organizationId: "org-1",
-            onSave: () => undefined,
+            onSave: (draft) => console.log("save PR feedback agent", draft),
           }}
         />
       </div>
