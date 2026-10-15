@@ -173,9 +173,13 @@ kubectl get pods -n superplane
 kubectl get certificate -n superplane
 ```
 
+The apply waits until `https://superplane.example.com/health` responds.
+The GCE controller skips the certificate check on the first sync.
+Terraform syncs the Ingress twice after Helm, then waits for the
+certificate. This wait can take 15 minutes.
+
 All pods must be `Running`. The namespace must have one Certificate, and
-that Certificate must be `Ready`. The load balancer and the certificate
-can take 15 minutes after the apply.
+that Certificate must be `Ready`.
 
 Open `https://superplane.example.com`. Create the owner account. The owner
 account is the installation admin.
