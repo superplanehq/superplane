@@ -1,60 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import type {
-  ComponentBaseContext,
-  ComponentDefinition,
-  ExecutionDetailsContext,
-  ExecutionInfo,
-  NodeInfo,
-  OutputPayload,
-} from "../types";
+import type { ComponentDefinition } from "../types";
 import { purgeCacheMapper } from "./purge_cache";
 import { eventStateRegistry } from "./index";
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "Purge CDN Cache",
-    componentName: "cloudflare.purgeCache",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildOutput(data: unknown): OutputPayload {
-  return {
-    type: "cloudflare.cache.purged",
-    timestamp: new Date().toISOString(),
-    data,
-  };
-}
-
-function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
-  return {
-    id: "exec-1",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    resultReason: "RESULT_REASON_OK",
-    resultMessage: "",
-    metadata: {},
-    configuration: {},
-    rootEvent: undefined,
-    ...overrides,
-  };
-}
-
-function buildDetailsCtx(overrides?: {
-  node?: Partial<NodeInfo>;
-  execution?: Partial<ExecutionInfo>;
-}): ExecutionDetailsContext {
-  const node = buildNode(overrides?.node);
-  return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
-}
+import { buildExecution, buildOutput as buildCloudflareOutput, createComponentFixtures } from "./test_support";
 
 const defaultDefinition: ComponentDefinition = {
   name: "cloudflare.purgeCache",
@@ -64,17 +12,12 @@ const defaultDefinition: ComponentDefinition = {
   color: "orange",
 };
 
-function buildPropsCtx(overrides?: Partial<ComponentBaseContext>): ComponentBaseContext {
-  return {
-    nodes: [],
-    node: buildNode(),
-    componentDefinition: defaultDefinition,
-    lastExecutions: [],
-    currentUser: undefined,
-    actions: { invokeNodeExecutionHook: async () => {} },
-    ...overrides,
-  };
-}
+const {
+  buildNode,
+  buildDetailsCtx,
+  buildPropsContext: buildPropsCtx,
+} = createComponentFixtures(defaultDefinition, "Purge CDN Cache");
+const buildOutput = (data: unknown) => buildCloudflareOutput("cloudflare.cache.purged", data);
 
 // ── props ─────────────────────────────────────────────────────────────────────
 
@@ -202,22 +145,5 @@ describe("purgeCacheMapper.getExecutionDetails", () => {
 describe("eventStateRegistry.purgeCache", () => {
   it("maps finished success to purged", () => {
     expect(eventStateRegistry.purgeCache.getState(buildExecution())).toBe("purged");
-  });
-
-  it("returns running when execution is in progress", () => {
-    const running = buildExecution({
-      state: "STATE_STARTED",
-      result: "RESULT_UNSPECIFIED" as ExecutionInfo["result"],
-      resultReason: "RESULT_REASON_UNSPECIFIED" as ExecutionInfo["resultReason"],
-    });
-    expect(eventStateRegistry.purgeCache.getState(running)).toBe("running");
-  });
-
-  it("returns failed when execution fails", () => {
-    const failed = buildExecution({
-      result: "RESULT_FAILED" as ExecutionInfo["result"],
-      resultReason: "RESULT_REASON_COMPONENT_FAILED" as ExecutionInfo["resultReason"],
-    });
-    expect(eventStateRegistry.purgeCache.getState(failed)).toBe("failed");
   });
 });

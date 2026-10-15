@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { buildComponentCtx, buildDetailsCtx, buildOutput } from "./common";
+import { buildComponentCtx, buildDetailsCtx, buildOutput } from "./test-support";
 import { updateWorkspaceMapper } from "./update_workspace";
 
 describe("updateWorkspaceMapper.props", () => {

@@ -1,65 +1,14 @@
 import { describe, expect, it } from "bun:test";
+import { createEC2Fixtures } from "./test-support";
 
 import { createLoadBalancerMapper } from "./create_load_balancer";
-import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../../types";
 
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "Create Load Balancer",
-    componentName: "ec2.createLoadBalancer",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildExecution(overrides?: Partial<ExecutionInfo>): ExecutionInfo {
-  return {
-    id: "exec-1",
-    createdAt: new Date("2026-05-21T12:00:00Z").toISOString(),
-    updatedAt: new Date("2026-05-21T12:01:00Z").toISOString(),
-    state: "STATE_FINISHED",
-    result: "RESULT_PASSED",
-    resultReason: "RESULT_REASON_OK",
-    resultMessage: "",
-    metadata: {},
-    configuration: {},
-    rootEvent: undefined,
-    ...overrides,
-  };
-}
-
-function buildOutput(data: Record<string, unknown>) {
-  return { type: "json", timestamp: new Date().toISOString(), data };
-}
-
-function buildDetailsCtx(overrides?: {
-  node?: Partial<NodeInfo>;
-  execution?: Partial<ExecutionInfo>;
-}): ExecutionDetailsContext {
-  const node = buildNode(overrides?.node);
-  return { nodes: [node], node, execution: buildExecution(overrides?.execution) };
-}
-
-function buildComponentCtx(nodeOverrides?: Partial<NodeInfo>): ComponentBaseContext {
-  const node = buildNode(nodeOverrides);
-  return {
-    nodes: [node],
-    node,
-    componentDefinition: {
-      name: "ec2.createLoadBalancer",
-      label: "EC2 • Create Load Balancer",
-      description: "",
-      icon: "server",
-      color: "gray",
-    },
-    lastExecutions: [],
-    currentUser: undefined,
-    actions: { invokeNodeExecutionHook: async () => {} },
-  };
-}
+const { buildOutput, buildDetailsCtx, buildComponentCtx } = createEC2Fixtures({
+  nodeName: "Create Load Balancer",
+  componentName: "ec2.createLoadBalancer",
+  label: "EC2 • Create Load Balancer",
+  icon: "server",
+});
 
 describe("createLoadBalancerMapper.props", () => {
   it("includes name, type, and region in metadata", () => {
