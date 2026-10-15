@@ -76,17 +76,3 @@ same. Emit toYaml when a caller overrides the values.
 {{- $text := include "superplane.securityContextText" (dict "context" $ctx "default" $default "legacy" $legacy) -}}
 {{- include "superplane.writeSecurityContext" (dict "text" $text "indent" .indent) -}}
 {{- end -}}
-
-{{- define "superplane.fleetManagerPodSecurityContext" -}}
-{{- $default := dict "runAsNonRoot" true "runAsUser" 65532 "runAsGroup" 65532 "seccompProfile" (dict "type" "RuntimeDefault") -}}
-{{- $legacy := "securityContext:\n  runAsNonRoot: true\n  runAsUser: 65532\n  runAsGroup: 65532\n  seccompProfile:\n    type: RuntimeDefault" -}}
-{{- $text := include "superplane.securityContextText" (dict "context" .podSecurityContext "default" $default "legacy" $legacy) -}}
-{{- include "superplane.writeSecurityContext" (dict "text" $text "indent" .indent) -}}
-{{- end -}}
-
-{{- define "superplane.fleetManagerContainerSecurityContext" -}}
-{{- $default := dict "privileged" false "allowPrivilegeEscalation" false "readOnlyRootFilesystem" true "capabilities" (dict "drop" (list "ALL")) -}}
-{{- $legacy := "securityContext:\n  privileged: false\n  allowPrivilegeEscalation: false\n  readOnlyRootFilesystem: true\n  capabilities:\n    drop: [ALL]" -}}
-{{- $text := include "superplane.securityContextText" (dict "context" .securityContext "default" $default "legacy" $legacy) -}}
-{{- include "superplane.writeSecurityContext" (dict "text" $text "indent" .indent) -}}
-{{- end -}}
