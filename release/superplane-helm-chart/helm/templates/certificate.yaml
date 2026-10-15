@@ -13,8 +13,12 @@ metadata:
     {{- toYaml $certManager.annotations | nindent 4 }}
     {{- end }}
     {{- if eq .Values.ingress.className "gce" }}
-    # For GCE ingress, edit the existing ingress in-place instead of creating a new one
+    # For GCE ingress, edit the existing ingress in-place instead of creating a new one.
     acme.cert-manager.io/http01-edit-in-place: "true"
+    # GCE will not create the load balancer until this Secret exists.
+    # A temporary certificate lets HTTP-01 reach the domain. cert-manager
+    # replaces it after Let's Encrypt issues the real certificate.
+    cert-manager.io/issue-temporary-certificate: "true"
     {{- end }}
 spec:
   secretName: {{ $certManager.secretName | required "ingress.ssl.certManager.secretName is required when ingress.ssl.type is 'cert-manager'." }}

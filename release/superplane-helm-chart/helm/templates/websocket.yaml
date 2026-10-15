@@ -50,6 +50,7 @@ spec:
         {{- end }}
     spec:
       terminationGracePeriodSeconds: 75
+      {{- include "superplane.avoidRunnerLogNode" . | nindent 6 }}
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
       {{- end }}

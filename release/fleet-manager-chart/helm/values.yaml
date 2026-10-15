@@ -4,9 +4,7 @@ manager:
 superplane:
   url: https://superplane.example.com
 
-credentials:
-  existingSecret: superplane-fleet-manager-token
-  tokenKey: INSTALLATION_ADMIN_TOKEN
+installationAdminToken: ""
 
 runner:
   releaseBaseUrl: https://github.com/superplanehq/superplane/releases/download/runner%2F{version}
@@ -41,7 +39,6 @@ resources:
     memory: 128Mi
 
 startupJob:
-  image: curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6
   activeDeadlineSeconds: 300
 
 fleets:

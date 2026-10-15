@@ -2,8 +2,7 @@ manager:
   id: test-aws
 superplane:
   url: https://superplane.example.com
-credentials:
-  existingSecret: fleet-manager-token
+installationAdminToken: fleet-manager-personal-token
 serviceAccount:
   annotations:
     eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/fleet-manager
