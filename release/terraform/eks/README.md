@@ -97,10 +97,10 @@ Access SuperPlane at `https://your-domain.com`
 ### 7. Install Fleet Manager (optional)
 
 Open **Set up runner fleets** during owner setup. Terraform passes the runner
-subnets, security group, instance profile, region, cluster name, and Fleet
-Manager role to SuperPlane. The wizard preloads these values. Replace the AMI
-placeholder with an immutable Runner image, save `values.yaml`, and run the
-displayed Helm command.
+subnets, security group, instance profile, region, public SuperPlane URL,
+cluster name, and Fleet Manager role to SuperPlane. The wizard preloads these
+values. Replace the AMI placeholder with an immutable Runner image, save
+`values.yaml`, and run the displayed Helm command.
 
 Terraform creates the AWS runner infrastructure, but it does not install Fleet
 Manager. The SuperPlane chart creates the dedicated service-token Secret in

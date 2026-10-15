@@ -229,8 +229,9 @@ If `172.20.0.0/24` overlaps a range in your network, set `runner_subnet_cidr`.
 
 ### 3.3 Install the standalone Fleet Manager
 
-Open **Set up runner fleets** during owner setup. Terraform passes these values
-to SuperPlane, and the wizard preloads them into the generated configuration:
+Open **Set up runner fleets** during owner setup. Terraform passes the public
+SuperPlane URL and these values to SuperPlane. The wizard preloads them into
+the generated configuration:
 
 ```bash
 terraform output runner_project
