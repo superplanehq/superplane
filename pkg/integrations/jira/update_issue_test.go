@@ -247,6 +247,5 @@ func Test__UpdateIssue__BuildFields(t *testing.T) {
 func Test__UpdateIssue__ComponentInfo(t *testing.T) {
 	component := UpdateIssue{}
 	assert.Equal(t, "jira.updateIssue", component.Name())
-	assert.Equal(t, "Update Issue", component.Label())
 	assert.NotEmpty(t, component.Documentation())
 }

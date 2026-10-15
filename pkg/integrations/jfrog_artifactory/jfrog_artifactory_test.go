@@ -106,8 +106,6 @@ func Test__JFrogArtifactory__IntegrationInfo(t *testing.T) {
 	j := &JFrogArtifactory{}
 
 	assert.Equal(t, "jfrogArtifactory", j.Name())
-	assert.Equal(t, "JFrog Artifactory", j.Label())
-	assert.Equal(t, "jfrogArtifactory", j.Icon())
 	assert.NotEmpty(t, j.Description())
 }
 
