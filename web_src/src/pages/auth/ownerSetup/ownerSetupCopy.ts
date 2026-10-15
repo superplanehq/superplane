@@ -19,10 +19,8 @@ export const OWNER_SETUP_COPY = {
   fleet: {
     headline: "Set up runner fleets",
     body: "Use the standalone Fleet Manager chart to connect runner infrastructure to this SuperPlane installation.",
-    helper:
-      "The reusable setup page generates values for AWS, GCP, or Azure. It creates a token only when you request installation instructions.",
-    open: "Open Fleet Manager setup",
-    continue: "Finish installation",
+    helper: "SuperPlane uses your Terraform outputs to prepare values. You can review every value before installation.",
+    continue: "Set up fleets",
     skip: "Skip for now",
   },
 } as const;

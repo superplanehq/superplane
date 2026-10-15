@@ -19,29 +19,49 @@ export type FleetManagerSetupMetadata = {
   chartRepository: string;
   imageRepository: string;
   fleetPresets: Array<{ id: string; spec: FleetSpec }>;
+  infrastructureDefaults: {
+    source: "terraform" | "manual";
+    provider: FleetManagerProvider | null;
+    managerId: string;
+    namespace: string;
+    serviceAccountName: string;
+    fields: Record<string, string | string[]>;
+  };
+  credentials: {
+    existingSecret: string;
+    tokenKey: string;
+    autoProvisioned: boolean;
+  };
 };
 
 export type FleetManagerProviderFields = Record<string, string>;
 
-type GenerateValuesInput = {
-  metadata: FleetManagerSetupMetadata;
+export type FleetManagerDraft = {
   provider: FleetManagerProvider;
   managerId: string;
+  namespace: string;
+  serviceAccountName: string;
   runnerVersion: string;
   selectedFleetIds: string[];
   warmCapacity: number;
   maxCapacity: number;
   fields: FleetManagerProviderFields;
+};
+
+export type InstalledFleet = {
+  id?: string;
+  runnerVersion?: string;
+  spec?: Partial<FleetSpec>;
+};
+
+type GenerateValuesInput = Omit<FleetManagerDraft, "namespace" | "serviceAccountName"> & {
+  metadata: FleetManagerSetupMetadata;
   serviceAccountName?: string;
 };
 
-export type FleetManagerConfigurationInput = Pick<
-  GenerateValuesInput,
-  "managerId" | "runnerVersion" | "selectedFleetIds" | "warmCapacity" | "maxCapacity"
-> & {
-  namespace: string;
-  serviceAccountName: string;
-};
+export type FleetManagerConfigurationInput = Omit<FleetManagerDraft, "provider" | "fields">;
+
+export const FLEET_MANAGER_DRAFT_KEY = "superplane.fleet-manager-setup.v1";
 
 const splitList = (value: string | undefined, fallback: string) =>
   (value || fallback)
@@ -134,8 +154,8 @@ export function generateFleetManagerValues(input: GenerateValuesInput): string {
       manager: { id: input.managerId },
       superplane: { url: window.location.origin },
       credentials: {
-        existingSecret: "superplane-fleet-manager-token",
-        tokenKey: "INSTALLATION_ADMIN_TOKEN",
+        existingSecret: input.metadata.credentials.existingSecret,
+        tokenKey: input.metadata.credentials.tokenKey,
       },
       runner: { releaseBaseUrl: input.metadata.runnerReleaseUrlTemplate },
       image: {
@@ -184,28 +204,79 @@ export function validateFleetManagerConfiguration(input: FleetManagerConfigurati
   return errors;
 }
 
-export function fleetManagerSecretCommand(namespace: string, secretName: string): string {
-  const createSecret = [
-    'printf %s "$FLEET_MANAGER_TOKEN" |',
-    `  kubectl --namespace ${namespace} create secret generic ${secretName}`,
-    "  --from-file=INSTALLATION_ADMIN_TOKEN=/dev/stdin",
-    "  --dry-run=client --output=yaml | kubectl apply -f -",
-  ].join(" \\\n");
-  return [
-    `kubectl create namespace ${namespace} --dry-run=client --output=yaml | kubectl apply -f -`,
-    "read -rsp 'Fleet Manager token: ' FLEET_MANAGER_TOKEN; echo",
-    createSecret,
-    "unset FLEET_MANAGER_TOKEN",
-  ].join("\n");
-}
-
 export function fleetManagerInstallCommand(
   metadata: FleetManagerSetupMetadata,
   namespace: string,
   valuesFile: string,
 ): string {
-  return `helm upgrade --install fleet-manager ${metadata.chartRepository} --version ${metadata.defaultChartVersion} --namespace ${namespace} --create-namespace --values ${valuesFile}`;
+  return `helm upgrade --install fleet-manager ${metadata.chartRepository} --version ${metadata.defaultChartVersion} --namespace ${namespace} --create-namespace --values ${valuesFile} --wait --timeout 10m`;
 }
 
-export const fleetManagerRestartCommand = (namespace: string) =>
-  `kubectl --namespace ${namespace} rollout restart deployment/fleet-manager-fleet-manager`;
+export function normalizeInfrastructureFields(fields: Record<string, string | string[]>): FleetManagerProviderFields {
+  return Object.fromEntries(
+    Object.entries(fields).map(([key, value]) => [key, Array.isArray(value) ? value.join(", ") : value]),
+  );
+}
+
+export function fleetsMatchConfiguration(
+  installed: InstalledFleet[],
+  draft: FleetManagerDraft,
+  presets: FleetManagerSetupMetadata["fleetPresets"],
+): boolean {
+  const byID = new Map(installed.map((fleet) => [fleet.id, fleet]));
+  const presetByID = new Map(presets.map((preset) => [preset.id, preset]));
+
+  return draft.selectedFleetIds.every((id) => {
+    const fleet = byID.get(id);
+    const preset = presetByID.get(id);
+    if (!fleet || !preset || fleet.runnerVersion !== draft.runnerVersion) return false;
+
+    return (
+      fleet.spec?.operatingSystem === preset.spec.operatingSystem &&
+      fleet.spec.architecture === preset.spec.architecture &&
+      fleet.spec.cpuMillicores === preset.spec.cpuMillicores &&
+      fleet.spec.memoryMb === preset.spec.memoryMb &&
+      fleet.spec.diskGb === preset.spec.diskGb &&
+      JSON.stringify(fleet.spec.capabilities ?? []) === JSON.stringify(preset.spec.capabilities)
+    );
+  });
+}
+
+export function saveFleetManagerDraft(draft: FleetManagerDraft): void {
+  window.localStorage.setItem(FLEET_MANAGER_DRAFT_KEY, JSON.stringify(draft));
+}
+
+export function loadFleetManagerDraft(): FleetManagerDraft | null {
+  const stored = window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY);
+  if (!stored) return null;
+
+  try {
+    const draft = JSON.parse(stored) as Partial<FleetManagerDraft>;
+    if (!draft.provider || !["aws", "gcp", "azure"].includes(draft.provider)) return null;
+    if (!draft.managerId || !draft.namespace || !draft.serviceAccountName || !draft.runnerVersion) return null;
+    if (!Array.isArray(draft.selectedFleetIds) || !draft.selectedFleetIds.every((id) => typeof id === "string"))
+      return null;
+    if (typeof draft.fields !== "object" || draft.fields === null) return null;
+    if (typeof draft.warmCapacity !== "number" || typeof draft.maxCapacity !== "number") return null;
+    const fields = Object.fromEntries(
+      Object.entries(draft.fields).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+    );
+    return {
+      provider: draft.provider,
+      managerId: draft.managerId,
+      namespace: draft.namespace,
+      serviceAccountName: draft.serviceAccountName,
+      runnerVersion: draft.runnerVersion,
+      selectedFleetIds: draft.selectedFleetIds,
+      warmCapacity: draft.warmCapacity,
+      maxCapacity: draft.maxCapacity,
+      fields,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function clearFleetManagerDraft(): void {
+  window.localStorage.removeItem(FLEET_MANAGER_DRAFT_KEY);
+}

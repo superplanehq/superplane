@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { FirstRunHeading } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
-import { ExternalLink } from "lucide-react";
 
 import { OWNER_SETUP_COPY } from "./ownerSetupCopy";
 
@@ -15,12 +14,6 @@ export function FleetManagerStep({ onContinue, onSkip }: { onContinue: () => voi
 
       <div className="mt-8 space-y-4 text-left">
         <p className="text-[13px] leading-5 text-muted-foreground">{copy.helper}</p>
-        <Button asChild type="button" variant="outline">
-          <a href="/admin/fleet-manager-setup" target="_blank" rel="noreferrer">
-            {copy.open}
-            <ExternalLink />
-          </a>
-        </Button>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button type="button" className="min-w-40" onClick={onContinue}>
             {copy.continue}

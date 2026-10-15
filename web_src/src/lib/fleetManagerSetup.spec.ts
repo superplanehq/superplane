@@ -1,9 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  FLEET_MANAGER_DRAFT_KEY,
+  fleetsMatchConfiguration,
   fleetManagerInstallCommand,
-  fleetManagerSecretCommand,
   generateFleetManagerValues,
+  loadFleetManagerDraft,
+  saveFleetManagerDraft,
   validateFleetManagerConfiguration,
   type FleetManagerSetupMetadata,
 } from "./fleetManagerSetup";
@@ -28,6 +31,19 @@ const metadata: FleetManagerSetupMetadata = {
       },
     },
   ],
+  infrastructureDefaults: {
+    source: "terraform",
+    provider: "aws",
+    managerId: "test-cluster",
+    namespace: "superplane",
+    serviceAccountName: "superplane-fleet-manager",
+    fields: { region: "us-east-1", subnetIds: ["subnet-a"] },
+  },
+  credentials: {
+    existingSecret: "superplane-fleet-manager-token",
+    tokenKey: "INSTALLATION_ADMIN_TOKEN",
+    autoProvisioned: true,
+  },
 };
 
 describe("generateFleetManagerValues", () => {
@@ -137,23 +153,75 @@ describe("validateFleetManagerConfiguration", () => {
   });
 });
 
-it("keeps the token out of generated commands", () => {
-  const secret = fleetManagerSecretCommand("superplane", "superplane-fleet-manager-token");
+it("generates a bounded Helm installation command", () => {
   const install = fleetManagerInstallCommand(metadata, "superplane", "values.yaml");
 
-  expect(secret).toContain("read -rsp");
-  expect(secret).toContain("--from-file=INSTALLATION_ADMIN_TOKEN=/dev/stdin");
-  expect(secret).not.toContain("--from-literal");
-  expect(secret).not.toContain("<TOKEN>");
   expect(install).toContain("--version 0.1.0");
+  expect(install).toContain("--wait --timeout 10m");
   expect(install).not.toContain("token");
 });
 
 it("uses a custom namespace in generated commands", () => {
-  const secret = fleetManagerSecretCommand("runners", "superplane-fleet-manager-token");
   const install = fleetManagerInstallCommand(metadata, "runners", "values.yaml");
 
-  expect(secret).toContain("kubectl create namespace runners");
-  expect(secret).toContain("--namespace runners");
   expect(install).toContain("--namespace runners");
+});
+
+it("matches installed fleets by version and specification", () => {
+  const draft = {
+    provider: "aws" as const,
+    managerId: "test-cluster",
+    namespace: "superplane",
+    serviceAccountName: "superplane-fleet-manager",
+    runnerVersion: "v0.1.0",
+    selectedFleetIds: ["e1-large-amd64"],
+    warmCapacity: 0,
+    maxCapacity: 1,
+    fields: {},
+  };
+  const installed = [{ id: "e1-large-amd64", runnerVersion: "v0.1.0", spec: metadata.fleetPresets[0].spec }];
+
+  expect(fleetsMatchConfiguration(installed, draft, metadata.fleetPresets)).toBe(true);
+  expect(fleetsMatchConfiguration([{ ...installed[0], runnerVersion: "v0.0.9" }], draft, metadata.fleetPresets)).toBe(
+    false,
+  );
+});
+
+it("uses a browser key that stores only the non-secret draft", () => {
+  const draft = {
+    provider: "aws" as const,
+    managerId: "test-cluster",
+    namespace: "superplane",
+    serviceAccountName: "superplane-fleet-manager",
+    runnerVersion: "v0.1.0",
+    selectedFleetIds: ["e1-large-amd64"],
+    warmCapacity: 0,
+    maxCapacity: 1,
+    fields: { region: "us-east-1" },
+  };
+
+  saveFleetManagerDraft(draft);
+
+  expect(loadFleetManagerDraft()).toEqual(draft);
+  expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("INSTALLATION_ADMIN_TOKEN");
+});
+
+it("removes unknown values from a stored Fleet Manager draft", () => {
+  window.localStorage.setItem(
+    FLEET_MANAGER_DRAFT_KEY,
+    JSON.stringify({
+      provider: "aws",
+      managerId: "test-cluster",
+      namespace: "superplane",
+      serviceAccountName: "superplane-fleet-manager",
+      runnerVersion: "v0.1.0",
+      selectedFleetIds: ["e1-large-amd64"],
+      warmCapacity: 0,
+      maxCapacity: 1,
+      fields: { region: "us-east-1" },
+      plaintextToken: "must-not-survive",
+    }),
+  );
+
+  expect(loadFleetManagerDraft()).not.toHaveProperty("plaintextToken");
 });

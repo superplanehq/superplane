@@ -7,16 +7,16 @@ import { OWNER_SETUP_COPY } from "./ownerSetupCopy";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("FleetManagerStep", () => {
-  it("links to the reusable setup page without making a request", () => {
+  it("starts the embedded setup without making a request", () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
+    const onContinue = vi.fn();
 
-    render(<FleetManagerStep onContinue={vi.fn()} onSkip={vi.fn()} />);
+    render(<FleetManagerStep onContinue={onContinue} onSkip={vi.fn()} />);
 
-    expect(screen.getByRole("link", { name: OWNER_SETUP_COPY.fleet.open })).toHaveAttribute(
-      "href",
-      "/admin/fleet-manager-setup",
-    );
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
+    expect(onContinue).toHaveBeenCalledTimes(1);
     expect(fetch).not.toHaveBeenCalled();
   });
 

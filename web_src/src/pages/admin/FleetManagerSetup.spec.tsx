@@ -1,17 +1,17 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { FLEET_MANAGER_DRAFT_KEY } from "@/lib/fleetManagerSetup";
 import FleetManagerSetup from "./FleetManagerSetup";
 
-const createToken = vi.fn();
-
-vi.mock("@/hooks/useAccountOrganizations", () => ({
-  useAccountOrganizations: () => ({ data: [{ id: "org-1", name: "Example" }] }),
-}));
-
-vi.mock("@/hooks/useUserTokens", () => ({
-  useCreateUserToken: () => ({ mutateAsync: createToken, isPending: false }),
-}));
+const fleetSpec = {
+  operatingSystem: "linux",
+  architecture: "amd64" as const,
+  cpuMillicores: 2000,
+  memoryMb: 8192,
+  diskGb: 30,
+  capabilities: ["docker"],
+};
 
 const metadata = {
   defaultRunnerVersion: "v0.1.0",
@@ -20,85 +20,147 @@ const metadata = {
   runnerReleaseUrlTemplate: "https://example/releases/runner%2F{version}",
   chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
   imageRepository: "ghcr.io/superplanehq/fleet-manager",
-  fleetPresets: [
-    {
-      id: "e1-large-amd64",
-      spec: {
-        operatingSystem: "linux",
-        architecture: "amd64",
-        cpuMillicores: 2000,
-        memoryMb: 8192,
-        diskGb: 30,
-        capabilities: ["docker"],
-      },
+  fleetPresets: [{ id: "e1-large-amd64", spec: fleetSpec }],
+  infrastructureDefaults: {
+    source: "terraform" as const,
+    provider: "aws" as const,
+    managerId: "terraform-cluster",
+    namespace: "superplane",
+    serviceAccountName: "superplane-fleet-manager",
+    fields: {
+      region: "us-east-1",
+      subnetIds: ["subnet-a", "subnet-b"],
+      securityGroupIds: ["sg-runner"],
+      runnerIdentity: "runner-profile",
+      fleetManagerIdentity: "arn:aws:iam::123456789012:role/fleet-manager",
     },
-  ],
+  },
+  credentials: {
+    existingSecret: "superplane-fleet-manager-token",
+    tokenKey: "INSTALLATION_ADMIN_TOKEN",
+    autoProvisioned: true,
+  },
 };
+
+const jsonResponse = (body: unknown) =>
+  new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+
+async function continueTo(stepName: string) {
+  while (!screen.queryByRole("heading", { name: stepName })) {
+    fireEvent.click(await screen.findByRole("button", { name: /continue/i }));
+  }
+}
 
 describe("FleetManagerSetup", () => {
   beforeEach(() => {
-    createToken.mockReset();
-    createToken.mockResolvedValue({ plaintext: "one-time-token" });
+    window.localStorage.clear();
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(JSON.stringify(metadata), { status: 200 })),
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/admin/api/installation/fleet-manager/setup")) return jsonResponse(metadata);
+        if (url.endsWith("/admin/api/installation/fleets")) {
+          return jsonResponse({ fleets: [{ id: "e1-large-amd64", runnerVersion: "v0.1.0", spec: fleetSpec }] });
+        }
+        return new Response("", { status: 404 });
+      }),
     );
   });
 
   afterEach(() => vi.unstubAllGlobals());
 
-  it("loads setup metadata without creating a token", async () => {
+  it("uses Terraform defaults without creating or displaying a token", async () => {
     render(<FleetManagerSetup />);
 
-    expect(await screen.findByRole("heading", { name: "1. Select a provider and fleets" })).toBeInTheDocument();
-    expect(createToken).not.toHaveBeenCalled();
-    await waitFor(() =>
-      expect((screen.getByLabelText("Fleet Manager values") as HTMLTextAreaElement).value).toContain("provider: aws"),
+    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+    expect(screen.getAllByText("Loaded from Terraform").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/create fleet manager token/i)).not.toBeInTheDocument();
+
+    await continueTo("Confirm cloud infrastructure");
+    expect(screen.getByLabelText("AWS region")).toHaveValue("us-east-1");
+    expect(screen.getByLabelText("Private subnet IDs")).toHaveValue("subnet-a, subnet-b");
+  });
+
+  it("generates values with a Secret reference and no credential value", async () => {
+    render(<FleetManagerSetup />);
+    await continueTo("Review Fleet Manager values");
+
+    const yaml = screen.getByText(/existingSecret: superplane-fleet-manager-token/).textContent ?? "";
+    expect(yaml).toContain("tokenKey: INSTALLATION_ADMIN_TOKEN");
+    expect(yaml).not.toContain("kubernetes-api-token");
+    expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("INSTALLATION_ADMIN_TOKEN");
+  });
+
+  it("clears incompatible fields when the provider changes", async () => {
+    render(<FleetManagerSetup />);
+    fireEvent.click(await screen.findByRole("button", { name: "GCP" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+    expect(await screen.findByLabelText("GCP project")).toHaveValue("");
+    expect(screen.queryByLabelText("AWS region")).not.toBeInTheDocument();
+  });
+
+  it("verifies every selected fleet after the Helm step", async () => {
+    render(<FleetManagerSetup />);
+    await continueTo("Review Fleet Manager values");
+    fireEvent.click(screen.getByRole("button", { name: "Continue to install" }));
+
+    expect(await screen.findByText(/created every selected fleet/i)).toBeInTheDocument();
+    expect(screen.getByText(/--wait --timeout 10m/)).toBeInTheDocument();
+    expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Finish installation" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Fleet Manager setup saved" })).toBeInTheDocument());
+  });
+
+  it("explains authentication failures and retries verification", async () => {
+    let fleetRequests = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/admin/api/installation/fleet-manager/setup")) return jsonResponse(metadata);
+        if (url.endsWith("/admin/api/installation/fleets")) {
+          fleetRequests += 1;
+          if (fleetRequests === 1) return new Response("", { status: 401 });
+          return jsonResponse({ fleets: [{ id: "e1-large-amd64", runnerVersion: "v0.1.0", spec: fleetSpec }] });
+        }
+        return new Response("", { status: 404 });
+      }),
     );
+
+    render(<FleetManagerSetup />);
+    await continueTo("Review Fleet Manager values");
+    fireEvent.click(screen.getByRole("button", { name: "Continue to install" }));
+
+    expect(await screen.findByText(/sign in again and retry/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry verification" }));
+
+    expect(await screen.findByText(/created every selected fleet/i)).toBeInTheDocument();
+    expect(fleetRequests).toBe(2);
   });
 
-  it("creates and shows the token only after an explicit action", async () => {
-    render(<FleetManagerSetup />);
-    fireEvent.click(await screen.findByRole("button", { name: "Create Fleet Manager token" }));
-
-    await waitFor(() => expect(createToken).toHaveBeenCalledWith({ name: "Fleet Manager" }));
-    expect(screen.getByLabelText("Fleet Manager token")).toHaveValue("one-time-token");
-    expect((screen.getByLabelText("Fleet Manager values") as HTMLTextAreaElement).value).not.toContain(
-      "one-time-token",
+  it("stops verification after the bounded timeout", async () => {
+    const now = vi
+      .spyOn(Date, "now")
+      .mockReturnValueOnce(0)
+      .mockReturnValue(10 * 60_000);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith("/admin/api/installation/fleet-manager/setup")) return jsonResponse(metadata);
+        if (url.endsWith("/admin/api/installation/fleets")) return jsonResponse({ fleets: [] });
+        return new Response("", { status: 404 });
+      }),
     );
-    expect((screen.getByLabelText("Install Fleet Manager command") as HTMLTextAreaElement).value).not.toContain(
-      "token",
-    );
-  });
 
-  it("explains token creation failures and permits a retry", async () => {
-    createToken.mockRejectedValueOnce(new Error("request failed"));
     render(<FleetManagerSetup />);
+    await continueTo("Review Fleet Manager values");
+    fireEvent.click(screen.getByRole("button", { name: "Continue to install" }));
 
-    fireEvent.click(await screen.findByRole("button", { name: "Create Fleet Manager token" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("SuperPlane could not create the token. Try again.");
-    expect(screen.getByRole("button", { name: "Create Fleet Manager token" })).toBeEnabled();
-  });
-
-  it("prevents copying values when capacity is invalid", async () => {
-    render(<FleetManagerSetup />);
-    fireEvent.change(await screen.findByLabelText("Warm capacity"), { target: { value: "2" } });
-
-    expect(screen.getByRole("button", { name: "Copy values.yaml" })).toBeDisabled();
-    expect(screen.getByRole("alert")).toHaveTextContent("Warm capacity cannot exceed maximum capacity.");
-  });
-
-  it("keeps infrastructure fields separate for each provider", async () => {
-    render(<FleetManagerSetup />);
-    fireEvent.change(await screen.findByLabelText("EC2 instance type for AMD64"), {
-      target: { value: "m8a.large" },
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "GCP" }));
-    expect(screen.getByLabelText("Compute Engine machine type for AMD64")).toHaveValue("");
-
-    fireEvent.click(screen.getByRole("button", { name: "AWS" }));
-    expect(screen.getByLabelText("EC2 instance type for AMD64")).toHaveValue("m8a.large");
+    expect(await screen.findByText(/verification timed out/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry verification" })).toBeEnabled();
+    now.mockRestore();
   });
 });
