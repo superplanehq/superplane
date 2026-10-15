@@ -32,8 +32,9 @@ func Test__PullRequestMergeStrategy(t *testing.T) {
 
 func Test__GetPullRequest(t *testing.T) {
 	client, httpCtx := stubBitbucketClient(okResponse(`{
-		"id": 42, "state": "OPEN",
-		"source": {"branch": {"name": "feat/x"}, "commit": {"hash": "abc123"}},
+		"id": 42, "title": "Ready", "state": "OPEN",
+		"links": {"html": {"href": "https://bitbucket.org/acme/widgets/pull-requests/42"}},
+		"source": {"branch": {"name": "feat/x"}, "commit": {"hash": "abc123"}, "repository": {"full_name": "contributor/widgets"}},
 		"destination": {"branch": {"name": "main", "merge_strategies": ["squash", "merge_commit", "fast_forward"]}, "commit": {"hash": "def456"}},
 		"merge_commit": {"hash": "merge789"}
 	}`))
@@ -42,6 +43,9 @@ func Test__GetPullRequest(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(42), pr.ID)
 	assert.Equal(t, "OPEN", pr.State)
+	assert.Equal(t, "Ready", pr.Title)
+	assert.Equal(t, "https://bitbucket.org/acme/widgets/pull-requests/42", pr.HTMLURL)
+	assert.Equal(t, "contributor/widgets", pr.SourceRepository)
 	assert.Equal(t, "abc123", pr.SourceHash)
 	assert.Equal(t, "feat/x", pr.SourceBr)
 	assert.Equal(t, "main", pr.DestBranch)

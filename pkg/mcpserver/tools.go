@@ -104,7 +104,7 @@ func Tools() []Tool {
 					"description":      map[string]any{"type": "string", "description": "Task description in markdown."},
 					"plan":             map[string]any{"type": "string", "description": "Implementation plan stored as the task spec."},
 					"column":           map[string]any{"type": "string", "enum": []string{"implement", "verify"}, "description": "Board column to hand the task to."},
-					"pull_request_url": map[string]any{"type": "string", "description": "Open GitHub pull request URL. Required when column is verify."},
+					"pull_request_url": map[string]any{"type": "string", "description": "Open pull request URL (GitHub or Bitbucket). Required when column is verify."},
 					"line":             map[string]any{"type": "string", "description": "Line name. Required when the workspace has more than one line."},
 				},
 				"required": []string{"title", "plan", "column"},
