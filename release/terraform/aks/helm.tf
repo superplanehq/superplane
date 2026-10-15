@@ -55,6 +55,33 @@ resource "helm_release" "nginx_ingress" {
 # SuperPlane Helm Release
 # -----------------------------------------------------------------------------
 
+locals {
+  fleet_manager_setup_values = yamlencode({
+    fleetManagerSetup = {
+      enabled            = true
+      provider           = "azure"
+      managerId          = var.cluster_name
+      namespace          = var.superplane_namespace
+      serviceAccountName = "superplane-fleet-manager"
+      credentials = {
+        provision      = true
+        existingSecret = "superplane-fleet-manager-token"
+        tokenKey       = "INSTALLATION_ADMIN_TOKEN"
+      }
+      infrastructure = {
+        subscriptionId       = var.subscription_id
+        resourceGroup        = azurerm_resource_group.runners.name
+        location             = azurerm_resource_group.runners.location
+        zones                = var.runner_zones
+        subnetId             = azurerm_subnet.runners.id
+        securityGroupIds     = azurerm_network_security_group.runners.id
+        runnerIdentity       = azurerm_user_assigned_identity.runner.id
+        fleetManagerIdentity = azurerm_user_assigned_identity.fleet_manager.client_id
+      }
+    }
+  })
+}
+
 resource "helm_release" "superplane" {
   name             = "superplane"
   repository       = local.helm_chart_repository
@@ -75,8 +102,9 @@ resource "helm_release" "superplane" {
       condition     = !local.use_local_helm_chart || var.superplane_image_tag != ""
       error_message = "With a local chart (helm_chart_path), set superplane_image_tag. The local Chart.yaml appVersion (0.1.0) is a placeholder, not a published image."
     }
-
   }
+
+  values = [local.fleet_manager_setup_values]
 
   set {
     name  = "database.secretName"

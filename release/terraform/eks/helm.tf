@@ -400,6 +400,30 @@ resource "helm_release" "traefik" {
 # SuperPlane Helm Release
 # -----------------------------------------------------------------------------
 
+locals {
+  fleet_manager_setup_values = yamlencode({
+    fleetManagerSetup = {
+      enabled            = var.enable_runners
+      provider           = var.enable_runners ? "aws" : ""
+      managerId          = var.cluster_name
+      namespace          = var.superplane_namespace
+      serviceAccountName = "superplane-fleet-manager"
+      credentials = {
+        provision      = true
+        existingSecret = "superplane-fleet-manager-token"
+        tokenKey       = "INSTALLATION_ADMIN_TOKEN"
+      }
+      infrastructure = var.enable_runners ? {
+        region               = var.region
+        subnetIds            = aws_subnet.private[*].id
+        securityGroupIds     = [aws_security_group.runners[0].id]
+        fleetManagerIdentity = aws_iam_role.fleet_manager[0].arn
+        runnerIdentity       = aws_iam_instance_profile.runner[0].name
+      } : {}
+    }
+  })
+}
+
 resource "helm_release" "superplane" {
   name             = "superplane"
   repository       = "oci://ghcr.io/superplanehq"
@@ -408,6 +432,8 @@ resource "helm_release" "superplane" {
   namespace        = var.superplane_namespace
   create_namespace = false
   timeout          = 1200
+
+  values = [local.fleet_manager_setup_values]
 
   # Database configuration
   set {
