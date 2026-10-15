@@ -202,6 +202,9 @@ const OrganizationDetail: React.FC = () => {
           if (!isOrganizationTab(nextTab)) {
             return;
           }
+          if (nextTab === "overview" && tab !== "overview") {
+            detail.retry();
+          }
           if (nextTab === "credits") {
             setCreditsVisited(true);
           }

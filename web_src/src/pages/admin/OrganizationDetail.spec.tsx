@@ -436,6 +436,39 @@ describe("OrganizationDetail", () => {
     expect(await screen.findByTestId("admin-org-credit-topup-target")).toHaveValue("12.50");
   });
 
+  it("refreshes the member count when Overview opens again", async () => {
+    const user = userEvent.setup();
+    let memberCount = 3;
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/admin/api/organizations/${ORG_ID}`) {
+        return jsonResponse({ ...organizationOverview(), member_count: memberCount });
+      }
+      if (url.startsWith(`/admin/api/organizations/${ORG_ID}/users`)) {
+        return jsonResponse({ items: [], total: 0 });
+      }
+      return new Response("not found", { status: 404 });
+    });
+
+    renderPage();
+
+    const overview = await screen.findByRole("tabpanel", { name: "Overview" });
+    expect(within(overview).getByText("Members").nextElementSibling).toHaveTextContent("3");
+    const detailCalls = () =>
+      vi.mocked(fetch).mock.calls.filter(([input]) => String(input) === `/admin/api/organizations/${ORG_ID}`).length;
+    expect(detailCalls()).toBe(1);
+
+    await user.click(screen.getByRole("tab", { name: "Users" }));
+    memberCount = 9;
+
+    await user.click(screen.getByRole("tab", { name: "Overview" }));
+
+    const refreshed = await screen.findByRole("tabpanel", { name: "Overview" });
+    expect(await within(refreshed).findByText("9")).toBeInTheDocument();
+    expect(within(refreshed).getByText("Members").nextElementSibling).toHaveTextContent("9");
+    expect(detailCalls()).toBe(2);
+  });
+
   it("retries overview load after an error", async () => {
     const user = userEvent.setup();
     const overview = {
