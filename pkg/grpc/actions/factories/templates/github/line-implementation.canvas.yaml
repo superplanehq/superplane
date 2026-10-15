@@ -64,16 +64,16 @@ spec:
           - name: COAUTHORS
             value: '{{ join(map(filter(task().assignees, {#.email != ""}), "Co-authored-by: " + #.name + " <" + #.email + ">"), "\n") }}'
             valueSource: literal
+          - name: CHECKOUT_COMMIT_SETUP
+            value: "1"
+            valueSource: literal
         executionTimeoutSeconds: 3600
         machineType: e1-large-amd64
         model: claude-opus-5-5
         steps:
           - name: Clone Repo
             type: bash
-            command: |-
-              set -euo pipefail
-
-              CHECKOUT_COMMIT_SETUP=1 source "$SUPERPLANE_TASK_DIR/setup/checkout-workspace.sh"
+            command: checkout
           - name: Implementation
             type: prompt
             workingDirectory: repo

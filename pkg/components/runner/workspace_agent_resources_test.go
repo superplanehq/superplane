@@ -643,6 +643,7 @@ func TestAttachWorkspaceAgentResourcesShipsCheckoutHelper(t *testing.T) {
 	}, nil, nil)
 	require.Len(t, files, 1)
 	assert.Equal(t, runner.WorkspaceCheckoutScriptPath, files[0].Path)
+	assert.Equal(t, "0755", files[0].Mode)
 	script := files[0].Content
 	assert.Contains(t, script, "REPO_URL")
 	assert.Contains(t, script, "workspace_context.json")

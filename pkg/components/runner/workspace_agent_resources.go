@@ -25,13 +25,13 @@ const (
 	workspaceAgentsSkillPath        = ".agents/skills/%s/SKILL.md"
 	WorkspaceSetupConfigPath        = "workspace_setup.json"
 	WorkspaceContextConfigPath      = "workspace_context.json"
-	// WorkspaceCheckoutScriptPath is the smart checkout helper shipped on
-	// factory tasks. New factory templates source it as a single line so
-	// the main repo lands in repo/ and every context repo in its
-	// directory. Stored canvases are never rewritten, so existing
-	// automations keep their inline Clone Repo step until their owner
-	// adopts the helper.
-	WorkspaceCheckoutScriptPath = "setup/checkout-workspace.sh"
+	// WorkspaceCheckoutScriptPath is the checkout command shipped on
+	// factory tasks. It lives in bin/ so every step finds it on PATH and
+	// factory Clone steps run it as a bare "checkout" line. The main repo
+	// lands in repo/ and every context repo in its directory. Stored
+	// canvases are never rewritten, so existing automations keep their
+	// inline Clone Repo step until their owner adopts the helper.
+	WorkspaceCheckoutScriptPath = "bin/checkout"
 	// WorkspaceCheckoutCommitSetupEnv opts a checkout into the factory
 	// commit setup (agent git identity, trailer hook, branch handling).
 	// The Implement Clone step sets it inline; read-only checkouts such
@@ -344,8 +344,8 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 	})
 }
 
-// WorkspaceCheckoutScript is the smart checkout helper factory Clone steps
-// source as a single line. It checks out the main repo to repo/ with the
+// WorkspaceCheckoutScript is the checkout command factory Clone steps run
+// as a bare "checkout" line. It checks out the main repo to repo/ with the
 // same branch handling as the legacy Clone Repo step, then clones every
 // workspace_context.json entry to its directory. Authentication comes from
 // the VCS integration setup that already ran (gh auth setup-git /
@@ -355,7 +355,8 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 // identity, trailer hook, branch handling) runs only when
 // CHECKOUT_COMMIT_SETUP=1, so read-only checkouts stay side-effect free.
 func WorkspaceCheckoutScript() string {
-	return `set -euo pipefail
+	return `#!/bin/bash
+set -euo pipefail
 : "${SUPERPLANE_TASK_DIR:?SUPERPLANE_TASK_DIR is required}"
 : "${REPO_URL:?REPO_URL is required}"
 if ! command -v git >/dev/null 2>&1; then
@@ -468,7 +469,7 @@ func appendWorkspaceCheckoutFile(files []BrokerTaskFile) []BrokerTaskFile {
 	return append(files, BrokerTaskFile{
 		Path:    WorkspaceCheckoutScriptPath,
 		Content: WorkspaceCheckoutScript(),
-		Mode:    "0644",
+		Mode:    "0755",
 	})
 }
 
@@ -693,8 +694,8 @@ func workspaceAgentResourcesHint(mcpNames []string, setupCommands []string, cont
 			}
 			names = append(names, repository+" ("+WorkspaceContextRepoDirectory(repository)+")")
 		}
-		builder.WriteString("\nCheckout: source \"$SUPERPLANE_TASK_DIR/" + WorkspaceCheckoutScriptPath + "\" to check out repo/ and context repositories. ")
-		builder.WriteString("Extra repositories (already checked out by the script when the automation sources it): ")
+		builder.WriteString("\nCheckout: run `checkout` to check out repo/ and context repositories. ")
+		builder.WriteString("Extra repositories (already checked out when the automation runs it): ")
 		builder.WriteString(strings.Join(names, ", "))
 	}
 	return builder.String()
