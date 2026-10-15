@@ -161,6 +161,8 @@ func factoryErrorToStatus(err error, internalMessage string) error {
 		return grpcerrors.FailedPrecondition(err, "planning session has ended")
 	case errors.Is(err, models.ErrFactoryPlanningSessionNoDraft):
 		return grpcerrors.FailedPrecondition(err, "planning session has no draft")
+	case errors.Is(err, models.ErrFactorySystemSkillProtected):
+		return grpcerrors.FailedPrecondition(err, "System skills cannot be deleted, renamed, or disabled.")
 	case errors.Is(err, models.ErrFactoryAgentResourceNotFound):
 		return grpcerrors.NotFound(err, "agent resource not found")
 	case errors.Is(err, models.ErrFactoryAgentResourceKindInvalid):
