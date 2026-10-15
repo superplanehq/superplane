@@ -302,13 +302,22 @@ function BitbucketChooseHost({
         retrying={flow.bitbucketLookupRetrying}
         attemptActive={flow.bitbucketInstallationAttemptActive}
         attemptTimedOut={flow.bitbucketInstallationAttemptTimedOut}
+        login={flow.bitbucketLogin}
+        providerUserId={flow.bitbucketProviderUserId}
+        identities={flow.bitbucketIdentities}
+        switchingAccount={flow.blockingAction === "switching-bitbucket-account"}
+        switchFailed={flow.bitbucketSwitchFailed}
         chrome={chrome}
         sphere={sphere}
         onRetryLookup={flow.retryBitbucketLookup}
         onGrantAccess={() => void flow.grantBitbucketAccess()}
+        installUrl={flow.bitbucketInstallUrl}
+        onCopyInstallLink={() => flow.copyBitbucketInstallLink()}
         onSelectRepository={model.setup.selectRepo}
         onClearRepository={model.setup.clearRepository}
         onContinue={() => void flow.continueFromRepository()}
+        onSelectIdentity={(providerUserId) => void flow.selectBitbucketIdentity(providerUserId)}
+        onConnectAnotherAccount={() => window.location.assign(flow.bitbucketConnectHref)}
       />
     );
   }

@@ -1,3 +1,4 @@
+import type { MeDescribeVcsProviderOnboardingResponse } from "@/api-client";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router";
@@ -17,6 +18,17 @@ function installedSlugs(data: { installedWorkspaces?: Array<{ slug?: string; ext
   return (data?.installedWorkspaces ?? [])
     .map((workspace) => workspace.slug || workspace.externalId || "")
     .filter(Boolean);
+}
+
+function linkedIdentities(data: Pick<MeDescribeVcsProviderOnboardingResponse, "identity" | "identities"> | undefined) {
+  const login = data?.identity?.login ?? "";
+  const providerUserId = data?.identity?.providerUserId ?? "";
+  return {
+    identityLinked: Boolean(login || providerUserId),
+    login,
+    providerUserId,
+    identities: data?.identities ?? [],
+  };
 }
 
 export function useFirstRunBitbucket(args: {
@@ -68,6 +80,14 @@ export function useFirstRunBitbucket(args: {
 
   const startAttempt = (known: string[]) => setAttempt({ startedAt: Date.now(), knownSlugs: known });
 
+  const installUrl = onboarding.data?.installUrl ?? "";
+
+  const copyInstallLink = async () => {
+    const url = onboarding.data?.installUrl ?? (await onboarding.startInstallation.mutateAsync());
+    await navigator.clipboard.writeText(url);
+    startAttempt(installedSlugs(onboarding.data));
+  };
+
   const grantAccess = () =>
     args.blocking.run("opening-bitbucket", async () => {
       const popup = openGitHubWindow();
@@ -88,7 +108,8 @@ export function useFirstRunBitbucket(args: {
     installedWorkspaces: slugs,
     installationAttemptActive: attemptActive,
     installationAttemptTimedOut: timedOut,
-    identityLinked: Boolean(onboarding.data?.identity?.login || onboarding.data?.identity?.providerUserId),
+    ...linkedIdentities(onboarding.data),
+    selectIdentity: (providerUserId: string) => onboarding.selectIdentity.mutateAsync(providerUserId),
     loadError: Boolean(onboarding.error),
     lookupFailed: Boolean(onboarding.error) && !onboarding.data,
     lookupRetrying: Boolean(onboarding.isFetching),
@@ -101,6 +122,8 @@ export function useFirstRunBitbucket(args: {
       "bitbucket",
       onboardingStepPath(`${location.pathname}${location.search}`, "repo"),
     ),
+    installUrl,
+    copyInstallLink,
     grantAccess,
   };
 }

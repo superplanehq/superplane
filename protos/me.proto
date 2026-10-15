@@ -278,6 +278,7 @@ message DescribeVCSProviderOnboardingResponse {
 message SelectVCSProviderOnboardingIdentityRequest {
   string provider = 1;
   int64 user_id = 2;
+  string provider_user_id = 3;
 }
 
 message SelectVCSProviderOnboardingIdentityResponse {}
