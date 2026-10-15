@@ -14,6 +14,7 @@ Install these tools:
 - Azure CLI
 - Helm 3
 - kubectl
+- Docker (optional, to check the published images)
 
 You also need:
 
@@ -28,6 +29,25 @@ AKS pulls `ghcr.io/superplanehq/superplane` and
 
 New subscriptions often have a small regional vCPU quota. The default node
 pool is one `Standard_D2s_v4` node (2 vCPUs).
+
+Fleet Manager runners use the same regional vCPU quota as the AKS nodes.
+Family quotas can still have spare capacity when the regional total is full.
+
+Estimate the total before you apply:
+
+```text
+node_count × node vCPUs + fleet maxCapacity × runner vCPUs
+```
+
+Check the quota:
+
+```bash
+az vm list-usage --location <region> -o table | grep -Ei "Total Regional vCPUs|<family>"
+```
+
+A new subscription often has a Total Regional vCPUs limit of 4.
+The default install then has room for one runner.
+Request a quota increase before you raise `maxCapacity`.
 
 Check Flexible Server SKUs before you apply:
 
@@ -281,6 +301,8 @@ Terraform variables.
 
 ## Runners
 
+> Requires a Fleet Manager image published from the merge of this change. The default tag does not support community gallery IDs or empty zones.
+
 Terraform creates the runner subnet, network security group, and identities.
 Use the SuperPlane community gallery for the VM image. Do not run Packer in
 the customer subscription.
@@ -309,10 +331,6 @@ az vm list-skus --location <region> --size <vmSize>
 
 Zone numbers are not the same in every subscription. Leave `azure.zones`
 empty when the region or size has no availability zones.
-
-The default Fleet Manager image does not accept a community gallery ID
-or an empty zone list. Publish a Fleet Manager image from the merge
-commit before you set those values.
 
 Set `fleet_manager_config` from `terraform output` for the subnet, network
 security group, and runner identity. Apply again.
