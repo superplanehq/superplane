@@ -6,3 +6,7 @@ image_name              = "superplane-runner-amd64"
 image_version           = "1.0.0"
 architecture            = "amd64"
 vm_size                 = "Standard_D2ds_v4"
+# Leave empty to let Packer create the build resource group.
+# build_resource_group_name = "superplane-runner-image-builds"
+# Extra replica regions. location is always included.
+# replication_regions = ["centralus", "westus"]

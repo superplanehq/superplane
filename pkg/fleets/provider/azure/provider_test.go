@@ -420,20 +420,117 @@ func TestNewRejectsResourceTagsThatOverrideReservedTags(t *testing.T) {
 	}
 }
 
+func TestCreateUsesTheAzureImageReferenceField(t *testing.T) {
+	communityID := "/CommunityGalleries/Superplane-e02dee64-33d2-4663-b192-4f86050ba3ff/Images/superplane-runner-amd64/Versions/0.1.0"
+	sharedID := "/SharedGalleries/gallery-1/Images/superplane-runner-amd64/Versions/1.0.0"
+	resourceID := "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/superplane-runners/providers/Microsoft.Compute/galleries/superplanerunners/images/superplane-runner-amd64/versions/1.0.0"
+	tests := []struct {
+		name      string
+		imageID   string
+		community string
+		shared    string
+		resource  string
+	}{
+		{name: "community gallery", imageID: communityID, community: communityID},
+		{
+			name:      "community gallery lowercase",
+			imageID:   "/communityGalleries/public/images/runner/versions/1.0.0",
+			community: "/communityGalleries/public/images/runner/versions/1.0.0",
+		},
+		{name: "shared gallery", imageID: sharedID, shared: sharedID},
+		{name: "resource id", imageID: resourceID, resource: resourceID},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := &fakeCompute{}
+			azureProvider := newTestProviderWith(t, client, test.imageID, []string{"1"})
+			if _, err := azureProvider.Create(context.Background(), provider.CreateRequest{
+				RunnerID:      "runner-1",
+				FleetID:       "linux-amd64",
+				RunnerVersion: "1.0.0",
+				Bootstrap:     []byte("bootstrap"),
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if len(client.createVMInputs) != 1 || client.createVMInputs[0].Properties == nil ||
+				client.createVMInputs[0].Properties.StorageProfile == nil ||
+				client.createVMInputs[0].Properties.StorageProfile.ImageReference == nil {
+				t.Fatal("VM create has no image reference")
+			}
+			image := client.createVMInputs[0].Properties.StorageProfile.ImageReference
+			if deref(image.CommunityGalleryImageID) != test.community ||
+				deref(image.SharedGalleryImageID) != test.shared ||
+				deref(image.ID) != test.resource {
+				t.Fatalf("image = %#v", image)
+			}
+		})
+	}
+}
+
+func TestNewRejectsIncompleteGalleryImageID(t *testing.T) {
+	for _, imageID := range []string{
+		"/CommunityGalleries/gallery-only",
+		"/SharedGalleries/gallery/Images/runner",
+	} {
+		_, err := New(&fakeCompute{}, Config{
+			FleetManagerID:         "fleet-manager-production",
+			SubscriptionID:         "sub",
+			ResourceGroup:          "runners",
+			Location:               "eastus",
+			ImageID:                imageID,
+			VMSize:                 "Standard_D2ds_v4",
+			Architecture:           "amd64",
+			SubnetID:               "/subnets/runners",
+			NetworkSecurityGroupID: "/nsgs/runners",
+			IdentityID:             "/identities/runner",
+			Zones:                  []string{"1"},
+		}, nil)
+		if err == nil {
+			t.Fatalf("image %q was accepted", imageID)
+		}
+	}
+}
+
+func TestCreateOmitsZoneWhenTheRegionHasNone(t *testing.T) {
+	client := &fakeCompute{}
+	azureProvider := newTestProviderWith(t, client, "/images/runner", nil)
+	if _, err := azureProvider.Create(context.Background(), provider.CreateRequest{
+		RunnerID:      "runner-1",
+		FleetID:       "linux-amd64",
+		RunnerVersion: "1.0.0",
+		Bootstrap:     []byte("bootstrap"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(client.createVMInputs) != 1 || client.createVMInputs[0].Zones != nil {
+		t.Fatalf("zones = %#v", client.createVMInputs)
+	}
+}
+
 func newTestProvider(t *testing.T, client ComputeAPI) *Provider {
+	t.Helper()
+	return newTestProviderWith(
+		t,
+		client,
+		"/galleries/runners/images/superplane-runner-amd64/versions/1.0.0",
+		[]string{"1", "2"},
+	)
+}
+
+func newTestProviderWith(t *testing.T, client ComputeAPI, imageID string, zones []string) *Provider {
 	t.Helper()
 	azureProvider, err := New(client, Config{
 		FleetManagerID:         "fleet-manager-production",
 		SubscriptionID:         "00000000-0000-0000-0000-000000000000",
 		ResourceGroup:          "superplane-runners",
 		Location:               "eastus",
-		ImageID:                "/galleries/runners/images/superplane-runner-amd64/versions/1.0.0",
+		ImageID:                imageID,
 		VMSize:                 "Standard_D2ds_v4",
 		Architecture:           "amd64",
 		SubnetID:               "/subnets/runners",
 		NetworkSecurityGroupID: "/nsgs/runners",
 		IdentityID:             "/identities/runner",
-		Zones:                  []string{"1", "2"},
+		Zones:                  zones,
 		DiskSizeGB:             30,
 		EphemeralOSDisk:        true,
 		ResourceTags:           map[string]string{"Environment": "production"},
