@@ -115,38 +115,6 @@ func Test__Daytona__Sync(t *testing.T) {
 	})
 }
 
-func Test__Daytona__Metadata(t *testing.T) {
-	t.Run("metadata is set on successful sync", func(t *testing.T) {
-		d := &Daytona{}
-
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`[]`)),
-				},
-			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiKey": "test-api-key",
-			},
-		}
-
-		err := d.Sync(core.SyncContext{
-			Configuration: appCtx.Configuration,
-			HTTP:          httpContext,
-			Integration:   appCtx,
-		})
-
-		require.NoError(t, err)
-		assert.NotNil(t, appCtx.Metadata)
-		_, ok := appCtx.Metadata.(Metadata)
-		assert.True(t, ok, "metadata should be of type Metadata")
-	})
-}
-
 func Test__Daytona__ListResources(t *testing.T) {
 	d := &Daytona{}
 

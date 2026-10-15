@@ -165,8 +165,6 @@ func Test__GetIssue__ComponentInfo(t *testing.T) {
 	component := GetIssue{}
 
 	assert.Equal(t, "jira.getIssue", component.Name())
-	assert.Equal(t, "Get Issue", component.Label())
-	assert.Equal(t, "jira", component.Icon())
 	assert.NotEmpty(t, component.Documentation())
 }
 

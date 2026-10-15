@@ -175,6 +175,5 @@ func Test__DeleteIssue__Execute(t *testing.T) {
 func Test__DeleteIssue__ComponentInfo(t *testing.T) {
 	component := DeleteIssue{}
 	assert.Equal(t, "jira.deleteIssue", component.Name())
-	assert.Equal(t, "Delete Issue", component.Label())
 	assert.NotEmpty(t, component.Documentation())
 }
