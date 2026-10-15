@@ -83,6 +83,29 @@ describe("FleetManagerSetup", () => {
     expect(screen.getByLabelText("SuperPlane URL")).toHaveValue("https://superplane.example.com");
   });
 
+  it("adds Terraform defaults to an existing manual draft", async () => {
+    saveFleetManagerDraft({
+      provider: "aws",
+      managerId: "my-cluster",
+      namespace: "superplane",
+      serviceAccountName: "superplane-fleet-manager",
+      superplaneUrl: window.location.origin,
+      runnerVersion: "v0.1.0",
+      selectedFleetIds: ["e1-large-amd64"],
+      warmCapacity: 5,
+      maxCapacity: 100,
+      fields: {},
+    });
+
+    render(<FleetManagerSetup />);
+    await continueTo("Confirm cloud infrastructure");
+
+    expect(screen.getByLabelText("Fleet Manager ID")).toHaveValue("terraform-cluster");
+    expect(screen.getByLabelText("SuperPlane URL")).toHaveValue("https://superplane.example.com");
+    expect(screen.getByLabelText("AWS region")).toHaveValue("us-east-1");
+    expect(screen.getByLabelText("Private subnet IDs")).toHaveValue("subnet-a, subnet-b");
+  });
+
   it("generates values with a Secret reference and no credential value", async () => {
     render(<FleetManagerSetup />);
     await continueTo("Review Fleet Manager values");
