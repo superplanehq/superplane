@@ -100,6 +100,26 @@ installation:
   type: "kubernetes"
   beaconEnabled: true
 
+#
+# Fleet Manager setup metadata and its dedicated service credential.
+# The credential value is generated in Kubernetes and never enters Helm values.
+# Set provision to false when existingSecret is managed outside this chart.
+#
+fleetManagerSetup:
+  enabled: true
+  provider: ""
+  managerId: ""
+  namespace: ""
+  serviceAccountName: superplane-fleet-manager
+  credentials:
+    provision: true
+    existingSecret: superplane-fleet-manager-token
+    tokenKey: INSTALLATION_ADMIN_TOKEN
+  infrastructure: {}
+  credentialJob:
+    image: curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6
+    activeDeadlineSeconds: 180
+
 sentry:
   secretName: ""
   enabled: false

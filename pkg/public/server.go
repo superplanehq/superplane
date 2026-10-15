@@ -92,6 +92,7 @@ type Server struct {
 	upgrader              *websocket.Upgrader
 	Router                *mux.Router
 	adminRouter           *mux.Router
+	fleetAdminRouter      *mux.Router
 	BasePath              string
 	BaseURL               string
 	WebhooksBaseURL       string
@@ -417,8 +418,7 @@ func (s *Server) RegisterGRPCGateway(services *grpc.Services) error {
 	if err := pbAdminRunners.RegisterRunnersHandlerServer(ctx, adminGatewayMux, services.AdminRunners); err != nil {
 		return err
 	}
-	adminGatewayHandler := s.grpcGatewayAccountHandler(adminGatewayMux)
-	s.adminRouter.PathPrefix("/installation/fleets").Handler(adminGatewayHandler)
+	s.fleetAdminRouter.PathPrefix("").Handler(s.grpcGatewayServiceHandler(adminGatewayMux))
 
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
@@ -571,6 +571,13 @@ func (s *Server) grpcGatewayAccountHandler(grpcGatewayMux *runtime.ServeMux) htt
 
 		r2 := middleware.CloneGatewayRequest(r)
 		r2.Header.Set("x-account-id", account.ID.String())
+		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
+	})
+}
+
+func (s *Server) grpcGatewayServiceHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r2 := middleware.CloneGatewayRequest(r)
 		middleware.TraceGatewayServe(r.Context(), w, grpcGatewayMux, r2.WithContext(r.Context()))
 	})
 }
@@ -804,6 +811,16 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
 	accountRoute.HandleFunc(mcpserver.PathAuthorize, s.handleMCPAuthorize).Methods("GET", "POST")
+
+	// Fleet Manager can use its dedicated service token only on fleet routes.
+	// Register this route before the broader admin router so its authentication
+	// policy cannot grant access to other installation endpoints.
+	fleetAdminRoute := r.PathPrefix("/admin/api/installation/fleets").Subrouter()
+	fleetAdminRoute.Use(middleware.FleetManagerAuthMiddleware(
+		s.jwt,
+		os.Getenv(middleware.FleetManagerTokenPathEnvironment),
+	))
+	s.fleetAdminRouter = fleetAdminRoute
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()

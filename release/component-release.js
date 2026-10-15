@@ -36,7 +36,12 @@ const COMPONENTS = {
     initialChangelogRef: "v0.30.0",
     tagPrefix: "fleet-manager/",
     releaseName: "Fleet Manager",
-    releaseScopes: ["fleet-manager", "fleets", "release/fleet-manager"],
+    releaseScopes: [
+      "fleet-manager",
+      "fleets",
+      "release/fleet-manager",
+      "release/fleet-manager-chart",
+    ],
     releasePaths: [
       ".semaphore/*fleet-manager-release.yml",
       "cliff.toml",
@@ -44,6 +49,7 @@ const COMPONENTS = {
       "pkg/fleets/**",
       "release/component-release.*",
       "release/fleet-manager/**",
+      "release/fleet-manager-chart/**",
     ],
   },
 };
@@ -618,6 +624,7 @@ async function publishGitHubRelease({
   version,
   sha,
   imageDigest,
+  chartDigest,
   releaseNotes,
 }) {
   componentConfig(component);
@@ -635,6 +642,9 @@ async function publishGitHubRelease({
   let body = imageDigest
     ? `Source commit: ${sha}\n\nFleet Manager image digest: \`${imageDigest}\``
     : `Source commit: ${sha}`;
+  if (chartDigest) {
+    body += `\n\nFleet Manager chart digest: \`${chartDigest}\``;
+  }
   if (!prerelease) {
     body += `\n\n${releaseNotes.trim()}`;
   }
@@ -765,6 +775,7 @@ async function main() {
       version: option("version"),
       sha: option("sha"),
       imageDigest: process.env.FLEET_MANAGER_IMAGE_DIGEST,
+      chartDigest: process.env.FLEET_MANAGER_CHART_DIGEST,
       releaseNotes: releaseNotesPath
         ? fs.readFileSync(releaseNotesPath, "utf8")
         : undefined,
