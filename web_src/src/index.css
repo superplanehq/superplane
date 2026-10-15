@@ -91,6 +91,14 @@ div.monaco-editor .view-overlays .current-line {
   box-shadow: 0 3px 0 rgb(0 0 0 / 0.2) !important;
 }
 
+.planning-review-code-editor .workbench-hover {
+  pointer-events: none;
+}
+
+.planning-review-code-editor .workbench-hover .hover-contents {
+  white-space: nowrap !important;
+}
+
 .canvas-conflict-current-line {
   background: rgb(220 252 231 / 45%);
 }
