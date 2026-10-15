@@ -2,12 +2,16 @@ package factories
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +23,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func Test__ListFactoryAgentResourceToolsReturnsNames(t *testing.T) {
@@ -439,6 +444,125 @@ func Test__ListFactoryAgentResourceToolsDoesNotApplyDefaultsForAReplacedServer(t
 			}
 		})
 	}
+}
+
+func Test__ListFactoryAgentResourceToolsOutboundTimeoutStaysRetryable(t *testing.T) {
+	t.Run("active request keeps the retry status", func(t *testing.T) {
+		ctx := context.Background()
+		err := listToolsForTimeout(ctx, t, nil)
+		sanitized := grpcerrors.SanitizeError(ctx, err)
+		assert.Equal(t, codes.FailedPrecondition, status.Code(sanitized))
+		assert.Equal(t, "SuperPlane could not load the tools. Try again.", status.Convert(sanitized).Message())
+		assert.False(t, errors.Is(err, context.DeadlineExceeded))
+	})
+
+	t.Run("request deadline stays deadline exceeded", func(t *testing.T) {
+		ctx := newDeadlineContext()
+		err := listToolsForTimeout(ctx, t, func(req *http.Request) {
+			ctx.expire()
+			waitForRequestDone(t, req)
+		})
+		sanitized := grpcerrors.SanitizeError(ctx, err)
+		assert.Equal(t, codes.DeadlineExceeded, status.Code(sanitized))
+	})
+
+	t.Run("canceled request stays canceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		err := listToolsForTimeout(ctx, t, func(req *http.Request) {
+			cancel()
+			waitForRequestDone(t, req)
+		})
+		sanitized := grpcerrors.SanitizeError(ctx, err)
+		assert.Equal(t, codes.Canceled, status.Code(sanitized))
+	})
+}
+
+func listToolsForTimeout(ctx context.Context, t *testing.T, onCall func(*http.Request)) error {
+	t.Helper()
+	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://mcp.example.test/mcp",
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+
+	called := false
+	previous := http.DefaultClient
+	http.DefaultClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		called = true
+		if onCall != nil {
+			onCall(req)
+		}
+		if err := req.Context().Err(); err != nil {
+			return nil, err
+		}
+		return nil, context.DeadlineExceeded
+	})}
+	t.Cleanup(func() { http.DefaultClient = previous })
+
+	_, err = ListFactoryAgentResourceTools(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.ListFactoryAgentResourceToolsRequest{
+		FactoryId:  factory.ID.String(),
+		ResourceId: resource.ID.String(),
+	})
+	http.DefaultClient = previous
+	require.Error(t, err)
+	require.True(t, called, "MCP transport was not called")
+	return err
+}
+
+func waitForRequestDone(t *testing.T, req *http.Request) {
+	t.Helper()
+	select {
+	case <-req.Context().Done():
+	case <-time.After(time.Second):
+		t.Fatal("request context stayed active after the outbound call ended it")
+	}
+}
+
+type deadlineContext struct {
+	context.Context
+	done chan struct{}
+	once sync.Once
+	err  error
+}
+
+func newDeadlineContext() *deadlineContext {
+	return &deadlineContext{
+		Context: context.Background(),
+		done:    make(chan struct{}),
+	}
+}
+
+func (c *deadlineContext) Done() <-chan struct{} {
+	return c.done
+}
+
+func (c *deadlineContext) Err() error {
+	select {
+	case <-c.done:
+		return c.err
+	default:
+		return nil
+	}
+}
+
+func (c *deadlineContext) expire() {
+	c.once.Do(func() {
+		c.err = context.DeadlineExceeded
+		close(c.done)
+	})
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 func Test__SaveDefaultMCPWriteToolsDoesNotReplaceAppliedDenylist(t *testing.T) {
