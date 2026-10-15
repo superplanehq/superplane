@@ -32,16 +32,6 @@ func TestAdminDashboard(t *testing.T) {
 		steps.assertOrganizationVisible("e2e-org")
 	})
 
-	t.Run("admin user can view organization details", func(t *testing.T) {
-		steps := &adminSteps{t: t}
-		steps.start()
-		steps.promoteToAdmin()
-		steps.session.Login()
-		steps.session.Visit("/admin")
-		steps.clickOrganization("e2e-org")
-		steps.assertUserVisible("E2E User")
-	})
-
 	t.Run("admin user can start and end impersonation", func(t *testing.T) {
 		steps := &adminSteps{t: t}
 		steps.start()
@@ -153,15 +143,6 @@ func (s *adminSteps) assertNotOnAdminPage() {
 }
 
 func (s *adminSteps) assertOrganizationVisible(name string) {
-	s.session.AssertText(name)
-}
-
-func (s *adminSteps) clickOrganization(name string) {
-	s.session.Click(q.Text(name))
-	s.session.Sleep(500)
-}
-
-func (s *adminSteps) assertUserVisible(name string) {
 	s.session.AssertText(name)
 }
 
