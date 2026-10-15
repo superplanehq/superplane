@@ -287,8 +287,8 @@ Terraform variables.
 
 ## Runners
 
-Install Fleet Manager with `oci://ghcr.io/superplanehq/fleet-manager-chart`.
-Use chart version `0.1.2` or later.
+Terraform sets `fleet_manager_version` to `v0.1.2`.
+The owner-setup wizard writes that chart version and that image tag.
 Version `0.1.2` accepts a community gallery image ID and an empty `zones` list.
 
 Terraform creates the runner subnet, network security group, and identities.

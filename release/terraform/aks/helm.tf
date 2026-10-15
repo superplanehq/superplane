@@ -108,6 +108,11 @@ resource "helm_release" "superplane" {
   values = [local.fleet_manager_setup_values]
 
   set {
+    name  = "componentReleases.fleetManagerVersion"
+    value = var.fleet_manager_version
+  }
+
+  set {
     name  = "database.secretName"
     value = "superplane-db-credentials"
   }
