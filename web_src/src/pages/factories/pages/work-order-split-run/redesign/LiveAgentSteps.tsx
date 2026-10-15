@@ -19,7 +19,7 @@ import { activityFromTranscript } from "./activityFromAgentStep";
 import { AgentStepMarkers } from "./AgentStepList";
 import { agentStepsFromNotes, settleStoppedSteps, type AutomationStage } from "./automationsViewModel";
 import { FailedNodeAlerts } from "./failedNodeAlerts";
-import { failedNonRunnerErrors, type FailedNodeError } from "./failedNodeErrors";
+import { failedNodeErrors, type FailedNodeError } from "./failedNodeErrors";
 import { META_TEXT_CLASSNAME } from "./redesignFormat";
 
 const WAITING_FOR_LOGS_NOTE = "Waiting for logs…";
@@ -51,7 +51,7 @@ export function LiveAgentSteps({
   emptyNote?: string;
   /** When false, skip the usage chart. The card footer only charts the latest run. */
   reportUsage?: boolean;
-  /** Canvas run page for a failed node that is not a runner. */
+  /** Canvas run page for a failed node. */
   runHref?: string | null;
 }) {
   const run = useLiveAgentRun(stage, phase, organizationId);
@@ -137,7 +137,7 @@ function useLiveAgentRun(stage: AutomationStage, phase: SplitRunPhase | undefine
     () => settleStoppedSteps(agentStepsFromNotes(transcriptNotes, runStatus, stream), stoppedStatus),
     [runStatus, stream, transcriptNotes, stoppedStatus],
   );
-  const failedNodes = useMemo(() => failedNonRunnerErrors(stream, phase?.status), [phase?.status, stream]);
+  const failedNodes = useMemo(() => failedNodeErrors(stream, phase?.status), [phase?.status, stream]);
   const runningRunner = [...runners].reverse().find((line) => line.status === "running" && Boolean(line.executionId));
   const running = Boolean(runningRunner);
   const liveActivity = activityFromTranscript(runningRunner ? (liveByLine[runningRunner.id]?.activities ?? []) : []);
