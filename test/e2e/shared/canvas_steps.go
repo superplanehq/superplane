@@ -2,7 +2,6 @@ package shared
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -324,14 +323,6 @@ func (s *CanvasSteps) ListDraftVersions() []models.CanvasVersion {
 	return []models.CanvasVersion{*live}
 }
 
-// AssertDraftCount is deprecated and only checks that a live version exists when expected > 0.
-func (s *CanvasSteps) AssertDraftCount(expected int) {
-	if expected == 0 {
-		return
-	}
-	require.NotNil(s.t, s.FindCurrentDraft())
-}
-
 // AssertVersionHistoryContains verifies commit labels appear in the versions sidebar.
 func (s *CanvasSteps) AssertVersionHistoryContains(labels ...string) {
 	s.OpenVersionsSidebar()
@@ -521,37 +512,6 @@ func (s *CanvasSteps) StagingContainsNodeForUser(userID uuid.UUID, nodeName stri
 	return false
 }
 
-// FindDraftByDisplayName returns the live version (display names are no longer used).
-func (s *CanvasSteps) FindDraftByDisplayName(_ string) *models.CanvasVersion {
-	return s.FindCurrentDraft()
-}
-
-// DraftCommittedNodeNames returns node names stored on the committed draft version row.
-func (s *CanvasSteps) DraftCommittedNodeNames(versionID uuid.UUID) []string {
-	version, err := models.FindCanvasVersion(s.WorkflowID, versionID)
-	require.NoError(s.t, err)
-
-	names := make([]string, 0, len(version.Nodes))
-	for _, node := range version.Nodes {
-		names = append(names, node.Name)
-	}
-	return names
-}
-
-// AssertDraftCommittedHasNode verifies a node exists on the committed version row (not staging).
-func (s *CanvasSteps) AssertDraftCommittedHasNode(versionID uuid.UUID, nodeName string) {
-	require.Eventually(s.t, func() bool {
-		return slices.Contains(s.DraftCommittedNodeNames(versionID), nodeName)
-	}, 10*time.Second, 200*time.Millisecond)
-}
-
-// AssertDraftCommittedLacksNode verifies a node is absent from the committed version row.
-func (s *CanvasSteps) AssertDraftCommittedLacksNode(versionID uuid.UUID, nodeName string) {
-	require.Eventually(s.t, func() bool {
-		return !slices.Contains(s.DraftCommittedNodeNames(versionID), nodeName)
-	}, 5*time.Second, 200*time.Millisecond)
-}
-
 // AssertLiveCanvasHasNode verifies a node exists on the live (published) canvas.
 func (s *CanvasSteps) AssertLiveCanvasHasNode(nodeName string) {
 	require.Eventually(s.t, func() bool {
@@ -636,21 +596,6 @@ func (s *CanvasSteps) AssertVersionCountAtLeast(expected int) {
 		versions, err := models.ListCanvasVersions(s.WorkflowID)
 		return err == nil && len(versions) >= expected
 	}, 15*time.Second, 200*time.Millisecond)
-}
-
-// WaitForPublishEnabled is deprecated; commit replaces publish.
-func (s *CanvasSteps) WaitForPublishEnabled() {}
-
-// Publish is deprecated; use CommitStaging or CommitAndPublish instead.
-func (s *CanvasSteps) Publish() {}
-
-// FindCurrentDraft returns the live canvas version used as the staging base.
-func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
-	live, err := models.FindLiveCanvasVersion(s.WorkflowID)
-	if err != nil {
-		return nil
-	}
-	return live
 }
 
 func (s *CanvasSteps) Create() {
@@ -808,13 +753,6 @@ func (s *CanvasSteps) ClickOnEmptyCanvasArea() {
 	if box != nil {
 		_ = s.session.Page().Mouse().Click(box.X+600, box.Y+50)
 	}
-}
-
-// SelectAllNodes performs a rubber-band drag selection across the entire visible
-// canvas area to select all nodes. The sidebar must be closed before calling this.
-func (s *CanvasSteps) SelectAllNodes() {
-	target := q.TestID("rf__wrapper")
-	s.session.DragSelectOnCanvas(target, 10, 10, 1100, 700)
 }
 
 func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
