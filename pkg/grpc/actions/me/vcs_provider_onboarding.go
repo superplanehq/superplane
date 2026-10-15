@@ -114,10 +114,14 @@ func SelectVCSProviderOnboardingIdentity(
 	ctx context.Context,
 	provider string,
 	userID int64,
+	providerUserID string,
 ) (*pb.SelectVCSProviderOnboardingIdentityResponse, error) {
 	provider, err := supportedVCSProvider(provider)
 	if err != nil {
 		return nil, err
+	}
+	if provider == models.ProviderBitbucket {
+		return selectBitbucketOnboardingIdentity(ctx, providerUserID)
 	}
 	if userID <= 0 {
 		return nil, grpcerrors.InvalidArgument(nil, "provider user id is required")
@@ -126,7 +130,16 @@ func SelectVCSProviderOnboardingIdentity(
 	if err != nil {
 		return nil, err
 	}
-	err = models.SelectAccountLinkedAccount(database.DB(ctx), accountID, provider, strconv.FormatInt(userID, 10))
+	return selectLinkedAccount(ctx, accountID, provider, strconv.FormatInt(userID, 10))
+}
+
+func selectLinkedAccount(
+	ctx context.Context,
+	accountID uuid.UUID,
+	provider string,
+	providerID string,
+) (*pb.SelectVCSProviderOnboardingIdentityResponse, error) {
+	err := models.SelectAccountLinkedAccount(database.DB(ctx), accountID, provider, providerID)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, grpcerrors.PermissionDenied(err, "provider account is not linked")
 	}
