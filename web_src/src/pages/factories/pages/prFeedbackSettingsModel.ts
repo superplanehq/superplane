@@ -526,6 +526,7 @@ export type PRFeedbackLogRun = {
   attemptLabel?: string;
   costCents?: string;
   totalTokens?: string;
+  models?: string[];
   kind?: PRFeedbackActivityKind;
   waitingForAccess?: boolean;
   run: CanvasesCanvasRunRef;
