@@ -237,10 +237,5 @@
   envFrom:
     - secretRef:
         name: {{ include "secrets.database.name" . }}
-  securityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: true
-    runAsNonRoot: true
-    capabilities:
-      drop: ["ALL"]
+  {{- include "superplane.migrateContainerSecurityContext" (dict "migrateSecurityContext" .Values.migrate.securityContext "securityContext" .Values.securityContext "quoteDrop" true "indent" 2) }}
 {{- end }}

@@ -6,6 +6,7 @@ resource "helm_release" "cert_manager" {
   name             = "cert-manager"
   repository       = "https://charts.jetstack.io"
   chart            = "cert-manager"
+  version          = var.cert_manager_chart_version
   namespace        = "cert-manager"
   create_namespace = true
   timeout          = 600
@@ -29,6 +30,7 @@ resource "helm_release" "nginx_ingress" {
   name             = "ingress-nginx"
   repository       = "https://kubernetes.github.io/ingress-nginx"
   chart            = "ingress-nginx"
+  version          = var.ingress_nginx_chart_version
   namespace        = "ingress-nginx"
   create_namespace = true
   timeout          = 1200
@@ -61,6 +63,25 @@ resource "helm_release" "superplane" {
   create_namespace = false
   timeout          = 1200
   wait             = true
+  version          = local.use_local_helm_chart ? null : var.superplane_chart_version
+
+  lifecycle {
+    precondition {
+      condition     = local.use_local_helm_chart || var.superplane_chart_version != ""
+      error_message = "Set superplane_chart_version, or set helm_chart_path for a local chart."
+    }
+
+    precondition {
+      condition     = !local.use_local_helm_chart || var.superplane_image_tag != ""
+      error_message = "With a local chart (helm_chart_path), set superplane_image_tag. The local Chart.yaml appVersion (0.1.0) is a placeholder, not a published image."
+    }
+
+    # fleet_manager_config is sensitive. The enabled local is the same empty check the secret count uses.
+    precondition {
+      condition     = !local.fleet_manager_enabled || var.fleet_manager_image_tag != ""
+      error_message = "Set fleet_manager_image_tag when fleet_manager_config is set."
+    }
+  }
 
   set {
     name  = "database.secretName"
@@ -107,9 +128,12 @@ resource "helm_release" "superplane" {
     value = var.image_name
   }
 
-  set {
-    name  = "image.tag"
-    value = var.superplane_image_tag
+  dynamic "set" {
+    for_each = var.superplane_image_tag == "" ? [] : [var.superplane_image_tag]
+    content {
+      name  = "image.tag"
+      value = set.value
+    }
   }
 
   set {
@@ -265,7 +289,7 @@ resource "helm_release" "superplane" {
 
   set {
     name  = "fleetManager.image.tag"
-    value = local.fleet_manager_image_tag
+    value = var.fleet_manager_image_tag
   }
 
   set {

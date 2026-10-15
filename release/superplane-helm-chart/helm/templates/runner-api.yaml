@@ -50,8 +50,7 @@ spec:
       {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
       serviceAccountName: {{ include "superplane.serviceAccountName" . }}
       {{- end }}
-      securityContext:
-        fsGroup: {{ .Values.runner.activeLogs.fsGroup }}
+      {{- include "superplane.appPodSecurityContext" (dict "podSecurityContext" .Values.podSecurityContext "mountLogs" true "fsGroup" .Values.runner.activeLogs.fsGroup "indent" 6) }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -165,11 +164,7 @@ spec:
             periodSeconds: 10
             timeoutSeconds: 2
             failureThreshold: 5
-          securityContext:
-            privileged: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop: [ALL]
+          {{- include "superplane.appContainerSecurityContext" (dict "securityContext" .Values.securityContext "indent" 10) }}
           {{- with .Values.api.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
