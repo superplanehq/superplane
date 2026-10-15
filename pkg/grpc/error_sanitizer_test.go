@@ -36,7 +36,7 @@ func TestSanitizeError(t *testing.T) {
 	t.Run("other errors map to internal", func(t *testing.T) {
 		err := SanitizeError(context.Background(), errors.New("db down"))
 		assert.Equal(t, codes.Internal, status.Code(err))
-		assert.Equal(t, sanitizedInternalMessage, status.Convert(err).Message())
+		assert.Equal(t, "internal error", status.Convert(err).Message())
 	})
 
 	t.Run("internal error preserves handler message", func(t *testing.T) {

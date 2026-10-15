@@ -2,12 +2,15 @@ package factories
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +22,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func Test__ListFactoryAgentResourceToolsReturnsNames(t *testing.T) {
@@ -439,6 +443,74 @@ func Test__ListFactoryAgentResourceToolsDoesNotApplyDefaultsForAReplacedServer(t
 			}
 		})
 	}
+}
+
+func Test__ListFactoryAgentResourceToolsOutboundTimeoutStaysRetryable(t *testing.T) {
+	t.Run("active request keeps the retry status", func(t *testing.T) {
+		ctx := context.Background()
+		err := listToolsForTimeout(t, ctx)
+		sanitized := grpcerrors.SanitizeError(ctx, err)
+		assert.Equal(t, codes.FailedPrecondition, status.Code(sanitized))
+		assert.Equal(t, "SuperPlane could not load the tools. Try again.", status.Convert(sanitized).Message())
+		assert.False(t, errors.Is(err, context.DeadlineExceeded))
+	})
+
+	t.Run("request deadline stays deadline exceeded", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Nanosecond)
+		defer cancel()
+		<-ctx.Done()
+
+		err := listToolsForTimeout(t, ctx)
+		sanitized := grpcerrors.SanitizeError(ctx, err)
+		assert.Equal(t, codes.DeadlineExceeded, status.Code(sanitized))
+	})
+
+	t.Run("canceled request stays canceled", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		err := listToolsForTimeout(t, ctx)
+		sanitized := grpcerrors.SanitizeError(ctx, err)
+		assert.Equal(t, codes.Canceled, status.Code(sanitized))
+	})
+}
+
+func listToolsForTimeout(t *testing.T, ctx context.Context) error {
+	t.Helper()
+	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "docs", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       "https://mcp.example.test/mcp",
+		Auth:      models.FactoryAgentResourceAuthHeaders,
+	})
+	require.NoError(t, err)
+
+	previous := http.DefaultClient
+	http.DefaultClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if err := req.Context().Err(); err != nil {
+			return nil, err
+		}
+		return nil, context.DeadlineExceeded
+	})}
+	t.Cleanup(func() { http.DefaultClient = previous })
+
+	_, err = ListFactoryAgentResourceTools(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.ListFactoryAgentResourceToolsRequest{
+		FactoryId:  factory.ID.String(),
+		ResourceId: resource.ID.String(),
+	})
+	http.DefaultClient = previous
+	require.Error(t, err)
+	return err
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 func Test__SaveDefaultMCPWriteToolsDoesNotReplaceAppliedDenylist(t *testing.T) {
