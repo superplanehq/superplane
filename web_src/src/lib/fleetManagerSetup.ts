@@ -261,6 +261,8 @@ export function fleetsMatchConfiguration(
   const byID = new Map(installed.map((fleet) => [fleet.id, fleet]));
   const presetByID = new Map(presets.map((preset) => [preset.id, preset]));
 
+  if (draft.selectedFleetIds.length === 0) return false;
+
   return draft.selectedFleetIds.every((id) => {
     const fleet = byID.get(id);
     const preset = presetByID.get(id);
