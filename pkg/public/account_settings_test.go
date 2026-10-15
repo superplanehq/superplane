@@ -511,17 +511,17 @@ func TestLinkProviderToAccount_RefusesForeignIdentity(t *testing.T) {
 	other, err := models.CreateAccount("Other", "other-sso@example.com")
 	require.NoError(t, err)
 
-	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, other, testGothUser("google", "google-1", "other-sso@example.com"))
+	err = authentication.LinkProviderToAccount(database.Conn(), other, testGothUser("google", "google-1", "other-sso@example.com"))
 	require.NoError(t, err)
 
-	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, r.Account, testGothUser("google", "google-1", "other-sso@example.com"))
+	err = authentication.LinkProviderToAccount(database.Conn(), r.Account, testGothUser("google", "google-1", "other-sso@example.com"))
 	assert.ErrorIs(t, err, models.ErrSignInIdentityInUse)
 }
 
 func TestLinkProviderToAccount_AttachesUnusedIdentity(t *testing.T) {
 	r := support.Setup(t)
 
-	err := authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, r.Account, testGothUser("google", "google-2", "ada@example.com"))
+	err := authentication.LinkProviderToAccount(database.Conn(), r.Account, testGothUser("google", "google-2", "ada@example.com"))
 	require.NoError(t, err)
 
 	linked, err := models.FindAccountByProvider(database.Conn(), models.ProviderGoogle, "google-2")
@@ -530,16 +530,16 @@ func TestLinkProviderToAccount_AttachesUnusedIdentity(t *testing.T) {
 }
 
 func TestLinkProviderToAccount_RefusesSharedGitHubIdentity(t *testing.T) {
-	r := support.Setup(t)
+	support.Setup(t)
 	first, err := models.CreateAccount("First GitHub", "first-github-sso@example.com")
 	require.NoError(t, err)
 	second, err := models.CreateAccount("Second GitHub", "second-github-sso@example.com")
 	require.NoError(t, err)
 
-	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, first, testGothUser(models.ProviderGitHub, "github-shared", first.Email))
+	err = authentication.LinkProviderToAccount(database.Conn(), first, testGothUser(models.ProviderGitHub, "github-shared", first.Email))
 	require.NoError(t, err)
 
-	err = authentication.LinkProviderToAccount(database.Conn(), r.Encryptor, second, testGothUser(models.ProviderGitHub, "github-shared", second.Email))
+	err = authentication.LinkProviderToAccount(database.Conn(), second, testGothUser(models.ProviderGitHub, "github-shared", second.Email))
 	assert.ErrorIs(t, err, models.ErrSignInIdentityInUse)
 }
 
