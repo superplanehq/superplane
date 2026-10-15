@@ -8,12 +8,15 @@ export type FailedNodeError = {
   iconSlug?: string;
 };
 
-export function failedNonRunnerErrors(lines: SplitRunStreamLine[], runStatus?: SplitRunPhaseStatus): FailedNodeError[] {
+export function failedNodeErrors(lines: SplitRunStreamLine[], runStatus?: SplitRunPhaseStatus): FailedNodeError[] {
   if (runStatus === "cancelled") {
     return [];
   }
   return lines
-    .filter((line) => !line.note && line.status === "failed" && !isRunnerComponent(line.component))
+    .filter(
+      (line) =>
+        !line.note && line.status === "failed" && (!isRunnerComponent(line.component) || Boolean(line.detail?.trim())),
+    )
     .map((line) => ({
       id: line.id,
       name: line.componentName,
