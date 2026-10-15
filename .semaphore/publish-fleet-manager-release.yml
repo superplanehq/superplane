@@ -17,8 +17,9 @@ global_job_config:
       value: ghcr.io/superplanehq/fleet-manager
     - name: FLEET_MANAGER_CHART_REPO
       value: oci://ghcr.io/superplanehq/fleet-manager-chart
+    # Quay republished v1.22.3 and removed the old digest. Pin the immutable tag.
     - name: SKOPEO_CONTAINER_IMAGE
-      value: quay.io/skopeo/stable:v1.22.3@sha256:22ea3c3baf639147b07fb9f2ea28a6308edf7909e919d91a5d296af0121d7ed9
+      value: quay.io/skopeo/stable:v1.22.3-immutable@sha256:c0ee1f4edca5c01cb8d5611124f92f3cc47196ecab68aee5d0f90834e00574d5
   prologue:
     commands:
       - checkout
