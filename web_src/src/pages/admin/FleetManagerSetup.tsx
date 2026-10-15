@@ -9,11 +9,23 @@ import { FleetManagerVerificationStatus } from "@/components/fleet-manager-setup
 import { Button } from "@/components/ui/button";
 import { useFleetManagerSetup, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
 import { downloadFleetManagerValues } from "@/lib/downloadFleetManagerValues";
-import { fleetManagerInstallCommand, type FleetManagerDraft } from "@/lib/fleetManagerSetup";
+import { fleetManagerInstallCommand, type FleetManagerDraft, type FleetManagerProvider } from "@/lib/fleetManagerSetup";
 import { CopyButton } from "@/ui/CopyButton";
 import { Download, TriangleAlert } from "lucide-react";
 
 const INSTALL_INSTRUCTION = "Run this command where kubectl can access your cluster.";
+
+const providerNames: Record<FleetManagerProvider, string> = {
+  aws: "AWS",
+  gcp: "GCP",
+  azure: "Azure",
+};
+
+function providerValues(values: string) {
+  const marker = "\nfleets:\n";
+  const index = values.indexOf(marker);
+  return index === -1 ? values : values.slice(index + 1);
+}
 
 function SectionCard({
   title,
@@ -35,12 +47,29 @@ function SectionCard({
   );
 }
 
-function ValuesBlock({ values, command }: { values: string; command: string }) {
+function ValuesBlock({
+  values,
+  command,
+  provider,
+}: {
+  values: string;
+  command: string;
+  provider: FleetManagerProvider;
+}) {
+  const providerName = providerNames[provider];
+
   return (
     <div className="space-y-4" data-testid="fleet-manager-values">
       <div className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-700/60 dark:bg-amber-950/30 dark:text-amber-100">
         <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />
         <p>Replace each public VM image placeholder before production use.</p>
+      </div>
+      <p className="text-sm text-gray-600 dark:text-gray-300">The values file uses {providerName}.</p>
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{providerName} values</p>
+        <pre className="max-h-96 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-4 text-left font-mono text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
+          <code>{providerValues(values)}</code>
+        </pre>
       </div>
       <div className="space-y-2">
         <p className="text-xs font-medium text-gray-500 dark:text-gray-400">values.yaml</p>
@@ -122,7 +151,7 @@ export function FleetManagerSetup() {
           >
             <div className="space-y-5">
               {draftIsValid ? (
-                <ValuesBlock values={setup.values} command={command} />
+                <ValuesBlock values={setup.values} command={command} provider={setup.draft.provider} />
               ) : (
                 <p role="alert" className="text-sm text-destructive">
                   {setup.validationErrors[0]}

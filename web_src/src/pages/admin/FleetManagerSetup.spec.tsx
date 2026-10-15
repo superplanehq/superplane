@@ -224,6 +224,34 @@ describe("FleetManagerSetup", () => {
     expect(screen.queryByLabelText("AWS region")).not.toBeInTheDocument();
   });
 
+  it("uses the selected provider values in the values file", async () => {
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByText("The values file uses AWS.")).toBeInTheDocument();
+    expect(screen.getAllByText(/provider: aws/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/eks.amazonaws.com\/role-arn/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "GCP" }));
+    fireEvent.change(screen.getByLabelText("GCP project"), { target: { value: "runner-project" } });
+
+    expect(screen.getByText("The values file uses GCP.")).toBeInTheDocument();
+    expect(screen.getAllByText(/provider: gcp/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/projectId: runner-project/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/provider: aws/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/eks.amazonaws.com\/role-arn/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /AWS/ }));
+
+    expect(screen.getByText("The values file uses AWS.")).toBeInTheDocument();
+    expect(screen.getByLabelText("AWS region")).toHaveValue("us-east-1");
+    expect(screen.getAllByText(/provider: aws/).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "GCP" }));
+
+    expect(screen.getByLabelText("GCP project")).toHaveValue("runner-project");
+    expect(screen.getAllByText(/projectId: runner-project/).length).toBeGreaterThan(0);
+  });
+
   it("starts fleet verification only after Check installation", async () => {
     render(<FleetManagerSetup />);
     expect(await screen.findByRole("button", { name: "Check installation" })).toBeEnabled();

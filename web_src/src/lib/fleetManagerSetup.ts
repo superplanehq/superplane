@@ -51,6 +51,7 @@ export type FleetManagerDraft = {
   selectedFleetIds: string[];
   fleetCapacities: Record<string, FleetCapacity>;
   fields: FleetManagerProviderFields;
+  fieldsByProvider?: Partial<Record<FleetManagerProvider, FleetManagerProviderFields>>;
 };
 
 export type InstalledFleet = {
@@ -279,9 +280,21 @@ export function fleetsMatchConfiguration(
   });
 }
 
+const FLEET_MANAGER_PROVIDERS: FleetManagerProvider[] = ["aws", "gcp", "azure"];
+
+export function rememberProviderFields(draft: FleetManagerDraft): FleetManagerDraft {
+  return {
+    ...draft,
+    fieldsByProvider: {
+      ...draft.fieldsByProvider,
+      [draft.provider]: draft.fields,
+    },
+  };
+}
+
 export function saveFleetManagerDraft(draft: FleetManagerDraft): void {
   window.localStorage.removeItem(LEGACY_FLEET_MANAGER_DRAFT_KEY);
-  window.localStorage.setItem(FLEET_MANAGER_DRAFT_KEY, JSON.stringify(draft));
+  window.localStorage.setItem(FLEET_MANAGER_DRAFT_KEY, JSON.stringify(rememberProviderFields(draft)));
 }
 
 type RequiredDraftStrings = Pick<
@@ -306,7 +319,7 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
       warmCapacity?: unknown;
       maxCapacity?: unknown;
     };
-    if (!draft.provider || !["aws", "gcp", "azure"].includes(draft.provider)) return null;
+    if (!draft.provider || !FLEET_MANAGER_PROVIDERS.includes(draft.provider)) return null;
     if (!hasRequiredDraftStrings(draft)) return null;
     if (!Array.isArray(draft.selectedFleetIds) || !draft.selectedFleetIds.every((id) => typeof id === "string"))
       return null;
@@ -315,6 +328,10 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
       Object.entries(draft.fields).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
     );
     const fleetCapacities = storedFleetCapacities(draft);
+    const fieldsByProvider = {
+      ...storedFieldsByProvider(draft.fieldsByProvider),
+      [draft.provider]: fields,
+    };
     return {
       provider: draft.provider,
       managerId: draft.managerId,
@@ -325,10 +342,30 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
       selectedFleetIds: draft.selectedFleetIds,
       fleetCapacities,
       fields,
+      fieldsByProvider,
     };
   } catch {
     return null;
   }
+}
+
+function storedFieldsByProvider(value: unknown): Partial<Record<FleetManagerProvider, FleetManagerProviderFields>> {
+  if (typeof value !== "object" || value === null) return {};
+
+  return Object.fromEntries(
+    FLEET_MANAGER_PROVIDERS.flatMap((provider) => {
+      const fields = (value as Record<string, unknown>)[provider];
+      if (typeof fields !== "object" || fields === null) return [];
+      return [
+        [
+          provider,
+          Object.fromEntries(
+            Object.entries(fields).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+          ),
+        ],
+      ];
+    }),
+  );
 }
 
 function storedFleetCapacities(

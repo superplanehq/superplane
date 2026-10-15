@@ -88,20 +88,24 @@ export function FleetManagerProviderSection({ setup }: { setup: FleetManagerSetu
   const terraformProvider = setup.metadata.infrastructureDefaults.provider;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
-      {(["aws", "gcp", "azure"] as const).map((provider) => (
-        <Button
-          key={provider}
-          type="button"
-          variant={setup.draft?.provider === provider ? "default" : "outline"}
-          className="h-auto min-h-20 flex-col gap-1"
-          onClick={() => setup.setProvider(provider)}
-        >
-          <Cloud className="size-4" aria-hidden />
-          <span>{provider.toUpperCase()}</span>
-          {terraformProvider === provider && <span className="text-[10px] normal-case">Loaded from Terraform</span>}
-        </Button>
-      ))}
+    <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Cloud provider">
+      {(["aws", "gcp", "azure"] as const).map((provider) => {
+        const selected = setup.draft?.provider === provider;
+        return (
+          <Button
+            key={provider}
+            type="button"
+            variant={selected ? "default" : "outline"}
+            className="h-auto min-h-20 flex-col gap-1"
+            aria-pressed={selected}
+            onClick={() => setup.setProvider(provider)}
+          >
+            <Cloud className="size-4" aria-hidden />
+            <span>{provider.toUpperCase()}</span>
+            {terraformProvider === provider && <span className="text-[10px] normal-case">Loaded from Terraform</span>}
+          </Button>
+        );
+      })}
     </div>
   );
 }

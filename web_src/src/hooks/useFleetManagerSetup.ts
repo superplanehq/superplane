@@ -7,6 +7,7 @@ import {
   generateFleetManagerValues,
   loadFleetManagerDraft,
   normalizeInfrastructureFields,
+  rememberProviderFields,
   saveFleetManagerDraft,
   validateFleetInfrastructure,
   validateFleetSelection,
@@ -81,11 +82,17 @@ export function useFleetManagerSetup(enabled = true) {
     (provider: FleetManagerProvider) => {
       const providerDefaults = normalizeInfrastructureFields(metadata?.infrastructureDefaults.fields ?? {});
       delete providerDefaults.superplaneUrl;
-      updateDraft((current) => ({
-        ...current,
-        provider,
-        fields: metadata?.infrastructureDefaults.provider === provider ? providerDefaults : {},
-      }));
+      const defaults = metadata?.infrastructureDefaults.provider === provider ? providerDefaults : {};
+      updateDraft((current) => {
+        const remembered = rememberProviderFields(current);
+        const fields = remembered.fieldsByProvider?.[provider] ?? defaults;
+        return {
+          ...remembered,
+          provider,
+          fields,
+          fieldsByProvider: { ...remembered.fieldsByProvider, [provider]: fields },
+        };
+      });
     },
     [metadata, updateDraft],
   );

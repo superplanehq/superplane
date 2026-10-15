@@ -229,7 +229,10 @@ it("uses a browser key that stores only the non-secret draft", () => {
 
   saveFleetManagerDraft(draft);
 
-  expect(loadFleetManagerDraft()).toEqual(draft);
+  expect(loadFleetManagerDraft()).toEqual({
+    ...draft,
+    fieldsByProvider: { aws: draft.fields },
+  });
   expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("INSTALLATION_ADMIN_TOKEN");
 });
 
