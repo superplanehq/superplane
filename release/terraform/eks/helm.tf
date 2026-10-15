@@ -414,6 +414,7 @@ locals {
         tokenKey       = "INSTALLATION_ADMIN_TOKEN"
       }
       infrastructure = var.enable_runners ? {
+        superplaneUrl        = "https://${var.domain_name}"
         region               = var.region
         subnetIds            = aws_subnet.private[*].id
         securityGroupIds     = [aws_security_group.runners[0].id]

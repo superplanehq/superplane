@@ -93,6 +93,7 @@ locals {
         tokenKey       = "INSTALLATION_ADMIN_TOKEN"
       }
       infrastructure = local.runners_enabled ? {
+        superplaneUrl        = "https://${var.domain_name}"
         projectId            = var.project_id
         zones                = local.runner_zones
         subnetwork           = google_compute_subnetwork.runners[0].id
