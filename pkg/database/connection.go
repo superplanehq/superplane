@@ -199,7 +199,8 @@ func TruncateTables() error {
 		return err
 	}
 
-	return Conn().Exec(`
+	return RetryOnDeadlock(5, func() error {
+		return Conn().Exec(`
 		truncate table
 			bitbucket_forge_installations,
 			runner_task_log_lifecycles,
@@ -258,4 +259,8 @@ func TruncateTables() error {
 			mcp_oauth_refresh_tokens
 		restart identity cascade;
 	`).Error
+	}, func(attempt int) {
+		log.Printf("truncate tables deadlock, retry %d", attempt)
+		time.Sleep(time.Duration(attempt) * 200 * time.Millisecond)
+	})
 }

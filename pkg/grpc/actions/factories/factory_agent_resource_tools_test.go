@@ -449,7 +449,7 @@ func Test__ListFactoryAgentResourceToolsDoesNotApplyDefaultsForAReplacedServer(t
 func Test__ListFactoryAgentResourceToolsOutboundTimeoutStaysRetryable(t *testing.T) {
 	t.Run("active request keeps the retry status", func(t *testing.T) {
 		ctx := context.Background()
-		err := listToolsForTimeout(t, ctx, nil)
+		err := listToolsForTimeout(ctx, t, nil)
 		sanitized := grpcerrors.SanitizeError(ctx, err)
 		assert.Equal(t, codes.FailedPrecondition, status.Code(sanitized))
 		assert.Equal(t, "SuperPlane could not load the tools. Try again.", status.Convert(sanitized).Message())
@@ -458,7 +458,7 @@ func Test__ListFactoryAgentResourceToolsOutboundTimeoutStaysRetryable(t *testing
 
 	t.Run("request deadline stays deadline exceeded", func(t *testing.T) {
 		ctx := newDeadlineContext()
-		err := listToolsForTimeout(t, ctx, func(req *http.Request) {
+		err := listToolsForTimeout(ctx, t, func(req *http.Request) {
 			ctx.expire()
 			waitForRequestDone(t, req)
 		})
@@ -469,7 +469,7 @@ func Test__ListFactoryAgentResourceToolsOutboundTimeoutStaysRetryable(t *testing
 	t.Run("canceled request stays canceled", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		err := listToolsForTimeout(t, ctx, func(req *http.Request) {
+		err := listToolsForTimeout(ctx, t, func(req *http.Request) {
 			cancel()
 			waitForRequestDone(t, req)
 		})
@@ -478,7 +478,7 @@ func Test__ListFactoryAgentResourceToolsOutboundTimeoutStaysRetryable(t *testing
 	})
 }
 
-func listToolsForTimeout(t *testing.T, ctx context.Context, onCall func(*http.Request)) error {
+func listToolsForTimeout(ctx context.Context, t *testing.T, onCall func(*http.Request)) error {
 	t.Helper()
 	r := support.Setup(t)
 	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
