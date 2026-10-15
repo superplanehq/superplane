@@ -96,13 +96,15 @@ Access SuperPlane at `https://your-domain.com`
 
 ### 7. Install Fleet Manager (optional)
 
-Open **Fleet setup** in SuperPlane. Select AWS and copy the runner subnet,
-security group, instance profile, region, and Fleet Manager role outputs from
-Terraform. Replace the AMI placeholder with an immutable Runner image. Then
-create the token Secret and install the standalone Fleet Manager chart.
+Open **Set up runner fleets** during owner setup. Terraform passes the runner
+subnets, security group, instance profile, region, cluster name, and Fleet
+Manager role to SuperPlane. The wizard preloads these values. Replace the AMI
+placeholder with an immutable Runner image, save `values.yaml`, and run the
+displayed Helm command.
 
 Terraform creates the AWS runner infrastructure, but it does not install Fleet
-Manager or store its token. See
+Manager. The SuperPlane chart creates the dedicated service-token Secret in
+Kubernetes. The credential does not enter Terraform state. See
 [the standalone chart guide](../../fleet-manager-chart/README.md).
 
 ## Destroy

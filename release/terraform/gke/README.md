@@ -229,8 +229,8 @@ If `172.20.0.0/24` overlaps a range in your network, set `runner_subnet_cidr`.
 
 ### 3.3 Install the standalone Fleet Manager
 
-Open **Fleet setup** in SuperPlane. Select GCP and copy these Terraform outputs
-into the generated configuration:
+Open **Set up runner fleets** during owner setup. Terraform passes these values
+to SuperPlane, and the wizard preloads them into the generated configuration:
 
 ```bash
 terraform output runner_project
@@ -241,9 +241,9 @@ terraform output fleet_manager_service_account_email
 ```
 
 Replace the GCP image placeholder with an image or image family that contains
-the Runner. Generate the installation token and follow the displayed
-`kubectl` and `helm install` commands. The token is stored in a Kubernetes
-Secret. It does not enter Terraform state or Helm release metadata.
+the Runner. Save `values.yaml` and run the displayed Helm command. The
+SuperPlane chart creates a dedicated service-token Secret in Kubernetes. The
+credential does not enter Terraform state or Helm release metadata.
 
 The chart startup Job creates or updates the fleets before Fleet Manager
 starts. For complete install, upgrade, token rotation, fleet removal, and
