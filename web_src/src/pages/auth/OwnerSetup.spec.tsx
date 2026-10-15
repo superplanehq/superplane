@@ -62,6 +62,41 @@ const OWNER_SETUP_SURVEY = {
   ],
 };
 
+const fleetManagerMetadata = {
+  defaultRunnerVersion: "v0.1.0",
+  defaultFleetManagerVersion: "v0.1.0",
+  defaultChartVersion: "0.1.0",
+  runnerReleaseUrlTemplate: "https://example/releases/runner%2F{version}",
+  chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
+  imageRepository: "ghcr.io/superplanehq/fleet-manager",
+  fleetPresets: [
+    {
+      id: "e1-large-amd64",
+      spec: {
+        operatingSystem: "linux",
+        architecture: "amd64",
+        cpuMillicores: 2000,
+        memoryMb: 8192,
+        diskGb: 30,
+        capabilities: ["docker"],
+      },
+    },
+  ],
+  infrastructureDefaults: {
+    source: "terraform",
+    provider: "aws",
+    managerId: "test-cluster",
+    namespace: "superplane",
+    serviceAccountName: "superplane-fleet-manager",
+    fields: { region: "us-east-1" },
+  },
+  credentials: {
+    existingSecret: "superplane-fleet-manager-token",
+    tokenKey: "INSTALLATION_ADMIN_TOKEN",
+    autoProvisioned: true,
+  },
+};
+
 function stubOwnerSetupFetch() {
   vi.stubGlobal(
     "fetch",
@@ -69,6 +104,9 @@ function stubOwnerSetupFetch() {
       const url = String(input);
       if (url.endsWith("/api/v1/setup-owner") && init?.method === "POST") {
         return jsonResponse({ organization_id: "org-1", organization_slug: "acme" });
+      }
+      if (url.endsWith("/admin/api/installation/fleet-manager/setup")) {
+        return jsonResponse(fleetManagerMetadata);
       }
       return new Response("", { status: 404 });
     }),
@@ -98,13 +136,14 @@ async function reachFleetStep() {
   fireEvent.click(screen.getByTestId("owner-setup-smtp-skip"));
 
   expect(await screen.findByTestId("owner-setup-fleet")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: OWNER_SETUP_COPY.fleet.open })).toBeInTheDocument();
+  expect(screen.queryByRole("link")).not.toBeInTheDocument();
 }
 
 describe("OwnerSetup", () => {
   const originalLocation = window.location;
 
   beforeEach(() => {
+    window.localStorage.clear();
     posthogMock.enabled = false;
     posthogMock.getActiveMatchingSurveys.mockReset();
     posthogMock.capture.mockReset();
@@ -141,6 +180,51 @@ describe("OwnerSetup", () => {
 
     await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
     expect(screen.queryByText(OWNER_SETUP_COPY.smtp.headline)).not.toBeInTheDocument();
+  });
+
+  it("opens the Fleet Manager wizard inside owner setup", async () => {
+    stubOwnerSetupFetch();
+    renderOwnerSetup();
+    await reachFleetStep();
+
+    fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
+
+    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /fleet manager setup/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-progress")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByTestId("owner-setup-fleet")).toBeInTheDocument();
+  });
+
+  it("navigates forward and backward through the Fleet Manager steps", async () => {
+    stubOwnerSetupFetch();
+    renderOwnerSetup();
+    await reachFleetStep();
+
+    fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.fleet.continue }));
+    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
+
+    for (const heading of [
+      "Choose runner fleets",
+      "Confirm cloud infrastructure",
+      "Review Fleet Manager values",
+      "Install Fleet Manager",
+    ]) {
+      fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+      expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+    }
+
+    for (const heading of [
+      "Review Fleet Manager values",
+      "Confirm cloud infrastructure",
+      "Choose runner fleets",
+      "Choose a cloud provider",
+      OWNER_SETUP_COPY.fleet.headline,
+    ]) {
+      fireEvent.click(screen.getByRole("button", { name: "Back" }));
+      expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+    }
   });
 
   it("keeps the gold scene and hides step dots while the survey is completed", async () => {

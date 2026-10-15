@@ -3,6 +3,8 @@ package public
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,6 +36,10 @@ func TestAdminGetFleetManagerSetup(t *testing.T) {
 	require.Len(t, body.FleetPresets, 4)
 	assert.Equal(t, models.RunnerFleetE1LargeAMD64, body.FleetPresets[0].ID)
 	assert.Equal(t, "amd64", body.FleetPresets[0].Spec.Architecture)
+	assert.Equal(t, "manual", body.InfrastructureDefaults.Source)
+	assert.Nil(t, body.InfrastructureDefaults.Provider)
+	assert.Equal(t, "superplane-fleet-manager-token", body.Credentials.ExistingSecret)
+	assert.False(t, body.Credentials.AutoProvisioned)
 
 	fleets, err := models.ListInstallationRunnerFleets(database.DB(t.Context()))
 	require.NoError(t, err)
@@ -41,6 +47,41 @@ func TestAdminGetFleetManagerSetup(t *testing.T) {
 	tokens, err := models.ListUserAPITokens(database.DB(t.Context()), user.User)
 	require.NoError(t, err)
 	assert.Empty(t, tokens)
+}
+
+func TestAdminGetFleetManagerSetupLoadsChartDefaults(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "fleet-manager-setup.json")
+	config := `{
+		"source":"terraform",
+		"provider":"aws",
+		"managerId":"test-cluster",
+		"namespace":"superplane",
+		"serviceAccountName":"superplane-fleet-manager",
+		"infrastructure":{"region":"us-east-1","subnetIds":["subnet-a","subnet-b"]},
+		"credentials":{"existingSecret":"generated-token","tokenKey":"TOKEN","provision":true}
+	}`
+	require.NoError(t, os.WriteFile(configPath, []byte(config), 0o600))
+	t.Setenv("FLEET_MANAGER_SETUP_CONFIG_PATH", configPath)
+	server, _, token := setupAdminTestServer(t)
+
+	response := execRequest(server, requestParams{
+		method:     http.MethodGet,
+		path:       "/admin/api/installation/fleet-manager/setup",
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+
+	var body fleetManagerSetupResponse
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	require.NotNil(t, body.InfrastructureDefaults.Provider)
+	assert.Equal(t, "aws", *body.InfrastructureDefaults.Provider)
+	assert.Equal(t, "terraform", body.InfrastructureDefaults.Source)
+	assert.Equal(t, "test-cluster", body.InfrastructureDefaults.ManagerID)
+	assert.Equal(t, "us-east-1", body.InfrastructureDefaults.Fields["region"])
+	assert.Equal(t, []any{"subnet-a", "subnet-b"}, body.InfrastructureDefaults.Fields["subnetIds"])
+	assert.Equal(t, "generated-token", body.Credentials.ExistingSecret)
+	assert.Equal(t, "TOKEN", body.Credentials.TokenKey)
+	assert.True(t, body.Credentials.AutoProvisioned)
 }
 
 func TestAdminGetFleetManagerSetupRequiresAdministrator(t *testing.T) {

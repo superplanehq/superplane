@@ -1,146 +1,205 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
-import { useCreateUserToken } from "@/hooks/useUserTokens";
 import {
+  clearFleetManagerDraft,
+  fleetsMatchConfiguration,
   generateFleetManagerValues,
+  loadFleetManagerDraft,
+  normalizeInfrastructureFields,
+  saveFleetManagerDraft,
   validateFleetManagerConfiguration,
+  type FleetManagerDraft,
   type FleetManagerProvider,
   type FleetManagerSetupMetadata,
+  type InstalledFleet,
 } from "@/lib/fleetManagerSetup";
 
-function useFleetManagerMetadata() {
+const VERIFICATION_INTERVAL_MS = 5_000;
+const VERIFICATION_TIMEOUT_MS = 10 * 60_000;
+
+function defaultDraft(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
+  const defaults = metadata.infrastructureDefaults;
+  return {
+    provider: defaults.provider ?? "aws",
+    managerId: defaults.managerId || "my-cluster",
+    namespace: defaults.namespace || "superplane",
+    serviceAccountName: defaults.serviceAccountName || "superplane-fleet-manager",
+    runnerVersion: metadata.defaultRunnerVersion,
+    selectedFleetIds: metadata.fleetPresets[0] ? [metadata.fleetPresets[0].id] : [],
+    warmCapacity: 0,
+    maxCapacity: 1,
+    fields: normalizeInfrastructureFields(defaults.fields),
+  };
+}
+
+export function useFleetManagerSetup(enabled = true) {
   const [metadata, setMetadata] = useState<FleetManagerSetupMetadata | null>(null);
+  const [draft, setDraft] = useState<FleetManagerDraft | null>(null);
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
-    let active = true;
-    fetch("/admin/api/installation/fleet-manager/setup", { credentials: "include" })
+    if (!enabled || metadata) return;
+
+    const controller = new AbortController();
+    setLoadError(false);
+    fetch("/admin/api/installation/fleet-manager/setup", {
+      credentials: "include",
+      signal: controller.signal,
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error("Could not load Fleet Manager setup metadata");
         return (await response.json()) as FleetManagerSetupMetadata;
       })
-      .then((body) => active && setMetadata(body))
-      .catch(() => active && setLoadError(true));
-    return () => {
-      active = false;
-    };
+      .then((body) => {
+        const initialDraft = loadFleetManagerDraft() ?? defaultDraft(body);
+        setMetadata(body);
+        saveFleetManagerDraft(initialDraft);
+        setDraft(initialDraft);
+      })
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setLoadError(true);
+      });
+
+    return () => controller.abort();
+  }, [enabled, metadata]);
+
+  const updateDraft = useCallback((update: (current: FleetManagerDraft) => FleetManagerDraft) => {
+    setDraft((current) => {
+      if (!current) return current;
+      const next = update(current);
+      saveFleetManagerDraft(next);
+      return next;
+    });
   }, []);
 
-  return { metadata, loadError };
-}
+  const setProvider = useCallback(
+    (provider: FleetManagerProvider) => {
+      updateDraft((current) => ({
+        ...current,
+        provider,
+        fields:
+          metadata?.infrastructureDefaults.provider === provider
+            ? normalizeInfrastructureFields(metadata.infrastructureDefaults.fields)
+            : {},
+      }));
+    },
+    [metadata, updateDraft],
+  );
 
-export function useFleetManagerSetup() {
-  const { metadata, loadError } = useFleetManagerMetadata();
-  const [provider, setProvider] = useState<FleetManagerProvider>("aws");
-  const [managerId, setManagerId] = useState("my-cluster");
-  const [namespace, setNamespace] = useState("superplane");
-  const [serviceAccountName, setServiceAccountName] = useState("superplane-fleet-manager");
-  const [runnerVersion, setRunnerVersion] = useState("");
-  const [selectedFleetIds, setSelectedFleetIds] = useState<string[]>([]);
-  const [warmCapacity, setWarmCapacity] = useState(0);
-  const [maxCapacity, setMaxCapacity] = useState(1);
-  const [providerFieldValues, setProviderFieldValues] = useState<Record<FleetManagerProvider, Record<string, string>>>({
-    aws: {},
-    gcp: {},
-    azure: {},
-  });
-  const [plaintextToken, setPlaintextToken] = useState<string | null>(null);
-  const [tokenError, setTokenError] = useState<string | null>(null);
-  const organizationId = useAccountOrganizations().data?.[0]?.id || "";
-  const createToken = useCreateUserToken(organizationId);
-  const fields = providerFieldValues[provider];
+  const setField = useCallback(
+    (key: string, value: string) =>
+      updateDraft((current) => ({ ...current, fields: { ...current.fields, [key]: value } })),
+    [updateDraft],
+  );
 
-  useEffect(() => {
-    if (!metadata) return;
-    setRunnerVersion(metadata.defaultRunnerVersion);
-    setSelectedFleetIds(metadata.fleetPresets[0] ? [metadata.fleetPresets[0].id] : []);
-  }, [metadata]);
+  const toggleFleet = useCallback(
+    (id: string, checked: boolean) =>
+      updateDraft((current) => ({
+        ...current,
+        selectedFleetIds: checked
+          ? [...new Set([...current.selectedFleetIds, id])]
+          : current.selectedFleetIds.filter((item) => item !== id),
+      })),
+    [updateDraft],
+  );
 
   const values = useMemo(
-    () =>
-      metadata
-        ? generateFleetManagerValues({
-            metadata,
-            provider,
-            managerId,
-            runnerVersion,
-            selectedFleetIds,
-            warmCapacity,
-            maxCapacity,
-            fields,
-            serviceAccountName,
-          })
-        : "",
-    [
-      fields,
-      managerId,
-      maxCapacity,
-      metadata,
-      provider,
-      runnerVersion,
-      selectedFleetIds,
-      serviceAccountName,
-      warmCapacity,
-    ],
+    () => (metadata && draft ? generateFleetManagerValues({ metadata, ...draft }) : ""),
+    [draft, metadata],
   );
-  const validationErrors = validateFleetManagerConfiguration({
-    managerId,
-    namespace,
-    serviceAccountName,
-    runnerVersion,
-    selectedFleetIds,
-    warmCapacity,
-    maxCapacity,
-  });
-
-  const toggleFleet = (id: string, checked: boolean) =>
-    setSelectedFleetIds((current) =>
-      checked ? [...new Set([...current, id])] : current.filter((item) => item !== id),
-    );
-  const setField = (key: string, value: string) =>
-    setProviderFieldValues((current) => ({
-      ...current,
-      [provider]: { ...current[provider], [key]: value },
-    }));
-  const generateToken = async () => {
-    setTokenError(null);
-    try {
-      const token = await createToken.mutateAsync({ name: "Fleet Manager" });
-      if (!token?.plaintext) throw new Error("token response has no plaintext value");
-      setPlaintextToken(token.plaintext);
-    } catch {
-      setTokenError("SuperPlane could not create the token. Try again.");
-    }
-  };
+  const validationErrors = draft ? validateFleetManagerConfiguration(draft) : [];
+  const importedFieldKeys = useMemo(() => {
+    if (!metadata || !draft || metadata.infrastructureDefaults.provider !== draft.provider) return new Set<string>();
+    const defaults = normalizeInfrastructureFields(metadata.infrastructureDefaults.fields);
+    return new Set(Object.keys(defaults).filter((key) => defaults[key] === draft.fields[key]));
+  }, [draft, metadata]);
 
   return {
     metadata,
+    draft,
     loadError,
-    provider,
-    setProvider,
-    managerId,
-    setManagerId,
-    namespace,
-    setNamespace,
-    serviceAccountName,
-    setServiceAccountName,
-    runnerVersion,
-    setRunnerVersion,
-    selectedFleetIds,
-    toggleFleet,
-    warmCapacity,
-    setWarmCapacity,
-    maxCapacity,
-    setMaxCapacity,
-    fields,
-    setField,
     values,
     validationErrors,
-    organizationId,
-    tokenPending: createToken.isPending,
-    tokenError,
-    plaintextToken,
-    generateToken,
+    importedFieldKeys,
+    setProvider,
+    toggleFleet,
+    setField,
+    setManagerId: (value: string) => updateDraft((current) => ({ ...current, managerId: value })),
+    setNamespace: (value: string) => updateDraft((current) => ({ ...current, namespace: value })),
+    setServiceAccountName: (value: string) => updateDraft((current) => ({ ...current, serviceAccountName: value })),
+    setRunnerVersion: (value: string) => updateDraft((current) => ({ ...current, runnerVersion: value })),
+    setWarmCapacity: (value: number) => updateDraft((current) => ({ ...current, warmCapacity: value })),
+    setMaxCapacity: (value: number) => updateDraft((current) => ({ ...current, maxCapacity: value })),
   };
+}
+
+export type FleetManagerVerificationStatus =
+  | "idle"
+  | "checking"
+  | "waiting"
+  | "verified"
+  | "unauthorized"
+  | "error"
+  | "timeout";
+
+export function useFleetManagerVerification(
+  enabled: boolean,
+  draft: FleetManagerDraft | null,
+  metadata: FleetManagerSetupMetadata | null,
+) {
+  const [status, setStatus] = useState<FleetManagerVerificationStatus>("idle");
+  const [retryKey, setRetryKey] = useState(0);
+
+  useEffect(() => {
+    if (!enabled || !draft || !metadata) {
+      setStatus("idle");
+      return;
+    }
+
+    const controller = new AbortController();
+    const startedAt = Date.now();
+    let timeout: number | undefined;
+
+    const check = async () => {
+      setStatus((current) => (current === "waiting" ? current : "checking"));
+      try {
+        const response = await fetch("/admin/api/installation/fleets", {
+          credentials: "include",
+          signal: controller.signal,
+        });
+        if (response.status === 401 || response.status === 403) {
+          setStatus("unauthorized");
+          return;
+        }
+        if (!response.ok) {
+          setStatus("error");
+          return;
+        }
+
+        const body = (await response.json()) as { fleets?: InstalledFleet[] };
+        if (fleetsMatchConfiguration(body.fleets ?? [], draft, metadata.fleetPresets)) {
+          clearFleetManagerDraft();
+          setStatus("verified");
+          return;
+        }
+        if (Date.now() - startedAt >= VERIFICATION_TIMEOUT_MS) {
+          setStatus("timeout");
+          return;
+        }
+
+        setStatus("waiting");
+        timeout = window.setTimeout(() => void check(), VERIFICATION_INTERVAL_MS);
+      } catch (error: unknown) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setStatus("error");
+      }
+    };
+
+    void check();
+    return () => {
+      controller.abort();
+      if (timeout !== undefined) window.clearTimeout(timeout);
+    };
+  }, [draft, enabled, metadata, retryKey]);
+
+  return { status, retry: () => setRetryKey((current) => current + 1) };
 }
