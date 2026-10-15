@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeAll, describe, expect, it } from "bun:test";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 
 import { client } from "@/api-client/client.gen";
 import { FactoriesHarness } from "../../__fixtures__/FactoriesHarness";
@@ -11,8 +12,14 @@ import {
 } from "../../__fixtures__/setupStoryFixtures";
 
 describe("FactorySettingsRepositoryPage", () => {
+  const originalFetch = globalThis.fetch;
+
   beforeAll(() => {
     client.setConfig({ baseUrl: "http://localhost" });
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
   });
 
   it("selects and saves the workspace repository", async () => {
@@ -79,4 +86,61 @@ describe("FactorySettingsRepositoryPage", () => {
     expect(await within(settings).findByRole("option", { name: /acme\/api/i })).toBeInTheDocument();
     expect(within(settings).getByRole("option", { name: /acme\/web/i })).toBeInTheDocument();
   }, 10000);
+
+  it("enables save when the branch changes and sends that branch with the current repository", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/workspace/repository`}
+        factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.agent)}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+      />,
+    );
+
+    const settings = await screen.findByTestId("factory-settings-repository", {}, { timeout: 8000 });
+    const saves: { repository?: string; defaultBranch?: string }[] = [];
+    const currentFetch = globalThis.fetch;
+    globalThis.fetch = async (input, init) => {
+      const target = requestTarget(input);
+      if (target.includes("/repository") && requestMethodFrom(input, init) !== "GET") {
+        saves.push(await readSaveBody(input, init));
+      }
+      return currentFetch(input, init);
+    };
+    try {
+      const branch = await within(settings).findByTestId("factory-settings-default-branch");
+      await user.click(branch);
+      await user.click(await screen.findByRole("option", { name: "develop" }));
+      const saveButton = within(settings).getByTestId("factory-settings-repository-save");
+      await waitFor(() => expect(saveButton).toBeEnabled());
+      await user.click(saveButton);
+
+      await waitFor(() => expect(saves).toEqual([{ repository: "acme/api", defaultBranch: "develop" }]));
+    } finally {
+      globalThis.fetch = currentFetch;
+    }
+  }, 10000);
 });
+
+function requestTarget(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
+
+function requestMethodFrom(input: RequestInfo | URL, init?: RequestInit): string {
+  return (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+}
+
+async function readSaveBody(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+): Promise<{ repository?: string; defaultBranch?: string }> {
+  if (typeof init?.body === "string" && init.body) {
+    return JSON.parse(init.body) as { repository?: string; defaultBranch?: string };
+  }
+  if (input instanceof Request) {
+    return (await input.clone().json()) as { repository?: string; defaultBranch?: string };
+  }
+  return {};
+}
