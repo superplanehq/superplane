@@ -84,9 +84,12 @@ func UpdateFactoryRepository(
 			return invalidArgument("repository settings currently require a GitHub integration")
 		}
 
+		requestedBranch := strings.TrimSpace(req.GetDefaultBranch())
+		repositoryChanged := !sameRepository(previous.AppRepository, repository)
 		selectedRepository := repository
-		selectedDefaultBranch := strings.TrimSpace(req.GetDefaultBranch())
+		hostDefault := ""
 		selectedRepositoryID := int64(0)
+		installationID := int64(0)
 		selectedIntegration := integration
 		_, bindingErr := models.FindVCSProviderIntegrationBinding(tx, integration.ID)
 		if bindingErr == nil {
@@ -117,11 +120,32 @@ func UpdateFactoryRepository(
 			}
 			selectedRepository = catalogRepository.FullName
 			selectedRepositoryID = catalogRepository.RepositoryID
-			selectedDefaultBranch = catalogRepository.DefaultBranch
+			installationID = catalogRepository.InstallationID
+			hostDefault = catalogRepository.DefaultBranch
 		} else if !errors.Is(bindingErr, gorm.ErrRecordNotFound) {
 			return bindingErr
-		} else if selectedDefaultBranch == "" {
-			return invalidArgument("default branch is required")
+		}
+		selectedDefaultBranch, err := chooseSavedBranch(repositoryChanged, requestedBranch, hostDefault)
+		if err != nil {
+			return err
+		}
+		if requestedBranch != "" {
+			if err := ensureGitHubBranch(
+				ctx,
+				deps,
+				selectedIntegration,
+				selectedRepository,
+				installationID,
+				selectedRepositoryID,
+				requestedBranch,
+			); err != nil {
+				return err
+			}
+		}
+		if !repositoryChanged {
+			selectedRepository = previous.AppRepository
+			selectedRepositoryID = previous.AppRepositoryID
+			selectedIntegration = integration
 		}
 
 		previousBranch, err := currentFactoryDefaultBranch(tx, factory, previous.DefaultBranch)
@@ -133,18 +157,18 @@ func UpdateFactoryRepository(
 		}
 
 		selectedIntegrationID := selectedIntegration.ID.String()
-		patch := models.FactoryOnboardingPatch{
-			VCSIntegrationID:    &selectedIntegrationID,
-			AppRepository:       &selectedRepository,
-			AppRepositoryID:     &selectedRepositoryID,
-			BacklogRepository:   &selectedRepository,
-			BacklogRepositoryID: &selectedRepositoryID,
-			DefaultBranch:       &selectedDefaultBranch,
+		patch := models.FactoryOnboardingPatch{DefaultBranch: &selectedDefaultBranch}
+		if repositoryChanged {
+			patch.VCSIntegrationID = &selectedIntegrationID
+			patch.AppRepository = &selectedRepository
+			patch.AppRepositoryID = &selectedRepositoryID
+			patch.BacklogRepository = &selectedRepository
+			patch.BacklogRepositoryID = &selectedRepositoryID
 		}
 		if err := factory.UpdateOnboarding(tx, patch); err != nil {
 			return err
 		}
-		if bindingErr == nil {
+		if repositoryChanged && bindingErr == nil {
 			if err := syncFactoryVCSProviderBindings(
 				tx,
 				models.ProviderGitHub,
@@ -580,7 +604,7 @@ func replaceConfigurationValues(value any, replacements []configurationReplaceme
 		return cloned, changed
 	case string:
 		for _, replacement := range replacements {
-			if replacement.from != "" && current == replacement.from {
+			if replacement.from != "" && replacement.from != replacement.to && current == replacement.from {
 				return replacement.to, true
 			}
 		}
