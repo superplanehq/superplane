@@ -19,13 +19,13 @@ Do the steps in this order:
 | Part | Resources | Variable |
 | --- | --- | --- |
 | SuperPlane | GKE cluster, Cloud NAT (private nodes), Cloud SQL, cert-manager, Helm release | Always |
-| Blob storage | GCS bucket, `superplane-app` service account, Workload Identity binding | `enable_gcs_blob_storage` (default `true`) |
-| Runner network | Runner subnetwork, deny-all ingress firewall rule, `superplane-fleet-mgr` service account | `enable_runners` (default `true`) |
-| Fleet Manager infrastructure | Service account, Workload Identity binding, setup values, service-token Secret | `enable_runners` (default `true`) |
+| Blob storage | GCS bucket, `superplane-app` service account, Workload Identity binding | `enable_gcs_blob_storage` |
+| Runner network | Runner subnetwork, deny-all ingress firewall rule, `superplane-fleet-mgr` service account | `enable_runners` |
+| Fleet Manager infrastructure | Service account, Workload Identity binding, setup values, service-token Secret | `enable_runners` |
 
-The apply creates blob storage and runner infrastructure. Set both flags to
-`false` only for a short app-only evaluation. That evaluation stores blobs on
-pod volumes.
+A new install sets both flags to `true` in `terraform.tfvars` before the first
+apply. The variable defaults stay `false`. An existing install that omitted
+these settings keeps local blob files.
 
 ## Prerequisites
 
@@ -104,15 +104,13 @@ letsencrypt_email = "admin@example.com"
 # Required. Confirm both artifacts exist before you apply.
 superplane_image_tag     = "<commit-sha>-selfhosted"
 superplane_chart_version = "0.0.0-<commit-sha>"
+
+enable_gcs_blob_storage = true
+enable_runners          = true
 ```
 
-GCS blob storage and runner infrastructure are on by default. Set both flags
-to `false` only for a short app-only evaluation:
-
-```hcl
-enable_gcs_blob_storage = false
-enable_runners          = false
-```
+Set both flags in this file. Do not rely on the variable defaults. Those
+defaults stay `false` so an existing install keeps its current blob storage.
 
 Select a `main` commit that published both artifacts. The image and the
 chart can use different SHAs. Confirm them:
@@ -293,12 +291,12 @@ must stop and Fleet Manager must delete it after the task.
 | `superplane_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the SuperPlane image. |
 | `fleet_manager_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the standalone Fleet Manager image. Set this for private GCP registries so nodes keep pull access. |
 | `superplane_image_tag` | required | Image tag. Must contain `selfhosted`. Published tags are `<git-sha>-selfhosted`. |
-| `enable_gcs_blob_storage` | `true` | Store blobs in GCS. Set this and `enable_runners` to `false` for an app-only evaluation. |
+| `enable_gcs_blob_storage` | `false` | Store blobs in GCS. Set this to `true` in `terraform.tfvars` for a new install. |
 | `blob_bucket_name` | `<project_id>-superplane-blobs` | Name of the blob bucket. |
 | `blob_bucket_force_destroy` | `false` | Delete the bucket objects on destroy. |
 | `superplane_chart_path` | empty | Path to a local chart. Empty installs the published chart. |
 | `superplane_chart_version` | empty | Version of the published chart, for example `0.0.0-<commit-sha>`. Required when `superplane_chart_path` is empty. |
-| `enable_runners` | `true` | Enable the runner API and create the runner network. |
+| `enable_runners` | `false` | Enable the runner API and create the runner network. Set this to `true` in `terraform.tfvars` for a new install. |
 | `runner_subnet_cidr` | `172.20.0.0/24` | Range of the runner subnetwork. |
 | `runner_zones` | `[zone]` | Zones for runner VMs. |
 
