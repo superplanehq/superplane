@@ -41,9 +41,9 @@ export function columnAutomationHeaderRowCount(columns: ReadonlyArray<ReadonlyAr
   return Math.max(1, ...columns.map((automations) => automations.length));
 }
 
-const SPLIT_CONFIG_NODE_IDS = new Set(["on-pr-risk", "on-pr-visual-evidence"]);
+const SPLIT_CONFIG_NODE_IDS = new Set(["on-pr-risk", "on-pr-visual-evidence", "on-pr-closed"]);
 
-/** Merge confidence and visual evidence open the split node settings panel. */
+/** Merge confidence, visual evidence, and pull-request closure open the split node settings panel. */
 export function columnAutomationUsesSplitConfig(nodeIds: Iterable<string | undefined>): boolean {
   for (const id of nodeIds) {
     if (id && SPLIT_CONFIG_NODE_IDS.has(id)) {
