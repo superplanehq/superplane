@@ -22,6 +22,20 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "blobs" {
   }
 }
 
+# Finished runner logs are a signed GET. The browser fetches that URL
+# from the SuperPlane origin, so the bucket must allow that origin.
+resource "aws_s3_bucket_cors_configuration" "blobs" {
+  bucket = aws_s3_bucket.blobs.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["GET", "HEAD"]
+    allowed_origins = ["https://${var.domain_name}"]
+    expose_headers  = ["Content-Type", "Content-Encoding", "Content-Length"]
+    max_age_seconds = 3600
+  }
+}
+
 resource "aws_iam_role" "blob_storage" {
   name = "${var.cluster_name}-blob-storage"
 
