@@ -189,6 +189,18 @@ variable "runner_zones" {
   default     = []
 }
 
+variable "runner_image_amd64" {
+  description = "Packer-built GCP image resource for linux/amd64 runner VMs."
+  type        = string
+  default     = ""
+}
+
+variable "runner_image_arm64" {
+  description = "Packer-built GCP image resource for linux/arm64 runner VMs."
+  type        = string
+  default     = ""
+}
+
 # -----------------------------------------------------------------------------
 # Optional Variables - Network
 # -----------------------------------------------------------------------------

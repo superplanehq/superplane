@@ -430,7 +430,7 @@ kubectl get svc -n ingress-nginx ingress-nginx-controller \\
     )
     story.append(
         Paragraph(
-            "Complete owner setup. The SuperPlane chart provisions the dedicated Fleet Manager service-token Secret in Kubernetes.",
+            "Complete owner setup. SuperPlane creates a personal token when you generate the Fleet Manager install command.",
             s["body"],
         )
     )
@@ -461,7 +461,7 @@ packer build -var-file=release/runner/packer/azure/runner.pkrvars.hcl \\
     )
     story.append(
         Paragraph(
-            "Open Set up runner fleets in SuperPlane. The wizard preloads the Terraform outputs. Replace the Azure image placeholder with the immutable gallery image version, confirm that the dedicated Secret exists, and install the standalone Fleet Manager chart.",
+            "Set runner_image_amd64 or runner_image_arm64 to the immutable gallery image-version resource ID and apply Terraform. Open Set up runner fleets in SuperPlane. Select the fleets, then run the generated Helm heredoc. The standalone chart creates fleet-manager-config with the complete configuration.",
             s["body"],
         )
     )
