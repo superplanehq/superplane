@@ -314,7 +314,9 @@ it.each([
       managerId: "superplane",
       namespace: "superplane",
       serviceAccountName: "superplane-fleet-manager",
-      fields: { ...fields },
+      fields: Object.fromEntries(
+        Object.entries(fields).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
+      ),
     },
   };
   const draft = mergeTerraformInfrastructure(

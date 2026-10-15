@@ -58,16 +58,17 @@ export function FleetManagerFleetSection({
   contained?: boolean;
 }) {
   if (!setup.metadata || !setup.draft) return null;
+  const metadata = setup.metadata;
+  const draft = setup.draft;
 
   return (
     <div>
       <div className={contained ? "max-h-52 space-y-2 overflow-y-auto pr-1" : "space-y-2"}>
-        {setup.metadata.fleetPresets.map((preset) => {
+        {metadata.fleetPresets.map((preset) => {
           const id = `fleet-${preset.id}`;
-          const selected = setup.draft?.selectedFleetIds.includes(preset.id) ?? false;
+          const selected = draft.selectedFleetIds.includes(preset.id);
           const blocked =
-            setup.metadata?.infrastructureDefaults.source === "terraform" &&
-            !setup.hasFleetImage(preset.spec.architecture);
+            metadata.infrastructureDefaults.source === "terraform" && !setup.hasFleetImage(preset.spec.architecture);
           return (
             <div key={preset.id} className="flex items-start gap-3 rounded-md border border-border p-3">
               <Checkbox
@@ -93,7 +94,7 @@ export function FleetManagerFleetSection({
                     <Field
                       id={`machine-type-${preset.id}`}
                       label={`Machine type for ${preset.id}`}
-                      value={setup.draft.fields[`machineType.${preset.id}`] || ""}
+                      value={draft.fields[`machineType.${preset.id}`] || ""}
                       onChange={(event) => setup.setField(`machineType.${preset.id}`, event.target.value)}
                     />
                     <Field
@@ -101,7 +102,7 @@ export function FleetManagerFleetSection({
                       label={`Warm capacity for ${preset.id}`}
                       type="number"
                       min={0}
-                      value={setup.draft.fleetCapacities[preset.id]?.warmCapacity ?? 0}
+                      value={draft.fleetCapacities[preset.id]?.warmCapacity ?? 0}
                       onChange={(event) =>
                         setup.setFleetCapacity(preset.id, { warmCapacity: Number(event.target.value) })
                       }
@@ -111,7 +112,7 @@ export function FleetManagerFleetSection({
                       label={`Maximum capacity for ${preset.id}`}
                       type="number"
                       min={0}
-                      value={setup.draft.fleetCapacities[preset.id]?.maxCapacity ?? 1}
+                      value={draft.fleetCapacities[preset.id]?.maxCapacity ?? 1}
                       onChange={(event) =>
                         setup.setFleetCapacity(preset.id, { maxCapacity: Number(event.target.value) })
                       }
@@ -125,12 +126,12 @@ export function FleetManagerFleetSection({
       </div>
       <div className="mt-5 max-w-xs">
         <Label htmlFor="runner-version">Runner version</Label>
-        <Select value={setup.draft.runnerVersion} onValueChange={setup.setRunnerVersion}>
+        <Select value={draft.runnerVersion} onValueChange={setup.setRunnerVersion}>
           <SelectTrigger id="runner-version" className="mt-1.5 w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {setup.metadata.runnerVersions.map((version) => (
+            {metadata.runnerVersions.map((version) => (
               <SelectItem key={version} value={version}>
                 {version}
               </SelectItem>
