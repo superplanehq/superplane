@@ -29,8 +29,6 @@ type ProviderField = { key: string; label: string; placeholder: string };
 const providerFields: Record<FleetManagerProvider, ProviderField[]> = {
   aws: [
     { key: "region", label: "AWS region", placeholder: "us-east-1" },
-    { key: "machineTypeAmd64", label: "EC2 instance type for AMD64", placeholder: "m8a.large" },
-    { key: "machineTypeArm64", label: "EC2 instance type for ARM64", placeholder: "m8g.large" },
     { key: "subnetIds", label: "Private subnet IDs", placeholder: "subnet-a, subnet-b" },
     { key: "securityGroupIds", label: "Runner security group IDs", placeholder: "sg-0123456789" },
     { key: "runnerIdentity", label: "Runner instance profile", placeholder: "superplane-runner" },
@@ -43,8 +41,6 @@ const providerFields: Record<FleetManagerProvider, ProviderField[]> = {
   gcp: [
     { key: "projectId", label: "GCP project", placeholder: "my-project" },
     { key: "zones", label: "Zones", placeholder: "us-central1-a, us-central1-b" },
-    { key: "machineTypeAmd64", label: "Compute Engine machine type for AMD64", placeholder: "e2-standard-4" },
-    { key: "machineTypeArm64", label: "Compute Engine machine type for ARM64", placeholder: "t2a-standard-4" },
     { key: "subnetwork", label: "Runner subnetwork", placeholder: "projects/.../subnetworks/runners" },
     { key: "networkTags", label: "Runner network tags", placeholder: "superplane-runner" },
     {
@@ -63,8 +59,6 @@ const providerFields: Record<FleetManagerProvider, ProviderField[]> = {
     { key: "resourceGroup", label: "Resource group", placeholder: "superplane" },
     { key: "location", label: "Location", placeholder: "eastus" },
     { key: "zones", label: "Zones", placeholder: "1, 2" },
-    { key: "machineTypeAmd64", label: "Azure VM size for AMD64", placeholder: "Standard_D2ds_v4" },
-    { key: "machineTypeArm64", label: "Azure VM size for ARM64", placeholder: "Standard_D2ps_v5" },
     { key: "subnetId", label: "Runner subnet ID", placeholder: "/subscriptions/.../subnets/runners" },
     {
       key: "securityGroupIds",
@@ -82,6 +76,12 @@ const providerFields: Record<FleetManagerProvider, ProviderField[]> = {
       placeholder: "00000000-0000-0000-0000-000000000000",
     },
   ],
+};
+
+const machineTypePlaceholder = (provider: FleetManagerProvider, architecture: "amd64" | "arm64") => {
+  if (provider === "aws") return architecture === "amd64" ? "m8a.large" : "m8g.large";
+  if (provider === "gcp") return architecture === "amd64" ? "e2-standard-4" : "t2a-standard-4";
+  return architecture === "amd64" ? "Standard_D2ds_v4" : "Standard_D2ps_v5";
 };
 
 const Field = ({
@@ -186,12 +186,23 @@ function FleetsStep({ setup, actions }: { setup: SetupState; actions: React.Reac
                 checked={setup.draft?.selectedFleetIds.includes(preset.id)}
                 onChange={(event) => setup.toggleFleet(preset.id, event.target.checked)}
               />
-              <Label htmlFor={id} className="min-w-0 text-sm">
-                <span className="block font-medium">{preset.id}</span>
-                <span className="block text-xs text-muted-foreground">
-                  {preset.spec.architecture} · {preset.spec.cpuMillicores}m CPU · {preset.spec.memoryMb} MB memory
-                </span>
-              </Label>
+              <div className="min-w-0 flex-1 space-y-3">
+                <Label htmlFor={id} className="text-sm">
+                  <span className="block font-medium">{preset.id}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {preset.spec.architecture} · {preset.spec.cpuMillicores}m CPU · {preset.spec.memoryMb} MB memory
+                  </span>
+                </Label>
+                {setup.draft?.selectedFleetIds.includes(preset.id) && (
+                  <Field
+                    id={`machine-type-${preset.id}`}
+                    label={`Machine type for ${preset.id}`}
+                    value={setup.draft.fields[`machineType.${preset.id}`] || ""}
+                    placeholder={machineTypePlaceholder(setup.draft.provider, preset.spec.architecture)}
+                    onChange={(event) => setup.setField(`machineType.${preset.id}`, event.target.value)}
+                  />
+                )}
+              </div>
             </div>
           );
         })}
@@ -264,6 +275,14 @@ function InfrastructureStep({ setup, actions }: { setup: SetupState; actions: Re
             imported={setup.metadata.infrastructureDefaults.serviceAccountName === setup.draft.serviceAccountName}
             value={setup.draft.serviceAccountName}
             onChange={(event) => setup.setServiceAccountName(event.target.value)}
+          />
+          <Field
+            id="superplane-url"
+            label="SuperPlane URL"
+            imported={setup.metadata.infrastructureDefaults.fields.superplaneUrl === setup.draft.superplaneUrl}
+            value={setup.draft.superplaneUrl}
+            placeholder="https://superplane.example.com"
+            onChange={(event) => setup.setSuperplaneUrl(event.target.value)}
           />
           {providerFields[setup.draft.provider].map((field) => (
             <Field

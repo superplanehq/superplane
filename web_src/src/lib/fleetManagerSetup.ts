@@ -41,6 +41,7 @@ export type FleetManagerDraft = {
   managerId: string;
   namespace: string;
   serviceAccountName: string;
+  superplaneUrl: string;
   runnerVersion: string;
   selectedFleetIds: string[];
   warmCapacity: number;
@@ -69,15 +70,17 @@ const splitList = (value: string | undefined, fallback: string) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-const machineType = (spec: FleetSpec, fields: FleetManagerProviderFields, fallback: string) =>
-  fields[`machineType${spec.architecture === "amd64" ? "Amd64" : "Arm64"}`] || fallback;
+const machineType = (fleetId: string, spec: FleetSpec, fields: FleetManagerProviderFields, fallback: string) =>
+  fields[`machineType.${fleetId}`] ||
+  fields[`machineType${spec.architecture === "amd64" ? "Amd64" : "Arm64"}`] ||
+  fallback;
 
 const providerConfiguration = {
-  aws: (spec: FleetSpec, fields: FleetManagerProviderFields) => ({
+  aws: (fleetId: string, spec: FleetSpec, fields: FleetManagerProviderFields) => ({
     aws: {
       region: fields.region || "<AWS_REGION>",
       ami: "<PUBLIC_AMI_ID_FOR_REGION_AND_ARCH>",
-      instanceType: machineType(spec, fields, "<INSTANCE_TYPE>"),
+      instanceType: machineType(fleetId, spec, fields, "<INSTANCE_TYPE>"),
       architecture: spec.architecture,
       subnetIds: splitList(fields.subnetIds, "<SUBNET_ID>"),
       securityGroupIds: splitList(fields.securityGroupIds, "<SECURITY_GROUP_ID>"),
@@ -85,11 +88,11 @@ const providerConfiguration = {
       volumeSizeGb: spec.diskGb,
     },
   }),
-  gcp: (spec: FleetSpec, fields: FleetManagerProviderFields) => ({
+  gcp: (fleetId: string, spec: FleetSpec, fields: FleetManagerProviderFields) => ({
     gcp: {
       projectId: fields.projectId || "<GCP_PROJECT_ID>",
       zones: splitList(fields.zones, "<GCP_ZONE>"),
-      machineType: machineType(spec, fields, "<MACHINE_TYPE>"),
+      machineType: machineType(fleetId, spec, fields, "<MACHINE_TYPE>"),
       image: "<PUBLIC_GCP_IMAGE_OR_FAMILY>",
       architecture: spec.architecture,
       subnetwork: fields.subnetwork || "<RUNNER_SUBNETWORK>",
@@ -98,13 +101,13 @@ const providerConfiguration = {
       diskSizeGb: spec.diskGb,
     },
   }),
-  azure: (spec: FleetSpec, fields: FleetManagerProviderFields) => ({
+  azure: (fleetId: string, spec: FleetSpec, fields: FleetManagerProviderFields) => ({
     azure: {
       subscriptionId: fields.subscriptionId || "<AZURE_SUBSCRIPTION_ID>",
       resourceGroup: fields.resourceGroup || "<RESOURCE_GROUP>",
       location: fields.location || "<AZURE_LOCATION>",
       imageId: "<PUBLIC_AZURE_IMAGE_VERSION_ID>",
-      vmSize: machineType(spec, fields, "<VM_SIZE>"),
+      vmSize: machineType(fleetId, spec, fields, "<VM_SIZE>"),
       architecture: spec.architecture,
       subnetId: fields.subnetId || "<RUNNER_SUBNET_ID>",
       networkSecurityGroupId: fields.securityGroupIds || "<NETWORK_SECURITY_GROUP_ID>",
@@ -126,7 +129,7 @@ export function generateFleetManagerValues(input: GenerateValuesInput): string {
       maxCapacity: input.maxCapacity,
       spec: preset.spec,
       provider: input.provider,
-      ...providerConfiguration[input.provider](preset.spec, input.fields),
+      ...providerConfiguration[input.provider](preset.id, preset.spec, input.fields),
     }));
 
   const workloadIdentity =
@@ -152,7 +155,7 @@ export function generateFleetManagerValues(input: GenerateValuesInput): string {
   return dump(
     {
       manager: { id: input.managerId },
-      superplane: { url: window.location.origin },
+      superplane: { url: input.superplaneUrl },
       credentials: {
         existingSecret: input.metadata.credentials.existingSecret,
         tokenKey: input.metadata.credentials.tokenKey,
@@ -188,6 +191,12 @@ export function validateFleetManagerConfiguration(input: FleetManagerConfigurati
   }
   if (!/^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$/.test(input.serviceAccountName)) {
     errors.push("Enter a valid service account name.");
+  }
+  try {
+    const url = new URL(input.superplaneUrl);
+    if (url.protocol !== "https:" && url.protocol !== "http:") errors.push("Enter a valid SuperPlane URL.");
+  } catch {
+    errors.push("Enter a valid SuperPlane URL.");
   }
   if (input.selectedFleetIds.length === 0) {
     errors.push("Select at least one fleet.");
@@ -246,6 +255,19 @@ export function saveFleetManagerDraft(draft: FleetManagerDraft): void {
   window.localStorage.setItem(FLEET_MANAGER_DRAFT_KEY, JSON.stringify(draft));
 }
 
+type RequiredDraftStrings = Pick<
+  FleetManagerDraft,
+  "managerId" | "namespace" | "serviceAccountName" | "superplaneUrl" | "runnerVersion"
+>;
+
+function hasRequiredDraftStrings(
+  draft: Partial<FleetManagerDraft>,
+): draft is Partial<FleetManagerDraft> & RequiredDraftStrings {
+  return [draft.managerId, draft.namespace, draft.serviceAccountName, draft.superplaneUrl, draft.runnerVersion].every(
+    (value) => typeof value === "string" && value.length > 0,
+  );
+}
+
 export function loadFleetManagerDraft(): FleetManagerDraft | null {
   const stored = window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY);
   if (!stored) return null;
@@ -253,7 +275,7 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
   try {
     const draft = JSON.parse(stored) as Partial<FleetManagerDraft>;
     if (!draft.provider || !["aws", "gcp", "azure"].includes(draft.provider)) return null;
-    if (!draft.managerId || !draft.namespace || !draft.serviceAccountName || !draft.runnerVersion) return null;
+    if (!hasRequiredDraftStrings(draft)) return null;
     if (!Array.isArray(draft.selectedFleetIds) || !draft.selectedFleetIds.every((id) => typeof id === "string"))
       return null;
     if (typeof draft.fields !== "object" || draft.fields === null) return null;
@@ -266,6 +288,7 @@ export function loadFleetManagerDraft(): FleetManagerDraft | null {
       managerId: draft.managerId,
       namespace: draft.namespace,
       serviceAccountName: draft.serviceAccountName,
+      superplaneUrl: draft.superplaneUrl,
       runnerVersion: draft.runnerVersion,
       selectedFleetIds: draft.selectedFleetIds,
       warmCapacity: draft.warmCapacity,

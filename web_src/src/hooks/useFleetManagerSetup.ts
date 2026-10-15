@@ -19,16 +19,18 @@ const VERIFICATION_TIMEOUT_MS = 10 * 60_000;
 
 function defaultDraft(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
   const defaults = metadata.infrastructureDefaults;
+  const { superplaneUrl, ...fields } = normalizeInfrastructureFields(defaults.fields);
   return {
     provider: defaults.provider ?? "aws",
     managerId: defaults.managerId || "my-cluster",
     namespace: defaults.namespace || "superplane",
     serviceAccountName: defaults.serviceAccountName || "superplane-fleet-manager",
+    superplaneUrl: superplaneUrl || window.location.origin,
     runnerVersion: metadata.defaultRunnerVersion,
     selectedFleetIds: metadata.fleetPresets[0] ? [metadata.fleetPresets[0].id] : [],
     warmCapacity: 0,
     maxCapacity: 1,
-    fields: normalizeInfrastructureFields(defaults.fields),
+    fields,
   };
 }
 
@@ -74,13 +76,12 @@ export function useFleetManagerSetup(enabled = true) {
 
   const setProvider = useCallback(
     (provider: FleetManagerProvider) => {
+      const providerDefaults = normalizeInfrastructureFields(metadata?.infrastructureDefaults.fields ?? {});
+      delete providerDefaults.superplaneUrl;
       updateDraft((current) => ({
         ...current,
         provider,
-        fields:
-          metadata?.infrastructureDefaults.provider === provider
-            ? normalizeInfrastructureFields(metadata.infrastructureDefaults.fields)
-            : {},
+        fields: metadata?.infrastructureDefaults.provider === provider ? providerDefaults : {},
       }));
     },
     [metadata, updateDraft],
@@ -127,6 +128,7 @@ export function useFleetManagerSetup(enabled = true) {
     setManagerId: (value: string) => updateDraft((current) => ({ ...current, managerId: value })),
     setNamespace: (value: string) => updateDraft((current) => ({ ...current, namespace: value })),
     setServiceAccountName: (value: string) => updateDraft((current) => ({ ...current, serviceAccountName: value })),
+    setSuperplaneUrl: (value: string) => updateDraft((current) => ({ ...current, superplaneUrl: value })),
     setRunnerVersion: (value: string) => updateDraft((current) => ({ ...current, runnerVersion: value })),
     setWarmCapacity: (value: number) => updateDraft((current) => ({ ...current, warmCapacity: value })),
     setMaxCapacity: (value: number) => updateDraft((current) => ({ ...current, maxCapacity: value })),
