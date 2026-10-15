@@ -87,17 +87,14 @@ locals {
       managerId          = var.cluster_name
       namespace          = var.superplane_namespace
       serviceAccountName = local.fleet_manager_service_account_name
-      credentials = {
-        provision      = true
-        existingSecret = "superplane-fleet-manager-token"
-        tokenKey       = "INSTALLATION_ADMIN_TOKEN"
-      }
       infrastructure = local.runners_enabled ? {
         superplaneUrl        = "https://${var.domain_name}"
         projectId            = var.project_id
         zones                = local.runner_zones
         subnetwork           = google_compute_subnetwork.runners[0].id
         networkTags          = [local.runner_network_tag]
+        imageAmd64           = var.runner_image_amd64
+        imageArm64           = var.runner_image_arm64
         fleetManagerIdentity = google_service_account.fleet_manager[0].email
       } : null
     }

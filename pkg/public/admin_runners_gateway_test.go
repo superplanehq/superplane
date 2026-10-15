@@ -3,8 +3,6 @@ package public
 import (
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/google/uuid"
@@ -16,69 +14,6 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 )
-
-func TestAdminRunnersGatewayScopesFleetManagerServiceToken(t *testing.T) {
-	tokenPath := filepath.Join(t.TempDir(), "fleet-manager-token")
-	serviceToken := "fleet-manager-service-token"
-	require.NoError(t, os.WriteFile(tokenPath, []byte(serviceToken+"\n"), 0o600))
-	t.Setenv("FLEET_MANAGER_TOKEN_PATH", tokenPath)
-
-	server, resource, _ := setupAdminTestServer(t)
-	registerTestGRPCGateway(
-		t,
-		server,
-		resource.AuthService,
-		resource.Registry,
-		resource.Encryptor,
-		support.NewOIDCProvider(),
-	)
-
-	t.Run("accepts service token on fleet endpoints", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:    http.MethodGet,
-			path:      "/admin/api/installation/fleets",
-			authToken: serviceToken,
-		})
-		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
-	})
-
-	t.Run("rejects incorrect service token", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:    http.MethodGet,
-			path:      "/admin/api/installation/fleets",
-			authToken: "incorrect-token",
-		})
-		require.Equal(t, http.StatusUnauthorized, response.Code)
-	})
-
-	t.Run("reads a rotated service token", func(t *testing.T) {
-		rotatedToken := "rotated-fleet-manager-token"
-		require.NoError(t, os.WriteFile(tokenPath, []byte(rotatedToken), 0o600))
-
-		oldTokenResponse := execRequest(server, requestParams{
-			method:    http.MethodGet,
-			path:      "/admin/api/installation/fleets",
-			authToken: serviceToken,
-		})
-		require.Equal(t, http.StatusUnauthorized, oldTokenResponse.Code)
-
-		rotatedTokenResponse := execRequest(server, requestParams{
-			method:    http.MethodGet,
-			path:      "/admin/api/installation/fleets",
-			authToken: rotatedToken,
-		})
-		require.Equal(t, http.StatusOK, rotatedTokenResponse.Code, rotatedTokenResponse.Body.String())
-	})
-
-	t.Run("rejects service token on other admin endpoints", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:    http.MethodGet,
-			path:      "/admin/api/accounts",
-			authToken: serviceToken,
-		})
-		require.Equal(t, http.StatusUnauthorized, response.Code)
-	})
-}
 
 func TestAdminRunnersGatewaySupportsCookieAndPersonalTokenAuthentication(t *testing.T) {
 	server, resource, accountToken := setupAdminTestServer(t)
