@@ -28,7 +28,12 @@ export function BrandArrowArt({
   return (
     <div className="brand-arrow-art" style={{ background }} aria-hidden="true">
       <img src={field} alt="" className="brand-arrow-fallback" />
-      {canAnimate ? <FirstRunArtPane art={{ mode: "school", background, arrowColor }} /> : null}
+      {canAnimate ? (
+        <FirstRunArtPane
+          className="brand-arrow-motion"
+          art={{ mode: "school", background, arrowColor, arrowScale: variant === "orange" ? 1.4 : undefined }}
+        />
+      ) : null}
     </div>
   );
 }

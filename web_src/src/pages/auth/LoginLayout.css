@@ -15,6 +15,7 @@
   display: flex;
   flex-direction: column;
   padding: 32px clamp(24px, 5vw, 80px);
+  gap: 40px;
 }
 .login-brand-home {
   display: block;
@@ -27,16 +28,22 @@
 }
 .login-brand-form {
   width: 100%;
-  max-width: 380px;
+  max-width: 440px;
   margin: auto;
-  padding: 56px 0;
+  padding: 36px 32px;
+  border: 1px solid var(--login-border);
+  border-radius: 24px;
+  background: #f9f9f3;
 }
 .login-brand h1 {
   font-family: inherit;
-  font-size: clamp(28px, 2.6vw, 38px);
+  font-size: clamp(23px, 2vw, 28px);
   line-height: 1.15;
   font-weight: 500;
   letter-spacing: -0.035em;
+}
+.login-brand-form > header {
+  text-align: center;
 }
 .login-brand-subheading {
   margin-top: 12px;
@@ -101,8 +108,8 @@
 }
 .login-brand-fields [data-slot="input"] {
   height: 46px;
-  border-radius: 6px;
-  background: transparent;
+  border-radius: 10px;
+  background: #e4e4da;
   border-color: var(--login-border);
   color: var(--login-text);
   font-family: inherit;
@@ -111,8 +118,8 @@
   color: var(--login-muted);
 }
 .login-brand-fields [data-slot="button"] {
-  min-height: 46px;
-  border-radius: 6px;
+  min-height: 42px;
+  border-radius: 999px;
   font-family: inherit;
   font-size: 14px;
 }
@@ -125,7 +132,7 @@
   background: #174d4f;
 }
 .login-brand-fields [data-slot="button"]:not([type="submit"]) {
-  background: transparent;
+  background: #e4e4da;
   color: var(--login-text);
   border-color: var(--login-border);
 }
@@ -168,7 +175,7 @@
     width: 170px;
   }
   .login-brand-form {
-    padding: 40px 0;
+    padding: 32px 24px;
   }
 }
 
@@ -198,4 +205,20 @@
 }
 .login-brand-fields .login-signup-entry a {
   color: var(--login-text);
+}
+
+.dark .login-brand-form {
+  background: #17191a;
+}
+.dark .login-brand-fields [data-slot="input"],
+.dark .login-brand-fields [data-slot="button"]:not([type="submit"]) {
+  background: #242425;
+}
+.login-brand-field .brand-arrow-motion {
+  transform: scale(1.25);
+}
+@media (max-width: 380px) {
+  .login-brand-form {
+    padding: 28px 20px;
+  }
 }
