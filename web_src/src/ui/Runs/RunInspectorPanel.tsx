@@ -9,6 +9,7 @@ import {
   type TriggersTrigger,
 } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useCanvasVersion, useEventExecutions } from "@/hooks/useCanvasData";
 import { useMe } from "@/hooks/useMe";
 import { appDarkModeClasses } from "@/lib/appDarkModeClasses";
@@ -26,7 +27,7 @@ import { buildNodeMap, buildRunPresentation, type RUN_STATUS_META } from "./runP
 import { normalizeRunErrors } from "./runErrors";
 import type { RunInspectorCurrentUser, RunInspectorErrorSummary, RunInspectorNodeSection } from "./types";
 import { useResizableInspectorWidth } from "./useResizableInspectorWidth";
-import { useRunInspectorActions } from "./useRunInspectorActions";
+import { canvasUpdatePermissionMessage, useRunInspectorActions } from "./useRunInspectorActions";
 import { buildRunInspectorNodeSections, findRunInspectorErrorSummaries } from "./runNodeDetailModel";
 
 export interface RunInspectorPanelProps {
@@ -159,7 +160,8 @@ function RunInspectorPanelBody({
         stepCount={model.sections.length || run.executions?.length || 0}
         onAction={() => (stopping ? model.actions.stop() : model.actions.rerun())}
         actionPending={stopping ? model.actions.stopPending : model.actions.rerunPending}
-        actionDisabled={stopping ? model.actions.stopDisabled : !run.rootEvent?.id}
+        actionDisabled={stopping ? model.actions.stopDisabled : model.actions.rerunDisabled}
+        actionTooltip={model.canUpdateCanvas ? undefined : canvasUpdatePermissionMessage}
       />
       <RunInspectorContent
         runErrors={model.runErrors}
@@ -298,6 +300,8 @@ function useRunInspectorPanelModel({
   workflowEdges,
   workflowNodes,
 }: RunInspectorPanelProps) {
+  const { canAct } = usePermissions();
+  const canUpdateCanvas = canAct("canvases", "update");
   const { account } = useAccount();
   const { data: me } = useMe(true, organizationId ?? null);
   const executionsQuery = useEventExecutions(canvasId, run.rootEvent?.id || null);
@@ -336,6 +340,7 @@ function useRunInspectorPanelModel({
     sections,
     executionsLoading: executionsQuery.isLoading,
     onRerunCreated,
+    canUpdateCanvas,
   });
   const accordionValue = useMemo(
     () => resolveSelectedSectionValue(sections, selectedNodeId, selectedSectionValue),
@@ -347,6 +352,7 @@ function useRunInspectorPanelModel({
   return {
     accordionValue,
     actions,
+    canUpdateCanvas,
     clearErrorScrollRequest: () => setErrorScrollRequest(null),
     errorScrollRequest,
     errorSummaries,

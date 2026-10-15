@@ -1,11 +1,18 @@
 import { useContext } from "react";
 
-import { PermissionsContext } from "./permissionsContextState";
+import { PermissionsContext, type PermissionsContextType } from "./permissionsContextState";
+
+const missingPermissions: PermissionsContextType = {
+  permissions: [],
+  isLoading: false,
+  canAct: () => false,
+  currentUserId: undefined,
+  browserNotificationPreferences: {
+    enabled: false,
+    showWhileViewing: true,
+  },
+};
 
 export function usePermissions() {
-  const context = useContext(PermissionsContext);
-  if (!context) {
-    throw new Error("usePermissions must be used within a PermissionsProvider");
-  }
-  return context;
+  return useContext(PermissionsContext) ?? missingPermissions;
 }
