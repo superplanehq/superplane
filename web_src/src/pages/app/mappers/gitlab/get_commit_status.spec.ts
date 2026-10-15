@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { buildGitLabDetailsContext } from "./test_support";
 
-import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
+import type { ExecutionDetailsContext, ExecutionInfo } from "../types";
 import { getCommitStatusMapper } from "./get_commit_status";
 
 describe("getCommitStatusMapper", () => {
@@ -31,6 +32,8 @@ describe("getCommitStatusMapper", () => {
       }),
     );
 
+    expect(Object.keys(details)[0]).toBe("Retrieved At");
+    expect(Object.keys(details).length).toBeLessThanOrEqual(6);
     expect(details).toEqual({
       "Retrieved At": expect.any(String),
       Status: "failed",
@@ -39,32 +42,6 @@ describe("getCommitStatusMapper", () => {
       Ref: "main",
       URL: "https://gitlab.com/g/p/-/pipelines/1024",
     });
-  });
-
-  it("shows the timestamp first and at most 6 details", () => {
-    const details = getCommitStatusMapper.getExecutionDetails(
-      buildDetailsContext({
-        outputs: {
-          default: [
-            {
-              type: "gitlab.commit",
-              timestamp: "2026-02-13T18:04:12.000Z",
-              data: {
-                id: "18f3e63d05582537db6d183d9d557be09e1f90c8",
-                short_id: "18f3e63d",
-                status: "success",
-                web_url: "https://gitlab.com/g/p/-/commit/18f3e63d",
-                last_pipeline: { id: 1, ref: "main", status: "success", web_url: "https://gitlab.com/x" },
-              },
-            },
-          ],
-        },
-      }),
-    );
-
-    const keys = Object.keys(details);
-    expect(keys[0]).toBe("Retrieved At");
-    expect(keys.length).toBeLessThanOrEqual(6);
   });
 
   it("falls back to the commit URL when there is no pipeline", () => {
@@ -103,39 +80,15 @@ describe("getCommitStatusMapper", () => {
 });
 
 function buildDetailsContext(execution: Partial<ExecutionInfo>): ExecutionDetailsContext {
-  const node: NodeInfo = {
-    id: "node-1",
-    name: "Get Commit Status",
-    componentName: "gitlab.getCommitStatus",
-    isCollapsed: false,
-    configuration: {
-      project: "123",
-      ref: "main",
-    },
-    metadata: {
-      project: {
-        id: 123,
-        name: "felixgateru/hello-world",
-        url: "https://gitlab.com/felixgateru/hello-world",
+  return buildGitLabDetailsContext(
+    {
+      name: "Get Commit Status",
+      componentName: "gitlab.getCommitStatus",
+      configuration: {
+        project: "123",
+        ref: "main",
       },
     },
-  };
-
-  return {
-    nodes: [node],
-    node,
-    execution: {
-      id: "exec-1",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      state: "STATE_FINISHED",
-      result: "RESULT_PASSED",
-      resultReason: "RESULT_REASON_OK",
-      resultMessage: "",
-      metadata: {},
-      configuration: {},
-      rootEvent: undefined,
-      ...execution,
-    },
-  };
+    execution,
+  );
 }

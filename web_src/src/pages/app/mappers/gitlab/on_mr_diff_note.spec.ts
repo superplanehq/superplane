@@ -1,43 +1,18 @@
 import { describe, expect, it } from "bun:test";
+import { createGitLabTriggerBuilders } from "./test_support";
 
 import { onMRDiffNoteTriggerRenderer } from "./on_mr_diff_note";
-import type { NodeInfo, TriggerEventContext, TriggerRendererContext, ComponentDefinition, EventInfo } from "../types";
+import type { TriggerEventContext, TriggerRendererContext } from "../types";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
-  return {
-    id: "node-1",
-    name: "On MR Diff Note",
-    componentName: "gitlab.onMRDiffNote",
-    isCollapsed: false,
-    configuration: {},
-    metadata: {},
-    ...overrides,
-  };
-}
-
-function buildDefinition(overrides?: Partial<ComponentDefinition>): ComponentDefinition {
-  return {
-    name: "onMRDiffNote",
-    label: "On MR Diff Note",
-    description: "",
-    icon: "gitlab",
-    color: "orange",
-    ...overrides,
-  };
-}
-
-function buildEvent(overrides?: Partial<NonNullable<EventInfo>>): EventInfo {
-  return {
-    id: "evt-1",
-    createdAt: new Date().toISOString(),
-    data: {},
-    nodeId: "node-1",
-    type: "gitlab.mrDiffNote",
-    ...overrides,
-  };
-}
+const { buildNode, buildDefinition, buildEvent } = createGitLabTriggerBuilders({
+  name: "On MR Diff Note",
+  componentName: "gitlab.onMRDiffNote",
+  definitionName: "onMRDiffNote",
+  label: "On MR Diff Note",
+  eventType: "gitlab.mrDiffNote",
+});
 
 function buildEventData() {
   return {
@@ -103,23 +78,14 @@ describe("onMRDiffNoteTriggerRenderer.getRootEventValues", () => {
   it("extracts comment and diff position details from event data", () => {
     const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
     const values = onMRDiffNoteTriggerRenderer.getRootEventValues(ctx);
+    expect(Object.keys(values)[0]).toBe("Received At");
+    expect(values["Received At"]).toBe(new Date(ctx.event!.createdAt!).toLocaleString());
+    expect(Object.keys(values).length).toBeLessThanOrEqual(6);
     expect(values["Comment"]).toBe("This variable name is misleading, can we rename it?");
     expect(values["Diff Location"]).toBe("src/handlers/login.go:10");
     expect(values["Author"]).toBe("agarcia");
     expect(values["Merge Request"]).toBe("!12 - Add merge request trigger");
     expect(values["Project"]).toBe("group/example");
-  });
-
-  it("includes received at as the first value", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    const values = onMRDiffNoteTriggerRenderer.getRootEventValues(ctx);
-    expect(Object.keys(values)[0]).toBe("Received At");
-    expect(values["Received At"]).not.toBe("-");
-  });
-
-  it("returns at most 6 values", () => {
-    const ctx: TriggerEventContext = { event: buildEvent({ data: buildEventData() }) };
-    expect(Object.keys(onMRDiffNoteTriggerRenderer.getRootEventValues(ctx)).length).toBeLessThanOrEqual(6);
   });
 
   it("returns placeholders when event data is missing", () => {
