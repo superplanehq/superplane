@@ -67,6 +67,7 @@ locals {
         tokenKey       = "INSTALLATION_ADMIN_TOKEN"
       }
       infrastructure = {
+        superplaneUrl        = "https://${var.domain_name}"
         subscriptionId       = var.subscription_id
         resourceGroup        = azurerm_resource_group.runners.name
         location             = azurerm_resource_group.runners.location

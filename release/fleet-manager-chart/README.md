@@ -28,16 +28,19 @@ version.
 
 | Provider | Chart field | Terraform output |
 | --- | --- | --- |
+| AWS | `superplane.url` | `superplane_url` |
 | AWS | `aws.region` | `runner_region` |
 | AWS | `aws.subnetIds` | `runner_private_subnet_ids` |
 | AWS | `aws.securityGroupIds` | `runner_security_group_id` |
 | AWS | `aws.iamInstanceProfile` | `runner_instance_profile_name` |
 | AWS | `serviceAccount.annotations.eks.amazonaws.com/role-arn` | `fleet_manager_role_arn` |
+| GCP | `superplane.url` | `superplane_url` |
 | GCP | `gcp.projectId` | `runner_project` |
 | GCP | `gcp.zones` | `runner_zones` |
 | GCP | `gcp.subnetwork` | `runner_subnetwork` |
 | GCP | `gcp.networkTags` | `runner_network_tag` |
 | GCP | `serviceAccount.annotations.iam.gke.io/gcp-service-account` | `fleet_manager_service_account_email` |
+| Azure | `superplane.url` | `superplane_url` |
 | Azure | `azure.subscriptionId` | `runner_subscription_id` |
 | Azure | `azure.resourceGroup` | `runner_resource_group` |
 | Azure | `azure.location` | `runner_location` |
