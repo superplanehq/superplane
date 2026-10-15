@@ -45,6 +45,29 @@ describe("PhaseLogCard node line", () => {
     expect(statusTime).not.toHaveTextContent("Passed");
   });
 
+  it("shows the artifact produced by a stream node", () => {
+    render(
+      <PhaseLogCard
+        phase={PHASE}
+        expanded
+        stream={[
+          line({
+            id: "planner-agent",
+            componentName: "Agent - Plan for GH Issue",
+            artifact: {
+              id: "art-plan",
+              type: "TYPE_MARKDOWN",
+              data: { name: "PLAN.md", title: "PLAN.md" },
+            },
+          }),
+        ]}
+      />,
+    );
+
+    const row = screen.getByTestId("split-run-stream-line-planner-agent");
+    expect(within(row).getByRole("button", { name: "PLAN.md" })).toBeInTheDocument();
+  });
+
   it("inverts a Sentry stream-line logo in dark mode", () => {
     render(
       <PhaseLogCard
