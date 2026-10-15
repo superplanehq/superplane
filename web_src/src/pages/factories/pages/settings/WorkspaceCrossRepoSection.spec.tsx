@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeAll, describe, expect, it, vi } from "bun:test";
 
@@ -86,6 +86,43 @@ describe("cross-repo context picker", () => {
     } finally {
       vi.restoreAllMocks();
     }
+  }, 15000);
+
+  it("hides the workspace repository from the add list", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={factoriesFixtureWithSetupAnswers(SETUP_ANSWERS.repository)}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("agent-cross-repo-add", {}, { timeout: 8000 }));
+    const picker = await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 });
+    expect(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 })).toBeInTheDocument();
+    expect(within(picker).queryByRole("option", { name: /^acme\/api$/ })).not.toBeInTheDocument();
+  }, 15000);
+
+  it("hides the workspace repository when only the letter case differs", async () => {
+    const user = userEvent.setup();
+    render(
+      <FactoriesHarness
+        pathSuffix={agentPath}
+        factoriesFixture={factoriesFixtureWithSetupAnswers({
+          ...SETUP_ANSWERS.repository,
+          appRepository: "ACME/API",
+        })}
+        orgIntegrations={CONNECTED_SETUP_INTEGRATIONS}
+        experimentalFeatures={agentPageFeatures}
+      />,
+    );
+
+    await user.click(await screen.findByTestId("agent-cross-repo-add", {}, { timeout: 8000 }));
+    const picker = await screen.findByTestId("agent-cross-repo-picker", {}, { timeout: 8000 });
+    expect(await within(picker).findByRole("option", { name: /^acme\/web$/ }, { timeout: 8000 })).toBeInTheDocument();
+    expect(within(picker).queryByRole("option", { name: /^acme\/api$/ })).not.toBeInTheDocument();
   }, 15000);
 
   it("asks to connect version control when nothing is connected", async () => {
