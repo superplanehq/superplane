@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
+import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { usePermissions } from "@/contexts/usePermissions";
 import {
   useCreateFactoryAgentResource,
   useDeleteFactoryAgentResource,
   useFactoryAgentResources,
   useUpdateFactoryAgentResource,
+  useRestoreFactorySystemSkill,
 } from "@/hooks/useFactoryAgentResources";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
@@ -91,10 +93,16 @@ export function useSkillEditorPage() {
     setDraftKey(nextDraftKey);
   }, [isCreate, resource, nextDraftKey, draftKey]);
 
+  const restoration = useSkillRestore(organizationId, factoryId, resource, (restored) => {
+    setName(skillDisplayTitle(restored));
+    setStoredCommand(restored.name ?? "");
+    setNameTouched(false);
+    setMarkdown(restored.markdown ?? "");
+    setNameError("");
+    setMarkdownError("");
+  });
+
   const commandName = skillCommandForSave(name, storedCommand, nameTouched);
-  const taken = Boolean(
-    commandName && skills.data?.some((entry) => entry.id !== resource?.id && entry.name === commandName),
-  );
 
   return {
     isCreate,
@@ -107,6 +115,7 @@ export function useSkillEditorPage() {
     nameError,
     markdownError,
     pendingDelete,
+    ...restoration,
     listPath,
     commandName,
     command: commandName ? `/${commandName}` : "/",
@@ -124,7 +133,9 @@ export function useSkillEditorPage() {
         commandName,
         title: name.trim(),
         markdown,
-        taken,
+        taken: Boolean(
+          commandName && skills.data?.some((entry) => entry.id !== resource?.id && entry.name === commandName),
+        ),
         resourceId: resource?.id,
         listPath,
         navigate,
@@ -141,6 +152,33 @@ export function useSkillEditorPage() {
       void updateResource.mutateAsync({ resourceId: resource.id, enabled }).catch((error) => {
         showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.skillUpdateFailed));
       });
+    },
+  };
+}
+
+function useSkillRestore(
+  organizationId: string,
+  factoryId: string,
+  resource: FactoriesFactoryAgentResource | undefined,
+  onRestored: (resource: FactoriesFactoryAgentResource) => void,
+) {
+  const restoreResource = useRestoreFactorySystemSkill(organizationId, factoryId);
+  const [pendingRestore, setPendingRestore] = useState(false);
+  return {
+    pendingRestore,
+    setPendingRestore,
+    isRestoring: restoreResource.isPending,
+    canRestore:
+      resource?.systemSkill?.state === "STATE_CUSTOM" || resource?.systemSkill?.state === "STATE_UPDATE_AVAILABLE",
+    confirmRestore: async () => {
+      if (!resource?.id) return;
+      try {
+        onRestored(await restoreResource.mutateAsync(resource.id));
+        setPendingRestore(false);
+        showSuccessToast(AGENT_RESOURCES_COPY.restoreSkillSuccess);
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.restoreSkillFailed));
+      }
     },
   };
 }

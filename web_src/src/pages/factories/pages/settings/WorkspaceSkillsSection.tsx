@@ -113,7 +113,7 @@ function SkillRow({
       >
         <BookOpen className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden />
         <span className="min-w-0 truncate text-[13px] font-medium text-foreground">{name}</span>
-        {resource.systemSkill ? <SystemSkillBadge /> : null}
+        {resource.systemSkill ? <SystemSkillBadge state={resource.systemSkill?.state} /> : null}
       </Link>
       <div className="flex shrink-0 items-center gap-1" data-testid={`agent-resource-actions-${resource.id}`}>
         {disabled ? (

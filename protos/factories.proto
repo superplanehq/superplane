@@ -739,6 +739,17 @@ service Factories {
     };
   }
 
+  rpc RestoreFactorySystemSkill(RestoreFactorySystemSkillRequest) returns (RestoreFactorySystemSkillResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}/restore"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Restore a system skill to the latest SuperPlane version";
+      tags: "Factory";
+    };
+  }
+
   rpc DeleteFactoryAgentResource(DeleteFactoryAgentResourceRequest) returns (DeleteFactoryAgentResourceResponse) {
     option (google.api.http) = {
       delete: "/api/v1/factories/{factory_id}/agent-resources/{resource_id}"
@@ -2682,8 +2693,17 @@ message FactoryAgentResource {
 
   // Read-only metadata supplied by SuperPlane.
   message SystemSkill {
+    enum State {
+      STATE_UNSPECIFIED = 0;
+      STATE_LATEST = 1;
+      STATE_CUSTOM = 2;
+      STATE_UPDATE_AVAILABLE = 3;
+      STATE_UNAVAILABLE = 4;
+    }
     string template_id = 1;
     int32 version = 2;
+    State state = 3;
+    int32 latest_version = 4;
   }
 
   string id = 1;
@@ -2755,6 +2775,15 @@ message UpdateFactoryAgentResourceRequest {
 }
 
 message UpdateFactoryAgentResourceResponse {
+  FactoryAgentResource resource = 1;
+}
+
+message RestoreFactorySystemSkillRequest {
+  string factory_id = 1;
+  string resource_id = 2;
+}
+
+message RestoreFactorySystemSkillResponse {
   FactoryAgentResource resource = 1;
 }
 

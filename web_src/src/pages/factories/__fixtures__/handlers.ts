@@ -611,6 +611,23 @@ function factoryAgentResourceOAuthDisconnectRoute(fixture: FactoriesFixture): Fa
   };
 }
 
+function factorySystemSkillRestoreRoute(fixture: FactoriesFixture): FactoriesRoute {
+  return {
+    pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)/restore"),
+    resolve: (match, method) => {
+      if (method !== "POST") return { json: {} };
+      if (fixture.failAgentResourceRestoreForIds?.includes(match[2]))
+        return { status: 503, json: { message: "Could not restore skill." } };
+      const restored = fixture.restoredAgentResourcesById?.[match[2]];
+      const resources = ensureAgentResources(fixture, match[1]);
+      const index = resources.findIndex((entry) => entry.id === match[2]);
+      if (!restored || index < 0) return { status: 404, json: { message: "Skill not found." } };
+      resources[index] = { ...restored };
+      return { json: { resource: resources[index] } };
+    },
+  };
+}
+
 function factoryAgentResourceItemRoute(fixture: FactoriesFixture): FactoriesRoute {
   return {
     pattern: re("/api/v1/factories/([^/]+)/agent-resources/([^/]+)"),
@@ -736,6 +753,7 @@ function factoryAgentResourceRoutes(fixture: FactoriesFixture): FactoriesRoute[]
     factoryAgentResourceToolsRoute(fixture),
     factoryAgentResourceOAuthStartRoute(fixture),
     factoryAgentResourceOAuthDisconnectRoute(fixture),
+    factorySystemSkillRestoreRoute(fixture),
     factoryAgentResourceItemRoute(fixture),
     factoryAgentResourceListRoute(fixture),
   ];

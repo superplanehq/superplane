@@ -330,7 +330,7 @@ function SkillAutomationRow({
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
-          {systemSkill ? <SystemSkillBadge /> : null}
+          {systemSkill ? <SystemSkillBadge state={resource.systemSkill?.state} /> : null}
         </div>
         {description ? <p className="truncate text-[12px] text-muted-foreground">{description}</p> : null}
         {systemSkill ? (

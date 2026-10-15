@@ -1,4 +1,5 @@
 import { SystemSkillBadge } from "./SystemSkillBadge";
+import { RestoreSystemSkillDialog } from "./RestoreSystemSkillDialog";
 import { Editor } from "@monaco-editor/react";
 
 import { PermissionTooltip } from "@/components/PermissionGate";
@@ -43,7 +44,7 @@ export function FactorySettingsSkillEditorPage() {
     >
       {editor.resource?.systemSkill ? (
         <div className="mb-4 flex items-center gap-2">
-          <SystemSkillBadge />
+          <SystemSkillBadge state={editor.resource.systemSkill.state} />
           <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.systemSkillProtected}</p>
         </div>
       ) : null}
@@ -58,6 +59,12 @@ export function FactorySettingsSkillEditorPage() {
         resolvedTheme={resolvedTheme}
         onNameChange={editor.setName}
         onMarkdownChange={editor.setMarkdown}
+      />
+      <RestoreSystemSkillDialog
+        open={editor.pendingRestore}
+        isRestoring={editor.isRestoring}
+        onClose={() => editor.setPendingRestore(false)}
+        onConfirm={editor.confirmRestore}
       />
       <FactoryDeleteDialog
         open={editor.pendingDelete}
@@ -76,7 +83,17 @@ export function FactorySettingsSkillEditorPage() {
 function SkillEditorActions({ editor }: { editor: ReturnType<typeof useSkillEditorPage> }) {
   const displayName = editor.name.trim() || AGENT_RESOURCES_COPY.unnamedSkill;
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      {editor.canRestore ? (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!editor.canUpdate || editor.isSaving || editor.isRestoring}
+          onClick={() => editor.setPendingRestore(true)}
+        >
+          {AGENT_RESOURCES_COPY.restoreSkill}
+        </Button>
+      ) : null}
       {!editor.isCreate && editor.resource ? (
         <div className="mr-1 flex items-center gap-3">
           <span className="text-[12px] text-muted-foreground">Enabled</span>
@@ -107,7 +124,7 @@ function SkillEditorActions({ editor }: { editor: ReturnType<typeof useSkillEdit
           type="button"
           onClick={() => void editor.handleSave()}
           loading={editor.isSaving}
-          disabled={!editor.canUpdate}
+          disabled={!editor.canUpdate || editor.isRestoring}
           data-testid="agent-resource-skill-save"
         >
           {editor.isCreate ? AGENT_RESOURCES_COPY.addSkill : AGENT_RESOURCES_COPY.saveSkill}
