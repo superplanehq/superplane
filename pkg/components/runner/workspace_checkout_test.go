@@ -60,6 +60,9 @@ type checkoutScriptOptions struct {
 	context     string
 	commitSetup string
 	home        string
+	// workDir overrides the process working directory. Production Clone
+	// steps run at the task root, but prompt steps run inside repo/.
+	workDir string
 }
 
 func runCheckoutScriptFull(t *testing.T, dir, repoURL, base string, opts checkoutScriptOptions) (string, error) {
@@ -94,7 +97,10 @@ func runCheckoutScriptFull(t *testing.T, dir, repoURL, base string, opts checkou
 		env = append(env, runner.WorkspaceCheckoutCommitSetupEnv+"="+opts.commitSetup)
 	}
 	cmd := exec.Command("bash", "-c", "checkout")
-	cmd.Dir = dir
+	cmd.Dir = opts.workDir
+	if cmd.Dir == "" {
+		cmd.Dir = dir
+	}
 	cmd.Env = env
 	output, err := cmd.CombinedOutput()
 	return string(output), err
@@ -174,6 +180,19 @@ func TestWorkspaceCheckoutScriptReusesExistingCheckouts(t *testing.T) {
 	output, err := runCheckoutScript(t, dir, "file://"+main, "main", "")
 	require.NoError(t, err, output)
 	assert.Contains(t, output, "already checked out")
+}
+
+func TestWorkspaceCheckoutScriptAnchorsToTaskDirFromSubdirectory(t *testing.T) {
+	main := initBareRepo(t, "main")
+	dir := t.TempDir()
+	// Prompt steps run inside repo/, so invoke the helper from a nested
+	// directory the way an agent following the checkout hint would.
+	nested := filepath.Join(dir, "session")
+	require.NoError(t, os.MkdirAll(nested, 0o755))
+	output, err := runCheckoutScriptFull(t, dir, "file://"+main, "main", checkoutScriptOptions{workDir: nested})
+	require.NoError(t, err, output)
+	assert.DirExists(t, filepath.Join(dir, "repo", ".git"))
+	assert.NoDirExists(t, filepath.Join(nested, "repo"))
 }
 
 func TestWorkspaceCheckoutScriptFailsOnMissingBranch(t *testing.T) {

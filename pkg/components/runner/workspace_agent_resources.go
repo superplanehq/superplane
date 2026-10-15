@@ -359,6 +359,10 @@ func WorkspaceCheckoutScript() string {
 set -euo pipefail
 : "${SUPERPLANE_TASK_DIR:?SUPERPLANE_TASK_DIR is required}"
 : "${REPO_URL:?REPO_URL is required}"
+# Prompt steps run inside repo/, so anchor every relative clone path to the
+# task directory. Agents that run this helper from a step working directory
+# must still check out beside the task root, never nested inside it.
+cd "$SUPERPLANE_TASK_DIR" || exit 1
 if ! command -v git >/dev/null 2>&1; then
   echo "git not found on PATH; required for checkout" >&2
   exit 1
