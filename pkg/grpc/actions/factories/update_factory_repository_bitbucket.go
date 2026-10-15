@@ -40,8 +40,10 @@ func updateBitbucketFactoryRepository(
 		return nil, factoryErrorToStatus(invalidArgument("repository settings currently require a Bitbucket integration"), "failed to update factory repository")
 	}
 
+	requestedBranch := strings.TrimSpace(req.GetDefaultBranch())
+	repositoryChanged := !sameRepository(previous.AppRepository, repositoryName)
 	selectedRepository := repositoryName
-	selectedDefaultBranch := strings.TrimSpace(req.GetDefaultBranch())
+	hostDefault := ""
 	selectedExternalID := previous.AppRepositoryExternalID
 	selectedIntegration := integration
 	repositoryID := int64(0)
@@ -64,15 +66,24 @@ func updateBitbucketFactoryRepository(
 		}
 		selectedIntegration = bound
 		selectedRepository = match.FullName
-		selectedDefaultBranch = match.DefaultBranch
+		hostDefault = match.DefaultBranch
 		selectedExternalID = match.UUID
-	} else {
-		if err := validateBitbucketTokenRepository(integration, repositoryName); err != nil {
+	} else if err := validateBitbucketTokenRepository(integration, repositoryName); err != nil {
+		return nil, factoryErrorToStatus(err, "failed to update factory repository")
+	}
+	selectedDefaultBranch, branchErr := chooseSavedBranch(repositoryChanged, requestedBranch, hostDefault)
+	if branchErr != nil {
+		return nil, factoryErrorToStatus(branchErr, "failed to update factory repository")
+	}
+	if requestedBranch != "" {
+		if err := ensureBitbucketBranch(ctx, db, deps, selectedIntegration, selectedRepository, requestedBranch); err != nil {
 			return nil, factoryErrorToStatus(err, "failed to update factory repository")
 		}
-		if selectedDefaultBranch == "" {
-			return nil, factoryErrorToStatus(invalidArgument("default branch is required"), "failed to update factory repository")
-		}
+	}
+	if !repositoryChanged {
+		selectedRepository = previous.AppRepository
+		selectedIntegration = integration
+		selectedExternalID = previous.AppRepositoryExternalID
 	}
 
 	err = db.Transaction(func(tx *gorm.DB) error {
@@ -89,16 +100,16 @@ func updateBitbucketFactoryRepository(
 			return err
 		}
 		selectedIntegrationID := selectedIntegration.ID.String()
-		patch := models.FactoryOnboardingPatch{
-			VCSIntegrationID:  &selectedIntegrationID,
-			AppRepository:     &selectedRepository,
-			BacklogRepository: &selectedRepository,
-			DefaultBranch:     &selectedDefaultBranch,
-		}
-		if forgeInstall {
-			patch.AppRepositoryID = &repositoryID
-			patch.BacklogRepositoryID = &repositoryID
-			patch.AppRepositoryExternalID = &selectedExternalID
+		patch := models.FactoryOnboardingPatch{DefaultBranch: &selectedDefaultBranch}
+		if repositoryChanged {
+			patch.VCSIntegrationID = &selectedIntegrationID
+			patch.AppRepository = &selectedRepository
+			patch.BacklogRepository = &selectedRepository
+			if forgeInstall {
+				patch.AppRepositoryID = &repositoryID
+				patch.BacklogRepositoryID = &repositoryID
+				patch.AppRepositoryExternalID = &selectedExternalID
+			}
 		}
 		if err := factory.UpdateOnboarding(tx, patch); err != nil {
 			return err

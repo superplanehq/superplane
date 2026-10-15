@@ -315,6 +315,13 @@ func buildFactoryBitbucketAPI(db *gorm.DB, deps IntakeDependencies, factory *mod
 		return nil, errFactoryBitbucketNotConnected
 	}
 
+	return buildBitbucketClient(db, deps, integration)
+}
+
+func buildBitbucketClient(db *gorm.DB, deps IntakeDependencies, integration *models.Integration) (*bitbucketintegration.Client, error) {
+	if deps.Registry == nil || deps.Encryptor == nil || integration == nil {
+		return nil, errFactoryBitbucketNotConnected
+	}
 	metadata := bitbucketintegration.Metadata{}
 	if err := mapstructure.Decode(integration.Metadata.Data(), &metadata); err != nil {
 		return nil, fmt.Errorf("%w: %w", errFactoryBitbucketNotConnected, err)
