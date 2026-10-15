@@ -98,6 +98,10 @@ const fleetManagerMetadata = {
     fields: {
       superplaneUrl: "https://superplane.example.com",
       region: "us-east-1",
+      subnetIds: ["subnet-a"],
+      securityGroupIds: ["sg-runner"],
+      runnerIdentity: "runner-profile",
+      fleetManagerIdentity: "arn:aws:iam::123456789012:role/fleet-manager",
       imageAmd64: "ami-amd64",
     },
   },
@@ -223,6 +227,11 @@ describe("OwnerSetup", () => {
       fireEvent.click(screen.getByRole("button", { name: "Back" }));
       expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
     }
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByRole("heading", { name: OWNER_SETUP_COPY.smtp.headline })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByTestId("owner-setup-license-skip")).toBeInTheDocument();
   });
 
   it("keeps the gold scene and hides step dots while the survey is completed", async () => {

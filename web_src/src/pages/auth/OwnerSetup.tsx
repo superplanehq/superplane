@@ -47,6 +47,21 @@ function fleetWizardStep(step: OwnerSetupStep): FleetManagerWizardStep | null {
   return step.slice("fleet-".length) as FleetManagerWizardStep;
 }
 
+function fleetStepBefore(step: OwnerSetupStep): OwnerSetupStep {
+  const active = fleetWizardStep(step);
+  if (!active) return "fleet-intro";
+  const index = FLEET_MANAGER_WIZARD_STEPS.indexOf(active);
+  if (index <= 0) return "fleet-intro";
+  return `fleet-${FLEET_MANAGER_WIZARD_STEPS[index - 1]}`;
+}
+
+function ownerSetupBackTarget(step: OwnerSetupStep): OwnerSetupStep | null {
+  if (fleetWizardStep(step)) return fleetStepBefore(step);
+  if (step === "fleet-intro") return "smtp";
+  if (step === "smtp") return "license";
+  return null;
+}
+
 function OwnerFleetSetupSteps({
   step,
   pendingOrganizationSlug,
@@ -263,12 +278,10 @@ const OwnerSetup: React.FC = () => {
 
   const afterOwner = step !== "owner" && step !== "survey";
   const fleetStepIndex = activeFleetStep ? FLEET_MANAGER_WIZARD_STEPS.indexOf(activeFleetStep) : -1;
-  const previousFleetStep = () => {
-    if (fleetStepIndex <= 0) {
-      setStep("fleet-intro");
-      return;
-    }
-    setStep(`fleet-${FLEET_MANAGER_WIZARD_STEPS[fleetStepIndex - 1]}`);
+  const previousFleetStep = () => setStep(fleetStepBefore(step));
+  const goBack = () => {
+    const target = ownerSetupBackTarget(step);
+    if (target) setStep(target);
   };
 
   return (
@@ -285,7 +298,7 @@ const OwnerSetup: React.FC = () => {
               stepCount: OWNER_SETUP_STEPS,
               email: afterOwner ? email : undefined,
               onLogOut: afterOwner ? () => (window.location.href = "/logout") : undefined,
-              onBack: activeFleetStep ? previousFleetStep : undefined,
+              onBack: ownerSetupBackTarget(step) ? goBack : undefined,
             }
       }
     >
