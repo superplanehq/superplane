@@ -586,34 +586,13 @@ func intakeAnalysisCloneCommand(vcsProvider string) string {
 	if !strings.EqualFold(strings.TrimSpace(vcsProvider), models.ProviderBitbucket) {
 		lines = append(lines, `git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"`)
 	}
-	// New workspaces source the smart checkout helper (main repo to repo/,
-	// context repos to context/...) when the agent screen shipped it.
-	// Stored canvases without the file keep the inline clone below, so
-	// existing automations are never rewritten.
+	// Every factory task ships the checkout helper, so the clone stays a
+	// single line. Stored canvases without the new template keep their
+	// inline clone, so existing automations are never rewritten.
 	lines = append(lines,
-		`if [ -n "${SUPERPLANE_TASK_DIR:-}" ] && [ -f "$SUPERPLANE_TASK_DIR/`+runner.WorkspaceCheckoutScriptPath+`" ]; then`,
-		`  source "$SUPERPLANE_TASK_DIR/`+runner.WorkspaceCheckoutScriptPath+`"`,
-		`else`,
-		"  rm -rf repo",
-		cloneRepositoryCommand(),
-		`fi`,
+		`source "$SUPERPLANE_TASK_DIR/`+runner.WorkspaceCheckoutScriptPath+`"`,
 	)
 	return strings.Join(lines, "\n")
-}
-
-func cloneRepositoryCommand() string {
-	return strings.Join([]string{
-		`branch="${BASE:-main}"`,
-		`heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1`,
-		`if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then`,
-		`  git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo`,
-		`elif [ -z "$heads" ]; then`,
-		`  git clone "${REPO_URL}" repo`,
-		`else`,
-		`  echo "Remote branch ${branch} not found. The repository has other branches." >&2`,
-		`  exit 1`,
-		`fi`,
-	}, "\n")
 }
 
 var intakeThresholdPattern = regexp.MustCompile(`>=\s*(\d+)`)

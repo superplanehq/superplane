@@ -76,20 +76,7 @@ spec:
               git config --global user.email "superplaneagent@superplane.com"
               git config --global user.name "SuperPlane Agent"
 
-              if [ -n "${SUPERPLANE_TASK_DIR:-}" ] && [ -f "$SUPERPLANE_TASK_DIR/setup/checkout-workspace.sh" ]; then
-                source "$SUPERPLANE_TASK_DIR/setup/checkout-workspace.sh"
-              else
-                branch="${BASE:-main}"
-                heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1
-                if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then
-                  git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo
-                elif [ -z "$heads" ]; then
-                  git clone "${REPO_URL}" repo
-                else
-                  echo "Remote branch ${branch} not found. The repository has other branches." >&2
-                  exit 1
-                fi
-              fi
+              source "$SUPERPLANE_TASK_DIR/setup/checkout-workspace.sh"
               cd repo
 
               git config user.email "superplaneagent@superplane.com"

@@ -62,7 +62,9 @@ type workspaceContextFile struct {
 
 // AttachWorkspaceAgentResources ships enabled workspace MCP connections,
 // inline skills, setup commands, and context repositories on the broker
-// task. It is a no-op when the canvas is not factory-owned.
+// task. Every factory-owned task also ships the checkout helper, so
+// factory Clone steps stay a single line with no inline fallback. It is a
+// no-op when the canvas is not factory-owned.
 func AttachWorkspaceAgentResources(
 	ctx core.ExecutionContext,
 	environment []BrokerEnvironmentVariable,
@@ -71,24 +73,6 @@ func AttachWorkspaceAgentResources(
 	logger := workspaceAgentResourcesLogger(ctx)
 	orgID, err := uuid.Parse(strings.TrimSpace(ctx.OrganizationID))
 	if err != nil {
-		return environment, files
-	}
-	mcpEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceMCP)
-	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: MCP feature check failed")
-		return environment, files
-	}
-	skillsEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceSkills)
-	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: skills feature check failed")
-		return environment, files
-	}
-	agentEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceAgent)
-	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: agent feature check failed")
-		return environment, files
-	}
-	if !mcpEnabled && !skillsEnabled && !agentEnabled {
 		return environment, files
 	}
 	canvasID, err := uuid.Parse(strings.TrimSpace(ctx.WorkflowID))
@@ -105,6 +89,30 @@ func AttachWorkspaceAgentResources(
 	factory, err := models.FindFactory(db, orgID, *factoryID)
 	if err != nil {
 		logger.WithError(err).Warn("skip workspace agent resources: factory not found")
+		return environment, files
+	}
+
+	// The checkout helper needs no configured resources: it clones the
+	// main repo on its own and context repos when the agent screen adds
+	// them. Ship it on every factory task so Clone steps never branch.
+	files = appendWorkspaceCheckoutFile(files)
+
+	mcpEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceMCP)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace agent resources: MCP feature check failed")
+		return environment, files
+	}
+	skillsEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceSkills)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace agent resources: skills feature check failed")
+		return environment, files
+	}
+	agentEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceAgent)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace agent resources: agent feature check failed")
+		return environment, files
+	}
+	if !mcpEnabled && !skillsEnabled && !agentEnabled {
 		return environment, files
 	}
 
@@ -147,9 +155,6 @@ func AttachWorkspaceAgentResources(
 	files = appendWorkspaceSkillFiles(skills, files)
 	files = appendWorkspaceSetupFiles(setupCommands, files)
 	files = appendWorkspaceContextFiles(factory, contextRepos, files)
-	if agentEnabled {
-		files = appendWorkspaceCheckoutFile(files)
-	}
 	files = appendWorkspaceAgentResourcesHint(files, mcpNames, setupCommands, contextRepos)
 	return environment, files
 }
@@ -333,14 +338,14 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 	})
 }
 
-// WorkspaceCheckoutScript is the smart checkout helper sourced by new factory
-// templates (with an inline-clone fallback for tasks without the file). It
-// checks out the main repo to repo/ with the same branch handling as the
-// legacy Clone Repo step, then clones every workspace_context.json entry to
-// its directory. Authentication comes from the VCS integration setup that
-// already ran (gh auth setup-git / Bitbucket credential helper), so the
-// script uses plain HTTPS URLs and never embeds tokens. It is idempotent:
-// directories that already contain a checkout are reused, never wiped.
+// WorkspaceCheckoutScript is the smart checkout helper factory Clone steps
+// source as a single line. It checks out the main repo to repo/ with the
+// same branch handling as the legacy Clone Repo step, then clones every
+// workspace_context.json entry to its directory. Authentication comes from
+// the VCS integration setup that already ran (gh auth setup-git /
+// Bitbucket credential helper), so the script uses plain HTTPS URLs and
+// never embeds tokens. It is idempotent: directories that already contain
+// a checkout are reused, never wiped.
 func WorkspaceCheckoutScript() string {
 	return `set -euo pipefail
 : "${SUPERPLANE_TASK_DIR:?SUPERPLANE_TASK_DIR is required}"
