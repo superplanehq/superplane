@@ -259,13 +259,13 @@ keys and wraps them with the new primary KMS version. It atomically
 replaces the wrapped keys and verifies that it can read them. Application
 ciphertext and data key IDs do not change. The rewrap operation uses the first configured KMS URI.
 
-For a new KMS URI or local master key, first deploy `old,new` to every API and
-worker instance. Wait for the rollout to finish. Then deploy `new,old` to every
-instance. Both versions can read data keys during this second rollout. Rewrap
-the data keys in the admin UI after it finishes. The server selects the first
-configured key. It updates the wrapped
-data keys and stored references in one transaction. Afterward, verify a fresh
-instance can start. Remove old access only after backup retention permits it.
+For a new KMS URI or local master key, deploy `new,old` to every API and worker
+instance in one rollout. Do not rotate or rewrap data keys during the rollout.
+Operators must confirm that every instance has the new configuration before
+they run either operation. Then rewrap the data keys in the admin UI. The server
+selects the first configured key. It updates the wrapped data keys and stored
+references in one transaction. Afterward, verify that a fresh instance can
+start. Remove old access only after backup retention permits it.
 The UI and API must not accept raw master keys. A rewrap failure must keep
 the prior data keys and references intact.
 
