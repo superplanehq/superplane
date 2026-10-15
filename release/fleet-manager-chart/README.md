@@ -75,8 +75,8 @@ let you select a fleet when its architecture does not have an image.
 Complete **Set up runner fleets** during owner setup. For installations that
 use the repository Terraform stacks, SuperPlane loads the provider, network,
 location, images, and workload-identity fields from the chart configuration.
-Select the provider and fleets. Then, run the generated Helm heredoc. The
-command contains the complete values file and the personal token.
+Select the provider and fleets. Then, run the generated Helm commands. The
+commands write the values file and install the chart with the personal token.
 
 The chart creates `fleet-manager-config` for the normal `fleet-manager` release.
 Helm stores the Secret content, including `installationAdminToken`, in release

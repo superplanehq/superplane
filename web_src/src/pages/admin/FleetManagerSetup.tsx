@@ -11,7 +11,7 @@ import { useFleetManagerSetup, useFleetManagerVerification } from "@/hooks/useFl
 import { fleetManagerInstallCommand, type FleetManagerDraft } from "@/lib/fleetManagerSetup";
 import { CopyButton } from "@/ui/CopyButton";
 
-const INSTALL_INSTRUCTION = "Run this command where kubectl can access your cluster.";
+const INSTALL_INSTRUCTION = "Run these commands where kubectl can access your cluster.";
 
 function SectionCard({
   title,
@@ -41,8 +41,8 @@ function InstallCommand({ command }: { command: string }) {
         <pre className="max-h-96 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-4 text-left font-mono text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
           <code>{command}</code>
         </pre>
-        <CopyButton variant="button" text={command}>
-          Copy Helm command
+        <CopyButton variant="button" buttonVariant="default" copiedLabel="Copied" text={command}>
+          Copy commands
         </CopyButton>
       </div>
     </div>

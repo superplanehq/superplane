@@ -96,11 +96,14 @@ export const recommendedMachineType = (
 export const fleetImage = (fields: FleetManagerProviderFields, architecture: FleetSpec["architecture"]): string =>
   fields[architecture === "amd64" ? "imageAmd64" : "imageArm64"]?.trim() ?? "";
 
+const configuredRunnerImage = (fields: FleetManagerProviderFields, architecture: FleetSpec["architecture"]): string =>
+  fleetImage(fields, architecture) || "<RUNNER_IMAGE>";
+
 const providerConfiguration = {
   aws: (fleetId: string, spec: FleetSpec, fields: FleetManagerProviderFields) => ({
     aws: {
       region: fields.region || "<AWS_REGION>",
-      ami: fleetImage(fields, spec.architecture),
+      ami: configuredRunnerImage(fields, spec.architecture),
       instanceType: machineType(fleetId, spec, fields, recommendedMachineType("aws", spec.architecture)),
       architecture: spec.architecture,
       subnetIds: splitList(fields.subnetIds, "<SUBNET_ID>"),
@@ -114,7 +117,7 @@ const providerConfiguration = {
       projectId: fields.projectId || "<GCP_PROJECT_ID>",
       zones: splitList(fields.zones, "<GCP_ZONE>"),
       machineType: machineType(fleetId, spec, fields, recommendedMachineType("gcp", spec.architecture)),
-      image: fleetImage(fields, spec.architecture),
+      image: configuredRunnerImage(fields, spec.architecture),
       architecture: spec.architecture,
       subnetwork: fields.subnetwork || "<RUNNER_SUBNETWORK>",
       ...(fields.runnerIdentity ? { serviceAccountEmail: fields.runnerIdentity } : {}),
@@ -127,7 +130,7 @@ const providerConfiguration = {
       subscriptionId: fields.subscriptionId || "<AZURE_SUBSCRIPTION_ID>",
       resourceGroup: fields.resourceGroup || "<RESOURCE_GROUP>",
       location: fields.location || "<AZURE_LOCATION>",
-      imageId: fleetImage(fields, spec.architecture),
+      imageId: configuredRunnerImage(fields, spec.architecture),
       vmSize: machineType(fleetId, spec, fields, recommendedMachineType("azure", spec.architecture)),
       architecture: spec.architecture,
       subnetId: fields.subnetId || "<RUNNER_SUBNET_ID>",
@@ -246,13 +249,37 @@ export function validateFleetManagerConfiguration(input: FleetManagerConfigurati
   return [...validateFleetSelection(input), ...validateFleetInfrastructure(input)];
 }
 
+const INSTALL_PLACEHOLDER = /<[A-Z0-9_]+>/;
+
+export function terraformInstallPlaceholders(draft: FleetManagerDraft, metadata: FleetManagerSetupMetadata): string[] {
+  const defaults = metadata.infrastructureDefaults;
+  if (defaults.source !== "terraform" || defaults.provider !== draft.provider) return [];
+
+  const values = generateFleetManagerValues({
+    metadata,
+    ...draft,
+    installationAdminToken: "token",
+  });
+  if (!INSTALL_PLACEHOLDER.test(values)) return [];
+  return ["Apply Terraform again before you install Fleet Manager. A required value is missing."];
+}
+
 export function fleetManagerInstallCommand(
   metadata: FleetManagerSetupMetadata,
   namespace: string,
   values: string,
 ): string {
-  const command = `helm upgrade --install fleet-manager ${metadata.chartRepository} --version ${metadata.defaultChartVersion} --namespace ${namespace} --create-namespace --values - --wait --timeout 10m`;
-  return `${command} <<'FLEET_MANAGER_VALUES'\n${values.trimEnd()}\nFLEET_MANAGER_VALUES`;
+  const valuesFile = "fleet-manager-values.yaml";
+  const helm = [
+    `helm upgrade --install fleet-manager ${metadata.chartRepository}`,
+    `--version ${metadata.defaultChartVersion}`,
+    `--namespace ${namespace}`,
+    "--create-namespace",
+    "--wait",
+    "--timeout 10m",
+    `-f ${valuesFile}`,
+  ].join(" \\\n  ");
+  return `cat > ${valuesFile} <<'EOF'\n${values.trimEnd()}\nEOF\n\n${helm}\n`;
 }
 
 export function normalizeInfrastructureFields(fields: Record<string, string | string[]>): FleetManagerProviderFields {

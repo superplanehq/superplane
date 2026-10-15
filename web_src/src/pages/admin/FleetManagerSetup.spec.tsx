@@ -88,6 +88,63 @@ describe("FleetManagerSetup", () => {
     expect(screen.getByRole("combobox", { name: "Runner version" })).toHaveTextContent("v0.2.0");
   });
 
+  it("generates a command when no Terraform runner image is configured", async () => {
+    const manual = {
+      ...metadata,
+      infrastructureDefaults: {
+        source: "manual" as const,
+        provider: null,
+        managerId: "my-cluster",
+        namespace: "superplane",
+        serviceAccountName: "superplane-fleet-manager",
+        fields: {},
+      },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).endsWith("/admin/api/installation/fleet-manager/setup")) return jsonResponse(manual);
+        return new Response("", { status: 404 });
+      }),
+    );
+
+    render(<FleetManagerSetup />);
+
+    const amd64 = await screen.findByRole("checkbox", { name: /e1-large-amd64/ });
+    expect(amd64).toBeEnabled();
+    expect(screen.queryByText(/Add the amd64 runner image through Terraform/)).not.toBeInTheDocument();
+    fireEvent.click(amd64);
+    fireEvent.click(screen.getByRole("button", { name: "Generate install command" }));
+
+    const command = await screen.findByTestId("fleet-manager-install-command");
+    expect(command).toHaveTextContent("ami: <RUNNER_IMAGE>");
+  });
+
+  it("lets you clear a selected fleet when Terraform has no image", async () => {
+    window.localStorage.setItem(
+      FLEET_MANAGER_DRAFT_KEY,
+      JSON.stringify({
+        provider: "aws",
+        managerId: "terraform-cluster",
+        namespace: "superplane",
+        serviceAccountName: "superplane-fleet-manager",
+        superplaneUrl: "https://superplane.example.com",
+        runnerVersion: "v0.2.0",
+        selectedFleetIds: ["e1-large-arm64"],
+        fleetCapacities: { "e1-large-arm64": { warmCapacity: 0, maxCapacity: 1 } },
+        fields: { region: "us-east-1" },
+      }),
+    );
+
+    render(<FleetManagerSetup />);
+
+    const arm64 = await screen.findByRole("checkbox", { name: /e1-large-arm64/ });
+    expect(arm64).toBeEnabled();
+    expect(arm64).toBeChecked();
+    fireEvent.click(arm64);
+    expect(arm64).not.toBeChecked();
+  });
+
   it("prevents selection when Terraform has no image for the architecture", async () => {
     render(<FleetManagerSetup />);
 
@@ -96,7 +153,7 @@ describe("FleetManagerSetup", () => {
     expect(screen.getByText(/Add the arm64 runner image through Terraform/)).toBeInTheDocument();
   });
 
-  it("creates one personal token and puts it only in the generated heredoc", async () => {
+  it("creates one personal token and puts it only in the values file", async () => {
     render(<FleetManagerSetup />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Generate install command" }));
@@ -104,8 +161,8 @@ describe("FleetManagerSetup", () => {
     const command = await screen.findByTestId("fleet-manager-install-command");
     expect(createToken).toHaveBeenCalledTimes(1);
     expect(createToken).toHaveBeenCalledWith({ name: "Fleet Manager" });
-    expect(command).toHaveTextContent("--values -");
-    expect(command).toHaveTextContent("FLEET_MANAGER_VALUES");
+    expect(command).toHaveTextContent("cat > fleet-manager-values.yaml");
+    expect(command).toHaveTextContent("-f fleet-manager-values.yaml");
     expect(command).toHaveTextContent("installationAdminToken: one-time-personal-token");
     expect(command).toHaveTextContent("ami: ami-amd64");
     expect(command).toHaveTextContent("runnerVersion: v0.2.0");

@@ -105,7 +105,7 @@ The wizard disables fleets whose architecture has no configured AMI.
 
 Terraform creates the AWS runner infrastructure, but it does not install Fleet
 Manager. SuperPlane creates a normal personal token when you generate the Helm
-heredoc. The standalone chart stores the complete configuration and token in
+commands. The standalone chart stores the complete configuration and token in
 `fleet-manager-config`. See
 [the standalone chart guide](../../fleet-manager-chart/README.md).
 

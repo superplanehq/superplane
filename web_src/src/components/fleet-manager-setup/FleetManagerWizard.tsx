@@ -88,7 +88,7 @@ function FleetsStep({ setup, actions }: { setup: FleetManagerSetupState; actions
         </p>
       </FirstRunHeading>
       <div className="mt-6">
-        <FleetManagerFleetSection setup={setup} contained />
+        <FleetManagerFleetSection setup={setup} />
       </div>
       {actions}
     </div>
@@ -149,15 +149,15 @@ function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
     <div data-testid="fleet-manager-install-step">
       <FirstRunHeading headline="Install Fleet Manager" size="display">
         <p className="text-[15px] leading-6 text-muted-foreground">
-          Run this command where kubectl can access your cluster.
+          Run these commands where kubectl can access your cluster.
         </p>
       </FirstRunHeading>
       <pre className="mt-5 max-h-80 overflow-auto rounded-md border border-border bg-muted p-4 text-left font-mono text-xs">
         <code>{command}</code>
       </pre>
       <div className="mt-3">
-        <CopyButton variant="button" text={command}>
-          Copy Helm command
+        <CopyButton variant="button" buttonVariant="default" copiedLabel="Copied" text={command}>
+          Copy commands
         </CopyButton>
       </div>
       <div className="mt-5">

@@ -14,6 +14,7 @@ import {
   recommendedMachineType,
   rememberProviderFields,
   saveFleetManagerDraft,
+  terraformInstallPlaceholders,
   validateFleetInfrastructure,
   validateFleetSelection,
   type FleetManagerDraft,
@@ -91,6 +92,7 @@ function draftForProvider(
 }
 
 function missingImageErrors(draft: FleetManagerDraft, metadata: FleetManagerSetupMetadata): string[] {
+  if (metadata.infrastructureDefaults.source !== "terraform") return [];
   return draft.selectedFleetIds.flatMap((fleetId) => {
     const preset = metadata.fleetPresets.find((candidate) => candidate.id === fleetId);
     if (!preset || fleetImage(draft.fields, preset.spec.architecture)) return [];
@@ -102,7 +104,7 @@ function fleetSelectionErrors(draft: FleetManagerDraft | null, metadata: FleetMa
   if (!draft) return [];
   const errors = validateFleetSelection(draft);
   if (!metadata) return errors;
-  return [...errors, ...missingImageErrors(draft, metadata)];
+  return [...errors, ...missingImageErrors(draft, metadata), ...terraformInstallPlaceholders(draft, metadata)];
 }
 
 function useFleetManagerDraft(enabled: boolean) {

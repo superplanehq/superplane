@@ -129,7 +129,7 @@ create_postgresql_flexible_server = false
 ```
 
 Terraform does not install Fleet Manager. SuperPlane creates a personal token
-when you generate the Helm heredoc. The standalone chart stores that token and
+when you generate the Helm commands. The standalone chart stores that token and
 the complete configuration in `fleet-manager-config`.
 Leave `helm_chart_path` empty. Leave `superplane_image_tag` empty.
 
@@ -335,7 +335,7 @@ Open **Set up runner fleets** during owner setup. Terraform passes the runner
 network, location, identity, and cluster values to SuperPlane. The wizard
 preloads these values. Set `runner_image_amd64` and `runner_image_arm64` to
 immutable community gallery or customer gallery image-version IDs. Run
-`terraform apply`, then run the Helm heredoc from the wizard.
+`terraform apply`, then run the Helm commands from the wizard.
 
 This stack still creates an empty customer Compute Gallery and two image
 definitions. You can ignore them when `azure.imageId` points at the
@@ -367,7 +367,7 @@ subscription allows it.
 Open **Set up runner fleets** during owner setup. Terraform passes the runner
 network, location, identity, public SuperPlane URL, and cluster values to
 SuperPlane. Set the Packer image-version resource ID in `runner_image_amd64` or
-`runner_image_arm64`, apply Terraform, and run the Helm heredoc from the wizard.
+`runner_image_arm64`, apply Terraform, and run the Helm commands from the wizard.
 See [the standalone chart guide](../../fleet-manager-chart/README.md).
 
 ## Destroy

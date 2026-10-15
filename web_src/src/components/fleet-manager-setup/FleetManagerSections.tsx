@@ -64,13 +64,16 @@ export function FleetManagerFleetSection({
       <div className={contained ? "max-h-52 space-y-2 overflow-y-auto pr-1" : "space-y-2"}>
         {setup.metadata.fleetPresets.map((preset) => {
           const id = `fleet-${preset.id}`;
-          const hasImage = setup.hasFleetImage(preset.spec.architecture);
+          const selected = setup.draft?.selectedFleetIds.includes(preset.id) ?? false;
+          const blocked =
+            setup.metadata?.infrastructureDefaults.source === "terraform" &&
+            !setup.hasFleetImage(preset.spec.architecture);
           return (
             <div key={preset.id} className="flex items-start gap-3 rounded-md border border-border p-3">
               <Checkbox
                 id={id}
-                checked={setup.draft?.selectedFleetIds.includes(preset.id)}
-                disabled={!hasImage}
+                checked={selected}
+                disabled={blocked && !selected}
                 onChange={(event) => setup.toggleFleet(preset.id, event.target.checked)}
               />
               <div className="min-w-0 flex-1 space-y-3">
@@ -79,13 +82,13 @@ export function FleetManagerFleetSection({
                   <span className="block text-xs text-muted-foreground">
                     {preset.spec.architecture} · {preset.spec.cpuMillicores}m CPU · {preset.spec.memoryMb} MB memory
                   </span>
-                  {!hasImage && (
+                  {blocked && (
                     <span className="block text-xs text-amber-600 dark:text-amber-300">
                       Add the {preset.spec.architecture} runner image through Terraform to use this fleet.
                     </span>
                   )}
                 </Label>
-                {setup.draft?.selectedFleetIds.includes(preset.id) && (
+                {selected && (
                   <div className="grid gap-3 sm:grid-cols-3">
                     <Field
                       id={`machine-type-${preset.id}`}
