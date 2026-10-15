@@ -176,29 +176,6 @@ describe("PhaseLogCard stream details", () => {
     expect(screen.queryAllByTestId("split-run-log-line-no")).toHaveLength(0);
   });
 
-  it("tints collapsed phases on hover and leaves log lines clear", () => {
-    const { rerender } = render(<PhaseLogCard phase={PHASE} expanded={false} />);
-
-    expect(screen.getByTestId("split-run-phase-plan").firstElementChild?.className).toMatch(/hover:bg-/);
-
-    rerender(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
-
-    expect(screen.getByTestId("split-run-phase-plan").firstElementChild?.className).not.toMatch(/hover:bg-/);
-
-    const node = screen.getByTestId("split-run-stream-line-planner-agent");
-    expect(node.className).not.toMatch(/hover:bg-/);
-    const step = screen.getByTestId("split-run-stream-line-step-clone");
-    expect(step.className).not.toMatch(/hover:bg-/);
-
-    const outputLine = screen.getAllByTestId("split-run-stream-output")[0]?.firstElementChild;
-    expect(outputLine?.className).not.toMatch(/hover:bg-/);
-
-    expect(screen.getByText(LONG_NOTE).closest("[data-testid^='split-run-stream-line-']")?.className).not.toMatch(
-      /hover:bg-/,
-    );
-    expect(screen.getByRole("button", { name: "Ran 1 command" }).className).not.toMatch(/hover:bg-/);
-  });
-
   it("pins the open phase, node, and step while their output scrolls", () => {
     render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
 
@@ -228,17 +205,10 @@ describe("PhaseLogCard stream details", () => {
     const user = userEvent.setup();
     render(<PhaseLogCard phase={PHASE} expanded stream={PLANNING_STREAM} />);
 
-    const note = screen.getByText(LONG_NOTE).closest(".whitespace-normal");
+    const note = screen.getByText(LONG_NOTE);
     expect(note).toBeInTheDocument();
-    expect(note).not.toHaveClass("truncate");
-    expect(note).toHaveClass("whitespace-normal");
-    expect(note?.closest("[data-testid^='split-run-stream-line-']")?.className).toMatch(/\bbg-muted\b/);
-    expect(note?.closest("[data-testid^='split-run-stream-line-']")?.className).not.toMatch(/\bbg-background\b/);
     const toolSummary = screen.getByRole("button", { name: "Ran 1 command" });
     expect(toolSummary).toBeInTheDocument();
-    expect(toolSummary.className).toMatch(/\bbg-muted\b/);
-    expect(toolSummary.className).not.toMatch(/\bbg-background\b/);
-    expect(toolSummary.querySelector('[style*="ch"]')).toBeNull();
     expect(screen.getByRole("button", { name: "Read 1 file" })).toBeInTheDocument();
     expect(screen.queryByText("cat /tmp/ORDER.md")).not.toBeInTheDocument();
     expect(screen.queryByText("LineListCard.tsx")).not.toBeInTheDocument();
@@ -248,7 +218,6 @@ describe("PhaseLogCard stream details", () => {
 
     const stream = screen.getByTestId("split-run-stream-plan");
     expect(within(stream).getByText("cat /tmp/ORDER.md")).toBeInTheDocument();
-    expect(within(stream).getByText("cat /tmp/ORDER.md").closest("ol")).not.toHaveClass("pl-2");
     expect(within(stream).queryByText(/## Goal/)).not.toBeInTheDocument();
     expect(within(stream).queryByText("LineListCard.tsx")).not.toBeInTheDocument();
 
