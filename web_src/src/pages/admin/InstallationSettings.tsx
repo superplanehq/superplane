@@ -8,7 +8,6 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Switch } from "@/ui/switch";
 import React, { useCallback, useEffect, useState } from "react";
 import { HostedLLMSettings } from "./HostedLLMSettings";
-import { InstallationFactoryTemplates } from "./InstallationFactoryTemplates";
 
 type InstallationSettingsResponse = {
   allow_private_network_access: boolean;
@@ -677,8 +676,6 @@ const InstallationSettings: React.FC = () => {
           onFieldChange={setSMTPField}
           onSave={saveSMTPSettings}
         />
-
-        <InstallationFactoryTemplates />
 
         <HostedLLMSettings />
       </div>
