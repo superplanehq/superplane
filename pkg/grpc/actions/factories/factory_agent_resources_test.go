@@ -423,3 +423,136 @@ func Test__finishFactoryAgentResourceOAuthConnectRejectsDuplicateURL(t *testing.
 	_, err = second.FindSecret(db, models.FactoryAgentResourceSecretAccessToken)
 	assert.ErrorIs(t, err, models.ErrFactoryAgentResourceSecretNotFound)
 }
+
+func Test__CreateFactoryAgentResourceCreatesSetupCommands(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	response, err := CreateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId: factory.ID.String(),
+		Kind:      pb.FactoryAgentResource_KIND_SETUP_COMMAND,
+		Enabled:   true,
+		Commands:  []string{"npm ci", "go mod download"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, response.GetResource())
+	assert.Equal(t, pb.FactoryAgentResource_KIND_SETUP_COMMAND, response.GetResource().GetKind())
+	assert.Equal(t, []string{"npm ci", "go mod download"}, response.GetResource().GetCommands())
+}
+
+func Test__CreateFactoryAgentResourceCreatesContextRepo(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	response, err := CreateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId:   factory.ID.String(),
+		Kind:        pb.FactoryAgentResource_KIND_CONTEXT_REPO,
+		Enabled:     true,
+		Repository:  "superplanehq/suss",
+		VcsProvider: "github",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, response.GetResource())
+	assert.Equal(t, pb.FactoryAgentResource_KIND_CONTEXT_REPO, response.GetResource().GetKind())
+	assert.Equal(t, "superplanehq/suss", response.GetResource().GetRepository())
+}
+
+func Test__CreateFactoryAgentResourceRejectsDuplicateContextRepo(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	_, err = CreateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId:  factory.ID.String(),
+		Kind:       pb.FactoryAgentResource_KIND_CONTEXT_REPO,
+		Enabled:    true,
+		Repository: "superplanehq/suss",
+	})
+	require.NoError(t, err)
+
+	_, err = CreateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId:  factory.ID.String(),
+		Kind:       pb.FactoryAgentResource_KIND_CONTEXT_REPO,
+		Enabled:    true,
+		Repository: "superplanehq/suss",
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.AlreadyExists, grpcerrors.Code(err))
+}
+
+func Test__UpdateFactoryAgentResourceReplacesSetupCommands(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{
+		Commands: []string{"npm ci"},
+	})
+	require.NoError(t, err)
+
+	replace := true
+	response, err := UpdateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryAgentResourceRequest{
+		FactoryId:       factory.ID.String(),
+		ResourceId:      resource.ID.String(),
+		Commands:        []string{"go test ./..."},
+		ReplaceCommands: &replace,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"go test ./..."}, response.GetResource().GetCommands())
+}
+
+func Test__ListFactoryAgentResourcesFiltersByNewKinds(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceAgent))
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindSetup, "setup", true, models.FactoryAgentResourceConfig{
+		Commands: []string{"npm ci"},
+	})
+	require.NoError(t, err)
+	_, err = factory.CreateAgentResource(db, models.FactoryAgentResourceKindContextRepo, "", true, models.FactoryAgentResourceConfig{
+		Repository: "superplanehq/suss",
+	})
+	require.NoError(t, err)
+
+	setupList, err := ListFactoryAgentResources(t.Context(), r.Organization.ID.String(), &pb.ListFactoryAgentResourcesRequest{
+		FactoryId: factory.ID.String(),
+		Kind:      pb.FactoryAgentResource_KIND_SETUP_COMMAND,
+	})
+	require.NoError(t, err)
+	require.Len(t, setupList.GetResources(), 1)
+
+	repoList, err := ListFactoryAgentResources(t.Context(), r.Organization.ID.String(), &pb.ListFactoryAgentResourcesRequest{
+		FactoryId: factory.ID.String(),
+		Kind:      pb.FactoryAgentResource_KIND_CONTEXT_REPO,
+	})
+	require.NoError(t, err)
+	require.Len(t, repoList.GetResources(), 1)
+}
+
+func Test__CreateFactoryAgentResourceRequiresAgentFeatureForNewKinds(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	_, err = CreateFactoryAgentResource(t.Context(), IntakeDependencies{}, r.Organization.ID.String(), &pb.CreateFactoryAgentResourceRequest{
+		FactoryId: factory.ID.String(),
+		Kind:      pb.FactoryAgentResource_KIND_SETUP_COMMAND,
+		Enabled:   true,
+		Commands:  []string{"npm ci"},
+	})
+	require.Error(t, err)
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+}
