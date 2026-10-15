@@ -77,7 +77,14 @@ func TestMaterializeFactoryTemplate(t *testing.T) {
 	assert.Contains(t, implementationPrompt, runner.FactoryImaginedLimitPrompt)
 	cloneCommand, ok := implementationStep(t, agent, "Clone Repo")["command"].(string)
 	require.True(t, ok)
-	assert.Contains(t, cloneCommand, runner.FactoryRepoCommitSetup())
+	assert.Equal(t, "checkout", cloneCommand)
+	environment, ok := agent.Configuration["environment"].([]any)
+	require.True(t, ok, "expected the agent to declare step environment")
+	assert.Contains(t, environment, map[string]any{
+		"name":        runner.WorkspaceCheckoutCommitSetupEnv,
+		"value":       "1",
+		"valueSource": "literal",
+	})
 	assert.Contains(t, result.canvasYAML, `title: ($title | gsub("[\\r\\n]"; "") | @base64)`)
 
 	createPR := findYAMLNode(t, canvas, "create-pr")
@@ -755,6 +762,9 @@ func TestMaterializeFactoryTemplateBitbucketImplement(t *testing.T) {
 	assert.NotContains(t, result.canvasYAML, "visualEvidence")
 	assert.NotContains(t, result.canvasYAML, "bitbucket.createPullRequestComment")
 	assert.NotContains(t, strings.ToLower(result.canvasYAML), "github")
+	cloneCommand, ok := implementationStep(t, agent, "Clone Repo")["command"].(string)
+	require.True(t, ok)
+	assert.Equal(t, "checkout", cloneCommand)
 }
 
 func TestMaterializeFactoryTemplateBitbucketPRClosure(t *testing.T) {
