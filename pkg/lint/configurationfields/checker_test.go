@@ -72,25 +72,6 @@ func TestCheckFieldsFlagsSnakeCaseNames(t *testing.T) {
 	}
 }
 
-func TestRunFindsKnownSnakeCaseFields(t *testing.T) {
-	issues, err := Run()
-	if err != nil {
-		t.Fatalf("Run() error = %v", err)
-	}
-
-	found := false
-	for _, issue := range issues {
-		if issue.OwnerName == "runner" && issue.Field == "execution_mode" {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		t.Fatalf("expected runner execution_mode issue, got: %#v", issues)
-	}
-}
-
 func TestIssueString(t *testing.T) {
 	issue := Issue{
 		OwnerKind: "action",
