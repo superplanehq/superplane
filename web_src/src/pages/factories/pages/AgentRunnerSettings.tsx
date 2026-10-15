@@ -2,6 +2,7 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import { useEffect, useRef, useState } from "react";
 
 import { canvasNodeToPlanningReviewComponent, type CanvasSpecNode } from "../lib/columnCanvasAgent";
+import { IMPLEMENT_AGENT_NODE_ID } from "../lib/columnAutomationHeadline";
 import type { NodeConfigurationUpdate } from "./nodeConfigurationCanvas";
 import { expandMergeConfidenceSteps } from "./mergeConfidenceSteps";
 import { PlanningReviewForm } from "./PlanningReviewForm";
@@ -74,8 +75,8 @@ export function AgentRunnerSettings({
     >
       <PlanningReviewForm
         appearance="fields"
-        showResources={false}
-        showConcurrency={false}
+        showResources={showsImplementAgentControls(node)}
+        showConcurrency={showsImplementAgentControls(node)}
         draft={draft}
         onChange={(next) => applyDraft(saveState.current, next, setDraft)}
         organizationId={organizationId}
@@ -84,6 +85,10 @@ export function AgentRunnerSettings({
       />
     </div>
   );
+}
+
+function showsImplementAgentControls(node: SuperplaneComponentsNode): boolean {
+  return node.id === IMPLEMENT_AGENT_NODE_ID;
 }
 
 function acceptNodeUpdate(

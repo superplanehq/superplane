@@ -16,6 +16,8 @@ import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  FEATURE_WORKSPACE_MCP,
+  FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
 import { unmockedSrc } from "@/test/unmockedModule";
 
@@ -689,6 +691,8 @@ describe("LinesPage board", () => {
   });
 
   it("opens an existing phase automation on the split config screen", async () => {
+    enabledExperimentalFeatures.add(FEATURE_WORKSPACE_MCP);
+    enabledExperimentalFeatures.add(FEATURE_WORKSPACE_SKILLS);
     useFactoryAutomations.mockReturnValue({ data: [{ id: "app-refund-implementer", name: "Implement" }] });
     const user = userEvent.setup();
     renderLinesBoard(`/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT}/lines/${REFUND_LINE_PLAN_ID}`);
@@ -723,6 +727,9 @@ describe("LinesPage board", () => {
     expect(screen.queryByRole("tab", { name: "General" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Edit automation" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Concurrency")).toHaveValue(5);
+    expect(within(dialog).getByText("MCP servers")).toBeInTheDocument();
+    expect(within(dialog).getByText("Skills")).toBeInTheDocument();
   });
 
   it("opens Planning settings from the Task analysis row", async () => {
@@ -1605,13 +1612,11 @@ describe("LinesPage board editing", () => {
     await user.click(screen.getByRole("button", { name: "Add step" }));
 
     await waitFor(() => {
-      expect(updateCanvasVersionMutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          versionId: "version-live",
-          canvasYaml: expect.stringContaining("implementation-agent-no-issue"),
-        }),
-      );
+      expect(commitCanvasStagingMutateAsync).toHaveBeenCalledWith("Update step");
     });
+    const saved = updateCanvasVersionMutateAsync.mock.calls.at(-1)?.[0] as { canvasYaml?: string };
+    expect(saved.canvasYaml).toContain("implementation-agent-no-issue");
+    expect(saved.canvasYaml?.match(/type: bash/g)).toHaveLength(2);
     expect(screen.queryByRole("button", { name: "Save Agent" })).not.toBeInTheDocument();
   });
 
