@@ -26,12 +26,18 @@ const (
 	WorkspaceSetupConfigPath        = "workspace_setup.json"
 	WorkspaceContextConfigPath      = "workspace_context.json"
 	// WorkspaceCheckoutScriptPath is the smart checkout helper shipped on
-	// factory tasks when the workspace agent flag is on. New factory
-	// templates source it (with an inline-clone fallback) so the main repo
-	// lands in repo/ and every context repo in its directory. Stored
-	// canvases are never rewritten, so existing automations keep their
-	// inline Clone Repo step until their owner adopts the helper.
+	// factory tasks. New factory templates source it as a single line so
+	// the main repo lands in repo/ and every context repo in its
+	// directory. Stored canvases are never rewritten, so existing
+	// automations keep their inline Clone Repo step until their owner
+	// adopts the helper.
 	WorkspaceCheckoutScriptPath = "setup/checkout-workspace.sh"
+	// WorkspaceCheckoutCommitSetupEnv opts a checkout into the factory
+	// commit setup (agent git identity, trailer hook, branch handling).
+	// The Implement Clone step sets it inline; read-only checkouts such
+	// as intake analysis leave it off so sourcing the helper never
+	// mutates the remote.
+	WorkspaceCheckoutCommitSetupEnv = "CHECKOUT_COMMIT_SETUP"
 )
 
 type workspaceMCPServer struct {
@@ -345,7 +351,9 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 // the VCS integration setup that already ran (gh auth setup-git /
 // Bitbucket credential helper), so the script uses plain HTTPS URLs and
 // never embeds tokens. It is idempotent: directories that already contain
-// a checkout are reused, never wiped.
+// a checkout are reused, never wiped. The factory commit setup (agent git
+// identity, trailer hook, branch handling) runs only when
+// CHECKOUT_COMMIT_SETUP=1, so read-only checkouts stay side-effect free.
 func WorkspaceCheckoutScript() string {
 	return `set -euo pipefail
 : "${SUPERPLANE_TASK_DIR:?SUPERPLANE_TASK_DIR is required}"
@@ -370,7 +378,7 @@ else
     exit 1
   fi
 fi
-
+` + workspaceCheckoutCommitSetup() + `
 ctx="$SUPERPLANE_TASK_DIR/workspace_context.json"
 if [ -f "$ctx" ]; then
   if ! command -v node >/dev/null 2>&1; then
@@ -405,6 +413,49 @@ if [ -f "$ctx" ]; then
   fi
 fi
 echo "Checkout complete: repo/ and context repositories (if any)."
+`
+}
+
+// workspaceCheckoutCommitSetup runs the factory commit identity and branch
+// handling inside repo/. The caller opts in with CHECKOUT_COMMIT_SETUP=1
+// (the Implement Clone step sets it inline on the source line). The script
+// is sourced, so it saves and restores the working directory instead of a
+// subshell: the exports below must persist in the caller, and the context
+// clones after this block use paths relative to the task directory.
+func workspaceCheckoutCommitSetup() string {
+	return `if [ "${` + WorkspaceCheckoutCommitSetupEnv + `:-0}" = "1" ]; then
+git config --global user.email "` + FactoryAgentEmail + `"
+git config --global user.name "` + FactoryAgentName + `"
+_sp_cwd="$(pwd)"
+cd repo || exit 1
+` + FactoryRepoCommitSetup() + `
+use_existing_branch() {
+  echo "Another run created ${branch}. Using that branch." >&2
+  git fetch origin "${branch}"
+  git checkout -B "${branch}" "origin/${branch}"
+}
+
+if ! git rev-parse --verify --quiet "refs/remotes/origin/${branch}" >/dev/null && ! git rev-parse --verify --quiet HEAD >/dev/null; then
+  remote_head="$(git ls-remote --heads origin "refs/heads/${branch}")" || exit 1
+  if [ -n "$remote_head" ]; then
+    use_existing_branch
+  else
+    echo "Remote has no branches. Creating ${branch}." >&2
+    git checkout -B "${branch}"
+    git commit --allow-empty -s -m "chore: Initialize repository"
+    if ! git push -u origin "HEAD:refs/heads/${branch}"; then
+      remote_head="$(git ls-remote --heads origin "refs/heads/${branch}")" || exit 1
+      if [ -z "$remote_head" ]; then
+        echo "Failed to create ${branch}." >&2
+        exit 1
+      fi
+      use_existing_branch
+    fi
+  fi
+fi
+cd "$_sp_cwd" || exit 1
+unset _sp_cwd
+fi
 `
 }
 
