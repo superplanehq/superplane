@@ -55,11 +55,29 @@ const PREVIEW_CONTENT_CLASS = cn(
   "[&_[data-slot=button].bg-primary[data-size=sm]]:text-[14px]",
   "[&_[data-slot=button].bg-primary[data-size=sm]]:font-normal",
   "[&_[data-slot=button].bg-primary[data-size=sm]]:normal-case",
+  "[&_[data-slot=button].border]:h-auto",
+  "[&_[data-slot=button].border]:rounded-[5px]",
+  "[&_[data-slot=button].border]:border-[#34322b]",
+  "[&_[data-slot=button].border]:bg-[#201f1a]",
+  "[&_[data-slot=button].border]:text-[#eeede9]",
+  "[&_[data-slot=button].border]:shadow-none",
+  "[&_[data-slot=button].border]:hover:bg-[#2a2923]",
+  "[&_[data-slot=button].border]:hover:text-[#eeede9]",
   "[&_[data-slot=input]]:rounded-[5px]",
   "[&_[data-slot=input]]:border-[#34322b]!",
   "[&_[data-slot=input]]:bg-[#201f1a]!",
   "[&_[data-slot=input]]:text-[#eeede9]!",
   "[&_[data-slot=input]]:placeholder:text-[#9b9993]!",
+  "[&_[data-slot=select-trigger]]:h-auto",
+  "[&_[data-slot=select-trigger]]:w-full",
+  "[&_[data-slot=select-trigger]]:rounded-[5px]",
+  "[&_[data-slot=select-trigger]]:border-[#34322b]",
+  "[&_[data-slot=select-trigger]]:bg-[#201f1a]",
+  "[&_[data-slot=select-trigger]]:text-[#eeede9]",
+  "[&_[data-slot=select-trigger]]:shadow-none",
+  "[&_[data-slot=checkbox]]:border-[#34322b]",
+  "[&_[data-slot=checkbox]]:bg-[#201f1a]",
+  "[&_[data-slot=checkbox]]:accent-[#f3f3f1]",
 );
 
 function firstRunSide(aside: ReactNode | undefined, sphere: FirstRunSphereProps | undefined) {
@@ -223,13 +241,11 @@ function PreviewShell({
           )}
           data-testid="first-run-content"
         >
-          <div className={cn(PREVIEW_CONTENT_CLASS, "my-auto shrink-0")}>
-            {children}
-            <FirstRunBack onBack={chrome?.onBack} disabled={controlsDisabled} preview />
-          </div>
+          <div className={cn(PREVIEW_CONTENT_CLASS, "my-auto shrink-0")}>{children}</div>
         </div>
         <div className="flex items-center justify-between pt-4" data-testid="first-run-bottom-row">
           <div className="flex items-center gap-3">
+            <FirstRunBack onBack={chrome?.onBack} disabled={controlsDisabled} preview />
             <FirstRunLogOut onLogOut={chrome?.onLogOut} disabled={controlsDisabled} preview />
             <FirstRunOrganizationSwitch
               organizationSwitch={chrome?.organizationSwitch}
@@ -338,10 +354,9 @@ function FirstRunBack({
       type="button"
       variant="ghost"
       className={cn(
-        "mt-4",
         preview
           ? "h-auto px-0 text-[14px] font-normal text-[#9b9993] hover:bg-transparent hover:text-[#eeede9]"
-          : "text-muted-foreground hover:text-foreground",
+          : "mt-4 text-muted-foreground hover:text-foreground",
       )}
       onClick={onBack}
       disabled={disabled}

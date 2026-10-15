@@ -63,11 +63,6 @@ locals {
       managerId          = var.cluster_name
       namespace          = var.superplane_namespace
       serviceAccountName = "superplane-fleet-manager"
-      credentials = {
-        provision      = true
-        existingSecret = "superplane-fleet-manager-token"
-        tokenKey       = "INSTALLATION_ADMIN_TOKEN"
-      }
       infrastructure = {
         superplaneUrl        = "https://${var.domain_name}"
         subscriptionId       = var.subscription_id
@@ -76,6 +71,8 @@ locals {
         zones                = var.runner_zones
         subnetId             = azurerm_subnet.runners.id
         securityGroupIds     = azurerm_network_security_group.runners.id
+        imageAmd64           = var.runner_image_amd64
+        imageArm64           = var.runner_image_arm64
         runnerIdentity       = azurerm_user_assigned_identity.runner.id
         fleetManagerIdentity = azurerm_user_assigned_identity.fleet_manager.client_id
       }

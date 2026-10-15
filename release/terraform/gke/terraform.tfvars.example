@@ -29,7 +29,7 @@ letsencrypt_email = "admin@example.com"
 # cluster_name    = "superplane"
 # cluster_version = "1.36"
 # node_count      = 2
-# machine_type    = "e2-medium"
+# machine_type    = "e2-standard-2"
 
 # Set to false and apply before terraform destroy
 # gke_deletion_protection = true
@@ -94,6 +94,8 @@ superplane_chart_version = "0.0.0-<git-sha>"
 
 # runner_zones       = ["us-central1-a", "us-central1-b"]
 # runner_subnet_cidr = "172.20.0.0/24"
+# runner_image_amd64 = "projects/example/global/images/superplane-runner-amd64"
+# runner_image_arm64 = "projects/example/global/images/superplane-runner-arm64"
 
 # After owner setup, use /admin/fleet-manager-setup. The page maps Terraform
 # outputs to the standalone chart at

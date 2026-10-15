@@ -28,15 +28,21 @@ import (
 const (
 	configPathEnvironment = "FLEET_MANAGER_CONFIG_FILE"
 	defaultConfigPath     = "/etc/superplane/fleet-manager.yaml"
+	syncFleetsCommand     = "sync-fleets"
 )
 
 var Version = "dev"
 
 func main() {
-	if printVersion(os.Args[1:], os.Stdout) {
+	args := os.Args[1:]
+	if printVersion(args, os.Stdout) {
 		return
 	}
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	if len(args) > 0 && !isSyncFleetsCommand(args) {
+		log.Error("unknown Fleet Manager command", slog.String("command", args[0]))
+		os.Exit(1)
+	}
 	configPath := os.Getenv(configPathEnvironment)
 	if configPath == "" {
 		configPath = defaultConfigPath
@@ -59,6 +65,14 @@ func main() {
 	if err != nil {
 		log.Error("create installation admin API client", slog.Any("error", err))
 		os.Exit(1)
+	}
+	if isSyncFleetsCommand(args) {
+		if err := syncConfiguredFleets(ctx, admin, config.Fleets); err != nil {
+			log.Error("sync fleets", slog.Any("error", err))
+			os.Exit(1)
+		}
+		log.Info("Fleet configuration synchronized", slog.Int("fleet_count", len(config.Fleets)))
+		return
 	}
 	var releaseArtifactResolver reconcile.ArtifactResolver
 	var awsSDKConfig aws.Config
@@ -174,6 +188,10 @@ func main() {
 	)
 	<-ctx.Done()
 	log.Info("Fleet Manager stopped")
+}
+
+func isSyncFleetsCommand(args []string) bool {
+	return len(args) == 1 && args[0] == syncFleetsCommand
 }
 
 func printVersion(args []string, output io.Writer) bool {
