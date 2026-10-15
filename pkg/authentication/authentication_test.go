@@ -473,13 +473,12 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 func attachGitHubIdentity(t *testing.T, account *models.Account, providerID string) {
 	t.Helper()
 	require.NoError(t, database.Conn().Create(&models.AccountProvider{
-		AccountID:   account.ID,
-		Provider:    models.ProviderGitHub,
-		ProviderID:  providerID,
-		Email:       account.Email,
-		Name:        account.Name,
-		AvatarURL:   "https://avatars.example/" + providerID + ".png",
-		AccessToken: "token-" + account.ID.String(),
+		AccountID:  account.ID,
+		Provider:   models.ProviderGitHub,
+		ProviderID: providerID,
+		Email:      account.Email,
+		Name:       account.Name,
+		AvatarURL:  "https://avatars.example/" + providerID + ".png",
 	}).Error)
 }
 
