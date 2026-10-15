@@ -609,3 +609,27 @@ func TestAttachWorkspaceAgentResourcesSkipsDisabledSetupAndContext(t *testing.T)
 	require.Len(t, files, 1)
 	assert.Equal(t, "Implement the plan.\n", files[0].Content)
 }
+
+func TestAttachWorkspaceAgentResourcesKeepsSystemSkillsEnabled(t *testing.T) {
+	r := support.Setup(t)
+	require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureWorkspaceSkills))
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	canvas := support.CreateFactoryCanvas(t, r, factory.ID, "Line app")
+	system, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "refine-task", true, models.FactoryAgentResourceConfig{
+		Markdown: "# Refine task", SystemSkill: &models.FactorySystemSkill{TemplateID: "refine-task", Version: 1},
+	})
+	require.NoError(t, err)
+	custom, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "custom", true, models.FactoryAgentResourceConfig{Markdown: "# Custom"})
+	require.NoError(t, err)
+	_, files := runner.AttachWorkspaceAgentResources(core.ExecutionContext{
+		OrganizationID: r.Organization.ID.String(), WorkflowID: canvas.ID.String(),
+		Configuration: map[string]any{"disabledAgentResourceIds": []string{system.ID.String(), custom.ID.String()}},
+	}, nil, nil)
+	require.Len(t, files, 2)
+	assert.Equal(t, ".claude/skills/refine-task/SKILL.md", files[0].Path)
+	assert.Equal(t, ".agents/skills/refine-task/SKILL.md", files[1].Path)
+	assert.Equal(t, "# Refine task\n", files[0].Content)
+	assert.Equal(t, files[0].Content, files[1].Content)
+}

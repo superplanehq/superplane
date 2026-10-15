@@ -2680,6 +2680,12 @@ message FactoryAgentResource {
     string secret_key = 3;
   }
 
+  // Read-only metadata supplied by SuperPlane.
+  message SystemSkill {
+    string template_id = 1;
+    int32 version = 2;
+  }
+
   string id = 1;
   string factory_id = 2;
   Kind kind = 3;
@@ -2701,6 +2707,7 @@ message FactoryAgentResource {
   repeated string disabled_tools = 19;
   repeated string commands = 20;
   string vcs_provider = 21;
+  SystemSkill system_skill = 22;
 }
 
 message ListFactoryAgentResourcesRequest {

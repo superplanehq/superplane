@@ -513,7 +513,7 @@ func rejectDisabledAgentResources(resources []models.FactoryAgentResource, disab
 	}
 	out := make([]models.FactoryAgentResource, 0, len(resources))
 	for i := range resources {
-		if _, skip := disabled[resources[i].ID.String()]; skip {
+		if _, skip := disabled[resources[i].ID.String()]; skip && !resources[i].IsSystemSkill() {
 			continue
 		}
 		out = append(out, resources[i])

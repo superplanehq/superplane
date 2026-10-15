@@ -1,3 +1,4 @@
+import { SystemSkillBadge } from "./SystemSkillBadge";
 import { Editor } from "@monaco-editor/react";
 
 import { PermissionTooltip } from "@/components/PermissionGate";
@@ -40,7 +41,14 @@ export function FactorySettingsSkillEditorPage() {
       wide
       actions={<SkillEditorActions editor={editor} />}
     >
+      {editor.resource?.systemSkill ? (
+        <div className="mb-4 flex items-center gap-2">
+          <SystemSkillBadge />
+          <p className="text-[13px] text-muted-foreground">{AGENT_RESOURCES_COPY.systemSkillProtected}</p>
+        </div>
+      ) : null}
       <SkillEditorFields
+        systemSkill={Boolean(editor.resource?.systemSkill)}
         name={editor.name}
         markdown={editor.markdown}
         command={editor.command}
@@ -56,7 +64,7 @@ export function FactorySettingsSkillEditorPage() {
         factoryName={displayName}
         title={`Delete "${displayName}"?`}
         description={AGENT_RESOURCES_COPY.deleteSkillDescription}
-        canDelete={editor.canUpdate}
+        canDelete={editor.canUpdate && !editor.resource?.systemSkill}
         isDeleting={editor.isDeleting}
         onClose={() => editor.setPendingDelete(false)}
         onConfirm={editor.confirmDelete}
@@ -74,7 +82,7 @@ function SkillEditorActions({ editor }: { editor: ReturnType<typeof useSkillEdit
           <span className="text-[12px] text-muted-foreground">Enabled</span>
           <Switch
             checked={editor.resource.enabled !== false}
-            disabled={!editor.canUpdate}
+            disabled={!editor.canUpdate || Boolean(editor.resource?.systemSkill)}
             onCheckedChange={editor.toggleEnabled}
             aria-label={`Enable ${displayName}`}
             data-testid="skill-editor-enabled"
@@ -86,7 +94,7 @@ function SkillEditorActions({ editor }: { editor: ReturnType<typeof useSkillEdit
           type="button"
           variant="outline"
           onClick={() => editor.setPendingDelete(true)}
-          disabled={!editor.canUpdate}
+          disabled={!editor.canUpdate || Boolean(editor.resource?.systemSkill)}
         >
           {AGENT_RESOURCES_COPY.delete}
         </Button>
@@ -110,6 +118,7 @@ function SkillEditorActions({ editor }: { editor: ReturnType<typeof useSkillEdit
 }
 
 function SkillEditorFields({
+  systemSkill,
   name,
   markdown,
   command,
@@ -120,6 +129,7 @@ function SkillEditorFields({
   onNameChange,
   onMarkdownChange,
 }: {
+  systemSkill: boolean;
   name: string;
   markdown: string;
   command: string;
@@ -133,6 +143,7 @@ function SkillEditorFields({
   return (
     <div className="flex flex-col gap-4" data-testid="factory-settings-skill-editor">
       <SkillNameFields
+        systemSkill={systemSkill}
         name={name}
         command={command}
         commandName={commandName}
@@ -169,12 +180,14 @@ function SkillEditorFields({
 }
 
 function SkillNameFields({
+  systemSkill,
   name,
   command,
   commandName,
   nameError,
   onNameChange,
 }: {
+  systemSkill: boolean;
   name: string;
   command: string;
   commandName: string;
@@ -187,6 +200,7 @@ function SkillNameFields({
         <Label htmlFor="skill-editor-name">{AGENT_RESOURCES_COPY.nameLabel}</Label>
         <Input
           id="skill-editor-name"
+          disabled={systemSkill}
           data-testid="agent-resource-skill-name"
           value={name}
           onChange={(event) => onNameChange(event.target.value)}

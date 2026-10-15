@@ -1,6 +1,7 @@
 package models_test
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"strings"
 	"testing"
@@ -607,4 +608,56 @@ func Test__CanonicalMCPServerURL(t *testing.T) {
 	assert.Equal(t, models.CanonicalMCPServerURL("https://mcp.example.com"), models.CanonicalMCPServerURL("https://mcp.example.com/"))
 	assert.NotEqual(t, models.CanonicalMCPServerURL("https://mcp.example.com/sse?token=abc/"), models.CanonicalMCPServerURL("https://mcp.example.com/sse?token=abc"))
 	assert.Empty(t, models.CanonicalMCPServerURL("  "))
+}
+
+func TestSystemSkillMetadataSurvivesContentEdits(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindSkill, "refine-task", true, models.FactoryAgentResourceConfig{
+		Markdown:    "  # Original  ",
+		SystemSkill: &models.FactorySystemSkill{TemplateID: "refine-task", Version: 1},
+	})
+	require.NoError(t, err)
+	original, err := factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.True(t, original.IsSystemSkill())
+	assert.Equal(t, fmt.Sprintf("%x", sha256.Sum256([]byte("# Original"))), original.Config.Data().SystemSkill.ContentHash)
+	// A replacement config cannot remove or replace the supplied metadata.
+	require.NoError(t, resource.Update(db, nil, nil, &models.FactoryAgentResourceConfig{
+		Markdown: "# Customized", SystemSkill: &models.FactorySystemSkill{TemplateID: "other", Version: 99},
+	}))
+	edited, err := factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.Equal(t, original.Config.Data().SystemSkill, edited.Config.Data().SystemSkill)
+	assert.Equal(t, "# Customized", edited.Config.Data().Markdown)
+	require.NoError(t, resource.Update(db, nil, nil, &models.FactoryAgentResourceConfig{Markdown: "# Customized again"}))
+	edited, err = factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.Equal(t, original.Config.Data().SystemSkill, edited.Config.Data().SystemSkill)
+}
+
+func TestSystemSkillCreationRequiresValidMetadataAndEnabledSkill(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		name, kind, template string
+		version              int32
+		enabled              bool
+	}{
+		{"missing template", models.FactoryAgentResourceKindSkill, "", 1, true},
+		{"missing version", models.FactoryAgentResourceKindSkill, "refine-task", 0, true},
+		{"disabled", models.FactoryAgentResourceKindSkill, "refine-task", 1, false},
+		{"not a skill", models.FactoryAgentResourceKindMCPServer, "refine-task", 1, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := factory.CreateAgentResource(db, tc.kind, "refine-task", tc.enabled, models.FactoryAgentResourceConfig{
+				Markdown: "# Refine task", SystemSkill: &models.FactorySystemSkill{TemplateID: tc.template, Version: tc.version},
+			})
+			assert.ErrorIs(t, err, models.ErrFactorySystemSkillMetadataInvalid)
+		})
+	}
 }

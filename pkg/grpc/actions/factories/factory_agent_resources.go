@@ -238,6 +238,9 @@ func serializeFactoryAgentResource(resource *models.FactoryAgentResource) *pb.Fa
 		out.Ref = config.Ref
 		out.Path = config.Path
 		out.Markdown = config.Markdown
+		if resource.IsSystemSkill() {
+			out.SystemSkill = &pb.FactoryAgentResource_SystemSkill{TemplateId: config.SystemSkill.TemplateID, Version: config.SystemSkill.Version}
+		}
 	}
 	if resource.Kind == models.FactoryAgentResourceKindContextRepo {
 		out.Repository = config.Repository
