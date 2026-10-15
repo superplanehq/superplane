@@ -80,32 +80,19 @@ az account set --subscription SUBSCRIPTION_ID
 The defaults pin these artifacts:
 
 - Chart `oci://ghcr.io/superplanehq/superplane-chart` version
-  `0.0.0-77688495d9ae8bdb1dcb3252998b5850bc032b69`
-- App image `ghcr.io/superplanehq/superplane:77688495d9ae8bdb1dcb3252998b5850bc032b69-selfhosted`
-- Fleet Manager image `ghcr.io/superplanehq/fleet-manager:38fd599797f475b299f80b7c28116d89935b53f4`
+  `0.0.0-f711ba6b1ebf19ae26825b8a6397b9ef24832f68`
+- App image `ghcr.io/superplanehq/superplane:f711ba6b1ebf19ae26825b8a6397b9ef24832f68-selfhosted`
 
 Confirm them before you apply:
 
 ```bash
-SHA=77688495d9ae8bdb1dcb3252998b5850bc032b69
+SHA=f711ba6b1ebf19ae26825b8a6397b9ef24832f68
 helm show chart oci://ghcr.io/superplanehq/superplane-chart --version "0.0.0-${SHA}"
 docker manifest inspect "ghcr.io/superplanehq/superplane:${SHA}-selfhosted"
-docker manifest inspect ghcr.io/superplanehq/fleet-manager:38fd599797f475b299f80b7c28116d89935b53f4
 ```
 
 `helm show chart` must print `appVersion: ${SHA}-selfhosted`.
 Leave `superplane_image_tag` empty. The chart uses that appVersion.
-
-These defaults predate the chart and Fleet Manager changes in this
-repository.
-
-The pinned chart does not read `podSecurityContext` or `securityContext`.
-Those Terraform values have no effect until maintainers publish a chart
-from the merge commit.
-
-The pinned Fleet Manager image still requires an image resource ID and
-at least one availability zone. A community gallery image ID and an
-empty `zones` list need a Fleet Manager image from that same merge.
 
 ## 3. Configure Terraform
 
@@ -300,7 +287,9 @@ Terraform variables.
 
 ## Runners
 
-> Requires a Fleet Manager image published from the merge of this change. The default tag does not support community gallery IDs or empty zones.
+Install Fleet Manager with `oci://ghcr.io/superplanehq/fleet-manager-chart`.
+Use chart version `0.1.2` or later.
+Version `0.1.2` accepts a community gallery image ID and an empty `zones` list.
 
 Terraform creates the runner subnet, network security group, and identities.
 Use the SuperPlane community gallery for the VM image. Do not run Packer in
@@ -334,7 +323,7 @@ empty when the region or size has no availability zones.
 Open **Set up runner fleets** during owner setup. Terraform passes the runner
 network, location, identity, and cluster values to SuperPlane. The wizard
 preloads these values. Replace the Azure image placeholder with the community
-gallery image version. Save `values.yaml` and run the displayed Helm command.
+gallery image version. Save `values.yaml` and run the Helm command that the wizard shows.
 
 This stack still creates an empty customer Compute Gallery and two image
 definitions. You can ignore them when `azure.imageId` points at the
