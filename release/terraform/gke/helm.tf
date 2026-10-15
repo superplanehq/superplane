@@ -81,6 +81,13 @@ locals {
   }) : ""
 
   fleet_manager_setup_values = yamlencode({
+    # The published chart still defaults both components to v0.1.0.
+    # Runner and Fleet Manager publish on separate release lines.
+    componentReleases = {
+      runnerVersion       = "v0.2.0"
+      runnerVersions      = ["v0.2.0"]
+      fleetManagerVersion = "v0.1.3"
+    }
     fleetManagerSetup = {
       enabled            = local.runners_enabled
       provider           = local.runners_enabled ? "gcp" : ""
