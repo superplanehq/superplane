@@ -162,9 +162,8 @@ func TestUpdateFactoryRepositorySynchronizesHostedBindingAccess(t *testing.T) {
 	require.NoError(t, err)
 
 	updated, err := UpdateFactoryRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryRepositoryRequest{
-		Id:            factory.ID.String(),
-		Repository:    "ACME/WEB",
-		DefaultBranch: "untrusted-branch",
+		Id:         factory.ID.String(),
+		Repository: "ACME/WEB",
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "acme/web", updated.Factory.Onboarding.AppRepository)
@@ -327,4 +326,185 @@ func TestFactoryDefaultBranchFromNodesIgnoresExpressions(t *testing.T) {
 	}
 
 	assert.Empty(t, factoryDefaultBranchFromNodes(nodes))
+}
+
+func TestUpdateFactoryRepositoryKeepsRequestedGitHubBranch(t *testing.T) {
+	t.Setenv(config.EnvGitHubAppID, "123")
+	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "test-private-key")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
+
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := githubCatalogFactory(t, r, db)
+	started, err := factory.CreateWorkOrder(db, "Started", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	integrationID := factory.OnboardingConfigValue().VCSIntegrationID
+	deps := IntakeDependencies{
+		Registry: r.Registry, Encryptor: r.Encryptor, AuthService: r.AuthService, WebhookBaseURL: "http://localhost:8000",
+	}
+	implement := support.CreateFactoryCanvas(t, r, factory.ID, "Implement")
+	closure := support.CreateFactoryCanvas(t, r, factory.ID, "Close")
+	publishRepositoryCanvas(t, r, deps, implement, []models.Node{{
+		ID: "create-pr", Name: "Create pull request", Type: models.NodeTypeComponent,
+		Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "github.createPullRequest"}},
+		IntegrationID: &integrationID,
+		Configuration: map[string]any{"repository": "{{ task().repository }}", "base": "main"},
+		Metadata:      models.FactoryAppTemplateMetadataFor("line-implementation", 1, models.ProviderGitHub),
+	}})
+	publishRepositoryCanvas(t, r, deps, closure, []models.Node{{
+		ID: "on-pr-closed", Name: "On pull request closed", Type: models.NodeTypeComponent,
+		Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "github.createIssueComment"}},
+		IntegrationID: &integrationID,
+		Configuration: map[string]any{"repository": "acme/api"},
+		Metadata:      models.FactoryAppTemplateMetadataFor("pr-closure", 1, models.ProviderGitHub),
+	}})
+
+	ctx := withRepositoryBranchResolver(
+		authentication.SetUserIdInMetadata(context.Background(), r.User.String()),
+		repositoryBranchResolver{gitHubBranches: func(string) ([]string, error) {
+			return []string{"main", "develop"}, nil
+		}},
+	)
+	updated, err := UpdateFactoryRepository(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryRepositoryRequest{
+		Id:            factory.ID.String(),
+		Repository:    "acme/api",
+		DefaultBranch: "develop",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "acme/api", updated.Factory.Onboarding.AppRepository)
+	assert.Equal(t, int64(201), updated.Factory.Onboarding.AppRepositoryId)
+	assert.Equal(t, "develop", updated.Factory.Onboarding.DefaultBranch)
+
+	var kept models.FactoryWorkOrder
+	require.NoError(t, db.First(&kept, "id = ?", started.ID).Error)
+	require.NotNil(t, kept.DefaultBranch)
+	assert.Equal(t, "main", *kept.DefaultBranch)
+	assert.Equal(t, "acme/api", *kept.Repository)
+
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	created, err := reloaded.CreateWorkOrder(db, "Next", "", &r.User, nil, nil)
+	require.NoError(t, err)
+	require.NotNil(t, created.DefaultBranch)
+	assert.Equal(t, "develop", *created.DefaultBranch)
+	assert.Equal(t, "acme/api", *created.Repository)
+
+	implementVersion := liveRepositoryCanvas(t, db, r.Organization.ID, implement)
+	assert.Equal(t, orderDefaultBranchExpression, findIntakeNode(implementVersion.Nodes, "create-pr").Configuration["base"])
+	assert.Len(t, canvasVersions(t, implement.ID), 3)
+	assert.Equal(t, "acme/api", findIntakeNode(liveRepositoryCanvas(t, db, r.Organization.ID, closure).Nodes, "on-pr-closed").Configuration["repository"])
+	assert.Len(t, canvasVersions(t, closure.ID), 2)
+
+	_, err = UpdateFactoryRepository(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryRepositoryRequest{
+		Id:            factory.ID.String(),
+		Repository:    "acme/api",
+		DefaultBranch: "develop",
+	})
+	require.NoError(t, err)
+	assert.Len(t, canvasVersions(t, implement.ID), 3)
+	assert.Len(t, canvasVersions(t, closure.ID), 2)
+}
+
+func TestUpdateFactoryRepositoryRejectsUnknownGitHubBranch(t *testing.T) {
+	t.Setenv(config.EnvGitHubAppID, "123")
+	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "test-private-key")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
+
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := githubCatalogFactory(t, r, db)
+	ctx := withRepositoryBranchResolver(
+		authentication.SetUserIdInMetadata(context.Background(), r.User.String()),
+		repositoryBranchResolver{gitHubBranches: func(string) ([]string, error) {
+			return []string{"main"}, nil
+		}},
+	)
+	_, err := UpdateFactoryRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryRepositoryRequest{
+		Id:            factory.ID.String(),
+		Repository:    "acme/api",
+		DefaultBranch: "develop",
+	})
+	require.ErrorContains(t, err, "branch does not exist")
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "main", reloaded.OnboardingConfigValue().DefaultBranch)
+}
+
+func TestUpdateFactoryRepositoryRejectsGitHubBranchWhenCheckCannotRun(t *testing.T) {
+	t.Setenv(config.EnvGitHubAppID, "123")
+	t.Setenv(config.EnvGitHubAppSlug, "superplane-test")
+	t.Setenv(config.EnvGitHubAppPrivateKey, "test-private-key")
+	t.Setenv(config.EnvGitHubAppWebhookSecret, "test-webhook-secret")
+
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	factory := githubCatalogFactory(t, r, db)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	_, err := UpdateFactoryRepository(ctx, IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryRepositoryRequest{
+		Id:            factory.ID.String(),
+		Repository:    "acme/api",
+		DefaultBranch: "develop",
+	})
+	require.ErrorContains(t, err, "could not verify the branch")
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "main", reloaded.OnboardingConfigValue().DefaultBranch)
+	assert.Equal(t, "acme/api", reloaded.OnboardingConfigValue().AppRepository)
+}
+
+func githubCatalogFactory(t *testing.T, r *support.ResourceRegistry, db *gorm.DB) *models.Factory {
+	t.Helper()
+	const githubUserID = int64(42)
+	const installationID = int64(101)
+	require.NoError(t, models.SaveAccountLinkedAccount(db, models.NewAccountLinkedAccount(
+		r.Account.ID, models.ProviderGitHub, "42", "octocat", "The Octocat", "https://github.com/octocat.png",
+	)))
+	require.NoError(t, models.UpsertVCSProviderInstallation(db, &models.VCSProviderInstallation{
+		Provider: models.ProviderGitHub, InstallationID: installationID, AccountLogin: "acme",
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositories(db, models.ProviderGitHub, installationID, []models.VCSProviderRepository{
+		{RepositoryID: 201, FullName: "acme/api", DefaultBranch: "main"},
+	}))
+	require.NoError(t, models.ReplaceVCSProviderRepositoryCollaborators(db, models.ProviderGitHub, 201, []models.VCSProviderRepositoryCollaborator{
+		{ProviderUserID: githubUserID, ProviderLogin: "octocat"},
+	}))
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	selected, err := SelectFactoryVCSProviderRepository(ctx, r.Organization.ID.String(), &pb.SelectFactoryVCSProviderRepositoryRequest{
+		Id: factory.ID.String(), Provider: models.ProviderGitHub, RepositoryId: 201,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "main", selected.Factory.Onboarding.DefaultBranch)
+	reloaded, err := models.FindFactory(db, r.Organization.ID, factory.ID)
+	require.NoError(t, err)
+	return reloaded
+}
+
+func publishRepositoryCanvas(t *testing.T, r *support.ResourceRegistry, deps IntakeDependencies, canvas *models.Canvas, nodes []models.Node) {
+	t.Helper()
+	require.NoError(t, database.DB(t.Context()).Transaction(func(tx *gorm.DB) error {
+		return canvases.PublishGeneratedCanvasNodes(t.Context(), tx, canvas, r.User, "Install", nodes, nil, changesets.CanvasPublisherOptions{
+			Registry: r.Registry, OrgID: r.Organization.ID, Encryptor: r.Encryptor,
+			AuthService: r.AuthService, WebhookBaseURL: deps.WebhookBaseURL,
+		})
+	}))
+}
+
+func liveRepositoryCanvas(t *testing.T, db *gorm.DB, organizationID uuid.UUID, canvas *models.Canvas) *models.CanvasVersion {
+	t.Helper()
+	reloaded, err := models.FindCanvasInTransaction(db, organizationID, canvas.ID)
+	require.NoError(t, err)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, reloaded)
+	require.NoError(t, err)
+	return version
+}
+
+func canvasVersions(t *testing.T, canvasID uuid.UUID) []models.CanvasVersion {
+	t.Helper()
+	versions, err := models.ListCanvasVersions(canvasID)
+	require.NoError(t, err)
+	return versions
 }
