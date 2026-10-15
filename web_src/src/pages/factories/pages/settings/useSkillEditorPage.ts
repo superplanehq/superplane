@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import type { FactoriesFactoryAgentResource } from "@/api-client";
@@ -163,18 +163,22 @@ function useSkillRestore(
   onRestored: (resource: FactoriesFactoryAgentResource) => void,
 ) {
   const restoreResource = useRestoreFactorySystemSkill(organizationId, factoryId);
-  const [pendingRestore, setPendingRestore] = useState(false);
+  const activeResourceId = useRef(resource?.id);
+  activeResourceId.current = resource?.id;
+  const [restoreTargetId, setRestoreTargetId] = useState<string>();
   return {
-    pendingRestore,
-    setPendingRestore,
+    pendingRestore: Boolean(restoreTargetId && restoreTargetId === resource?.id),
+    setPendingRestore: (open: boolean) => setRestoreTargetId(open ? resource?.id : undefined),
     isRestoring: restoreResource.isPending,
     canRestore:
       resource?.systemSkill?.state === "STATE_CUSTOM" || resource?.systemSkill?.state === "STATE_UPDATE_AVAILABLE",
     confirmRestore: async () => {
       if (!resource?.id) return;
       try {
-        onRestored(await restoreResource.mutateAsync(resource.id));
-        setPendingRestore(false);
+        const restored = await restoreResource.mutateAsync(resource.id);
+        setRestoreTargetId(undefined);
+        if (activeResourceId.current !== restored.id) return;
+        onRestored(restored);
         showSuccessToast(AGENT_RESOURCES_COPY.restoreSkillSuccess);
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.restoreSkillFailed));
