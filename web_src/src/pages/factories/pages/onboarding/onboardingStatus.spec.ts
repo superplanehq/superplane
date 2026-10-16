@@ -11,6 +11,7 @@ import {
   localIssuesSource,
   ONBOARDING_CONNECTION_NAMES,
   ONBOARDING_MANUAL_CONNECTION_NAMES,
+  restoreSavedAgentSelection,
 } from "./onboardingStatus";
 
 function githubInstance(id: string, name: string): OrganizationsIntegration {
@@ -136,6 +137,64 @@ describe("initialOnboardingSelections", () => {
     expect(synced).toEqual({
       [provider]: { id: "saved-key", name: "my-key", ready: true },
     });
+  });
+
+  it("restores a saved OpenAI integration under OpenAI", () => {
+    const saved = initialOnboardingSelections({
+      agentIntegrationId: "saved-key",
+      agentHarness: "AGENT_HARNESS_CODEX",
+    });
+    const synced = syncSelectionsWithInstances(
+      connectionData(
+        [{ metadata: { id: "saved-key", name: "my-openai", integrationName: "openai" }, status: { state: "ready" } }],
+        "openai",
+      ),
+      saved,
+      {},
+      ONBOARDING_MANUAL_CONNECTION_NAMES,
+    );
+
+    expect(synced).toEqual({
+      openai: { id: "saved-key", name: "my-openai", ready: true },
+    });
+  });
+
+  it("restores a saved OpenRouter integration after the connection sync drops the wrong provider", () => {
+    const saved = initialOnboardingSelections({
+      agentIntegrationId: "saved-key",
+      agentHarness: "AGENT_HARNESS_CLAUDE_CODE",
+    });
+    const instances = connectionData(
+      [{ metadata: { id: "saved-key", name: "my-router", integrationName: "openrouter" }, status: { state: "ready" } }],
+      "openrouter",
+    );
+    const synced = syncSelectionsWithInstances(instances, saved, {}, ONBOARDING_MANUAL_CONNECTION_NAMES) ?? saved;
+
+    expect(saved.claude).toBeUndefined();
+    expect(
+      restoreSavedAgentSelection(
+        synced,
+        instances.flatMap((item) => item.allInstances),
+        "saved-key",
+      ),
+    ).toEqual({
+      openrouter: { id: "saved-key", name: "my-router", ready: true },
+    });
+  });
+
+  it("does not replace a different agent the user already selected", () => {
+    expect(
+      restoreSavedAgentSelection(
+        { openai: { id: "new-key", name: "new-openai", ready: true } },
+        [
+          {
+            metadata: { id: "saved-key", name: "my-router", integrationName: "openrouter" },
+            status: { state: "ready" },
+          },
+        ],
+        "saved-key",
+      ),
+    ).toBeNull();
   });
 
   it("does not adopt a different GitHub connection when the workspace has none saved", () => {

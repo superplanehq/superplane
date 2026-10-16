@@ -16,7 +16,7 @@ import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { selectReadyIntegrationInstance, useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
-import { createElement, useEffect, useMemo, useState } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
@@ -42,6 +42,7 @@ import {
   ONBOARDING_CONNECTION_NAMES,
   ONBOARDING_MANUAL_CONNECTION_NAMES,
   onboardingVcsHost,
+  restoreSavedAgentSelection,
 } from "./onboardingStatus";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
@@ -387,6 +388,24 @@ export function useOnboardingPageModel(args: {
   const { data: connectedIntegrations = [] } = useConnectedIntegrations(args.organizationId, {
     enabled: Boolean(args.organizationId),
   });
+  const connectedIntegrationsRef = useRef(connectedIntegrations);
+  connectedIntegrationsRef.current = connectedIntegrations;
+  const savedAgentIntegrationIdRef = useRef(onboarding?.agentIntegrationId);
+  savedAgentIntegrationIdRef.current = onboarding?.agentIntegrationId;
+  const onSelectionsChange = useCallback(
+    (next: IntegrationSelections) => {
+      integrations.setSelections(
+        restoreSavedAgentSelection(next, connectedIntegrationsRef.current, savedAgentIntegrationIdRef.current) ?? next,
+      );
+    },
+    [integrations.setSelections],
+  );
+  useEffect(() => {
+    integrations.setSelections(
+      (current) =>
+        restoreSavedAgentSelection(current, connectedIntegrations, onboarding?.agentIntegrationId) ?? current,
+    );
+  }, [connectedIntegrations, integrations.setSelections, onboarding?.agentIntegrationId]);
   const existingIntegrationNames = new Set(
     connectedIntegrations.map((item) => item.metadata?.name?.trim()).filter((name): name is string => Boolean(name)),
   );
@@ -408,7 +427,7 @@ export function useOnboardingPageModel(args: {
     returnTo: onboardingStepPath(onboardingPath, openSection),
     integrationNames: [...ONBOARDING_CONNECTION_NAMES],
     selections: integrations.selections,
-    onSelectionsChange: integrations.setSelections,
+    onSelectionsChange,
     hiddenConfigurationFields: ONBOARDING_HIDDEN_CONFIGURATION_FIELDS,
     manualSelectionNames: ONBOARDING_MANUAL_CONNECTION_NAMES,
   });

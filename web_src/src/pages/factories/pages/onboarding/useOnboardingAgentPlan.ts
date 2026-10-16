@@ -72,9 +72,10 @@ function onboardingModelChoice(
   selectedModel: string | null | undefined,
 ) {
   if (!query) return { plan, modelPicker: undefined };
-  const models = byokModelIds(query.data);
+  const models = agentUsableModelIds(byokModelIds(query.data));
   const defaultModel = plan && models.includes(plan.model) ? plan.model : (models[0] ?? "");
-  const model = selectedModel ?? defaultModel;
+  const selectedIsUnusable = Boolean(selectedModel) && agentUsableModelIds([selectedModel ?? ""]).length === 0;
+  const model = selectedIsUnusable ? defaultModel : (selectedModel ?? defaultModel);
   const ready = model !== "" && models.includes(model) && query.isFetched && !query.isError;
   return {
     modelPicker: {
@@ -88,6 +89,35 @@ function onboardingModelChoice(
     },
     plan: ready && plan ? { ...plan, model, planningModel: model } : undefined,
   };
+}
+
+const NON_AGENT_MODEL_SEGMENTS = new Set([
+  "audio",
+  "babbage",
+  "dall",
+  "davinci",
+  "embedding",
+  "embeddings",
+  "image",
+  "moderation",
+  "moderations",
+  "realtime",
+  "sora",
+  "transcribe",
+  "transcription",
+  "tts",
+  "whisper",
+]);
+
+export function agentUsableModelIds(ids: string[]): string[] {
+  return ids.filter((id) => {
+    const segments = id
+      .trim()
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean);
+    return segments.length > 0 && !segments.some((segment) => NON_AGENT_MODEL_SEGMENTS.has(segment));
+  });
 }
 
 /** Keep organization selections within the models available to this key. */

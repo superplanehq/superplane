@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { byokModelIds, useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
+import { byokModelIds, agentUsableModelIds, useOnboardingAgentPlan } from "./useOnboardingAgentPlan";
 import { useOnboardingAgentModel } from "./onboardingAgentModel";
 import { agentRewriteFromPlan } from "./useOnboardingAgentPlan";
 
@@ -15,6 +15,23 @@ vi.mock("@/hooks/useLLMModelAllowlists", () => ({
     refetch: vi.fn(),
   }),
 }));
+
+describe("agentUsableModelIds", () => {
+  it("drops embedding, audio, and image models a coding agent cannot run", () => {
+    expect(
+      agentUsableModelIds([
+        "gpt-5",
+        "text-embedding-3-small",
+        "whisper-1",
+        "gpt-image-1",
+        "gpt-4o-mini-tts",
+        "dall-e-3",
+        "o3",
+        "openai/text-embedding-3-small",
+      ]),
+    ).toEqual(["gpt-5", "o3"]);
+  });
+});
 
 describe("byokModelIds", () => {
   it.each([
@@ -112,6 +129,23 @@ describe("useOnboardingAgentPlan", () => {
       model: "claude-opus-5-5",
       planningModel: "claude-opus-5-5",
       credentials: { source: "integration", name: "my-key" },
+    });
+  });
+
+  it("does not offer models Codex cannot run", () => {
+    keyModels.ids = ["gpt-5", "text-embedding-3-small", "whisper-1", "gpt-image-1", "o3"];
+    const { result } = renderHook(() =>
+      useOnboardingAgentPlan("org-1", new Set(["openai"]), 0, {
+        preferOwnKey: true,
+        selectedModel: "text-embedding-3-small",
+      }),
+    );
+
+    expect(result.current.modelPicker?.models).toEqual(["gpt-5", "o3"]);
+    expect(result.current.plan).toMatchObject({
+      component: "runnerCodex",
+      model: "gpt-5",
+      planningModel: "gpt-5",
     });
   });
 
