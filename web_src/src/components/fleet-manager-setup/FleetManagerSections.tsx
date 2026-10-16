@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -31,6 +33,7 @@ const PROVIDERS = [
 ] as const;
 
 export function FleetManagerProviderSection({ setup }: { setup: FleetManagerSetupState }) {
+  const terraformNoteIdPrefix = useId();
   if (!setup.metadata || !setup.draft) return null;
   const terraformProvider = setup.metadata.infrastructureDefaults.provider;
 
@@ -38,6 +41,8 @@ export function FleetManagerProviderSection({ setup }: { setup: FleetManagerSetu
     <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Cloud provider">
       {PROVIDERS.map(({ id, name, Logo }) => {
         const selected = setup.draft?.provider === id;
+        const loadedFromTerraform = terraformProvider === id;
+        const terraformNoteId = `${terraformNoteIdPrefix}-${id}`;
         return (
           <Button
             key={id}
@@ -45,11 +50,16 @@ export function FleetManagerProviderSection({ setup }: { setup: FleetManagerSetu
             variant={selected ? "default" : "outline"}
             className="h-auto min-h-20 flex-col gap-1"
             aria-label={name}
+            aria-describedby={loadedFromTerraform ? terraformNoteId : undefined}
             aria-pressed={selected}
             onClick={() => setup.setProvider(id)}
           >
             <Logo className="size-7" testId={`provider-logo-${id}`} />
-            {terraformProvider === id && <span className="text-[10px]">Loaded from Terraform</span>}
+            {loadedFromTerraform && (
+              <span id={terraformNoteId} className="text-[10px]">
+                Loaded from Terraform
+              </span>
+            )}
           </Button>
         );
       })}

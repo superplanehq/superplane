@@ -47,9 +47,11 @@ describe("FleetManagerProviderSection", () => {
     const { setup } = buildSetup({ terraformProvider: "gcp" });
     render(<FleetManagerProviderSection setup={setup} />);
 
-    const gcpCard = screen.getByRole("button", { name: "GCP" });
+    const gcpCard = screen.getByRole("button", { name: "GCP", description: "Loaded from Terraform" });
     expect(within(gcpCard).getByText("Loaded from Terraform")).toBeInTheDocument();
     expect(screen.getAllByText("Loaded from Terraform")).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "AWS" })).not.toHaveAccessibleDescription();
+    expect(screen.getByRole("button", { name: "Azure" })).not.toHaveAccessibleDescription();
   });
 
   it("selects the provider on click", async () => {
