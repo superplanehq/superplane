@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1144,4 +1145,92 @@ func TestBitbucketProviderReadMergeability_MissingIntegration(t *testing.T) {
 	assert.False(t, result.CanMerge)
 	assert.Equal(t, "MISSING_INTEGRATION", result.BlockedReason)
 	assert.Equal(t, bitbucketMergeBlockedMissingIntegration, result.Message)
+}
+
+func TestUpdateBitbucketDiscussionHandlerRefreshesAcknowledgeBody(t *testing.T) {
+	r := support.Setup(t)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	db := database.DB(t.Context())
+	deps := IntakeDependencies{
+		Registry:       r.Registry,
+		Encryptor:      r.Encryptor,
+		AuthService:    r.AuthService,
+		WebhookBaseURL: "http://localhost:8000",
+	}
+
+	factory := bitbucketFactory(t, r)
+	integrationID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
+	appRepo := "acme/widgets"
+	provider := models.ProviderBitbucket
+	require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+		VCSProvider:      &provider,
+		VCSIntegrationID: &integrationID,
+		AppRepository:    &appRepo,
+	}))
+
+	created, err := CreateFactoryPRFeedbackHandler(ctx, deps, r.Organization.ID.String(), &pb.CreateFactoryPRFeedbackHandlerRequest{
+		FactoryId: factory.ID.String(),
+		Source:    pb.FactoryPRFeedbackHandler_SOURCE_PULL_REQUEST_DISCUSSION,
+	})
+	require.NoError(t, err)
+
+	// Simulate a canvas created before the task link acknowledgement.
+	canvas, err := models.FindCanvasInTransaction(db, r.Organization.ID, uuid.MustParse(created.GetHandler().GetCanvasId()))
+	require.NoError(t, err)
+	version, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, canvas)
+	require.NoError(t, err)
+	nodes := append([]models.Node(nil), version.Nodes...)
+	stale := false
+	for i := range nodes {
+		if nodes[i].ID != prFeedbackAcknowledgeCommentNodeID {
+			continue
+		}
+		nodes[i].Configuration["body"] = "SuperPlane is looking into this."
+		stale = true
+	}
+	require.True(t, stale, "acknowledge node not found")
+	require.NoError(t, db.Model(version).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
+
+	// Older canvases acknowledge straight from the trigger.
+	edges := slices.DeleteFunc(slices.Clone(version.Edges), func(edge models.Edge) bool {
+		return edge.TargetID == prFeedbackAcknowledgeCommentNodeID
+	})
+	edges = append(edges, models.Edge{SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackAcknowledgeCommentNodeID, Channel: "default"})
+	require.NoError(t, db.Model(version).Update("edges", datatypes.NewJSONSlice(edges)).Error)
+
+	_, err = UpdateFactoryPRFeedbackHandler(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryPRFeedbackHandlerRequest{
+		FactoryId: factory.ID.String(),
+		HandlerId: created.GetHandler().GetId(),
+		Settings: &pb.FactoryPRFeedbackHandler_Settings{
+			Subject: &pb.FactoryPRFeedbackHandler_SubjectSettings{
+				Repository: appRepo,
+			},
+			Discussion: &pb.FactoryPRFeedbackHandler_DiscussionSettings{
+				Mention:    "@superplaneagent",
+				IgnoreBots: true,
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	reloaded, err := models.FindCanvasInTransaction(db, r.Organization.ID, canvas.ID)
+	require.NoError(t, err)
+	updated, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, reloaded)
+	require.NoError(t, err)
+	acknowledgeSources := []string{}
+	for _, edge := range updated.Edges {
+		if edge.TargetID == prFeedbackAcknowledgeCommentNodeID {
+			acknowledgeSources = append(acknowledgeSources, edge.SourceID)
+		}
+	}
+	assert.Equal(t, []string{prFeedbackActivityNodeID}, acknowledgeSources)
+	for _, node := range updated.Nodes {
+		if node.ID != prFeedbackAcknowledgeCommentNodeID {
+			continue
+		}
+		assert.Equal(t, prFeedbackBitbucketAcknowledgeBodyExpression(), node.Configuration["body"])
+		assert.Equal(t, "{{ root().data.comment.id }}", node.Configuration["parentCommentId"])
+		return
+	}
+	require.Fail(t, "acknowledge node not found after update")
 }

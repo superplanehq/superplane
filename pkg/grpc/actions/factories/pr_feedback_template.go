@@ -242,7 +242,9 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 		Description:  prFeedbackCommentActivityDescriptionExpression(),
 		Y:            prFeedbackCommentFlowY,
 	}, request)
-	commentFlow = commentFlow.withAcknowledge(yaml.Node{
+	// The task link is created when the activity node runs. Reply after it,
+	// so the reply can link to the task.
+	commentFlow = commentFlow.withAcknowledgeAfter(yaml.Node{
 		ID:        prFeedbackAcknowledgeCommentNodeID,
 		Name:      "Acknowledge PR Comment",
 		Type:      yaml.NodeTypeAction,
@@ -251,11 +253,11 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 			"repository":      "{{ root().data.repository.full_name }}",
 			"pullNumber":      "{{ root().data.pullrequest.id }}",
 			"parentCommentId": "{{ root().data.comment.id }}",
-			"body":            "SuperPlane is looking into this.",
+			"body":            prFeedbackBitbucketAcknowledgeBodyExpression(),
 		},
 		Integration: request.Binding.integrationRef(),
 		Position:    prFeedbackAcknowledgePosition(prFeedbackCommentFlowY),
-	})
+	}, prFeedbackActivityNodeID)
 
 	return withPRFeedbackConcurrency(&yaml.Canvas{
 		APIVersion: yaml.APIVersion,
@@ -329,10 +331,15 @@ type prFeedbackDiscussionFlowSpec struct {
 }
 
 func (flow prFeedbackDiscussionFlowSpec) withAcknowledge(node yaml.Node) prFeedbackDiscussionFlowSpec {
+	return flow.withAcknowledgeAfter(node, flow.triggerID)
+}
+
+// withAcknowledgeAfter runs the acknowledgement node after sourceID.
+func (flow prFeedbackDiscussionFlowSpec) withAcknowledgeAfter(node yaml.Node, sourceID string) prFeedbackDiscussionFlowSpec {
 	flow.nodes = append(flow.nodes, node)
 	flow.edges = append(flow.edges, yaml.Edge{
 		Channel:  "default",
-		SourceID: flow.triggerID,
+		SourceID: sourceID,
 		TargetID: node.ID,
 	})
 	return flow
@@ -468,6 +475,13 @@ func prFeedbackCommentActivityTitleExpression() string {
 func prFeedbackBitbucketCommentActivityTitleExpression() string {
 	return `{{ "[@" + (root().data.comment.author.login ?? root().data.comment.author.nickname) + "](" + root().data.comment.author.html_url` +
 		` + ") left a [comment](" + root().data.comment.html_url + ")" }}`
+}
+
+// prFeedbackBitbucketAcknowledgeBodyExpression replies to a Bitbucket PR
+// comment. Runs without a linked task get the text alone, so the reply
+// never contains a link with no target.
+func prFeedbackBitbucketAcknowledgeBodyExpression() string {
+	return `{{ task() == nil ? "Sure, looking into this." : "Sure, looking into this. Follow along: [" + task().key + "](" + task().url + ")" }}`
 }
 
 func prFeedbackReplyActivityTitleExpression() string {
