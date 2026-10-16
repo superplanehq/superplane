@@ -20,11 +20,11 @@ function githubInstance(id: string, name: string): OrganizationsIntegration {
   };
 }
 
-function connectionData(instances: OrganizationsIntegration[]): IntegrationInstanceSummary[] {
+function connectionData(instances: OrganizationsIntegration[], provider = "github"): IntegrationInstanceSummary[] {
   return ONBOARDING_CONNECTION_NAMES.map((name) => ({
     name,
-    allInstances: name === "github" ? instances : [],
-    readyInstances: name === "github" ? instances : [],
+    allInstances: name === provider ? instances : [],
+    readyInstances: name === provider ? instances : [],
   }));
 }
 
@@ -116,17 +116,25 @@ describe("initialOnboardingSelections", () => {
     });
   });
 
-  it("marks the saved GitHub installation ready after a reload", () => {
-    const saved = initialOnboardingSelections({ vcsIntegrationId: "saved-github" });
+  it.each(["github", "claude"] as const)("restores the saved %s installation after a reload", (provider) => {
+    const saved = initialOnboardingSelections(
+      provider === "github" ? { vcsIntegrationId: "saved-key" } : { agentIntegrationId: "saved-key" },
+    );
     const synced = syncSelectionsWithInstances(
-      connectionData([githubInstance("saved-github", "github-acme"), githubInstance("other-github", "github-other")]),
+      connectionData(
+        [
+          { metadata: { id: "other-key", name: "other-key", integrationName: provider }, status: { state: "ready" } },
+          { metadata: { id: "saved-key", name: "my-key", integrationName: provider }, status: { state: "ready" } },
+        ],
+        provider,
+      ),
       saved,
       {},
       ONBOARDING_MANUAL_CONNECTION_NAMES,
     );
 
     expect(synced).toEqual({
-      github: { id: "saved-github", name: "github-acme", ready: true },
+      [provider]: { id: "saved-key", name: "my-key", ready: true },
     });
   });
 
