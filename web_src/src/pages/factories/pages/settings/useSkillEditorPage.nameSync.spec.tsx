@@ -142,6 +142,24 @@ describe("skill name sync", () => {
     expect(result.current.command).toBe("/ponytail-review");
   });
 
+  it("keeps a YAML comment out of the pasted command and the saved name", async () => {
+    const { result } = renderSkillEditor();
+    act(() => {
+      result.current.setMarkdown("---\nname: review-copy # command name\n---\n\nCheck the diff.\n");
+    });
+
+    expect(result.current.name).toBe("review-copy");
+    expect(result.current.command).toBe("/review-copy");
+
+    await act(async () => {
+      await result.current.handleSave();
+    });
+
+    const saved = createSkill.mock.calls[0]?.[0];
+    expect(saved?.name).toBe("review-copy");
+    expect(skillFrontmatterField(saved?.markdown ?? "", "name")).toBe("review-copy");
+  });
+
   it("saves the pasted name instead of an empty name", async () => {
     const { result } = renderSkillEditor();
     act(() => {
