@@ -79,6 +79,7 @@ func (c *FindPullRequest) ExampleOutput() map[string]any {
 				"id":     "9ac921bc-68e4-46dc-a78b-60b955f3bbf2",
 				"number": 123,
 				"key":    "SP-123",
+				"url":    "https://app.superplane.com/3ee1aa47-3a60-4c1f-b645-0b9859ab91f8/workspaces/sp-k7m2xqab/work-order/123",
 				"origin": map[string]any{
 					"url":   "https://github.com/acme/app/issues/42",
 					"label": "acme/app#42",

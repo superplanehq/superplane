@@ -1006,6 +1006,7 @@ func (c *FactoryContext) pullRequestMatch(pullRequest *models.FactoryPullRequest
 	}
 	workOrder := workOrderToCore(order)
 	workOrder.Key = factoryModel.WorkOrderKey(order.Number)
+	workOrder.URL = workOrderPermalink(order, factoryModel.RouteSegment())
 	return &core.PullRequestMatch{
 		PullRequest: pullRequestToCore(pullRequest),
 		WorkOrder:   workOrder,
