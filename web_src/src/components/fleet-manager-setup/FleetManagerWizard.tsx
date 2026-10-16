@@ -169,15 +169,29 @@ function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
             Finish installation
           </Button>
         )}
-        <Button type="button" variant="ghost" onClick={onFinishLater}>
-          Finish later
-        </Button>
+        <FinishLaterButton onFinishLater={onFinishLater} />
       </div>
     </div>
   );
 }
 
-function InstallCommandPending({ setup, onRetry }: { setup: FleetManagerSetupState; onRetry: () => void }) {
+function FinishLaterButton({ onFinishLater }: { onFinishLater: () => void }) {
+  return (
+    <Button type="button" variant="ghost" onClick={onFinishLater}>
+      Finish later
+    </Button>
+  );
+}
+
+function InstallCommandPending({
+  setup,
+  onRetry,
+  onFinishLater,
+}: {
+  setup: FleetManagerSetupState;
+  onRetry: () => void;
+  onFinishLater: () => void;
+}) {
   return (
     <div data-testid="fleet-manager-install-step">
       <FirstRunHeading headline="Install Fleet Manager" size="display">
@@ -190,12 +204,20 @@ function InstallCommandPending({ setup, onRetry }: { setup: FleetManagerSetupSta
           <p role="alert" className="text-sm text-destructive">
             {setup.tokenError}
           </p>
-          <Button type="button" className="mt-3" onClick={onRetry}>
-            Try again
-          </Button>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Button type="button" onClick={onRetry}>
+              Try again
+            </Button>
+            <FinishLaterButton onFinishLater={onFinishLater} />
+          </div>
         </div>
       ) : (
-        <p className="mt-5 text-sm text-muted-foreground">Preparing the install command...</p>
+        <>
+          <p className="mt-5 text-sm text-muted-foreground">Preparing the install command...</p>
+          <div className="mt-7">
+            <FinishLaterButton onFinishLater={onFinishLater} />
+          </div>
+        </>
       )}
     </div>
   );
@@ -250,7 +272,13 @@ export function FleetManagerWizardScreen(props: WizardProps) {
   if (props.step === "provider") return <ProviderStep setup={props.setup} actions={continueActions} />;
   if (props.step === "fleets") return <FleetsStep setup={props.setup} actions={continueActions} />;
   if (!props.setup.values) {
-    return <InstallCommandPending setup={props.setup} onRetry={() => void props.setup.prepareInstallation()} />;
+    return (
+      <InstallCommandPending
+        setup={props.setup}
+        onRetry={() => void props.setup.prepareInstallation()}
+        onFinishLater={props.onFinishLater}
+      />
+    );
   }
   return <InstallStep {...props} />;
 }

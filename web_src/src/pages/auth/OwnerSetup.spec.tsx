@@ -353,12 +353,49 @@ describe("OwnerSetup", () => {
     renderOwnerSetup();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not create the Fleet Manager personal token/i);
+    expect(screen.getByRole("button", { name: "Finish later" })).toBeInTheDocument();
     expect(screen.queryByText(/fleet-manager-values.yaml/)).not.toBeInTheDocument();
 
     createToken.mockResolvedValue({ plaintext: "owner-setup-token" });
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
 
     expect(await screen.findByText(/installationAdminToken: owner-setup-token/)).toBeInTheDocument();
+  });
+
+  it("keeps Finish later available while a resumed install command is prepared", async () => {
+    let releaseToken: (value: { plaintext: string }) => void = () => undefined;
+    createToken.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseToken = resolve;
+        }),
+    );
+    stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "fleet-install" },
+      account: { status: 200 },
+      organizations: [{ slug: "acme" }],
+    });
+    renderOwnerSetup();
+
+    expect(await screen.findByText("Preparing the install command...")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Finish later" })).toBeInTheDocument();
+
+    releaseToken({ plaintext: "owner-setup-token" });
+    expect(await screen.findByText(/installationAdminToken: owner-setup-token/)).toBeInTheDocument();
+  });
+
+  it("closes setup from Finish later when the resumed install command fails", async () => {
+    createToken.mockRejectedValueOnce(new Error("no token"));
+    stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "fleet-install" },
+      account: { status: 200 },
+      organizations: [{ slug: "acme" }],
+    });
+    renderOwnerSetup();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Finish later" }));
+
+    await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
   });
 
   it("stays on the page when closing setup fails", async () => {
