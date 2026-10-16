@@ -62,6 +62,7 @@ type publicAutomation struct {
 }
 
 type publicCard struct {
+	Number        int64              `json:"number"`
 	ID            string             `json:"id"`
 	Title         string             `json:"title"`
 	CreatedAt     time.Time          `json:"createdAt"`
@@ -538,6 +539,7 @@ func publicCardFromOrder(
 	avatars map[uuid.UUID]string,
 ) publicCard {
 	card := publicCard{
+		Number:      order.Number,
 		Title:       order.Title,
 		CreatedAt:   order.CreatedAt,
 		State:       uiWorkOrderState(order.State),
