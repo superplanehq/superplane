@@ -168,7 +168,7 @@ variable "helm_chart_path" {
 variable "superplane_chart_version" {
   description = "Published SuperPlane Helm chart version with a matching versioned image. Ignored when helm_chart_path is set."
   type        = string
-  default     = "0.0.0-25eae97f1259c9c4a8f10cada152fa94764846b8"
+  default     = "1.0.0-rc1"
 }
 
 variable "fleet_manager_version" {

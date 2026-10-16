@@ -123,7 +123,7 @@ variable "superplane_namespace" {
 variable "superplane_chart_version" {
   description = "Published SuperPlane Helm chart version with a matching versioned image"
   type        = string
-  default     = "0.0.0-782e528cea1fd707313bcfa4a2e8f57e9148f5c5"
+  default     = "1.0.0-rc1"
 }
 
 variable "superplane_image_tag" {

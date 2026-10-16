@@ -103,7 +103,7 @@ letsencrypt_email = "admin@example.com"
 
 # Confirm the release exists before you apply.
 superplane_image_tag     = ""
-superplane_chart_version = "1.0.0"
+superplane_chart_version = "1.0.0-rc1"
 
 enable_gcs_blob_storage = true
 enable_runners          = true
@@ -121,7 +121,7 @@ Select a published stable or release-candidate version. Confirm the image and
 chart before you apply:
 
 ```bash
-export SUPERPLANE_VERSION=v1.0.0
+export SUPERPLANE_VERSION=v1.0.0-rc1
 
 docker manifest inspect ghcr.io/superplanehq/superplane:${SUPERPLANE_VERSION}
 helm show chart oci://ghcr.io/superplanehq/superplane-chart --version "${SUPERPLANE_VERSION#v}"
@@ -309,7 +309,7 @@ must stop and Fleet Manager must delete it after the task.
 | `blob_bucket_name` | `<project_id>-superplane-blobs` | Name of the blob bucket. |
 | `blob_bucket_force_destroy` | `false` | Delete the bucket objects on destroy. |
 | `superplane_chart_path` | empty | Path to a local chart. Empty installs the published chart. |
-| `superplane_chart_version` | empty | Published chart version, for example `1.0.0` or `1.0.0-rc1`. Required when `superplane_chart_path` is empty. |
+| `superplane_chart_version` | `1.0.0-rc1` | Published chart version. Use a stable `1.x` chart when one exists. Do not use chart `0.30.0` or any lower chart. |
 | `enable_runners` | `false` | Enable the runner API and create the runner network. Set this to `true` in `terraform.tfvars` for a new install. |
 | `runner_subnet_cidr` | `172.20.0.0/24` | Range of the runner subnetwork. |
 | `runner_zones` | `[zone]` | Zones for runner VMs. |
