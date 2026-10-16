@@ -89,7 +89,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 
 		filter := findSpecNode(t, canvas, intakeFilterNodeID)
 		assert.Equal(t, intakeFilterComponent, filter.Component)
-		assert.Equal(t, intakeSuperplaneLabelCondition, filter.Configuration["expression"])
+		assert.Equal(t, intakeLabelAddedCondition(defaultIntakeSettings()), filter.Configuration["expression"])
 	})
 
 	t.Run("Jira issues flow from the trigger through the filter to the work order", func(t *testing.T) {
@@ -311,7 +311,7 @@ func Test__BuildIntakeCanvas(t *testing.T) {
 
 func Test__IntakeFilterExpression(t *testing.T) {
 	t.Run("a default GitHub filter matches the superplane label event", func(t *testing.T) {
-		assert.Equal(t, intakeSuperplaneLabelCondition, intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, defaultIntakeSettings()))
+		assert.Equal(t, intakeLabelAddedCondition(defaultIntakeSettings()), intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, defaultIntakeSettings()))
 	})
 
 	t.Run("GitHub labels and assignment join without a score", func(t *testing.T) {

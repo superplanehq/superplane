@@ -64,7 +64,7 @@ func (i *OnIssue) Documentation() string {
 - **Label filter**: Optional. Include starts a run when the issue has one of the labels. Exclude starts a run when the issue has none of those labels.
 - **Assignment**: Optional. Start a run only for assigned issues, only for unassigned issues, or for any assignment.
 - **Author is a repository collaborator**: Optional. Start a run only when the author can access the repository.
-- **The "superplane" label is added to the issue**: Optional. For a labeled event, start a run only when that label is added to an open issue.
+- **The configured label is added to the issue**: Optional. For a labeled event, start a run only when the configured label, or "superplane" when none is set, is added to an open issue. With the label filter set to include, adding any listed label counts.
 
 ## Event Data
 
@@ -188,11 +188,11 @@ func (i *OnIssue) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "superplaneLabelAdded",
-			Label:       `The "superplane" label is added to the issue`,
+			Label:       "The configured label is added to the issue",
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
 			Default:     false,
-			Description: "For a labeled event, start a run only when the superplane label is added to an open issue.",
+			Description: "For a labeled event, start a run only when the configured label, or superplane when none is set, is added to an open issue.",
 		},
 	}
 }
@@ -316,7 +316,7 @@ func blankMissingIssueBody(data map[string]any) {
 
 func issueMatchesFilters(data map[string]any, config OnIssueConfiguration) bool {
 	return issueMatchesLabels(data, config.Labels, config.LabelFilterMode) &&
-		issueMatchesSuperplaneLabel(data, config.SuperplaneLabelAdded) &&
+		issueMatchesLabelAdded(data, config) &&
 		issueMatchesAssignment(data, config.Assignment)
 }
 
@@ -339,8 +339,8 @@ func issueMatchesLabels(data map[string]any, labels []string, mode string) bool 
 	return matched
 }
 
-func issueMatchesSuperplaneLabel(data map[string]any, enabled bool) bool {
-	if !enabled {
+func issueMatchesLabelAdded(data map[string]any, config OnIssueConfiguration) bool {
+	if !config.SuperplaneLabelAdded {
 		return true
 	}
 	action, _ := data["action"].(string)
@@ -352,7 +352,18 @@ func issueMatchesSuperplaneLabel(data map[string]any, enabled bool) bool {
 	name, _ := label["name"].(string)
 	issue, _ := data["issue"].(map[string]any)
 	state, _ := issue["state"].(string)
-	return name == issueSuperplaneLabel && state == "open"
+	return state == "open" && slices.Contains(labelAddedTriggerNames(config.Labels, config.LabelFilterMode), name)
+}
+
+// labelAddedTriggerNames returns the labels that start a run when they are
+// added. The include labels are used when set. Otherwise the default
+// superplane label is used.
+func labelAddedTriggerNames(labels []string, mode string) []string {
+	names := trimmedIssueLabels(labels)
+	if mode == issueLabelFilterExclude || len(names) == 0 {
+		return []string{issueSuperplaneLabel}
+	}
+	return names
 }
 
 func issueMatchesAssignment(data map[string]any, assignment string) bool {

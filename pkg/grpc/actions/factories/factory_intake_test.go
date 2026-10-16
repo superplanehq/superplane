@@ -938,9 +938,37 @@ func Test__FactoryIntakeActions(t *testing.T) {
 			case intakeTriggerNodeID:
 				assert.Equal(t, []any{"labeled"}, node.Configuration["actions"])
 			case intakeFilterNodeID:
-				assert.Contains(t, node.Configuration["expression"], intakeSuperplaneLabelCondition)
+				assert.Contains(t, node.Configuration["expression"], intakeLabelAddedCondition(defaultIntakeSettings()))
 			}
 		}
+	})
+
+	t.Run("a label filter change rewrites the label added condition", func(t *testing.T) {
+		factory := newFactory(t)
+		intake := create(t, factory, &pb.CreateFactoryIntakeRequest{Source: pb.FactoryIntake_SOURCE_GITHUB_ISSUES})
+
+		_, err := UpdateFactoryIntake(ctx, deps, orgID, &pb.UpdateFactoryIntakeRequest{
+			FactoryId: factory.ID.String(),
+			IntakeId:  intake.GetId(),
+			Settings: &pb.FactoryIntake_Settings{
+				Labels: []string{"superplane-claude"},
+			},
+		})
+		require.NoError(t, err)
+
+		canvas, err := models.FindCanvasInTransaction(database.DB(t.Context()), r.Organization.ID, uuid.MustParse(intake.GetCanvasId()))
+		require.NoError(t, err)
+		liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.DB(t.Context()), canvas)
+		require.NoError(t, err)
+
+		expression := ""
+		for _, node := range liveVersion.Nodes {
+			if node.ID == intakeFilterNodeID {
+				expression, _ = node.Configuration["expression"].(string)
+			}
+		}
+		assert.Contains(t, expression, `root().data.label.name in ["superplane-claude"]`)
+		assert.NotContains(t, expression, `root().data.label.name == "superplane"`)
 	})
 
 	t.Run("the new and re-opened toggles reach the trigger on their own", func(t *testing.T) {
