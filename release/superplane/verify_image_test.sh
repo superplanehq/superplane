@@ -41,6 +41,10 @@ if [[ "${reference}" == *:v1.2.3 ]]; then
 JSON
     exit 0
   fi
+  if [ "${mode}" = old-revision ]; then
+    printf '%s\n' '{"org.opencontainers.image.source":"https://github.com/superplanehq/superplane","org.opencontainers.image.version":"v1.2.3","org.opencontainers.image.revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+    exit 0
+  fi
   printf '%s\n' '{"org.opencontainers.image.source":"https://github.com/superplanehq/superplane","org.opencontainers.image.version":"v1.2.3","org.opencontainers.image.revision":"cccccccccccccccccccccccccccccccccccccccc"}'
   exit 0
 fi
@@ -69,6 +73,13 @@ export PATH="${TMP_DIR}/bin:${PATH}"
 export SKOPEO_CONTAINER_IMAGE=""
 
 TEST_MODE=ok bash "${SCRIPT_DIR}/verify-image.sh" \
+  ghcr.io/superplanehq/superplane:v1.2.3 \
+  v1.2.3 \
+  cccccccccccccccccccccccccccccccccccccccc \
+  ghcr.io/superplanehq/superplane:v1.2.3-amd64 \
+  ghcr.io/superplanehq/superplane:v1.2.3-arm64 >/dev/null
+
+TEST_MODE=old-revision bash "${SCRIPT_DIR}/verify-image.sh" \
   ghcr.io/superplanehq/superplane:v1.2.3 \
   v1.2.3 \
   cccccccccccccccccccccccccccccccccccccccc \
