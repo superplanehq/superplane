@@ -33,6 +33,8 @@ const FeatureFactoryProductiveIntake = "factory_productive_intake"
 // Backlog column menu until the flow is generally available.
 const FeatureFactoryDatadogIntake = "factory_datadog_intake"
 
+const FeatureFactoryScheduledIntake = "factory_scheduled_intake"
+
 // FeatureFactoryBitbucket gates Bitbucket as a workspace Git host until the
 // flow is generally available.
 const FeatureFactoryBitbucket = "factory_bitbucket"
@@ -87,6 +89,7 @@ var registry = []Feature{
 	{ID: FeatureFactories, Label: "Factories", Description: "Software factories for work orders and production workflows"},
 	{ID: FeatureNewIntegrationSetupFlow, Label: "New Integration Setup Flow", Description: "Use the multi-step SetupProvider wizard when connecting integrations such as GitHub"},
 	{ID: FeatureFactoryProductiveIntake, Label: "Factory Productive Intake", Description: "Add Productive intake from the Backlog column menu"},
+	{ID: FeatureFactoryScheduledIntake, Label: "Scheduled Intake", Description: "Propose backlog tasks on a schedule"},
 	{ID: FeatureFactoryDatadogIntake, Label: "Factory Datadog Intake", Description: "Add Datadog intake from the Backlog column menu"},
 	{ID: FeatureFactoryBitbucket, Label: "Bitbucket Workspaces", Description: "Connect a Bitbucket workspace and open pull requests from Implement"},
 	{ID: FeatureWorkspaceModels, Label: "Workspace Models", Description: "Show the in-progress workspace Models settings page"},

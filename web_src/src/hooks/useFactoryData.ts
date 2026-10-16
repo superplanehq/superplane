@@ -9,6 +9,7 @@ import {
   factoriesDescribeWorkOrder,
   factoriesDispatchWorkOrder,
   factoriesCreateFactoryAutomation,
+  factoriesPreviewFactorySchedule,
   factoriesDeleteFactoryAutomation,
   factoriesListFactories,
   factoriesListFactoryAutomations,
@@ -924,7 +925,12 @@ export function useCreateFactoryAutomation(organizationId: string, factoryId: st
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: { name?: string; columnKey?: string }) => {
+    mutationFn: async (input: {
+      name?: string;
+      columnKey?: string;
+      templateId?: string;
+      installParams?: Record<string, string>;
+    }) => {
       const response = await factoriesCreateFactoryAutomation(
         withOrganizationHeader({
           organizationId,
@@ -932,6 +938,8 @@ export function useCreateFactoryAutomation(organizationId: string, factoryId: st
           body: {
             name: input.name,
             columnKey: input.columnKey,
+            templateId: input.templateId,
+            installParams: input.installParams,
           },
         }),
       );
@@ -1032,3 +1040,24 @@ export function useUpdateFactoryLine(organizationId: string, factoryId: string) 
 }
 
 export type { FactoryAutomation, FactoriesFactoryLine, FactoryLineStep };
+
+export function useFactorySchedulePreview(
+  organizationId: string,
+  factoryId: string,
+  params: Record<string, string>,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ["factory-schedule-preview", organizationId, factoryId, params],
+    enabled: enabled && Boolean(organizationId && factoryId),
+    retry: false,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const response = await factoriesPreviewFactorySchedule(
+        withOrganizationHeader({ organizationId, path: { factoryId }, body: { installParams: params } }),
+      );
+      if (!response.data?.nextRun) throw new Error("Could not calculate the next run.");
+      return response.data.nextRun;
+    },
+  });
+}
