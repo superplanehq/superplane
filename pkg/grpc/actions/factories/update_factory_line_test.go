@@ -27,6 +27,22 @@ func Test__UpdateFactoryLine__ColumnColors(t *testing.T) {
 		return factory, line
 	}
 
+	t.Run("accepts orange and pink", func(t *testing.T) {
+		factory, line := newFactoryAndLine(t)
+
+		response, err := UpdateFactoryLine(context.Background(), r.Organization.ID.String(), &pb.UpdateFactoryLineRequest{
+			FactoryId:    factory.ID.String(),
+			LineId:       line.ID.String(),
+			ColumnColors: map[string]string{"phase-1": "orange", "phase-2": "pink"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"phase-1": "orange", "phase-2": "pink"}, response.Line.ColumnColors)
+
+		updated, err := factory.FindLine(db, line.ID)
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{"phase-1": "orange", "phase-2": "pink"}, updated.ColumnColorsValue())
+	})
+
 	t.Run("sets a color", func(t *testing.T) {
 		factory, line := newFactoryAndLine(t)
 
