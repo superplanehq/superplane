@@ -507,3 +507,17 @@ describe("columnAutomationOpenPath", () => {
     ).toBe(factoryPRFeedbackPath("org-1", "RF", "line-plan", undefined, "handler-checks"));
   });
 });
+
+it("keeps a renamed scheduled intake visible and opens its saved automation", () => {
+  const rows = buildColumnAutomations("backlog", {
+    columnTitle: "Backlog",
+    planningEnabled: false,
+    apps: [{ id: "scheduled-app", name: "Review documentation", columnKey: "backlog" }],
+  });
+  expect(rows).toHaveLength(1);
+  expect(rows[0].name).toBe("Review documentation");
+  expect(rows[0].trigger).toBe("On schedule");
+  expect(columnAutomationOpenPath(rows[0], { organizationId: "org", factoryKey: "workspace" })).toBe(
+    factoryColumnAutomationViewPath("org", "workspace", undefined, "scheduled-app"),
+  );
+});
