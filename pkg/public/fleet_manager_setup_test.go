@@ -25,9 +25,11 @@ func useRunnerReleases(t *testing.T, base string) {
 	previous := runnerReleaseAPIBase
 	runnerReleaseAPIBase = base
 	resetRunnerReleaseCache()
+	resetFleetManagerReleaseCache()
 	t.Cleanup(func() {
 		runnerReleaseAPIBase = previous
 		resetRunnerReleaseCache()
+		resetFleetManagerReleaseCache()
 	})
 }
 
@@ -96,6 +98,55 @@ func TestAdminGetFleetManagerSetup(t *testing.T) {
 	tokens, err := models.ListUserAPITokens(database.DB(t.Context()), user.User)
 	require.NoError(t, err)
 	assert.Empty(t, tokens)
+}
+
+func TestAdminGetFleetManagerSetupUsesNewestPublishedFleetManagerRelease(t *testing.T) {
+	t.Setenv("RUNNER_STABLE_VERSION", "v1.2.3")
+	t.Setenv("FLEET_MANAGER_STABLE_VERSION", "v0.1.0")
+
+	published := map[string]githubRunnerRelease{
+		"fleet-manager/v0.1.0": {TagName: "fleet-manager/v0.1.0"},
+		"fleet-manager/v0.1.3": {TagName: "fleet-manager/v0.1.3", Draft: true},
+		"fleet-manager/v0.1.4": {TagName: "fleet-manager/v0.1.4"},
+	}
+	releases := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "matching-refs") {
+			if strings.Contains(r.URL.Path, "fleet-manager") {
+				_ = json.NewEncoder(w).Encode([]githubMatchingRef{
+					{Ref: "refs/tags/fleet-manager/v0.1.0"},
+					{Ref: "refs/tags/fleet-manager/v0.1.3"},
+					{Ref: "refs/tags/fleet-manager/v0.1.4"},
+					{Ref: "refs/tags/fleet-manager/v0.1.4-rc.1"},
+				})
+				return
+			}
+			_ = json.NewEncoder(w).Encode([]githubMatchingRef{})
+			return
+		}
+
+		release, ok := published[runnerReleaseTagFromRequest(r)]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(release)
+	}))
+	t.Cleanup(releases.Close)
+	useRunnerReleases(t, releases.URL)
+
+	server, _, token := setupAdminTestServer(t)
+	response := execRequest(server, requestParams{
+		method:     http.MethodGet,
+		path:       "/admin/api/installation/fleet-manager/setup",
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+
+	var body fleetManagerSetupResponse
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	assert.Equal(t, "v0.1.4", body.DefaultFleetManagerVersion)
+	assert.Equal(t, "0.1.4", body.DefaultChartVersion)
 }
 
 func TestAdminGetFleetManagerSetupMergesPublishedRunnerVersions(t *testing.T) {
@@ -285,7 +336,7 @@ func TestAdminGetFleetManagerSetupOmitsVersionsFromIncompleteTagList(t *testing.
 	var body fleetManagerSetupResponse
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
 	assert.Equal(t, []string{"v1.2.3"}, body.RunnerVersions)
-	assert.Equal(t, int32(maximumRunnerTagPages), pages.Load())
+	assert.Equal(t, int32(maximumRunnerTagPages*2), pages.Load())
 }
 
 func TestAdminGetFleetManagerSetupKeepsConfiguredVersionsWhenReleaseLookupFails(t *testing.T) {
