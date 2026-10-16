@@ -233,14 +233,29 @@ func TestHandleGitHubAppSetupReturnsToIncompleteWorkspace(t *testing.T) {
 		}
 	})
 
-	t.Run("two unfinished workspaces without state return home", func(t *testing.T) {
-		require.NoError(t, db.Model(factory).Update("onboarding_completed_at", gorm.Expr("NULL")).Error)
-		_, err := models.CreateFactory(db, r.Organization.ID, "Billing", "", "BILL")
+	t.Run("signed state opens the only unfinished workspace", func(t *testing.T) {
+		second, err := models.CreateFactory(db, r.Organization.ID, "Billing", "", "BILL")
 		require.NoError(t, err)
-		recorder := httptest.NewRecorder()
-		server.HandleGitHubAppSetup(recorder, githubAppSetupRequest("install", "", token))
-		assert.Equal(t, http.StatusFound, recorder.Code)
-		assert.Equal(t, "/", recorder.Header().Get("Location"))
+		assertGitHubAppSetupRedirect(
+			t,
+			server,
+			githubAppSetupRequest("install", state, ""),
+			"/"+r.Organization.Slug+"/workspaces/"+second.RouteSegment()+"/setup",
+		)
+	})
+
+	t.Run("two unfinished workspaces return home", func(t *testing.T) {
+		require.NoError(t, db.Model(factory).Update("onboarding_completed_at", gorm.Expr("NULL")).Error)
+		for _, request := range []*http.Request{
+			githubAppSetupRequest("install", "", token),
+			githubAppSetupRequest("install", state, ""),
+			githubAppSetupRequest("update", state, ""),
+		} {
+			recorder := httptest.NewRecorder()
+			server.HandleGitHubAppSetup(recorder, request)
+			assert.Equal(t, http.StatusFound, recorder.Code)
+			assert.Equal(t, "/", recorder.Header().Get("Location"))
+		}
 	})
 }
 

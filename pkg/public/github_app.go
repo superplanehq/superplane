@@ -110,10 +110,11 @@ func (s *Server) HandleGitHubAppSetup(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// githubAppSetupRedirect opens Choose organization for an unfinished workspace.
-// A signed install state names the organization. Without state, the signed-in
-// session can name it only when that session has one unfinished workspace.
-// This does not create a workspace.
+// githubAppSetupRedirect opens Choose organization for one unfinished workspace.
+// A signed install state names the organization, not the workspace. Without
+// state, the signed-in session can name a workspace only when that session has
+// one unfinished workspace. Two unfinished workspaces return home so install
+// does not open the wrong one. This does not create a workspace.
 func (s *Server) githubAppSetupRedirect(r *http.Request, organizationID uuid.UUID, state string) string {
 	if strings.TrimSpace(state) != "" {
 		path, err := incompleteOrganizationSetupPath(r.Context(), organizationID)
@@ -149,7 +150,7 @@ func incompleteOrganizationSetupPath(ctx context.Context, organizationID uuid.UU
 	if err != nil {
 		return "", err
 	}
-	factory := firstIncompleteFactory(factories)
+	factory := onlyIncompleteFactory(factories)
 	if factory == nil {
 		return "/", nil
 	}
@@ -191,13 +192,18 @@ func singleIncompleteSessionSetupPath(ctx context.Context, account *models.Accou
 	return path, nil
 }
 
-func firstIncompleteFactory(factories []models.Factory) *models.Factory {
+func onlyIncompleteFactory(factories []models.Factory) *models.Factory {
+	var incomplete *models.Factory
 	for index := range factories {
-		if !factories[index].IsOnboardingComplete() {
-			return &factories[index]
+		if factories[index].IsOnboardingComplete() {
+			continue
 		}
+		if incomplete != nil {
+			return nil
+		}
+		incomplete = &factories[index]
 	}
-	return nil
+	return incomplete
 }
 
 func workspaceSetupRepoPath(slug, segment string) string {
