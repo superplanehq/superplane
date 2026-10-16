@@ -106,17 +106,80 @@ function singleQuotedYamlScalar(value: string): string | undefined {
   return undefined;
 }
 
+const YAML_DOUBLE_QUOTE_ESCAPES: Record<string, string> = {
+  "0": "\0",
+  a: "\u0007",
+  b: "\b",
+  t: "\t",
+  n: "\n",
+  v: "\v",
+  f: "\f",
+  r: "\r",
+  e: "\u001b",
+  " ": " ",
+  '"': '"',
+  "/": "/",
+  "\\": "\\",
+  N: "\u0085",
+  _: "\u00a0",
+  L: "\u2028",
+  P: "\u2029",
+};
+
+const YAML_HEX_ESCAPE_WIDTH: Record<string, number> = {
+  x: 2,
+  u: 4,
+  U: 8,
+};
+
 function doubleQuotedYamlScalar(value: string): string | undefined {
   const end = closingDoubleQuote(value);
   if (end < 0) {
     return undefined;
   }
-  try {
-    const parsed: unknown = JSON.parse(value.slice(0, end + 1));
-    return typeof parsed === "string" ? parsed : undefined;
-  } catch {
+  return decodeDoubleQuotedYaml(value.slice(1, end));
+}
+
+function decodeDoubleQuotedYaml(value: string): string {
+  let decoded = "";
+  for (let index = 0; index < value.length; index++) {
+    if (value[index] !== "\\") {
+      decoded += value[index];
+      continue;
+    }
+    const escape = yamlDoubleQuotedEscape(value, index + 1);
+    if (!escape) {
+      decoded += "\\";
+      continue;
+    }
+    decoded += escape.text;
+    index += escape.consumed;
+  }
+  return decoded;
+}
+
+function yamlDoubleQuotedEscape(value: string, index: number): { text: string; consumed: number } | undefined {
+  const marker = value[index];
+  if (!marker) {
     return undefined;
   }
+  const simple = YAML_DOUBLE_QUOTE_ESCAPES[marker];
+  if (simple !== undefined) {
+    return { text: simple, consumed: 1 };
+  }
+  const width = YAML_HEX_ESCAPE_WIDTH[marker] ?? 0;
+  if (width === 0) {
+    return undefined;
+  }
+  const hex = value.slice(index + 1, index + 1 + width);
+  if (hex.length !== width || !/^[0-9a-fA-F]+$/.test(hex)) {
+    return undefined;
+  }
+  const codePoint = Number.parseInt(hex, 16);
+  if (codePoint > 0x10ffff) {
+    return undefined;
+  }
+  return { text: String.fromCodePoint(codePoint), consumed: 1 + width };
 }
 
 function closingDoubleQuote(value: string): number {

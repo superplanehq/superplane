@@ -61,6 +61,11 @@ describe("skillFrontmatterField", () => {
   it("keeps doubled quotes inside a single-quoted title", () => {
     expect(skillFrontmatterField("---\ntitle: 'Review ''copy'''\n---\n", "title")).toBe("Review 'copy'");
   });
+
+  it("decodes YAML escapes and keeps a hash inside the quotes", () => {
+    expect(skillFrontmatterField('---\ntitle: "Review\\x20copy # notes"\n---\n', "title")).toBe("Review copy # notes");
+    expect(skillFrontmatterField('---\ntitle: "Review\\u0020copy"\n---\n', "title")).toBe("Review copy");
+  });
 });
 
 describe("setSkillFrontmatterFields", () => {
