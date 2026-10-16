@@ -201,7 +201,9 @@ func oauthHeadersForResource(
 	db *gorm.DB,
 	resource *models.FactoryAgentResource,
 ) (map[string]string, error) {
-	if resource.OAuthState() != models.FactoryAgentResourceOAuthConnected {
+	switch resource.OAuthState() {
+	case models.FactoryAgentResourceOAuthConnected, models.FactoryAgentResourceOAuthNeedsReconnect:
+	default:
 		return nil, errFactoryAgentResourceNotConnected
 	}
 	if deps.Encryptor == nil {
