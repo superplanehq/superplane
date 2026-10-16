@@ -576,6 +576,55 @@ func Test__ApplyPolarSubscriptionIncompleteKeepsTrial(t *testing.T) {
 	assert.Equal(t, models.PolarSubscriptionStatusIncomplete, after.PolarSubscriptionStatus)
 }
 
+func Test__BillingEnabledDefaultsOn(t *testing.T) {
+	t.Setenv(models.BillingEnabledEnv, "")
+	assert.True(t, models.BillingEnabled())
+
+	for _, value := range []string{"yes", "true", " YES "} {
+		t.Setenv(models.BillingEnabledEnv, value)
+		assert.True(t, models.BillingEnabled(), value)
+	}
+	for _, value := range []string{"no", "false", " NO "} {
+		t.Setenv(models.BillingEnabledEnv, value)
+		assert.False(t, models.BillingEnabled(), value)
+	}
+}
+
+func Test__CreateOrganizationSkipsTrialWhenBillingDisabled(t *testing.T) {
+	t.Setenv(models.BillingEnabledEnv, "no")
+	support.Setup(t)
+
+	org, err := models.CreateOrganization(support.RandomName("no-billing"), "")
+	require.NoError(t, err)
+
+	plan, err := models.FindOrganizationBillingPlan(database.Conn(), org.ID)
+	require.NoError(t, err)
+	assert.Nil(t, plan)
+}
+
+func Test__AssertHostedRunAllowedSkipsLimitsWhenBillingDisabled(t *testing.T) {
+	r := support.Setup(t)
+	db := database.Conn()
+	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+
+	require.NoError(t, db.Model(&models.OrganizationBillingPlan{}).
+		Where("organization_id = ?", r.Organization.ID).
+		Updates(map[string]any{
+			"plan":          models.BillingPlanNone,
+			"plan_source":   models.BillingPlanSourcePolar,
+			"trial_ends_at": time.Now().Add(-time.Hour),
+		}).Error)
+	require.NoError(t, db.Where("organization_id = ?", r.Organization.ID).Delete(&models.OrganizationLLMCreditGrant{}).Error)
+
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+	zero := int64(0)
+	require.NoError(t, factory.UpdateHostedSpendBudget(db, &zero))
+
+	require.NoError(t, models.AssertHostedRunAllowed(db, r.Organization.ID, &factory.ID))
+}
+
 func Test__AssertHostedRunAllowedRequiresSubscriptionWhenPolarConfigured(t *testing.T) {
 	r := support.Setup(t)
 	db := database.Conn()

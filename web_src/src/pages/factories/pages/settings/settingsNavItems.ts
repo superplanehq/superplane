@@ -333,6 +333,18 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
 
 export const FACTORY_SETTINGS_NAV_ITEMS = FACTORY_SETTINGS_NAV_GROUPS.flatMap((group) => group.items);
 
+const BILLING_SETTINGS_NAV_ITEM_ID = "organization-billing";
+
+/** Drops Billing from settings navigation when product billing is off. */
+export function omitFactorySettingsBillingItem(groups: FactorySettingsNavGroup[]): FactorySettingsNavGroup[] {
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => item.id !== BILLING_SETTINGS_NAV_ITEM_ID),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
 /**
  * Filters settings nav groups for the Find settings field.
  * Matches item labels, indexed page content, and group labels (group match keeps all items).

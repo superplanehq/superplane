@@ -97,6 +97,9 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 		if err := models.SetOrganizationCreatedByAccount(tx, organization.ID, account.ID); err != nil {
 			return err
 		}
+		if !models.BillingEnabled() {
+			return nil
+		}
 		return models.GrantWelcomeCredit(tx, organization.ID, account.ID)
 	})
 
