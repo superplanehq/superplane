@@ -37,6 +37,15 @@ func MaterializeFactoryAppTemplate(
 		return nil, factoryErrorToStatus(err, "failed to materialize factory app template")
 	}
 
+	if req.GetTemplateId() == scheduledIntakeTemplateID {
+		org, err := models.FindOrganizationByIDInTransaction(db, orgID.String())
+		if err != nil {
+			return nil, err
+		}
+		if err := requireScheduledIntake(org); err != nil {
+			return nil, err
+		}
+	}
 	input := factoryTemplateInputFromRequest(req)
 	input.appID = canvas.ID.String()
 	input.appName = canvas.Name

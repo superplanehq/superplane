@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: Scheduled intake
+  description: Inspect the repository on a schedule and propose a backlog task.
+spec:
+  edges:
+    - {sourceId: schedule, targetId: scheduled-agent, channel: default}
+    - {sourceId: scheduled-agent, targetId: has-proposal, channel: passed}
+    - {sourceId: scheduled-agent, targetId: add-run-error, channel: failed}
+    - {sourceId: has-proposal, targetId: create-task, channel: "true"}
+  nodes:
+    - id: schedule
+      name: Schedule
+      type: TYPE_TRIGGER
+      component: schedule
+      configuration: {type: days, daysInterval: 1, hour: 9, minute: 0, timezone: "0"}
+      position: {x: 160, y: 80}
+    - id: scheduled-agent
+      name: Agent
+      type: TYPE_ACTION
+      component: runnerSuperPlane
+      concurrency: {max: 1}
+      configuration:
+        machineType: e1-large-amd64
+        executionTimeoutSeconds: 900
+        steps:
+          - {name: Clone repository, type: bash, command: ""}
+          - {name: Propose a task, type: prompt, workingDirectory: repo, prompt: ""}
+          - name: Read proposal
+            type: bash
+            workingDirectory: repo
+            command: |-
+              set -euo pipefail
+              node <<'NODE'
+              const fs = require('node:fs');
+              const proposal = JSON.parse(fs.readFileSync('/tmp/proposal.json', 'utf8'));
+              if (!proposal || typeof proposal !== 'object' || Array.isArray(proposal)) {
+                throw new Error('The proposal must be a JSON object.');
+              }
+              let result = {};
+              if (Object.keys(proposal).length > 0) {
+                if (typeof proposal.title !== 'string' || !proposal.title.trim() ||
+                    typeof proposal.description !== 'string' || !proposal.description.trim()) {
+                  throw new Error('The proposal must include a title and description, or {} for no proposal.');
+                }
+                result = {title: proposal.title.trim(), description: proposal.description.trim()};
+              }
+              fs.writeFileSync(process.env.SUPERPLANE_RESULT_FILE, JSON.stringify(result));
+              NODE
+      position: {x: 160, y: 260}
+    - id: has-proposal
+      name: Has proposal?
+      type: TYPE_ACTION
+      component: if
+      configuration:
+        expression: '{{ $["Agent"].data.result.title != nil }}'
+      position: {x: 160, y: 440}
+    - id: create-task
+      name: Create Task
+      type: TYPE_ACTION
+      component: createWorkOrder
+      configuration:
+        title: '{{ $["Agent"].data.result.title }}'
+        description: '{{ $["Agent"].data.result.description }}'
+      position: {x: 160, y: 620}
+    - id: add-run-error
+      name: Record Agent Failure
+      type: TYPE_ACTION
+      component: addRunError
+      configuration:
+        message: The intake agent failed. Open the agent logs to find the cause.
+      position: {x: 480, y: 440}
