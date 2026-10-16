@@ -1,11 +1,17 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
+import {
+  DEFAULT_SETUP_FLEET_ID,
+  formatMachineTypeOption,
+  machineTypeChoices,
+  type FleetManagerProvider,
+} from "@/lib/fleetManagerSetup";
 
 import { AwsProviderLogo, AzureProviderLogo, GcpProviderLogo } from "./providerLogos";
 
@@ -13,18 +19,118 @@ export type FleetManagerSetupState = ReturnType<typeof useFleetManagerSetup>;
 
 const LOADED_FROM_TERRAFORM = "Loaded from Terraform";
 
-const Field = ({
+const FLEET_HELPER = "Default automations use this fleet. You can add more fleets later.";
+const WARM_CAPACITY_HELP =
+  "Idle machines kept ready before a task starts. Use 0 to start a machine only when work arrives.";
+const MAX_CAPACITY_HELP = "The most machines this fleet can run at one time, including busy machines.";
+const OTHER_MACHINE_TYPE = "__other_machine_type__";
+const OTHER_MACHINE_TYPE_LABEL = "Other machine type";
+const OTHER_MACHINE_TYPE_HELP = "Enter the machine type id from your cloud provider.";
+
+function MachineTypeField({
+  id,
+  provider,
+  value,
+  onChange,
+}: {
+  id: string;
+  provider: FleetManagerProvider;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const customFieldId = `${id}-custom`;
+  const listed = machineTypeChoices(provider, "");
+  const [customTypes, setCustomTypes] = useState<{ provider: FleetManagerProvider | null; ids: string[] }>({
+    provider: null,
+    ids: [],
+  });
+  const [enteringCustomType, setEnteringCustomType] = useState(false);
+  const [customDraft, setCustomDraft] = useState("");
+  const currentIsCustom = value.trim() !== "" && !listed.some((option) => option.id === value);
+
+  if (customTypes.provider !== provider) {
+    setCustomTypes({ provider, ids: currentIsCustom ? [value] : [] });
+    setEnteringCustomType(false);
+  } else if (!enteringCustomType && currentIsCustom && !customTypes.ids.includes(value)) {
+    setCustomTypes({ provider, ids: [...customTypes.ids, value] });
+  }
+
+  const choices = [
+    ...listed,
+    ...customTypes.ids
+      .filter((typeId) => customTypes.provider === provider && !listed.some((option) => option.id === typeId))
+      .map((typeId) => ({ id: typeId })),
+  ];
+
+  const rememberCustomType = (typeId: string) => {
+    if (listed.some((option) => option.id === typeId) || customTypes.ids.includes(typeId)) return;
+    setCustomTypes({ provider, ids: [...customTypes.ids, typeId] });
+  };
+
+  return (
+    <div className="space-y-1.5 text-sm">
+      <Label htmlFor={id}>Machine type</Label>
+      <Select
+        value={enteringCustomType ? OTHER_MACHINE_TYPE : value || undefined}
+        onValueChange={(next) => {
+          if (next === OTHER_MACHINE_TYPE) {
+            setEnteringCustomType(true);
+            setCustomDraft("");
+            return;
+          }
+          setEnteringCustomType(false);
+          onChange(next);
+        }}
+      >
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue placeholder="Select a machine type" />
+        </SelectTrigger>
+        <SelectContent>
+          {choices.map((option) => (
+            <SelectItem key={option.id} value={option.id}>
+              {formatMachineTypeOption(option)}
+            </SelectItem>
+          ))}
+          <SelectItem value={OTHER_MACHINE_TYPE}>{OTHER_MACHINE_TYPE_LABEL}</SelectItem>
+        </SelectContent>
+      </Select>
+      {enteringCustomType && (
+        <div className="space-y-1.5">
+          <Label htmlFor={customFieldId}>{OTHER_MACHINE_TYPE_LABEL}</Label>
+          <p id={`${customFieldId}-help`} className="text-xs leading-5 text-muted-foreground">
+            {OTHER_MACHINE_TYPE_HELP}
+          </p>
+          <Input
+            id={customFieldId}
+            value={customDraft}
+            aria-describedby={`${customFieldId}-help`}
+            onChange={(event) => setCustomDraft(event.target.value)}
+            onBlur={() => {
+              const trimmed = customDraft.trim();
+              setEnteringCustomType(false);
+              if (!trimmed) return;
+              onChange(trimmed);
+              if (!listed.some((option) => option.id === trimmed)) rememberCustomType(trimmed);
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+const CapacityField = ({
   id,
   label,
-  imported = false,
+  description,
   ...props
-}: { id: string; label: string; imported?: boolean } & React.ComponentProps<typeof Input>) => (
-  <div className="space-y-1.5 text-sm">
-    <div className="flex items-center justify-between gap-3">
-      <Label htmlFor={id}>{label}</Label>
-      {imported && <span className="text-[11px] text-emerald-400">{LOADED_FROM_TERRAFORM}</span>}
-    </div>
-    <Input id={id} {...props} />
+}: { id: string; label: string; description: string } & React.ComponentProps<typeof Input>) => (
+  <div className="flex h-full flex-col gap-1.5 text-sm">
+    <Label htmlFor={id}>{label}</Label>
+    <p id={`${id}-help`} className="text-xs leading-5 text-muted-foreground">
+      {description}
+    </p>
+    <Input id={id} aria-describedby={`${id}-help`} className="mt-auto" {...props} />
   </div>
 );
 
@@ -64,21 +170,21 @@ function ProviderCard({
       <span className="absolute inset-0 flex items-center justify-center p-5">
         <Logo className="size-auto h-auto max-h-full w-auto max-w-full" testId={`provider-logo-${id}`} />
       </span>
+    </Button>
+  );
+
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>{card}</TooltipTrigger>
+        <TooltipContent side="bottom">{name}</TooltipContent>
+      </Tooltip>
       {loadedFromTerraform && (
         <span id={noteId} className="sr-only">
           {LOADED_FROM_TERRAFORM}
         </span>
       )}
-    </Button>
-  );
-
-  if (!loadedFromTerraform) return card;
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{card}</TooltipTrigger>
-      <TooltipContent side="bottom">{LOADED_FROM_TERRAFORM}</TooltipContent>
-    </Tooltip>
+    </>
   );
 }
 
@@ -105,82 +211,78 @@ export function FleetManagerProviderSection({ setup }: { setup: FleetManagerSetu
   );
 }
 
-export function FleetManagerFleetSection({
-  setup,
-  contained = false,
-}: {
-  setup: FleetManagerSetupState;
-  contained?: boolean;
-}) {
+export function FleetManagerFleetSection({ setup }: { setup: FleetManagerSetupState }) {
+  const baseId = useId();
   if (!setup.metadata || !setup.draft) return null;
   const metadata = setup.metadata;
   const draft = setup.draft;
+  const preset = metadata.fleetPresets.find((item) => item.id === DEFAULT_SETUP_FLEET_ID);
+  if (!preset) {
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        SuperPlane could not find the default fleet.
+      </p>
+    );
+  }
+
+  const fleetFieldId = `${baseId}-fleet`;
+  const machineTypeFieldId = `${baseId}-machine-type`;
+  const warmFieldId = `${baseId}-warm`;
+  const maxFieldId = `${baseId}-max`;
+  const machineTypeKey = `machineType.${DEFAULT_SETUP_FLEET_ID}`;
+  const machineType = draft.fields[machineTypeKey] || "";
+  const blocked =
+    metadata.infrastructureDefaults.source === "terraform" && !setup.hasFleetImage(preset.spec.architecture);
+  const capacity = draft.fleetCapacities[DEFAULT_SETUP_FLEET_ID];
 
   return (
-    <div>
-      <div className={contained ? "max-h-52 space-y-2 overflow-y-auto pr-1" : "space-y-2"}>
-        {metadata.fleetPresets.map((preset) => {
-          const id = `fleet-${preset.id}`;
-          const selected = draft.selectedFleetIds.includes(preset.id);
-          const blocked =
-            metadata.infrastructureDefaults.source === "terraform" && !setup.hasFleetImage(preset.spec.architecture);
-          return (
-            <div key={preset.id} className="flex items-start gap-3 rounded-md border border-border p-3">
-              <Checkbox
-                id={id}
-                checked={selected}
-                disabled={blocked && !selected}
-                onChange={(event) => setup.toggleFleet(preset.id, event.target.checked)}
-              />
-              <div className="min-w-0 flex-1 space-y-3">
-                <Label htmlFor={id} className="text-sm">
-                  <span className="block font-medium">{preset.id}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {preset.spec.architecture} · {preset.spec.cpuMillicores}m CPU · {preset.spec.memoryMb} MB memory
-                  </span>
-                  {blocked && (
-                    <span className="block text-xs text-amber-600 dark:text-amber-300">
-                      Add the {preset.spec.architecture} runner image through Terraform to use this fleet.
-                    </span>
-                  )}
-                </Label>
-                {selected && (
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <Field
-                      id={`machine-type-${preset.id}`}
-                      label={`Machine type for ${preset.id}`}
-                      value={draft.fields[`machineType.${preset.id}`] || ""}
-                      onChange={(event) => setup.setField(`machineType.${preset.id}`, event.target.value)}
-                    />
-                    <Field
-                      id={`warm-capacity-${preset.id}`}
-                      label={`Warm capacity for ${preset.id}`}
-                      type="number"
-                      min={0}
-                      value={draft.fleetCapacities[preset.id]?.warmCapacity ?? 0}
-                      onChange={(event) =>
-                        setup.setFleetCapacity(preset.id, { warmCapacity: Number(event.target.value) })
-                      }
-                    />
-                    <Field
-                      id={`max-capacity-${preset.id}`}
-                      label={`Maximum capacity for ${preset.id}`}
-                      type="number"
-                      min={0}
-                      value={draft.fleetCapacities[preset.id]?.maxCapacity ?? 1}
-                      onChange={(event) =>
-                        setup.setFleetCapacity(preset.id, { maxCapacity: Number(event.target.value) })
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+    <div className="space-y-4">
+      <div className="space-y-1.5 text-sm">
+        <Label htmlFor={fleetFieldId}>Fleet</Label>
+        <p id={`${fleetFieldId}-help`} className="text-xs leading-5 text-muted-foreground">
+          {FLEET_HELPER}
+        </p>
+        <Input id={fleetFieldId} value={DEFAULT_SETUP_FLEET_ID} readOnly aria-describedby={`${fleetFieldId}-help`} />
       </div>
+      {blocked && (
+        <p className="text-xs text-amber-600 dark:text-amber-300">
+          Add the {preset.spec.architecture} runner image through Terraform to use this fleet.
+        </p>
+      )}
+      <MachineTypeField
+        id={machineTypeFieldId}
+        provider={draft.provider}
+        value={machineType}
+        onChange={(value) => setup.setField(machineTypeKey, value)}
+      />
+      {machineType && (
+        <div className="grid items-stretch gap-3 sm:grid-cols-2">
+          <CapacityField
+            id={warmFieldId}
+            label="Warm capacity"
+            description={WARM_CAPACITY_HELP}
+            type="number"
+            min={0}
+            value={capacity?.warmCapacity ?? 0}
+            onChange={(event) =>
+              setup.setFleetCapacity(DEFAULT_SETUP_FLEET_ID, { warmCapacity: Number(event.target.value) })
+            }
+          />
+          <CapacityField
+            id={maxFieldId}
+            label="Maximum capacity"
+            description={MAX_CAPACITY_HELP}
+            type="number"
+            min={0}
+            value={capacity?.maxCapacity ?? 1}
+            onChange={(event) =>
+              setup.setFleetCapacity(DEFAULT_SETUP_FLEET_ID, { maxCapacity: Number(event.target.value) })
+            }
+          />
+        </div>
+      )}
       {setup.fleetErrors.length > 0 && (
-        <p role="alert" className="mt-3 text-sm text-destructive">
+        <p role="alert" className="text-sm text-destructive">
           {setup.fleetErrors[0]}
         </p>
       )}

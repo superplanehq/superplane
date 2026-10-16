@@ -33,13 +33,14 @@ describe("FleetManagerProviderSection", () => {
     expect(logo).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("does not show the provider names or the generic cloud icon", () => {
+  it("shows the provider name in a tooltip", async () => {
+    const user = userEvent.setup();
     const { setup } = buildSetup();
     const { container } = render(<FleetManagerProviderSection setup={setup} />);
 
-    for (const name of ["AWS", "GCP", "AZURE"]) {
-      expect(screen.queryByText(name)).not.toBeInTheDocument();
-    }
+    expect(screen.queryByText("Azure")).not.toBeInTheDocument();
+    await user.hover(screen.getByRole("button", { name: "Azure" }));
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Azure");
     expect(container.querySelector(".lucide-cloud")).not.toBeInTheDocument();
   });
 
@@ -53,7 +54,9 @@ describe("FleetManagerProviderSection", () => {
     expect(screen.getByRole("button", { name: "Azure" })).not.toHaveAccessibleDescription();
 
     await user.hover(gcpCard);
-    expect(await screen.findByRole("tooltip")).toHaveTextContent("Loaded from Terraform");
+    const tooltip = await screen.findByRole("tooltip");
+    expect(tooltip).toHaveTextContent("GCP");
+    expect(tooltip).not.toHaveTextContent("Loaded from Terraform");
     expect(screen.getAllByRole("tooltip")).toHaveLength(1);
   });
 

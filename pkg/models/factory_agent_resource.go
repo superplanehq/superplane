@@ -140,6 +140,7 @@ type FactoryAgentResourceOAuthMetadata struct {
 	RegistrationEndpoint  string `json:"registrationEndpoint,omitempty"`
 	ClientID              string `json:"clientId,omitempty"`
 	Resource              string `json:"resource,omitempty"`
+	AccessTokenExpiresAt  string `json:"accessTokenExpiresAt,omitempty"`
 }
 
 type FactoryAgentResourceSecret struct {
