@@ -13,7 +13,7 @@ FALLBACK_COMMENT="# Saved versions are the fallback when release lookup fails."
 TMP_DIR="$(mktemp -d)"
 VALUES_BACKUP="${TMP_DIR}/values.yaml.bak"
 cp "${VALUES_PATH}" "${VALUES_BACKUP}"
-trap 'cp "${VALUES_BACKUP}" "${VALUES_PATH}"; rm -rf "${TMP_DIR}"; rm -f "${REPO_ROOT}/superplane-chart-1.2.3.tgz"' EXIT
+trap 'cp "${VALUES_BACKUP}" "${VALUES_PATH}"; rm -rf "${TMP_DIR}"' EXIT
 
 unset GITHUB_TOKEN
 export PATH="${TMP_DIR}:${PATH}"
@@ -140,7 +140,7 @@ case "${CURL_MODE}" in
       echo "unexpected releases URL: ${url}" >&2
       exit 1
     fi
-    sleep 60
+    sleep 11
     exit 28
     ;;
   invalid-json)
@@ -192,22 +192,26 @@ set -euo pipefail
 
 printf 'helm %s\n' "$1" >>"${CURL_SEQUENCE}"
 case "$1" in
-  dependency|push)
+  dependency)
     ;;
   package)
     version=""
+    destination=""
     while [ "$#" -gt 0 ]; do
-      if [ "$1" = "--version" ]; then
-        version="$2"
-        break
-      fi
-      shift
+      case "$1" in
+        --version) version="$2"; shift 2 ;;
+        --destination) destination="$2"; shift 2 ;;
+        *) shift ;;
+      esac
     done
-    if [ -z "${version}" ]; then
-      echo "helm package did not receive a version" >&2
+    if [ -z "${version}" ] || [ -z "${destination}" ]; then
+      echo "helm package did not receive its version and destination" >&2
       exit 1
     fi
-    printf 'chart' >"superplane-chart-${version}.tgz"
+    printf 'chart' >"${destination}/superplane-chart-${version}.tgz"
+    ;;
+  show)
+    printf 'version: 1.2.3\nappVersion: v1.2.3\n'
     ;;
   *)
     echo "unexpected helm invocation: $*" >&2
@@ -234,7 +238,7 @@ EOF
 
 run_updater() {
   : >"${CURL_SEQUENCE}"
-  timeout 15 node "${UPDATER}" "${TMP_DIR}/values.yaml" >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr"
+  node "${UPDATER}" "${TMP_DIR}/values.yaml" >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr"
 }
 
 assert_unchanged() {
@@ -337,7 +341,7 @@ rm -f "${TMP_DIR}/max-time"
 : >"${CURL_SEQUENCE}"
 stall_started="$(date +%s)"
 set +e
-timeout 45 node "${UPDATER}" "${TMP_DIR}/values.yaml" >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr"
+node "${UPDATER}" "${TMP_DIR}/values.yaml" >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr"
 stall_status="$?"
 set -e
 stall_elapsed="$(( $(date +%s) - stall_started ))"
@@ -429,7 +433,7 @@ grep -q 'no stable runner release' "${TMP_DIR}/stderr"
 export CURL_MODE=http-error
 (
   cd "${REPO_ROOT}"
-  timeout 15 bash "${BUILD_SCRIPT}" v1.2.3 >"${TMP_DIR}/build-stdout" 2>"${TMP_DIR}/build-stderr"
+  bash "${BUILD_SCRIPT}" v1.2.3 "${TMP_DIR}/chart-output" >"${TMP_DIR}/build-stdout" 2>"${TMP_DIR}/build-stderr"
 )
 cmp -s "${VALUES_BACKUP}" "${VALUES_PATH}"
 grep -q 'HTTP 500' "${TMP_DIR}/build-stderr"
@@ -438,6 +442,10 @@ package_line="$(grep -n '^helm package$' "${CURL_SEQUENCE}" | head -n 1 | cut -d
 test -n "${curl_line}"
 test -n "${package_line}"
 test "${curl_line}" -lt "${package_line}"
-grep -qx 'helm push' "${CURL_SEQUENCE}"
+if grep -qx 'helm push' "${CURL_SEQUENCE}"; then
+  echo "chart preparation must not publish to the registry" >&2
+  exit 1
+fi
+test -f "${TMP_DIR}/chart-output/superplane-1.2.3.tgz"
 
 echo "Chart component release default tests passed."

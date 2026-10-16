@@ -301,13 +301,6 @@ docker build --platform linux/amd64 \\
             s,
         )
     )
-    story.append(
-        Paragraph(
-            "Do not run release/superplane-image/build.sh for this path. That script pushes to GHCR.",
-            s["body"],
-        )
-    )
-
     story.append(Paragraph("5. Push images to a registry", s["h1"]))
     story.append(
         Paragraph(

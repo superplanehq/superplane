@@ -188,12 +188,12 @@ Access SuperPlane at `https://YOUR_DOMAIN`.
 
 ## Update SuperPlane
 
-Change `superplane_chart_version` to a published chart version
-`0.0.0-<git-sha>`. Run the confirm commands in section 2 with the new SHA.
+Change `superplane_chart_version` to a published chart version such as
+`1.0.0` or `1.0.0-rc1`. Confirm the matching image and chart first.
 Then run `terraform apply`.
 
 Leave `superplane_image_tag` empty. The chart appVersion selects the
-self-hosted app image.
+matching versioned app image.
 
 ## Third-party chart versions
 
@@ -249,9 +249,6 @@ docker build \
   -t "fleet-manager:${IMAGE_TAG}" \
   .
 ```
-
-Do not run `release/superplane-image/build.sh` for this path. That script
-pushes to GHCR.
 
 AKS cannot pull images that exist only on your laptop. Create ACR:
 

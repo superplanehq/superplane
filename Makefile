@@ -573,9 +573,15 @@ openapi.web.client.gen: dev.test.is.running
 
 CLI_VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
 
-cli.build:
+cli.build.prepare:
 	$(MAKE) pb.gen
-	$(COMPOSE) exec -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o build/cli cmd/cli/main.go'
+
+CLI_OUTPUT ?= build/cli
+
+cli.build.binary:
+	$(COMPOSE) exec -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o $(CLI_OUTPUT) cmd/cli/main.go'
+
+cli.build: cli.build.prepare cli.build.binary
 
 admincli.build:
 	$(MAKE) pb.gen
@@ -614,13 +620,3 @@ image.auth:
 image.push:
 	docker tag $(IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
 	docker push $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
-
-#
-# Tag creation
-#
-
-tag.create.patch:
-	./release/create_tag.sh patch
-
-tag.create.minor:
-	./release/create_tag.sh minor

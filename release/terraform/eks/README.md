@@ -49,7 +49,7 @@ availability_zones = ["us-west-2a", "us-west-2b"]
 Review the defaults before you apply the plan.
 Terraform generates a database password if you do not set one.
 To use a newer published chart, set `superplane_chart_version` in `terraform.tfvars`.
-Leave `superplane_image_tag` empty to use that chart's matching self-hosted image.
+Leave `superplane_image_tag` empty to use that chart's matching versioned image.
 
 ### 3. Init, plan and apply
 

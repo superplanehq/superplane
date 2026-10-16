@@ -23,7 +23,7 @@ case "${ACTION}" in
 esac
 
 case "${COMPONENT}" in
-  runner | fleet-manager) ;;
+  superplane | runner | fleet-manager) ;;
   *)
     echo "Error: unsupported component ${COMPONENT}" >&2
     exit 1
