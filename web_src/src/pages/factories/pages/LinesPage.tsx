@@ -49,6 +49,7 @@ import { useHostedCreditChrome } from "../lib/useHostedCreditEmptyBanner";
 import { CreateFactoryAppDialog } from "../CreateFactoryAppDialog";
 import { AddColumnAutomationPicker } from "./AddColumnAutomationPicker";
 import { AddIntakePicker } from "./AddIntakePicker";
+import { ScheduledIntakeSetupDialog } from "./ScheduledIntakeSetupDialog";
 import { AddPRFeedbackPicker } from "./AddPRFeedbackPicker";
 import { useAddColumnAutomation } from "./useAddColumnAutomation";
 import { NextStepsPanel, WorkspaceNextStepsHeaderBadge } from "./NextStepsPanel";
@@ -142,6 +143,7 @@ import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFoote
 import {
   factoryAppConfigurePath,
   factoryAppRunPath,
+  factoryColumnAutomationViewPath,
   factoryDatadogIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
   factoryHomePath,
@@ -374,6 +376,7 @@ export function LinesPage() {
   );
   const addIntakeTemplates = useMemo(() => addIntakeTemplatesForOrg(hasExperimentalFeature), [hasExperimentalFeature]);
   const [addIntakeOpen, setAddIntakeOpen] = useState(false);
+  const [scheduledIntakeOpen, setScheduledIntakeOpen] = useState(false);
   const [addPRFeedbackOpen, setAddPRFeedbackOpen] = useState(false);
   const appRepository = factory?.onboarding?.appRepository?.trim() ?? "";
   const githubIntegrationId = factory?.onboarding?.vcsIntegrationId?.trim() ?? "";
@@ -548,6 +551,10 @@ export function LinesPage() {
     if (isAddIntakeSoon(template, hasExperimentalFeature) || takenIntakeSourceIds.includes(template.id)) {
       return;
     }
+    if (template.id === "scheduled-intake") {
+      setScheduledIntakeOpen(true);
+      return;
+    }
     if (template.id === "github-issues") {
       if (selectedLine.id) {
         navigate(factoryGitHubIntakeSetupPath(organizationId, routeSegment, selectedLine.id));
@@ -631,7 +638,10 @@ export function LinesPage() {
 
   const viewedAutomation = factoryApps.find((app) => app.id === automationViewCanvasId);
   const canDeleteViewedCustom =
-    canUpdate && (viewedAutomation?.columnKey === "verify" || viewedAutomation?.columnKey === "done");
+    canUpdate &&
+    (viewedAutomation?.columnKey === "backlog" ||
+      viewedAutomation?.columnKey === "verify" ||
+      viewedAutomation?.columnKey === "done");
   const closeAutomationView = () => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id));
   const deleteViewedCustomAutomation = async () => {
     if (!automationViewCanvasId) {
@@ -661,6 +671,17 @@ export function LinesPage() {
           vcsIntegrationId={factory?.onboarding?.vcsIntegrationId}
           initialTab={isIntakeSettingsTab(intakeSettingsTab) ? intakeSettingsTab : "general"}
           onClose={() => navigate(factoryHomePath(organizationId, routeSegment, selectedLine.id))}
+        />
+      ) : null}
+      {scheduledIntakeOpen ? (
+        <ScheduledIntakeSetupDialog
+          organizationId={organizationId}
+          factoryId={factoryId}
+          onClose={() => setScheduledIntakeOpen(false)}
+          onCreated={(canvasId) => {
+            setScheduledIntakeOpen(false);
+            navigate(factoryColumnAutomationViewPath(organizationId, routeSegment, selectedLine.id, canvasId));
+          }}
         />
       ) : null}
       <AddIntakePicker

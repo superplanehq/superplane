@@ -9,15 +9,11 @@ const copy = FIRST_RUN_COPY.host;
 
 export function FirstRunHostScreen({
   selectedHost,
-  bitbucketAvailable = false,
-  bitbucketFeatureLoading = false,
   chrome,
   sphere,
   onChooseHost,
 }: {
   selectedHost: VcsHostId | null;
-  bitbucketAvailable?: boolean;
-  bitbucketFeatureLoading?: boolean;
   chrome?: FirstRunChrome;
   sphere?: FirstRunSphereProps;
   onChooseHost: (host: VcsHostId) => void;
@@ -29,31 +25,19 @@ export function FirstRunHostScreen({
       </FirstRunHeading>
 
       <div className="mt-8 space-y-3">
-        {VCS_OPTIONS.map((option) => {
-          const bitbucket = option.id === "bitbucket";
-          const waiting = bitbucket && bitbucketFeatureLoading;
-          const unavailable = bitbucket && !bitbucketFeatureLoading && !bitbucketAvailable;
-          return (
-            <div key={option.id} data-testid={`first-run-host-${option.id}`}>
-              <ConnectOptionRow
-                icon={<IntegrationChoiceIcon name={option.id} />}
-                title={option.label}
-                detail={hostOptionDetail(option.detail, waiting, unavailable)}
-                selected={selectedHost === option.id}
-                soon={option.soon || unavailable}
-                disabled={waiting}
-                onSelect={() => onChooseHost(option.id)}
-              />
-            </div>
-          );
-        })}
+        {VCS_OPTIONS.map((option) => (
+          <div key={option.id} data-testid={`first-run-host-${option.id}`}>
+            <ConnectOptionRow
+              icon={<IntegrationChoiceIcon name={option.id} />}
+              title={option.label}
+              detail={option.detail}
+              selected={selectedHost === option.id}
+              soon={option.soon}
+              onSelect={() => onChooseHost(option.id)}
+            />
+          </div>
+        ))}
       </div>
     </FirstRunShell>
   );
-}
-
-function hostOptionDetail(detail: string, waiting: boolean, unavailable: boolean): string {
-  if (waiting) return copy.bitbucketLookupLoading;
-  if (unavailable) return copy.bitbucketSoon;
-  return detail;
 }
