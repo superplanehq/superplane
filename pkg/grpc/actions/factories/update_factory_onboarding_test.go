@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -70,23 +69,7 @@ func Test__UpdateFactoryOnboarding(t *testing.T) {
 		assert.Equal(t, pb.FactoryOnboarding_AGENT_HARNESS_CLAUDE_CODE, response.Factory.Onboarding.AgentHarness)
 	})
 
-	t.Run("bitbucket integration is rejected when the feature is off", func(t *testing.T) {
-		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryBitbucket))
-		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
-		require.NoError(t, err)
-		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)
-
-		_, err = UpdateFactoryOnboarding(context.Background(), IntakeDependencies{}, r.Organization.ID.String(), &pb.UpdateFactoryOnboardingRequest{
-			Id:               factory.ID.String(),
-			VcsIntegrationId: &vcsID,
-		})
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
-	})
-
 	t.Run("bitbucket integration stores the provider and keeps automations off", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryBitbucket))
 		factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
 		require.NoError(t, err)
 		vcsID := createReadyOnboardingIntegration(t, r.Organization.ID, models.ProviderBitbucket)

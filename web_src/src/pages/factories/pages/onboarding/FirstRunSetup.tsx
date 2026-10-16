@@ -357,8 +357,6 @@ function VcsScreen({
     return (
       <FirstRunHostScreen
         selectedHost={flow.vcsHost}
-        bitbucketAvailable={flow.bitbucketAvailable}
-        bitbucketFeatureLoading={flow.bitbucketFeatureLoading}
         chrome={chrome}
         sphere={sphereFor("host", setup.selectedRepo)}
         onChooseHost={flow.chooseVcsHost}
