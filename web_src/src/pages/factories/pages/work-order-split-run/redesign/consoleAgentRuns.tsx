@@ -348,7 +348,7 @@ function checksMarkdownLines(description: string | undefined): string[] {
   if (!lines || lines.length === 0) {
     return [];
   }
-  return lines[0] === "Failed checks" ? lines.slice(1) : lines;
+  return lines[0] === "Failed checks" || lines[0] === "Failed builds" ? lines.slice(1) : lines;
 }
 
 function CheckName({ check }: { check: WatchedPullRequestCheck }) {
