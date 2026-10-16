@@ -40,7 +40,7 @@ export function ScheduledIntakeSetupDialog({ organizationId, factoryId, onClose,
   if (!enabled) return null;
 
   const submit = async () => {
-    if (!valid || create.isPending) return;
+    if (!valid || !schedule.nextRun || Date.parse(schedule.nextRun) <= Date.now() || create.isPending) return;
     setError(undefined);
     try {
       const automation = await create.mutateAsync({

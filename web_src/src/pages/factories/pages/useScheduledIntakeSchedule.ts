@@ -21,7 +21,8 @@ export function useScheduledIntakeSchedule(organizationId: string, factoryId: st
   }, [params]);
   const valid = mode === "cron" ? Boolean(cronExpression.trim()) : /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   const preview = useFactorySchedulePreview(organizationId, factoryId, settled, enabled && valid);
-  const checking = settled !== params || preview.isFetching || preview.isPending;
+  const checking =
+    settled !== params || preview.isFetching || preview.isPending || (!preview.isFuture && !preview.error);
   return {
     mode,
     setMode,
@@ -31,11 +32,11 @@ export function useScheduledIntakeSchedule(organizationId: string, factoryId: st
     setCronExpression,
     timezone,
     params,
-    nextRun: preview.data,
+    nextRun: preview.isFuture ? preview.data : undefined,
     error: preview.error,
     retry: preview.refetch,
     checking,
     valid,
-    ready: valid && !checking && preview.isSuccess,
+    ready: valid && !checking && preview.isSuccess && preview.isFuture,
   };
 }

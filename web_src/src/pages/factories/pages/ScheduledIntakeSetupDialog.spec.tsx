@@ -10,7 +10,8 @@ vi.mock("@/hooks/useExperimentalFeature", () => ({ useExperimentalFeature: () =>
 vi.mock("@/hooks/useFactoryData", () => ({
   useCreateFactoryAutomation: () => ({ mutateAsync: mocks.create, isPending: false }),
   useFactorySchedulePreview: () => ({
-    data: "2026-10-17T07:00:00Z",
+    data: new Date(Date.now() + 86_400_000).toISOString(),
+    isFuture: true,
     error: mocks.previewError,
     isFetching: false,
     isPending: false,
