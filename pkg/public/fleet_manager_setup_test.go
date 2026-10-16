@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -50,6 +51,14 @@ func expireRunnerReleaseCache(t *testing.T) {
 	defer runnerReleaseCacheMu.Unlock()
 	require.True(t, cachedRunnerReleaseOK)
 	cachedRunnerReleaseFetchedAt = time.Now().Add(-runnerReleaseCacheTTL - time.Second)
+}
+
+func expireRunnerReleaseFailure(t *testing.T) {
+	t.Helper()
+	runnerReleaseCacheMu.Lock()
+	defer runnerReleaseCacheMu.Unlock()
+	require.Error(t, cachedRunnerReleaseFailure)
+	cachedRunnerReleaseFailedAt = time.Now().Add(-runnerReleaseFailureBackoff - time.Second)
 }
 
 func TestAdminGetFleetManagerSetup(t *testing.T) {
@@ -209,6 +218,41 @@ func TestAdminGetFleetManagerSetupKeepsCachedRunnerVersionsWhenLookupFails(t *te
 	failedRefresh := requests.Load()
 	assert.Equal(t, []string{"v1.2.3", "v1.0.0", "v0.9.0"}, load().RunnerVersions)
 	assert.Equal(t, failedRefresh, requests.Load())
+}
+
+func TestPublishedRunnerVersionsRemembersAFailedLookup(t *testing.T) {
+	var requests atomic.Int32
+	releases := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		http.Error(w, "unavailable", http.StatusBadGateway)
+	}))
+	t.Cleanup(releases.Close)
+	useRunnerReleases(t, releases.URL)
+
+	const callers = 4
+	var wg sync.WaitGroup
+	lookupErrors := make([]error, callers)
+	wg.Add(callers)
+	for i := range callers {
+		go func() {
+			defer wg.Done()
+			_, lookupErrors[i] = publishedRunnerVersions()
+		}()
+	}
+	wg.Wait()
+	for _, err := range lookupErrors {
+		require.Error(t, err)
+	}
+	assert.Equal(t, int32(1), requests.Load())
+
+	_, err := publishedRunnerVersions()
+	require.Error(t, err)
+	assert.Equal(t, int32(1), requests.Load())
+
+	expireRunnerReleaseFailure(t)
+	_, err = publishedRunnerVersions()
+	require.Error(t, err)
+	assert.Equal(t, int32(2), requests.Load())
 }
 
 func TestAdminGetFleetManagerSetupOmitsVersionsFromIncompleteTagList(t *testing.T) {

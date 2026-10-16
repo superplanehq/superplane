@@ -26,6 +26,7 @@ const (
 	runnerReleaseURLTemplate         = "https://github.com/superplanehq/superplane/releases/download/runner%2F{version}"
 	runnerReleaseLookupTimeout       = 3 * time.Second
 	runnerReleaseCacheTTL            = 5 * time.Minute
+	runnerReleaseFailureBackoff      = 15 * time.Second
 	maximumRunnerTagPages            = 10
 	runnerReleaseTagPrefix           = "runner/"
 	runnerTagRefPrefix               = "refs/tags/" + runnerReleaseTagPrefix
@@ -40,6 +41,8 @@ var (
 	cachedRunnerReleaseVersions  []string
 	cachedRunnerReleaseFetchedAt time.Time
 	cachedRunnerReleaseOK        bool
+	cachedRunnerReleaseFailedAt  time.Time
+	cachedRunnerReleaseFailure   error
 )
 
 type githubRunnerRelease struct {
@@ -222,14 +225,14 @@ func configuredRunnerVersions(stableVersion string) []string {
 }
 
 func publishedRunnerVersions() ([]string, error) {
-	if versions, ok := freshCachedRunnerVersions(); ok {
-		return versions, nil
+	if versions, err, ok := reusableRunnerReleaseResult(); ok {
+		return versions, err
 	}
 
 	runnerReleaseRefreshMu.Lock()
 	defer runnerReleaseRefreshMu.Unlock()
-	if versions, ok := freshCachedRunnerVersions(); ok {
-		return versions, nil
+	if versions, err, ok := reusableRunnerReleaseResult(); ok {
+		return versions, err
 	}
 
 	versions, err := fetchPublishedRunnerVersions()
@@ -238,10 +241,21 @@ func publishedRunnerVersions() ([]string, error) {
 			touchRunnerReleaseCache()
 			return stale, nil
 		}
+		rememberRunnerReleaseFailure(err)
 		return nil, err
 	}
 	storeCachedRunnerVersions(versions)
 	return versions, nil
+}
+
+func reusableRunnerReleaseResult() ([]string, error, bool) {
+	if versions, ok := freshCachedRunnerVersions(); ok {
+		return versions, nil, true
+	}
+	if err := freshRunnerReleaseFailure(); err != nil {
+		return nil, err, true
+	}
+	return nil, nil, false
 }
 
 func fetchPublishedRunnerVersions() ([]string, error) {
@@ -392,12 +406,30 @@ func cachedRunnerVersions() ([]string, bool) {
 	return append([]string(nil), cachedRunnerReleaseVersions...), true
 }
 
+func freshRunnerReleaseFailure() error {
+	runnerReleaseCacheMu.Lock()
+	defer runnerReleaseCacheMu.Unlock()
+	if cachedRunnerReleaseFailure == nil || time.Since(cachedRunnerReleaseFailedAt) >= runnerReleaseFailureBackoff {
+		return nil
+	}
+	return cachedRunnerReleaseFailure
+}
+
+func rememberRunnerReleaseFailure(err error) {
+	runnerReleaseCacheMu.Lock()
+	defer runnerReleaseCacheMu.Unlock()
+	cachedRunnerReleaseFailure = err
+	cachedRunnerReleaseFailedAt = time.Now()
+}
+
 func storeCachedRunnerVersions(versions []string) {
 	runnerReleaseCacheMu.Lock()
 	defer runnerReleaseCacheMu.Unlock()
 	cachedRunnerReleaseVersions = append([]string(nil), versions...)
 	cachedRunnerReleaseFetchedAt = time.Now()
 	cachedRunnerReleaseOK = true
+	cachedRunnerReleaseFailure = nil
+	cachedRunnerReleaseFailedAt = time.Time{}
 }
 
 func touchRunnerReleaseCache() {
@@ -415,6 +447,8 @@ func resetRunnerReleaseCache() {
 	cachedRunnerReleaseVersions = nil
 	cachedRunnerReleaseFetchedAt = time.Time{}
 	cachedRunnerReleaseOK = false
+	cachedRunnerReleaseFailure = nil
+	cachedRunnerReleaseFailedAt = time.Time{}
 }
 
 func stableRunnerVersionFromRef(ref string) (string, bool) {
