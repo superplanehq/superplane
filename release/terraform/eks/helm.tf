@@ -487,9 +487,12 @@ resource "helm_release" "superplane" {
     value = "superplane"
   }
 
-  set {
-    name  = "image.tag"
-    value = var.superplane_image_tag
+  dynamic "set" {
+    for_each = var.superplane_image_tag == "" ? [] : [var.superplane_image_tag]
+    content {
+      name  = "image.tag"
+      value = set.value
+    }
   }
 
   set {

@@ -15,8 +15,8 @@ letsencrypt_email = "admin@example.com"
 # Terraform downloads the chart from
 # oci://ghcr.io/superplanehq/superplane-chart. The chart uses the application
 # image at ghcr.io/superplanehq/superplane.
-# superplane_chart_version = "0.0.0-782e528cea1fd707313bcfa4a2e8f57e9148f5c5"
-# superplane_image_tag    = "<git-sha>-selfhosted"  # Empty uses the chart's matching image.
+# superplane_chart_version = "1.0.0"
+# superplane_image_tag    = ""  # Empty uses the chart's matching image.
 # superplane_namespace = "superplane"
 
 # Nominal PV/PVC capacity. EFS grows elastically and does not reserve this size.
