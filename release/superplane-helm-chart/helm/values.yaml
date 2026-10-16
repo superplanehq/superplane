@@ -111,6 +111,7 @@ fleetManagerSetup:
   serviceAccountName: superplane-fleet-manager
   infrastructure: {}
 
+# Saved versions are the fallback when release lookup fails.
 componentReleases:
   runnerVersion: v0.2.0
   runnerVersions:
