@@ -94,7 +94,7 @@ function unescapeYamlScalar(value: string): string {
       return value;
     }
     const inner = value.slice(1, closing);
-    return quote === "'" ? inner.replaceAll("''", "'") : inner;
+    return quote === "'" ? inner.replace(/''/g, "'") : inner;
   }
   // In YAML, " #" starts a comment in a plain scalar.
   const comment = value.search(/\s#/);
