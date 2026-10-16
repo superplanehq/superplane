@@ -47,6 +47,24 @@ export function setSkillFrontmatterFields(markdown: string, fields: Record<strin
   return `---\n${lines.join("\n")}\n---${body.startsWith("\n") ? body : `\n${body}`}`;
 }
 
+export type SkillFieldsFromMarkdown = {
+  title?: string;
+  command?: string;
+};
+
+// Returns the Name field value (frontmatter title, else name) and the command
+// (frontmatter name, else title, sanitized). A missing value is undefined.
+export function skillFieldsFromMarkdown(markdown: string): SkillFieldsFromMarkdown {
+  const name = skillFrontmatterField(markdown, "name")?.trim() ?? "";
+  const title = skillFrontmatterField(markdown, "title")?.trim() ?? "";
+  const displayTitle = title || name;
+  const commandSource = name || title;
+  return {
+    title: displayTitle || undefined,
+    command: commandSource ? sanitizeSkillCommandName(commandSource) : undefined,
+  };
+}
+
 export function skillDisplayTitle(resource: { name?: string; markdown?: string }): string {
   const title = skillFrontmatterField(resource.markdown ?? "", "title")?.trim();
   if (title) {
@@ -69,13 +87,36 @@ export function skillListDescription(resource: { markdown?: string; repository?:
 }
 
 function unescapeYamlScalar(value: string): string {
-  if (
-    (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
-    (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
-  ) {
-    return value.slice(1, -1);
+  const quote = value[0];
+  if (quote === '"' || quote === "'") {
+    const closing = findClosingQuote(value, quote);
+    if (closing < 0) {
+      return value;
+    }
+    const inner = value.slice(1, closing);
+    return quote === "'" ? inner.replace(/''/g, "'") : inner;
   }
-  return value;
+  // In YAML, " #" starts a comment in a plain scalar.
+  const comment = value.search(/\s#/);
+  return (comment >= 0 ? value.slice(0, comment) : value).trim();
+}
+
+function findClosingQuote(value: string, quote: string): number {
+  for (let index = 1; index < value.length; index++) {
+    if (quote === '"' && value[index] === "\\") {
+      index++;
+      continue;
+    }
+    if (value[index] !== quote) {
+      continue;
+    }
+    if (quote === "'" && value[index + 1] === "'") {
+      index++;
+      continue;
+    }
+    return index;
+  }
+  return -1;
 }
 
 function yamlScalar(value: string): string {
