@@ -407,7 +407,7 @@ describe("OwnerSetup", () => {
         closeAttempts += 1;
         if (closeAttempts === 1) return new Response("", { status: 500 });
       }
-      return original?.(input, init) ?? new Response("", { status: 404 });
+      return original?.(input) ?? new Response("", { status: 404 });
     });
     renderOwnerSetup();
     await reachFleetStep();
@@ -440,7 +440,7 @@ describe("OwnerSetup", () => {
         steps.push((JSON.parse(String(init?.body)) as { step: string }).step);
         if (progressCalls === 1) await firstSave;
       }
-      return original?.(input, init) ?? new Response("", { status: 404 });
+      return original?.(input) ?? new Response("", { status: 404 });
     });
     renderOwnerSetup();
 

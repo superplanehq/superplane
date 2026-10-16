@@ -13,6 +13,8 @@ import { LicenseStep } from "./ownerSetup/LicenseStep";
 import { OWNER_SETUP_COPY } from "./ownerSetup/ownerSetupCopy";
 import { OwnerStep } from "./ownerSetup/OwnerStep";
 import { SmtpStep } from "./ownerSetup/SmtpStep";
+import { useFinishInstallation } from "./ownerSetup/useFinishInstallation";
+import { useOwnerAccountForm } from "./ownerSetup/useOwnerAccountForm";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { newOrganizationLandingPath } from "./newOrganizationLandingPath";
 
@@ -241,108 +243,6 @@ function OwnerFleetSetupSteps({
   );
 }
 
-function isEmailValid(email: string) {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-function isPasswordValid(password: string) {
-  if (password.length < 8) return false;
-  if (!/[0-9]/.test(password)) return false;
-  if (!/[A-Z]/.test(password)) return false;
-  return true;
-}
-
-function validateOwnerFields(values: {
-  email: string;
-  firstName: string;
-  lastName: string;
-  password: string;
-  confirmPassword: string;
-}): Record<string, string> {
-  const errors: Record<string, string> = {};
-
-  if (!values.email.trim()) {
-    errors.email = "Email is required.";
-  } else if (!isEmailValid(values.email.trim())) {
-    errors.email = "Please enter a valid email address.";
-  }
-
-  if (!values.firstName.trim()) {
-    errors.firstName = "First name is required.";
-  }
-
-  if (!values.lastName.trim()) {
-    errors.lastName = "Last name is required.";
-  }
-
-  if (!values.password) {
-    errors.password = "Password is required.";
-  } else if (!isPasswordValid(values.password)) {
-    errors.password = "Password must be 8+ characters with at least 1 number and 1 capital letter.";
-  }
-
-  if (!values.confirmPassword) {
-    errors.confirmPassword = "Please confirm your password.";
-  } else if (values.confirmPassword !== values.password) {
-    errors.confirmPassword = "Passwords do not match.";
-  }
-
-  return errors;
-}
-
-async function submitOwnerSetup(args: {
-  email: string;
-  firstName: string;
-  lastName: string;
-  password: string;
-  setError: (error: string | null) => void;
-  setLoading: (loading: boolean) => void;
-  setPendingOrganizationSlug: (slug: string | null) => void;
-  onOwnerCreated: (step: OwnerSetupStep) => void;
-}) {
-  args.setError(null);
-  args.setLoading(true);
-
-  try {
-    const response = await fetch("/api/v1/setup-owner", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify({
-        email: args.email.trim(),
-        first_name: args.firstName.trim(),
-        last_name: args.lastName.trim(),
-        password: args.password,
-      }),
-    });
-
-    if (!response.ok) {
-      try {
-        const data = await response.json();
-        args.setError(data.message || "Failed to set up owner account");
-      } catch {
-        if (response.status === 409) {
-          args.setError("This instance is already initialized.");
-        } else {
-          args.setError(`Failed to set up owner account (${response.status})`);
-        }
-      }
-      return;
-    }
-
-    const data: { organization_id: string; organization_slug: string } = await response.json();
-    args.setPendingOrganizationSlug(data.organization_slug);
-    args.onOwnerCreated("license");
-  } catch {
-    args.setError("Network error occurred");
-  } finally {
-    args.setLoading(false);
-  }
-}
-
 function continueAfterOwnerSetup(args: {
   orgSlug: string;
   setActiveSurvey: (survey: PostHogSurvey | null) => void;
@@ -412,64 +312,53 @@ function ownerSetupChrome(args: {
   };
 }
 
-function handleOwnerFormSubmit(
-  e: React.FormEvent,
-  values: { email: string; firstName: string; lastName: string; password: string; confirmPassword: string },
-  actions: {
-    setFieldErrors: (errors: Record<string, string>) => void;
-    setError: (error: string | null) => void;
-    setLoading: (loading: boolean) => void;
-    setPendingOrganizationSlug: (slug: string | null) => void;
-    onOwnerCreated: (step: OwnerSetupStep) => void;
-  },
-) {
-  e.preventDefault();
-  const errors = validateOwnerFields(values);
-  actions.setFieldErrors(errors);
-  if (Object.keys(errors).length > 0) {
-    return;
-  }
-  void submitOwnerSetup({ ...values, ...actions });
-}
-
 const OwnerSetup: React.FC = () => {
-  const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [phase, setPhase] = useState<"loading" | "ready">("loading");
   const [step, setStep] = useState<OwnerSetupStep>("owner");
   const [pendingOrganizationSlug, setPendingOrganizationSlug] = useState<string | null>(null);
   const [activeSurvey, setActiveSurvey] = useState<PostHogSurvey | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const activeFleetStep = fleetWizardStep(step);
   const fleetSetup = useFleetManagerSetup(
     activeFleetStep !== null,
     fleetManagerOrganizationId(pendingOrganizationSlug),
   );
   const saveSetupProgress = useQueuedSetupProgress();
-  const closingSetup = useRef(false);
-  const [closeError, setCloseError] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
+  const { closeError, isClosing, finishInstallation } = useFinishInstallation({
+    organizationSlug: pendingOrganizationSlug,
+    saveSetupProgress,
+    onClosed: (orgSlug) => continueAfterOwnerSetup({ orgSlug, setActiveSurvey, setStep }),
+  });
 
   useReportPageReady(true);
+
+  const onOwnerCreated = useCallback((next: OwnerSetupStep) => {
+    setStep(next);
+    writeSetupStepToAddress(next);
+  }, []);
+
+  const account = useOwnerAccountForm({
+    setPendingOrganizationSlug,
+    onOwnerCreated,
+  });
 
   useEffect(() => {
     let cancelled = false;
 
     void resolveOwnerSetupEntry().then((entry) => {
       if (!cancelled) {
-        applyOwnerSetupEntry(entry, { setEmail, setPendingOrganizationSlug, setStep, setPhase });
+        applyOwnerSetupEntry(entry, {
+          setEmail: account.setEmail,
+          setPendingOrganizationSlug,
+          setStep,
+          setPhase,
+        });
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [account.setEmail]);
 
   const goToStep = useCallback(
     (next: OwnerSetupStep) => {
@@ -481,36 +370,6 @@ const OwnerSetup: React.FC = () => {
     },
     [saveSetupProgress],
   );
-
-  // The setup-owner request already saved this step in its transaction,
-  // so advancing after account creation does not persist again.
-  const onOwnerCreated = useCallback((next: OwnerSetupStep) => {
-    setStep(next);
-    writeSetupStepToAddress(next);
-  }, []);
-
-  const handleOwnerSubmit = (e: React.FormEvent) =>
-    handleOwnerFormSubmit(
-      e,
-      { email, firstName, lastName, password, confirmPassword },
-      { setFieldErrors, setError, setLoading, setPendingOrganizationSlug, onOwnerCreated },
-    );
-
-  const finishInstallation = useCallback(() => {
-    if (!pendingOrganizationSlug || closingSetup.current) return;
-    closingSetup.current = true;
-    setIsClosing(true);
-    setCloseError(false);
-    void saveSetupProgress("").then((saved) => {
-      closingSetup.current = false;
-      setIsClosing(false);
-      if (!saved) {
-        setCloseError(true);
-        return;
-      }
-      continueAfterOwnerSetup({ orgSlug: pendingOrganizationSlug, setActiveSurvey, setStep });
-    });
-  }, [pendingOrganizationSlug, saveSetupProgress]);
 
   const fleetStepIndex = activeFleetStep ? FLEET_MANAGER_WIZARD_STEPS.indexOf(activeFleetStep) : -1;
 
@@ -524,7 +383,7 @@ const OwnerSetup: React.FC = () => {
       contentSpacing="compact"
       visual="preview"
       sphere={OWNER_SETUP_PREVIEW}
-      chrome={ownerSetupChrome({ step, email, goToStep })}
+      chrome={ownerSetupChrome({ step, email: account.email, goToStep })}
     >
       {closeError && (
         <div className="mb-6" role="alert" data-testid="owner-setup-close-error">
@@ -536,20 +395,20 @@ const OwnerSetup: React.FC = () => {
       )}
       {step === "owner" && (
         <OwnerStep
-          email={email}
-          firstName={firstName}
-          lastName={lastName}
-          password={password}
-          confirmPassword={confirmPassword}
-          loading={loading}
-          error={error}
-          fieldErrors={fieldErrors}
-          onEmailChange={setEmail}
-          onFirstNameChange={setFirstName}
-          onLastNameChange={setLastName}
-          onPasswordChange={setPassword}
-          onConfirmPasswordChange={setConfirmPassword}
-          onSubmit={handleOwnerSubmit}
+          email={account.email}
+          firstName={account.firstName}
+          lastName={account.lastName}
+          password={account.password}
+          confirmPassword={account.confirmPassword}
+          loading={account.loading}
+          error={account.error}
+          fieldErrors={account.fieldErrors}
+          onEmailChange={account.setEmail}
+          onFirstNameChange={account.setFirstName}
+          onLastNameChange={account.setLastName}
+          onPasswordChange={account.setPassword}
+          onConfirmPasswordChange={account.setConfirmPassword}
+          onSubmit={account.handleOwnerSubmit}
         />
       )}
 
