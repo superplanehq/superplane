@@ -25,7 +25,7 @@ trap 'rm -f "${inspect_error}"' EXIT
 if docker buildx imagetools inspect --raw "${IMAGE}" >/dev/null 2>"${inspect_error}"; then
   echo "* Reusing existing image index ${IMAGE}"
 elif grep -Eqi 'manifest unknown|name unknown|not found' "${inspect_error}"; then
-  docker buildx imagetools create --tag "${IMAGE}" "${SOURCES[@]}"
+  docker buildx imagetools create --progress=plain --tag "${IMAGE}" "${SOURCES[@]}"
 else
   echo "Error: could not determine whether ${IMAGE} exists" >&2
   cat "${inspect_error}" >&2
@@ -35,7 +35,10 @@ fi
 bash "${SCRIPT_DIR}/verify-image.sh" \
   "${IMAGE}" "${VERSION}" "${SOURCE_SHA}" "${SOURCES[@]}"
 
-digest="$(docker buildx imagetools inspect "${IMAGE}" | awk '$1 == "Digest:" {print $2; exit}')"
+# Read the full inspect output before selecting the digest. An early awk
+# exit closes the pipe, and pipefail then stops the publish with no message.
+inspect_output="$(docker buildx imagetools inspect "${IMAGE}")"
+digest="$(printf '%s\n' "${inspect_output}" | awk '$1 == "Digest:" {print $2; exit}')"
 if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
   echo "Error: could not read the published image digest" >&2
   exit 1
