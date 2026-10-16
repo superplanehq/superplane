@@ -20,7 +20,8 @@ import (
 
 const (
 	defaultStableRunnerVersion       = "v0.1.0"
-	defaultStableFleetManagerVersion = "v0.1.0"
+	defaultStableFleetManagerVersion = "v0.1.4"
+	fleetManagerReleaseTagPrefix     = "fleet-manager/"
 	fleetManagerChartRepository      = "oci://ghcr.io/superplanehq/fleet-manager-chart"
 	fleetManagerImageRepository      = "ghcr.io/superplanehq/fleet-manager"
 	runnerReleaseURLTemplate         = "https://github.com/superplanehq/superplane/releases/download/runner%2F{version}"
@@ -30,6 +31,7 @@ const (
 	maximumRunnerTagPages            = 10
 	runnerReleaseTagPrefix           = "runner/"
 	runnerTagRefPrefix               = "refs/tags/" + runnerReleaseTagPrefix
+	fleetManagerTagRefPrefix         = "refs/tags/" + fleetManagerReleaseTagPrefix
 	runnerTagPageSize                = 100
 )
 
@@ -43,6 +45,13 @@ var (
 	cachedRunnerReleaseOK        bool
 	cachedRunnerReleaseFailedAt  time.Time
 	cachedRunnerReleaseFailure   error
+
+	fleetManagerReleaseCacheMu        sync.Mutex
+	cachedFleetManagerVersions        []string
+	cachedFleetManagerFetchedAt       time.Time
+	cachedFleetManagerOK              bool
+	cachedFleetManagerReleaseFailedAt time.Time
+	cachedFleetManagerReleaseFailure  error
 )
 
 type githubRunnerRelease struct {
@@ -107,10 +116,10 @@ func (s *Server) adminGetFleetManagerSetup(w http.ResponseWriter, _ *http.Reques
 	}
 
 	runnerVersion := configuredVersion("RUNNER_STABLE_VERSION", defaultStableRunnerVersion)
-	fleetManagerVersion := configuredVersion(
+	fleetManagerVersion := installationFleetManagerVersion(configuredVersion(
 		"FLEET_MANAGER_STABLE_VERSION",
 		defaultStableFleetManagerVersion,
-	)
+	))
 	defaults := models.DefaultInstallationRunnerFleets(runnerVersion)
 	presets := make([]fleetManagerFleetPreset, 0, len(defaults))
 	for _, fleet := range defaults {
@@ -193,6 +202,118 @@ func runnerVersionsForSetup(stableVersion string) (string, []string) {
 		return stableVersion, configured
 	}
 	return installationRunnerVersion(stableVersion, published), mergeRunnerVersions(configured, published)
+}
+
+func installationFleetManagerVersion(configured string) string {
+	published, err := publishedFleetManagerVersions()
+	if err != nil || len(published) == 0 {
+		return configured
+	}
+	return installationRunnerVersion(configured, published)
+}
+
+func publishedFleetManagerVersions() ([]string, error) {
+	fleetManagerReleaseCacheMu.Lock()
+	if cachedFleetManagerOK && time.Since(cachedFleetManagerFetchedAt) < runnerReleaseCacheTTL {
+		versions := append([]string(nil), cachedFleetManagerVersions...)
+		fleetManagerReleaseCacheMu.Unlock()
+		return versions, nil
+	}
+	if cachedFleetManagerReleaseFailure != nil && time.Since(cachedFleetManagerReleaseFailedAt) < runnerReleaseFailureBackoff {
+		err := cachedFleetManagerReleaseFailure
+		fleetManagerReleaseCacheMu.Unlock()
+		return nil, err
+	}
+	fleetManagerReleaseCacheMu.Unlock()
+
+	versions, err := fetchPublishedFleetManagerVersions()
+	fleetManagerReleaseCacheMu.Lock()
+	defer fleetManagerReleaseCacheMu.Unlock()
+	if err != nil {
+		if cachedFleetManagerOK {
+			cachedFleetManagerFetchedAt = time.Now()
+			return append([]string(nil), cachedFleetManagerVersions...), nil
+		}
+		cachedFleetManagerReleaseFailure = err
+		cachedFleetManagerReleaseFailedAt = time.Now()
+		return nil, err
+	}
+	cachedFleetManagerVersions = append([]string(nil), versions...)
+	cachedFleetManagerFetchedAt = time.Now()
+	cachedFleetManagerOK = true
+	cachedFleetManagerReleaseFailure = nil
+	cachedFleetManagerReleaseFailedAt = time.Time{}
+	return versions, nil
+}
+
+func fetchPublishedFleetManagerVersions() ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), runnerReleaseLookupTimeout)
+	defer cancel()
+
+	client := &http.Client{Timeout: runnerReleaseLookupTimeout}
+	candidates, err := listStableTagVersions(ctx, client, fleetManagerReleaseTagPrefix, fleetManagerTagRefPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	published := make([]string, 0, len(candidates))
+	for _, version := range candidates {
+		release, found, err := fetchRunnerReleaseByTag(ctx, client, fleetManagerReleaseTagPrefix+version)
+		if err != nil {
+			return nil, err
+		}
+		if !found || release.Draft || release.Prerelease {
+			continue
+		}
+		confirmed, ok := strings.CutPrefix(release.TagName, fleetManagerReleaseTagPrefix)
+		if !ok || !stableRunnerVersionPattern.MatchString(confirmed) || confirmed != version {
+			continue
+		}
+		published = append(published, version)
+	}
+	return published, nil
+}
+
+func listStableTagVersions(ctx context.Context, client *http.Client, tagPrefix, refPrefix string) ([]string, error) {
+	nextURL := runnerReleaseAPIBase + "/git/matching-refs/tags/" + tagPrefix + "?per_page=" + fmt.Sprint(runnerTagPageSize)
+	seen := map[string]struct{}{}
+	versions := make([]string, 0)
+
+	for page := 0; page < maximumRunnerTagPages && nextURL != ""; page++ {
+		refs, nextPageURL, err := fetchRunnerTagPage(ctx, client, nextURL)
+		if err != nil {
+			return nil, err
+		}
+		for _, ref := range refs {
+			version, ok := strings.CutPrefix(ref.Ref, refPrefix)
+			if !ok || !stableRunnerVersionPattern.MatchString(version) {
+				continue
+			}
+			if _, exists := seen[version]; exists {
+				continue
+			}
+			seen[version] = struct{}{}
+			versions = append(versions, version)
+		}
+		if nextPageURL == "" {
+			return versions, nil
+		}
+		nextURL = nextPageURL
+	}
+	if nextURL != "" {
+		return nil, fmt.Errorf("tag list for %s exceeded %d pages", tagPrefix, maximumRunnerTagPages)
+	}
+	return versions, nil
+}
+
+func resetFleetManagerReleaseCache() {
+	fleetManagerReleaseCacheMu.Lock()
+	defer fleetManagerReleaseCacheMu.Unlock()
+	cachedFleetManagerVersions = nil
+	cachedFleetManagerFetchedAt = time.Time{}
+	cachedFleetManagerOK = false
+	cachedFleetManagerReleaseFailure = nil
+	cachedFleetManagerReleaseFailedAt = time.Time{}
 }
 
 func installationRunnerVersion(stableVersion string, published []string) string {
