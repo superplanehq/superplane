@@ -5,11 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/models"
@@ -22,19 +25,31 @@ const (
 	fleetManagerImageRepository      = "ghcr.io/superplanehq/fleet-manager"
 	runnerReleaseURLTemplate         = "https://github.com/superplanehq/superplane/releases/download/runner%2F{version}"
 	runnerReleaseLookupTimeout       = 3 * time.Second
-	maximumRunnerReleasePages        = 10
+	runnerReleaseCacheTTL            = 5 * time.Minute
+	maximumRunnerTagPages            = 10
 	runnerReleaseTagPrefix           = "runner/"
+	runnerTagRefPrefix               = "refs/tags/" + runnerReleaseTagPrefix
+	runnerTagPageSize                = 100
 )
 
 var (
-	runnerReleasesURL          = "https://api.github.com/repos/superplanehq/superplane/releases?per_page=100"
-	stableRunnerVersionPattern = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
+	runnerReleaseAPIBase         = "https://api.github.com/repos/superplanehq/superplane"
+	stableRunnerVersionPattern   = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
+	runnerReleaseCacheMu         sync.Mutex
+	runnerReleaseRefreshMu       sync.Mutex
+	cachedRunnerReleaseVersions  []string
+	cachedRunnerReleaseFetchedAt time.Time
+	cachedRunnerReleaseOK        bool
 )
 
 type githubRunnerRelease struct {
 	TagName    string `json:"tag_name"`
 	Draft      bool   `json:"draft"`
 	Prerelease bool   `json:"prerelease"`
+}
+
+type githubMatchingRef struct {
+	Ref string `json:"ref"`
 }
 
 type fleetManagerSetupResponse struct {
@@ -195,21 +210,68 @@ func configuredRunnerVersions(stableVersion string) []string {
 }
 
 func publishedRunnerVersions() ([]string, error) {
+	if versions, ok := freshCachedRunnerVersions(); ok {
+		return versions, nil
+	}
+
+	runnerReleaseRefreshMu.Lock()
+	defer runnerReleaseRefreshMu.Unlock()
+	if versions, ok := freshCachedRunnerVersions(); ok {
+		return versions, nil
+	}
+
+	versions, err := fetchPublishedRunnerVersions()
+	if err != nil {
+		if stale, ok := cachedRunnerVersions(); ok {
+			touchRunnerReleaseCache()
+			return stale, nil
+		}
+		return nil, err
+	}
+	storeCachedRunnerVersions(versions)
+	return versions, nil
+}
+
+func fetchPublishedRunnerVersions() ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), runnerReleaseLookupTimeout)
 	defer cancel()
 
 	client := &http.Client{Timeout: runnerReleaseLookupTimeout}
-	nextURL := runnerReleasesURL
-	seen := map[string]struct{}{}
-	versions := make([]string, 0)
+	candidates, err := listStableRunnerTagVersions(ctx, client)
+	if err != nil {
+		return nil, err
+	}
 
-	for page := 0; page < maximumRunnerReleasePages && nextURL != ""; page++ {
-		releases, nextPageURL, err := fetchRunnerReleasePage(ctx, client, nextURL)
+	published := make([]string, 0, len(candidates))
+	for _, version := range candidates {
+		release, found, err := fetchRunnerReleaseByTag(ctx, client, runnerReleaseTagPrefix+version)
 		if err != nil {
 			return nil, err
 		}
-		for _, release := range releases {
-			version, ok := stableRunnerVersionFromRelease(release)
+		if !found {
+			continue
+		}
+		confirmed, ok := stableRunnerVersionFromRelease(release)
+		if !ok || confirmed != version {
+			continue
+		}
+		published = append(published, version)
+	}
+	return published, nil
+}
+
+func listStableRunnerTagVersions(ctx context.Context, client *http.Client) ([]string, error) {
+	nextURL := runnerTagRefsURL()
+	seen := map[string]struct{}{}
+	versions := make([]string, 0)
+
+	for page := 0; page < maximumRunnerTagPages && nextURL != ""; page++ {
+		refs, nextPageURL, err := fetchRunnerTagPage(ctx, client, nextURL)
+		if err != nil {
+			return nil, err
+		}
+		for _, ref := range refs {
+			version, ok := stableRunnerVersionFromRef(ref.Ref)
 			if !ok {
 				continue
 			}
@@ -219,13 +281,63 @@ func publishedRunnerVersions() ([]string, error) {
 			seen[version] = struct{}{}
 			versions = append(versions, version)
 		}
+		if nextPageURL == "" {
+			return versions, nil
+		}
 		nextURL = nextPageURL
 	}
-
+	if nextURL != "" {
+		return nil, fmt.Errorf("runner tag list exceeded %d pages", maximumRunnerTagPages)
+	}
 	return versions, nil
 }
 
-func fetchRunnerReleasePage(ctx context.Context, client *http.Client, pageURL string) ([]githubRunnerRelease, string, error) {
+func runnerTagRefsURL() string {
+	return runnerReleaseAPIBase + "/git/matching-refs/tags/" + runnerReleaseTagPrefix + "?per_page=" + fmt.Sprint(runnerTagPageSize)
+}
+
+func fetchRunnerTagPage(ctx context.Context, client *http.Client, pageURL string) ([]githubMatchingRef, string, error) {
+	body, nextPageURL, err := fetchGitHubJSON(ctx, client, pageURL)
+	if err != nil {
+		return nil, "", err
+	}
+	var refs []githubMatchingRef
+	if err := json.Unmarshal(body, &refs); err != nil {
+		return nil, "", err
+	}
+	return refs, nextPageURL, nil
+}
+
+func fetchRunnerReleaseByTag(ctx context.Context, client *http.Client, tag string) (githubRunnerRelease, bool, error) {
+	pageURL := runnerReleaseAPIBase + "/releases/tags/" + url.PathEscape(tag)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
+	if err != nil {
+		return githubRunnerRelease{}, false, err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "SuperPlane")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return githubRunnerRelease{}, false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return githubRunnerRelease{}, false, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return githubRunnerRelease{}, false, fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
+
+	var release githubRunnerRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return githubRunnerRelease{}, false, err
+	}
+	return release, true, nil
+}
+
+func fetchGitHubJSON(ctx context.Context, client *http.Client, pageURL string) ([]byte, string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
 	if err != nil {
 		return nil, "", err
@@ -243,11 +355,62 @@ func fetchRunnerReleasePage(ctx context.Context, client *http.Client, pageURL st
 		return nil, "", fmt.Errorf("unexpected status %d", resp.StatusCode)
 	}
 
-	var releases []githubRunnerRelease
-	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return nil, "", err
 	}
-	return releases, nextRunnerReleasePageURL(resp.Header.Get("Link")), nil
+	return body, nextRunnerReleasePageURL(resp.Header.Get("Link")), nil
+}
+
+func freshCachedRunnerVersions() ([]string, bool) {
+	runnerReleaseCacheMu.Lock()
+	defer runnerReleaseCacheMu.Unlock()
+	if !cachedRunnerReleaseOK || time.Since(cachedRunnerReleaseFetchedAt) >= runnerReleaseCacheTTL {
+		return nil, false
+	}
+	return append([]string(nil), cachedRunnerReleaseVersions...), true
+}
+
+func cachedRunnerVersions() ([]string, bool) {
+	runnerReleaseCacheMu.Lock()
+	defer runnerReleaseCacheMu.Unlock()
+	if !cachedRunnerReleaseOK {
+		return nil, false
+	}
+	return append([]string(nil), cachedRunnerReleaseVersions...), true
+}
+
+func storeCachedRunnerVersions(versions []string) {
+	runnerReleaseCacheMu.Lock()
+	defer runnerReleaseCacheMu.Unlock()
+	cachedRunnerReleaseVersions = append([]string(nil), versions...)
+	cachedRunnerReleaseFetchedAt = time.Now()
+	cachedRunnerReleaseOK = true
+}
+
+func touchRunnerReleaseCache() {
+	runnerReleaseCacheMu.Lock()
+	defer runnerReleaseCacheMu.Unlock()
+	if !cachedRunnerReleaseOK {
+		return
+	}
+	cachedRunnerReleaseFetchedAt = time.Now()
+}
+
+func resetRunnerReleaseCache() {
+	runnerReleaseCacheMu.Lock()
+	defer runnerReleaseCacheMu.Unlock()
+	cachedRunnerReleaseVersions = nil
+	cachedRunnerReleaseFetchedAt = time.Time{}
+	cachedRunnerReleaseOK = false
+}
+
+func stableRunnerVersionFromRef(ref string) (string, bool) {
+	version, ok := strings.CutPrefix(ref, runnerTagRefPrefix)
+	if !ok || !stableRunnerVersionPattern.MatchString(version) {
+		return "", false
+	}
+	return version, true
 }
 
 func nextRunnerReleasePageURL(linkHeader string) string {
