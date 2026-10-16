@@ -85,6 +85,22 @@ if grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${forced_off}" | grep -q 'value:
   exit 1
 fi
 
+forced_bool_off="${TMP_DIR}/billing-bool-off.yaml"
+helm template superplane "${CHART_DIR}" \
+  "${common_args[@]}" \
+  --set polar.enabled=true \
+  --set polar.secretName=test-polar \
+  --set billing.enabled=false >"${forced_bool_off}"
+if grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${forced_bool_off}" | grep -q 'value: "yes"'; then
+  echo "operator billing.enabled=false must stay off when Polar is enabled" >&2
+  exit 1
+fi
+bool_off="$(grep -A1 'name: SUPERPLANE_BILLING_ENABLED' "${forced_bool_off}" | grep -c 'value: "no"' || true)"
+if [ "${bool_off}" -lt 3 ]; then
+  echo "expected SUPERPLANE_BILLING_ENABLED=no when billing.enabled is boolean false" >&2
+  exit 1
+fi
+
 runner_manifest="${TMP_DIR}/runner-billing.yaml"
 helm template superplane "${CHART_DIR}" \
   "${common_args[@]}" \

@@ -44,8 +44,8 @@ const EDITABLE_BALANCES: Array<{ bucket: CreditBalanceBucket; label: string; act
 ];
 
 export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
-  const credit = useOrgLLMCredit(orgId);
   const billingProductEnabled = useBillingProductEnabled();
+  const credit = useOrgLLMCredit(orgId, { billingEnabled: billingProductEnabled });
 
   return (
     <div className="mb-8">

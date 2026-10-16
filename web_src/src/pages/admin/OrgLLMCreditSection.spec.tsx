@@ -135,12 +135,14 @@ describe("OrgLLMCreditSection billing plan", () => {
 
   it("hides plan controls when product billing is off", async () => {
     billingProductEnabled = false;
-    mockOrgCreditFetch();
+    const fetchMock = mockOrgCreditFetch({ planStatus: 404 });
     render(<OrgLLMCreditSection orgId="org-1" />);
 
-    expect(await screen.findByText("Hosted credit")).toBeInTheDocument();
+    expect(await screen.findByTestId("admin-org-credit-total-remaining")).toBeInTheDocument();
     expect(screen.queryByTestId("admin-org-billing-plan")).not.toBeInTheDocument();
     expect(screen.queryByTestId("admin-org-billing-plan-save")).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/billing-plan"))).toBe(false);
+    expect(showErrorToast).not.toHaveBeenCalledWith("Failed to load billing plan");
   });
 
   it("disables the plan control when Polar manages billing", async () => {

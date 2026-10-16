@@ -1,4 +1,11 @@
 {{- define "superplane.billingEnabled" -}}
+{{- if kindIs "bool" .Values.billing.enabled -}}
+{{- if .Values.billing.enabled -}}
+yes
+{{- else -}}
+no
+{{- end -}}
+{{- else -}}
 {{- $raw := .Values.billing.enabled | default "" | toString | lower | trim -}}
 {{- if or (eq $raw "yes") (eq $raw "true") -}}
 yes
@@ -8,6 +15,7 @@ no
 yes
 {{- else -}}
 no
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
