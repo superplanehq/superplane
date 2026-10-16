@@ -219,8 +219,8 @@ promotions:
     pipeline_file: release-helm-chart.yml
     deployment_target: ghcr
 
-  - name: Deploy to Production
-    pipeline_file: deploy-to-production.yml
+  - name: Promote
+    pipeline_file: promote.yml
     deployment_target: production
     auto_promote:
       when: "branch = 'main' AND result = 'passed' AND change_in('/', {exclude: ['/docs/**', '/release/terraform/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
