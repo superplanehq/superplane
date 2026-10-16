@@ -38,7 +38,11 @@ raw_digest() {
   sha256sum "${raw_manifest}" | awk '{print "sha256:" $1}'
 }
 
-prepared_digest="$(raw_digest "oci-archive:${OCI_ARCHIVE}")"
+if ! prepared_digest="$(raw_digest "oci-archive:${OCI_ARCHIVE}")"; then
+  echo "Error: could not inspect prepared archive ${OCI_ARCHIVE}" >&2
+  cat "${inspect_error}" >&2
+  exit 1
+fi
 reused=0
 
 if remote_digest="$(raw_digest "docker://${IMAGE}")"; then
@@ -53,7 +57,11 @@ else
   exit 1
 fi
 
-published_digest="$(raw_digest "docker://${IMAGE}")"
+if ! published_digest="$(raw_digest "docker://${IMAGE}")"; then
+  echo "Error: could not inspect published image ${IMAGE}" >&2
+  cat "${inspect_error}" >&2
+  exit 1
+fi
 if [ "${reused}" -eq 0 ] && [ "${published_digest}" != "${prepared_digest}" ]; then
   echo "Error: published digest ${published_digest} does not match ${prepared_digest}" >&2
   exit 1

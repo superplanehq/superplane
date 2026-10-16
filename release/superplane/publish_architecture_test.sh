@@ -24,8 +24,20 @@ if [ "$1" = inspect ] && [ "$2" = --raw ]; then
     reference="${argument}"
   done
   if [[ "${reference}" == oci-archive:* ]]; then
+    if [ "${TEST_MODE}" = inspect-fail ]; then
+      echo 'archive is corrupt' >&2
+      exit 1
+    fi
     cat "${TEST_ARCHIVE}"
     exit 0
+  fi
+  if [ "${TEST_MODE}" = publish-inspect-fail ]; then
+    if [ -f "${TEST_PUBLISHED}" ]; then
+      echo 'registry unavailable' >&2
+      exit 1
+    fi
+    echo 'manifest unknown' >&2
+    exit 1
   fi
   if [ "${TEST_MODE}" = collision ]; then
     printf 'different\n'
@@ -68,6 +80,25 @@ TEST_MODE=collision PATH="${TMP_DIR}/bin:${PATH}" \
   bash "${SCRIPT_DIR}/publish-architecture.sh" v1.2.3 amd64 "${TEST_ARCHIVE}" \
   >"${TMP_DIR}/digest"
 grep -Fx "${different_digest}" "${TMP_DIR}/digest" >/dev/null
+test "$(wc -l <"${TEST_COPY_LOG}")" -eq 1
+
+if TEST_MODE=inspect-fail PATH="${TMP_DIR}/bin:${PATH}" \
+  bash "${SCRIPT_DIR}/publish-architecture.sh" v1.2.3 amd64 "${TEST_ARCHIVE}" \
+  >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr"; then
+  echo "A failed archive inspection must fail" >&2
+  exit 1
+fi
+grep -q 'archive is corrupt' "${TMP_DIR}/stderr"
+
+: >"${TEST_COPY_LOG}"
+rm -f "${TEST_PUBLISHED}"
+if TEST_MODE=publish-inspect-fail PATH="${TMP_DIR}/bin:${PATH}" \
+  bash "${SCRIPT_DIR}/publish-architecture.sh" v1.2.3 amd64 "${TEST_ARCHIVE}" \
+  >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr"; then
+  echo "A failed published-image inspection must fail" >&2
+  exit 1
+fi
+grep -q 'registry unavailable' "${TMP_DIR}/stderr"
 test "$(wc -l <"${TEST_COPY_LOG}")" -eq 1
 
 echo "SuperPlane architecture publication tests passed."
