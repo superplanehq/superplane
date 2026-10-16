@@ -101,9 +101,9 @@ domain_name       = "superplane.example.com"
 static_ip_name    = "superplane-ip"
 letsencrypt_email = "admin@example.com"
 
-# Required. Confirm both artifacts exist before you apply.
-superplane_image_tag     = "<commit-sha>-selfhosted"
-superplane_chart_version = "0.0.0-<commit-sha>"
+# Confirm the release exists before you apply.
+superplane_image_tag     = ""
+superplane_chart_version = "1.0.0"
 
 enable_gcs_blob_storage = true
 enable_runners          = true
@@ -117,24 +117,23 @@ type. The API, the runner API, and the runner workers share one log disk.
 They must run on one node. `e2-medium` does not have enough CPU for that
 node. The Helm release then fails at the timeout.
 
-Select a `main` commit that published both artifacts. The image and the
-chart can use different SHAs. Confirm them:
+Select a published stable or release-candidate version. Confirm the image and
+chart before you apply:
 
 ```bash
-export APP_SHA=<commit-sha>
-export CHART_SHA=<commit-sha>
+export SUPERPLANE_VERSION=v1.0.0
 
-docker manifest inspect ghcr.io/superplanehq/superplane:${APP_SHA}-selfhosted
-helm show chart oci://ghcr.io/superplanehq/superplane-chart --version 0.0.0-${CHART_SHA}
+docker manifest inspect ghcr.io/superplanehq/superplane:${SUPERPLANE_VERSION}
+helm show chart oci://ghcr.io/superplanehq/superplane-chart --version "${SUPERPLANE_VERSION#v}"
 ```
 
-The plain `<commit-sha>` and `stable` images load JS and CSS from
-`assets.superplane.com`. That host allows only `app.superplane.com`.
-The UI then fails on your domain.
+Leave `superplane_image_tag` empty. The chart appVersion selects the matching
+versioned image. Legacy self-hosted tags remain valid as explicit overrides.
 
 If the chart is not published yet, set `superplane_chart_path` to
 `../../superplane-helm-chart/helm` and leave `superplane_chart_version`
-empty.
+empty. Also set `superplane_image_tag`. The checked-in chart appVersion
+is a placeholder, not a published image.
 
 With `enable_gcs_blob_storage = false`, SuperPlane stores blobs on pod
 volumes. Each pod has its own volume, and the data is lost when a pod restarts.
@@ -305,12 +304,12 @@ must stop and Fleet Manager must delete it after the task.
 | --- | --- | --- |
 | `superplane_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the SuperPlane image. |
 | `fleet_manager_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the standalone Fleet Manager image. Set this for private GCP registries so nodes keep pull access. |
-| `superplane_image_tag` | required | Image tag. Must contain `selfhosted`. Published tags are `<git-sha>-selfhosted`. |
+| `superplane_image_tag` | empty | Image tag override. Empty uses the chart appVersion. A local chart requires an explicit tag. Versioned, legacy self-hosted, and local tags are supported. |
 | `enable_gcs_blob_storage` | `false` | Store blobs in GCS. Set this to `true` in `terraform.tfvars` for a new install. |
 | `blob_bucket_name` | `<project_id>-superplane-blobs` | Name of the blob bucket. |
 | `blob_bucket_force_destroy` | `false` | Delete the bucket objects on destroy. |
 | `superplane_chart_path` | empty | Path to a local chart. Empty installs the published chart. |
-| `superplane_chart_version` | empty | Version of the published chart, for example `0.0.0-<commit-sha>`. Required when `superplane_chart_path` is empty. |
+| `superplane_chart_version` | empty | Published chart version, for example `1.0.0` or `1.0.0-rc1`. Required when `superplane_chart_path` is empty. |
 | `enable_runners` | `false` | Enable the runner API and create the runner network. Set this to `true` in `terraform.tfvars` for a new install. |
 | `runner_subnet_cidr` | `172.20.0.0/24` | Range of the runner subnetwork. |
 | `runner_zones` | `[zone]` | Zones for runner VMs. |
@@ -320,9 +319,8 @@ type. For example, T2A machines are not available in all zones.
 
 ## Troubleshooting
 
-**The UI loads HTML but scripts fail CORS.** The image tag is not a
-self-hosted tag. Set `superplane_image_tag` to `<commit-sha>-selfhosted`
-and apply again. Hard-refresh the browser.
+**The UI loads HTML but scripts fail CORS.** Use a versioned release image or
+a legacy self-hosted image. Apply again, then hard-refresh the browser.
 
 **The API or the runner workers stay `Pending`.** The node does not have
 enough CPU. Those pods share one log disk, so they must run on one node.

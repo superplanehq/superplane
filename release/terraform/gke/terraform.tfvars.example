@@ -61,8 +61,8 @@ letsencrypt_email = "admin@example.com"
 # Set this when the standalone Fleet Manager image is in a private GCP registry.
 # fleet_manager_image_registry = "ghcr.io/superplanehq"
 
-# Required. The plain SHA and stable images fail CORS on your domain.
-superplane_image_tag = "<git-sha>-selfhosted"
+# Optional. Empty uses the image version in the published chart.
+superplane_image_tag = ""
 
 # Set both before the first apply. The variable defaults stay false so an
 # existing install that omitted them keeps local blob files.
@@ -71,7 +71,7 @@ enable_runners          = true
 
 # Required unless you set superplane_chart_path. Terraform downloads published
 # charts from oci://ghcr.io/superplanehq/superplane-chart.
-superplane_chart_version = "0.0.0-<git-sha>"
+superplane_chart_version = "1.0.0"
 
 # Install the chart from this repository to test changes that are not published.
 # superplane_chart_path = "../../superplane-helm-chart/helm"

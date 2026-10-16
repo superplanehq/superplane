@@ -123,6 +123,11 @@ resource "helm_release" "superplane" {
       condition     = local.superplane_chart_local || var.superplane_chart_version != ""
       error_message = "Set superplane_chart_version or superplane_chart_path. An empty version installs the latest published chart, which may lack GKE ACME and migrate fixes."
     }
+
+    precondition {
+      condition     = !local.superplane_chart_local || var.superplane_image_tag != ""
+      error_message = "With a local chart (superplane_chart_path), set superplane_image_tag. The local Chart.yaml appVersion (0.1.0) is a placeholder, not a published image."
+    }
   }
 
   values = compact([
@@ -178,9 +183,12 @@ resource "helm_release" "superplane" {
     value = "superplane"
   }
 
-  set {
-    name  = "image.tag"
-    value = var.superplane_image_tag
+  dynamic "set" {
+    for_each = var.superplane_image_tag == "" ? [] : [var.superplane_image_tag]
+    content {
+      name  = "image.tag"
+      value = set.value
+    }
   }
 
   set {
