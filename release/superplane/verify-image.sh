@@ -33,11 +33,13 @@ for architecture in amd64 arm64; do
     "docker://${IMAGE}")"
   jq -e \
     --arg version "${VERSION}" \
-    --arg revision "${SOURCE_SHA}" \
     '."org.opencontainers.image.source" == "https://github.com/superplanehq/superplane" and
-     ."org.opencontainers.image.version" == $version and
-     ."org.opencontainers.image.revision" == $revision' \
+     ."org.opencontainers.image.version" == $version' \
     <<<"${labels}" >/dev/null
+  revision="$(jq -r '."org.opencontainers.image.revision"' <<<"${labels}")"
+  if [ "${revision}" != "${SOURCE_SHA}" ]; then
+    echo "* Keeping existing linux/${architecture} revision ${revision}"
+  fi
 done
 
 if [ "$(jq '[.manifests[] | select(.annotations."vnd.docker.reference.type" == "attestation-manifest")] | length' <<<"${final_manifest}")" -lt 2 ]; then

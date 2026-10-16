@@ -63,10 +63,11 @@ TEST_MODE=matching PATH="${TMP_DIR}/bin:${PATH}" \
   bash "${SCRIPT_DIR}/publish-architecture.sh" v1.2.3 amd64 "${TEST_ARCHIVE}" >/dev/null
 test "$(wc -l <"${TEST_COPY_LOG}")" -eq 1
 
-if TEST_MODE=collision PATH="${TMP_DIR}/bin:${PATH}" \
-  bash "${SCRIPT_DIR}/publish-architecture.sh" v1.2.3 amd64 "${TEST_ARCHIVE}" >/dev/null 2>&1; then
-  echo "A conflicting architecture image must fail" >&2
-  exit 1
-fi
+different_digest="sha256:$(printf 'different\n' | sha256sum | awk '{print $1}')"
+TEST_MODE=collision PATH="${TMP_DIR}/bin:${PATH}" \
+  bash "${SCRIPT_DIR}/publish-architecture.sh" v1.2.3 amd64 "${TEST_ARCHIVE}" \
+  >"${TMP_DIR}/digest"
+grep -Fx "${different_digest}" "${TMP_DIR}/digest" >/dev/null
+test "$(wc -l <"${TEST_COPY_LOG}")" -eq 1
 
 echo "SuperPlane architecture publication tests passed."

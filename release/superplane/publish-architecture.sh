@@ -39,13 +39,11 @@ raw_digest() {
 }
 
 prepared_digest="$(raw_digest "oci-archive:${OCI_ARCHIVE}")"
+reused=0
 
 if remote_digest="$(raw_digest "docker://${IMAGE}")"; then
-  if [ "${remote_digest}" != "${prepared_digest}" ]; then
-    echo "Error: ${IMAGE} already points to ${remote_digest}, not ${prepared_digest}" >&2
-    exit 1
-  fi
-  echo "* Reusing matching image ${IMAGE}@${remote_digest}"
+  echo "* Reusing existing image ${IMAGE}@${remote_digest}"
+  reused=1
 elif grep -Eqi 'manifest unknown|name unknown|not found' "${inspect_error}"; then
   echo "* Publishing new image ${IMAGE}"
   "${SKOPEO[@]}" copy --all "oci-archive:${OCI_ARCHIVE}" "docker://${IMAGE}"
@@ -56,7 +54,7 @@ else
 fi
 
 published_digest="$(raw_digest "docker://${IMAGE}")"
-if [ "${published_digest}" != "${prepared_digest}" ]; then
+if [ "${reused}" -eq 0 ] && [ "${published_digest}" != "${prepared_digest}" ]; then
   echo "Error: published digest ${published_digest} does not match ${prepared_digest}" >&2
   exit 1
 fi
