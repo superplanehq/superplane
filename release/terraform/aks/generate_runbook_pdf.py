@@ -445,7 +445,43 @@ kubectl get certificate -n superplane""",
     story.append(Paragraph("9. Optional Azure runner VMs", s["h1"]))
     story.append(
         Paragraph(
-            "Terraform already creates the gallery, runner subnet, NSG, and identities. Packer publishes Ubuntu images into the gallery. Fleet Manager then creates one VM per runner.",
+            "Use the SuperPlane community gallery for the runner image.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "The default linux/amd64 image is /CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-amd64/Versions/1.14623.0.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "The image version has the form 1.<build>.0.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "That number is independent of the runner version.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "Apply Terraform. Run the Helm commands from the wizard.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "The Fleet Manager default VM size is Standard_D2ds_v4 for linux/amd64. For linux/arm64, set vmSize to Standard_D2pds_v6.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "The commands below publish an image into the customer gallery. Add -var trusted_launch=false for a community gallery image.",
             s["body"],
         )
     )
@@ -457,12 +493,6 @@ packer build -var-file=release/runner/packer/azure/runner.pkrvars.hcl \\
   -var image_name=superplane-runner-amd64 -var image_version=1.0.0 \\
   release/runner/packer/azure/runner.pkr.hcl""",
             s,
-        )
-    )
-    story.append(
-        Paragraph(
-            "Set runner_image_amd64 or runner_image_arm64 to the immutable gallery image-version resource ID and apply Terraform. Open Set up runner fleets in SuperPlane. Select the fleets, then run the generated Helm heredoc. The standalone chart creates fleet-manager-config with the complete configuration.",
-            s["body"],
         )
     )
 
