@@ -64,7 +64,7 @@ func (i *OnIssue) Documentation() string {
 - **Label filter**: Optional. Include starts a run when the issue has one of the labels. Exclude starts a run when the issue has none of those labels.
 - **Assignment**: Optional. Start a run only for assigned issues, only for unassigned issues, or for any assignment.
 - **Author is a repository collaborator**: Optional. Start a run only when the author can access the repository.
-- **The configured label is added to the issue**: Optional. For a labeled event, start a run only when the configured label, or "superplane" when none is set, is added to an open issue. With the label filter set to include, adding any listed label counts.
+- **The configured label is added to the issue**: Optional. For a labeled event, start a run only when the configured label, or "superplane" when none is set, is added to an open issue. Only an include label filter replaces the default: adding any listed label counts. With an exclude filter, the default label is still required.
 
 ## Event Data
 
@@ -192,7 +192,7 @@ func (i *OnIssue) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
 			Default:     false,
-			Description: "For a labeled event, start a run only when the configured label, or superplane when none is set, is added to an open issue.",
+			Description: "For a labeled event, start a run only when the label is added to an open issue. With an include label filter, any listed label counts. Otherwise, the label is superplane.",
 		},
 	}
 }
