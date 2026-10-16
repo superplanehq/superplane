@@ -74,7 +74,11 @@ letsencrypt_email = "admin@example.com"
 # postgres_subnet_cidr  = "10.0.16.0/24"
 # runner_subnet_cidr    = "10.0.17.0/24"
 # runner_zones          = ["1", "2"]
-# runner_image_amd64    = "/subscriptions/.../galleries/.../images/runner-amd64/versions/1.0.0"
-# runner_image_arm64    = "/subscriptions/.../galleries/.../images/runner-arm64/versions/1.0.0"
+# The defaults already use the public community gallery images.
+# runner_image_amd64 = "/CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-amd64/Versions/1.14623.0"
+# runner_image_arm64 = "/CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-arm64/Versions/1.14623.0"
+# A customer gallery version ID from the development Packer path also works.
+# runner_image_amd64 = "/subscriptions/.../galleries/.../images/runner-amd64/versions/1.0.0"
+# runner_image_arm64 = "/subscriptions/.../galleries/.../images/runner-arm64/versions/1.0.0"
 # aks_service_cidr      = "172.16.0.0/16"
 # aks_dns_service_ip    = "172.16.0.10"
