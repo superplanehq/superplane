@@ -8,6 +8,7 @@ import {
   fleetImage,
   fleetsMatchConfiguration,
   generateFleetManagerValues,
+  installationRunnerVersion,
   loadFleetManagerDraft,
   mergeTerraformInfrastructure,
   normalizeInfrastructureFields,
@@ -38,7 +39,7 @@ function defaultDraft(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
     namespace: defaults.namespace || "superplane",
     serviceAccountName: defaults.serviceAccountName || "superplane-fleet-manager",
     superplaneUrl: superplaneUrl || window.location.origin,
-    runnerVersion: metadata.defaultRunnerVersion,
+    runnerVersion: installationRunnerVersion(metadata),
     selectedFleetIds: firstAvailableFleet ? [firstAvailableFleet.id] : [],
     fleetCapacities: Object.fromEntries(
       metadata.fleetPresets.map((preset) => [preset.id, { ...DEFAULT_FLEET_CAPACITY }]),
@@ -60,16 +61,22 @@ function withRecommendedMachineTypes(
 }
 
 function draftFromMetadata(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
-  metadata.runnerVersions = metadata.runnerVersions?.length ? metadata.runnerVersions : [metadata.defaultRunnerVersion];
+  metadata.runnerVersions = metadata.runnerVersions?.length
+    ? metadata.runnerVersions
+    : metadata.defaultRunnerVersion
+      ? [metadata.defaultRunnerVersion]
+      : [];
   const restoredDraft = loadFleetManagerDraft();
-  if (!restoredDraft) return defaultDraft(metadata);
-  return mergeTerraformInfrastructure(
-    {
-      ...restoredDraft,
-      fields: withRecommendedMachineTypes(restoredDraft.fields, restoredDraft.provider, metadata),
-    },
-    metadata,
-  );
+  const draft = restoredDraft
+    ? mergeTerraformInfrastructure(
+        {
+          ...restoredDraft,
+          fields: withRecommendedMachineTypes(restoredDraft.fields, restoredDraft.provider, metadata),
+        },
+        metadata,
+      )
+    : defaultDraft(metadata);
+  return { ...draft, runnerVersion: installationRunnerVersion(metadata) };
 }
 
 function draftForProvider(
@@ -102,7 +109,7 @@ function missingImageErrors(draft: FleetManagerDraft, metadata: FleetManagerSetu
 
 function fleetSelectionErrors(draft: FleetManagerDraft | null, metadata: FleetManagerSetupMetadata | null): string[] {
   if (!draft) return [];
-  const errors = validateFleetSelection(draft);
+  const errors = validateFleetSelection({ ...draft, runnerVersions: metadata?.runnerVersions ?? [] });
   if (!metadata) return errors;
   return [...errors, ...missingImageErrors(draft, metadata), ...terraformInstallPlaceholders(draft, metadata)];
 }
@@ -262,7 +269,6 @@ export function useFleetManagerSetup(enabled = true, organizationId = "") {
     setNamespace: (value: string) => updateDraft((current) => ({ ...current, namespace: value })),
     setServiceAccountName: (value: string) => updateDraft((current) => ({ ...current, serviceAccountName: value })),
     setSuperplaneUrl: (value: string) => updateDraft((current) => ({ ...current, superplaneUrl: value })),
-    setRunnerVersion: (value: string) => updateDraft((current) => ({ ...current, runnerVersion: value })),
   };
 }
 
