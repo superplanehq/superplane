@@ -109,17 +109,15 @@ export function resolveOnboardingAgent(args: {
   customModels?: string[];
   defaultHostedProvider?: string;
   defaultHostedModel?: string;
-  /** When set, a connected provider key is used before the hosted model. */
+  /** Require a connected provider key instead of falling back to hosted models. */
   preferOwnKey?: boolean;
 }): OnboardingAgentPlan | undefined {
   if (args.preferOwnKey) {
-    const ownKey = connectedProviderPlan(args);
-    if (ownKey) return ownKey;
+    return connectedProviderPlan(args);
   }
 
   const hosted = hostedSuperPlanePlan(args);
   if (hosted) return hosted;
-  if (args.preferOwnKey) return undefined;
 
   return connectedProviderPlan(args);
 }
@@ -157,10 +155,6 @@ function hostedSuperPlanePlan(args: {
     model: "",
     planningModel: "",
   };
-}
-
-export function hostedModelsQueriesLoading(needHosted: boolean, queries: Array<{ isFetched: boolean }>): boolean {
-  return needHosted && queries.some((query) => !query.isFetched);
 }
 
 /**

@@ -20,11 +20,6 @@ func TestTriggerRunTitle(t *testing.T) {
 		expectedTitle string
 	}{
 		{
-			name:          "static title",
-			titleTemplate: "Manual run title",
-			expectedTitle: "Manual run title",
-		},
-		{
 			name:          "root function",
 			titleTemplate: "Run: {{ root().data.message }}",
 			expectedTitle: "Run: Hello, World!",

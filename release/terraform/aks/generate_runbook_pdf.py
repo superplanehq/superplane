@@ -430,7 +430,7 @@ kubectl get svc -n ingress-nginx ingress-nginx-controller \\
     )
     story.append(
         Paragraph(
-            "Complete owner setup. The SuperPlane chart provisions the dedicated Fleet Manager service-token Secret in Kubernetes.",
+            "Complete owner setup. SuperPlane creates a personal token when you generate the Fleet Manager install command.",
             s["body"],
         )
     )
@@ -445,7 +445,43 @@ kubectl get certificate -n superplane""",
     story.append(Paragraph("9. Optional Azure runner VMs", s["h1"]))
     story.append(
         Paragraph(
-            "Terraform already creates the gallery, runner subnet, NSG, and identities. Packer publishes Ubuntu images into the gallery. Fleet Manager then creates one VM per runner.",
+            "Use the SuperPlane community gallery for the runner image.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "The default linux/amd64 image is /CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-amd64/Versions/1.14623.0.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "The image version has the form 1.&lt;build&gt;.0.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "That number is independent of the runner version.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "Apply Terraform. Run the Helm commands from the wizard.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "The Fleet Manager default VM size is Standard_D2ds_v4 for linux/amd64. For linux/arm64, set vmSize to Standard_D2pds_v6.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "The commands below publish an image into the customer gallery. Add -var trusted_launch=false for a community gallery image.",
             s["body"],
         )
     )
@@ -461,7 +497,19 @@ packer build -var-file=release/runner/packer/azure/runner.pkrvars.hcl \\
     )
     story.append(
         Paragraph(
-            "Open Set up runner fleets in SuperPlane. The wizard preloads the Terraform outputs. Replace the Azure image placeholder with the immutable gallery image version, confirm that the dedicated Secret exists, and install the standalone Fleet Manager chart.",
+            "runner_image_amd64 and runner_image_arm64 default to the public images.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "Set runner_image_amd64 or runner_image_arm64 to the image version resource ID from that build.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "Apply Terraform. Run the Helm commands from the wizard.",
             s["body"],
         )
     )

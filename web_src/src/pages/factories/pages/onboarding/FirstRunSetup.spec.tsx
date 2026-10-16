@@ -129,6 +129,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     agentCredentialChoice: null,
     setAgentCredentialChoice: vi.fn(),
     agentLoading: false,
+    agentModelPicker: undefined,
     openSection: "vcs",
     setOpenSection: vi.fn(),
     requestConnect: vi.fn(),
@@ -140,6 +141,7 @@ function pageModel(overrides: Partial<OnboardingPageModel> = {}): OnboardingPage
     canConfigureWorkspace: true,
     saving: false,
     saveName: vi.fn().mockResolvedValue(true),
+    saveAgent: vi.fn().mockResolvedValue(true),
     saveIssues: vi.fn().mockResolvedValue(true),
     finish: vi.fn(),
     provisionedDestination: null,
@@ -407,6 +409,28 @@ describe("FirstRunSetup GitHub catalog", () => {
       renderSetup(pageModel(), setupPath);
 
       expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+      expect(screen.getByTestId("first-run-get-started")).toBeInTheDocument();
+    });
+
+    it("keeps loading until GitHub access is known", () => {
+      github.isPending = true;
+      github.data.providerConfigured = false;
+      github.data.accountConnectionRequired = false;
+      renderSetup(pageModel(), setupPath);
+
+      expect(screen.getByRole("status")).toHaveTextContent(FIRST_RUN_COPY.connect.loadingAccounts);
+      expect(screen.queryByTestId("first-run-welcome")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("first-run-get-started")).not.toBeInTheDocument();
+    });
+
+    it("opens organization selection when the installation GitHub App does not require sign-in", () => {
+      github.data.providerConfigured = true;
+      github.data.accountConnectionRequired = false;
+      renderSetup(pageModel(), setupPath);
+
+      expect(screen.getByText(FIRST_RUN_COPY.choose.organizationHeadline)).toBeInTheDocument();
+      expect(screen.queryByTestId("first-run-welcome")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("first-run-get-started")).not.toBeInTheDocument();
     });
 
     it("opens the welcome screen when the GitHub identity only comes from sign-in", () => {

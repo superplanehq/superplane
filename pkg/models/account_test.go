@@ -21,15 +21,13 @@ func TestFindAccountByProvider(t *testing.T) {
 		require.NoError(t, err)
 
 		provider := &AccountProvider{
-			AccountID:    account.ID,
-			Provider:     "github",
-			ProviderID:   "12345",
-			Username:     "testuser",
-			Email:        account.Email,
-			Name:         account.Name,
-			AvatarURL:    "https://github.com/testuser.png",
-			AccessToken:  "token123",
-			RefreshToken: "refresh123",
+			AccountID:  account.ID,
+			Provider:   "github",
+			ProviderID: "12345",
+			Username:   "testuser",
+			Email:      account.Email,
+			Name:       account.Name,
+			AvatarURL:  "https://github.com/testuser.png",
 		}
 		err = database.Conn().Create(provider).Error
 		require.NoError(t, err)
@@ -82,13 +80,12 @@ func TestFindAccountByProvider(t *testing.T) {
 		require.NoError(t, err)
 
 		provider := &AccountProvider{
-			AccountID:   deletedAccount.ID,
-			Provider:    "google",
-			ProviderID:  "67890",
-			Username:    "deleteduser",
-			Email:       deletedAccount.Email,
-			Name:        deletedAccount.Name,
-			AccessToken: "token456",
+			AccountID:  deletedAccount.ID,
+			Provider:   "google",
+			ProviderID: "67890",
+			Username:   "deleteduser",
+			Email:      deletedAccount.Email,
+			Name:       deletedAccount.Name,
 		}
 		err = database.Conn().Create(provider).Error
 		require.NoError(t, err)

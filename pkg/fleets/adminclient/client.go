@@ -75,6 +75,22 @@ func (c *Client) DescribeFleet(ctx context.Context, fleetID string) (Fleet, erro
 	return response.Fleet, err
 }
 
+func (c *Client) CreateFleet(ctx context.Context, request CreateFleetRequest) (Fleet, error) {
+	var response struct {
+		Fleet Fleet `json:"fleet"`
+	}
+	err := c.doWithRetry(ctx, http.MethodPost, "/admin/api/installation/fleets", request, &response)
+	return response.Fleet, err
+}
+
+func (c *Client) UpdateFleet(ctx context.Context, fleetID string, request UpdateFleetRequest) (Fleet, error) {
+	var response struct {
+		Fleet Fleet `json:"fleet"`
+	}
+	err := c.doWithRetry(ctx, http.MethodPatch, fleetPath(fleetID), request, &response)
+	return response.Fleet, err
+}
+
 func (c *Client) GetFleetCapacity(
 	ctx context.Context,
 	fleetID, generation string,
@@ -206,6 +222,22 @@ func (c *Client) do(
 		return fmt.Errorf("decode admin API response: %w", err)
 	}
 	return nil
+}
+
+func (c *Client) doWithRetry(
+	ctx context.Context,
+	method, path string,
+	requestBody any,
+	responseBody any,
+) error {
+	var err error
+	for attempt := 0; attempt < 2; attempt++ {
+		err = c.do(ctx, method, path, nil, requestBody, responseBody)
+		if err == nil || !retryable(err) || ctx.Err() != nil {
+			return err
+		}
+	}
+	return err
 }
 
 func fleetPath(fleetID string) string {

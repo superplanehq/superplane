@@ -163,11 +163,7 @@ export async function provisionWorkspace(args: {
   const subscription = args.agentPlan.credentialsSource === "subscription";
   await args.updateOnboarding({
     vcsIntegrationId: args.vcs.id,
-    ...(subscription
-      ? { agentIntegrationId: "" }
-      : args.agentIntegrationId
-        ? { agentIntegrationId: args.agentIntegrationId }
-        : {}),
+    agentIntegrationId: subscription ? "" : (args.agentIntegrationId ?? ""),
     appRepository: args.appRepository,
     backlogRepository: args.backlogRepository,
     issuesSource: apiIssuesSource(args.issuesChoice),

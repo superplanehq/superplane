@@ -144,6 +144,18 @@ variable "enable_runners" {
   default     = true
 }
 
+variable "runner_image_amd64" {
+  description = "Packer-built AMI ID for linux/amd64 runner VMs."
+  type        = string
+  default     = ""
+}
+
+variable "runner_image_arm64" {
+  description = "Packer-built AMI ID for linux/arm64 runner VMs."
+  type        = string
+  default     = ""
+}
+
 # -----------------------------------------------------------------------------
 # Optional Variables - Network
 # -----------------------------------------------------------------------------

@@ -1,8 +1,20 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { FLEET_MANAGER_DRAFT_KEY, saveFleetManagerDraft } from "@/lib/fleetManagerSetup";
+import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
+import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
+import { FLEET_MANAGER_DRAFT_KEY } from "@/lib/fleetManagerSetup";
 import { FleetManagerSetup } from "./FleetManagerSetup";
+
+const { createToken } = vi.hoisted(() => ({ createToken: vi.fn() }));
+
+vi.mock("@/hooks/useAccountOrganizations", () => ({
+  useAccountOrganizations: () => ({ data: [{ id: "org-1", name: "Acme" }] }),
+}));
+
+vi.mock("@/hooks/useUserTokens", () => ({
+  useCreateUserToken: () => ({ mutateAsync: createToken, isPending: false }),
+}));
 
 const fleetSpec = {
   operatingSystem: "linux",
@@ -14,12 +26,13 @@ const fleetSpec = {
 };
 
 const metadata = {
-  defaultRunnerVersion: "v0.1.0",
+  defaultRunnerVersion: "v0.2.0",
   defaultFleetManagerVersion: "v0.1.0",
   defaultChartVersion: "0.1.0",
   runnerReleaseUrlTemplate: "https://example/releases/runner%2F{version}",
   chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
   imageRepository: "ghcr.io/superplanehq/fleet-manager",
+  runnerVersions: ["v0.2.0", "v0.1.0"],
   fleetPresets: [
     { id: "e1-large-amd64", spec: fleetSpec },
     { id: "e1-large-arm64", spec: { ...fleetSpec, architecture: "arm64" as const } },
@@ -37,32 +50,50 @@ const metadata = {
       securityGroupIds: ["sg-runner"],
       runnerIdentity: "runner-profile",
       fleetManagerIdentity: "arn:aws:iam::123456789012:role/fleet-manager",
+      imageAmd64: "ami-amd64",
+      imageArm64: "",
     },
-  },
-  credentials: {
-    existingSecret: "superplane-fleet-manager-token",
-    tokenKey: "INSTALLATION_ADMIN_TOKEN",
-    autoProvisioned: true,
   },
 };
 
 const jsonResponse = (body: unknown) =>
   new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
 
-function fleetRequestCount(fetchMock: ReturnType<typeof vi.fn>) {
-  return fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/admin/api/installation/fleets")).length;
+function stubSetup(body: unknown = metadata) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/admin/api/installation/fleet-manager/setup")) return jsonResponse(body);
+      return new Response("", { status: 404 });
+    }),
+  );
+}
+
+function FleetWizard() {
+  const setup = useFleetManagerSetup(true, "org-1");
+  return (
+    <FleetManagerWizardScreen
+      step="fleets"
+      setup={setup}
+      onNext={() => undefined}
+      onFinish={() => undefined}
+      onFinishLater={() => undefined}
+    />
+  );
 }
 
 describe("FleetManagerSetup", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    createToken.mockReset();
+    createToken.mockResolvedValue({ plaintext: "one-time-personal-token" });
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url.endsWith("/admin/api/installation/fleet-manager/setup")) return jsonResponse(metadata);
         if (url.endsWith("/admin/api/installation/fleets")) {
-          return jsonResponse({ fleets: [{ id: "e1-large-amd64", runnerVersion: "v0.1.0", spec: fleetSpec }] });
+          return jsonResponse({ fleets: [{ id: "e1-large-amd64", runnerVersion: "v0.2.0", spec: fleetSpec }] });
         }
         return new Response("", { status: 404 });
       }),
@@ -71,271 +102,160 @@ describe("FleetManagerSetup", () => {
 
   afterEach(() => vi.unstubAllGlobals());
 
-  it("shows provider, fleets, infrastructure, and values on one page", async () => {
+  it("uses the Provider, Fleets, and Install sequence", async () => {
     render(<FleetManagerSetup />);
 
     expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Choose runner fleets" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Confirm cloud infrastructure" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Install Fleet Manager" })).toBeInTheDocument();
-    expect(screen.getByText("values.yaml")).toBeInTheDocument();
-    expect(screen.getByText(/existingSecret: superplane-fleet-manager-token/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Copy values.yaml" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Download values.yaml" })).toBeInTheDocument();
-    expect(screen.getByText("Run this command where kubectl can access your cluster.")).toBeInTheDocument();
-    expect(screen.getByText(/--wait --timeout 10m/)).toBeInTheDocument();
-    expect(screen.queryByText(/step \d+ of/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Continue" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Fleet Manager setup saved" })).not.toBeInTheDocument();
-    expect(fleetRequestCount(vi.mocked(fetch))).toBe(0);
+    expect(screen.queryByRole("heading", { name: /cloud infrastructure/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Machine type for e1-large-amd64")).toHaveValue("m8a.large");
+    expect(screen.queryByRole("combobox", { name: "Runner version" })).not.toBeInTheDocument();
   });
 
-  it("uses Terraform defaults without creating or displaying a token", async () => {
-    render(<FleetManagerSetup />);
-
-    expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
-    expect(screen.getAllByText("Loaded from Terraform").length).toBeGreaterThan(0);
-    expect(screen.queryByText(/create fleet manager token/i)).not.toBeInTheDocument();
-    expect(screen.getByLabelText("AWS region")).toHaveValue("us-east-1");
-    expect(screen.getByLabelText("Private subnet IDs")).toHaveValue("subnet-a, subnet-b");
-    expect(screen.getByLabelText("SuperPlane URL")).toHaveValue("https://superplane.example.com");
-
-    const yaml = screen.getByText(/existingSecret: superplane-fleet-manager-token/).textContent ?? "";
-    expect(yaml).toContain("tokenKey: INSTALLATION_ADMIN_TOKEN");
-    expect(yaml).not.toContain("kubernetes-api-token");
-    expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("INSTALLATION_ADMIN_TOKEN");
-  });
-
-  it("uses Terraform defaults instead of an incompatible legacy draft", async () => {
+  it("pins the setup runner version and ignores a saved version choice", async () => {
     window.localStorage.setItem(
-      "superplane.fleet-manager-setup.v1",
+      FLEET_MANAGER_DRAFT_KEY,
       JSON.stringify({
         provider: "aws",
+        managerId: "terraform-cluster",
+        namespace: "superplane",
+        serviceAccountName: "superplane-fleet-manager",
+        superplaneUrl: "https://superplane.example.com",
+        runnerVersion: "v0.1.0",
+        selectedFleetIds: ["e1-large-amd64"],
+        fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+        fields: { region: "us-east-1", imageAmd64: "ami-amd64" },
+      }),
+    );
+
+    render(<FleetManagerSetup />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Generate install command" }));
+    expect(await screen.findByTestId("fleet-manager-install-command")).toHaveTextContent("runnerVersion: v0.2.0");
+    expect(screen.queryByRole("combobox", { name: "Runner version" })).not.toBeInTheDocument();
+  });
+
+  it("blocks installation when no runner version is available", async () => {
+    stubSetup({ ...metadata, defaultRunnerVersion: "", runnerVersions: [] });
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByRole("button", { name: "Generate install command" })).toBeDisabled();
+    expect(screen.getAllByRole("alert")[0]).toHaveTextContent("SuperPlane could not determine a Runner version.");
+  });
+
+  it("keeps the wizard install action disabled when no runner version is available", async () => {
+    stubSetup({ ...metadata, defaultRunnerVersion: "", runnerVersions: [] });
+    render(<FleetWizard />);
+
+    expect(await screen.findByRole("button", { name: "Generate install command" })).toBeDisabled();
+  });
+
+  it("generates a command when no Terraform runner image is configured", async () => {
+    const manual = {
+      ...metadata,
+      infrastructureDefaults: {
+        source: "manual" as const,
+        provider: null,
         managerId: "my-cluster",
         namespace: "superplane",
         serviceAccountName: "superplane-fleet-manager",
-        superplaneUrl: window.location.origin,
-        runnerVersion: "v0.1.0",
-        selectedFleetIds: ["e1-large-amd64"],
-        warmCapacity: 5,
-        maxCapacity: 100,
         fields: {},
-      }),
-    );
-
-    render(<FleetManagerSetup />);
-
-    expect(await screen.findByLabelText("Fleet Manager ID")).toHaveValue("terraform-cluster");
-    expect(screen.getByLabelText("SuperPlane URL")).toHaveValue("https://superplane.example.com");
-    expect(screen.getByLabelText("AWS region")).toHaveValue("us-east-1");
-    expect(screen.getByLabelText("Private subnet IDs")).toHaveValue("subnet-a, subnet-b");
-    expect(window.localStorage.getItem("superplane.fleet-manager-setup.v1")).toBeNull();
-  });
-
-  it("preserves explicit infrastructure changes in the current draft", async () => {
-    saveFleetManagerDraft({
-      provider: "aws",
-      managerId: "my-cluster",
-      namespace: "superplane",
-      serviceAccountName: "custom-fleet-manager",
-      superplaneUrl: "https://custom.example.com",
-      runnerVersion: "v0.1.0",
-      selectedFleetIds: ["e1-large-amd64"],
-      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
-      fields: { region: "us-west-2" },
-    });
-
-    render(<FleetManagerSetup />);
-
-    expect(await screen.findByLabelText("Fleet Manager ID")).toHaveValue("my-cluster");
-    expect(screen.getByLabelText("Fleet Manager service account")).toHaveValue("custom-fleet-manager");
-    expect(screen.getByLabelText("SuperPlane URL")).toHaveValue("https://custom.example.com");
-    expect(screen.getByLabelText("AWS region")).toHaveValue("us-west-2");
-  });
-
-  it("configures capacity independently for each fleet", async () => {
-    render(<FleetManagerSetup />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: /e1-large-arm64/ }));
-
-    fireEvent.change(screen.getByLabelText("Warm capacity for e1-large-amd64"), { target: { value: "2" } });
-    fireEvent.change(screen.getByLabelText("Maximum capacity for e1-large-amd64"), { target: { value: "10" } });
-    fireEvent.change(screen.getByLabelText("Maximum capacity for e1-large-arm64"), { target: { value: "3" } });
-
-    expect(screen.getByLabelText("Warm capacity for e1-large-amd64")).toHaveValue(2);
-    expect(screen.getByLabelText("Maximum capacity for e1-large-amd64")).toHaveValue(10);
-    expect(screen.getByLabelText("Warm capacity for e1-large-arm64")).toHaveValue(0);
-    expect(screen.getByLabelText("Maximum capacity for e1-large-arm64")).toHaveValue(3);
-  });
-
-  it("uses the reachable SuperPlane URL entered by the administrator", async () => {
-    render(<FleetManagerSetup />);
-    fireEvent.change(await screen.findByLabelText("SuperPlane URL"), {
-      target: { value: "https://runners.example.com" },
-    });
-
-    const yaml = screen.getByText(/url: https:\/\/runners.example.com/).textContent ?? "";
-    expect(yaml).toContain("url: https://runners.example.com");
-    expect(yaml).not.toContain(window.location.origin);
-  });
-
-  it("hides incomplete YAML when the URL is invalid", async () => {
-    saveFleetManagerDraft({
-      provider: "aws",
-      managerId: "terraform-cluster",
-      namespace: "superplane",
-      serviceAccountName: "superplane-fleet-manager",
-      superplaneUrl: "not-a-url",
-      runnerVersion: "v0.1.0",
-      selectedFleetIds: ["e1-large-amd64"],
-      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
-      fields: {},
-    });
-
-    render(<FleetManagerSetup />);
-
-    expect((await screen.findAllByText("Enter a valid SuperPlane URL.")).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/existingSecret:/)).not.toBeInTheDocument();
-    expect(screen.queryByText("values.yaml")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Check installation" })).toBeDisabled();
-
-    fireEvent.change(screen.getByLabelText("SuperPlane URL"), {
-      target: { value: "https://superplane.example.com" },
-    });
-
-    expect(screen.getByText(/existingSecret: superplane-fleet-manager-token/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Check installation" })).toBeEnabled();
-  });
-
-  it("hides incomplete YAML when no fleet is selected", async () => {
-    render(<FleetManagerSetup />);
-    fireEvent.click(await screen.findByRole("checkbox", { name: /e1-large-amd64/ }));
-
-    expect(screen.getAllByText("Select at least one fleet.").length).toBeGreaterThan(0);
-    expect(screen.queryByText(/existingSecret:/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Check installation" })).toBeDisabled();
-  });
-
-  it("clears incompatible fields when the provider changes", async () => {
-    render(<FleetManagerSetup />);
-    fireEvent.click(await screen.findByRole("button", { name: "GCP" }));
-
-    expect(screen.getByLabelText("GCP project")).toHaveValue("");
-    expect(screen.queryByLabelText("AWS region")).not.toBeInTheDocument();
-  });
-
-  it("uses the selected provider values in the values file", async () => {
-    render(<FleetManagerSetup />);
-
-    expect(await screen.findByText("The values file uses AWS.")).toBeInTheDocument();
-    expect(screen.getAllByText(/provider: aws/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/eks.amazonaws.com\/role-arn/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "GCP" }));
-    fireEvent.change(screen.getByLabelText("GCP project"), { target: { value: "runner-project" } });
-
-    expect(screen.getByText("The values file uses GCP.")).toBeInTheDocument();
-    expect(screen.getAllByText(/provider: gcp/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/projectId: runner-project/).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/provider: aws/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/eks.amazonaws.com\/role-arn/)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: /AWS/ }));
-
-    expect(screen.getByText("The values file uses AWS.")).toBeInTheDocument();
-    expect(screen.getByLabelText("AWS region")).toHaveValue("us-east-1");
-    expect(screen.getAllByText(/provider: aws/).length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole("button", { name: "GCP" }));
-
-    expect(screen.getByLabelText("GCP project")).toHaveValue("runner-project");
-    expect(screen.getAllByText(/projectId: runner-project/).length).toBeGreaterThan(0);
-  });
-
-  it("starts fleet verification only after Check installation", async () => {
-    render(<FleetManagerSetup />);
-    expect(await screen.findByRole("button", { name: "Check installation" })).toBeEnabled();
-    expect(fleetRequestCount(vi.mocked(fetch))).toBe(0);
-
-    fireEvent.click(screen.getByRole("button", { name: "Check installation" }));
-
-    expect(await screen.findByText(/created every selected fleet/i)).toBeInTheDocument();
-    expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Fleet Manager setup saved" })).not.toBeInTheDocument();
-    expect(fleetRequestCount(vi.mocked(fetch))).toBe(1);
-  });
-
-  it("stops fleet verification when the draft changes", async () => {
-    render(<FleetManagerSetup />);
-    fireEvent.click(await screen.findByRole("button", { name: "Check installation" }));
-
-    expect(await screen.findByText(/created every selected fleet/i)).toBeInTheDocument();
-    expect(fleetRequestCount(vi.mocked(fetch))).toBe(1);
-
-    fireEvent.change(screen.getByLabelText("SuperPlane URL"), {
-      target: { value: "https://edited.example.com" },
-    });
-
-    expect(screen.queryByText(/created every selected fleet/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Check installation" })).toBeEnabled();
-
-    fireEvent.click(screen.getByRole("checkbox", { name: /e1-large-amd64/ }));
-
-    expect(screen.getAllByText("Select at least one fleet.").length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Check installation" })).toBeDisabled();
-    await waitFor(() => {
-      expect(fleetRequestCount(vi.mocked(fetch))).toBe(1);
-      expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).toContain('"selectedFleetIds":[]');
-    });
-    expect(screen.queryByText(/created every selected fleet/i)).not.toBeInTheDocument();
-  });
-
-  it("explains authentication failures and retries verification", async () => {
-    let fleetRequests = 0;
+      },
+    };
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.endsWith("/admin/api/installation/fleet-manager/setup")) return jsonResponse(metadata);
-        if (url.endsWith("/admin/api/installation/fleets")) {
-          fleetRequests += 1;
-          if (fleetRequests === 1) return new Response("", { status: 401 });
-          return jsonResponse({ fleets: [{ id: "e1-large-amd64", runnerVersion: "v0.1.0", spec: fleetSpec }] });
-        }
+        if (String(input).endsWith("/admin/api/installation/fleet-manager/setup")) return jsonResponse(manual);
         return new Response("", { status: 404 });
       }),
     );
 
     render(<FleetManagerSetup />);
-    fireEvent.click(await screen.findByRole("button", { name: "Check installation" }));
 
-    expect(await screen.findByText(/sign in again and retry/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Retry verification" }));
+    const amd64 = await screen.findByRole("checkbox", { name: /e1-large-amd64/ });
+    expect(amd64).toBeEnabled();
+    expect(screen.queryByText(/Add the amd64 runner image through Terraform/)).not.toBeInTheDocument();
+    fireEvent.click(amd64);
+    fireEvent.click(screen.getByRole("button", { name: "Generate install command" }));
 
-    expect(await screen.findByText(/created every selected fleet/i)).toBeInTheDocument();
-    expect(fleetRequests).toBe(2);
+    const command = await screen.findByTestId("fleet-manager-install-command");
+    expect(command).toHaveTextContent("ami: <RUNNER_IMAGE>");
   });
 
-  it("stops verification after the bounded timeout", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: RequestInfo | URL) => {
-        const url = String(input);
-        if (url.endsWith("/admin/api/installation/fleet-manager/setup")) return jsonResponse(metadata);
-        if (url.endsWith("/admin/api/installation/fleets")) return jsonResponse({ fleets: [] });
-        return new Response("", { status: 404 });
+  it("lets you clear a selected fleet when Terraform has no image", async () => {
+    window.localStorage.setItem(
+      FLEET_MANAGER_DRAFT_KEY,
+      JSON.stringify({
+        provider: "aws",
+        managerId: "terraform-cluster",
+        namespace: "superplane",
+        serviceAccountName: "superplane-fleet-manager",
+        superplaneUrl: "https://superplane.example.com",
+        runnerVersion: "v0.2.0",
+        selectedFleetIds: ["e1-large-arm64"],
+        fleetCapacities: { "e1-large-arm64": { warmCapacity: 0, maxCapacity: 1 } },
+        fields: { region: "us-east-1" },
       }),
     );
 
     render(<FleetManagerSetup />);
-    const now = vi
-      .spyOn(Date, "now")
-      .mockReturnValueOnce(0)
-      .mockReturnValue(10 * 60_000);
-    fireEvent.click(await screen.findByRole("button", { name: "Check installation" }));
 
-    expect(await screen.findByText(/verification timed out/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Retry verification" })).toBeEnabled();
-    now.mockRestore();
+    const arm64 = await screen.findByRole("checkbox", { name: /e1-large-arm64/ });
+    expect(arm64).toBeEnabled();
+    expect(arm64).toBeChecked();
+    fireEvent.click(arm64);
+    expect(arm64).not.toBeChecked();
+  });
+
+  it("prevents selection when Terraform has no image for the architecture", async () => {
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByRole("checkbox", { name: /e1-large-amd64/ })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: /e1-large-arm64/ })).toBeDisabled();
+    expect(screen.getByText(/Add the arm64 runner image through Terraform/)).toBeInTheDocument();
+  });
+
+  it("creates one personal token and puts it only in the values file", async () => {
+    render(<FleetManagerSetup />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Generate install command" }));
+
+    const command = await screen.findByTestId("fleet-manager-install-command");
+    expect(createToken).toHaveBeenCalledTimes(1);
+    expect(createToken).toHaveBeenCalledWith({ name: "Fleet Manager" });
+    expect(command).toHaveTextContent("cat > fleet-manager-values.yaml");
+    expect(command).toHaveTextContent("-f fleet-manager-values.yaml");
+    expect(command).toHaveTextContent("installationAdminToken: one-time-personal-token");
+    expect(command).toHaveTextContent("ami: ami-amd64");
+    expect(command).toHaveTextContent("runnerVersion: v0.2.0");
+    expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("one-time-personal-token");
+
+    fireEvent.change(screen.getByLabelText("Maximum capacity for e1-large-amd64"), { target: { value: "3" } });
+    await waitFor(() => expect(command).toHaveTextContent("maxCapacity: 3"));
+    expect(createToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates a new token after the page is remounted", async () => {
+    const first = render(<FleetManagerSetup />);
+    fireEvent.click(await screen.findByRole("button", { name: "Generate install command" }));
+    await screen.findByTestId("fleet-manager-install-command");
+    first.unmount();
+
+    render(<FleetManagerSetup />);
+    fireEvent.click(await screen.findByRole("button", { name: "Generate install command" }));
+    await screen.findByTestId("fleet-manager-install-command");
+
+    expect(createToken).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports a personal-token creation failure", async () => {
+    createToken.mockRejectedValueOnce(new Error("failed"));
+    render(<FleetManagerSetup />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Generate install command" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not create the Fleet Manager personal token/i);
+    expect(screen.queryByTestId("fleet-manager-install-command")).not.toBeInTheDocument();
   });
 });

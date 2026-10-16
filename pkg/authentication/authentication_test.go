@@ -473,13 +473,12 @@ func TestHandler_findOrCreateAccountForProvider(t *testing.T) {
 func attachGitHubIdentity(t *testing.T, account *models.Account, providerID string) {
 	t.Helper()
 	require.NoError(t, database.Conn().Create(&models.AccountProvider{
-		AccountID:   account.ID,
-		Provider:    models.ProviderGitHub,
-		ProviderID:  providerID,
-		Email:       account.Email,
-		Name:        account.Name,
-		AvatarURL:   "https://avatars.example/" + providerID + ".png",
-		AccessToken: "token-" + account.ID.String(),
+		AccountID:  account.ID,
+		Provider:   models.ProviderGitHub,
+		ProviderID: providerID,
+		Email:      account.Email,
+		Name:       account.Name,
+		AvatarURL:  "https://avatars.example/" + providerID + ".png",
 	}).Error)
 }
 
@@ -585,12 +584,11 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 	t.Run("should create the account when signup intent is missing", func(t *testing.T) {
 		handler, _ := setupAuthHandler(t, false)
 		googleUser := goth.User{
-			UserID:      "google-login-no-account",
-			Email:       "google-login-no-account@example.com",
-			Name:        "Google Login User",
-			NickName:    "googlelogin",
-			Provider:    "google",
-			AccessToken: "google-access-token",
+			UserID:   "google-login-no-account",
+			Email:    "google-login-no-account@example.com",
+			Name:     "Google Login User",
+			NickName: "googlelogin",
+			Provider: "google",
 		}
 		req := mux.SetURLVars(
 			httptest.NewRequest(http.MethodGet, "/auth/google", nil),
@@ -685,12 +683,11 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		attachGitHubIdentity(t, account, "10001")
 
 		githubUser := goth.User{
-			UserID:      "10001",
-			Email:       account.Email,
-			Name:        account.Name,
-			NickName:    "solo",
-			Provider:    models.ProviderGitHub,
-			AccessToken: "solo-token",
+			UserID:   "10001",
+			Email:    account.Email,
+			Name:     account.Name,
+			NickName: "solo",
+			Provider: models.ProviderGitHub,
 		}
 		req := mux.SetURLVars(
 			httptest.NewRequest(http.MethodGet, "/auth/github", nil),
@@ -737,6 +734,28 @@ func TestHandler_completeProviderAuth(t *testing.T) {
 		assert.Equal(t, http.StatusTemporaryRedirect, recorder.Code)
 		assert.Equal(t, identityAccount.ID.String(), sessionAccountID(t, recorder, handler.jwtSigner))
 	})
+}
+
+func TestLinkProviderToAccountUpdatesIdentityProfile(t *testing.T) {
+	_, registry := setupAuthHandler(t, false)
+	user := goth.User{
+		Provider: models.ProviderGoogle,
+		UserID:   "google-linked",
+		Email:    "linked@example.com",
+		Name:     "Linked User",
+		NickName: "linked",
+	}
+
+	require.NoError(t, LinkProviderToAccount(database.Conn(), registry.Account, user))
+
+	user.Name = "Updated Linked User"
+	require.NoError(t, LinkProviderToAccount(database.Conn(), registry.Account, user))
+
+	provider, err := registry.Account.GetAccountProvider(user.Provider)
+	require.NoError(t, err)
+	assert.Equal(t, user.UserID, provider.ProviderID)
+	assert.Equal(t, user.Email, provider.Email)
+	assert.Equal(t, user.Name, provider.Name)
 }
 
 func sessionAccountID(t *testing.T, recorder *httptest.ResponseRecorder, signer *jwt.Signer) string {

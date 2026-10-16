@@ -1,4 +1,3 @@
-import { useHostedLLMModels } from "@/hooks/useHostedLLMModels";
 import { useBYOKLLMModels } from "@/hooks/useLLMModelAllowlists";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { hostedModelIds } from "@/lib/hostedLLMModels";
@@ -7,9 +6,8 @@ import type { FactoryAgentRewrite } from "@/pages/home/factories";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 
 import {
+  AGENT_PROVIDER_IDS,
   hasHostedDefaultModel,
-  hostedModelsQueriesLoading,
-  isAgentProviderConnected,
   resolveOnboardingAgent,
   type OnboardingAgentPlan,
 } from "./onboardingAgentReadiness";
@@ -21,91 +19,114 @@ type HostedAgentDefaults = {
   preferOwnKey?: boolean;
   customProvider?: boolean;
   usageLoading?: boolean;
-};
-
-type ModelQuery = {
-  data?: {
-    models?: { id?: string | null }[];
-    selected?: { id?: string | null }[];
-    candidates?: { id?: string | null }[];
-  };
-  isFetched: boolean;
+  selectedModel?: string | null;
 };
 
 export function useOnboardingAgentPlan(
   organizationId: string,
   connected: Set<IntegrationId>,
   remainingCreditCents: number,
-  defaultHosted?: HostedAgentDefaults,
+  defaultHosted: HostedAgentDefaults = {},
 ) {
-  const needHostedModels = isAgentProviderConnected(connected);
-  const customConnected = customProviderConnected(connected, defaultHosted?.customProvider);
-  // A Claude key picks from the models that key can use, not the hosted allowlist.
-  const anthropic = useBYOKLLMModels(organizationId, "anthropic", needHostedModels);
-  const openai = useHostedLLMModels(organizationId, "openai", needHostedModels);
-  const openrouter = useHostedLLMModels(organizationId, "openrouter", needHostedModels);
-  const custom = useBYOKLLMModels(organizationId, "custom", customConnected);
-  return onboardingAgentPlan({
-    connected,
-    remainingCreditCents,
-    defaultHosted,
-    needHostedModels,
-    customConnected,
-    anthropic,
-    openai,
-    openrouter,
-    custom,
+  const queries = {
+    claude: useBYOKLLMModels(organizationId, "anthropic", connected.has("claude")),
+    openai: useBYOKLLMModels(organizationId, "openai", connected.has("openai")),
+    openrouter: useBYOKLLMModels(organizationId, "openrouter", connected.has("openrouter")),
+    customLlm: useBYOKLLMModels(
+      organizationId,
+      "custom",
+      Boolean(defaultHosted.customProvider) && connected.has("customLlm"),
+    ),
+  };
+  const connectedForPlan = new Set(connected);
+  if (!defaultHosted.customProvider) connectedForPlan.delete("customLlm");
+  const plan = resolveOnboardingAgent({
+    connected: connectedForPlan,
+    hostedModels: {
+      anthropic: byokModelIds(queries.claude.data),
+      openai: byokModelIds(queries.openai.data),
+      openrouter: byokModelIds(queries.openrouter.data),
+    },
+    customModels: byokModelIds(queries.customLlm.data),
+    defaultHostedProvider: defaultHosted.provider,
+    defaultHostedModel: defaultHosted.model,
+    preferOwnKey: defaultHosted.preferOwnKey,
   });
-}
-
-function customProviderConnected(connected: Set<IntegrationId>, enabled: boolean | undefined): boolean {
-  return Boolean(enabled) && connected.has("customLlm");
-}
-
-function onboardingAgentPlan(args: {
-  connected: Set<IntegrationId>;
-  remainingCreditCents: number;
-  defaultHosted?: HostedAgentDefaults;
-  needHostedModels: boolean;
-  customConnected: boolean;
-  anthropic: ModelQuery;
-  openai: ModelQuery;
-  openrouter: ModelQuery;
-  custom: ModelQuery;
-}) {
-  const connectedForPlan = new Set(args.connected);
-  if (!args.customConnected) connectedForPlan.delete("customLlm");
-  const modelQueries = [args.anthropic, args.openai, args.openrouter];
-  if (args.customConnected) modelQueries.push(args.custom);
+  const providerId = plan?.providerId ?? AGENT_PROVIDER_IDS.find((id) => connectedForPlan.has(id));
+  const query = plan?.credentialsSource !== "hosted" && providerId ? queries[providerId] : undefined;
   return {
-    remainingCreditCents: args.remainingCreditCents,
+    remainingCreditCents,
     hostedModelsAvailable: hasHostedDefaultModel({
-      defaultHostedProvider: args.defaultHosted?.provider,
-      defaultHostedModel: args.defaultHosted?.model,
+      defaultHostedProvider: defaultHosted.provider,
+      defaultHostedModel: defaultHosted.model,
     }),
-    hostedModelsAvailableLoading: args.defaultHosted?.usageLoading ?? false,
-    hostedModelsLoading: hostedModelsQueriesLoading(args.needHostedModels || args.customConnected, modelQueries),
-    plan: resolveOnboardingAgent({
-      connected: connectedForPlan,
-      hostedModels: {
-        anthropic: anthropicKeyModelIds(args.anthropic.data),
-        openai: hostedModelIds(args.openai.data?.models),
-        openrouter: hostedModelIds(args.openrouter.data?.models),
-      },
-      customModels: args.customConnected ? anthropicKeyModelIds(args.custom.data) : [],
-      defaultHostedProvider: args.defaultHosted?.provider,
-      defaultHostedModel: args.defaultHosted?.model,
-      preferOwnKey: args.defaultHosted?.preferOwnKey,
-    }),
+    hostedModelsAvailableLoading: defaultHosted.usageLoading ?? false,
+    hostedModelsLoading: Boolean(query && !query.isFetched),
+    ...onboardingModelChoice(plan, query, defaultHosted.selectedModel),
   };
 }
 
-/** The organization's selected Claude models, or every model the key can use. */
-export function anthropicKeyModelIds(
+function onboardingModelChoice(
+  plan: OnboardingAgentPlan | undefined,
+  query: ReturnType<typeof useBYOKLLMModels> | undefined,
+  selectedModel: string | null | undefined,
+) {
+  if (!query) return { plan, modelPicker: undefined };
+  const models = agentUsableModelIds(byokModelIds(query.data));
+  const defaultModel = plan && models.includes(plan.model) ? plan.model : (models[0] ?? "");
+  const selectedIsUnusable = Boolean(selectedModel) && agentUsableModelIds([selectedModel ?? ""]).length === 0;
+  const model = selectedIsUnusable ? defaultModel : (selectedModel ?? defaultModel);
+  const ready = model !== "" && models.includes(model) && query.isFetched && !query.isError;
+  return {
+    modelPicker: {
+      models,
+      value: ready ? model : "",
+      loading: !query.isFetched,
+      error: query.isError,
+      retry: () => {
+        void query.refetch();
+      },
+    },
+    plan: ready && plan ? { ...plan, model, planningModel: model } : undefined,
+  };
+}
+
+const NON_AGENT_MODEL_SEGMENTS = new Set([
+  "audio",
+  "babbage",
+  "dall",
+  "davinci",
+  "embedding",
+  "embeddings",
+  "image",
+  "moderation",
+  "moderations",
+  "realtime",
+  "sora",
+  "transcribe",
+  "transcription",
+  "tts",
+  "whisper",
+]);
+
+export function agentUsableModelIds(ids: string[]): string[] {
+  return ids.filter((id) => {
+    const segments = id
+      .trim()
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean);
+    return segments.length > 0 && !segments.some((segment) => NON_AGENT_MODEL_SEGMENTS.has(segment));
+  });
+}
+
+/** Keep organization selections within the models available to this key. */
+export function byokModelIds(
   data: { selected?: { id?: string | null }[]; candidates?: { id?: string | null }[] } | undefined,
 ): string[] {
   const selected = hostedModelIds(data?.selected);
-  return selected.length > 0 ? selected : hostedModelIds(data?.candidates);
+  const candidates = hostedModelIds(data?.candidates);
+  return selected.length > 0 ? selected.filter((id) => candidates.includes(id)) : candidates;
 }
 
 export function agentRewriteFromPlan(
@@ -148,6 +169,7 @@ export function useOnboardingAgentContext(
   connected: Set<IntegrationId>,
   preferOwnKey: boolean,
   customProvider = false,
+  selectedModel?: string | null,
 ) {
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const remainingCreditCents = parseWorkOrderMetric(spend.data?.remainingCreditCents);
@@ -156,6 +178,7 @@ export function useOnboardingAgentContext(
     model: spend.data?.defaultHostedModel,
     preferOwnKey,
     customProvider,
+    selectedModel,
     usageLoading: spend.isLoading,
   });
 }

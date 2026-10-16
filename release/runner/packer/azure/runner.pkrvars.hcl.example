@@ -6,6 +6,12 @@ image_name              = "superplane-runner-amd64"
 image_version           = "1.0.0"
 architecture            = "amd64"
 vm_size                 = "Standard_D2ds_v4"
+# Private gallery with image definition TrustedLaunch. This is the default.
+# The AKS development gallery in release/terraform/aks uses this value.
+trusted_launch          = true
+# Community gallery or direct shared gallery. The image definition must be
+# TrustedLaunchSupported. The build VM is then Standard Gen2.
+# trusted_launch          = false
 # Leave empty to let Packer create the build resource group.
 # build_resource_group_name = "superplane-runner-image-builds"
 # Extra replica regions. location is always included.

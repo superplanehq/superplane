@@ -233,8 +233,6 @@ function VcsScreen({
     return (
       <FirstRunHostScreen
         selectedHost={flow.vcsHost}
-        bitbucketAvailable={flow.bitbucketAvailable}
-        bitbucketFeatureLoading={flow.bitbucketFeatureLoading}
         chrome={chrome}
         sphere={sphereFor("host", setup.selectedRepo)}
         onChooseHost={flow.chooseVcsHost}
@@ -376,7 +374,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       setup={setup}
       chrome={chromeFor("agent")}
       sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
-      saving={!flow.agentBeforeTickets && (flow.blockingAction === "finishing-setup" || model.saving)}
+      saving={flow.busy}
       loading={model.agentLoading}
       hostedAgentReady={model.hostedAgentReady}
       showCustomProvider={model.customProvider}
@@ -395,6 +393,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         onCancel: model.cancelCodexConnection,
       }}
       onRequestConnect={model.requestConnect}
+      modelPicker={model.agentModelPicker}
       onContinue={() => {
         if (flow.agentBeforeTickets && !flow.credentialChoice) flow.selectCredentialChoice("hosted");
         void flow.continueFromAgent();

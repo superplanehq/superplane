@@ -70,3 +70,28 @@ export function useFactoryCodexConnection(organizationId: string, factoryId: str
 
   return { query, start, cancel };
 }
+
+export function useCodexSubscriptionModel(
+  organizationId: string,
+  factoryId: string,
+  flagLoading: boolean,
+  flagOn: boolean,
+) {
+  const enabled = !flagLoading && flagOn;
+  const codex = useFactoryCodexConnection(organizationId, factoryId, enabled);
+  const connection = codex.query.data;
+  return {
+    codexSubscriptionOffered: enabled && connection?.eligible === true,
+    codexSubscriptionLoading: flagLoading || (enabled && codex.query.isLoading),
+    codexConnection: connection,
+    codexSubscriptionReady: codexSubscriptionReady(connection),
+    startCodexConnection: () => {
+      codex.start.mutate();
+    },
+    cancelCodexConnection: () => {
+      codex.cancel.mutate();
+    },
+    codexStarting: codex.start.isPending,
+    codexCanceling: codex.cancel.isPending,
+  };
+}

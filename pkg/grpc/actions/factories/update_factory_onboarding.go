@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
 	"gorm.io/gorm"
@@ -35,7 +34,6 @@ func UpdateFactoryOnboarding(
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
 	}
 	setOnboardingVCSProvider(db, orgID, &patch)
-	provider := onboardingPatchVCSProvider(patch)
 
 	if err := rejectVCSProviderChange(factory, patch); err != nil {
 		return nil, factoryErrorToStatus(err, "failed to update factory onboarding")
@@ -46,20 +44,11 @@ func UpdateFactoryOnboarding(
 		if configErr != nil {
 			return nil, factoryErrorToStatus(configErr, "failed to update factory onboarding")
 		}
-		if provider == "" {
-			provider = config.EffectiveVCSProvider()
-		}
-		if featureErr := requireBitbucketWorkspace(db, orgID, provider); featureErr != nil {
-			return nil, factoryErrorToStatus(featureErr, "failed to update factory onboarding")
-		}
 		if validationErr := validateFactoryOnboardingResources(db, orgID, factory, config); validationErr != nil {
 			return nil, factoryErrorToStatus(validationErr, "failed to update factory onboarding")
 		}
 		err = factory.CompleteOnboarding(db, patch)
 	} else {
-		if featureErr := requireBitbucketWorkspace(db, orgID, provider); featureErr != nil {
-			return nil, factoryErrorToStatus(featureErr, "failed to update factory onboarding")
-		}
 		err = factory.UpdateOnboarding(db, patch)
 	}
 	if err != nil {
@@ -173,13 +162,6 @@ func validateFactoryOnboardingResources(
 	return nil
 }
 
-func onboardingPatchVCSProvider(patch models.FactoryOnboardingPatch) string {
-	if patch.VCSProvider == nil {
-		return ""
-	}
-	return strings.TrimSpace(*patch.VCSProvider)
-}
-
 // rejectVCSProviderChange locks the provider at the first saved VCS binding.
 // Clearing the integration keeps the lock; switching hosts is rejected.
 func rejectVCSProviderChange(factory *models.Factory, patch models.FactoryOnboardingPatch) error {
@@ -196,20 +178,6 @@ func rejectVCSProviderChange(factory *models.Factory, patch models.FactoryOnboar
 	}
 	if !strings.EqualFold(next, current.EffectiveVCSProvider()) {
 		return invalidArgument("version control provider cannot be changed")
-	}
-	return nil
-}
-
-func requireBitbucketWorkspace(db *gorm.DB, organizationID uuid.UUID, provider string) error {
-	if provider != models.ProviderBitbucket {
-		return nil
-	}
-	organization, err := models.FindOrganizationByIDInTransaction(db, organizationID.String())
-	if err != nil {
-		return err
-	}
-	if !organization.HasExperimentalFeature(features.FeatureFactoryBitbucket) {
-		return errFactoryBitbucketDisabled
 	}
 	return nil
 }

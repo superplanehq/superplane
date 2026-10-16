@@ -14,9 +14,8 @@ bash release/fleet-manager/skopeo_image_pin_test.sh
 bash release/fleet-manager/verify_image_test.sh
 bash release/fleet-manager/publish_chart_test.sh
 bash release/fleet-manager-chart/test-chart.sh
-bash release/fleet-manager-chart/test-sync-fleets.sh
-bash release/superplane-helm-chart/test-fleet-manager-credentials.sh
-bash release/superplane-helm-chart/test-provision-fleet-manager-token.sh
+bash release/superplane-helm-chart/test-fleet-manager-setup.sh
+bash release/superplane-helm-chart/update_component_release_defaults_test.sh
 
 bash -n \
   release/generate-component-sbom.sh \
@@ -39,9 +38,9 @@ bash -n \
   release/fleet-manager/verify-oci-archive.sh \
   release/fleet-manager/verify-image.sh \
   release/fleet-manager/verify_image_test.sh \
-  release/superplane-helm-chart/helm/files/provision-fleet-manager-token.sh \
-  release/superplane-helm-chart/test-fleet-manager-credentials.sh \
-  release/superplane-helm-chart/test-provision-fleet-manager-token.sh \
-  release/superplane-helm-chart/testdata/fake-curl.sh
+  release/superplane-helm-chart/build.sh \
+  release/superplane-helm-chart/test-fleet-manager-setup.sh \
+  release/superplane-helm-chart/update_component_release_defaults_test.sh
 
 node --check release/component-release.js
+node --check release/superplane-helm-chart/update-component-release-defaults.js

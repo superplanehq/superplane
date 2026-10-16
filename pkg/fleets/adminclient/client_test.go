@@ -119,6 +119,67 @@ func TestHTTPErrorIncludesStatus(t *testing.T) {
 	}
 }
 
+func TestCreateAndUpdateFleetUseInstallationEndpoints(t *testing.T) {
+	requests := make([]string, 0, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests = append(requests, r.Method+" "+r.URL.Path)
+		if r.Header.Get("Authorization") != "Bearer personal-token" {
+			t.Fatalf("authorization = %q", r.Header.Get("Authorization"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"fleet":{"id":"linux-amd64","runnerVersion":"v1.2.3"}}`))
+	}))
+	defer server.Close()
+
+	client, err := New(server.URL, "personal-token", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	spec := FleetSpec{OperatingSystem: "linux", Architecture: "amd64"}
+	if _, err := client.CreateFleet(context.Background(), CreateFleetRequest{
+		FleetID: "linux-amd64", RunnerVersion: "v1.2.3", Spec: spec,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.UpdateFleet(context.Background(), "linux-amd64", UpdateFleetRequest{
+		RunnerVersion: "v1.2.3", Spec: spec,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []string{
+		"POST /admin/api/installation/fleets",
+		"PATCH /admin/api/installation/fleets/linux-amd64",
+	}
+	if len(requests) != len(want) || requests[0] != want[0] || requests[1] != want[1] {
+		t.Fatalf("requests = %#v, want %#v", requests, want)
+	}
+}
+
+func TestCreateFleetRetriesServerFailure(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		if calls == 1 {
+			http.Error(w, "temporary failure", http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte(`{"fleet":{"id":"linux-amd64"}}`))
+	}))
+	defer server.Close()
+
+	client, err := New(server.URL, "personal-token", server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.CreateFleet(context.Background(), CreateFleetRequest{FleetID: "linux-amd64"}); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 2 {
+		t.Fatalf("calls = %d, want 2", calls)
+	}
+}
+
 func TestDescribeRunnerUsesFleetAndRunnerPath(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

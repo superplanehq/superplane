@@ -305,14 +305,22 @@ func TestDefaultAuthorizationRulesAreKeyedByHTTPRoute(t *testing.T) {
 	assert.Equal(t, []string{IDPathParam}, rule.ResourcePathParams)
 }
 
-func TestCreateFactoryAutomationRequiresCustomAutomationsFeature(t *testing.T) {
+func TestCreateFactoryAutomationUsesTemplateSpecificFeatureGuards(t *testing.T) {
 	rules := DefaultAuthorizationRules()
 	rule, ok := rules[HTTPRoute{
 		Method:  http.MethodPost,
 		Pattern: "/api/v1/factories/{factory_id}/automations",
 	}]
 	require.True(t, ok)
-	assert.Equal(t, []string{features.FeatureFactories, features.FeatureFactoryCustomAutomations}, rule.RequiredExperimentalFeatures)
+	assert.Equal(t, []string{features.FeatureFactories}, rule.RequiredExperimentalFeatures)
+}
+
+func TestSchedulePreviewRequiresScheduledIntakeFeature(t *testing.T) {
+	rule, ok := DefaultAuthorizationRules()[HTTPRoute{Method: http.MethodPost, Pattern: "/api/v1/factories/{factory_id}/scheduled-intake/preview"}]
+	require.True(t, ok)
+	assert.Equal(t, "factories", rule.Resource)
+	assert.Equal(t, "read", rule.Action)
+	assert.Equal(t, []string{features.FeatureFactories, features.FeatureFactoryScheduledIntake}, rule.RequiredExperimentalFeatures)
 }
 
 func TestMergeRoutesRequirePullRequestMergeFeature(t *testing.T) {

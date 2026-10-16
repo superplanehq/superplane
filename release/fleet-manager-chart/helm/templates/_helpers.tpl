@@ -18,17 +18,18 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | quote }}
 {{- end -}}
 
 {{- define "fleet-manager.runtimeConfig" -}}
-{{- $fleets := list -}}
-{{- range .Values.fleets -}}
-{{- $fleets = append $fleets (omit . "runnerVersion" "spec") -}}
-{{- end -}}
 {{- $config := dict
   "id" .Values.manager.id
   "superplaneUrl" (.Values.superplane.url | trimSuffix "/")
+  "installationAdminToken" (required "installationAdminToken is required" .Values.installationAdminToken)
   "runnerReleaseBaseUrl" .Values.runner.releaseBaseUrl
   "reconciliation" .Values.reconciliation
   "http" .Values.http
-  "fleets" $fleets
+  "fleets" .Values.fleets
 -}}
 {{ toYaml $config }}
+{{- end -}}
+
+{{- define "fleet-manager.configSecretName" -}}
+{{- printf "%s-config" .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}

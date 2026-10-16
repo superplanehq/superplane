@@ -12,6 +12,8 @@ export type FirstRunArtScene = {
   arrowColor: string;
   /** Globe particle count. School leaves this unset. */
   count?: number;
+  /** Optional per-scene arrow size; the renderer default applies when omitted. */
+  arrowScale?: number;
   pill?: FirstRunArtPill;
   badges?: { discover: string; verify: string };
 };

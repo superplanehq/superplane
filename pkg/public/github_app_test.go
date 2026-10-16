@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -154,6 +155,133 @@ func TestHandleGitHubAppSetup(t *testing.T) {
 
 		assert.Equal(t, http.StatusBadRequest, recorder.Code)
 	})
+}
+
+func TestHandleGitHubAppSetupReturnsToIncompleteWorkspace(t *testing.T) {
+	setGitHubAppEnvironment(t)
+	r := support.Setup(t)
+	server, _, token := setupTestServer(r, t)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, "Payments", "", "PAY")
+	require.NoError(t, err)
+	state, err := githubcommon.SignHostedAppInstallState("test-webhook-secret", r.Organization.ID)
+	require.NoError(t, err)
+	previousInstallationReconciliation := enqueueGitHubAppInstallationReconciliation
+	previousHasInstallationRequest := hasGitHubAppInstallationRequest
+	enqueueGitHubAppInstallationReconciliation = func(context.Context, int64, uuid.UUID, time.Time) error {
+		return nil
+	}
+	hasGitHubAppInstallationRequest = func(context.Context, int64) (bool, error) {
+		return false, nil
+	}
+	t.Cleanup(func() {
+		enqueueGitHubAppInstallationReconciliation = previousInstallationReconciliation
+		hasGitHubAppInstallationRequest = previousHasInstallationRequest
+	})
+
+	setupPath := "/" + r.Organization.Slug + "/workspaces/" + factory.RouteSegment() + "/setup"
+
+	t.Run("install with state opens choose organization", func(t *testing.T) {
+		assertGitHubAppSetupRedirect(t, server, githubAppSetupRequest("install", state, ""), setupPath)
+	})
+
+	t.Run("update with state opens choose organization", func(t *testing.T) {
+		assertGitHubAppSetupRedirect(t, server, githubAppSetupRequest("update", state, ""), setupPath)
+	})
+
+	t.Run("install without state opens the signed-in workspace", func(t *testing.T) {
+		assertGitHubAppSetupRedirect(t, server, githubAppSetupRequest("install", "", token), setupPath)
+	})
+
+	t.Run("update without state opens the signed-in workspace", func(t *testing.T) {
+		assertGitHubAppSetupRedirect(t, server, githubAppSetupRequest("update", "", token), setupPath)
+	})
+
+	t.Run("callback without state does not create a workspace", func(t *testing.T) {
+		var before int64
+		require.NoError(t, db.Model(&models.Factory{}).Count(&before).Error)
+		recorder := httptest.NewRecorder()
+		server.HandleGitHubAppSetup(recorder, githubAppSetupRequest("install", "", ""))
+		var after int64
+		require.NoError(t, db.Model(&models.Factory{}).Count(&after).Error)
+		assert.Equal(t, before, after)
+		assert.Equal(t, "/", recorder.Header().Get("Location"))
+	})
+
+	t.Run("approved install still opens the confirmation page", func(t *testing.T) {
+		hasGitHubAppInstallationRequest = func(context.Context, int64) (bool, error) {
+			return true, nil
+		}
+		t.Cleanup(func() {
+			hasGitHubAppInstallationRequest = func(context.Context, int64) (bool, error) {
+				return false, nil
+			}
+		})
+		recorder := httptest.NewRecorder()
+		server.HandleGitHubAppSetup(recorder, githubAppSetupRequest("install", "", token))
+		assert.Equal(t, http.StatusFound, recorder.Code)
+		assert.Equal(t, "/github/approved", recorder.Header().Get("Location"))
+	})
+
+	t.Run("complete setup returns home", func(t *testing.T) {
+		require.NoError(t, db.Model(factory).Update("onboarding_completed_at", time.Now()).Error)
+		for _, action := range []string{"install", "update"} {
+			recorder := httptest.NewRecorder()
+			server.HandleGitHubAppSetup(recorder, githubAppSetupRequest(action, state, token))
+			assert.Equal(t, http.StatusFound, recorder.Code)
+			assert.Equal(t, "/", recorder.Header().Get("Location"))
+		}
+	})
+
+	t.Run("signed state opens the only unfinished workspace", func(t *testing.T) {
+		second, err := models.CreateFactory(db, r.Organization.ID, "Billing", "", "BILL")
+		require.NoError(t, err)
+		assertGitHubAppSetupRedirect(
+			t,
+			server,
+			githubAppSetupRequest("install", state, ""),
+			"/"+r.Organization.Slug+"/workspaces/"+second.RouteSegment()+"/setup",
+		)
+	})
+
+	t.Run("two unfinished workspaces return home", func(t *testing.T) {
+		require.NoError(t, db.Model(factory).Update("onboarding_completed_at", gorm.Expr("NULL")).Error)
+		for _, request := range []*http.Request{
+			githubAppSetupRequest("install", "", token),
+			githubAppSetupRequest("install", state, ""),
+			githubAppSetupRequest("update", state, ""),
+		} {
+			recorder := httptest.NewRecorder()
+			server.HandleGitHubAppSetup(recorder, request)
+			assert.Equal(t, http.StatusFound, recorder.Code)
+			assert.Equal(t, "/", recorder.Header().Get("Location"))
+		}
+	})
+}
+
+func githubAppSetupRequest(action, state, token string) *http.Request {
+	query := url.Values{}
+	query.Set("installation_id", "159131070")
+	query.Set("setup_action", action)
+	if state != "" {
+		query.Set("state", state)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/github/app/setup?"+query.Encode(), nil)
+	if token != "" {
+		request.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	}
+	return request
+}
+
+func assertGitHubAppSetupRedirect(t *testing.T, server *Server, request *http.Request, setupPath string) {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	server.HandleGitHubAppSetup(recorder, request)
+	require.Equal(t, http.StatusFound, recorder.Code)
+	location, err := url.Parse(recorder.Header().Get("Location"))
+	require.NoError(t, err)
+	assert.Equal(t, setupPath, location.Path)
+	assert.Equal(t, "repo", location.Query().Get("step"))
 }
 
 func TestGitHubAppSetupOrganizationID(t *testing.T) {

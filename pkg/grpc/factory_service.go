@@ -126,6 +126,11 @@ func (s *FactoryService) CreateFactoryAutomation(ctx context.Context, req *pb.Cr
 	return actions.CreateFactoryAutomation(ctx, s.intakeDeps, organizationID, req)
 }
 
+func (s *FactoryService) PreviewFactorySchedule(ctx context.Context, req *pb.PreviewFactoryScheduleRequest) (*pb.PreviewFactoryScheduleResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return actions.PreviewFactorySchedule(ctx, organizationID, req)
+}
+
 func (s *FactoryService) DeleteFactoryAutomation(ctx context.Context, req *pb.DeleteFactoryAutomationRequest) (*pb.DeleteFactoryAutomationResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return actions.DeleteFactoryAutomation(ctx, organizationID, req)

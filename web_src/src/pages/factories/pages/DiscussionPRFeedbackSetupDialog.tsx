@@ -162,6 +162,7 @@ function BotsStep({ setup }: { setup: DiscussionPRFeedbackSetupModel }) {
           catalog={setup.catalog}
           loading={setup.catalogLoading}
           loadError={setup.catalogQuery.isError}
+          supportsReviewBots={setup.supportsReviewBots}
           onToggle={setup.toggleBot}
           onAdd={setup.addBot}
         />

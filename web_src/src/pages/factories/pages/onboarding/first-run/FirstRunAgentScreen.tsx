@@ -1,6 +1,6 @@
 import { LoadingButton } from "@/components/ui/loading-button";
 
-import { AgentStep } from "../AgentStep";
+import { AgentStep, type OnboardingAgentModelPicker } from "../AgentStep";
 import { WIZARD_STEPS } from "../onboardingFixtures";
 import {
   agentFinishReady,
@@ -59,6 +59,7 @@ function AgentConnectionChoices({
   codex,
   subscriptionSelected,
   showProviders,
+  modelPicker,
   onRequestConnect,
 }: {
   organizationId: string;
@@ -70,6 +71,7 @@ function AgentConnectionChoices({
   codex?: CodexPanel;
   subscriptionSelected: boolean;
   showProviders: boolean;
+  modelPicker?: OnboardingAgentModelPicker;
   onRequestConnect: (id: IntegrationId) => void;
 }) {
   return (
@@ -105,6 +107,7 @@ function AgentConnectionChoices({
               setup={setup}
               showHostedCredit={modelSource.choice !== "own-key"}
               showCustomProvider={showCustomProvider}
+              modelPicker={modelPicker}
               onRequestConnect={onRequestConnect}
             />
           </FirstRunPanel>
@@ -125,6 +128,7 @@ export function FirstRunAgentScreen({
   showCustomProvider,
   modelSource,
   codex,
+  modelPicker,
   onRequestConnect,
   onContinue,
 }: {
@@ -138,6 +142,7 @@ export function FirstRunAgentScreen({
   showCustomProvider: boolean;
   modelSource: AgentModelSource;
   codex?: CodexPanel;
+  modelPicker?: OnboardingAgentModelPicker;
   onRequestConnect: (id: IntegrationId) => void;
   onContinue: () => void;
 }) {
@@ -179,13 +184,14 @@ export function FirstRunAgentScreen({
           codex={codex}
           subscriptionSelected={subscriptionSelected}
           showProviders={showProviders}
+          modelPicker={modelPicker}
           onRequestConnect={onRequestConnect}
         />
         <div className="space-y-3">
           <LoadingButton
             type="button"
             className="w-full"
-            disabled={!canFinish || loading}
+            disabled={!canFinish || loading || Boolean(showProviders && modelPicker && !modelPicker.value)}
             loading={saving}
             loadingText={FIRST_RUN_COPY.finish.saving}
             onClick={onContinue}
