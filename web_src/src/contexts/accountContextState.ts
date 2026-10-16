@@ -45,6 +45,8 @@ interface Account {
   groups?: string[];
   impersonation?: AccountImpersonation;
   license?: AccountLicense;
+  /** Product billing. False hides Billing. Missing keeps Billing. */
+  billing_enabled?: boolean;
 }
 
 export interface AccountContextType {

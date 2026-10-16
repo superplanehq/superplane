@@ -250,7 +250,10 @@ export function spendingBreakdownColumnLabel(breakdown: SpendingBreakdown): stri
   return "Machine type";
 }
 
-export function spendingUsageCopy(kind: SpendingUsageKind): {
+export function spendingUsageCopy(
+  kind: SpendingUsageKind,
+  billingEnabled = true,
+): {
   title: string;
   description: string;
   emptyMessage: string;
@@ -260,8 +263,9 @@ export function spendingUsageCopy(kind: SpendingUsageKind): {
   if (kind === "model") {
     return {
       title: "Model usage",
-      description:
-        "SuperPlane-hosted model usage uses hosted credit. Bring your own key usage is estimated and is not billed.",
+      description: billingEnabled
+        ? "SuperPlane-hosted model usage uses hosted credit. Bring your own key usage is estimated and is not billed."
+        : "Token usage and estimated spend by model.",
       emptyMessage: "No model usage is recorded for this period.",
       testIdPrefix: "spending-model",
       breakdownOptions: MODEL_BREAKDOWN_OPTIONS,

@@ -2,6 +2,7 @@ import type { FactoriesWorkOrderExecution } from "@/api-client";
 import { Link } from "@/components/Link/link";
 import { cn } from "@/lib/utils";
 
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { factorySettingsSectionPath } from "./lib/factoryPagePaths";
 import { workOrderExecutionCreditFailure } from "./lib/workOrderFailureReason";
 
@@ -23,7 +24,8 @@ export function WorkOrderCreditFailureNotice({
   className,
 }: WorkOrderCreditFailureNoticeProps) {
   const failure = workOrderExecutionCreditFailure(execution);
-  if (!failure) {
+  const billingProductEnabled = useBillingProductEnabled();
+  if (!billingProductEnabled || !failure) {
     return null;
   }
 
