@@ -61,6 +61,8 @@ func bitbucketFactoryTemplate(template factoryAppTemplate) factoryAppTemplate {
 }
 
 var factoryAppTemplates = map[factoryTemplateKey]factoryAppTemplate{
+	{id: scheduledIntakeTemplateID, provider: models.ProviderGitHub}:    scheduledIntakeTemplate(models.ProviderGitHub),
+	{id: scheduledIntakeTemplateID, provider: models.ProviderBitbucket}: scheduledIntakeTemplate(models.ProviderBitbucket),
 	{id: "line-implementation", provider: models.ProviderGitHub}: githubFactoryTemplate(factoryAppTemplate{
 		id:               "line-implementation",
 		entrypointNodeID: "onrun-implement",
@@ -242,6 +244,11 @@ func materializeFactoryTemplate(templateID, provider string, input factoryTempla
 		filterDisabledMergeChecks(canvas, params["enabledChecks"])
 	}
 
+	if template.id == scheduledIntakeTemplateID {
+		if err := configureScheduledIntake(canvas, template.provider, params); err != nil {
+			return nil, err
+		}
+	}
 	canvas.Metadata.ID = input.appID
 	canvas.Metadata.Name = input.appName
 	wireFactoryTemplate(canvas, template, input)
@@ -542,6 +549,19 @@ func deriveFactoryTemplateInput(
 		integrations:          map[string]factoryTemplateIntegration{},
 		agent:                 resetFactoryTemplateAgent(tx, factory, version.Nodes),
 		includeVisualEvidence: &includeVisualEvidence,
+	}
+	if template.id == scheduledIntakeTemplateID {
+		config := factory.OnboardingConfigValue()
+		input.installParams["appRepository"] = config.AppRepository
+		for _, node := range version.Nodes {
+			if node.ComponentName() == "schedule" {
+				for _, key := range []string{"type", "hour", "minute", "timezone", "cronExpression"} {
+					if value, ok := node.Configuration[key]; ok {
+						input.installParams[key] = fmt.Sprint(value)
+					}
+				}
+			}
+		}
 	}
 	for _, node := range version.Nodes {
 		integrationType := template.componentIntegrations[node.ComponentName()]
