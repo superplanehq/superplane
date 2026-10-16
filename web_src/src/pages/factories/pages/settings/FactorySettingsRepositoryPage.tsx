@@ -1,4 +1,5 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -179,20 +180,22 @@ function BranchPicker(props: {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
+        <Button
           type="button"
+          variant="outline"
           id={BRANCH_FIELD_ID}
           role="combobox"
           aria-expanded={open}
+          aria-haspopup="listbox"
           disabled={props.disabled}
           data-testid={BRANCH_FIELD_ID}
-          className="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-2.5 text-sm shadow-xs outline-none focus-visible:border-gray-500 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600/70 dark:bg-gray-800 dark:text-gray-100"
+          className="w-full justify-between rounded-md px-2.5 font-normal"
         >
-          <span className={cn("truncate", props.branch ? "text-foreground" : "text-muted-foreground")}>
+          <span className={cn("min-w-0 truncate", props.branch ? "text-foreground" : "text-muted-foreground")}>
             {props.branch || "Select a branch"}
           </span>
           <ChevronDown className="size-4 shrink-0 opacity-50" aria-hidden />
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command>
