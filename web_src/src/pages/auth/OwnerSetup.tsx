@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
+import { Button } from "@/components/ui/button";
 import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
 import { FLEET_MANAGER_WIZARD_STEPS, type FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
 import { posthog, isPostHogEnabled } from "@/posthog";
@@ -9,6 +10,7 @@ import type { FirstRunSphereProps } from "@/pages/factories/pages/onboarding/fir
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
 import { FleetManagerStep } from "./ownerSetup/FleetManagerStep";
 import { LicenseStep } from "./ownerSetup/LicenseStep";
+import { OWNER_SETUP_COPY } from "./ownerSetup/ownerSetupCopy";
 import { OwnerStep } from "./ownerSetup/OwnerStep";
 import { SmtpStep } from "./ownerSetup/SmtpStep";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
@@ -61,11 +63,13 @@ async function fetchSetupOwnerStatus(): Promise<SetupOwnerStatusResponse> {
   return (await response.json()) as SetupOwnerStatusResponse;
 }
 
-async function fetchSignedInAccount(): Promise<{ email: string } | null> {
+async function fetchSignedInAccount(): Promise<{ email: string; installation_admin: boolean } | null> {
   try {
     const response = await fetch("/account", { credentials: "include" });
     if (!response.ok) return null;
-    return (await response.json()) as { email: string };
+    const account = (await response.json()) as { email?: string; installation_admin?: boolean };
+    if (!account.email) return null;
+    return { email: account.email, installation_admin: account.installation_admin === true };
   } catch {
     return null;
   }
@@ -110,6 +114,10 @@ async function resolveOwnerSetupEntry(): Promise<OwnerSetupEntry> {
     return { kind: "redirect", to: "/login?redirect=/setup" };
   }
 
+  if (!account.installation_admin) {
+    return { kind: "redirect", to: "/" };
+  }
+
   const orgSlug = await fetchFirstOrganizationSlug();
   if (!orgSlug) {
     return { kind: "redirect", to: "/" };
@@ -122,17 +130,35 @@ async function resolveOwnerSetupEntry(): Promise<OwnerSetupEntry> {
 // Forward and back save the new step so a refresh resumes the same page.
 // Clearing the step closes the wizard; the survey and the organization
 // landing are not resumable setup pages.
-async function persistSetupProgress(step: string) {
+async function persistSetupProgress(step: string): Promise<boolean> {
   try {
-    await fetch("/api/v1/setup-owner/progress", {
+    const response = await fetch("/api/v1/setup-owner/progress", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ step }),
     });
+    if (response.ok) return true;
+    return step === "" && response.status === 409;
   } catch {
-    // Progress persistence is best-effort. The next load reconciles.
+    return false;
   }
+}
+
+function useQueuedSetupProgress() {
+  const queue = useRef(Promise.resolve());
+
+  return useCallback((step: string) => {
+    const save = queue.current.then(
+      () => persistSetupProgress(step),
+      () => persistSetupProgress(step),
+    );
+    queue.current = save.then(
+      () => undefined,
+      () => undefined,
+    );
+    return save;
+  }, []);
 }
 
 function writeSetupStepToAddress(step: OwnerSetupStep) {
@@ -424,6 +450,10 @@ const OwnerSetup: React.FC = () => {
     activeFleetStep !== null,
     fleetManagerOrganizationId(pendingOrganizationSlug),
   );
+  const saveSetupProgress = useQueuedSetupProgress();
+  const closingSetup = useRef(false);
+  const [closeError, setCloseError] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
   useReportPageReady(true);
 
@@ -441,13 +471,16 @@ const OwnerSetup: React.FC = () => {
     };
   }, []);
 
-  const goToStep = useCallback((next: OwnerSetupStep) => {
-    setStep(next);
-    writeSetupStepToAddress(next);
-    if (isResumableStep(next)) {
-      void persistSetupProgress(next);
-    }
-  }, []);
+  const goToStep = useCallback(
+    (next: OwnerSetupStep) => {
+      setStep(next);
+      writeSetupStepToAddress(next);
+      if (isResumableStep(next)) {
+        void saveSetupProgress(next);
+      }
+    },
+    [saveSetupProgress],
+  );
 
   // The setup-owner request already saved this step in its transaction,
   // so advancing after account creation does not persist again.
@@ -464,11 +497,20 @@ const OwnerSetup: React.FC = () => {
     );
 
   const finishInstallation = useCallback(() => {
-    if (!pendingOrganizationSlug) return;
-    void persistSetupProgress("").then(() => {
+    if (!pendingOrganizationSlug || closingSetup.current) return;
+    closingSetup.current = true;
+    setIsClosing(true);
+    setCloseError(false);
+    void saveSetupProgress("").then((saved) => {
+      closingSetup.current = false;
+      setIsClosing(false);
+      if (!saved) {
+        setCloseError(true);
+        return;
+      }
       continueAfterOwnerSetup({ orgSlug: pendingOrganizationSlug, setActiveSurvey, setStep });
     });
-  }, [pendingOrganizationSlug]);
+  }, [pendingOrganizationSlug, saveSetupProgress]);
 
   const fleetStepIndex = activeFleetStep ? FLEET_MANAGER_WIZARD_STEPS.indexOf(activeFleetStep) : -1;
 
@@ -484,6 +526,14 @@ const OwnerSetup: React.FC = () => {
       sphere={OWNER_SETUP_PREVIEW}
       chrome={ownerSetupChrome({ step, email, goToStep })}
     >
+      {closeError && (
+        <div className="mb-6" role="alert" data-testid="owner-setup-close-error">
+          <p className="text-sm text-destructive">{OWNER_SETUP_COPY.closeError}</p>
+          <Button type="button" className="mt-3" onClick={finishInstallation} disabled={isClosing}>
+            {OWNER_SETUP_COPY.closeRetry}
+          </Button>
+        </div>
+      )}
       {step === "owner" && (
         <OwnerStep
           email={email}

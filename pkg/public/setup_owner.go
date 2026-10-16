@@ -2,7 +2,6 @@ package public
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	log "github.com/sirupsen/logrus"
@@ -20,8 +19,6 @@ const (
 	setupOwnerStatusInProgress = "in_progress"
 	setupOwnerStatusComplete   = "complete"
 )
-
-var errOwnerSetupClosed = errors.New("owner setup is already finished")
 
 type SetupOwnerRequest struct {
 	Email     string `json:"email"`
@@ -210,27 +207,20 @@ func (s *Server) updateSetupOwnerProgress(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	var updated bool
 	err := database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
-		current, err := models.GetOwnerSetupStep(tx)
-		if err != nil {
-			return err
-		}
-
-		if current == "" {
-			return errOwnerSetupClosed
-		}
-
-		return models.SetOwnerSetupStep(tx, req.Step)
+		var err error
+		updated, err = models.SetOwnerSetupStepIfOpen(tx, req.Step)
+		return err
 	})
-
-	if errors.Is(err, errOwnerSetupClosed) {
-		http.Error(w, "Owner setup is already finished", http.StatusConflict)
-		return
-	}
-
 	if err != nil {
 		log.Errorf("Failed to update owner setup step: %v", err)
 		http.Error(w, "Failed to update owner setup progress", http.StatusInternalServerError)
+		return
+	}
+
+	if !updated {
+		http.Error(w, "Owner setup is already finished", http.StatusConflict)
 		return
 	}
 

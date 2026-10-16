@@ -318,6 +318,104 @@ describe("OwnerSetup", () => {
     expect(screen.queryByRole("heading", { name: "Create the owner account" })).not.toBeInTheDocument();
   });
 
+  it("sends a signed-in member away from an in-progress setup", async () => {
+    stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "smtp" },
+      account: { status: 200, body: { email: "member@example.com", installation_admin: false } },
+      organizations: [{ slug: "acme" }],
+    });
+    renderOwnerSetup();
+
+    await waitFor(() => expect(window.location.href).toBe("/"));
+    expect(screen.queryByRole("heading", { name: OWNER_SETUP_COPY.smtp.headline })).not.toBeInTheDocument();
+  });
+
+  it("prepares a personal token before showing a resumed install command", async () => {
+    stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "fleet-install" },
+      account: { status: 200 },
+      organizations: [{ slug: "acme" }],
+    });
+    renderOwnerSetup();
+
+    expect(await screen.findByText(/installationAdminToken: owner-setup-token/)).toBeInTheDocument();
+    expect(createToken).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/<<'EOF'\s*EOF/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the install command hidden when a resumed token cannot be created", async () => {
+    createToken.mockRejectedValueOnce(new Error("no token"));
+    stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "fleet-install" },
+      account: { status: 200 },
+      organizations: [{ slug: "acme" }],
+    });
+    renderOwnerSetup();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not create the Fleet Manager personal token/i);
+    expect(screen.queryByText(/fleet-manager-values.yaml/)).not.toBeInTheDocument();
+
+    createToken.mockResolvedValue({ plaintext: "owner-setup-token" });
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByText(/installationAdminToken: owner-setup-token/)).toBeInTheDocument();
+  });
+
+  it("stays on the page when closing setup fails", async () => {
+    const fetchMock = stubOwnerSetupFetch();
+    const original = fetchMock.getMockImplementation();
+    let closeAttempts = 0;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/api/v1/setup-owner/progress") && init?.body === JSON.stringify({ step: "" })) {
+        closeAttempts += 1;
+        if (closeAttempts === 1) return new Response("", { status: 500 });
+      }
+      return original?.(input, init) ?? new Response("", { status: 404 });
+    });
+    renderOwnerSetup();
+    await reachFleetStep();
+
+    fireEvent.click(screen.getByTestId("owner-setup-fleet-skip"));
+
+    expect(await screen.findByTestId("owner-setup-close-error")).toHaveTextContent(OWNER_SETUP_COPY.closeError);
+    expect(window.location.href).toBe("http://localhost/setup");
+
+    fireEvent.click(screen.getByRole("button", { name: OWNER_SETUP_COPY.closeRetry }));
+    await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
+  });
+
+  it("sends setup progress saves in navigation order", async () => {
+    let releaseFirst: () => void = () => undefined;
+    const firstSave = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const steps: string[] = [];
+    let progressCalls = 0;
+    const fetchMock = stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "license" },
+      account: { status: 200 },
+      organizations: [{ slug: "acme" }],
+    });
+    const original = fetchMock.getMockImplementation();
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/api/v1/setup-owner/progress")) {
+        progressCalls += 1;
+        steps.push((JSON.parse(String(init?.body)) as { step: string }).step);
+        if (progressCalls === 1) await firstSave;
+      }
+      return original?.(input, init) ?? new Response("", { status: 404 });
+    });
+    renderOwnerSetup();
+
+    fireEvent.click(await screen.findByTestId("owner-setup-license-skip"));
+    await waitFor(() => expect(progressCalls).toBe(1));
+    fireEvent.click(screen.getByTestId("owner-setup-smtp-skip"));
+    expect(progressCalls).toBe(1);
+
+    releaseFirst();
+    await waitFor(() => expect(steps).toEqual(["smtp", "fleet-intro"]));
+  });
+
   it("sends a signed-out user to login when setup is complete", async () => {
     stubOwnerSetupFetch({
       status: { status: "complete" },
