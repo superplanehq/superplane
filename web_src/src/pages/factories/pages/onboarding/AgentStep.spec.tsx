@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "bun:test";
 
 import { FACTORIES_ORGANIZATION_ID } from "@/pages/factories/__fixtures__/factoryPageResponses";
 
-import { AgentStep } from "./AgentStep";
+import { AgentStep, type OnboardingAgentModelPicker } from "./AgentStep";
 import type { IntegrationId } from "./onboardingFixtures";
 import { useOnboardingSetupState } from "./useOnboardingSetupState";
 
@@ -22,6 +22,7 @@ function renderAgentStep(args?: {
   spend?: { remainingCreditCents: string; grantTotalCents: string };
   showCustomProvider?: boolean;
   onRequestConnect?: (id: IntegrationId) => void;
+  modelPicker?: OnboardingAgentModelPicker;
 }) {
   Object.assign(spendState, args?.spend ?? { remainingCreditCents: "4124", grantTotalCents: "5000" });
   const onRequestConnect = args?.onRequestConnect ?? vi.fn();
@@ -38,6 +39,7 @@ function renderAgentStep(args?: {
         setup={setup}
         showCustomProvider={args?.showCustomProvider}
         onRequestConnect={onRequestConnect}
+        modelPicker={args?.modelPicker}
       />
     );
   }
@@ -49,6 +51,47 @@ function renderAgentStep(args?: {
 }
 
 describe("AgentStep", () => {
+  it("lets the user select a model from the connected key", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderAgentStep({
+      connected: ["claude"],
+      modelPicker: {
+        models: ["claude-sonnet-4-6", "claude-opus-5-5"],
+        value: "claude-sonnet-4-6",
+        loading: false,
+        error: false,
+        retry: vi.fn(),
+        onChange,
+      },
+    });
+
+    await user.click(screen.getByRole("combobox", { name: "Model" }));
+    await user.click(screen.getByRole("option", { name: "claude-opus-5-5" }));
+
+    expect(onChange).toHaveBeenCalledWith("claude-opus-5-5");
+  });
+
+  it("offers a retry when key models cannot load", async () => {
+    const user = userEvent.setup();
+    const retry = vi.fn();
+    renderAgentStep({
+      connected: ["claude"],
+      modelPicker: {
+        models: [],
+        value: "",
+        loading: false,
+        error: true,
+        retry,
+        onChange: vi.fn(),
+      },
+    });
+
+    expect(screen.getByRole("combobox", { name: "Model" })).toBeDisabled();
+    expect(screen.getByText("Unable to load models. Try again.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry" }));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
   it("shows hosted credit when the organization has a grant", () => {
     renderAgentStep();
 

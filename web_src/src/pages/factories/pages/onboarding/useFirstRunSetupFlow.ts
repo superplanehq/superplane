@@ -331,7 +331,11 @@ function useFirstRunCommands(args: {
       return model.requestConnect(source);
     });
   const continueFromAgent = () => {
-    if (agentGate === "first") return navigation.goToScreen("tickets");
+    if (agentGate === "first") {
+      return blocking.run("saving-agent", async () => {
+        if (await model.saveAgent()) navigation.goToScreen("tickets");
+      });
+    }
     return blocking.run("finishing-setup", async () => {
       await model.finish();
     });

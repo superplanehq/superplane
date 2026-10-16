@@ -65,6 +65,38 @@ func Test__ResolveIntakeAgent(t *testing.T) {
 		}
 	})
 
+	t.Run("planning uses the model selected on the provisioned app", func(t *testing.T) {
+		factory := newFactoryIn(t, r.Organization.ID)
+		agentID := createReadyOnboardingIntegration(t, r.Organization.ID, "claude")
+		app := createLineAppWithRunner(t, r, factory.ID, "runnerClaudeCode", "integration", "claude-haiku-4-5-20251001")
+		version, err := models.FindLiveCanvasVersionInTransaction(db, app.ID)
+		require.NoError(t, err)
+		nodes := version.Nodes
+		nodes[1].Configuration["credentials"] = map[string]any{
+			"source":      "integration",
+			"integration": map[string]any{"name": integrationName(t, r.Organization.ID, agentID)},
+		}
+		require.NoError(t, db.Model(version).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
+		appID := app.ID.String()
+		require.NoError(t, factory.UpdateOnboarding(db, models.FactoryOnboardingPatch{
+			AgentIntegrationID: &agentID,
+			ProvisionedAppID:   &appID,
+		}))
+
+		agent := resolveIntakeAgent(db, factory)
+		require.NotNil(t, agent)
+		canvas := buildBacklogCanvas(backlogCanvasRequest{Agent: agent})
+		node := findYAMLNode(t, canvas, backlogRefinementNodeID)
+		assert.Equal(t, "claude-haiku-4-5-20251001", node.Configuration["model"])
+		assert.Equal(t, integrationName(t, r.Organization.ID, agentID), integrationRefName(t, agent))
+
+		nodes[1].Configuration["credentials"] = map[string]any{
+			"source": "integration", "integration": map[string]any{"name": "another-key"},
+		}
+		require.NoError(t, db.Model(version).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
+		assert.Equal(t, intakeAgentSpecs[0].model, resolveIntakeAgent(db, factory).Model)
+	})
+
 	t.Run("OpenRouter needs the model the runner asks for", func(t *testing.T) {
 		organization := support.CreateOrganization(t, r, r.User)
 		factory := newFactoryIn(t, organization.ID)
