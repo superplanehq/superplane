@@ -233,6 +233,7 @@ export function PRFeedbackDiscussionFields({
             catalog={catalog}
             loading={catalogEnabled && (catalogQuery.isPending || catalogQuery.isFetching)}
             loadError={catalogQuery.isError}
+            supportsReviewBots={supportsReviewBots}
             onToggle={(login) => onUpdate("allowedBots", toggleUniqueString(draft.allowedBots, login))}
             onAdd={(login) => {
               const normalized = normalizeReviewBotLogin(login);

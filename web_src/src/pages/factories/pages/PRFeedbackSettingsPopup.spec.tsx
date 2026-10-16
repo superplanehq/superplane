@@ -147,6 +147,7 @@ function renderChecksPopup(
   settings: PRFeedbackDraftSettings = checksDraft(),
   organizationId?: string,
   githubIntegrationId?: string,
+  vcsProvider?: string,
 ) {
   render(
     <MemoryRouter>
@@ -154,6 +155,7 @@ function renderChecksPopup(
         <PRFeedbackSettingsPopup
           organizationId={organizationId}
           githubIntegrationId={githubIntegrationId}
+          vcsProvider={vcsProvider}
           settings={settings}
           healthy
           onSave={onSave}
@@ -176,12 +178,7 @@ function prFeedbackGraph(): IntakeAutomationGraph {
         nodes: [
           { id: "comment", name: "On PR Comment", type: "TYPE_TRIGGER", component: "github.onPRComment" },
           { id: "find", name: "Find Pull Request", type: "TYPE_ACTION", component: "findPullRequest" },
-          {
-            id: "runner",
-            name: "Address PR feedback",
-            type: "TYPE_ACTION",
-            component: "runnerClaude",
-          },
+          { id: "runner", name: "Address PR feedback", type: "TYPE_ACTION", component: "runnerClaude" },
         ],
         edges: [
           { channel: "default", sourceId: "comment", targetId: "find" },
@@ -215,12 +212,7 @@ function prFeedbackGraph(): IntakeAutomationGraph {
   };
 }
 
-function renderAutomationPopup(
-  props: {
-    canvasId?: string;
-    runHrefFor?: (runId: string) => string;
-  } = {},
-) {
+function renderAutomationPopup(props: { canvasId?: string; runHrefFor?: (runId: string) => string } = {}) {
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
       <MemoryRouter>
@@ -309,6 +301,16 @@ describe("PRFeedbackSettingsPopup discussion", () => {
         allowedBots: ["coderabbitai"],
       }),
     );
+  });
+
+  it("shows a bot name field for Bitbucket instead of an empty catalog", async () => {
+    const user = userEvent.setup();
+    renderChecksPopup(vi.fn(), discussionDraft(), "org-1", "gh-1", "bitbucket");
+    await user.click(screen.getByRole("radio", { name: /Address bot comments/ }));
+    expect(screen.queryByTestId("discussion-setup-bots-empty")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("discussion-setup-bots-picker")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("discussion-setup-bot-coderabbitai")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Bot name")).toBeInTheDocument();
   });
 });
 
