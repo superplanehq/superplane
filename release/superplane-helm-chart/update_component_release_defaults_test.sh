@@ -55,6 +55,10 @@ while [ "$#" -gt 0 ]; do
     --write-out)
       shift 2
       ;;
+    --max-time)
+      printf '%s' "$2" >"${TMP_DIR}/max-time"
+      shift 2
+      ;;
     --silent|--show-error)
       shift
       ;;
@@ -130,6 +134,14 @@ case "${CURL_MODE}" in
       exit 1
     fi
     write_response "500 Internal Server Error" '{"message":"unavailable"}'
+    ;;
+  stall)
+    if [ "${url}" != "${API_ROOT}" ]; then
+      echo "unexpected releases URL: ${url}" >&2
+      exit 1
+    fi
+    sleep 60
+    exit 28
     ;;
   invalid-json)
     if [ "${url}" != "${API_ROOT}" ]; then
@@ -317,6 +329,34 @@ export CURL_MODE=http-error
 run_updater
 assert_unchanged
 grep -q 'HTTP 500' "${TMP_DIR}/stderr"
+
+write_saved_values
+cp "${TMP_DIR}/values.yaml" "${TMP_DIR}/values.before"
+export CURL_MODE=stall
+rm -f "${TMP_DIR}/max-time"
+: >"${CURL_SEQUENCE}"
+stall_started="$(date +%s)"
+set +e
+timeout 45 node "${UPDATER}" "${TMP_DIR}/values.yaml" >"${TMP_DIR}/stdout" 2>"${TMP_DIR}/stderr"
+stall_status="$?"
+set -e
+stall_elapsed="$(( $(date +%s) - stall_started ))"
+if [ "${stall_status}" -ne 0 ]; then
+  echo "stalled release lookup did not fall back (status ${stall_status}, elapsed ${stall_elapsed}s)" >&2
+  cat "${TMP_DIR}/stderr" >&2 || true
+  exit 1
+fi
+if [ "${stall_elapsed}" -lt 10 ]; then
+  echo "stalled release lookup returned before the request timeout (${stall_elapsed}s)" >&2
+  exit 1
+fi
+assert_unchanged
+grep -q 'request timed out' "${TMP_DIR}/stderr"
+max_time="$(cat "${TMP_DIR}/max-time")"
+if [ "${max_time}" -lt 10 ] || [ "${max_time}" -gt 30 ]; then
+  echo "curl --max-time must stay between 10 and 30 seconds, got ${max_time}" >&2
+  exit 1
+fi
 
 write_saved_values
 cp "${TMP_DIR}/values.yaml" "${TMP_DIR}/values.before"

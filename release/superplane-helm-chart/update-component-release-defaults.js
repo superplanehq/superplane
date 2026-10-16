@@ -11,6 +11,8 @@ const { parseVersion } = require("../component-release");
 
 const API_VERSION = "2022-11-28";
 const USER_AGENT = "superplane-component-release";
+const RELEASE_REQUEST_TIMEOUT_SECONDS = 20;
+const RELEASE_REQUEST_TIMEOUT_GRACE_MS = 5000;
 const FALLBACK_COMMENT =
   "# Saved versions are the fallback when release lookup fails.";
 const COMPONENTS = [
@@ -75,6 +77,8 @@ function requestReleases(pageURL, token) {
     const args = [
       "--silent",
       "--show-error",
+      "--max-time",
+      String(RELEASE_REQUEST_TIMEOUT_SECONDS),
       "--output",
       bodyPath,
       "--dump-header",
@@ -89,8 +93,17 @@ function requestReleases(pageURL, token) {
 
     let statusCode;
     try {
-      statusCode = execFileSync("curl", args, { encoding: "utf8" }).trim();
-    } catch {
+      statusCode = execFileSync("curl", args, {
+        encoding: "utf8",
+        timeout:
+          RELEASE_REQUEST_TIMEOUT_SECONDS * 1000 +
+          RELEASE_REQUEST_TIMEOUT_GRACE_MS,
+        killSignal: "SIGKILL",
+      }).trim();
+    } catch (error) {
+      if (error && (error.code === "ETIMEDOUT" || error.status === 28)) {
+        throw new Error("failed to list GitHub releases: request timed out");
+      }
       throw new Error("failed to list GitHub releases");
     }
 
