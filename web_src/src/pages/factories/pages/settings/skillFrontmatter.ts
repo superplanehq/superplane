@@ -79,14 +79,63 @@ function unescapeYamlScalar(value: string): string {
 
 function quotedYamlScalar(value: string): string | undefined {
   const quote = value[0];
-  if (quote !== '"' && quote !== "'") {
-    return undefined;
+  if (quote === "'") {
+    return singleQuotedYamlScalar(value);
   }
-  const end = value.indexOf(quote, 1);
+  if (quote === '"') {
+    return doubleQuotedYamlScalar(value);
+  }
+  return undefined;
+}
+
+function singleQuotedYamlScalar(value: string): string | undefined {
+  let decoded = "";
+  for (let index = 1; index < value.length; index++) {
+    const char = value[index];
+    if (char !== "'") {
+      decoded += char;
+      continue;
+    }
+    if (value[index + 1] === "'") {
+      decoded += "'";
+      index += 1;
+      continue;
+    }
+    return decoded;
+  }
+  return undefined;
+}
+
+function doubleQuotedYamlScalar(value: string): string | undefined {
+  const end = closingDoubleQuote(value);
   if (end < 0) {
     return undefined;
   }
-  return value.slice(1, end);
+  try {
+    const parsed: unknown = JSON.parse(value.slice(0, end + 1));
+    return typeof parsed === "string" ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function closingDoubleQuote(value: string): number {
+  let escaped = false;
+  for (let index = 1; index < value.length; index++) {
+    const char = value[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      return index;
+    }
+  }
+  return -1;
 }
 
 function plainYamlScalar(value: string): string {
