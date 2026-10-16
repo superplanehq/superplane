@@ -57,17 +57,19 @@ resource "helm_release" "nginx_ingress" {
 
 locals {
   fleet_manager_setup_values = yamlencode({
+    # The published chart still defaults both components to v0.1.0.
+    # Runner and Fleet Manager publish on separate release lines.
+    componentReleases = {
+      runnerVersion       = "v0.2.0"
+      runnerVersions      = ["v0.2.0"]
+      fleetManagerVersion = "v0.1.3"
+    }
     fleetManagerSetup = {
       enabled            = true
       provider           = "azure"
       managerId          = var.cluster_name
       namespace          = var.superplane_namespace
       serviceAccountName = "superplane-fleet-manager"
-      credentials = {
-        provision      = true
-        existingSecret = "superplane-fleet-manager-token"
-        tokenKey       = "INSTALLATION_ADMIN_TOKEN"
-      }
       infrastructure = {
         superplaneUrl        = "https://${var.domain_name}"
         subscriptionId       = var.subscription_id
@@ -76,6 +78,8 @@ locals {
         zones                = var.runner_zones
         subnetId             = azurerm_subnet.runners.id
         securityGroupIds     = azurerm_network_security_group.runners.id
+        imageAmd64           = var.runner_image_amd64
+        imageArm64           = var.runner_image_arm64
         runnerIdentity       = azurerm_user_assigned_identity.runner.id
         fleetManagerIdentity = azurerm_user_assigned_identity.fleet_manager.client_id
       }
@@ -106,6 +110,11 @@ resource "helm_release" "superplane" {
   }
 
   values = [local.fleet_manager_setup_values]
+
+  set {
+    name  = "componentReleases.fleetManagerVersion"
+    value = var.fleet_manager_version
+  }
 
   set {
     name  = "database.secretName"

@@ -45,6 +45,24 @@ describe("FirstRunShell", () => {
     expect(screen.getByRole("heading", { name: "Connect SuperPlane to GitHub" })).toBeInTheDocument();
   });
 
+  it("keeps preview Back in the footer so a long step cannot cover it", () => {
+    renderShell(
+      <FirstRunShell
+        testId="preview"
+        visual="preview"
+        chrome={{ stepIndex: 1, onBack: () => undefined, onLogOut: () => undefined }}
+      >
+        <h1>Install Fleet Manager</h1>
+      </FirstRunShell>,
+    );
+
+    const bottomRow = screen.getByTestId("first-run-bottom-row");
+    const back = screen.getByTestId("first-run-back");
+    expect(bottomRow).toContainElement(back);
+    expect(screen.getByTestId("first-run-content")).not.toContainElement(back);
+    expect(bottomRow).toContainElement(screen.getByTestId("first-run-log-out"));
+  });
+
   it("gives the organization and workspace menus the preview colors", async () => {
     const user = userEvent.setup();
     renderShell(

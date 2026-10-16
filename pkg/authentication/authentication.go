@@ -3,7 +3,6 @@ package authentication
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -424,7 +423,7 @@ func (a *Handler) completeProviderAuth(w http.ResponseWriter, r *http.Request, g
 		return
 	}
 
-	err = updateAccountProviders(a.encryptor, account, gothUser)
+	err = updateAccountProviders(account, gothUser)
 	if err != nil {
 		log.Errorf("Error updating account providers for %s: %v", gothUser.Email, err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -1321,28 +1320,17 @@ func getAuthState(r *http.Request) string {
 	return redirectURL
 }
 
-func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account, gothUser goth.User) error {
-	accessToken, err := encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Email))
-	if err != nil {
-		return err
-	}
-
+func updateAccountProviders(account *models.Account, gothUser goth.User) error {
 	accountProvider, err := account.FindAccountProviderByID(gothUser.Provider, gothUser.UserID)
 
 	//
 	// If we already have an account provider for this provider and provider ID, we just update it.
 	//
 	if err == nil {
-		accountProvider.AccessToken = base64.StdEncoding.EncodeToString(accessToken)
 		accountProvider.Username = gothUser.NickName
 		accountProvider.Email = utils.NormalizeEmail(gothUser.Email)
 		accountProvider.Name = gothUser.Name
 		accountProvider.AvatarURL = gothUser.AvatarURL
-		accountProvider.RefreshToken = gothUser.RefreshToken
-		if !gothUser.ExpiresAt.IsZero() {
-			accountProvider.TokenExpiresAt = &gothUser.ExpiresAt
-		}
-
 		return database.Conn().Save(accountProvider).Error
 	}
 
@@ -1350,16 +1338,13 @@ func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account,
 	// Otherwise, we create a new account provider.
 	//
 	accountProvider = &models.AccountProvider{
-		AccountID:      account.ID,
-		Provider:       gothUser.Provider,
-		ProviderID:     gothUser.UserID,
-		Username:       gothUser.NickName,
-		Email:          utils.NormalizeEmail(gothUser.Email),
-		Name:           gothUser.Name,
-		AvatarURL:      gothUser.AvatarURL,
-		AccessToken:    base64.StdEncoding.EncodeToString(accessToken),
-		RefreshToken:   gothUser.RefreshToken,
-		TokenExpiresAt: &gothUser.ExpiresAt,
+		AccountID:  account.ID,
+		Provider:   gothUser.Provider,
+		ProviderID: gothUser.UserID,
+		Username:   gothUser.NickName,
+		Email:      utils.NormalizeEmail(gothUser.Email),
+		Name:       gothUser.Name,
+		AvatarURL:  gothUser.AvatarURL,
 	}
 
 	return database.Conn().Create(accountProvider).Error

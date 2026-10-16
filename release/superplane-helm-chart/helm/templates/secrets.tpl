@@ -89,6 +89,21 @@
 {{- end -}}
 {{- end -}}
 
+{{- define "superplane.avoidRunnerLogNode" -}}
+{{- if and (or .Values.runner.api.enabled (eq (include "runner.workers.enabled" .) "true")) (not .Values.runner.activeLogs.existingClaim) }}
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app: superplane
+              service: {{ .Release.Name }}-{{ if .Values.runner.api.enabled }}runner-api{{ else }}runner-workers{{ end }}
+          topologyKey: kubernetes.io/hostname
+{{- end }}
+{{- end }}
+
 {{- define "runner.activeLogs.claimName" -}}
 {{- if .Values.runner.activeLogs.existingClaim -}}
 {{- .Values.runner.activeLogs.existingClaim -}}

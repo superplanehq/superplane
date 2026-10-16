@@ -7,7 +7,9 @@ import {
   fleetManagerInstallCommand,
   generateFleetManagerValues,
   loadFleetManagerDraft,
+  mergeTerraformInfrastructure,
   saveFleetManagerDraft,
+  terraformInstallPlaceholders,
   validateFleetManagerConfiguration,
   type FleetManagerSetupMetadata,
 } from "./fleetManagerSetup";
@@ -19,6 +21,7 @@ const metadata: FleetManagerSetupMetadata = {
   runnerReleaseUrlTemplate: "https://example/releases/runner%2F{version}",
   chartRepository: "oci://ghcr.io/superplanehq/fleet-manager-chart",
   imageRepository: "ghcr.io/superplanehq/fleet-manager",
+  runnerVersions: ["v0.1.0"],
   fleetPresets: [
     {
       id: "e1-large-amd64",
@@ -38,36 +41,51 @@ const metadata: FleetManagerSetupMetadata = {
     managerId: "test-cluster",
     namespace: "superplane",
     serviceAccountName: "superplane-fleet-manager",
-    fields: { superplaneUrl: "https://superplane.example.com", region: "us-east-1", subnetIds: ["subnet-a"] },
-  },
-  credentials: {
-    existingSecret: "superplane-fleet-manager-token",
-    tokenKey: "INSTALLATION_ADMIN_TOKEN",
-    autoProvisioned: true,
+    fields: {
+      superplaneUrl: "https://superplane.example.com",
+      region: "us-east-1",
+      subnetIds: ["subnet-a"],
+      imageAmd64: "runner-image-amd64",
+    },
   },
 };
 
 describe("generateFleetManagerValues", () => {
-  it.each([
-    ["aws", "<PUBLIC_AMI_ID_FOR_REGION_AND_ARCH>"],
-    ["gcp", "<PUBLIC_GCP_IMAGE_OR_FAMILY>"],
-    ["azure", "<PUBLIC_AZURE_IMAGE_VERSION_ID>"],
-  ] as const)("generates %s values with a public image placeholder", (provider, placeholder) => {
+  it.each(["aws", "gcp", "azure"] as const)("generates complete %s values", (provider) => {
     const values = generateFleetManagerValues({
       metadata,
+      installationAdminToken: "personal-token",
       provider,
       managerId: `test-${provider}`,
       superplaneUrl: "https://superplane.example.com",
       runnerVersion: "v0.1.0",
       selectedFleetIds: ["e1-large-amd64"],
       fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 2 } },
-      fields: {},
+      fields: { imageAmd64: "runner-image-amd64" },
     });
 
     expect(values).toContain(`provider: ${provider}`);
-    expect(values).toContain(placeholder);
-    expect(values).not.toContain("INSTALLATION_ADMIN_TOKEN:");
-    expect(values).not.toContain("token:");
+    expect(values).toContain("runner-image-amd64");
+    expect(values).toContain("installationAdminToken: personal-token");
+    expect(values).not.toContain("credentials:");
+  });
+
+  it("quotes the runner release URL so a shell paste keeps the version placeholder", () => {
+    const values = generateFleetManagerValues({
+      metadata,
+      installationAdminToken: "personal-token",
+      provider: "gcp",
+      managerId: "test-gcp",
+      superplaneUrl: "https://superplane.example.com",
+      runnerVersion: "v0.1.0",
+      selectedFleetIds: ["e1-large-amd64"],
+      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+      fields: {},
+    });
+
+    expect(values).toContain('releaseBaseUrl: "https://example/releases/runner%2F{version}"');
+    const parsed = load(values) as { runner: { releaseBaseUrl: string } };
+    expect(parsed.runner.releaseBaseUrl).toBe(metadata.runnerReleaseUrlTemplate);
   });
 
   it("generates capacity for each selected fleet", () => {
@@ -76,6 +94,7 @@ describe("generateFleetManagerValues", () => {
         ...metadata,
         fleetPresets: [...metadata.fleetPresets, { ...metadata.fleetPresets[0], id: "e1-tiny-amd64" }],
       },
+      installationAdminToken: "personal-token",
       provider: "aws",
       managerId: "test-aws",
       superplaneUrl: "https://superplane.example.com",
@@ -110,6 +129,7 @@ describe("generateFleetManagerValues", () => {
           },
         ],
       },
+      installationAdminToken: "personal-token",
       provider: "aws",
       managerId: "test-aws",
       superplaneUrl: "https://cluster.example.com",
@@ -135,6 +155,7 @@ describe("generateFleetManagerValues", () => {
   it("does not attach a GCP service account unless one is configured", () => {
     const values = generateFleetManagerValues({
       metadata,
+      installationAdminToken: "personal-token",
       provider: "gcp",
       managerId: "test-gcp",
       superplaneUrl: "https://superplane.example.com",
@@ -179,16 +200,19 @@ describe("validateFleetManagerConfiguration", () => {
   });
 });
 
-it("generates a bounded Helm installation command", () => {
-  const install = fleetManagerInstallCommand(metadata, "superplane", "values.yaml");
+it("generates a bounded Helm installation command with the complete values", () => {
+  const install = fleetManagerInstallCommand(metadata, "superplane", "installationAdminToken: personal-token\n");
 
+  expect(install).toContain("cat > fleet-manager-values.yaml <<'EOF'");
   expect(install).toContain("--version 0.1.0");
-  expect(install).toContain("--wait --timeout 10m");
-  expect(install).not.toContain("token");
+  expect(install).toContain("--timeout 10m");
+  expect(install).toContain("-f fleet-manager-values.yaml");
+  expect(install).not.toContain("--values -");
+  expect(install).toContain("installationAdminToken: personal-token");
 });
 
 it("uses a custom namespace in generated commands", () => {
-  const install = fleetManagerInstallCommand(metadata, "runners", "values.yaml");
+  const install = fleetManagerInstallCommand(metadata, "runners", "manager:\n  id: test\n");
 
   expect(install).toContain("--namespace runners");
 });
@@ -212,6 +236,206 @@ it("matches installed fleets by version and specification", () => {
     false,
   );
   expect(fleetsMatchConfiguration(installed, { ...draft, selectedFleetIds: [] }, metadata.fleetPresets)).toBe(false);
+});
+
+it("replaces saved infrastructure with the current Terraform values", () => {
+  const draft = {
+    provider: "aws" as const,
+    managerId: "test-cluster",
+    namespace: "superplane",
+    serviceAccountName: "superplane-fleet-manager",
+    superplaneUrl: "https://old.example.com",
+    runnerVersion: "v0.1.0",
+    selectedFleetIds: [] as string[],
+    fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+    fields: { region: "eu-west-1", imageAmd64: "ami-old", "machineType.e1-large-amd64": "t3.small" },
+    fieldsByProvider: {
+      aws: { region: "eu-west-1", imageAmd64: "ami-old", "machineType.e1-large-amd64": "t3.small" },
+    },
+  };
+
+  const merged = mergeTerraformInfrastructure(draft, metadata);
+  const values = generateFleetManagerValues({
+    metadata,
+    ...merged,
+    installationAdminToken: "personal-token",
+    selectedFleetIds: ["e1-large-amd64"],
+  });
+
+  expect(values).toContain("region: us-east-1");
+  expect(values).toContain("ami: runner-image-amd64");
+  expect(values).toContain("instanceType: t3.small");
+  expect(values).toContain("url: https://superplane.example.com");
+  expect(merged.fieldsByProvider?.aws?.region).toBe("us-east-1");
+  expect(mergeTerraformInfrastructure({ ...draft, provider: "gcp" }, metadata).fields.region).toBe("eu-west-1");
+  expect(
+    mergeTerraformInfrastructure(draft, {
+      ...metadata,
+      infrastructureDefaults: { ...metadata.infrastructureDefaults, source: "manual" },
+    }).fields.region,
+  ).toBe("eu-west-1");
+});
+
+it.each([
+  [
+    "aws",
+    {
+      superplaneUrl: "https://superplane.example.com",
+      region: "us-east-1",
+      subnetIds: ["subnet-a", "subnet-b"],
+      securityGroupIds: ["sg-runner"],
+      imageAmd64: "ami-amd64",
+      imageArm64: "",
+      fleetManagerIdentity: "arn:aws:iam::123456789012:role/fleet-manager",
+      runnerIdentity: "runner-profile",
+    },
+  ],
+  [
+    "gcp",
+    {
+      superplaneUrl: "https://superplane.fezta.app",
+      projectId: "self-hosted-1",
+      zones: ["us-central1-a"],
+      subnetwork: "projects/self-hosted-1/regions/us-central1/subnetworks/superplane-runners",
+      networkTags: ["superplane-runner"],
+      imageAmd64: "projects/self-hosted-1/global/images/family/superplane-runner-amd64",
+      imageArm64: "",
+      fleetManagerIdentity: "superplane-fleet-mgr@self-hosted-1.iam.gserviceaccount.com",
+    },
+  ],
+  [
+    "azure",
+    {
+      superplaneUrl: "https://superplane.example.com",
+      subscriptionId: "00000000-0000-0000-0000-000000000000",
+      resourceGroup: "superplane-runners",
+      location: "eastus",
+      zones: ["1"],
+      subnetId:
+        "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/runners/providers/Microsoft.Network/virtualNetworks/runners/subnets/runners",
+      securityGroupIds:
+        "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/runners/providers/Microsoft.Network/networkSecurityGroups/runners",
+      imageAmd64:
+        "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/runners/providers/Microsoft.Compute/galleries/runners/images/amd64",
+      imageArm64: "",
+      runnerIdentity:
+        "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/runners/providers/Microsoft.ManagedIdentity/userAssignedIdentities/runner",
+      fleetManagerIdentity: "11111111-1111-1111-1111-111111111111",
+    },
+  ],
+] as const)("writes a %s Terraform install with no placeholders", (provider, fields) => {
+  const terraformMetadata: FleetManagerSetupMetadata = {
+    ...metadata,
+    infrastructureDefaults: {
+      source: "terraform",
+      provider,
+      managerId: "superplane",
+      namespace: "superplane",
+      serviceAccountName: "superplane-fleet-manager",
+      fields: Object.fromEntries(
+        Object.entries(fields).map(([key, value]) => [key, Array.isArray(value) ? [...value] : value]),
+      ),
+    },
+  };
+  const draft = mergeTerraformInfrastructure(
+    {
+      provider,
+      managerId: "my-cluster",
+      namespace: "superplane",
+      serviceAccountName: "superplane-fleet-manager",
+      superplaneUrl: "http://localhost:8000",
+      runnerVersion: "v0.1.0",
+      selectedFleetIds: ["e1-large-amd64"],
+      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 10 } },
+      fields: {},
+    },
+    terraformMetadata,
+  );
+  const values = generateFleetManagerValues({
+    metadata: terraformMetadata,
+    ...draft,
+    installationAdminToken: "personal-token",
+  });
+
+  expect(values).not.toMatch(/<[A-Z0-9_]+>/);
+  expect(terraformInstallPlaceholders(draft, terraformMetadata)).toEqual([]);
+});
+
+it("writes an empty Azure zone list when Terraform sets no zones", () => {
+  const terraformMetadata: FleetManagerSetupMetadata = {
+    ...metadata,
+    infrastructureDefaults: {
+      source: "terraform",
+      provider: "azure",
+      managerId: "superplane",
+      namespace: "superplane",
+      serviceAccountName: "superplane-fleet-manager",
+      fields: {
+        superplaneUrl: "https://superplane.example.com",
+        subscriptionId: "00000000-0000-0000-0000-000000000000",
+        resourceGroup: "superplane-runners",
+        location: "eastus",
+        zones: [],
+        subnetId: "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/runners/subnets/runners",
+        securityGroupIds:
+          "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/runners/networkSecurityGroups/runners",
+        imageAmd64: "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/runners/images/amd64",
+        imageArm64: "",
+        runnerIdentity:
+          "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/runners/userAssignedIdentities/runner",
+        fleetManagerIdentity: "11111111-1111-1111-1111-111111111111",
+      },
+    },
+  };
+  const draft = mergeTerraformInfrastructure(
+    {
+      provider: "azure",
+      managerId: "my-cluster",
+      namespace: "superplane",
+      serviceAccountName: "superplane-fleet-manager",
+      superplaneUrl: "http://localhost:8000",
+      runnerVersion: "v0.1.0",
+      selectedFleetIds: ["e1-large-amd64"],
+      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 10 } },
+      fields: {},
+    },
+    terraformMetadata,
+  );
+  const values = generateFleetManagerValues({
+    metadata: terraformMetadata,
+    ...draft,
+    installationAdminToken: "personal-token",
+  });
+
+  expect(load(values)).toMatchObject({ fleets: [{ azure: { zones: [] } }] });
+  expect(terraformInstallPlaceholders(draft, terraformMetadata)).toEqual([]);
+});
+
+it("blocks a Terraform install that would still contain a placeholder", () => {
+  const draft = mergeTerraformInfrastructure(
+    {
+      provider: "aws",
+      managerId: "test-cluster",
+      namespace: "superplane",
+      serviceAccountName: "superplane-fleet-manager",
+      superplaneUrl: "https://old.example.com",
+      runnerVersion: "v0.1.0",
+      selectedFleetIds: ["e1-large-amd64"],
+      fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+      fields: {},
+    },
+    metadata,
+  );
+
+  expect(terraformInstallPlaceholders(draft, metadata)).toEqual([
+    "Apply Terraform again before you install Fleet Manager. A required value is missing.",
+  ]);
+  expect(
+    terraformInstallPlaceholders(draft, {
+      ...metadata,
+      infrastructureDefaults: { ...metadata.infrastructureDefaults, source: "manual" },
+    }),
+  ).toEqual([]);
 });
 
 it("uses a browser key that stores only the non-secret draft", () => {

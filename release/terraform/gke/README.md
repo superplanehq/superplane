@@ -21,7 +21,7 @@ Do the steps in this order:
 | SuperPlane | GKE cluster, Cloud NAT (private nodes), Cloud SQL, cert-manager, Helm release | Always |
 | Blob storage | GCS bucket, `superplane-app` service account, Workload Identity binding | `enable_gcs_blob_storage` |
 | Runner network | Runner subnetwork, deny-all ingress firewall rule, `superplane-fleet-mgr` service account | `enable_runners` |
-| Fleet Manager infrastructure | Service account, Workload Identity binding, setup values, service-token Secret | `enable_runners` |
+| Fleet Manager infrastructure | Service account, Workload Identity binding, and setup metadata | `enable_runners` |
 
 A new install sets both flags to `true` in `terraform.tfvars` before the first
 apply. The variable defaults stay `false`. An existing install that omitted
@@ -112,6 +112,11 @@ enable_runners          = true
 Set both flags in this file. Do not rely on the variable defaults. Those
 defaults stay `false` so an existing install keeps its current blob storage.
 
+The default node type is `e2-standard-2`. Keep that type, or use a larger
+type. The API, the runner API, and the runner workers share one log disk.
+They must run on one node. `e2-medium` does not have enough CPU for that
+node. The Helm release then fails at the timeout.
+
 Select a `main` commit that published both artifacts. The image and the
 chart can use different SHAs. Confirm them:
 
@@ -154,7 +159,7 @@ The runner infrastructure includes:
   the project.
 - A runner API Deployment. Runners connect to
   `https://superplane.example.com/runner/v1`.
-- Fleet Manager setup values and the service-token Secret.
+- Fleet Manager setup metadata, including the configured runner images.
 
 If `172.20.0.0/24` overlaps a range in your network, set `runner_subnet_cidr`
 before you apply.
@@ -168,17 +173,20 @@ kubectl get pods -n superplane
 kubectl get certificate -n superplane
 ```
 
+The apply waits until `https://superplane.example.com/health` responds.
+The GCE controller skips the certificate check on the first sync.
+Terraform syncs the Ingress twice after Helm, then waits for the
+certificate. This wait can take 15 minutes.
+
 All pods must be `Running`. The namespace must have one Certificate, and
-that Certificate must be `Ready`. The load balancer and the certificate
-can take 15 minutes after the apply.
+that Certificate must be `Ready`.
 
 Open `https://superplane.example.com`. Create the owner account. The owner
 account is the installation admin.
 
 ## 3. Install Fleet Manager
 
-Do these steps after the installation in step 2 works. They do not need another
-Terraform apply.
+Do these steps after the installation in step 2 works.
 
 ### 3.1 Build the runner image
 
@@ -197,8 +205,13 @@ packer build \
 cd release/terraform/gke
 ```
 
-The image goes into the `superplane-runner-amd64` image family. Fleet Manager
-uses the newest image in the family.
+The image goes into the `superplane-runner-amd64` image family. Set the
+immutable image resource in `terraform.tfvars`, and apply the stack again:
+
+```hcl
+runner_image_amd64 = "projects/PROJECT/global/images/IMAGE_NAME"
+runner_image_arm64 = "projects/PROJECT/global/images/ARM_IMAGE_NAME"
+```
 
 The default build uses a public IP address and SSH on TCP 22. If the
 network blocks inbound SSH, build after the apply. Use Identity-Aware Proxy
@@ -229,16 +242,18 @@ terraform output runner_project
 terraform output runner_zones
 terraform output runner_subnetwork
 terraform output runner_network_tag
+terraform output runner_image_amd64
+terraform output runner_image_arm64
 terraform output fleet_manager_service_account_email
 ```
 
-Replace the GCP image placeholder with an image or image family that contains
-the Runner. Save `values.yaml` and run the displayed Helm command. The
-SuperPlane chart creates a dedicated service-token Secret in Kubernetes. The
-credential does not enter Terraform state or Helm release metadata.
+Select only fleets whose image output is set. SuperPlane creates a personal
+token when you generate the install command. Run the displayed Helm commands.
+The standalone chart stores the complete configuration in
+`fleet-manager-config`.
 
-The chart startup Job creates or updates the fleets before Fleet Manager
-starts. For complete install, upgrade, token rotation, fleet removal, and
+The chart startup Job creates or updates the fleets after the configuration
+Secret exists. For complete install, upgrade, token rotation, fleet removal, and
 rollback instructions, see
 [the standalone chart guide](../../fleet-manager-chart/README.md).
 
@@ -308,6 +323,11 @@ type. For example, T2A machines are not available in all zones.
 **The UI loads HTML but scripts fail CORS.** The image tag is not a
 self-hosted tag. Set `superplane_image_tag` to `<commit-sha>-selfhosted`
 and apply again. Hard-refresh the browser.
+
+**The API or the runner workers stay `Pending`.** The node does not have
+enough CPU. Those pods share one log disk, so they must run on one node.
+Set `machine_type` to `e2-standard-2` or a larger type. A change of
+`machine_type` replaces the cluster.
 
 **Pods stay in `ImagePullBackOff` with HTTP 403.** You pointed
 `superplane_image_registry` at `gcr.io/<project>` or Artifact Registry.

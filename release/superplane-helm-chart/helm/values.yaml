@@ -101,9 +101,7 @@ installation:
   beaconEnabled: true
 
 #
-# Fleet Manager setup metadata and its dedicated service credential.
-# The credential value is generated in Kubernetes and never enters Helm values.
-# Set provision to false when existingSecret is managed outside this chart.
+# Fleet Manager setup metadata for the installation wizard.
 #
 fleetManagerSetup:
   enabled: true
@@ -111,18 +109,13 @@ fleetManagerSetup:
   managerId: ""
   namespace: ""
   serviceAccountName: superplane-fleet-manager
-  credentials:
-    provision: true
-    existingSecret: superplane-fleet-manager-token
-    tokenKey: INSTALLATION_ADMIN_TOKEN
   infrastructure: {}
-  credentialJob:
-    image: curlimages/curl:8.16.0@sha256:463eaf6072688fe96ac64fa623fe73e1dbe25d8ad6c34404a669ad3ce1f104b6
-    activeDeadlineSeconds: 180
 
 componentReleases:
-  runnerVersion: v0.1.0
-  fleetManagerVersion: v0.1.0
+  runnerVersion: v0.2.0
+  runnerVersions:
+    - v0.2.0
+  fleetManagerVersion: v0.1.3
 
 sentry:
   secretName: ""
@@ -363,9 +356,12 @@ migrate:
 # Active logs are a shared filesystem. The API reads live logs from this
 # volume. Leave existingClaim empty to create a ReadWriteOnce claim. The
 # API then schedules on the runner API node, or on the worker node when
-# the runner API is off. A rollout stops the old API pod before a new
-# pod starts, because that claim attaches to one node. Set existingClaim
-# to a ReadWriteMany claim when replicas run on more than one node.
+# the runner API is off. The websocket and the workers prefer another
+# node so the shared log pods have CPU. A one-node cluster can still
+# schedule them. A rollout stops the old API pod before
+# a new pod starts, because that claim attaches to one node. Set
+# existingClaim to a ReadWriteMany claim when replicas run on more than
+# one node.
 #
 runner:
   api:

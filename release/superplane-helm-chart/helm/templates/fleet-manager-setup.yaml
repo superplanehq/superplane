@@ -9,8 +9,7 @@
   "managerId" (.Values.fleetManagerSetup.managerId | default "my-cluster")
   "namespace" (.Values.fleetManagerSetup.namespace | default .Release.Namespace)
   "serviceAccountName" (.Values.fleetManagerSetup.serviceAccountName | default "superplane-fleet-manager")
-  "infrastructure" .Values.fleetManagerSetup.infrastructure
-  "credentials" .Values.fleetManagerSetup.credentials -}}
+  "infrastructure" .Values.fleetManagerSetup.infrastructure -}}
 {{- if $provider -}}
 {{- $_ := set $config "provider" $provider -}}
 {{- end -}}

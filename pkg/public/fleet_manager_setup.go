@@ -25,9 +25,9 @@ type fleetManagerSetupResponse struct {
 	RunnerReleaseURLTemplate   string                     `json:"runnerReleaseUrlTemplate"`
 	ChartRepository            string                     `json:"chartRepository"`
 	ImageRepository            string                     `json:"imageRepository"`
+	RunnerVersions             []string                   `json:"runnerVersions"`
 	FleetPresets               []fleetManagerFleetPreset  `json:"fleetPresets"`
 	InfrastructureDefaults     fleetManagerInfrastructure `json:"infrastructureDefaults"`
-	Credentials                fleetManagerCredentials    `json:"credentials"`
 }
 
 type fleetManagerInfrastructure struct {
@@ -39,12 +39,6 @@ type fleetManagerInfrastructure struct {
 	Fields             map[string]any `json:"fields"`
 }
 
-type fleetManagerCredentials struct {
-	ExistingSecret  string `json:"existingSecret"`
-	TokenKey        string `json:"tokenKey"`
-	AutoProvisioned bool   `json:"autoProvisioned"`
-}
-
 type fleetManagerSetupConfig struct {
 	Source             string         `json:"source"`
 	Provider           *string        `json:"provider"`
@@ -52,11 +46,6 @@ type fleetManagerSetupConfig struct {
 	Namespace          string         `json:"namespace"`
 	ServiceAccountName string         `json:"serviceAccountName"`
 	Infrastructure     map[string]any `json:"infrastructure"`
-	Credentials        struct {
-		ExistingSecret string `json:"existingSecret"`
-		TokenKey       string `json:"tokenKey"`
-		Provision      bool   `json:"provision"`
-	} `json:"credentials"`
 }
 
 type fleetManagerFleetPreset struct {
@@ -110,6 +99,7 @@ func (s *Server) adminGetFleetManagerSetup(w http.ResponseWriter, _ *http.Reques
 		RunnerReleaseURLTemplate:   runnerReleaseURLTemplate,
 		ChartRepository:            fleetManagerChartRepository,
 		ImageRepository:            fleetManagerImageRepository,
+		RunnerVersions:             configuredRunnerVersions(runnerVersion),
 		FleetPresets:               presets,
 		InfrastructureDefaults: fleetManagerInfrastructure{
 			Source:             setup.Source,
@@ -118,11 +108,6 @@ func (s *Server) adminGetFleetManagerSetup(w http.ResponseWriter, _ *http.Reques
 			Namespace:          setup.Namespace,
 			ServiceAccountName: setup.ServiceAccountName,
 			Fields:             setup.Infrastructure,
-		},
-		Credentials: fleetManagerCredentials{
-			ExistingSecret:  setup.Credentials.ExistingSecret,
-			TokenKey:        setup.Credentials.TokenKey,
-			AutoProvisioned: setup.Credentials.Provision,
 		},
 	})
 }
@@ -160,9 +145,21 @@ func defaultFleetManagerSetupConfig() fleetManagerSetupConfig {
 		ServiceAccountName: "superplane-fleet-manager",
 		Infrastructure:     map[string]any{},
 	}
-	setup.Credentials.ExistingSecret = "superplane-fleet-manager-token"
-	setup.Credentials.TokenKey = "INSTALLATION_ADMIN_TOKEN"
 	return setup
+}
+
+func configuredRunnerVersions(stableVersion string) []string {
+	versions := []string{stableVersion}
+	seen := map[string]bool{stableVersion: true}
+	for _, version := range strings.Split(os.Getenv("RUNNER_SUPPORTED_VERSIONS"), ",") {
+		version = strings.TrimSpace(version)
+		if version == "" || seen[version] {
+			continue
+		}
+		versions = append(versions, version)
+		seen[version] = true
+	}
+	return versions
 }
 
 func validFleetManagerProvider(provider string) bool {
