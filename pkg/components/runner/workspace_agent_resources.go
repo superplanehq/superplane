@@ -25,6 +25,19 @@ const (
 	workspaceAgentsSkillPath        = ".agents/skills/%s/SKILL.md"
 	WorkspaceSetupConfigPath        = "workspace_setup.json"
 	WorkspaceContextConfigPath      = "workspace_context.json"
+	// WorkspaceCheckoutScriptPath is the checkout command shipped on
+	// factory tasks. It lives in bin/ so every step finds it on PATH and
+	// factory Clone steps run it as a bare "checkout" line. The main repo
+	// lands in repo/ and every context repo in its directory. Stored
+	// canvases are never rewritten, so existing automations keep their
+	// inline Clone Repo step until their owner adopts the helper.
+	WorkspaceCheckoutScriptPath = "bin/checkout"
+	// WorkspaceCheckoutCommitSetupEnv opts a checkout into the factory
+	// commit setup (agent git identity, trailer hook, branch handling).
+	// The Implement Clone step sets it inline; read-only checkouts such
+	// as intake analysis leave it off so sourcing the helper never
+	// mutates the remote.
+	WorkspaceCheckoutCommitSetupEnv = "CHECKOUT_COMMIT_SETUP"
 )
 
 type workspaceMCPServer struct {
@@ -55,7 +68,9 @@ type workspaceContextFile struct {
 
 // AttachWorkspaceAgentResources ships enabled workspace MCP connections,
 // inline skills, setup commands, and context repositories on the broker
-// task. It is a no-op when the canvas is not factory-owned.
+// task. Every factory-owned task also ships the checkout helper, so
+// factory Clone steps stay a single line with no inline fallback. It is a
+// no-op when the canvas is not factory-owned.
 func AttachWorkspaceAgentResources(
 	ctx core.ExecutionContext,
 	environment []BrokerEnvironmentVariable,
@@ -64,24 +79,6 @@ func AttachWorkspaceAgentResources(
 	logger := workspaceAgentResourcesLogger(ctx)
 	orgID, err := uuid.Parse(strings.TrimSpace(ctx.OrganizationID))
 	if err != nil {
-		return environment, files
-	}
-	mcpEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceMCP)
-	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: MCP feature check failed")
-		return environment, files
-	}
-	skillsEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceSkills)
-	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: skills feature check failed")
-		return environment, files
-	}
-	agentEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceAgent)
-	if err != nil {
-		logger.WithError(err).Warn("skip workspace agent resources: agent feature check failed")
-		return environment, files
-	}
-	if !mcpEnabled && !skillsEnabled && !agentEnabled {
 		return environment, files
 	}
 	canvasID, err := uuid.Parse(strings.TrimSpace(ctx.WorkflowID))
@@ -98,6 +95,30 @@ func AttachWorkspaceAgentResources(
 	factory, err := models.FindFactory(db, orgID, *factoryID)
 	if err != nil {
 		logger.WithError(err).Warn("skip workspace agent resources: factory not found")
+		return environment, files
+	}
+
+	// The checkout helper needs no configured resources: it clones the
+	// main repo on its own and context repos when the agent screen adds
+	// them. Ship it on every factory task so Clone steps never branch.
+	files = appendWorkspaceCheckoutFile(files)
+
+	mcpEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceMCP)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace agent resources: MCP feature check failed")
+		return environment, files
+	}
+	skillsEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceSkills)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace agent resources: skills feature check failed")
+		return environment, files
+	}
+	agentEnabled, err := models.HasExperimentalFeature(orgID, features.FeatureWorkspaceAgent)
+	if err != nil {
+		logger.WithError(err).Warn("skip workspace agent resources: agent feature check failed")
+		return environment, files
+	}
+	if !mcpEnabled && !skillsEnabled && !agentEnabled {
 		return environment, files
 	}
 
@@ -323,6 +344,139 @@ func appendWorkspaceContextFiles(factory *models.Factory, resources []models.Fac
 	})
 }
 
+// WorkspaceCheckoutScript is the checkout command factory Clone steps run
+// as a bare "checkout" line. It checks out the main repo to repo/ with the
+// same branch handling as the legacy Clone Repo step, then clones every
+// workspace_context.json entry to its directory. Authentication comes from
+// the VCS integration setup that already ran (gh auth setup-git /
+// Bitbucket credential helper), so the script uses plain HTTPS URLs and
+// never embeds tokens. It is idempotent: directories that already contain
+// a checkout are reused, never wiped. The factory commit setup (agent git
+// identity, trailer hook, branch handling) runs only when
+// CHECKOUT_COMMIT_SETUP=1, so read-only checkouts stay side-effect free.
+func WorkspaceCheckoutScript() string {
+	return `#!/bin/bash
+set -euo pipefail
+: "${SUPERPLANE_TASK_DIR:?SUPERPLANE_TASK_DIR is required}"
+: "${REPO_URL:?REPO_URL is required}"
+# Prompt steps run inside repo/, so anchor every relative clone path to the
+# task directory. Agents that run this helper from a step working directory
+# must still check out beside the task root, never nested inside it.
+cd "$SUPERPLANE_TASK_DIR" || exit 1
+if ! command -v git >/dev/null 2>&1; then
+  echo "git not found on PATH; required for checkout" >&2
+  exit 1
+fi
+branch="${BASE:-main}"
+
+if [ -d repo/.git ]; then
+  echo "repo/ already checked out, reusing."
+else
+  rm -rf repo
+  heads="$(git ls-remote --heads "${REPO_URL}")" || exit 1
+  if printf '%s\n' "$heads" | awk '{print $2}' | grep -Fxq "refs/heads/${branch}"; then
+    git clone --depth 1 --branch "${branch}" "${REPO_URL}" repo
+  elif [ -z "$heads" ]; then
+    git clone "${REPO_URL}" repo
+  else
+    echo "Remote branch ${branch} not found. The repository has other branches." >&2
+    exit 1
+  fi
+fi
+` + workspaceCheckoutCommitSetup() + `
+ctx="$SUPERPLANE_TASK_DIR/workspace_context.json"
+if [ -f "$ctx" ]; then
+  if ! command -v node >/dev/null 2>&1; then
+    echo "node not found on PATH; skipping context repositories" >&2
+  else
+    _sp_tab="$(printf '\t')"
+    _sp_ctx_list="$(node -e 'const fs=require("fs");try{const d=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const r=Array.isArray(d.repositories)?d.repositories:[];for(const e of r){const u=((e&&e.url)||"").trim();const dir=((e&&e.directory)||"").trim();if(u&&dir){console.log(u+"\t"+dir);}}}catch(e){console.error("workspace_context.json parse failed: "+e.message);process.exit(1);}' "$ctx")" || exit 1
+    if [ -n "$_sp_ctx_list" ]; then
+      printf '%s\n' "$_sp_ctx_list" | while IFS="$_sp_tab" read -r url dir; do
+        case "$dir" in
+          ""|"."|"/"|*..*)
+            echo "Skipping context repository with unsafe directory: $dir" >&2
+            continue
+            ;;
+        esac
+        case "$url" in
+          "")
+            echo "Skipping context repository with missing URL: $dir" >&2
+            continue
+            ;;
+        esac
+        if [ -d "$dir/.git" ]; then
+          echo "$dir already checked out, reusing."
+          continue
+        fi
+        mkdir -p "$(dirname "$dir")"
+        rm -rf "$dir"
+        git clone --depth 1 "$url" "$dir" || exit 1
+      done
+    fi
+    unset _sp_tab _sp_ctx_list
+  fi
+fi
+echo "Checkout complete: repo/ and context repositories (if any)."
+`
+}
+
+// workspaceCheckoutCommitSetup runs the factory commit identity and branch
+// handling inside repo/. The caller opts in with CHECKOUT_COMMIT_SETUP=1
+// (the Implement Clone step sets it inline on the source line). The script
+// is sourced, so it saves and restores the working directory instead of a
+// subshell: the exports below must persist in the caller, and the context
+// clones after this block use paths relative to the task directory.
+func workspaceCheckoutCommitSetup() string {
+	return `if [ "${` + WorkspaceCheckoutCommitSetupEnv + `:-0}" = "1" ]; then
+git config --global user.email "` + FactoryAgentEmail + `"
+git config --global user.name "` + FactoryAgentName + `"
+_sp_cwd="$(pwd)"
+cd repo || exit 1
+` + FactoryRepoCommitSetup() + `
+use_existing_branch() {
+  echo "Another run created ${branch}. Using that branch." >&2
+  git fetch origin "${branch}"
+  git checkout -B "${branch}" "origin/${branch}"
+}
+
+if ! git rev-parse --verify --quiet "refs/remotes/origin/${branch}" >/dev/null && ! git rev-parse --verify --quiet HEAD >/dev/null; then
+  remote_head="$(git ls-remote --heads origin "refs/heads/${branch}")" || exit 1
+  if [ -n "$remote_head" ]; then
+    use_existing_branch
+  else
+    echo "Remote has no branches. Creating ${branch}." >&2
+    git checkout -B "${branch}"
+    git commit --allow-empty -s -m "chore: Initialize repository"
+    if ! git push -u origin "HEAD:refs/heads/${branch}"; then
+      remote_head="$(git ls-remote --heads origin "refs/heads/${branch}")" || exit 1
+      if [ -z "$remote_head" ]; then
+        echo "Failed to create ${branch}." >&2
+        exit 1
+      fi
+      use_existing_branch
+    fi
+  fi
+fi
+cd "$_sp_cwd" || exit 1
+unset _sp_cwd
+fi
+`
+}
+
+func appendWorkspaceCheckoutFile(files []BrokerTaskFile) []BrokerTaskFile {
+	for i := range files {
+		if files[i].Path == WorkspaceCheckoutScriptPath {
+			return files
+		}
+	}
+	return append(files, BrokerTaskFile{
+		Path:    WorkspaceCheckoutScriptPath,
+		Content: WorkspaceCheckoutScript(),
+		Mode:    "0755",
+	})
+}
+
 func workspaceAgentResourcesLogger(ctx core.ExecutionContext) *log.Entry {
 	if ctx.Logger != nil {
 		return ctx.Logger
@@ -544,7 +698,8 @@ func workspaceAgentResourcesHint(mcpNames []string, setupCommands []string, cont
 			}
 			names = append(names, repository+" ("+WorkspaceContextRepoDirectory(repository)+")")
 		}
-		builder.WriteString("\nExtra repositories (clone with the workspace token when needed): ")
+		builder.WriteString("\nCheckout: run `checkout` to check out repo/ and context repositories. ")
+		builder.WriteString("Extra repositories (already checked out when the automation runs it): ")
 		builder.WriteString(strings.Join(names, ", "))
 	}
 	return builder.String()
