@@ -14,17 +14,25 @@ cat >"${TMP_DIR}/bin/skopeo" <<'SHIM'
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$1" = inspect ] && [ "$2" = --raw ]; then
-  cat "${TEST_ARCHIVE}"
-  exit 0
+if [ "$1" = inspect ] && [ "$2" != --raw ]; then
+  echo 'no image found in image index for architecture "amd64"' >&2
+  exit 1
 fi
-if [ "$1" = inspect ]; then
+if [ "$1" = inspect ] && [ "$2" = --raw ]; then
+  reference=""
+  for argument in "$@"; do
+    reference="${argument}"
+  done
+  if [[ "${reference}" == oci-archive:* ]]; then
+    cat "${TEST_ARCHIVE}"
+    exit 0
+  fi
   if [ "${TEST_MODE}" = collision ]; then
-    printf 'sha256:%064d\n' 9
+    printf 'different\n'
     exit 0
   fi
   if [ "${TEST_MODE}" = matching ] || [ -f "${TEST_PUBLISHED}" ]; then
-    printf '%s\n' "${TEST_PREPARED_DIGEST}"
+    cat "${TEST_ARCHIVE}"
     exit 0
   fi
   echo 'manifest unknown' >&2
@@ -41,7 +49,6 @@ chmod +x "${TMP_DIR}/bin/skopeo"
 
 export TEST_ARCHIVE="${TMP_DIR}/image.oci.tar"
 export TEST_COPY_LOG="${TMP_DIR}/copy.log"
-export TEST_PREPARED_DIGEST="${PREPARED_DIGEST}"
 export TEST_PUBLISHED="${TMP_DIR}/published"
 export SKOPEO_CONTAINER_IMAGE=""
 
