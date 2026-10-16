@@ -399,6 +399,28 @@ describe("FirstRunSetup GitHub catalog", () => {
       renderSetup(pageModel(), setupPath);
 
       expect(screen.getByTestId("first-run-welcome")).toBeInTheDocument();
+      expect(screen.getByTestId("first-run-get-started")).toBeInTheDocument();
+    });
+
+    it("keeps loading until GitHub access is known", () => {
+      github.isPending = true;
+      github.data.providerConfigured = false;
+      github.data.accountConnectionRequired = false;
+      renderSetup(pageModel(), setupPath);
+
+      expect(screen.getByRole("status")).toHaveTextContent(FIRST_RUN_COPY.connect.loadingAccounts);
+      expect(screen.queryByTestId("first-run-welcome")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("first-run-get-started")).not.toBeInTheDocument();
+    });
+
+    it("opens organization selection when the installation GitHub App does not require sign-in", () => {
+      github.data.providerConfigured = true;
+      github.data.accountConnectionRequired = false;
+      renderSetup(pageModel(), setupPath);
+
+      expect(screen.getByText(FIRST_RUN_COPY.choose.organizationHeadline)).toBeInTheDocument();
+      expect(screen.queryByTestId("first-run-welcome")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("first-run-get-started")).not.toBeInTheDocument();
     });
 
     it("opens the welcome screen when the GitHub identity only comes from sign-in", () => {
