@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
+import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
 import { FLEET_MANAGER_DRAFT_KEY } from "@/lib/fleetManagerSetup";
 import { FleetManagerSetup } from "./FleetManagerSetup";
 
@@ -57,6 +59,29 @@ const metadata = {
 const jsonResponse = (body: unknown) =>
   new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
 
+function stubSetup(body: unknown = metadata) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/admin/api/installation/fleet-manager/setup")) return jsonResponse(body);
+      return new Response("", { status: 404 });
+    }),
+  );
+}
+
+function FleetWizard() {
+  const setup = useFleetManagerSetup(true, "org-1");
+  return (
+    <FleetManagerWizardScreen
+      step="fleets"
+      setup={setup}
+      onNext={() => undefined}
+      onFinish={() => undefined}
+      onFinishLater={() => undefined}
+    />
+  );
+}
+
 describe("FleetManagerSetup", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -86,6 +111,53 @@ describe("FleetManagerSetup", () => {
     expect(screen.queryByRole("heading", { name: /cloud infrastructure/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Machine type for e1-large-amd64")).toHaveValue("m8a.large");
     expect(screen.getByRole("combobox", { name: "Runner version" })).toHaveTextContent("v0.2.0");
+  });
+
+  it("shows the stable runner version before the menu opens", async () => {
+    window.localStorage.setItem(
+      FLEET_MANAGER_DRAFT_KEY,
+      JSON.stringify({
+        provider: "aws",
+        managerId: "terraform-cluster",
+        namespace: "superplane",
+        serviceAccountName: "superplane-fleet-manager",
+        superplaneUrl: "https://superplane.example.com",
+        runnerVersion: "v9.9.9",
+        selectedFleetIds: ["e1-large-amd64"],
+        fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+        fields: { region: "us-east-1", imageAmd64: "ami-amd64" },
+      }),
+    );
+
+    render(<FleetManagerSetup />);
+
+    const version = await screen.findByRole("combobox", { name: "Runner version" });
+    expect(version).toHaveTextContent("v0.2.0");
+    expect(version).not.toHaveTextContent("v9.9.9");
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+  });
+
+  it("blocks installation when no listed runner version is selected", async () => {
+    stubSetup({ ...metadata, defaultRunnerVersion: "" });
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByRole("button", { name: "Generate install command" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Runner version" })).not.toHaveTextContent("v0.2.0");
+  });
+
+  it("blocks installation when the selected runner version is not listed", async () => {
+    stubSetup({ ...metadata, defaultRunnerVersion: "v9.9.9" });
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByRole("combobox", { name: "Runner version" })).toHaveTextContent("v9.9.9");
+    expect(screen.getByRole("button", { name: "Generate install command" })).toBeDisabled();
+  });
+
+  it("keeps the wizard install action disabled when no listed runner version is selected", async () => {
+    stubSetup({ ...metadata, defaultRunnerVersion: "" });
+    render(<FleetWizard />);
+
+    expect(await screen.findByRole("button", { name: "Generate install command" })).toBeDisabled();
   });
 
   it("generates a command when no Terraform runner image is configured", async () => {

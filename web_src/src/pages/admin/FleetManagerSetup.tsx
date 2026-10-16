@@ -33,6 +33,39 @@ function SectionCard({
   );
 }
 
+function InstallActions({
+  draftIsValid,
+  error,
+  command,
+  isPreparingInstallation,
+  onGenerate,
+}: {
+  draftIsValid: boolean;
+  error?: string;
+  command: string;
+  isPreparingInstallation: boolean;
+  onGenerate: () => void;
+}) {
+  if (!draftIsValid) {
+    return (
+      <>
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+        <Button type="button" disabled>
+          Generate install command
+        </Button>
+      </>
+    );
+  }
+  if (command) return <InstallCommand command={command} />;
+  return (
+    <Button type="button" onClick={onGenerate} disabled={isPreparingInstallation}>
+      Generate install command
+    </Button>
+  );
+}
+
 function InstallCommand({ command }: { command: string }) {
   return (
     <div className="space-y-4" data-testid="fleet-manager-install-command">
@@ -97,21 +130,13 @@ export function FleetManagerSetup() {
             }
           >
             <div className="space-y-5">
-              {!draftIsValid ? (
-                <p role="alert" className="text-sm text-destructive">
-                  {setup.validationErrors[0]}
-                </p>
-              ) : setup.values ? (
-                <InstallCommand command={command} />
-              ) : (
-                <Button
-                  type="button"
-                  onClick={() => void setup.prepareInstallation()}
-                  disabled={setup.isPreparingInstallation}
-                >
-                  Generate install command
-                </Button>
-              )}
+              <InstallActions
+                draftIsValid={draftIsValid}
+                error={setup.validationErrors[0]}
+                command={setup.values ? command : ""}
+                isPreparingInstallation={setup.isPreparingInstallation}
+                onGenerate={() => void setup.prepareInstallation()}
+              />
               {setup.tokenError && (
                 <p role="alert" className="text-sm text-destructive">
                   {setup.tokenError}
