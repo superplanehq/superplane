@@ -457,7 +457,7 @@ kubectl get certificate -n superplane""",
     )
     story.append(
         Paragraph(
-            "The image version has the form 1.<build>.0.",
+            "The image version has the form 1.&lt;build&gt;.0.",
             s["body"],
         )
     )
@@ -493,6 +493,24 @@ packer build -var-file=release/runner/packer/azure/runner.pkrvars.hcl \\
   -var image_name=superplane-runner-amd64 -var image_version=1.0.0 \\
   release/runner/packer/azure/runner.pkr.hcl""",
             s,
+        )
+    )
+    story.append(
+        Paragraph(
+            "runner_image_amd64 and runner_image_arm64 default to the public images.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "Set runner_image_amd64 or runner_image_arm64 to the image version resource ID from that build.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "Apply Terraform. Run the Helm commands from the wizard.",
+            s["body"],
         )
     )
 
