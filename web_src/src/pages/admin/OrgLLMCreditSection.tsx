@@ -21,6 +21,7 @@ import {
   type OrganizationBillingPlan,
   type OrganizationLLMCredit,
 } from "./useOrgLLMCredit";
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const ADMIN_POLAR_MANAGED_PLAN_COPY =
@@ -44,6 +45,7 @@ const EDITABLE_BALANCES: Array<{ bucket: CreditBalanceBucket; label: string; act
 
 export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
   const credit = useOrgLLMCredit(orgId);
+  const billingProductEnabled = useBillingProductEnabled();
 
   return (
     <div className="mb-8">
@@ -63,6 +65,7 @@ export function OrgLLMCreditSection({ orgId }: { orgId: string }) {
           planKnown={credit.plan != null}
           savedPlan={credit.plan}
           savedTrialEndsAt={credit.plan?.trial_ends_at ?? null}
+          showPlanControls={billingProductEnabled}
         />
       ) : null}
     </div>
@@ -180,23 +183,26 @@ function OrgHostedCreditCard(args: {
   saveBalance: (bucket: CreditBalanceBucket) => void;
   saveMarkup: () => void;
   savePlan: () => void;
+  showPlanControls: boolean;
 }) {
   const trialFieldLocked = trialBalanceLocked(args.credit.welcome_credit_expires_at, args.savedPlan);
 
   return (
     <div className="bg-white rounded-md shadow-sm outline outline-slate-950/10 p-4 dark:bg-gray-900 dark:outline-gray-700/70">
-      <OrgBillingPlanField
-        polarManaged={args.polarManaged}
-        planKnown={args.planKnown}
-        planValue={args.planValue}
-        setPlanValue={args.setPlanValue}
-        savedTrialEndsAt={args.savedTrialEndsAt}
-        trialEndsOn={args.trialEndsOn}
-        setTrialEndsOn={args.setTrialEndsOn}
-        trialEndInvalid={args.trialEndInvalid}
-        savingPlan={args.savingPlan}
-        savePlan={args.savePlan}
-      />
+      {args.showPlanControls ? (
+        <OrgBillingPlanField
+          polarManaged={args.polarManaged}
+          planKnown={args.planKnown}
+          planValue={args.planValue}
+          setPlanValue={args.setPlanValue}
+          savedTrialEndsAt={args.savedTrialEndsAt}
+          trialEndsOn={args.trialEndsOn}
+          setTrialEndsOn={args.setTrialEndsOn}
+          trialEndInvalid={args.trialEndInvalid}
+          savingPlan={args.savingPlan}
+          savePlan={args.savePlan}
+        />
+      ) : null}
       <CreditBalanceMetrics credit={args.credit} />
       <div className="mt-6">
         <Heading level={3} className="text-gray-800 text-sm dark:text-gray-100">

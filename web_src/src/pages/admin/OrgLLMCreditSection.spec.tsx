@@ -21,6 +21,12 @@ vi.mock("@/lib/toast", () => ({
   showSuccessToast: vi.fn(),
 }));
 
+let billingProductEnabled = true;
+
+vi.mock("@/hooks/useBillingProductEnabled", () => ({
+  useBillingProductEnabled: () => billingProductEnabled,
+}));
+
 const trialEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
 const credit: OrganizationLLMCredit = {
@@ -114,6 +120,7 @@ function mockOrgCreditFetch(
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.mocked(showErrorToast).mockClear();
+  billingProductEnabled = true;
 });
 
 describe("OrgLLMCreditSection billing plan", () => {
@@ -124,6 +131,16 @@ describe("OrgLLMCreditSection billing plan", () => {
     expect(await screen.findByTestId("admin-org-billing-plan")).toBeEnabled();
     expect(screen.getByTestId("admin-org-billing-plan-save")).toBeInTheDocument();
     expect(screen.getByText(ADMIN_LOCAL_PLAN_COPY)).toBeInTheDocument();
+  });
+
+  it("hides plan controls when product billing is off", async () => {
+    billingProductEnabled = false;
+    mockOrgCreditFetch();
+    render(<OrgLLMCreditSection orgId="org-1" />);
+
+    expect(await screen.findByText("Hosted credit")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-org-billing-plan")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-org-billing-plan-save")).not.toBeInTheDocument();
   });
 
   it("disables the plan control when Polar manages billing", async () => {
