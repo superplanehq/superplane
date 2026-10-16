@@ -72,8 +72,8 @@ export const DEFAULT_GITHUB_INTAKE_SETTINGS: IntakeSourceSettings = {
   assignment: "any",
   newIssues: true,
   reopenedIssues: true,
-  superplaneLabelAdded: true,
-  authorsWithAccess: false,
+  superplaneLabelAdded: false,
+  authorsWithAccess: true,
   jiraMoveOnComplete: true,
   jiraCompletionColumn: "",
   sentryNewIssues: true,
@@ -148,15 +148,16 @@ export const INTAKE_SETTINGS_COPY = {
   newIssues: "A new issue is opened",
   reopenedIssues: "A closed issue is re-opened",
   filterByLabel: "Issue has one of these labels",
+  mainLabel: "Default SuperPlane label",
+  otherLabels: "Other labels",
   labelInput: "Issue label",
   labelPlaceholder: "Type a label name",
   labelNew: "Add label",
   labelAdd: "Add",
   labelCancel: "Cancel",
   labelsLoading: "Loading labels from the repository",
-  labelsEmpty: "No labels found in the repository. Add a label name.",
+  labelsEmpty: "No other labels in the repository. Add a label name.",
   superplaneLabelAdded: 'The "superplane" label is added to the issue',
-  superplaneLabelAddedSeveral: "One of the filter labels is added to the issue",
   authorsWithAccess: "Author is a repository collaborator",
   save: "Save",
   saving: "Saving",
@@ -169,34 +170,6 @@ export const INTAKE_SETTINGS_COPY = {
   deleteConfirm: "Delete intake",
   deleteError: "SuperPlane could not delete the intake. Try again.",
 } as const;
-
-/**
- * The labels that start a run when they are added to an issue. This follows the
- * label filter, the same as the saved filter expression. Without an include
- * filter, the default `superplane` label applies.
- */
-function labelAddedFilterLabels(
-  settings: Pick<IntakeSourceSettings, "filterByLabel" | "labelFilterMode" | "labels">,
-): string[] {
-  if (!settings.filterByLabel || settings.labelFilterMode !== "include") {
-    return [];
-  }
-  return settings.labels;
-}
-
-/** The "label is added" checkbox text. It names the label that is in use. */
-export function superplaneLabelAddedCopy(
-  settings: Pick<IntakeSourceSettings, "filterByLabel" | "labelFilterMode" | "labels">,
-): string {
-  const labels = labelAddedFilterLabels(settings);
-  if (labels.length === 1) {
-    return `The "${labels[0]}" label is added to the issue`;
-  }
-  if (labels.length > 1) {
-    return INTAKE_SETTINGS_COPY.superplaneLabelAddedSeveral;
-  }
-  return INTAKE_SETTINGS_COPY.superplaneLabelAdded;
-}
 
 export function intakeSupportsDelete(sourceId: LineIntakeSourceId): boolean {
   return (
@@ -236,27 +209,22 @@ export function normalizeIntakeSourceSettings(
   const linearProjectIds = normalizeLinearValues(draft.linearProjectIds);
   const linearLabels = normalizeLinearValues(draft.linearLabels);
   const sentryProjectIds = normalizeLinearValues(draft.sentryProjectIds);
-  if (!draft.filterByLabel) {
-    return {
-      ...draft,
-      ...hiddenSentryTriggers,
-      confidencePct,
-      labels: [],
-      labelFilterMode: "include",
-      sentryLevels,
-      dependabotSeverities,
-      taskListIds,
-      datadogEnvironments,
-      datadogService,
-      linearProjectIds,
-      linearLabels,
-      sentryProjectIds,
-    };
-  }
+  const labels = draft.filterByLabel ? draft.labels : [];
+  const labelFilterMode = draft.filterByLabel ? draft.labelFilterMode : "include";
+  const githubListening =
+    sourceId === "github-issues"
+      ? {
+          newIssues: true,
+          superplaneLabelAdded: draft.filterByLabel && labelFilterMode === "include" && labels.length > 0,
+        }
+      : {};
   return {
     ...draft,
     ...hiddenSentryTriggers,
+    ...githubListening,
     confidencePct,
+    labels,
+    labelFilterMode,
     sentryLevels,
     dependabotSeverities,
     taskListIds,

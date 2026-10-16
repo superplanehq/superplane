@@ -768,12 +768,18 @@ func materializeIntakeDefaults(
 		return nil, err
 	}
 	settings := intakeSettingsFromGraph(intake.Source, graph, spec)
+	if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+		settings = deriveGitHubIssueListening(settings)
+	}
 	for i := range defaults.Spec.Nodes {
 		node := &defaults.Spec.Nodes[i]
 		if node.ID == intakeFilterNodeID {
 			node.Configuration["expression"] = intakeFilterExpressionFor(intake.Source, settings)
 		}
 		if node.ID == intakeTriggerNodeID {
+			if intake.Source == models.FactoryIntakeSourceGitHubIssues {
+				node.Configuration["actions"] = intakeTriggerActionsFor(settings)
+			}
 			node.Metadata = models.FactoryAppTemplateMetadata("intake:"+intake.Source, factoryTemplateVersion)
 		}
 	}

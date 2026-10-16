@@ -107,21 +107,27 @@ func dependabotIntakeActions() []any {
 
 func defaultIntakeSettings() intakeSettings {
 	return intakeSettings{
-		ConfidencePct:        DefaultIntakeConfidencePct,
-		Labels:               []string{},
-		LabelFilterMode:      intakeLabelFilterInclude,
-		Assignment:           intakeAssignmentAny,
-		NewIssues:            true,
-		ReopenedIssues:       true,
-		SuperplaneLabelAdded: true,
+		ConfidencePct:   DefaultIntakeConfidencePct,
+		Labels:          []string{},
+		LabelFilterMode: intakeLabelFilterInclude,
+		Assignment:      intakeAssignmentAny,
+		NewIssues:       true,
+		ReopenedIssues:  true,
+		// Label events follow the selected labels. With no labels, a new issue
+		// creates a task and adding a label does not.
+		SuperplaneLabelAdded: false,
 		JiraMoveOnComplete:   true,
 		ExcludeKeyTasks:      true,
-		// AuthorsWithAccess is off by default: false.
+		// A new GitHub intake accepts an issue only when the author can
+		// access the repository. The gate is installed when the intake
+		// already has a repository.
+		AuthorsWithAccess: true,
 	}
 }
 
 func defaultJiraIntakeSettings() intakeSettings {
 	settings := defaultIntakeSettings()
+	settings.AuthorsWithAccess = false
 	settings.ReopenedIssues = true
 	settings.SuperplaneLabelAdded = false
 	settings.JiraMoveOnComplete = true
@@ -130,6 +136,7 @@ func defaultJiraIntakeSettings() intakeSettings {
 
 func defaultSentryIntakeSettings() intakeSettings {
 	settings := defaultIntakeSettings()
+	settings.AuthorsWithAccess = false
 	settings.SentryNewIssues = true
 	settings.SentryRegressedIssues = false
 	settings.SentryAssignedIssues = false
@@ -140,18 +147,21 @@ func defaultSentryIntakeSettings() intakeSettings {
 
 func defaultProductiveIntakeSettings() intakeSettings {
 	settings := defaultIntakeSettings()
+	settings.AuthorsWithAccess = false
 	settings.ExcludeKeyTasks = true
 	return settings
 }
 
 func defaultDependabotIntakeSettings() intakeSettings {
 	settings := defaultIntakeSettings()
+	settings.AuthorsWithAccess = false
 	settings.DependabotSeverities = []string{}
 	return settings
 }
 
 func defaultDatadogIntakeSettings() intakeSettings {
 	settings := defaultIntakeSettings()
+	settings.AuthorsWithAccess = false
 	settings.DatadogTriggeredAlerts = true
 	settings.DatadogRetriggeredAlerts = false
 	settings.DatadogEnvironments = []string{}
@@ -432,6 +442,16 @@ func intakeProductiveTaskListCondition(ids []string) string {
 		encoded,
 	)
 	return fmt.Sprintf(`(%s || %s)`, createdOnList, movedOntoList)
+}
+
+// deriveGitHubIssueListening keeps the GitHub intake trigger in step with
+// the label filter. Selected labels start a task when one of them is added,
+// and they also limit a re-opened issue. With no labels, a new issue starts
+// a task and label events do not.
+func deriveGitHubIssueListening(settings intakeSettings) intakeSettings {
+	settings.NewIssues = true
+	settings.SuperplaneLabelAdded = len(settings.Labels) > 0 && settings.LabelFilterMode == intakeLabelFilterInclude
+	return settings
 }
 
 func intakeTriggerActionsFor(settings intakeSettings) []any {

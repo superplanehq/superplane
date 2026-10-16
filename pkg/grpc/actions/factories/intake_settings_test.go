@@ -12,8 +12,9 @@ import (
 )
 
 func Test__intakeFilterExpressionFor_AuthorsWithAccess(t *testing.T) {
-	t.Run("off by default", func(t *testing.T) {
+	t.Run("starts on and stays out of the filter expression", func(t *testing.T) {
 		settings := defaultIntakeSettings()
+		assert.True(t, settings.AuthorsWithAccess)
 		expression := intakeFilterExpressionFor(models.FactoryIntakeSourceGitHubIssues, settings)
 		assert.NotContains(t, expression, intakeAuthorAccessCondition)
 	})
@@ -88,7 +89,7 @@ func Test__intakeTriggerActionsFor(t *testing.T) {
 	t.Run("listens for opened and reopened issues by default", func(t *testing.T) {
 		settings := defaultIntakeSettings()
 
-		assert.Equal(t, []any{"opened", "reopened", "labeled"}, intakeTriggerActionsFor(settings))
+		assert.Equal(t, []any{"opened", "reopened"}, intakeTriggerActionsFor(settings))
 	})
 
 	t.Run("listens only for opened issues", func(t *testing.T) {
@@ -105,13 +106,6 @@ func Test__intakeTriggerActionsFor(t *testing.T) {
 		settings.SuperplaneLabelAdded = false
 
 		assert.Equal(t, []any{"reopened"}, intakeTriggerActionsFor(settings))
-	})
-
-	t.Run("can turn the label trigger off", func(t *testing.T) {
-		settings := defaultIntakeSettings()
-		settings.SuperplaneLabelAdded = false
-
-		assert.Equal(t, []any{"opened", "reopened"}, intakeTriggerActionsFor(settings))
 	})
 
 	t.Run("can listen only for added labels", func(t *testing.T) {
@@ -190,6 +184,37 @@ func Test__intakeSettingsChangeTrigger(t *testing.T) {
 
 		assert.True(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceDatadog, current, updated))
 		assert.False(t, intakeSettingsChangeTrigger(models.FactoryIntakeSourceDatadog, current, current))
+	})
+}
+
+func Test__deriveGitHubIssueListening(t *testing.T) {
+	t.Run("a new issue starts a task when no label is selected", func(t *testing.T) {
+		settings := deriveGitHubIssueListening(defaultIntakeSettings())
+
+		assert.True(t, settings.NewIssues)
+		assert.False(t, settings.SuperplaneLabelAdded)
+		assert.Equal(t, []any{"opened", "reopened"}, intakeTriggerActionsFor(settings))
+	})
+
+	t.Run("a selected label starts a task when it is added", func(t *testing.T) {
+		settings := defaultIntakeSettings()
+		settings.Labels = []string{"bug", "superplane"}
+		settings.ReopenedIssues = false
+		settings = deriveGitHubIssueListening(settings)
+
+		assert.True(t, settings.NewIssues)
+		assert.False(t, settings.ReopenedIssues)
+		assert.True(t, settings.SuperplaneLabelAdded)
+		assert.Equal(t, []any{"opened", "labeled"}, intakeTriggerActionsFor(settings))
+	})
+
+	t.Run("an exclude filter does not listen for an added label", func(t *testing.T) {
+		settings := defaultIntakeSettings()
+		settings.Labels = []string{"bug"}
+		settings.LabelFilterMode = intakeLabelFilterExclude
+		settings = deriveGitHubIssueListening(settings)
+
+		assert.False(t, settings.SuperplaneLabelAdded)
 	})
 }
 
@@ -410,6 +435,17 @@ func Test__intakeFilterExpressionFor_EvaluatesAgainstIssuePayloads(t *testing.T)
 		assert.Equal(t, false, evalRootDataExpression(t, expression, otherLabelAdded))
 		assert.Equal(t, true, evalRootDataExpression(t, expression, openedWithLabel))
 		assert.Equal(t, false, evalRootDataExpression(t, expression, openedWithoutLabel))
+
+		reopenedWithLabel := map[string]any{
+			"action": "reopened",
+			"issue":  openedWithLabel["issue"],
+		}
+		reopenedWithoutLabel := map[string]any{
+			"action": "reopened",
+			"issue":  openedWithoutLabel["issue"],
+		}
+		assert.Equal(t, true, evalRootDataExpression(t, expression, reopenedWithLabel))
+		assert.Equal(t, false, evalRootDataExpression(t, expression, reopenedWithoutLabel))
 	})
 
 	t.Run("combines every filter", func(t *testing.T) {

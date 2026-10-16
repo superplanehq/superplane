@@ -9,7 +9,6 @@ import {
   intakeSettingsTabs,
   intakeSettingsFromApi,
   intakeSettingsToApi,
-  superplaneLabelAddedCopy,
   intakeSupportsDelete,
   jiraCompletionSettingsToApi,
   normalizeIntakeSourceSettings,
@@ -47,9 +46,9 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeSettingsTabs(true)).toEqual(["general", "agent", "automation"]);
   });
 
-  it("defaults the authors filter to off", () => {
-    expect(DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess).toBe(false);
-    expect(intakeSettingsFromApi("GitHub issues", undefined).authorsWithAccess).toBe(false);
+  it("defaults the authors filter to on", () => {
+    expect(DEFAULT_GITHUB_INTAKE_SETTINGS.authorsWithAccess).toBe(true);
+    expect(intakeSettingsFromApi("GitHub issues", undefined).authorsWithAccess).toBe(true);
   });
 
   it("round-trips the authors filter through the API shape", () => {
@@ -62,24 +61,53 @@ describe("intakeSourceSettingsModel", () => {
     expect(intakeSettingsToApi(off).authorsWithAccess).toBe(false);
   });
 
-  it("names the label that is added, following the label filter", () => {
-    const base = { ...DEFAULT_GITHUB_INTAKE_SETTINGS };
+  it("listens for a selected label and for every new issue otherwise", () => {
+    const withLabels = normalizeIntakeSourceSettings(
+      {
+        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+        filterByLabel: true,
+        labels: ["bug"],
+        newIssues: false,
+        reopenedIssues: false,
+        superplaneLabelAdded: false,
+      },
+      "github-issues",
+    );
+    expect(withLabels.newIssues).toBe(true);
+    expect(withLabels.reopenedIssues).toBe(false);
+    expect(withLabels.superplaneLabelAdded).toBe(true);
 
-    expect(superplaneLabelAddedCopy(base)).toBe('The "superplane" label is added to the issue');
-    expect(superplaneLabelAddedCopy({ ...base, filterByLabel: true, labels: ["superplane-claude"] })).toBe(
-      'The "superplane-claude" label is added to the issue',
+    const withoutLabels = normalizeIntakeSourceSettings(
+      {
+        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
+        filterByLabel: false,
+        labels: ["bug"],
+        superplaneLabelAdded: true,
+      },
+      "github-issues",
     );
-    expect(superplaneLabelAddedCopy({ ...base, filterByLabel: true, labels: ["bug", "superplane-claude"] })).toBe(
-      "One of the filter labels is added to the issue",
-    );
-    expect(
-      superplaneLabelAddedCopy({
-        ...base,
+    expect(withoutLabels.newIssues).toBe(true);
+    expect(withoutLabels.superplaneLabelAdded).toBe(false);
+    expect(withoutLabels.labels).toEqual([]);
+
+    const excluded = normalizeIntakeSourceSettings(
+      {
+        ...DEFAULT_GITHUB_INTAKE_SETTINGS,
         filterByLabel: true,
         labelFilterMode: "exclude",
         labels: ["bug"],
-      }),
-    ).toBe('The "superplane" label is added to the issue');
+        superplaneLabelAdded: true,
+      },
+      "github-issues",
+    );
+    expect(excluded.superplaneLabelAdded).toBe(false);
+
+    const jira = normalizeIntakeSourceSettings(
+      { ...DEFAULT_GITHUB_INTAKE_SETTINGS, newIssues: false, superplaneLabelAdded: true },
+      "jira-issues",
+    );
+    expect(jira.newIssues).toBe(false);
+    expect(jira.superplaneLabelAdded).toBe(true);
   });
 
   it("round-trips GitHub issue events through the API shape", () => {
@@ -134,12 +162,12 @@ describe("intakeSourceSettingsModel", () => {
     expect(settings.reopenedIssues).toBe(false);
   });
 
-  it("defaults the GitHub issue event toggles on when the API omits them", () => {
+  it("defaults a new issue and a re-opened issue on when the API omits them", () => {
     const settings = intakeSettingsFromApi("GitHub issues", {});
 
     expect(settings.newIssues).toBe(true);
     expect(settings.reopenedIssues).toBe(true);
-    expect(settings.superplaneLabelAdded).toBe(true);
+    expect(settings.superplaneLabelAdded).toBe(false);
   });
 
   it("round-trips Sentry new-issue and level fields and turns off hidden triggers", () => {
