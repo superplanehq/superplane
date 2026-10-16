@@ -237,7 +237,7 @@ function ReviewBotManualAdd({
   onSubmit: () => void;
 }) {
   return (
-    <div className="flex gap-2">
+    <div className="review-bot-manual-add flex items-center gap-2">
       <Input
         id="discussion-setup-bot-manual"
         value={draft}
