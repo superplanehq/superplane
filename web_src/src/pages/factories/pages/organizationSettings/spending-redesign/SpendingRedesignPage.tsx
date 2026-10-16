@@ -23,7 +23,8 @@ import {
   type SpendingUsageEvent,
 } from "./spendingRedesignLib";
 import { SpendingPeriodControls } from "./SpendingPeriodControls";
-import { SpendingKpiRow, SpendingUsageSection } from "./SpendingRedesignPanels";
+import { SpendingKpiRow } from "./SpendingKpiRow";
+import { SpendingUsageSection } from "./SpendingRedesignPanels";
 import { useSpendingRedesignPageModel, type SpendingRedesignControlledState } from "./useSpendingRedesignPageModel";
 
 export interface SpendingRedesignPageProps extends SpendingRedesignControlledState {
