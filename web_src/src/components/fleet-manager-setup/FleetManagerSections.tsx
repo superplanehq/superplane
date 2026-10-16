@@ -104,21 +104,13 @@ function MachineTypeField({
             id={customFieldId}
             value={customDraft}
             aria-describedby={`${customFieldId}-help`}
-            onChange={(event) => {
-              const next = event.target.value;
-              setCustomDraft(next);
-              const trimmed = next.trim();
-              if (trimmed) onChange(trimmed);
-            }}
+            onChange={(event) => setCustomDraft(event.target.value)}
             onBlur={() => {
               const trimmed = customDraft.trim();
-              if (!trimmed) {
-                setEnteringCustomType(false);
-                return;
-              }
+              setEnteringCustomType(false);
+              if (!trimmed) return;
               onChange(trimmed);
               if (!listed.some((option) => option.id === trimmed)) rememberCustomType(trimmed);
-              setEnteringCustomType(false);
             }}
           />
         </div>

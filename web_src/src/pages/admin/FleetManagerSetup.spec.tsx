@@ -230,6 +230,26 @@ describe("FleetManagerSetup", () => {
     expect(screen.getByRole("combobox", { name: "Machine type" })).toHaveTextContent("t3.small");
   });
 
+  it("keeps the listed machine type when the other type is cleared", async () => {
+    const user = userEvent.setup();
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByRole("combobox", { name: "Machine type" })).toHaveTextContent(
+      "m8a.large · 2 vCPU · 8 GB memory",
+    );
+    await user.click(screen.getByRole("combobox", { name: "Machine type" }));
+    await user.click(screen.getByRole("option", { name: "Other machine type" }));
+
+    const customType = screen.getByRole("textbox", { name: "Other machine type" });
+    await user.type(customType, "c5.large");
+    await user.clear(customType);
+    fireEvent.blur(customType);
+
+    expect(screen.getByRole("combobox", { name: "Machine type" })).toHaveTextContent(
+      "m8a.large · 2 vCPU · 8 GB memory",
+    );
+  });
+
   it("keeps an entered machine type after a listed type is selected", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
