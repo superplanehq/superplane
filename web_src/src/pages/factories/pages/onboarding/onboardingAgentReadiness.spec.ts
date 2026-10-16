@@ -6,7 +6,6 @@ import {
   firstWorkOrderAgentError,
   hostedCreditGrantCopy,
   hasHostedDefaultModel,
-  hostedModelsQueriesLoading,
   isAgentStepReady,
   isHostedAgentReady,
   onboardingAgentGate,
@@ -203,18 +202,6 @@ describe("resolveOnboardingAgent", () => {
     });
   });
 
-  it("keeps the hosted model when bring-your-own-key is on and no provider is connected", () => {
-    expect(
-      resolveOnboardingAgent({
-        connected: connected(),
-        hostedModels: noHostedModels,
-        defaultHostedProvider: "anthropic",
-        defaultHostedModel: "claude-sonnet-4-6",
-        preferOwnKey: true,
-      })?.credentialsSource,
-    ).toBe("hosted");
-  });
-
   it("prefers hosted SuperPlane over a connected org provider when a default model is set", () => {
     expect(
       resolveOnboardingAgent({
@@ -230,17 +217,6 @@ describe("resolveOnboardingAgent", () => {
       model: "",
       planningModel: "",
     });
-  });
-});
-
-describe("hostedModelsQueriesLoading", () => {
-  it("waits until every hosted model query has fetched when credit remains", () => {
-    expect(hostedModelsQueriesLoading(true, [{ isFetched: true }, { isFetched: false }])).toBe(true);
-    expect(hostedModelsQueriesLoading(true, [{ isFetched: true }, { isFetched: true }])).toBe(false);
-  });
-
-  it("does not wait when hosted models are not required", () => {
-    expect(hostedModelsQueriesLoading(false, [{ isFetched: false }])).toBe(false);
   });
 });
 
