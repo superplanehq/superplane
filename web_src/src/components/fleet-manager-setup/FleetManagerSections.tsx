@@ -1,12 +1,18 @@
+import { useId } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
-import { Cloud } from "lucide-react";
+
+import { AwsProviderLogo, AzureProviderLogo, GcpProviderLogo } from "./providerLogos";
 
 export type FleetManagerSetupState = ReturnType<typeof useFleetManagerSetup>;
+
+const LOADED_FROM_TERRAFORM = "Loaded from Terraform";
 
 const Field = ({
   id,
@@ -17,35 +23,85 @@ const Field = ({
   <div className="space-y-1.5 text-sm">
     <div className="flex items-center justify-between gap-3">
       <Label htmlFor={id}>{label}</Label>
-      {imported && <span className="text-[11px] text-emerald-400">Loaded from Terraform</span>}
+      {imported && <span className="text-[11px] text-emerald-400">{LOADED_FROM_TERRAFORM}</span>}
     </div>
     <Input id={id} {...props} />
   </div>
 );
 
+const PROVIDERS = [
+  { id: "aws", name: "AWS", Logo: AwsProviderLogo },
+  { id: "gcp", name: "GCP", Logo: GcpProviderLogo },
+  { id: "azure", name: "Azure", Logo: AzureProviderLogo },
+] as const;
+
+function ProviderCard({
+  id,
+  name,
+  Logo,
+  selected,
+  loadedFromTerraform,
+  noteId,
+  onSelect,
+}: {
+  id: string;
+  name: string;
+  Logo: typeof AwsProviderLogo;
+  selected: boolean;
+  loadedFromTerraform: boolean;
+  noteId: string;
+  onSelect: () => void;
+}) {
+  const card = (
+    <Button
+      type="button"
+      variant={selected ? "default" : "outline"}
+      className="relative aspect-[5/3]! h-auto! w-full overflow-hidden rounded-xl! p-0! shadow-none!"
+      aria-label={name}
+      aria-describedby={loadedFromTerraform ? noteId : undefined}
+      aria-pressed={selected}
+      onClick={onSelect}
+    >
+      <span className="absolute inset-0 flex items-center justify-center p-5">
+        <Logo className="size-auto h-auto max-h-full w-auto max-w-full" testId={`provider-logo-${id}`} />
+      </span>
+      {loadedFromTerraform && (
+        <span id={noteId} className="sr-only">
+          {LOADED_FROM_TERRAFORM}
+        </span>
+      )}
+    </Button>
+  );
+
+  if (!loadedFromTerraform) return card;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{card}</TooltipTrigger>
+      <TooltipContent side="bottom">{LOADED_FROM_TERRAFORM}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function FleetManagerProviderSection({ setup }: { setup: FleetManagerSetupState }) {
+  const terraformNoteIdPrefix = useId();
   if (!setup.metadata || !setup.draft) return null;
   const terraformProvider = setup.metadata.infrastructureDefaults.provider;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Cloud provider">
-      {(["aws", "gcp", "azure"] as const).map((provider) => {
-        const selected = setup.draft?.provider === provider;
-        return (
-          <Button
-            key={provider}
-            type="button"
-            variant={selected ? "default" : "outline"}
-            className="h-auto min-h-20 flex-col gap-1"
-            aria-pressed={selected}
-            onClick={() => setup.setProvider(provider)}
-          >
-            <Cloud className="size-4" aria-hidden />
-            <span>{provider.toUpperCase()}</span>
-            {terraformProvider === provider && <span className="text-[10px] normal-case">Loaded from Terraform</span>}
-          </Button>
-        );
-      })}
+    <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Cloud provider">
+      {PROVIDERS.map(({ id, name, Logo }) => (
+        <ProviderCard
+          key={id}
+          id={id}
+          name={name}
+          Logo={Logo}
+          selected={setup.draft?.provider === id}
+          loadedFromTerraform={terraformProvider === id}
+          noteId={`${terraformNoteIdPrefix}-${id}`}
+          onSelect={() => setup.setProvider(id)}
+        />
+      ))}
     </div>
   );
 }
