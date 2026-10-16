@@ -47,6 +47,24 @@ export function setSkillFrontmatterFields(markdown: string, fields: Record<strin
   return `---\n${lines.join("\n")}\n---${body.startsWith("\n") ? body : `\n${body}`}`;
 }
 
+export type SkillFieldsFromMarkdown = {
+  title?: string;
+  command?: string;
+};
+
+// Returns the Name field value (frontmatter title, else name) and the command
+// (frontmatter name, else title, sanitized). A missing value is undefined.
+export function skillFieldsFromMarkdown(markdown: string): SkillFieldsFromMarkdown {
+  const name = skillFrontmatterField(markdown, "name")?.trim() ?? "";
+  const title = skillFrontmatterField(markdown, "title")?.trim() ?? "";
+  const displayTitle = title || name;
+  const commandSource = name || title;
+  return {
+    title: displayTitle || undefined,
+    command: commandSource ? sanitizeSkillCommandName(commandSource) : undefined,
+  };
+}
+
 export function skillDisplayTitle(resource: { name?: string; markdown?: string }): string {
   const title = skillFrontmatterField(resource.markdown ?? "", "title")?.trim();
   if (title) {
