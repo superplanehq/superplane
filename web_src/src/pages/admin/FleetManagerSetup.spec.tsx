@@ -230,6 +230,42 @@ describe("FleetManagerSetup", () => {
     expect(screen.getByRole("combobox", { name: "Machine type" })).toHaveTextContent("t3.small");
   });
 
+  it("keeps an entered machine type after a listed type is selected", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      FLEET_MANAGER_DRAFT_KEY,
+      JSON.stringify({
+        provider: "aws",
+        managerId: "terraform-cluster",
+        namespace: "superplane",
+        serviceAccountName: "superplane-fleet-manager",
+        superplaneUrl: "https://superplane.example.com",
+        runnerVersion: "v0.2.0",
+        selectedFleetIds: ["e1-large-amd64"],
+        fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+        fields: { region: "us-east-1", "machineType.e1-large-amd64": "t3.small" },
+      }),
+    );
+
+    render(<FleetManagerSetup />);
+
+    await user.click(await screen.findByRole("combobox", { name: "Machine type" }));
+    expect(screen.getByRole("option", { name: "t3.small" })).toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: "m8a.large · 2 vCPU · 8 GB memory" }));
+
+    await user.click(screen.getByRole("combobox", { name: "Machine type" }));
+    expect(screen.getByRole("option", { name: "t3.small" })).toBeInTheDocument();
+    await user.click(screen.getByRole("option", { name: "Other machine type" }));
+
+    const customType = screen.getByRole("textbox", { name: "Other machine type" });
+    await user.type(customType, "c5.large");
+    fireEvent.blur(customType);
+
+    await user.click(screen.getByRole("combobox", { name: "Machine type" }));
+    expect(screen.getByRole("option", { name: "c5.large" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "t3.small" })).toBeInTheDocument();
+  });
+
   it("blocks install when Terraform has no amd64 runner image", async () => {
     stubSetup({
       ...metadata,

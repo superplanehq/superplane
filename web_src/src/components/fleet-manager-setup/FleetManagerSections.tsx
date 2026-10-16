@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
-import { DEFAULT_SETUP_FLEET_ID, formatMachineTypeOption, machineTypeChoices } from "@/lib/fleetManagerSetup";
+import {
+  DEFAULT_SETUP_FLEET_ID,
+  formatMachineTypeOption,
+  machineTypeChoices,
+  type FleetManagerProvider,
+} from "@/lib/fleetManagerSetup";
 
 import { AwsProviderLogo, AzureProviderLogo, GcpProviderLogo } from "./providerLogos";
 
@@ -18,6 +23,109 @@ const FLEET_HELPER = "Default automations use this fleet. You can add more fleet
 const WARM_CAPACITY_HELP =
   "Idle machines kept ready before a task starts. Use 0 to start a machine only when work arrives.";
 const MAX_CAPACITY_HELP = "The most machines this fleet can run at one time, including busy machines.";
+const OTHER_MACHINE_TYPE = "__other_machine_type__";
+const OTHER_MACHINE_TYPE_LABEL = "Other machine type";
+const OTHER_MACHINE_TYPE_HELP = "Enter the machine type id from your cloud provider.";
+
+function MachineTypeField({
+  id,
+  provider,
+  value,
+  onChange,
+}: {
+  id: string;
+  provider: FleetManagerProvider;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const customFieldId = `${id}-custom`;
+  const listed = machineTypeChoices(provider, "");
+  const [customTypes, setCustomTypes] = useState<{ provider: FleetManagerProvider | null; ids: string[] }>({
+    provider: null,
+    ids: [],
+  });
+  const [enteringCustomType, setEnteringCustomType] = useState(false);
+  const [customDraft, setCustomDraft] = useState("");
+  const currentIsCustom = value.trim() !== "" && !listed.some((option) => option.id === value);
+
+  if (customTypes.provider !== provider) {
+    setCustomTypes({ provider, ids: currentIsCustom ? [value] : [] });
+    setEnteringCustomType(false);
+  } else if (!enteringCustomType && currentIsCustom && !customTypes.ids.includes(value)) {
+    setCustomTypes({ provider, ids: [...customTypes.ids, value] });
+  }
+
+  const choices = [
+    ...listed,
+    ...customTypes.ids
+      .filter((typeId) => customTypes.provider === provider && !listed.some((option) => option.id === typeId))
+      .map((typeId) => ({ id: typeId })),
+  ];
+
+  const rememberCustomType = (typeId: string) => {
+    if (listed.some((option) => option.id === typeId) || customTypes.ids.includes(typeId)) return;
+    setCustomTypes({ provider, ids: [...customTypes.ids, typeId] });
+  };
+
+  return (
+    <div className="space-y-1.5 text-sm">
+      <Label htmlFor={id}>Machine type</Label>
+      <Select
+        value={enteringCustomType ? OTHER_MACHINE_TYPE : value || undefined}
+        onValueChange={(next) => {
+          if (next === OTHER_MACHINE_TYPE) {
+            setEnteringCustomType(true);
+            setCustomDraft("");
+            return;
+          }
+          setEnteringCustomType(false);
+          onChange(next);
+        }}
+      >
+        <SelectTrigger id={id} className="w-full">
+          <SelectValue placeholder="Select a machine type" />
+        </SelectTrigger>
+        <SelectContent>
+          {choices.map((option) => (
+            <SelectItem key={option.id} value={option.id}>
+              {formatMachineTypeOption(option)}
+            </SelectItem>
+          ))}
+          <SelectItem value={OTHER_MACHINE_TYPE}>{OTHER_MACHINE_TYPE_LABEL}</SelectItem>
+        </SelectContent>
+      </Select>
+      {enteringCustomType && (
+        <div className="space-y-1.5">
+          <Label htmlFor={customFieldId}>{OTHER_MACHINE_TYPE_LABEL}</Label>
+          <p id={`${customFieldId}-help`} className="text-xs leading-5 text-muted-foreground">
+            {OTHER_MACHINE_TYPE_HELP}
+          </p>
+          <Input
+            id={customFieldId}
+            value={customDraft}
+            aria-describedby={`${customFieldId}-help`}
+            onChange={(event) => {
+              const next = event.target.value;
+              setCustomDraft(next);
+              const trimmed = next.trim();
+              if (trimmed) onChange(trimmed);
+            }}
+            onBlur={() => {
+              const trimmed = customDraft.trim();
+              if (!trimmed) {
+                setEnteringCustomType(false);
+                return;
+              }
+              onChange(trimmed);
+              if (!listed.some((option) => option.id === trimmed)) rememberCustomType(trimmed);
+              setEnteringCustomType(false);
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
 
 const CapacityField = ({
   id,
@@ -149,21 +257,12 @@ export function FleetManagerFleetSection({ setup }: { setup: FleetManagerSetupSt
           Add the {preset.spec.architecture} runner image through Terraform to use this fleet.
         </p>
       )}
-      <div className="space-y-1.5 text-sm">
-        <Label htmlFor={machineTypeFieldId}>Machine type</Label>
-        <Select value={machineType || undefined} onValueChange={(value) => setup.setField(machineTypeKey, value)}>
-          <SelectTrigger id={machineTypeFieldId} className="w-full">
-            <SelectValue placeholder="Select a machine type" />
-          </SelectTrigger>
-          <SelectContent>
-            {machineTypeChoices(draft.provider, machineType).map((option) => (
-              <SelectItem key={option.id} value={option.id}>
-                {formatMachineTypeOption(option)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <MachineTypeField
+        id={machineTypeFieldId}
+        provider={draft.provider}
+        value={machineType}
+        onChange={(value) => setup.setField(machineTypeKey, value)}
+      />
       {machineType && (
         <div className="grid items-stretch gap-3 sm:grid-cols-2">
           <CapacityField
