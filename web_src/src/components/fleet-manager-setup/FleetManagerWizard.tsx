@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import {
   FleetManagerFleetSection,
@@ -177,7 +177,42 @@ function InstallStep({ setup, onFinish, onFinishLater }: WizardProps) {
   );
 }
 
+function InstallCommandPending({ setup, onRetry }: { setup: FleetManagerSetupState; onRetry: () => void }) {
+  return (
+    <div data-testid="fleet-manager-install-step">
+      <FirstRunHeading headline="Install Fleet Manager" size="display">
+        <p className="text-[15px] leading-6 text-muted-foreground">
+          Run these commands where kubectl can access your cluster.
+        </p>
+      </FirstRunHeading>
+      {setup.tokenError ? (
+        <div className="mt-5">
+          <p role="alert" className="text-sm text-destructive">
+            {setup.tokenError}
+          </p>
+          <Button type="button" className="mt-3" onClick={onRetry}>
+            Try again
+          </Button>
+        </div>
+      ) : (
+        <p className="mt-5 text-sm text-muted-foreground">Preparing the install command...</p>
+      )}
+    </div>
+  );
+}
+
+function usePrepareInstallCommand(step: FleetManagerWizardStep, setup: FleetManagerSetupState) {
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (step !== "install" || setup.values || started.current) return;
+    started.current = true;
+    void setup.prepareInstallation();
+  }, [setup, step]);
+}
+
 export function FleetManagerWizardScreen(props: WizardProps) {
+  usePrepareInstallCommand(props.step, props.setup);
   const back = props.showBackButton ? props.onBack : undefined;
   const stepErrors = props.step === "fleets" ? props.setup.validationErrors : [];
   const continueToNextStep = async () => {
@@ -214,5 +249,8 @@ export function FleetManagerWizardScreen(props: WizardProps) {
 
   if (props.step === "provider") return <ProviderStep setup={props.setup} actions={continueActions} />;
   if (props.step === "fleets") return <FleetsStep setup={props.setup} actions={continueActions} />;
+  if (!props.setup.values) {
+    return <InstallCommandPending setup={props.setup} onRetry={() => void props.setup.prepareInstallation()} />;
+  }
   return <InstallStep {...props} />;
 }

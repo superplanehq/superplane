@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,13 +12,38 @@ import (
 
 const installationMetadataID = 1
 
+const (
+	OwnerSetupStepLicense       = "license"
+	OwnerSetupStepSMTP          = "smtp"
+	OwnerSetupStepFleetIntro    = "fleet-intro"
+	OwnerSetupStepFleetProvider = "fleet-provider"
+	OwnerSetupStepFleetFleets   = "fleet-fleets"
+	OwnerSetupStepFleetInstall  = "fleet-install"
+)
+
 type InstallationMetadata struct {
 	ID                        int    `gorm:"primary_key"`
 	InstallationID            string `gorm:"type:varchar(64)"`
 	AllowPrivateNetworkAccess bool
 	SignupsEnabled            bool
+	OwnerSetupStep            *string `gorm:"type:text"`
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
+}
+
+// OwnerSetupSteps lists the wizard steps an installation admin can resume.
+// The survey step is not persisted: reaching it ends the wizard.
+var OwnerSetupSteps = []string{
+	OwnerSetupStepLicense,
+	OwnerSetupStepSMTP,
+	OwnerSetupStepFleetIntro,
+	OwnerSetupStepFleetProvider,
+	OwnerSetupStepFleetFleets,
+	OwnerSetupStepFleetInstall,
+}
+
+func IsOwnerSetupStep(step string) bool {
+	return slices.Contains(OwnerSetupSteps, step)
 }
 
 func GetInstallationMetadata(tx *gorm.DB) (*InstallationMetadata, error) {
@@ -31,6 +57,78 @@ func GetInstallationID(tx *gorm.DB) (string, error) {
 	}
 
 	return metadata.InstallationID, nil
+}
+
+// GetOwnerSetupStep returns the owner setup wizard step in progress.
+// An empty value means the wizard is not in progress.
+func GetOwnerSetupStep(tx *gorm.DB) (string, error) {
+	metadata, err := findOrCreateInstallationMetadata(tx)
+	if err != nil {
+		return "", err
+	}
+
+	if metadata.OwnerSetupStep == nil {
+		return "", nil
+	}
+
+	return *metadata.OwnerSetupStep, nil
+}
+
+// SetOwnerSetupStep records the current owner setup wizard step.
+// An empty step clears the value and closes the wizard.
+func SetOwnerSetupStep(tx *gorm.DB, step string) error {
+	if _, err := findOrCreateInstallationMetadata(tx); err != nil {
+		return err
+	}
+
+	var value any
+	if step != "" {
+		value = step
+	}
+
+	return tx.Model(&InstallationMetadata{}).
+		Where("id = ?", installationMetadataID).
+		Update("owner_setup_step", value).
+		Error
+}
+
+// SetOwnerSetupStepIfOpen updates the wizard step only while it is open.
+// A close and a later step write cannot reopen a finished wizard.
+func SetOwnerSetupStepIfOpen(tx *gorm.DB, step string) (bool, error) {
+	updated := false
+	err := tx.Transaction(func(inner *gorm.DB) error {
+		if _, err := findOrCreateInstallationMetadata(inner); err != nil {
+			return err
+		}
+
+		var metadata InstallationMetadata
+		err := inner.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", installationMetadataID).
+			First(&metadata).Error
+		if err != nil {
+			return err
+		}
+		if metadata.OwnerSetupStep == nil || *metadata.OwnerSetupStep == "" {
+			return nil
+		}
+
+		var value any = step
+		if step == "" {
+			value = gorm.Expr("NULL")
+		}
+
+		result := inner.Model(&InstallationMetadata{}).
+			Where("id = ? AND owner_setup_step IS NOT NULL AND owner_setup_step <> ''", installationMetadataID).
+			Update("owner_setup_step", value)
+		if result.Error != nil {
+			return result.Error
+		}
+
+		updated = result.RowsAffected > 0
+		return nil
+	})
+
+	return updated, err
 }
 
 func UpdateInstallationMetadata(tx *gorm.DB, metadata *InstallationMetadata) error {
