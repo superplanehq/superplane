@@ -1,5 +1,7 @@
 import { type ReactNode } from "react";
-import { useParams } from "react-router";
+import { Navigate, useParams } from "react-router";
+
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 
 import type {
   OrganizationsHostedCreditInvoice,
@@ -24,6 +26,7 @@ import {
 } from "../../lib/billingCreditBuckets";
 import { hostedCreditBillingBalanceCopy } from "../../lib/hostedCreditEmpty";
 import { formatUsdCents } from "../../lib/workOrderUsage";
+import { factorySettingsSectionPath } from "../../lib/factoryPagePaths";
 import { FactorySettingsCard, FactorySettingsPageFrame } from "../settings/FactorySettingsCard";
 import { BillingCreditHistoryCard } from "./BillingCreditHistoryCard";
 import { BillingInvoicesCard } from "./BillingInvoicesCard";
@@ -36,12 +39,17 @@ const HOSTED_CREDIT_EXPLANATION =
 const HOSTED_CREDIT_REMAINING_CAPTION = "Remaining hosted credit";
 
 export function OrganizationSettingsBillingPage() {
-  const { organizationId = "" } = useParams<{ organizationId: string }>();
+  const { organizationId = "", factoryKey = "" } = useParams<{ organizationId: string; factoryKey: string }>();
+  const billingProductEnabled = useBillingProductEnabled();
   const model = useOrganizationBillingPageModel(organizationId);
   const packs = model.billing.products;
 
   usePageTitle(["Billing", model.organizationName]);
   useReportPageReady(!model.isLoading, { failed: Boolean(model.error) });
+
+  if (!billingProductEnabled) {
+    return <Navigate to={factorySettingsSectionPath(organizationId, factoryKey, "organization", "general")} replace />;
+  }
 
   return (
     <FactorySettingsPageFrame title="Billing">

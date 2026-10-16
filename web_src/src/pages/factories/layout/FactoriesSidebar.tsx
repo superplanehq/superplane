@@ -2,6 +2,7 @@ import type { FactoriesFactory } from "@/api-client";
 import { useAccount } from "@/contexts/useAccount";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useOrganization } from "@/hooks/useOrganizationData";
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { useOrganizationBilling } from "@/hooks/useOrganizationBilling";
 import { useOrganizationWorkspaceUsage } from "@/hooks/useOrganizationWorkspaceUsage";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
@@ -37,12 +38,15 @@ export function FactoriesSidebar({ organizationId, factoryKey, factory, factorie
   const { lineId: routeLineId } = useParams<{ lineId?: string }>();
   const spend = useOrganizationWorkspaceUsage(organizationId);
   const billing = useOrganizationBilling(organizationId);
-  const planLabel = organizationPlanLabel({
-    purchasedCreditCents: spend.data?.purchasedCreditCents,
-    welcomeCreditExpiresAt: spend.data?.welcomeCreditExpiresAt,
-    plan: billing.data?.plan,
-    trialEndsAt: billing.data?.trialEndsAt,
-  });
+  const billingProductEnabled = useBillingProductEnabled();
+  const planLabel = billingProductEnabled
+    ? organizationPlanLabel({
+        purchasedCreditCents: spend.data?.purchasedCreditCents,
+        welcomeCreditExpiresAt: spend.data?.welcomeCreditExpiresAt,
+        plan: billing.data?.plan,
+        trialEndsAt: billing.data?.trialEndsAt,
+      })
+    : undefined;
 
   return (
     <aside className={factoriesSidebarClassName} data-testid="factories-sidebar">
