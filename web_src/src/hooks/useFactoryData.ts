@@ -65,6 +65,7 @@ import {
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
 import { integrationKeys } from "./useIntegrations";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 
 export const factoryQueryKeys = {
   list: (organizationId: string) => ["factories", organizationId] as const,
@@ -1047,17 +1048,38 @@ export function useFactorySchedulePreview(
   params: Record<string, string>,
   enabled: boolean,
 ) {
-  return useQuery({
+  const [now, setNow] = useState(() => Date.now());
+  const preview = useQuery({
     queryKey: ["factory-schedule-preview", organizationId, factoryId, params],
     enabled: enabled && Boolean(organizationId && factoryId),
     retry: false,
-    refetchInterval: 60_000,
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async () => {
       const response = await factoriesPreviewFactorySchedule(
         withOrganizationHeader({ organizationId, path: { factoryId }, body: { installParams: params } }),
       );
-      if (!response.data?.nextRun) throw new Error("Could not calculate the next run.");
-      return response.data.nextRun;
+      const nextRun = response.data?.nextRun;
+      const timestamp = Date.parse(nextRun ?? "");
+      if (!nextRun || !Number.isFinite(timestamp) || timestamp <= Date.now()) {
+        throw new Error("Could not calculate a future run. Try again.");
+      }
+      return nextRun;
     },
   });
+  const nextRunAt = Date.parse(preview.data ?? "");
+  const { refetch } = preview;
+  useEffect(() => {
+    const remaining = nextRunAt - Date.now();
+    if (!enabled || !Number.isFinite(remaining) || remaining <= 0) return;
+    const timer = setTimeout(
+      () => {
+        setNow(Date.now());
+        void refetch();
+      },
+      Math.min(remaining, 60_000),
+    );
+    return () => clearTimeout(timer);
+  }, [enabled, nextRunAt, now, refetch]);
+  return { ...preview, isFuture: nextRunAt > Math.max(now, Date.now()) };
 }
