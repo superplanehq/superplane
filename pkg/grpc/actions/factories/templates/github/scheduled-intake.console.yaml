@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Console
+metadata:
+  name: Scheduled intake
+  canvasId: __FACTORY_CANVAS_ID__
+spec:
+  panels:
+    - id: about
+      type: markdown
+      content:
+        title: Scheduled intake
+        body: |
+          Inspect the repository on a schedule and propose a task in Backlog.
+          Edit the Schedule trigger to change when the automation runs.
+          Edit the agent prompt to change what it looks for.
+          An empty proposal creates no task. Agent failures appear in the run history.
+  layout:
+    - {i: about, x: 0, y: 0, w: 12, h: 5, minW: 3, minH: 3}

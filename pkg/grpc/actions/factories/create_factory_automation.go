@@ -30,13 +30,27 @@ func CreateFactoryAutomation(
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory automation")
 	}
-	if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
+	templateID := strings.TrimSpace(req.GetTemplateId())
+	if templateID != "" && templateID != scheduledIntakeTemplateID {
+		return nil, factoryErrorToStatus(invalidArgument("unknown factory automation template"), "failed to create factory automation")
+	}
+	if templateID == scheduledIntakeTemplateID {
+		if err := requireScheduledIntake(organization); err != nil {
+			return nil, err
+		}
+	} else if !organization.HasExperimentalFeature(features.FeatureFactoryCustomAutomations) {
 		return nil, factoryErrorToStatus(errCustomAutomationsDisabled, "failed to create factory automation")
 	}
 
 	columnKey := strings.TrimSpace(req.GetColumnKey())
+	if templateID == scheduledIntakeTemplateID {
+		columnKey = models.CanvasColumnKeyBacklog
+	}
+	if columnKey == models.CanvasColumnKeyBacklog && templateID != scheduledIntakeTemplateID {
+		return nil, factoryErrorToStatus(invalidArgument("Use the scheduled intake template for Backlog automations."), "failed to create factory automation")
+	}
 	if columnKey != "" && !models.ValidCanvasColumnKey(columnKey) {
-		return nil, factoryErrorToStatus(invalidArgument("column key must be verify or done"), "failed to create factory automation")
+		return nil, factoryErrorToStatus(invalidArgument("column key must be backlog, verify, or done"), "failed to create factory automation")
 	}
 
 	factory, err := findFactory(db, orgID, req.GetFactoryId())
@@ -48,12 +62,29 @@ func CreateFactoryAutomation(
 	name := strings.TrimSpace(req.GetName())
 	if name == "" {
 		name = factoryAutomationDefaultName
+		if templateID == scheduledIntakeTemplateID {
+			name = "Scheduled intake"
+		}
 	}
 	name, err = models.AvailableCanvasName(db, orgID, &factoryID, name)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to create factory automation")
 	}
 
+	var nodes []models.Node
+	var edges []models.Edge
+	description := ""
+	if templateID == scheduledIntakeTemplateID {
+		doc, buildErr := scheduledIntakeCanvas(db, factory, name, req.GetInstallParams())
+		if buildErr != nil {
+			return nil, factoryErrorToStatus(buildErr, "failed to configure scheduled intake")
+		}
+		nodes, edges, err = doc.Parse(deps.Registry, orgID.String())
+		if err != nil {
+			return nil, factoryErrorToStatus(err, "failed to build scheduled intake")
+		}
+		description = doc.Metadata.Description
+	}
 	response, err := canvases.CreateCanvas(
 		ctx,
 		deps.Registry,
@@ -62,10 +93,10 @@ func CreateFactoryAutomation(
 		deps.WebhookBaseURL,
 		orgID,
 		name,
-		"",
+		description,
 		&factoryID,
-		nil,
-		nil,
+		nodes,
+		edges,
 	)
 	if err != nil {
 		return nil, err
