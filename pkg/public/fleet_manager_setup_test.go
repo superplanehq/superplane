@@ -2,10 +2,16 @@ package public
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,10 +19,44 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
+func useRunnerReleases(t *testing.T, base string) {
+	t.Helper()
+	previous := runnerReleaseAPIBase
+	runnerReleaseAPIBase = base
+	resetRunnerReleaseCache()
+	t.Cleanup(func() {
+		runnerReleaseAPIBase = previous
+		resetRunnerReleaseCache()
+	})
+}
+
+func runnerReleaseTagFromRequest(r *http.Request) string {
+	const marker = "/releases/tags/"
+	escaped := r.URL.EscapedPath()
+	index := strings.Index(escaped, marker)
+	if index < 0 {
+		return ""
+	}
+	tag, err := url.PathUnescape(escaped[index+len(marker):])
+	if err != nil {
+		return ""
+	}
+	return tag
+}
+
+func expireRunnerReleaseCache(t *testing.T) {
+	t.Helper()
+	runnerReleaseCacheMu.Lock()
+	defer runnerReleaseCacheMu.Unlock()
+	require.True(t, cachedRunnerReleaseOK)
+	cachedRunnerReleaseFetchedAt = time.Now().Add(-runnerReleaseCacheTTL - time.Second)
+}
+
 func TestAdminGetFleetManagerSetup(t *testing.T) {
 	t.Setenv("RUNNER_STABLE_VERSION", "v1.2.3")
 	t.Setenv("RUNNER_SUPPORTED_VERSIONS", "v1.1.0, v1.2.3, v1.0.0")
 	t.Setenv("FLEET_MANAGER_STABLE_VERSION", "v2.3.4")
+	useRunnerReleases(t, "http://127.0.0.1:1")
 	server, user, token := setupAdminTestServer(t)
 
 	response := execRequest(server, requestParams{
@@ -49,7 +89,197 @@ func TestAdminGetFleetManagerSetup(t *testing.T) {
 	assert.Empty(t, tokens)
 }
 
+func TestAdminGetFleetManagerSetupMergesPublishedRunnerVersions(t *testing.T) {
+	t.Setenv("RUNNER_STABLE_VERSION", "v1.2.3")
+	t.Setenv("RUNNER_SUPPORTED_VERSIONS", "v1.0.0, v9.9.9, v1.4.0")
+
+	published := map[string]githubRunnerRelease{
+		"runner/v1.2.3": {TagName: "runner/v1.2.3"},
+		"runner/v2.0.0": {TagName: "runner/v2.0.0", Draft: true},
+		"runner/v2.1.0": {TagName: "runner/v2.1.0", Prerelease: true},
+		"runner/v1.4.0": {TagName: "runner/v1.4.0"},
+		"runner/v0.9.0": {TagName: "runner/v0.9.0"},
+	}
+	var releases *httptest.Server
+	releases = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "matching-refs") {
+			switch r.URL.Query().Get("page") {
+			case "", "1":
+				w.Header().Set("Link", fmt.Sprintf(`<%s/git/matching-refs/tags/runner/?page=2>; rel="next"`, releases.URL))
+				_ = json.NewEncoder(w).Encode([]githubMatchingRef{
+					{Ref: "refs/tags/v3.0.0"},
+					{Ref: "refs/tags/runner/v1.2.3"},
+					{Ref: "refs/tags/runner/v2.0.0"},
+					{Ref: "refs/tags/runner/v2.1.0"},
+					{Ref: "refs/tags/runner/v1.2.3-rc.1"},
+					{Ref: "refs/tags/runner/not-a-version"},
+				})
+			case "2":
+				_ = json.NewEncoder(w).Encode([]githubMatchingRef{
+					{Ref: "refs/tags/runner/v1.4.0"},
+					{Ref: "refs/tags/runner/v1.2.3"},
+					{Ref: "refs/tags/runner/v0.9.0"},
+					{Ref: "refs/tags/runner/v3.1.0"},
+				})
+			default:
+				http.Error(w, "unexpected page", http.StatusBadRequest)
+			}
+			return
+		}
+
+		release, ok := published[runnerReleaseTagFromRequest(r)]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(release)
+	}))
+	t.Cleanup(releases.Close)
+	useRunnerReleases(t, releases.URL)
+
+	server, _, token := setupAdminTestServer(t)
+	response := execRequest(server, requestParams{
+		method:     http.MethodGet,
+		path:       "/admin/api/installation/fleet-manager/setup",
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+
+	var body fleetManagerSetupResponse
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	assert.Equal(t, []string{"v9.9.9", "v1.4.0", "v1.2.3", "v1.0.0", "v0.9.0"}, body.RunnerVersions)
+	assert.Equal(t, "v1.4.0", body.DefaultRunnerVersion)
+}
+
+func TestAdminGetFleetManagerSetupKeepsCachedRunnerVersionsWhenLookupFails(t *testing.T) {
+	t.Setenv("RUNNER_STABLE_VERSION", "v1.2.3")
+	t.Setenv("RUNNER_SUPPORTED_VERSIONS", "v1.0.0")
+
+	var fail atomic.Bool
+	var requests atomic.Int32
+	releases := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if fail.Load() {
+			http.Error(w, "unavailable", http.StatusBadGateway)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "matching-refs") {
+			_ = json.NewEncoder(w).Encode([]githubMatchingRef{{Ref: "refs/tags/runner/v0.9.0"}})
+			return
+		}
+		if runnerReleaseTagFromRequest(r) != "runner/v0.9.0" {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(githubRunnerRelease{TagName: "runner/v0.9.0"})
+	}))
+	t.Cleanup(releases.Close)
+	useRunnerReleases(t, releases.URL)
+
+	server, _, token := setupAdminTestServer(t)
+	load := func() fleetManagerSetupResponse {
+		t.Helper()
+		response := execRequest(server, requestParams{
+			method:     http.MethodGet,
+			path:       "/admin/api/installation/fleet-manager/setup",
+			authCookie: token,
+		})
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		var body fleetManagerSetupResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		return body
+	}
+
+	first := load()
+	assert.Equal(t, []string{"v1.2.3", "v1.0.0", "v0.9.0"}, first.RunnerVersions)
+	assert.Equal(t, "v1.2.3", first.DefaultRunnerVersion)
+	downloaded := requests.Load()
+	require.Positive(t, downloaded)
+
+	assert.Equal(t, []string{"v1.2.3", "v1.0.0", "v0.9.0"}, load().RunnerVersions)
+	assert.Equal(t, downloaded, requests.Load())
+
+	expireRunnerReleaseCache(t)
+	fail.Store(true)
+	assert.Equal(t, []string{"v1.2.3", "v1.0.0", "v0.9.0"}, load().RunnerVersions)
+	assert.Greater(t, requests.Load(), downloaded)
+
+	failedRefresh := requests.Load()
+	assert.Equal(t, []string{"v1.2.3", "v1.0.0", "v0.9.0"}, load().RunnerVersions)
+	assert.Equal(t, failedRefresh, requests.Load())
+}
+
+func TestAdminGetFleetManagerSetupOmitsVersionsFromIncompleteTagList(t *testing.T) {
+	t.Setenv("RUNNER_STABLE_VERSION", "v1.2.3")
+	t.Setenv("RUNNER_SUPPORTED_VERSIONS", "")
+
+	var pages atomic.Int32
+	var releases *httptest.Server
+	releases = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "matching-refs") {
+			page := pages.Add(1)
+			w.Header().Set("Link", fmt.Sprintf(`<%s/git/matching-refs/tags/runner/?page=%d>; rel="next"`, releases.URL, page+1))
+			_ = json.NewEncoder(w).Encode([]githubMatchingRef{{Ref: "refs/tags/runner/v8.0.0"}})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(githubRunnerRelease{TagName: "runner/v8.0.0"})
+	}))
+	t.Cleanup(releases.Close)
+	useRunnerReleases(t, releases.URL)
+
+	server, _, token := setupAdminTestServer(t)
+	response := execRequest(server, requestParams{
+		method:     http.MethodGet,
+		path:       "/admin/api/installation/fleet-manager/setup",
+		authCookie: token,
+	})
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+
+	var body fleetManagerSetupResponse
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	assert.Equal(t, []string{"v1.2.3"}, body.RunnerVersions)
+	assert.Equal(t, int32(maximumRunnerTagPages), pages.Load())
+}
+
+func TestAdminGetFleetManagerSetupKeepsConfiguredVersionsWhenReleaseLookupFails(t *testing.T) {
+	releases := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "unavailable", http.StatusBadGateway)
+	}))
+	t.Cleanup(releases.Close)
+
+	tests := []struct {
+		name string
+		url  string
+	}{
+		{name: "non-success response", url: releases.URL},
+		{name: "network error", url: "http://127.0.0.1:1"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("RUNNER_STABLE_VERSION", "v1.2.3")
+			t.Setenv("RUNNER_SUPPORTED_VERSIONS", "v1.1.0, v1.2.3, v1.0.0")
+			useRunnerReleases(t, test.url)
+
+			server, _, token := setupAdminTestServer(t)
+			response := execRequest(server, requestParams{
+				method:     http.MethodGet,
+				path:       "/admin/api/installation/fleet-manager/setup",
+				authCookie: token,
+			})
+			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+
+			var body fleetManagerSetupResponse
+			require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+			assert.Equal(t, []string{"v1.2.3", "v1.1.0", "v1.0.0"}, body.RunnerVersions)
+		})
+	}
+}
+
 func TestAdminGetFleetManagerSetupLoadsChartDefaults(t *testing.T) {
+	useRunnerReleases(t, "http://127.0.0.1:1")
 	configPath := filepath.Join(t.TempDir(), "fleet-manager-setup.json")
 	config := `{
 		"source":"terraform",
