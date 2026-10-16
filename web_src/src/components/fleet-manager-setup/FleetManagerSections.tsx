@@ -56,13 +56,15 @@ function ProviderCard({
     <Button
       type="button"
       variant={selected ? "default" : "outline"}
-      className="aspect-square h-auto w-full rounded-xl p-0"
+      className="relative aspect-[5/3]! h-auto! w-full overflow-hidden rounded-xl! p-0! shadow-none!"
       aria-label={name}
       aria-describedby={loadedFromTerraform ? noteId : undefined}
       aria-pressed={selected}
       onClick={onSelect}
     >
-      <Logo className="size-[calc(100%-1rem)]" testId={`provider-logo-${id}`} />
+      <span className="absolute inset-0 flex items-center justify-center p-5">
+        <Logo className="size-auto h-auto max-h-full w-auto max-w-full" testId={`provider-logo-${id}`} />
+      </span>
       {loadedFromTerraform && (
         <span id={noteId} className="sr-only">
           {LOADED_FROM_TERRAFORM}
