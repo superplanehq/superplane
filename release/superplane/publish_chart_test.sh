@@ -25,6 +25,14 @@ case "$1 $2" in
       echo 'manifest unknown' >&2
       exit 1
     fi
+    if [ "${PULL_MODE}" = content-mismatch ] && [ "${count}" -eq 1 ]; then
+      echo 'manifest unknown' >&2
+      exit 1
+    fi
+    if [ "${PULL_MODE}" = content-mismatch ]; then
+      printf 'different' >"${destination}/superplane-chart-1.2.3-rc1.tgz"
+      exit 0
+    fi
     cp "${REMOTE_CHART}" "${destination}/superplane-chart-1.2.3-rc1.tgz"
     ;;
   "push "*) printf 'push\n' >>"${PUSH_LOG}"; printf 'Digest: sha256:%064d\n' 1 ;;
@@ -67,5 +75,14 @@ cp "${TMP_DIR}/superplane-1.2.3-rc1.tgz" "${REMOTE_CHART}"
 PULL_MODE=missing-once bash "${SCRIPT_DIR}/publish-chart.sh" \
   v1.2.3-rc1 "${TMP_DIR}/superplane-1.2.3-rc1.tgz" >"${TMP_DIR}/digest"
 grep -Eq '^sha256:[0-9a-f]{64}$' "${TMP_DIR}/digest"
+
+: >"${PULL_COUNT}"
+if PULL_MODE=content-mismatch bash "${SCRIPT_DIR}/publish-chart.sh" \
+  v1.2.3-rc1 "${TMP_DIR}/superplane-1.2.3-rc1.tgz" \
+  >"${TMP_DIR}/digest" 2>"${TMP_DIR}/stderr"; then
+  echo "A published chart with different content must fail" >&2
+  exit 1
+fi
+grep -q 'published chart content does not match' "${TMP_DIR}/stderr"
 
 echo "SuperPlane chart publication tests passed."
