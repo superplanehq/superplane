@@ -10,16 +10,24 @@ import {
   type OnboardingArtHandle,
 } from "./onboardingArt";
 
-export function FirstRunArtPane({ art, testId }: { art: FirstRunArtScene; testId?: string }) {
+export function FirstRunArtPane({
+  art,
+  testId,
+  className,
+}: {
+  art: FirstRunArtScene;
+  testId?: string;
+  className?: string;
+}) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<OnboardingArtHandle | null>(null);
-  const { mode, background, arrowColor, count } = art;
+  const { mode, background, arrowColor, count, arrowScale } = art;
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let cancelled = false;
-    const scene: FirstRunArtScene = { mode, background, arrowColor, count };
+    const scene: FirstRunArtScene = { mode, background, arrowColor, count, arrowScale };
 
     const mount = () => {
       if (cancelled) return;
@@ -51,7 +59,7 @@ export function FirstRunArtPane({ art, testId }: { art: FirstRunArtScene; testId
     return () => {
       cancelled = true;
     };
-  }, [mode, background, arrowColor, count]);
+  }, [mode, background, arrowColor, count, arrowScale]);
 
   useEffect(() => {
     return () => {
@@ -62,7 +70,7 @@ export function FirstRunArtPane({ art, testId }: { art: FirstRunArtScene; testId
 
   return (
     <div
-      className="absolute inset-0"
+      className={cn("absolute inset-0", className)}
       data-testid={testId ?? "first-run-art-pane"}
       data-art-mode={art.mode}
       data-art-background={art.background}
