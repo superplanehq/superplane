@@ -97,4 +97,25 @@ describe("useCreateWorkOrder", () => {
       queryKey: ["backlog-analysis-runs", "org-1"],
     });
   });
+
+  it("does not mark the new order pending analysis when planning is off", async () => {
+    factoriesCreateWorkOrder.mockResolvedValue({ data: { order: { id: "wo-created-1" } } });
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(["factories", "org-1", "factory-1"], {
+      id: "factory-1",
+      planning: { enabled: false, clarity: false, confidence: false },
+    });
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useCreateWorkOrder("org-1", "factory-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ title: "New task", description: "" });
+    });
+
+    await waitFor(() => expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["backlog-analysis-runs", "org-1"] }));
+    expect(pendingBacklogAnalysisIds().has("wo-created-1")).toBe(false);
+  });
 });

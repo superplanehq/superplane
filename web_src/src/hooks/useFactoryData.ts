@@ -62,6 +62,7 @@ import {
   type WorkOrdersPageCursor,
   type WorkOrdersPageQuery,
 } from "@/pages/factories/lib/workOrderListPagination";
+import { factoryPlanningEnabled } from "@/pages/factories/pages/planningSettingsModel";
 import { applyWorkOrderToListCaches, cachedWorkOrderFromLists } from "./workOrderListCache";
 import { integrationKeys } from "./useIntegrations";
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -595,7 +596,11 @@ export function useCreateWorkOrder(organizationId: string, factoryId: string) {
       invalidateWorkOrderLists(queryClient, organizationId, factoryId);
       // The Backlog run for this order is created asynchronously after this
       // RPC returns. Show "Analyzing" until the canvas WebSocket delivers it.
-      markBacklogAnalysisPending(order.id);
+      // With planning off, no run starts, so do not show the analyzing state.
+      const factory = queryClient.getQueryData<FactoriesFactory>(factoryDetailKey(organizationId, factoryId));
+      if (factoryPlanningEnabled(factory)) {
+        markBacklogAnalysisPending(order.id);
+      }
       void queryClient.invalidateQueries({ queryKey: ["backlog-analysis-runs", organizationId] });
       if (order.id) {
         void queryClient.invalidateQueries({
