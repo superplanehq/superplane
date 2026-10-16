@@ -8,6 +8,7 @@ import {
   fleetImage,
   fleetsMatchConfiguration,
   generateFleetManagerValues,
+  installationRunnerVersion,
   loadFleetManagerDraft,
   mergeTerraformInfrastructure,
   normalizeInfrastructureFields,
@@ -38,7 +39,7 @@ function defaultDraft(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
     namespace: defaults.namespace || "superplane",
     serviceAccountName: defaults.serviceAccountName || "superplane-fleet-manager",
     superplaneUrl: superplaneUrl || window.location.origin,
-    runnerVersion: metadata.defaultRunnerVersion,
+    runnerVersion: installationRunnerVersion(metadata),
     selectedFleetIds: firstAvailableFleet ? [firstAvailableFleet.id] : [],
     fleetCapacities: Object.fromEntries(
       metadata.fleetPresets.map((preset) => [preset.id, { ...DEFAULT_FLEET_CAPACITY }]),
@@ -59,13 +60,12 @@ function withRecommendedMachineTypes(
   return next;
 }
 
-function runnerVersionForDraft(version: string, metadata: FleetManagerSetupMetadata): string {
-  if (version && metadata.runnerVersions.includes(version)) return version;
-  return metadata.defaultRunnerVersion;
-}
-
 function draftFromMetadata(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
-  metadata.runnerVersions = metadata.runnerVersions?.length ? metadata.runnerVersions : [metadata.defaultRunnerVersion];
+  metadata.runnerVersions = metadata.runnerVersions?.length
+    ? metadata.runnerVersions
+    : metadata.defaultRunnerVersion
+      ? [metadata.defaultRunnerVersion]
+      : [];
   const restoredDraft = loadFleetManagerDraft();
   const draft = restoredDraft
     ? mergeTerraformInfrastructure(
@@ -76,7 +76,7 @@ function draftFromMetadata(metadata: FleetManagerSetupMetadata): FleetManagerDra
         metadata,
       )
     : defaultDraft(metadata);
-  return { ...draft, runnerVersion: runnerVersionForDraft(draft.runnerVersion, metadata) };
+  return { ...draft, runnerVersion: installationRunnerVersion(metadata) };
 }
 
 function draftForProvider(
@@ -269,7 +269,6 @@ export function useFleetManagerSetup(enabled = true, organizationId = "") {
     setNamespace: (value: string) => updateDraft((current) => ({ ...current, namespace: value })),
     setServiceAccountName: (value: string) => updateDraft((current) => ({ ...current, serviceAccountName: value })),
     setSuperplaneUrl: (value: string) => updateDraft((current) => ({ ...current, superplaneUrl: value })),
-    setRunnerVersion: (value: string) => updateDraft((current) => ({ ...current, runnerVersion: value })),
   };
 }
 

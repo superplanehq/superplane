@@ -149,6 +149,7 @@ func TestAdminGetFleetManagerSetupMergesPublishedRunnerVersions(t *testing.T) {
 	var body fleetManagerSetupResponse
 	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
 	assert.Equal(t, []string{"v9.9.9", "v1.4.0", "v1.2.3", "v1.0.0", "v0.9.0"}, body.RunnerVersions)
+	assert.Equal(t, "v1.4.0", body.DefaultRunnerVersion)
 }
 
 func TestAdminGetFleetManagerSetupKeepsCachedRunnerVersionsWhenLookupFails(t *testing.T) {
@@ -191,7 +192,9 @@ func TestAdminGetFleetManagerSetupKeepsCachedRunnerVersionsWhenLookupFails(t *te
 		return body
 	}
 
-	assert.Equal(t, []string{"v1.2.3", "v1.0.0", "v0.9.0"}, load().RunnerVersions)
+	first := load()
+	assert.Equal(t, []string{"v1.2.3", "v1.0.0", "v0.9.0"}, first.RunnerVersions)
+	assert.Equal(t, "v1.2.3", first.DefaultRunnerVersion)
 	downloaded := requests.Load()
 	require.Positive(t, downloaded)
 

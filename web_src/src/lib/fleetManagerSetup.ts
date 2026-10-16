@@ -238,11 +238,20 @@ export function validateFleetInfrastructure(input: FleetInfrastructureInput): st
   return errors;
 }
 
+export function installationRunnerVersion(
+  metadata: Pick<FleetManagerSetupMetadata, "defaultRunnerVersion" | "runnerVersions">,
+): string {
+  const listed = metadata.runnerVersions ?? [];
+  const preferred = metadata.defaultRunnerVersion?.trim() ?? "";
+  if (preferred && listed.includes(preferred)) return preferred;
+  return listed[0] ?? "";
+}
+
 export function validateFleetSelection(input: FleetSelectionInput): string[] {
   const errors: string[] = [];
   const runnerVersions = input.runnerVersions ?? [];
   if (!input.runnerVersion || !runnerVersions.includes(input.runnerVersion)) {
-    errors.push("Select a listed Runner version.");
+    errors.push("SuperPlane could not determine a Runner version.");
   }
   if (input.selectedFleetIds.length === 0) {
     errors.push("Select at least one fleet.");

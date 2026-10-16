@@ -110,10 +110,10 @@ describe("FleetManagerSetup", () => {
     expect(screen.getByRole("heading", { name: "Install Fleet Manager" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /cloud infrastructure/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Machine type for e1-large-amd64")).toHaveValue("m8a.large");
-    expect(screen.getByRole("combobox", { name: "Runner version" })).toHaveTextContent("v0.2.0");
+    expect(screen.queryByRole("combobox", { name: "Runner version" })).not.toBeInTheDocument();
   });
 
-  it("shows the stable runner version before the menu opens", async () => {
+  it("pins the setup runner version and ignores a saved version choice", async () => {
     window.localStorage.setItem(
       FLEET_MANAGER_DRAFT_KEY,
       JSON.stringify({
@@ -122,7 +122,7 @@ describe("FleetManagerSetup", () => {
         namespace: "superplane",
         serviceAccountName: "superplane-fleet-manager",
         superplaneUrl: "https://superplane.example.com",
-        runnerVersion: "v9.9.9",
+        runnerVersion: "v0.1.0",
         selectedFleetIds: ["e1-large-amd64"],
         fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
         fields: { region: "us-east-1", imageAmd64: "ami-amd64" },
@@ -131,30 +131,21 @@ describe("FleetManagerSetup", () => {
 
     render(<FleetManagerSetup />);
 
-    const version = await screen.findByRole("combobox", { name: "Runner version" });
-    expect(version).toHaveTextContent("v0.2.0");
-    expect(version).not.toHaveTextContent("v9.9.9");
-    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Generate install command" }));
+    expect(await screen.findByTestId("fleet-manager-install-command")).toHaveTextContent("runnerVersion: v0.2.0");
+    expect(screen.queryByRole("combobox", { name: "Runner version" })).not.toBeInTheDocument();
   });
 
-  it("blocks installation when no listed runner version is selected", async () => {
-    stubSetup({ ...metadata, defaultRunnerVersion: "" });
+  it("blocks installation when no runner version is available", async () => {
+    stubSetup({ ...metadata, defaultRunnerVersion: "", runnerVersions: [] });
     render(<FleetManagerSetup />);
 
     expect(await screen.findByRole("button", { name: "Generate install command" })).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "Runner version" })).not.toHaveTextContent("v0.2.0");
+    expect(screen.getAllByRole("alert")[0]).toHaveTextContent("SuperPlane could not determine a Runner version.");
   });
 
-  it("blocks installation when the selected runner version is not listed", async () => {
-    stubSetup({ ...metadata, defaultRunnerVersion: "v9.9.9" });
-    render(<FleetManagerSetup />);
-
-    expect(await screen.findByRole("combobox", { name: "Runner version" })).toHaveTextContent("v9.9.9");
-    expect(screen.getByRole("button", { name: "Generate install command" })).toBeDisabled();
-  });
-
-  it("keeps the wizard install action disabled when no listed runner version is selected", async () => {
-    stubSetup({ ...metadata, defaultRunnerVersion: "" });
+  it("keeps the wizard install action disabled when no runner version is available", async () => {
+    stubSetup({ ...metadata, defaultRunnerVersion: "", runnerVersions: [] });
     render(<FleetWizard />);
 
     expect(await screen.findByRole("button", { name: "Generate install command" })).toBeDisabled();

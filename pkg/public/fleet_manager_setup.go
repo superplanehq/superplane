@@ -125,15 +125,16 @@ func (s *Server) adminGetFleetManagerSetup(w http.ResponseWriter, _ *http.Reques
 		})
 	}
 
+	installVersion, runnerVersions := runnerVersionsForSetup(runnerVersion)
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(fleetManagerSetupResponse{
-		DefaultRunnerVersion:       runnerVersion,
+		DefaultRunnerVersion:       installVersion,
 		DefaultFleetManagerVersion: fleetManagerVersion,
 		DefaultChartVersion:        strings.TrimPrefix(fleetManagerVersion, "v"),
 		RunnerReleaseURLTemplate:   runnerReleaseURLTemplate,
 		ChartRepository:            fleetManagerChartRepository,
 		ImageRepository:            fleetManagerImageRepository,
-		RunnerVersions:             runnerVersionsForSetup(runnerVersion),
+		RunnerVersions:             runnerVersions,
 		FleetPresets:               presets,
 		InfrastructureDefaults: fleetManagerInfrastructure{
 			Source:             setup.Source,
@@ -182,13 +183,24 @@ func defaultFleetManagerSetupConfig() fleetManagerSetupConfig {
 	return setup
 }
 
-func runnerVersionsForSetup(stableVersion string) []string {
+func runnerVersionsForSetup(stableVersion string) (string, []string) {
 	configured := configuredRunnerVersions(stableVersion)
 	published, err := publishedRunnerVersions()
 	if err != nil {
-		return configured
+		return stableVersion, configured
 	}
-	return mergeRunnerVersions(configured, published)
+	return installationRunnerVersion(stableVersion, published), mergeRunnerVersions(configured, published)
+}
+
+func installationRunnerVersion(stableVersion string, published []string) string {
+	candidates := make([]string, 0, len(published)+1)
+	candidates = append(candidates, published...)
+	candidates = append(candidates, stableVersion)
+	newest := mergeRunnerVersions(nil, candidates)
+	if len(newest) == 0 {
+		return stableVersion
+	}
+	return newest[0]
 }
 
 func configuredRunnerVersions(stableVersion string) []string {

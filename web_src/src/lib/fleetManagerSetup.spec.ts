@@ -6,6 +6,7 @@ import {
   fleetsMatchConfiguration,
   fleetManagerInstallCommand,
   generateFleetManagerValues,
+  installationRunnerVersion,
   loadFleetManagerDraft,
   mergeTerraformInfrastructure,
   saveFleetManagerDraft,
@@ -170,6 +171,18 @@ describe("generateFleetManagerValues", () => {
   });
 });
 
+describe("installationRunnerVersion", () => {
+  it("uses the listed setup version and falls back to the first listed version", () => {
+    expect(installationRunnerVersion({ defaultRunnerVersion: "v1.4.0", runnerVersions: ["v1.4.0", "v1.2.3"] })).toBe(
+      "v1.4.0",
+    );
+    expect(installationRunnerVersion({ defaultRunnerVersion: "v9.9.9", runnerVersions: ["v1.4.0", "v1.2.3"] })).toBe(
+      "v1.4.0",
+    );
+    expect(installationRunnerVersion({ defaultRunnerVersion: "", runnerVersions: [] })).toBe("");
+  });
+});
+
 describe("validateFleetManagerConfiguration", () => {
   const validConfiguration = {
     managerId: "my-cluster",
@@ -203,9 +216,13 @@ describe("validateFleetManagerConfiguration", () => {
 
   it("rejects a runner version that is empty or not listed", () => {
     const listed = { ...validConfiguration, runnerVersions: ["v0.1.0"] };
-    expect(validateFleetSelection({ ...listed, runnerVersion: "" })).toContain("Select a listed Runner version.");
-    expect(validateFleetSelection({ ...listed, runnerVersion: "v9.9.9" })).toContain("Select a listed Runner version.");
-    expect(validateFleetSelection(listed)).not.toContain("Select a listed Runner version.");
+    expect(validateFleetSelection({ ...listed, runnerVersion: "" })).toContain(
+      "SuperPlane could not determine a Runner version.",
+    );
+    expect(validateFleetSelection({ ...listed, runnerVersion: "v9.9.9" })).toContain(
+      "SuperPlane could not determine a Runner version.",
+    );
+    expect(validateFleetSelection(listed)).not.toContain("SuperPlane could not determine a Runner version.");
   });
 });
 
