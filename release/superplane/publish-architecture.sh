@@ -25,12 +25,22 @@ case "${ARCHITECTURE}" in
 esac
 test -f "${OCI_ARCHIVE}"
 
-prepared_digest="$("${SKOPEO[@]}" inspect --raw "oci-archive:${OCI_ARCHIVE}" | sha256sum | awk '{print $1}')"
-prepared_digest="sha256:${prepared_digest}"
 inspect_error="$(mktemp)"
-trap 'rm -f "${inspect_error}"' EXIT
+raw_manifest="$(mktemp)"
+trap 'rm -f "${inspect_error}" "${raw_manifest}"' EXIT
 
-if remote_digest="$("${SKOPEO[@]}" inspect --format '{{.Digest}}' "docker://${IMAGE}" 2>"${inspect_error}")"; then
+# Hash the index bytes. skopeo inspect without --raw selects the agent
+# architecture, so an arm64 index fails on an amd64 machine.
+raw_digest() {
+  if ! "${SKOPEO[@]}" inspect --raw "$1" >"${raw_manifest}" 2>"${inspect_error}"; then
+    return 1
+  fi
+  sha256sum "${raw_manifest}" | awk '{print "sha256:" $1}'
+}
+
+prepared_digest="$(raw_digest "oci-archive:${OCI_ARCHIVE}")"
+
+if remote_digest="$(raw_digest "docker://${IMAGE}")"; then
   if [ "${remote_digest}" != "${prepared_digest}" ]; then
     echo "Error: ${IMAGE} already points to ${remote_digest}, not ${prepared_digest}" >&2
     exit 1
@@ -45,7 +55,7 @@ else
   exit 1
 fi
 
-published_digest="$("${SKOPEO[@]}" inspect --format '{{.Digest}}' "docker://${IMAGE}")"
+published_digest="$(raw_digest "docker://${IMAGE}")"
 if [ "${published_digest}" != "${prepared_digest}" ]; then
   echo "Error: published digest ${published_digest} does not match ${prepared_digest}" >&2
   exit 1
