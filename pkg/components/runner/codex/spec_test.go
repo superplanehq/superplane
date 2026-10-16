@@ -3,11 +3,13 @@ package codex
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
 )
 
 func TestDecodeRunCodexSpecRequiresPromptStep(t *testing.T) {
@@ -46,6 +48,53 @@ func TestValidateRunCodexSpecRejectsHostedCredentials(t *testing.T) {
 	err := validateRunCodexSpec(spec)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Run SuperPlane Agent")
+}
+
+func TestValidateCodexConfigurationAcceptsSubscription(t *testing.T) {
+	t.Parallel()
+	err := configuration.ValidateConfiguration((&RunCodex{}).Configuration(), map[string]any{
+		"machineType": "e1-large-amd64",
+		"credentials": map[string]any{"source": runner.CredentialsSourceSubscription},
+		"steps": []any{
+			map[string]any{"name": "Plan task", "type": runner.AgentStepPrompt, "prompt": "Plan this task"},
+		},
+	})
+	require.NoError(t, err)
+}
+
+func TestInjectSubscriptionCredentialsPreservesPlanningEnvironment(t *testing.T) {
+	t.Setenv("JWT_SECRET", "test-secret")
+	t.Setenv("TASK_BROKER_BASE_URL", "http://host.docker.internal:8091")
+	t.Setenv("BASE_URL", "http://localhost:8000")
+	environment, err := injectSubscriptionCredentials(core.ExecutionContext{
+		OrganizationID:    uuid.NewString(),
+		CodexSubscription: subscriptionLease{},
+	}, []runner.BrokerEnvironmentVariable{
+		{Name: runner.EnvSuperplaneBaseURL, Value: "http://host.docker.internal:8000"},
+		{Name: runner.EnvSuperplanePlanningID, Value: "planning-session"},
+		{Name: runner.EnvSuperplaneRunToken, Value: "planning-token"},
+		{Name: envOpenAIAPIKey, Value: "api-key"},
+		{Name: envOpenAIBaseURL, Value: "https://api.example.com"},
+	}, uuid.New(), 60)
+	require.NoError(t, err)
+
+	values := map[string]string{}
+	for _, item := range environment {
+		require.NotContains(t, values, item.Name, "duplicate environment variable")
+		values[item.Name] = item.Value
+	}
+	assert.Equal(t, "planning-session", values[runner.EnvSuperplanePlanningID])
+	assert.Equal(t, "planning-token", values[runner.EnvSuperplaneRunToken])
+	assert.Equal(t, "http://host.docker.internal:8000", values[runner.EnvSuperplaneBaseURL])
+	assert.NotEmpty(t, values[runner.EnvCodexSubscriptionToken])
+	assert.NotContains(t, values, envOpenAIAPIKey)
+	assert.NotContains(t, values, envOpenAIBaseURL)
+}
+
+type subscriptionLease struct{}
+
+func (subscriptionLease) Reserve(uuid.UUID) (core.CodexSubscriptionLease, error) {
+	return core.CodexSubscriptionLease{ConnectionID: uuid.New(), FactoryID: uuid.New(), Generation: 1}, nil
 }
 
 func TestValidateRunCodexSpecRejectsReservedEnv(t *testing.T) {

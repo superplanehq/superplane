@@ -3,12 +3,13 @@ import type { FactoriesFactoryCodexConnection } from "@/api-client";
 
 import { FIRST_RUN_COPY } from "./firstRunCopy";
 
-type CodexPhase = "device" | "finishing" | "ready" | "start" | "idle";
+type CodexPhase = "device" | "pending" | "finishing" | "ready" | "start" | "idle";
 
 function codexPhase(selected: boolean, connection?: FactoriesFactoryCodexConnection): CodexPhase {
   if (!selected) return "idle";
   if (!connection) return "start";
   if (connection.status === "pending" && connection.verificationUrl && connection.verificationCode) return "device";
+  if (connection.status === "pending") return "pending";
   if (connection.status === "finishing" || connection.reservationHeld === true) return "finishing";
   if (connection.status === "ready") return "ready";
   return "start";
@@ -43,11 +44,19 @@ function DeviceSignIn({
   );
 }
 
-function FinishingSignIn({ canceling, onCancel }: { canceling: boolean; onCancel: () => void }) {
+function WaitingSignIn({
+  message,
+  canceling,
+  onCancel,
+}: {
+  message: string;
+  canceling: boolean;
+  onCancel: () => void;
+}) {
   const copy = FIRST_RUN_COPY.agent;
   return (
     <div className="mt-3 space-y-2 text-[13px]" role="status">
-      <p>{copy.subscriptionFinishing}</p>
+      <p>{message}</p>
       <LoadingButton type="button" variant="outline" loading={canceling} onClick={onCancel}>
         {copy.subscriptionCancel}
       </LoadingButton>
@@ -113,7 +122,13 @@ export function FirstRunCodexSubscription({
       {phase === "device" && connection ? (
         <DeviceSignIn connection={connection} canceling={canceling} onCancel={onCancel} />
       ) : null}
-      {phase === "finishing" ? <FinishingSignIn canceling={canceling} onCancel={onCancel} /> : null}
+      {phase === "pending" || phase === "finishing" ? (
+        <WaitingSignIn
+          message={phase === "pending" ? copy.subscriptionPending : copy.subscriptionFinishing}
+          canceling={canceling}
+          onCancel={onCancel}
+        />
+      ) : null}
       {phase === "ready" ? <ReadySignIn connection={connection} /> : null}
       {phase === "start" ? <StartSignIn status={connection?.status} starting={starting} onStart={onStart} /> : null}
     </fieldset>

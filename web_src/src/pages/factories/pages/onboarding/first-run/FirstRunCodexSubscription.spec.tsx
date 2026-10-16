@@ -48,6 +48,16 @@ describe("FirstRunCodexSubscription", () => {
     expect(screen.queryByRole("button", { name: copy.subscriptionStart })).not.toBeInTheDocument();
   });
 
+  it("waits for a device code without saying sign-in is finishing", async () => {
+    const onCancel = vi.fn();
+    renderPanel({ status: "pending", reservationHeld: true }, { onCancel });
+
+    expect(screen.getByRole("status")).toHaveTextContent("Wait for the ChatGPT sign-in code.");
+    expect(screen.queryByText(copy.subscriptionFinishing)).not.toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: copy.subscriptionCancel }));
+    expect(onCancel).toHaveBeenCalledOnce();
+  });
+
   it("lets the user cancel while the login runner is finishing", async () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();

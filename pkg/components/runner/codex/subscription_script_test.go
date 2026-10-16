@@ -67,7 +67,7 @@ mkdir -p "$CODEX_HOME"
 cat > "$CODEX_HOME/auth.json" <<'EOF'
 {"access_token":"access-token-value","refresh_token":"refresh-token-value","id_token":"id-token-value","OPENAI_API_KEY":"sk-live"}
 EOF
-printf '%s\n' 'https://auth.openai.com/codex/device' 'CODE-1234'
+printf '\033[94m%s\033[0m\n' 'https://auth.openai.com/codex/device' 'CODE-1234'
 `), 0o755))
 
 	_, callerFile, _, ok := runtime.Caller(0)

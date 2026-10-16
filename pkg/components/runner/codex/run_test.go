@@ -86,6 +86,8 @@ func TestCodexExecArgsUsesReadOnlySandboxForAnalysis(t *testing.T) {
 		"SUPERPLANE_PLANNING_SESSION_ID":   "session-1",
 		"SUPERPLANE_PLANNING_SESSION_KIND": "work_order_analysis",
 	}, "gpt-5", "/task/planning_session_mcp.js")
+	assert.Contains(t, args, `mcp_servers.superplane.default_tools_approval_mode="approve"`)
+	assert.Contains(t, args, `mcp_servers.superplane.env_vars=["SUPERPLANE_BASE_URL", "SUPERPLANE_RUN_TOKEN", "SUPERPLANE_ARTIFACT_TOKEN", "SUPERPLANE_MERGE_CONFIDENCE_TOKEN", "SUPERPLANE_TASK_DIR", "SUPERPLANE_ACTIVITY_ID", "SUPERPLANE_ANALYSIS_SPEC_FILE", "SUPERPLANE_ANALYSIS_SCORE_FILE"]`)
 
 	assert.NotContains(t, args, "--dangerously-bypass-approvals-and-sandbox")
 	joined := strings.Join(args, " ")

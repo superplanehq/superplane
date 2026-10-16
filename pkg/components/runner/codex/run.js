@@ -217,6 +217,19 @@ function mcpConfigOverrides(mcpScriptPath, env = process.env) {
     `mcp_servers.superplane.command=${tomlString("node")}`,
     "-c",
     `mcp_servers.superplane.args=${tomlStringArray([mcpScriptPath])}`,
+    "-c",
+    'mcp_servers.superplane.default_tools_approval_mode="approve"',
+    "-c",
+    `mcp_servers.superplane.env_vars=${tomlStringArray([
+      "SUPERPLANE_BASE_URL",
+      "SUPERPLANE_RUN_TOKEN",
+      "SUPERPLANE_ARTIFACT_TOKEN",
+      "SUPERPLANE_MERGE_CONFIDENCE_TOKEN",
+      "SUPERPLANE_TASK_DIR",
+      "SUPERPLANE_ACTIVITY_ID",
+      "SUPERPLANE_ANALYSIS_SPEC_FILE",
+      "SUPERPLANE_ANALYSIS_SCORE_FILE",
+    ])}`,
     ...workspaceMCPConfigOverrides(env),
   ];
 }

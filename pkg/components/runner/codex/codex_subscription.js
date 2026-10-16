@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const { stripVTControlCharacters } = require("node:util");
 
 const CHECKPOINT_TIMEOUT_MS = 30000;
 
@@ -121,7 +122,7 @@ async function checkpoint(options = {}) {
 }
 
 function parseDeviceAuth(text) {
-  const source = String(text || "");
+  const source = stripVTControlCharacters(String(text || ""));
   const urlMatch = source.match(/https:\/\/[^\s)]+/);
   const codeMatch = source.match(/\b([A-Z0-9]{4,8}(?:-[A-Z0-9]{4,8})+)\b/);
   return {
