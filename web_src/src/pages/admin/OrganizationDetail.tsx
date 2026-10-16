@@ -1,4 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { OrganizationSpendingExplorer } from "@/pages/factories/pages/organizationSettings/spending-redesign/OrganizationSpendingExplorer";
 import { ArrowLeft } from "lucide-react";
@@ -33,6 +34,7 @@ function isOrganizationTab(value: string): value is OrganizationTab {
 
 const OrganizationDetail: React.FC = () => {
   const { orgId } = useParams<{ orgId: string }>();
+  const billingProductEnabled = useBillingProductEnabled();
   const [tab, setTab] = useState<OrganizationTab>("overview");
   const [creditsVisited, setCreditsVisited] = useState(false);
   const [spendingVisited, setSpendingVisited] = useState(false);
@@ -73,7 +75,7 @@ const OrganizationDetail: React.FC = () => {
           <TabsTrigger value="automations">Automations</TabsTrigger>
           <TabsTrigger value="connections">Connections</TabsTrigger>
           <TabsTrigger value="features">Features</TabsTrigger>
-          <TabsTrigger value="spending">Spending</TabsTrigger>
+          {billingProductEnabled ? <TabsTrigger value="spending">Spending</TabsTrigger> : null}
           <TabsTrigger value="velocity">Velocity</TabsTrigger>
           <TabsTrigger value="credits">Credits</TabsTrigger>
         </TabsList>
@@ -92,17 +94,19 @@ const OrganizationDetail: React.FC = () => {
         <TabsContent value="features" className="mt-3">
           <OrgExperimentalFeaturesTable orgId={orgId!} />
         </TabsContent>
-        <TabsContent
-          value="spending"
-          forceMount={spendingVisited || undefined}
-          className="mt-3 data-[state=inactive]:hidden"
-        >
-          <OrganizationSpendingExplorer
-            organizationId={orgId!}
-            setDocumentTitle={false}
-            useReport={useAdminOrganizationSpendingReport}
-          />
-        </TabsContent>
+        {billingProductEnabled ? (
+          <TabsContent
+            value="spending"
+            forceMount={spendingVisited || undefined}
+            className="mt-3 data-[state=inactive]:hidden"
+          >
+            <OrganizationSpendingExplorer
+              organizationId={orgId!}
+              setDocumentTitle={false}
+              useReport={useAdminOrganizationSpendingReport}
+            />
+          </TabsContent>
+        ) : null}
         <TabsContent
           value="velocity"
           forceMount={velocityVisited || undefined}

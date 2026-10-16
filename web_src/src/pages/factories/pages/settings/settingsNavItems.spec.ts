@@ -145,10 +145,12 @@ describe("filterFactorySettingsNavGroupsByPermission", () => {
 });
 
 describe("omitFactorySettingsBillingItem", () => {
-  it("drops Billing and keeps Spending", () => {
+  it("drops Billing, Spending, and Usage", () => {
     const filtered = omitFactorySettingsBillingItem(FACTORY_SETTINGS_NAV_GROUPS);
     const labels = filtered.flatMap((group) => group.items.map((item) => item.label));
     expect(labels).not.toContain("Billing");
-    expect(labels).toContain("Spending");
+    expect(labels).not.toContain("Spending");
+    expect(labels).not.toContain("Usage");
+    expect(labels).toContain("General");
   });
 });

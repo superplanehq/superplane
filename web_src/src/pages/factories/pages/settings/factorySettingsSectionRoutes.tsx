@@ -40,6 +40,7 @@ import {
   WorkspaceAutomationsSettingsRedirect,
   WorkspaceSpendingRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
+import { BillingProductSettingsRoute } from "@/pages/factories/pages/settings/BillingProductSettingsRoute";
 import { LegacyAgentResourcesRedirect } from "@/pages/factories/pages/settings/LegacyAgentResourcesRedirect";
 import { FactorySettingsIndexRoute } from "@/pages/factories/pages/settings/MobileSettingsIndexPage";
 
@@ -154,9 +155,11 @@ export const factorySettingsSectionRoutes = [
     key="factory-settings-workspace-usage"
     path="workspace/usage"
     element={
-      <RequirePermission resource="org" action="read">
-        <OrganizationSettingsUsagePage />
-      </RequirePermission>
+      <BillingProductSettingsRoute>
+        <RequirePermission resource="org" action="read">
+          <OrganizationSettingsUsagePage />
+        </RequirePermission>
+      </BillingProductSettingsRoute>
     }
   />,
   <Route
@@ -260,9 +263,11 @@ export const factorySettingsSectionRoutes = [
     key="factory-settings-organization-billing"
     path="organization/billing"
     element={
-      <RequirePermission resource="org" action="read">
-        <OrganizationSettingsBillingPage />
-      </RequirePermission>
+      <BillingProductSettingsRoute>
+        <RequirePermission resource="org" action="read">
+          <OrganizationSettingsBillingPage />
+        </RequirePermission>
+      </BillingProductSettingsRoute>
     }
   />,
   <Route key="factory-settings-organization-usage" path="organization/usage" element={<OrganizationUsageRedirect />} />,
@@ -270,9 +275,11 @@ export const factorySettingsSectionRoutes = [
     key="factory-settings-organization-spending"
     path="organization/spending"
     element={
-      <RequirePermission resource="org" action="read">
-        <OrganizationSettingsWorkspaceUsagePage />
-      </RequirePermission>
+      <BillingProductSettingsRoute>
+        <RequirePermission resource="org" action="read">
+          <OrganizationSettingsWorkspaceUsagePage />
+        </RequirePermission>
+      </BillingProductSettingsRoute>
     }
   />,
   <Route key="factory-settings-legacy" path="*" element={<LegacyFactorySettingsRedirect />} />,

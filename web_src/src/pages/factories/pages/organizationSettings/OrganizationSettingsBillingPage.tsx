@@ -48,7 +48,7 @@ export function OrganizationSettingsBillingPage() {
   useReportPageReady(!model.isLoading, { failed: Boolean(model.error) });
 
   if (!billingProductEnabled) {
-    return <Navigate to={factorySettingsSectionPath(organizationId, factoryKey, "organization", "spending")} replace />;
+    return <Navigate to={factorySettingsSectionPath(organizationId, factoryKey, "organization", "general")} replace />;
   }
 
   return (
