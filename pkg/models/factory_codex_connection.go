@@ -3,10 +3,12 @@ package models
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/features"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -52,6 +54,8 @@ type FactoryCodexConnection struct {
 	VerificationURL           string
 	VerificationCode          string
 	AccountLabel              string
+	UsageLimits               datatypes.JSONSlice[CodexUsageLimit]
+	UsageObservedAt           *time.Time
 	BundleCiphertext          []byte
 	CredentialVersion         int64
 	FinalCheckpointVersion    int64
@@ -60,6 +64,20 @@ type FactoryCodexConnection struct {
 	ReservationGeneration     int64
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time
+}
+
+type CodexUsageLimit struct {
+	LimitID   string            `json:"limitId"`
+	LimitName string            `json:"limitName"`
+	PlanType  string            `json:"planType"`
+	Primary   *CodexUsageWindow `json:"primary"`
+	Secondary *CodexUsageWindow `json:"secondary"`
+}
+
+type CodexUsageWindow struct {
+	UsedPercent        *float64 `json:"usedPercent"`
+	WindowDurationMins *int64   `json:"windowDurationMins"`
+	ResetsAt           *int64   `json:"resetsAt"`
 }
 
 func (FactoryCodexConnection) TableName() string {
@@ -141,6 +159,8 @@ func (c *FactoryCodexConnection) BeginLogin(tx *gorm.DB, taskID uuid.UUID, now t
 		Where("id = ? AND reservation_task_id IS NULL AND status = ?", c.ID, c.Status).
 		Updates(map[string]any{
 			"status":                      CodexConnectionStatusPending,
+			"usage_limits":                datatypes.NewJSONSlice([]CodexUsageLimit{}),
+			"usage_observed_at":           nil,
 			"resume_status":               c.Status,
 			"verification_url":            "",
 			"verification_code":           "",
@@ -156,6 +176,8 @@ func (c *FactoryCodexConnection) BeginLogin(tx *gorm.DB, taskID uuid.UUID, now t
 		return ErrCodexConnectionStale
 	}
 	c.ResumeStatus = c.Status
+	c.UsageLimits = nil
+	c.UsageObservedAt = nil
 	c.Status = CodexConnectionStatusPending
 	c.VerificationURL = ""
 	c.VerificationCode = ""
@@ -314,6 +336,8 @@ func (c *FactoryCodexConnection) Disconnect(tx *gorm.DB, now time.Time) error {
 			"verification_url":         "",
 			"verification_code":        "",
 			"account_label":            "",
+			"usage_limits":             datatypes.NewJSONSlice([]CodexUsageLimit{}),
+			"usage_observed_at":        nil,
 			"bundle_ciphertext":        nil,
 			"credential_version":       0,
 			"final_checkpoint_version": 0,
@@ -331,6 +355,8 @@ func (c *FactoryCodexConnection) Disconnect(tx *gorm.DB, now time.Time) error {
 	c.VerificationURL = ""
 	c.VerificationCode = ""
 	c.AccountLabel = ""
+	c.UsageLimits = nil
+	c.UsageObservedAt = nil
 	c.BundleCiphertext = nil
 	c.CredentialVersion = 0
 	c.FinalCheckpointVersion = 0
@@ -534,4 +560,50 @@ func SoleHumanOrganizationMember(tx *gorm.DB, organizationID uuid.UUID) (*User, 
 		return nil, ErrCodexConnectionNotEligible
 	}
 	return &users[0], nil
+}
+
+func ValidateCodexUsageLimits(limits []CodexUsageLimit) error {
+	if len(limits) == 0 || len(limits) > 32 {
+		return errors.New("invalid Codex usage limits")
+	}
+	seen := map[string]bool{}
+	for _, limit := range limits {
+		if limit.LimitID == "" || len(limit.LimitID) > 256 || len(limit.LimitName) > 256 || len(limit.PlanType) > 64 || seen[limit.LimitID] {
+			return errors.New("invalid Codex usage bucket")
+		}
+		seen[limit.LimitID] = true
+		for _, window := range []*CodexUsageWindow{limit.Primary, limit.Secondary} {
+			if window == nil {
+				continue
+			}
+			if window.UsedPercent == nil || math.IsNaN(*window.UsedPercent) || math.IsInf(*window.UsedPercent, 0) || *window.UsedPercent < 0 {
+				return errors.New("invalid Codex usage percentage")
+			}
+			if window.WindowDurationMins != nil && *window.WindowDurationMins <= 0 || window.ResetsAt != nil && *window.ResetsAt <= 0 {
+				return errors.New("invalid Codex usage window")
+			}
+			if window.ResetsAt != nil && time.Unix(*window.ResetsAt, 0).UTC().Year() > 9999 {
+				return errors.New("Codex usage reset exceeds the API timestamp range")
+			}
+		}
+	}
+	return nil
+}
+
+func ListOwnedFactoryCodexConnections(tx *gorm.DB, organizationID, ownerUserID uuid.UUID) ([]FactoryCodexConnection, error) {
+	var connections []FactoryCodexConnection
+	err := tx.Select("id", "factory_id", "status", "account_label", "usage_limits", "usage_observed_at").
+		Where("organization_id = ? AND owner_user_id = ? AND status <> ?", organizationID, ownerUserID, CodexConnectionStatusDisconnected).
+		Order("created_at, id").Find(&connections).Error
+	return connections, err
+}
+
+func (c *FactoryCodexConnection) StoreUsage(tx *gorm.DB, limits []CodexUsageLimit, now time.Time) error {
+	if err := ValidateCodexUsageLimits(limits); err != nil {
+		return err
+	}
+	return tx.Model(c).Updates(map[string]any{
+		"usage_limits":      datatypes.NewJSONSlice(limits),
+		"usage_observed_at": now,
+	}).Error
 }

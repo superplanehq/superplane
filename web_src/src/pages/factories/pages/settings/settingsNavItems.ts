@@ -23,6 +23,7 @@ export type FactorySettingsSection =
   | "profile"
   | "security"
   | "notifications"
+  | "codex-usage"
   | "repository"
   | "superplane-mcp-server"
   | "mcp"
@@ -119,6 +120,14 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
           "all workspaces",
           "selected workspaces",
         ],
+      },
+      {
+        id: "account-codex-usage",
+        label: "Codex usage",
+        Icon: BarChart3,
+        scope: "account",
+        section: "codex-usage",
+        keywords: ["chatgpt", "subscription", "quota", "remaining", "limits"],
       },
     ],
   },

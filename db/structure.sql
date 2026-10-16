@@ -475,6 +475,8 @@ CREATE TABLE public.factory_codex_connections (
     reservation_generation bigint DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    usage_limits jsonb DEFAULT '[]'::jsonb NOT NULL,
+    usage_observed_at timestamp with time zone,
     CONSTRAINT factory_codex_connections_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'finishing'::character varying, 'ready'::character varying, 'reconnect_required'::character varying, 'disconnected'::character varying])::text[]))),
     CONSTRAINT factory_codex_connections_version_check CHECK (((credential_version >= 0) AND (final_checkpoint_version >= 0) AND (final_checkpoint_version <= credential_version) AND (reservation_generation >= 0) AND (reservation_started_version >= 0)))
 );
@@ -5756,7 +5758,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20261015161731	f
+20261016105426	f
 \.
 
 

@@ -62,12 +62,33 @@ func TestSubscriptionScriptRestoresCheckpointsAndHidesTokens(t *testing.T) {
 	binDir := filepath.Join(taskDir, "bin")
 	require.NoError(t, os.MkdirAll(binDir, 0o755))
 	fakeCodex := filepath.Join(binDir, "codex")
-	require.NoError(t, os.WriteFile(fakeCodex, []byte(`#!/bin/sh
-mkdir -p "$CODEX_HOME"
-cat > "$CODEX_HOME/auth.json" <<'EOF'
-{"access_token":"access-token-value","refresh_token":"refresh-token-value","id_token":"id-token-value","OPENAI_API_KEY":"sk-live"}
-EOF
-printf '\033[94m%s\033[0m\n' 'https://auth.openai.com/codex/device' 'CODE-1234'
+	require.NoError(t, os.WriteFile(fakeCodex, []byte(`#!/usr/bin/env node
+const fs = require("fs");
+const path = require("path");
+if (process.argv[2] === "app-server") {
+  require("readline").createInterface({ input: process.stdin }).on("line", (line) => {
+    const request = JSON.parse(line);
+    if (request.method === "initialize") {
+      process.stdout.write(JSON.stringify({ id: request.id, result: {} }) + "\n");
+    }
+    if (request.method === "account/rateLimits/read") {
+      const reply = fs.existsSync(path.join(process.env.CODEX_HOME, "unavailable"))
+        ? { error: { message: "provider unavailable access-token-value" } }
+        : { result: { rateLimits: { limitId: "codex", primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: 1900000000 }, secondary: null } } };
+      if (reply.result && fs.existsSync(path.join(process.env.CODEX_HOME, "multi"))) {
+        reply.result.rateLimitsByLimitId = {
+          codex: reply.result.rateLimits,
+          codex_other: { limitId: "codex_other", primary: { usedPercent: 60, windowDurationMins: 60, resetsAt: 1900000000 } },
+        };
+      }
+      process.stdout.write(JSON.stringify({ id: request.id, ...reply }) + "\n");
+    }
+  });
+} else {
+  fs.mkdirSync(process.env.CODEX_HOME, { recursive: true });
+  fs.writeFileSync(path.join(process.env.CODEX_HOME, "auth.json"), JSON.stringify({ access_token: "access-token-value", refresh_token: "refresh-token-value", id_token: "id-token-value", OPENAI_API_KEY: "sk-live" }));
+  process.stdout.write("\u001b[94mhttps://auth.openai.com/codex/device\u001b[0m\nCODE-1234\n");
+}
 `), 0o755))
 
 	_, callerFile, _, ok := runtime.Caller(0)
@@ -87,6 +108,10 @@ if (child.OPENAI_API_KEY || child.OPENAI_BASE_URL) {
     throw new Error("refresh token remained in the log");
   }
   await checkpoint({ final: true, version: 4 });
+  fs.writeFileSync(child.CODEX_HOME + "/unavailable", "");
+  await checkpoint();
+  fs.unlinkSync(child.CODEX_HOME + "/unavailable");
+  fs.writeFileSync(child.CODEX_HOME + "/multi", "");
   await login();
   process.stdout.write(redacted + "\n");
 })().catch((err) => {
@@ -116,6 +141,15 @@ if (child.OPENAI_API_KEY || child.OPENAI_BASE_URL) {
 	bundle, _ := last["bundle"].(map[string]any)
 	assert.Equal(t, refreshToken, bundle["refresh_token"])
 	assert.Equal(t, true, last["final"])
+	usage, ok := last["usage"].(map[string]any)
+	require.True(t, ok, "checkpoint must report the account quota")
+	limits := usage["limits"].([]any)
+	require.Len(t, limits, 2, "all account quota buckets must be reported")
+	primary := limits[0].(map[string]any)["primary"].(map[string]any)
+	assert.Equal(t, float64(25), primary["usedPercent"])
+	assert.Equal(t, float64(300), primary["windowDurationMins"])
+	assert.Nil(t, checkpoints[len(checkpoints)-2]["usage"], "an unavailable quota must not block credential saves")
+	assert.NotContains(t, string(out), "provider unavailable access-token-value")
 	assert.Equal(t, "https://auth.openai.com/codex/device", progress["verificationUrl"])
 	assert.Equal(t, "CODE-1234", progress["verificationCode"])
 

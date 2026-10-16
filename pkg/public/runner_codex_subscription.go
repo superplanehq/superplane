@@ -22,6 +22,7 @@ type codexCheckpointRequest struct {
 	Bundle  json.RawMessage `json:"bundle"`
 	Version int64           `json:"version"`
 	Final   bool            `json:"final"`
+	Usage   json.RawMessage `json:"usage"`
 }
 
 type codexProgressRequest struct {
@@ -83,6 +84,10 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		http.Error(w, "ChatGPT subscription credentials are invalid", http.StatusBadRequest)
 		return
 	}
+	var usage struct {
+		Limits []models.CodexUsageLimit `json:"limits"`
+	}
+	validUsage := json.Unmarshal(request.Usage, &usage) == nil && models.ValidateCodexUsageLimits(usage.Limits) == nil
 	var version int64
 	err = database.DB(r.Context()).Transaction(func(tx *gorm.DB) error {
 		if eligibleErr := codexSubscriptionStillEligible(tx, scope.OrganizationID); eligibleErr != nil {
@@ -105,6 +110,12 @@ func (s *Server) handleRunnerCodexSubscriptionCheckpoint(w http.ResponseWriter, 
 		}
 		if storeErr := connection.StoreBundle(tx, scope.TaskID, scope.Generation, next, ciphertext, label, request.Final, time.Now()); storeErr != nil {
 			return storeErr
+		}
+		// Usage is optional. Invalid quota data must not prevent a credential save.
+		if validUsage {
+			if err := connection.StoreUsage(tx, usage.Limits, time.Now()); err != nil {
+				return err
+			}
 		}
 		version = connection.CredentialVersion
 		return nil

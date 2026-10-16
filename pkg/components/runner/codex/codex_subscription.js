@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const readline = require("readline");
 const { stripVTControlCharacters } = require("node:util");
 
 const CHECKPOINT_TIMEOUT_MS = 30000;
@@ -51,7 +52,11 @@ function secretValues(value, found = []) {
     return found;
   }
   for (const [key, child] of Object.entries(value)) {
-    if (typeof child === "string" && /token|secret|password/i.test(key) && child.length > 8) {
+    if (
+      typeof child === "string" &&
+      /token|secret|password/i.test(key) &&
+      child.length > 8
+    ) {
       found.push(child);
       continue;
     }
@@ -90,7 +95,11 @@ async function requestJSON(env, method, pathname, body) {
 }
 
 async function restore(env = process.env) {
-  const payload = await requestJSON(env, "GET", "/api/v1/runner/codex-subscription/credentials");
+  const payload = await requestJSON(
+    env,
+    "GET",
+    "/api/v1/runner/codex-subscription/credentials",
+  );
   const bundle = payload && payload.bundle;
   if (!bundle || typeof bundle !== "object") {
     throw new Error("ChatGPT subscription credentials are missing");
@@ -101,24 +110,114 @@ async function restore(env = process.env) {
   const file = authPath(env);
   fs.writeFileSync(file, `${JSON.stringify(bundle)}\n`, { mode: 0o600 });
   fs.chmodSync(file, 0o600);
-  return payload.version;
+  return checkpoint({ env });
 }
 
 async function checkpoint(options = {}) {
   const env = options.env || process.env;
+  // Read limits before the bundle: app-server can renew the saved credentials.
+  const usage = await readUsage(env).catch(() => {
+    process.stderr.write(
+      "Codex usage is unavailable. Credentials will still be saved.\n",
+    );
+    return undefined;
+  });
   const bundle = readBundle(env);
   if (!bundle) {
     throw new Error("ChatGPT subscription credentials were not found");
   }
-  const payload = await requestJSON(env, "POST", "/api/v1/runner/codex-subscription/checkpoint", {
-    bundle,
-    version: options.version,
-    final: Boolean(options.final),
-  });
+  const payload = await requestJSON(
+    env,
+    "POST",
+    "/api/v1/runner/codex-subscription/checkpoint",
+    {
+      bundle,
+      version: options.version,
+      final: Boolean(options.final),
+      usage,
+    },
+  );
   if (!payload || payload.accepted !== true) {
     throw new Error("ChatGPT subscription credentials were not saved");
   }
   return payload.version;
+}
+
+function readUsage(env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("codex", ["app-server", "--listen", "stdio://"], {
+      env: subscriptionChildEnv(env),
+      stdio: ["pipe", "pipe", "ignore"],
+    });
+    const lines = readline.createInterface({ input: child.stdout });
+    const timeout = setTimeout(
+      () => finish(new Error("Codex usage request timed out")),
+      10000,
+    );
+    let settled = false;
+    function finish(error, usage) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      lines.close();
+      child.stdin.destroy();
+      child.kill("SIGKILL");
+      if (error) reject(error);
+      else resolve(usage);
+    }
+    function send(message) {
+      child.stdin.write(`${JSON.stringify(message)}\n`);
+    }
+    child.on("error", () => finish(new Error("Codex usage process failed")));
+    child.stdin.on("error", () =>
+      finish(new Error("Codex usage connection failed")),
+    );
+    child.on("close", () => finish(new Error("Codex usage process stopped")));
+    lines.on("line", (line) => {
+      try {
+        const message = JSON.parse(line);
+        if (message.id !== 1 && message.id !== 2) return;
+        if (message.error)
+          return finish(new Error("Codex usage request failed"));
+        if (message.id === 1) {
+          send({ method: "initialized" });
+          send({ id: 2, method: "account/rateLimits/read" });
+          return;
+        }
+        const result = message.result;
+        const buckets = Object.entries(result.rateLimitsByLimitId || {});
+        const limits = buckets.length
+          ? buckets.map(([id, limit]) => ({
+              ...limit,
+              limitId: limit.limitId || id,
+            }))
+          : result.rateLimits
+            ? [
+                {
+                  ...result.rateLimits,
+                  limitId: result.rateLimits.limitId || "codex",
+                },
+              ]
+            : [];
+        if (!limits.length)
+          return finish(new Error("Codex usage was not returned"));
+        finish(null, { limits });
+      } catch (_err) {
+        finish(new Error("Codex usage response is invalid"));
+      }
+    });
+    send({
+      id: 1,
+      method: "initialize",
+      params: {
+        clientInfo: {
+          name: "superplane",
+          title: "SuperPlane",
+          version: "1.0.0",
+        },
+      },
+    });
+  });
 }
 
 function parseDeviceAuth(text) {
@@ -146,7 +245,12 @@ async function login(env = process.env) {
     const parsed = parseDeviceAuth(output);
     if (parsed.verificationUrl && parsed.verificationCode && !capture.posted) {
       capture.posted = true;
-      progressPost = requestJSON(env, "POST", "/api/v1/runner/codex-subscription/progress", parsed).catch((err) => {
+      progressPost = requestJSON(
+        env,
+        "POST",
+        "/api/v1/runner/codex-subscription/progress",
+        parsed,
+      ).catch((err) => {
         child.kill();
         throw err;
       });
@@ -190,7 +294,9 @@ async function main(argv = process.argv.slice(2)) {
 
 if (require.main === module) {
   main().catch((err) => {
-    process.stderr.write(`${err && err.message ? err.message : "ChatGPT subscription failed"}\n`);
+    process.stderr.write(
+      `${err && err.message ? err.message : "ChatGPT subscription failed"}\n`,
+    );
     process.exit(1);
   });
 }
