@@ -132,7 +132,7 @@ function PreviewMention({ children }: { children: string }) {
     return null;
   }
   return (
-    <span className="rounded-[4px] bg-[#5b33ad]/10 px-1 py-0.5 font-medium text-[#4c2a94] dark:bg-[#f6a821]/15 dark:text-[#f6a821]">
+    <span className="rounded-[4px] bg-[#0b383a]/10 px-1 py-0.5 font-medium text-[#0b383a] dark:bg-[#ed8e09]/15 dark:text-[#ed8e09]">
       {children}
     </span>
   );
@@ -186,7 +186,7 @@ function BotPreviewOutcome({ skipped }: { skipped: boolean }) {
 
   return (
     <p
-      className="animate-in fade-in slide-in-from-bottom-1 inline-flex w-full items-center justify-center gap-2 text-[12px] font-medium text-[#4c2a94] duration-300 dark:text-[#f6a821]"
+      className="animate-in fade-in slide-in-from-bottom-1 inline-flex w-full items-center justify-center gap-2 text-[12px] font-medium text-[#0b383a] duration-300 dark:text-[#ed8e09]"
       data-testid="discussion-setup-preview-bot-outcome"
       role="status"
     >
@@ -225,7 +225,7 @@ function PreviewCommentCard({
       >
         <header className="mb-3 flex items-center gap-2.5">
           <span
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#5b33ad]/10 text-[11px] font-medium text-[#4c2a94] dark:bg-[#f6a821]/15 dark:text-[#f6a821]"
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#0b383a]/10 text-[11px] font-medium text-[#0b383a] dark:bg-[#ed8e09]/15 dark:text-[#ed8e09]"
             aria-hidden
           >
             {initials}
