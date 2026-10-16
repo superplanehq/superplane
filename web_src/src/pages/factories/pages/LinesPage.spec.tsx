@@ -16,6 +16,7 @@ import {
   FEATURE_FACTORY_CUSTOM_AUTOMATIONS,
   FEATURE_FACTORY_DATADOG_INTAKE,
   FEATURE_FACTORY_PRODUCTIVE_INTAKE,
+  FEATURE_FACTORY_SCHEDULED_INTAKE,
   FEATURE_WORKSPACE_MCP,
   FEATURE_WORKSPACE_SKILLS,
 } from "@/lib/experimentalFeatures";
@@ -195,6 +196,15 @@ vi.mock("@/hooks/useFactoryData", () => ({
   useWorkOrderEvents: () => ({ data: { pages: [] } }),
   useWorkOrderArtifacts: () => ({ data: [] }),
   useCreateFactoryAutomation: () => ({ mutateAsync: createFactoryAutomationMutateAsync, isPending: false }),
+  useFactorySchedulePreview: () => ({
+    data: new Date(Date.now() + 86_400_000).toISOString(),
+    isFuture: true,
+    isSuccess: true,
+    isFetching: false,
+    isPending: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
   useDeleteFactoryAutomation: () => ({ mutateAsync: deleteFactoryAutomationMutateAsync, isPending: false }),
   useCloseWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDispatchWorkOrder: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -1143,6 +1153,31 @@ describe("LinesPage board extras", () => {
         `/org-1/workspaces/${PRIMARY_FACTORY_ROUTE_SEGMENT.toLowerCase()}/automations/canvas-custom`,
       );
     });
+  });
+
+  it("opens the created scheduled intake in the board automation view", async () => {
+    enabledExperimentalFeatures.add(FEATURE_FACTORY_SCHEDULED_INTAKE);
+    createFactoryAutomationMutateAsync.mockResolvedValueOnce({ id: "canvas-scheduled", name: "Scheduled intake" });
+    const user = userEvent.setup();
+    renderLinesBoard();
+
+    await user.click(screen.getByTestId("lines-backlog-menu"));
+    await user.click(screen.getByTestId("lines-backlog-menu-add-intake"));
+    await user.click(screen.getByTestId("add-intake-template-scheduled-intake"));
+    await user.click(screen.getByRole("button", { name: "Create intake" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("lines-test-location")).toHaveTextContent(
+        factoryColumnAutomationViewPath(
+          "org-1",
+          PRIMARY_FACTORY_ROUTE_SEGMENT,
+          REFUND_LINE_PLAN_ID,
+          "canvas-scheduled",
+        ),
+      );
+    });
+    expect(screen.getByTestId("column-automation-view")).toBeInTheDocument();
+    expect(screen.queryByLabelText("What should the agent look for?")).not.toBeInTheDocument();
   });
 
   it("deletes a custom Verify automation from the view modal", async () => {

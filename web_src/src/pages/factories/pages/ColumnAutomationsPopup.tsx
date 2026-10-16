@@ -1,3 +1,4 @@
+import { Icon as ComponentIcon } from "@/components/Icon";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
@@ -94,9 +95,10 @@ export function ColumnAutomationGlyph({
   automation,
   className,
 }: {
-  automation: Pick<ColumnAutomation, "iconSrc" | "iconAlt" | "kind">;
+  automation: Pick<ColumnAutomation, "iconSrc" | "iconAlt" | "iconName" | "kind">;
   className?: string;
 }) {
+  if (automation.iconName) return <ComponentIcon name={automation.iconName} className={className} />;
   if (automation.iconSrc) {
     return (
       <img
