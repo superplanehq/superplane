@@ -16,7 +16,12 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { factoryAgentPath, factoryRouteSegment } from "../../lib/factoryPagePaths";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
-import { sanitizeSkillCommandName, setSkillFrontmatterFields, skillDisplayTitle } from "./skillFrontmatter";
+import {
+  sanitizeSkillCommandName,
+  setSkillFrontmatterFields,
+  skillDisplayTitle,
+  skillFieldsFromMarkdown,
+} from "./skillFrontmatter";
 
 const NAME_PATTERN = /^[a-z][a-z0-9-]{0,62}$/;
 const RESERVED_NAME = "superplane";
@@ -125,7 +130,10 @@ export function useSkillEditorPage() {
       setNameTouched(true);
       setNameAndFrontmatter(value, setName, setMarkdown);
     },
-    setMarkdown,
+    setMarkdown: (value: string) => {
+      setMarkdown(value);
+      applyFrontmatterToNameField(value, setName, setStoredCommand, setNameTouched);
+    },
     setPendingDelete,
     navigateToList: () => navigate(listPath),
     handleSave: () =>
@@ -185,6 +193,23 @@ function useSkillRestore(
       }
     },
   };
+}
+
+// Markdown wins: a non-empty frontmatter name or title sets the Name field and command.
+// Empty frontmatter values leave the current Name field unchanged.
+function applyFrontmatterToNameField(
+  markdown: string,
+  setName: (value: string) => void,
+  setStoredCommand: (value: string) => void,
+  setNameTouched: (value: boolean) => void,
+) {
+  const fields = skillFieldsFromMarkdown(markdown);
+  if (fields.title === undefined) {
+    return;
+  }
+  setName(fields.title);
+  setStoredCommand(fields.command ?? "");
+  setNameTouched(false);
 }
 
 function setNameAndFrontmatter(

@@ -4,6 +4,7 @@ import {
   sanitizeSkillCommandName,
   setSkillFrontmatterFields,
   skillDisplayTitle,
+  skillFieldsFromMarkdown,
   skillFrontmatterField,
   skillListDescription,
 } from "./skillFrontmatter";
@@ -59,6 +60,47 @@ describe("setSkillFrontmatterFields", () => {
     expect(skillFrontmatterField(next, "name")).toBe("oypirate");
     expect(skillFrontmatterField(next, "title")).toBe("Oy Pirate!");
     expect(skillFrontmatterField(next, "description")).toBe("");
+  });
+});
+
+describe("skillFieldsFromMarkdown", () => {
+  it("uses name for both the title and the command when only name is set", () => {
+    expect(skillFieldsFromMarkdown("---\nname: ponytail-review\n---\n")).toEqual({
+      title: "ponytail-review",
+      command: "ponytail-review",
+    });
+  });
+
+  it("uses title for the Name field and derives the command from it when only title is set", () => {
+    expect(skillFieldsFromMarkdown('---\ntitle: "Oy Pirate!"\n---\n')).toEqual({
+      title: "Oy Pirate!",
+      command: "oypirate",
+    });
+  });
+
+  it("prefers title for the Name field and name for the command when both are set", () => {
+    expect(skillFieldsFromMarkdown("---\nname: oypirate\ntitle: Oy Pirate Pro\n---\n")).toEqual({
+      title: "Oy Pirate Pro",
+      command: "oypirate",
+    });
+  });
+
+  it("returns undefined values when name and title are empty", () => {
+    expect(skillFieldsFromMarkdown("---\nname: \ntitle: \ndescription: \n---\n\n")).toEqual({
+      title: undefined,
+      command: undefined,
+    });
+  });
+
+  it("returns undefined values when there is no frontmatter", () => {
+    expect(skillFieldsFromMarkdown("Ahoy.")).toEqual({ title: undefined, command: undefined });
+  });
+
+  it("sanitizes invalid characters in the command but keeps the title as written", () => {
+    expect(skillFieldsFromMarkdown("---\nname: Ponytail Review!\n---\n")).toEqual({
+      title: "Ponytail Review!",
+      command: "ponytailreview",
+    });
   });
 });
 
