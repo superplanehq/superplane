@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -1190,6 +1191,13 @@ func TestUpdateBitbucketDiscussionHandlerRefreshesAcknowledgeBody(t *testing.T) 
 	require.True(t, stale, "acknowledge node not found")
 	require.NoError(t, db.Model(version).Update("nodes", datatypes.NewJSONSlice(nodes)).Error)
 
+	// Older canvases acknowledge straight from the trigger.
+	edges := slices.DeleteFunc(slices.Clone(version.Edges), func(edge models.Edge) bool {
+		return edge.TargetID == prFeedbackAcknowledgeCommentNodeID
+	})
+	edges = append(edges, models.Edge{SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackAcknowledgeCommentNodeID, Channel: "default"})
+	require.NoError(t, db.Model(version).Update("edges", datatypes.NewJSONSlice(edges)).Error)
+
 	_, err = UpdateFactoryPRFeedbackHandler(ctx, deps, r.Organization.ID.String(), &pb.UpdateFactoryPRFeedbackHandlerRequest{
 		FactoryId: factory.ID.String(),
 		HandlerId: created.GetHandler().GetId(),
@@ -1209,6 +1217,13 @@ func TestUpdateBitbucketDiscussionHandlerRefreshesAcknowledgeBody(t *testing.T) 
 	require.NoError(t, err)
 	updated, err := models.FindLiveCanvasVersionByCanvasInTransaction(db, reloaded)
 	require.NoError(t, err)
+	acknowledgeSources := []string{}
+	for _, edge := range updated.Edges {
+		if edge.TargetID == prFeedbackAcknowledgeCommentNodeID {
+			acknowledgeSources = append(acknowledgeSources, edge.SourceID)
+		}
+	}
+	assert.Equal(t, []string{prFeedbackActivityNodeID}, acknowledgeSources)
 	for _, node := range updated.Nodes {
 		if node.ID != prFeedbackAcknowledgeCommentNodeID {
 			continue

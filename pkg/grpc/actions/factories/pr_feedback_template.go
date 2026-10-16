@@ -242,7 +242,9 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 		Description:  prFeedbackCommentActivityDescriptionExpression(),
 		Y:            prFeedbackCommentFlowY,
 	}, request)
-	commentFlow = commentFlow.withAcknowledge(yaml.Node{
+	// The task link is created when the activity node runs. Reply after it,
+	// so the reply can link to the task.
+	commentFlow = commentFlow.withAcknowledgeAfter(yaml.Node{
 		ID:        prFeedbackAcknowledgeCommentNodeID,
 		Name:      "Acknowledge PR Comment",
 		Type:      yaml.NodeTypeAction,
@@ -255,7 +257,7 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 		},
 		Integration: request.Binding.integrationRef(),
 		Position:    prFeedbackAcknowledgePosition(prFeedbackCommentFlowY),
-	})
+	}, prFeedbackActivityNodeID)
 
 	return withPRFeedbackConcurrency(&yaml.Canvas{
 		APIVersion: yaml.APIVersion,
@@ -329,10 +331,15 @@ type prFeedbackDiscussionFlowSpec struct {
 }
 
 func (flow prFeedbackDiscussionFlowSpec) withAcknowledge(node yaml.Node) prFeedbackDiscussionFlowSpec {
+	return flow.withAcknowledgeAfter(node, flow.triggerID)
+}
+
+// withAcknowledgeAfter runs the acknowledgement node after sourceID.
+func (flow prFeedbackDiscussionFlowSpec) withAcknowledgeAfter(node yaml.Node, sourceID string) prFeedbackDiscussionFlowSpec {
 	flow.nodes = append(flow.nodes, node)
 	flow.edges = append(flow.edges, yaml.Edge{
 		Channel:  "default",
-		SourceID: flow.triggerID,
+		SourceID: sourceID,
 		TargetID: node.ID,
 	})
 	return flow

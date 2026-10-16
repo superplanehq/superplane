@@ -247,7 +247,37 @@ func TestBuildBitbucketDiscussionPRFeedbackCanvasAcknowledgeBody(t *testing.T) {
 	acknowledge := findSpecNode(t, canvas, prFeedbackAcknowledgeCommentNodeID)
 	assert.Equal(t, prFeedbackBitbucketAcknowledgeBodyExpression(), acknowledge.Configuration["body"])
 
+	// The task link exists only after the activity node ran.
+	edges := yamlEdgeChannels(canvas)
+	assert.Contains(t, edges, "default:"+prFeedbackActivityNodeID+"->"+prFeedbackAcknowledgeCommentNodeID)
+	assert.NotContains(t, edges, "default:"+prFeedbackCommentTriggerNodeID+"->"+prFeedbackAcknowledgeCommentNodeID)
+
 	encoded, err := goyaml.Marshal(canvas)
 	require.NoError(t, err)
 	assert.NotContains(t, string(encoded), "SuperPlane is looking into this.")
+}
+
+func TestMoveAcknowledgeAfterActivity(t *testing.T) {
+	edges := []models.Edge{
+		{SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackFindNodeID, Channel: "default"},
+		{SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackAcknowledgeCommentNodeID, Channel: "default"},
+		{SourceID: prFeedbackFindNodeID, TargetID: prFeedbackActivityNodeID, Channel: "found"},
+	}
+
+	got := moveAcknowledgeAfterActivity(edges, prFeedbackActivityNodeID)
+
+	assert.ElementsMatch(t, []models.Edge{
+		{SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackFindNodeID, Channel: "default"},
+		{SourceID: prFeedbackFindNodeID, TargetID: prFeedbackActivityNodeID, Channel: "found"},
+		{SourceID: prFeedbackActivityNodeID, TargetID: prFeedbackAcknowledgeCommentNodeID, Channel: "default"},
+	}, got)
+	assert.Len(t, edges, 3, "input edges stay unchanged")
+}
+
+func TestMoveAcknowledgeAfterActivity_WithoutAcknowledgeNodeKeepsEdges(t *testing.T) {
+	edges := []models.Edge{
+		{SourceID: prFeedbackCommentTriggerNodeID, TargetID: prFeedbackFindNodeID, Channel: "default"},
+	}
+
+	assert.Equal(t, edges, moveAcknowledgeAfterActivity(edges, prFeedbackActivityNodeID))
 }

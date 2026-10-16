@@ -249,6 +249,11 @@ func applyPRFeedbackSettings(
 
 		nodes = ensurePRFeedbackConcurrency(nodes)
 
+		edges := slices.Clone(liveVersion.Edges)
+		if provider == models.ProviderBitbucket && !graph.isChecks() {
+			edges = moveAcknowledgeAfterActivity(edges, graph.ActivityNodeID)
+		}
+
 		if err := canvases.PublishGeneratedCanvasNodes(
 			ctx,
 			tx,
@@ -256,7 +261,7 @@ func applyPRFeedbackSettings(
 			uuid.MustParse(userID),
 			"Update PR feedback settings",
 			nodes,
-			slices.Clone(liveVersion.Edges),
+			edges,
 			changesets.CanvasPublisherOptions{
 				Registry:       deps.Registry,
 				OrgID:          canvas.OrganizationID,
@@ -278,4 +283,30 @@ func applyPRFeedbackSettings(
 	}
 
 	return nil
+}
+
+// moveAcknowledgeAfterActivity runs the Bitbucket acknowledgement after the
+// activity node. Canvases created earlier start it from the trigger, before
+// the run has a task link.
+func moveAcknowledgeAfterActivity(edges []models.Edge, activityNodeID string) []models.Edge {
+	if activityNodeID == "" {
+		return edges
+	}
+	moved := make([]models.Edge, 0, len(edges)+1)
+	hasAcknowledge := false
+	for _, edge := range edges {
+		if edge.TargetID != prFeedbackAcknowledgeCommentNodeID {
+			moved = append(moved, edge)
+			continue
+		}
+		hasAcknowledge = true
+	}
+	if !hasAcknowledge {
+		return edges
+	}
+	return append(moved, models.Edge{
+		SourceID: activityNodeID,
+		TargetID: prFeedbackAcknowledgeCommentNodeID,
+		Channel:  "default",
+	})
 }
