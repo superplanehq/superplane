@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState, type ComponentProps } from "react";
 import { beforeEach, describe, expect, it } from "bun:test";
 
+import { AccountContext, type AccountContextType } from "@/contexts/accountContextState";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { TooltipProvider } from "@/ui/tooltip";
 
@@ -27,19 +28,42 @@ const FAKE_REPORT: SpendingReport = {
   breakdown: [],
 };
 
-function renderPage(props?: Partial<ComponentProps<typeof SpendingRedesignPage>>) {
+function accountValue(billingEnabled: boolean): AccountContextType {
+  return {
+    account: {
+      id: "account-1",
+      name: "Ada",
+      email: "ada@example.com",
+      avatar_url: "",
+      installation_admin: false,
+      has_password: true,
+      billing_enabled: billingEnabled,
+    },
+    loading: false,
+    setupRequired: false,
+    refreshAccount: async () => undefined,
+  };
+}
+
+function renderPage(
+  props?: Partial<ComponentProps<typeof SpendingRedesignPage>>,
+  options?: { billingEnabled?: boolean },
+) {
+  const billingEnabled = options?.billingEnabled ?? true;
   return render(
-    <ThemeProvider>
-      <TooltipProvider>
-        <SpendingRedesignPage
-          catalogs={SPENDING_CATALOGS}
-          credit={SPENDING_CREDIT}
-          events={SPENDING_LEDGER}
-          now={SPENDING_REDESIGN_NOW}
-          {...props}
-        />
-      </TooltipProvider>
-    </ThemeProvider>,
+    <AccountContext.Provider value={accountValue(billingEnabled)}>
+      <ThemeProvider>
+        <TooltipProvider>
+          <SpendingRedesignPage
+            catalogs={SPENDING_CATALOGS}
+            credit={SPENDING_CREDIT}
+            events={SPENDING_LEDGER}
+            now={SPENDING_REDESIGN_NOW}
+            {...props}
+          />
+        </TooltipProvider>
+      </ThemeProvider>
+    </AccountContext.Provider>,
   );
 }
 
@@ -75,7 +99,7 @@ describe("SpendingRedesignPage", () => {
   });
 
   it("hides hosted credit when billing is off and keeps usage reports", () => {
-    renderPage({ credit: { ...SPENDING_CREDIT, billingEnabled: false } });
+    renderPage({ credit: { ...SPENDING_CREDIT, billingEnabled: false } }, { billingEnabled: false });
 
     expect(screen.getByRole("heading", { name: "Model usage" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "VM usage" })).toBeInTheDocument();
@@ -105,6 +129,18 @@ describe("SpendingRedesignPage", () => {
     expect(
       within(within(screen.getByTestId("spending-vm-usage")).getByTestId("spending-vm-breakdown")).getByText(
         "e1-large-amd64",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps remaining hosted credit when Polar is off and product billing is on", () => {
+    renderPage({ credit: { ...SPENDING_CREDIT, billingEnabled: false, hasBillingCustomer: false } });
+
+    expect(screen.getByTestId("spending-kpi-credit")).toHaveTextContent("$41.24");
+    expect(screen.getByText("Remaining hosted credit")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "SuperPlane-hosted model usage uses hosted credit. Bring your own key usage is estimated and is not billed.",
       ),
     ).toBeInTheDocument();
   });

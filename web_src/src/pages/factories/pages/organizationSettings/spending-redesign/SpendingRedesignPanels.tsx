@@ -279,12 +279,14 @@ export function SpendingKpiRow({
   metrics,
   credit,
   rangeCaption,
+  billingEnabled,
 }: {
   metrics: { spend: string; tokens: string; duration: string; hosted: string; byok: string };
   credit: SpendingCreditSnapshot;
   rangeCaption: string;
+  billingEnabled: boolean;
 }) {
-  const showCredit = credit.billingEnabled;
+  const showCredit = billingEnabled;
 
   return (
     <div
