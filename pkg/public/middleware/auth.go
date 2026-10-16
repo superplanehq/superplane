@@ -675,6 +675,19 @@ func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, int64
 	return accountID, int64(iat), nil
 }
 
+// AccountFromRequest returns the signed-in account when the session cookie is
+// valid. A missing or invalid cookie is not an error.
+func AccountFromRequest(r *http.Request, jwtSigner *jwt.Signer) (*models.Account, bool) {
+	if r == nil || jwtSigner == nil {
+		return nil, false
+	}
+	account, err := getValidatedAccountFromCookie(r, jwtSigner)
+	if err != nil {
+		return nil, false
+	}
+	return account, true
+}
+
 // getValidatedAccountFromCookie reads the account_token cookie, loads the
 // matching account, and rejects the request if the token's iat is older
 // than the account's PasswordChangedAt. Use this anywhere a cookie-based
