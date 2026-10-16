@@ -19,6 +19,30 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
+func Test__DescribeOrganizationBillingDisabledWhenFlagOff(t *testing.T) {
+	r := support.Setup(t)
+	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv("POLAR_ACCESS_TOKEN", "oat_test")
+	t.Setenv("POLAR_BUSINESS_PRODUCT_ID", "prod_business")
+
+	resp, err := DescribeOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.DescribeOrganizationBillingRequest{})
+	require.NoError(t, err)
+	assert.False(t, resp.BillingEnabled)
+	assert.False(t, resp.SubscriptionCheckoutEnabled)
+
+	_, err = SyncOrganizationBilling(context.Background(), r.Organization.ID.String(), &pb.SyncOrganizationBillingRequest{})
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+
+	_, err = CreateBusinessCheckout(context.Background(), r.Organization.ID.String(), &pb.CreateBusinessCheckoutRequest{}, r.Account.ID.String(), "http://localhost")
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+
+	_, err = CancelOrganizationSubscription(context.Background(), r.Organization.ID.String(), &pb.CancelOrganizationSubscriptionRequest{})
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+
+	_, err = ResumeOrganizationSubscription(context.Background(), r.Organization.ID.String(), &pb.ResumeOrganizationSubscriptionRequest{})
+	assert.Equal(t, codes.FailedPrecondition, grpcerrors.Code(err))
+}
+
 func Test__SyncOrganizationBilling(t *testing.T) {
 	r := support.Setup(t)
 

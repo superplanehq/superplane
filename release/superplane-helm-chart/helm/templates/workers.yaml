@@ -150,6 +150,7 @@ spec:
               value: {{ .Values.blobStorage.credentialsFile | quote }}
             - name: START_FILE_CLEANUP_WORKER
               value: "yes"
+            {{- include "superplane.billingEnabledEnv" . | nindent 12 }}
 
           volumeMounts:
             - name: oidc-keys

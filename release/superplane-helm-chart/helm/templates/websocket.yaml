@@ -158,6 +158,7 @@ spec:
               value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
             - name: SUPERPLANE_INSTALLATION_TYPE
               value: {{ .Values.installation.type | quote }}
+            {{- include "superplane.billingEnabledEnv" . | nindent 12 }}
             - name: SUPERPLANE_LICENSE_HIDE_EXPIRY_BANNER
               value: {{ ternary "yes" "no" .Values.license.hideExpiryBanner | quote }}
             - name: BLOB_STORAGE_PROVIDER

@@ -21,8 +21,12 @@ let permissionsLoading = false;
 let canUpdateFactories = true;
 let enabledFeatures = new Set<string>();
 
+const accountRef = vi.hoisted(() => ({
+  current: { id: "account-1", name: "Ada", billing_enabled: true as boolean | undefined },
+}));
+
 vi.mock("@/contexts/useAccount", () => ({
-  useAccount: () => ({ account: { id: "account-1", name: "Ada" } }),
+  useAccount: () => ({ account: accountRef.current, loading: false }),
 }));
 
 vi.mock("@/contexts/usePermissions", () => ({
@@ -92,6 +96,7 @@ describe("MobileMorePage", () => {
     permissionsLoading = false;
     canUpdateFactories = true;
     enabledFeatures = new Set([FEATURE_WORKSPACE_AGENT]);
+    accountRef.current = { id: "account-1", name: "Ada", billing_enabled: true };
   });
 
   it("opens Agent when the user can update factories and SuperPlane Agent is on", () => {
@@ -129,5 +134,16 @@ describe("MobileMorePage", () => {
     renderMore();
 
     expect(screen.queryByRole("link", { name: "Agent" })).not.toBeInTheDocument();
+  });
+
+  it("shows Billing when product billing is on", () => {
+    renderMore();
+    expect(screen.getByRole("link", { name: "Billing" })).toBeInTheDocument();
+  });
+
+  it("omits Billing when product billing is off", () => {
+    accountRef.current = { id: "account-1", name: "Ada", billing_enabled: false };
+    renderMore();
+    expect(screen.queryByRole("link", { name: "Billing" })).not.toBeInTheDocument();
   });
 });
