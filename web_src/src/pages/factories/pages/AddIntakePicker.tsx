@@ -1,3 +1,4 @@
+import { Icon } from "@/components/Icon";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { logoDarkInvertClass } from "@/lib/logoDarkMode";
@@ -140,6 +141,7 @@ function intakeTemplateStatus(template: AddIntakeTemplate, taken: boolean): stri
 }
 
 function TemplateGlyph({ template }: { template: AddIntakeTemplate }) {
+  if (template.iconName) return <Icon name={template.iconName} size="lg" />;
   if (template.iconSrc) {
     return (
       <img src={template.iconSrc} alt="" className={cn("size-5 shrink-0", logoDarkInvertClass(template.iconSrc))} />

@@ -57,6 +57,7 @@ export type ColumnAutomation = {
   action: string;
   iconSrc: string;
   iconAlt: string;
+  iconName?: string;
   health: ColumnAutomationHealth;
   runningCount: number;
   catalogId: string;
@@ -149,6 +150,7 @@ function automationsForColumn(
   if (key === "backlog") {
     return [
       ...intakeAutomations(input.intakes ?? [], workOrders),
+      ...customColumnAutomations(input.apps ?? [], "backlog", workOrders, new Set()),
       ...analysisAutomation(input.apps ?? [], workOrders, input.planningEnabled !== false),
     ];
   }
@@ -276,7 +278,7 @@ function prFeedbackAutomations(
 
 function customColumnAutomations(
   apps: Array<{ id?: string; name?: string; columnKey?: string }>,
-  columnKey: "verify" | "done",
+  columnKey: "backlog" | "verify" | "done",
   workOrders: FactoriesWorkOrder[],
   skipIds: Set<string>,
 ): ColumnAutomation[] {
@@ -290,13 +292,14 @@ function customColumnAutomations(
         id: `custom-${id}`,
         kind: "custom" as const,
         name: app.name?.trim() || EVENT_CUSTOM_ENTRY.name,
-        trigger: EVENT_CUSTOM_ENTRY.trigger,
-        action: EVENT_CUSTOM_ENTRY.action,
+        iconName: columnKey === "backlog" ? "alarm-clock" : undefined,
+        trigger: columnKey === "backlog" ? "On schedule" : EVENT_CUSTOM_ENTRY.trigger,
+        action: columnKey === "backlog" ? "Proposes a task" : EVENT_CUSTOM_ENTRY.action,
         iconSrc: EVENT_CUSTOM_ENTRY.iconSrc,
         iconAlt: EVENT_CUSTOM_ENTRY.iconAlt,
         health: "healthy" as const,
         runningCount: runningCountForApp(id, workOrders),
-        catalogId: CUSTOM_CATALOG_ID,
+        catalogId: columnKey === "backlog" ? "scheduled-intake" : CUSTOM_CATALOG_ID,
         canvasId: id,
       },
     ];
