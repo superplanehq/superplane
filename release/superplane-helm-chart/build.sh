@@ -32,6 +32,9 @@ REGISTRY="oci://ghcr.io/superplanehq"
 echo "* Updating Helm dependencies"
 helm dependency update "${CHART_DIR}"
 
+echo "* Resolving component release defaults"
+node release/superplane-helm-chart/update-component-release-defaults.js
+
 # Package the chart with the specified version
 helm package "${CHART_DIR}" --version "${CHART_VERSION}" --app-version "${APP_VERSION}"
 
