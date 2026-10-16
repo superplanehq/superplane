@@ -87,13 +87,36 @@ export function skillListDescription(resource: { markdown?: string; repository?:
 }
 
 function unescapeYamlScalar(value: string): string {
-  if (
-    (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
-    (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
-  ) {
-    return value.slice(1, -1);
+  const quote = value[0];
+  if (quote === '"' || quote === "'") {
+    const closing = findClosingQuote(value, quote);
+    if (closing < 0) {
+      return value;
+    }
+    const inner = value.slice(1, closing);
+    return quote === "'" ? inner.replaceAll("''", "'") : inner;
   }
-  return value;
+  // In YAML, " #" starts a comment in a plain scalar.
+  const comment = value.search(/\s#/);
+  return (comment >= 0 ? value.slice(0, comment) : value).trim();
+}
+
+function findClosingQuote(value: string, quote: string): number {
+  for (let index = 1; index < value.length; index++) {
+    if (quote === '"' && value[index] === "\\") {
+      index++;
+      continue;
+    }
+    if (value[index] !== quote) {
+      continue;
+    }
+    if (quote === "'" && value[index + 1] === "'") {
+      index++;
+      continue;
+    }
+    return index;
+  }
+  return -1;
 }
 
 function yamlScalar(value: string): string {

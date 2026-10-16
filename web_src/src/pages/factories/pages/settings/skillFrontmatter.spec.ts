@@ -92,6 +92,17 @@ describe("skillFieldsFromMarkdown", () => {
     });
   });
 
+  it("ignores inline YAML comments after plain and quoted values", () => {
+    expect(skillFieldsFromMarkdown("---\nname: review-copy # team skill\n---\n")).toEqual({
+      title: "review-copy",
+      command: "review-copy",
+    });
+    expect(skillFieldsFromMarkdown('---\nname: review-copy\ntitle: "Review copy" # team skill\n---\n')).toEqual({
+      title: "Review copy",
+      command: "review-copy",
+    });
+  });
+
   it("returns undefined values when there is no frontmatter", () => {
     expect(skillFieldsFromMarkdown("Ahoy.")).toEqual({ title: undefined, command: undefined });
   });

@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from "bun:test";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router";
 import type { FactoriesFactoryAgentResource } from "@/api-client";
 import { CUSTOM_SYSTEM_SKILL, LATEST_SYSTEM_SKILL } from "../../__fixtures__/systemSkillFixtures";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useSkillEditorPage } from "./useSkillEditorPage";
 
 const otherSkill: FactoriesFactoryAgentResource = {
@@ -32,23 +35,23 @@ function EditorHarness() {
   const navigate = useNavigate();
   return (
     <>
-      <input aria-label="Skill name" value={editor.name} onChange={(event) => editor.setName(event.target.value)} />
-      <input aria-label="Command" value={editor.command} readOnly />
-      <textarea
+      <Input aria-label="Skill name" value={editor.name} onChange={(event) => editor.setName(event.target.value)} />
+      <Input aria-label="Command" value={editor.command} readOnly />
+      <Textarea
         aria-label="Instructions"
         value={editor.markdown}
         onChange={(event) => editor.setMarkdown(event.target.value)}
       />
-      <button
+      <Button
         onClick={() => {
           editor.setPendingRestore(true);
           void editor.confirmRestore();
         }}
       >
         Restore
-      </button>
-      <button onClick={() => navigate(-1)}>Back</button>
-      <button onClick={() => void editor.handleSave()}>Save</button>
+      </Button>
+      <Button onClick={() => navigate(-1)}>Back</Button>
+      <Button onClick={() => void editor.handleSave()}>Save</Button>
       {editor.pendingRestore ? <p>Restore confirmation open</p> : null}
     </>
   );
