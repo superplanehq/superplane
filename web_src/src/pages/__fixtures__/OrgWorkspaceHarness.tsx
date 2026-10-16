@@ -61,7 +61,6 @@ import {
   LegacyOrganizationSettingsRedirect,
 } from "@/pages/factories/pages/settings/FactorySettingsRedirects";
 import { agentSectionRoute } from "@/pages/factories/pages/settings/agentSectionRoutes";
-import { BillingProductSettingsRoute } from "@/pages/factories/pages/settings/BillingProductSettingsRoute";
 import { factorySettingsSectionRoutes } from "@/pages/factories/pages/settings/factorySettingsSectionRoutes";
 import { MissionDetailPage } from "@/pages/factories/pages/missions/MissionDetailPage";
 import { ConfigureAutomationPage } from "@/pages/factories/pages/ConfigureAutomationPage";
@@ -245,11 +244,9 @@ function factorySettingsOrganizationSpendingRoute(OrganizationSpendingPage: Comp
       key="factory-settings-organization-spending"
       path="organization/spending"
       element={
-        <BillingProductSettingsRoute>
-          <RequirePermission resource="org" action="read">
-            <OrganizationSpendingPage />
-          </RequirePermission>
-        </BillingProductSettingsRoute>
+        <RequirePermission resource="org" action="read">
+          <OrganizationSpendingPage />
+        </RequirePermission>
       }
     />
   );

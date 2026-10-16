@@ -155,11 +155,9 @@ export const factorySettingsSectionRoutes = [
     key="factory-settings-workspace-usage"
     path="workspace/usage"
     element={
-      <BillingProductSettingsRoute>
-        <RequirePermission resource="org" action="read">
-          <OrganizationSettingsUsagePage />
-        </RequirePermission>
-      </BillingProductSettingsRoute>
+      <RequirePermission resource="org" action="read">
+        <OrganizationSettingsUsagePage />
+      </RequirePermission>
     }
   />,
   <Route
@@ -275,11 +273,9 @@ export const factorySettingsSectionRoutes = [
     key="factory-settings-organization-spending"
     path="organization/spending"
     element={
-      <BillingProductSettingsRoute>
-        <RequirePermission resource="org" action="read">
-          <OrganizationSettingsWorkspaceUsagePage />
-        </RequirePermission>
-      </BillingProductSettingsRoute>
+      <RequirePermission resource="org" action="read">
+        <OrganizationSettingsWorkspaceUsagePage />
+      </RequirePermission>
     }
   />,
   <Route key="factory-settings-legacy" path="*" element={<LegacyFactorySettingsRedirect />} />,

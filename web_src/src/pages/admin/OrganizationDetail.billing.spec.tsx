@@ -42,10 +42,9 @@ describe("OrganizationDetail billing off", () => {
     vi.unstubAllGlobals();
   });
 
-  it("hides Spending when product billing is off", () => {
+  it("keeps the Spending report when product billing is off", () => {
     renderPage();
 
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).not.toContain("Spending");
-    expect(screen.queryByTestId("spending-redesign-page")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toContain("Spending");
   });
 });

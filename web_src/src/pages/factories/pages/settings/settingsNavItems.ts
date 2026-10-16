@@ -333,13 +333,9 @@ export const FACTORY_SETTINGS_NAV_GROUPS: FactorySettingsNavGroup[] = [
 
 export const FACTORY_SETTINGS_NAV_ITEMS = FACTORY_SETTINGS_NAV_GROUPS.flatMap((group) => group.items);
 
-const BILLING_PRODUCT_SETTINGS_NAV_ITEM_IDS = new Set([
-  "organization-billing",
-  "organization-spending",
-  "workspace-usage",
-]);
+const BILLING_PRODUCT_SETTINGS_NAV_ITEM_IDS = new Set(["organization-billing"]);
 
-/** Drops Billing, Spending, and Usage when product billing is off. */
+/** Drops Billing when product billing is off. Usage reports stay. */
 export function omitFactorySettingsBillingItem(groups: FactorySettingsNavGroup[]): FactorySettingsNavGroup[] {
   return groups
     .map((group) => ({

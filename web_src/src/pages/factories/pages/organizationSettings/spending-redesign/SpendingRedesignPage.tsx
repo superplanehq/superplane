@@ -119,6 +119,7 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
         <SpendingKpiRow credit={credit} metrics={metrics} rangeCaption={formatSpendingRangeCaption(view.range)} />
         <SpendingUsageSection
           breakdown={view.modelBreakdown}
+          billingEnabled={credit.billingEnabled}
           catalogs={catalogs}
           filters={view.modelFilters}
           kind="model"
@@ -128,6 +129,7 @@ export function SpendingRedesignPage(props: SpendingRedesignPageProps) {
         />
         <SpendingUsageSection
           breakdown={view.machineBreakdown}
+          billingEnabled={credit.billingEnabled}
           catalogs={catalogs}
           filters={view.machineFilters}
           kind="compute"

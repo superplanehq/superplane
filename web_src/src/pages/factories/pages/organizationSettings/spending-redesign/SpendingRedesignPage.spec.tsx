@@ -67,6 +67,28 @@ describe("SpendingRedesignPage", () => {
     expect(screen.getByTestId("spending-kpi-byok")).toHaveTextContent("Bring your own key spend");
     expect(screen.getByTestId("spending-kpi-vm")).toHaveTextContent("VM time");
     expect(screen.getByTestId("spending-kpi-credit")).toHaveTextContent("$41.24");
+    expect(
+      screen.getByText(
+        "SuperPlane-hosted model usage uses hosted credit. Bring your own key usage is estimated and is not billed.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("hides hosted credit when billing is off and keeps usage reports", () => {
+    renderPage({ credit: { ...SPENDING_CREDIT, billingEnabled: false } });
+
+    expect(screen.getByRole("heading", { name: "Model usage" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "VM usage" })).toBeInTheDocument();
+    expect(screen.getByTestId("spending-kpi-hosted")).toBeInTheDocument();
+    expect(screen.getByTestId("spending-kpi-vm")).toBeInTheDocument();
+    expect(screen.queryByTestId("spending-kpi-credit")).not.toBeInTheDocument();
+    expect(screen.queryByText("Remaining hosted credit")).not.toBeInTheDocument();
+    expect(screen.getByText("Token usage and estimated spend by model.")).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "SuperPlane-hosted model usage uses hosted credit. Bring your own key usage is estimated and is not billed.",
+      ),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId("spending-period")).toHaveTextContent("Last 30 days");
     expect(screen.queryByRole("tab", { name: "Custom" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Custom range" })).not.toBeInTheDocument();

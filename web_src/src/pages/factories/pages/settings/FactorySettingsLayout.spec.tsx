@@ -225,13 +225,35 @@ describe("FactorySettingsLayout sidebar", () => {
     expect(await screen.findByTestId("organization-usage-history", {}, { timeout: 8000 })).toBeInTheDocument();
   }, 10000);
 
+  it("opens General instead of Billing when billing is off", async () => {
+    render(
+      <FactoriesHarness
+        billingEnabled={false}
+        pathSuffix={`workspaces/${PRIMARY_FACTORY_KEY}/settings/organization/billing`}
+        factoriesFixture={defaultFactoriesFixture}
+      />,
+    );
+
+    const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
+    await waitFor(() => {
+      expect(within(sidebar).queryByTestId("factory-settings-nav-organization-billing")).not.toBeInTheDocument();
+      expect(within(sidebar).getByTestId("factory-settings-nav-organization-spending")).toBeInTheDocument();
+      expect(within(sidebar).getByTestId("factory-settings-nav-workspace-usage")).toBeInTheDocument();
+      expect(within(sidebar).getByTestId("factory-settings-nav-organization-general")).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+    expect(screen.queryByTestId("billing-credit-balance")).not.toBeInTheDocument();
+    expect(await screen.findByTestId("organization-settings-overview", {}, { timeout: 8000 })).toBeInTheDocument();
+  }, 10000);
+
   it.each([
-    ["organization/spending", "spending-redesign-page"],
-    ["workspace/usage", "organization-usage-history"],
-    ["organization/billing", "billing-credit-balance"],
+    ["organization/spending", "factory-settings-nav-organization-spending", "spending-redesign-page"],
+    ["workspace/usage", "factory-settings-nav-workspace-usage", "organization-usage-history"],
   ])(
-    "opens General instead of %s when billing is off",
-    async (path, pageTestId) => {
+    "keeps %s when billing is off",
+    async (path, navTestId, pageTestId) => {
       render(
         <FactoriesHarness
           billingEnabled={false}
@@ -243,15 +265,9 @@ describe("FactorySettingsLayout sidebar", () => {
       const sidebar = await screen.findByTestId("factory-settings-sidebar", {}, { timeout: 8000 });
       await waitFor(() => {
         expect(within(sidebar).queryByTestId("factory-settings-nav-organization-billing")).not.toBeInTheDocument();
-        expect(within(sidebar).queryByTestId("factory-settings-nav-organization-spending")).not.toBeInTheDocument();
-        expect(within(sidebar).queryByTestId("factory-settings-nav-workspace-usage")).not.toBeInTheDocument();
-        expect(within(sidebar).getByTestId("factory-settings-nav-organization-general")).toHaveAttribute(
-          "aria-current",
-          "page",
-        );
+        expect(within(sidebar).getByTestId(navTestId)).toHaveAttribute("aria-current", "page");
       });
-      expect(screen.queryByTestId(pageTestId)).not.toBeInTheDocument();
-      expect(await screen.findByTestId("organization-settings-overview", {}, { timeout: 8000 })).toBeInTheDocument();
+      expect(await screen.findByTestId(pageTestId, {}, { timeout: 8000 })).toBeInTheDocument();
     },
     10000,
   );
