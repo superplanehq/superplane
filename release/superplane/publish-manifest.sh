@@ -35,10 +35,11 @@ fi
 bash "${SCRIPT_DIR}/verify-image.sh" \
   "${IMAGE}" "${VERSION}" "${SOURCE_SHA}" "${SOURCES[@]}"
 
-# Read the full inspect output before selecting the digest. An early awk
-# exit closes the pipe, and pipefail then stops the publish with no message.
+# Capture the inspect output first so docker does not get a broken pipe.
+# awk must read that whole buffer. An early exit makes printf fail under pipefail.
 inspect_output="$(docker buildx imagetools inspect "${IMAGE}")"
-digest="$(printf '%s\n' "${inspect_output}" | awk '$1 == "Digest:" {print $2; exit}')"
+digest="$(printf '%s\n' "${inspect_output}" | awk '$1 == "Digest:" {print $2}')"
+digest="${digest%%$'\n'*}"
 if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
   echo "Error: could not read the published image digest" >&2
   exit 1
