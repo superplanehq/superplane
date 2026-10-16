@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
 import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
@@ -14,6 +15,10 @@ vi.mock("@/hooks/useAccountOrganizations", () => ({
 
 vi.mock("@/hooks/useUserTokens", () => ({
   useCreateUserToken: () => ({ mutateAsync: createToken, isPending: false }),
+}));
+
+vi.mock("@monaco-editor/react", () => ({
+  default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
 }));
 
 const fleetSpec = {
@@ -106,11 +111,31 @@ describe("FleetManagerSetup", () => {
     render(<FleetManagerSetup />);
 
     expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Choose runner fleets" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Configure the default fleet" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Install Fleet Manager" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /cloud infrastructure/i })).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Machine type for e1-large-amd64")).toHaveValue("m8a.large");
+    expect(screen.getByLabelText("Fleet")).toHaveValue("e1-large-amd64");
+    expect(screen.getByRole("combobox", { name: "Machine type" })).toHaveTextContent(
+      "m8a.large · 2 vCPU · 8 GB memory",
+    );
+    expect(screen.getByText(/Idle machines kept ready before a task starts/)).toBeInTheDocument();
+    expect(screen.getByText(/The most machines this fleet can run at one time/)).toBeInTheDocument();
+    expect(screen.queryByText("e1-large-arm64")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Runner version" })).not.toBeInTheDocument();
+  });
+
+  it("switches the machine type list when the cloud changes", async () => {
+    const user = userEvent.setup();
+    render(<FleetManagerSetup />);
+
+    await user.click(await screen.findByRole("button", { name: "GCP" }));
+    expect(screen.getByRole("combobox", { name: "Machine type" })).toHaveTextContent(
+      "e2-standard-4 · 4 vCPU · 16 GB memory",
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "Machine type" }));
+    expect(screen.getByRole("option", { name: "e2-standard-2 · 2 vCPU · 8 GB memory" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /m8a.large/ })).not.toBeInTheDocument();
   });
 
   it("pins the setup runner version and ignores a saved version choice", async () => {
@@ -173,17 +198,15 @@ describe("FleetManagerSetup", () => {
 
     render(<FleetManagerSetup />);
 
-    const amd64 = await screen.findByRole("checkbox", { name: /e1-large-amd64/ });
-    expect(amd64).toBeEnabled();
+    expect(await screen.findByLabelText("Fleet")).toHaveValue("e1-large-amd64");
     expect(screen.queryByText(/Add the amd64 runner image through Terraform/)).not.toBeInTheDocument();
-    fireEvent.click(amd64);
     fireEvent.click(screen.getByRole("button", { name: "Generate install command" }));
 
     const command = await screen.findByTestId("fleet-manager-install-command");
     expect(command).toHaveTextContent("ami: <RUNNER_IMAGE>");
   });
 
-  it("lets you clear a selected fleet when Terraform has no image", async () => {
+  it("keeps a saved custom machine type and ignores other fleets", async () => {
     window.localStorage.setItem(
       FLEET_MANAGER_DRAFT_KEY,
       JSON.stringify({
@@ -193,27 +216,33 @@ describe("FleetManagerSetup", () => {
         serviceAccountName: "superplane-fleet-manager",
         superplaneUrl: "https://superplane.example.com",
         runnerVersion: "v0.2.0",
-        selectedFleetIds: ["e1-large-arm64"],
+        selectedFleetIds: ["e1-large-arm64", "e1-tiny-amd64"],
         fleetCapacities: { "e1-large-arm64": { warmCapacity: 0, maxCapacity: 1 } },
-        fields: { region: "us-east-1" },
+        fields: { region: "us-east-1", "machineType.e1-large-amd64": "t3.small" },
       }),
     );
 
     render(<FleetManagerSetup />);
 
-    const arm64 = await screen.findByRole("checkbox", { name: /e1-large-arm64/ });
-    expect(arm64).toBeEnabled();
-    expect(arm64).toBeChecked();
-    fireEvent.click(arm64);
-    expect(arm64).not.toBeChecked();
+    expect(await screen.findByLabelText("Fleet")).toHaveValue("e1-large-amd64");
+    expect(screen.queryByText("e1-large-arm64")).not.toBeInTheDocument();
+    expect(screen.queryByText("e1-tiny-amd64")).not.toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Machine type" })).toHaveTextContent("t3.small");
   });
 
-  it("prevents selection when Terraform has no image for the architecture", async () => {
+  it("blocks install when Terraform has no amd64 runner image", async () => {
+    stubSetup({
+      ...metadata,
+      infrastructureDefaults: {
+        ...metadata.infrastructureDefaults,
+        fields: { ...metadata.infrastructureDefaults.fields, imageAmd64: "" },
+      },
+    });
     render(<FleetManagerSetup />);
 
-    expect(await screen.findByRole("checkbox", { name: /e1-large-amd64/ })).toBeEnabled();
-    expect(screen.getByRole("checkbox", { name: /e1-large-arm64/ })).toBeDisabled();
-    expect(screen.getByText(/Add the arm64 runner image through Terraform/)).toBeInTheDocument();
+    expect(await screen.findByLabelText("Fleet")).toHaveValue("e1-large-amd64");
+    expect(screen.getByText(/Add the amd64 runner image through Terraform to use this fleet/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate install command" })).toBeDisabled();
   });
 
   it("creates one personal token and puts it only in the values file", async () => {
@@ -221,17 +250,33 @@ describe("FleetManagerSetup", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Generate install command" }));
 
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+
     const command = await screen.findByTestId("fleet-manager-install-command");
     expect(createToken).toHaveBeenCalledTimes(1);
     expect(createToken).toHaveBeenCalledWith({ name: "Fleet Manager" });
-    expect(command).toHaveTextContent("cat > fleet-manager-values.yaml");
-    expect(command).toHaveTextContent("-f fleet-manager-values.yaml");
     expect(command).toHaveTextContent("installationAdminToken: one-time-personal-token");
     expect(command).toHaveTextContent("ami: ami-amd64");
     expect(command).toHaveTextContent("runnerVersion: v0.2.0");
+    expect(command).toHaveTextContent("cpuMillicores: 2000");
+    expect(command).toHaveTextContent("-f fleet-manager-values.yaml");
+    expect(command).not.toHaveTextContent("kubectl create secret");
     expect(window.localStorage.getItem(FLEET_MANAGER_DRAFT_KEY)).not.toContain("one-time-personal-token");
 
-    fireEvent.change(screen.getByLabelText("Maximum capacity for e1-large-amd64"), { target: { value: "3" } });
+    expect(command).toHaveTextContent("cat > fleet-manager-values.yaml <<'EOF'");
+    fireEvent.click(screen.getByRole("button", { name: "Copy values command" }));
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining("cat > fleet-manager-values.yaml <<'EOF'")),
+    );
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("installationAdminToken: one-time-personal-token"));
+    fireEvent.click(screen.getByRole("button", { name: "Copy install command" }));
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(expect.stringContaining("helm upgrade --install fleet-manager")),
+    );
+    expect(writeText.mock.calls.some(([text]) => String(text).includes("kubectl"))).toBe(false);
+
+    fireEvent.change(screen.getByLabelText("Maximum capacity"), { target: { value: "3" } });
     await waitFor(() => expect(command).toHaveTextContent("maxCapacity: 3"));
     expect(createToken).toHaveBeenCalledTimes(1);
   });
