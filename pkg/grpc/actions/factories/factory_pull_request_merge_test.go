@@ -168,6 +168,21 @@ func emptyCombinedStatus() *github.CombinedStatus {
 	}
 }
 
+// Merge tests need a stored pull request, not the attachment handler's background jobs.
+func createMergeTestPullRequest(t *testing.T, db *gorm.DB, order *models.FactoryWorkOrder) *pb.FactoryPullRequest {
+	t.Helper()
+	pullRequest, err := order.CreatePullRequest(db, models.FactoryPullRequestParams{
+		Provider:   models.FactoryPullRequestProviderGitHub,
+		Repository: "acme/app",
+		Number:     42,
+		URL:        "https://github.com/acme/app/pull/42",
+		Title:      "Ready",
+		State:      models.FactoryPullRequestStateOpen,
+	})
+	require.NoError(t, err)
+	return &pb.FactoryPullRequest{Id: pullRequest.ID.String()}
+}
+
 func Test__FactoryPullRequestMerge(t *testing.T) {
 	r := support.Setup(t)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
@@ -191,22 +206,6 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 		order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
 		require.NoError(t, err)
 		return order
-	}
-
-	createGitHubPR := func(t *testing.T, factory *models.Factory, order *models.FactoryWorkOrder) *pb.FactoryPullRequest {
-		t.Helper()
-		resp, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
-			FactoryId:   factory.ID.String(),
-			WorkOrderId: order.ID.String(),
-			Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
-			Repository:  "acme/app",
-			Number:      42,
-			Url:         "https://github.com/acme/app/pull/42",
-			Title:       "Ready",
-			State:       pb.FactoryPullRequest_STATE_OPEN,
-		})
-		require.NoError(t, err)
-		return resp.GetPullRequest()
 	}
 
 	useGitHub := func(t *testing.T, api *fakeFactoryGitHub) {
@@ -240,7 +239,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 
 	t.Run("merges with squash", func(t *testing.T) {
 		factory := newFactory(t)
-		pr := createGitHubPR(t, factory, createOrder(t, factory))
+		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
 		api := readyAPI()
 		useGitHub(t, api)
 
@@ -255,7 +254,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 
 	t.Run("merges with a merge commit", func(t *testing.T) {
 		factory := newFactory(t)
-		pr := createGitHubPR(t, factory, createOrder(t, factory))
+		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
 		api := readyAPI()
 		useGitHub(t, api)
 
@@ -267,7 +266,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 
 	t.Run("merges with rebase", func(t *testing.T) {
 		factory := newFactory(t)
-		pr := createGitHubPR(t, factory, createOrder(t, factory))
+		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
 		api := readyAPI()
 		useGitHub(t, api)
 
@@ -279,7 +278,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 
 	t.Run("refuses a method the repository forbids", func(t *testing.T) {
 		factory := newFactory(t)
-		pr := createGitHubPR(t, factory, createOrder(t, factory))
+		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
 		api := readyAPI()
 		api.repository = &github.Repository{
 			AllowSquashMerge: github.Ptr(true),
@@ -299,7 +298,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 	t.Run("refuses while exclusive mutation access is held", func(t *testing.T) {
 		factory := newFactory(t)
 		order := createOrder(t, factory)
-		pr := createGitHubPR(t, factory, order)
+		pr := createMergeTestPullRequest(t, db, order)
 		grantExclusivePullRequestAccess(t, db, r, factory, pr)
 		api := readyAPI()
 		useGitHub(t, api)
@@ -316,7 +315,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 	t.Run("refuses while a run is active", func(t *testing.T) {
 		factory := newFactory(t)
 		order := createOrder(t, factory)
-		pr := createGitHubPR(t, factory, order)
+		pr := createMergeTestPullRequest(t, db, order)
 		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
 		line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
 			{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
@@ -342,7 +341,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 
 	t.Run("refuses while a check run is in progress", func(t *testing.T) {
 		factory := newFactory(t)
-		pr := createGitHubPR(t, factory, createOrder(t, factory))
+		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
 		api := readyAPI()
 		api.checkRuns = &github.ListCheckRunsResults{
 			CheckRuns: []*github.CheckRun{{
@@ -362,7 +361,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 
 	t.Run("refuses after a failed status", func(t *testing.T) {
 		factory := newFactory(t)
-		pr := createGitHubPR(t, factory, createOrder(t, factory))
+		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
 		api := readyAPI()
 		api.combined = &github.CombinedStatus{
 			State: github.Ptr("failure"),
@@ -383,7 +382,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 
 	t.Run("refuses when the head SHA moved", func(t *testing.T) {
 		factory := newFactory(t)
-		pr := createGitHubPR(t, factory, createOrder(t, factory))
+		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
 		api := readyAPI()
 		useGitHub(t, api)
 
@@ -422,7 +421,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 
 	t.Run("refuses when no GitHub integration is ready", func(t *testing.T) {
 		factory := newFactory(t)
-		pr := createGitHubPR(t, factory, createOrder(t, factory))
+		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
 
 		_, err := merge(t, factory, pr, pb.FactoryPullRequestMergeability_MERGE_METHOD_SQUASH, headSHA)
 		require.Error(t, err)
@@ -440,7 +439,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 			Actor:   &r.User,
 		})
 		require.NoError(t, err)
-		pr := createGitHubPR(t, factory, order)
+		pr := createMergeTestPullRequest(t, db, order)
 		api := readyAPI()
 		useGitHub(t, api)
 
@@ -458,7 +457,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 
 	t.Run("persists the merged state after success", func(t *testing.T) {
 		factory := newFactory(t)
-		pr := createGitHubPR(t, factory, createOrder(t, factory))
+		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
 		api := readyAPI()
 		useGitHub(t, api)
 
@@ -473,7 +472,7 @@ func Test__FactoryPullRequestMerge(t *testing.T) {
 
 	t.Run("refuses when GitHub reports the head moved", func(t *testing.T) {
 		factory := newFactory(t)
-		pr := createGitHubPR(t, factory, createOrder(t, factory))
+		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
 		api := readyAPI()
 		api.mergeErr = &github.ErrorResponse{Response: &http.Response{StatusCode: http.StatusConflict}}
 		useGitHub(t, api)
@@ -510,22 +509,6 @@ func Test__FactoryPullRequestMerge_FlagOff(t *testing.T) {
 		return order
 	}
 
-	createGitHubPR := func(t *testing.T, factory *models.Factory, order *models.FactoryWorkOrder) *pb.FactoryPullRequest {
-		t.Helper()
-		resp, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
-			FactoryId:   factory.ID.String(),
-			WorkOrderId: order.ID.String(),
-			Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
-			Repository:  "acme/app",
-			Number:      42,
-			Url:         "https://github.com/acme/app/pull/42",
-			Title:       "Ready",
-			State:       pb.FactoryPullRequest_STATE_OPEN,
-		})
-		require.NoError(t, err)
-		return resp.GetPullRequest()
-	}
-
 	api := &fakeFactoryGitHub{
 		pullRequest: mergeableGitHubPullRequest(headSHA),
 		combined:    &github.CombinedStatus{State: github.Ptr("success")},
@@ -540,7 +523,7 @@ func Test__FactoryPullRequestMerge_FlagOff(t *testing.T) {
 
 	t.Run("refuses merge when the flag is off", func(t *testing.T) {
 		factory := newFactory(t)
-		pr := createGitHubPR(t, factory, createOrder(t, factory))
+		pr := createMergeTestPullRequest(t, db, createOrder(t, factory))
 
 		_, err := MergeFactoryPullRequest(ctx, deps, orgID, &pb.MergeFactoryPullRequestRequest{
 			FactoryId:       factory.ID.String(),
@@ -579,18 +562,7 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		t.Helper()
 		order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
 		require.NoError(t, err)
-		resp, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
-			FactoryId:   factory.ID.String(),
-			WorkOrderId: order.ID.String(),
-			Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
-			Repository:  "acme/app",
-			Number:      42,
-			Url:         "https://github.com/acme/app/pull/42",
-			Title:       "Ready",
-			State:       pb.FactoryPullRequest_STATE_OPEN,
-		})
-		require.NoError(t, err)
-		return resp.GetPullRequest()
+		return createMergeTestPullRequest(t, db, order)
 	}
 
 	useGitHub := func(t *testing.T, api *fakeFactoryGitHub) {
@@ -736,23 +708,14 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		factory := newFactory(t)
 		order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
 		require.NoError(t, err)
-		resp, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
-			FactoryId:   factory.ID.String(),
-			WorkOrderId: order.ID.String(),
-			Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
-			Repository:  "acme/app",
-			Number:      42,
-			Url:         "https://github.com/acme/app/pull/42",
-			State:       pb.FactoryPullRequest_STATE_OPEN,
-		})
-		require.NoError(t, err)
-		grantExclusivePullRequestAccess(t, db, r, factory, resp.GetPullRequest())
+		pr := createMergeTestPullRequest(t, db, order)
+		grantExclusivePullRequestAccess(t, db, r, factory, pr)
 		useGitHub(t, &fakeFactoryGitHub{
 			pullRequest: mergeableGitHubPullRequest(headSHA),
 			repository:  allMethodsRepository(),
 		})
 
-		got := describe(t, factory, resp.GetPullRequest())
+		got := describe(t, factory, pr)
 		assert.False(t, got.GetCanMerge())
 		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN, got.GetBlockedReason())
 		assert.Equal(t, mergeBlockedActiveRun, got.GetMessage())
@@ -762,16 +725,7 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 		factory := newFactory(t)
 		order, err := factory.CreateWorkOrder(db, "Tracked", "", &r.User, nil, nil)
 		require.NoError(t, err)
-		resp, err := CreateFactoryPullRequest(ctx, IntakeDependencies{}, orgID, &pb.CreateFactoryPullRequestRequest{
-			FactoryId:   factory.ID.String(),
-			WorkOrderId: order.ID.String(),
-			Provider:    pb.FactoryPullRequest_PROVIDER_GITHUB,
-			Repository:  "acme/app",
-			Number:      42,
-			Url:         "https://github.com/acme/app/pull/42",
-			State:       pb.FactoryPullRequest_STATE_OPEN,
-		})
-		require.NoError(t, err)
+		pr := createMergeTestPullRequest(t, db, order)
 		app, entrypoint := support.CreateFactoryAppWithOnRunTrigger(t, r, factory.ID, "step-one", "start-one")
 		line, err := factory.CreateLine(db, "ship", []models.FactoryLineStep{
 			{Type: models.FactoryLineStepTypeRunApp, AppID: app.ID, Entrypoint: entrypoint},
@@ -788,7 +742,7 @@ func Test__FactoryPullRequestMergeability(t *testing.T) {
 			repository:  allMethodsRepository(),
 		})
 
-		got := describe(t, factory, resp.GetPullRequest())
+		got := describe(t, factory, pr)
 		assert.False(t, got.GetCanMerge())
 		assert.Equal(t, pb.FactoryPullRequestMergeability_BLOCKED_REASON_ACTIVE_RUN, got.GetBlockedReason())
 		assert.Equal(t, mergeBlockedActiveRun, got.GetMessage())

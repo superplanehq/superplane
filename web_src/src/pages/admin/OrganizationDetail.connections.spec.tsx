@@ -23,6 +23,8 @@ function organization() {
     task_count: 4,
     done_task_count: 6,
     member_count: 3,
+    workspace_count: 7,
+    repository_count: 8,
     created_at: "2024-01-15T12:00:00Z",
     updated_at: "2024-02-20T12:00:00Z",
   };

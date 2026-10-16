@@ -24,8 +24,9 @@ var canvasNameUniqueConstraints = []string{
 }
 
 const (
-	CanvasColumnKeyVerify = "verify"
-	CanvasColumnKeyDone   = "done"
+	CanvasColumnKeyBacklog = "backlog"
+	CanvasColumnKeyVerify  = "verify"
+	CanvasColumnKeyDone    = "done"
 )
 
 type Canvas struct {
@@ -183,10 +184,10 @@ func (c *Canvas) SoftDelete() error {
 }
 
 func ValidCanvasColumnKey(key string) bool {
-	return key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone
+	return key == CanvasColumnKeyBacklog || key == CanvasColumnKeyVerify || key == CanvasColumnKeyDone
 }
 
-// SetColumnKey attaches this factory canvas to Verify or Done. An empty key
+// SetColumnKey attaches this factory canvas to a board column. An empty key
 // clears the attachment.
 func (c *Canvas) SetColumnKey(tx *gorm.DB, key string) error {
 	var stored *string

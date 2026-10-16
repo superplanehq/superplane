@@ -3,8 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-import { FEATURE_FACTORY_BITBUCKET } from "@/lib/experimentalFeatures";
-
 import { FirstRunSetup } from "./FirstRunSetup";
 import type { IntegrationId } from "./onboardingFixtures";
 import { useOnboardingSetupState, type OnboardingSetupApi } from "./useOnboardingSetupState";
@@ -14,11 +12,6 @@ type OnboardingPageModel = ReturnType<typeof useOnboardingPageModel>;
 
 const resources = vi.hoisted(() => ({
   calls: [] as Array<{ integrationId: string; type: string; enabled?: boolean }>,
-}));
-
-const experimental = vi.hoisted(() => ({
-  enabled: new Set<string>(),
-  loading: false,
 }));
 
 const bitbucketOnboarding = vi.hoisted(() => ({
@@ -106,14 +99,6 @@ vi.mock("@/contexts/useAccount", () => ({
 
 vi.mock("@/hooks/useAccountOrganizations", () => ({
   useAccountOrganizations: () => ({ data: [{ id: "org-1", name: "Acme" }] }),
-}));
-
-vi.mock("@/hooks/useExperimentalFeature", () => ({
-  useExperimentalFeature: () => ({
-    has: (id: string) => experimental.enabled.has(id),
-    isLoading: experimental.loading,
-    organizationReady: true,
-  }),
 }));
 
 vi.mock("@/posthog", () => ({ posthog: { reset: vi.fn() } }));
@@ -204,22 +189,7 @@ describe("FirstRunSetup Bitbucket", () => {
     bitbucketOnboarding.installedWorkspaces = [];
     bitbucketOnboarding.isPending = false;
     bitbucketOnboarding.error = null;
-    experimental.enabled = new Set([FEATURE_FACTORY_BITBUCKET]);
-    experimental.loading = false;
     localStorage.clear();
-  });
-
-  it("keeps Bitbucket unavailable until the organization enables it", async () => {
-    experimental.enabled = new Set();
-    const user = userEvent.setup();
-    renderSetup(new Set());
-
-    await user.click(screen.getByTestId("first-run-get-started"));
-
-    const bitbucket = screen.getByTestId("first-run-host-bitbucket");
-    expect(within(bitbucket).getByRole("button")).toBeDisabled();
-    expect(bitbucket).toHaveTextContent("Bitbucket is not available yet.");
-    expect(screen.queryByTestId("first-run-bitbucket-connect")).not.toBeInTheDocument();
   });
 
   it("offers GitHub and Bitbucket on the host screen and keeps GitLab disabled", async () => {

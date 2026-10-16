@@ -1,7 +1,5 @@
 import type { MeVcsProviderRepository } from "@/api-client";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { linkedAccountConnectHref } from "@/lib/accountSettings";
-import { FEATURE_FACTORY_BITBUCKET } from "@/lib/experimentalFeatures";
 import { startPublicGitHubAppCreate } from "@/lib/githubAppManifest";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
@@ -108,11 +106,9 @@ function screenWithVcsConnection(
   screen: FirstRunScreen,
   vcsHost: VcsHostId | null,
   github: Parameters<typeof screenWithGitHubConnection>[1],
-  bitbucket: { available: boolean; loading: boolean },
 ): FirstRunScreen {
   if (screen === "host") return screen;
   if (vcsHost === "bitbucket") {
-    if (!bitbucket.loading && !bitbucket.available && screen !== "welcome") return "host";
     return screen === "connect" ? "choose" : screen;
   }
   return screenWithGitHubConnection(screen, github);
@@ -151,7 +147,6 @@ function useFirstRunNavigation(
   agentGate: OnboardingAgentGate,
   connection: GitHubConnectionState,
   github: { ready: boolean; returned: boolean },
-  bitbucket: { available: boolean; loading: boolean },
 ) {
   const [searchParams] = useSearchParams();
   const [requestedScreen, setRequestedScreen] = useState<FirstRunScreen | null>(() =>
@@ -174,19 +169,14 @@ function useFirstRunNavigation(
     setRequestedScreen(SCREEN_FOR_STEP[model.openSection]);
   }, [model.openSection]);
 
-  const availableScreen = screenWithVcsConnection(
-    openedScreen,
-    model.setup.vcsHost,
-    {
-      pending: connection.onboarding.isPending,
-      identity: Boolean(connection.identity),
-      ready: github.ready,
-      stayOnConnect,
-      appConfigured: connection.appConfigured,
-      accountConnectionRequired: connection.accountConnectionRequired,
-    },
-    bitbucket,
-  );
+  const availableScreen = screenWithVcsConnection(openedScreen, model.setup.vcsHost, {
+    pending: connection.onboarding.isPending,
+    identity: Boolean(connection.identity),
+    ready: github.ready,
+    stayOnConnect,
+    appConfigured: connection.appConfigured,
+    accountConnectionRequired: connection.accountConnectionRequired,
+  });
 
   const goToScreen = (next: FirstRunScreen) => {
     const step = STEP_FOR_SCREEN[next];
@@ -277,12 +267,10 @@ function useFirstRunCommands(args: {
   connection: GitHubConnectionState;
   navigation: ReturnType<typeof useFirstRunNavigation>;
   blocking: FirstRunBlocking;
-  bitbucketAvailable: boolean;
   forgeConfigured: boolean;
   installScope: GitHubInstallScope;
 }) {
-  const { model, agentGate, connection, navigation, blocking, bitbucketAvailable, forgeConfigured, installScope } =
-    args;
+  const { model, agentGate, connection, navigation, blocking, forgeConfigured, installScope } = args;
   const location = useLocation();
   const saveRepository = () => saveSelectedRepository({ model, connection, forgeConfigured });
   const continueFromRepository = () =>
@@ -292,7 +280,7 @@ function useFirstRunCommands(args: {
       }
     });
   const chooseVcsHost = (host: VcsHostId) => {
-    if (host === "gitlab" || (host === "bitbucket" && !bitbucketAvailable)) return;
+    if (host === "gitlab") return;
     model.setup.selectVcsHost(host);
     navigation.goToScreen(host === "bitbucket" ? "choose" : "connect");
   };
@@ -380,30 +368,22 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     connectedBefore: Boolean(model.setup.selectedRepo),
   });
   const bitbucketConnect = useFirstRunBitbucket({ organizationId, setupFinished, blocking });
-  const intakeFeatures = useExperimentalFeature(organizationId);
-  const intakeFeatureLoading = intakeFeatures.isLoading;
-  const bitbucketAvailable = !intakeFeatureLoading && intakeFeatures.has(FEATURE_FACTORY_BITBUCKET);
-  const bitbucket = { available: bitbucketAvailable, loading: intakeFeatureLoading };
   const agentGate = onboardingAgentGate({
     hostedModelsAvailable: model.hostedModelsAvailable,
     hostedModelsAvailableLoading: model.hostedModelsAvailableLoading,
     bringYourOwnKey: model.bringYourOwnKey,
     bringYourOwnKeyLoading: model.bringYourOwnKeyLoading,
   });
-  const navigation = useFirstRunNavigation(
-    model,
-    agentGate,
-    connection,
-    { ready: githubReady, returned: githubReturned },
-    bitbucket,
-  );
+  const navigation = useFirstRunNavigation(model, agentGate, connection, {
+    ready: githubReady,
+    returned: githubReturned,
+  });
   const commands = useFirstRunCommands({
     model,
     agentGate,
     connection,
     navigation,
     blocking,
-    bitbucketAvailable,
     forgeConfigured: bitbucketConnect.configured,
     installScope,
   });
@@ -423,8 +403,6 @@ export function useFirstRunSetupFlow(model: OnboardingPageModel) {
     ...commands,
     selectBitbucketIdentity,
     vcsHost: model.setup.vcsHost,
-    bitbucketAvailable,
-    bitbucketFeatureLoading: intakeFeatureLoading,
     bitbucketForgeConfigured: bitbucketConnect.configured,
     bitbucketOnboardingPending: bitbucketConnect.pending,
     bitbucketRepositories: bitbucketConnect.repositories,
