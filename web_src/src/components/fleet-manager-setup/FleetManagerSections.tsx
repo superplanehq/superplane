@@ -2,7 +2,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
 import { Cloud } from "lucide-react";
 
@@ -123,21 +122,6 @@ export function FleetManagerFleetSection({
             </div>
           );
         })}
-      </div>
-      <div className="mt-5 max-w-xs">
-        <Label htmlFor="runner-version">Runner version</Label>
-        <Select value={draft.runnerVersion} onValueChange={setup.setRunnerVersion}>
-          <SelectTrigger id="runner-version" className="mt-1.5 w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {metadata.runnerVersions.map((version) => (
-              <SelectItem key={version} value={version}>
-                {version}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
       {setup.fleetErrors.length > 0 && (
         <p role="alert" className="mt-3 text-sm text-destructive">

@@ -6,11 +6,13 @@ import {
   fleetsMatchConfiguration,
   fleetManagerInstallCommand,
   generateFleetManagerValues,
+  installationRunnerVersion,
   loadFleetManagerDraft,
   mergeTerraformInfrastructure,
   saveFleetManagerDraft,
   terraformInstallPlaceholders,
   validateFleetManagerConfiguration,
+  validateFleetSelection,
   type FleetManagerSetupMetadata,
 } from "./fleetManagerSetup";
 
@@ -169,6 +171,18 @@ describe("generateFleetManagerValues", () => {
   });
 });
 
+describe("installationRunnerVersion", () => {
+  it("uses the listed setup version and falls back to the first listed version", () => {
+    expect(installationRunnerVersion({ defaultRunnerVersion: "v1.4.0", runnerVersions: ["v1.4.0", "v1.2.3"] })).toBe(
+      "v1.4.0",
+    );
+    expect(installationRunnerVersion({ defaultRunnerVersion: "v9.9.9", runnerVersions: ["v1.4.0", "v1.2.3"] })).toBe(
+      "v1.4.0",
+    );
+    expect(installationRunnerVersion({ defaultRunnerVersion: "", runnerVersions: [] })).toBe("");
+  });
+});
+
 describe("validateFleetManagerConfiguration", () => {
   const validConfiguration = {
     managerId: "my-cluster",
@@ -176,6 +190,7 @@ describe("validateFleetManagerConfiguration", () => {
     serviceAccountName: "superplane-fleet-manager",
     superplaneUrl: "https://superplane.example.com",
     runnerVersion: "v0.1.0",
+    runnerVersions: ["v0.1.0"],
     selectedFleetIds: ["e1-large-amd64"],
     fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
   };
@@ -197,6 +212,17 @@ describe("validateFleetManagerConfiguration", () => {
     [{ superplaneUrl: "not-a-url" }, "Enter a valid SuperPlane URL."],
   ])("rejects an invalid fleet configuration", (updates, expectedError) => {
     expect(validateFleetManagerConfiguration({ ...validConfiguration, ...updates })).toContain(expectedError);
+  });
+
+  it("rejects a runner version that is empty or not listed", () => {
+    const listed = { ...validConfiguration, runnerVersions: ["v0.1.0"] };
+    expect(validateFleetSelection({ ...listed, runnerVersion: "" })).toContain(
+      "SuperPlane could not determine a Runner version.",
+    );
+    expect(validateFleetSelection({ ...listed, runnerVersion: "v9.9.9" })).toContain(
+      "SuperPlane could not determine a Runner version.",
+    );
+    expect(validateFleetSelection(listed)).not.toContain("SuperPlane could not determine a Runner version.");
   });
 });
 

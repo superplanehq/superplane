@@ -63,7 +63,9 @@ type GenerateValuesInput = Omit<FleetManagerDraft, "namespace" | "serviceAccount
 };
 
 export type FleetManagerConfigurationInput = Omit<FleetManagerDraft, "provider" | "fields">;
-type FleetSelectionInput = Pick<FleetManagerDraft, "runnerVersion" | "selectedFleetIds" | "fleetCapacities">;
+type FleetSelectionInput = Pick<FleetManagerDraft, "runnerVersion" | "selectedFleetIds" | "fleetCapacities"> & {
+  runnerVersions?: readonly string[];
+};
 type FleetInfrastructureInput = Pick<
   FleetManagerDraft,
   "managerId" | "namespace" | "serviceAccountName" | "superplaneUrl"
@@ -236,10 +238,20 @@ export function validateFleetInfrastructure(input: FleetInfrastructureInput): st
   return errors;
 }
 
+export function installationRunnerVersion(
+  metadata: Pick<FleetManagerSetupMetadata, "defaultRunnerVersion" | "runnerVersions">,
+): string {
+  const listed = metadata.runnerVersions ?? [];
+  const preferred = metadata.defaultRunnerVersion?.trim() ?? "";
+  if (preferred && listed.includes(preferred)) return preferred;
+  return listed[0] ?? "";
+}
+
 export function validateFleetSelection(input: FleetSelectionInput): string[] {
   const errors: string[] = [];
-  if (!/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(input.runnerVersion)) {
-    errors.push("Enter a valid immutable Runner version.");
+  const runnerVersions = input.runnerVersions ?? [];
+  if (!input.runnerVersion || !runnerVersions.includes(input.runnerVersion)) {
+    errors.push("SuperPlane could not determine a Runner version.");
   }
   if (input.selectedFleetIds.length === 0) {
     errors.push("Select at least one fleet.");
@@ -259,7 +271,9 @@ export function validateFleetSelection(input: FleetSelectionInput): string[] {
   return errors;
 }
 
-export function validateFleetManagerConfiguration(input: FleetManagerConfigurationInput): string[] {
+export function validateFleetManagerConfiguration(
+  input: FleetManagerConfigurationInput & { runnerVersions?: readonly string[] },
+): string[] {
   return [...validateFleetSelection(input), ...validateFleetInfrastructure(input)];
 }
 
