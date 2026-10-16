@@ -132,7 +132,8 @@ versioned image. Legacy self-hosted tags remain valid as explicit overrides.
 
 If the chart is not published yet, set `superplane_chart_path` to
 `../../superplane-helm-chart/helm` and leave `superplane_chart_version`
-empty.
+empty. Also set `superplane_image_tag`. The checked-in chart appVersion
+is a placeholder, not a published image.
 
 With `enable_gcs_blob_storage = false`, SuperPlane stores blobs on pod
 volumes. Each pod has its own volume, and the data is lost when a pod restarts.
@@ -303,7 +304,7 @@ must stop and Fleet Manager must delete it after the task.
 | --- | --- | --- |
 | `superplane_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the SuperPlane image. |
 | `fleet_manager_image_registry` | `ghcr.io/superplanehq` | Registry that hosts the standalone Fleet Manager image. Set this for private GCP registries so nodes keep pull access. |
-| `superplane_image_tag` | empty | Image tag override. Empty uses the chart appVersion. Versioned, legacy self-hosted, and local tags are supported. |
+| `superplane_image_tag` | empty | Image tag override. Empty uses the chart appVersion. A local chart requires an explicit tag. Versioned, legacy self-hosted, and local tags are supported. |
 | `enable_gcs_blob_storage` | `false` | Store blobs in GCS. Set this to `true` in `terraform.tfvars` for a new install. |
 | `blob_bucket_name` | `<project_id>-superplane-blobs` | Name of the blob bucket. |
 | `blob_bucket_force_destroy` | `false` | Delete the bucket objects on destroy. |

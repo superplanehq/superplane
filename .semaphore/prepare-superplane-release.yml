@@ -89,7 +89,7 @@ blocks:
             - |
               set -euo pipefail
               platforms=(darwin-amd64 darwin-arm64 linux-amd64 linux-arm64)
-              platform="${platforms[$SEMAPHORE_JOB_INDEX]}"
+              platform="${platforms[$((SEMAPHORE_JOB_INDEX - 1))]}"
               os="${platform%-*}"
               architecture="${platform#*-}"
               asset="superplane-cli-$platform"

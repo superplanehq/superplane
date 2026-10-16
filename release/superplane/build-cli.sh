@@ -30,4 +30,3 @@ make cli.build.binary \
   ARCH="${ARCHITECTURE}" \
   CLI_VERSION="${VERSION}" \
   CLI_OUTPUT="${OUTPUT}"
-chmod 0755 "${OUTPUT}"

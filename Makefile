@@ -579,7 +579,7 @@ cli.build.prepare:
 CLI_OUTPUT ?= build/cli
 
 cli.build.binary:
-	$(COMPOSE) exec -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o $(CLI_OUTPUT) cmd/cli/main.go'
+	$(COMPOSE) exec -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o $(CLI_OUTPUT) cmd/cli/main.go && chmod 0755 $(CLI_OUTPUT)'
 
 cli.build: cli.build.prepare cli.build.binary
 

@@ -15,6 +15,8 @@ ruby -ryaml -e '
   raise "arm64 must use the native arm machine" unless arm_machine == "r1-standard-4"
   cli_parallelism = blocks.fetch("Build CLI Assets").dig("task", "jobs", 0, "parallelism")
   raise "CLI builds must use four independent jobs" unless cli_parallelism == 4
+  cli_commands = blocks.fetch("Build CLI Assets").dig("task", "jobs", 0, "commands").join("\n")
+  raise "CLI jobs must treat the Semaphore index as 1-based" unless cli_commands.include?("SEMAPHORE_JOB_INDEX - 1")
   %w[amd64 arm64].each do |architecture|
     commands = blocks.fetch("Build #{architecture} Image").dig("task", "jobs", 0, "commands").join("\n")
     archive = "superplane-#{architecture}.oci.tar"
