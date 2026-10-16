@@ -251,7 +251,7 @@ func buildBitbucketDiscussionPRFeedbackCanvas(request prFeedbackBuildRequest) *y
 			"repository":      "{{ root().data.repository.full_name }}",
 			"pullNumber":      "{{ root().data.pullrequest.id }}",
 			"parentCommentId": "{{ root().data.comment.id }}",
-			"body":            "SuperPlane is looking into this.",
+			"body":            prFeedbackBitbucketAcknowledgeBodyExpression(),
 		},
 		Integration: request.Binding.integrationRef(),
 		Position:    prFeedbackAcknowledgePosition(prFeedbackCommentFlowY),
@@ -468,6 +468,13 @@ func prFeedbackCommentActivityTitleExpression() string {
 func prFeedbackBitbucketCommentActivityTitleExpression() string {
 	return `{{ "[@" + (root().data.comment.author.login ?? root().data.comment.author.nickname) + "](" + root().data.comment.author.html_url` +
 		` + ") left a [comment](" + root().data.comment.html_url + ")" }}`
+}
+
+// prFeedbackBitbucketAcknowledgeBodyExpression replies to a Bitbucket PR
+// comment. Runs without a linked task get the text alone, so the reply
+// never contains a link with no target.
+func prFeedbackBitbucketAcknowledgeBodyExpression() string {
+	return `{{ task() == nil ? "Sure, looking into this." : "Sure, looking into this. Follow along: [" + task().key + "](" + task().url + ")" }}`
 }
 
 func prFeedbackReplyActivityTitleExpression() string {
