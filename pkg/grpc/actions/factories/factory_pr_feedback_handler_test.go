@@ -166,6 +166,11 @@ func Test__FactoryPRFeedbackHandlerActions(t *testing.T) {
 				assert.Equal(t, title, node.Configuration["title"])
 				assert.Equal(t, description, node.Configuration["description"])
 			}
+			if node.ID == prFeedbackAcknowledgeCommentNodeID {
+				// GitHub acknowledgement is a reaction and has no body to refresh.
+				assert.Equal(t, "github.addReaction", node.ComponentName())
+				assert.NotContains(t, node.Configuration, "body")
+			}
 			if node.ID != prFeedbackCommentTriggerNodeID && node.ID != prFeedbackReviewTriggerNodeID && node.ID != prFeedbackReplyTriggerNodeID {
 				continue
 			}

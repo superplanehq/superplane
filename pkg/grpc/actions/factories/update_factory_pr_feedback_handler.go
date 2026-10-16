@@ -187,6 +187,15 @@ func applyPRFeedbackSettings(
 				nodes[i].Configuration = configuration
 				continue
 			}
+			if provider == models.ProviderBitbucket && nodes[i].ID == prFeedbackAcknowledgeCommentNodeID {
+				configuration := maps.Clone(nodes[i].Configuration)
+				if configuration == nil {
+					configuration = map[string]any{}
+				}
+				configuration["body"] = prFeedbackBitbucketAcknowledgeBodyExpression()
+				nodes[i].Configuration = configuration
+				continue
+			}
 			if nodes[i].ID == graph.PauseFixesNodeID {
 				configuration := maps.Clone(nodes[i].Configuration)
 				if configuration == nil {
