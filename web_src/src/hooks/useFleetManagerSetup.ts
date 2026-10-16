@@ -59,17 +59,24 @@ function withRecommendedMachineTypes(
   return next;
 }
 
+function runnerVersionForDraft(version: string, metadata: FleetManagerSetupMetadata): string {
+  if (version && metadata.runnerVersions.includes(version)) return version;
+  return metadata.defaultRunnerVersion;
+}
+
 function draftFromMetadata(metadata: FleetManagerSetupMetadata): FleetManagerDraft {
   metadata.runnerVersions = metadata.runnerVersions?.length ? metadata.runnerVersions : [metadata.defaultRunnerVersion];
   const restoredDraft = loadFleetManagerDraft();
-  if (!restoredDraft) return defaultDraft(metadata);
-  return mergeTerraformInfrastructure(
-    {
-      ...restoredDraft,
-      fields: withRecommendedMachineTypes(restoredDraft.fields, restoredDraft.provider, metadata),
-    },
-    metadata,
-  );
+  const draft = restoredDraft
+    ? mergeTerraformInfrastructure(
+        {
+          ...restoredDraft,
+          fields: withRecommendedMachineTypes(restoredDraft.fields, restoredDraft.provider, metadata),
+        },
+        metadata,
+      )
+    : defaultDraft(metadata);
+  return { ...draft, runnerVersion: runnerVersionForDraft(draft.runnerVersion, metadata) };
 }
 
 function draftForProvider(
@@ -102,7 +109,7 @@ function missingImageErrors(draft: FleetManagerDraft, metadata: FleetManagerSetu
 
 function fleetSelectionErrors(draft: FleetManagerDraft | null, metadata: FleetManagerSetupMetadata | null): string[] {
   if (!draft) return [];
-  const errors = validateFleetSelection(draft);
+  const errors = validateFleetSelection({ ...draft, runnerVersions: metadata?.runnerVersions ?? [] });
   if (!metadata) return errors;
   return [...errors, ...missingImageErrors(draft, metadata), ...terraformInstallPlaceholders(draft, metadata)];
 }

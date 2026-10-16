@@ -1,11 +1,16 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
+	"regexp"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -16,7 +21,21 @@ const (
 	fleetManagerChartRepository      = "oci://ghcr.io/superplanehq/fleet-manager-chart"
 	fleetManagerImageRepository      = "ghcr.io/superplanehq/fleet-manager"
 	runnerReleaseURLTemplate         = "https://github.com/superplanehq/superplane/releases/download/runner%2F{version}"
+	runnerReleaseLookupTimeout       = 3 * time.Second
+	maximumRunnerReleasePages        = 10
+	runnerReleaseTagPrefix           = "runner/"
 )
+
+var (
+	runnerReleasesURL          = "https://api.github.com/repos/superplanehq/superplane/releases?per_page=100"
+	stableRunnerVersionPattern = regexp.MustCompile(`^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$`)
+)
+
+type githubRunnerRelease struct {
+	TagName    string `json:"tag_name"`
+	Draft      bool   `json:"draft"`
+	Prerelease bool   `json:"prerelease"`
+}
 
 type fleetManagerSetupResponse struct {
 	DefaultRunnerVersion       string                     `json:"defaultRunnerVersion"`
@@ -99,7 +118,7 @@ func (s *Server) adminGetFleetManagerSetup(w http.ResponseWriter, _ *http.Reques
 		RunnerReleaseURLTemplate:   runnerReleaseURLTemplate,
 		ChartRepository:            fleetManagerChartRepository,
 		ImageRepository:            fleetManagerImageRepository,
-		RunnerVersions:             configuredRunnerVersions(runnerVersion),
+		RunnerVersions:             runnerVersionsForSetup(runnerVersion),
 		FleetPresets:               presets,
 		InfrastructureDefaults: fleetManagerInfrastructure{
 			Source:             setup.Source,
@@ -148,18 +167,161 @@ func defaultFleetManagerSetupConfig() fleetManagerSetupConfig {
 	return setup
 }
 
+func runnerVersionsForSetup(stableVersion string) []string {
+	configured := configuredRunnerVersions(stableVersion)
+	published, err := publishedRunnerVersions()
+	if err != nil {
+		return configured
+	}
+	return mergeRunnerVersions(configured, published)
+}
+
 func configuredRunnerVersions(stableVersion string) []string {
-	versions := []string{stableVersion}
-	seen := map[string]bool{stableVersion: true}
-	for _, version := range strings.Split(os.Getenv("RUNNER_SUPPORTED_VERSIONS"), ",") {
+	versions := make([]string, 0, 1)
+	seen := map[string]bool{}
+	add := func(version string) {
 		version = strings.TrimSpace(version)
 		if version == "" || seen[version] {
-			continue
+			return
 		}
-		versions = append(versions, version)
 		seen[version] = true
+		versions = append(versions, version)
+	}
+	add(stableVersion)
+	for _, version := range strings.Split(os.Getenv("RUNNER_SUPPORTED_VERSIONS"), ",") {
+		add(version)
 	}
 	return versions
+}
+
+func publishedRunnerVersions() ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), runnerReleaseLookupTimeout)
+	defer cancel()
+
+	client := &http.Client{Timeout: runnerReleaseLookupTimeout}
+	nextURL := runnerReleasesURL
+	seen := map[string]struct{}{}
+	versions := make([]string, 0)
+
+	for page := 0; page < maximumRunnerReleasePages && nextURL != ""; page++ {
+		releases, nextPageURL, err := fetchRunnerReleasePage(ctx, client, nextURL)
+		if err != nil {
+			return nil, err
+		}
+		for _, release := range releases {
+			version, ok := stableRunnerVersionFromRelease(release)
+			if !ok {
+				continue
+			}
+			if _, exists := seen[version]; exists {
+				continue
+			}
+			seen[version] = struct{}{}
+			versions = append(versions, version)
+		}
+		nextURL = nextPageURL
+	}
+
+	return versions, nil
+}
+
+func fetchRunnerReleasePage(ctx context.Context, client *http.Client, pageURL string) ([]githubRunnerRelease, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pageURL, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "SuperPlane")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("unexpected status %d", resp.StatusCode)
+	}
+
+	var releases []githubRunnerRelease
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, "", err
+	}
+	return releases, nextRunnerReleasePageURL(resp.Header.Get("Link")), nil
+}
+
+func nextRunnerReleasePageURL(linkHeader string) string {
+	for link := range strings.SplitSeq(linkHeader, ",") {
+		if !strings.Contains(link, `rel="next"`) {
+			continue
+		}
+		start := strings.IndexByte(link, '<')
+		end := strings.IndexByte(link, '>')
+		if start >= 0 && end > start {
+			return link[start+1 : end]
+		}
+	}
+	return ""
+}
+
+func stableRunnerVersionFromRelease(release githubRunnerRelease) (string, bool) {
+	if release.Draft || release.Prerelease {
+		return "", false
+	}
+	version, ok := strings.CutPrefix(release.TagName, runnerReleaseTagPrefix)
+	if !ok || !stableRunnerVersionPattern.MatchString(version) {
+		return "", false
+	}
+	return version, true
+}
+
+func mergeRunnerVersions(configured, published []string) []string {
+	seen := map[string]struct{}{}
+	versions := make([]string, 0, len(configured)+len(published))
+	for _, version := range append(append([]string{}, published...), configured...) {
+		version = strings.TrimSpace(version)
+		if version == "" {
+			continue
+		}
+		if _, exists := seen[version]; exists {
+			continue
+		}
+		seen[version] = struct{}{}
+		versions = append(versions, version)
+	}
+	sort.SliceStable(versions, func(i, j int) bool {
+		return runnerVersionNewer(versions[i], versions[j])
+	})
+	return versions
+}
+
+func runnerVersionNewer(left, right string) bool {
+	leftMajor, leftMinor, leftPatch, leftOK := parseStableRunnerVersion(left)
+	rightMajor, rightMinor, rightPatch, rightOK := parseStableRunnerVersion(right)
+	if leftOK != rightOK {
+		return leftOK
+	}
+	if !leftOK {
+		return left > right
+	}
+	if leftMajor != rightMajor {
+		return leftMajor > rightMajor
+	}
+	if leftMinor != rightMinor {
+		return leftMinor > rightMinor
+	}
+	return leftPatch > rightPatch
+}
+
+func parseStableRunnerVersion(version string) (int, int, int, bool) {
+	if !stableRunnerVersionPattern.MatchString(version) {
+		return 0, 0, 0, false
+	}
+	var major, minor, patch int
+	if _, err := fmt.Sscanf(version, "v%d.%d.%d", &major, &minor, &patch); err != nil {
+		return 0, 0, 0, false
+	}
+	return major, minor, patch, true
 }
 
 func validFleetManagerProvider(provider string) bool {

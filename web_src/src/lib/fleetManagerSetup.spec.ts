@@ -11,6 +11,7 @@ import {
   saveFleetManagerDraft,
   terraformInstallPlaceholders,
   validateFleetManagerConfiguration,
+  validateFleetSelection,
   type FleetManagerSetupMetadata,
 } from "./fleetManagerSetup";
 
@@ -176,6 +177,7 @@ describe("validateFleetManagerConfiguration", () => {
     serviceAccountName: "superplane-fleet-manager",
     superplaneUrl: "https://superplane.example.com",
     runnerVersion: "v0.1.0",
+    runnerVersions: ["v0.1.0"],
     selectedFleetIds: ["e1-large-amd64"],
     fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
   };
@@ -197,6 +199,13 @@ describe("validateFleetManagerConfiguration", () => {
     [{ superplaneUrl: "not-a-url" }, "Enter a valid SuperPlane URL."],
   ])("rejects an invalid fleet configuration", (updates, expectedError) => {
     expect(validateFleetManagerConfiguration({ ...validConfiguration, ...updates })).toContain(expectedError);
+  });
+
+  it("rejects a runner version that is empty or not listed", () => {
+    const listed = { ...validConfiguration, runnerVersions: ["v0.1.0"] };
+    expect(validateFleetSelection({ ...listed, runnerVersion: "" })).toContain("Select a listed Runner version.");
+    expect(validateFleetSelection({ ...listed, runnerVersion: "v9.9.9" })).toContain("Select a listed Runner version.");
+    expect(validateFleetSelection(listed)).not.toContain("Select a listed Runner version.");
   });
 });
 
