@@ -10,6 +10,21 @@ import (
 )
 
 func DescribeWorkOrder(ctx context.Context, organizationID string, req *pb.DescribeWorkOrderRequest) (*pb.DescribeWorkOrderResponse, error) {
+	loaded, err := loadDescribedWorkOrder(ctx, organizationID, req, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.DescribeWorkOrderResponse{Order: loaded.Order}, nil
+}
+
+type loadedWorkOrder struct {
+	Factory *models.Factory
+	Record  *models.FactoryWorkOrder
+	Order   *pb.WorkOrder
+}
+
+func loadDescribedWorkOrder(ctx context.Context, organizationID string, req *pb.DescribeWorkOrderRequest, includeArchived bool) (*loadedWorkOrder, error) {
 	orgID, err := parseOrganizationID(organizationID)
 	if err != nil {
 		return nil, factoryErrorToStatus(err, "failed to describe work order")
@@ -26,7 +41,7 @@ func DescribeWorkOrder(ctx context.Context, organizationID string, req *pb.Descr
 		return nil, factoryErrorToStatus(err, "failed to describe work order")
 	}
 
-	if order.IsArchived() {
+	if !includeArchived && order.IsArchived() {
 		return nil, grpcerrors.NotFound(models.ErrFactoryWorkOrderNotFound, "work order not found")
 	}
 
@@ -35,7 +50,5 @@ func DescribeWorkOrder(ctx context.Context, organizationID string, req *pb.Descr
 		return nil, factoryErrorToStatus(err, "failed to describe work order")
 	}
 
-	return &pb.DescribeWorkOrderResponse{
-		Order: serialized,
-	}, nil
+	return &loadedWorkOrder{Factory: factory, Record: order, Order: serialized}, nil
 }
