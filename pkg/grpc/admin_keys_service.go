@@ -112,24 +112,6 @@ func (s *AdminKeysService) ListMigrations(ctx context.Context, _ *pb.ListMigrati
 	return response, nil
 }
 
-func (s *AdminKeysService) RetryMigration(ctx context.Context, req *pb.RetryMigrationRequest) (*pb.MigrationResponse, error) {
-	if s.migrator == nil {
-		return nil, s.migrationUnavailable()
-	}
-	id, err := uuid.Parse(req.Id)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid migration ID")
-	}
-	job, err := s.migrator.Retry(ctx, id)
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, status.Error(codes.NotFound, "encryption migration not found")
-	}
-	if err != nil {
-		return nil, status.Error(codes.FailedPrecondition, err.Error())
-	}
-	return migrationResponse(job), nil
-}
-
 func (s *AdminKeysService) migrationUnavailable() error {
 	if s.store == nil {
 		return status.Error(codes.Unavailable, "application encryption keys are not configured")

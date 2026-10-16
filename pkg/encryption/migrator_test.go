@@ -132,31 +132,50 @@ func testMigratorConvertsLegacyValues(t *testing.T, legacy crypto.Encryptor) {
 	plain, err = encryptor.Decrypt(ctx, decoded, []byte(openRouterID.String()))
 	require.NoError(t, err)
 	require.Equal(t, "router secret", string(plain))
-	_, err = store.Rotate(ctx)
+	newKeyID, err := store.Rotate(ctx)
 	require.NoError(t, err)
 	if _, plaintext := legacy.(*crypto.NoOpEncryptor); plaintext {
 		return
 	}
-	require.NoError(t, db.Exec("UPDATE "+table+" SET secret = ? WHERE id = ?", []byte("invalid ciphertext"), id).Error)
+	corruptID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	require.NoError(t, db.Exec("INSERT INTO "+table+" (id, secret, configuration, app_name) VALUES (?, ?, '{}', 'openai')", corruptID, []byte("invalid ciphertext")).Error)
 	failedJob, err := migrator.Start(ctx)
-	require.NoError(t, err)
-	require.NoError(t, migrator.RunBatch(ctx))
-	failedJob, err = migrator.Get(ctx, failedJob.ID)
-	require.NoError(t, err)
-	require.Equal(t, "failed", failedJob.State)
-	require.Contains(t, failedJob.ErrorMessage, location.Name)
-	require.NoError(t, db.Exec("UPDATE "+table+" SET secret = ? WHERE id = ?", stored, id).Error)
-	_, err = migrator.Retry(ctx, failedJob.ID)
 	require.NoError(t, err)
 	for range 100 {
 		require.NoError(t, migrator.RunBatch(ctx))
 		failedJob, err = migrator.Get(ctx, failedJob.ID)
 		require.NoError(t, err)
-		if failedJob.State == "completed" {
+		if failedJob.State == "failed" {
 			break
 		}
 	}
-	require.Equal(t, "completed", failedJob.State, failedJob.ErrorMessage)
+	require.Equal(t, "failed", failedJob.State)
+	require.NotEmpty(t, failedJob.ErrorMessage)
+	require.NoError(t, db.Raw("SELECT secret FROM "+table+" WHERE id = ?", id).Row().Scan(&stored))
+	keyID, versioned, err = crypto.EncryptedDataKeyID(stored)
+	require.NoError(t, err)
+	require.True(t, versioned)
+	require.Equal(t, newKeyID, keyID)
+
+	repaired, err := legacy.Encrypt(ctx, []byte("repaired secret"), []byte("smtp_password"))
+	require.NoError(t, err)
+	require.NoError(t, db.Exec("UPDATE "+table+" SET secret = ? WHERE id = ?", repaired, corruptID).Error)
+	newJob, err := migrator.Start(ctx)
+	require.NoError(t, err)
+	require.NotEqual(t, failedJob.ID, newJob.ID)
+	require.Equal(t, failedJob.TargetKeyID, newJob.TargetKeyID)
+	for range 100 {
+		require.NoError(t, migrator.RunBatch(ctx))
+		newJob, err = migrator.Get(ctx, newJob.ID)
+		require.NoError(t, err)
+		if newJob.State == "completed" {
+			break
+		}
+	}
+	require.Equal(t, "completed", newJob.State, newJob.ErrorMessage)
+	failedJob, err = migrator.Get(ctx, failedJob.ID)
+	require.NoError(t, err)
+	require.Equal(t, "failed", failedJob.State)
 }
 
 func testEncryptedStorageLocation(table, column, associatedData, appName string, format models.EncryptedStorageFormat) models.EncryptedStorageLocation {

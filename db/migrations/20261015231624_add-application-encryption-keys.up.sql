@@ -27,6 +27,6 @@ CREATE TABLE application_encryption_migrations (
 
 CREATE UNIQUE INDEX application_encryption_migrations_unfinished
   ON application_encryption_migrations ((1))
-  WHERE state IN ('pending', 'running', 'failed');
+  WHERE state IN ('pending', 'running');
 
 COMMIT;

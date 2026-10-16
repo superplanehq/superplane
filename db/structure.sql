@@ -3164,7 +3164,7 @@ CREATE UNIQUE INDEX application_encryption_keys_one_active ON public.application
 -- Name: application_encryption_migrations_unfinished; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX application_encryption_migrations_unfinished ON public.application_encryption_migrations USING btree ((1)) WHERE (state = ANY (ARRAY['pending'::text, 'running'::text, 'failed'::text]));
+CREATE UNIQUE INDEX application_encryption_migrations_unfinished ON public.application_encryption_migrations USING btree ((1)) WHERE (state = ANY (ARRAY['pending'::text, 'running'::text]));
 
 
 --

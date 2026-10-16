@@ -47,12 +47,6 @@ service Keys {
     };
   }
 
-  rpc RetryMigration(RetryMigrationRequest) returns (MigrationResponse) {
-    option (google.api.http) = {
-      post: "/admin/api/installation/keys/migrations/{id}/retry"
-      body: "*"
-    };
-  }
 }
 
 message DataKey {
@@ -89,10 +83,6 @@ message ListMigrationsRequest {}
 
 message ListMigrationsResponse {
   repeated MigrationResponse migrations = 1;
-}
-
-message RetryMigrationRequest {
-  string id = 1;
 }
 
 message MigrationResponse {

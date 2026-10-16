@@ -146,15 +146,14 @@ response.
 | Start migration | `POST /admin/api/installation/keys/migrations` | Create a migration job for the current active key. Return its ID. |
 | View migrations | `GET /admin/api/installation/keys/migrations` | List recent jobs so progress remains visible after a page reload. |
 | Fetch one job | `GET /admin/api/installation/keys/migrations/{id}` | Show state, current storage location, and failures. |
-| Retry migration | `POST /admin/api/installation/keys/migrations/{id}/retry` | Resume a failed job. |
 | Rewrap data keys | `POST /admin/api/installation/keys/rewrap` | Rewrap data keys with a configured master key. |
 
 The UI starts a server job and shows its saved progress. The browser does not
 hold decrypted values or run migration batches.
 
-Reject data key rotation while a migration job is pending, running, or failed.
+Reject data key rotation while a migration job is pending or running.
 Enforce this rule in the same database transaction that activates a new key.
-An admin must retry a failed job and complete it before another rotation.
+An admin can start a new job after a failed job. The failed job remains in the history.
 Keep old data keys available while stored values or backups reference them.
 Permit only one unfinished migration job per installation.
 
@@ -168,9 +167,9 @@ Use one PostgreSQL row per job. The row stores:
 - Creation, update, and completion times.
 - A short error code and message, without plaintext or ciphertext.
 
-Store records for individual failures only when a value needs investigation.
-Do not store one progress row per migrated value. Do not require scanned or
-migrated counters for correctness.
+Log unreadable values with their storage location and row ID. Keep logs free of
+plaintext and ciphertext. Do not store one progress row per migrated value.
+Do not require scanned or migrated counters for correctness.
 
 The target key ID is fixed when the job starts. The first pass converts values.
 Later passes verify that all values use the target key. A cursor identifies the last examined row
@@ -201,9 +200,10 @@ still uses an old key.
 
 After the initial walk, scan every registered location again for legacy values
 or values that do not use the target key. Repeat bounded passes until none
-remain. Mark the job completed only when all locations pass verification and
-no unresolved failures remain. Report decryption failures. Never mark them as
-skipped successes.
+remain. Continue past unreadable values and process the remaining rows. Mark
+the job failed after the full scan if any value could not be migrated. Keep
+successful changes. After the operator resolves the errors, start a new job.
+The new job scans all locations and targets the active data key.
 
 ## Rollout and Operations
 
@@ -221,7 +221,7 @@ skipped successes.
 4. Set `ENCRYPTION_WRITE_FORMAT=versioned` and roll out every instance again.
    During this rollout, both configurations can read both formats.
 5. Start a migration from the admin UI when old ciphertext must be converted.
-   Inspect failures and retry the job until it completes.
+   Inspect logs for failures, correct the affected values, and start a new job.
 6. Keep `ENCRYPTION_KEY` available while legacy values or retained backups need it.
 
 After step 4, roll back only to an application version that can read both

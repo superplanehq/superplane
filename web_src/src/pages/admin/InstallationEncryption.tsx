@@ -10,10 +10,10 @@ import { Button } from "@/components/ui/button";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useCallback, useEffect, useState } from "react";
 
-type Action = "rotate" | "migrate" | "retry" | "rewrap";
+type Action = "rotate" | "migrate" | "rewrap";
 
 const basePath = "/admin/api/installation/keys";
-const activeStates = ["pending", "running", "failed"];
+const activeStates = ["pending", "running"];
 
 async function request<T>(path: string, method = "GET", body?: object): Promise<T> {
   const response = await fetch(`${basePath}${path}`, {
@@ -153,11 +153,6 @@ function MigrationSection({
         <Button disabled={!!busy || !!unfinished} onClick={() => setConfirm("migrate")}>
           Start migration
         </Button>
-        {latestMigration?.state === "failed" ? (
-          <Button variant="outline" disabled={!!busy} onClick={() => setConfirm("retry")}>
-            Retry migration
-          </Button>
-        ) : null}
         <Button variant="outline" disabled={!!busy} onClick={() => void refresh()}>
           Refresh status
         </Button>
@@ -212,7 +207,6 @@ function ConfirmAction({
   const confirmation = {
     rotate: ["Rotate data key", "New values will use a new data key. Existing values will remain readable."],
     migrate: ["Start encryption migration", "This job will re-encrypt stored values with the active data key."],
-    retry: ["Retry encryption migration", "The job will resume from its saved position."],
     rewrap: [
       "Rewrap data keys",
       "The configured master key will protect all data keys. Application values will not change.",
@@ -293,11 +287,6 @@ export default function InstallationEncryption() {
         case "migrate":
           await request("/migrations", "POST", {});
           showSuccessToast("Encryption migration started.");
-          break;
-        case "retry":
-          if (!latestMigration?.id) return;
-          await request(`/migrations/${encodeURIComponent(latestMigration.id)}/retry`, "POST", {});
-          showSuccessToast("Encryption migration resumed.");
           break;
         case "rewrap":
           await request("/rewrap", "POST", {});

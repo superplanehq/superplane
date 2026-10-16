@@ -6,7 +6,7 @@ import InstallationEncryption from "./InstallationEncryption";
 describe("InstallationEncryption", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("restores a failed migration and blocks rotation until it completes", async () => {
+  it("allows a new migration after a failed job", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: RequestInfo | URL) => {
@@ -30,8 +30,7 @@ describe("InstallationEncryption", () => {
     render(<InstallationEncryption />);
 
     expect(await screen.findByText("Could not decrypt a value.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Rotate data key" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Start migration" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Retry migration" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Rotate data key" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Start migration" })).toBeEnabled();
   });
 });

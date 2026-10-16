@@ -23,6 +23,9 @@ const encryptionRegistryVersion = 1
 const migrationBatchSize = 100
 
 var ErrMigrationAlreadyRunning = errors.New("an encryption migration is already unfinished")
+var errUnreadableValue = errors.New("encrypted value cannot be read")
+
+const migrationValueError = "Some values could not be migrated. Check worker logs and start a new migration."
 
 type Migrator struct {
 	encryptor *crypto.VersionedEncryptor
@@ -67,24 +70,6 @@ func (m *Migrator) List(ctx context.Context) ([]models.ApplicationEncryptionMigr
 	return models.ListApplicationEncryptionMigrations(database.DB(ctx))
 }
 
-func (m *Migrator) Retry(ctx context.Context, id uuid.UUID) (*models.ApplicationEncryptionMigration, error) {
-	var job *models.ApplicationEncryptionMigration
-	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
-		var err error
-		job, err = models.LoadApplicationEncryptionMigration(tx, id)
-		if err != nil {
-			return err
-		}
-		if job.State != "failed" {
-			return errors.New("only a failed encryption migration can be retried")
-		}
-		job.State = "pending"
-		job.ErrorMessage = ""
-		return tx.Save(job).Error
-	})
-	return job, err
-}
-
 // Run lets every worker pod attempt one short batch at a time. PostgreSQL row
 // locking gives each batch to one pod and rolls it back if that pod exits.
 func (m *Migrator) Run(ctx context.Context) {
@@ -103,7 +88,9 @@ func (m *Migrator) Run(ctx context.Context) {
 }
 
 func (m *Migrator) RunBatch(ctx context.Context) error {
-	return database.DB(ctx).Transaction(func(tx *gorm.DB) error {
+	var skipped []error
+	var jobID uuid.UUID
+	err := database.DB(ctx).Transaction(func(tx *gorm.DB) error {
 		job, err := models.LockNextApplicationEncryptionMigration(tx)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
@@ -111,17 +98,25 @@ func (m *Migrator) RunBatch(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		jobID = job.ID
 		next := *job
 		if err := tx.Transaction(func(batch *gorm.DB) error {
-			return m.processBatch(ctx, batch, &next)
+			return m.processBatch(ctx, batch, &next, &skipped)
 		}); err != nil {
 			return m.failJob(tx, job, err.Error())
 		}
 		return tx.Save(&next).Error
 	})
+	if err != nil {
+		return err
+	}
+	for _, skippedError := range skipped {
+		log.WithField("migration_id", jobID).WithError(skippedError).Error("application encryption value could not be migrated")
+	}
+	return nil
 }
 
-func (m *Migrator) processBatch(ctx context.Context, tx *gorm.DB, job *models.ApplicationEncryptionMigration) error {
+func (m *Migrator) processBatch(ctx context.Context, tx *gorm.DB, job *models.ApplicationEncryptionMigration, skipped *[]error) error {
 	if job.RegistryVersion != encryptionRegistryVersion {
 		return errors.New("migration registry version is not supported")
 	}
@@ -143,7 +138,11 @@ func (m *Migrator) processBatch(ctx context.Context, tx *gorm.DB, job *models.Ap
 	for _, row := range page {
 		changed, err := m.migrateRow(ctx, tx, locations[locationIndex], row, job.TargetKeyID)
 		if err != nil {
-			return fmt.Errorf("%s row %s: %w", job.StorageLocation, row.Cursor, err)
+			if !errors.Is(err, errUnreadableValue) {
+				return fmt.Errorf("%s row %s: %w", job.StorageLocation, row.Cursor, err)
+			}
+			job.ErrorMessage = migrationValueError
+			*skipped = append(*skipped, fmt.Errorf("%s row %s: %w", job.StorageLocation, row.Cursor, err))
 		}
 		if changed && job.Pass >= 2 && job.Pass%2 == 0 {
 			job.Pass++ // odd verification pass means at least one value changed
@@ -155,6 +154,8 @@ func (m *Migrator) processBatch(ctx context.Context, tx *gorm.DB, job *models.Ap
 		job.Cursor = ""
 		if locationIndex+1 < len(locations) {
 			job.StorageLocation = locations[locationIndex+1].Name
+		} else if job.ErrorMessage != "" {
+			job.State = "failed"
 		} else if job.Pass == 1 || job.Pass%2 == 1 {
 			job.Pass++
 			job.StorageLocation = locations[0].Name
@@ -188,14 +189,14 @@ func (m *Migrator) migrateRow(ctx context.Context, tx *gorm.DB, location models.
 func (m *Migrator) migrateCiphertext(ctx context.Context, tx *gorm.DB, location models.EncryptedStorageLocation, row models.EncryptedStorageRow, ciphertext []byte, target uuid.UUID, encode func([]byte) []byte) (bool, error) {
 	id, versioned, err := crypto.EncryptedDataKeyID(ciphertext)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("%w: parse encrypted value: %w", errUnreadableValue, err)
 	}
 	if versioned && id == target {
 		return false, nil
 	}
 	plain, err := m.encryptor.Decrypt(ctx, ciphertext, []byte(row.AssociatedData))
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("%w: decrypt value: %w", errUnreadableValue, err)
 	}
 	replacement, err := m.encryptor.Encrypt(ctx, plain, []byte(row.AssociatedData))
 	if err != nil {
@@ -213,11 +214,11 @@ func (m *Migrator) migrateIntegrationConfiguration(ctx context.Context, tx *gorm
 	decoder := json.NewDecoder(bytes.NewReader(row.Value))
 	decoder.UseNumber()
 	if err := decoder.Decode(&configuration); err != nil {
-		return false, fmt.Errorf("decode integration configuration: %w", err)
+		return false, fmt.Errorf("%w: decode integration configuration: %w", errUnreadableValue, err)
 	}
 	integration, err := m.registry.GetIntegration(row.AppName)
 	if err != nil {
-		return false, fmt.Errorf("load integration %s: %w", row.AppName, err)
+		return false, fmt.Errorf("%w: load integration %s: %w", errUnreadableValue, row.AppName, err)
 	}
 	fields := make([]string, 0)
 	for _, field := range integration.Configuration() {
@@ -231,6 +232,7 @@ func (m *Migrator) migrateIntegrationConfiguration(ctx context.Context, tx *gorm
 		fields = append(fields, "apiKey")
 	}
 	changed := false
+	var unreadable []error
 	for _, name := range fields {
 		value, exists := configuration[name]
 		if !exists {
@@ -238,22 +240,26 @@ func (m *Migrator) migrateIntegrationConfiguration(ctx context.Context, tx *gorm
 		}
 		encoded, ok := value.(string)
 		if !ok {
-			return false, fmt.Errorf("sensitive field %s is not a string", name)
+			unreadable = append(unreadable, fmt.Errorf("%w: sensitive field %s is not a string", errUnreadableValue, name))
+			continue
 		}
 		ciphertext, err := base64.StdEncoding.DecodeString(encoded)
 		if err != nil {
-			return false, fmt.Errorf("decode sensitive field %s: %w", name, err)
+			unreadable = append(unreadable, fmt.Errorf("%w: decode sensitive field %s: %w", errUnreadableValue, name, err))
+			continue
 		}
 		id, versioned, err := crypto.EncryptedDataKeyID(ciphertext)
 		if err != nil {
-			return false, err
+			unreadable = append(unreadable, fmt.Errorf("%w: parse sensitive field %s: %w", errUnreadableValue, name, err))
+			continue
 		}
 		if versioned && id == target {
 			continue
 		}
 		plain, err := m.encryptor.Decrypt(ctx, ciphertext, []byte(row.AssociatedData))
 		if err != nil {
-			return false, fmt.Errorf("decrypt sensitive field %s: %w", name, err)
+			unreadable = append(unreadable, fmt.Errorf("%w: decrypt sensitive field %s: %w", errUnreadableValue, name, err))
+			continue
 		}
 		replacement, err := m.encryptor.Encrypt(ctx, plain, []byte(row.AssociatedData))
 		if err != nil {
@@ -263,11 +269,15 @@ func (m *Migrator) migrateIntegrationConfiguration(ctx context.Context, tx *gorm
 		changed = true
 	}
 	if !changed {
-		return false, nil
+		return false, errors.Join(unreadable...)
 	}
 	replacement, err := json.Marshal(configuration)
 	if err != nil {
 		return false, err
 	}
-	return location.Replace(tx, row, replacement)
+	replaced, err := location.Replace(tx, row, replacement)
+	if err != nil {
+		return false, err
+	}
+	return replaced, errors.Join(unreadable...)
 }
