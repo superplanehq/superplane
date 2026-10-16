@@ -93,6 +93,34 @@ func MintFactoryAgentResourceAccessToken(
 	db *gorm.DB,
 	resource *models.FactoryAgentResource,
 ) (string, error) {
+	return mintFactoryAgentResourceAccessToken(ctx, encryptor, httpClient, db, resource, accessTokenRefreshSkew)
+}
+
+// MintFactoryAgentResourceAccessTokenWithLifetime returns a token that remains
+// valid for at least minRemaining. Agent runs pass the execution timeout
+// because they copy the token into fixed headers for the whole run.
+func MintFactoryAgentResourceAccessTokenWithLifetime(
+	ctx context.Context,
+	encryptor crypto.Encryptor,
+	httpClient HTTPDoer,
+	db *gorm.DB,
+	resource *models.FactoryAgentResource,
+	minRemaining time.Duration,
+) (string, error) {
+	if minRemaining < accessTokenRefreshSkew {
+		minRemaining = accessTokenRefreshSkew
+	}
+	return mintFactoryAgentResourceAccessToken(ctx, encryptor, httpClient, db, resource, minRemaining)
+}
+
+func mintFactoryAgentResourceAccessToken(
+	ctx context.Context,
+	encryptor crypto.Encryptor,
+	httpClient HTTPDoer,
+	db *gorm.DB,
+	resource *models.FactoryAgentResource,
+	minRemaining time.Duration,
+) (string, error) {
 	if resource.Config.Data().MCPAuth() != models.FactoryAgentResourceAuthOAuth {
 		return "", nil
 	}
@@ -115,7 +143,7 @@ func MintFactoryAgentResourceAccessToken(
 		if err != nil {
 			return err
 		}
-		if currentAccess != "" && accessTokenCurrent(expiresAt, now) {
+		if currentAccess != "" && accessTokenCurrent(expiresAt, now, minRemaining) {
 			accessToken = currentAccess
 			return markOAuthConnected(tx, resource)
 		}
@@ -138,7 +166,7 @@ func MintFactoryAgentResourceAccessToken(
 		defer cancel()
 		tokens, err := RefreshAccessToken(oauthCtx, httpClient, metadata.TokenEndpoint, metadata.ClientID, clientSecret, refresh, metadata.Resource)
 		if err != nil {
-			minted, err := finishRefreshError(ctx, encryptor, tx, resource, refresh, currentAccess, expiresAt, now, err)
+			minted, err := finishRefreshError(ctx, encryptor, tx, resource, refresh, currentAccess, expiresAt, err)
 			if err != nil {
 				return err
 			}
@@ -177,12 +205,11 @@ func finishRefreshError(
 	refresh string,
 	currentAccess string,
 	expiresAt time.Time,
-	now time.Time,
 	cause error,
 ) (mintedToken, error) {
 	var endpointErr *TokenEndpointError
 	if !errors.As(cause, &endpointErr) || !endpointErr.RejectsGrant() {
-		if currentAccess != "" && accessTokenUnexpired(expiresAt, now) {
+		if currentAccess != "" && accessTokenUnexpired(expiresAt, time.Now()) {
 			return mintedToken{accessToken: currentAccess}, nil
 		}
 		return mintedToken{}, cause
@@ -255,8 +282,11 @@ func accessTokenExpiresAt(resource *models.FactoryAgentResource) time.Time {
 	return expiresAt
 }
 
-func accessTokenCurrent(expiresAt, now time.Time) bool {
-	return !expiresAt.IsZero() && expiresAt.After(now.Add(accessTokenRefreshSkew))
+func accessTokenCurrent(expiresAt, now time.Time, minRemaining time.Duration) bool {
+	if minRemaining < accessTokenRefreshSkew {
+		minRemaining = accessTokenRefreshSkew
+	}
+	return !expiresAt.IsZero() && expiresAt.After(now.Add(minRemaining))
 }
 
 func accessTokenUnexpired(expiresAt, now time.Time) bool {

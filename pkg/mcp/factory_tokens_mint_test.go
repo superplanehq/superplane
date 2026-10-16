@@ -19,6 +19,45 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestMintRefreshesWhenCallerNeedsLongerLifetime(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	resource := connectOAuthResource(t, db, r, time.Now().Add(3*time.Minute), "short-access", "refresh-1")
+	calls := 0
+	client := tokenEndpointClient(t, func(w http.ResponseWriter, req *http.Request) {
+		calls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"access_token":"long-access","refresh_token":"refresh-2","expires_in":3600,"token_type":"Bearer"}`)
+	})
+
+	token, err := mcp.MintFactoryAgentResourceAccessToken(t.Context(), r.Encryptor, client, db, resource)
+	require.NoError(t, err)
+	assert.Equal(t, "short-access", token)
+	assert.Zero(t, calls)
+
+	token, err = mcp.MintFactoryAgentResourceAccessTokenWithLifetime(t.Context(), r.Encryptor, client, db, resource, time.Hour)
+	require.NoError(t, err)
+	assert.Equal(t, "long-access", token)
+	assert.Equal(t, 1, calls)
+}
+
+func TestMintDoesNotReturnTokenThatExpiresDuringRefresh(t *testing.T) {
+	r := support.Setup(t)
+	db := database.DB(t.Context())
+	resource := connectOAuthResource(t, db, r, time.Now().Add(time.Second), "almost-expired", "refresh-1")
+	client := tokenEndpointClient(t, func(w http.ResponseWriter, req *http.Request) {
+		time.Sleep(2 * time.Second)
+		http.Error(w, "unavailable", http.StatusInternalServerError)
+	})
+
+	_, err := mcp.MintFactoryAgentResourceAccessToken(t.Context(), r.Encryptor, client, db, resource)
+	require.Error(t, err)
+	saved := reloadResource(t, db, resource)
+	assert.Equal(t, models.FactoryAgentResourceOAuthConnected, saved.OAuthState())
+	assert.Empty(t, saved.OAuthError)
+	assert.Equal(t, "almost-expired", decryptedSecret(t, r, db, saved, models.FactoryAgentResourceSecretAccessToken))
+}
+
 func TestMintReusesAccessTokenUntilNearExpiry(t *testing.T) {
 	r := support.Setup(t)
 	db := database.DB(t.Context())
