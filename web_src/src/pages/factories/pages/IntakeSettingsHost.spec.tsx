@@ -31,11 +31,12 @@ describe("IntakeSettingsHost", () => {
     expect(within(dialog).getByRole("heading", { name: "Intake GitHub issues" })).toBeInTheDocument();
     expect(within(dialog).queryByTestId("intake-connection")).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText("Name")).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("checkbox", { name: "A new issue is opened" })).toBeChecked();
+    expect(within(dialog).queryByRole("checkbox", { name: "A new issue is opened" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("checkbox", { name: "Author is a repository collaborator" })).toBeChecked();
     expect(within(dialog).getByRole("checkbox", { name: "A closed issue is re-opened" })).toBeChecked();
     expect(
-      within(dialog).getByRole("checkbox", { name: 'The "superplane" label is added to the issue' }),
-    ).toBeChecked();
+      within(dialog).queryByRole("checkbox", { name: 'The "superplane" label is added to the issue' }),
+    ).not.toBeInTheDocument();
     expect(
       within(dialog)
         .getAllByRole("tab")

@@ -213,14 +213,27 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(screen.queryByRole("radio", { name: /Listen for new issues/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("radio", { name: /Run on a schedule/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId("intake-confidence-value")).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "A new issue is opened" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Issue has one of these labels" })).not.toBeInTheDocument();
+    const checkboxNames = screen.getAllByRole("checkbox").map((checkbox) => checkbox.getAttribute("aria-label"));
+    expect(checkboxNames).toEqual([
+      "Author is a repository collaborator",
+      "superplane",
+      "bug",
+      "enhancement",
+      "A closed issue is re-opened",
+    ]);
+    const filters = screen.getByRole("group", { name: "Filters" });
+    expect(within(filters).getByRole("checkbox", { name: "Author is a repository collaborator" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "superplane" })).not.toBeChecked();
+    expect(screen.getByText("Default SuperPlane label")).toBeInTheDocument();
+    expect(screen.getByText("Other labels")).toBeInTheDocument();
+    expect(screen.getByTestId("intake-label-options")).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Create task when:" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "A new issue is opened" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "A closed issue is re-opened" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: 'The "superplane" label is added to the issue' })).toBeChecked();
-    expect(screen.getByRole("group", { name: "Filters" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Issue has one of these labels" })).not.toBeChecked();
-    expect(screen.queryByTestId("intake-label-options")).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Author is a repository collaborator" })).not.toBeChecked();
+    expect(
+      screen.queryByRole("checkbox", { name: 'The "superplane" label is added to the issue' }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "General" })).toHaveAttribute("data-state", "active");
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["General", "Automation"]);
     expect(screen.queryByTestId("intake-settings-tab-agent")).not.toBeInTheDocument();
@@ -263,11 +276,11 @@ describe("IntakeSourceSettingsPopup", () => {
 
   it("offers the labels that exist in the repository", async () => {
     const user = userEvent.setup();
-    renderPopup({ labelOptions: ["bug", "needs design"] });
-
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
+    renderPopup({ labelOptions: ["bug", "superplane", "needs design"] });
 
     const options = screen.getByTestId("intake-label-options");
+    expect(screen.getAllByRole("checkbox", { name: "superplane" })).toHaveLength(1);
+    expect(within(options).queryByRole("checkbox", { name: "superplane" })).not.toBeInTheDocument();
     expect(within(options).getByRole("checkbox", { name: "bug" })).not.toBeChecked();
     expect(within(options).getByRole("checkbox", { name: "needs design" })).not.toBeChecked();
 
@@ -275,20 +288,17 @@ describe("IntakeSourceSettingsPopup", () => {
     expect(within(options).getByRole("checkbox", { name: "bug" })).toBeChecked();
   });
 
-  it("reports when the repository has no labels", async () => {
-    const user = userEvent.setup();
+  it("reports when the repository has no labels", () => {
     renderPopup({ labelOptions: [] });
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
-
-    expect(screen.getByText("No labels found in the repository. Add a label name.")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "superplane" })).toBeInTheDocument();
+    expect(screen.getByText("No other labels in the repository. Add a label name.")).toBeInTheDocument();
   });
 
   it("keeps a label that the user types", async () => {
     const user = userEvent.setup();
     renderPopup();
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
     expect(screen.queryByRole("textbox", { name: "Issue label" })).not.toBeInTheDocument();
 
     await user.click(screen.getByTestId("intake-label-new"));
@@ -305,7 +315,6 @@ describe("IntakeSourceSettingsPopup", () => {
     const user = userEvent.setup();
     renderPopup();
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
     await user.click(screen.getByTestId("intake-label-new"));
     await user.type(screen.getByRole("textbox", { name: "Issue label" }), "needs-triage{Enter}");
 
@@ -316,7 +325,6 @@ describe("IntakeSourceSettingsPopup", () => {
     const user = userEvent.setup();
     renderPopup();
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
     await user.click(screen.getByTestId("intake-label-new"));
     await user.type(screen.getByRole("textbox", { name: "Issue label" }), "needs-triage");
     await user.click(screen.getByTestId("intake-label-cancel"));
@@ -392,7 +400,7 @@ describe("IntakeSourceSettingsPopup", () => {
     const user = userEvent.setup();
     renderPopup({ onSave, onClose });
 
-    await user.click(screen.getByRole("checkbox", { name: "Issue has one of these labels" }));
+    await user.click(screen.getByRole("checkbox", { name: "superplane" }));
     await user.click(within(screen.getByTestId("intake-label-options")).getByRole("checkbox", { name: "bug" }));
     await user.click(screen.getByRole("checkbox", { name: "A closed issue is re-opened" }));
     await user.click(screen.getByRole("checkbox", { name: "Author is a repository collaborator" }));
@@ -401,10 +409,11 @@ describe("IntakeSourceSettingsPopup", () => {
     await waitFor(() =>
       expect(onSave).toHaveBeenCalledWith({
         ...DEFAULT_GITHUB_INTAKE_SETTINGS,
-        labels: ["bug"],
+        labels: ["superplane", "bug"],
         filterByLabel: true,
         reopenedIssues: false,
-        authorsWithAccess: true,
+        authorsWithAccess: false,
+        superplaneLabelAdded: true,
       }),
     );
     expect(onClose).toHaveBeenCalledTimes(1);
