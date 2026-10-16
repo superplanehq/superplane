@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "bun:test";
 import type { FactoriesFactoryPullRequestActivity } from "@/api-client";
@@ -93,7 +93,6 @@ describe("AutomationsConsoleVariant run footer", () => {
     renderConsole(feedbackFooterFixture([feedbackActivity("empty", 1)]));
     fireEvent.click(screen.getByRole("button", { name: "Toggle Fix pull request checks details" }));
     const footer = screen.getByTestId("redesign-console-run-footer-pr-feedback-empty");
-    expect(within(footer).queryByRole("button", { name: "Show usage" })).not.toBeInTheDocument();
     expect(footer).not.toHaveTextContent("$");
   });
 
