@@ -47,16 +47,12 @@ pull_dir="$(mktemp -d)"
 inspect_error="$(mktemp)"
 trap 'rm -rf "${pull_dir}"; rm -f "${inspect_error}"' EXIT
 if helm pull "${CHART_REPOSITORY}" --version "${CHART_VERSION}" --destination "${pull_dir}" 2>"${inspect_error}"; then
-  if ! cmp -s "${CHART_ARCHIVE}" "${pull_dir}/superplane-chart-${CHART_VERSION}.tgz"; then
-    echo "Error: chart version ${CHART_VERSION} already contains different content" >&2
-    exit 1
-  fi
   digest="$(public_digest)"
   if [[ ! "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
     echo "Error: registry did not return a valid chart digest" >&2
     exit 1
   fi
-  echo "* Reusing matching chart version ${CHART_VERSION}" >&2
+  echo "* Reusing existing chart version ${CHART_VERSION}" >&2
   printf '%s\n' "${digest}"
   exit 0
 fi

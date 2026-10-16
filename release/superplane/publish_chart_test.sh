@@ -27,7 +27,7 @@ case "$1 $2" in
     fi
     cp "${REMOTE_CHART}" "${destination}/superplane-chart-1.2.3-rc1.tgz"
     ;;
-  "push "*) printf 'Digest: sha256:%064d\n' 1 ;;
+  "push "*) printf 'push\n' >>"${PUSH_LOG}"; printf 'Digest: sha256:%064d\n' 1 ;;
   *) echo "unexpected helm invocation: $*" >&2; exit 1 ;;
 esac
 SHIM
@@ -46,6 +46,7 @@ chmod +x "${TMP_DIR}/helm" "${TMP_DIR}/curl"
 
 export PATH="${TMP_DIR}:${PATH}"
 export PULL_COUNT="${TMP_DIR}/pull-count"
+export PUSH_LOG="${TMP_DIR}/push.log"
 export REMOTE_CHART="${TMP_DIR}/remote.tgz"
 cp "${TMP_DIR}/superplane-1.2.3-rc1.tgz" "${REMOTE_CHART}"
 
@@ -55,11 +56,11 @@ grep -Eq '^sha256:[0-9a-f]{64}$' "${TMP_DIR}/digest"
 
 printf 'different' >"${REMOTE_CHART}"
 : >"${PULL_COUNT}"
-if PULL_MODE=existing bash "${SCRIPT_DIR}/publish-chart.sh" \
-  v1.2.3-rc1 "${TMP_DIR}/superplane-1.2.3-rc1.tgz" >/dev/null 2>&1; then
-  echo "A conflicting chart must fail" >&2
-  exit 1
-fi
+: >"${PUSH_LOG}"
+PULL_MODE=existing bash "${SCRIPT_DIR}/publish-chart.sh" \
+  v1.2.3-rc1 "${TMP_DIR}/superplane-1.2.3-rc1.tgz" >"${TMP_DIR}/digest"
+grep -Eq '^sha256:[0-9a-f]{64}$' "${TMP_DIR}/digest"
+test ! -s "${PUSH_LOG}"
 
 cp "${TMP_DIR}/superplane-1.2.3-rc1.tgz" "${REMOTE_CHART}"
 : >"${PULL_COUNT}"
