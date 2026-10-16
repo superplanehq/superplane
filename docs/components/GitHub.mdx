@@ -391,7 +391,7 @@ The On Issue trigger starts a workflow execution when issue events occur in a Gi
 - **Label filter**: Optional. Include starts a run when the issue has one of the labels. Exclude starts a run when the issue has none of those labels.
 - **Assignment**: Optional. Start a run only for assigned issues, only for unassigned issues, or for any assignment.
 - **Author is a repository collaborator**: Optional. Start a run only when the author can access the repository.
-- **The "superplane" label is added to the issue**: Optional. For a labeled event, start a run only when that label is added to an open issue.
+- **The configured label is added to the issue**: Optional. For a labeled event, start a run only when the configured label, or "superplane" when none is set, is added to an open issue. With the label filter set to include, adding any listed label counts.
 
 ### Event Data
 
