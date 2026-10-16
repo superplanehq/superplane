@@ -86,6 +86,18 @@ TEST_MODE=old-revision bash "${SCRIPT_DIR}/verify-image.sh" \
   ghcr.io/superplanehq/superplane:v1.2.3-amd64 \
   ghcr.io/superplanehq/superplane:v1.2.3-arm64 >/dev/null
 
+if TEST_MODE=ok bash "${SCRIPT_DIR}/verify-image.sh" \
+  ghcr.io/superplanehq/superplane:v1.2.3 \
+  v9.9.9 \
+  cccccccccccccccccccccccccccccccccccccccc \
+  ghcr.io/superplanehq/superplane:v1.2.3-amd64 \
+  ghcr.io/superplanehq/superplane:v1.2.3-arm64 \
+  >/dev/null 2>"${TMP_DIR}/stderr"; then
+  echo "Image labels for the wrong version must fail" >&2
+  exit 1
+fi
+grep -q 'labels do not match v9.9.9' "${TMP_DIR}/stderr"
+
 if TEST_MODE=missing-arm64 bash "${SCRIPT_DIR}/verify-image.sh" \
   ghcr.io/superplanehq/superplane:v1.2.3 \
   v1.2.3 \

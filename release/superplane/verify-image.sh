@@ -31,14 +31,18 @@ for architecture in amd64 arm64; do
     --override-arch "${architecture}" \
     --format '{{json .Labels}}' \
     "docker://${IMAGE}")"
-  jq -e \
+  if ! jq -e \
     --arg version "${VERSION}" \
     '."org.opencontainers.image.source" == "https://github.com/superplanehq/superplane" and
      ."org.opencontainers.image.version" == $version' \
-    <<<"${labels}" >/dev/null
+    <<<"${labels}" >/dev/null; then
+    echo "Error: ${IMAGE} linux/${architecture} labels do not match ${VERSION}" >&2
+    printf '%s\n' "${labels}" >&2
+    exit 1
+  fi
   revision="$(jq -r '."org.opencontainers.image.revision"' <<<"${labels}")"
   if [ "${revision}" != "${SOURCE_SHA}" ]; then
-    echo "* Keeping existing linux/${architecture} revision ${revision}"
+    echo "* Keeping existing linux/${architecture} revision ${revision}" >&2
   fi
 done
 
@@ -57,4 +61,4 @@ for source in "${AMD64_SOURCE}" "${ARM64_SOURCE}"; do
   done < <(jq -r '.manifests[].digest' <<<"${source_manifest}")
 done
 
-echo "SuperPlane image ${IMAGE} verified."
+echo "SuperPlane image ${IMAGE} verified." >&2
