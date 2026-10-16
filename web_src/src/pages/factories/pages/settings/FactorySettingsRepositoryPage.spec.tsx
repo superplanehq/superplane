@@ -104,6 +104,8 @@ describe("FactorySettingsRepositoryPage", () => {
     try {
       const branch = await within(settings).findByTestId("factory-settings-default-branch");
       await user.click(branch);
+      await user.type(await screen.findByPlaceholderText("Find a branch"), "dev");
+      expect(screen.queryByRole("option", { name: "main" })).not.toBeInTheDocument();
       await user.click(await screen.findByRole("option", { name: "develop" }));
       const saveButton = within(settings).getByTestId("factory-settings-repository-save");
       await waitFor(() => expect(saveButton).toBeEnabled());

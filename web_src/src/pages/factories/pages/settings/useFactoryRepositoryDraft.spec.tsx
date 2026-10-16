@@ -1,14 +1,15 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "bun:test";
 
-const { resolveGithubDefaultBranch, showErrorToast } = vi.hoisted(() => ({
+const { resolveGithubDefaultBranch, showErrorToast, integrationResources } = vi.hoisted(() => ({
   resolveGithubDefaultBranch: vi.fn(),
   showErrorToast: vi.fn(),
+  integrationResources: vi.fn(() => ({ data: [{ name: "main" }, { name: "develop" }] })),
 }));
 
 vi.mock("@/hooks/useIntegrations", () => ({
   resolveGithubDefaultBranch,
-  useIntegrationResources: () => ({ data: [{ name: "main" }, { name: "develop" }] }),
+  useIntegrationResources: () => integrationResources(),
 }));
 
 vi.mock("@/lib/toast", () => ({
@@ -31,6 +32,29 @@ describe("useFactoryRepositoryDraft", () => {
   beforeEach(() => {
     resolveGithubDefaultBranch.mockReset();
     showErrorToast.mockReset();
+    integrationResources.mockReset();
+    integrationResources.mockReturnValue({ data: [{ name: "main" }, { name: "develop" }] });
+  });
+
+  it("lists common default branches before the other branches", () => {
+    integrationResources.mockReturnValue({
+      data: ["feature/login", "dev", "zebra", "master", "bugfix", "Develop", "Main", "trunk"].map((name) => ({
+        name,
+      })),
+    });
+
+    const { result } = renderHook(() => useFactoryRepositoryDraft(draftArgs({ savedBranch: "feature/login" })));
+
+    expect(result.current.branchChoices).toEqual([
+      "Main",
+      "master",
+      "Develop",
+      "dev",
+      "trunk",
+      "bugfix",
+      "feature/login",
+      "zebra",
+    ]);
   });
 
   it("keeps the latest repository branch when an older lookup finishes last", async () => {

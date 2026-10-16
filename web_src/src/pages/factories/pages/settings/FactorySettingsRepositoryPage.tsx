@@ -1,13 +1,16 @@
 import { PermissionTooltip } from "@/components/PermissionGate";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { Check, ChevronDown } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { RepositoryPicker } from "../onboarding/onboardingSteps";
 import type { VcsHostId } from "../onboarding/onboardingFixtures";
-import type { ReactNode } from "react";
 
 import { FactorySettingsCard, FactorySettingsPageFrame } from "./FactorySettingsCard";
 import { useFactorySettingsLayout } from "./factorySettingsLayoutContext";
@@ -136,7 +139,6 @@ function DefaultBranchField(props: {
     <div className="mt-4 space-y-2">
       <Label htmlFor={BRANCH_FIELD_ID}>Default branch</Label>
       <DefaultBranchControl {...props} />
-      <p className="text-[12px] text-muted-foreground">New tasks use this branch. Started tasks keep their branch.</p>
     </div>
   );
 }
@@ -149,20 +151,7 @@ function DefaultBranchControl(props: {
   onChange: (branch: string) => void;
 }) {
   if (props.listedBranchNames.length > 0) {
-    return (
-      <Select value={props.branch || undefined} onValueChange={props.onChange} disabled={props.disabled}>
-        <SelectTrigger id={BRANCH_FIELD_ID} className="w-full" data-testid={BRANCH_FIELD_ID}>
-          <SelectValue placeholder="Select a branch" />
-        </SelectTrigger>
-        <SelectContent>
-          {props.choices.map((name) => (
-            <SelectItem key={name} value={name}>
-              {name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    );
+    return <BranchPicker {...props} />;
   }
   return (
     <Input
@@ -172,5 +161,55 @@ function DefaultBranchControl(props: {
       onChange={(event) => props.onChange(event.target.value)}
       data-testid={BRANCH_FIELD_ID}
     />
+  );
+}
+
+function BranchPicker(props: {
+  branch: string;
+  choices: string[];
+  disabled: boolean;
+  onChange: (branch: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectBranch = (name: string) => {
+    props.onChange(name);
+    setOpen(false);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          id={BRANCH_FIELD_ID}
+          role="combobox"
+          aria-expanded={open}
+          disabled={props.disabled}
+          data-testid={BRANCH_FIELD_ID}
+          className="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-2.5 text-sm shadow-xs outline-none focus-visible:border-gray-500 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600/70 dark:bg-gray-800 dark:text-gray-100"
+        >
+          <span className={cn("truncate", props.branch ? "text-foreground" : "text-muted-foreground")}>
+            {props.branch || "Select a branch"}
+          </span>
+          <ChevronDown className="size-4 shrink-0 opacity-50" aria-hidden />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+        <Command>
+          <CommandInput placeholder="Find a branch" autoFocus />
+          <CommandList>
+            <CommandEmpty>No branch found.</CommandEmpty>
+            <CommandGroup>
+              {props.choices.map((name) => (
+                <CommandItem key={name} value={name} onSelect={() => selectBranch(name)}>
+                  <span className="min-w-0 flex-1 truncate">{name}</span>
+                  <Check className={cn("size-4", name === props.branch ? "opacity-100" : "opacity-0")} aria-hidden />
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
