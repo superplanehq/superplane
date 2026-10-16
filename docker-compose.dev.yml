@@ -85,6 +85,7 @@ services:
       # in .env to test rotation with another key.
       ENCRYPTION_MASTER_KEYS: ${ENCRYPTION_MASTER_KEYS:-env://dev-v1:MTIzNDU2Nzg5MGFiY2RlZmdoaWprbG1ub3BxcnN0dXY=}
       ENCRYPTION_LEGACY_FORMAT: ${ENCRYPTION_LEGACY_FORMAT:-plaintext}
+      ENCRYPTION_WRITE_FORMAT: ${ENCRYPTION_WRITE_FORMAT:-versioned}
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
       OIDC_KEYS_PATH: /app/test/fixtures/oidc-keys
       SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
