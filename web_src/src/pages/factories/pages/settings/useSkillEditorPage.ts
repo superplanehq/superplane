@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import type { FactoriesFactoryAgentResource } from "@/api-client";
@@ -16,7 +16,12 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
 import { factoryAgentPath, factoryRouteSegment } from "../../lib/factoryPagePaths";
 import { AGENT_RESOURCES_COPY } from "./agentResourceCopy";
-import { sanitizeSkillCommandName, setSkillFrontmatterFields, skillDisplayTitle } from "./skillFrontmatter";
+import {
+  sanitizeSkillCommandName,
+  setSkillFrontmatterFields,
+  skillDisplayTitle,
+  skillFrontmatterField,
+} from "./skillFrontmatter";
 
 const NAME_PATTERN = /^[a-z][a-z0-9-]{0,62}$/;
 const RESERVED_NAME = "superplane";
@@ -57,52 +62,16 @@ export function useSkillEditorPage() {
   const createResource = useCreateFactoryAgentResource(organizationId, factoryId);
   const updateResource = useUpdateFactoryAgentResource(organizationId, factoryId);
   const deleteResource = useDeleteFactoryAgentResource(organizationId, factoryId);
-  const [name, setName] = useState("");
-  const [markdown, setMarkdown] = useState("");
-  const [storedCommand, setStoredCommand] = useState("");
-  const [nameTouched, setNameTouched] = useState(false);
-  const [draftKey, setDraftKey] = useState("");
   const [nameError, setNameError] = useState("");
   const [markdownError, setMarkdownError] = useState("");
   const [pendingDelete, setPendingDelete] = useState(false);
   const listPath = factoryAgentPath(organizationId, factoryRouteSegment(factory));
-  const nextDraftKey = isCreate ? "new" : (resource?.id ?? "");
-
-  useEffect(() => {
-    if (!isCreate && !resource) {
-      return;
-    }
-    if (!nextDraftKey || draftKey === nextDraftKey) {
-      return;
-    }
-    if (isCreate) {
-      setName("");
-      setStoredCommand("");
-      setNameTouched(false);
-      setMarkdown(EMPTY_SKILL_MARKDOWN);
-      setDraftKey("new");
-      return;
-    }
-    if (!resource) {
-      return;
-    }
-    setName(skillDisplayTitle(resource));
-    setStoredCommand((resource.name ?? "").trim());
-    setNameTouched(false);
-    setMarkdown(resource.markdown ?? "");
-    setDraftKey(nextDraftKey);
-  }, [isCreate, resource, nextDraftKey, draftKey]);
-
+  const draft = useSkillEditorDraft(isCreate, resource);
   const restoration = useSkillRestore(organizationId, factoryId, resource, (restored) => {
-    setName(skillDisplayTitle(restored));
-    setStoredCommand(restored.name ?? "");
-    setNameTouched(false);
-    setMarkdown(restored.markdown ?? "");
+    draft.replaceDraft(restored);
     setNameError("");
     setMarkdownError("");
   });
-
-  const commandName = skillCommandForSave(name, storedCommand, nameTouched);
 
   return {
     isCreate,
@@ -110,31 +79,29 @@ export function useSkillEditorPage() {
     canUpdate,
     resource,
     skillsLoading: skills.isLoading,
-    name,
-    markdown,
+    name: draft.name,
+    markdown: draft.markdown,
     nameError,
     markdownError,
     pendingDelete,
     ...restoration,
     listPath,
-    commandName,
-    command: commandName ? `/${commandName}` : "/",
+    commandName: draft.commandName,
+    command: draft.command,
     isSaving: createResource.isPending || updateResource.isPending,
     isDeleting: deleteResource.isPending,
-    setName: (value: string) => {
-      setNameTouched(true);
-      setNameAndFrontmatter(value, setName, setMarkdown);
-    },
-    setMarkdown,
+    setName: draft.setName,
+    setMarkdown: draft.setMarkdown,
     setPendingDelete,
     navigateToList: () => navigate(listPath),
     handleSave: () =>
       saveSkill({
-        commandName,
-        title: name.trim(),
-        markdown,
+        commandName: draft.commandName,
+        title: draft.name.trim(),
+        markdown: draft.markdown,
         taken: Boolean(
-          commandName && skills.data?.some((entry) => entry.id !== resource?.id && entry.name === commandName),
+          draft.commandName &&
+            skills.data?.some((entry) => entry.id !== resource?.id && entry.name === draft.commandName),
         ),
         resourceId: resource?.id,
         listPath,
@@ -153,6 +120,67 @@ export function useSkillEditorPage() {
         showErrorToast(getApiErrorMessage(error, AGENT_RESOURCES_COPY.skillUpdateFailed));
       });
     },
+  };
+}
+
+function useSkillEditorDraft(isCreate: boolean, resource: FactoriesFactoryAgentResource | undefined) {
+  const [name, setName] = useState("");
+  const [markdown, setMarkdown] = useState("");
+  const [storedCommand, setStoredCommand] = useState("");
+  const [nameTouched, setNameTouched] = useState(false);
+  const [draftKey, setDraftKey] = useState("");
+  const markdownRef = useRef("");
+  const frontmatterRef = useRef<SkillNameFields>({ name: "", title: "" });
+  const writeSkillMarkdown = useCallback((next: string | ((current: string) => string)) => {
+    const value = typeof next === "function" ? next(markdownRef.current) : next;
+    markdownRef.current = value;
+    frontmatterRef.current = readSkillNameFields(value);
+    setMarkdown(value);
+  }, []);
+  const setMarkdownFromEditor = useCallback(
+    (value: string) => {
+      const previous = frontmatterRef.current;
+      writeSkillMarkdown(value);
+      adoptChangedSkillName(previous, frontmatterRef.current, (nextName, command) => {
+        setName(nextName);
+        setStoredCommand(command);
+        setNameTouched(false);
+      });
+    },
+    [writeSkillMarkdown],
+  );
+  const replaceDraft = useCallback(
+    (next: FactoriesFactoryAgentResource) => {
+      setName(skillDisplayTitle(next));
+      setStoredCommand(next.name ?? "");
+      setNameTouched(false);
+      writeSkillMarkdown(next.markdown ?? "");
+    },
+    [writeSkillMarkdown],
+  );
+
+  useEffect(() => {
+    syncLoadedSkillDraft(isCreate, resource, draftKey, {
+      setName,
+      setStoredCommand,
+      setNameTouched,
+      setDraftKey,
+      writeSkillMarkdown,
+    });
+  }, [isCreate, resource, draftKey, writeSkillMarkdown]);
+
+  const commandName = skillCommandForSave(name, storedCommand, nameTouched);
+  return {
+    name,
+    markdown,
+    commandName,
+    command: commandName ? `/${commandName}` : "/",
+    setName: (value: string) => {
+      setNameTouched(true);
+      setNameAndFrontmatter(value, setName, writeSkillMarkdown);
+    },
+    setMarkdown: setMarkdownFromEditor,
+    replaceDraft,
   };
 }
 
@@ -185,6 +213,82 @@ function useSkillRestore(
       }
     },
   };
+}
+
+function syncLoadedSkillDraft(
+  isCreate: boolean,
+  resource: FactoriesFactoryAgentResource | undefined,
+  draftKey: string,
+  writers: SkillDraftWriters,
+) {
+  const nextDraftKey = isCreate ? "new" : (resource?.id ?? "");
+  if ((!isCreate && !resource) || !nextDraftKey || draftKey === nextDraftKey) {
+    return;
+  }
+  if (isCreate) {
+    writers.setName("");
+    writers.setStoredCommand("");
+    writers.setNameTouched(false);
+    writers.writeSkillMarkdown(EMPTY_SKILL_MARKDOWN);
+    writers.setDraftKey("new");
+    return;
+  }
+  if (!resource) {
+    return;
+  }
+  writers.setName(skillDisplayTitle(resource));
+  writers.setStoredCommand((resource.name ?? "").trim());
+  writers.setNameTouched(false);
+  writers.writeSkillMarkdown(resource.markdown ?? "");
+  writers.setDraftKey(nextDraftKey);
+}
+
+function adoptChangedSkillName(
+  previous: SkillNameFields,
+  fields: SkillNameFields,
+  apply: (name: string, command: string) => void,
+) {
+  if (!skillNameFieldsChanged(previous, fields)) {
+    return;
+  }
+  const adopted = skillNameFromFile(fields);
+  if (!adopted) {
+    return;
+  }
+  apply(adopted.name, adopted.command);
+}
+
+type SkillDraftWriters = {
+  setName: (value: string) => void;
+  setStoredCommand: (value: string) => void;
+  setNameTouched: (value: boolean) => void;
+  setDraftKey: (value: string) => void;
+  writeSkillMarkdown: (value: string) => void;
+};
+
+type SkillNameFields = {
+  name: string;
+  title: string;
+};
+
+function readSkillNameFields(markdown: string): SkillNameFields {
+  return {
+    name: skillFrontmatterField(markdown, "name")?.trim() ?? "",
+    title: skillFrontmatterField(markdown, "title")?.trim() ?? "",
+  };
+}
+
+function skillNameFieldsChanged(previous: SkillNameFields, next: SkillNameFields): boolean {
+  return previous.name !== next.name || previous.title !== next.title;
+}
+
+function skillNameFromFile(fields: SkillNameFields): { name: string; command: string } | undefined {
+  if (!fields.name && !fields.title) {
+    return undefined;
+  }
+  const name = fields.title || fields.name;
+  const command = fields.name ? sanitizeSkillCommandName(fields.name) : sanitizeSkillCommandName(name);
+  return { name, command };
 }
 
 function setNameAndFrontmatter(

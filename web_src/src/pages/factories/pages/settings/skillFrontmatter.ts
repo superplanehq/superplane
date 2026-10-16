@@ -69,13 +69,32 @@ export function skillListDescription(resource: { markdown?: string; repository?:
 }
 
 function unescapeYamlScalar(value: string): string {
-  if (
-    (value.startsWith('"') && value.endsWith('"') && value.length >= 2) ||
-    (value.startsWith("'") && value.endsWith("'") && value.length >= 2)
-  ) {
-    return value.slice(1, -1);
+  const trimmed = value.trim();
+  const quoted = quotedYamlScalar(trimmed);
+  if (quoted !== undefined) {
+    return quoted;
   }
-  return value;
+  return plainYamlScalar(trimmed);
+}
+
+function quotedYamlScalar(value: string): string | undefined {
+  const quote = value[0];
+  if (quote !== '"' && quote !== "'") {
+    return undefined;
+  }
+  const end = value.indexOf(quote, 1);
+  if (end < 0) {
+    return undefined;
+  }
+  return value.slice(1, end);
+}
+
+function plainYamlScalar(value: string): string {
+  const commentStart = value.search(/(?:^|\s)#/);
+  if (commentStart < 0) {
+    return value;
+  }
+  return value.slice(0, commentStart).trim();
 }
 
 function yamlScalar(value: string): string {

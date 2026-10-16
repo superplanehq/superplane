@@ -48,6 +48,11 @@ describe("skillFrontmatterField", () => {
   it("strips quotes around YAML scalars", () => {
     expect(skillFrontmatterField('---\ntitle: "Oy Pirate!"\n---\n', "title")).toBe("Oy Pirate!");
   });
+
+  it("drops an inline comment and keeps a hash inside quotes", () => {
+    expect(skillFrontmatterField("---\nname: review-copy # command name\n---\n", "name")).toBe("review-copy");
+    expect(skillFrontmatterField('---\ntitle: "review # copy" # label\n---\n', "title")).toBe("review # copy");
+  });
 });
 
 describe("setSkillFrontmatterFields", () => {
