@@ -340,6 +340,24 @@ func TestAdminOrganizationCreditBalances(t *testing.T) {
 	})
 }
 
+func TestAdminOrganizationBillingPlanHiddenWhenBillingDisabled(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+	t.Setenv(models.BillingEnabledEnv, "no")
+	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"
+
+	for _, method := range []string{http.MethodGet, http.MethodPut} {
+		response := execRequest(server, requestParams{
+			method:      method,
+			path:        path,
+			authCookie:  token,
+			body:        []byte(`{"plan":"business"}`),
+			contentType: "application/json",
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code, method)
+		assert.Contains(t, response.Body.String(), "Billing is not available")
+	}
+}
+
 func TestAdminOrganizationBillingPlan(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 	path := "/admin/api/organizations/" + r.Organization.ID.String() + "/billing-plan"

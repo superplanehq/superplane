@@ -552,6 +552,10 @@ func (s *Server) adminUpdateOrganizationLLMMarkup(w http.ResponseWriter, r *http
 }
 
 func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
+	if !models.BillingEnabled() {
+		http.Error(w, "Billing is not available", http.StatusNotFound)
+		return
+	}
 	orgID, ok := parseAdminOrgID(w, r)
 	if !ok {
 		return
@@ -569,6 +573,10 @@ func (s *Server) adminGetOrganizationBillingPlan(w http.ResponseWriter, r *http.
 }
 
 func (s *Server) adminSetOrganizationBillingPlan(w http.ResponseWriter, r *http.Request) {
+	if !models.BillingEnabled() {
+		http.Error(w, "Billing is not available", http.StatusNotFound)
+		return
+	}
 	orgID, ok := parseAdminOrgID(w, r)
 	if !ok {
 		return

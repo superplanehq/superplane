@@ -51,6 +51,7 @@ export function SpendingUsageSection({
   filters,
   breakdown,
   report,
+  billingEnabled = true,
   onChange,
   onBreakdownChange,
 }: {
@@ -59,10 +60,11 @@ export function SpendingUsageSection({
   filters: SpendingFilters;
   breakdown: SpendingBreakdown;
   report: SpendingReport;
+  billingEnabled?: boolean;
   onChange: (filters: SpendingFilters) => void;
   onBreakdownChange: (value: SpendingBreakdown) => void;
 }) {
-  const copy = spendingUsageCopy(kind);
+  const copy = spendingUsageCopy(kind, billingEnabled);
   const prefix = copy.testIdPrefix;
   const visibleReport = narrowSpendingReport(report, filters, breakdown);
   const empty = visibleReport.totals.costCents === 0;
@@ -277,13 +279,19 @@ export function SpendingKpiRow({
   metrics,
   credit,
   rangeCaption,
+  billingEnabled,
 }: {
   metrics: { spend: string; tokens: string; duration: string; hosted: string; byok: string };
   credit: SpendingCreditSnapshot;
   rangeCaption: string;
+  billingEnabled: boolean;
 }) {
+  const showCredit = billingEnabled;
+
   return (
-    <div className={`grid gap-3 sm:grid-cols-2 xl:grid-cols-4 ${factoryCardClassName} p-4`}>
+    <div
+      className={`grid gap-3 sm:grid-cols-2 ${showCredit ? "xl:grid-cols-4" : "xl:grid-cols-3"} ${factoryCardClassName} p-4`}
+    >
       <SpendingKpi
         label="SuperPlane-hosted spend"
         value={metrics.hosted}
@@ -297,12 +305,14 @@ export function SpendingKpiRow({
         testId="spending-kpi-byok"
       />
       <SpendingKpi label="VM time" value={metrics.duration} hint="SuperPlane runner fleets" testId="spending-kpi-vm" />
-      <SpendingKpi
-        label="Remaining hosted credit"
-        value={formatUsdCents(credit.remainingCreditCents)}
-        hint="Organization wallet"
-        testId="spending-kpi-credit"
-      />
+      {showCredit ? (
+        <SpendingKpi
+          label="Remaining hosted credit"
+          value={formatUsdCents(credit.remainingCreditCents)}
+          hint="Organization wallet"
+          testId="spending-kpi-credit"
+        />
+      ) : null}
     </div>
   );
 }

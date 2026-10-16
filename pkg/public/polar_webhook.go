@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/billing/polar"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
@@ -35,6 +36,10 @@ func (s *Server) handlePolarWebhook(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.WithError(err).Warn("rejected polar webhook payload")
 		http.Error(w, "invalid webhook payload", http.StatusBadRequest)
+		return
+	}
+	if !models.BillingEnabled() {
+		acceptPolarWebhook(w)
 		return
 	}
 	if event.APIVersionMismatch() {

@@ -87,3 +87,56 @@ func TestSetupOwnerIgnoresInstallationSettings(t *testing.T) {
 	require.Empty(t, fleets)
 	assert.True(t, organization.HasExperimentalFeature(features.FeatureNewRunners))
 }
+
+func TestSetupOwnerSkipsWelcomeCreditWhenBillingDisabled(t *testing.T) {
+	middleware.ResetOwnerSetupStateForTests()
+	t.Setenv(models.BillingEnabledEnv, "no")
+	t.Setenv("BASE_URL", "http://localhost:8000")
+
+	r := support.Setup(t)
+	require.NoError(t, database.TruncateTables())
+
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		jwt.NewSigner("test-client-secret"),
+		support.NewOIDCProvider(),
+		"",
+		"",
+		"",
+		"test",
+		"/app/templates",
+		r.AuthService, false,
+	)
+	require.NoError(t, err)
+
+	body, err := json.Marshal(map[string]any{
+		"email":      "owner@example.com",
+		"first_name": "Owner",
+		"last_name":  "User",
+		"password":   "Password1",
+	})
+	require.NoError(t, err)
+
+	response := execRequest(server, requestParams{
+		method:      http.MethodPost,
+		path:        "/api/v1/setup-owner",
+		body:        body,
+		contentType: "application/json",
+	})
+	assert.Equal(t, http.StatusOK, response.Code)
+
+	organization, err := models.FindOrganizationByName("Demo")
+	require.NoError(t, err)
+	credit, err := models.DescribeOrganizationLLMCredit(database.Conn(), organization.ID)
+	require.NoError(t, err)
+	assert.Zero(t, credit.GrantMicros)
+
+	plan, err := models.FindOrganizationBillingPlan(database.Conn(), organization.ID)
+	require.NoError(t, err)
+	assert.Nil(t, plan)
+
+	owner, err := models.FindAccountByEmail("owner@example.com")
+	require.NoError(t, err)
+	assert.False(t, owner.HasReceivedWelcomeCredit())
+}

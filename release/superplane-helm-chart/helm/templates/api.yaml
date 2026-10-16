@@ -176,6 +176,7 @@ spec:
               value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
             - name: SUPERPLANE_INSTALLATION_TYPE
               value: {{ .Values.installation.type | quote }}
+            {{- include "superplane.billingEnabledEnv" . | nindent 12 }}
 {{- if .Values.fleetManagerSetup.enabled }}
             - name: FLEET_MANAGER_SETUP_CONFIG_PATH
               value: /etc/superplane/fleet-manager-setup/setup.json

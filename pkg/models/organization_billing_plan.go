@@ -70,9 +70,25 @@ func (OrganizationBillingPlan) TableName() string {
 	return "organization_billing_plans"
 }
 
+// BillingEnabledEnv turns product billing on or off.
+// An empty or missing value is on. yes and true are on. no and false are off.
+const BillingEnabledEnv = "SUPERPLANE_BILLING_ENABLED"
+
+// BillingEnabled reports whether product billing is on.
+// An empty or missing value is on, so SuperPlane Cloud and local development
+// keep plans, credit limits, and checkout. A self-hosted install sets no.
+func BillingEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(BillingEnabledEnv))) {
+	case "no", "false":
+		return false
+	default:
+		return true
+	}
+}
+
 // HostedPlanGatesEnabled is true when Polar billing is configured.
 // pkg/models cannot import pkg/billing/polar, so this reads POLAR_ACCESS_TOKEN
-// the same way polar.Configured does.
+// the same way polar.Configured does. Product behavior also requires BillingEnabled.
 func HostedPlanGatesEnabled() bool {
 	return strings.TrimSpace(os.Getenv("POLAR_ACCESS_TOKEN")) != ""
 }
@@ -197,7 +213,7 @@ func EnsureOrganizationBillingPlan(tx *gorm.DB, orgID uuid.UUID) (*OrganizationB
 }
 
 func OrganizationBillingIsPolarManaged(plan *OrganizationBillingPlan) bool {
-	if !HostedPlanGatesEnabled() {
+	if !BillingEnabled() || !HostedPlanGatesEnabled() {
 		return false
 	}
 	return polarPaidAccessContinues(plan, time.Now())

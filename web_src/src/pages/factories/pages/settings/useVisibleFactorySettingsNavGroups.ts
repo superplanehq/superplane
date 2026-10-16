@@ -1,8 +1,13 @@
 import { usePermissions } from "@/contexts/usePermissions";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+import { useBillingProductEnabled } from "@/hooks/useBillingProductEnabled";
 import { FEATURE_ORGANIZATION_BYOK, FEATURE_SUPERPLANE_MCP_SERVER } from "@/lib/experimentalFeatures";
 
-import { type FactorySettingsNavGroup, filterFactorySettingsNavGroupsByPermission } from "./settingsNavItems";
+import {
+  type FactorySettingsNavGroup,
+  filterFactorySettingsNavGroupsByPermission,
+  omitFactorySettingsBillingItem,
+} from "./settingsNavItems";
 import { useFactorySettingsNavGroups } from "./useFactorySettingsNavGroups";
 
 /** Nav item id for the SuperPlane MCP Server (inbound MCP clients). */
@@ -47,8 +52,11 @@ export function useVisibleFactorySettingsNavGroups(organizationId: string): Fact
   const settingsNavGroups = useFactorySettingsNavGroups();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  return visibleFactorySettingsNavGroups(
-    filterFactorySettingsNavGroupsByPermission(settingsNavGroups, canAct, permissionsLoading),
-    hasExperimentalFeature,
-  );
+  const billingProductEnabled = useBillingProductEnabled();
+  const permitted = filterFactorySettingsNavGroupsByPermission(settingsNavGroups, canAct, permissionsLoading);
+  const visible = visibleFactorySettingsNavGroups(permitted, hasExperimentalFeature);
+  if (billingProductEnabled) {
+    return visible;
+  }
+  return omitFactorySettingsBillingItem(visible);
 }
