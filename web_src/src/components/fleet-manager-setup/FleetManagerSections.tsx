@@ -126,9 +126,14 @@ export function FleetManagerFleetSection({
       </div>
       <div className="mt-5 max-w-xs">
         <Label htmlFor="runner-version">Runner version</Label>
-        <Select value={draft.runnerVersion} onValueChange={setup.setRunnerVersion}>
+        <Select
+          value={draft.runnerVersion}
+          onValueChange={(version) => {
+            if (metadata.runnerVersions.includes(version)) setup.setRunnerVersion(version);
+          }}
+        >
           <SelectTrigger id="runner-version" className="mt-1.5 w-full">
-            <SelectValue />
+            <SelectValue placeholder="Select a version">{draft.runnerVersion || undefined}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {metadata.runnerVersions.map((version) => (
