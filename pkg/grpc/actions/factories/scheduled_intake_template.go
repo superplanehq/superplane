@@ -46,9 +46,6 @@ func scheduledIntakeCanvas(db *gorm.DB, factory *models.Factory, name string, pa
 		return nil, invalidArgument("Connect a repository in workspace setup before you add scheduled intake.")
 	}
 	provider := config.EffectiveVCSProvider()
-	if err := requireBitbucketWorkspace(db, factory.OrganizationID, provider); err != nil {
-		return nil, err
-	}
 	agent := resolveIntakeAgent(db, factory)
 	if agent == nil {
 		return nil, invalidArgument("Connect an agent or configure SuperPlane-hosted models before you add scheduled intake.")

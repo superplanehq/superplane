@@ -143,6 +143,7 @@ import { useSplitRunFooterCloser } from "./work-order-split-run/useSplitRunFoote
 import {
   factoryAppConfigurePath,
   factoryAppRunPath,
+  factoryColumnAutomationViewPath,
   factoryDatadogIntakeSetupPath,
   factoryDependabotIntakeSetupPath,
   factoryHomePath,
@@ -679,12 +680,7 @@ export function LinesPage() {
           onClose={() => setScheduledIntakeOpen(false)}
           onCreated={(canvasId) => {
             setScheduledIntakeOpen(false);
-            navigate(
-              factoryAppConfigurePath(organizationId, routeSegment, canvasId, {
-                from: "lines",
-                lineId: selectedLine.id,
-              }),
-            );
+            navigate(factoryColumnAutomationViewPath(organizationId, routeSegment, selectedLine.id, canvasId));
           }}
         />
       ) : null}
