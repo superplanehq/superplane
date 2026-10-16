@@ -107,20 +107,37 @@ const fleetManagerMetadata = {
   },
 };
 
-function stubOwnerSetupFetch() {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith("/api/v1/setup-owner") && init?.method === "POST") {
-        return jsonResponse({ organization_id: "org-1", organization_slug: "acme" });
-      }
-      if (url.endsWith("/admin/api/installation/fleet-manager/setup")) {
-        return jsonResponse(fleetManagerMetadata);
-      }
-      return new Response("", { status: 404 });
-    }),
-  );
+interface OwnerSetupFetchStubs {
+  status?: unknown;
+  account?: { status: number; body?: unknown };
+  organizations?: unknown;
+}
+
+function stubAccountResponse(stubs: OwnerSetupFetchStubs) {
+  const account = stubs.account ?? { status: 401 };
+  if (account.status !== 200) {
+    return new Response("", { status: account.status });
+  }
+  return jsonResponse(account.body ?? { email: "ada@example.com", installation_admin: true });
+}
+
+function stubOwnerSetupFetch(stubs: OwnerSetupFetchStubs = {}) {
+  const routes: Array<[string, () => Response]> = [
+    ["/api/v1/setup-owner/status", () => jsonResponse(stubs.status ?? { status: "required" })],
+    ["/api/v1/setup-owner/progress", () => jsonResponse({})],
+    ["/api/v1/setup-owner", () => jsonResponse({ organization_id: "org-1", organization_slug: "acme" })],
+    ["/account", () => stubAccountResponse(stubs)],
+    ["/organizations", () => jsonResponse(stubs.organizations ?? [])],
+    ["/admin/api/installation/fleet-manager/setup", () => jsonResponse(fleetManagerMetadata)],
+  ];
+
+  const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const url = String(input);
+    const route = routes.find(([suffix]) => url.endsWith(suffix));
+    return route ? route[1]() : new Response("", { status: 404 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
 
 function renderOwnerSetup() {
@@ -132,7 +149,7 @@ function renderOwnerSetup() {
 }
 
 async function reachFleetStep() {
-  fireEvent.change(screen.getByPlaceholderText("First name"), { target: { value: "Ada" } });
+  fireEvent.change(await screen.findByPlaceholderText("First name"), { target: { value: "Ada" } });
   fireEvent.change(screen.getByPlaceholderText("Last name"), { target: { value: "Lovelace" } });
   fireEvent.change(screen.getByPlaceholderText("you@example.com"), { target: { value: "ada@example.com" } });
   fireEvent.change(screen.getByPlaceholderText("Password"), { target: { value: "Secret1x" } });
@@ -170,17 +187,18 @@ describe("OwnerSetup", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows the gold arrow preview without onboarding labels", () => {
+  it("shows the gold arrow preview without onboarding labels", async () => {
+    stubOwnerSetupFetch();
     renderOwnerSetup();
 
+    expect(await screen.findByRole("heading", { name: "Create the owner account" })).toBeInTheDocument();
     expectOwnerSetupPreview();
     expect(screen.queryByTestId("first-run-signed-in")).not.toBeInTheDocument();
     expect(screen.queryByTestId("first-run-log-out")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Create the owner account" })).toBeInTheDocument();
   });
 
   it("reaches workspace setup when SMTP and Fleet Manager are skipped", async () => {
-    stubOwnerSetupFetch();
+    const fetchMock = stubOwnerSetupFetch();
     renderOwnerSetup();
     await reachFleetStep();
 
@@ -191,6 +209,10 @@ describe("OwnerSetup", () => {
     fireEvent.click(screen.getByTestId("owner-setup-fleet-skip"));
 
     await waitFor(() => expect(window.location.href).toBe("/acme/workspaces/new"));
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/setup-owner/progress",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ step: "" }) }),
+    );
     expect(screen.queryByText(OWNER_SETUP_COPY.smtp.headline)).not.toBeInTheDocument();
   });
 
@@ -257,5 +279,52 @@ describe("OwnerSetup", () => {
       "survey sent",
       expect.objectContaining({ $survey_id: "owner-setup-survey", $survey_completed: true }),
     );
+  });
+
+  it("resumes the stored fleet step for the signed-in admin", async () => {
+    const replaceState = vi.spyOn(window.history, "replaceState");
+    stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "fleet-fleets" },
+      account: { status: 200 },
+      organizations: [{ slug: "acme" }],
+    });
+    renderOwnerSetup();
+
+    expect(await screen.findByRole("heading", { name: "Choose runner fleets" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Create the owner account" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("first-run-signed-in")).toHaveTextContent("ada@example.com");
+    expect(replaceState).toHaveBeenCalledWith(null, "", "/setup?step=fleet-fleets");
+  });
+
+  it("sends a signed-out admin in progress to sign in and back to setup", async () => {
+    stubOwnerSetupFetch({
+      status: { status: "in_progress", step: "smtp" },
+      account: { status: 401 },
+    });
+    renderOwnerSetup();
+
+    await waitFor(() => expect(window.location.href).toBe("/login?redirect=/setup"));
+    expect(screen.queryByRole("heading", { name: "Create the owner account" })).not.toBeInTheDocument();
+  });
+
+  it("sends a signed-in user away when setup is complete", async () => {
+    stubOwnerSetupFetch({
+      status: { status: "complete" },
+      account: { status: 200 },
+    });
+    renderOwnerSetup();
+
+    await waitFor(() => expect(window.location.href).toBe("/"));
+    expect(screen.queryByRole("heading", { name: "Create the owner account" })).not.toBeInTheDocument();
+  });
+
+  it("sends a signed-out user to login when setup is complete", async () => {
+    stubOwnerSetupFetch({
+      status: { status: "complete" },
+      account: { status: 401 },
+    });
+    renderOwnerSetup();
+
+    await waitFor(() => expect(window.location.href).toBe("/login"));
   });
 });

@@ -1,9 +1,10 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
 import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
 import { FLEET_MANAGER_WIZARD_STEPS, type FleetManagerWizardStep } from "@/lib/fleetManagerWizard";
 import { posthog, isPostHogEnabled } from "@/posthog";
 import { FirstRunShell } from "@/pages/factories/pages/onboarding/first-run/FirstRunShell";
+import type { FirstRunChrome } from "@/pages/factories/pages/onboarding/first-run/firstRunTypes";
 import type { FirstRunSphereProps } from "@/pages/factories/pages/onboarding/first-run/FirstRunSpherePane";
 import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
 import { FleetManagerStep } from "./ownerSetup/FleetManagerStep";
@@ -26,6 +27,118 @@ const OWNER_SETUP_PREVIEW: FirstRunSphereProps = {
 };
 
 type OwnerSetupStep = "owner" | "license" | "smtp" | "fleet-intro" | `fleet-${FleetManagerWizardStep}` | "survey";
+
+const RESUMABLE_STEPS: OwnerSetupStep[] = [
+  "license",
+  "smtp",
+  "fleet-intro",
+  "fleet-provider",
+  "fleet-fleets",
+  "fleet-install",
+];
+
+type SetupOwnerStatus = "disabled" | "required" | "in_progress" | "complete";
+
+interface SetupOwnerStatusResponse {
+  status: SetupOwnerStatus;
+  step?: string;
+}
+
+type OwnerSetupEntry =
+  | { kind: "redirect"; to: string }
+  | { kind: "owner" }
+  | { kind: "resume"; step: OwnerSetupStep; email: string; orgSlug: string };
+
+function isResumableStep(step: string | undefined): step is OwnerSetupStep {
+  return (RESUMABLE_STEPS as string[]).includes(step ?? "");
+}
+
+async function fetchSetupOwnerStatus(): Promise<SetupOwnerStatusResponse> {
+  const response = await fetch("/api/v1/setup-owner/status", { credentials: "include" });
+  if (!response.ok) {
+    throw new Error(`Failed to load setup status (${response.status})`);
+  }
+  return (await response.json()) as SetupOwnerStatusResponse;
+}
+
+async function fetchSignedInAccount(): Promise<{ email: string } | null> {
+  try {
+    const response = await fetch("/account", { credentials: "include" });
+    if (!response.ok) return null;
+    return (await response.json()) as { email: string };
+  } catch {
+    return null;
+  }
+}
+
+// The organization slug always comes from the signed-in account. The
+// anonymous status endpoint never returns organization data.
+async function fetchFirstOrganizationSlug(): Promise<string | null> {
+  try {
+    const response = await fetch("/organizations", { credentials: "include" });
+    if (!response.ok) return null;
+    const organizations = (await response.json()) as { slug: string }[];
+    return organizations[0]?.slug ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveOwnerSetupEntry(): Promise<OwnerSetupEntry> {
+  let status: SetupOwnerStatusResponse;
+  try {
+    status = await fetchSetupOwnerStatus();
+  } catch {
+    return { kind: "redirect", to: "/login" };
+  }
+
+  if (status.status === "disabled") {
+    return { kind: "redirect", to: "/login" };
+  }
+
+  if (status.status === "required") {
+    return { kind: "owner" };
+  }
+
+  const account = await fetchSignedInAccount();
+
+  if (status.status === "complete") {
+    return { kind: "redirect", to: account ? "/" : "/login" };
+  }
+
+  if (!account) {
+    return { kind: "redirect", to: "/login?redirect=/setup" };
+  }
+
+  const orgSlug = await fetchFirstOrganizationSlug();
+  if (!orgSlug) {
+    return { kind: "redirect", to: "/" };
+  }
+
+  const step = isResumableStep(status.step) ? status.step : "license";
+  return { kind: "resume", step, email: account.email, orgSlug };
+}
+
+// Forward and back save the new step so a refresh resumes the same page.
+// Clearing the step closes the wizard; the survey and the organization
+// landing are not resumable setup pages.
+async function persistSetupProgress(step: string) {
+  try {
+    await fetch("/api/v1/setup-owner/progress", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ step }),
+    });
+  } catch {
+    // Progress persistence is best-effort. The next load reconciles.
+  }
+}
+
+function writeSetupStepToAddress(step: OwnerSetupStep) {
+  if (!isResumableStep(step)) return;
+  window.history.replaceState(window.history.state, "", `/setup?step=${step}`);
+}
 
 function ownerSetupStepNumber(step: OwnerSetupStep) {
   if (step === "owner") return 1;
@@ -160,7 +273,7 @@ async function submitOwnerSetup(args: {
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
   setPendingOrganizationSlug: (slug: string | null) => void;
-  setStep: (step: OwnerSetupStep) => void;
+  onOwnerCreated: (step: OwnerSetupStep) => void;
 }) {
   args.setError(null);
   args.setLoading(true);
@@ -196,7 +309,7 @@ async function submitOwnerSetup(args: {
 
     const data: { organization_id: string; organization_slug: string } = await response.json();
     args.setPendingOrganizationSlug(data.organization_slug);
-    args.setStep("license");
+    args.onOwnerCreated("license");
   } catch {
     args.setError("Network error occurred");
   } finally {
@@ -231,12 +344,75 @@ function continueAfterOwnerSetup(args: {
   });
 }
 
+interface OwnerSetupEntryActions {
+  setEmail: (email: string) => void;
+  setPendingOrganizationSlug: (slug: string | null) => void;
+  setStep: (step: OwnerSetupStep) => void;
+  setPhase: (phase: "loading" | "ready") => void;
+}
+
+function applyOwnerSetupEntry(entry: OwnerSetupEntry, actions: OwnerSetupEntryActions) {
+  if (entry.kind === "redirect") {
+    window.location.href = entry.to;
+    return;
+  }
+
+  if (entry.kind === "resume") {
+    actions.setEmail(entry.email);
+    actions.setPendingOrganizationSlug(entry.orgSlug);
+    actions.setStep(entry.step);
+    writeSetupStepToAddress(entry.step);
+  }
+
+  actions.setPhase("ready");
+}
+
+function ownerSetupChrome(args: {
+  step: OwnerSetupStep;
+  email: string;
+  goToStep: (step: OwnerSetupStep) => void;
+}): FirstRunChrome | undefined {
+  if (args.step === "survey") return undefined;
+
+  const afterOwner = args.step !== "owner";
+  const backTarget = ownerSetupBackTarget(args.step);
+
+  return {
+    stepIndex: ownerSetupStepNumber(args.step) - 1,
+    stepCount: OWNER_SETUP_STEPS,
+    email: afterOwner ? args.email : undefined,
+    onLogOut: afterOwner ? () => (window.location.href = "/logout?redirect=/setup") : undefined,
+    onBack: backTarget ? () => args.goToStep(backTarget) : undefined,
+  };
+}
+
+function handleOwnerFormSubmit(
+  e: React.FormEvent,
+  values: { email: string; firstName: string; lastName: string; password: string; confirmPassword: string },
+  actions: {
+    setFieldErrors: (errors: Record<string, string>) => void;
+    setError: (error: string | null) => void;
+    setLoading: (loading: boolean) => void;
+    setPendingOrganizationSlug: (slug: string | null) => void;
+    onOwnerCreated: (step: OwnerSetupStep) => void;
+  },
+) {
+  e.preventDefault();
+  const errors = validateOwnerFields(values);
+  actions.setFieldErrors(errors);
+  if (Object.keys(errors).length > 0) {
+    return;
+  }
+  void submitOwnerSetup({ ...values, ...actions });
+}
+
 const OwnerSetup: React.FC = () => {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [phase, setPhase] = useState<"loading" | "ready">("loading");
   const [step, setStep] = useState<OwnerSetupStep>("owner");
   const [pendingOrganizationSlug, setPendingOrganizationSlug] = useState<string | null>(null);
   const [activeSurvey, setActiveSurvey] = useState<PostHogSurvey | null>(null);
@@ -251,38 +427,54 @@ const OwnerSetup: React.FC = () => {
 
   useReportPageReady(true);
 
-  const handleOwnerSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const errors = validateOwnerFields({ email, firstName, lastName, password, confirmPassword });
-    setFieldErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      return;
-    }
-    void submitOwnerSetup({
-      email,
-      firstName,
-      lastName,
-      password,
-      setError,
-      setLoading,
-      setPendingOrganizationSlug,
-      setStep,
+  useEffect(() => {
+    let cancelled = false;
+
+    void resolveOwnerSetupEntry().then((entry) => {
+      if (!cancelled) {
+        applyOwnerSetupEntry(entry, { setEmail, setPendingOrganizationSlug, setStep, setPhase });
+      }
     });
-  };
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const goToStep = useCallback((next: OwnerSetupStep) => {
+    setStep(next);
+    writeSetupStepToAddress(next);
+    if (isResumableStep(next)) {
+      void persistSetupProgress(next);
+    }
+  }, []);
+
+  // The setup-owner request already saved this step in its transaction,
+  // so advancing after account creation does not persist again.
+  const onOwnerCreated = useCallback((next: OwnerSetupStep) => {
+    setStep(next);
+    writeSetupStepToAddress(next);
+  }, []);
+
+  const handleOwnerSubmit = (e: React.FormEvent) =>
+    handleOwnerFormSubmit(
+      e,
+      { email, firstName, lastName, password, confirmPassword },
+      { setFieldErrors, setError, setLoading, setPendingOrganizationSlug, onOwnerCreated },
+    );
 
   const finishInstallation = useCallback(() => {
-    if (pendingOrganizationSlug) {
+    if (!pendingOrganizationSlug) return;
+    void persistSetupProgress("").then(() => {
       continueAfterOwnerSetup({ orgSlug: pendingOrganizationSlug, setActiveSurvey, setStep });
-    }
+    });
   }, [pendingOrganizationSlug]);
 
-  const afterOwner = step !== "owner" && step !== "survey";
   const fleetStepIndex = activeFleetStep ? FLEET_MANAGER_WIZARD_STEPS.indexOf(activeFleetStep) : -1;
-  const previousFleetStep = () => setStep(fleetStepBefore(step));
-  const goBack = () => {
-    const target = ownerSetupBackTarget(step);
-    if (target) setStep(target);
-  };
+
+  if (phase === "loading") {
+    return null;
+  }
 
   return (
     <FirstRunShell
@@ -290,17 +482,7 @@ const OwnerSetup: React.FC = () => {
       contentSpacing="compact"
       visual="preview"
       sphere={OWNER_SETUP_PREVIEW}
-      chrome={
-        step === "survey"
-          ? undefined
-          : {
-              stepIndex: ownerSetupStepNumber(step) - 1,
-              stepCount: OWNER_SETUP_STEPS,
-              email: afterOwner ? email : undefined,
-              onLogOut: afterOwner ? () => (window.location.href = "/logout") : undefined,
-              onBack: ownerSetupBackTarget(step) ? goBack : undefined,
-            }
-      }
+      chrome={ownerSetupChrome({ step, email, goToStep })}
     >
       {step === "owner" && (
         <OwnerStep
@@ -321,10 +503,10 @@ const OwnerSetup: React.FC = () => {
         />
       )}
 
-      {step === "license" && pendingOrganizationSlug && <LicenseStep onContinue={() => setStep("smtp")} />}
+      {step === "license" && pendingOrganizationSlug && <LicenseStep onContinue={() => goToStep("smtp")} />}
 
       {step === "smtp" && pendingOrganizationSlug && (
-        <SmtpStep onContinue={() => setStep("fleet-intro")} onSkip={() => setStep("fleet-intro")} />
+        <SmtpStep onContinue={() => goToStep("fleet-intro")} onSkip={() => goToStep("fleet-intro")} />
       )}
 
       <OwnerFleetSetupSteps
@@ -333,9 +515,9 @@ const OwnerSetup: React.FC = () => {
         activeFleetStep={activeFleetStep}
         fleetStepIndex={fleetStepIndex}
         fleetSetup={fleetSetup}
-        previousFleetStep={previousFleetStep}
+        previousFleetStep={() => goToStep(fleetStepBefore(step))}
         finishInstallation={finishInstallation}
-        setStep={setStep}
+        setStep={goToStep}
       />
 
       {step === "survey" && activeSurvey && pendingOrganizationSlug && (
