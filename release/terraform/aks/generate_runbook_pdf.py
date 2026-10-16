@@ -451,13 +451,25 @@ kubectl get certificate -n superplane""",
     )
     story.append(
         Paragraph(
-            "Runner v0.2.0 on linux/amd64 uses /CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-amd64/Versions/0.2.0.",
+            "The default linux/amd64 image is /CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-amd64/Versions/1.14623.0.",
             s["body"],
         )
     )
     story.append(
         Paragraph(
-            "Set runner_image_amd64 and runner_image_arm64. Apply Terraform. Run the Helm commands from the wizard.",
+            "The image version has the form 1.<build>.0.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "That number is independent of the runner version.",
+            s["body"],
+        )
+    )
+    story.append(
+        Paragraph(
+            "Apply Terraform. Run the Helm commands from the wizard.",
             s["body"],
         )
     )
@@ -469,7 +481,7 @@ kubectl get certificate -n superplane""",
     )
     story.append(
         Paragraph(
-            "The commands below publish an image into the customer gallery. Use that path for development.",
+            "The commands below publish an image into the customer gallery. Add -var trusted_launch=false for a community gallery image.",
             s["body"],
         )
     )

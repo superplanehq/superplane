@@ -172,7 +172,7 @@ variable "superplane_chart_version" {
 }
 
 variable "fleet_manager_version" {
-  description = "Fleet Manager release the owner-setup wizard installs. Use v0.1.3 or later with this chart. The Fleet Manager binary syncs fleets. Community gallery images and empty zones need 0.1.2 or later."
+  description = "Fleet Manager release the owner-setup wizard installs. Use v0.1.3 or later with this chart. The Fleet Manager binary syncs fleets."
   type        = string
   default     = "v0.1.3"
 
@@ -215,15 +215,15 @@ variable "runner_zones" {
 }
 
 variable "runner_image_amd64" {
-  description = "linux/amd64 runner image version ID. Use /CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-amd64/Versions/<version>, or a customer gallery version ID from the development path."
+  description = "linux/amd64 image version ID. Use a /CommunityGalleries/... ID published by SuperPlane, or a customer gallery version ID. The image version is independent of the runner version."
   type        = string
-  default     = ""
+  default     = "/CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-amd64/Versions/1.14623.0"
 }
 
 variable "runner_image_arm64" {
-  description = "linux/arm64 runner image version ID. Use /CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-arm64/Versions/<version>, or a customer gallery version ID from the development path."
+  description = "linux/arm64 image version ID. Use a /CommunityGalleries/... ID published by SuperPlane, or a customer gallery version ID. The image version is independent of the runner version."
   type        = string
-  default     = ""
+  default     = "/CommunityGalleries/Superplane-ba852f02-dd01-43eb-b8c4-67a57fdd8af8/Images/superplane-runner-arm64/Versions/1.14623.0"
 }
 
 # -----------------------------------------------------------------------------
