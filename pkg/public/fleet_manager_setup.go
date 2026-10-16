@@ -225,13 +225,13 @@ func configuredRunnerVersions(stableVersion string) []string {
 }
 
 func publishedRunnerVersions() ([]string, error) {
-	if versions, err, ok := reusableRunnerReleaseResult(); ok {
+	if versions, ok, err := reusableRunnerReleaseResult(); ok {
 		return versions, err
 	}
 
 	runnerReleaseRefreshMu.Lock()
 	defer runnerReleaseRefreshMu.Unlock()
-	if versions, err, ok := reusableRunnerReleaseResult(); ok {
+	if versions, ok, err := reusableRunnerReleaseResult(); ok {
 		return versions, err
 	}
 
@@ -248,14 +248,14 @@ func publishedRunnerVersions() ([]string, error) {
 	return versions, nil
 }
 
-func reusableRunnerReleaseResult() ([]string, error, bool) {
+func reusableRunnerReleaseResult() ([]string, bool, error) {
 	if versions, ok := freshCachedRunnerVersions(); ok {
-		return versions, nil, true
+		return versions, true, nil
 	}
 	if err := freshRunnerReleaseFailure(); err != nil {
-		return nil, err, true
+		return nil, true, err
 	}
-	return nil, nil, false
+	return nil, false, nil
 }
 
 func fetchPublishedRunnerVersions() ([]string, error) {
