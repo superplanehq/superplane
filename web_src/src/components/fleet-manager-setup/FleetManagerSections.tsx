@@ -5,11 +5,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
 
 import { AwsProviderLogo, AzureProviderLogo, GcpProviderLogo } from "./providerLogos";
 
 export type FleetManagerSetupState = ReturnType<typeof useFleetManagerSetup>;
+
+const LOADED_FROM_TERRAFORM = "Loaded from Terraform";
 
 const Field = ({
   id,
@@ -20,7 +23,7 @@ const Field = ({
   <div className="space-y-1.5 text-sm">
     <div className="flex items-center justify-between gap-3">
       <Label htmlFor={id}>{label}</Label>
-      {imported && <span className="text-[11px] text-emerald-400">Loaded from Terraform</span>}
+      {imported && <span className="text-[11px] text-emerald-400">{LOADED_FROM_TERRAFORM}</span>}
     </div>
     <Input id={id} {...props} />
   </div>
@@ -32,37 +35,71 @@ const PROVIDERS = [
   { id: "azure", name: "Azure", Logo: AzureProviderLogo },
 ] as const;
 
+function ProviderCard({
+  id,
+  name,
+  Logo,
+  selected,
+  loadedFromTerraform,
+  noteId,
+  onSelect,
+}: {
+  id: string;
+  name: string;
+  Logo: typeof AwsProviderLogo;
+  selected: boolean;
+  loadedFromTerraform: boolean;
+  noteId: string;
+  onSelect: () => void;
+}) {
+  const card = (
+    <Button
+      type="button"
+      variant={selected ? "default" : "outline"}
+      className="aspect-square h-auto w-full rounded-xl p-0"
+      aria-label={name}
+      aria-describedby={loadedFromTerraform ? noteId : undefined}
+      aria-pressed={selected}
+      onClick={onSelect}
+    >
+      <Logo className="size-[calc(100%-1rem)]" testId={`provider-logo-${id}`} />
+      {loadedFromTerraform && (
+        <span id={noteId} className="sr-only">
+          {LOADED_FROM_TERRAFORM}
+        </span>
+      )}
+    </Button>
+  );
+
+  if (!loadedFromTerraform) return card;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{card}</TooltipTrigger>
+      <TooltipContent side="bottom">{LOADED_FROM_TERRAFORM}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function FleetManagerProviderSection({ setup }: { setup: FleetManagerSetupState }) {
   const terraformNoteIdPrefix = useId();
   if (!setup.metadata || !setup.draft) return null;
   const terraformProvider = setup.metadata.infrastructureDefaults.provider;
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Cloud provider">
-      {PROVIDERS.map(({ id, name, Logo }) => {
-        const selected = setup.draft?.provider === id;
-        const loadedFromTerraform = terraformProvider === id;
-        const terraformNoteId = `${terraformNoteIdPrefix}-${id}`;
-        return (
-          <Button
-            key={id}
-            type="button"
-            variant={selected ? "default" : "outline"}
-            className="h-auto min-h-20 flex-col gap-1"
-            aria-label={name}
-            aria-describedby={loadedFromTerraform ? terraformNoteId : undefined}
-            aria-pressed={selected}
-            onClick={() => setup.setProvider(id)}
-          >
-            <Logo className="size-7" testId={`provider-logo-${id}`} />
-            {loadedFromTerraform && (
-              <span id={terraformNoteId} className="text-[10px]">
-                Loaded from Terraform
-              </span>
-            )}
-          </Button>
-        );
-      })}
+    <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Cloud provider">
+      {PROVIDERS.map(({ id, name, Logo }) => (
+        <ProviderCard
+          key={id}
+          id={id}
+          name={name}
+          Logo={Logo}
+          selected={setup.draft?.provider === id}
+          loadedFromTerraform={terraformProvider === id}
+          noteId={`${terraformNoteIdPrefix}-${id}`}
+          onSelect={() => setup.setProvider(id)}
+        />
+      ))}
     </div>
   );
 }

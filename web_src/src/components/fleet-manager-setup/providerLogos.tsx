@@ -11,7 +11,7 @@ export function AwsProviderLogo({ className, testId }: ProviderLogoProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
+      viewBox="0 5.7 24 15.1"
       fill="currentColor"
       fillRule="evenodd"
       className={className}
@@ -32,7 +32,7 @@ export function GcpProviderLogo({ className, testId }: ProviderLogoProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 128 128"
+      viewBox="4 13 120 96"
       fill="currentColor"
       className={className}
       data-testid={testId}
@@ -54,7 +54,7 @@ export function AzureProviderLogo({ className, testId }: ProviderLogoProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 256 256"
+      viewBox="46 12 165 208"
       fill="currentColor"
       className={className}
       data-testid={testId}

@@ -43,15 +43,18 @@ describe("FleetManagerProviderSection", () => {
     expect(container.querySelector(".lucide-cloud")).not.toBeInTheDocument();
   });
 
-  it("keeps the Terraform note on the Terraform provider card", () => {
+  it("announces the Terraform note and shows it in a tooltip", async () => {
+    const user = userEvent.setup();
     const { setup } = buildSetup({ terraformProvider: "gcp" });
     render(<FleetManagerProviderSection setup={setup} />);
 
     const gcpCard = screen.getByRole("button", { name: "GCP", description: "Loaded from Terraform" });
-    expect(within(gcpCard).getByText("Loaded from Terraform")).toBeInTheDocument();
-    expect(screen.getAllByText("Loaded from Terraform")).toHaveLength(1);
     expect(screen.getByRole("button", { name: "AWS" })).not.toHaveAccessibleDescription();
     expect(screen.getByRole("button", { name: "Azure" })).not.toHaveAccessibleDescription();
+
+    await user.hover(gcpCard);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Loaded from Terraform");
+    expect(screen.getAllByRole("tooltip")).toHaveLength(1);
   });
 
   it("selects the provider on click", async () => {
