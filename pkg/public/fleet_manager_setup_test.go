@@ -149,6 +149,52 @@ func TestAdminGetFleetManagerSetupUsesNewestPublishedFleetManagerRelease(t *test
 	assert.Equal(t, "0.1.4", body.DefaultChartVersion)
 }
 
+func TestPublishedFleetManagerVersionsSkipsRepeatLookupAfterFailure(t *testing.T) {
+	var fail atomic.Bool
+	var requests atomic.Int32
+	releases := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if fail.Load() {
+			http.Error(w, "unavailable", http.StatusBadGateway)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(r.URL.Path, "matching-refs") {
+			_ = json.NewEncoder(w).Encode([]githubMatchingRef{{Ref: "refs/tags/fleet-manager/v0.1.4"}})
+			return
+		}
+		if runnerReleaseTagFromRequest(r) != "fleet-manager/v0.1.4" {
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(githubRunnerRelease{TagName: "fleet-manager/v0.1.4"})
+	}))
+	t.Cleanup(releases.Close)
+	useRunnerReleases(t, releases.URL)
+
+	versions, err := publishedFleetManagerVersions()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"v0.1.4"}, versions)
+	downloaded := requests.Load()
+	require.Positive(t, downloaded)
+
+	fleetManagerReleaseCacheMu.Lock()
+	cachedFleetManagerFetchedAt = time.Now().Add(-runnerReleaseCacheTTL - time.Second)
+	fleetManagerReleaseCacheMu.Unlock()
+	fail.Store(true)
+
+	versions, err = publishedFleetManagerVersions()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"v0.1.4"}, versions)
+	failedRefresh := requests.Load()
+	assert.Greater(t, failedRefresh, downloaded)
+
+	versions, err = publishedFleetManagerVersions()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"v0.1.4"}, versions)
+	assert.Equal(t, failedRefresh, requests.Load())
+}
+
 func TestAdminGetFleetManagerSetupMergesPublishedRunnerVersions(t *testing.T) {
 	t.Setenv("RUNNER_STABLE_VERSION", "v1.2.3")
 	t.Setenv("RUNNER_SUPPORTED_VERSIONS", "v1.0.0, v9.9.9, v1.4.0")

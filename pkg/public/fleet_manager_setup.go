@@ -231,6 +231,7 @@ func publishedFleetManagerVersions() ([]string, error) {
 	defer fleetManagerReleaseCacheMu.Unlock()
 	if err != nil {
 		if cachedFleetManagerOK {
+			cachedFleetManagerFetchedAt = time.Now()
 			return append([]string(nil), cachedFleetManagerVersions...), nil
 		}
 		cachedFleetManagerReleaseFailure = err
