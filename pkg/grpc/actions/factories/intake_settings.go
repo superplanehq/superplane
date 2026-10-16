@@ -32,14 +32,9 @@ const (
 
 	intakeAuthorAccessCondition = `root().data.issue.author_association in ["COLLABORATOR", "MEMBER", "OWNER"]`
 
-	// Label that a user adds to an issue to hand it to the factory.
+	// Label that a user adds to an issue to hand it to the factory when no
+	// include label is set in the label filter.
 	intakeSuperplaneLabel = "superplane"
-
-	// Conditions are joined with `&&`, which binds tighter than `||`, so a
-	// compound condition has to carry its own parentheses. The `||` also has
-	// to short-circuit: only a `labeled` payload carries a label to read.
-	intakeSuperplaneLabelCondition = `(root().data.action != "labeled" || (root().data.issue.state == "open" && root().data.label.name == "` +
-		intakeSuperplaneLabel + `"))`
 
 	intakeJiraAssignedCondition   = "root().data.issue.fields.assignee != null"
 	intakeJiraUnassignedCondition = "root().data.issue.fields.assignee == null"
@@ -63,7 +58,8 @@ type intakeSettings struct {
 	AuthorsWithAccess bool
 	NewIssues         bool
 	ReopenedIssues    bool
-	// Create a task when somebody adds the "superplane" label to an open issue.
+	// Create a task when somebody adds the include label, or "superplane" when
+	// none is set, to an open issue.
 	SuperplaneLabelAdded bool
 	// Move the originating Jira issue when the work order completes.
 	JiraMoveOnComplete bool
@@ -330,7 +326,7 @@ func intakeGitHubFilterExpression(settings intakeSettings) string {
 	}
 
 	if settings.SuperplaneLabelAdded {
-		conditions = append(conditions, intakeSuperplaneLabelCondition)
+		conditions = append(conditions, intakeLabelAddedCondition(settings))
 	}
 
 	if len(conditions) == 0 {
@@ -338,6 +334,28 @@ func intakeGitHubFilterExpression(settings intakeSettings) string {
 	}
 
 	return strings.Join(conditions, " && ")
+}
+
+// intakeLabelAddedCondition gates a `labeled` payload on the label that was
+// added. The label is the include filter when one is set, so a custom label
+// works the same as the default. Conditions are joined with `&&`, which binds
+// tighter than `||`, so the compound condition carries its own parentheses.
+// The `||` also has to short-circuit: only a `labeled` payload carries a label
+// to read.
+func intakeLabelAddedCondition(settings intakeSettings) string {
+	return fmt.Sprintf(
+		`(root().data.action != "labeled" || (root().data.issue.state == "open" && %s))`,
+		intakeLabelAddedMatch(settings),
+	)
+}
+
+func intakeLabelAddedMatch(settings intakeSettings) string {
+	if settings.LabelFilterMode == intakeLabelFilterInclude && len(settings.Labels) > 0 {
+		if labels, err := json.Marshal(settings.Labels); err == nil {
+			return fmt.Sprintf("root().data.label.name in %s", labels)
+		}
+	}
+	return fmt.Sprintf(`root().data.label.name == "%s"`, intakeSuperplaneLabel)
 }
 
 func intakeJiraFilterExpression(settings intakeSettings) string {

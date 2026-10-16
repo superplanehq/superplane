@@ -9,6 +9,7 @@ import {
   intakeSettingsTabs,
   intakeSettingsFromApi,
   intakeSettingsToApi,
+  superplaneLabelAddedCopy,
   intakeSupportsDelete,
   jiraCompletionSettingsToApi,
   normalizeIntakeSourceSettings,
@@ -59,6 +60,26 @@ describe("intakeSourceSettingsModel", () => {
     const off = intakeSettingsFromApi("GitHub issues", { authorsWithAccess: false });
     expect(off.authorsWithAccess).toBe(false);
     expect(intakeSettingsToApi(off).authorsWithAccess).toBe(false);
+  });
+
+  it("names the label that is added, following the label filter", () => {
+    const base = { ...DEFAULT_GITHUB_INTAKE_SETTINGS };
+
+    expect(superplaneLabelAddedCopy(base)).toBe('The "superplane" label is added to the issue');
+    expect(superplaneLabelAddedCopy({ ...base, filterByLabel: true, labels: ["superplane-claude"] })).toBe(
+      'The "superplane-claude" label is added to the issue',
+    );
+    expect(superplaneLabelAddedCopy({ ...base, filterByLabel: true, labels: ["bug", "superplane-claude"] })).toBe(
+      "One of the filter labels is added to the issue",
+    );
+    expect(
+      superplaneLabelAddedCopy({
+        ...base,
+        filterByLabel: true,
+        labelFilterMode: "exclude",
+        labels: ["bug"],
+      }),
+    ).toBe('The "superplane" label is added to the issue');
   });
 
   it("round-trips GitHub issue events through the API shape", () => {

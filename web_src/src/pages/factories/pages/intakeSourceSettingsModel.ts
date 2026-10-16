@@ -26,7 +26,7 @@ export interface IntakeSourceSettings {
   newIssues: boolean;
   /** Create a task when a closed GitHub issue is re-opened. */
   reopenedIssues: boolean;
-  /** Also create a task when somebody adds the "superplane" label to an open issue. */
+  /** Also create a task when the include label, or "superplane" when none is set, is added to an open issue. */
   superplaneLabelAdded: boolean;
   authorsWithAccess: boolean;
   /** Move the originating Jira issue when SuperPlane completes the task. */
@@ -156,6 +156,7 @@ export const INTAKE_SETTINGS_COPY = {
   labelsLoading: "Loading labels from the repository",
   labelsEmpty: "No labels found in the repository. Add a label name.",
   superplaneLabelAdded: 'The "superplane" label is added to the issue',
+  superplaneLabelAddedSeveral: "One of the filter labels is added to the issue",
   authorsWithAccess: "Author is a repository collaborator",
   save: "Save",
   saving: "Saving",
@@ -168,6 +169,34 @@ export const INTAKE_SETTINGS_COPY = {
   deleteConfirm: "Delete intake",
   deleteError: "SuperPlane could not delete the intake. Try again.",
 } as const;
+
+/**
+ * The labels that start a run when they are added to an issue. This follows the
+ * label filter, the same as the saved filter expression. Without an include
+ * filter, the default `superplane` label applies.
+ */
+function labelAddedFilterLabels(
+  settings: Pick<IntakeSourceSettings, "filterByLabel" | "labelFilterMode" | "labels">,
+): string[] {
+  if (!settings.filterByLabel || settings.labelFilterMode !== "include") {
+    return [];
+  }
+  return settings.labels;
+}
+
+/** The "label is added" checkbox text. It names the label that is in use. */
+export function superplaneLabelAddedCopy(
+  settings: Pick<IntakeSourceSettings, "filterByLabel" | "labelFilterMode" | "labels">,
+): string {
+  const labels = labelAddedFilterLabels(settings);
+  if (labels.length === 1) {
+    return `The "${labels[0]}" label is added to the issue`;
+  }
+  if (labels.length > 1) {
+    return INTAKE_SETTINGS_COPY.superplaneLabelAddedSeveral;
+  }
+  return INTAKE_SETTINGS_COPY.superplaneLabelAdded;
+}
 
 export function intakeSupportsDelete(sourceId: LineIntakeSourceId): boolean {
   return (
