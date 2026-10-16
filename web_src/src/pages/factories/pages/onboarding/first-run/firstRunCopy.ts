@@ -23,8 +23,6 @@ export const FIRST_RUN_COPY = {
   host: {
     headline: "Where is your code?",
     body: "Choose the Git host of your repository. SuperPlane opens pull requests there.",
-    bitbucketSoon: "Bitbucket is not available yet.",
-    bitbucketLookupLoading: "Checking whether Bitbucket is available…",
   },
   bitbucket: {
     connectHeadline: "Connect SuperPlane to Bitbucket",

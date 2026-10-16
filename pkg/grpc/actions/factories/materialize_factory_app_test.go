@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/features"
 	grpcerrors "github.com/superplanehq/superplane/pkg/grpc/errors"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/factories"
@@ -69,25 +68,6 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, backlog.ID.String(), defaults.Metadata.ID)
 		assert.Equal(t, backlog.Name, defaults.Metadata.Name)
-	})
-
-	t.Run("bitbucket implement install is rejected when the feature is off", func(t *testing.T) {
-		require.NoError(t, models.DisableExperimentalFeature(r.Organization.ID, features.FeatureFactoryBitbucket))
-		factoryModel := newFactory(t)
-		provider := models.ProviderBitbucket
-		require.NoError(t, factoryModel.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
-			VCSProvider: &provider,
-		}))
-		canvas := support.CreateFactoryCanvas(t, r, factoryModel.ID, support.RandomName("Implement"))
-
-		_, err := MaterializeFactoryAppTemplate(ctx, orgID, &pb.MaterializeFactoryAppTemplateRequest{
-			FactoryId:  factoryModel.ID.String(),
-			TemplateId: "line-implementation",
-			AppId:      canvas.ID.String(),
-		})
-		code, _, ok := grpcerrors.HandlerStatus(err)
-		require.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, code)
 	})
 
 	t.Run("a newly created app materializes its install template", func(t *testing.T) {
@@ -287,7 +267,6 @@ func Test__MaterializeFactoryAutomationDefaults(t *testing.T) {
 	})
 
 	t.Run("a GitHub app resets with its saved provider after the workspace uses Bitbucket", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, features.FeatureFactoryBitbucket))
 		factoryModel := newFactory(t)
 		provider := models.ProviderBitbucket
 		require.NoError(t, factoryModel.UpdateOnboarding(database.DB(t.Context()), models.FactoryOnboardingPatch{
