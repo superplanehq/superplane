@@ -62,16 +62,18 @@ function initialFirstRunScreen(searchParams: URLSearchParams): FirstRunScreen | 
 }
 
 // A GitHub return can omit the step. Saved progress or that return must not
-// open the welcome screen. A connection saved for the account does not choose
+// open the welcome screen. An installation GitHub App that does not require
+// sign-in is that return. A connection saved for the account does not choose
 // the opening screen.
 function resumeFirstRunScreen(args: {
   savedStep: WizardStepId;
   githubPending: boolean;
   githubReturned: boolean;
+  installationAppReady: boolean;
 }): FirstRunScreen {
   if (args.savedStep !== "vcs") return SCREEN_FOR_STEP[args.savedStep];
   if (args.githubPending) return "connect";
-  if (args.githubReturned) return "choose";
+  if (args.githubReturned || args.installationAppReady) return "choose";
   return "welcome";
 }
 
@@ -88,12 +90,13 @@ function screenWithGitHubConnection(
     accountConnectionRequired: boolean;
   },
 ): FirstRunScreen {
-  if (github.pending || screen === "welcome") return screen;
+  if (github.pending) return screen;
   if (!github.accountConnectionRequired) {
     if (!github.appConfigured) return screen === "choose" ? "connect" : screen;
-    if (screen === "connect" && !github.stayOnConnect) return "choose";
+    if (screen === "welcome" || (screen === "connect" && !github.stayOnConnect)) return "choose";
     return screen;
   }
+  if (screen === "welcome") return screen;
   if (!github.identity) return "connect";
   if (screen === "connect" && github.ready && !github.stayOnConnect) return "choose";
   if (screen === "choose" && !github.ready) return "connect";
@@ -155,12 +158,14 @@ function useFirstRunNavigation(
   // Back from repository selection must not forward to it again.
   const [stayOnConnect, setStayOnConnect] = useState(false);
   const openStep = useRef(model.openSection);
+  const installationAppReady = connection.appConfigured && !connection.accountConnectionRequired;
   const openedScreen =
     requestedScreen ??
     resumeFirstRunScreen({
       savedStep: model.openSection,
       githubPending: connection.onboarding.isPending,
       githubReturned: github.returned,
+      installationAppReady,
     });
 
   useEffect(() => {
