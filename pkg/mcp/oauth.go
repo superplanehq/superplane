@@ -439,6 +439,57 @@ func discoverAuthServer(ctx context.Context, httpClient HTTPDoer, issuer string)
 	return nil, lastErr
 }
 
+// TokenEndpointError is a non-success response from an OAuth token endpoint.
+// Code is the OAuth error name, such as invalid_grant, when the body is JSON.
+type TokenEndpointError struct {
+	StatusCode  int
+	Code        string
+	Description string
+	Body        string
+}
+
+func (e *TokenEndpointError) Error() string {
+	if e == nil {
+		return "token endpoint request failed"
+	}
+	body := strings.TrimSpace(e.Body)
+	if body == "" {
+		return fmt.Sprintf("HTTP %d", e.StatusCode)
+	}
+	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, body)
+}
+
+// RejectsGrant reports whether the authorization server refused the grant.
+// Timeouts and server errors are not a rejected grant.
+func (e *TokenEndpointError) RejectsGrant() bool {
+	if e == nil {
+		return false
+	}
+	switch e.Code {
+	case "invalid_grant", "invalid_client":
+		return true
+	default:
+		return false
+	}
+}
+
+func newTokenEndpointError(statusCode int, body []byte) *TokenEndpointError {
+	endpointErr := &TokenEndpointError{
+		StatusCode: statusCode,
+		Body:       strings.TrimSpace(string(body)),
+	}
+	var payload struct {
+		Error            string `json:"error"`
+		ErrorDescription string `json:"error_description"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return endpointErr
+	}
+	endpointErr.Code = payload.Error
+	endpointErr.Description = payload.ErrorDescription
+	return endpointErr
+}
+
 func postToken(ctx context.Context, httpClient HTTPDoer, tokenEndpoint, clientID, clientSecret string, values url.Values) (*TokenResponse, error) {
 	if err := ValidatePublicHTTPSURL(tokenEndpoint); err != nil {
 		return nil, fmt.Errorf("token endpoint is not valid")
@@ -483,7 +534,7 @@ func doJSON(httpClient HTTPDoer, req *http.Request, dest any) error {
 		return err
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return newTokenEndpointError(resp.StatusCode, body)
 	}
 	if dest == nil {
 		return nil

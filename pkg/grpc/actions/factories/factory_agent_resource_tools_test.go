@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -104,6 +105,51 @@ func Test__ListFactoryAgentResourceToolsRequiresOAuthConnection(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, codes.FailedPrecondition, code)
 	assert.Equal(t, "Connect this MCP server first.", message)
+}
+
+func Test__ListFactoryAgentResourceToolsUsesTokenWhenReconnectIsNeeded(t *testing.T) {
+	r := support.Setup(t)
+	enableWorkspaceMCPAndSkills(t, r.Organization.ID)
+	db := database.DB(t.Context())
+	factory, err := models.CreateFactory(db, r.Organization.ID, support.RandomName("factory"), "", "")
+	require.NoError(t, err)
+
+	server := httptest.NewServer(mcpToolsHandler(t, []map[string]any{
+		{"name": "search", "description": "Search issues.", "annotations": map[string]any{"readOnlyHint": true}},
+	}))
+	t.Cleanup(server.Close)
+
+	resource, err := factory.CreateAgentResource(db, models.FactoryAgentResourceKindMCPServer, "sentry", true, models.FactoryAgentResourceConfig{
+		Transport: "http",
+		URL:       server.URL,
+		Auth:      models.FactoryAgentResourceAuthOAuth,
+	})
+	require.NoError(t, err)
+	require.NoError(t, resource.SetOAuthMetadata(db, models.FactoryAgentResourceOAuthMetadata{
+		TokenEndpoint:        "https://mcp.example.com/token",
+		ClientID:             "client-1",
+		AccessTokenExpiresAt: time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+	}))
+	access, err := mcp.EncryptResourceSecret(t.Context(), r.Encryptor, resource.ID, "access-token")
+	require.NoError(t, err)
+	require.NoError(t, resource.UpsertSecret(db, models.FactoryAgentResourceSecretAccessToken, access))
+	refresh, err := mcp.EncryptResourceSecret(t.Context(), r.Encryptor, resource.ID, "refresh-token")
+	require.NoError(t, err)
+	require.NoError(t, resource.UpsertSecret(db, models.FactoryAgentResourceSecretRefreshToken, refresh))
+	require.NoError(t, resource.SetOAuthStatus(db, models.FactoryAgentResourceOAuthNeedsReconnect, "HTTP 400: invalid_grant", nil))
+
+	response, err := ListFactoryAgentResourceTools(t.Context(), IntakeDependencies{Encryptor: r.Encryptor}, r.Organization.ID.String(), &pb.ListFactoryAgentResourceToolsRequest{
+		FactoryId:  factory.ID.String(),
+		ResourceId: resource.ID.String(),
+	})
+	require.NoError(t, err)
+	require.Len(t, response.GetTools(), 1)
+	assert.Equal(t, "search", response.GetTools()[0].GetName())
+
+	saved, err := factory.FindAgentResource(db, resource.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.FactoryAgentResourceOAuthConnected, saved.OAuthState())
+	assert.Empty(t, saved.OAuthError)
 }
 
 func Test__ListFactoryAgentResourceToolsRejectsNonJSON(t *testing.T) {
