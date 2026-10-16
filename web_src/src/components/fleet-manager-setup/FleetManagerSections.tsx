@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
-import { Cloud } from "lucide-react";
+
+import { AwsProviderLogo, AzureProviderLogo, GcpProviderLogo } from "./providerLogos";
 
 export type FleetManagerSetupState = ReturnType<typeof useFleetManagerSetup>;
 
@@ -23,26 +24,32 @@ const Field = ({
   </div>
 );
 
+const PROVIDERS = [
+  { id: "aws", name: "AWS", Logo: AwsProviderLogo },
+  { id: "gcp", name: "GCP", Logo: GcpProviderLogo },
+  { id: "azure", name: "Azure", Logo: AzureProviderLogo },
+] as const;
+
 export function FleetManagerProviderSection({ setup }: { setup: FleetManagerSetupState }) {
   if (!setup.metadata || !setup.draft) return null;
   const terraformProvider = setup.metadata.infrastructureDefaults.provider;
 
   return (
     <div className="grid gap-3 sm:grid-cols-3" role="radiogroup" aria-label="Cloud provider">
-      {(["aws", "gcp", "azure"] as const).map((provider) => {
-        const selected = setup.draft?.provider === provider;
+      {PROVIDERS.map(({ id, name, Logo }) => {
+        const selected = setup.draft?.provider === id;
         return (
           <Button
-            key={provider}
+            key={id}
             type="button"
             variant={selected ? "default" : "outline"}
             className="h-auto min-h-20 flex-col gap-1"
+            aria-label={name}
             aria-pressed={selected}
-            onClick={() => setup.setProvider(provider)}
+            onClick={() => setup.setProvider(id)}
           >
-            <Cloud className="size-4" aria-hidden />
-            <span>{provider.toUpperCase()}</span>
-            {terraformProvider === provider && <span className="text-[10px] normal-case">Loaded from Terraform</span>}
+            <Logo className="size-7" testId={`provider-logo-${id}`} />
+            {terraformProvider === id && <span className="text-[10px]">Loaded from Terraform</span>}
           </Button>
         );
       })}
