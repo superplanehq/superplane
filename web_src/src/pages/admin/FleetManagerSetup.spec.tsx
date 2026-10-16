@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 
+import { FleetManagerWizardScreen } from "@/components/fleet-manager-setup/FleetManagerWizard";
+import { useFleetManagerSetup } from "@/hooks/useFleetManagerSetup";
 import { FLEET_MANAGER_DRAFT_KEY } from "@/lib/fleetManagerSetup";
 import { FleetManagerSetup } from "./FleetManagerSetup";
 
@@ -57,6 +59,29 @@ const metadata = {
 const jsonResponse = (body: unknown) =>
   new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
 
+function stubSetup(body: unknown = metadata) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith("/admin/api/installation/fleet-manager/setup")) return jsonResponse(body);
+      return new Response("", { status: 404 });
+    }),
+  );
+}
+
+function FleetWizard() {
+  const setup = useFleetManagerSetup(true, "org-1");
+  return (
+    <FleetManagerWizardScreen
+      step="fleets"
+      setup={setup}
+      onNext={() => undefined}
+      onFinish={() => undefined}
+      onFinishLater={() => undefined}
+    />
+  );
+}
+
 describe("FleetManagerSetup", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -85,7 +110,45 @@ describe("FleetManagerSetup", () => {
     expect(screen.getByRole("heading", { name: "Install Fleet Manager" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /cloud infrastructure/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Machine type for e1-large-amd64")).toHaveValue("m8a.large");
-    expect(screen.getByRole("combobox", { name: "Runner version" })).toHaveTextContent("v0.2.0");
+    expect(screen.queryByRole("combobox", { name: "Runner version" })).not.toBeInTheDocument();
+  });
+
+  it("pins the setup runner version and ignores a saved version choice", async () => {
+    window.localStorage.setItem(
+      FLEET_MANAGER_DRAFT_KEY,
+      JSON.stringify({
+        provider: "aws",
+        managerId: "terraform-cluster",
+        namespace: "superplane",
+        serviceAccountName: "superplane-fleet-manager",
+        superplaneUrl: "https://superplane.example.com",
+        runnerVersion: "v0.1.0",
+        selectedFleetIds: ["e1-large-amd64"],
+        fleetCapacities: { "e1-large-amd64": { warmCapacity: 0, maxCapacity: 1 } },
+        fields: { region: "us-east-1", imageAmd64: "ami-amd64" },
+      }),
+    );
+
+    render(<FleetManagerSetup />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Generate install command" }));
+    expect(await screen.findByTestId("fleet-manager-install-command")).toHaveTextContent("runnerVersion: v0.2.0");
+    expect(screen.queryByRole("combobox", { name: "Runner version" })).not.toBeInTheDocument();
+  });
+
+  it("blocks installation when no runner version is available", async () => {
+    stubSetup({ ...metadata, defaultRunnerVersion: "", runnerVersions: [] });
+    render(<FleetManagerSetup />);
+
+    expect(await screen.findByRole("button", { name: "Generate install command" })).toBeDisabled();
+    expect(screen.getAllByRole("alert")[0]).toHaveTextContent("SuperPlane could not determine a Runner version.");
+  });
+
+  it("keeps the wizard install action disabled when no runner version is available", async () => {
+    stubSetup({ ...metadata, defaultRunnerVersion: "", runnerVersions: [] });
+    render(<FleetWizard />);
+
+    expect(await screen.findByRole("button", { name: "Generate install command" })).toBeDisabled();
   });
 
   it("generates a command when no Terraform runner image is configured", async () => {
