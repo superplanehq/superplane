@@ -4,11 +4,14 @@ import { load } from "js-yaml";
 import {
   FLEET_MANAGER_DRAFT_KEY,
   fleetsMatchConfiguration,
+  fleetManagerHelmCommand,
   fleetManagerInstallCommand,
+  fleetManagerValuesFileCommand,
   generateFleetManagerValues,
   installationRunnerVersion,
   loadFleetManagerDraft,
   mergeTerraformInfrastructure,
+  resolveSetupMachineType,
   saveFleetManagerDraft,
   terraformInstallPlaceholders,
   validateFleetManagerConfiguration,
@@ -152,6 +155,13 @@ describe("generateFleetManagerValues", () => {
     expect(values).toContain("instanceType: t3.small");
     expect(values).toContain("name: custom-fleet-manager");
     expect(values).toContain("url: https://cluster.example.com");
+    const parsed = load(values) as {
+      fleets: Array<{ spec: { cpuMillicores: number; memoryMb: number }; aws: { instanceType: string } }>;
+    };
+    expect(parsed.fleets[0]).toMatchObject({
+      spec: { cpuMillicores: 2000, memoryMb: 8192 },
+      aws: { instanceType: "m8a.large" },
+    });
   });
 
   it("does not attach a GCP service account unless one is configured", () => {
@@ -227,14 +237,28 @@ describe("validateFleetManagerConfiguration", () => {
 });
 
 it("generates a bounded Helm installation command with the complete values", () => {
-  const install = fleetManagerInstallCommand(metadata, "superplane", "installationAdminToken: personal-token\n");
+  const values = "installationAdminToken: personal-token\n";
+  const fileCommand = fleetManagerValuesFileCommand(values);
+  const helmCommand = fleetManagerHelmCommand(metadata, "superplane");
+  const install = fleetManagerInstallCommand(metadata, "superplane", values);
 
-  expect(install).toContain("cat > fleet-manager-values.yaml <<'EOF'");
-  expect(install).toContain("--version 0.1.0");
-  expect(install).toContain("--timeout 10m");
-  expect(install).toContain("-f fleet-manager-values.yaml");
+  expect(fileCommand).toBe("cat > fleet-manager-values.yaml <<'EOF'\ninstallationAdminToken: personal-token\nEOF\n");
+  expect(helmCommand).toContain("helm upgrade --install fleet-manager");
+  expect(helmCommand).toContain("--version 0.1.0");
+  expect(helmCommand).toContain("--timeout 10m");
+  expect(helmCommand).toContain("-f fleet-manager-values.yaml");
+  expect(helmCommand).not.toContain("kubectl");
+  expect(helmCommand).not.toContain("create secret");
+  expect(install).toBe(`${fileCommand}\n${helmCommand}\n`);
   expect(install).not.toContain("--values -");
-  expect(install).toContain("installationAdminToken: personal-token");
+});
+
+it("keeps a custom machine type and resets a type from another cloud", () => {
+  expect(resolveSetupMachineType("aws", "")).toBe("m8a.large");
+  expect(resolveSetupMachineType("gcp", "m8a.large")).toBe("e2-standard-4");
+  expect(resolveSetupMachineType("azure", undefined)).toBe("Standard_D2ds_v4");
+  expect(resolveSetupMachineType("aws", "t3.small")).toBe("t3.small");
+  expect(resolveSetupMachineType("gcp", "e2-standard-2")).toBe("e2-standard-2");
 });
 
 it("uses a custom namespace in generated commands", () => {

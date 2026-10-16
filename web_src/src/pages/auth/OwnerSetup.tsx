@@ -14,7 +14,7 @@ import { useReportPageReady } from "@/hooks/useReportPageReady";
 import { newOrganizationLandingPath } from "./newOrganizationLandingPath";
 
 const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
-const OWNER_SETUP_STEPS = 7;
+const OWNER_SETUP_STEPS = 8;
 const OWNER_SETUP_PREVIEW: FirstRunSphereProps = {
   level: 0,
   art: {
@@ -34,7 +34,8 @@ function ownerSetupStepNumber(step: OwnerSetupStep) {
   if (step === "fleet-intro") return 4;
   if (step === "fleet-provider") return 5;
   if (step === "fleet-fleets") return 6;
-  if (step === "fleet-install") return 7;
+  if (step === "fleet-values") return 7;
+  if (step === "fleet-install") return 8;
   return OWNER_SETUP_STEPS;
 }
 
