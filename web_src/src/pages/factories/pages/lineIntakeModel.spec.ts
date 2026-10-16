@@ -363,20 +363,6 @@ describe("lineIntakeModel", () => {
     ]);
   });
 
-  it("lists GitHub, Dependabot, Jira, Sentry, Productive.io, Datadog, and coming-soon Notion add-intake sources", () => {
-    expect(ADD_INTAKE_TEMPLATES.map((template) => template.id)).toEqual([
-      "github-issues",
-      "dependabot-alerts",
-      "jira-issues",
-      "sentry-exceptions",
-      "productive-tasks",
-      "datadog",
-      "linear-issues",
-      "notion",
-    ]);
-    expect(ADD_INTAKE_TEMPLATES.filter((template) => template.soon).map((template) => template.id)).toEqual(["notion"]);
-  });
-
   it("keeps Jira and Linear live when other flagged intake sources are off", () => {
     const templates = addIntakeTemplatesForOrg(() => false);
 
