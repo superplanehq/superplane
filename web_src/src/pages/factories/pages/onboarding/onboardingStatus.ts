@@ -1,5 +1,9 @@
 import type { FactoriesFactory, FactoriesUpdateFactoryOnboardingBody, OrganizationsIntegration } from "@/api-client";
-import { selectionFromInstance, type IntegrationSelections } from "@/pages/home/homeIntegrationStatus";
+import {
+  selectionFromInstance,
+  type IntegrationSelection,
+  type IntegrationSelections,
+} from "@/pages/home/homeIntegrationStatus";
 
 import { AGENT_PROVIDER_IDS, type AgentProviderId } from "./onboardingAgentReadiness";
 import { WIZARD_STEPS, type IssuesChoiceId, type VcsHostId, type WizardStepId } from "./onboardingFixtures";
@@ -59,40 +63,70 @@ function isAgentProviderId(value: string | undefined): value is AgentProviderId 
   return AGENT_PROVIDER_IDS.some((id) => id === value);
 }
 
+type SavedAgentSelection = {
+  id: string;
+  provider: AgentProviderId;
+  selection: IntegrationSelection;
+};
+
+function readySavedAgent(
+  instances: OrganizationsIntegration[],
+  agentIntegrationId: string | undefined,
+): SavedAgentSelection | null {
+  const savedId = agentIntegrationId?.trim() ?? "";
+  if (!savedId) return null;
+  const instance = instances.find((item) => item.metadata?.id === savedId);
+  if (!instance || instance.status?.state !== "ready") return null;
+  const provider = instance.metadata?.integrationName;
+  if (!isAgentProviderId(provider)) return null;
+  const selection = selectionFromInstance(instance);
+  if (!selection?.ready) return null;
+  return { id: savedId, provider, selection };
+}
+
+function choseAnotherAgent(selections: IntegrationSelections, saved: SavedAgentSelection): boolean {
+  return AGENT_PROVIDER_IDS.some((name) => {
+    if (name === saved.provider) return false;
+    const current = selections[name];
+    if (!current) return false;
+    return current.id !== saved.id;
+  });
+}
+
+function savedAgentAlreadyApplied(selections: IntegrationSelections, saved: SavedAgentSelection): boolean {
+  const current = selections[saved.provider];
+  if (!current) return false;
+  if (current.id !== saved.selection.id) return false;
+  if (current.name !== saved.selection.name) return false;
+  if (current.ready !== saved.selection.ready) return false;
+  return !savedAgentIsMisplaced(selections, saved);
+}
+
+function savedAgentIsMisplaced(selections: IntegrationSelections, saved: SavedAgentSelection): boolean {
+  return AGENT_PROVIDER_IDS.some((name) => name !== saved.provider && selections[name]?.id === saved.id);
+}
+
+function withSavedAgent(selections: IntegrationSelections, saved: SavedAgentSelection): IntegrationSelections {
+  const next = { ...selections };
+  for (const name of AGENT_PROVIDER_IDS) {
+    if (name === saved.provider) continue;
+    if (next[name]?.id !== saved.id) continue;
+    delete next[name];
+  }
+  next[saved.provider] = saved.selection;
+  return next;
+}
+
 export function restoreSavedAgentSelection(
   selections: IntegrationSelections,
   instances: OrganizationsIntegration[],
   agentIntegrationId: string | undefined,
 ): IntegrationSelections | null {
-  const savedId = agentIntegrationId?.trim() ?? "";
-  if (!savedId) return null;
-  const instance = instances.find((item) => item.metadata?.id === savedId);
-  const provider = instance?.metadata?.integrationName;
-  if (!isAgentProviderId(provider) || instance?.status?.state !== "ready") return null;
-  const selection = selectionFromInstance(instance);
-  if (!selection?.ready) return null;
-  const otherChoice = AGENT_PROVIDER_IDS.some((name) => {
-    if (name === provider) return false;
-    const current = selections[name];
-    return Boolean(current && current.id !== savedId);
-  });
-  if (otherChoice) return null;
-  const current = selections[provider];
-  const misplaced = AGENT_PROVIDER_IDS.some((name) => name !== provider && selections[name]?.id === savedId);
-  if (
-    !misplaced &&
-    current?.id === selection.id &&
-    current.name === selection.name &&
-    current.ready === selection.ready
-  ) {
-    return null;
-  }
-  const next = { ...selections };
-  for (const name of AGENT_PROVIDER_IDS) {
-    if (name !== provider && next[name]?.id === savedId) delete next[name];
-  }
-  next[provider] = selection;
-  return next;
+  const saved = readySavedAgent(instances, agentIntegrationId);
+  if (!saved) return null;
+  if (choseAnotherAgent(selections, saved)) return null;
+  if (savedAgentAlreadyApplied(selections, saved)) return null;
+  return withSavedAgent(selections, saved);
 }
 
 export function localIssuesSource(source?: string): IssuesChoiceId | null {

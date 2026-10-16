@@ -16,7 +16,7 @@ import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { selectReadyIntegrationInstance, useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
-import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createElement, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
@@ -30,7 +30,7 @@ import { isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentR
 import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
-import { useOnboardingAgentModel } from "./onboardingAgentModel";
+import { useOnboardingAgentPageState } from "./useOnboardingAgentPageState";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
@@ -42,13 +42,12 @@ import {
   ONBOARDING_CONNECTION_NAMES,
   ONBOARDING_MANUAL_CONNECTION_NAMES,
   onboardingVcsHost,
-  restoreSavedAgentSelection,
 } from "./onboardingStatus";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
 import { useFinishOnboarding, type OnboardingDestination } from "./useFinishOnboarding";
 import { useFinishSetupAction } from "./useFinishSetupAction";
-import { useOnboardingAgentContext } from "./useOnboardingAgentPlan";
+import type { useOnboardingAgentContext } from "./useOnboardingAgentPlan";
 import { useOnboardingJiraBinding } from "./useOnboardingJiraBinding";
 import { useOnboardingLinearBinding } from "./useOnboardingLinearBinding";
 import {
@@ -376,36 +375,19 @@ export function useOnboardingPageModel(args: {
   const [agentCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
   const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
-  const preferOwnKey = agentCredentialChoice === "own-key";
-  const [selectedModel, selectModel] = useOnboardingAgentModel(args.factoryId);
-  const agent = useOnboardingAgentContext(
-    args.organizationId,
-    integrations.connected,
-    preferOwnKey,
-    customProvider,
-    selectedModel,
-  );
   const { data: connectedIntegrations = [] } = useConnectedIntegrations(args.organizationId, {
     enabled: Boolean(args.organizationId),
   });
-  const connectedIntegrationsRef = useRef(connectedIntegrations);
-  connectedIntegrationsRef.current = connectedIntegrations;
-  const savedAgentIntegrationIdRef = useRef(onboarding?.agentIntegrationId);
-  savedAgentIntegrationIdRef.current = onboarding?.agentIntegrationId;
-  const onSelectionsChange = useCallback(
-    (next: IntegrationSelections) => {
-      integrations.setSelections(
-        restoreSavedAgentSelection(next, connectedIntegrationsRef.current, savedAgentIntegrationIdRef.current) ?? next,
-      );
-    },
-    [integrations.setSelections],
-  );
-  useEffect(() => {
-    integrations.setSelections(
-      (current) =>
-        restoreSavedAgentSelection(current, connectedIntegrations, onboarding?.agentIntegrationId) ?? current,
-    );
-  }, [connectedIntegrations, integrations.setSelections, onboarding?.agentIntegrationId]);
+  const { agent, selectModel, onSelectionsChange } = useOnboardingAgentPageState({
+    organizationId: args.organizationId,
+    factoryId: args.factoryId,
+    connected: integrations.connected,
+    customProvider,
+    agentCredentialChoice,
+    setSelections: integrations.setSelections,
+    connectedIntegrations,
+    agentIntegrationId: onboarding?.agentIntegrationId,
+  });
   const existingIntegrationNames = new Set(
     connectedIntegrations.map((item) => item.metadata?.name?.trim()).filter((name): name is string => Boolean(name)),
   );
