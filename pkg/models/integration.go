@@ -60,6 +60,22 @@ type CapabilityState struct {
 	Reason *string                         `json:"reason,omitempty"`
 }
 
+func NewIntegration(id, orgID uuid.UUID, appName string, installationName string, config map[string]any) *Integration {
+	now := time.Now()
+	integration := Integration{
+		ID:               id,
+		OrganizationID:   orgID,
+		AppName:          appName,
+		InstallationName: installationName,
+		State:            IntegrationStatePending,
+		Configuration:    datatypes.NewJSONType(config),
+		CreatedAt:        &now,
+		UpdatedAt:        &now,
+	}
+
+	return &integration
+}
+
 func (a *Integration) TableName() string {
 	return "app_installations"
 }
@@ -102,24 +118,14 @@ type BrowserAction struct {
 }
 
 func CreateIntegration(id, orgID uuid.UUID, appName string, installationName string, config map[string]any) (*Integration, error) {
-	now := time.Now()
-	integration := Integration{
-		ID:               id,
-		OrganizationID:   orgID,
-		AppName:          appName,
-		InstallationName: installationName,
-		State:            IntegrationStatePending,
-		Configuration:    datatypes.NewJSONType(config),
-		CreatedAt:        &now,
-		UpdatedAt:        &now,
-	}
+	integration := NewIntegration(id, orgID, appName, installationName, config)
 
-	err := database.Conn().Create(&integration).Error
+	err := database.Conn().Create(integration).Error
 	if err != nil {
 		return nil, err
 	}
 
-	return &integration, nil
+	return integration, nil
 }
 
 func ListIntegrations(db *gorm.DB, orgID uuid.UUID) ([]Integration, error) {

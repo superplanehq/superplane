@@ -7,7 +7,7 @@ import { posthog } from "@/posthog";
 import { useNavigate } from "react-router";
 
 import { useFactoriesLayout } from "../../layout/factoriesLayoutContext";
-import { AgentStep } from "./AgentStep";
+import { AgentStep, type OnboardingAgentModelPicker } from "./AgentStep";
 import { FirstRunAnalysisHost } from "./first-run/FirstRunAnalysisHost";
 import { FirstRunBitbucketChooseScreen } from "./first-run/FirstRunBitbucketChooseScreen";
 import { FirstRunBitbucketForgeScreen } from "./first-run/FirstRunBitbucketForgeScreen";
@@ -111,6 +111,7 @@ function AgentScreen({
   showCustomProvider,
   modelSource,
   onRequestConnect,
+  modelPicker,
   onContinue,
 }: {
   organizationId: string;
@@ -123,6 +124,7 @@ function AgentScreen({
   showCustomProvider: boolean;
   modelSource: AgentModelSource;
   onRequestConnect: (id: IntegrationId) => void;
+  modelPicker?: OnboardingAgentModelPicker;
   onContinue: () => void;
 }) {
   const credentialChoice = modelSource.offered && !modelSource.choice ? "hosted" : modelSource.choice;
@@ -171,6 +173,7 @@ function AgentScreen({
                 showHostedCredit={modelSource.choice !== "own-key"}
                 showCustomProvider={showCustomProvider}
                 onRequestConnect={onRequestConnect}
+                modelPicker={modelPicker}
               />
             </FirstRunPanel>
           </fieldset>
@@ -179,7 +182,7 @@ function AgentScreen({
           <LoadingButton
             type="button"
             className="w-full"
-            disabled={!canFinish || loading}
+            disabled={!canFinish || loading || Boolean(modelPicker && !modelPicker.value)}
             loading={saving}
             loadingText={FIRST_RUN_COPY.finish.saving}
             onClick={onContinue}
@@ -498,7 +501,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
       setup={setup}
       chrome={chromeFor("agent")}
       sphere={sphereFor("agent", setup.selectedRepo, model.githubOwner)}
-      saving={!flow.agentBeforeTickets && (flow.blockingAction === "finishing-setup" || model.saving)}
+      saving={flow.busy}
       loading={model.agentLoading}
       hostedAgentReady={model.hostedAgentReady}
       showCustomProvider={model.customProvider}
@@ -508,6 +511,7 @@ export function FirstRunSetup({ model }: { model: OnboardingPageModel }) {
         onSelect: flow.selectCredentialChoice,
       }}
       onRequestConnect={model.requestConnect}
+      modelPicker={model.agentModelPicker}
       onContinue={() => {
         if (flow.agentBeforeTickets && !flow.credentialChoice) flow.selectCredentialChoice("hosted");
         void flow.continueFromAgent();

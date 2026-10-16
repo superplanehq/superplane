@@ -16,7 +16,7 @@ import { showErrorToast } from "@/lib/toast";
 import type { IntegrationSelections } from "@/pages/home/InstallIntegrationsSection";
 import { selectReadyIntegrationInstance, useIntegrationConnectDialog } from "@/pages/home/useIntegrationConnectDialog";
 import { useInstallFactory } from "@/pages/home/useInstallFactory";
-import { createElement, useEffect, useMemo, useState } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import { factorySetupPath } from "../../lib/factoryPagePaths";
@@ -26,10 +26,11 @@ import {
   githubIntegrationSelection,
   selectionsWithSavedVcsInstallation,
 } from "./githubIntegrationSelection";
-import { isHostedAgentReady } from "./onboardingAgentReadiness";
+import { isHostedAgentReady, type OnboardingAgentPlan } from "./onboardingAgentReadiness";
 import { useOnboardingIntegrationSelections } from "./useOnboardingIntegrationSelections";
 import type { IntegrationId, IssuesChoiceId, WizardStepId } from "./onboardingFixtures";
 import { useOnboardingModelSource } from "./onboardingModelSource";
+import { useOnboardingAgentModel } from "./onboardingAgentModel";
 import type { OnboardingWorkspaceResolution } from "./onboardingWorkspaceResolutionContext";
 import { onboardingStepPath } from "./onboardingStepPath";
 import type { UpdateOnboarding } from "./onboardingProvision";
@@ -41,6 +42,7 @@ import {
   ONBOARDING_CONNECTION_NAMES,
   ONBOARDING_MANUAL_CONNECTION_NAMES,
   onboardingVcsHost,
+  restoreSavedAgentSelection,
 } from "./onboardingStatus";
 import { saveWithFreeWorkspaceName } from "./uniqueFactoryName";
 import { useFactoryOnboarding } from "./useFactoryOnboarding";
@@ -106,6 +108,7 @@ function useSectionSaves(args: {
   takenNames: string[];
   updateFactory: (input: { name: string }) => Promise<unknown>;
   updateOnboarding: UpdateOnboarding;
+  agentPlan: OnboardingAgentPlan | undefined;
 }) {
   const saveName = () => {
     const workspaceName = args.setup.workspaceName.trim();
@@ -131,7 +134,21 @@ function useSectionSaves(args: {
       }),
     );
   };
-  return { saveName, saveIssues };
+  const saveAgent = () => {
+    const plan = args.agentPlan;
+    if (!plan) return Promise.resolve(false);
+    const integration = plan.integrationName ? args.selections[plan.integrationName] : undefined;
+    if (plan.credentialsSource === "integration" && (!integration?.id || !integration.ready)) {
+      return Promise.resolve(false);
+    }
+    return runSave(args.setSaving, () =>
+      args.updateOnboarding({
+        agentHarness: plan.harness,
+        agentIntegrationId: plan.credentialsSource === "integration" ? integration?.id : "",
+      }),
+    );
+  };
+  return { saveName, saveIssues, saveAgent };
 }
 
 /** Names held by the other workspaces of the organization. */
@@ -229,6 +246,7 @@ function useOnboardingGithubSavesAndFinish(args: OnboardingGithubSavesAndFinishA
     takenNames,
     updateFactory: updateFactory.mutateAsync,
     updateOnboarding: updateOnboarding.mutateAsync,
+    agentPlan: args.agent.plan,
   });
   const githubOwner = args.setup.selectedRepo?.split("/")[0];
   const finish = useFinishOnboarding({
@@ -358,19 +376,38 @@ export function useOnboardingPageModel(args: {
   const [agentCredentialChoice, setAgentCredentialChoice] = useOnboardingModelSource(args.factoryId);
   const onboarding = args.factory?.onboarding;
   const integrations = useOnboardingIntegrationSelections(args.organizationId, onboarding);
-  const preferOwnKey = bringYourOwnKey.has(FEATURE_ORGANIZATION_BYOK) && agentCredentialChoice !== "hosted";
-  const agent = useOnboardingAgentContext(args.organizationId, integrations.connected, preferOwnKey, customProvider);
+  const preferOwnKey = agentCredentialChoice === "own-key";
+  const [selectedModel, selectModel] = useOnboardingAgentModel(args.factoryId);
+  const agent = useOnboardingAgentContext(
+    args.organizationId,
+    integrations.connected,
+    preferOwnKey,
+    customProvider,
+    selectedModel,
+  );
   const { data: connectedIntegrations = [] } = useConnectedIntegrations(args.organizationId, {
     enabled: Boolean(args.organizationId),
   });
-  const existingIntegrationNames = useMemo(
-    () =>
-      new Set(
-        connectedIntegrations
-          .map((item) => item.metadata?.name?.trim())
-          .filter((name): name is string => Boolean(name)),
-      ),
-    [connectedIntegrations],
+  const connectedIntegrationsRef = useRef(connectedIntegrations);
+  connectedIntegrationsRef.current = connectedIntegrations;
+  const savedAgentIntegrationIdRef = useRef(onboarding?.agentIntegrationId);
+  savedAgentIntegrationIdRef.current = onboarding?.agentIntegrationId;
+  const onSelectionsChange = useCallback(
+    (next: IntegrationSelections) => {
+      integrations.setSelections(
+        restoreSavedAgentSelection(next, connectedIntegrationsRef.current, savedAgentIntegrationIdRef.current) ?? next,
+      );
+    },
+    [integrations.setSelections],
+  );
+  useEffect(() => {
+    integrations.setSelections(
+      (current) =>
+        restoreSavedAgentSelection(current, connectedIntegrations, onboarding?.agentIntegrationId) ?? current,
+    );
+  }, [connectedIntegrations, integrations.setSelections, onboarding?.agentIntegrationId]);
+  const existingIntegrationNames = new Set(
+    connectedIntegrations.map((item) => item.metadata?.name?.trim()).filter((name): name is string => Boolean(name)),
   );
   const [customProviderDialogOpen, setCustomProviderDialogOpen] = useState(false);
   const setup = useOnboardingSetupState(
@@ -390,7 +427,7 @@ export function useOnboardingPageModel(args: {
     returnTo: onboardingStepPath(onboardingPath, openSection),
     integrationNames: [...ONBOARDING_CONNECTION_NAMES],
     selections: integrations.selections,
-    onSelectionsChange: integrations.setSelections,
+    onSelectionsChange,
     hiddenConfigurationFields: ONBOARDING_HIDDEN_CONFIGURATION_FIELDS,
     manualSelectionNames: ONBOARDING_MANUAL_CONNECTION_NAMES,
   });
@@ -435,6 +472,7 @@ export function useOnboardingPageModel(args: {
     agentCredentialChoice,
     setAgentCredentialChoice,
     agentLoading: agent.hostedModelsLoading,
+    agentModelPicker: agent.modelPicker ? { ...agent.modelPicker, onChange: selectModel } : undefined,
     openSection,
     setOpenSection,
     requestConnect,

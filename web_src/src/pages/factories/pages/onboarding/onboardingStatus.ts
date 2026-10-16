@@ -1,7 +1,7 @@
-import type { FactoriesFactory, FactoriesUpdateFactoryOnboardingBody } from "@/api-client";
-import type { IntegrationSelections } from "@/pages/home/homeIntegrationStatus";
+import type { FactoriesFactory, FactoriesUpdateFactoryOnboardingBody, OrganizationsIntegration } from "@/api-client";
+import { selectionFromInstance, type IntegrationSelections } from "@/pages/home/homeIntegrationStatus";
 
-import { AGENT_PROVIDER_IDS } from "./onboardingAgentReadiness";
+import { AGENT_PROVIDER_IDS, type AgentProviderId } from "./onboardingAgentReadiness";
 import { WIZARD_STEPS, type IssuesChoiceId, type VcsHostId, type WizardStepId } from "./onboardingFixtures";
 
 // The connection list restores a saved installation. GitHub is included so a
@@ -29,14 +29,70 @@ export function initialOnboardingSelections(onboarding: FactoriesFactory["onboar
       ready: false,
     };
   }
-  if (onboarding?.agentIntegrationId) {
-    selections.claude = {
-      id: onboarding.agentIntegrationId,
-      name: onboarding.agentIntegrationId,
+  const agentProvider = savedAgentProvider(onboarding);
+  const agentIntegrationId = onboarding?.agentIntegrationId?.trim() ?? "";
+  if (agentProvider && agentIntegrationId) {
+    selections[agentProvider] = {
+      id: agentIntegrationId,
+      name: agentIntegrationId,
       ready: false,
     };
   }
   return selections;
+}
+
+function savedAgentProvider(onboarding: FactoriesFactory["onboarding"]): AgentProviderId | null {
+  if (!onboarding?.agentIntegrationId?.trim()) return null;
+  switch (onboarding.agentHarness) {
+    case "AGENT_HARNESS_CODEX":
+      return "openai";
+    case "AGENT_HARNESS_CLAUDE_CODE":
+    case "AGENT_HARNESS_CURSOR":
+    case "AGENT_HARNESS_SUPERPLANE":
+      return null;
+    default:
+      return "claude";
+  }
+}
+
+function isAgentProviderId(value: string | undefined): value is AgentProviderId {
+  return AGENT_PROVIDER_IDS.some((id) => id === value);
+}
+
+export function restoreSavedAgentSelection(
+  selections: IntegrationSelections,
+  instances: OrganizationsIntegration[],
+  agentIntegrationId: string | undefined,
+): IntegrationSelections | null {
+  const savedId = agentIntegrationId?.trim() ?? "";
+  if (!savedId) return null;
+  const instance = instances.find((item) => item.metadata?.id === savedId);
+  const provider = instance?.metadata?.integrationName;
+  if (!isAgentProviderId(provider) || instance?.status?.state !== "ready") return null;
+  const selection = selectionFromInstance(instance);
+  if (!selection?.ready) return null;
+  const otherChoice = AGENT_PROVIDER_IDS.some((name) => {
+    if (name === provider) return false;
+    const current = selections[name];
+    return Boolean(current && current.id !== savedId);
+  });
+  if (otherChoice) return null;
+  const current = selections[provider];
+  const misplaced = AGENT_PROVIDER_IDS.some((name) => name !== provider && selections[name]?.id === savedId);
+  if (
+    !misplaced &&
+    current?.id === selection.id &&
+    current.name === selection.name &&
+    current.ready === selection.ready
+  ) {
+    return null;
+  }
+  const next = { ...selections };
+  for (const name of AGENT_PROVIDER_IDS) {
+    if (name !== provider && next[name]?.id === savedId) delete next[name];
+  }
+  next[provider] = selection;
+  return next;
 }
 
 export function localIssuesSource(source?: string): IssuesChoiceId | null {
