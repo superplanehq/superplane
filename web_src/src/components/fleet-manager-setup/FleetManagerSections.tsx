@@ -170,21 +170,21 @@ function ProviderCard({
       <span className="absolute inset-0 flex items-center justify-center p-5">
         <Logo className="size-auto h-auto max-h-full w-auto max-w-full" testId={`provider-logo-${id}`} />
       </span>
+    </Button>
+  );
+
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>{card}</TooltipTrigger>
+        <TooltipContent side="bottom">{name}</TooltipContent>
+      </Tooltip>
       {loadedFromTerraform && (
         <span id={noteId} className="sr-only">
           {LOADED_FROM_TERRAFORM}
         </span>
       )}
-    </Button>
-  );
-
-  if (!loadedFromTerraform) return card;
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{card}</TooltipTrigger>
-      <TooltipContent side="bottom">{LOADED_FROM_TERRAFORM}</TooltipContent>
-    </Tooltip>
+    </>
   );
 }
 
