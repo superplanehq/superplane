@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { MemoryRouter } from "react-router";
 
 import OwnerSetup from "./OwnerSetup";
 import { OWNER_SETUP_COPY } from "./ownerSetup/ownerSetupCopy";
@@ -12,6 +12,10 @@ const { createToken } = vi.hoisted(() => ({ createToken: vi.fn() }));
 
 vi.mock("@/hooks/useUserTokens", () => ({
   useCreateUserToken: () => ({ mutateAsync: createToken, isPending: false }),
+}));
+
+vi.mock("@monaco-editor/react", () => ({
+  default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
 }));
 
 vi.mock("./ownerSetup/LicenseStep", () => ({
@@ -218,12 +222,21 @@ describe("OwnerSetup", () => {
     expect(await screen.findByRole("heading", { name: "Choose a cloud provider" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(await screen.findByRole("heading", { name: "Choose runner fleets" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Configure the default fleet" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Generate install command" }));
-    expect(await screen.findByRole("heading", { name: "Install Fleet Manager" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Create the chart values" })).toBeInTheDocument();
+    expect(screen.getByText(/cat > fleet-manager-values.yaml/)).toBeInTheDocument();
     expect(createToken).toHaveBeenCalledWith({ name: "Fleet Manager" });
 
-    for (const heading of ["Choose runner fleets", "Choose a cloud provider", OWNER_SETUP_COPY.fleet.headline]) {
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(await screen.findByRole("heading", { name: "Install the chart" })).toBeInTheDocument();
+
+    for (const heading of [
+      "Create the chart values",
+      "Configure the default fleet",
+      "Choose a cloud provider",
+      OWNER_SETUP_COPY.fleet.headline,
+    ]) {
       fireEvent.click(screen.getByRole("button", { name: "Back" }));
       expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
     }

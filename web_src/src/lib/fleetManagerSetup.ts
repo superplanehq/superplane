@@ -95,6 +95,58 @@ export const recommendedMachineType = (
   return architecture === "amd64" ? "Standard_D2ds_v4" : "Standard_D2ps_v5";
 };
 
+export const DEFAULT_SETUP_FLEET_ID = "e1-large-amd64";
+
+export type CloudMachineType = {
+  id: string;
+  vcpu?: number;
+  memoryGb?: number;
+};
+
+const CLOUD_MACHINE_TYPES: Record<FleetManagerProvider, CloudMachineType[]> = {
+  aws: [
+    { id: "m8a.large", vcpu: 2, memoryGb: 8 },
+    { id: "m8a.xlarge", vcpu: 4, memoryGb: 16 },
+    { id: "m7i.large", vcpu: 2, memoryGb: 8 },
+    { id: "m7i.xlarge", vcpu: 4, memoryGb: 16 },
+  ],
+  gcp: [
+    { id: "e2-standard-2", vcpu: 2, memoryGb: 8 },
+    { id: "e2-standard-4", vcpu: 4, memoryGb: 16 },
+    { id: "n2-standard-2", vcpu: 2, memoryGb: 8 },
+    { id: "n2-standard-4", vcpu: 4, memoryGb: 16 },
+  ],
+  azure: [
+    { id: "Standard_D2ds_v4", vcpu: 2, memoryGb: 8 },
+    { id: "Standard_D4ds_v4", vcpu: 4, memoryGb: 16 },
+    { id: "Standard_D2s_v5", vcpu: 2, memoryGb: 8 },
+    { id: "Standard_D4s_v5", vcpu: 4, memoryGb: 16 },
+  ],
+};
+
+export function formatMachineTypeOption(option: CloudMachineType): string {
+  if (option.vcpu == null || option.memoryGb == null) return option.id;
+  return `${option.id} · ${option.vcpu} vCPU · ${option.memoryGb} GB memory`;
+}
+
+export function machineTypeChoices(provider: FleetManagerProvider, current: string): CloudMachineType[] {
+  const catalog = CLOUD_MACHINE_TYPES[provider];
+  const value = current.trim();
+  if (!value || catalog.some((option) => option.id === value)) return catalog;
+  return [...catalog, { id: value }];
+}
+
+export function resolveSetupMachineType(provider: FleetManagerProvider, current: string | undefined): string {
+  const value = current?.trim() ?? "";
+  if (!value) return recommendedMachineType(provider, "amd64");
+  if (CLOUD_MACHINE_TYPES[provider].some((option) => option.id === value)) return value;
+  const belongsToAnotherCloud = (["aws", "gcp", "azure"] as const).some(
+    (other) => other !== provider && CLOUD_MACHINE_TYPES[other].some((option) => option.id === value),
+  );
+  if (belongsToAnotherCloud) return recommendedMachineType(provider, "amd64");
+  return value;
+}
+
 export const fleetImage = (fields: FleetManagerProviderFields, architecture: FleetSpec["architecture"]): string =>
   fields[architecture === "amd64" ? "imageAmd64" : "imageArm64"]?.trim() ?? "";
 
@@ -292,22 +344,31 @@ export function terraformInstallPlaceholders(draft: FleetManagerDraft, metadata:
   return ["Apply Terraform again before you install Fleet Manager. A required value is missing."];
 }
 
-export function fleetManagerInstallCommand(
-  metadata: FleetManagerSetupMetadata,
-  namespace: string,
-  values: string,
-): string {
-  const valuesFile = "fleet-manager-values.yaml";
-  const helm = [
-    `helm upgrade --install fleet-manager ${metadata.chartRepository}`,
+export const FLEET_MANAGER_VALUES_FILE = "fleet-manager-values.yaml";
+
+export function fleetManagerValuesFileCommand(values: string): string {
+  return `cat > ${FLEET_MANAGER_VALUES_FILE} <<'EOF'\n${values.trimEnd()}\nEOF\n`;
+}
+
+export function fleetManagerHelmCommand(metadata: FleetManagerSetupMetadata, namespace: string): string {
+  return [
+    "helm upgrade --install fleet-manager",
+    metadata.chartRepository,
     `--version ${metadata.defaultChartVersion}`,
     `--namespace ${namespace}`,
     "--create-namespace",
     "--wait",
     "--timeout 10m",
-    `-f ${valuesFile}`,
+    `-f ${FLEET_MANAGER_VALUES_FILE}`,
   ].join(" \\\n  ");
-  return `cat > ${valuesFile} <<'EOF'\n${values.trimEnd()}\nEOF\n\n${helm}\n`;
+}
+
+export function fleetManagerInstallCommand(
+  metadata: FleetManagerSetupMetadata,
+  namespace: string,
+  values: string,
+): string {
+  return `${fleetManagerValuesFileCommand(values)}\n${fleetManagerHelmCommand(metadata, namespace)}\n`;
 }
 
 export function normalizeInfrastructureFields(fields: Record<string, string | string[]>): FleetManagerProviderFields {

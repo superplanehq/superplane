@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { FleetManagerInstallCommands } from "@/components/fleet-manager-setup/FleetManagerInstallCommands";
 import {
   FleetManagerFleetSection,
   FleetManagerProviderSection,
@@ -8,10 +9,11 @@ import { FleetManagerVerificationStatus } from "@/components/fleet-manager-setup
 import { Button } from "@/components/ui/button";
 import { useAccountOrganizations } from "@/hooks/useAccountOrganizations";
 import { useFleetManagerSetup, useFleetManagerVerification } from "@/hooks/useFleetManagerSetup";
-import { fleetManagerInstallCommand, type FleetManagerDraft } from "@/lib/fleetManagerSetup";
-import { CopyButton } from "@/ui/CopyButton";
-
-const INSTALL_INSTRUCTION = "Run these commands where kubectl can access your cluster.";
+import {
+  fleetManagerHelmCommand,
+  fleetManagerValuesFileCommand,
+  type FleetManagerDraft,
+} from "@/lib/fleetManagerSetup";
 
 function SectionCard({
   title,
@@ -36,13 +38,13 @@ function SectionCard({
 function InstallActions({
   draftIsValid,
   error,
-  command,
+  commands,
   isPreparingInstallation,
   onGenerate,
 }: {
   draftIsValid: boolean;
   error?: string;
-  command: string;
+  commands: { valuesCommand: string; helmCommand: string } | null;
   isPreparingInstallation: boolean;
   onGenerate: () => void;
 }) {
@@ -58,27 +60,13 @@ function InstallActions({
       </>
     );
   }
-  if (command) return <InstallCommand command={command} />;
+  if (commands) {
+    return <FleetManagerInstallCommands valuesCommand={commands.valuesCommand} helmCommand={commands.helmCommand} />;
+  }
   return (
     <Button type="button" onClick={onGenerate} disabled={isPreparingInstallation}>
       Generate install command
     </Button>
-  );
-}
-
-function InstallCommand({ command }: { command: string }) {
-  return (
-    <div className="space-y-4" data-testid="fleet-manager-install-command">
-      <div className="space-y-2">
-        <p className="text-sm text-gray-600 dark:text-gray-300">{INSTALL_INSTRUCTION}</p>
-        <pre className="max-h-96 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-4 text-left font-mono text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100">
-          <code>{command}</code>
-        </pre>
-        <CopyButton variant="button" buttonVariant="default" copiedLabel="Copied" text={command}>
-          Copy commands
-        </CopyButton>
-      </div>
-    </div>
   );
 }
 
@@ -89,13 +77,13 @@ export function FleetManagerSetup() {
   const draftIsValid = setup.validationErrors.length === 0;
   const submittedDraftIsCurrent = submittedDraft !== null && setup.draft === submittedDraft;
   const verification = useFleetManagerVerification(submittedDraftIsCurrent, submittedDraft, setup.metadata);
-  const command = useMemo(
-    () =>
-      setup.metadata && setup.draft
-        ? fleetManagerInstallCommand(setup.metadata, setup.draft.namespace, setup.values)
-        : "",
-    [setup.draft, setup.metadata, setup.values],
-  );
+  const commands = useMemo(() => {
+    if (!setup.metadata || !setup.draft || !setup.values) return null;
+    return {
+      valuesCommand: fleetManagerValuesFileCommand(setup.values),
+      helmCommand: fleetManagerHelmCommand(setup.metadata, setup.draft.namespace),
+    };
+  }, [setup.draft, setup.metadata, setup.values]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -120,20 +108,29 @@ export function FleetManagerSetup() {
           >
             <FleetManagerProviderSection setup={setup} />
           </SectionCard>
-          <SectionCard title="Choose runner fleets" description="Select fleet sizes and set their initial capacity.">
+          <SectionCard
+            title="Configure the default fleet"
+            description="Set the cloud machine type and how many machines to keep ready."
+          >
             <FleetManagerFleetSection setup={setup} />
           </SectionCard>
           <SectionCard
             title="Install Fleet Manager"
             description={
-              draftIsValid ? "Generate one command with the complete Fleet Manager configuration." : undefined
+              draftIsValid
+                ? "Run the first command to write fleet-manager-values.yaml. Run the second command to install the chart."
+                : undefined
             }
           >
             <div className="space-y-5">
               <InstallActions
                 draftIsValid={draftIsValid}
                 error={setup.validationErrors[0]}
-                command={setup.values ? command : ""}
+                commands={
+                  commands && setup.values
+                    ? { valuesCommand: commands.valuesCommand, helmCommand: commands.helmCommand }
+                    : null
+                }
                 isPreparingInstallation={setup.isPreparingInstallation}
                 onGenerate={() => void setup.prepareInstallation()}
               />
