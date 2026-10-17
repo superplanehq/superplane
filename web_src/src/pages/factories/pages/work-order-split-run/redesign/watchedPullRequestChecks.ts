@@ -1,6 +1,9 @@
 export const WAIT_FOR_PULL_REQUEST_CHECKS_COMPONENT = "github.waitForPullRequestChecks";
+const WAIT_FOR_BUILDS_COMPONENT = "bitbucket.waitForBuilds";
 
-const FAILING_CONCLUSIONS = new Set(["failure", "error", "timed_out", "action_required"]);
+const WAIT_FOR_CHECKS_COMPONENTS = new Set([WAIT_FOR_PULL_REQUEST_CHECKS_COMPONENT, WAIT_FOR_BUILDS_COMPONENT]);
+
+const FAILING_CONCLUSIONS = new Set(["failure", "error", "timed_out", "action_required", "failed", "stopped"]);
 const PASSING_CONCLUSIONS = new Set(["success", "neutral", "skipped", "cancelled"]);
 const OUTPUT_CHANNELS = ["passed", "failed", "timedOut", "default"] as const;
 
@@ -23,7 +26,7 @@ type CanvasNodeRef = {
 export function waitForPullRequestChecksNode(
   nodes: CanvasNodeRef[] | undefined,
 ): { id: string; checkNames: string[] } | undefined {
-  const node = nodes?.find((item) => item.component === WAIT_FOR_PULL_REQUEST_CHECKS_COMPONENT && item.id);
+  const node = nodes?.find((item) => item.component && WAIT_FOR_CHECKS_COMPONENTS.has(item.component) && item.id);
   if (!node?.id) {
     return undefined;
   }
@@ -31,16 +34,29 @@ export function waitForPullRequestChecksNode(
 }
 
 function configuredCheckNames(configuration: unknown): string[] {
-  if (!isRecord(configuration) || !Array.isArray(configuration.checkNames)) {
+  if (!isRecord(configuration)) {
+    return [];
+  }
+  if (Object.prototype.hasOwnProperty.call(configuration, "checkNames")) {
+    return uniqueNames(configuration.checkNames);
+  }
+  if (Object.prototype.hasOwnProperty.call(configuration, "buildKeys")) {
+    return uniqueNames(configuration.buildKeys);
+  }
+  return [];
+}
+
+function uniqueNames(value: unknown): string[] {
+  if (!Array.isArray(value)) {
     return [];
   }
   const names: string[] = [];
   const seen = new Set<string>();
-  for (const value of configuration.checkNames) {
-    if (typeof value !== "string") {
+  for (const item of value) {
+    if (typeof item !== "string") {
       continue;
     }
-    const name = value.trim();
+    const name = item.trim();
     if (!name) {
       continue;
     }
@@ -129,20 +145,30 @@ function selectedChecksFromChannel(channel: unknown): WatchedPullRequestCheck[] 
 }
 
 function selectedChecksList(source: unknown): WatchedPullRequestCheck[] | undefined {
-  if (!isRecord(source) || !Object.prototype.hasOwnProperty.call(source, "selectedChecks")) {
+  if (!isRecord(source)) {
     return undefined;
   }
-  if (!Array.isArray(source.selectedChecks)) {
+  if (Object.prototype.hasOwnProperty.call(source, "selectedChecks")) {
+    return checkList(source.selectedChecks);
+  }
+  if (Object.prototype.hasOwnProperty.call(source, "selectedBuilds")) {
+    return checkList(source.selectedBuilds);
+  }
+  return undefined;
+}
+
+function checkList(value: unknown): WatchedPullRequestCheck[] | undefined {
+  if (!Array.isArray(value)) {
     return undefined;
   }
-  return source.selectedChecks.flatMap(watchedCheckFromValue);
+  return value.flatMap(watchedCheckFromValue);
 }
 
 function watchedCheckFromValue(value: unknown): WatchedPullRequestCheck[] {
-  if (!isRecord(value) || typeof value.name !== "string") {
+  if (!isRecord(value)) {
     return [];
   }
-  const name = value.name.trim();
+  const name = checkName(value);
   if (!name) {
     return [];
   }
@@ -182,6 +208,14 @@ function createdAtMs(value: unknown): number {
   }
   const time = Date.parse(value);
   return Number.isFinite(time) ? time : 0;
+}
+
+function checkName(value: Record<string, unknown>): string {
+  const name = stringField(value.name).trim();
+  if (name) {
+    return name;
+  }
+  return stringField(value.key).trim();
 }
 
 function stringField(value: unknown): string {
